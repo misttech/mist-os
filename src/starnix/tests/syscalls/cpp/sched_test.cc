@@ -2,12 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// NOTE(nathaniel): this test is not supported to be run as not-root. We
+// might choose in the future to adapt it to give some valid results when
+// run as not-root, but that's not decided today.
+//
+// TODO: https://fxbug.dev/317285180 - drop the many GTEST_SKIPs in this
+// file after another mechanism is put in place ensuring that this test
+// only ever runs as root (or, if the day ever comes, support for being run
+// as non-root is added).
+
 #include <fcntl.h>
 #include <grp.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/mount.h>
 #include <sys/resource.h>
+#include <sys/select.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
@@ -40,7 +50,11 @@ class Poker {
   Poker(const Poker&) = delete;
   Poker& operator=(const Poker&) = delete;
 
-  void poke() { SAFE_SYSCALL(pipe_write_side_.reset()); }
+  void poke() {
+    char clog[] = "clog";  // This data will enter but never leave the pipe.
+    SAFE_SYSCALL(write(pipe_write_side_.get(), clog, sizeof(clog)));
+    SAFE_SYSCALL(pipe_write_side_.reset());
+  }
 
  private:
   fbl::unique_fd pipe_write_side_;
@@ -48,7 +62,7 @@ class Poker {
 
 class Holder {
  public:
-  explicit Holder(fbl::unique_fd pipe_write_side) : pipe_read_side_(std::move(pipe_write_side)) {}
+  explicit Holder(fbl::unique_fd pipe_read_side) : pipe_read_side_(std::move(pipe_read_side)) {}
   Holder(Holder&& o) : pipe_read_side_(std::move(o.pipe_read_side_)) {}
   Holder& operator=(Holder&& o) {
     pipe_read_side_ = std::move(o.pipe_read_side_);
@@ -58,8 +72,11 @@ class Holder {
   Holder& operator=(const Holder&) = delete;
 
   void hold() {
-    char never_actually_written;
-    SAFE_SYSCALL(read(pipe_read_side_.get(), &never_actually_written, 1));
+    int pipe_read_side_fd = pipe_read_side_.get();
+    fd_set read_fds;
+    FD_ZERO(&read_fds);
+    FD_SET(pipe_read_side_fd, &read_fds);
+    SAFE_SYSCALL(select(pipe_read_side_fd + 1, &read_fds, nullptr, nullptr, nullptr));
   }
 
  private:
@@ -79,6 +96,16 @@ Rendezvous MakeRendezvous() {
       .poker = Poker(std::move(unique_fds[1])),
       .holder = Holder(std::move(unique_fds[0])),
   };
+}
+
+pid_t SpawnTarget(test_helper::ForkHelper& fork_helper, Poker ready, Holder complete,
+                  fit::function<void()> prepare) {
+  return fork_helper.RunInForkedProcess([ready = std::move(ready), complete = std::move(complete),
+                                         prepare = std::move(prepare)]() mutable {
+    prepare();
+    ready.poke();
+    complete.hold();
+  });
 }
 
 testing::AssertionResult CheckPriorityMinimums() {
@@ -140,9 +167,7 @@ testing::AssertionResult CheckPriorityMinimums() {
   return testing::AssertionSuccess();
 }
 
-TEST(GetPriorityMinTest, RootCanGetMinimumPriorities) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetPriorityMinTest, RootCanGetMinimumPriorities) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -150,9 +175,7 @@ TEST(GetPriorityMinTest, RootCanGetMinimumPriorities) {
   EXPECT_TRUE(CheckPriorityMinimums());
 }
 
-TEST(GetPriorityMinTest, NonRootCanGetMinimumPriorities) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetPriorityMinTest, NonRootCanGetMinimumPriorities) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -223,9 +246,7 @@ testing::AssertionResult CheckPriorityMaximums() {
   return testing::AssertionSuccess();
 }
 
-TEST(GetPriorityMaxTest, RootCanGetMaximumPriorities) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetPriorityMaxTest, RootCanGetMaximumPriorities) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -233,9 +254,7 @@ TEST(GetPriorityMaxTest, RootCanGetMaximumPriorities) {
   EXPECT_TRUE(CheckPriorityMaximums());
 }
 
-TEST(GetPriorityMaxTest, NonRootCanGetMaximumPriorities) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetPriorityMaxTest, NonRootCanGetMaximumPriorities) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -248,61 +267,44 @@ TEST(GetPriorityMaxTest, NonRootCanGetMaximumPriorities) {
 }
 
 TEST(GetPriorityTest, NonRootCanGetNicenessOfUnfriendlyProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper testing_process_fork_helper;
-  test_helper::ForkHelper target_process_fork_helper;
-  target_process_fork_helper.ExpectSignal(SIGKILL);
-  Rendezvous rendezvous = MakeRendezvous();
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
 
-  pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
-      [poker = std::move(rendezvous.poker)]() mutable {
-        Become(kUser2Uid, kUser2Uid);
+  pid_t target_pid = SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder),
+                                 []() { Become(kUser2Uid, kUser2Uid); });
 
-        // After poking the rendezvous to indicate that the desired non-root state
-        // has been reached, this process blocks forever.
-        poker.poke();
-        while (true) {
-          pause();
-        }
-      });
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
 
-  testing_process_fork_helper.RunInForkedProcess(
-      [holder = std::move(rendezvous.holder), target_pid]() mutable {
-        Become(kUser1Uid, kUser1Uid);
+    ready.hold();
 
-        holder.hold();
+    // We're not testing that the observed niceness is any particular value;
+    // we're just testing that the getpriority call succeeds.
+    errno = 0;
+    getpriority(PRIO_PROCESS, target_pid);
+    EXPECT_EQ(errno, 0);
 
-        // We're not testing that the observed niceness is any particular value;
-        // we're just testing that the getpriority call succeeds.
-        errno = 0;
-        getpriority(PRIO_PROCESS, target_pid);
-        EXPECT_EQ(errno, 0);
-      });
-  testing_process_fork_helper.OnlyWaitForForkedChildren();
-  EXPECT_TRUE(testing_process_fork_helper.WaitForChildren());
-
-  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poke();
+  });
 }
 
 TEST(SetPriorityTest, NonRootCanSetNicenessOfFriendlyProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper testing_process_fork_helper;
-  test_helper::ForkHelper target_process_fork_helper;
-  Rendezvous rendezvous = MakeRendezvous();
-  target_process_fork_helper.ExpectSignal(SIGKILL);
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
 
-  pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
-      [poker = std::move(rendezvous.poker)]() mutable {
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
         // Remove rlimits from consideration in this test.
         struct rlimit limit = {
             .rlim_cur = RLIM_INFINITY,
@@ -319,37 +321,26 @@ TEST(SetPriorityTest, NonRootCanSetNicenessOfFriendlyProcess) {
         // the caller to match the real or effective user ID of the process
         // who" at setpriority(2).
         Become(kUser2Uid, kUser1Uid);
-
-        // After poking the rendezvous to indicate that the desired non-root state
-        // has been reached, this process blocks forever.
-        poker.poke();
-        while (true) {
-          pause();
-        }
       });
 
-  testing_process_fork_helper.RunInForkedProcess(
-      [holder = std::move(rendezvous.holder), target_pid]() mutable {
-        Become(kUser1Uid, kUser1Uid);
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
 
-        holder.hold();
+    ready.hold();
 
-        for (int niceness = 19; niceness >= -20; niceness--) {
-          EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, niceness), 0);
-          errno = 0;
-          EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), niceness);
-          EXPECT_EQ(errno, 0);
-        }
-      });
-  testing_process_fork_helper.OnlyWaitForForkedChildren();
-  EXPECT_TRUE(testing_process_fork_helper.WaitForChildren());
+    for (int niceness = 19; niceness >= -20; niceness--) {
+      EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, niceness), 0);
+      errno = 0;
+      EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), niceness);
+      EXPECT_EQ(errno, 0);
+    }
 
-  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poke();
+  });
 }
 
 TEST(SetPriorityTest, OutOfRangeNicenessValuesGetClamped) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -367,36 +358,30 @@ TEST(SetPriorityTest, OutOfRangeNicenessValuesGetClamped) {
 }
 
 TEST(SetPriorityTest, RootCanExceedRLimits) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  int niceness_rlimit = 17;
-  test_helper::ForkHelper target_process_fork_helper;
-  Rendezvous rendezvous = MakeRendezvous();
-  target_process_fork_helper.ExpectSignal(SIGKILL);
+  // Not the min, not the max, otherwise arbitrary.
+  constexpr int niceness_rlimit_cur = 17;
+  constexpr int niceness_rlimit_max = niceness_rlimit_cur + 2;
 
-  pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
-      [poker = std::move(rendezvous.poker), niceness_rlimit]() mutable {
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
         struct rlimit limit = {
-            .rlim_cur = static_cast<rlim_t>(niceness_rlimit),
-            .rlim_max = static_cast<rlim_t>(niceness_rlimit + 2),
+            .rlim_cur = static_cast<rlim_t>(niceness_rlimit_cur),
+            .rlim_max = static_cast<rlim_t>(niceness_rlimit_max),
         };
         SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &limit));
 
         Become(kUser1Uid, kUser1Uid);
-
-        // After poking the rendezvous to indicate that the desired non-root state
-        // has been reached, this process blocks forever.
-        poker.poke();
-        while (true) {
-          pause();
-        }
       });
 
-  rendezvous.holder.hold();
+  ready.holder.hold();
 
   for (int niceness = 19; niceness >= -20; niceness--) {
     EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, niceness), 0);
@@ -405,64 +390,55 @@ TEST(SetPriorityTest, RootCanExceedRLimits) {
     EXPECT_EQ(errno, 0);
   }
 
-  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+  complete.poker.poke();
 }
 
 TEST(SetPriorityTest, RLimitedAndUnfriendly) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  int niceness_rlimit = 12;
-  test_helper::ForkHelper testing_process_fork_helper;
-  test_helper::ForkHelper target_process_fork_helper;
-  Rendezvous rendezvous = MakeRendezvous();
-  target_process_fork_helper.ExpectSignal(SIGKILL);
+  // Not the min, not the max, otherwise arbitrary.
+  constexpr int niceness_rlimit_cur = 12;
+  constexpr int niceness_rlimit_max = niceness_rlimit_cur + 3;
+  constexpr int within_rlimit_niceness = 18;
+  constexpr int beyond_rlimit_niceness = -3;
 
-  pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
-      [poker = std::move(rendezvous.poker), niceness_rlimit]() mutable {
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
         struct rlimit limit = {
-            .rlim_cur = static_cast<rlim_t>(niceness_rlimit),
-            .rlim_max = static_cast<rlim_t>(niceness_rlimit + 2),
+            .rlim_cur = static_cast<rlim_t>(niceness_rlimit_cur),
+            .rlim_max = static_cast<rlim_t>(niceness_rlimit_max),
         };
         SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &limit));
         sched_param param = {.sched_priority = 0};
         SAFE_SYSCALL(sched_setscheduler(0, SCHED_OTHER, &param));
-        SAFE_SYSCALL(setpriority(PRIO_PROCESS, 0, 18));
+        SAFE_SYSCALL(setpriority(PRIO_PROCESS, 0, within_rlimit_niceness));
 
         Become(kUser2Uid, kUser2Uid);
-
-        // After poking the rendezvous to indicate that the desired non-root
-        // state has been reached, this process blocks forever.
-        poker.poke();
-        while (true) {
-          pause();
-        }
       });
 
-  testing_process_fork_helper.RunInForkedProcess(
-      [holder = std::move(rendezvous.holder), target_pid]() mutable {
-        Become(kUser1Uid, kUser1Uid);
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
 
-        holder.hold();
+    ready.hold();
 
-        // It's the unfriendliness that "wins"; attempting to set the niceness fails
-        // with EPERM and the rlimit doesn't get a chance to fail with EACCES.
-        errno = 0;
-        EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, -3), -1);
-        EXPECT_EQ(errno, EPERM);
-      });
-  testing_process_fork_helper.OnlyWaitForForkedChildren();
-  EXPECT_TRUE(testing_process_fork_helper.WaitForChildren());
+    // It's the unfriendliness that "wins"; attempting to set the niceness fails
+    // with EPERM and the rlimit doesn't get a chance to fail with EACCES.
+    errno = 0;
+    EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, beyond_rlimit_niceness), -1);
+    EXPECT_EQ(errno, EPERM);
 
-  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poke();
+  });
 }
 
-TEST(GetSchedulerTest, RootCanGetOwnScheduler) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetSchedulerTest, RootCanGetOwnScheduler) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -470,138 +446,98 @@ TEST(GetSchedulerTest, RootCanGetOwnScheduler) {
   EXPECT_GE(sched_getscheduler(0), 0);
 }
 
-TEST(GetSchedulerTest, RootCanGetSchedulerOfRootOwnedProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetSchedulerTest, RootCanGetSchedulerOfRootOwnedProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper target_process_fork_helper;
-  target_process_fork_helper.ExpectSignal(SIGKILL);
-  pid_t target_pid = target_process_fork_helper.RunInForkedProcess([]() {
-    // This process blocks forever.
-    while (true) {
-      pause();
-    }
-  });
+  test_helper::ForkHelper fork_helper;
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid = fork_helper.RunInForkedProcess(
+      [complete = std::move(complete.holder)]() mutable { complete.hold(); });
 
   EXPECT_GE(sched_getscheduler(target_pid), 0);
 
-  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+  complete.poker.poke();
 }
 
-TEST(GetSchedulerTest, RootCanGetSchedulerOfNonRootOwnedProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetSchedulerTest, RootCanGetSchedulerOfNonRootOwnedProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper target_process_fork_helper;
-  target_process_fork_helper.ExpectSignal(SIGKILL);
-  Rendezvous rendezvous = MakeRendezvous();
-  pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
-      [poker = std::move(rendezvous.poker)]() mutable {
-        Become(kUser1Uid, kUser1Uid);
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
 
-        // After poking the rendezvous to indicate that the desired non-root state
-        // has been reached, this process blocks forever.
-        poker.poke();
-        while (true) {
-          pause();
-        }
-      });
+  pid_t target_pid = SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder),
+                                 []() { Become(kUser1Uid, kUser1Uid); });
 
-  rendezvous.holder.hold();
+  ready.holder.hold();
 
   EXPECT_GE(sched_getscheduler(target_pid), 0);
 
-  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+  complete.poker.poke();
 }
 
-TEST(GetSchedulerTest, NonRootCanGetOwnScheduler) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetSchedulerTest, NonRootCanGetOwnScheduler) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper testing_process_fork_helper;
-  testing_process_fork_helper.RunInForkedProcess([]() {
+  test_helper::ForkHelper().RunInForkedProcess([]() {
     Become(kUser1Uid, kUser1Uid);
 
     EXPECT_GE(sched_getscheduler(0), 0);
   });
 }
 
-TEST(GetSchedulerTest, NonRootCanGetSchedulerOfFriendlyProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetSchedulerTest, NonRootCanGetSchedulerOfFriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper testing_process_fork_helper;
-  testing_process_fork_helper.RunInForkedProcess([]() {
+  test_helper::ForkHelper().RunInForkedProcess([]() {
     Become(kUser1Uid, kUser1Uid);
 
     test_helper::ForkHelper target_process_fork_helper;
-    target_process_fork_helper.ExpectSignal(SIGKILL);
-    pid_t target_pid = target_process_fork_helper.RunInForkedProcess([]() {
-      // This process blocks forever.
-      while (true) {
-        pause();
-      }
-    });
+    Rendezvous complete = MakeRendezvous();
+
+    pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
+        [complete = std::move(complete.holder)]() mutable { complete.hold(); });
 
     EXPECT_GE(sched_getscheduler(target_pid), 0);
 
-    SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poker.poke();
   });
 }
 
-TEST(GetSchedulerTest, NonRootCanGetSchedulerOfUnfriendlyProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetSchedulerTest, NonRootCanGetSchedulerOfUnfriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper testing_process_fork_helper;
-  test_helper::ForkHelper target_process_fork_helper;
-  target_process_fork_helper.ExpectSignal(SIGKILL);
-  Rendezvous rendezvous = MakeRendezvous();
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
 
-  pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
-      [poker = std::move(rendezvous.poker)]() mutable {
-        Become(kUser2Uid, kUser2Uid);
+  pid_t target_pid = SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder),
+                                 []() { Become(kUser2Uid, kUser2Uid); });
 
-        // After poking the rendezvous to indicate that the desired non-root state
-        // has been reached, this process blocks forever.
-        poker.poke();
-        while (true) {
-          pause();
-        }
-      });
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
 
-  testing_process_fork_helper.RunInForkedProcess(
-      [holder = std::move(rendezvous.holder), target_pid]() mutable {
-        Become(kUser1Uid, kUser1Uid);
+    ready.hold();
 
-        holder.hold();
+    EXPECT_GE(sched_getscheduler(target_pid), 0);
 
-        EXPECT_GE(sched_getscheduler(target_pid), 0);
-      });
-  testing_process_fork_helper.OnlyWaitForForkedChildren();
-  EXPECT_TRUE(testing_process_fork_helper.WaitForChildren());
-
-  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poke();
+  });
 }
 
-TEST(GetSchedulerTest, ResetOnForkAppearsInReturnedValue) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetSchedulerTest, ResetOnForkAppearsInReturnedValue) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -706,7 +642,7 @@ testing::AssertionResult SetScheduler(pid_t pid) {
   return testing::AssertionSuccess();
 }
 
-TEST(SetSchedulerTest, InvalidArguments) {
+TEST(SchedSetSchedulerTest, InvalidArguments) {
   sched_param param;
 
   // See "Invalid arguments: pid is negative or param is NULL" at
@@ -784,9 +720,7 @@ TEST(SetSchedulerTest, InvalidArguments) {
   EXPECT_EQ(errno, EINVAL);
 }
 
-TEST(SetSchedulerTest, RootCanSetOwnScheduler) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetSchedulerTest, RootCanSetOwnScheduler) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -794,63 +728,47 @@ TEST(SetSchedulerTest, RootCanSetOwnScheduler) {
   test_helper::ForkHelper().RunInForkedProcess([]() { EXPECT_TRUE(SetScheduler(0)); });
 }
 
-TEST(SetSchedulerTest, RootCanSetSchedulerOfRootOwnedProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetSchedulerTest, RootCanSetSchedulerOfRootOwnedProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
   test_helper::ForkHelper().RunInForkedProcess([]() {
     test_helper::ForkHelper target_process_fork_helper;
-    target_process_fork_helper.ExpectSignal(SIGKILL);
-    pid_t target_pid = target_process_fork_helper.RunInForkedProcess([]() {
-      // This process blocks forever.
-      while (true) {
-        pause();
-      }
-    });
+    Rendezvous complete = MakeRendezvous();
+
+    pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
+        [complete = std::move(complete.holder)]() mutable { complete.hold(); });
 
     EXPECT_TRUE(SetScheduler(target_pid));
 
-    SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poker.poke();
   });
 }
 
-TEST(SetSchedulerTest, RootCanSetSchedulerOfNonRootOwnedProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetSchedulerTest, RootCanSetSchedulerOfNonRootOwnedProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper().RunInForkedProcess([]() mutable {
-    Rendezvous rendezvous = MakeRendezvous();
+  test_helper::ForkHelper().RunInForkedProcess([]() {
     test_helper::ForkHelper target_process_fork_helper;
-    target_process_fork_helper.ExpectSignal(SIGKILL);
-    pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
-        [poker = std::move(rendezvous.poker)]() mutable {
-          Become(kUser1Uid, kUser1Uid);
+    Rendezvous ready = MakeRendezvous();
+    Rendezvous complete = MakeRendezvous();
 
-          // After poking the rendezvous to indicate that the desired non-root state
-          // has been reached, this process blocks forever.
-          poker.poke();
-          while (true) {
-            pause();
-          }
-        });
+    pid_t target_pid =
+        SpawnTarget(target_process_fork_helper, std::move(ready.poker), std::move(complete.holder),
+                    []() { Become(kUser1Uid, kUser1Uid); });
 
-    rendezvous.holder.hold();
+    ready.holder.hold();
 
     EXPECT_TRUE(SetScheduler(target_pid));
 
-    SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poker.poke();
   });
 }
 
-TEST(SetSchedulerTest, NonRootCanSetOwnScheduler) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetSchedulerTest, NonRootCanSetOwnScheduler) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -869,20 +787,17 @@ TEST(SetSchedulerTest, NonRootCanSetOwnScheduler) {
   });
 }
 
-TEST(SetSchedulerTest, NonRootCanSetSchedulerOfFriendlyProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetSchedulerTest, NonRootCanSetSchedulerOfFriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper testing_process_fork_helper;
-  test_helper::ForkHelper target_process_fork_helper;
-  Rendezvous rendezvous = MakeRendezvous();
-  target_process_fork_helper.ExpectSignal(SIGKILL);
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
 
-  pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
-      [poker = std::move(rendezvous.poker)]() mutable {
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
         // Remove rlimits from consideration in this test.
         struct rlimit limit = {
             .rlim_cur = RLIM_INFINITY,
@@ -891,32 +806,21 @@ TEST(SetSchedulerTest, NonRootCanSetSchedulerOfFriendlyProcess) {
         SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
 
         Become(kUser1Uid, kUser1Uid);
-
-        // After poking the rendezvous to indicate that the desired non-root state
-        // has been reached, this process blocks forever.
-        poker.poke();
-        while (true) {
-          pause();
-        }
       });
 
-  testing_process_fork_helper.RunInForkedProcess(
-      [holder = std::move(rendezvous.holder), target_pid]() mutable {
-        Become(kUser1Uid, kUser1Uid);
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
 
-        holder.hold();
+    ready.hold();
 
-        EXPECT_TRUE(SetScheduler(target_pid));
-      });
-  testing_process_fork_helper.OnlyWaitForForkedChildren();
-  EXPECT_TRUE(testing_process_fork_helper.WaitForChildren());
+    EXPECT_TRUE(SetScheduler(target_pid));
 
-  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poke();
+  });
 }
 
-TEST(SetSchedulerTest, RootCanClearResetOnFork) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetSchedulerTest, RootCanClearResetOnFork) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -932,9 +836,7 @@ TEST(SetSchedulerTest, RootCanClearResetOnFork) {
   });
 }
 
-TEST(SetSchedulerTest, ResetOnForkShiftsToNonRealTimePolicy) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetSchedulerTest, ResetOnForkShiftsToNonRealTimePolicy) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -946,23 +848,18 @@ TEST(SetSchedulerTest, ResetOnForkShiftsToNonRealTimePolicy) {
     Become(kUser1Uid, kUser1Uid);
 
     test_helper::ForkHelper target_process_fork_helper;
-    target_process_fork_helper.ExpectSignal(SIGKILL);
-    pid_t target_pid = target_process_fork_helper.RunInForkedProcess([]() {
-      // This process blocks forever.
-      while (true) {
-        pause();
-      }
-    });
+    Rendezvous complete = MakeRendezvous();
+
+    pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
+        [complete = std::move(complete.holder)]() mutable { complete.hold(); });
 
     EXPECT_EQ(sched_getscheduler(target_pid), SCHED_OTHER);
 
-    SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poker.poke();
   });
 }
 
-TEST(SetSchedulerTest, ResetOnForkShiftsToNonRealTimePolicyEvenForRoot) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetSchedulerTest, ResetOnForkShiftsToNonRealTimePolicyEvenForRoot) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -974,23 +871,18 @@ TEST(SetSchedulerTest, ResetOnForkShiftsToNonRealTimePolicyEvenForRoot) {
     // No transition to an ordinary user here; we remain root!
 
     test_helper::ForkHelper target_process_fork_helper;
-    target_process_fork_helper.ExpectSignal(SIGKILL);
-    pid_t target_pid = target_process_fork_helper.RunInForkedProcess([]() {
-      // This process blocks forever.
-      while (true) {
-        pause();
-      }
-    });
+    Rendezvous complete = MakeRendezvous();
+
+    pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
+        [complete = std::move(complete.holder)]() mutable { complete.hold(); });
 
     EXPECT_EQ(sched_getscheduler(target_pid), SCHED_OTHER);
 
-    SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poker.poke();
   });
 }
 
-TEST(SetSchedulerTest, ResetOnForkZeroesNegativeNiceness) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetSchedulerTest, ResetOnForkZeroesNegativeNiceness) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -1003,24 +895,19 @@ TEST(SetSchedulerTest, ResetOnForkZeroesNegativeNiceness) {
     Become(kUser1Uid, kUser1Uid);
 
     test_helper::ForkHelper target_process_fork_helper;
-    target_process_fork_helper.ExpectSignal(SIGKILL);
-    pid_t target_pid = target_process_fork_helper.RunInForkedProcess([]() {
-      // This process blocks forever.
-      while (true) {
-        pause();
-      }
-    });
+    Rendezvous complete = MakeRendezvous();
+
+    pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
+        [complete = std::move(complete.holder)]() mutable { complete.hold(); });
 
     EXPECT_EQ(sched_getscheduler(target_pid), SCHED_BATCH);
     EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), 0);
 
-    SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poker.poke();
   });
 }
 
-TEST(GetParamTest, RootCanGetOwnParam) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetParamTest, RootCanGetOwnParam) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -1032,21 +919,16 @@ TEST(GetParamTest, RootCanGetOwnParam) {
   EXPECT_GE(observed_param.sched_priority, 0);
 }
 
-TEST(GetParamTest, RootCanGetParamOfRootOwnedProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetParamTest, RootCanGetParamOfRootOwnedProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper target_process_fork_helper;
-  target_process_fork_helper.ExpectSignal(SIGKILL);
-  pid_t target_pid = target_process_fork_helper.RunInForkedProcess([]() {
-    // This process blocks forever.
-    while (true) {
-      pause();
-    }
-  });
+  test_helper::ForkHelper fork_helper;
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid = fork_helper.RunInForkedProcess(
+      [complete = std::move(complete.holder)]() mutable { complete.hold(); });
 
   sched_param observed_param;
   observed_param.sched_priority = -1;
@@ -1054,33 +936,22 @@ TEST(GetParamTest, RootCanGetParamOfRootOwnedProcess) {
   EXPECT_EQ(sched_getparam(target_pid, &observed_param), 0);
   EXPECT_GE(observed_param.sched_priority, 0);
 
-  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+  complete.poker.poke();
 }
 
-TEST(GetParamTest, RootCanGetParamOfNonRootOwnedProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetParamTest, RootCanGetParamOfNonRootOwnedProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper target_process_fork_helper;
-  Rendezvous rendezvous = MakeRendezvous();
-  target_process_fork_helper.ExpectSignal(SIGKILL);
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
 
-  pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
-      [poker = std::move(rendezvous.poker)]() mutable {
-        Become(kUser1Uid, kUser1Uid);
+  pid_t target_pid = SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder),
+                                 []() { Become(kUser1Uid, kUser1Uid); });
 
-        // After poking the rendezvous to indicate that the desired non-root state
-        // has been reached, this process blocks forever.
-        poker.poke();
-        while (true) {
-          pause();
-        }
-      });
-
-  rendezvous.holder.hold();
+  ready.holder.hold();
 
   sched_param observed_param;
   observed_param.sched_priority = -1;
@@ -1088,18 +959,15 @@ TEST(GetParamTest, RootCanGetParamOfNonRootOwnedProcess) {
   EXPECT_EQ(sched_getparam(target_pid, &observed_param), 0);
   EXPECT_GE(observed_param.sched_priority, 0);
 
-  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+  complete.poker.poke();
 }
 
-TEST(GetParamTest, NonRootCanGetOwnScheduler) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetParamTest, NonRootCanGetOwnScheduler) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper testing_process_fork_helper;
-  testing_process_fork_helper.RunInForkedProcess([]() {
+  test_helper::ForkHelper().RunInForkedProcess([]() {
     Become(kUser1Uid, kUser1Uid);
 
     sched_param observed_param;
@@ -1110,25 +978,19 @@ TEST(GetParamTest, NonRootCanGetOwnScheduler) {
   });
 }
 
-TEST(GetParamTest, NonRootCanGetParamOfFriendlyProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetParamTest, NonRootCanGetParamOfFriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper testing_process_fork_helper;
-  testing_process_fork_helper.RunInForkedProcess([]() {
+  test_helper::ForkHelper().RunInForkedProcess([]() {
     Become(kUser1Uid, kUser1Uid);
 
     test_helper::ForkHelper target_process_fork_helper;
-    target_process_fork_helper.ExpectSignal(SIGKILL);
-    pid_t target_pid = target_process_fork_helper.RunInForkedProcess([]() {
-      // This process blocks forever.
-      while (true) {
-        pause();
-      }
-    });
+    Rendezvous complete = MakeRendezvous();
+
+    pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
+        [complete = std::move(complete.holder)]() mutable { complete.hold(); });
 
     sched_param observed_param;
     observed_param.sched_priority = -1;
@@ -1136,50 +998,36 @@ TEST(GetParamTest, NonRootCanGetParamOfFriendlyProcess) {
     EXPECT_EQ(sched_getparam(target_pid, &observed_param), 0);
     EXPECT_GE(observed_param.sched_priority, 0);
 
-    SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poker.poke();
   });
 }
 
-TEST(GetParamTest, NonRootCanGetParamOfUnfriendlyProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedGetParamTest, NonRootCanGetParamOfUnfriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper testing_process_fork_helper;
-  test_helper::ForkHelper target_process_fork_helper;
-  Rendezvous rendezvous = MakeRendezvous();
-  target_process_fork_helper.ExpectSignal(SIGKILL);
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
 
-  pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
-      [poker = std::move(rendezvous.poker)]() mutable {
-        Become(kUser2Uid, kUser2Uid);
+  pid_t target_pid = SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder),
+                                 []() { Become(kUser2Uid, kUser2Uid); });
 
-        // After poking the rendezvous to indicate that the desired non-root state
-        // has been reached, this process blocks forever.
-        poker.poke();
-        while (true) {
-          pause();
-        }
-      });
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
 
-  testing_process_fork_helper.RunInForkedProcess(
-      [holder = std::move(rendezvous.holder), target_pid]() mutable {
-        Become(kUser1Uid, kUser1Uid);
+    ready.hold();
 
-        holder.hold();
+    sched_param observed_param;
+    observed_param.sched_priority = -1;
 
-        sched_param observed_param;
-        observed_param.sched_priority = -1;
+    EXPECT_EQ(sched_getparam(target_pid, &observed_param), 0);
+    EXPECT_GE(observed_param.sched_priority, 0);
 
-        EXPECT_EQ(sched_getparam(target_pid, &observed_param), 0);
-        EXPECT_GE(observed_param.sched_priority, 0);
-      });
-  testing_process_fork_helper.OnlyWaitForForkedChildren();
-  EXPECT_TRUE(testing_process_fork_helper.WaitForChildren());
-
-  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poke();
+  });
 }
 
 testing::AssertionResult SetParam(pid_t pid) {
@@ -1283,9 +1131,7 @@ testing::AssertionResult SetParam(pid_t pid) {
   return testing::AssertionSuccess();
 }
 
-TEST(SetParamTest, InvalidArguments) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetParamTest, InvalidArguments) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -1317,9 +1163,7 @@ TEST(SetParamTest, InvalidArguments) {
   });
 }
 
-TEST(SetParamTest, RootCanSetOwnScheduler) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetParamTest, RootCanSetOwnScheduler) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -1327,64 +1171,47 @@ TEST(SetParamTest, RootCanSetOwnScheduler) {
   test_helper::ForkHelper().RunInForkedProcess([]() { EXPECT_TRUE(SetParam(0)); });
 }
 
-TEST(SetParamTest, RootCanSetParamOfRootOwnedProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetParamTest, RootCanSetParamOfRootOwnedProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
   test_helper::ForkHelper().RunInForkedProcess([]() {
     test_helper::ForkHelper target_process_fork_helper;
-    target_process_fork_helper.ExpectSignal(SIGKILL);
-    pid_t target_pid = target_process_fork_helper.RunInForkedProcess([]() {
-      // This process blocks forever.
-      while (true) {
-        pause();
-      }
-    });
-
-    EXPECT_TRUE(SetParam(target_pid));
-
-    SAFE_SYSCALL(kill(target_pid, SIGKILL));
-  });
-}
-
-TEST(SetParamTest, RootCanSetParamOfNonRootOwnedProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
-  if (!test_helper::HasSysAdmin()) {
-    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
-  }
-
-  test_helper::ForkHelper().RunInForkedProcess([]() {
-    Rendezvous rendezvous = MakeRendezvous();
-    test_helper::ForkHelper target_process_fork_helper;
-    target_process_fork_helper.ExpectSignal(SIGKILL);
+    Rendezvous complete = MakeRendezvous();
 
     pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
-        [poker = std::move(rendezvous.poker)]() mutable {
-          Become(kUser1Uid, kUser1Uid);
-
-          // After poking the rendezvous to indicate that the desired non-root state
-          // has been reached, this process blocks forever.
-          poker.poke();
-          while (true) {
-            pause();
-          }
-        });
-
-    rendezvous.holder.hold();
+        [complete = std::move(complete.holder)]() mutable { complete.hold(); });
 
     EXPECT_TRUE(SetParam(target_pid));
 
-    SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poker.poke();
   });
 }
 
-TEST(SetParamTest, NonRootCanSetOwnParam) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetParamTest, RootCanSetParamOfNonRootOwnedProcess) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+
+  test_helper::ForkHelper().RunInForkedProcess([]() {
+    test_helper::ForkHelper target_process_fork_helper;
+    Rendezvous ready = MakeRendezvous();
+    Rendezvous complete = MakeRendezvous();
+
+    pid_t target_pid =
+        SpawnTarget(target_process_fork_helper, std::move(ready.poker), std::move(complete.holder),
+                    []() { Become(kUser1Uid, kUser1Uid); });
+
+    ready.holder.hold();
+
+    EXPECT_TRUE(SetParam(target_pid));
+
+    complete.poker.poke();
+  });
+}
+
+TEST(SchedSetParamTest, NonRootCanSetOwnParam) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -1403,20 +1230,17 @@ TEST(SetParamTest, NonRootCanSetOwnParam) {
   });
 }
 
-TEST(SetParamTest, NonRootCanSetParamOfFriendlyProcess) {
-  // TODO: https://fxbug.dev/317285180 - drop this after another means is
-  // put in place to ensure that this test only ever runs as root.
+TEST(SchedSetParamTest, NonRootCanSetParamOfFriendlyProcess) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
 
-  test_helper::ForkHelper testing_process_fork_helper;
-  test_helper::ForkHelper target_process_fork_helper;
-  Rendezvous rendezvous = MakeRendezvous();
-  target_process_fork_helper.ExpectSignal(SIGKILL);
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
 
-  pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
-      [poker = std::move(rendezvous.poker)]() mutable {
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
         // Remove rlimits from consideration in this test.
         struct rlimit limit = {
             .rlim_cur = RLIM_INFINITY,
@@ -1425,27 +1249,18 @@ TEST(SetParamTest, NonRootCanSetParamOfFriendlyProcess) {
         SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
 
         Become(kUser1Uid, kUser1Uid);
-
-        // After poking the rendezvous to indicate that the desired non-root state
-        // has been reached, this process blocks forever.
-        poker.poke();
-        while (true) {
-          pause();
-        }
       });
 
-  testing_process_fork_helper.RunInForkedProcess(
-      [holder = std::move(rendezvous.holder), target_pid]() mutable {
-        Become(kUser1Uid, kUser1Uid);
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
 
-        holder.hold();
+    ready.hold();
 
-        EXPECT_TRUE(SetParam(target_pid));
-      });
-  testing_process_fork_helper.OnlyWaitForForkedChildren();
-  EXPECT_TRUE(testing_process_fork_helper.WaitForChildren());
+    EXPECT_TRUE(SetParam(target_pid));
 
-  SAFE_SYSCALL(kill(target_pid, SIGKILL));
+    complete.poke();
+  });
 }
 
 }  // namespace
