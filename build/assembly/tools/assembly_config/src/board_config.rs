@@ -5,10 +5,10 @@
 use crate::{common, BoardArgs, HybridBoardArgs};
 
 use anyhow::{ensure, Context, Result};
-use assembly_config_schema::release_info::{BoardReleaseInfo, ReleaseInfo};
 use assembly_config_schema::{BoardInformation, BoardInputBundleSet};
 use assembly_container::{AssemblyContainer, DirectoryPathBuf};
 use assembly_partitions_config::PartitionsConfig;
+use assembly_release_info::{BoardReleaseInfo, ReleaseInfo};
 use std::collections::BTreeMap;
 
 pub fn new(args: &BoardArgs) -> Result<()> {

@@ -8,11 +8,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::common::{PackageDetails, PackagedDriverDetails};
 use crate::platform_config::sysmem_config::BoardSysmemConfig;
-use crate::release_info::{BoardReleaseInfo, ReleaseInfo};
 use anyhow::Result;
 use assembly_constants::Arm64DebugDapSoc;
 use assembly_container::{assembly_container, AssemblyContainer, DirectoryPathBuf, WalkPaths};
 use assembly_images_config::BoardFilesystemConfig;
+use assembly_release_info::{BoardReleaseInfo, ReleaseInfo};
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 

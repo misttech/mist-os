@@ -23,10 +23,10 @@ pub struct ReleaseInfo {
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, JsonSchema, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BoardReleaseInfo {
-    /// Name of this input artifact.
+    /// Board release information.
     pub info: ReleaseInfo,
 
-    /// Name of this input artifact.
+    /// Release information for the associated BIB sets.
     pub bib_sets: Vec<ReleaseInfo>,
 }
 
@@ -34,10 +34,10 @@ pub struct BoardReleaseInfo {
 #[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, JsonSchema, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProductReleaseInfo {
-    /// Name of this input artifact.
+    /// Product release information.
     pub info: ReleaseInfo,
 
-    /// Name of this input artifact.
+    /// Release information for the associated product input bundles.
     pub pibs: Vec<ReleaseInfo>,
 }
 
@@ -64,6 +64,9 @@ pub struct ProductBundleReleaseInfo {
 
     /// Product Bundle version.
     pub version: String,
+
+    /// SDK version.
+    pub sdk_version: String,
 
     /// Release information for slot A.
     #[serde(skip_serializing_if = "Option::is_none")]

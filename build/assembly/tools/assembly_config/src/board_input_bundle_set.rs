@@ -4,9 +4,9 @@
 
 use crate::{common, BoardInputBundleSetArgs};
 use anyhow::Result;
-use assembly_config_schema::release_info::ReleaseInfo;
 use assembly_config_schema::{BoardInputBundle, BoardInputBundleEntry, BoardInputBundleSet};
 use assembly_container::{AssemblyContainer, DirectoryPathBuf};
+use assembly_release_info::ReleaseInfo;
 use std::collections::BTreeMap;
 
 pub fn new(args: &BoardInputBundleSetArgs) -> Result<()> {
