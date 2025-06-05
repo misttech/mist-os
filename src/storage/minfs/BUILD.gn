@@ -132,7 +132,6 @@ static_library("minfs") {
       "//sdk/lib/syslog/cpp",
       "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_cpp",
       "//src/storage/fvm",
-      "//src/storage/lib/storage-metrics",
       "//src/storage/lib/vfs/cpp/journal",
       "//zircon/system/ulib/fdio-caller",
       "//zircon/system/ulib/fzl",

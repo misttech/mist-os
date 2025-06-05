@@ -114,13 +114,6 @@ closed protocol Block {
         info BlockInfo;
     }) error zx.Status;
 
-    /// Returns stats about block device operations. Setting `clear` will reset stats counters.
-    strict GetStats(struct {
-        clear bool;
-    }) -> (struct {
-        stats BlockStats;
-    }) error zx.Status;
-
 
     /// Opens a new FIFO-based session on the block device.
     strict OpenSession(resource struct {

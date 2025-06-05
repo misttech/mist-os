@@ -15,7 +15,6 @@
 #include <zircon/threads.h>
 
 #include "src/devices/block/drivers/core/server.h"
-#include "src/storage/lib/storage-metrics/block-metrics.h"
 
 zx_status_t BlockDevice::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
   switch (proto_id) {
@@ -40,12 +39,6 @@ zx_status_t BlockDevice::DdkGetProtocol(uint32_t proto_id, void* out_protocol) {
     default:
       return ZX_ERR_NOT_SUPPORTED;
   }
-}
-
-void BlockDevice::UpdateStats(bool success, zx::ticks start_tick, block_op_t* op) {
-  uint64_t bytes_transfered = op->rw.length * info_.block_size;
-  std::lock_guard<std::mutex> lock(stat_lock_);
-  stats_.UpdateStats(success, start_tick, op->command.opcode, bytes_transfered);
 }
 
 // Define the maximum I/O possible for the midlayer; this is arbitrarily
@@ -113,32 +106,12 @@ void BlockDevice::BlockQuery(block_info_t* block_info, size_t* op_size) {
   // Safety check that parent op size doesn't change dynamically.
   ZX_DEBUG_ASSERT(parent_op_size == parent_op_size_);
 
-  *op_size = OpSize();
-}
-
-void BlockDevice::UpdateStatsAndCallCompletion(void* cookie, zx_status_t status, block_op_t* op) {
-  BlockDevice* block_device = static_cast<BlockDevice*>(cookie);
-  block::BorrowedOperation<StatsCookie> txn(op, block_device->parent_op_size_);
-  StatsCookie* stats_cookie = txn.private_storage();
-
-  block_device->UpdateStats(status == ZX_OK, stats_cookie->start_tick, op);
-  txn.Complete(status);
+  *op_size = parent_op_size_;
 }
 
 void BlockDevice::BlockQueue(block_op_t* op, block_impl_queue_callback completion_cb,
                              void* cookie) {
-  zx::ticks start_tick = zx::ticks::now();
-
-  if (completion_status_stats_) {
-    block::BorrowedOperation<StatsCookie> txn(op, completion_cb, cookie, parent_op_size_);
-    StatsCookie* stats_cookie = txn.private_storage();
-    stats_cookie->start_tick = start_tick;
-    parent_protocol_.Queue(txn.take(), UpdateStatsAndCallCompletion, this);
-  } else {
-    // Since we don't know the return status, we assume all commands succeeded.
-    UpdateStats(true, start_tick, op);
-    parent_protocol_.Queue(op, completion_cb, cookie);
-  }
+  parent_protocol_.Queue(op, completion_cb, cookie);
 }
 
 void BlockDevice::GetInfo(GetInfoCompleter::Sync& completer) {
@@ -153,21 +126,6 @@ void BlockDevice::GetInfo(GetInfoCompleter::Sync& completer) {
     info.flags -= fuchsia_hardware_block::wire::Flag::kBootpart;
   }
   completer.ReplySuccess(info);
-}
-
-void BlockDevice::GetStats(GetStatsRequestView request, GetStatsCompleter::Sync& completer) {
-  std::lock_guard<std::mutex> lock(stat_lock_);
-  if (!enable_stats_) {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-    return;
-  }
-
-  fuchsia_hardware_block::wire::BlockStats stats;
-  stats_.CopyToFidl(&stats);
-  if (request->clear) {
-    stats_.Reset();
-  }
-  completer.ReplySuccess(stats);
 }
 
 void BlockDevice::OpenSession(OpenSessionRequestView request,
@@ -400,7 +358,7 @@ zx_status_t BlockDevice::Bind(void* ctx, zx_device_t* dev) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  bdev->io_op_ = std::make_unique<uint8_t[]>(bdev->OpSize());
+  bdev->io_op_ = std::make_unique<uint8_t[]>(bdev->parent_op_size_);
   size_t block_size = bdev->info_.block_size;
   if ((block_size < 512) || (block_size & (block_size - 1))) {
     zxlogf(ERROR, "block device: invalid block size: %zu", block_size);

@@ -92,15 +92,6 @@ bool FakeBlockDevice::IsRegistered(vmoid_t vmoid) const {
   return vmos_.find(vmoid) != vmos_.end();
 }
 
-void FakeBlockDevice::GetStats(bool clear, fuchsia_hardware_block::wire::BlockStats* out_stats) {
-  ZX_ASSERT(out_stats != nullptr);
-  fbl::AutoLock lock(&lock_);
-  stats_.CopyToFidl(out_stats);
-  if (clear) {
-    stats_.Reset();
-  }
-}
-
 void FakeBlockDevice::ResizeDeviceToAtLeast(uint64_t new_size) {
   fbl::AutoLock lock(&lock_);
   uint64_t size;
@@ -112,11 +103,6 @@ void FakeBlockDevice::ResizeDeviceToAtLeast(uint64_t new_size) {
 
 void FakeBlockDevice::AdjustBlockDeviceSizeLocked(uint64_t new_size) {
   ZX_ASSERT(block_device_.set_size(new_size) == ZX_OK);
-}
-
-void FakeBlockDevice::UpdateStats(bool success, zx::ticks start_tick,
-                                  const block_fifo_request_t& op) {
-  stats_.UpdateStats(success, start_tick, op.command.opcode, block_size_ * op.length);
 }
 
 void FakeBlockDevice::WaitOnPaused() const __TA_REQUIRES(lock_) {
@@ -141,7 +127,6 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
       }
     }
 
-    zx::ticks start_tick = zx::ticks::now();
     switch (requests[i].command.opcode) {
       case BLOCK_OPCODE_READ: {
         vmoid_t vmoid = requests[i].vmoid;
@@ -164,7 +149,6 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
             return status;
           }
         }
-        UpdateStats(true, start_tick, requests[i]);
         break;
       }
       case BLOCK_OPCODE_WRITE: {
@@ -194,11 +178,9 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
           }
           write_block_count_++;
         }
-        UpdateStats(true, start_tick, requests[i]);
         break;
       }
       case BLOCK_OPCODE_TRIM:
-        UpdateStats(false, start_tick, requests[i]);
         if (!(block_info_flags_ & fuchsia_hardware_block::wire::Flag::kTrimSupport)) {
           return ZX_ERR_NOT_SUPPORTED;
         }
@@ -210,13 +192,11 @@ zx_status_t FakeBlockDevice::FifoTransaction(block_fifo_request_t* requests, siz
         }
         break;
       case BLOCK_OPCODE_FLUSH:
-        UpdateStats(true, start_tick, requests[i]);
         continue;
       case BLOCK_OPCODE_CLOSE_VMO:
         ZX_ASSERT(vmos_.erase(requests[i].vmoid) == 1);
         break;
       default:
-        UpdateStats(false, start_tick, requests[i]);
         return ZX_ERR_NOT_SUPPORTED;
     }
   }

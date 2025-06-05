@@ -1004,14 +1004,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_against_ram_disk() {
-        let (_ramdisk, block_proxy, block_client) = make_ramdisk().await;
-
-        let stats_before = block_proxy
-            .get_stats(false)
-            .await
-            .expect("get_stats failed")
-            .map_err(zx::Status::from_raw)
-            .expect("get_stats error");
+        let (_ramdisk, _block_proxy, block_client) = make_ramdisk().await;
 
         let vmo = zx::Vmo::create(131072).expect("Vmo::create failed");
         vmo.write(b"hello", 5).expect("vmo.write failed");
@@ -1028,91 +1021,6 @@ mod tests {
         vmo.read(&mut buf, 1029).expect("vmo.read failed");
         assert_eq!(&buf, b"hello");
         block_client.detach_vmo(vmo_id).await.expect("detach_vmo failed");
-
-        // check that the stats are what we expect them to be
-        let stats_after = block_proxy
-            .get_stats(false)
-            .await
-            .expect("get_stats failed")
-            .map_err(zx::Status::from_raw)
-            .expect("get_stats error");
-        // write stats
-        assert_eq!(
-            stats_before.write.success.total_calls + 1,
-            stats_after.write.success.total_calls
-        );
-        assert_eq!(
-            stats_before.write.success.bytes_transferred + 1024,
-            stats_after.write.success.bytes_transferred
-        );
-        assert_eq!(stats_before.write.failure.total_calls, stats_after.write.failure.total_calls);
-        // read stats
-        assert_eq!(stats_before.read.success.total_calls + 1, stats_after.read.success.total_calls);
-        assert_eq!(
-            stats_before.read.success.bytes_transferred + 2048,
-            stats_after.read.success.bytes_transferred
-        );
-        assert_eq!(stats_before.read.failure.total_calls, stats_after.read.failure.total_calls);
-    }
-
-    #[fuchsia::test]
-    async fn test_against_ram_disk_with_flush() {
-        let (_ramdisk, block_proxy, block_client) = make_ramdisk().await;
-
-        let stats_before = block_proxy
-            .get_stats(false)
-            .await
-            .expect("get_stats failed")
-            .map_err(zx::Status::from_raw)
-            .expect("get_stats error");
-
-        let vmo = zx::Vmo::create(131072).expect("Vmo::create failed");
-        vmo.write(b"hello", 5).expect("vmo.write failed");
-        let vmo_id = block_client.attach_vmo(&vmo).await.expect("attach_vmo failed");
-        block_client
-            .write_at(BufferSlice::new_with_vmo_id(&vmo_id, 0, 1024), 0)
-            .await
-            .expect("write_at failed");
-        block_client.flush().await.expect("flush failed");
-        block_client
-            .read_at(MutableBufferSlice::new_with_vmo_id(&vmo_id, 1024, 2048), 0)
-            .await
-            .expect("read_at failed");
-        let mut buf: [u8; 5] = Default::default();
-        vmo.read(&mut buf, 1029).expect("vmo.read failed");
-        assert_eq!(&buf, b"hello");
-        block_client.detach_vmo(vmo_id).await.expect("detach_vmo failed");
-
-        // check that the stats are what we expect them to be
-        let stats_after = block_proxy
-            .get_stats(false)
-            .await
-            .expect("get_stats failed")
-            .map_err(zx::Status::from_raw)
-            .expect("get_stats error");
-        // write stats
-        assert_eq!(
-            stats_before.write.success.total_calls + 1,
-            stats_after.write.success.total_calls
-        );
-        assert_eq!(
-            stats_before.write.success.bytes_transferred + 1024,
-            stats_after.write.success.bytes_transferred
-        );
-        assert_eq!(stats_before.write.failure.total_calls, stats_after.write.failure.total_calls);
-        // flush stats
-        assert_eq!(
-            stats_before.flush.success.total_calls + 1,
-            stats_after.flush.success.total_calls
-        );
-        assert_eq!(stats_before.flush.failure.total_calls, stats_after.flush.failure.total_calls);
-        // read stats
-        assert_eq!(stats_before.read.success.total_calls + 1, stats_after.read.success.total_calls);
-        assert_eq!(
-            stats_before.read.success.bytes_transferred + 2048,
-            stats_after.read.success.bytes_transferred
-        );
-        assert_eq!(stats_before.read.failure.total_calls, stats_after.read.failure.total_calls);
     }
 
     #[fuchsia::test]

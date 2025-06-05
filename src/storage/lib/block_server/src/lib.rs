@@ -376,10 +376,6 @@ impl<SM: SessionManager> BlockServer<SM> {
                 }
                 Err(status) => responder.send(Err(status.into_raw()))?,
             },
-            fvolume::VolumeRequest::GetStats { clear: _, responder } => {
-                // TODO(https://fxbug.dev/348077960): Implement this
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
-            }
             fvolume::VolumeRequest::OpenSession { session, control_handle: _ } => {
                 match self.device_info().await {
                     Ok(info) => {

@@ -18,12 +18,6 @@ namespace {
 
 using SyncFdioTest = FdioTest;
 
-uint64_t GetSucceededFlushCalls(block_client::FakeBlockDevice* device) {
-  fuchsia_hardware_block::wire::BlockStats stats;
-  device->GetStats(true, &stats);
-  return stats.flush.success.total_calls;
-}
-
 }  // namespace
 
 // Verifies that fdio "fsync" calls actually sync blobfs files to the block device and verifies
@@ -42,6 +36,22 @@ TEST_F(SyncFdioTest, Sync) {
   EXPECT_EQ(0, ftruncate(file, info->size_data));
   EXPECT_EQ(write(file, info->data.get(), info->size_data), static_cast<ssize_t>(info->size_data));
 
+  std::atomic_uint64_t num_writes = 0;
+  std::atomic_uint64_t num_flushes = 0;
+  block_device()->set_hook([&](const block_fifo_request_t& request, const zx::vmo* vmo) {
+    switch (request.command.opcode) {
+      case BLOCK_OPCODE_WRITE:
+        num_writes++;
+        break;
+      case BLOCK_OPCODE_FLUSH:
+        num_flushes++;
+        break;
+      default:
+        break;
+    }
+    return ZX_OK;
+  });
+
   // Sync the file. This will block until woken up by the file_wake_thread.
   EXPECT_EQ(0, fsync(file));
 
@@ -49,16 +59,16 @@ TEST_F(SyncFdioTest, Sync) {
   // those required to flush the journal.  This might change, but presently, flushing the journal
   // will trigger a flush after writing data, but before writing to the journal, another one after
   // between writing to the journal and writing to the final metadata location, and then another one
-  // prior to writing a new info-block, so we should see 3 flush calls plus a flush that's triggered
-  // when we format, so 4 in total.
-  fuchsia_hardware_block::wire::BlockStats stats;
-  block_device()->GetStats(true, &stats);
-  EXPECT_LE(1u, stats.write.success.total_calls);
-  EXPECT_EQ(4u, stats.flush.success.total_calls);
+  // prior to writing a new info-block, so we should see 3 flush calls.
+  EXPECT_LE(1u, num_writes);
+  EXPECT_EQ(3u, num_flushes);
 
   // Sync the root directory. Syncing a directory will force the block device to flush.
   EXPECT_EQ(0, fsync(root_fd()));
-  EXPECT_EQ(1u, GetSucceededFlushCalls(block_device()));
+  EXPECT_EQ(4u, num_flushes);
+
+  block_device()->set_hook(
+      [](const block_fifo_request_t& request, const zx::vmo* vmo) { return ZX_OK; });
 }
 
 // Verifies that fdio "sync" actually flushes a NAND device. This tests the fdio, blobfs, block

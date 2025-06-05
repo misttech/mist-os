@@ -38,8 +38,6 @@
 
 #include <ddktl/device.h>
 
-#include "src/storage/lib/storage-metrics/block-metrics.h"
-
 // To maintain stats related to time taken by a command or its success/failure, we need to
 // intercept command completion with a callback routine. This might introduce memory
 // overhead.
@@ -67,11 +65,6 @@ class BlockDevice : public BlockDeviceType,
 
   static zx_status_t Bind(void* ctx, zx_device_t* dev);
 
-  constexpr size_t OpSize() const {
-    ZX_DEBUG_ASSERT(parent_op_size_ > 0);
-    return block::BorrowedOperation<StatsCookie>::OperationSize(parent_op_size_);
-  }
-
   void DdkRelease();
 
   // ddk::GetProtocolable
@@ -83,7 +76,6 @@ class BlockDevice : public BlockDeviceType,
 
   // fuchsia_hardware_block_volume::Volume
   void GetInfo(GetInfoCompleter::Sync& completer) override;
-  void GetStats(GetStatsRequestView request, GetStatsCompleter::Sync& completer) override;
   void OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) override;
   void OpenSessionWithOffsetMap(OpenSessionWithOffsetMapRequestView request,
                                 OpenSessionWithOffsetMapCompleter::Sync& completer) override;
@@ -134,19 +126,6 @@ class BlockDevice : public BlockDeviceType,
   zx_status_t io_status_ = ZX_OK;
   sync_completion_t io_signal_;
   std::unique_ptr<uint8_t[]> io_op_;
-
-  std::mutex stat_lock_;
-  // TODO(https://fxbug.dev/42072576): We should consider adding the ability to toggle stats, or
-  // remove this boolean if we aren't going to.
-  bool enable_stats_ TA_GUARDED(stat_lock_) = true;
-  storage_metrics::BlockDeviceMetrics stats_ TA_GUARDED(stat_lock_) = {};
-
-  // To maintain stats related to time taken by a command or its success/failure, we need to
-  // intercept command completion with a callback routine. This might introduce cpu
-  // overhead.
-  // TODO(https://fxbug.dev/42072576): We should be able to turn on/off stats at run-time.
-  //                 Create fidl interface to control how stats are maintained.
-  bool completion_status_stats_ = true;
 };
 
 #endif  // SRC_DEVICES_BLOCK_DRIVERS_CORE_BLOCK_DEVICE_H_

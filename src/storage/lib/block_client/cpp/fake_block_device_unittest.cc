@@ -25,7 +25,7 @@ constexpr uint64_t kSliceCountDefault = 128;
 TEST(FakeBlockDeviceTest, EmptyDevice) {
   const uint64_t kBlockCount = 0;
   const uint32_t kBlockSize = 0;
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeBlockDevice>(kBlockCount, kBlockSize);
+  auto device = std::make_unique<FakeBlockDevice>(kBlockCount, kBlockSize);
   fuchsia_hardware_block::wire::BlockInfo info = {};
   ASSERT_EQ(device->BlockGetInfo(&info), ZX_OK);
   EXPECT_EQ(kBlockCount, info.block_count);
@@ -35,7 +35,7 @@ TEST(FakeBlockDeviceTest, EmptyDevice) {
 }
 
 TEST(FakeBlockDeviceTest, NonEmptyDevice) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeBlockDevice>(
+  auto device = std::make_unique<FakeBlockDevice>(
       FakeBlockDevice::Config{.block_count = kBlockCountDefault,
                               .block_size = kBlockSizeDefault,
                               .supports_trim = true,
@@ -58,7 +58,7 @@ void CreateAndRegisterVmo(BlockDevice* device, size_t blocks, zx::vmo* vmo,
 
 TEST(FakeBlockDeviceTest, WriteAndReadUsingFifoTransaction) {
   auto fake_device = std::make_unique<FakeBlockDevice>(kBlockCountDefault, kBlockSizeDefault);
-  BlockDevice* device = fake_device.get();
+  auto device = reinterpret_cast<BlockDevice*>(fake_device.get());
 
   const size_t kVmoBlocks = 4;
   zx::vmo vmo;
@@ -66,6 +66,12 @@ TEST(FakeBlockDeviceTest, WriteAndReadUsingFifoTransaction) {
   ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device, kVmoBlocks, &vmo, &vmoid));
 
   // Write some data to the device.
+  fake_device->set_hook([&](const block_fifo_request_t& request, const zx::vmo* vmo) {
+    EXPECT_EQ(request.command.opcode, BLOCK_OPCODE_WRITE);
+    EXPECT_EQ(request.length, kVmoBlocks);
+    return ZX_OK;
+  });
+
   char src[kVmoBlocks * kBlockSizeDefault];
   memset(src, 'a', sizeof(src));
   ASSERT_EQ(vmo.write(src, 0, sizeof(src)), ZX_OK);
@@ -77,12 +83,6 @@ TEST(FakeBlockDeviceTest, WriteAndReadUsingFifoTransaction) {
   request.dev_offset = 0;
   ASSERT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
 
-  fuchsia_hardware_block::wire::BlockStats stats;
-  fake_device->GetStats(false, &stats);
-  ASSERT_EQ(stats.write.success.total_calls, 1u);
-  ASSERT_EQ(kVmoBlocks * kBlockSizeDefault, stats.write.success.bytes_transferred);
-  ASSERT_GE(stats.write.success.total_time_spent, 0u);
-
   // Clear out the registered VMO.
   char dst[kVmoBlocks * kBlockSizeDefault];
   static_assert(sizeof(src) == sizeof(dst), "Mismatched input/output buffer size");
@@ -90,6 +90,12 @@ TEST(FakeBlockDeviceTest, WriteAndReadUsingFifoTransaction) {
   ASSERT_EQ(vmo.write(dst, 0, sizeof(dst)), ZX_OK);
 
   // Read data from the fake back into the registered VMO.
+  fake_device->set_hook([&](const block_fifo_request_t& request, const zx::vmo* vmo) {
+    EXPECT_EQ(request.command.opcode, BLOCK_OPCODE_READ);
+    EXPECT_EQ(request.length, kVmoBlocks);
+    return ZX_OK;
+  });
+
   request.command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
   request.vmoid = vmoid.get();
   request.length = kVmoBlocks;
@@ -99,20 +105,25 @@ TEST(FakeBlockDeviceTest, WriteAndReadUsingFifoTransaction) {
   ASSERT_EQ(vmo.read(dst, 0, sizeof(dst)), ZX_OK);
   EXPECT_EQ(memcmp(src, dst, sizeof(src)), 0);
 
-  fake_device->GetStats(false, &stats);
-  ASSERT_EQ(stats.read.success.total_calls, 1u);
-  ASSERT_EQ(kVmoBlocks * kBlockSizeDefault, stats.read.success.bytes_transferred);
-  ASSERT_GE(stats.read.success.total_time_spent, 0u);
+  fake_device->set_hook([&](const block_fifo_request_t& request, const zx::vmo* vmo) {
+    EXPECT_EQ(request.command.opcode, BLOCK_OPCODE_CLOSE_VMO);
+    return ZX_OK;
+  });
 }
 
 TEST(FakeBlockDeviceTest, FifoTransactionFlush) {
   auto fake_device = std::make_unique<FakeBlockDevice>(kBlockCountDefault, kBlockSizeDefault);
-  BlockDevice* device = fake_device.get();
+  auto device = reinterpret_cast<BlockDevice*>(fake_device.get());
 
   const size_t kVmoBlocks = 1;
   zx::vmo vmo;
   storage::OwnedVmoid vmoid;
   ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device, kVmoBlocks, &vmo, &vmoid));
+
+  fake_device->set_hook([&](const block_fifo_request_t& request, const zx::vmo* vmo) {
+    EXPECT_EQ(request.command.opcode, BLOCK_OPCODE_FLUSH);
+    return ZX_OK;
+  });
 
   block_fifo_request_t request;
   request.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
@@ -122,22 +133,21 @@ TEST(FakeBlockDeviceTest, FifoTransactionFlush) {
   request.dev_offset = 0;
   EXPECT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
 
-  fuchsia_hardware_block::wire::BlockStats stats;
-  fake_device->GetStats(false, &stats);
-  ASSERT_EQ(stats.flush.success.total_calls, 1u);
-  ASSERT_EQ(stats.flush.success.bytes_transferred, 0u);
-  ASSERT_GE(stats.flush.success.total_time_spent, 0u);
+  fake_device->set_hook([&](const block_fifo_request_t& request, const zx::vmo* vmo) {
+    EXPECT_EQ(request.command.opcode, BLOCK_OPCODE_CLOSE_VMO);
+    return ZX_OK;
+  });
 }
 
 // Tests that writing followed by a flush acts like a regular write.
 TEST(FakeBlockDeviceTest, FifoTransactionWriteThenFlush) {
-  std::unique_ptr<BlockDevice> device =
-      std::make_unique<FakeBlockDevice>(kBlockCountDefault, kBlockSizeDefault);
+  auto device = std::make_unique<FakeBlockDevice>(kBlockCountDefault, kBlockSizeDefault);
 
   const size_t kVmoBlocks = 1;
   zx::vmo vmo;
   storage::OwnedVmoid vmoid;
-  ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device.get(), kVmoBlocks, &vmo, &vmoid));
+  ASSERT_NO_FATAL_FAILURE(
+      CreateAndRegisterVmo(reinterpret_cast<BlockDevice*>(device.get()), kVmoBlocks, &vmo, &vmoid));
 
   char src[kVmoBlocks * kBlockSizeDefault];
   memset(src, 'a', sizeof(src));
@@ -175,13 +185,13 @@ TEST(FakeBlockDeviceTest, FifoTransactionWriteThenFlush) {
 
 // Tests that flushing followed by a write acts like a regular write.
 TEST(FakeBlockDeviceTest, FifoTransactionFlushThenWrite) {
-  std::unique_ptr<BlockDevice> device =
-      std::make_unique<FakeBlockDevice>(kBlockCountDefault, kBlockSizeDefault);
+  auto device = std::make_unique<FakeBlockDevice>(kBlockCountDefault, kBlockSizeDefault);
 
   const size_t kVmoBlocks = 1;
   zx::vmo vmo;
   storage::OwnedVmoid vmoid;
-  ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device.get(), kVmoBlocks, &vmo, &vmoid));
+  ASSERT_NO_FATAL_FAILURE(
+      CreateAndRegisterVmo(reinterpret_cast<BlockDevice*>(device.get()), kVmoBlocks, &vmo, &vmoid));
 
   char src[kVmoBlocks * kBlockSizeDefault];
   memset(src, 'a', sizeof(src));
@@ -242,7 +252,7 @@ TEST(FakeBlockDeviceTest, FifoTransactionClose) {
 
 TEST(FakeBlockDeviceTest, FifoTransactionUnsupportedTrim) {
   auto fake_device = std::make_unique<FakeBlockDevice>(kBlockCountDefault, kBlockSizeDefault);
-  BlockDevice* device = fake_device.get();
+  auto device = reinterpret_cast<BlockDevice*>(fake_device.get());
 
   const size_t kVmoBlocks = 1;
   zx::vmo vmo;
@@ -256,42 +266,6 @@ TEST(FakeBlockDeviceTest, FifoTransactionUnsupportedTrim) {
   request.vmo_offset = 0;
   request.dev_offset = 0;
   EXPECT_EQ(ZX_ERR_NOT_SUPPORTED, device->FifoTransaction(&request, 1));
-
-  fuchsia_hardware_block::wire::BlockStats stats;
-  fake_device->GetStats(true, &stats);
-  ASSERT_EQ(stats.trim.failure.total_calls, 1u);
-  ASSERT_EQ(kVmoBlocks * kBlockSizeDefault, stats.trim.failure.bytes_transferred);
-  ASSERT_GE(stats.trim.failure.total_time_spent, 0u);
-}
-
-TEST(FakeBlockDeviceTest, ClearStats) {
-  auto fake_device = std::make_unique<FakeBlockDevice>(kBlockCountDefault, kBlockSizeDefault);
-  BlockDevice* device = fake_device.get();
-
-  const size_t kVmoBlocks = 1;
-  zx::vmo vmo;
-  storage::OwnedVmoid vmoid;
-  ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device, kVmoBlocks, &vmo, &vmoid));
-
-  block_fifo_request_t request;
-  request.command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0};
-  request.vmoid = vmoid.get();
-  request.length = 0;
-  request.vmo_offset = 0;
-  request.dev_offset = 0;
-  EXPECT_EQ(device->FifoTransaction(&request, 1), ZX_OK);
-
-  fuchsia_hardware_block::wire::BlockStats stats;
-  fake_device->GetStats(true, &stats);
-  ASSERT_EQ(stats.flush.success.total_calls, 1u);
-  ASSERT_EQ(stats.flush.success.bytes_transferred, 0u);
-  ASSERT_GE(stats.flush.success.total_time_spent, 0u);
-
-  // We cleared stats during previous GetStats.
-  fake_device->GetStats(false, &stats);
-  ASSERT_EQ(stats.flush.success.total_calls, 0u);
-  ASSERT_EQ(stats.flush.success.bytes_transferred, 0u);
-  ASSERT_EQ(stats.flush.success.total_time_spent, 0u);
 }
 
 TEST(FakeBlockDeviceTest, BlockLimitPartialyFailTransaction) {
@@ -301,7 +275,8 @@ TEST(FakeBlockDeviceTest, BlockLimitPartialyFailTransaction) {
   const size_t kLimitBlocks = 2;
   zx::vmo vmo;
   storage::OwnedVmoid vmoid;
-  ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device.get(), kVmoBlocks, &vmo, &vmoid));
+  ASSERT_NO_FATAL_FAILURE(
+      CreateAndRegisterVmo(reinterpret_cast<BlockDevice*>(device.get()), kVmoBlocks, &vmo, &vmoid));
 
   // Pre-fill the source buffer.
   std::array<uint8_t, kBlockSizeDefault> block;
@@ -354,7 +329,8 @@ TEST(FakeBlockDeviceTest, BlockLimitFailsDistinctTransactions) {
   const size_t kVmoBlocks = 1;
   zx::vmo vmo;
   storage::OwnedVmoid vmoid;
-  ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device.get(), kVmoBlocks, &vmo, &vmoid));
+  ASSERT_NO_FATAL_FAILURE(
+      CreateAndRegisterVmo(reinterpret_cast<BlockDevice*>(device.get()), kVmoBlocks, &vmo, &vmoid));
 
   block_fifo_request_t request;
   request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
@@ -383,7 +359,8 @@ TEST(FakeBlockDeviceTest, BlockLimitFailsMergedTransactions) {
   const size_t kVmoBlocks = 1;
   zx::vmo vmo;
   storage::OwnedVmoid vmoid;
-  ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device.get(), kVmoBlocks, &vmo, &vmoid));
+  ASSERT_NO_FATAL_FAILURE(
+      CreateAndRegisterVmo(reinterpret_cast<BlockDevice*>(device.get()), kVmoBlocks, &vmo, &vmoid));
 
   constexpr size_t kRequests = 3;
   block_fifo_request_t requests[kRequests];
@@ -411,7 +388,8 @@ TEST(FakeBlockDeviceTest, BlockLimitResetsDevice) {
   const size_t kVmoBlocks = 1;
   zx::vmo vmo;
   storage::OwnedVmoid vmoid;
-  ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(device.get(), kVmoBlocks, &vmo, &vmoid));
+  ASSERT_NO_FATAL_FAILURE(
+      CreateAndRegisterVmo(reinterpret_cast<BlockDevice*>(device.get()), kVmoBlocks, &vmo, &vmoid));
 
   block_fifo_request_t request;
   request.command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
@@ -439,7 +417,8 @@ TEST(FakeBlockDeviceTest, Hook) {
   const size_t kVmoBlocks = 1;
   zx::vmo vmo;
   storage::OwnedVmoid vmoid;
-  ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(&device, kVmoBlocks, &vmo, &vmoid));
+  ASSERT_NO_FATAL_FAILURE(
+      CreateAndRegisterVmo(reinterpret_cast<BlockDevice*>(&device), kVmoBlocks, &vmo, &vmoid));
   char v = 1;
   ASSERT_EQ(vmo.write(&v, 0, 1), ZX_OK);
 
@@ -475,7 +454,8 @@ TEST(FakeBlockDeviceTest, WipeZeroesDevice) {
   const size_t kVmoBlocks = 1;
   zx::vmo vmo;
   storage::OwnedVmoid vmoid;
-  ASSERT_NO_FATAL_FAILURE(CreateAndRegisterVmo(&device, kVmoBlocks, &vmo, &vmoid));
+  ASSERT_NO_FATAL_FAILURE(
+      CreateAndRegisterVmo(reinterpret_cast<BlockDevice*>(&device), kVmoBlocks, &vmo, &vmoid));
   char v = 1;
   ASSERT_EQ(vmo.write(&v, 0, 1), ZX_OK);
 
@@ -527,8 +507,8 @@ TEST(FakeBlockDeviceTest, TrimSucceedsIfSupported) {
 }
 
 TEST(FakeFVMBlockDeviceTest, GetVolumeInfo) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCountDefault);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCountDefault);
   {
     fuchsia_hardware_block::wire::BlockInfo info = {};
     ASSERT_EQ(device->BlockGetInfo(&info), ZX_OK);
@@ -546,8 +526,8 @@ TEST(FakeFVMBlockDeviceTest, GetVolumeInfo) {
 }
 
 TEST(FakeFVMBlockDeviceTest, QuerySlices) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCountDefault);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCountDefault);
   uint64_t slice_start = 0;
   size_t slice_count = 1;
   fuchsia_hardware_block_volume::wire::VsliceRange ranges;
@@ -571,8 +551,8 @@ TEST(FakeFVMBlockDeviceTest, QuerySlices) {
   ASSERT_EQ(actual_ranges, 0u);
 }
 
-void CheckAllocatedSlices(BlockDevice* device, const uint64_t* starts, const uint64_t* lengths,
-                          size_t slices_count) {
+void CheckAllocatedSlices(FakeFVMBlockDevice* device, const uint64_t* starts,
+                          const uint64_t* lengths, size_t slices_count) {
   auto ranges = std::make_unique<fuchsia_hardware_block_volume::wire::VsliceRange[]>(slices_count);
   size_t actual_ranges = 0;
   ASSERT_EQ(ZX_OK, device->VolumeQuerySlices(starts, slices_count, ranges.get(), &actual_ranges));
@@ -584,8 +564,8 @@ void CheckAllocatedSlices(BlockDevice* device, const uint64_t* starts, const uin
 }
 
 TEST(FakeFVMBlockDeviceTest, ExtendNoOp) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCountDefault);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCountDefault);
 
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info = {};
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info = {};
@@ -602,8 +582,8 @@ TEST(FakeFVMBlockDeviceTest, ExtendNoOp) {
 }
 
 TEST(FakeFVMBlockDeviceTest, ExtendOverlappingSameStart) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCountDefault);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCountDefault);
 
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info = {};
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info = {};
@@ -620,8 +600,8 @@ TEST(FakeFVMBlockDeviceTest, ExtendOverlappingSameStart) {
 }
 
 TEST(FakeFVMBlockDeviceTest, ExtendOverlappingDifferentStart) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCountDefault);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCountDefault);
 
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info = {};
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info = {};
@@ -638,8 +618,8 @@ TEST(FakeFVMBlockDeviceTest, ExtendOverlappingDifferentStart) {
 }
 
 TEST(FakeFVMBlockDeviceTest, ExtendNonOverlapping) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCountDefault);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCountDefault);
 
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info = {};
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info = {};
@@ -656,8 +636,8 @@ TEST(FakeFVMBlockDeviceTest, ExtendNonOverlapping) {
 }
 
 TEST(FakeFVMBlockDeviceTest, ShrinkNoOp) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCountDefault);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCountDefault);
 
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info = {};
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info = {};
@@ -670,8 +650,8 @@ TEST(FakeFVMBlockDeviceTest, ShrinkNoOp) {
 }
 
 TEST(FakeFVMBlockDeviceTest, ShrinkInvalid) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCountDefault);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCountDefault);
 
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info = {};
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info = {};
@@ -687,8 +667,8 @@ TEST(FakeFVMBlockDeviceTest, ShrinkInvalid) {
 // [0, 11) -> Shrink
 // [0, 0)
 TEST(FakeFVMBlockDeviceTest, ExtendThenShrinkSubSection) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCountDefault);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCountDefault);
 
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info = {};
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info = {};
@@ -713,8 +693,8 @@ TEST(FakeFVMBlockDeviceTest, ExtendThenShrinkSubSection) {
 // [0, 0) + [6, 15) -> Shrink
 // [0, 0) + [6, 14)
 TEST(FakeFVMBlockDeviceTest, ExtendThenShrinkPartialOverlap) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCountDefault);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCountDefault);
 
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info = {};
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info = {};
@@ -744,8 +724,8 @@ TEST(FakeFVMBlockDeviceTest, ExtendThenShrinkPartialOverlap) {
 // [0, 0) + [5, 15) -> Shrink
 // [0, 0)
 TEST(FakeFVMBlockDeviceTest, ExtendThenShrinkTotal) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCountDefault);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCountDefault);
 
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info = {};
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info = {};
@@ -769,8 +749,8 @@ TEST(FakeFVMBlockDeviceTest, ExtendThenShrinkTotal) {
 // [0, 0) + [5, 15) -> Shrink
 // [0, 0) + [5, 6) + [9, 15)
 TEST(FakeFVMBlockDeviceTest, ExtendThenShrinkToSplit) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCountDefault);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCountDefault);
 
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info = {};
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info = {};
@@ -797,8 +777,8 @@ TEST(FakeFVMBlockDeviceTest, ExtendThenShrinkToSplit) {
 // [0, 9)
 TEST(FakeFVMBlockDeviceTest, OverallocateSlices) {
   const uint64_t kSliceCapacity = 10;
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCapacity);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCapacity);
 
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info = {};
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info = {};
@@ -832,8 +812,8 @@ TEST(FakeFVMBlockDeviceTest, OverallocateSlices) {
 // [0, 0)
 TEST(FakeFVMBlockDeviceTest, PartialOverallocateSlices) {
   const uint64_t kSliceCapacity = 10;
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCapacity);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCapacity);
 
   fuchsia_hardware_block_volume::wire::VolumeManagerInfo manager_info = {};
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info = {};
@@ -852,8 +832,8 @@ TEST(FakeFVMBlockDeviceTest, PartialOverallocateSlices) {
 }
 
 TEST(FakeFVMBlockDeviceTest, ExtendOutOfRange) {
-  std::unique_ptr<BlockDevice> device = std::make_unique<FakeFVMBlockDevice>(
-      kBlockCountDefault, kBlockSizeDefault, kSliceSizeDefault, kSliceCountDefault);
+  auto device = std::make_unique<FakeFVMBlockDevice>(kBlockCountDefault, kBlockSizeDefault,
+                                                     kSliceSizeDefault, kSliceCountDefault);
   EXPECT_EQ(device->VolumeExtend(fvm::kMaxVSlices - 1, 1), ZX_OK);
   EXPECT_EQ(device->VolumeShrink(fvm::kMaxVSlices - 1, 1), ZX_OK);
 

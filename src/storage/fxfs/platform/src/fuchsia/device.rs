@@ -287,10 +287,6 @@ impl BlockServer {
                     flags: block::Flag::empty(),
                 }))?;
             }
-            // TODO(https://fxbug.dev/293970391)
-            VolumeRequest::GetStats { clear: _, responder } => {
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
-            }
             VolumeRequest::OpenSession { session, control_handle: _ } => {
                 let stream = session.into_stream();
                 let () = stream

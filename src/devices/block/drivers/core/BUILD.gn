@@ -127,7 +127,6 @@ source_set("shared") {
     "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition_cpp",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
     "//src/devices/lib/dev-operation",
-    "//src/storage/lib/storage-metrics",
   ]
 }
 

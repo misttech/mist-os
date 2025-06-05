@@ -82,10 +82,6 @@ class MockBlockDevice final
     });
   }
 
-  void GetStats(GetStatsRequestView request, GetStatsCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-
   void OpenSession(OpenSessionRequestView request, OpenSessionCompleter::Sync& completer) override {
     if (FifoAttached()) {
       request->session.Close(ZX_ERR_BAD_STATE);
