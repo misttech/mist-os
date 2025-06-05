@@ -192,7 +192,7 @@ def handle_package_manifest(
 
     # Write altered manifest to build output location.
     with open(build_output_manifest_path, "w") as manifest_file:
-        json.dump(input_manifest, manifest_file, indent=2)
+        json.dump(input_manifest, manifest_file, sort_keys=True, indent=2)
         depfile_collection[Path(build_output_manifest_path)] = [
             input_manifest_path
         ]
