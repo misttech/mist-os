@@ -349,6 +349,14 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
   void SetUp() override {
     sdmmc_.Reset();
 
+    sdmmc_.set_command_callback(MMC_SEND_OP_COND, [](uint32_t out_response[4]) -> void {
+      out_response[0] = MMC_OCR_BUSY;
+    });
+
+    sdmmc_.set_command_callback(SDMMC_SEND_STATUS, [](uint32_t out_response[4]) -> void {
+      out_response[0] = MMC_STATUS_CURRENT_STATE_TRAN;
+    });
+
     sdmmc_.set_command_callback(SDMMC_SEND_CSD, [](uint32_t out_response[4]) -> void {
       uint8_t* response = reinterpret_cast<uint8_t*>(out_response);
       response[MMC_CSD_SPEC_VERSION] = MMC_CID_SPEC_VRSN_40 << 2;
