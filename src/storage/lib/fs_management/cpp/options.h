@@ -12,10 +12,14 @@
 #include <zircon/types.h>
 
 #include <cstdint>
+#include <optional>
 #include <vector>
 
 namespace fs_management {
 
+// Because MountOptions is used for abstracting away mounting single volume or multivolume
+// filesystems this becomes a mixture of fuchsia_fs_startup::wire::StartOptions and
+// fuchsia_fs_startup::wire::MountOptions.
 struct MountOptions {
   bool readonly = false;
   bool verbose_mount = false;
@@ -42,10 +46,21 @@ struct MountOptions {
   // If set, a callable that connects and returns a handle to the crypt service.
   std::function<zx::result<fidl::ClientEnd<fuchsia_fxfs::Crypt>>()> crypt_client;
 
+  // If set, this is passed in as a duration to provide profile recording and replay.
+  std::optional<uint32_t> startup_profiling_seconds;
+
+  // If set, the system will be requested to use inline hardware crypto instead of in-process
+  // encryption.
+  std::optional<bool> inline_crypto_enabled;
+
+  // If set, the system will be requested to use barriers instead of checksums to ensure data
+  // consistency with respect to the journal.
+  std::optional<bool> barriers_enabled;
+
   // Generate a StartOptions fidl struct to pass the a fuchsia.fs.startup.Startup interface based
   // on this set of options.
   __EXPORT
-  zx::result<fuchsia_fs_startup::wire::StartOptions> as_start_options() const;
+  zx::result<fuchsia_fs_startup::wire::StartOptions> as_start_options(fidl::AnyArena& arena) const;
 };
 
 struct MkfsOptions {

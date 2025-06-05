@@ -6,17 +6,47 @@
 
 #include <gtest/gtest.h>
 
+#include "fidl/fuchsia.fs.startup/cpp/wire_types.h"
+#include "lib/fidl/cpp/wire/arena.h"
+
 namespace fs_management {
 
 namespace {
 
 void AssertStartOptionsEqual(const fuchsia_fs_startup::wire::StartOptions& a,
                              const fuchsia_fs_startup::wire::StartOptions& b) {
-  ASSERT_EQ(a.read_only, b.read_only);
-  ASSERT_EQ(a.verbose, b.verbose);
-  ASSERT_EQ(a.write_compression_algorithm, b.write_compression_algorithm);
-  ASSERT_EQ(a.write_compression_level, b.write_compression_level);
-  ASSERT_EQ(a.cache_eviction_policy_override, b.cache_eviction_policy_override);
+  ASSERT_EQ(a.has_read_only(), b.has_read_only());
+  if (a.has_read_only()) {
+    ASSERT_EQ(a.read_only(), b.read_only());
+  }
+  ASSERT_EQ(a.has_verbose(), b.has_verbose());
+  if (a.has_verbose()) {
+    ASSERT_EQ(a.verbose(), b.verbose());
+  }
+  ASSERT_EQ(a.has_write_compression_algorithm(), b.has_write_compression_algorithm());
+  if (a.has_write_compression_algorithm()) {
+    ASSERT_EQ(a.write_compression_algorithm(), b.write_compression_algorithm());
+  }
+  ASSERT_EQ(a.has_write_compression_level(), b.has_write_compression_level());
+  if (a.has_write_compression_level()) {
+    ASSERT_EQ(a.write_compression_level(), b.write_compression_level());
+  }
+  ASSERT_EQ(a.has_cache_eviction_policy_override(), b.has_cache_eviction_policy_override());
+  if (a.has_cache_eviction_policy_override()) {
+    ASSERT_EQ(a.cache_eviction_policy_override(), b.cache_eviction_policy_override());
+  }
+  ASSERT_EQ(a.has_startup_profiling_seconds(), b.has_startup_profiling_seconds());
+  if (a.has_startup_profiling_seconds()) {
+    ASSERT_EQ(a.startup_profiling_seconds(), b.startup_profiling_seconds());
+  }
+  ASSERT_EQ(a.has_inline_crypto_enabled(), b.has_inline_crypto_enabled());
+  if (a.has_inline_crypto_enabled()) {
+    ASSERT_EQ(a.inline_crypto_enabled(), b.inline_crypto_enabled());
+  }
+  ASSERT_EQ(a.has_barriers_enabled(), b.has_barriers_enabled());
+  if (a.has_barriers_enabled()) {
+    ASSERT_EQ(a.barriers_enabled(), b.barriers_enabled());
+  }
 }
 
 void AssertFormatOptionsEqual(const fuchsia_fs_startup::wire::FormatOptions& a,
@@ -40,14 +70,14 @@ void AssertFormatOptionsEqual(const fuchsia_fs_startup::wire::FormatOptions& a,
 
 TEST(MountOptionsTest, DefaultOptions) {
   MountOptions options;
-  fuchsia_fs_startup::wire::StartOptions expected_start_options{
-      // This is the default, but we explicitly enumerate it here to be clear that it's the default.
-      .write_compression_algorithm = fuchsia_fs_startup::wire::CompressionAlgorithm::kZstdChunked,
-      .write_compression_level = -1,
-      .cache_eviction_policy_override = fuchsia_fs_startup::wire::EvictionPolicyOverride::kNone,
-  };
+  fidl::Arena arena;
+  auto builder = fuchsia_fs_startup::wire::StartOptions::Builder(arena);
+  // This is the default, but we explicitly enumerate it here to be clear that it's the default.
+  builder.read_only(false);
+  builder.verbose(false);
+  fuchsia_fs_startup::wire::StartOptions expected_start_options = builder.Build();
 
-  auto start_options_or = options.as_start_options();
+  auto start_options_or = options.as_start_options(arena);
   ASSERT_TRUE(start_options_or.is_ok()) << start_options_or.status_string();
   AssertStartOptionsEqual(*start_options_or, expected_start_options);
 }
@@ -60,17 +90,25 @@ TEST(MountOptionsTest, AllOptionsSet) {
       .write_compression_level = 10,
       .cache_eviction_policy = "NEVER_EVICT",
       .fsck_after_every_transaction = true,
+      .startup_profiling_seconds = 5,
+      .inline_crypto_enabled = true,
+      .barriers_enabled = true,
   };
-  fuchsia_fs_startup::wire::StartOptions expected_start_options{
-      .read_only = true,
-      .verbose = true,
-      .write_compression_algorithm = fuchsia_fs_startup::wire::CompressionAlgorithm::kUncompressed,
-      .write_compression_level = 10,
-      .cache_eviction_policy_override =
-          fuchsia_fs_startup::wire::EvictionPolicyOverride::kNeverEvict,
-  };
+  fidl::Arena arena;
+  auto builder = fuchsia_fs_startup::wire::StartOptions::Builder(arena);
+  builder.read_only(true);
+  builder.verbose(true);
+  builder.write_compression_algorithm(
+      fuchsia_fs_startup::wire::CompressionAlgorithm::kUncompressed);
+  builder.write_compression_level(10);
+  builder.cache_eviction_policy_override(
+      fuchsia_fs_startup::wire::EvictionPolicyOverride::kNeverEvict);
+  builder.startup_profiling_seconds(5);
+  builder.inline_crypto_enabled(true);
+  builder.barriers_enabled(true);
+  fuchsia_fs_startup::wire::StartOptions expected_start_options = builder.Build();
 
-  auto start_options_or = options.as_start_options();
+  auto start_options_or = options.as_start_options(arena);
   ASSERT_TRUE(start_options_or.is_ok()) << start_options_or.status_string();
   AssertStartOptionsEqual(*start_options_or, expected_start_options);
 }
@@ -80,14 +118,16 @@ TEST(MountOptionsTest, ZstdChunkedEvictImmediately) {
       .write_compression_algorithm = "ZSTD_CHUNKED",
       .cache_eviction_policy = "EVICT_IMMEDIATELY",
   };
-  fuchsia_fs_startup::wire::StartOptions expected_start_options{
-      .write_compression_algorithm = fuchsia_fs_startup::wire::CompressionAlgorithm::kZstdChunked,
-      .write_compression_level = -1,
-      .cache_eviction_policy_override =
-          fuchsia_fs_startup::wire::EvictionPolicyOverride::kEvictImmediately,
-  };
+  fidl::Arena arena;
+  auto builder = fuchsia_fs_startup::wire::StartOptions::Builder(arena);
+  builder.read_only(false);
+  builder.verbose(false);
+  builder.write_compression_algorithm(fuchsia_fs_startup::wire::CompressionAlgorithm::kZstdChunked);
+  builder.cache_eviction_policy_override(
+      fuchsia_fs_startup::wire::EvictionPolicyOverride::kEvictImmediately);
+  fuchsia_fs_startup::wire::StartOptions expected_start_options = builder.Build();
 
-  auto start_options_or = options.as_start_options();
+  auto start_options_or = options.as_start_options(arena);
   ASSERT_TRUE(start_options_or.is_ok()) << start_options_or.status_string();
   AssertStartOptionsEqual(*start_options_or, expected_start_options);
 }

@@ -285,7 +285,7 @@ impl Filesystem {
         let exposed_dir = self.get_component_exposed_dir().await?;
         let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
         proxy
-            .start(self.block_connector.connect_block()?, start_options)
+            .start(self.block_connector.connect_block()?, &start_options)
             .await?
             .map_err(Status::from_raw)?;
 
@@ -323,7 +323,7 @@ impl Filesystem {
         let exposed_dir = self.get_component_exposed_dir().await?;
         let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
         proxy
-            .start(self.block_connector.connect_block()?, self.config.options().start_options)
+            .start(self.block_connector.connect_block()?, &self.config.options().start_options)
             .await?
             .map_err(Status::from_raw)?;
 

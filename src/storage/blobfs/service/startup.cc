@@ -36,40 +36,44 @@ namespace {
 MountOptions ParseMountOptions(fuchsia_fs_startup::wire::StartOptions start_options) {
   MountOptions options;
 
-  options.verbose = start_options.verbose;
+  options.verbose = start_options.has_verbose() ? start_options.verbose() : false;
 
-  if (start_options.read_only) {
+  if (start_options.has_read_only() && start_options.read_only()) {
     options.writability = Writability::ReadOnlyFilesystem;
   }
-  if (start_options.write_compression_level >= 0) {
-    options.compression_settings.compression_level = start_options.write_compression_level;
+  if (start_options.has_write_compression_level() && start_options.write_compression_level() >= 0) {
+    options.compression_settings.compression_level = start_options.write_compression_level();
   }
 
-  switch (start_options.write_compression_algorithm) {
-    case fuchsia_fs_startup::wire::CompressionAlgorithm::kZstdChunked:
-      options.compression_settings.compression_algorithm = CompressionAlgorithm::kChunked;
-      break;
-    case fuchsia_fs_startup::wire::CompressionAlgorithm::kUncompressed:
-      options.compression_settings.compression_algorithm = CompressionAlgorithm::kUncompressed;
-      break;
-    default:
-      ZX_PANIC("Unknown compression algorithm: %d",
-               static_cast<uint32_t>(start_options.write_compression_algorithm));
+  if (start_options.has_write_compression_algorithm()) {
+    switch (start_options.write_compression_algorithm()) {
+      case fuchsia_fs_startup::wire::CompressionAlgorithm::kZstdChunked:
+        options.compression_settings.compression_algorithm = CompressionAlgorithm::kChunked;
+        break;
+      case fuchsia_fs_startup::wire::CompressionAlgorithm::kUncompressed:
+        options.compression_settings.compression_algorithm = CompressionAlgorithm::kUncompressed;
+        break;
+      default:
+        ZX_PANIC("Unknown compression algorithm: %d",
+                 static_cast<uint32_t>(start_options.write_compression_algorithm()));
+    }
   }
 
-  switch (start_options.cache_eviction_policy_override) {
-    case fuchsia_fs_startup::wire::EvictionPolicyOverride::kNone:
-      options.pager_backed_cache_policy = std::nullopt;
-      break;
-    case fuchsia_fs_startup::wire::EvictionPolicyOverride::kNeverEvict:
-      options.pager_backed_cache_policy = CachePolicy::NeverEvict;
-      break;
-    case fuchsia_fs_startup::wire::EvictionPolicyOverride::kEvictImmediately:
-      options.pager_backed_cache_policy = CachePolicy::EvictImmediately;
-      break;
-    default:
-      ZX_PANIC("Unknown cache eviction policy override: %d",
-               static_cast<uint32_t>(start_options.cache_eviction_policy_override));
+  if (start_options.has_cache_eviction_policy_override()) {
+    switch (start_options.cache_eviction_policy_override()) {
+      case fuchsia_fs_startup::wire::EvictionPolicyOverride::kNone:
+        options.pager_backed_cache_policy = std::nullopt;
+        break;
+      case fuchsia_fs_startup::wire::EvictionPolicyOverride::kNeverEvict:
+        options.pager_backed_cache_policy = CachePolicy::NeverEvict;
+        break;
+      case fuchsia_fs_startup::wire::EvictionPolicyOverride::kEvictImmediately:
+        options.pager_backed_cache_policy = CachePolicy::EvictImmediately;
+        break;
+      default:
+        ZX_PANIC("Unknown cache eviction policy override: %d",
+                 static_cast<uint32_t>(start_options.cache_eviction_policy_override()));
+    }
   }
 
   return options;

@@ -476,21 +476,7 @@ mod tests {
                     connect_to_protocol_at_dir_svc::<fstartup::StartupMarker>(&outgoing_dir)
                         .unwrap();
                 client
-                    .start(
-                        block_client,
-                        fstartup::StartOptions {
-                            read_only: false,
-                            verbose: false,
-                            fsck_after_every_transaction: false,
-                            write_compression_algorithm:
-                                fstartup::CompressionAlgorithm::ZstdChunked,
-                            write_compression_level: 0,
-                            cache_eviction_policy_override: fstartup::EvictionPolicyOverride::None,
-                            startup_profiling_seconds: 0,
-                            inline_crypto_enabled: false,
-                            barriers_enabled: false,
-                        },
-                    )
+                    .start(block_client, &fstartup::StartOptions::default())
                     .await
                     .expect("FIDL error")
                     .expect("Start failed");
@@ -550,21 +536,7 @@ mod tests {
                 let admin_client =
                     connect_to_protocol_at_dir_svc::<ffs::AdminMarker>(&outgoing_dir).unwrap();
                 client
-                    .start(
-                        block_client,
-                        fstartup::StartOptions {
-                            read_only: false,
-                            verbose: false,
-                            fsck_after_every_transaction: false,
-                            write_compression_algorithm:
-                                fstartup::CompressionAlgorithm::ZstdChunked,
-                            write_compression_level: 0,
-                            cache_eviction_policy_override: fstartup::EvictionPolicyOverride::None,
-                            startup_profiling_seconds: 0,
-                            inline_crypto_enabled: false,
-                            barriers_enabled: false,
-                        },
-                    )
+                    .start(block_client, &fstartup::StartOptions::default())
                     .await
                     .expect("FIDL error")
                     .expect("Start failed");
@@ -619,21 +591,7 @@ mod tests {
                 // Client
                 connect_to_protocol_at_dir_svc::<fstartup::StartupMarker>(&outgoing_dir)
                     .unwrap()
-                    .start(
-                        block_client,
-                        fstartup::StartOptions {
-                            read_only: false,
-                            verbose: false,
-                            fsck_after_every_transaction: false,
-                            write_compression_algorithm:
-                                fstartup::CompressionAlgorithm::ZstdChunked,
-                            write_compression_level: 0,
-                            cache_eviction_policy_override: fstartup::EvictionPolicyOverride::None,
-                            startup_profiling_seconds: 0,
-                            inline_crypto_enabled: false,
-                            barriers_enabled: false,
-                        },
-                    )
+                    .start(block_client, &fstartup::StartOptions::default())
                     .await
                     .expect("FIDL error")
                     .expect("Start failed");

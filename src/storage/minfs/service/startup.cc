@@ -18,13 +18,14 @@ MountOptions ParseMountOptions(fuchsia_fs_startup::wire::StartOptions start_opti
                                bool bcache_read_only) {
   MountOptions options;
 
-  options.verbose = start_options.verbose;
-  options.fsck_after_every_transaction = start_options.fsck_after_every_transaction;
+  options.verbose = start_options.has_verbose() && start_options.verbose();
+  options.fsck_after_every_transaction = start_options.has_fsck_after_every_transaction() &&
+                                         start_options.fsck_after_every_transaction();
 
   if (bcache_read_only) {
     options.writability = Writability::ReadOnlyDisk;
     options.repair_filesystem = false;
-  } else if (start_options.read_only) {
+  } else if (start_options.has_read_only() && start_options.read_only()) {
     options.writability = Writability::ReadOnlyFilesystem;
   } else {
     options.writability = Writability::Writable;

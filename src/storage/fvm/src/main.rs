@@ -16,9 +16,9 @@ use device::Device;
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
 use fidl_fuchsia_fs_startup::{
-    CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, FormatOptions, MountOptions,
-    StartOptions, StartupMarker, StartupRequest, StartupRequestStream, VolumeRequest,
-    VolumeRequestStream, VolumesMarker, VolumesRequest, VolumesRequestStream,
+    CreateOptions, FormatOptions, MountOptions, StartOptions, StartupMarker, StartupRequest,
+    StartupRequestStream, VolumeRequest, VolumeRequestStream, VolumesMarker, VolumesRequest,
+    VolumesRequestStream,
 };
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fs_management::filesystem::{BlockConnector, Filesystem};
@@ -1157,17 +1157,7 @@ impl Component {
                         component_name: &self.0,
                         reuse_component_after_serving: false,
                         format_options: FormatOptions::default(),
-                        start_options: StartOptions {
-                            read_only: false,
-                            verbose: false,
-                            fsck_after_every_transaction: false,
-                            write_compression_level: -1,
-                            write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
-                            cache_eviction_policy_override: EvictionPolicyOverride::None,
-                            startup_profiling_seconds: 0,
-                            inline_crypto_enabled: false,
-                            barriers_enabled: false,
-                        },
+                        start_options: StartOptions::default(),
                         component_type: ComponentType::DynamicChild {
                             // Use a separate collection for blobfs because it needs additional
                             // capabilities routed to it (e.g. VmexResource) and we don't want
@@ -1903,8 +1893,8 @@ mod tests {
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_fs::AdminMarker;
     use fidl_fuchsia_fs_startup::{
-        CheckOptions, CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, MountOptions,
-        StartOptions, StartupMarker, VolumeMarker, VolumesMarker,
+        CheckOptions, CreateOptions, MountOptions, StartOptions, StartupMarker, VolumeMarker,
+        VolumesMarker,
     };
     use fidl_fuchsia_hardware_block::BlockMarker;
     use fs_management::DATA_TYPE_GUID;
@@ -1957,20 +1947,7 @@ mod tests {
                 connect_to_protocol_at_dir_svc::<StartupMarker>(&fixture.outgoing_dir).unwrap();
 
             startup_proxy
-                .start(
-                    block_client.into_channel().into(),
-                    StartOptions {
-                        read_only: false,
-                        verbose: false,
-                        fsck_after_every_transaction: false,
-                        write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
-                        write_compression_level: 0,
-                        cache_eviction_policy_override: EvictionPolicyOverride::None,
-                        startup_profiling_seconds: 0,
-                        inline_crypto_enabled: false,
-                        barriers_enabled: false,
-                    },
-                )
+                .start(block_client.into_channel().into(), &StartOptions::default())
                 .await
                 .expect("start failed (FIDL")
                 .expect("start failed");

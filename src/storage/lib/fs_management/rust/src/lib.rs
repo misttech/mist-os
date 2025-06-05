@@ -189,28 +189,25 @@ impl FSConfig for Blobfs {
             },
             start_options: {
                 let mut start_options = StartOptions {
-                    read_only: self.readonly,
-                    verbose: self.verbose,
-                    fsck_after_every_transaction: false,
-                    write_compression_level: self.write_compression_level.unwrap_or(-1),
-                    write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
-                    cache_eviction_policy_override: EvictionPolicyOverride::None,
-                    startup_profiling_seconds: 0,
-                    inline_crypto_enabled: false,
-                    barriers_enabled: false,
+                    read_only: Some(self.readonly),
+                    verbose: Some(self.verbose),
+                    write_compression_level: Some(self.write_compression_level.unwrap_or(-1)),
+                    write_compression_algorithm: Some(CompressionAlgorithm::ZstdChunked),
+                    cache_eviction_policy_override: Some(EvictionPolicyOverride::None),
+                    ..Default::default()
                 };
-                start_options.write_compression_algorithm = match &self.write_compression_algorithm
-                {
-                    BlobCompression::ZSTDChunked => CompressionAlgorithm::ZstdChunked,
-                    BlobCompression::Uncompressed => CompressionAlgorithm::Uncompressed,
-                };
+                start_options.write_compression_algorithm =
+                    Some(match &self.write_compression_algorithm {
+                        BlobCompression::ZSTDChunked => CompressionAlgorithm::ZstdChunked,
+                        BlobCompression::Uncompressed => CompressionAlgorithm::Uncompressed,
+                    });
                 start_options.cache_eviction_policy_override =
-                    match &self.cache_eviction_policy_override {
+                    Some(match &self.cache_eviction_policy_override {
                         BlobEvictionPolicy::NeverEvict => EvictionPolicyOverride::NeverEvict,
                         BlobEvictionPolicy::EvictImmediately => {
                             EvictionPolicyOverride::EvictImmediately
                         }
-                    };
+                    });
                 start_options
             },
             component_type: self.component_type.clone(),
@@ -264,15 +261,10 @@ impl FSConfig for Minfs {
                 ..Default::default()
             },
             start_options: StartOptions {
-                read_only: self.readonly,
-                verbose: self.verbose,
-                fsck_after_every_transaction: self.fsck_after_every_transaction,
-                write_compression_level: -1,
-                write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
-                cache_eviction_policy_override: EvictionPolicyOverride::None,
-                startup_profiling_seconds: 0,
-                inline_crypto_enabled: false,
-                barriers_enabled: false,
+                read_only: Some(self.readonly),
+                verbose: Some(self.verbose),
+                fsck_after_every_transaction: Some(self.fsck_after_every_transaction),
+                ..Default::default()
             },
             component_type: self.component_type.clone(),
         }
@@ -334,15 +326,12 @@ impl FSConfig for Fxfs {
             reuse_component_after_serving: true,
             format_options: FormatOptions { verbose: Some(false), ..Default::default() },
             start_options: StartOptions {
-                read_only: self.readonly,
-                verbose: false,
-                fsck_after_every_transaction: self.fsck_after_every_transaction,
-                write_compression_level: -1,
-                write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
-                cache_eviction_policy_override: EvictionPolicyOverride::None,
-                startup_profiling_seconds: self.startup_profiling_seconds.unwrap_or(0),
-                inline_crypto_enabled: self.inline_crypto_enabled,
-                barriers_enabled: self.barriers_enabled,
+                read_only: Some(self.readonly),
+                fsck_after_every_transaction: Some(self.fsck_after_every_transaction),
+                startup_profiling_seconds: Some(self.startup_profiling_seconds.unwrap_or(0)),
+                inline_crypto_enabled: Some(self.inline_crypto_enabled),
+                barriers_enabled: Some(self.barriers_enabled),
+                ..Default::default()
             },
             component_type: self.component_type.clone(),
         }
@@ -388,15 +377,10 @@ impl FSConfig for F2fs {
             reuse_component_after_serving: false,
             format_options: FormatOptions::default(),
             start_options: StartOptions {
-                read_only: false,
-                verbose: false,
-                fsck_after_every_transaction: false,
-                write_compression_level: -1,
-                write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
-                cache_eviction_policy_override: EvictionPolicyOverride::None,
-                startup_profiling_seconds: 0,
-                inline_crypto_enabled: false,
-                barriers_enabled: false,
+                read_only: Some(false),
+                verbose: Some(false),
+                fsck_after_every_transaction: Some(false),
+                ..Default::default()
             },
             component_type: self.component_type.clone(),
         }
@@ -445,17 +429,7 @@ impl FSConfig for Fvm {
             component_name: "fvm2",
             reuse_component_after_serving: true,
             format_options: FormatOptions::default(),
-            start_options: StartOptions {
-                read_only: false,
-                verbose: false,
-                fsck_after_every_transaction: false,
-                write_compression_level: -1,
-                write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
-                cache_eviction_policy_override: EvictionPolicyOverride::None,
-                startup_profiling_seconds: 0,
-                inline_crypto_enabled: false,
-                barriers_enabled: false,
-            },
+            start_options: StartOptions::default(),
             component_type: self.component_type.clone(),
         }
     }
@@ -504,17 +478,7 @@ impl FSConfig for Gpt {
             component_name: "gpt2",
             reuse_component_after_serving: true,
             format_options: FormatOptions::default(),
-            start_options: StartOptions {
-                read_only: false,
-                verbose: false,
-                fsck_after_every_transaction: false,
-                write_compression_level: -1,
-                write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
-                cache_eviction_policy_override: EvictionPolicyOverride::None,
-                startup_profiling_seconds: 0,
-                inline_crypto_enabled: false,
-                barriers_enabled: false,
-            },
+            start_options: StartOptions::default(),
             component_type: self.component_type.clone(),
         }
     }

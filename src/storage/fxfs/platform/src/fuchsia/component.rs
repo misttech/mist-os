@@ -263,11 +263,13 @@ impl Component {
         assert!((zx::system_get_page_size() as u64) == MIN_BLOCK_SIZE);
 
         let fs = FxFilesystemBuilder::new()
-            .fsck_after_every_transaction(options.fsck_after_every_transaction)
-            .read_only(options.read_only)
-            .inline_crypto_enabled(options.inline_crypto_enabled)
-            .barriers_enabled(options.barriers_enabled)
-            .open(DeviceHolder::new(BlockDevice::new(Box::new(client), options.read_only).await?))
+            .fsck_after_every_transaction(options.fsck_after_every_transaction.unwrap_or(false))
+            .read_only(options.read_only.unwrap_or(false))
+            .inline_crypto_enabled(options.inline_crypto_enabled.unwrap_or(false))
+            .barriers_enabled(options.barriers_enabled.unwrap_or(false))
+            .open(DeviceHolder::new(
+                BlockDevice::new(Box::new(client), options.read_only.unwrap_or(false)).await?,
+            ))
             .await?;
         let root_volume = root_volume(fs.clone()).await?;
         let fs: Arc<InspectedFxFilesystem> = Arc::new(fs.into());
@@ -311,11 +313,11 @@ impl Component {
             "Mounted"
         );
 
-        if options.startup_profiling_seconds > 0 {
+        if let Some(profile_time) = options.startup_profiling_seconds {
             // Unwrap ok, shouldn't have anything else recording or replaying this early in startup.
             volumes
                 .clone()
-                .record_or_replay_profile(".boot".to_owned(), options.startup_profiling_seconds)
+                .record_or_replay_profile(".boot".to_owned(), profile_time)
                 .await
                 .unwrap();
         }
@@ -488,8 +490,7 @@ mod tests {
     use fidl::endpoints::Proxy;
     use fidl_fuchsia_fs::AdminMarker;
     use fidl_fuchsia_fs_startup::{
-        CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, MountOptions, StartOptions,
-        StartupMarker, VolumesMarker,
+        CreateOptions, MountOptions, StartOptions, StartupMarker, VolumesMarker,
     };
     use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy};
     use fuchsia_component_client::connect_to_protocol_at_dir_svc;
@@ -560,17 +561,7 @@ mod tests {
             startup_proxy
                 .start(
                     ramdisk.open().expect("Unable to open ramdisk").into(),
-                    StartOptions {
-                        read_only: false,
-                        verbose: false,
-                        fsck_after_every_transaction: false,
-                        write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
-                        write_compression_level: 0,
-                        cache_eviction_policy_override: EvictionPolicyOverride::None,
-                        startup_profiling_seconds: 0,
-                        inline_crypto_enabled: false,
-                        barriers_enabled: false,
-                    },
+                    &StartOptions::default(),
                 )
                 .await
                 .expect("Start failed (FIDL)")

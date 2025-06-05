@@ -58,11 +58,12 @@ zx::result<> StartFsComponent(fidl::UnownedClientEnd<Directory> exposed_dir,
     return startup_client_end.take_error();
   fidl::WireSyncClient startup_client{std::move(*startup_client_end)};
 
-  auto start_options_or = options.as_start_options();
+  fidl::Arena arena;
+  auto start_options_or = options.as_start_options(arena);
   if (start_options_or.is_error())
     return start_options_or.take_error();
 
-  auto res = startup_client->Start(std::move(device), std::move(*start_options_or));
+  auto res = startup_client->Start(std::move(device), *start_options_or);
   if (!res.ok())
     return zx::error(res.status());
   if (res->is_error())
