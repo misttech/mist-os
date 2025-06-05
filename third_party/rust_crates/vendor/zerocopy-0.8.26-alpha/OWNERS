@@ -22,6 +22,7 @@ include /src/connectivity/overnet/usb/OWNERS
 include /src/connectivity/ppp/OWNERS
 include /src/connectivity/wlan/OWNERS
 include /src/developer/ffx/OWNERS
+include /src/developer/ffx/plugins/profile/memory/OWNERS
 include /src/devices/pci/OWNERS
 include /src/devices/usb/OWNERS
 include /src/diagnostics/OWNERS
