@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result};
 use async_trait::async_trait;
 use ffx_fastboot_interface::fastboot_interface::FastbootInterface;
 use ffx_fastboot_interface::fastboot_proxy::FastbootProxy;
@@ -15,19 +15,8 @@ use ffx_fastboot_transport_interface::udp::UdpNetworkInterface;
 use netext::TokioAsyncWrapper;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use thiserror::Error;
 use tokio::net::TcpStream;
 use usb_bulk::AsyncInterface;
-
-#[derive(Error, Debug, Clone)]
-enum FastbootConnectionFactoryError {
-    #[error("Passed Target Name was empty. Target name needs to be a non-empty string to support Target rediscovery")]
-    EmptyTargetName,
-}
-
-///////////////////////////////////////////////////////////////////////////////
-// ConnectionFactory
-//
 
 pub enum FastbootConnectionKind {
     Usb(String),
@@ -151,10 +140,6 @@ pub async fn tcp_proxy(
     addr: &SocketAddr,
     config: FastbootNetworkConnectionConfig,
 ) -> Result<FastbootProxy<TcpNetworkInterface<TokioAsyncWrapper<TcpStream>>>> {
-    if target_name.is_empty() {
-        bail!(FastbootConnectionFactoryError::EmptyTargetName);
-    }
-
     let mut factory = TcpFactory::new(
         target_name,
         fastboot_device_file_path,
@@ -184,10 +169,6 @@ pub async fn udp_proxy(
     addr: &SocketAddr,
     config: FastbootNetworkConnectionConfig,
 ) -> Result<FastbootProxy<UdpNetworkInterface>> {
-    if target_name.is_empty() {
-        bail!(FastbootConnectionFactoryError::EmptyTargetName);
-    }
-
     let mut factory = UdpFactory::new(
         target_name,
         fastboot_device_file_path,

@@ -47,6 +47,12 @@ pub(crate) struct RebootController {
     fastboot_connection_builder: Box<dyn FastbootConnectionFactory>,
 }
 
+#[derive(thiserror::Error, Debug, Clone)]
+enum FastbootConnectionError {
+    #[error("Passed Target Name was empty. Target name needs to be a non-empty string to support Target rediscovery")]
+    EmptyTargetName,
+}
+
 impl RebootController {
     pub(crate) fn new(target: Rc<Target>, overnet_node: Arc<overnet_core::Router>) -> Self {
         Self {
@@ -66,6 +72,14 @@ impl RebootController {
             .get_or_try_init(self.target.init_remote_proxy(&self.overnet_node))
             .await
             .map(|proxy| proxy.clone())
+    }
+
+    fn nodename(&self) -> Result<String> {
+        let target_name = self.target.nodename_str();
+        if target_name.is_empty() {
+            return Err(FastbootConnectionError::EmptyTargetName.into());
+        }
+        Ok(target_name)
     }
 
     async fn get_admin_proxy(&self) -> Result<AdminProxy> {
@@ -124,7 +138,7 @@ impl RebootController {
                                 .ok_or_else(|| anyhow!("No fastboot address"))?
                                 .0
                                 .into();
-                            let target_name = self.target.nodename_str();
+                            let target_name = self.nodename()?;
                             self.fastboot_connection_builder
                                 .build_interface(FastbootConnectionKind::Tcp(target_name, address))
                                 .await?
@@ -136,7 +150,7 @@ impl RebootController {
                                 .ok_or_else(|| anyhow!("No fastboot address"))?
                                 .0
                                 .into();
-                            let target_name = self.target.nodename_str();
+                            let target_name = self.nodename()?;
                             self.fastboot_connection_builder
                                 .build_interface(FastbootConnectionKind::Udp(target_name, address))
                                 .await?
@@ -178,7 +192,7 @@ impl RebootController {
                                 .ok_or_else(|| anyhow!("No fastboot address"))?
                                 .0
                                 .into();
-                            let target_name = self.target.nodename_str();
+                            let target_name = self.nodename()?;
                             self.fastboot_connection_builder
                                 .build_interface(FastbootConnectionKind::Tcp(target_name, address))
                                 .await?
@@ -190,7 +204,7 @@ impl RebootController {
                                 .ok_or_else(|| anyhow!("No fastboot address"))?
                                 .0
                                 .into();
-                            let target_name = self.target.nodename_str();
+                            let target_name = self.nodename()?;
                             self.fastboot_connection_builder
                                 .build_interface(FastbootConnectionKind::Udp(target_name, address))
                                 .await?
