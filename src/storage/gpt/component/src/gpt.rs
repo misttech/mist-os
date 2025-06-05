@@ -139,6 +139,10 @@ impl GptPartition {
         self.block_client.read_at_traced(buffer, dev_offset, trace_id(trace_flow_id)).await
     }
 
+    pub fn barrier(&self) {
+        self.block_client.barrier();
+    }
+
     pub async fn write(
         &self,
         device_block_offset: u64,
@@ -868,6 +872,61 @@ mod tests {
             .write_at_with_opts(BufferSlice::Memory(&buffer), 0, WriteOptions::FORCE_ACCESS)
             .await
             .unwrap();
+
+        manager.shutdown().await;
+    }
+
+    #[fuchsia::test]
+    async fn barrier_passed_through() {
+        const BLOCK_SIZE: u32 = 512;
+        const BLOCK_COUNT: u64 = 1024;
+
+        struct Observer(Arc<AtomicBool>);
+
+        impl fake_block_server::Observer for Observer {
+            fn barrier(&self) {
+                self.0.store(true, Ordering::Relaxed);
+            }
+        }
+
+        let expect_barrier = Arc::new(AtomicBool::new(false));
+        let (server, partitions_dir) = setup_with_options(
+            FakeServerOptions {
+                block_count: Some(BLOCK_COUNT),
+                block_size: BLOCK_SIZE,
+                observer: Some(Box::new(Observer(expect_barrier.clone()))),
+                ..Default::default()
+            },
+            vec![PartitionInfo {
+                label: "foo".to_string(),
+                type_guid: Guid::from_bytes([1; 16]),
+                instance_guid: Guid::from_bytes([2; 16]),
+                start_block: 4,
+                num_blocks: 1,
+                flags: 0,
+            }],
+        )
+        .await;
+
+        let manager = GptManager::new(server.block_proxy(), partitions_dir.clone()).await.unwrap();
+
+        let proxy = vfs::serve_directory(
+            partitions_dir.clone(),
+            vfs::path::Path::validate_and_split("part-000").unwrap(),
+            fio::PERM_READABLE,
+        );
+        let block =
+            connect_to_named_protocol_at_dir_root::<fvolume::VolumeMarker>(&proxy, "volume")
+                .expect("Failed to open block service");
+        let client = RemoteBlockClient::new(block).await.expect("Failed to create block client");
+
+        let buffer = vec![0; BLOCK_SIZE as usize];
+        client.write_at(BufferSlice::Memory(&buffer), 0).await.unwrap();
+
+        client.barrier();
+        client.write_at(BufferSlice::Memory(&buffer), 0).await.unwrap();
+
+        assert!(expect_barrier.load(Ordering::Relaxed));
 
         manager.shutdown().await;
     }

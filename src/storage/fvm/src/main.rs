@@ -1470,6 +1470,10 @@ impl Interface for PartitionInterface {
         })
     }
 
+    fn barrier(&self) -> Result<(), zx::Status> {
+        return Err(zx::Status::NOT_SUPPORTED);
+    }
+
     async fn write(
         &self,
         device_block_offset: u64,

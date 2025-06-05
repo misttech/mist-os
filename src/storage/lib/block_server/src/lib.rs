@@ -1034,7 +1034,7 @@ mod tests {
     use std::future::poll_fn;
     use std::num::NonZero;
     use std::pin::pin;
-    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
     use std::sync::Arc;
     use std::task::{Context, Poll};
     use zx::{AsHandleRef as _, HandleBased as _};
@@ -1052,6 +1052,9 @@ mod tests {
                     + Sync,
             >,
         >,
+        write_hook:
+            Option<Box<dyn Fn(u64) -> BoxFuture<'static, Result<(), zx::Status>> + Send + Sync>>,
+        barrier_hook: Option<Box<dyn Fn() -> Result<(), zx::Status> + Send + Sync>>,
     }
 
     impl super::async_interface::Interface for MockInterface {
@@ -1080,18 +1083,30 @@ mod tests {
 
         async fn write(
             &self,
-            _device_block_offset: u64,
+            device_block_offset: u64,
             _block_count: u32,
             _vmo: &Arc<zx::Vmo>,
             _vmo_offset: u64,
             _opts: WriteOptions,
             _trace_flow_id: TraceFlowId,
         ) -> Result<(), zx::Status> {
-            unreachable!();
+            if let Some(write_hook) = &self.write_hook {
+                write_hook(device_block_offset).await
+            } else {
+                unimplemented!();
+            }
         }
 
         async fn flush(&self, _trace_flow_id: TraceFlowId) -> Result<(), zx::Status> {
             unreachable!();
+        }
+
+        fn barrier(&self) -> Result<(), zx::Status> {
+            if let Some(barrier_hook) = &self.barrier_hook {
+                barrier_hook()
+            } else {
+                unimplemented!();
+            }
         }
 
         async fn trim(
@@ -1113,17 +1128,242 @@ mod tests {
     }
 
     const BLOCK_SIZE: u32 = 512;
+    const MAX_TRANSFER_BLOCKS: u32 = 10;
 
     fn test_device_info() -> DeviceInfo {
         DeviceInfo::Partition(PartitionInfo {
             device_flags: fblock::Flag::READONLY,
-            max_transfer_blocks: NonZero::new(10),
+            max_transfer_blocks: NonZero::new(MAX_TRANSFER_BLOCKS),
             block_range: Some(0..100),
             type_guid: [1; 16],
             instance_guid: [2; 16],
             name: "foo".to_string(),
             flags: 0xabcd,
         })
+    }
+
+    #[fuchsia::test]
+    async fn test_split_request_only_issues_single_barrier() {
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
+        let vmo = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
+        let barrier_called = Arc::new(AtomicU32::new(0));
+        let barrier_called_clone = barrier_called.clone();
+
+        futures::join!(
+            async move {
+                let block_server = BlockServer::new(
+                    BLOCK_SIZE,
+                    Arc::new(MockInterface {
+                        barrier_hook: Some(Box::new(move || {
+                            barrier_called_clone.fetch_add(1, Ordering::Relaxed);
+                            Ok(())
+                        })),
+                        write_hook: Some(Box::new(move |_device_block_offset| {
+                            Box::pin(async move { Ok(()) })
+                        })),
+                        ..MockInterface::default()
+                    }),
+                );
+                block_server.handle_requests(stream).await.unwrap();
+            },
+            async move {
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
+
+                proxy.open_session(server).unwrap();
+
+                let vmo_id = session_proxy
+                    .attach_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_ne!(vmo_id.id, 0);
+
+                let mut fifo =
+                    fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
+                // Set length to MAX_TRANSFER_BLOCKS + 1 to ensure the write is split across two
+                // sub requests.
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Write.into_primitive(),
+                            flags: BlockIoFlag::PRE_BARRIER.bits(),
+                            ..Default::default()
+                        },
+                        vmoid: vmo_id.id,
+                        dev_offset: 0,
+                        length: MAX_TRANSFER_BLOCKS + 1,
+                        vmo_offset: 6,
+                        ..Default::default()
+                    })
+                    .await
+                    .unwrap();
+
+                let mut response = BlockFifoResponse::default();
+                reader.read_entries(&mut response).await.unwrap();
+                assert_eq!(response.status, zx::sys::ZX_OK);
+
+                assert_eq!(barrier_called.load(Ordering::Relaxed), 1);
+
+                std::mem::drop(proxy);
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_barriers_not_supported() {
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
+        let vmo = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
+
+        futures::join!(
+            async move {
+                let block_server = BlockServer::new(
+                    BLOCK_SIZE,
+                    Arc::new(MockInterface {
+                        barrier_hook: Some(Box::new(move || Err(zx::Status::NOT_SUPPORTED))),
+                        write_hook: Some(Box::new(move |_device_block_offset| {
+                            Box::pin(async move { Ok(()) })
+                        })),
+                        ..MockInterface::default()
+                    }),
+                );
+                block_server.handle_requests(stream).await.unwrap();
+            },
+            async move {
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
+
+                proxy.open_session(server).unwrap();
+
+                let vmo_id = session_proxy
+                    .attach_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_ne!(vmo_id.id, 0);
+
+                let mut fifo =
+                    fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
+
+                // Set length to MAX_TRANSFER_BLOCKS + 1 to ensure the write is split across two
+                // sub requests.
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Write.into_primitive(),
+                            flags: BlockIoFlag::PRE_BARRIER.bits(),
+                            ..Default::default()
+                        },
+                        vmoid: vmo_id.id,
+                        dev_offset: 0,
+                        length: MAX_TRANSFER_BLOCKS + 1,
+                        vmo_offset: 6,
+                        ..Default::default()
+                    })
+                    .await
+                    .unwrap();
+
+                let mut response = BlockFifoResponse::default();
+                reader.read_entries(&mut response).await.unwrap();
+                assert_eq!(response.status, zx::sys::ZX_ERR_NOT_SUPPORTED);
+
+                std::mem::drop(proxy);
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_barriers_ordering() {
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
+        let vmo = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
+        let barrier_called = Arc::new(AtomicBool::new(false));
+
+        futures::join!(
+            async move {
+                let barrier_called_clone = barrier_called.clone();
+                let block_server = BlockServer::new(
+                    BLOCK_SIZE,
+                    Arc::new(MockInterface {
+                        barrier_hook: Some(Box::new(move || {
+                            barrier_called.store(true, Ordering::Relaxed);
+                            Ok(())
+                        })),
+                        write_hook: Some(Box::new(move |device_block_offset| {
+                            let barrier_called = barrier_called_clone.clone();
+                            Box::pin(async move {
+                                // The sleep allows the server to reorder the fifo requests.
+                                if device_block_offset % 2 == 0 {
+                                    fasync::Timer::new(fasync::MonotonicInstant::after(
+                                        zx::MonotonicDuration::from_millis(200),
+                                    ))
+                                    .await;
+                                }
+                                assert!(barrier_called.load(Ordering::Relaxed));
+                                Ok(())
+                            })
+                        })),
+                        ..MockInterface::default()
+                    }),
+                );
+                block_server.handle_requests(stream).await.unwrap();
+            },
+            async move {
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
+
+                proxy.open_session(server).unwrap();
+
+                let vmo_id = session_proxy
+                    .attach_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_ne!(vmo_id.id, 0);
+
+                let mut fifo =
+                    fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
+
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Write.into_primitive(),
+                            flags: BlockIoFlag::PRE_BARRIER.bits(),
+                            ..Default::default()
+                        },
+                        vmoid: vmo_id.id,
+                        dev_offset: 0,
+                        length: 5,
+                        vmo_offset: 6,
+                        ..Default::default()
+                    })
+                    .await
+                    .unwrap();
+
+                for i in 0..10 {
+                    writer
+                        .write_entries(&BlockFifoRequest {
+                            command: BlockFifoCommand {
+                                opcode: BlockOpcode::Write.into_primitive(),
+                                ..Default::default()
+                            },
+                            vmoid: vmo_id.id,
+                            dev_offset: i + 1,
+                            length: 5,
+                            vmo_offset: 6,
+                            ..Default::default()
+                        })
+                        .await
+                        .unwrap();
+                }
+                for _ in 0..11 {
+                    let mut response = BlockFifoResponse::default();
+                    reader.read_entries(&mut response).await.unwrap();
+                    assert_eq!(response.status, zx::sys::ZX_OK);
+                }
+
+                std::mem::drop(proxy);
+            }
+        );
     }
 
     #[fuchsia::test]
@@ -1151,7 +1391,7 @@ mod tests {
                 );
                 assert_eq!(block_info.flags, fblock::Flag::READONLY);
 
-                assert_eq!(block_info.max_transfer_size, 10 * BLOCK_SIZE);
+                assert_eq!(block_info.max_transfer_size, MAX_TRANSFER_BLOCKS * BLOCK_SIZE);
 
                 let (status, type_guid) = proxy.get_type_guid().await.unwrap();
                 assert_eq!(status, zx::sys::ZX_OK);
@@ -1400,6 +1640,10 @@ mod tests {
                 }
                 Ok(())
             }
+        }
+
+        fn barrier(&self) -> Result<(), zx::Status> {
+            unreachable!()
         }
 
         async fn trim(
@@ -1809,6 +2053,7 @@ mod tests {
                                 Ok(())
                             })
                         })),
+                        ..MockInterface::default()
                     }),
                 );
                 block_server.handle_requests(stream).await.unwrap();
@@ -1903,6 +2148,7 @@ mod tests {
                     BLOCK_SIZE,
                     Arc::new(MockInterface {
                         read_hook: Some(Box::new(move |_, _, _, _| Box::pin(async { Ok(()) }))),
+                        ..MockInterface::default()
                     }),
                 );
                 block_server.handle_requests(stream).await.unwrap();
@@ -1979,6 +2225,7 @@ mod tests {
                             counter_clone.fetch_add(1, Ordering::Relaxed);
                             Box::pin(async { Err(zx::Status::BAD_STATE) })
                         })),
+                        ..MockInterface::default()
                     }),
                 );
                 block_server.handle_requests(stream).await.unwrap();
@@ -2092,6 +2339,7 @@ mod tests {
                                 Ok(())
                             })
                         })),
+                        ..MockInterface::default()
                     }),
                 );
                 block_server.handle_requests(stream).await.unwrap();
@@ -2196,6 +2444,7 @@ mod tests {
                             Ok(())
                         })
                     })),
+                    ..MockInterface::default()
                 }),
             );
             block_server.handle_requests(stream).await.unwrap();
@@ -2277,6 +2526,7 @@ mod tests {
                                 Ok(())
                             })
                         })),
+                        ..MockInterface::default()
                     }),
                 );
                 block_server.handle_requests(stream).await.unwrap();

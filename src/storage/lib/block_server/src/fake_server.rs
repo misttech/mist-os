@@ -46,6 +46,8 @@ pub trait Observer: Send + Sync {
         WriteAction::Write
     }
 
+    fn barrier(&self) {}
+
     fn flush(&self) {}
 
     fn trim(&self, _device_block_offset: u64, _block_count: u32) {}
@@ -230,6 +232,13 @@ impl Interface for Data {
                 device_block_offset * self.block_size as u64,
             )
         }
+    }
+
+    fn barrier(&self) -> Result<(), zx::Status> {
+        if let Some(observer) = self.observer.as_ref() {
+            observer.barrier();
+        }
+        Ok(())
     }
 
     async fn flush(&self, _trace_flow_id: Option<NonZero<u64>>) -> Result<(), zx::Status> {

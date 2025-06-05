@@ -60,6 +60,11 @@ impl block_server::async_interface::Interface for PartitionBackend {
         Ok(Cow::Owned(self.partition.get_info().await?))
     }
 
+    fn barrier(&self) -> Result<(), zx::Status> {
+        self.partition.barrier();
+        Ok(())
+    }
+
     async fn read(
         &self,
         device_block_offset: u64,
