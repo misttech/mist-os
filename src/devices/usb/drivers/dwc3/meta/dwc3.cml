@@ -13,7 +13,7 @@
         bind: "meta/bind/dwc3.bindbc",
         colocate: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],
-        fallback: "false",
+        service_connect_validation: "true",
     },
     capabilities: [
         { protocol: "fuchsia.hardware.usb.endpoint.Endpoint" },
@@ -23,6 +23,7 @@
         { service: "fuchsia.hardware.usb.phy.Metadata" },
     ],
     use: [
+        { service: "fuchsia.hardware.interconnect.PathService" },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.boot.metadata.MacAddressMetadata" },
         { service: "fuchsia.boot.metadata.SerialNumberMetadata" },

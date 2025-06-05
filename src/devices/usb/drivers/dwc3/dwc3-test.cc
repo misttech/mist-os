@@ -4,6 +4,7 @@
 
 #include "src/devices/usb/drivers/dwc3/dwc3.h"
 
+#include <fidl/fuchsia.hardware.interconnect/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 
 #include <fake-mmio-reg/fake-mmio-reg.h>
@@ -16,6 +17,28 @@
 namespace dwc3 {
 
 namespace fpdev = fuchsia_hardware_platform_device;
+namespace fhi = fuchsia_hardware_interconnect;
+
+class FakePath final : public fidl::Server<fhi::Path> {
+ public:
+  explicit FakePath() = default;
+  virtual ~FakePath() = default;
+
+  fhi::PathService::InstanceHandler GetInstanceHandler(async_dispatcher_t* dispatcher) {
+    return fhi::PathService::InstanceHandler({
+        .path = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+    });
+  }
+
+  void SetBandwidth(SetBandwidthRequest& request, SetBandwidthCompleter::Sync& completer) override {
+    completer.Reply(zx::ok());
+  }
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fhi::Path> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  fidl::ServerBindingGroup<fhi::Path> bindings_;
+};
 
 class Environment : public fdf_testing::Environment {
  public:
@@ -29,8 +52,22 @@ class Environment : public fdf_testing::Environment {
   }
 
   zx::result<> Serve(fdf::OutgoingDirectory& directory) override {
-    auto result = directory.AddService<fpdev::Service>(
-        pdev_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()), "pdev");
+    auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+
+    zx::result result =
+        directory.AddService<fpdev::Service>(pdev_.GetInstanceHandler(dispatcher), "pdev");
+    EXPECT_TRUE(result.is_ok());
+
+    result = directory.AddService<fhi::PathService>(path_.GetInstanceHandler(dispatcher),
+                                                    "interconnect-usb-ddr");
+    EXPECT_TRUE(result.is_ok());
+
+    result = directory.AddService<fhi::PathService>(path_.GetInstanceHandler(dispatcher),
+                                                    "interconnect-usb-ipa");
+    EXPECT_TRUE(result.is_ok());
+
+    result = directory.AddService<fhi::PathService>(path_.GetInstanceHandler(dispatcher),
+                                                    "interconnect-ddr-usb");
     EXPECT_TRUE(result.is_ok());
 
     return zx::ok();
@@ -45,6 +82,7 @@ class Environment : public fdf_testing::Environment {
 
   fdf_fake::FakePDev pdev_;
   ddk_fake::FakeMmioRegRegion reg_region_{kRegSize, kRegCount};
+  FakePath path_;
 };
 
 class Config final {
