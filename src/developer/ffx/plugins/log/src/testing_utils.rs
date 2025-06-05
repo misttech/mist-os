@@ -18,7 +18,7 @@ use fidl_fuchsia_diagnostics_host::{
 };
 use futures::channel::{mpsc, oneshot};
 use futures::{Stream, StreamExt, TryStreamExt};
-use log_command::parse_time;
+use log_command::parse_utc_time;
 use moniker::Moniker;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -97,7 +97,7 @@ pub fn test_log_with_tag(timestamp: i64) -> LogsData {
 }
 
 pub fn naive_utc_nanos(utc_time: &str) -> i64 {
-    parse_time(utc_time).unwrap().time.naive_utc().timestamp_nanos_opt().unwrap()
+    parse_utc_time(utc_time).unwrap().time.naive_utc().timestamp_nanos_opt().unwrap()
 }
 
 impl Default for TestEnvironmentConfig {

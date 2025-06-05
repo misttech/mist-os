@@ -349,8 +349,8 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::StreamExt;
     use log_command::{
-        parse_seconds_string_as_duration, parse_time, DumpCommand, LogData, OneOrMany,
-        SymbolizeMode, TimeFormat, TIMESTAMP_FORMAT,
+        parse_seconds_string_as_duration, parse_time, parse_utc_time, DumpCommand, LogData,
+        OneOrMany, SymbolizeMode, TimeFormat, TIMESTAMP_FORMAT,
     };
     use moniker::Moniker;
     use selectors::parse_log_interest_selector;
@@ -665,10 +665,10 @@ ffx log --force-set-severity.
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             symbolize: SymbolizeMode::Off,
-            clock: TimeFormat::Local,
+            clock: TimeFormat::Utc,
             since: Some(log_command::DetailedDateTime {
                 is_now: true,
-                ..parse_time("1980-01-01T00:00:01").unwrap()
+                ..parse_utc_time("1980-01-01T00:00:01").unwrap()
             }),
             until: None,
             set_severity: selectors.clone(),
@@ -741,10 +741,10 @@ ffx log --force-set-severity.
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             symbolize: SymbolizeMode::Off,
-            clock: TimeFormat::Local,
+            clock: TimeFormat::Utc,
             since: Some(log_command::DetailedDateTime {
                 is_now: true,
-                ..parse_time("1980-01-01T00:00:01").unwrap()
+                ..parse_utc_time("1980-01-01T00:00:01").unwrap()
             }),
             until: None,
             ..LogCommand::default()
@@ -782,10 +782,10 @@ ffx log --force-set-severity.
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             symbolize: SymbolizeMode::Off,
-            clock: TimeFormat::Local,
+            clock: TimeFormat::Utc,
             since: Some(log_command::DetailedDateTime {
                 is_now: true,
-                ..parse_time("1980-01-01T00:00:01").unwrap()
+                ..parse_utc_time("1980-01-01T00:00:01").unwrap()
             }),
             until: None,
             ..LogCommand::default()
@@ -853,9 +853,9 @@ ffx log --force-set-severity.
                 ..Default::default()
             },
             LogCommand {
-                since: Some(parse_time("1980-01-01T00:00:01").unwrap()),
-                until: Some(parse_time("1980-01-01T00:00:05").unwrap()),
-                clock: TimeFormat::Local,
+                since: Some(parse_utc_time("1980-01-01T00:00:01").unwrap()),
+                until: Some(parse_utc_time("1980-01-01T00:00:05").unwrap()),
+                clock: TimeFormat::Utc,
                 ..LogCommand::default()
             },
             "[1980-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n",
