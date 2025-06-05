@@ -1468,6 +1468,10 @@ async fn starts_device_in_multicast_promiscuous(name: &str) {
             assert_eq!(mcast_filters, vec![]);
         }
     );
+    // Disable checking for clean shutdown on drop. This test exits before
+    // netsvc completes opening the session, which may cause it to exit with a
+    // sad exit code.
+    netsvc_realm.set_checked_shutdown_on_drop(false);
 }
 
 #[netstack_test]
