@@ -50,7 +50,7 @@ class PowerSourceState {
       .present_voltage = 2910,
       .battery_spec = fuchsia_hardware_powersource::BatterySpec{{
           .max_charging_current_ua = 1000000,
-          .max_charnging_voltage_uv = 5000000,
+          .max_charging_voltage_uv = 5000000,
           .design_capacity_uah = 300000,
       }},
   }};
