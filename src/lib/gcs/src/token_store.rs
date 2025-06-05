@@ -13,6 +13,7 @@ use fuchsia_hyper::HttpsClient;
 use http::{request, StatusCode};
 use hyper::{Body, Method, Request, Response};
 use std::fmt;
+use std::path::PathBuf;
 use url::Url;
 
 /// Base URL for JSON API access.
@@ -226,6 +227,69 @@ impl TokenStore {
         self.attempt_list(https_client, bucket, prefix, limit).await
     }
 
+    /// Uploads a local file to a GCS bucket using a simple media upload
+    /// and returns the GCS URL of the new object.
+    ///
+    /// See: https://cloud.google.com/storage/docs/json_api/v1/objects/insert#upload-simple
+    ///
+    /// # Arguments
+    /// * `https_client` - An HttpsClient to make the request with.
+    /// * `bucket` - The name of the GCS bucket to upload to.
+    /// * `object_name` - The desired name of the object in GCS.
+    /// * `file_path` - The local path of the file to upload.
+    ///
+    /// # Returns
+    /// On success, returns the canonical `Url` of the uploaded GCS object.
+    pub async fn upload(
+        &self,
+        https_client: &HttpsClient,
+        bucket: &str,
+        object_name: &str,
+        file_path: &PathBuf,
+    ) -> Result<Url> {
+        let file_data = std::fs::read(file_path)?;
+
+        let mut upload_url = self.storage_base.to_owned();
+        upload_url
+            .path_segments_mut()
+            .map_err(|_| anyhow::anyhow!("Internal error: GCS URL cannot be a base"))?
+            .extend(&["upload", "storage", "v1", "b", bucket, "o"]);
+        upload_url
+            .query_pairs_mut()
+            .append_pair("uploadType", "media")
+            .append_pair("name", object_name);
+
+        let req = Request::builder()
+            .method("POST")
+            .uri(upload_url.as_str())
+            .header("Content-Type", "application/octet-stream");
+
+        let req = self
+            .maybe_authorize(req)
+            .await?
+            .body(Body::from(file_data))
+            .context("Failed to build GCS upload request")?;
+        let res = https_client.request(req).await.context("Failed to send GCS upload request")?;
+
+        // Check the HTTP response status for a successful upload.
+        let status = res.status();
+        if !status.is_success() {
+            // If the upload failed, provide a detailed error from the response body.
+            let body_bytes = hyper::body::to_bytes(res.into_body()).await?;
+            let error_body = String::from_utf8_lossy(&body_bytes);
+            bail!("GCS upload failed with status {}: {}", status, error_body);
+        }
+
+        // On success, construct and return the canonical URL for the created object.
+        let mut final_url = self.storage_base.to_owned();
+        final_url
+            .path_segments_mut()
+            .map_err(|_| anyhow::anyhow!("Internal error: GCS URL cannot be a base"))?
+            .extend(&[bucket, object_name]);
+
+        Ok(final_url)
+    }
+
     /// Make one attempt to list objects from GCS.
     ///
     /// If `limit` is given, at most N results will be returned. If `limit` is
@@ -306,6 +370,14 @@ impl fmt::Debug for TokenStore {
 mod test {
     use super::*;
     use fuchsia_hyper::new_https_client;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    fn setup_temp_file(content: &[u8]) -> Result<NamedTempFile> {
+        let mut file = NamedTempFile::new()?;
+        file.write_all(content)?;
+        Ok(file)
+    }
 
     #[should_panic(expected = "Connection refused")]
     #[fuchsia_async::run_singlethreaded(test)]
@@ -314,6 +386,20 @@ mod test {
         let bucket = "fake_bucket";
         let object = "fake/object/path.txt";
         token_store.download(&new_https_client(), bucket, object).await.expect("client download");
+    }
+
+    #[should_panic(expected = "Connection refused")]
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn test_fake_upload() {
+        let token_store = TokenStore::local_fake();
+        let file_content = b"this is the file content";
+        let temp_file = setup_temp_file(file_content).unwrap();
+        let bucket = "fake_bucket";
+        let object = "fake/object/path.txt";
+        token_store
+            .upload(&new_https_client(), bucket, object, &temp_file.path().to_path_buf())
+            .await
+            .expect("client upload");
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
