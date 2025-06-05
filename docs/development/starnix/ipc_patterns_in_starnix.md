@@ -31,7 +31,7 @@ in Starnix:
 ```mermaid
 flowchart TD
     A(Need to make two-way FIDL calls?) -->|Yes| B(Do you need to make the FIDL calls during a Linux syscall?)
-    B -->|Yes, the FIDL calls serve the syscalls of a Linux program.| C(Synchronous FDL binding)
+    B -->|Yes, the FIDL calls serve the syscalls of a Linux program.| C(Synchronous FIDL binding)
     B -->|No, the FIDL calls are not associated with any syscalls.| D(Asynchronous FIDL binding)
     D -->|Default case| E(Spawn a future onto the main thread's executor)
     D -->|Exceptional case| F(Spawn a separate thread that runs its own executor)
