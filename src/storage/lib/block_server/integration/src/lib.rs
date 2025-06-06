@@ -4,12 +4,13 @@
 
 use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice};
 use block_protocol::{BlockFifoCommand, BlockFifoRequest, BlockFifoResponse};
-use fake_block_server::{FakeServer, FakeServerOptions, Observer};
+use block_server::{BlockInfo, DeviceInfo};
 use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
 use std::num::NonZero;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use test_case::test_case;
+use vmo_backed_block_server::{InitialContents, Observer, VmoBackedServerOptions};
 use zx::{AsHandleRef, HandleBased as _};
 use {
     fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
@@ -189,13 +190,18 @@ async fn test_request_splitting_rust_server() {
     let last_trim_length_clone = last_trim_length.clone();
 
     let server = async {
-        let block_server = FakeServer::from(FakeServerOptions {
-            block_count: Some(NUM_BLOCKS),
+        let block_server = VmoBackedServerOptions {
+            initial_contents: InitialContents::FromCapacity(NUM_BLOCKS),
             block_size: BLOCK_SIZE,
-            max_transfer_blocks: NonZero::new(MAX_TRANSFER_BLOCKS),
+            info: DeviceInfo::Block(BlockInfo {
+                max_transfer_blocks: NonZero::new(MAX_TRANSFER_BLOCKS),
+                ..Default::default()
+            }),
             observer: Some(Box::new(TrimObserver(last_trim_length_clone))),
             ..Default::default()
-        });
+        }
+        .build()
+        .unwrap();
         block_server.serve(stream).await.unwrap();
     };
 

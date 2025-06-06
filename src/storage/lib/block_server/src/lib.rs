@@ -36,7 +36,7 @@ pub enum DeviceInfo {
 }
 
 impl DeviceInfo {
-    fn block_count(&self) -> Option<u64> {
+    pub fn block_count(&self) -> Option<u64> {
         match self {
             Self::Block(BlockInfo { block_count, .. }) => Some(*block_count),
             Self::Partition(PartitionInfo { block_range, .. }) => {
@@ -45,7 +45,7 @@ impl DeviceInfo {
         }
     }
 
-    fn max_transfer_blocks(&self) -> Option<NonZero<u32>> {
+    pub fn max_transfer_blocks(&self) -> Option<NonZero<u32>> {
         match self {
             Self::Block(BlockInfo { max_transfer_blocks, .. }) => max_transfer_blocks.clone(),
             Self::Partition(PartitionInfo { max_transfer_blocks, .. }) => {
@@ -64,7 +64,7 @@ impl DeviceInfo {
 }
 
 /// Information associated with non-partition block devices.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct BlockInfo {
     pub device_flags: fblock::Flag,
     pub block_count: u64,
@@ -72,7 +72,7 @@ pub struct BlockInfo {
 }
 
 /// Information associated with a block device that is also a partition.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct PartitionInfo {
     /// The device flags reported by the underlying device.
     pub device_flags: fblock::Flag,

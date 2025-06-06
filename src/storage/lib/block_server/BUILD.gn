@@ -44,10 +44,11 @@ rustc_library("block_server") {
   ]
 }
 
-rustc_library("fake_block_server") {
+rustc_library("vmo_backed_block_server") {
+  assert_no_deps = [ ":vmo_backed_block_server_testing" ]
   edition = "2021"
-  sources = [ "src/fake_server.rs" ]
-  source_root = "src/fake_server.rs"
+  sources = [ "src/vmo_backed_server.rs" ]
+  source_root = "src/vmo_backed_server.rs"
   deps = [
     ":block_server",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",

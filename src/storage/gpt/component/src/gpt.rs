@@ -512,14 +512,16 @@ impl Drop for GptManager {
 mod tests {
     use super::GptManager;
     use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
-    use block_server::WriteOptions;
-    use fake_block_server::{FakeServer, FakeServerOptions};
+    use block_server::{BlockInfo, DeviceInfo, WriteOptions};
     use fidl::HandleBased as _;
     use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
     use gpt::{Gpt, Guid, PartitionInfo};
     use std::num::NonZero;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use vmo_backed_block_server::{
+        InitialContents, VmoBackedServer, VmoBackedServerOptions, VmoBackedServerTestingExt as _,
+    };
     use {
         fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
         fidl_fuchsia_io as fio, fidl_fuchsia_storage_partitions as fpartitions,
@@ -530,19 +532,23 @@ mod tests {
         block_size: u32,
         block_count: u64,
         partitions: Vec<PartitionInfo>,
-    ) -> (Arc<FakeServer>, Arc<vfs::directory::immutable::Simple>) {
+    ) -> (Arc<VmoBackedServer>, Arc<vfs::directory::immutable::Simple>) {
         setup_with_options(
-            FakeServerOptions { block_count: Some(block_count), block_size, ..Default::default() },
+            VmoBackedServerOptions {
+                initial_contents: InitialContents::FromCapacity(block_count),
+                block_size,
+                ..Default::default()
+            },
             partitions,
         )
         .await
     }
 
     async fn setup_with_options(
-        opts: FakeServerOptions<'_>,
+        opts: VmoBackedServerOptions<'_>,
         partitions: Vec<PartitionInfo>,
-    ) -> (Arc<FakeServer>, Arc<vfs::directory::immutable::Simple>) {
-        let server = Arc::new(FakeServer::from(opts));
+    ) -> (Arc<VmoBackedServer>, Arc<vfs::directory::immutable::Simple>) {
+        let server = Arc::new(opts.build().unwrap());
         {
             let (block_client, block_server) =
                 fidl::endpoints::create_proxy::<fblock::BlockMarker>();
@@ -561,7 +567,7 @@ mod tests {
     #[fuchsia::test]
     async fn load_unformatted_gpt() {
         let vmo = zx::Vmo::create(4096).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
 
         GptManager::new(server.block_proxy(), vfs::directory::immutable::simple())
             .await
@@ -815,7 +821,7 @@ mod tests {
 
         struct Observer(Arc<AtomicBool>);
 
-        impl fake_block_server::Observer for Observer {
+        impl vmo_backed_block_server::Observer for Observer {
             fn write(
                 &self,
                 _device_block_offset: u64,
@@ -823,19 +829,19 @@ mod tests {
                 _vmo: &Arc<zx::Vmo>,
                 _vmo_offset: u64,
                 opts: WriteOptions,
-            ) -> fake_block_server::WriteAction {
+            ) -> vmo_backed_block_server::WriteAction {
                 assert_eq!(
                     opts.contains(WriteOptions::FORCE_ACCESS),
                     self.0.load(Ordering::Relaxed)
                 );
-                fake_block_server::WriteAction::Write
+                vmo_backed_block_server::WriteAction::Write
             }
         }
 
         let expect_force_access = Arc::new(AtomicBool::new(false));
         let (server, partitions_dir) = setup_with_options(
-            FakeServerOptions {
-                block_count: Some(BLOCK_COUNT),
+            VmoBackedServerOptions {
+                initial_contents: InitialContents::FromCapacity(BLOCK_COUNT),
                 block_size: BLOCK_SIZE,
                 observer: Some(Box::new(Observer(expect_force_access.clone()))),
                 ..Default::default()
@@ -883,7 +889,7 @@ mod tests {
 
         struct Observer(Arc<AtomicBool>);
 
-        impl fake_block_server::Observer for Observer {
+        impl vmo_backed_block_server::Observer for Observer {
             fn barrier(&self) {
                 self.0.store(true, Ordering::Relaxed);
             }
@@ -891,8 +897,8 @@ mod tests {
 
         let expect_barrier = Arc::new(AtomicBool::new(false));
         let (server, partitions_dir) = setup_with_options(
-            FakeServerOptions {
-                block_count: Some(BLOCK_COUNT),
+            VmoBackedServerOptions {
+                initial_contents: InitialContents::FromCapacity(BLOCK_COUNT),
                 block_size: BLOCK_SIZE,
                 observer: Some(Box::new(Observer(expect_barrier.clone()))),
                 ..Default::default()
@@ -1261,11 +1267,14 @@ mod tests {
         const PART_NAME: &str = "part";
 
         let (block_device, partitions_dir) = setup_with_options(
-            FakeServerOptions {
-                block_count: Some(8),
+            VmoBackedServerOptions {
+                initial_contents: InitialContents::FromCapacity(16),
                 block_size: 512,
-                max_transfer_blocks: NonZero::new(2),
-                flags: fblock::Flag::READONLY | fblock::Flag::REMOVABLE,
+                info: DeviceInfo::Block(BlockInfo {
+                    max_transfer_blocks: NonZero::new(2),
+                    device_flags: fblock::Flag::READONLY | fblock::Flag::REMOVABLE,
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
             vec![PartitionInfo {
@@ -1319,10 +1328,13 @@ mod tests {
         let vmo = zx::Vmo::create(64 * 512).unwrap();
         let vmo_clone = vmo.create_child(zx::VmoChildOptions::REFERENCE, 0, 0).unwrap();
         let (outer_block_device, outer_partitions_dir) = setup_with_options(
-            FakeServerOptions {
-                vmo: Some(vmo_clone),
+            VmoBackedServerOptions {
+                initial_contents: InitialContents::FromVmo(vmo_clone),
                 block_size: 512,
-                flags: fblock::Flag::READONLY | fblock::Flag::REMOVABLE,
+                info: DeviceInfo::Block(BlockInfo {
+                    device_flags: fblock::Flag::READONLY | fblock::Flag::REMOVABLE,
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
             vec![PartitionInfo {
@@ -1407,10 +1419,13 @@ mod tests {
         const PART_NAME: &str = "part";
 
         let (block_device, partitions_dir) = setup_with_options(
-            FakeServerOptions {
-                block_count: Some(16),
+            VmoBackedServerOptions {
+                initial_contents: InitialContents::FromCapacity(16),
                 block_size: 512,
-                flags: fblock::Flag::READONLY | fblock::Flag::REMOVABLE,
+                info: DeviceInfo::Block(BlockInfo {
+                    device_flags: fblock::Flag::READONLY | fblock::Flag::REMOVABLE,
+                    ..Default::default()
+                }),
                 ..Default::default()
             },
             vec![PartitionInfo {

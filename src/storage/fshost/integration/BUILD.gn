@@ -49,7 +49,7 @@ rustc_library("fshost_test_fixture") {
     "//src/storage/gpt/rust",
     "//src/storage/lib/blob_writer:blob-writer",
     "//src/storage/lib/block_client/rust",
-    "//src/storage/lib/block_server:fake_block_server",
+    "//src/storage/lib/block_server:vmo_backed_block_server",
     "//src/storage/lib/delivery_blob",
     "//src/storage/lib/fs_management/rust:fs_management",
     "//src/storage/lib/key-bag",

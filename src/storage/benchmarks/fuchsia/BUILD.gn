@@ -64,7 +64,7 @@ rustc_library("framework") {
     "//src/lib/fuchsia",
     "//src/storage/gpt/rust",
     "//src/storage/lib/block_client/rust:block-client",
-    "//src/storage/lib/block_server:fake_block_server",
+    "//src/storage/lib/block_server:vmo_backed_block_server",
     "//src/sys/test_runners:tmp_storage",
   ]
   with_unit_tests = true

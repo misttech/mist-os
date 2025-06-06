@@ -5,7 +5,6 @@
 use blob_writer::BlobWriter;
 use block_client::{BlockClient as _, RemoteBlockClient};
 use delivery_blob::{CompressionMode, Type1Blob};
-use fake_block_server::FakeServer;
 use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::{BlobCreatorProxy, CryptManagementMarker, CryptMarker, KeyPurpose};
@@ -23,6 +22,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use storage_isolated_driver_manager::fvm::format_for_fvm;
 use uuid::Uuid;
+use vmo_backed_block_server::{VmoBackedServer, VmoBackedServerTestingExt as _};
 use zerocopy::{Immutable, IntoBytes};
 use zx::{self as zx, HandleBased};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
@@ -339,7 +339,7 @@ impl DiskBuilder {
             return (vmo, self.type_guid);
         }
 
-        let server = Arc::new(FakeServer::from_vmo(
+        let server = Arc::new(VmoBackedServer::from_vmo(
             TEST_DISK_BLOCK_SIZE,
             vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
         ));

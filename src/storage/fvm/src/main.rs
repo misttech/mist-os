@@ -1893,7 +1893,7 @@ mod tests {
     use block_client::{
         BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient, WriteOptions,
     };
-    use fake_block_server::{FakeServer, FakeServerOptions};
+    use block_server::{BlockInfo, DeviceInfo};
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_fs::AdminMarker;
     use fidl_fuchsia_fs_startup::{
@@ -1909,6 +1909,9 @@ mod tests {
     use std::collections::HashSet;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use vmo_backed_block_server::{
+        InitialContents, VmoBackedServer, VmoBackedServerOptions, VmoBackedServerTestingExt as _,
+    };
     use {
         fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -1917,7 +1920,7 @@ mod tests {
     struct Fixture {
         component: Arc<Component>,
         outgoing_dir: fio::DirectoryProxy,
-        fake_server: Arc<FakeServer>,
+        fake_server: Arc<VmoBackedServer>,
     }
 
     const BLOCK_SIZE: u32 = 512;
@@ -1926,7 +1929,7 @@ mod tests {
     impl Fixture {
         async fn new(extra_space: u64) -> Self {
             let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
-            let fake_server = Arc::new(FakeServer::new(
+            let fake_server = Arc::new(VmoBackedServer::new(
                 (contents.len() as u64 + extra_space) / BLOCK_SIZE as u64,
                 BLOCK_SIZE,
                 &contents,
@@ -1934,7 +1937,7 @@ mod tests {
             Self::from_fake_server(fake_server).await
         }
 
-        async fn from_fake_server(fake_server: Arc<FakeServer>) -> Self {
+        async fn from_fake_server(fake_server: Arc<VmoBackedServer>) -> Self {
             let (outgoing_dir, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let fixture =
@@ -1977,7 +1980,7 @@ mod tests {
             connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap()
         }
 
-        fn take_fake_server(self) -> Arc<FakeServer> {
+        fn take_fake_server(self) -> Arc<VmoBackedServer> {
             self.fake_server
         }
     }
@@ -2805,7 +2808,7 @@ mod tests {
 
         struct Observer(Arc<AtomicBool>);
 
-        impl fake_block_server::Observer for Observer {
+        impl vmo_backed_block_server::Observer for Observer {
             fn write(
                 &self,
                 _device_block_offset: u64,
@@ -2813,25 +2816,25 @@ mod tests {
                 _vmo: &Arc<zx::Vmo>,
                 _vmo_offset: u64,
                 opts: WriteOptions,
-            ) -> fake_block_server::WriteAction {
+            ) -> vmo_backed_block_server::WriteAction {
                 assert_eq!(
                     opts.contains(WriteOptions::FORCE_ACCESS),
                     self.0.load(Ordering::Relaxed)
                 );
-                fake_block_server::WriteAction::Write
+                vmo_backed_block_server::WriteAction::Write
             }
         }
 
         let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
         let fake_server = Arc::new(
-            FakeServerOptions {
-                block_count: Some(contents.len() as u64 / BLOCK_SIZE as u64),
+            VmoBackedServerOptions {
                 block_size: BLOCK_SIZE,
-                initial_content: Some(&contents),
+                initial_contents: InitialContents::FromBuffer(&contents),
                 observer: Some(Box::new(Observer(expect_force_access.clone()))),
                 ..Default::default()
             }
-            .into(),
+            .build()
+            .unwrap(),
         );
 
         let fixture = Fixture::from_fake_server(fake_server).await;
@@ -2872,7 +2875,7 @@ mod tests {
 
         struct Observer(Arc<AtomicBool>);
 
-        impl fake_block_server::Observer for Observer {
+        impl vmo_backed_block_server::Observer for Observer {
             fn flush(&self) {
                 self.0.store(true, Ordering::Relaxed);
             }
@@ -2880,14 +2883,17 @@ mod tests {
 
         let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
         let fake_server = Arc::new(
-            FakeServerOptions {
-                block_count: Some((contents.len() as u64 + SLICE_SIZE) / BLOCK_SIZE as u64),
+            VmoBackedServerOptions {
                 block_size: BLOCK_SIZE,
-                initial_content: Some(&contents),
+                initial_contents: InitialContents::FromBufferAndCapactity(
+                    (contents.len() as u64 + SLICE_SIZE) / BLOCK_SIZE as u64,
+                    &contents,
+                ),
                 observer: Some(Box::new(Observer(flush_called.clone()))),
                 ..Default::default()
             }
-            .into(),
+            .build()
+            .unwrap(),
         );
 
         let fixture = Fixture::from_fake_server(fake_server).await;
@@ -3063,7 +3069,7 @@ mod tests {
 
         struct Observer(Arc<AtomicBool>);
 
-        impl fake_block_server::Observer for Observer {
+        impl vmo_backed_block_server::Observer for Observer {
             fn trim(&self, _device_block_offset: u64, _block_count: u32) {
                 self.0.store(true, Ordering::Relaxed)
             }
@@ -3071,14 +3077,14 @@ mod tests {
 
         let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
         let fake_server = Arc::new(
-            FakeServerOptions {
-                block_count: Some(contents.len() as u64 / BLOCK_SIZE as u64),
+            VmoBackedServerOptions {
                 block_size: BLOCK_SIZE,
-                initial_content: Some(&contents),
+                initial_contents: InitialContents::FromBuffer(&contents),
                 observer: Some(Box::new(Observer(trim_called.clone()))),
                 ..Default::default()
             }
-            .into(),
+            .build()
+            .unwrap(),
         );
 
         let fixture = Fixture::from_fake_server(fake_server).await;
@@ -3111,14 +3117,17 @@ mod tests {
     async fn test_volume_info() {
         let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
         let fake_server = Arc::new(
-            FakeServerOptions {
-                flags: fblock::Flag::READONLY,
-                block_count: Some(contents.len() as u64 / BLOCK_SIZE as u64),
+            VmoBackedServerOptions {
+                info: DeviceInfo::Block(BlockInfo {
+                    device_flags: fblock::Flag::READONLY,
+                    ..Default::default()
+                }),
                 block_size: BLOCK_SIZE,
-                initial_content: Some(&contents),
+                initial_contents: InitialContents::FromBuffer(&contents),
                 ..Default::default()
             }
-            .into(),
+            .build()
+            .unwrap(),
         );
 
         let fixture = Fixture::from_fake_server(fake_server).await;

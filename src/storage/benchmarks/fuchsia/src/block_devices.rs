@@ -619,11 +619,11 @@ mod tests {
     use super::*;
     use crate::testing::{RamdiskFactory, RAMDISK_FVM_SLICE_SIZE};
     use block_client::RemoteBlockClient;
-    use fake_block_server::FakeServer;
     use fidl_fuchsia_fs_startup::VolumesMarker;
     use fs_management::Gpt;
     use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
     use std::sync::Arc;
+    use vmo_backed_block_server::{VmoBackedServer, VmoBackedServerTestingExt as _};
 
     const BLOCK_SIZE: u64 = 4 * 1024;
     const BLOCK_COUNT: u64 = 1024;
@@ -703,7 +703,7 @@ mod tests {
 
     async fn init_gpt(block_size: u32, block_count: u64) -> zx::Vmo {
         let vmo = zx::Vmo::create(block_size as u64 * block_count).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(
+        let server = Arc::new(VmoBackedServer::from_vmo(
             block_size,
             vmo.create_child(zx::VmoChildOptions::REFERENCE, 0, 0).unwrap(),
         ));

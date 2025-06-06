@@ -498,16 +498,18 @@ impl Drop for Transaction {
 mod tests {
     use crate::{AddPartitionError, Gpt, Guid, PartitionInfo};
     use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
-    use fake_block_server::{FakeServer, FakeServerOptions};
     use std::ops::Range;
     use std::sync::Arc;
+    use vmo_backed_block_server::{
+        InitialContents, VmoBackedServer, VmoBackedServerOptions, VmoBackedServerTestingExt as _,
+    };
     use zx::HandleBased;
     use {fidl_fuchsia_hardware_block_volume as fvolume, fuchsia_async as fasync};
 
     #[fuchsia::test]
     async fn load_unformatted_gpt() {
         let vmo = zx::Vmo::create(4096).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -519,7 +521,7 @@ mod tests {
     #[fuchsia::test]
     async fn load_formatted_empty_gpt() {
         let vmo = zx::Vmo::create(4096).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -536,7 +538,7 @@ mod tests {
         const PART_NAME: &str = "part";
 
         let vmo = zx::Vmo::create(6 * 4096).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(4096, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(4096, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -572,7 +574,7 @@ mod tests {
         const PART_NAME: &str = "part";
 
         let vmo = zx::Vmo::create(4096).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -610,7 +612,7 @@ mod tests {
         const PART_2_NAME: &str = "part2";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -662,7 +664,7 @@ mod tests {
         const PART_NAME: &str = "part\0extrastuff";
 
         let vmo = zx::Vmo::create(4096).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -694,7 +696,7 @@ mod tests {
         const PART_NAME: &str = "";
 
         let vmo = zx::Vmo::create(4096).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -728,7 +730,7 @@ mod tests {
 
         let vmo = zx::Vmo::create(8192).unwrap();
 
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -785,7 +787,7 @@ mod tests {
 
         let vmo = zx::Vmo::create(8192).unwrap();
 
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -835,7 +837,7 @@ mod tests {
     #[fuchsia::test]
     async fn drop_transaction() {
         let vmo = zx::Vmo::create(8192).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -854,7 +856,7 @@ mod tests {
     #[fuchsia::test]
     async fn commit_empty_transaction() {
         let vmo = zx::Vmo::create(8192).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -883,7 +885,7 @@ mod tests {
         const PART_2_NAME: &str = "part2";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -943,7 +945,7 @@ mod tests {
         const PART_NAME: &str = "part1";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -986,7 +988,7 @@ mod tests {
         const PART_2_NAME: &str = "part2";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -1041,7 +1043,7 @@ mod tests {
     #[fuchsia::test]
     async fn grow_partition_table_in_transaction() {
         let vmo = zx::Vmo::create(1024 * 1024).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -1104,7 +1106,7 @@ mod tests {
                 flags: 0,
             });
         }
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -1136,7 +1138,7 @@ mod tests {
         const PART_NAME: &str = "part1";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -1187,7 +1189,7 @@ mod tests {
         discard_range: Range<u64>,
     }
 
-    impl fake_block_server::Observer for DiscardingObserver {
+    impl vmo_backed_block_server::Observer for DiscardingObserver {
         fn write(
             &self,
             device_block_offset: u64,
@@ -1195,15 +1197,15 @@ mod tests {
             _vmo: &Arc<zx::Vmo>,
             _vmo_offset: u64,
             _opts: block_server::WriteOptions,
-        ) -> fake_block_server::WriteAction {
+        ) -> vmo_backed_block_server::WriteAction {
             let write_range = (device_block_offset * self.block_size)
                 ..(device_block_offset + block_count as u64) * self.block_size;
             if write_range.end <= self.discard_range.start
                 || write_range.start >= self.discard_range.end
             {
-                fake_block_server::WriteAction::Write
+                vmo_backed_block_server::WriteAction::Write
             } else {
-                fake_block_server::WriteAction::Discard
+                vmo_backed_block_server::WriteAction::Discard
             }
         }
     }
@@ -1217,15 +1219,19 @@ mod tests {
         const PART_2_NAME: &str = "part2";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        let server = Arc::new(FakeServer::from(FakeServerOptions {
-            vmo: Some(vmo),
-            block_size: 512,
-            observer: Some(Box::new(DiscardingObserver {
-                discard_range: 1024..1536,
+        let server = Arc::new(
+            VmoBackedServerOptions {
+                initial_contents: InitialContents::FromVmo(vmo),
                 block_size: 512,
-            })),
-            ..Default::default()
-        }));
+                observer: Some(Box::new(DiscardingObserver {
+                    discard_range: 1024..1536,
+                    block_size: 512,
+                })),
+                ..Default::default()
+            }
+            .build()
+            .unwrap(),
+        );
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -1284,7 +1290,7 @@ mod tests {
         let vmo_dup = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
         {
             let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
-            let server = Arc::new(FakeServer::from_vmo(512, vmo_dup));
+            let server = Arc::new(VmoBackedServer::from_vmo(512, vmo_dup));
             let _task =
                 fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
             let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
@@ -1303,15 +1309,19 @@ mod tests {
             .expect("format failed");
         }
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
-        let server = Arc::new(FakeServer::from(FakeServerOptions {
-            vmo: Some(vmo),
-            block_size: 512,
-            observer: Some(Box::new(DiscardingObserver {
-                discard_range: 0..2048,
+        let server = Arc::new(
+            VmoBackedServerOptions {
+                initial_contents: InitialContents::FromVmo(vmo),
                 block_size: 512,
-            })),
-            ..Default::default()
-        }));
+                observer: Some(Box::new(DiscardingObserver {
+                    discard_range: 0..2048,
+                    block_size: 512,
+                })),
+                ..Default::default()
+            }
+            .build()
+            .unwrap(),
+        );
         let _task =
             fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
@@ -1351,7 +1361,7 @@ mod tests {
         let vmo_dup = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap();
         {
             let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
-            let server = Arc::new(FakeServer::from_vmo(512, vmo_dup));
+            let server = Arc::new(VmoBackedServer::from_vmo(512, vmo_dup));
             let _task =
                 fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
             let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
@@ -1370,15 +1380,19 @@ mod tests {
             .expect("format failed");
         }
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
-        let server = Arc::new(FakeServer::from(FakeServerOptions {
-            vmo: Some(vmo),
-            block_size: 512,
-            observer: Some(Box::new(DiscardingObserver {
-                discard_range: 0..7680,
+        let server = Arc::new(
+            VmoBackedServerOptions {
+                initial_contents: InitialContents::FromVmo(vmo),
                 block_size: 512,
-            })),
-            ..Default::default()
-        }));
+                observer: Some(Box::new(DiscardingObserver {
+                    discard_range: 0..7680,
+                    block_size: 512,
+                })),
+                ..Default::default()
+            }
+            .build()
+            .unwrap(),
+        );
         let _task =
             fasync::Task::spawn(async move { server.serve(server_end.into_stream()).await });
         let client = Arc::new(RemoteBlockClient::new(client).await.unwrap());
@@ -1413,7 +1427,7 @@ mod tests {
         const PART_NAME: &str = "part1";
 
         let vmo = zx::Vmo::create(8192).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -1447,7 +1461,7 @@ mod tests {
     #[fuchsia::test]
     async fn load_golden_gpt_linux() {
         let contents = std::fs::read("/pkg/data/gpt_golden/gpt.linux.blk").unwrap();
-        let server = Arc::new(FakeServer::new(contents.len() as u64 / 512, 512, &contents));
+        let server = Arc::new(VmoBackedServer::new(contents.len() as u64 / 512, 512, &contents));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -1466,7 +1480,7 @@ mod tests {
     #[fuchsia::test]
     async fn load_golden_gpt_fuchsia() {
         let contents = std::fs::read("/pkg/data/gpt_golden/gpt.fuchsia.blk").unwrap();
-        let server = Arc::new(FakeServer::new(contents.len() as u64 / 512, 512, &contents));
+        let server = Arc::new(VmoBackedServer::new(contents.len() as u64 / 512, 512, &contents));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         struct ExpectedPartition {
@@ -1535,7 +1549,7 @@ mod tests {
     #[fuchsia::test]
     async fn add_partitions_till_no_blocks_left() {
         let vmo = zx::Vmo::create(65536).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
@@ -1581,7 +1595,7 @@ mod tests {
     #[fuchsia::test]
     async fn add_partitions_till_no_slots_left() {
         let vmo = zx::Vmo::create(65536).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         let (client, server_end) = fidl::endpoints::create_proxy::<fvolume::VolumeMarker>();
 
         let _task =
