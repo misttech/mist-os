@@ -150,9 +150,6 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   struct DisplayConfigResponse {
     // Whether or not the config can be successfully applied or not.
     fuchsia_hardware_display_types::ConfigResult result;
-    // If the config is invalid, this vector will list all the operations
-    // that need to be performed to make the config valid again.
-    std::vector<fuchsia_hardware_display::ClientCompositionOp> ops;
   };
 
   struct FrameEventData {

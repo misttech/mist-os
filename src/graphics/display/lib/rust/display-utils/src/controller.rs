@@ -259,9 +259,9 @@ impl Coordinator {
             }
         }
 
-        let (result, ops) = proxy.check_config(false).await?;
+        let result = proxy.check_config(false).await?;
         if result != display_types::ConfigResult::Ok {
-            return Err(ConfigError::invalid(result, ops));
+            return Err(ConfigError::invalid(result));
         }
 
         let config_stamp = self.inner.write().next_config_stamp().unwrap();

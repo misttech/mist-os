@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 library fuchsia.hardware.display;
 
-using fuchsia.hardware.display.types;
-
 /// Type of the internal value in [`LayerId`].
 alias LayerIdValue = uint64;
 
@@ -22,16 +20,4 @@ alias LayerIdValue = uint64;
 /// subsequent [`fuchsia.hardware.display/Coordinator.CreateLayer`] call.
 type LayerId = struct {
     value LayerIdValue;
-};
-
-type ClientCompositionOp = struct {
-    /// display_id and layer_id uniquely identify the subject of the
-    /// opcode.
-    display_id fuchsia.hardware.display.types.DisplayId;
-
-    /// Invalid for issues that aren't scoped to a specific layer, such as
-    /// unsupported color conversion tables.
-    layer_id LayerId;
-
-    opcode fuchsia.hardware.display.types.ClientCompositionOpcode;
 };

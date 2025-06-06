@@ -288,10 +288,6 @@ zx_status_t apply_config(fuchsia_hardware_display::wire::ConfigStamp stamp) {
 
   if (check_result.value().res != fuchsia_hardware_display_types::wire::ConfigResult::kOk) {
     printf("Config not valid (%d)\n", static_cast<uint32_t>(check_result.value().res));
-    for (const auto& op : check_result.value().ops) {
-      printf("Client composition op (display %ld, layer %ld): %hhu\n", op.display_id.value,
-             op.layer_id.value, static_cast<uint8_t>(op.opcode));
-    }
     return ZX_ERR_INVALID_ARGS;
   }
 

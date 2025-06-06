@@ -752,15 +752,14 @@ void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image
 
 void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& completer) {
   fhdt::wire::ConfigResult res;
-  std::vector<fhd::wire::ClientCompositionOp> ops;
 
-  draft_display_config_was_validated_ = CheckConfig(&res, &ops);
+  draft_display_config_was_validated_ = CheckConfig(&res);
 
   if (request->discard) {
     DiscardConfig();
   }
 
-  completer.Reply(res, ::fidl::VectorView<fhd::wire::ClientCompositionOp>::FromExternal(ops));
+  completer.Reply(res);
 }
 
 void Client::DiscardConfig(DiscardConfigCompleter::Sync& /*_completer*/) { DiscardConfig(); }
@@ -785,7 +784,7 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
   if (!draft_display_config_was_validated_) {
     // TODO(https://fxbug.dev/397427767): TearDown(ZX_ERR_BAD_STATE) instead of
     // calling CheckConfig() and silently failing.
-    draft_display_config_was_validated_ = CheckConfig(nullptr, nullptr);
+    draft_display_config_was_validated_ = CheckConfig(nullptr);
 
     if (!draft_display_config_was_validated_) {
       fdf::info("ApplyConfig3 called with invalid configuration; dropping the request");
@@ -1034,13 +1033,11 @@ void Client::SetDisplayPower(SetDisplayPowerRequestView request,
   completer.ReplySuccess();
 }
 
-bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
-                         std::vector<fhd::wire::ClientCompositionOp>* ops) {
+bool Client::CheckConfig(fhdt::wire::ConfigResult* res) {
   TRACE_DURATION("gfx", "Display::Client::CheckConfig");
 
-  if (res && ops) {
+  if (res) {
     *res = fhdt::wire::ConfigResult::kOk;
-    ops->clear();
   }
 
   // The total number of registered layers is an upper bound on the number of
@@ -1207,44 +1204,6 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res,
   ZX_DEBUG_ASSERT_MSG(layer_fail,
                       "At least one layer must have non-empty LayerCompositionOperations");
 
-  if (ops) {
-    // TODO(b/249297195): Once Gerrit IFTTT supports multiple paths, add IFTTT
-    // comments to make sure that any change of type `Client` in
-    // //sdk/banjo/fuchsia.hardware.display.controller/display-controller.fidl
-    // will cause the definition of `kAllErrors` to change as well.
-    static constexpr layer_composition_operations_t kAllOperations =
-        LAYER_COMPOSITION_OPERATIONS_USE_IMAGE | LAYER_COMPOSITION_OPERATIONS_MERGE |
-        LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE | LAYER_COMPOSITION_OPERATIONS_SRC_FRAME |
-        LAYER_COMPOSITION_OPERATIONS_TRANSFORM | LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION |
-        LAYER_COMPOSITION_OPERATIONS_ALPHA;
-
-    banjo_layers_index = 0;
-    for (const DisplayConfig& display_config : display_configs_) {
-      if (display_config.draft_layers_.is_empty()) {
-        continue;
-      }
-
-      for (const LayerNode& draft_layer_node : display_config.draft_layers_) {
-        uint32_t composition_operations =
-            kAllOperations & layer_composition_operations[banjo_layers_index];
-
-        // TODO(https://fxbug.dev/42079482): When switching to client-managed IDs,
-        // the client-side ID will have to be looked up in a map.
-        const display::LayerId draft_layer_id(draft_layer_node.layer->id().value());
-
-        for (uint8_t i = 0; i < 32; i++) {
-          if (composition_operations & (1 << i)) {
-            ops->emplace_back(fhd::wire::ClientCompositionOp{
-                .display_id = display::ToFidlDisplayId(display_config.id()),
-                .layer_id = display::ToFidlLayerId(draft_layer_id),
-                .opcode = static_cast<fhdt::wire::ClientCompositionOpcode>(i),
-            });
-          }
-        }
-        ++banjo_layers_index;
-      }
-    }
-  }
   return false;
 }
 
@@ -2070,36 +2029,3 @@ ClientProxy::ClientProxy(Controller* controller, ClientPriority client_priority,
 ClientProxy::~ClientProxy() {}
 
 }  // namespace display_coordinator
-
-// Checks the FIDL `ClientCompositionOpcode` enum matches the corresponding bits
-// in banjo `ClientCompositionOpcode` bitfield.
-//
-// TODO(https://fxbug.dev/42080698): In the short term, instead of checking this in
-// Coordinator, a bridging type should be used for conversion of the types. In
-// the long term, these two types should be unified.
-namespace {
-
-static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientUseImage)) ==
-                  LAYER_COMPOSITION_OPERATIONS_USE_IMAGE,
-              "Const mismatch");
-static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientMerge)) ==
-                  LAYER_COMPOSITION_OPERATIONS_MERGE,
-              "Const mismatch");
-static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientFrameScale)) ==
-                  LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE,
-              "Const mismatch");
-static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientSrcFrame)) ==
-                  LAYER_COMPOSITION_OPERATIONS_SRC_FRAME,
-              "Const mismatch");
-static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientTransform)) ==
-                  LAYER_COMPOSITION_OPERATIONS_TRANSFORM,
-              "Const mismatch");
-static_assert(
-    (1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientColorConversion)) ==
-        LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION,
-    "Const mismatch");
-static_assert((1 << static_cast<int>(fhdt::wire::ClientCompositionOpcode::kClientAlpha)) ==
-                  LAYER_COMPOSITION_OPERATIONS_ALPHA,
-              "Const mismatch");
-
-}  // namespace

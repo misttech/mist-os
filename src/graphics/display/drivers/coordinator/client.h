@@ -320,8 +320,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   void NotifyDisplaysChanged(const int32_t* displays_added, uint32_t added_count,
                              const int32_t* displays_removed, uint32_t removed_count);
-  bool CheckConfig(fuchsia_hardware_display_types::wire::ConfigResult* res,
-                   std::vector<fuchsia_hardware_display::wire::ClientCompositionOp>* ops);
+  bool CheckConfig(fuchsia_hardware_display_types::wire::ConfigResult* res);
 
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>> binding_;
   fidl::WireSharedClient<fuchsia_hardware_display::CoordinatorListener> coordinator_listener_;
