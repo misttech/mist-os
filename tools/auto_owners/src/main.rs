@@ -56,6 +56,10 @@ struct Options {
     /// print the generated content without updating OWNERS files
     #[argh(switch)]
     dry_run: bool,
+
+    #[argh(switch)]
+    /// automatically generate OWNERS files from reverse dependencies.
+    generate_owners_from_reverse_deps: bool,
 }
 
 fn main() -> Result<()> {
@@ -105,6 +109,9 @@ struct OwnersDb {
     /// if set, print update results instead of updating OWNERS file
     dry_run: bool,
 
+    /// automatically generate OWNERS files from reverse dependencies.
+    generate_owners_from_reverse_deps: bool,
+
     update_strategy: UpdateStrategy,
 
     fuchsia_dir: Utf8PathBuf,
@@ -131,6 +138,7 @@ impl OwnersDb {
             filter,
             skip_existing,
             dry_run,
+            generate_owners_from_reverse_deps,
         } = options;
 
         let update_strategy = match skip_existing {
@@ -222,6 +230,7 @@ impl OwnersDb {
             gn_graph,
             filter,
             source_deps,
+            generate_owners_from_reverse_deps,
         })
     }
 
@@ -256,26 +265,27 @@ impl OwnersDb {
             }
         }
 
-        let file = self
+        if let Some(file) = self
             .compute_owners_file(metadata)
-            .with_context(|| format!("computing owners for {}", metadata.path))?;
+            .with_context(|| format!("computing owners for {}", metadata.path))?
+        {
+            let owners_path = self.fuchsia_dir.join(&metadata.path).join("OWNERS");
 
-        let owners_path = self.fuchsia_dir.join(&metadata.path).join("OWNERS");
-
-        if self.dry_run {
-            log::info!("Dry-run: generated {} with content:\n", owners_path);
-            output_buffer.write_all(file.to_string().as_bytes())?;
-        } else {
-            // We need to write every OWNERS file, even if it would be empty,
-            // because the other OWNERS files may include the empty ones.
-            std::fs::write(&owners_path, file.to_string().as_bytes())
-                .with_context(|| format!("writing {owners_path}"))?;
+            if self.dry_run {
+                log::info!("Dry-run: generated {} with content:\n", owners_path);
+                output_buffer.write_all(file.to_string().as_bytes())?;
+            } else {
+                // We need to write every OWNERS file, even if it would be empty,
+                // because the other OWNERS files may include the empty ones.
+                std::fs::write(&owners_path, file.to_string().as_bytes())
+                    .with_context(|| format!("writing {owners_path}"))?;
+            }
         }
 
         Ok(())
     }
 
-    fn compute_owners_file(&self, metadata: &ProjectMetadata) -> Result<OwnersFile> {
+    fn compute_owners_file(&self, metadata: &ProjectMetadata) -> Result<Option<OwnersFile>> {
         let override_key = if metadata.path.starts_with("third_party/rust_crates") {
             // Trims something like -0.24.11, otherwise the override list would have to be updated
             // every time the version is bumped.
@@ -295,13 +305,15 @@ impl OwnersDb {
         };
 
         if let Some(owners_overrides) = self.overrides.get(&override_key) {
-            Ok(OwnersFile {
+            Ok(Some(OwnersFile {
                 path: metadata.path.join("OWNERS"),
                 includes: owners_overrides.iter().map(Clone::clone).collect(),
                 source: OwnersSource::Override,
-            })
+            }))
+        } else if self.generate_owners_from_reverse_deps {
+            Ok(Some(self.owners_files_from_reverse_deps(&metadata)?))
         } else {
-            self.owners_files_from_reverse_deps(&metadata)
+            Ok(None)
         }
     }
 
@@ -773,6 +785,7 @@ mod tests {
             skip_existing: false,
             project_paths: vec![],
             dry_run: false,
+            generate_owners_from_reverse_deps: true,
         })
         .expect("valid OwnersDb")
         .update_all_files()
@@ -823,6 +836,7 @@ mod tests {
             skip_existing: false,
             project_paths: vec![],
             dry_run: false,
+            generate_owners_from_reverse_deps: true,
         })
         .expect("valid OwnersDb")
         .update_all_files()
@@ -874,6 +888,7 @@ mod tests {
                 skip_existing: true,
                 project_paths: vec![],
                 dry_run: false,
+                generate_owners_from_reverse_deps: true,
             })
             .expect("valid OwnersDb")
             .update_all_files(),
@@ -922,6 +937,7 @@ mod tests {
             skip_existing: false,
             project_paths: vec![],
             dry_run: true,
+            generate_owners_from_reverse_deps: true,
         })
         .expect("OwnersDb is valid");
 
@@ -963,6 +979,7 @@ mod tests {
                 skip_existing: false,
                 project_paths: vec!["third_party/bar/".to_string()],
                 dry_run: false,
+                generate_owners_from_reverse_deps: true,
             })
             .expect("valid OwnersDb")
             .update_all_files(),
@@ -1000,6 +1017,7 @@ mod tests {
             skip_existing: false,
             project_paths: vec!["third_party/baz/".to_string()],
             dry_run: false,
+            generate_owners_from_reverse_deps: true,
         })
         .expect("valid OwnersDb")
         .update_all_files()
@@ -1088,6 +1106,57 @@ mod tests {
             .success());
 
         test_dir
+    }
+
+    #[test]
+    fn no_auto_owners() {
+        let test_dir = setup_test_dir("no_auto_owners");
+        let test_dir_path = Utf8Path::from_path(test_dir.path()).unwrap();
+
+        // an OWNERS file should be generated for projects missing owners
+        let mut expected_owner_files = read_owners(&test_dir_path);
+        assert!(!expected_owner_files.contains_key("third_party/bar/OWNERS"));
+        assert!(!expected_owner_files.contains_key("third_party/rust_crates/foo/OWNERS"));
+        assert!(!expected_owner_files
+            .contains_key("third_party/rust_crates/with-dashes-and-version-0.1.0/OWNERS"));
+
+        assert!(OwnersDb::new(Options {
+            rust_metadata: Some(PATHS.test_base_dir.join("owners/rust_metadata.json")),
+            integration_manifest: None,
+            filter: Some(test_dir_path.join("filter-files")),
+            overrides: PATHS.test_base_dir.join("owners/owners.toml"),
+            gn_desc: test_dir_path.join("out/gn_desc.json"),
+            fuchsia_dir: test_dir_path.to_path_buf(),
+            skip_existing: false,
+            project_paths: vec![],
+            dry_run: false,
+            generate_owners_from_reverse_deps: false,
+        })
+        .expect("valid OwnersDb")
+        .update_all_files()
+        .is_ok());
+
+        // Only these paths should be created.
+        expected_owner_files.insert(
+            "third_party/rust_crates/vendor/bar/OWNERS".into(),
+            format!("include /tools/auto_owners/OWNERS\n"),
+        );
+
+        // The file should not contain the 'autogenerated' header because of the override.
+        expected_owner_files.insert(
+            "third_party/rust_crates/vendor/foo/OWNERS".into(),
+            format!("{HEADER}\ninclude /third_party/foo/OWNERS\n"),
+        );
+
+        // The file should not contain the 'autogenerated' header because of the override.
+        expected_owner_files.insert(
+            "third_party/rust_crates/vendor/with-dashes-and-version-0.1.0/OWNERS".into(),
+            format!("{HEADER}\ninclude /third_party/foo/OWNERS\n"),
+        );
+
+        // check that the OWNERS file was generated.
+        let actual_owner_files = read_owners(&test_dir_path);
+        assert_eq!(expected_owner_files, actual_owner_files);
     }
 
     fn copy_contents(original_test_dir: &Utf8Path, test_dir_path: &Utf8Path) {
