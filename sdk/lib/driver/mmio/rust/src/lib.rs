@@ -105,5 +105,6 @@
 //! earlier.
 
 mod mmio;
+pub mod region;
 
 pub use mmio::*;

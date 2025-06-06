@@ -11,8 +11,13 @@ rustc_library("mmio") {
   sources = [
     "src/lib.rs",
     "src/mmio.rs",
+    "src/region.rs",
   ]
   deps = [ "//third_party/rust_crates:thiserror" ]
+  test_deps = [
+    "//src/lib/fuchsia-sync",
+    "//third_party/rust_crates:rand",
+  ]
 }
 
 # Run with `fx test mmio-rust-unittests`

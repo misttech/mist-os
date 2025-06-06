@@ -1,6 +1,7 @@
 // Copyright 2025 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+use core::fmt::{Debug, Display};
 use core::ops::{BitAnd, BitOr, Not};
 
 /// An error which may be encountered when performing operations on an MMIO region.
@@ -269,6 +270,8 @@ pub trait MmioOperand:
     + sealed::MmioOperand
     + PartialEq
     + Copy
+    + Debug
+    + Display
     + Sized
 {
     /// Loads a value of the this type from the Mmio region at the given offset.
