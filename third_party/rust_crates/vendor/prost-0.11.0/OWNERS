@@ -4,5 +4,6 @@
 
 include /src/developer/ffx/plugins/profile/heapdump/OWNERS
 include /src/performance/memory/OWNERS
-include /src/starnix/OWNERS
+include /src/starnix/lib/perfetto/OWNERS
+include /src/starnix/modules/perfetto_consumer/OWNERS
 include /src/virtualization/OWNERS
