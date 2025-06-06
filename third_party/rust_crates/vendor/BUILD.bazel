@@ -283,14 +283,14 @@ alias(
 )
 
 alias(
-    name = "bit-set-0.5.3",
-    actual = "//third_party/rust_crates/vendor/bit-set-0.5.3:bit_set",
+    name = "bit-set-0.8.0",
+    actual = "//third_party/rust_crates/vendor/bit-set-0.8.0:bit_set",
     tags = ["manual"],
 )
 
 alias(
     name = "bit-set",
-    actual = "//third_party/rust_crates/vendor/bit-set-0.5.3:bit_set",
+    actual = "//third_party/rust_crates/vendor/bit-set-0.8.0:bit_set",
     tags = ["manual"],
 )
 

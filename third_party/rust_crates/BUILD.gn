@@ -100,7 +100,7 @@ group("bincode") {
 }
 
 group("bit-set") {
-  public_deps = [ ":bit-set-v0_5_3" ]
+  public_deps = [ ":bit-set-v0_8_0" ]
 }
 
 group("bit-vec") {
@@ -2770,6 +2770,41 @@ rustc_library("bit-set-v0_5_3") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":bit-set-v0_5_3.license" ]
+}
+
+license("bit-set-v0_8_0.license") {
+  public_package_name = "bit_set"
+  license_files = [
+    "//third_party/rust_crates/vendor/bit-set-0.8.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/bit-set-0.8.0/LICENSE-MIT",
+  ]
+}
+
+rustc_library("bit-set-v0_8_0") {
+  crate_name = "bit_set"
+  source_root = "//third_party/rust_crates/vendor/bit-set-0.8.0/src/lib.rs"
+  output_name = "bit_set-9a7f8bbf47ab0a10"
+  edition = "2015"
+  disable_clippy = true
+  enforce_source_listing = false
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":bit-vec-v0_8_0" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "-Cmetadata=9a7f8bbf47ab0a10",
+    "-Cextra-filename=-9a7f8bbf47ab0a10",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":bit-set-v0_8_0.license" ]
 }
 
 license("bit-vec-v0_6_3.license") {
