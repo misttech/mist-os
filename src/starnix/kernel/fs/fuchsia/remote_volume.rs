@@ -46,7 +46,7 @@ impl FileSystemOps for RemoteVolume {
     }
 
     fn name(&self) -> &'static FsStr {
-        self.remotefs.name()
+        "remotevol".into()
     }
 
     fn uses_external_node_ids(&self) -> bool {
