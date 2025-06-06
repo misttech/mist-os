@@ -367,24 +367,17 @@ ns3_test_component("component-debug-dropin") {
   deps = [ ":bin-instrumented" ]
 }
 
-fuchsia_unittest_component("netstack3-bin_test") {
+fuchsia_unittest_package("netstack3-bin_test") {
   deps = [
     ":bin_test",
     "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
   ]
 }
 
-fuchsia_unittest_component("netstack3-bin-instrumented_test") {
+fuchsia_unittest_package("netstack3-bin-instrumented_test") {
   deps = [
     ":bin-instrumented_test",
     "//src/connectivity/network/testing/netemul/service:netemul-sandbox",
-  ]
-}
-
-fuchsia_test_package("netstack3-tests") {
-  test_components = [
-    ":netstack3-bin_test",
-    ":netstack3-bin-instrumented_test",
   ]
 }
 
@@ -396,7 +389,8 @@ group("benchmarks") {
 group("tests") {
   testonly = true
   deps = [
-    ":netstack3-tests",
+    ":netstack3-bin-instrumented_test",
+    ":netstack3-bin_test",
     "bench:tests",
     "core:tests",
   ]
