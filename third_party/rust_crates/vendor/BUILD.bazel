@@ -295,14 +295,14 @@ alias(
 )
 
 alias(
-    name = "bit-vec-0.6.3",
-    actual = "//third_party/rust_crates/vendor/bit-vec-0.6.3:bit_vec",
+    name = "bit-vec-0.8.0",
+    actual = "//third_party/rust_crates/vendor/bit-vec-0.8.0:bit_vec",
     tags = ["manual"],
 )
 
 alias(
     name = "bit-vec",
-    actual = "//third_party/rust_crates/vendor/bit-vec-0.6.3:bit_vec",
+    actual = "//third_party/rust_crates/vendor/bit-vec-0.8.0:bit_vec",
     tags = ["manual"],
 )
 

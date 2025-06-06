@@ -104,7 +104,7 @@ group("bit-set") {
 }
 
 group("bit-vec") {
-  public_deps = [ ":bit-vec-v0_6_3" ]
+  public_deps = [ ":bit-vec-v0_8_0" ]
 }
 
 group("bitfield") {
@@ -2790,7 +2790,6 @@ rustc_library("bit-vec-v0_6_3") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":serde-v1_0_204" ]
 
   rustenv = []
 
@@ -2799,13 +2798,48 @@ rustc_library("bit-vec-v0_6_3") {
     "-Cmetadata=ef0910eab7e0b593",
     "-Cextra-filename=-ef0910eab7e0b593",
     "--cfg=feature=\"default\"",
-    "--cfg=feature=\"serde\"",
     "--cfg=feature=\"std\"",
   ]
 
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":bit-vec-v0_6_3.license" ]
+}
+
+license("bit-vec-v0_8_0.license") {
+  public_package_name = "bit_vec"
+  license_files = [
+    "//third_party/rust_crates/vendor/bit-vec-0.8.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/bit-vec-0.8.0/LICENSE-MIT",
+  ]
+}
+
+rustc_library("bit-vec-v0_8_0") {
+  crate_name = "bit_vec"
+  source_root = "//third_party/rust_crates/vendor/bit-vec-0.8.0/src/lib.rs"
+  output_name = "bit_vec-1ba65b48c247c698"
+  edition = "2015"
+  disable_clippy = true
+  enforce_source_listing = false
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":serde-v1_0_204" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "-Cmetadata=1ba65b48c247c698",
+    "-Cextra-filename=-1ba65b48c247c698",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"serde\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":bit-vec-v0_8_0.license" ]
 }
 
 license("bitfield-v0_14_0.license") {
