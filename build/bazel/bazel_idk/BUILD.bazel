@@ -1,0 +1,27 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Allowlists for each IDK atom type.
+#
+# Unlike GN, visibility cannot be limited to individual labels and is instead
+# either the package (`__pkg__`) or all subpackages (`__subpackages__`).
+# TODO(https://fxbug.dev/417305295): Is there an another allowlist pattern in
+# Bazel that allows specifying individual targets? If not, we may need to
+# establish a pattern where all IDK  targets are the package target
+# (directory name) and `__pkg__` is always used.
+
+filegroup(
+    name = "partner_idk_source_sets_allowlist",
+    visibility = [
+        "//build/bazel/bazel_idk/tests:__subpackages__",
+    ],
+)
+
+filegroup(
+    name = "partner_idk_unstable_source_sets_allowlist",
+    visibility = [
+        "//build/bazel/bazel_idk/tests:__subpackages__",
+        "//sdk/lib/memory_barriers:__pkg__",
+    ],
+)

@@ -1,0 +1,23 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("//build/bazel/bazel_idk:defs.bzl", "idk_cc_source_library")
+
+# LINT.IfChange
+idk_cc_source_library(
+    name = "memory_barriers",
+    hdrs = ["include/lib/memory_barriers/memory_barriers.h"],
+    category = "partner",
+    idk_name = "memory_barriers",
+    stable = False,
+    visibility = [
+        "//src/media:__subpackages__",
+        "//src/sysmem:__subpackages__",
+
+        # TODO(https://fxbug.dev/417305295): Remove when no longer using real
+        # atoms in tests.
+        "//build/bazel/bazel_idk/tests:__subpackages__",
+    ],
+)
+# LINT.ThenChange(BUILD.gn)
