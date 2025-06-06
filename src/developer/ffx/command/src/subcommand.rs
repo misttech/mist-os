@@ -40,25 +40,6 @@ pub struct ExternalSubTool {
     path: PathBuf,
 }
 
-impl ExternalSubTool {
-    pub async fn run_and_capture(self) -> Result<(ExitStatus, String, String)> {
-        let mut command = std::process::Command::new(&self.path);
-        command
-            .env(EnvironmentContext::FFX_BIN_ENV, self.context.rerun_bin()?)
-            .args(self.cmd_line.ffx_args_iter().chain(self.cmd_line.subcmd_iter()))
-            .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped());
-
-        let child = command.spawn().bug_context("Failed to spawn external subtool")?;
-
-        let output = child.wait_with_output().bug_context("Failed to wait for subtool output")?;
-
-        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
-
-        Ok((output.status, stdout, stderr))
-    }
-}
 #[derive(Clone, Debug)]
 pub struct ExternalSubToolSuite {
     context: EnvironmentContext,
@@ -135,7 +116,7 @@ impl ExternalSubToolSuite {
         Self { context, workspace_tools }
     }
 
-    pub fn find_workspace_tool(&self, ffx_cmd: &FfxCommandLine) -> Option<ExternalSubTool> {
+    fn find_workspace_tool(&self, ffx_cmd: &FfxCommandLine) -> Option<ExternalSubTool> {
         let name = ffx_cmd.global.subcommand.first()?;
         let cmd = match self.workspace_tools.get(name).and_then(SubToolLocation::validate_tool) {
             Some(FfxToolInfo { path: Some(path), .. }) => {
@@ -148,7 +129,7 @@ impl ExternalSubToolSuite {
         Some(cmd)
     }
 
-    pub fn find_sdk_tool(&self, sdk: &Sdk, ffx_cmd: &FfxCommandLine) -> Option<ExternalSubTool> {
+    fn find_sdk_tool(&self, sdk: &Sdk, ffx_cmd: &FfxCommandLine) -> Option<ExternalSubTool> {
         let name = format!("ffx-{}", ffx_cmd.global.subcommand.first()?);
         let ffx_tool = sdk.get_ffx_tool(&name)?;
         let location = SubToolLocation::from_path(

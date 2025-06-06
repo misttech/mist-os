@@ -7,10 +7,9 @@ use crate::ledger_view::*;
 use anyhow::{anyhow, Context, Result};
 use async_lock::Mutex;
 use async_trait::async_trait;
-use doctor_utils::{DaemonManager, DefaultDaemonManager, DoctorCheck, DoctorRecorder, Recorder};
+use doctor_utils::{DaemonManager, DefaultDaemonManager, DoctorRecorder, Recorder};
 use errors::{ffx_bail, ffx_error};
 use ffx_build_version::VersionInfo;
-use ffx_command::{ExternalSubToolSuite, FfxCommandLine, ToolSuite};
 use ffx_config::{print_config, EnvironmentContext};
 use ffx_daemon::DaemonConfig;
 use ffx_doctor_args::DoctorCommand;
@@ -1188,60 +1187,8 @@ async fn doctor_summary<W: Write>(
     }
 
     ledger.close(main_node)?;
-
-    /*
-    Look up external sub tool suite to check for existence of gdoctor fo Googler-specific
-    network configuration checks.
-    */
-    match ExternalSubToolSuite::from_env(&env_context) {
-        Ok(sub_tool_suite) => {
-            let command_line_args =
-                vec!["ffx".to_string(), "gdoctor".to_string(), "all-safe".to_string()];
-            let mut command = FfxCommandLine::new(None, &command_line_args).unwrap();
-            let mut ffx_args = ["--machine".to_string(), "json".to_string()].to_vec();
-            command.ffx_args.append(&mut ffx_args);
-            let workspace_command = sub_tool_suite.find_workspace_tool(&command);
-            match workspace_command {
-                // If the command exists in the workspace call it and show the results
-                Some(wcmd) => {
-                    main_node = ledger.add_node("Google Network Checks", LedgerMode::Automatic)?;
-                    let (_exit_status, stdout, _stderr) = wcmd.run_and_capture().await?;
-                    for line in stdout.trim().lines().filter(|l| !l.trim().is_empty()) {
-                        match serde_json::from_str::<DoctorCheck>(&line) {
-                            Ok(data) => {
-                                let node = ledger.add_node(
-                                    &format!("{}: {}", data.name, data.message),
-                                    LedgerMode::Automatic,
-                                )?;
-                                ledger.set_outcome(
-                                    node,
-                                    match data.passed {
-                                        true => LedgerOutcome::Success,
-                                        false => LedgerOutcome::Failure,
-                                    },
-                                )?;
-                            }
-                            Err(e) => {
-                                eprintln!(
-                            "Warning: Failed to parse gdoctor output line as DoctorCheck: {}",
-                            e
-                        );
-                            }
-                        }
-                    }
-                    ledger.close(main_node)?;
-                }
-                None => {
-                    // no gdoctor
-                }
-            }
-        }
-        Err(e) => {
-            eprintln!("Warning: could not find subtool suite: {}", e);
-        }
-    }
-
     main_node = ledger.add_node("Searching for targets", LedgerMode::Automatic)?;
+
     let (tc_proxy, tc_server) = fidl::endpoints::create_proxy::<TargetCollectionMarker>();
     match timeout(
         retry_delay,
@@ -1562,7 +1509,6 @@ mod test {
     use futures::{Future, FutureExt, TryFutureExt};
     use std::cell::Cell;
     use std::fmt;
-    use std::os::unix::fs::PermissionsExt;
     use tempfile::tempdir;
 
     const NODENAME: &str = "fake-nodename";
@@ -3792,100 +3738,5 @@ mod test {
         expected.sort();
         actual.sort();
         assert_eq!(expected, actual);
-    }
-
-    #[fuchsia::test]
-    async fn test_doctor_summary_with_gdoctor_subtool() {
-        let test_env = ffx_config::test_init().await.expect("Setting up test environment");
-
-        let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
-        let subtool_search_dir_path = temp_dir.path();
-
-        let mock_gdoctor_path = temp_dir.path().join("ffx-gdoctor");
-        // Scope to ensure File handle is dropped (and file closed) before setting permissions
-        {
-            let mut mock_gdoctor_script =
-                fs::File::create(&mock_gdoctor_path).expect("Failed to create mock script");
-            // example data in DoctorCheck format
-            write!(
-            mock_gdoctor_script,
-            "#!/bin/sh\n\
-             echo '{{\"name\": \"Corp DHCP\", \"message\": \"Successfully connected\", \"passed\": true}}'\n\
-             echo '{{\"name\": \"GPN\", \"message\": \"GPN not detected\", \"passed\": false}}'\n"
-        )
-        .expect("Failed to write to mock script");
-        }
-
-        let mut perms = fs::metadata(&mock_gdoctor_path)
-            .expect("Failed to get metadata for mock script")
-            .permissions();
-        perms.set_mode(0o755);
-        fs::set_permissions(&mock_gdoctor_path, perms)
-            .expect("Failed to set permissions on mock script");
-
-        let metadata_path = temp_dir.path().join("ffx-gdoctor.json");
-        let metadata_content = serde_json::json!({
-            "name": "gdoctor",
-            "description": "Mock gdoctor for testing",
-            "requires_fho": 0,
-            "fho_details": {
-                "version": 0
-            }
-        });
-        fs::write(&metadata_path, metadata_content.to_string()).expect("Failed to write metadata");
-
-        // Configure ffx to use our temporary search path
-        test_env
-            .context
-            .query("ffx.subtool-search-paths")
-            .level(Some(ConfigLevel::User))
-            .set(json!([subtool_search_dir_path]))
-            .await
-            .expect("Failed to set subtool search path");
-
-        let fake_daemon = FakeDaemonManager::new(
-            vec![true],
-            vec![],
-            vec![],
-            vec![Ok(setup_responsive_daemon_server())],
-            vec![Ok(vec![123])],
-        );
-        let mut handler = FakeStepHandler::new();
-        let mut ledger = DoctorLedger::<MockWriter>::new(
-            MockWriter::new(),
-            Box::new(FakeLedgerView::new()),
-            LedgerViewMode::Verbose,
-        );
-
-        doctor_summary(
-            &mut handler,
-            &fake_daemon,
-            "",
-            DEFAULT_RETRY_DELAY,
-            frontend_version_info(true),
-            Ok(None),
-            &test_env.context,
-            None,
-            &mut ledger,
-        )
-        .await
-        .unwrap();
-
-        let output = ledger.writer.get_data();
-        assert!(
-            output.contains("[✗] Google Network Checks"),
-            "Main 'Google Network Checks' node missing or has wrong outcome. Output:\n{}",
-            output
-        );
-        assert!(
-            output.contains("[✓] Corp DHCP: Successfully connected"),
-            "'Corp DHCP' check missing or has wrong outcome. Output:\n{}",
-            output
-        );
-        assert!(
-            output.contains("[✗] GPN: GPN not detected"),
-            "'GPN' check missing or has wrong outcome. Output:\n{}",
-            output
-        );
     }
 }
