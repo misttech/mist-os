@@ -334,15 +334,11 @@ class Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_s
     tx_fifo_depth_ = tx_hw_params.fifo_depth();
     // Store width in bytes, not bits.
     tx_fifo_width_ = tx_hw_params.fifo_width() >> 3;
-    if (tx_fifo_width_ > kFifoWidth) {
-      tx_fifo_width_ = kFifoWidth;
-    }
+    tx_fifo_width_ = std::min(tx_fifo_width_, kFifoWidth);
     auto rx_hw_params = RxParametersRegister::Get().ReadFrom(io.io());
     rx_fifo_depth_ = rx_hw_params.fifo_depth();
     rx_fifo_width_ = rx_hw_params.fifo_width() >> 3;
-    if (rx_fifo_width_ > kFifoWidth) {
-      rx_fifo_width_ = kFifoWidth;
-    }
+    rx_fifo_width_ = std::min(rx_fifo_width_, kFifoWidth);
 
     // Note, this is a very lightweight initialization. Without the bootloader
     // preconfiguring the debug UART, this code would need to check for GENI

@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_NS8250_H_
-#define ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_NS8250_H_
+#ifndef LIB_UART_NS8250_H_
+#define LIB_UART_NS8250_H_
 
 #include <lib/acpi_lite/debug_port.h>
 #include <lib/stdcompat/array.h>
@@ -21,8 +21,7 @@
 
 // 8250 and derivatives, including 16550.
 
-namespace uart {
-namespace ns8250 {
+namespace uart::ns8250 {
 
 constexpr uint32_t kDefaultBaudRate = 115200;
 constexpr uint32_t kMaxBaudRate = 115200;
@@ -588,7 +587,6 @@ using Dw8250Driver =
 using PxaDriver =
     DriverImpl<ZBI_KERNEL_DRIVER_PXA_UART, zbi_dcfg_simple_t, IoRegisterType::kMmio32>;
 
-}  // namespace ns8250
-}  // namespace uart
+}  // namespace uart::ns8250
 
-#endif  // ZIRCON_SYSTEM_ULIB_UART_INCLUDE_LIB_UART_NS8250_H_
+#endif  // LIB_UART_NS8250_H_

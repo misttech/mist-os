@@ -20,8 +20,7 @@ namespace devicetree {
 class PropertyDecoder;
 }
 
-namespace uart {
-namespace null {
+namespace uart::null {
 
 struct Driver {
   using config_type = StubConfig;
@@ -122,8 +121,6 @@ struct Driver {
   constexpr size_t io_slots() const { return 0; }
 };
 
-}  // namespace null
-
-}  // namespace uart
+}  // namespace uart::null
 
 #endif  // LIB_UART_NULL_H_
