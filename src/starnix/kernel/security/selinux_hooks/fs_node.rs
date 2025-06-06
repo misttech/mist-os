@@ -180,16 +180,12 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                     };
                     maybe_sid.unwrap_or_else(||{
                         // The node does not have a label, so apply the filesystem's default SID.
-                        if fs.name() == "remotefs" {
-                            track_stub!(TODO("https://fxbug.dev/378688761"), "RemoteFS node missing security label. Perhaps your device needs re-flashing?");
-                        } else {
-                            log_warn!(
-                                "Unlabeled node {:?} in {} ({:?}-labeled) filesystem",
-                                dir_entry,
-                                fs.name(),
-                                fs_use_type
-                            );
-                        };
+                        log_warn!(
+                            "Unlabeled node {:?} in {} ({:?}-labeled) filesystem",
+                            dir_entry,
+                            fs.name(),
+                            fs_use_type
+                        );
                         default_sid
                     })
                 }
