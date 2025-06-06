@@ -65,6 +65,9 @@ void print_backtrace_markup(FILE* f, const std::vector<unwinder::Frame>& frames)
       case unwinder::Frame::Trust::kFP:
         source += "FP";
         break;
+      case unwinder::Frame::Trust::kArmEhAbi:
+        source += "ArmEhAbi";
+        break;
       case unwinder::Frame::Trust::kCFI:
         source += "CFI";
         break;

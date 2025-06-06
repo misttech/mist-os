@@ -81,6 +81,9 @@ std::string Frame::Describe() const {
     case Trust::kPLT:
       res += "PLT";
       break;
+    case Trust::kArmEhAbi:
+      res += "ArmEhAbi";
+      break;
     case Trust::kCFI:
       res += "CFI";
       break;
