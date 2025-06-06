@@ -125,15 +125,17 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
 
     test_config.mode = display::ToBanjoDisplayMode(edid_timing);
 
-    config_check_result_t display_cfg_result;
-    display_cfg_result = engine_driver_client_->CheckConfiguration(&test_config);
-    if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
-      fbl::AllocChecker alloc_checker;
-      display_info.timings.push_back(edid_timing, &alloc_checker);
-      if (!alloc_checker.check()) {
-        fdf::warn("Failed to allocate memory for EDID timing. Skipping it.");
-        break;
-      }
+    display::ConfigCheckResult config_check_result =
+        engine_driver_client_->CheckConfiguration(&test_config);
+    if (config_check_result != display::ConfigCheckResult::kOk) {
+      continue;
+    }
+
+    fbl::AllocChecker alloc_checker;
+    display_info.timings.push_back(edid_timing, &alloc_checker);
+    if (!alloc_checker.check()) {
+      fdf::warn("Failed to allocate memory for EDID timing. Skipping it.");
+      break;
     }
   }
 }

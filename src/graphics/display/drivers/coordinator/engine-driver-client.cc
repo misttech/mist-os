@@ -160,14 +160,22 @@ zx::result<> EngineDriverClient::ReleaseCapture(
   return zx::make_result(banjo_status);
 }
 
-config_check_result_t EngineDriverClient::CheckConfiguration(
+display::ConfigCheckResult EngineDriverClient::CheckConfiguration(
     const display_config_t* display_config) {
   if (use_engine_) {
-    return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
+    return display::ConfigCheckResult::kUnsupportedDisplayModes;
   }
 
   ZX_DEBUG_ASSERT(banjo_engine_.is_valid());
-  return banjo_engine_.CheckConfiguration(display_config);
+  config_check_result_t banjo_config_check_result =
+      banjo_engine_.CheckConfiguration(display_config);
+  if (!display::ConfigCheckResult::IsValid(banjo_config_check_result)) {
+    fdf::error("Engine driver returned invalid ConfigCheck() result: {}",
+               banjo_config_check_result);
+    return display::ConfigCheckResult::kInvalidConfig;
+  }
+  display::ConfigCheckResult config_check_result(banjo_config_check_result);
+  return config_check_result;
 }
 
 void EngineDriverClient::ApplyConfiguration(const display_config_t* display_config,

@@ -751,15 +751,14 @@ void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image
 }
 
 void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& completer) {
-  fhdt::wire::ConfigResult res;
-
-  draft_display_config_was_validated_ = CheckConfig(&res);
+  display::ConfigCheckResult config_check_result = CheckConfigImpl();
+  draft_display_config_was_validated_ = config_check_result == display::ConfigCheckResult::kOk;
 
   if (request->discard) {
     DiscardConfig();
   }
 
-  completer.Reply(res);
+  completer.Reply(config_check_result.ToFidl());
 }
 
 void Client::DiscardConfig(DiscardConfigCompleter::Sync& /*_completer*/) { DiscardConfig(); }
@@ -784,7 +783,7 @@ void Client::ApplyConfig3(ApplyConfig3RequestView request,
   if (!draft_display_config_was_validated_) {
     // TODO(https://fxbug.dev/397427767): TearDown(ZX_ERR_BAD_STATE) instead of
     // calling CheckConfig() and silently failing.
-    draft_display_config_was_validated_ = CheckConfig(nullptr);
+    draft_display_config_was_validated_ = CheckConfigImpl() == display::ConfigCheckResult::kOk;
 
     if (!draft_display_config_was_validated_) {
       fdf::info("ApplyConfig3 called with invalid configuration; dropping the request");
@@ -1033,12 +1032,8 @@ void Client::SetDisplayPower(SetDisplayPowerRequestView request,
   completer.ReplySuccess();
 }
 
-bool Client::CheckConfig(fhdt::wire::ConfigResult* res) {
+display::ConfigCheckResult Client::CheckConfigImpl() {
   TRACE_DURATION("gfx", "Display::Client::CheckConfig");
-
-  if (res) {
-    *res = fhdt::wire::ConfigResult::kOk;
-  }
 
   // The total number of registered layers is an upper bound on the number of
   // layers assigned to display configurations.
@@ -1080,14 +1075,12 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res) {
     // Normalize the display configuration, and perform Coordinator-level
     // checks. The engine drivers API contract does not allow passing
     // configurations that fail these checks.
-    bool display_config_is_invalid = false;
     for (const LayerNode& draft_layer_node : display_config.draft_layers_) {
       layer_t& banjo_layer = banjo_layers[banjo_layers_index];
       ++banjo_layers_index;
 
       banjo_layer = draft_layer_node.layer->draft_layer_config_;
 
-      bool layer_config_is_invalid = false;
       if (banjo_layer.image_source.width != 0 && banjo_layer.image_source.height != 0) {
         // Frame for checking that the layer's `image_source` lies entirely within
         // the source image.
@@ -1097,7 +1090,9 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res) {
             .width = banjo_layer.image_metadata.dimensions.width,
             .height = banjo_layer.image_metadata.dimensions.height,
         };
-        layer_config_is_invalid = !OriginRectangleContains(image_area, banjo_layer.image_source);
+        if (!OriginRectangleContains(image_area, banjo_layer.image_source)) {
+          return display::ConfigCheckResult::kInvalidConfig;
+        }
 
         // The formats of layer images are negotiated by sysmem between clients
         // and display engine drivers when being imported, so they are always
@@ -1112,24 +1107,9 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res) {
         // workaround can be removed when we revise `SetColorLayer()`.
         draft_layer_node.layer->draft_layer_config_.display_destination = display_area;
       }
-      layer_config_is_invalid =
-          layer_config_is_invalid ||
-          !OriginRectangleContains(display_area, banjo_layer.display_destination);
-
-      if (layer_config_is_invalid) {
-        // Continue to the next display, since there's nothing more to check for this one.
-        display_config_is_invalid = true;
-        break;
+      if (!OriginRectangleContains(display_area, banjo_layer.display_destination)) {
+        return display::ConfigCheckResult::kInvalidConfig;
       }
-    }
-
-    if (display_config_is_invalid) {
-      // The configuration failed checks that can be performed by the
-      // Coordinator.
-      if (res) {
-        *res = fhdt::wire::ConfigResult::kInvalidConfig;
-      }
-      return false;
     }
 
     ZX_DEBUG_ASSERT_MSG(display_config.draft_.layer_count == banjo_layers_index,
@@ -1148,46 +1128,13 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res) {
     // missing display. Conversely, we don't want to fail the check, because the client may be
     // using `CheckConfig()` to probe the display engine's capabilities, and would likely be
     // confused by a transient failure they have no control over.
-    return true;
+    return display::ConfigCheckResult::kOk;
   }
 
-  config_check_result_t display_cfg_result;
   {
     TRACE_DURATION("gfx", "Display::Client::CheckConfig engine_driver_client");
-
-    display_cfg_result =
-        controller_.engine_driver_client()->CheckConfiguration(&banjo_display_config);
+    return controller_.engine_driver_client()->CheckConfiguration(&banjo_display_config);
   }
-
-  switch (display_cfg_result) {
-    case CONFIG_CHECK_RESULT_OK:
-      if (res) {
-        *res = fhdt::wire::ConfigResult::kOk;
-      }
-      return true;
-    case CONFIG_CHECK_RESULT_INVALID_CONFIG:
-      if (res) {
-        *res = fhdt::wire::ConfigResult::kInvalidConfig;
-      }
-      return false;
-    case CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG:
-      if (res) {
-        *res = fhdt::wire::ConfigResult::kUnsupportedConfig;
-      }
-      return false;
-    case CONFIG_CHECK_RESULT_TOO_MANY:
-      if (res) {
-        *res = fhdt::wire::ConfigResult::kTooManyDisplays;
-      }
-      return false;
-    case CONFIG_CHECK_RESULT_UNSUPPORTED_MODES:
-      if (res) {
-        *res = fhdt::wire::ConfigResult::kUnsupportedDisplayModes;
-      }
-      return false;
-  }
-  ZX_DEBUG_ASSERT_MSG(false, "Unhandled ConfigCheckResult value: %" PRIu32, display_cfg_result);
-  return false;
 }
 
 void Client::ReapplyConfig() {

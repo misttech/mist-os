@@ -40,6 +40,7 @@
 #include "src/graphics/display/drivers/coordinator/layer.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-id.h"
+#include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
@@ -231,6 +232,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                        SetDisplayPowerCompleter::Sync& _completer) override;
 
  private:
+  display::ConfigCheckResult CheckConfigImpl();
   void ApplyConfigImpl();
 
   // Cleans up states of all current Images.
@@ -320,7 +322,6 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   void NotifyDisplaysChanged(const int32_t* displays_added, uint32_t added_count,
                              const int32_t* displays_removed, uint32_t removed_count);
-  bool CheckConfig(fuchsia_hardware_display_types::wire::ConfigResult* res);
 
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>> binding_;
   fidl::WireSharedClient<fuchsia_hardware_display::CoordinatorListener> coordinator_listener_;
