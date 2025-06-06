@@ -13,7 +13,7 @@ class Session(affordance.Affordance):
 
     @abc.abstractmethod
     def start(self) -> None:
-        """Start session.
+        """Start session. Wait indefinitely until session started.
 
         Raises:
             honeydew.errors.SessionError: session failed to start.
@@ -31,6 +31,15 @@ class Session(affordance.Affordance):
         """
 
     @abc.abstractmethod
+    def ensure_started(self) -> None:
+        """Ensure session started, if not start a new session. Wait indefinitely until session
+        started.
+
+        Raises:
+            honeydew.errors.SessionError: session failed to check or start.
+        """
+
+    @abc.abstractmethod
     def add_component(self, url: str) -> None:
         """Instantiates a component by its URL and adds to the session.
 
@@ -44,7 +53,7 @@ class Session(affordance.Affordance):
 
     @abc.abstractmethod
     def restart(self) -> None:
-        """Restarts the session.
+        """Restarts the session. Wait indefinitely until session started.
 
         Raises:
             honeydew.errors.SessionError: Session failed to restart the session.
@@ -52,8 +61,20 @@ class Session(affordance.Affordance):
 
     @abc.abstractmethod
     def stop(self) -> None:
-        """Stop the session
+        """Stop the session. Wait indefinitely until session stopped.
 
         Raises:
             honeydew.errors.SessionError: Session failed to stop the session.
+        """
+
+    @abc.abstractmethod
+    def _cleanup(self) -> None:
+        """Cleanup the session using `ffx component list` and `ffx session remove`.
+
+        This method has been registered in device.close, no need to call explicitly in test
+        teardown.
+
+        Raises:
+            honeydew.errors.SessionError: Session failed to list running components or remove
+            components.
         """

@@ -29,12 +29,7 @@ class UserInputAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def setup_test(self) -> None:
         super().setup_test()
-        self.device.session.stop()
-        self.device.session.start()
-
-    def teardown_test(self) -> None:
-        super().teardown_test()
-        self.device.session.stop()
+        self.device.session.ensure_started()
 
     def test_user_input_tap(self) -> None:
         self.device.session.add_component(TOUCH_APP)

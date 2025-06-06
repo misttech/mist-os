@@ -403,7 +403,9 @@ class FuchsiaDeviceImpl(
             session.Session object
         """
         return session_using_ffx.SessionUsingFfx(
-            device_name=self.device_name, ffx=self.ffx
+            device_name=self.device_name,
+            ffx=self.ffx,
+            fuchsia_device_close=self,
         )
 
     @properties.Affordance
