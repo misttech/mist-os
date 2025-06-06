@@ -182,7 +182,6 @@ sanitizer_extra_options("suppress-asan-stack-use-after-return") {
 # https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow.
 sanitizer_extra_options("suppress-asan-container-overflow") {
   visibility = [
-    "//sdk/lib/component/outgoing/cpp:*",
     "//sdk/lib/sys/component/cpp/testing:*",
     "//src/lib/llvm:*",
   ]
