@@ -6,7 +6,7 @@ use discovery::query::TargetInfoQuery;
 use discovery::{DiscoverySources, FastbootConnectionState, TargetHandle, TargetState};
 use fdomain_fuchsia_hwinfo::{ProductInfo, ProductProxy};
 use ffx_config::EnvironmentContext;
-use ffx_diagnostics::{Check, CheckFut};
+use ffx_diagnostics::{Check, CheckFut, Notifier};
 use ffx_fastboot as _;
 use ffx_fastboot_connection_factory::{
     ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind,
@@ -14,57 +14,59 @@ use ffx_fastboot_connection_factory::{
 use ffx_target::connection::ConnectionError;
 use ffx_target::ssh_connector::SshConnector;
 use ffx_target::{Connection, TargetConnection, TargetConnectionError, TargetConnector};
-use std::io::Write;
 
-pub(crate) struct GetTargetSpecifier<'a, W>(
+pub(crate) struct GetTargetSpecifier<'a, N>(
     pub(crate) &'a EnvironmentContext,
-    std::marker::PhantomData<W>,
+    std::marker::PhantomData<N>,
 );
 
-impl<'a, W> GetTargetSpecifier<'a, W> {
+impl<'a, N> GetTargetSpecifier<'a, N> {
     pub fn new(ctx: &'a EnvironmentContext) -> Self {
         Self(ctx, Default::default())
     }
 }
 
-impl<W> Check for GetTargetSpecifier<'_, W>
+impl<N> Check for GetTargetSpecifier<'_, N>
 where
-    W: Write + Sized,
+    N: Notifier + Sized,
 {
     type Input = ();
     type Output = TargetInfoQuery;
-    type Writer = W;
+    type Notifier = N;
 
     fn write_preamble(
         &self,
         _input: &Self::Input,
-        writer: &mut Self::Writer,
-    ) -> std::io::Result<()> {
-        write!(writer, "Getting target specifier from config... ")?;
-        writer.flush()
+        notifier: &mut Self::Notifier,
+    ) -> anyhow::Result<()> {
+        notifier.info("Getting target specifier from config... ")
     }
 
-    fn on_success(&self, output: &Self::Output, writer: &mut Self::Writer) -> std::io::Result<()> {
-        writeln!(writer, " target is {:?}", output)
+    fn on_success(
+        &self,
+        output: &Self::Output,
+        notifier: &mut Self::Notifier,
+    ) -> anyhow::Result<()> {
+        notifier.on_success(format!("Target is {:?}", output))
     }
 
     fn check<'a>(
         &'a mut self,
         _input: Self::Input,
-        _writer: &'a mut Self::Writer,
+        _notifier: &'a mut Self::Notifier,
     ) -> CheckFut<'a, Self::Output> {
         Box::pin(async move { ffx_target::get_target_specifier(self.0).await.map(Into::into) })
     }
 }
 
-pub(crate) struct ResolveTarget<'a, W> {
+pub(crate) struct ResolveTarget<'a, N> {
     ctx: &'a EnvironmentContext,
-    _writer: std::marker::PhantomData<W>,
+    _notifier: std::marker::PhantomData<N>,
 }
 
-impl<'a, W> ResolveTarget<'a, W> {
+impl<'a, N> ResolveTarget<'a, N> {
     pub fn new(ctx: &'a EnvironmentContext) -> Self {
-        Self { ctx, _writer: Default::default() }
+        Self { ctx, _notifier: Default::default() }
     }
 }
 
@@ -86,34 +88,37 @@ fn sources_from_query(query: &TargetInfoQuery) -> DiscoverySources {
     }
 }
 
-impl<W> Check for ResolveTarget<'_, W>
+impl<N> Check for ResolveTarget<'_, N>
 where
-    W: Write + Sized,
+    N: Notifier + Sized,
 {
     type Input = TargetInfoQuery;
     type Output = TargetHandle;
-    type Writer = W;
+    type Notifier = N;
 
     fn write_preamble(
         &self,
         input: &Self::Input,
-        writer: &mut Self::Writer,
-    ) -> std::io::Result<()> {
+        notifier: &mut Self::Notifier,
+    ) -> anyhow::Result<()> {
         let sources = sources_from_query(&input);
         let sources =
             sources.iter_names().map(|(n, _)| n.to_owned()).collect::<Vec<_>>().join(", ");
-        write!(writer, "Attempting to find device {:?} via {}... ", input, sources)?;
-        writer.flush()
+        notifier.info(format!("Attempting to find device {:?} via {}... ", input, sources))
     }
 
-    fn on_success(&self, output: &Self::Output, writer: &mut Self::Writer) -> std::io::Result<()> {
-        writeln!(writer, "Target resolved to {:?}", output)
+    fn on_success(
+        &self,
+        output: &Self::Output,
+        notifier: &mut Self::Notifier,
+    ) -> anyhow::Result<()> {
+        notifier.on_success(format!("Target resolved to {:?}", output))
     }
 
     fn check<'a>(
         &'a mut self,
         input: Self::Input,
-        _writer: &'a mut Self::Writer,
+        _notifier: &'a mut Self::Notifier,
     ) -> CheckFut<'a, Self::Output> {
         // This step, on account of it being the most broad, will have the most potential ways to
         // fail, meaning that the solution space is quite wide. If this fails and there are no
@@ -140,12 +145,12 @@ where
     }
 }
 
-pub(crate) struct ConnectSsh<'a, W> {
+pub(crate) struct ConnectSsh<'a, N> {
     ctx: &'a EnvironmentContext,
-    _w: std::marker::PhantomData<W>,
+    _w: std::marker::PhantomData<N>,
 }
 
-impl<'a, W> ConnectSsh<'a, W> {
+impl<'a, N> ConnectSsh<'a, N> {
     pub fn new(ctx: &'a EnvironmentContext) -> Self {
         Self { ctx, _w: Default::default() }
     }
@@ -162,30 +167,34 @@ impl TargetConnector for ConnectorHolder {
     }
 }
 
-impl<W> Check for ConnectSsh<'_, W>
+impl<N> Check for ConnectSsh<'_, N>
 where
-    W: Write + Sized,
+    N: Notifier + Sized,
 {
     type Input = TargetHandle;
     type Output = Connection;
-    type Writer = W;
+    type Notifier = N;
 
     fn write_preamble(
         &self,
         input: &Self::Input,
-        writer: &mut Self::Writer,
-    ) -> std::io::Result<()> {
-        writeln!(writer, "Attempting to connect ssh to device {:?}", input)
+        notifier: &mut Self::Notifier,
+    ) -> anyhow::Result<()> {
+        notifier.info(format!("Attempting to connect ssh to device {:?}", input))
     }
 
-    fn on_success(&self, _output: &Self::Output, writer: &mut Self::Writer) -> std::io::Result<()> {
-        writeln!(writer, "Connected")
+    fn on_success(
+        &self,
+        _output: &Self::Output,
+        notifier: &mut Self::Notifier,
+    ) -> anyhow::Result<()> {
+        notifier.on_success("Connected")
     }
 
     fn check<'a>(
         &'a mut self,
         input: Self::Input,
-        writer: &'a mut Self::Writer,
+        notifier: &'a mut Self::Notifier,
     ) -> CheckFut<'a, Self::Output> {
         Box::pin(async {
             let resolution = ffx_target::Resolution::from_target_handle(input)?;
@@ -194,7 +203,8 @@ where
                 netext::ScopedSocketAddr::from_socket_addr(resolution.addr()?)?,
                 self.ctx,
             )?);
-            writeln!(writer, "Executing the command: `{}`", connector.0.fdomain_command()?)?;
+            notifier
+                .info(format!("Executing the command: `{}`", connector.0.fdomain_command()?))?;
             Connection::new(connector).await.map_err(|e| {
                 anyhow::anyhow!(
                     "Unable to connect to device. Underlying error: {}",
@@ -208,42 +218,45 @@ where
     }
 }
 
-pub(crate) struct ConnectRemoteControlProxy<W> {
+pub(crate) struct ConnectRemoteControlProxy<N> {
     pub(crate) timeout: std::time::Duration,
-    _w: std::marker::PhantomData<W>,
+    _w: std::marker::PhantomData<N>,
 }
 
-impl<W> ConnectRemoteControlProxy<W> {
+impl<N> ConnectRemoteControlProxy<N> {
     pub fn new(timeout: std::time::Duration) -> Self {
         Self { timeout, _w: Default::default() }
     }
 }
 
-impl<W> Check for ConnectRemoteControlProxy<W>
+impl<N> Check for ConnectRemoteControlProxy<N>
 where
-    W: Write + Sized,
+    N: Notifier + Sized,
 {
     type Input = Connection;
     type Output = ProductInfo;
-    type Writer = W;
+    type Notifier = N;
 
     fn write_preamble(
         &self,
         _input: &Self::Input,
-        writer: &mut Self::Writer,
-    ) -> std::io::Result<()> {
-        write!(writer, "Attempting to connect remote control through ssh... ")?;
-        writer.flush()
+        notifier: &mut Self::Notifier,
+    ) -> anyhow::Result<()> {
+        notifier.info("Attempting to connect remote control through ssh... ")
     }
 
-    fn on_success(&self, _output: &Self::Output, writer: &mut Self::Writer) -> std::io::Result<()> {
-        writeln!(writer, "Success")
+    fn on_success(
+        &self,
+        _output: &Self::Output,
+        notifier: &mut Self::Notifier,
+    ) -> anyhow::Result<()> {
+        notifier.on_success("Success")
     }
 
     fn check<'a>(
         &'a mut self,
         input: Self::Input,
-        _writer: &'a mut Self::Writer,
+        _notifier: &'a mut Self::Notifier,
     ) -> CheckFut<'a, Self::Output> {
         Box::pin(async move {
             let proxy = input.rcs_proxy_fdomain().await?;
@@ -260,35 +273,34 @@ where
     }
 }
 
-pub(crate) struct FastbootDeviceStatus<W>(std::marker::PhantomData<W>);
+pub(crate) struct FastbootDeviceStatus<N>(std::marker::PhantomData<N>);
 
-impl<W> FastbootDeviceStatus<W> {
+impl<N> FastbootDeviceStatus<N> {
     pub fn new() -> Self {
         Self(Default::default())
     }
 }
 
-impl<W> Check for FastbootDeviceStatus<W>
+impl<N> Check for FastbootDeviceStatus<N>
 where
-    W: Write + Sized,
+    N: Notifier + Sized,
 {
     type Input = TargetHandle;
     type Output = String;
-    type Writer = W;
+    type Notifier = N;
 
     fn write_preamble(
         &self,
         input: &Self::Input,
-        writer: &mut Self::Writer,
-    ) -> std::io::Result<()> {
-        write!(writer, "Attempting to connect to Fastboot device: {input:?}... ")?;
-        writer.flush()
+        notifier: &mut Self::Notifier,
+    ) -> anyhow::Result<()> {
+        notifier.info(format!("Attempting to connect to Fastboot device: {input:?}... "))
     }
 
     fn check<'a>(
         &'a mut self,
         input: Self::Input,
-        _writer: &'a mut Self::Writer,
+        _notifier: &'a mut Self::Notifier,
     ) -> CheckFut<'a, Self::Output> {
         Box::pin(async {
             // Example handle: [TargetHandle { node_name: None, state: Fastboot(FastbootTargetState

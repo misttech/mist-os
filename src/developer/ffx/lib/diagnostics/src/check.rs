@@ -17,16 +17,16 @@ pub trait Check {
     type Output;
 
     /// The type of the writer used in each check. Defaults to a vector of bytes for testing, but
-    /// this should typically be used with subtools, so one would pass the tool's `::Writer` to
+    /// this should typically be used with subtools, so one would pass the tool's `::Notifier` to
     /// this.
-    type Writer;
+    type Notifier: Notifier;
 
     /// Optional write before the check is run.
     fn write_preamble(
         &self,
         _input: &Self::Input,
-        _writer: &mut Self::Writer,
-    ) -> std::io::Result<()> {
+        _notifier: &mut Self::Notifier,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
 
@@ -34,8 +34,8 @@ pub trait Check {
     fn on_success(
         &self,
         _output: &Self::Output,
-        _writer: &mut Self::Writer,
-    ) -> std::io::Result<()> {
+        _notifier: &mut Self::Notifier,
+    ) -> anyhow::Result<()> {
         Ok(())
     }
 
@@ -43,27 +43,59 @@ pub trait Check {
     fn check<'a>(
         &'a mut self,
         input: Self::Input,
-        writer: &'a mut Self::Writer,
+        notifier: &'a mut Self::Notifier,
     ) -> CheckFut<'a, Self::Output>;
 
     /// Auto-implemented. Runs a check while writing a preamble. Returns a tuple of the main output
     /// and the reference to the writer being used.
     ///
     /// Allows for chaining checks together.
-    fn check_with_output<'a>(
+    fn check_with_notifier<'a>(
         mut self,
         input: Self::Input,
-        writer: &'a mut Self::Writer,
-    ) -> CheckFut<'a, (Self::Output, &'a mut Self::Writer)>
+        notifier: &'a mut Self::Notifier,
+    ) -> CheckFut<'a, (Self::Output, &'a mut Self::Notifier)>
     where
-        Self::Writer: Sized,
+        Self::Notifier: Sized,
         Self: Sized + 'a,
     {
         Box::pin(async move {
-            self.write_preamble(&input, writer)?;
-            let result = (self.check(input, writer).await?, writer);
+            self.write_preamble(&input, notifier)?;
+            let result = (self.check(input, notifier).await?, notifier);
             self.on_success(&result.0, result.1)?;
             Ok(result)
         })
+    }
+}
+
+pub enum NotificationType {
+    Info,
+    Success,
+    Warning,
+    Error,
+}
+
+/// A trait for updating the progress of a check as it continues.
+pub trait Notifier {
+    fn update_status(
+        &mut self,
+        ty: NotificationType,
+        status: impl Into<String>,
+    ) -> anyhow::Result<()>;
+
+    fn warn(&mut self, status: impl Into<String>) -> anyhow::Result<()> {
+        self.update_status(NotificationType::Warning, status)
+    }
+
+    fn info(&mut self, status: impl Into<String>) -> anyhow::Result<()> {
+        self.update_status(NotificationType::Info, status)
+    }
+
+    fn on_error(&mut self, status: impl Into<String>) -> anyhow::Result<()> {
+        self.update_status(NotificationType::Error, status)
+    }
+
+    fn on_success(&mut self, status: impl Into<String>) -> anyhow::Result<()> {
+        self.update_status(NotificationType::Success, status)
     }
 }
