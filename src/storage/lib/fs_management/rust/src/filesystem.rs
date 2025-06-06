@@ -12,7 +12,7 @@ use fidl_fuchsia_component::{self as fcomponent, RealmMarker};
 use fidl_fuchsia_fs::AdminMarker;
 use fidl_fuchsia_fs_startup::{CheckOptions, CreateOptions, MountOptions, StartupMarker};
 use fidl_fuchsia_hardware_block_volume::VolumeMarker;
-use fuchsia_component::client::{
+use fuchsia_component_client::{
     connect_to_named_protocol_at_dir_root, connect_to_protocol, connect_to_protocol_at_dir_root,
     connect_to_protocol_at_dir_svc, open_childs_exposed_directory,
 };

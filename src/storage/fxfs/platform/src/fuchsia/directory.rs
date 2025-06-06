@@ -11,6 +11,7 @@ use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume, RootDir};
 use anyhow::{bail, Error};
 use either::{Left, Right};
 use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_hardware_block_volume::VolumeMarker;
 use fidl_fuchsia_io as fio;
 use fuchsia_sync::Mutex;
 use futures::future::BoxFuture;
@@ -50,8 +51,9 @@ impl RootDir for FxDirectory {
         self
     }
 
-    fn as_directory(self: Arc<Self>) -> Arc<dyn VfsDirectory> {
-        self
+    fn serve(self: Arc<Self>, flags: fio::Flags, server_end: ServerEnd<fio::DirectoryMarker>) {
+        let scope = self.volume().scope().clone();
+        vfs::directory::serve_on(self, flags, scope, server_end);
     }
 
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode> {
@@ -586,6 +588,47 @@ impl FxDirectory {
         }
         Ok(())
     }
+
+    pub(crate) async fn open_block_file(
+        self: &Arc<Self>,
+        name: &str,
+        server_end: ServerEnd<VolumeMarker>,
+    ) {
+        let request = ObjectRequest::new(
+            fio::Flags::empty(),
+            &fio::Options::default(),
+            server_end.into_channel(),
+        );
+        let scope = self.volume().scope().clone();
+        let this = self.clone();
+        request
+            .handle_async(async move |request| {
+                let path = Path::validate_and_split(name).and_then(|p| {
+                    if p.is_single_component() {
+                        Ok(p)
+                    } else {
+                        Err(zx::Status::INVALID_ARGS)
+                    }
+                })?;
+                let node = this
+                    .lookup(&fio::Flags::empty(), path, request)
+                    .await
+                    .map_err(map_to_status)?;
+                if node.is::<FxFile>() {
+                    let file = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
+                    if file.is_verified_file() {
+                        log::error!("Tried to expose a verified file as a block device.");
+                        return Err(zx::Status::NOT_SUPPORTED);
+                    }
+                    let server = BlockServer::new(file, request.take().into_channel());
+                    scope.spawn(server.run());
+                    Ok(())
+                } else {
+                    Err(zx::Status::NOT_FILE)
+                }
+            })
+            .await
+    }
 }
 
 impl Drop for FxDirectory {
@@ -900,9 +943,6 @@ impl VfsDirectory for FxDirectory {
                         .await
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
-                    // TODO(https://fxbug.dev/397501864): Support opening block devices with the new
-                    // fuchsia.io/Directory.Open signature (e.g. via the `open3` impl below), or add
-                    // a separate protocol for this purpose.
                     if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
                         if node.is_verified_file() {
                             log::error!("Tried to expose a verified file as a block device.");
@@ -914,11 +954,7 @@ impl VfsDirectory for FxDirectory {
                             );
                             return Err(zx::Status::ACCESS_DENIED);
                         }
-                        let server = BlockServer::new(
-                            node,
-                            /*read_only=*/ !flags.contains(fio::OpenFlags::RIGHT_WRITABLE),
-                            object_request.take().into_channel(),
-                        );
+                        let server = BlockServer::new(node, object_request.take().into_channel());
                         scope.spawn(server.run());
                         Ok(())
                     } else {

@@ -82,8 +82,9 @@ impl RootDir for BlobDirectory {
         self
     }
 
-    fn as_directory(self: Arc<Self>) -> Arc<dyn VfsDirectory> {
-        self
+    fn serve(self: Arc<Self>, flags: fio::Flags, server_end: ServerEnd<fio::DirectoryMarker>) {
+        let scope = self.volume().scope().clone();
+        vfs::directory::serve_on(self, flags, scope, server_end);
     }
 
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode> {

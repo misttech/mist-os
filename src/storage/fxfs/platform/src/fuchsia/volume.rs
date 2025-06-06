@@ -14,9 +14,11 @@ use crate::fuchsia::symlink::FxSymlink;
 use crate::fuchsia::volumes_directory::VolumesDirectory;
 use anyhow::{bail, ensure, Error};
 use async_trait::async_trait;
+use fidl::endpoints::ServerEnd;
 use fidl::AsHandleRef;
 use fidl_fuchsia_fxfs::{
-    BytesAndNodes, ProjectIdRequest, ProjectIdRequestStream, ProjectIterToken,
+    BytesAndNodes, FileBackedVolumeProviderRequest, FileBackedVolumeProviderRequestStream,
+    ProjectIdRequest, ProjectIdRequestStream, ProjectIterToken,
 };
 use fs_inspect::{FsInspectVolume, VolumeData};
 use fuchsia_sync::Mutex;
@@ -38,9 +40,9 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 use vfs::directory::entry::DirectoryEntry;
-use vfs::directory::entry_container::Directory as VfsDirectory;
 use vfs::directory::simple::Simple;
 use vfs::execution_scope::ExecutionScope;
+
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 // LINT.IfChange
@@ -663,7 +665,7 @@ impl FsInspectVolume for FxVolume {
 pub trait RootDir: FxNode + DirectoryEntry {
     fn as_directory_entry(self: Arc<Self>) -> Arc<dyn DirectoryEntry>;
 
-    fn as_directory(self: Arc<Self>) -> Arc<dyn VfsDirectory>;
+    fn serve(self: Arc<Self>, flags: fio::Flags, server_end: ServerEnd<fio::DirectoryMarker>);
 
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode>;
 
@@ -777,6 +779,44 @@ impl FxVolumeAndRoot {
                         }
                     })?
                 }
+            }
+        }
+        Ok(())
+    }
+
+    pub async fn handle_file_backed_volume_provider_requests(
+        &self,
+        mut requests: FileBackedVolumeProviderRequestStream,
+    ) -> Result<(), Error> {
+        while let Some(request) = requests.try_next().await? {
+            match request {
+                FileBackedVolumeProviderRequest::Open {
+                    parent_directory_token,
+                    name,
+                    server_end,
+                    control_handle: _,
+                } => match self
+                    .volume
+                    .scope
+                    .token_registry()
+                    // NB: For now, we only expect these calls in a regular (non-blob) volume.
+                    // Hard-code the type for simplicity; attempts to call on a blob volume will
+                    // get an error.
+                    .get_owner(parent_directory_token)
+                    .and_then(|dir| {
+                        dir.ok_or(zx::Status::BAD_HANDLE).and_then(|dir| {
+                            dir.into_any()
+                                .downcast::<FxDirectory>()
+                                .map_err(|_| zx::Status::BAD_HANDLE)
+                        })
+                    }) {
+                    Ok(dir) => {
+                        dir.open_block_file(&name, server_end).await;
+                    }
+                    Err(status) => {
+                        let _ = server_end.close_with_epitaph(status)?;
+                    }
+                },
             }
         }
         Ok(())

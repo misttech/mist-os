@@ -103,6 +103,7 @@ rustc_library("platform") {
       "//src/storage/fxfs:lib",
       "//src/storage/fxfs/crypto/insecure",
       "//src/storage/lib/blob_writer:blob-writer",
+      "//src/storage/lib/block_protocol",
       "//src/storage/lib/fs_management/rust:fs_management",
       "//src/storage/lib/fsverity-merkle",
       "//src/storage/lib/ramdevice_client/rust:ramdevice_client",

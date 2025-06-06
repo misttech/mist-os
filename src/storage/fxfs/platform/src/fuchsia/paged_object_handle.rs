@@ -1263,12 +1263,7 @@ mod tests {
 
     fn open_volume(volume: &FxVolumeAndRoot) -> fio::DirectoryProxy {
         let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
-        vfs::directory::serve_on(
-            volume.root().clone().as_directory(),
-            fio::PERM_READABLE | fio::PERM_WRITABLE,
-            volume.volume().scope().clone(),
-            server_end,
-        );
+        volume.root().clone().serve(fio::PERM_READABLE | fio::PERM_WRITABLE, server_end);
         root
     }
 

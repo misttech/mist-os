@@ -27,7 +27,7 @@ use zx::{self as zx, Status};
 struct State {
     filesystem: OpenFxFilesystem,
     volume: FxVolumeAndRoot,
-    volume_out_dir: Option<fio::DirectoryProxy>,
+    volume_out_dir: fio::DirectoryProxy,
     root: fio::DirectoryProxy,
     volumes_directory: Arc<VolumesDirectory>,
 }
@@ -41,19 +41,12 @@ pub struct TestFixtureOptions {
     pub encrypted: bool,
     pub as_blob: bool,
     pub format: bool,
-    pub serve_volume: bool,
     pub pre_commit_hook: PreCommitHook,
 }
 
 impl Default for TestFixtureOptions {
     fn default() -> Self {
-        Self {
-            encrypted: true,
-            as_blob: false,
-            format: true,
-            serve_volume: false,
-            pre_commit_hook: None,
-        }
+        Self { encrypted: true, as_blob: false, format: true, pre_commit_hook: None }
     }
 }
 
@@ -151,22 +144,13 @@ impl TestFixture {
         };
 
         let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
-        vfs::directory::serve_on(
-            volume.root().clone().as_directory(),
-            fio::PERM_READABLE | fio::PERM_WRITABLE,
-            volume.volume().scope().clone(),
-            server_end,
-        );
+        volume.root().clone().serve(fio::PERM_READABLE | fio::PERM_WRITABLE, server_end);
 
-        let volume_out_dir = if options.serve_volume {
-            let (out_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-            volumes_directory
-                .serve_volume(&volume, server_end, options.as_blob)
-                .expect("serve_volume failed");
-            Some(out_dir)
-        } else {
-            None
-        };
+        let (volume_out_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        volumes_directory
+            .serve_volume(&volume, server_end, options.as_blob)
+            .expect("serve_volume failed");
+
         let encrypted = if options.encrypted { Some(crypt.clone()) } else { None };
         Self {
             state: Some(State { filesystem, volume, volume_out_dir, root, volumes_directory }),
@@ -184,14 +168,12 @@ impl TestFixture {
     pub async fn close(mut self) -> DeviceHolder {
         let State { filesystem, volume, volume_out_dir, root, volumes_directory } =
             std::mem::take(&mut self.state).unwrap();
-        if let Some(out_dir) = volume_out_dir {
-            out_dir
-                .close()
-                .await
-                .expect("FIDL call failed")
-                .map_err(Status::from_raw)
-                .expect("close out_dir failed");
-        }
+        volume_out_dir
+            .close()
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("close out_dir failed");
         // Close the root node and ensure that there's no remaining references to |vol|, which would
         // indicate a reference cycle or other leak.
         root.close()
@@ -265,12 +247,7 @@ impl TestFixture {
     }
 
     pub fn volume_out_dir(&self) -> &fio::DirectoryProxy {
-        self.state
-            .as_ref()
-            .unwrap()
-            .volume_out_dir
-            .as_ref()
-            .expect("Did you forget to set `serve_volume` in TestFixtureOptions?")
+        &self.state.as_ref().unwrap().volume_out_dir
     }
 }
 

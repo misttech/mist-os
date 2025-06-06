@@ -12,6 +12,9 @@ ffx_subtool_fidl_partner_unstable_allowlist = [
   # Though this is not ffx, it uses the same mechanism for host tools.
   # TODO(https://fxbug.dev/326090508): Add these to the SDK or remove usage.
   "//sdk/fidl/fuchsia.wlan.stats:fuchsia.wlan.stats",
+
+  "//sdk/fidl/fuchsia.hardware.block.partition:fuchsia.hardware.block.partition",
+  "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume",
 ]
 
 # Unstable FIDL libraries that are not in "host_tool" or greater but are
@@ -86,6 +89,8 @@ ffx_subtool_fidl_allowlist = [
 
   # used by ffx repository packages
   "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs",
+  "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.partition",
+  "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume",
 
   # used by ffx fuzz
   "//src/sys/fuzzing/fidl:fuchsia.fuzzer",

@@ -9,7 +9,7 @@ use fidl_fuchsia_hardware_block_partition::{Guid, PartitionMarker};
 use fidl_fuchsia_hardware_block_volume::VolumeManagerProxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::TimeoutExt;
-use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
+use fuchsia_component_client::connect_to_named_protocol_at_dir_root;
 use fuchsia_fs::directory::{WatchEvent, Watcher};
 use futures::StreamExt;
 use zx::{self as zx, MonotonicDuration};
