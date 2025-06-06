@@ -1,0 +1,47 @@
+[package]
+name = "tuf"
+edition = "2021"
+version = "0.3.0-beta13"
+rust-version = "1.71.1"
+authors = [ "heartsucker <heartsucker@autistici.org>", "Erick Tryzelaar <etryzelaar@google.com>" ]
+description = "Library for The Update Framework (TUF)"
+homepage = "https://github.com/theupdateframework/rust-tuf"
+repository = "https://github.com/theupdateframework/rust-tuf"
+documentation = "https://docs.rs/tuf"
+readme = "README.md"
+license = "MIT/Apache-2.0"
+keywords = [ "security", "update", "repository" ]
+categories = [ "cryptography" ]
+
+[lib]
+name = "tuf"
+path = "./src/lib.rs"
+
+[dependencies]
+chrono = { version = "0.4.34", features = [ "serde" ] }
+data-encoding = "2.0.0-rc.2"
+futures-io = "0.3.1"
+futures-util = { version = "0.3.1", features = [ "io" ] }
+http = "0.2.0"
+hyper = { version = "0.14.15", default-features = false, features = [ "stream", "client", "http1" ], optional = true }
+itoa = "1.0"
+log = "0.4"
+percent-encoding = "2.1"
+ring = { version = "0.17" }
+serde = "1"
+serde_derive = "1"
+serde_json = "1"
+tempfile = "3"
+thiserror = "1.0"
+untrusted = "0.9"
+url = "2"
+
+[dev-dependencies]
+assert_matches = "1.5.0"
+futures-executor = "0.3.1"
+lazy_static = "1"
+maplit = "1"
+pretty_assertions = "1"
+
+[features]
+default = ["hyper", "hyper/tcp"]

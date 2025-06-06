@@ -1,0 +1,15 @@
+[package]
+name = "kqueue-sys"
+version = "1.0.3"
+authors = ["William Orr <will@worrbase.com>", "Daniel (dmilith) Dettlaff <dmilith@me.com>"]
+description = "Low-level kqueue interface for BSDs"
+license = "MIT"
+keywords = ["kqueue", "kevent", "bsd", "darwin", "macos"]
+categories = ["external-ffi-bindings", "no-std", "os::unix-apis", "filesystem"]
+repository = "https://gitlab.com/worr/rust-kqueue-sys"
+readme = "README.md"
+edition = "2018"
+
+[dependencies]
+bitflags = "^1.2.1"
+libc = "^0.2.74"

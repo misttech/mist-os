@@ -1,0 +1,60 @@
+[package]
+authors = ["Jorge Aparicio <japaricious@gmail.com>", "Brook Heisler <brookheisler@gmail.com>"]
+name = "criterion"
+version = "0.2.11"
+
+description = "Statistics-driven micro-benchmarking library"
+homepage = "https://bheisler.github.io/criterion.rs/book/index.html"
+repository = "https://github.com/bheisler/criterion.rs"
+readme = "README.md"
+keywords = ["criterion", "benchmark"]
+categories = ["development-tools::profiling"]
+license = "Apache-2.0/MIT"
+exclude = ["book/*"]
+
+[dependencies]
+lazy_static = "1.2"
+criterion-plot = { path="plot", version="0.3.1", optional = true }
+itertools = "0.8"
+serde = "1.0"
+serde_json = "1.0"
+serde_derive = "1.0"
+atty = "0.2.11"
+clap = { version = "2.32", default-features = false }
+csv = "1.0"
+walkdir = "2.2.7"
+tinytemplate = { version = "1.0.1", optional = true }
+cast = "0.2"
+num-traits = "0.2"
+rand_os = "0.1"
+rand_xoshiro = "0.1"
+rand_core = { version = "0.3", default-features = false }
+rayon = "1.0.3"
+# These are needed for the minimal-versions build
+rayon-core = ">=1.4.1"
+libc = ">=0.1.5"
+
+[dev-dependencies]
+tempdir = "0.3.7"
+approx = "0.3"
+quickcheck = { version = "0.8", default-features = false }
+rand = "0.6"
+
+[badges]
+travis-ci = { repository = "bheisler/criterion.rs" }
+appveyor = { repository = "bheisler/criterion.rs", id = "4255ads9ctpupcl2" }
+maintenance = { status = "passively-maintained" }
+
+[features]
+real_blackbox = []
+html_reports = ["criterion-plot", "tinytemplate"]
+default = ["html_reports"]
+
+[workspace]
+
+[[bench]]
+name = "bench_main"
+harness = false
+
+[lib]
+bench = false

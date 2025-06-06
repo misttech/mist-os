@@ -1,0 +1,18 @@
+[package]
+name = "predicates-core"
+version = "1.0.2"
+authors = ["Nick Stevens <nick@bitcurry.com>"]
+license = "MIT/Apache-2.0"
+readme = "README.md"
+keywords = ["predicate", "boolean", "combinatorial", "match", "logic"]
+repository = "https://github.com/assert-rs/predicates-rs/tree/master/predicates-core"
+homepage = "https://github.com/assert-rs/predicates-rs/tree/master/predicates-core"
+documentation = "https://docs.rs/predicates-core"
+description = """
+An API for boolean-valued predicate functions.
+"""
+categories = ["data-structures", "rust-patterns"]
+edition = "2018"
+
+[badges]
+azure-devops = { project = "assert-rs", pipeline = "predicates-rs" }
