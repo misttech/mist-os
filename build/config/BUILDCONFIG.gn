@@ -2087,7 +2087,11 @@ declare_args() {
   #
   #     host
   #         [boolean] If true, the selector matches in the host toolchain.
-  #         If false, the selector matches in the target toolchain.
+  #         If false, the selector matches in non-host toolchains.
+  #
+  #     kernel
+  #         [boolean] If true, the selector matches in is_kernel toolchains.
+  #         If false, the selector matches in non-kernel toolchains.
   #
   #     testonly
   #         [boolean] If true, the selector matches targets with testonly=true.
@@ -2648,6 +2652,10 @@ template("variant_target") {
           # or host_arm64, due to the way it is set above in this file.
           # See https://fxbug.dev/42136023 for details.
           selected = is_host == selector.host
+        }
+
+        if (selected && defined(selector.kernel)) {
+          selected = is_kernel == selector.kernel
         }
 
         if (selected && defined(selector.testonly)) {

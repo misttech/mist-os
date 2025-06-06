@@ -25,6 +25,7 @@ sysroot_libc_base_toolchain = "//sdk/lib/c:user.libc_$target_cpu"
 # in //sdk/lib/c/BUILD.gn!
 #
 _select_host = false
+_select_kernel = false
 _select_testonly = false
 _select_target_type = [ "shared_library" ]
 _select_output_name = [ "libc.so" ]
@@ -65,6 +66,10 @@ if (select_variant_canonical != []) {
       _selected = true
       if (_selected && defined(_selector.host)) {
         _selected = _selector.host == _select_host
+      }
+
+      if (_selected && defined(_selector.kernel)) {
+        _selected = _selector.kernel == _select_kernel
       }
 
       if (_selected && defined(_selector.testonly)) {
