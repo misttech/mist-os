@@ -35,10 +35,7 @@
             from: "framework",
         },
         {
-            service: [
-                "fuchsia.hardware.block.volume.Service",
-                "fuchsia.hardware.ramdisk.Service",
-            ],
+            service: [ "fuchsia.hardware.block.volume.Service" ],
         },
 
         // This is only here to facilitate shutdown ordering.

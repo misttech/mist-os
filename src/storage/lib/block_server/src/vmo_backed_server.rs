@@ -5,6 +5,8 @@
 use anyhow::{anyhow, Error};
 use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockInfo, BlockServer, DeviceInfo, WriteOptions};
+use fidl::endpoints::ServerEnd;
+use fs_management::filesystem::BlockConnector;
 use std::borrow::Cow;
 use std::num::NonZero;
 use std::sync::Arc;
@@ -149,13 +151,38 @@ impl VmoBackedServer {
     }
 }
 
+/// Implements `BlockConnector` to vend connections to a VmoBackedServer.
+pub struct VmoBackedServerConnector {
+    scope: fuchsia_async::Scope,
+    server: Arc<VmoBackedServer>,
+}
+
+impl VmoBackedServerConnector {
+    pub fn new(scope: fuchsia_async::Scope, server: Arc<VmoBackedServer>) -> Self {
+        Self { scope, server }
+    }
+}
+
+impl BlockConnector for VmoBackedServerConnector {
+    fn connect_channel_to_volume(
+        &self,
+        server_end: ServerEnd<fvolume::VolumeMarker>,
+    ) -> Result<(), Error> {
+        let server = self.server.clone();
+        let _ = self.scope.spawn(async move {
+            let _ = server.serve(server_end.into_stream()).await;
+        });
+        Ok(())
+    }
+}
+
 /// Extension trait for test-only functionality.  `unwrap` is used liberally in these functions, to
 /// simplify their usage in tests.
 pub trait VmoBackedServerTestingExt {
     fn new(block_count: u64, block_size: u32, initial_content: &[u8]) -> Self;
     fn from_vmo(block_size: u32, vmo: zx::Vmo) -> Self;
     fn volume_proxy(self: &Arc<Self>) -> fvolume::VolumeProxy;
-    fn connect(self: &Arc<Self>, server: fidl::endpoints::ServerEnd<fvolume::VolumeMarker>);
+    fn connect(self: &Arc<Self>, server: ServerEnd<fvolume::VolumeMarker>);
     fn block_proxy(self: &Arc<Self>) -> fblock::BlockProxy;
 }
 
@@ -185,7 +212,7 @@ impl VmoBackedServerTestingExt for VmoBackedServer {
         client.into_proxy()
     }
 
-    fn connect(self: &Arc<Self>, server: fidl::endpoints::ServerEnd<fvolume::VolumeMarker>) {
+    fn connect(self: &Arc<Self>, server: ServerEnd<fvolume::VolumeMarker>) {
         let this = self.clone();
         fuchsia_async::Task::spawn(async move {
             let _ = this.serve(server.into_stream()).await;

@@ -179,7 +179,6 @@ impl TestFixtureBuilder {
             .add_route(
                 Route::new()
                     .capability(Capability::directory("dev-topological").rights(fio::R_STAR_DIR))
-                    .capability(Capability::service::<framdisk::ServiceMarker>())
                     .capability(Capability::service::<fvolume::ServiceMarker>())
                     .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
                     .to(&fshost),
