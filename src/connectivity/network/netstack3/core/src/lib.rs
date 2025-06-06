@@ -104,9 +104,9 @@ pub mod filter {
         Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsContext,
         FilterBindingsTypes, FilterIpExt, Hook, InterfaceMatcher, InterfaceProperties, IpPacket,
         IpRoutines, MarkAction, NatRoutines, PacketMatcher, PortMatcher, ProofOfEgressCheck,
-        Routine, Routines, Rule, SocketEgressFilterResult, SocketOpsFilter,
-        SocketOpsFilterBindingContext, TransparentProxy, TransportProtocolMatcher, Tuple,
-        UninstalledRoutine, ValidationError,
+        Routine, Routines, Rule, SocketEgressFilterResult, SocketIngressFilterResult,
+        SocketOpsFilter, SocketOpsFilterBindingContext, TransparentProxy, TransportProtocolMatcher,
+        Tuple, UninstalledRoutine, ValidationError,
     };
 }
 

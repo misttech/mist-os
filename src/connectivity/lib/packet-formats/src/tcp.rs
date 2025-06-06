@@ -466,6 +466,11 @@ impl<B: SplitByteSlice> TcpSegment<B> {
         }
     }
 
+    /// Returns packet headers and the body as a list of slices.
+    pub fn as_bytes(&self) -> [&[u8]; 3] {
+        [self.hdr_prefix.as_bytes(), self.options.bytes(), &self.body]
+    }
+
     /// Consumes this segment and constructs a [`Serializer`] with the same
     /// contents.
     ///

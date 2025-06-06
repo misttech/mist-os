@@ -37,7 +37,8 @@ pub use conntrack::{
 };
 pub use context::{
     FilterBindingsContext, FilterBindingsTypes, FilterContext, FilterIpContext, NatContext,
-    SocketEgressFilterResult, SocketOpsFilter, SocketOpsFilterBindingContext,
+    SocketEgressFilterResult, SocketIngressFilterResult, SocketOpsFilter,
+    SocketOpsFilterBindingContext,
 };
 pub use logic::{
     FilterHandler, FilterImpl, FilterTimerId, IngressVerdict, ProofOfEgressCheck, Verdict,
@@ -61,6 +62,13 @@ pub use state::{
 pub mod testutil {
     pub use crate::logic::testutil::NoopImpl;
     pub use crate::packets::testutil::new_filter_egress_ip_packet;
+    use packet::FragmentedByteSlice;
+
+    use crate::{
+        FilterIpExt, IpPacket, SocketEgressFilterResult, SocketIngressFilterResult, SocketOpsFilter,
+    };
+    use netstack3_base::socket::SocketCookie;
+    use netstack3_base::{Marks, StrongDeviceIdentifier};
 
     #[cfg(test)]
     pub(crate) trait TestIpExt:
@@ -72,5 +80,30 @@ pub mod testutil {
     impl<I> TestIpExt for I where
         I: crate::context::testutil::TestIpExt + crate::packets::testutil::internal::TestIpExt
     {
+    }
+
+    /// No-op implementation of `SocketOpsFilter`.
+    pub struct NoOpSocketOpsFilter;
+
+    impl<D: StrongDeviceIdentifier, T> SocketOpsFilter<D, T> for NoOpSocketOpsFilter {
+        fn on_egress<I: FilterIpExt, P: IpPacket<I>>(
+            &self,
+            _packet: &P,
+            _device: &D,
+            _tx_metadata: &T,
+            _marks: &Marks,
+        ) -> SocketEgressFilterResult {
+            SocketEgressFilterResult::Pass { congestion: false }
+        }
+
+        fn on_ingress(
+            &self,
+            _packet: &FragmentedByteSlice<'_, &[u8]>,
+            _device: &D,
+            _cookie: SocketCookie,
+            _marks: &Marks,
+        ) -> SocketIngressFilterResult {
+            SocketIngressFilterResult::Accept
+        }
     }
 }

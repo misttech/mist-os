@@ -53,9 +53,9 @@ use netstack3_device::{
     self as device, for_any_device_id, DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
     DeviceLayerTypes, DeviceProvider, DeviceSendFrameError, WeakDeviceId,
 };
+use netstack3_filter::testutil::NoOpSocketOpsFilter;
 use netstack3_filter::{
-    FilterBindingsTypes, FilterIpExt, FilterTimerId, IpPacket, SocketEgressFilterResult,
-    SocketOpsFilter, SocketOpsFilterBindingContext,
+    FilterBindingsTypes, FilterTimerId, SocketOpsFilter, SocketOpsFilterBindingContext,
 };
 use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
 use netstack3_ip::device::{
@@ -759,20 +759,6 @@ impl FakeBindingsCtx {
 
 impl FilterBindingsTypes for FakeBindingsCtx {
     type DeviceClass = ();
-}
-
-struct NoOpSocketOpsFilter;
-
-impl<D: netstack3_base::StrongDeviceIdentifier, T> SocketOpsFilter<D, T> for NoOpSocketOpsFilter {
-    fn on_egress<I: FilterIpExt, P: IpPacket<I>>(
-        &self,
-        _packet: &P,
-        _device: &D,
-        _tx_metadata: &T,
-        _marks: &Marks,
-    ) -> SocketEgressFilterResult {
-        SocketEgressFilterResult::Pass { congestion: false }
-    }
 }
 
 impl SocketOpsFilterBindingContext<DeviceId<FakeBindingsCtx>> for FakeBindingsCtx {

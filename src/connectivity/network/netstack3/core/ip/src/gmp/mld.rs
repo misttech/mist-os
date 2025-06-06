@@ -1169,6 +1169,9 @@ mod tests {
         fn router_alert(&self) -> bool {
             self.router_alert
         }
+        fn as_bytes(&self) -> [&[u8]; 2] {
+            unimplemented!()
+        }
     }
 
     const DEFAULT_HEADER_INFO: FakeHeaderInfo =

@@ -2299,7 +2299,10 @@ mod tests {
                     Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.into(),
                     q.clone(),
                     &LocalDeliveryPacketInfo {
-                        header_info: FakeIpHeaderInfo { hop_limit: BAD_TTL, ..base_header_info },
+                        header_info: FakeIpHeaderInfo {
+                            hop_limit: BAD_TTL,
+                            ..base_header_info.clone()
+                        },
                         ..Default::default()
                     }
                 ),
@@ -2335,7 +2338,7 @@ mod tests {
                         header_info: FakeIpHeaderInfo {
                             // Router alert must be set.
                             router_alert: false,
-                            ..base_header_info
+                            ..base_header_info.clone()
                         },
                         ..Default::default()
                     },

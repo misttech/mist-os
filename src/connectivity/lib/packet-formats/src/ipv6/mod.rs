@@ -850,6 +850,11 @@ impl<'a> ExtensionHeaders<'a> {
     pub fn iter(&self) -> impl Iterator<Item = Ipv6ExtensionHeader<'_>> {
         self.0.iter()
     }
+
+    /// Returns the raw bytes of the extension headers.
+    pub fn bytes(&self) -> &[u8] {
+        self.0.bytes()
+    }
 }
 
 /// We were unable to parse the extension headers.

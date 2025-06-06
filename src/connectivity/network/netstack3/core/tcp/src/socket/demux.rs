@@ -14,21 +14,25 @@ use log::{debug, error, warn};
 use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::socket::{
     AddrIsMappedError, AddrVec, AddrVecIter, ConnAddr, ConnIpAddr, InsertError, ListenerAddr,
-    ListenerIpAddr, SocketIpAddr, SocketIpAddrExt as _,
+    ListenerIpAddr, SocketCookie, SocketIpAddr, SocketIpAddrExt as _,
 };
 use netstack3_base::{
     BidirectionalConverter as _, Control, CounterContext, CtxPair, EitherDeviceId, IpDeviceAddr,
-    Marks, Mss, NotFoundError, Payload, Segment, SegmentHeader, SeqNum,
-    StrongDeviceIdentifier as _, WeakDeviceIdentifier,
+    Marks, Mss, NotFoundError, Payload, Segment, SegmentHeader, SeqNum, StrongDeviceIdentifier,
+    VerifiedTcpSegment, WeakDeviceIdentifier,
 };
-use netstack3_filter::{FilterIpExt, TransportPacketSerializer};
+use netstack3_filter::{
+    FilterIpExt, SocketIngressFilterResult, SocketOpsFilter, TransportPacketSerializer,
+};
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
     IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, ReceiveIpPacketMeta,
     TransportIpContext, TransportReceiveError,
 };
 use netstack3_trace::trace_duration;
-use packet::{BufferMut, BufferView as _, EmptyBuf, InnerPacketBuilder, PacketBuilder};
+use packet::{
+    BufferMut, BufferView as _, EmptyBuf, FragmentedByteSlice, InnerPacketBuilder, PacketBuilder,
+};
 use packet_formats::error::ParseError;
 use packet_formats::ip::IpProto;
 use packet_formats::tcp::{
@@ -68,7 +72,7 @@ impl<BT: TcpBindingsTypes> BufferProvider<BT::ReceiveBuffer, BT::SendBuffer> for
 impl<I, BC, CC> IpTransportContext<I, BC, CC> for TcpIpTransportContext
 where
     I: DualStackIpExt,
-    BC: TcpBindingsContext
+    BC: TcpBindingsContext<CC::DeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -116,7 +120,7 @@ where
         mut buffer: B,
         info: &LocalDeliveryPacketInfo<I, H>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        let LocalDeliveryPacketInfo { meta, header_info: _, marks } = info;
+        let LocalDeliveryPacketInfo { meta, header_info, marks } = info;
         let ReceiveIpPacketMeta { broadcast, transparent_override } = meta;
         if let Some(delivery) = transparent_override {
             warn!(
@@ -185,7 +189,7 @@ where
         };
         let local_port = packet.dst_port();
         let remote_port = packet.src_port();
-        let incoming = match Segment::try_from(packet) {
+        let incoming = match VerifiedTcpSegment::try_from(packet) {
             Ok(segment) => segment,
             Err(err) => {
                 CounterContext::<TcpCountersWithoutSocket<I>>::counters(core_ctx)
@@ -201,28 +205,30 @@ where
         CounterContext::<TcpCountersWithoutSocket<I>>::counters(core_ctx)
             .valid_segments_received
             .increment();
-        handle_incoming_packet::<I, _, _>(
+        handle_incoming_packet::<I, _, _, _>(
             core_ctx,
             bindings_ctx,
             conn_addr,
             device,
-            incoming,
+            header_info,
+            &incoming,
             marks,
         );
         Ok(())
     }
 }
 
-fn handle_incoming_packet<WireI, BC, CC>(
+fn handle_incoming_packet<WireI, BC, CC, H>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     conn_addr: ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>,
     incoming_device: &CC::DeviceId,
-    incoming: Segment<&[u8]>,
+    header_info: &H,
+    incoming: &VerifiedTcpSegment<'_>,
     marks: &Marks,
 ) where
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext
+    BC: TcpBindingsContext<CC::DeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -230,6 +236,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
             PassiveOpen = <BC as TcpBindingsTypes>::ReturnedBuffers,
         >,
     CC: TcpContext<WireI, BC> + TcpContext<WireI::OtherVersion, BC>,
+    H: IpHeaderInfo<WireI>,
 {
     trace_duration!(c"tcp::handle_incoming_packet");
     let mut tw_reuse = None;
@@ -260,7 +267,9 @@ fn handle_incoming_packet<WireI, BC, CC>(
                             core_ctx,
                             bindings_ctx,
                             conn_id,
-                            incoming.clone(),
+                            incoming_device,
+                            header_info,
+                            &incoming,
                         )
                     }
                     EitherStack::OtherStack(conn_id) => {
@@ -268,7 +277,9 @@ fn handle_incoming_packet<WireI, BC, CC>(
                             core_ctx,
                             bindings_ctx,
                             conn_id,
-                            incoming.clone(),
+                            incoming_device,
+                            header_info,
+                            &incoming,
                         )
                     }
                 };
@@ -277,7 +288,8 @@ fn handle_incoming_packet<WireI, BC, CC>(
                         WireI::destroy_socket_with_demux_id(core_ctx, bindings_ctx, demux_conn_id);
                         break FoundSocket::Yes(None);
                     }
-                    ConnectionIncomingSegmentDisposition::FoundSocket => {
+                    ConnectionIncomingSegmentDisposition::FoundSocket
+                    | ConnectionIncomingSegmentDisposition::Filtered => {
                         break FoundSocket::Yes(Some(demux_conn_id));
                     }
                     ConnectionIncomingSegmentDisposition::ReuseCandidateForListener => {
@@ -292,13 +304,14 @@ fn handle_incoming_packet<WireI, BC, CC>(
                             &listener_id,
                             |core_ctx, socket_state, isn| match core_ctx {
                                 MaybeDualStack::NotDualStack((core_ctx, converter)) => {
-                                    try_handle_incoming_for_listener::<WireI, WireI, CC, BC, _>(
+                                    try_handle_incoming_for_listener::<WireI, WireI, CC, BC, _, _>(
                                         core_ctx,
                                         bindings_ctx,
                                         &listener_id,
                                         isn,
                                         socket_state,
-                                        incoming.clone(),
+                                        header_info,
+                                        incoming,
                                         conn_addr,
                                         incoming_device,
                                         &mut tw_reuse,
@@ -308,13 +321,14 @@ fn handle_incoming_packet<WireI, BC, CC>(
                                     )
                                 }
                                 MaybeDualStack::DualStack((core_ctx, converter)) => {
-                                    try_handle_incoming_for_listener::<_, _, CC, BC, _>(
+                                    try_handle_incoming_for_listener::<_, _, CC, BC, _, _>(
                                         core_ctx,
                                         bindings_ctx,
                                         &listener_id,
                                         isn,
                                         socket_state,
-                                        incoming.clone(),
+                                        header_info,
+                                        incoming,
                                         conn_addr,
                                         incoming_device,
                                         &mut tw_reuse,
@@ -354,13 +368,14 @@ fn handle_incoming_packet<WireI, BC, CC>(
                                     MaybeDualStack::DualStack((core_ctx, converter)) => {
                                         let other_demux_id_converter =
                                             core_ctx.other_demux_id_converter();
-                                        try_handle_incoming_for_listener::<_, _, CC, BC, _>(
+                                        try_handle_incoming_for_listener::<_, _, CC, BC, _, _>(
                                             core_ctx,
                                             bindings_ctx,
                                             &listener_id,
                                             isn,
                                             socket_state,
-                                            incoming.clone(),
+                                            header_info,
+                                            incoming,
                                             conn_addr,
                                             incoming_device,
                                             &mut tw_reuse,
@@ -406,7 +421,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
             // CLOSED is fictional because it represents the state when
             // there is no TCB, and therefore, no connection.
             if let Some(seg) =
-                (Closed { reason: None::<Option<ConnectionError>> }.on_segment(&incoming))
+                (Closed { reason: None::<Option<ConnectionError>> }.on_segment(&incoming.into()))
             {
                 socket::send_tcp_segment::<WireI, WireI, _, _, _>(
                     core_ctx,
@@ -430,9 +445,8 @@ fn handle_incoming_packet<WireI, BC, CC>(
         }
     };
 
-    match incoming.header().control {
-        None => {}
-        Some(control) => counters::increment_counter_with_optional_demux_id::<WireI, _, _, _, _>(
+    if let Some(control) = incoming.control() {
+        counters::increment_counter_with_optional_demux_id::<WireI, _, _, _, _>(
             core_ctx,
             demux_id.as_ref(),
             |c| match control {
@@ -440,7 +454,7 @@ fn handle_incoming_packet<WireI, BC, CC>(
                 Control::SYN => &c.syns_received,
                 Control::FIN => &c.fins_received,
             },
-        ),
+        )
     }
 }
 
@@ -455,7 +469,7 @@ fn lookup_socket<I, CC, BC>(
 ) -> Option<SocketLookupResult<I, CC::WeakDeviceId, BC>>
 where
     I: DualStackIpExt,
-    BC: TcpBindingsContext,
+    BC: TcpBindingsContext<CC::DeviceId>,
     CC: TcpContext<I, BC>,
 {
     addrs_to_search.find_map(|addr| {
@@ -492,26 +506,30 @@ where
 #[derive(PartialEq, Eq)]
 enum ConnectionIncomingSegmentDisposition {
     FoundSocket,
+    Filtered,
     ReuseCandidateForListener,
     Destroy,
 }
 
 enum ListenerIncomingSegmentDisposition<S> {
     FoundSocket,
+    Filtered,
     ConflictingConnection,
     NoMatchingSocket,
     NewConnection(S),
 }
 
-fn try_handle_incoming_for_connection_dual_stack<SockI, CC, BC>(
+fn try_handle_incoming_for_connection_dual_stack<SockI, WireI, CC, BC, H>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     conn_id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
-    incoming: Segment<&[u8]>,
+    incoming_device: &CC::DeviceId,
+    header_info: &H,
+    incoming: &VerifiedTcpSegment<'_>,
 ) -> ConnectionIncomingSegmentDisposition
 where
     SockI: DualStackIpExt,
-    BC: TcpBindingsContext
+    BC: TcpBindingsContext<CC::DeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -519,9 +537,25 @@ where
             PassiveOpen = <BC as TcpBindingsTypes>::ReturnedBuffers,
         >,
     CC: TcpContext<SockI, BC>,
+    H: IpHeaderInfo<WireI>,
 {
     core_ctx.with_socket_mut_transport_demux(conn_id, |core_ctx, socket_state| {
         let TcpSocketState { socket_state, ip_options: _, socket_options } = socket_state;
+
+        match run_socket_ingress_filter(
+            bindings_ctx,
+            incoming_device,
+            conn_id.socket_cookie(),
+            socket_options,
+            header_info,
+            incoming.tcp_segment(),
+        ) {
+            SocketIngressFilterResult::Accept => (),
+            SocketIngressFilterResult::Drop => {
+                return ConnectionIncomingSegmentDisposition::Filtered;
+            }
+        }
+
         let (conn_and_addr, timer) = assert_matches!(
             socket_state,
             TcpSocketStateInner::Bound(BoundSocketState::Connected {
@@ -576,7 +610,7 @@ where
                     socket_options,
                     conn,
                     timer,
-                    incoming,
+                    incoming.into(),
                 )
             }
             EitherStack::OtherStack((core_ctx, conn, conn_addr, demux_conn_id)) => {
@@ -589,7 +623,7 @@ where
                     socket_options,
                     conn,
                     timer,
-                    incoming,
+                    incoming.into(),
                 )
             }
         }
@@ -616,7 +650,7 @@ fn try_handle_incoming_for_connection<SockI, WireI, CC, BC, DC>(
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext
+    BC: TcpBindingsContext<CC::DeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -777,10 +811,11 @@ where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
     CC: TcpContext<SockI, BC> + TcpContext<WireI, BC> + TcpContext<WireI::OtherVersion, BC>,
-    BC: TcpBindingsContext,
+    BC: TcpBindingsContext<CC::DeviceId>,
 {
     match disposition {
         ListenerIncomingSegmentDisposition::FoundSocket => true,
+        ListenerIncomingSegmentDisposition::Filtered => true,
         ListenerIncomingSegmentDisposition::ConflictingConnection => {
             // We're about to rewind the lookup. If we got a
             // conflicting connection it means tw_reuse has been
@@ -860,13 +895,14 @@ where
 /// Tries to handle an incoming segment by passing it to a listening socket.
 ///
 /// Returns `FoundSocket` if the segment was handled, otherwise `NoMatchingSocket`.
-fn try_handle_incoming_for_listener<SockI, WireI, CC, BC, DC>(
+fn try_handle_incoming_for_listener<SockI, WireI, CC, BC, DC, H>(
     core_ctx: &mut DC,
     bindings_ctx: &mut BC,
     listener_id: &TcpSocketId<SockI, CC::WeakDeviceId, BC>,
     isn: &IsnGenerator<BC::Instant>,
     socket_state: &mut TcpSocketState<SockI, CC::WeakDeviceId, BC>,
-    incoming: Segment<&[u8]>,
+    header_info: &H,
+    incoming: &VerifiedTcpSegment<'_>,
     incoming_addrs: ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>,
     incoming_device: &CC::DeviceId,
     tw_reuse: &mut Option<(
@@ -885,7 +921,7 @@ fn try_handle_incoming_for_listener<SockI, WireI, CC, BC, DC>(
 where
     SockI: DualStackIpExt,
     WireI: DualStackIpExt,
-    BC: TcpBindingsContext
+    BC: TcpBindingsContext<CC::DeviceId>
         + BufferProvider<
             BC::ReceiveBuffer,
             BC::SendBuffer,
@@ -898,6 +934,7 @@ where
         + TcpDemuxContext<WireI, CC::WeakDeviceId, BC>
         + TcpCounterContext<SockI, CC::WeakDeviceId, BC>
         + CoreTxMetadataContext<TcpSocketTxMetadata<SockI, CC::WeakDeviceId, BC>, BC>,
+    H: IpHeaderInfo<WireI>,
 {
     let (maybe_listener, sharing, listener_addr) = assert_matches!(
         &socket_state.socket_state,
@@ -915,6 +952,20 @@ where
         }
         MaybeListener::Listener(listener) => listener,
     };
+
+    match run_socket_ingress_filter(
+        bindings_ctx,
+        incoming_device,
+        listener_id.socket_cookie(),
+        &socket_state.socket_options,
+        header_info,
+        incoming.tcp_segment(),
+    ) {
+        SocketIngressFilterResult::Accept => (),
+        SocketIngressFilterResult::Drop => {
+            return ListenerIncomingSegmentDisposition::Filtered;
+        }
+    }
 
     // Note that this checks happens at the very beginning, before we try to
     // reuse the connection in TIME-WAIT, this is because we need to store the
@@ -998,7 +1049,7 @@ where
         // okay because the state machine ID is only for debugging purposes.
         &listener_id.either(),
         &TcpCountersRefs::from_ctx(core_ctx, listener_id),
-        incoming,
+        incoming.into(),
         bindings_ctx.now(),
         &SocketOptions::default(),
         false, /* defunct */
@@ -1167,6 +1218,31 @@ where
             panic!("Too many TCP options");
         })
         .wrap_body(data.into_serializer())
+}
+
+fn run_socket_ingress_filter<I, BC, D>(
+    bindings_ctx: &BC,
+    incoming_device: &D,
+    socket_cookie: SocketCookie,
+    socket_options: &SocketOptions,
+    header_info: &impl IpHeaderInfo<I>,
+    tcp_segment: &TcpSegment<&'_ [u8]>,
+) -> SocketIngressFilterResult
+where
+    BC: TcpBindingsContext<D>,
+    D: StrongDeviceIdentifier,
+{
+    let [ip_prefix, ip_options] = header_info.as_bytes();
+    let [tcp_prefix, tcp_options, data] = tcp_segment.as_bytes();
+    let mut slices = [ip_prefix, ip_options, tcp_prefix, tcp_options, data];
+    let data = FragmentedByteSlice::new(&mut slices);
+
+    bindings_ctx.socket_ops_filter().on_ingress(
+        &data,
+        incoming_device,
+        socket_cookie,
+        &socket_options.ip_options.marks,
+    )
 }
 
 #[cfg(test)]

@@ -17,13 +17,15 @@ use fidl_table_validation::ValidFidlTable;
 use log::{error, warn};
 use netstack3_core::device::DeviceId;
 use netstack3_core::device_socket::Frame;
-use netstack3_core::filter::{FilterIpExt, IpPacket, SocketEgressFilterResult, SocketOpsFilter};
+use netstack3_core::filter::{
+    FilterIpExt, IpPacket, SocketEgressFilterResult, SocketIngressFilterResult, SocketOpsFilter,
+};
 use netstack3_core::ip::{Mark, MarkDomain, Marks};
 use netstack3_core::socket::SocketCookie;
 use netstack3_core::sync::{Mutex, RwLock};
 use netstack3_core::trace::trace_duration;
 use netstack3_core::TxMetadata;
-use packet::{PacketConstraints, PartialSerializer};
+use packet::{FragmentedByteSlice, PacketConstraints, PartialSerializer};
 use std::collections::{hash_map, HashMap};
 use std::mem::offset_of;
 use std::sync::{Arc, LazyLock, Weak};
@@ -603,6 +605,17 @@ impl SocketOpsFilter<DeviceId<BindingsCtx>, TxMetadata<BindingsCtx>> for &EbpfMa
         } else {
             SocketEgressFilterResult::Drop { congestion }
         }
+    }
+
+    fn on_ingress(
+        &self,
+        _packet: &FragmentedByteSlice<'_, &[u8]>,
+        _device: &DeviceId<BindingsCtx>,
+        _cookie: SocketCookie,
+        _marks: &Marks,
+    ) -> SocketIngressFilterResult {
+        // TODO(https://fxbug.dev/407809292): Execute attached program.
+        SocketIngressFilterResult::Accept
     }
 }
 
