@@ -193,14 +193,19 @@ class RoamRequestTest(base_test.ConnectionBaseTestClass):
     ) -> tuple[str, Security, Security]:
         ssid = utils.rand_ascii_str(AP_SSID_LENGTH_2G)
         origin_password = None
+        target_password = None
         if test_params.origin_security_mode is not SecurityMode.OPEN:
             # Length 13, so it can be used for WEP or WPA
             origin_password = utils.rand_ascii_str(13)
+            target_password = origin_password
+        elif test_params.target_security_mode is not SecurityMode.OPEN:
+            # If the origin is open but the target is not, generate password for target.
+            target_password = utils.rand_ascii_str(13)
         origin_ap_security_config = Security(
             test_params.origin_security_mode, password=origin_password
         )
         target_ap_security_config = Security(
-            test_params.target_security_mode, password=origin_password
+            test_params.target_security_mode, password=target_password
         )
 
         # Ensure the bands are a 2.4GHz and 5GHz pair. This test uses a single AP, and therefore
