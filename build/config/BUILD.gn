@@ -1397,6 +1397,9 @@ config("werror") {
   rustflags += [
     "-Aunknown_lints",
 
+    # TODO(https://fxbug.dev/423021172) Allow renamed lints until after the next toolchain roll.
+    "-Arenamed_and_removed_lints",
+
     # TODO(https://fxbug.dev/327271893) Remove blanket allow once lint is actionable.
     "-Anon_local_definitions",
 
