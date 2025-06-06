@@ -561,9 +561,9 @@ if (is_host) {
     deps = [
       "//build/assembly/tools/assembly_config:assembly_config_sdk",
       "//src/developer/ffx:bin_sdk",
-      "//src/developer/ffx/plugins/driver:sdk",
       "//src/developer/ffx/plugins/product:sdk",
       "//src/developer/ffx/plugins/test:sdk",
+      "//src/developer/ffx/tools/driver:sdk",
       "//tools/bootserver_old:bootserver_sdk",
       "//tools/funnel:funnel_sdk",
       "//tools/sdk-tools/fssh:fssh_sdk",
