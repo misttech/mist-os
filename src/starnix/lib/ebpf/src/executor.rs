@@ -4,11 +4,10 @@
 
 use crate::visitor::{BpfVisitor, ProgramCounter, Register, Source};
 use crate::{
-    BpfValue, DataWidth, EbpfHelperImpl, EbpfInstruction, EbpfProgramContext, FromBpfValue, Packet,
+    BpfValue, DataWidth, EbpfInstruction, EbpfProgramContext, FromBpfValue, HelperSet, Packet,
     BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
-use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
@@ -16,7 +15,7 @@ use zerocopy::IntoBytes;
 
 pub fn execute<C: EbpfProgramContext>(
     code: &[EbpfInstruction],
-    helpers: &HashMap<u32, EbpfHelperImpl<C>>,
+    helpers: &HelperSet<C>,
     run_context: &mut C::RunContext<'_>,
     arguments: &[BpfValue],
 ) -> u64 {
@@ -61,7 +60,7 @@ struct ComputationContext<'a, C: EbpfProgramContext> {
     /// The program being executed.
     code: &'a [EbpfInstruction],
     /// Helpers.
-    helpers: &'a HashMap<u32, EbpfHelperImpl<C>>,
+    helpers: &'a HelperSet<C>,
     /// Registers.
     registers: [BpfValue; GENERAL_REGISTER_COUNT as usize + 1],
     /// The state of the stack.
@@ -521,7 +520,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         context: &mut Self::Context<'a>,
         index: u32,
     ) -> Result<(), String> {
-        let helper = &self.helpers[&index];
+        let helper = &self.helpers.get_by_index(index).unwrap();
         let result =
             helper.0(context, self.reg(1), self.reg(2), self.reg(3), self.reg(4), self.reg(5));
         self.set_reg(0, result);

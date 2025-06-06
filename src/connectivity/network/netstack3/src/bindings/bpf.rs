@@ -5,7 +5,7 @@
 use crate::bindings::BindingsCtx;
 use ebpf::{
     BpfProgramContext, BpfValue, CbpfConfig, DataWidth, EbpfInstruction, EbpfProgram,
-    EbpfProgramContext, FieldMapping, MapReference, MapSchema, Packet, ProgramArgument,
+    EbpfProgramContext, FieldMapping, HelperSet, MapReference, MapSchema, Packet, ProgramArgument,
     StructMapping, Type, VerifiedEbpfProgram,
 };
 use ebpf_api::{
@@ -153,7 +153,7 @@ impl SocketFilterProgram {
             vec![],
         );
         let program =
-            ebpf::link_program::<SocketFilterContext>(&program, &[], vec![], HashMap::new())
+            ebpf::link_program::<SocketFilterContext>(&program, &[], vec![], HelperSet::default())
                 .expect("Failed to link SocketFilter program");
 
         Self { program }
@@ -362,9 +362,9 @@ impl CgroupSkbProgram {
             parse_verified_program_fidl(program, map_cache, CGROUP_SKB_ARGS.clone())?;
 
         let helpers = ebpf_api::get_common_helpers()
-            .drain(..)
-            .chain(ebpf_api::get_socket_filter_helpers().drain(..))
-            .collect::<HashMap<_, _>>();
+            .into_iter()
+            .chain(ebpf_api::get_socket_filter_helpers())
+            .collect();
 
         let program =
             ebpf::link_program(&program, std::slice::from_ref(&SK_BUF_MAPPING), maps, helpers)

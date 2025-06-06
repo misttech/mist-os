@@ -9,7 +9,6 @@ use ebpf_api::{
     __sk_buff, uid_t, CGROUP_SKB_SK_BUF_TYPE, SK_BUF_ID,
 };
 use fuchsia_criterion::FuchsiaCriterion;
-use std::collections::HashMap;
 use std::sync::LazyLock;
 use std::time::Duration;
 use structopt::StructOpt;
@@ -180,9 +179,9 @@ fn main() {
             .collect();
 
         let helpers = ebpf_api::get_common_helpers()
-            .drain(..)
-            .chain(ebpf_api::get_socket_filter_helpers().drain(..))
-            .collect::<HashMap<_, _>>();
+            .into_iter()
+            .chain(ebpf_api::get_socket_filter_helpers())
+            .collect();
 
         let prog = ebpf::link_program::<TestEbpfContext>(
             &verified,

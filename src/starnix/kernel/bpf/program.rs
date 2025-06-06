@@ -20,7 +20,6 @@ use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_uapi::auth::{CAP_BPF, CAP_NET_ADMIN, CAP_PERFMON, CAP_SYS_ADMIN};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{bpf_attr__bindgen_ty_4, errno, error};
-use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 
 #[derive(Clone, Debug)]
@@ -98,9 +97,8 @@ impl Program {
             return error!(EINVAL);
         }
 
-        let mut helpers = HashMap::new();
-        helpers.extend(get_common_helpers::<C>().drain(..));
-        helpers.extend(local_helpers.iter().cloned());
+        let helpers =
+            get_common_helpers::<C>().into_iter().chain(local_helpers.iter().cloned()).collect();
 
         let program = link_program(&self.program, struct_mappings, self.maps.clone(), helpers)
             .map_err(map_ebpf_error)?;
