@@ -2635,6 +2635,8 @@ impl BinderObjectFlags {
         let sched_policy = (bits
             & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_SCHED_POLICY_MASK)
             >> uapi::flat_binder_object_shifts_FLAT_BINDER_FLAG_SCHED_POLICY_SHIFT;
+        let priority = u8::try_from(priority).expect("priority should fit in a u8");
+        let sched_policy = u8::try_from(sched_policy).expect("sched_policy should fit in a u8");
         if priority == 0 && sched_policy == 0 {
             None
         } else {

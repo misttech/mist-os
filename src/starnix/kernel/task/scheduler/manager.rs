@@ -201,26 +201,29 @@ impl SchedulerPolicy {
         Ok(Self { kind, reset_on_fork })
     }
 
-    pub fn from_binder(policy: u32, priority: u32) -> Result<Option<Self>, Errno> {
-        if priority == 0 && policy == 0 {
+    pub fn from_binder(policy: u8, priority_or_niceness: u8) -> Result<Option<Self>, Errno> {
+        if priority_or_niceness == 0 && policy == 0 {
             Ok(None)
         } else {
-            if policy != SCHED_NORMAL && policy != SCHED_RR && policy != SCHED_FIFO {
+            if policy != (SCHED_NORMAL as u8)
+                && policy != (SCHED_RR as u8)
+                && policy != (SCHED_FIFO as u8)
+            {
                 return error!(EINVAL);
             }
-            let priority: u8 = if policy == SCHED_NORMAL {
-                let signed_priority = (priority as u8) as i8;
-                if signed_priority < -20 || signed_priority > 19 {
+            let priority_or_nonnegative_niceness = if policy == (SCHED_NORMAL as u8) {
+                let signed_niceness = priority_or_niceness as i8;
+                if signed_niceness < -20 || signed_niceness > 19 {
                     return error!(EINVAL);
                 }
-                (20 - signed_priority) as u8
+                (20 - signed_niceness) as u8
             } else {
-                if priority < 1 || priority > 99 {
+                if priority_or_niceness < 1 || priority_or_niceness > 99 {
                     return error!(EINVAL);
                 }
-                priority as u8
+                priority_or_niceness
             };
-            Self::from_raw(policy, priority).map(Some)
+            Self::from_raw(policy as u32, priority_or_nonnegative_niceness).map(Some)
         }
     }
 
@@ -494,26 +497,26 @@ mod tests {
 
     #[fuchsia::test]
     fn build_policy_from_binder() {
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL, 0), Ok(None));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL as u8, 0), Ok(None));
         assert_matches!(
-            SchedulerPolicy::from_binder(SCHED_NORMAL, (((-21) as i8) as u8).into()),
+            SchedulerPolicy::from_binder(SCHED_NORMAL as u8, (((-21) as i8) as u8).into()),
             Err(_)
         );
         assert_matches!(
-            SchedulerPolicy::from_binder(SCHED_NORMAL, (((-20) as i8) as u8).into()),
+            SchedulerPolicy::from_binder(SCHED_NORMAL as u8, (((-20) as i8) as u8).into()),
             Ok(Some(_))
         );
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL, 1), Ok(Some(_)));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL, 19), Ok(Some(_)));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL, 20), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO, 0), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO, 1), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO, 99), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO, 100), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR, 0), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR, 1), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR, 99), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR, 100), Err(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL as u8, 1), Ok(Some(_)));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL as u8, 19), Ok(Some(_)));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL as u8, 20), Err(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO as u8, 0), Err(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO as u8, 1), Ok(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO as u8, 99), Ok(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO as u8, 100), Err(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR as u8, 0), Err(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR as u8, 1), Ok(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR as u8, 99), Ok(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR as u8, 100), Err(_));
         assert_matches!(SchedulerPolicy::from_binder(42, 0), Err(_));
         assert_matches!(SchedulerPolicy::from_binder(42, 0), Err(_));
     }
