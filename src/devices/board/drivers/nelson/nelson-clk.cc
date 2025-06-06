@@ -16,6 +16,7 @@
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
+namespace fclkimpl = fuchsia_hardware_clockimpl;
 
 static const std::vector<fpbus::Mmio> clk_mmios{
     {{
@@ -46,23 +47,23 @@ zx_status_t Nelson::ClkInit() {
   }
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  const fuchsia_hardware_clockimpl::ClockIdsMetadata kClockIdsMetadata{{
-      .clock_ids{{
-          sm1_clk::CLK_RESET,  // PLACEHOLDER.
+  const fuchsia_hardware_clockimpl::ClockIdsMetadata kClockIdsMetadata{
+      {.clock_nodes = std::vector<fuchsia_hardware_clockimpl::ClockNodeDescriptor>{
+           fclkimpl::ClockNodeDescriptor{{.clock_id = sm1_clk::CLK_RESET}},  // PLACEHOLDER.
 
-          // For audio driver.
-          sm1_clk::CLK_HIFI_PLL,
-          sm1_clk::CLK_SYS_PLL_DIV16,
-          sm1_clk::CLK_SYS_CPU_CLK_DIV16,
+           // For audio driver.
+           fclkimpl::ClockNodeDescriptor{{.clock_id = sm1_clk::CLK_HIFI_PLL}},
+           fclkimpl::ClockNodeDescriptor{{.clock_id = sm1_clk::CLK_SYS_PLL_DIV16}},
+           fclkimpl::ClockNodeDescriptor{{.clock_id = sm1_clk::CLK_SYS_CPU_CLK_DIV16}},
 
-          // For video decoder
-          sm1_clk::CLK_DOS_GCLK_VDEC,
-          sm1_clk::CLK_DOS,
+           // For video decoder
+           fclkimpl::ClockNodeDescriptor{{.clock_id = sm1_clk::CLK_DOS_GCLK_VDEC}},
+           fclkimpl::ClockNodeDescriptor{{.clock_id = sm1_clk::CLK_DOS}},
 
-          // For GPU
-          sm1_clk::CLK_GP0_PLL,
-      }},
-  }};
+           // For GPU
+           fclkimpl::ClockNodeDescriptor{{.clock_id = sm1_clk::CLK_GP0_PLL}},
+       }}};
+
   const fit::result encoded_clock_ids_metadata = fidl::Persist(kClockIdsMetadata);
   if (!encoded_clock_ids_metadata.is_ok()) {
     zxlogf(ERROR, "Failed to encode clock ID's: %s",

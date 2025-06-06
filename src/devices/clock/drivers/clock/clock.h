@@ -20,7 +20,7 @@ class ClockDevice : public fidl::WireServer<fuchsia_hardware_clock::Clock> {
 
   zx_status_t Init(const std::shared_ptr<fdf::Namespace>& incoming,
                    const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
-                   const std::optional<std::string>& node_name,
+                   const std::optional<std::string>& node_name, std::optional<int32_t> node_id,
                    AddChildCallback add_child_callback);
 
  private:
