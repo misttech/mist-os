@@ -46,7 +46,7 @@ impl FileSystemOps for PstoreFs {
     }
 
     fn name(&self) -> &'static FsStr {
-        "pstorefs".into()
+        "pstore".into()
     }
 }
 
