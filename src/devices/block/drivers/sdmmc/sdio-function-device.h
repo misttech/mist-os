@@ -5,15 +5,18 @@
 #ifndef SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDIO_FUNCTION_DEVICE_H_
 #define SRC_DEVICES_BLOCK_DRIVERS_SDMMC_SDIO_FUNCTION_DEVICE_H_
 
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.sdio/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.sdio/cpp/wire.h>
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fuchsia/hardware/sdio/cpp/banjo.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/power/cpp/element-description-builder.h>
 
-#include <atomic>
 #include <memory>
+#include <optional>
 
 namespace sdmmc {
 
@@ -21,8 +24,16 @@ using fuchsia_hardware_sdio::wire::SdioRwTxn;
 
 class SdioControllerDevice;
 
-class SdioFunctionDevice : public ddk::SdioProtocol<SdioFunctionDevice> {
+class SdioFunctionDevice : public ddk::SdioProtocol<SdioFunctionDevice>,
+                           public fidl::WireServer<fuchsia_power_broker::ElementRunner>,
+                           public fidl::WireServer<fuchsia_hardware_power::PowerTokenProvider> {
  public:
+  enum PowerLevel : uint8_t {
+    kOff = 0,
+    kOn,
+    kBoot,
+  };
+
   static zx_status_t Create(SdioControllerDevice* sdio_parent, uint32_t func,
                             std::unique_ptr<SdioFunctionDevice>* out_dev);
 
@@ -187,6 +198,23 @@ class SdioFunctionDevice : public ddk::SdioProtocol<SdioFunctionDevice> {
 
   fdf::Logger& logger();
 
+  zx::result<fdf_power::PowerElementConfiguration> GetPowerElementConfiguration();
+
+  zx::result<> ConfigurePowerManagement();
+
+  // fuchsia.power.broker/ElementRunner implementation
+  void SetLevel(fuchsia_power_broker::wire::ElementRunnerSetLevelRequest* request,
+                SetLevelCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementRunner> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // fuchsia.hardware.power/PowerTokenProvider implementation
+  void GetToken(GetTokenCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_power::PowerTokenProvider> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
+
   uint8_t function_ = SDIO_MAX_FUNCS;
   SdioControllerDevice* const sdio_parent_;
 
@@ -198,6 +226,17 @@ class SdioFunctionDevice : public ddk::SdioProtocol<SdioFunctionDevice> {
   DriverTransportImpl driver_transport_impl_;
   ZirconTransportImpl zircon_transport_impl_;
   driver_devfs::Connector<fuchsia_hardware_sdio::Device> devfs_connector_;
+
+  fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider>
+      power_token_provider_bindings_;
+
+  zx::event assertive_token_;
+  fidl::ClientEnd<fuchsia_power_broker::ElementControl> element_control_client_end_;
+  std::optional<fidl::ServerBinding<fuchsia_power_broker::ElementRunner>>
+      element_runner_server_binding_;
+
+  // A lease on our power element is kept until Power Framework moves us to a higher power level.
+  fidl::ClientEnd<fuchsia_power_broker::LeaseControl> boot_level_lease_;
 };
 
 }  // namespace sdmmc

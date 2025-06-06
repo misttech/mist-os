@@ -1,3 +1,5 @@
+// This configuration applies only when an SD or MMC device is connected. For the SDIO configuration
+// see sdio_power_config.json5.
 [
     {
         element: {
