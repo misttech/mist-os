@@ -75,7 +75,11 @@ void Service::Wait() {
             accept(sock_.get(), reinterpret_cast<struct sockaddr*>(&peer_addr), &peer_addr_len));
         if (!conn.is_valid()) {
           if (errno == EPIPE) {
-            FX_LOGS(FATAL) << "The netstack died. Terminating.";
+            FX_LOGS(ERROR) << "The netstack died. Terminating.";
+            // Avoid a crash here because the netstack terminating already
+            // causes the system to reboot. This prevents cascading crash
+            // reports.
+            exit(1);
           } else {
             FX_LOGS(ERROR) << "Failed to accept: " << strerror(errno);
             // Wait for another connection.
