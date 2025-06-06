@@ -126,11 +126,7 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
     test_config.mode = display::ToBanjoDisplayMode(edid_timing);
 
     config_check_result_t display_cfg_result;
-    layer_composition_operations_t layer_result = 0;
-    size_t display_layer_results_count;
-    display_cfg_result = engine_driver_client_->CheckConfiguration(
-        &test_config, &layer_result,
-        /*layer_composition_operations_count=*/1, &display_layer_results_count);
+    display_cfg_result = engine_driver_client_->CheckConfiguration(&test_config);
     if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
       fbl::AllocChecker alloc_checker;
       display_info.timings.push_back(edid_timing, &alloc_checker);

@@ -116,24 +116,9 @@ void DisplayEngineBanjoAdapter::DisplayEngineReleaseImage(uint64_t banjo_image_h
 }
 
 config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration(
-    const display_config_t* banjo_display_config,
-    layer_composition_operations_t* out_layer_composition_operations_list,
-    size_t out_layer_composition_operations_size, size_t* out_layer_composition_operations_actual) {
-  cpp20::span<layer_composition_operations_t> out_layer_composition_operations(
-      out_layer_composition_operations_list, out_layer_composition_operations_size);
-  std::fill(out_layer_composition_operations.begin(), out_layer_composition_operations.end(), 0);
-
-  if (out_layer_composition_operations_actual != nullptr) {
-    *out_layer_composition_operations_actual = 0;
-  }
-
+    const display_config_t* banjo_display_config) {
   cpp20::span<const layer_t> banjo_layers(banjo_display_config->layer_list,
                                           banjo_display_config->layer_count);
-
-  ZX_DEBUG_ASSERT(out_layer_composition_operations.size() >= banjo_layers.size());
-  if (out_layer_composition_operations_actual != nullptr) {
-    *out_layer_composition_operations_actual = banjo_layers.size();
-  }
 
   // The display coordinator currently uses zero-display configs to blank a
   // display. We'll remove this eventually.
@@ -144,15 +129,11 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   // This adapter does not currently support multi-layer configurations. This
   // restriction will be lifted in the near future.
   if (banjo_layers.size() > 1) {
-    for (size_t i = 0; i < banjo_layers.size(); ++i) {
-      out_layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE;
-    }
     return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
   }
 
   // This adapter does not currently support color correction.
   if (banjo_display_config->cc_flags != 0) {
-    out_layer_composition_operations[0] = LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION;
     return display::ConfigCheckResult::kUnsupportedConfig.ToBanjo();
   }
 
@@ -162,21 +143,8 @@ config_check_result_t DisplayEngineBanjoAdapter::DisplayEngineCheckConfiguration
   }
   display::DriverLayer layer0(banjo_layers[0]);
   cpp20::span<const display::DriverLayer> layers(&layer0, 1);
-  display::LayerCompositionOperations layer0_composition_operations;
-  cpp20::span<display::LayerCompositionOperations> layer_composition_operations(
-      &layer0_composition_operations, 1);
-
-  display::ConfigCheckResult config_check_result =
-      engine_.CheckConfiguration(display::ToDisplayId(banjo_display_config->display_id),
-                                 display::ModeId(1), layers, layer_composition_operations);
-
-  if (config_check_result == display::ConfigCheckResult::kUnsupportedConfig) {
-    // `layer_composition_operations` needs to be converted.
-    if (out_layer_composition_operations_actual != nullptr) {
-      *out_layer_composition_operations_actual = 1;
-    }
-    out_layer_composition_operations[0] = layer0_composition_operations.ToBanjo();
-  }
+  display::ConfigCheckResult config_check_result = engine_.CheckConfiguration(
+      display::ToDisplayId(banjo_display_config->display_id), display::ModeId(1), layers);
   return config_check_result.ToBanjo();
 }
 

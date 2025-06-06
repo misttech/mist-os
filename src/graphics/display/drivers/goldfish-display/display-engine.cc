@@ -365,22 +365,9 @@ void DisplayEngine::DisplayEngineReleaseImage(uint64_t image_handle) {
 }
 
 config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
-    const display_config_t* display_config_ptr,
-    layer_composition_operations_t* out_layer_composition_operations_list,
-    size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
+    const display_config_t* display_config_ptr) {
   ZX_DEBUG_ASSERT(display_config_ptr != nullptr);
   const display_config_t& display_config = *display_config_ptr;
-
-  if (out_layer_composition_operations_actual != nullptr) {
-    *out_layer_composition_operations_actual = 0;
-  }
-
-  ZX_DEBUG_ASSERT(layer_composition_operations_count >= display_config.layer_count);
-  if (out_layer_composition_operations_actual != nullptr) {
-    *out_layer_composition_operations_actual = display_config.layer_count;
-  }
-  cpp20::span<layer_composition_operations_t> layer_composition_operations(
-      out_layer_composition_operations_list, display_config.layer_count);
 
   const display::DisplayId display_id = display::ToDisplayId(display_config.display_id);
   if (display_config.layer_count == 0) {
@@ -402,7 +389,6 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
   if (layer0.image_source.width == 0 || layer0.image_source.height == 0) {
     // Solid color fill layers are not yet supported.
     // TODO(https://fxbug.dev/406525464): add support.
-    layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_USE_IMAGE;
     check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   } else {
     // Scaling is allowed if destination frame match display and
@@ -422,31 +408,24 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     if (memcmp(&layer0.display_destination, &display_area, sizeof(rect_u_t)) != 0) {
       // TODO(https://fxbug.dev/42111727): Need to provide proper flag to indicate driver only
       // accepts full screen dest frame.
-      layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE;
       check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
     if (memcmp(&layer0.image_source, &image_area, sizeof(rect_u_t)) != 0) {
-      layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_SRC_FRAME;
       check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
 
     if (layer0.alpha_mode != ALPHA_DISABLE) {
       // Alpha is not supported.
-      layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_ALPHA;
       check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
 
     if (layer0.image_source_transformation != COORDINATE_TRANSFORMATION_IDENTITY) {
       // Transformation is not supported.
-      layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_TRANSFORM;
       check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
   }
   // If there is more than one layer, the rest need to be merged into the base layer.
   if (display_config.layer_count > 1) {
-    for (size_t j = 0; j < display_config.layer_count; ++j) {
-      layer_composition_operations[j] |= LAYER_COMPOSITION_OPERATIONS_MERGE;
-    }
     check_result = CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
   }
 

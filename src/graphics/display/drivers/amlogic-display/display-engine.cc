@@ -435,15 +435,9 @@ void DisplayEngine::DisplayEngineReleaseImage(uint64_t image_handle) {
 }
 
 config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
-    const display_config_t* display_config_ptr,
-    layer_composition_operations_t* out_layer_composition_operations_list,
-    size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual) {
+    const display_config_t* display_config_ptr) {
   ZX_DEBUG_ASSERT(display_config_ptr != nullptr);
   const display_config_t& display_config = *display_config_ptr;
-
-  if (out_layer_composition_operations_actual != nullptr) {
-    *out_layer_composition_operations_actual = 0;
-  }
 
   fbl::AutoLock lock(&display_mutex_);
 
@@ -461,14 +455,6 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
       fdf::warn("CheckConfig failure: display timing not supported");
       return CONFIG_CHECK_RESULT_UNSUPPORTED_MODES;
     }
-  }
-
-  ZX_DEBUG_ASSERT(layer_composition_operations_count >= display_config.layer_count);
-  cpp20::span<layer_composition_operations_t> layer_composition_operations(
-      out_layer_composition_operations_list, display_config.layer_count);
-  std::fill(layer_composition_operations.begin(), layer_composition_operations.end(), 0);
-  if (out_layer_composition_operations_actual != nullptr) {
-    *out_layer_composition_operations_actual = layer_composition_operations.size();
   }
 
   config_check_result_t check_result = [&] {
@@ -514,7 +500,6 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
 
     if (layer.alpha_mode == ALPHA_PREMULTIPLIED) {
       // we don't support pre-multiplied alpha mode
-      layer_composition_operations[0] |= LAYER_COMPOSITION_OPERATIONS_ALPHA;
       fdf::warn("CheckConfig failure: pre-multipled alpha not supported");
       return CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG;
     }
@@ -553,11 +538,6 @@ config_check_result_t DisplayEngine::DisplayEngineCheckConfiguration(
     return CONFIG_CHECK_RESULT_OK;
   }();
 
-  if (check_result == CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG) {
-    for (size_t i = 0; i < display_config.layer_count; ++i) {
-      layer_composition_operations[i] = LAYER_COMPOSITION_OPERATIONS_MERGE;
-    }
-  }
   return check_result;
 }
 

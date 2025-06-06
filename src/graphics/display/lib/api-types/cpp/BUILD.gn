@@ -38,7 +38,6 @@ source_set("cpp") {
     "image-metadata.h",
     "image-tiling-type.cc",
     "image-tiling-type.h",
-    "layer-composition-operations.cc",
     "layer-composition-operations.h",
     "layer-id.h",
     "mode-and-id.h",

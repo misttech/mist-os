@@ -59,12 +59,20 @@ class DisplayEngineInterface {
       display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) = 0;
   virtual void ReleaseImage(display::DriverImageId driver_image_id) = 0;
 
+  // TODO(https://fxbug.dev/422844790): Remove this overload after drivers are migrated.
+  //
   // `layer_composition_operations` must have the same size as `layers`. All
   // the elements must be empty (`display::LayerCompositionOperations::kNoOperations`).
   virtual display::ConfigCheckResult CheckConfiguration(
       display::DisplayId display_id, display::ModeId display_mode_id,
       cpp20::span<const display::DriverLayer> layers,
-      cpp20::span<display::LayerCompositionOperations> layer_composition_operations) = 0;
+      cpp20::span<display::LayerCompositionOperations> layer_composition_operations);
+
+  // TODO(https://fxbug.dev/422844790): Make this method pure virtual after all
+  // drivers override it.
+  virtual display::ConfigCheckResult CheckConfiguration(
+      display::DisplayId display_id, display::ModeId display_mode_id,
+      cpp20::span<const display::DriverLayer> layers);
 
   virtual void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                                   cpp20::span<const display::DriverLayer> layers,

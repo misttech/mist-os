@@ -5,36 +5,17 @@
 #ifndef SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_LAYER_COMPOSITION_OPERATIONS_H_
 #define SRC_GRAPHICS_DISPLAY_LIB_API_TYPES_CPP_LAYER_COMPOSITION_OPERATIONS_H_
 
-#include <fidl/fuchsia.hardware.display.engine/cpp/wire.h>
-#include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <zircon/assert.h>
 
 #include <cstdint>
 
 namespace display {
 
-// Equivalent to the FIDL type [`fuchsia.hardware.display.engine/LayerCompositionOperations`].
-//
-// Also equivalent to the banjo type
-// [`fuchsia.hardware.display.controller/LayerCompositionOperations`].
-//
-// See `::fuchsia_hardware_display_engine::wire::LayerCompositionOperations` for references.
-//
-// Instances are guaranteed to represent valid subsets.
+// TODO(https://fxbug.com/422844790): Delete this after drivers stop using it.
 class LayerCompositionOperations {
  public:
-  // True iff `fidl_operations` is convertible to a valid LayerCompositionOperations.
-  [[nodiscard]] static constexpr bool IsValid(
-      fuchsia_hardware_display_engine::wire::LayerCompositionOperations fidl_operations);
-  // True iff `banjo_transformation` is convertible to a valid LayerCompositionOperations.
-  [[nodiscard]] static constexpr bool IsValid(layer_composition_operations_t banjo_operations);
-
   // Creates an empty subset.
-  constexpr LayerCompositionOperations() noexcept = default;
-
-  explicit constexpr LayerCompositionOperations(
-      fuchsia_hardware_display_engine::wire::LayerCompositionOperations fidl_operations);
-  explicit constexpr LayerCompositionOperations(layer_composition_operations_t banjo_operations);
+  constexpr LayerCompositionOperations() noexcept : LayerCompositionOperations(0) {}
 
   constexpr LayerCompositionOperations(const LayerCompositionOperations&) noexcept = default;
   constexpr LayerCompositionOperations(LayerCompositionOperations&&) noexcept = default;
@@ -42,9 +23,6 @@ class LayerCompositionOperations {
       default;
   constexpr LayerCompositionOperations& operator=(LayerCompositionOperations&&) noexcept = default;
   ~LayerCompositionOperations() = default;
-
-  constexpr fuchsia_hardware_display_engine::wire::LayerCompositionOperations ToFidl() const;
-  constexpr layer_composition_operations_t ToBanjo() const;
 
   // Raw numerical value of the equivalent FIDL value.
   //
@@ -80,53 +58,15 @@ class LayerCompositionOperations {
   constexpr LayerCompositionOperations WithAlpha() const;
 
  private:
+  explicit constexpr LayerCompositionOperations(uint32_t operations) : operations_(operations) {}
+
   friend constexpr bool operator==(const LayerCompositionOperations& lhs,
                                    const LayerCompositionOperations& rhs);
   friend constexpr bool operator!=(const LayerCompositionOperations& lhs,
                                    const LayerCompositionOperations& rhs);
 
-  fuchsia_hardware_display_engine::wire::LayerCompositionOperations operations_;
+  uint32_t operations_;
 };
-
-// static
-constexpr bool LayerCompositionOperations::IsValid(
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations fidl_operations) {
-  constexpr fuchsia_hardware_display_engine::wire::LayerCompositionOperations kAllOperations =
-      fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kUseImage |
-      fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kMerge |
-      fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kFrameScale |
-      fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kSrcFrame |
-      fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kTransform |
-      fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kColorConversion |
-      fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kAlpha;
-
-  return (static_cast<uint32_t>(fidl_operations) & ~static_cast<uint32_t>(kAllOperations)) == 0;
-}
-
-// static
-constexpr bool LayerCompositionOperations::IsValid(
-    layer_composition_operations_t banjo_operations) {
-  constexpr layer_composition_operations_t kAllOperations =
-      LAYER_COMPOSITION_OPERATIONS_USE_IMAGE | LAYER_COMPOSITION_OPERATIONS_MERGE |
-      LAYER_COMPOSITION_OPERATIONS_FRAME_SCALE | LAYER_COMPOSITION_OPERATIONS_SRC_FRAME |
-      LAYER_COMPOSITION_OPERATIONS_TRANSFORM | LAYER_COMPOSITION_OPERATIONS_COLOR_CONVERSION |
-      LAYER_COMPOSITION_OPERATIONS_ALPHA;
-
-  return (static_cast<uint32_t>(banjo_operations) & ~static_cast<uint32_t>(kAllOperations)) == 0;
-}
-
-constexpr LayerCompositionOperations::LayerCompositionOperations(
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations fidl_operations)
-    : operations_(fidl_operations) {
-  ZX_DEBUG_ASSERT(IsValid(fidl_operations));
-}
-
-constexpr LayerCompositionOperations::LayerCompositionOperations(
-    layer_composition_operations_t banjo_operations)
-    : operations_(static_cast<fuchsia_hardware_display_engine::wire::LayerCompositionOperations>(
-          banjo_operations)) {
-  ZX_DEBUG_ASSERT(IsValid(banjo_operations));
-}
 
 constexpr bool operator==(const LayerCompositionOperations& lhs,
                           const LayerCompositionOperations& rhs) {
@@ -138,44 +78,21 @@ constexpr bool operator!=(const LayerCompositionOperations& lhs,
   return !(lhs == rhs);
 }
 
-constexpr fuchsia_hardware_display_engine::wire::LayerCompositionOperations
-LayerCompositionOperations::ToFidl() const {
-  return operations_;
-}
-
-constexpr layer_composition_operations_t LayerCompositionOperations::ToBanjo() const {
-  return static_cast<image_tiling_type_t>(operations_);
-}
-
 constexpr uint32_t LayerCompositionOperations::ValueForLogging() const {
   return static_cast<uint32_t>(operations_);
 }
 
-inline constexpr const LayerCompositionOperations LayerCompositionOperations::kUseImage(
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kUseImage);
-inline constexpr const LayerCompositionOperations LayerCompositionOperations::kMerge(
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kMerge);
-inline constexpr const LayerCompositionOperations LayerCompositionOperations::kFrameScale(
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kFrameScale);
-inline constexpr const LayerCompositionOperations LayerCompositionOperations::kSrcFrame(
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kSrcFrame);
-inline constexpr const LayerCompositionOperations LayerCompositionOperations::kTransform(
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kTransform);
-inline constexpr const LayerCompositionOperations LayerCompositionOperations::kColorConversion(
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kColorConversion);
-inline constexpr const LayerCompositionOperations LayerCompositionOperations::kAlpha(
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kAlpha);
+inline constexpr const LayerCompositionOperations LayerCompositionOperations::kUseImage(1);
+inline constexpr const LayerCompositionOperations LayerCompositionOperations::kMerge(2);
+inline constexpr const LayerCompositionOperations LayerCompositionOperations::kFrameScale(4);
+inline constexpr const LayerCompositionOperations LayerCompositionOperations::kSrcFrame(8);
+inline constexpr const LayerCompositionOperations LayerCompositionOperations::kTransform(16);
+inline constexpr const LayerCompositionOperations LayerCompositionOperations::kColorConversion(32);
+inline constexpr const LayerCompositionOperations LayerCompositionOperations::kAlpha(64);
 
-inline constexpr const LayerCompositionOperations LayerCompositionOperations::kNoOperations;
+inline constexpr const LayerCompositionOperations LayerCompositionOperations::kNoOperations(0);
 
-inline constexpr const LayerCompositionOperations LayerCompositionOperations::kAllOperations(
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kUseImage |
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kMerge |
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kFrameScale |
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kSrcFrame |
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kTransform |
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kColorConversion |
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kAlpha);
+inline constexpr const LayerCompositionOperations LayerCompositionOperations::kAllOperations(127);
 
 constexpr bool LayerCompositionOperations::HasUseImage() const {
   return (static_cast<uint32_t>(operations_) & static_cast<uint32_t>(kUseImage.operations_)) != 0;

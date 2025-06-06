@@ -22,7 +22,6 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
-#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 
 namespace display::testing {
@@ -204,8 +203,7 @@ void MockDisplayEngine::ReleaseImage(display::DriverImageId driver_image_id) {
 
 display::ConfigCheckResult MockDisplayEngine::CheckConfiguration(
     display::DisplayId display_id, display::ModeId display_mode_id,
-    cpp20::span<const display::DriverLayer> layers,
-    cpp20::span<display::LayerCompositionOperations> layer_composition_operations) {
+    cpp20::span<const display::DriverLayer> layers) {
   std::lock_guard<std::mutex> lock(mutex_);
   ZX_ASSERT_MSG(call_index_ < expectations_.size(), "All expected calls were already received");
   Expectation& call_expectation = expectations_[call_index_];
@@ -213,8 +211,7 @@ display::ConfigCheckResult MockDisplayEngine::CheckConfiguration(
 
   ZX_ASSERT_MSG(call_expectation.check_configuration_checker != nullptr,
                 "Received call type does not match expected call type");
-  return call_expectation.check_configuration_checker(display_id, display_mode_id, layers,
-                                                      layer_composition_operations);
+  return call_expectation.check_configuration_checker(display_id, display_mode_id, layers);
 }
 
 void MockDisplayEngine::ApplyConfiguration(display::DisplayId display_id,
@@ -287,6 +284,14 @@ zx::result<> MockDisplayEngine::SetMinimumRgb(uint8_t minimum_rgb) {
   ZX_ASSERT_MSG(call_expectation.set_minimum_rgb_checker != nullptr,
                 "Received call type does not match expected call type");
   return call_expectation.set_minimum_rgb_checker(minimum_rgb);
+}
+
+display::ConfigCheckResult MockDisplayEngine::CheckConfiguration(
+    display::DisplayId display_id, display::ModeId display_mode_id,
+    cpp20::span<const display::DriverLayer> layers,
+    cpp20::span<display::LayerCompositionOperations> layer_composition_operations) {
+  ZX_ASSERT_MSG(false, "Deprected CheckConfiguration() overload");
+  return display::ConfigCheckResult::kUnsupportedConfig;
 }
 
 }  // namespace display::testing

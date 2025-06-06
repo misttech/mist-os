@@ -67,10 +67,7 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
     return ZX_ERR_NOT_SUPPORTED;
   }
   void DisplayEngineReleaseImage(uint64_t image_handle);
-  config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t* display_config_ptr,
-      layer_composition_operations_t* out_layer_composition_operations_list,
-      size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual);
+  config_check_result_t DisplayEngineCheckConfiguration(const display_config_t* display_config_ptr);
   void DisplayEngineApplyConfiguration(const display_config_t* display_config_ptr,
                                        const config_stamp_t* banjo_config_stamp);
   zx_status_t DisplayEngineSetBufferCollectionConstraints(

@@ -1049,9 +1049,6 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res) {
   // TODO(https://fxbug.dev/42080896): Do not use VLA. We should introduce a limit on
   // totally supported layers instead.
   layer_t banjo_layers[max_layer_count];
-  layer_composition_operations_t layer_composition_operations[max_layer_count];
-  std::memset(layer_composition_operations, 0,
-              max_layer_count * sizeof(layer_composition_operations_t));
 
   // The layer count will be replaced if the client has a valid configuration
   // for a display.
@@ -1154,15 +1151,12 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res) {
     return true;
   }
 
-  size_t layer_composition_operations_count_actual;
   config_check_result_t display_cfg_result;
   {
     TRACE_DURATION("gfx", "Display::Client::CheckConfig engine_driver_client");
 
-    display_cfg_result = controller_.engine_driver_client()->CheckConfiguration(
-        &banjo_display_config, layer_composition_operations,
-        /* layer_composition_operations_count=*/banjo_display_config.layer_count,
-        &layer_composition_operations_count_actual);
+    display_cfg_result =
+        controller_.engine_driver_client()->CheckConfiguration(&banjo_display_config);
   }
 
   switch (display_cfg_result) {
@@ -1180,8 +1174,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res) {
       if (res) {
         *res = fhdt::wire::ConfigResult::kUnsupportedConfig;
       }
-      // Handle `ops` in the following steps.
-      break;
+      return false;
     case CONFIG_CHECK_RESULT_TOO_MANY:
       if (res) {
         *res = fhdt::wire::ConfigResult::kTooManyDisplays;
@@ -1193,17 +1186,7 @@ bool Client::CheckConfig(fhdt::wire::ConfigResult* res) {
       }
       return false;
   }
-
-  ZX_DEBUG_ASSERT(display_cfg_result == CONFIG_CHECK_RESULT_UNSUPPORTED_CONFIG);
-
-  std::span<const layer_composition_operations_t> layer_composition_operations_actual(
-      layer_composition_operations, layer_composition_operations_count_actual);
-  const bool layer_fail =
-      std::ranges::any_of(layer_composition_operations_actual,
-                          [](layer_composition_operations_t ops) { return ops != 0; });
-  ZX_DEBUG_ASSERT_MSG(layer_fail,
-                      "At least one layer must have non-empty LayerCompositionOperations");
-
+  ZX_DEBUG_ASSERT_MSG(false, "Unhandled ConfigCheckResult value: %" PRIu32, display_cfg_result);
   return false;
 }
 

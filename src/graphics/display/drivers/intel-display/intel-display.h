@@ -114,9 +114,7 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   }
   void DisplayEngineReleaseImage(uint64_t image_handle);
   config_check_result_t DisplayEngineCheckConfiguration(
-      const display_config_t* banjo_display_config,
-      layer_composition_operations_t* out_layer_composition_operations_list,
-      size_t layer_composition_operations_count, size_t* out_layer_composition_operations_actual);
+      const display_config_t* banjo_display_config);
   void DisplayEngineApplyConfiguration(const display_config_t* banjo_display_config,
                                        const config_stamp_t* banjo_config_stamp);
   zx_status_t DisplayEngineSetBufferCollectionConstraints(
@@ -260,8 +258,7 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
 
   // Validates that a basic layer configuration can be supported for the
   // given modes of the displays.
-  bool CheckDisplayLimits(cpp20::span<const display_config_t> banjo_display_configs,
-                          cpp20::span<layer_composition_operations_t> layer_composition_operations)
+  bool CheckDisplayLimits(cpp20::span<const display_config_t> banjo_display_configs)
       __TA_REQUIRES(display_lock_);
 
   bool CalculatePipeAllocation(cpp20::span<const display_config_t> banjo_display_configs,

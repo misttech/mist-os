@@ -13,8 +13,7 @@ namespace display {
 
 namespace {
 
-constexpr LayerCompositionOperations kTransform2(
-    fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kTransform);
+constexpr LayerCompositionOperations kTransform2(LayerCompositionOperations::kTransform);
 
 TEST(LayerCompositionOperationsTest, EqualityIsReflexive) {
   EXPECT_EQ(LayerCompositionOperations::kTransform, LayerCompositionOperations::kTransform);
@@ -35,79 +34,8 @@ TEST(LayerCompositionOperationsTest, EqualityForDifferentValues) {
   EXPECT_NE(LayerCompositionOperations::kColorConversion, kTransform2);
 }
 
-TEST(LayerCompositionOperationsTest, ToBanjoLayerCompositionOperations) {
-  static constexpr coordinate_transformation_t banjo_transformation =
-      LayerCompositionOperations::kTransform.ToBanjo();
-  EXPECT_EQ(LAYER_COMPOSITION_OPERATIONS_TRANSFORM, banjo_transformation);
-}
-
-TEST(LayerCompositionOperationsTest, ToFidlLayerCompositionOperations) {
-  static constexpr fuchsia_hardware_display_engine::wire::LayerCompositionOperations
-      fidl_transformation = LayerCompositionOperations::kTransform.ToFidl();
-  EXPECT_EQ(fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kTransform,
-            fidl_transformation);
-}
-
-TEST(LayerCompositionOperationsTest, ValueForLogging) {
-  EXPECT_EQ(0u, LayerCompositionOperations::kNoOperations.ValueForLogging());
-
-  EXPECT_EQ(static_cast<uint32_t>(
-                fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kTransform),
-            LayerCompositionOperations::kTransform.ValueForLogging());
-}
-
 TEST(LayerCompositionOperationsTest, DefaultConstructor) {
   EXPECT_EQ(LayerCompositionOperations::kNoOperations, LayerCompositionOperations{});
-}
-
-TEST(LayerCompositionOperationsTest, ToLayerCompositionOperationsWithBanjoValue) {
-  static constexpr LayerCompositionOperations transformation(
-      LAYER_COMPOSITION_OPERATIONS_TRANSFORM);
-  EXPECT_EQ(LayerCompositionOperations::kTransform, transformation);
-}
-
-TEST(LayerCompositionOperationsTest, ToLayerCompositionOperationsWithFidlValue) {
-  static constexpr LayerCompositionOperations transformation(
-      fuchsia_hardware_display_engine::wire::LayerCompositionOperations::kTransform);
-  EXPECT_EQ(LayerCompositionOperations::kTransform, transformation);
-}
-
-TEST(LayerCompositionOperationsTest, BanjoConversionRoundtrip) {
-  EXPECT_EQ(LayerCompositionOperations::kTransform,
-            LayerCompositionOperations(LayerCompositionOperations::kTransform.ToBanjo()));
-  EXPECT_EQ(LayerCompositionOperations::kColorConversion,
-            LayerCompositionOperations(LayerCompositionOperations::kColorConversion.ToBanjo()));
-}
-
-TEST(LayerCompositionOperationsTest, FidlConversionRoundtrip) {
-  EXPECT_EQ(LayerCompositionOperations::kTransform,
-            LayerCompositionOperations(LayerCompositionOperations::kTransform.ToFidl()));
-  EXPECT_EQ(LayerCompositionOperations::kColorConversion,
-            LayerCompositionOperations(LayerCompositionOperations::kColorConversion.ToFidl()));
-}
-
-TEST(LayerCompositionOperationsTest, IsValidFidlNoOperations) {
-  static constexpr auto kNoOperation =
-      static_cast<fuchsia_hardware_display_engine::wire::LayerCompositionOperations>(0);
-  EXPECT_TRUE(LayerCompositionOperations::IsValid(kNoOperation));
-}
-
-TEST(LayerCompositionOperationsTest, IsValidBanjoNoOperations) {
-  static constexpr auto kNoOperation = static_cast<layer_composition_operations_t>(0);
-  EXPECT_TRUE(LayerCompositionOperations::IsValid(kNoOperation));
-}
-
-TEST(LayerCompositionOperationsTest, IsValidFidlUnknownOperations) {
-  static constexpr auto kInvalidAllBits =
-      static_cast<fuchsia_hardware_display_engine::wire::LayerCompositionOperations>(
-          std::numeric_limits<uint32_t>::max());
-  EXPECT_FALSE(LayerCompositionOperations::IsValid(kInvalidAllBits));
-}
-
-TEST(LayerCompositionOperationsTest, IsValidBanjoUnknownOperations) {
-  static constexpr auto kInvalidAllBits =
-      static_cast<layer_composition_operations_t>(std::numeric_limits<uint32_t>::max());
-  EXPECT_FALSE(LayerCompositionOperations::IsValid(kInvalidAllBits));
 }
 
 TEST(LayerCompositionOperationsTest, HasUseImage) {

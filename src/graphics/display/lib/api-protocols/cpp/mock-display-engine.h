@@ -27,7 +27,6 @@
 #include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
-#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 
 namespace display::testing {
@@ -54,8 +53,7 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
   using ReleaseImageChecker = fit::function<void(display::DriverImageId driver_image_id)>;
   using CheckConfigurationChecker = fit::function<display::ConfigCheckResult(
       display::DisplayId display_id, display::ModeId display_mode_id,
-      cpp20::span<const display::DriverLayer> layers,
-      cpp20::span<display::LayerCompositionOperations> layer_composition_operations)>;
+      cpp20::span<const display::DriverLayer> layers)>;
   using ApplyConfigurationChecker = fit::function<void(
       display::DisplayId display_id, display::ModeId display_mode_id,
       cpp20::span<const display::DriverLayer> layers, display::DriverConfigStamp config_stamp)>;
@@ -113,8 +111,7 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
   void ReleaseImage(display::DriverImageId driver_image_id) override;
   display::ConfigCheckResult CheckConfiguration(
       display::DisplayId display_id, display::ModeId display_mode_id,
-      cpp20::span<const display::DriverLayer> layers,
-      cpp20::span<display::LayerCompositionOperations> layer_composition_operations) override;
+      cpp20::span<const display::DriverLayer> layers) override;
   void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                           cpp20::span<const display::DriverLayer> layers,
                           display::DriverConfigStamp config_stamp) override;
@@ -125,6 +122,13 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
   zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id) override;
   zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id) override;
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb) override;
+
+  // TODO(https://fxbug.dev/422844790): Remove this overload after drivers are migrated.
+  // This overload works around a linker error that's not worth debugging.
+  display::ConfigCheckResult CheckConfiguration(
+      display::DisplayId display_id, display::ModeId display_mode_id,
+      cpp20::span<const display::DriverLayer> layers,
+      cpp20::span<display::LayerCompositionOperations> layer_composition_operations) override;
 
  private:
   struct Expectation;
