@@ -36,7 +36,9 @@ use net_types::ip::{
     GenericOverIp, Ip, IpAddr, IpAddress, IpVersion, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6,
     Ipv6Addr,
 };
-use net_types::{AddrAndPortFormatter, AddrAndZone, SpecifiedAddr, ZonedAddr};
+use net_types::{
+    AddrAndPortFormatter, AddrAndZone, MulticastAddress as _, SpecifiedAddr, ZonedAddr,
+};
 use netstack3_base::socket::{
     self, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnIpAddr, DualStackListenerIpAddr,
     DualStackLocalIp, DualStackRemoteIp, DualStackTuple, EitherStack, IncompatibleError,
@@ -5261,6 +5263,16 @@ where
     };
     let (remote_ip, device) = remote_ip.resolve_addr_with_device(bound_device)?;
 
+    // TCP sockets cannot connect to multicast addresses so error out early.
+    // Per RFC 9293 (https://datatracker.ietf.org/doc/html/rfc9293#name-open):
+    //   A TCP implementation MUST reject as an error a local OPEN call for an invalid remote
+    //   IP address (e.g., a broadcast or multicast address) (MUST-46).
+    if remote_ip.addr().is_multicast()
+        || WireI::map_ip_in(remote_ip.addr(), |ip| ip.is_limited_broadcast(), |_| false)
+    {
+        return Err(ConnectError::NoRoute);
+    }
+
     let ip_sock = core_ctx
         .new_ip_socket(
             bindings_ctx,
@@ -7446,6 +7458,28 @@ mod tests {
                 remote_addr: remote.map_zone(FakeWeakDeviceId),
                 device: None,
             }),
+        );
+    }
+
+    #[test_case(Ipv6::get_multicast_addr(1).into(), PhantomData::<Ipv6>)]
+    #[test_case(Ipv4::get_multicast_addr(1).into(), PhantomData::<Ipv4>)]
+    #[test_case(Ipv4::LIMITED_BROADCAST_ADDRESS, PhantomData::<Ipv4>)]
+    fn non_unicast_ip_peer<I>(remote_ip: SpecifiedAddr<I::Addr>, _ip: PhantomData<I>)
+    where
+        I: TcpTestIpExt + Ip,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
+    {
+        let mut ctx =
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(I::TEST_ADDRS.local_ip, remote_ip));
+        let mut api = ctx.tcp_api::<I>();
+        let remote = SocketAddr { ip: ZonedAddr::Unzoned(remote_ip), port: PORT_2 };
+        let socket = api.create(Default::default());
+
+        assert_eq!(
+            api.connect(&socket, Some(remote.ip), remote.port)
+                .expect_err("connect should fail for non-unicast peer"),
+            ConnectError::NoRoute
         );
     }
 

@@ -195,7 +195,9 @@
         {
             type: "expect_failure_with_err_logs",
             matchers: [
-                "NoNetworkTest.NonBlockingConnect*V*",
+                "NoNetworkTest.NonBlockingConnectHostV4",
+                "NoNetworkTest.NonBlockingConnectHostV6",
+                "NoNetworkTest.NonBlockingConnectNetV6",
                 "LocalhostTest/ReuseTest.AllowsAddressReuse/StreamLoopback",
             ],
         },
