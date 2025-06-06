@@ -19,6 +19,8 @@ pub struct PlatformStarnixConfig {
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub socket_mark: SocketMarkTreatment,
 
+    // TODO(https://fxbug.dev/387998791): Remove this flag after making
+    // RtnetlinkTreatmentOfIbf0Interface::NoProvideFake the default behavior.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub rtnetlink_ifb0: RtnetlinkTreatmentOfIfb0Interface,
 }
