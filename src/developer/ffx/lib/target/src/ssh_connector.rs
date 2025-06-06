@@ -65,7 +65,7 @@ enum FDomainConnectionError {
 
 #[derive(Debug)]
 pub struct SshConnector {
-    pub(crate) overnet_cmd: Option<Child>,
+    overnet_cmd: Option<Child>,
     target: ScopedSocketAddr,
     env_context: EnvironmentContext,
 }
@@ -74,12 +74,28 @@ impl SshConnector {
     pub fn new(target: ScopedSocketAddr, env_context: &EnvironmentContext) -> Result<Self> {
         Ok(Self { overnet_cmd: None, target, env_context: env_context.clone() })
     }
+
+    /// This is mainly for diagnostics/reporting info to the user. This takes the usual command
+    /// with which fdomain is started and converts it into a readable string.
+    pub fn fdomain_command(&self) -> Result<String> {
+        let cmd = make_fdomain_ssh_command(self.target.clone(), &self.env_context)?;
+        let envs = cmd
+            .as_std()
+            .get_envs()
+            .filter_map(|(k, v)| v.map(|v_unwrapped| (k, v_unwrapped)))
+            .map(|(k, v)| format!("{}={}", k.to_string_lossy(), v.to_string_lossy()))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let cmd_main = cmd.as_std().get_program().to_string_lossy();
+        let args_str =
+            cmd.as_std().get_args().map(|arg| arg.to_string_lossy()).collect::<Vec<_>>().join(" ");
+        Ok(format!("{} {} {}", envs, cmd_main, args_str))
+    }
 }
 
 impl SshConnector {
     async fn connect_overnet(&mut self) -> Result<OvernetConnection, TargetConnectionError> {
-        self.overnet_cmd =
-            Some(start_overnet_ssh_command(self.target.clone(), &self.env_context).await?);
+        self.overnet_cmd = Some(start_overnet_ssh_command(self.target.clone(), &self.env_context)?);
         let cmd = self.overnet_cmd.as_mut().unwrap();
         let mut stdout = BufReader::with_capacity(
             BUFFER_SIZE,
@@ -126,10 +142,24 @@ impl SshConnector {
         })
     }
 
+    pub async fn connect_via_fdomain(
+        &mut self,
+    ) -> Result<FDomainConnection, TargetConnectionError> {
+        self.connect_fdomain().await.map_err(|e| match e {
+            // TODO(b/421013405): This could likely be much more informative.
+            // Why isn't it supported? Version skew? What can we do if this is the case?
+            FDomainConnectionError::NotSupported => {
+                TargetConnectionError::Fatal(anyhow::anyhow!("FDomain not supported"))
+            }
+            FDomainConnectionError::ConnectionError(other) => {
+                TargetConnectionError::Fatal(anyhow::anyhow!("Connection error: {other:?}"))
+            }
+        })
+    }
+
     async fn connect_fdomain(&mut self) -> Result<FDomainConnection, FDomainConnectionError> {
         self.overnet_cmd = Some(
             start_fdomain_ssh_command(self.target.clone(), &self.env_context)
-                .await
                 .map_err(|x| FDomainConnectionError::ConnectionError(x.into()))?,
         );
         let cmd = self.overnet_cmd.as_mut().unwrap();
@@ -204,25 +234,33 @@ impl TryFromEnvContext for SshConnector {
     }
 }
 
-async fn start_fdomain_ssh_command(
+fn make_fdomain_ssh_command(
     target: ScopedSocketAddr,
     env_context: &EnvironmentContext,
-) -> Result<Child> {
+) -> Result<tokio::process::Command> {
     let args = vec!["fdomain_runner"];
     // Use ssh from the environment.
     let ssh_path = "ssh";
-    let mut ssh = tokio::process::Command::from(build_ssh_command_with_env(
+    let ssh = tokio::process::Command::from(build_ssh_command_with_env(
         ssh_path,
         target,
         env_context,
         args,
     )?);
+    Ok(ssh)
+}
+
+fn start_fdomain_ssh_command(
+    target: ScopedSocketAddr,
+    env_context: &EnvironmentContext,
+) -> Result<Child> {
+    let mut ssh = make_fdomain_ssh_command(target, env_context)?;
     log::debug!("SshConnector starting start_fdomain_ssh invoking:  {ssh:?}");
     let ssh_cmd = ssh.stdout(Stdio::piped()).stdin(Stdio::piped()).stderr(Stdio::piped());
     Ok(ssh_cmd.spawn().bug_context("spawning ssh command")?)
 }
 
-async fn start_overnet_ssh_command(
+fn start_overnet_ssh_command(
     target: ScopedSocketAddr,
     env_context: &EnvironmentContext,
 ) -> Result<Child> {

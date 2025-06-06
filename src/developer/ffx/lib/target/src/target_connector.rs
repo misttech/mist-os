@@ -49,7 +49,6 @@ pub trait TargetConnector: Debug {
     }
 }
 
-#[allow(unused)]
 pub struct FDomainConnection {
     // Currently because of the implementation of ffx_ssh::parse::parse_ssh_output's
     // implementation, this needs to be a buffered reader.

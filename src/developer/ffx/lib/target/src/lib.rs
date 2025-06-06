@@ -43,7 +43,8 @@ pub use discovery::query::TargetInfoQuery;
 pub use fidl_pipe::{create_overnet_socket, FidlPipe};
 pub use resolve::{
     get_discovery_stream, maybe_locally_resolve_target_spec, resolve_target_address,
-    resolve_target_query_to_info, resolve_target_query_with, Resolution,
+    resolve_target_query, resolve_target_query_to_info, resolve_target_query_with,
+    resolve_target_query_with_sources, Resolution,
 };
 pub use target_connector::{
     FDomainConnection, OvernetConnection, TargetConnection, TargetConnectionError, TargetConnector,

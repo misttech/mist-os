@@ -90,27 +90,22 @@ impl FidlPipe {
         C: TargetConnector + 'static,
     {
         let mut wait_duration = Duration::from_millis(50);
-        // If we only see FDomain, we should retry once in case Overnet just needs another attempt.
-        // There are Zero FDomain-only devices today so this should be a good plan.
-        let mut fdomain_only_retry = 1;
 
         let (overnet_connection, fdomain_connection) = loop {
             let error = match connector.connect().await {
                 Ok(TargetConnection::Overnet(o)) => break (Some(o), None),
                 Ok(TargetConnection::Both(f, o)) => break (Some(o), Some(f)),
                 Err(TargetConnectionError::Fatal(e)) => return Err(e),
-                Ok(TargetConnection::FDomain(f)) => {
-                    if fdomain_only_retry == 0 {
-                        break (None, Some(f));
-                    }
-                    fdomain_only_retry -= 1;
-                    anyhow::anyhow!("Only FDomain succeeded but FDomain isn't yet supported")
-                }
+                Ok(TargetConnection::FDomain(f)) => break (None, Some(f)),
                 Err(TargetConnectionError::NonFatal(e)) => e,
             };
 
             let error = format!("non-fatal error connecting to device. Retrying again after {wait_duration:?}: {error:?}");
             log::debug!("{}", error);
+            // TODO(b/421014246): We should have a more effective way to report non-fatal
+            // connectivity errors to the user. This currently only affects a small number of tools,
+            // but as more adopt directly connecting to the device for diagnostics this will
+            // undoubtedly create more noise than necessary.
             eprintln!("{}", error);
             Timer::new(wait_duration).await;
             wait_duration *= 2;

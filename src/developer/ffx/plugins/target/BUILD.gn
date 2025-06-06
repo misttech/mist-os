@@ -31,6 +31,7 @@ if (is_host) {
       "show:ffx_target_show",
       "snapshot:ffx_snapshot",
       "ssh:ffx_target_ssh",
+      "status:ffx_target_status",
       "update:ffx_update",
       "wait:ffx_wait",
     ]
