@@ -6,12 +6,10 @@ use async_trait::async_trait;
 use discovery::{TargetHandle, TargetState};
 use ffx_config::EnvironmentContext;
 use ffx_diagnostics::{Check, CheckExt, NotificationType, Notifier};
-use ffx_target_status_args as args;
 use ffx_writer::VerifiedMachineWriter;
 use fho::{FfxMain, FfxTool};
 use std::io::Write;
-
-mod checks;
+use {ffx_diagnostics_checks as checks, ffx_target_status_args as args};
 
 #[derive(FfxTool)]
 pub struct Status {

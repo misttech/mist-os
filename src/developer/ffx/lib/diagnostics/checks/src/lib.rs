@@ -15,7 +15,7 @@ use ffx_target::connection::ConnectionError;
 use ffx_target::ssh_connector::SshConnector;
 use ffx_target::{Connection, TargetConnection, TargetConnectionError, TargetConnector};
 
-pub(crate) struct GetTargetSpecifier<'a, N>(
+pub struct GetTargetSpecifier<'a, N>(
     pub(crate) &'a EnvironmentContext,
     std::marker::PhantomData<N>,
 );
@@ -59,7 +59,7 @@ where
     }
 }
 
-pub(crate) struct ResolveTarget<'a, N> {
+pub struct ResolveTarget<'a, N> {
     ctx: &'a EnvironmentContext,
     _notifier: std::marker::PhantomData<N>,
 }
@@ -145,7 +145,7 @@ where
     }
 }
 
-pub(crate) struct ConnectSsh<'a, N> {
+pub struct ConnectSsh<'a, N> {
     ctx: &'a EnvironmentContext,
     _w: std::marker::PhantomData<N>,
 }
@@ -218,8 +218,8 @@ where
     }
 }
 
-pub(crate) struct ConnectRemoteControlProxy<N> {
-    pub(crate) timeout: std::time::Duration,
+pub struct ConnectRemoteControlProxy<N> {
+    pub timeout: std::time::Duration,
     _w: std::marker::PhantomData<N>,
 }
 
@@ -273,7 +273,7 @@ where
     }
 }
 
-pub(crate) struct FastbootDeviceStatus<N>(std::marker::PhantomData<N>);
+pub struct FastbootDeviceStatus<N>(std::marker::PhantomData<N>);
 
 impl<N> FastbootDeviceStatus<N> {
     pub fn new() -> Self {

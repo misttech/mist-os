@@ -10,17 +10,11 @@ ffx_plugin("ffx_target_status") {
   edition = "2021"
   with_unit_tests = true
   deps = [
-    "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_fdomain",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/diagnostics:lib",
+    "//src/developer/ffx/lib/diagnostics/checks:lib",
     "//src/developer/ffx/lib/discovery:lib",
-    "//src/developer/ffx/lib/fastboot:lib",
-    "//src/developer/ffx/lib/fastboot/connection_factory:lib",
     "//src/developer/ffx/lib/fho:lib",
-    "//src/developer/ffx/lib/netext:lib",
-    "//src/developer/ffx/lib/rcs:lib",
-    "//src/developer/ffx/lib/target:lib",
-    "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
@@ -32,8 +26,5 @@ ffx_plugin("ffx_target_status") {
     "//third_party/rust_crates:argh",
   ]
 
-  sources = [
-    "src/checks.rs",
-    "src/lib.rs",
-  ]
+  sources = [ "src/lib.rs" ]
 }
