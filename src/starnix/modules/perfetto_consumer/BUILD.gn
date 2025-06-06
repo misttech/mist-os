@@ -14,7 +14,6 @@ rustc_library("perfetto_consumer") {
   sources = [ "lib.rs" ]
 
   deps = [
-    "//src/lib/fuchsia-async",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-observer",
     "//src/starnix/kernel:starnix_core",
