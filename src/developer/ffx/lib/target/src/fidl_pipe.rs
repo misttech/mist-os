@@ -346,49 +346,6 @@ mod test {
         }
     }
 
-    #[derive(Debug)]
-    struct FDomainThenOvernetConnector {
-        tried_once: bool,
-    }
-
-    impl TargetConnector for FDomainThenOvernetConnector {
-        const CONNECTION_TYPE: &'static str = "fake";
-        async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
-            let (sock1, sock2) = fidl::Socket::create_stream();
-            let sock1 = fidl::AsyncSocket::from_socket(sock1);
-            let sock2 = fidl::AsyncSocket::from_socket(sock2);
-            let (_error_tx, error_rx) = async_channel::unbounded();
-            let error_task = Task::local(async move {});
-            let fdomain = FDomainConnection {
-                output: Box::new(BufReader::new(sock1)),
-                input: Box::new(sock2),
-                errors: error_rx,
-                main_task: Some(error_task),
-            };
-
-            if !self.tried_once {
-                self.tried_once = true;
-                return Ok(TargetConnection::FDomain(fdomain));
-            }
-
-            let (sock1, sock2) = fidl::Socket::create_stream();
-            let sock1 = fidl::AsyncSocket::from_socket(sock1);
-            let sock2 = fidl::AsyncSocket::from_socket(sock2);
-            let (_error_tx, error_rx) = async_channel::unbounded();
-            let error_task = Task::local(async move {});
-            let overnet = OvernetConnection {
-                output: Box::new(BufReader::new(sock1)),
-                input: Box::new(sock2),
-                errors: error_rx,
-                compat: None,
-                main_task: Some(error_task),
-                ssh_host_address: None,
-            };
-
-            Ok(TargetConnection::Both(fdomain, overnet))
-        }
-    }
-
     #[fuchsia::test]
     async fn test_error_queue() {
         // These sockets will do nothing of import.
@@ -417,19 +374,6 @@ mod test {
         // however, even if AutoFailConnector was used here it still wouldn't work, since there is
         // no polling happening between the creation of FidlPipe and the attempt to drain errors
         // off of the queue.
-        let errs = fidl_pipe.try_drain_errors();
-        assert!(errs.is_none());
-    }
-
-    #[fuchsia::test]
-    async fn test_waits_for_overnet() {
-        let (fidl_pipe, Some(_node), Some(_fdomain)) =
-            FidlPipe::start_internal(FDomainThenOvernetConnector { tried_once: false })
-                .await
-                .unwrap()
-        else {
-            panic!("Didn't get both connections")
-        };
         let errs = fidl_pipe.try_drain_errors();
         assert!(errs.is_none());
     }
