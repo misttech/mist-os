@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 #include <linux/fs.h>
 
+#include "src/lib/fxl/strings/string_number_conversions.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/starnix/tests/selinux/userspace/util.h"
 
@@ -50,11 +51,40 @@ SeLinuxApiResult CallSeLinuxApi(std::string_view api, std::string_view request) 
   }
 }
 
-SeLinuxApiResult GetClassId(std::string_view class_name) {
+/// Reads a `uint32_t` value from the SELinuxFS `path` and returns it, if it is well-formed.
+uint32_t ReadSeLinuxFsU32(std::string path) {
+  auto result = CallSeLinuxApi(path, std::string_view());
+  uint32_t class_id{};
+  if (result.is_error() || !fxl::StringToNumberWithError(result.value(), &class_id)) {
+    ADD_FAILURE() << "Failed to read SELinuxFS U32: " << path;
+    return 0u;
+  }
+  return class_id;
+}
+
+uint32_t GetClassId(std::string_view class_name) {
   constexpr char kSeLinuxFsClassIndexApiNameFmt[] = "class/%s/index";
 
   auto api_name = fxl::StringPrintf(kSeLinuxFsClassIndexApiNameFmt, std::string(class_name).data());
-  return CallSeLinuxApi(api_name, std::string_view());
+  return ReadSeLinuxFsU32(api_name);
+}
+
+uint32_t GetPermissionId(std::string_view class_name, std::string_view perm_name) {
+  constexpr char kSeLinuxFsPermissionIndexApiNameFmt[] = "class/%s/perms/%s";
+
+  auto api_name = fxl::StringPrintf(kSeLinuxFsPermissionIndexApiNameFmt,
+                                    std::string(class_name).data(), std::string(perm_name).data());
+  return ReadSeLinuxFsU32(api_name);
+}
+
+uint32_t GetAccessVector(std::string_view class_name, std::string_view perm_name) {
+  auto perm_index = GetPermissionId(class_name, perm_name);
+  if (perm_index < 1 || perm_index > 32) {
+    ADD_FAILURE() << "Read invalid permission Id: " << perm_index;
+    return 0u;
+  }
+  uint32_t perm_mask = 1 << (perm_index - 1);
+  return perm_mask;
 }
 
 SeLinuxApiResult ValidateContext(std::string_view context) {
@@ -64,16 +94,20 @@ SeLinuxApiResult ValidateContext(std::string_view context) {
 SeLinuxApiResult ComputeCreateContext(std::string_view source_context,
                                       std::string_view target_context,
                                       std::string_view target_class) {
-  auto class_id_string = GetClassId(target_class);
-  if (class_id_string.is_error()) {
-    return class_id_string;
-  }
-  auto class_id = atoi(class_id_string.value().data());
-
+  auto class_id = GetClassId(target_class);
   constexpr char kSeLinuxCreateRequestFmt[] = "%s %s %hu";
   auto request = fxl::StringPrintf(kSeLinuxCreateRequestFmt, std::string(source_context).data(),
                                    std::string(target_context).data(), class_id);
   return CallSeLinuxApi("create", request);
+}
+
+SeLinuxApiResult ComputeAccess(std::string_view source_context, std::string_view target_context,
+                               std::string_view target_class, uint32_t requested) {
+  auto class_id = GetClassId(target_class);
+  constexpr char kSeLinuxCreateRequestFmt[] = "%s %s %hu %x";
+  auto request = fxl::StringPrintf(kSeLinuxCreateRequestFmt, std::string(source_context).data(),
+                                   std::string(target_context).data(), class_id, requested);
+  return CallSeLinuxApi("access", request);
 }
 
 TEST(SeLinuxFsNull, HasPolicyDevnullContext) {
@@ -231,7 +265,7 @@ TEST(SeLinuxFsCreate, ExtraWhitespace) {
                            "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 ", "process"),
       fit::ok(kExpectedContext));
 
-  // Tabs and other whitespace are also valid separators.
+  // Fields are separated by spaces, with leading & trailing whitespace around each element ignored.
   EXPECT_EQ(
       ComputeCreateContext("\ttest_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
                            "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0", "process"),
@@ -262,8 +296,8 @@ TEST(SeLinuxFsCreate, ExtraWhitespace) {
       fit::error(EINVAL));
 }
 
-// Validate that various badly-formed "create" API requests are rejected as invalid.
-TEST(SeLinuxFsCreate, MalformedComputeCreateRequest) {
+// "create" API requests are appropriately validated.
+TEST(SeLinuxFsCreate, ComputeCreateRequestValidation) {
   // Fewer than three arguments is an invalid request.
   EXPECT_EQ(CallSeLinuxApi("create", "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0"),
             fit::error(EINVAL));
@@ -291,7 +325,7 @@ TEST(SeLinuxFsCreate, MalformedComputeCreateRequest) {
             fit::error(EINVAL));
 }
 
-// Validate handling of class Id values not defined in the loaded policy.
+// Validate "create" handling of class Id values not defined in the loaded policy.
 // It appears that invalid class Ids may be "clamped" to the class Id range, resulting in their
 // being labeled according to whether the first/last class in the policy is process/socket-like, or
 // not.
@@ -310,6 +344,198 @@ TEST(SeLinuxFsCreate, InvalidComputeCreateClassId) {
           "create",
           "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 test_selinuxfs_create_target_u:test_selinuxfs_create_target_r:test_selinuxfs_create_target_t:s0 65535"),
       fit::ok("test_selinuxfs_u:object_r:test_selinuxfs_create_target_t:s0"));
+}
+
+// Validate handling of whitespace between request elements.
+TEST(SeLinuxFsAccess, ExtraWhitespace) {
+  const auto kRequested = GetAccessVector("process", "fork");
+  const auto kExpectedResult =
+      ComputeAccess("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                    "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0", "process", kRequested)
+          .value();
+
+  // Additional whitespace between elements is ignored.
+  EXPECT_EQ(
+      ComputeAccess(" test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                    "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0", "process", kRequested),
+      fit::ok(kExpectedResult));
+  EXPECT_EQ(
+      ComputeAccess("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 ",
+                    "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0", "process", kRequested),
+      fit::ok(kExpectedResult));
+  EXPECT_EQ(ComputeAccess("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                          "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 ", "process",
+                          kRequested),
+            fit::ok(kExpectedResult));
+
+  // Fields are separated by spaces, with leading & trailing whitespace around each element ignored.
+  EXPECT_EQ(
+      ComputeAccess("\ttest_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                    "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0", "process", kRequested),
+      fit::ok(kExpectedResult));
+  EXPECT_EQ(
+      ComputeAccess("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0\t",
+                    "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0", "process", kRequested),
+      fit::ok(kExpectedResult));
+  EXPECT_EQ(ComputeAccess("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                          "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0\t", "process",
+                          kRequested),
+            fit::ok(kExpectedResult));
+  EXPECT_EQ(ComputeAccess("\ntest_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                          "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0\n", "process",
+                          kRequested),
+            fit::ok(kExpectedResult));
+
+  // Although whitespace around elements is ignored, only spaces are valid separators.
+  EXPECT_EQ(
+      CallSeLinuxApi(
+          "access",
+          "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0\ttest_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0\tprocess\t1"),
+      fit::error(EINVAL));
+  EXPECT_EQ(
+      CallSeLinuxApi(
+          "access",
+          "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0\ntest_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0\nprocess\t1"),
+      fit::error(EINVAL));
+}
+
+// "access" API requests with too few arguments are invalid.
+TEST(SeLinuxFsAccess, TooFewArgumentsIsInvalid) {
+  // Fewer than three arguments is an invalid request.
+  EXPECT_EQ(CallSeLinuxApi("access", "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0"),
+            fit::error(EINVAL));
+  EXPECT_EQ(
+      CallSeLinuxApi(
+          "access",
+          "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0"),
+      fit::error(EINVAL));
+}
+
+// "access" API requests with three arguments are valid, even with trailing data.
+TEST(SeLinuxFsAccess, ClassIdMayHaveTrailingNonNumericData) {
+  const uint32_t kTargetClassId = GetClassId("test_selinuxfs_target_class");
+  const auto kRequestBase = fxl::StringPrintf(
+      "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 test_selinuxfs_u:object_r:test_selinuxfs_access_myperm1234_target_t:s0 %u",
+      kTargetClassId);
+  const std::string_view kExpectedAccess = "f ffffffff 0 ffffffff 1 0";
+
+  // Three arguments (just the `kRequestBase` with no "requested" set) is valid.
+  ASSERT_EQ(CallSeLinuxApi("access", kRequestBase), fit::ok(kExpectedAccess));
+
+  // Trailing non-numeric characters in the target class argument appear to be ignored. This is
+  // consistent with the way that `atoi()` handles trailing non-numeric characters.
+  EXPECT_EQ(CallSeLinuxApi("access", kRequestBase + "third_arg_trailing_junk"),
+            fit::ok(kExpectedAccess));
+}
+
+// The class Id argument must be a valid decimal.
+TEST(SeLinuxFsAccess, ClassIdMustBeDecimal) {
+  // Non-numeric class Ids are rejected.
+  EXPECT_EQ(
+      CallSeLinuxApi(
+          "access",
+          "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 test_selinuxfs_create_target_u:test_selinuxfs_create_target_r:test_selinuxfs_create_target_t:s0 bad"),
+      fit::error(EINVAL));
+}
+
+// "access" API requests with a fourth argument containing arbitrary data is accepted.
+TEST(SeLinuxFsAccess, FourthArgumentIsNotValidated) {
+  const uint32_t kTargetClassId = GetClassId("test_selinuxfs_target_class");
+  const auto kRequestBase = fxl::StringPrintf(
+      "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 test_selinuxfs_u:object_r:test_selinuxfs_access_myperm1234_target_t:s0 %u",
+      kTargetClassId);
+  const std::string_view kExpectedAccess = "f ffffffff 0 ffffffff 1 0";
+
+  // Four arguments (i.e. including the "requested" set) is valid, though the requested set has no
+  // effect on the result.
+  EXPECT_EQ(CallSeLinuxApi("access", kRequestBase + " 0"), fit::ok(kExpectedAccess));
+  EXPECT_EQ(CallSeLinuxApi("access", kRequestBase + " ffffffff"), fit::ok(kExpectedAccess));
+  EXPECT_EQ(CallSeLinuxApi("access", kRequestBase + " -1"), fit::ok(kExpectedAccess));
+
+  // There is no validation that the requested set argument is a valid hex value.
+  EXPECT_EQ(CallSeLinuxApi("access", kRequestBase + " non_numeric"), fit::ok(kExpectedAccess));
+}
+
+// If either security context is malformed, it is an invalid request.
+TEST(SeLinuxFsAccess, SecurityContextsMustBeValid) {
+  const auto kRequested = GetAccessVector("process", "fork");
+  EXPECT_EQ(
+      ComputeAccess("test_selinuxfs_non_existent_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                    "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0", "process", kRequested),
+      fit::error(EINVAL));
+  EXPECT_EQ(ComputeAccess("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                          "test_selinuxfs_non_existent_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                          "process", kRequested),
+            fit::error(EINVAL));
+}
+
+// Validate "access" handling of class Id values not defined in the loaded policy.
+// These queries appear to fall-back on the "handle unknown" behaviour, which is set to "deny" in
+// our test policy.
+TEST(SeLinuxFsAccess, UnknownClassIdIsAccepted) {
+  constexpr char kAllAccessDenied[] = "0 ffffffff 0 ffffffff 1 0";
+
+  // Zero is not a valid class Id.
+  EXPECT_EQ(
+      CallSeLinuxApi(
+          "access",
+          "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 test_selinuxfs_create_target_u:test_selinuxfs_create_target_r:test_selinuxfs_create_target_t:s0 0 1"),
+      fit::ok(kAllAccessDenied));
+
+  // 65535 is not a valid class Id in the test policy.
+  EXPECT_EQ(
+      CallSeLinuxApi(
+          "access",
+          "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 test_selinuxfs_create_target_u:test_selinuxfs_create_target_r:test_selinuxfs_create_target_t:s0 65535 1"),
+      fit::ok(kAllAccessDenied));
+}
+
+// Validate that a subject domain that is marked `permissive` in the policy is reported as having
+// no permissions allowed, but the permissive bit set in the "flags" argument of the result.
+TEST(SeLinuxFsAccess, ComputeAccessPermissiveSubject) {
+  constexpr uint32_t kAllPerms = UINT32_MAX;
+
+  EXPECT_EQ(ComputeAccess("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_access_permissive_t:s0",
+                          "test_selinuxfs_u:object_r:test_selinuxfs_access_no_perms_target_t:s0",
+                          "test_selinuxfs_target_class", kAllPerms),
+            fit::ok("0 ffffffff 0 ffffffff 1 1"));
+}
+
+// Validate that the allowed permissions are reported correctly in the result.
+TEST(SeLinuxFsAccess, ComputeAccessPermissions) {
+  constexpr uint32_t kAllPerms = UINT32_MAX;
+
+  EXPECT_EQ(ComputeAccess("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                          "test_selinuxfs_u:object_r:test_selinuxfs_access_no_perms_target_t:s0",
+                          "test_selinuxfs_target_class", kAllPerms),
+            fit::ok("0 ffffffff 0 ffffffff 1 0"));
+  EXPECT_EQ(ComputeAccess("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                          "test_selinuxfs_u:object_r:test_selinuxfs_access_myperm1_target_t:s0",
+                          "test_selinuxfs_target_class", kAllPerms),
+            fit::ok("1 ffffffff 0 ffffffff 1 0"));
+  EXPECT_EQ(ComputeAccess("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                          "test_selinuxfs_u:object_r:test_selinuxfs_access_myperm1234_target_t:s0",
+                          "test_selinuxfs_target_class", kAllPerms),
+            fit::ok("f ffffffff 0 ffffffff 1 0"));
+  EXPECT_EQ(ComputeAccess("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                          "test_selinuxfs_u:object_r:test_selinuxfs_access_all_target_t:s0",
+                          "test_selinuxfs_target_class", kAllPerms),
+            fit::ok("f ffffffff 0 ffffffff 1 0"));
+}
+
+// Validate that the `auditallow` and `dontaudit` statements are taken into account in the reported
+// "audit allow" and "audit deny" sets.
+TEST(SeLinuxFsAccess, ComputeAccessAudit) {
+  constexpr uint32_t kAllPerms = UINT32_MAX;
+
+  EXPECT_EQ(ComputeAccess("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                          "test_selinuxfs_u:object_r:test_selinuxfs_access_audit_all_target_t:s0",
+                          "test_selinuxfs_target_class", kAllPerms),
+            fit::ok("0 ffffffff f ffffffff 1 0"));
+  EXPECT_EQ(ComputeAccess("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0",
+                          "test_selinuxfs_u:object_r:test_selinuxfs_access_audit_none_target_t:s0",
+                          "test_selinuxfs_target_class", kAllPerms),
+            fit::ok("0 ffffffff 0 fffffff0 1 0"));
 }
 
 }  // namespace

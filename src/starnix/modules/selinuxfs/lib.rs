@@ -10,9 +10,13 @@ use fuchsia_inspect_contrib::profile_duration;
 
 use seq_lock::SeqLock;
 
+use selinux::policy::{AccessDecision, AccessVector, SUPPORTED_POLICY_VERSION};
+use selinux::{
+    ClassId, InitialSid, SeLinuxStatus, SeLinuxStatusPublisher, SecurityId, SecurityPermission,
+    SecurityServer,
+};
 use starnix_core::device::mem::DevNull;
 use starnix_core::mm::memory::MemoryObject;
-use starnix_core::security;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::pseudo::simple_file::{
@@ -27,23 +31,20 @@ use starnix_core::vfs::{
     FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
     MemoryRegularNode, NamespaceNode,
 };
-use starnix_uapi::auth::FsCred;
-
-use selinux::policy::SUPPORTED_POLICY_VERSION;
-use selinux::{
-    ClassId, InitialSid, SeLinuxStatus, SeLinuxStatusPublisher, SecurityId, SecurityPermission,
-    SecurityServer,
+use starnix_core::{security, TODO_DENY};
+use starnix_logging::{
+    BugRef, __track_stub_inner, impossible_error, log_error, log_info, log_warn, track_stub,
 };
-use starnix_logging::{impossible_error, log_error, log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_types::vfs::default_statfs;
+use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
-use std::num::NonZeroU32;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 use zerocopy::{Immutable, IntoBytes};
@@ -178,7 +179,14 @@ impl SeLinuxFs {
         security_server.set_status_publisher(Box::new(status_holder));
 
         // Write-only files used to configure and query SELinux.
-        dir.entry("access", AccessApi::new_node(), mode!(IFREG, 0o666));
+        let access_todo_bug = (!current_task.kernel().features.selinux_test_suite).then(|| {
+            TODO_DENY!("https://fxbug.dev/422929151", "Enforce SELinuxFS access API").into()
+        });
+        dir.entry(
+            "access",
+            AccessApi::new_node(security_server.clone(), access_todo_bug),
+            mode!(IFREG, 0o666),
+        );
         dir.entry("context", ContextApi::new_node(security_server.clone()), mode!(IFREG, 0o666));
         dir.entry("create", CreateApi::new_node(security_server.clone()), mode!(IFREG, 0o666));
         dir.entry("member", MemberApi::new_node(), mode!(IFREG, 0o666));
@@ -590,13 +598,35 @@ impl BytesFileOps for InitialContextFile {
     }
 }
 
+/// Extends a calculated `AccessDecision` with an additional permission set describing which
+/// permissions were actually `decided` - all other permissions in the `AccessDecision` structure
+/// should be assumed to be un-`decided`. This allows the "access" API to return partial results, to
+/// force userspace to re-query the API if any un-`decided` permission is later requested.
+struct AccessDecisionAndDecided {
+    decision: AccessDecision,
+    decided: AccessVector,
+}
+
 struct AccessApi {
-    result: Mutex<Vec<u8>>,
+    security_server: Arc<SecurityServer>,
+    result: OnceLock<AccessDecisionAndDecided>,
+
+    // TODO: https://fxbug.dev/422929151 - Always enforce the "access" API and remove this.
+    todo_bug: Option<NonZeroU64>,
 }
 
 impl AccessApi {
-    fn new_node() -> impl FsNodeOps {
-        SeLinuxApi::new_node(move || Ok(Self { result: Mutex::default() }))
+    fn new_node(
+        security_server: Arc<SecurityServer>,
+        todo_bug: Option<NonZeroU64>,
+    ) -> impl FsNodeOps {
+        SeLinuxApi::new_node(move || {
+            Ok(Self {
+                security_server: security_server.clone(),
+                result: OnceLock::default(),
+                todo_bug: todo_bug,
+            })
+        })
     }
 }
 
@@ -605,26 +635,118 @@ impl SeLinuxApiOps for AccessApi {
         SecurityPermission::ComputeAv
     }
 
-    fn api_write(&self, _data: Vec<u8>) -> Result<(), Errno> {
-        let mut result = self.result.lock();
-        if !result.is_empty() {
+    fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
+        if self.result.get().is_some() {
+            // The "access" API can be written-to at most once.
             return error!(EBUSY);
         }
 
-        // Result format is: allowed decided auditallow auditdeny seqno flags
-        // Everything but seqno must be in hexadecimal format and represents a bits field.
-        track_stub!(TODO("https://fxbug.dev/361551536"), "selinux access");
+        // Requests consist of three mandatory space-separated elements, and one optional element.
+        let mut parts = data.split(|x| *x == b' ');
 
-        // `SEQ_NUMBER` should reflect the policy revision from which the result was calculated.
-        const SEQ_NUMBER: u32 = 1;
-        *result = format!("ffffffff ffffffff 0 ffffffff {} 0\n", SEQ_NUMBER).into_bytes();
+        // <scontext>: describes the subject acting on the class.
+        let scontext = parts.next().ok_or_else(|| errno!(EINVAL))?;
+        let scontext = self
+            .security_server
+            .security_context_to_sid(scontext.into())
+            .map_err(|_| errno!(EINVAL))?;
+
+        // <tcontext>: describes the target (e.g. parent directory) of the operation.
+        let tcontext = parts.next().ok_or_else(|| errno!(EINVAL))?;
+        let tcontext = self
+            .security_server
+            .security_context_to_sid(tcontext.into())
+            .map_err(|_| errno!(EINVAL))?;
+
+        // <tclass>: the policy-specific Id of the target class, as a decimal integer.
+        // Class Ids are obtained via lookups in the SELinuxFS "class" directory.
+        let tclass = parts.next().ok_or_else(|| errno!(EINVAL))?;
+        let tclass = str::from_utf8(tclass).map_err(|_| errno!(EINVAL))?;
+        let tclass = u32::from_str(tclass).map_err(|_| errno!(EINVAL))?;
+        let tclass = ClassId::new(NonZeroU32::new(tclass).ok_or_else(|| errno!(EINVAL))?).into();
+
+        // <request>: the set of permissions that the caller requests.
+        let requested = if let Some(requested) = parts.next() {
+            let requested = str::from_utf8(requested).map_err(|_| errno!(EINVAL))?;
+            AccessVector::from_str(requested).map_err(|_| errno!(EINVAL))?
+        } else {
+            AccessVector::ALL
+        };
+
+        // This API does not appear to treat trailing arguments as invalid.
+
+        // Perform the access decision calculation.
+        let permission_check = self.security_server.as_permission_check();
+        let mut decision = permission_check.compute_access_decision(scontext, tcontext, tclass);
+
+        // `compute_access_decision()` returns an `AccessDecision` with results calculated for all
+        // permissions defined by policy, so by default the "access" API reports all permissions as
+        // having been `decided`.
+        let mut decided = AccessVector::ALL;
+
+        // If there is a `todo_bug` associated with the decision then grant all permissions and
+        // make a best-effort attempt to emit a log for missing permissions.
+        let todo_bug = decision.todo_bug.or(self.todo_bug);
+        if let Some(todo_bug) = todo_bug {
+            let denied = AccessVector::ALL - decision.allow;
+            let audited_denied = denied & decision.auditdeny;
+
+            let requested_has_audited_denial = audited_denied & requested != AccessVector::NONE;
+
+            if requested_has_audited_denial {
+                // One or more requested permissions would be denied, and the denial audit-logged,
+                // so emit a track-stub report and a description of the request and result.
+                // Leave all permissions `decided`, so that only the first such failure is audited.
+                __track_stub_inner(
+                    BugRef::from(todo_bug),
+                    "Enforce SELinuxFS access API",
+                    None,
+                    std::panic::Location::caller(),
+                );
+                log_warn!(
+                    "avc: todo_deny SELinuxFS access request {:?} -> {:?}",
+                    FsStr::new(&data),
+                    decision
+                );
+            } else {
+                // All requested permissions were granted. To allow "todo_deny" logs and track-stub
+                // tracking of permissions that would otherwise be denied & audited, remove those
+                // permissions from the `decided` set, to signal that the userspace AVC should re-
+                // query rather than using these cached results.
+                decided -= audited_denied;
+            }
+
+            // Grant all permissions in the returned result, so that clients that ignore the
+            // `decided` set will still have the allowance applied to all permissions.
+            decision.allow = AccessVector::ALL;
+        }
+
+        self.result
+            .set(AccessDecisionAndDecided { decision, decided })
+            .map_err(|_| errno!(EINVAL))?;
 
         Ok(())
     }
 
     fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
-        let result = self.result.lock().clone();
-        Ok(result.into())
+        let Some(AccessDecisionAndDecided { decision, decided }) = self.result.get() else {
+            return Ok(Vec::new().into());
+        };
+
+        let allowed = decision.allow;
+        let auditallow = decision.auditallow;
+        let auditdeny = decision.auditdeny;
+        let flags = decision.flags;
+
+        // TODO: https://fxbug.dev/361551536 - `seqno` should reflect the policy revision from
+        // which the result was calculated, to allow the client to re-try if the policy changed.
+        const SEQNO: u32 = 1;
+
+        // Result format is: allowed decided auditallow auditdeny seqno flags
+        // Everything but seqno must be in hexadecimal format and represents a bits field.
+        let result =
+            format!("{allowed:x} {decided:x} {auditallow:x} {auditdeny:x} {SEQNO} {flags:x}");
+        Ok(result.into_bytes().into())
     }
 }
 
