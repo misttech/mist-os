@@ -429,6 +429,7 @@ pub fn sys_getsockname(
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let socket = Socket::get_from_file(&file)?;
+    security::check_socket_getsockname_access(current_task, socket)?;
     let address_bytes = socket.getsockname(locked)?.to_bytes();
 
     write_socket_address(current_task, user_socket_address, user_address_length, &address_bytes)?;
@@ -445,6 +446,7 @@ pub fn sys_getpeername(
 ) -> Result<(), Errno> {
     let file = current_task.files.get(fd)?;
     let socket = Socket::get_from_file(&file)?;
+    security::check_socket_getpeername_access(current_task, socket)?;
     let address_bytes = socket.getpeername(locked)?.to_bytes();
 
     write_socket_address(current_task, user_socket_address, user_address_length, &address_bytes)?;

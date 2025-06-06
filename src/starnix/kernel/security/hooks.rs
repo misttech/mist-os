@@ -1070,6 +1070,30 @@ pub fn check_socket_recvmsg_access(
     })
 }
 
+/// Checks if the `current_task` is allowed to get the local name of `socket`.
+/// Corresponds to the `socket_getsockname()` LSM hook.
+pub fn check_socket_getsockname_access(
+    current_task: &CurrentTask,
+    socket: &Socket,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_getname_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_getname_access(&security_server, current_task, socket)
+    })
+}
+
+/// Checks if the `current_task` is allowed to get the remote name of `socket`.
+/// Corresponds to the `socket_getpeername()` LSM hook.
+pub fn check_socket_getpeername_access(
+    current_task: &CurrentTask,
+    socket: &Socket,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_getname_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::check_socket_getname_access(&security_server, current_task, socket)
+    })
+}
+
 /// Checks if the `current_task` is allowed to shutdown `socket`.
 /// Corresponds to the `socket_shutdown()` LSM hook.
 pub fn check_socket_shutdown_access(

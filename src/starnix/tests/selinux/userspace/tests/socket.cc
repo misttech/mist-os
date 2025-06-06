@@ -24,6 +24,16 @@ struct SocketTestCase {
   int type;
 };
 
+fit::result<int, fbl::unique_fd> SocketWithLabel(int domain, int type, int protocol,
+                                                 std::string_view label) {
+  auto sockcreate = ScopedTaskAttrResetter::SetTaskAttr("sockcreate", label);
+  fbl::unique_fd fd(socket(domain, type, protocol));
+  if (!fd) {
+    return fit::error(errno);
+  }
+  return fit::ok(std::move(fd));
+}
+
 class SocketTest : public ::testing::TestWithParam<SocketTestCase> {};
 
 TEST_P(SocketTest, SocketTakesProcessLabel) {
@@ -134,36 +144,30 @@ TEST(SocketTest, SockFileLabelIsCorrect) {
 
 TEST(SocketTest, ListenAllowed) {
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_listen_test_t:s0"), fit::ok());
-  auto sockcreate =
-      ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_listen_yes_t:s0");
   auto enforce = ScopedEnforcement::SetEnforcing();
-
-  fbl::unique_fd sockfd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0));
-  ASSERT_TRUE(sockfd) << strerror(errno);
+  auto sockfd = SocketWithLabel(AF_INET, SOCK_STREAM, 0, "test_u:test_r:socket_listen_yes_t:s0");
+  ASSERT_TRUE(sockfd.is_ok()) << sockfd.error_value();
 
   sockaddr_in addr;
   std::memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = INADDR_ANY;
-  ASSERT_THAT(bind(sockfd.get(), (struct sockaddr*)&addr, sizeof(addr)), SyscallSucceeds());
-  EXPECT_THAT(listen(sockfd.get(), kTestBacklog), SyscallSucceeds());
+  ASSERT_THAT(bind(sockfd.value().get(), (struct sockaddr*)&addr, sizeof(addr)), SyscallSucceeds());
+  EXPECT_THAT(listen(sockfd.value().get(), kTestBacklog), SyscallSucceeds());
 }
 
 TEST(SocketTest, ListenDenied) {
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_listen_test_t:s0"), fit::ok());
-  auto sockcreate =
-      ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_listen_no_t:s0");
   auto enforce = ScopedEnforcement::SetEnforcing();
-
-  fbl::unique_fd sockfd = fbl::unique_fd(socket(AF_INET, SOCK_STREAM, 0));
-  ASSERT_TRUE(sockfd) << strerror(errno);
+  auto sockfd = SocketWithLabel(AF_INET, SOCK_STREAM, 0, "test_u:test_r:socket_listen_no_t:s0");
+  ASSERT_TRUE(sockfd.is_ok()) << sockfd.error_value();
 
   sockaddr_in addr;
   std::memset(&addr, 0, sizeof(addr));
   addr.sin_family = AF_INET;
   addr.sin_addr.s_addr = INADDR_ANY;
-  ASSERT_THAT(bind(sockfd.get(), (struct sockaddr*)&addr, sizeof(addr)), SyscallSucceeds());
-  EXPECT_THAT(listen(sockfd.get(), kTestBacklog), SyscallFailsWithErrno(EACCES));
+  ASSERT_THAT(bind(sockfd.value().get(), (struct sockaddr*)&addr, sizeof(addr)), SyscallSucceeds());
+  EXPECT_THAT(listen(sockfd.value().get(), kTestBacklog), SyscallFailsWithErrno(EACCES));
 }
 
 TEST(SocketTest, SendmsgAllowed) {
@@ -300,6 +304,45 @@ TEST(SocketTest, ReadDenied) {
   EXPECT_THAT(read(fds[1], &data, 1), SyscallFailsWithErrno(EACCES));
 }
 
+TEST(SocketTest, GetSocknameAndPeername) {
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_getname_test_t:s0"), fit::ok());
+  auto enforce = ScopedEnforcement::SetEnforcing();
+  auto listen_fd =
+      SocketWithLabel(AF_UNIX, SOCK_STREAM, 0, "test_u:test_r:socket_getname_yes_t:s0");
+  ASSERT_TRUE(listen_fd.is_ok()) << listen_fd.error_value();
+  auto client_fd = SocketWithLabel(AF_UNIX, SOCK_STREAM, 0, "test_u:test_r:socket_getname_no_t:s0");
+  ASSERT_TRUE(client_fd.is_ok()) << client_fd.error_value();
+
+  constexpr char kListenPath[] = "/tmp/getpeername_test";
+  struct sockaddr_un sock_addr{.sun_family = AF_UNIX};
+  strncpy(sock_addr.sun_path, kListenPath, sizeof(sock_addr.sun_path) - 1);
+  ASSERT_THAT(bind(listen_fd.value().get(), (struct sockaddr*)&sock_addr, sizeof(sock_addr)),
+              SyscallSucceeds());
+  ASSERT_THAT(listen(listen_fd.value().get(), kTestBacklog), SyscallSucceeds());
+  ASSERT_THAT(connect(client_fd.value().get(), (struct sockaddr*)&sock_addr, sizeof(sock_addr)),
+              SyscallSucceeds());
+
+  // TODO: https://fxbug.dev/364569135 - don't set "sockcreate" explicitly, `accepted_fd` should
+  // inherit the `listen_fd` label.
+  auto sockcreate =
+      ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_getname_yes_t:s0");
+  fbl::unique_fd accepted_fd;
+  ASSERT_TRUE((accepted_fd = fbl::unique_fd(accept(listen_fd.value().get(), nullptr, nullptr))))
+      << strerror(errno);
+  sockaddr_in addr;
+  socklen_t addr_len = sizeof(addr);
+  std::memset(&addr, 0, sizeof(addr));
+
+  EXPECT_THAT(getsockname(accepted_fd.get(), (struct sockaddr*)&addr, &addr_len),
+              SyscallSucceeds());
+  EXPECT_THAT(getpeername(accepted_fd.get(), (struct sockaddr*)&addr, &addr_len),
+              SyscallSucceeds());
+  EXPECT_THAT(getsockname(client_fd.value().get(), (struct sockaddr*)&addr, &addr_len),
+              SyscallFailsWithErrno(EACCES));
+  EXPECT_THAT(getpeername(client_fd.value().get(), (struct sockaddr*)&addr, &addr_len),
+              SyscallFailsWithErrno(EACCES));
+}
+
 fit::result<int, std::string> GetPeerSec(int fd) {
   char label_buf[256]{};
   socklen_t label_len = sizeof(label_buf);
@@ -312,17 +355,12 @@ fit::result<int, std::string> GetPeerSec(int fd) {
 TEST(SocketPeerSecTest, UnixDomainStream) {
   ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_test_t:s0"), fit::ok());
 
-  fbl::unique_fd listen_fd;
-  {
-    auto sockcreate =
-        ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_test_peer_t:s0");
+  auto listen_fd = SocketWithLabel(AF_UNIX, SOCK_STREAM, 0, "test_u:test_r:socket_test_peer_t:s0");
+  ASSERT_TRUE(listen_fd.is_ok()) << listen_fd.error_value();
+  EXPECT_THAT(GetLabel(listen_fd.value().get()), IsOk("test_u:test_r:socket_test_peer_t:s0"));
 
-    ASSERT_TRUE((listen_fd = fbl::unique_fd(socket(AF_UNIX, SOCK_STREAM, 0)))) << strerror(errno);
-    EXPECT_THAT(GetLabel(listen_fd.get()), IsOk("test_u:test_r:socket_test_peer_t:s0"));
-
-    // Before connecting, Unix stream sockets report the peer as the "unlabeled" context.
-    EXPECT_THAT(GetPeerSec(listen_fd.get()), IsOk("unlabeled_u:unlabeled_r:unlabeled_t:s0"));
-  }
+  // Before connecting, Unix stream sockets report the peer as the "unlabeled" context.
+  EXPECT_THAT(GetPeerSec(listen_fd.value().get()), IsOk("unlabeled_u:unlabeled_r:unlabeled_t:s0"));
 
   fbl::unique_fd client_fd;
   ASSERT_TRUE((client_fd = fbl::unique_fd(socket(AF_UNIX, SOCK_STREAM, 0)))) << strerror(errno);
@@ -333,9 +371,9 @@ TEST(SocketPeerSecTest, UnixDomainStream) {
   constexpr char kListenPath[] = "/tmp/unix_domain_stream_test";
   struct sockaddr_un sock_addr{.sun_family = AF_UNIX};
   strncpy(sock_addr.sun_path, kListenPath, sizeof(sock_addr.sun_path) - 1);
-  ASSERT_THAT(bind(listen_fd.get(), (struct sockaddr*)&sock_addr, sizeof(sock_addr)),
+  ASSERT_THAT(bind(listen_fd.value().get(), (struct sockaddr*)&sock_addr, sizeof(sock_addr)),
               SyscallSucceeds());
-  ASSERT_THAT(listen(listen_fd.get(), kTestBacklog), SyscallSucceeds());
+  ASSERT_THAT(listen(listen_fd.value().get(), kTestBacklog), SyscallSucceeds());
 
   // Connect the `client_fd` to the listener, which should immediately cause the peer label to
   // reflect that of the listening socket.
@@ -346,7 +384,7 @@ TEST(SocketPeerSecTest, UnixDomainStream) {
   // Accept the client connection on `listen_fd` and validate the peer label reported by the
   // accepted socket.
   fbl::unique_fd accepted_fd;
-  ASSERT_TRUE((accepted_fd = fbl::unique_fd(accept(listen_fd.get(), nullptr, nullptr))))
+  ASSERT_TRUE((accepted_fd = fbl::unique_fd(accept(listen_fd.value().get(), nullptr, nullptr))))
       << strerror(errno);
   EXPECT_THAT(GetPeerSec(accepted_fd.get()), IsOk("test_u:test_r:unix_stream_socket_test_t:s0"));
 }
