@@ -1898,7 +1898,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2027,7 +2027,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2124,7 +2124,7 @@ mod tests {
 
         close_file_checked(Arc::try_unwrap(encrypted_file).unwrap()).await;
 
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
 
         let file = Arc::new(
             open_file_checked(
@@ -2206,7 +2206,7 @@ mod tests {
             .expect("Failed to set xattr with create");
 
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2323,7 +2323,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2382,7 +2382,7 @@ mod tests {
                 assert!(entry.kind == DirentKind::Directory)
             }
         }
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         let unencrypted_entries = readdir(Arc::clone(&parent)).await;
         for entry in unencrypted_entries {
             if entry.name == ".".to_owned() {
@@ -2416,7 +2416,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2546,7 +2546,7 @@ mod tests {
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
 
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent_1
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2673,10 +2673,10 @@ mod tests {
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
 
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
 
         let wrapping_key_id_2 = 3;
-        crypt.add_wrapping_key(wrapping_key_id_2, [2; 32]);
+        crypt.add_wrapping_key(wrapping_key_id_2, [2; 32].into());
 
         parent_1
             .update_attributes(&fio::MutableNodeAttributes {
@@ -2754,7 +2754,7 @@ mod tests {
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
 
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
 
         parent_1
             .update_attributes(&fio::MutableNodeAttributes {
@@ -2824,7 +2824,7 @@ mod tests {
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
 
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent_1
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2962,7 +2962,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3045,7 +3045,7 @@ mod tests {
         };
         let parent = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3138,7 +3138,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3236,7 +3236,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3304,7 +3304,7 @@ mod tests {
             .expect_err("rename should fail on a locked directory");
         let (status, dst_token) = parent.get_token().await.expect("FIDL call failed");
         zx::Status::ok(status).expect("get_token failed");
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         parent
             .rename("fee", zx::Event::from(dst_token.unwrap()), "new_fee")
             .await
@@ -3340,7 +3340,7 @@ mod tests {
         };
         let parent = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3419,7 +3419,7 @@ mod tests {
         };
         let parent = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3509,7 +3509,7 @@ mod tests {
         };
         let parent = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3613,7 +3613,7 @@ mod tests {
         };
         let parent = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),

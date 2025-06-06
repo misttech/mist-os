@@ -14,7 +14,10 @@ use crate::object_store::extent_record::{
 };
 use crate::serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned};
 use fprint::TypeFingerprint;
-use fxfs_crypto::{FxfsKeyV40, WrappedKey, WrappedKeysV32, WrappedKeysV40};
+use fxfs_crypto::{
+    EmptyStruct, FscryptKeyIdentifier, FscryptKeyIdentifierAndNonce, FxfsKeyV40, WrappedKey,
+    WrappedKeysV32, WrappedKeysV40,
+};
 use fxfs_unicode::CasefoldString;
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
@@ -731,6 +734,19 @@ impl From<EncryptionKey> for WrappedKey {
     fn from(value: EncryptionKey) -> Self {
         match value {
             EncryptionKey::Fxfs(key) => WrappedKey::Fxfs(key.into()),
+            EncryptionKey::FscryptInoLblk32File { key_identifier } => {
+                WrappedKey::FscryptInoLblk32File(FscryptKeyIdentifier { key_identifier })
+            }
+            EncryptionKey::FscryptInoLblk32Dir { key_identifier, nonce } => {
+                WrappedKey::FscryptInoLblk32Dir(FscryptKeyIdentifierAndNonce {
+                    key_identifier,
+                    nonce,
+                })
+            }
+            EncryptionKey::DmDefaultKey => WrappedKey::DmDefaultKey(EmptyStruct),
+            EncryptionKey::FscryptPerFile { key_identifier, nonce } => {
+                WrappedKey::FscryptPerFile(FscryptKeyIdentifierAndNonce { key_identifier, nonce })
+            }
         }
     }
 }
@@ -740,6 +756,10 @@ impl From<EncryptionKey> for WrappedKey {
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
 pub enum EncryptionKeyV47 {
     Fxfs(FxfsKeyV40),
+    FscryptInoLblk32File { key_identifier: [u8; 16] },
+    FscryptInoLblk32Dir { key_identifier: [u8; 16], nonce: [u8; 16] },
+    DmDefaultKey,
+    FscryptPerFile { key_identifier: [u8; 16], nonce: [u8; 16] },
 }
 
 pub type EncryptionKeys = EncryptionKeysV47;

@@ -475,6 +475,16 @@ impl Journal {
         self.inner.lock().image_builder_mode
     }
 
+    #[cfg(feature = "migration")]
+    pub fn set_filesystem_uuid(&self, uuid: &[u8; 16]) -> Result<(), Error> {
+        ensure!(
+            self.inner.lock().image_builder_mode.is_some(),
+            "Can only set filesystem uuid in image builder mode."
+        );
+        self.inner.lock().super_block_header.guid.0 = uuid::Uuid::from_bytes(*uuid);
+        Ok(())
+    }
+
     /// Used during replay to validate a mutation.  This should return false if the mutation is not
     /// valid and should not be applied.  This could be for benign reasons: e.g. the device flushed
     /// data out-of-order, or because of a malicious actor.

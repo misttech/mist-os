@@ -1816,7 +1816,7 @@ mod tests {
             .await
             .expect_err("wrapping key id 2 has not been added");
         transaction.commit().await.expect("commit failed");
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         let mut transaction = fs
             .clone()
             .new_transaction(
@@ -1907,7 +1907,7 @@ mod tests {
             .await
             .expect("create_child_dir failed");
         transaction.commit().await.expect("commit failed");
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         let transaction = fs
             .clone()
             .new_transaction(
@@ -1981,7 +1981,7 @@ mod tests {
                 .await
                 .expect("create_child_dir failed");
             transaction.commit().await.expect("commit failed");
-            crypt.add_wrapping_key(2, [1; 32]);
+            crypt.add_wrapping_key(2, [1; 32].into());
             let transaction = fs
                 .clone()
                 .new_transaction(
@@ -3823,7 +3823,7 @@ mod tests {
 
             // Create a (very weak) key for our encrypted directory.
             let wrapping_key_id = 2;
-            crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+            crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
 
             object_id = {
                 let mut transaction = fs
@@ -3987,7 +3987,7 @@ mod tests {
 
             // Create a (very weak) key for our encrypted directory.
             let wrapping_key_id = 2;
-            crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+            crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
 
             object_id = {
                 let mut transaction = fs

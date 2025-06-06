@@ -25,11 +25,13 @@ rustc_library("crypto") {
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:rustc-hash",
     "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:siphasher",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:zerocopy",
   ]
   sources = [
     "src/cipher.rs",
+    "src/cipher/fscrypt_ino_lblk32.rs",
     "src/cipher/fxfs.rs",
     "src/ff1.rs",
     "src/lib.rs",

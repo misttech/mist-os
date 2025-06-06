@@ -232,6 +232,28 @@ pub enum KeyPurpose {
     Metadata,
 }
 
+/// The `Crypt` trait below provides a mechanism to unwrap a key or set of keys.
+/// The wrapping keys can be one of these types.
+pub enum WrappingKey {
+    /// This is used for keys of the type WrappedKey::Fxfs.
+    Aes256GcmSiv([u8; 32]),
+    /// This is used for legacy fscrypt keys that use a 64-byte main key.
+    Fscrypt([u8; 64]),
+}
+impl From<[u8; 32]> for WrappingKey {
+    fn from(value: [u8; 32]) -> Self {
+        WrappingKey::Aes256GcmSiv(value)
+    }
+}
+impl From<[u8; 64]> for WrappingKey {
+    fn from(value: [u8; 64]) -> Self {
+        WrappingKey::Fscrypt(value)
+    }
+}
+
+/// The keys it unwraps can be wrapped with either Aes256GcmSiv (ideally) or using via
+/// legacy fscrypt master key + HKDF.
+
 /// An interface trait with the ability to wrap and unwrap encryption keys.
 ///
 /// Note that existence of this trait does not imply that an object will **securely**

@@ -258,8 +258,12 @@ impl FxFile {
                 .map_err(map_to_status)?
                 .get(FSCRYPT_KEY_ID)
             {
-                let EncryptionKey::Fxfs(fxfs_key) = key;
-                return Ok(Some(fxfs_key.wrapping_key_id.to_le_bytes()));
+                if let EncryptionKey::Fxfs(fxfs_key) = key {
+                    return Ok(Some(fxfs_key.wrapping_key_id.to_le_bytes()));
+                } else {
+                    error!("Unexpected key type: {:?}", key);
+                    return Ok(None);
+                }
             }
         }
         Ok(None)
@@ -2519,7 +2523,7 @@ mod tests {
         )
         .await;
         let wrapping_key_id = 123;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         encrypted_directory
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2609,7 +2613,7 @@ mod tests {
         )
         .await;
         let wrapping_key_id = 123;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         encrypted_directory
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),

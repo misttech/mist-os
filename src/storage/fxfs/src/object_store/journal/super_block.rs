@@ -130,7 +130,7 @@ pub type SuperBlockHeader = SuperBlockHeaderV32;
 )]
 pub struct SuperBlockHeaderV32 {
     /// The globally unique identifier for the filesystem.
-    guid: UuidWrapperV32,
+    pub guid: UuidWrapperV32,
 
     /// There are two super-blocks which are used in an A/B configuration. The super-block with the
     /// greatest generation number is what is used when mounting an Fxfs image; the other is
@@ -179,7 +179,7 @@ pub struct SuperBlockHeaderV32 {
 
 type UuidWrapper = UuidWrapperV32;
 #[derive(Clone, Default, Eq, PartialEq)]
-struct UuidWrapperV32(Uuid);
+pub struct UuidWrapperV32(pub Uuid);
 
 impl UuidWrapper {
     fn new() -> Self {

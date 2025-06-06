@@ -2118,7 +2118,7 @@ async fn test_encrypted_symlink_has_missing_keys() {
             .await
             .expect("new_transaction failed");
 
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         handle
             .update_attributes(
                 transaction,
@@ -2209,7 +2209,7 @@ async fn test_encrypted_directory_has_unencrypted_child() {
             .await
             .expect("new_transaction failed");
 
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         handle
             .update_attributes(
                 transaction,
@@ -2410,7 +2410,7 @@ async fn test_parent_and_child_encrypted_with_different_wrapping_keys() {
             .await
             .expect("new_transaction failed");
 
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         handle
             .update_attributes(
                 transaction,
@@ -2529,7 +2529,7 @@ async fn test_encrypted_directory_no_wrapping_key() {
             .await
             .expect("new_transaction failed");
 
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         handle
             .update_attributes(
                 transaction,
@@ -2707,7 +2707,7 @@ async fn test_directory_missing_encryption_key_for_fscrypt() {
             .await
             .expect("new_transaction failed");
 
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         handle.set_wrapping_key(&mut transaction, 2).await.expect("failed to set wrapping key");
 
         let txn_mutation = transaction

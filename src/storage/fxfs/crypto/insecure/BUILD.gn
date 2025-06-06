@@ -14,6 +14,7 @@ rustc_library("insecure") {
     "//sdk/rust/zx-status",
     "//src/lib/fuchsia-sync",
     "//src/storage/fxfs/crypto",
+    "//src/storage/lib/fscrypt",
     "//third_party/rust_crates:aes-gcm-siv",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:log",
@@ -22,5 +23,8 @@ rustc_library("insecure") {
   ]
 
   sources = [ "src/lib.rs" ]
-  visibility = [ "//src/storage/fxfs/*" ]
+  visibility = [
+    "//src/storage/f2fs_reader/tests/*",
+    "//src/storage/fxfs/*",
+  ]
 }

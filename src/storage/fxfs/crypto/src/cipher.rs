@@ -13,6 +13,7 @@ use std::sync::Arc;
 use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 use zx_status as zx;
 
+mod fscrypt_ino_lblk32;
 pub(crate) mod fxfs;
 
 // TODO(https://fxbug.dev/375700939): Support different padding sizes based on SET_ENCRYPTION_POLICY
@@ -76,6 +77,9 @@ pub(crate) fn key_to_cipher(
 ) -> Result<Option<Arc<dyn Cipher>>, zx::Status> {
     match key {
         WrappedKey::Fxfs(_) => Ok(Some(Arc::new(fxfs::FxfsCipher::new(&unwrapped_key)))),
+        WrappedKey::FscryptInoLblk32File { .. } => {
+            Ok(Some(Arc::new(fscrypt_ino_lblk32::FscryptInoLblk32FileCipher::new(&unwrapped_key))))
+        }
         _ => Err(zx::Status::NOT_SUPPORTED),
     }
 }
@@ -98,10 +102,6 @@ impl CipherSet {
 
     pub fn add_key(&mut self, id: u64, cipher: Option<Arc<dyn Cipher>>) {
         self.0.insert(id, cipher);
-    }
-
-    pub fn contains_key(&self, id: u64) -> bool {
-        self.0.contains_key(&id)
     }
 }
 impl From<Vec<(u64, Option<Arc<dyn Cipher>>)>> for CipherSet {
