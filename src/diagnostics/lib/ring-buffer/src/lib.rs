@@ -2,12 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_async::condition::Condition;
 use fuchsia_async::{self as fasync};
+use futures::task::AtomicWaker;
 use std::future::poll_fn;
 use std::ops::{Deref, Range};
-use std::pin::pin;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::task::Poll;
 use thiserror::Error;
@@ -16,7 +15,8 @@ use zx::AsHandleRef;
 /// Size of the kernel header in the ring buffer. This is different to the FXT header.
 pub const RING_BUFFER_MESSAGE_HEADER_SIZE: usize = 16;
 
-/// Maximum message size. This includes the ring buffer header.
+/// Maximum message size. This includes the ring buffer header. This is also the minimum capacity
+/// for the ring buffer.
 pub const MAX_MESSAGE_SIZE: usize = 65536;
 
 // The ring buffer consists of a head index, tail index on the first page. The ring buffer proper
@@ -38,7 +38,6 @@ pub struct RingBuffer {
     _vmar: zx::Vmar,
     base: usize,
     capacity: usize,
-    registration: fasync::ReceiverRegistration<Receiver>,
 }
 
 #[derive(Eq, Error, Debug, PartialEq)]
@@ -114,14 +113,14 @@ impl RingBuffer {
         )
         .unwrap();
 
-        let this = Arc::new(Self {
-            shared_region,
-            _vmar: vmar,
-            base,
-            capacity,
-            registration: fasync::EHandle::local().register_receiver(Arc::default()),
-        });
-        (this.clone(), Reader { ring_buffer: this })
+        let this = Arc::new(Self { shared_region, _vmar: vmar, base, capacity });
+        (
+            this.clone(),
+            Reader {
+                ring_buffer: this,
+                registration: fasync::EHandle::local().register_receiver(Arc::default()),
+            },
+        )
     }
 
     /// Returns an IOBuffer that can be used to write to the ring buffer. A tuple is returned; the
@@ -165,7 +164,7 @@ impl RingBuffer {
 
     /// Increments the tail pointer, synchronized with Release ordering (which will synchronise with
     /// the kernel that reads the tail pointer using Acquire ordering). `amount` should always be
-    /// a multiple of 8.
+    /// a multiple of 8. See also `ring_buffer_record_len`.
     pub fn increment_tail(&self, amount: usize) {
         assert_eq!(amount % 8, 0);
         // SAFETY: This should be aligned and we mapped base, so the pointer should be
@@ -225,49 +224,12 @@ impl RingBuffer {
             ),
         ))
     }
-
-    /// Waits for the head to exceed `index`. Returns head.
-    pub async fn wait(&self, index: u64) -> u64 {
-        // Check once before attaching the waker to the lock.
-        let head = self.head();
-        if head > index {
-            return head;
-        }
-        let mut waker_entry = pin!(self.registration.0.waker_entry());
-        poll_fn(|cx| {
-            // Check before taking the lock.
-            let head = self.head();
-            if head > index {
-                return Poll::Ready(head);
-            }
-            let mut reg = self.registration.0.lock();
-            reg.add_waker(waker_entry.as_mut(), cx.waker().clone());
-            if !reg.wait_async {
-                self.shared_region
-                    .wait_async_handle(
-                        self.registration.port(),
-                        self.registration.key(),
-                        zx::Signals::IOB_SHARED_REGION_UPDATED,
-                        zx::WaitAsyncOpts::empty(),
-                    )
-                    .unwrap();
-                reg.wait_async = true;
-            }
-            // And we need to check once more in case there was a race.
-            let head = self.head();
-            if head > index {
-                Poll::Ready(head)
-            } else {
-                Poll::Pending
-            }
-        })
-        .await
-    }
 }
 
 /// Provides exclusive read access to the ring buffer.
 pub struct Reader {
     ring_buffer: Arc<RingBuffer>,
+    registration: fasync::ReceiverRegistration<Receiver>,
 }
 
 impl Deref for Reader {
@@ -278,6 +240,36 @@ impl Deref for Reader {
 }
 
 impl Reader {
+    /// Waits for the head to exceed `index`. Returns head.
+    pub async fn wait(&mut self, index: u64) -> u64 {
+        poll_fn(|cx| {
+            // Check before registering the waker.
+            let head = self.head();
+            if head > index {
+                return Poll::Ready(head);
+            }
+            self.registration.waker.register(cx.waker());
+            if !self.registration.async_wait.swap(true, Ordering::Relaxed) {
+                self.shared_region
+                    .wait_async_handle(
+                        self.registration.port(),
+                        self.registration.key(),
+                        zx::Signals::IOB_SHARED_REGION_UPDATED,
+                        zx::WaitAsyncOpts::empty(),
+                    )
+                    .unwrap();
+            }
+            // Check again in case there was a race.
+            let head = self.head();
+            if head > index {
+                Poll::Ready(head)
+            } else {
+                Poll::Pending
+            }
+        })
+        .await
+    }
+
     /// Reads a message from `tail`. If no message is ready, this will wait. This will advance
     /// the `tail`.
     pub async fn read_message(&mut self) -> Result<(u64, Vec<u8>), Error> {
@@ -288,36 +280,35 @@ impl Reader {
         let message = unsafe {
             self.first_message_in(tail..head).map(|(tag, message)| (tag, message.to_vec()))?
         };
-        self.increment_tail(RING_BUFFER_MESSAGE_HEADER_SIZE + message.1.len().next_multiple_of(8));
+        self.increment_tail(ring_buffer_record_len(message.1.len()));
         Ok(message)
     }
 }
 
 #[derive(Default)]
-struct Receiver(Condition<State>);
-
-#[derive(Default)]
-struct State {
-    wait_async: bool,
+struct Receiver {
+    waker: AtomicWaker,
+    async_wait: AtomicBool,
 }
 
 impl fasync::PacketReceiver for Receiver {
     fn receive_packet(&self, _packet: zx::Packet) {
-        let mut this = self.0.lock();
-        this.wait_async = false;
-        for waker in this.drain_wakers() {
-            waker.wake();
-        }
+        self.async_wait.store(false, Ordering::Relaxed);
+        self.waker.wake();
     }
+}
+
+/// Returns the ring buffer record length given the message length. This accounts for the ring
+/// buffer message header and any padding required to maintain alignment.
+pub fn ring_buffer_record_len(message_len: usize) -> usize {
+    RING_BUFFER_MESSAGE_HEADER_SIZE + message_len.next_multiple_of(8)
 }
 
 #[cfg(test)]
 mod tests {
     use super::{Error, RingBuffer, MAX_MESSAGE_SIZE, RING_BUFFER_MESSAGE_HEADER_SIZE};
-    use fuchsia_async::scope::ScopeStream;
     use futures::stream::FuturesUnordered;
     use futures::{FutureExt, StreamExt};
-    use std::iter::repeat_with;
     use std::sync::atomic::{AtomicU64, Ordering};
 
     #[fuchsia::test]
@@ -351,31 +342,6 @@ mod tests {
         let (tag, data) = read_message.next().await.unwrap().expect("read_message failed");
         assert_eq!(tag, TAG);
         assert_eq!(&data, DATA);
-    }
-
-    #[fuchsia::test(threads = 4)]
-    async fn test_multiple_waiters() {
-        const TAG: u64 = 56;
-        const DATA: &[u8] = b"test";
-        const NUM_WAITERS: usize = 1000;
-
-        let ring_buffer = RingBuffer::new(128 * 1024).0;
-
-        let waiters = ScopeStream::from_iter(
-            repeat_with(|| {
-                let ring_buffer = ring_buffer.clone();
-                async move {
-                    ring_buffer.wait(0).await;
-                }
-            })
-            .take(NUM_WAITERS),
-        );
-
-        // Perform the write from a separate thread so that we can test races.
-        let (iob, _) = ring_buffer.new_iob_writer(TAG).unwrap();
-        std::thread::spawn(move || iob.write(Default::default(), 0, DATA).unwrap());
-
-        assert_eq!(waiters.count().await, NUM_WAITERS);
     }
 
     #[fuchsia::test]
