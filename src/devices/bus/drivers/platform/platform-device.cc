@@ -195,6 +195,12 @@ zx::result<zx::interrupt> PlatformDevice::GetInterrupt(uint32_t index, uint32_t 
     return zx::error(status);
   }
   interrupt_vectors_.insert(vector);
+
+  zx_info_handle_basic_t info;
+  status = out_irq.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
+  ZX_ASSERT(status == ZX_OK);
+  interrupt_koids_.insert(info.koid);
+
   return zx::ok(std::move(out_irq));
 }
 
