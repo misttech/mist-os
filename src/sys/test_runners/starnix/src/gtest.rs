@@ -166,10 +166,13 @@ pub async fn run_gtest_cases(
     component_runner: &frunner::ComponentRunnerProxy,
     test_type: TestType,
 ) -> Result<(), Error> {
+    // This is a hacky workaround for run dashboard ergonomics, so that we get a top-level view of
+    // the suite status (including logs from all test cases), while also retaining individual
+    // test case pass/fail results. To do this, we'll send a placeholder overall test case to the
+    // test manager, with stdio handles wired into that overall "test" case. The individual tests
+    // will report into those same handles, by way of the component start_info.numbered_handles.
     let (numbered_handles, std_handles) = create_numbered_handles();
     start_info.numbered_handles = numbered_handles;
-
-    // Hacky - send a fake case to test manager and use it to see all of stdout/stderr.
     let (overall_test_listener_proxy, overall_test_listener) =
         create_proxy::<ftest::CaseListenerMarker>();
     run_listener_proxy.on_test_case_started(
@@ -208,6 +211,9 @@ pub async fn run_gtest_cases(
     // Start the test component.
     let component_controller = start_test_component(start_info, component_runner)?;
     let _ = read_result(component_controller.take_event_stream()).await;
+
+    // Mark the overall test suite as completed. The status is always "Passed," but we will parse
+    // and report the actual status of individual tests below.
     overall_test_listener_proxy
         .finished(&TestResult { status: Some(Status::Passed), ..Default::default() })?;
 
