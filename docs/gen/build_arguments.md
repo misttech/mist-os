@@ -89,7 +89,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2120
+From //build/config/BUILDCONFIG.gn:2124
 
 ### allowed_test_device_types
 
@@ -1066,7 +1066,7 @@ This should never be set as a build argument.
 }
   hwasan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.hwasan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.hwasan.a"
@@ -5614,7 +5614,11 @@ is satisfied if any of the strings matches against the candidate string.
 
     host
         [boolean] If true, the selector matches in the host toolchain.
-        If false, the selector matches in the target toolchain.
+        If false, the selector matches in non-host toolchains.
+
+    kernel
+        [boolean] If true, the selector matches in is_kernel toolchains.
+        If false, the selector matches in non-kernel toolchains.
 
     testonly
         [boolean] If true, the selector matches targets with testonly=true.
@@ -5637,7 +5641,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2110
+From //build/config/BUILDCONFIG.gn:2114
 
 ### select_variant_canonical
 
@@ -5647,7 +5651,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2115
+From //build/config/BUILDCONFIG.gn:2119
 
 ### select_variant_shortcuts
 
