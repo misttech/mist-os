@@ -237,6 +237,11 @@ def main() -> int:
         action="store_true",
         help="Update goldens rather than failing.",
     )
+    parser.add_argument(
+        "--trace-build-actions",
+        action="store_true",
+        help="Trace build actions.",
+    )
 
     args = parser.parse_args()
 
@@ -328,6 +333,9 @@ def main() -> int:
 
     if args.update_goldens:
         args_gn_content += f"update_goldens = true\n"
+
+    if args.trace_build_actions:
+        args_gn_content += f"build_should_trace_actions = true\n"
 
     logger.info(f"{build_dir}: args.gn content:\n{args_gn_content}")
     if (
