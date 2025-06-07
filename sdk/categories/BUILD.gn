@@ -67,7 +67,6 @@ if (is_host || is_fidl_toolchain) {
     foreach(target, ffx_subtool_fidl_allowlist) {
       visibility += [
         "${target}_compile_fidlc",
-        "${target}_ir_root",
         "${target}_lint",
         "${target}_rust.actual",
         "${target}_rust.aux.deps.deps",
@@ -106,7 +105,10 @@ if (is_host || is_fidl_toolchain) {
     import("//src/testing/end_to_end/host_test_allowlist.gni")
     visibility = []
     foreach(target, host_test_fidl_allowlist) {
-      visibility += [ "${target}_host_test_data_" ]
+      visibility += [
+        "${target}_host_test_data_",
+        "${target}_ir_root",
+      ]
     }
   }
 }

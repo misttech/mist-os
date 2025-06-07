@@ -253,13 +253,13 @@ template("fidl") {
   if ((is_host && enable_rust && toolchain_variant.supports_rust) ||
       is_fidl_toolchain) {
     import("//src/developer/ffx/build/ffx_subtool_allowlist.gni")
-    label_name = get_label_info(_fidl_target, "label_no_toolchain")
-    is_allowed_for_ffx = ffx_subtool_fidl_allowlist + [ label_name ] -
-                         [ label_name ] != ffx_subtool_fidl_allowlist
-    if (is_allowed_for_ffx) {
+    _label_name = get_label_info(_fidl_target, "label_no_toolchain")
+    _is_allowed_for_ffx = ffx_subtool_fidl_allowlist + [ _label_name ] -
+                          [ _label_name ] != ffx_subtool_fidl_allowlist
+    if (_is_allowed_for_ffx) {
       assert(
           marker_category == _not_in_sdk_category,
-          "Remove `${label_name}` from //src/developer/ffx/build/ffx_subtool_allowlist.gni.")
+          "Remove `${_label_name}` from //src/developer/ffx/build/ffx_subtool_allowlist.gni.")
       marker_category = "allowed-for-ffx-subtool"
     }
   }
@@ -311,50 +311,73 @@ template("fidl") {
   # TODO(b/346586023): This is only really used for Fuchsia Controller, which should instead be
   # packaging this as a Python data resource.
   if (is_host && current_toolchain == toolchain_variant.base) {
-    fidl_ir_root_target = "${target_name}_ir_root"
-    fidl_ir_root_base = get_label_info(":anything($fidl_toolchain)",
-                                       "root_gen_dir") + "/ir_root"
-    fidl_library_name = common_parameters.library_name
-    fidl_ir_root_dir = fidl_ir_root_base + "/" + fidl_library_name
-    fidl_ir_root_outfile = "${fidl_ir_root_base}/${fidl_library_name}/${fidl_library_name}.fidl.json"
+    _fidl_ir_root_target = "${target_name}_ir_root"
+    _fidl_ir_root_base = get_label_info(":anything($fidl_toolchain)",
+                                        "root_gen_dir") + "/ir_root"
+    _fidl_library_name = common_parameters.library_name
+    _fidl_ir_root_dir = _fidl_ir_root_base + "/" + _fidl_library_name
+    _fidl_ir_root_outfile = "${_fidl_ir_root_base}/${_fidl_library_name}/${_fidl_library_name}.fidl.json"
+
+    _host_test_data_impl_target = "${target_name}_host_test_data_"
+
+    # Override the category if the library is in the allowlist for host tests.
+    # Do not allow the subtool allowlist for host tests.
+    # Use a different variable to avoid affecting other targets.
+    if (marker_category == "allowed-for-ffx-subtool") {
+      _host_test_marker_category = _not_in_sdk_category
+    } else {
+      _host_test_marker_category = marker_category
+    }
+
+    import("//src/testing/end_to_end/host_test_allowlist.gni")
+    _label_name = get_label_info(_fidl_target, "label_no_toolchain")
+    _is_allowed_for_host_test = host_test_fidl_allowlist + [ _label_name ] -
+                                [ _label_name ] != host_test_fidl_allowlist
+    if (_is_allowed_for_host_test) {
+      assert(
+          _host_test_marker_category == _not_in_sdk_category,
+          "Remove `${_label_name}` from //src/testing/end_to_end/host_test_allowlist.gni.")
+      _host_test_marker_category = "allowed-for-host-test"
+    }
 
     # This is intended as an alternative easily-searchable setup to all_fidl_json.txt
     # The only caveat is that this will fail if there are FIDL libraries with duplicate names as
     # dependencies. A future step may be to create this directory structure in a given package's
     # gen dir rather than the root FIDL gen dir.
-    action(fidl_ir_root_target) {
-      forward_variables_from(invoker,
-                             [
-                               "testonly",
-                               "visibility",
-                             ])
+    action(_fidl_ir_root_target) {
+      forward_variables_from(invoker, [ "testonly" ])
+
+      # Ensure this target is only used by a host test target since it applies
+      # that category allowlist.
+      visibility = [ ":${_host_test_data_impl_target}" ]
+
       sources = [ common_parameters.fidl_ir_json ]
       script = "//build/fidl/gen_ir_root_out.py"
       args = [
         "--root-dir",
-        rebase_path(fidl_ir_root_base, root_build_dir),
+        rebase_path(_fidl_ir_root_base, root_build_dir),
         "--ir-path",
-        rebase_path(common_parameters.fidl_ir_json, fidl_ir_root_dir),
+        rebase_path(common_parameters.fidl_ir_json, _fidl_ir_root_dir),
         "--library-name",
-        fidl_library_name,
+        _fidl_library_name,
       ]
-      outputs = [ fidl_ir_root_outfile ]
+      outputs = [ _fidl_ir_root_outfile ]
       deps = [
-        "//sdk/categories:marker-${marker_category}",
+        "//sdk/categories:marker-${_host_test_marker_category}",
         _fidl_target,
       ]
     }
 
     # See https://fxrev.dev/931429 for context.
-    host_test_data("${target_name}_host_test_data_") {
+    host_test_data(_host_test_data_impl_target) {
       forward_variables_from(invoker,
                              [
                                "applicable_licenses",
                                "visibility",
                              ])
       sources = [
+        _fidl_ir_root_outfile,
         common_parameters.fidl_ir_json,
-        fidl_ir_root_outfile,
       ]
 
       # Explicitly set `testonly` to false for SDK inclusion.
@@ -367,29 +390,14 @@ template("fidl") {
         testonly = invoker.testonly
       }
 
-      deps = [ ":${fidl_ir_root_target}" ]
+      deps = [ ":${_fidl_ir_root_target}" ]
 
-      # Override the category if the library is in the allowlist for host tests.
-      # Do not allow the subtool allowlist for host tests.
-      if (marker_category == "allowed-for-ffx-subtool") {
-        marker_category = _not_in_sdk_category
-      }
-      import("//src/testing/end_to_end/host_test_allowlist.gni")
-      label_name = get_label_info(_fidl_target, "label_no_toolchain")
-      is_allowed_for_host_test = host_test_fidl_allowlist + [ label_name ] -
-                                 [ label_name ] != host_test_fidl_allowlist
-      if (is_allowed_for_host_test) {
-        assert(
-            marker_category == _not_in_sdk_category,
-            "Remove `${label_name}` from //src/testing/end_to_end/host_test_allowlist.gni.")
-        marker_category = "allowed-for-host-test"
-      }
-      deps += [ "//sdk/categories:marker-${marker_category}" ]
+      deps += [ "//sdk/categories:marker-${_host_test_marker_category}" ]
     }
 
     group("${target_name}_host_test_data") {
       forward_variables_from(invoker, [ "testonly" ])
-      deps = [ ":${target_name}_" ]
+      deps = [ ":${target_name}_" ]  # _host_test_data_impl_target.
       if (defined(invoker.public_deps)) {
         foreach(pdep, invoker.public_deps) {
           label = get_label_info(pdep, "label_no_toolchain")
@@ -400,8 +408,8 @@ template("fidl") {
       metadata = {
         fidl_ir_info = [
           {
-            library_name = fidl_library_name
-            source = rebase_path(fidl_ir_root_outfile, root_build_dir)
+            library_name = _fidl_library_name
+            source = rebase_path(_fidl_ir_root_outfile, root_build_dir)
           },
         ]
       }
