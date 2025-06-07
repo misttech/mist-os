@@ -8,8 +8,16 @@ use ffx_config::EnvironmentContext;
 use ffx_diagnostics::{Check, CheckExt, NotificationType, Notifier};
 use ffx_writer::VerifiedMachineWriter;
 use fho::{FfxMain, FfxTool};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::io::Write;
 use {ffx_diagnostics_checks as checks, ffx_target_status_args as args};
+
+#[derive(Serialize, Deserialize, JsonSchema, Debug, PartialEq, Eq)]
+pub struct StatusUpdate {
+    status: NotificationType,
+    message: String,
+}
 
 #[derive(FfxTool)]
 pub struct Status {
@@ -27,16 +35,19 @@ struct DefaultNotifier {
 impl Notifier for DefaultNotifier {
     fn update_status(
         &mut self,
-        ty: NotificationType,
-        status: impl Into<String>,
+        status: NotificationType,
+        message: impl Into<String>,
     ) -> anyhow::Result<()> {
-        let prefix = match ty {
-            NotificationType::Info => "[i] ",
-            NotificationType::Success => "\t[✓] ",
-            NotificationType::Warning => "\t[!] ",
-            NotificationType::Error => "\t[✗] ",
-        };
-        writeln!(&mut self.writer, "{}{}", prefix, status.into())?;
+        let update = StatusUpdate { message: message.into(), status };
+        self.writer.machine_or_else(&update, || {
+            let prefix = match update.status {
+                NotificationType::Info => "[i] ",
+                NotificationType::Success => "\t[✓] ",
+                NotificationType::Warning => "\t[!] ",
+                NotificationType::Error => "\t[✗] ",
+            };
+            format!("{}{}", prefix, update.message)
+        })?;
         self.writer.flush().map_err(Into::into)
     }
 }
@@ -78,7 +89,7 @@ impl Status {
 #[async_trait(?Send)]
 impl FfxMain for Status {
     // This is a machine notifier, but there is (currently) no machine output in use yet.
-    type Writer = VerifiedMachineWriter<String>;
+    type Writer = VerifiedMachineWriter<StatusUpdate>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         let mut notifier = DefaultNotifier { writer };

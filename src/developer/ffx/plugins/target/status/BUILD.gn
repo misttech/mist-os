@@ -18,6 +18,8 @@ ffx_plugin("ffx_target_status") {
     "//src/developer/ffx/lib/writer:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
+    "//third_party/rust_crates:schemars",
+    "//third_party/rust_crates:serde",
   ]
 
   args_sources = [ "src/args.rs" ]

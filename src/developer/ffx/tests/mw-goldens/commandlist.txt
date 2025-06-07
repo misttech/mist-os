@@ -26,4 +26,5 @@ ffx target repository register
 ffx target snapshot
 ffx target screenshot
 ffx target show
+ffx target status
 ffx target wait

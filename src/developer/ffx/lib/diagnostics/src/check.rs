@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::pin::Pin;
 
@@ -68,6 +70,7 @@ pub trait Check {
     }
 }
 
+#[derive(Debug, PartialEq, Eq, JsonSchema, Serialize, Deserialize)]
 pub enum NotificationType {
     Info,
     Success,
