@@ -206,6 +206,15 @@ TEST(FsTest, DevZeroAndNullQuirks) {
 }
 #endif
 
+TEST(FsTest, CreateExistingFileInReadonlyFilesystemReturnsEEXIST) {
+  // This test requires that / is readonly.
+  ASSERT_EQ(mkdir("/asdfasdf", 0777), -1);
+  ASSERT_EQ(errno, EROFS);
+
+  EXPECT_EQ(mkdir("/tmp", 0777), -1);
+  EXPECT_EQ(errno, EEXIST);
+}
+
 constexpr uid_t kOwnerUid = 65534;
 constexpr uid_t kNonOwnerUid = 65533;
 constexpr gid_t kOwnerGid = 65534;
