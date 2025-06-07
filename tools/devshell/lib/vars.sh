@@ -1374,4 +1374,9 @@ function fx-choose-tui {
     fx-command-run gum choose "$@"
 }
 
+# Gum - wrapped functionality for choosing amongst options
+function fx-filter-tui {
+    fx-command-run gum filter "$@"
+}
+
 fi  # -z "${lib_vars_sh_sourced:-}"
