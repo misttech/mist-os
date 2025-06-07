@@ -12,8 +12,6 @@ wlan_fidls_allowlist = [
   "//sdk/fidl/fuchsia.wlan.common.security:fuchsia.wlan.common.security",
   "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service",
   "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal",
-  "//sdk/fidl/fuchsia.wlan.minstrel:fuchsia.wlan.minstrel",
-  "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme",
   "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme",
   "//sdk/fidl/fuchsia.wlan.stats:fuchsia.wlan.stats",
 ]
