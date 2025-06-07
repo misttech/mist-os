@@ -9,25 +9,38 @@
 #include <lib/fdio/fdio.h>
 #include <lib/fidl/cpp/string.h>
 #include <lib/fidl/cpp/synchronous_interface_ptr.h>
+#include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/syscalls.h>
 
 #include "src/developer/forensics/feedback/annotations/constants.h"
 #include "src/developer/forensics/feedback/constants.h"
 #include "src/developer/forensics/feedback/reboot_log/annotations.h"
+#include "src/developer/forensics/utils/time.h"
 #include "src/lib/files/file.h"
 #include "src/lib/fxl/strings/trim.h"
 
 namespace forensics::feedback {
 namespace {
 
-ErrorOrString ReadAnnotation(const std::string& filepath) {
+using FormatFn = fit::function<std::optional<std::string>(std::string_view)>;
+
+std::optional<std::string> IdentityFn(const std::string_view s) { return std::string(s); }
+
+ErrorOrString ReadAnnotation(const std::string& filepath, FormatFn format = IdentityFn) {
   std::string content;
   if (!files::ReadFileToString(filepath, &content)) {
     FX_LOGS(WARNING) << "Failed to read content from " << filepath;
     return ErrorOrString(Error::kFileReadFailure);
   }
-  return ErrorOrString(std::string(fxl::TrimString(content, "\r\n")));
+
+  const std::optional<std::string> formatted = format(content);
+  if (!formatted.has_value()) {
+    FX_LOGS(WARNING) << "Failed to formatted content from " << filepath;
+    return ErrorOrString(Error::kBadValue);
+  }
+
+  return ErrorOrString(std::string(fxl::TrimString(*formatted, "\r\n")));
 }
 
 ErrorOrString ReadAnnotationWithFallback(const std::string& filepath,
@@ -86,6 +99,7 @@ Annotations GetStartupAnnotations(const RebootLog& reboot_log) {
       {kBuildBoardKey, ReadAnnotation(kBuildBoardPath)},
       {kBuildProductKey, ReadAnnotation(kBuildProductPath)},
       {kBuildLatestCommitDateKey, ReadAnnotation(kBuildCommitDatePath)},
+      {kBuildPlatformBackstopKey, ReadAnnotation(kBuildMinUtcStampPath, FormatSecondsSinceEpoch)},
       {kBuildVersionKey, ReadAnnotation(kCurrentBuildVersionPath)},
       {kBuildVersionPreviousBootKey, ReadAnnotation(kPreviousBuildVersionPath)},
       {kBuildPlatformVersionKey, ReadAnnotation(kCurrentBuildPlatformVersionPath)},

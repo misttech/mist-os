@@ -134,6 +134,18 @@ TEST(TimeTest, FormatDuration_NegativeRandomNSec) {
   EXPECT_EQ(FormatDuration(kNegRndmNSecs), std::nullopt);
 }
 
+TEST(TimeTest, FormatSecondsSinceEpoch_ValidValue) {
+  EXPECT_EQ(FormatSecondsSinceEpoch("1748946819"), "2025-06-03T10:33:39+00:00");
+}
+
+TEST(TimeTest, FormatSecondsSinceEpoch_EpochValue) {
+  EXPECT_EQ(FormatSecondsSinceEpoch("0"), std::nullopt);
+}
+
+TEST(TimeTest, FormatSecondsSinceEpoch_NonNumber) {
+  EXPECT_EQ(FormatSecondsSinceEpoch("abc"), std::nullopt);
+}
+
 TEST(TimeTest, CurrentUtcTimeRaw) {
   timekeeper::TestClock clock;
 

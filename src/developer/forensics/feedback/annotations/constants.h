@@ -25,6 +25,7 @@ constexpr const char kBuildProductVersionKey[] = "build.product.version";
 constexpr const char kBuildProductVersionPreviousBootKey[] = "build.product.version.previous-boot";
 constexpr const char kBuildProductKey[] = "build.product";
 constexpr const char kBuildLatestCommitDateKey[] = "build.latest-commit-date";
+constexpr const char kBuildPlatformBackstopKey[] = "build.platform.utc-backstop";
 constexpr const char kBuildIsDebugKey[] = "build.is_debug";
 constexpr const char kDebugReportUploadBootId[] = "debug.report.upload.boot-id";
 constexpr const char kDebugReportUploadUptime[] = "debug.report.upload.uptime";

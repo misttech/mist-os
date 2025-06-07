@@ -69,6 +69,7 @@ const char kBuildProductVersionPath[] = "/config/build-info/product_version";
 const char kBuildBoardPath[] = "/config/build-info/board";
 const char kBuildProductPath[] = "/config/build-info/product";
 const char kBuildCommitDatePath[] = "/config/build-info/latest-commit-date";
+const char kBuildMinUtcStampPath[] = "/boot/config/build_info/minimum_utc_stamp";
 
 constexpr char kCrashRegisterPath[] = "/tmp/crash_register.json";
 constexpr char kProductQuotasPath[] = "/cache/product_quotas.json";

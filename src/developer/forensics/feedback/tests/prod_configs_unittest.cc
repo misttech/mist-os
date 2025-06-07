@@ -96,6 +96,7 @@ TEST_F(ProdConfigTest, DefaultSnapshot) {
                                                "build.product",
                                                "build.version",
                                                "build.version.previous-boot",
+                                               "build.platform.utc-backstop",
                                                "build.platform.version",
                                                "build.platform.version.previous-boot",
                                                "build.product.version",

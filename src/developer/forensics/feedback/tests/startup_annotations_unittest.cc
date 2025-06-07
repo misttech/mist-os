@@ -21,6 +21,7 @@ namespace forensics::feedback {
 namespace {
 
 using ::testing::_;
+using ::testing::Contains;
 using ::testing::Key;
 using ::testing::Pair;
 using ::testing::UnorderedElementsAre;
@@ -53,6 +54,7 @@ TEST_F(StartupAnnotationsTest, Keys) {
                                        Key(kBuildBoardKey),
                                        Key(kBuildProductKey),
                                        Key(kBuildLatestCommitDateKey),
+                                       Key(kBuildPlatformBackstopKey),
                                        Key(kBuildVersionKey),
                                        Key(kBuildVersionPreviousBootKey),
                                        Key(kBuildPlatformVersionKey),
@@ -73,6 +75,7 @@ TEST_F(StartupAnnotationsTest, Keys) {
 TEST_F(StartupAnnotationsTest, Values_FilesPresent) {
   testing::ScopedMemFsManager memfs_manager;
 
+  memfs_manager.Create("/boot/config/build_info");
   memfs_manager.Create("/config/build-info");
   memfs_manager.Create("/cache");
   memfs_manager.Create("/data");
@@ -82,6 +85,7 @@ TEST_F(StartupAnnotationsTest, Values_FilesPresent) {
       {kBuildBoardPath, "board"},
       {kBuildProductPath, "product"},
       {kBuildCommitDatePath, "commit-date"},
+      {kBuildMinUtcStampPath, "1748946819"},
       {kCurrentBuildVersionPath, "current-version"},
       {kPreviousBuildVersionPath, "previous-version"},
       {kCurrentBuildPlatformVersionPath, "current-platform-version"},
@@ -103,6 +107,7 @@ TEST_F(StartupAnnotationsTest, Values_FilesPresent) {
           Pair(kBuildBoardKey, ErrorOrString("board")),
           Pair(kBuildProductKey, ErrorOrString("product")),
           Pair(kBuildLatestCommitDateKey, ErrorOrString("commit-date")),
+          Pair(kBuildPlatformBackstopKey, ErrorOrString("2025-06-03T10:33:39+00:00")),
           Pair(kBuildVersionKey, ErrorOrString("current-version")),
           Pair(kBuildVersionPreviousBootKey, ErrorOrString("previous-version")),
           Pair(kBuildPlatformVersionKey, ErrorOrString("current-platform-version")),
@@ -129,6 +134,7 @@ TEST_F(StartupAnnotationsTest, Values_FilesMissing) {
           Pair(kBuildBoardKey, ErrorOrString(Error::kFileReadFailure)),
           Pair(kBuildProductKey, ErrorOrString(Error::kFileReadFailure)),
           Pair(kBuildLatestCommitDateKey, ErrorOrString(Error::kFileReadFailure)),
+          Pair(kBuildPlatformBackstopKey, ErrorOrString(Error::kFileReadFailure)),
           Pair(kBuildVersionKey, ErrorOrString(Error::kFileReadFailure)),
           Pair(kBuildVersionPreviousBootKey, ErrorOrString(Error::kFileReadFailure)),
           Pair(kBuildPlatformVersionKey, ErrorOrString(Error::kFileReadFailure)),
@@ -141,6 +147,23 @@ TEST_F(StartupAnnotationsTest, Values_FilesMissing) {
           Pair(kSystemLastRebootReasonKey, ErrorOrString(LastRebootReasonAnnotation(reboot_log))),
           Pair(kSystemLastRebootRuntimeKey, LastRebootRuntimeAnnotation(reboot_log)),
           Pair(kSystemLastRebootUptimeKey, LastRebootUptimeAnnotation(reboot_log))));
+}
+
+TEST_F(StartupAnnotationsTest, BackstopTime_Invalid) {
+  testing::ScopedMemFsManager memfs_manager;
+
+  memfs_manager.Create("/boot/config/build_info");
+
+  WriteFiles({
+      {kBuildMinUtcStampPath, "invalid"},
+  });
+  const RebootLog reboot_log(RebootReason::kOOM, "", /*dlog=*/std::nullopt,
+                             /*last_boot_uptime=*/std::nullopt,
+                             /*last_boot_runtime=*/std::nullopt, /*critical_process=*/std::nullopt);
+  const auto startup_annotations = GetStartupAnnotations(reboot_log);
+
+  EXPECT_THAT(startup_annotations,
+              Contains(Pair(kBuildPlatformBackstopKey, ErrorOrString(Error::kBadValue))));
 }
 
 TEST_F(StartupAnnotationsTest, BuildProductVersionPreviousBootFallback) {
@@ -166,6 +189,7 @@ TEST_F(StartupAnnotationsTest, BuildProductVersionPreviousBootFallback) {
       startup_annotations,
       UnorderedElementsAre(
           Pair(kBuildBoardKey, _), Pair(kBuildProductKey, _), Pair(kBuildLatestCommitDateKey, _),
+          Pair(kBuildPlatformBackstopKey, _),
           Pair(kBuildVersionKey, ErrorOrString("current-version")),
           Pair(kBuildVersionPreviousBootKey, ErrorOrString("previous-version")),
           Pair(kBuildPlatformVersionKey, ErrorOrString("current-platform-version")),
