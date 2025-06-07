@@ -58,6 +58,14 @@
                 "subdir": "edk2"
             }
         ],
+        "bot_dimensions": {
+            "cores": "8",
+            "cpu": "x64",
+            "gce": "1",
+            "kvm": "1",
+            "os": "Debian",
+            "pool": ""
+        },
         "build_metadata": {}
     },
     {
@@ -102,6 +110,14 @@
         "timeout_secs": 0,
         "summary": {
             "tests": null
+        },
+        "bot_dimensions": {
+            "cores": "8",
+            "cpu": "x64",
+            "gce": "1",
+            "kvm": "1",
+            "os": "Linux",
+            "pool": ""
         },
         "build_metadata": {}
     }

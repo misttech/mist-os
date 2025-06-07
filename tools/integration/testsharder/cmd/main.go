@@ -380,7 +380,7 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		if err := testsharder.AddEmuVersion(s, prebuiltVersions); err != nil {
 			return err
 		}
-		if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Tools(), params.Pave); err != nil {
+		if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Tools(), params.UseTcg); err != nil {
 			return err
 		}
 		if s.ProductBundle == "" {
@@ -423,8 +423,12 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		}
 	}
 
+	for _, s := range shards {
+		testsharder.GetBotDimensions(s, params)
+	}
+
 	if flags.depsFile != "" {
-		if err := testsharder.AddShardDeps(ctx, shards, m.Args(), m.Tools()); err != nil {
+		if err := testsharder.AddShardDeps(ctx, shards, m.Args(), m.Tools(), params); err != nil {
 			return err
 		}
 	}

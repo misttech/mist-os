@@ -63,6 +63,14 @@
                 "subdir": "edk2"
             }
         ],
+        "bot_dimensions": {
+            "cores": "8",
+            "cpu": "x64",
+            "gce": "1",
+            "kvm": "1",
+            "os": "Debian",
+            "pool": ""
+        },
         "build_metadata": {}
     },
     {
@@ -133,6 +141,7 @@
             ]
         },
         "expects_ssh": true,
+        "bot_dimensions": null,
         "build_metadata": {}
     },
     {
@@ -199,6 +208,14 @@
                 "subdir": "edk2"
             }
         ],
+        "bot_dimensions": {
+            "cores": "8",
+            "cpu": "x64",
+            "gce": "1",
+            "kvm": "1",
+            "os": "Debian",
+            "pool": ""
+        },
         "build_metadata": {}
     }
 ]

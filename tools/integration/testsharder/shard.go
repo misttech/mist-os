@@ -77,6 +77,9 @@ type Shard struct {
 	// CIPDPackages specifies the CIPD packages to install on the task that runs this shard.
 	CIPDPackages []CIPDPackage `json:"cipd_packages,omitempty"`
 
+	// BotDimensions specifies the swarming bot dimensions to use for this shard.
+	BotDimensions map[string]string `json:"bot_dimensions,omitmepty"`
+
 	// BuildMetadata provides the fint set artifacts metadata needed to construct
 	// swarming task requests from the shards. This will only be populated if the
 	// `-deps-file` flag is provided meaning that local artifacts will be used and
@@ -113,8 +116,8 @@ func (s *Shard) TargetCPU() string {
 }
 
 // HostCPU returns the host CPU architecture this shard will run on.
-func (s *Shard) HostCPU() string {
-	if s.Env.TargetsEmulator() && s.TargetCPU() == "arm64" {
+func (s *Shard) HostCPU(useTCG bool) string {
+	if s.Env.TargetsEmulator() && s.TargetCPU() == "arm64" && !useTCG {
 		return "arm64"
 	}
 	return "x64"
