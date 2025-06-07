@@ -67,18 +67,18 @@ constexpr const char kSystemUserActivityCurrentDurationKey[] =
 // RESTRICTIONS
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// 36 annotations may be collected by the platform.
-constexpr uint32_t kMaxNumPlatformAnnotations = 36u;
+// 256 annotations may be collected by the platform.
+constexpr uint32_t kMaxNumPlatformAnnotations = 256u;
 
-// 26 non-platform annotations may be registered by non-platform components.
-constexpr uint32_t kMaxNumNonPlatformAnnotations = 26u;
+// 128 non-platform annotations may be registered by non-platform components.
+constexpr uint32_t kMaxNumNonPlatformAnnotations = 128u;
 
-// 2 annotations are permitted to be from Feedback itself for debugging purposes.
-constexpr uint32_t kMaxNumDebugAnnotations = 2u;
+// 128 annotations are permitted to be from Feedback itself for debugging purposes.
+constexpr uint32_t kMaxNumDebugAnnotations = 128u;
 
 static_assert(kMaxNumPlatformAnnotations + kMaxNumNonPlatformAnnotations +
                       kMaxNumDebugAnnotations ==
-                  fuchsia::feedback::MAX_NUM_ANNOTATIONS_PROVIDED,
+                  fuchsia::feedback::MAX_NUM_ANNOTATIONS2_PROVIDED,
               "Annotations must be allocated to the platform, non-platform components, and "
               "Feedback itself (for debugging)");
 
