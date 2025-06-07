@@ -44,8 +44,8 @@ _valid_data_atom_types = [
 # Outputs
 #
 #   $target_gen_dir/$target_name.sdk
-#     A manifest describing what files pertain to the atom and which other atoms
-#     are required by this atom.
+#     An IDK build manifest describing what files pertain to the atom and which
+#     other atoms are required by this atom.
 #
 #   $target_gen_dir/$target_name.meta.json
 #     A metadata file describing the atom.
@@ -521,15 +521,15 @@ template("sdk_atom") {
     }
   }
 
-  # Builds a manifest representing this atom.
+  # Generates an IDK build manifest representing this atom.
   # This manifest is only used at build time to generate the IDK. The actual
   # manifest for this atom in the IDK is `meta_file_for_idk`.
   python_action(target_name) {
     forward_variables_from(invoker, _default_forward_from_invoker)
 
-    manifest = "$target_gen_dir/$target_name.sdk"
+    build_manifest = "$target_gen_dir/$target_name.sdk"
     areas_file = "//docs/contribute/governance/areas/_areas.yaml"
-    depfile = "$manifest.d"
+    depfile = "$build_manifest.d"
 
     binary_label = "//build/sdk:create_atom_manifest"
 
@@ -540,13 +540,13 @@ template("sdk_atom") {
 
     inputs = dep_manifests + file_inputs + [ areas_file ]
 
-    outputs = [ manifest ]
+    outputs = [ build_manifest ]
 
     args = [
              "--id",
              invoker.id,
              "--out",
-             rebase_path(manifest, root_build_dir),
+             rebase_path(build_manifest, root_build_dir),
              "--depfile",
              rebase_path(depfile, root_build_dir),
              "--gn-label",
