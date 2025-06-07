@@ -651,12 +651,12 @@ impl IcmpEchoBindingsTypes for BindingsCtx {
 }
 
 impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx {
-    fn receive_udp<B: BufferMut>(
+    fn receive_udp(
         &mut self,
         id: &UdpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>,
         device_id: &DeviceId<BindingsCtx>,
         meta: UdpPacketMeta<I>,
-        body: &B,
+        body: &[u8],
     ) {
         id.external_data().receive_udp(device_id, meta, body)
     }

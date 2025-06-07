@@ -50,6 +50,7 @@ use netstack3_datagram::{
     SetMulticastMembershipError, SocketInfo, SocketState as DatagramSocketState,
     WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
 };
+use netstack3_filter::{SocketIngressFilterResult, SocketOpsFilter, SocketOpsFilterBindingContext};
 use netstack3_ip::socket::{
     IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SocketHopLimits,
 };
@@ -59,7 +60,7 @@ use netstack3_ip::{
     TransportReceiveError,
 };
 use netstack3_trace::trace_duration;
-use packet::{BufferMut, Nested, PacketBuilder, ParsablePacket};
+use packet::{BufferMut, FragmentedByteSlice, Nested, PacketBuilder, ParsablePacket};
 use packet_formats::ip::{DscpAndEcn, IpProto, IpProtoExt};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use thiserror::Error;
@@ -1072,12 +1073,12 @@ impl UdpPacketMeta<Ipv4> {
 /// The bindings context handling received UDP frames.
 pub trait UdpReceiveBindingsContext<I: IpExt, D: StrongDeviceIdentifier>: UdpBindingsTypes {
     /// Receives a UDP packet on a socket.
-    fn receive_udp<B: BufferMut>(
+    fn receive_udp(
         &mut self,
         id: &UdpSocketId<I, D::Weak, Self>,
         device_id: &D,
         meta: UdpPacketMeta<I>,
-        body: &B,
+        body: &[u8],
     );
 }
 
@@ -1107,6 +1108,7 @@ pub trait UdpBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
     + UdpReceiveBindingsContext<I, D>
     + ReferenceNotifiers
     + UdpBindingsTypes
+    + SocketOpsFilterBindingContext<D>
 {
 }
 impl<
@@ -1115,7 +1117,8 @@ impl<
             + RngContext
             + UdpReceiveBindingsContext<I, D>
             + ReferenceNotifiers
-            + UdpBindingsTypes,
+            + UdpBindingsTypes
+            + SocketOpsFilterBindingContext<D>,
         D: StrongDeviceIdentifier,
     > UdpBindingsContext<I, D> for BC
 {
@@ -1331,11 +1334,8 @@ fn receive_ip_packet<
     trace!("received UDP packet: {:x?}", buffer.as_mut());
     let src_ip: I::Addr = src_ip.into_addr();
 
-    let packet = if let Ok(packet) =
-        buffer.parse_with::<_, UdpPacket<_>>(UdpParseArgs::new(src_ip, dst_ip.get()))
-    {
-        packet
-    } else {
+    let Ok(packet) = buffer.parse_with::<_, UdpPacket<_>>(UdpParseArgs::new(src_ip, dst_ip.get()))
+    else {
         // There isn't much we can do if the UDP packet is
         // malformed.
         CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).rx_malformed.increment();
@@ -1420,14 +1420,15 @@ fn receive_ip_packet<
         dscp_and_ecn: header_info.dscp_and_ecn(),
     };
     let was_delivered = recipients.into_iter().fold(false, |was_delivered, lookup_result| {
-        let delivered = try_dual_stack_deliver::<I, B, BC, CC>(
+        let delivered = try_dual_stack_deliver::<I, BC, CC, H>(
             core_ctx,
             bindings_ctx,
             lookup_result,
             device,
             &meta,
             require_transparent,
-            &buffer,
+            header_info,
+            packet.clone(),
         );
         was_delivered | delivered
     });
@@ -1448,7 +1449,8 @@ fn try_deliver<
     I: IpExt,
     CC: StateContext<I, BC> + UdpCounterContext<I, CC::WeakDeviceId, BC>,
     BC: UdpBindingsContext<I, CC::DeviceId>,
-    B: BufferMut,
+    WireI: IpExt,
+    H: IpHeaderInfo<WireI>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1456,7 +1458,8 @@ fn try_deliver<
     device_id: &CC::DeviceId,
     meta: UdpPacketMeta<I>,
     require_transparent: bool,
-    buffer: &B,
+    header_info: &H,
+    packet: UdpPacket<&[u8]>,
 ) -> bool {
     let delivered = core_ctx.with_socket_state(&id, |core_ctx, state| {
         let should_deliver = match state {
@@ -1492,7 +1495,23 @@ fn try_deliver<
                 }
             }
 
-            bindings_ctx.receive_udp(id, device_id, meta, buffer);
+            let [ip_prefix, ip_options] = header_info.as_bytes();
+            let [udp_header, data] = packet.as_bytes();
+            let mut slices = [ip_prefix, ip_options, udp_header, data];
+            let data = FragmentedByteSlice::new(&mut slices);
+            let filter_result = bindings_ctx.socket_ops_filter().on_ingress(
+                &data,
+                device_id,
+                id.socket_cookie(),
+                state.get_options(core_ctx).marks(),
+            );
+
+            match filter_result {
+                SocketIngressFilterResult::Accept => {
+                    bindings_ctx.receive_udp(id, device_id, meta, packet.body());
+                }
+                SocketIngressFilterResult::Drop => (),
+            }
         }
         should_deliver
     });
@@ -1506,12 +1525,12 @@ fn try_deliver<
 /// A wrapper for [`try_deliver`] that supports dual stack delivery.
 fn try_dual_stack_deliver<
     I: IpExt,
-    B: BufferMut,
     BC: UdpBindingsContext<I, CC::DeviceId> + UdpBindingsContext<I::OtherVersion, CC::DeviceId>,
     CC: StateContext<I, BC>
         + StateContext<I::OtherVersion, BC>
         + UdpCounterContext<I, CC::WeakDeviceId, BC>
         + UdpCounterContext<I::OtherVersion, CC::WeakDeviceId, BC>,
+    H: IpHeaderInfo<I>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1519,7 +1538,8 @@ fn try_dual_stack_deliver<
     device_id: &CC::DeviceId,
     meta: &UdpPacketMeta<I>,
     require_transparent: bool,
-    buffer: &B,
+    header_info: &H,
+    packet: UdpPacket<&[u8]>,
 ) -> bool {
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
@@ -1563,7 +1583,8 @@ fn try_dual_stack_deliver<
             device_id,
             meta,
             require_transparent,
-            buffer,
+            header_info,
+            packet,
         ),
         DualStackOutputs::OtherStack(Outputs { meta, socket }) => try_deliver(
             core_ctx,
@@ -1572,7 +1593,8 @@ fn try_dual_stack_deliver<
             device_id,
             meta,
             require_transparent,
-            buffer,
+            header_info,
+            packet,
         ),
     }
 }
@@ -2912,19 +2934,19 @@ mod tests {
     impl<I: IpExt, D: StrongDeviceIdentifier> UdpReceiveBindingsContext<I, D>
         for FakeUdpBindingsCtx<D>
     {
-        fn receive_udp<B: BufferMut>(
+        fn receive_udp(
             &mut self,
             id: &UdpSocketId<I, D::Weak, Self>,
             _device_id: &D,
             meta: UdpPacketMeta<I>,
-            body: &B,
+            body: &[u8],
         ) {
             self.state
                 .received_mut::<I>()
                 .entry(id.downgrade())
                 .or_default()
                 .packets
-                .push(ReceivedPacket { meta, body: body.as_ref().to_owned() })
+                .push(ReceivedPacket { meta, body: body.to_owned() })
         }
     }
 

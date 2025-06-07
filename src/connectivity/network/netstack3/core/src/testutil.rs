@@ -1297,17 +1297,17 @@ impl FakeNetworkSpec for FakeCtxNetworkSpec {
 }
 
 impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
-    fn receive_udp<B: BufferMut>(
+    fn receive_udp(
         &mut self,
         id: &UdpSocketId<I, WeakDeviceId<Self>, FakeBindingsCtx>,
         _device_id: &DeviceId<Self>,
         _meta: UdpPacketMeta<I>,
-        body: &B,
+        body: &[u8],
     ) {
         let mut state = self.state_mut();
         let received =
             (&mut *state).udp_state_mut::<I>().entry(id.clone()).or_insert_with(Vec::default);
-        received.push(body.as_ref().to_owned());
+        received.push(body.to_owned());
     }
 }
 

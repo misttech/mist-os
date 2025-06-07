@@ -658,11 +658,11 @@ where
 }
 
 impl<I: IpExt> DatagramSocketExternalData<I> {
-    pub(crate) fn receive_udp<B: BufferMut>(
+    pub(crate) fn receive_udp(
         &self,
         device_id: &DeviceId<BindingsCtx>,
         meta: UdpPacketMeta<I>,
-        body: &B,
+        body: &[u8],
     ) {
         // TODO(https://fxbug.dev/326102014): Store `UdpPacketMeta` in `AvailableMessage`.
         let UdpPacketMeta { src_ip, src_port, dst_ip, dst_port, .. } = meta;
@@ -675,7 +675,7 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
             destination_addr: dst_ip,
             destination_port: dst_port.get(),
             timestamp: fasync::MonotonicInstant::now(),
-            data: body.as_ref().to_vec(),
+            data: body.to_vec(),
             dscp_and_ecn: meta.dscp_and_ecn,
         };
 

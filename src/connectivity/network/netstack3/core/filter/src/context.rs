@@ -165,7 +165,7 @@ pub trait SocketOpsFilterBindingContext<D: StrongDeviceIdentifier>:
     fn socket_ops_filter(&self) -> impl SocketOpsFilter<D, Self::TxMetadata>;
 }
 
-#[cfg(feature = "testutils")]
+#[cfg(any(test, feature = "testutils"))]
 impl<
         TimerId: Debug + PartialEq + Clone + Send + Sync + 'static,
         Event: Debug + 'static,
@@ -175,6 +175,21 @@ impl<
     for netstack3_base::testutil::FakeBindingsCtx<TimerId, Event, State, FrameMeta>
 {
     type DeviceClass = ();
+}
+
+#[cfg(any(test, feature = "testutils"))]
+impl<
+        TimerId: Debug + PartialEq + Clone + Send + Sync + 'static,
+        Event: Debug + 'static,
+        State: 'static,
+        FrameMeta: 'static,
+        D: StrongDeviceIdentifier,
+    > SocketOpsFilterBindingContext<D>
+    for netstack3_base::testutil::FakeBindingsCtx<TimerId, Event, State, FrameMeta>
+{
+    fn socket_ops_filter(&self) -> impl SocketOpsFilter<D, Self::TxMetadata> {
+        crate::testutil::NoOpSocketOpsFilter
+    }
 }
 
 #[cfg(test)]

@@ -279,7 +279,49 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> SocketState<I, D,
         }
     }
 
-    fn get_options_mut<
+    /// Returns `IpOptions`.
+    pub fn get_options<
+        'a,
+        BC: DatagramBindingsTypes,
+        CC: DatagramBoundStateContext<I, BC, S, WeakDeviceId = D>,
+    >(
+        &'a self,
+        core_ctx: &mut CC,
+    ) -> &'a IpOptions<I, CC::WeakDeviceId, S> {
+        match self {
+            SocketState::Unbound(state) => {
+                let UnboundSocketState { ip_options, device: _, sharing: _ } = state;
+                ip_options
+            }
+            SocketState::Bound(BoundSocketState { socket_type, original_bound_addr: _ }) => {
+                match socket_type {
+                    BoundSocketStateType::Listener { state, sharing: _ } => {
+                        let ListenerState { ip_options, addr: _ } = state;
+                        ip_options
+                    }
+                    BoundSocketStateType::Connected { state, sharing: _ } => {
+                        match core_ctx.dual_stack_context() {
+                            MaybeDualStack::DualStack(dual_stack) => {
+                                match dual_stack.ds_converter().convert(state) {
+                                    DualStackConnState::ThisStack(state) => state.as_ref(),
+                                    DualStackConnState::OtherStack(state) => {
+                                        dual_stack.assert_dual_stack_enabled(state);
+                                        state.as_ref()
+                                    }
+                                }
+                            }
+                            MaybeDualStack::NotDualStack(not_dual_stack) => {
+                                not_dual_stack.nds_converter().convert(state).as_ref()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Returns mutable `IpOptions`.
+    pub fn get_options_mut<
         'a,
         BC: DatagramBindingsTypes,
         CC: DatagramBoundStateContext<I, BC, S, WeakDeviceId = D>,
@@ -682,6 +724,11 @@ impl<I: IpExt, D: WeakDeviceIdentifier, S: DatagramSocketSpec> IpOptions<I, D, S
     /// Returns the transparent option.
     pub fn transparent(&self) -> bool {
         self.common.transparent
+    }
+
+    /// Returns `Marks`.
+    pub fn marks(&self) -> &Marks {
+        &self.common.marks
     }
 
     fn this_stack_options_ref(&self) -> IpOptionsRef<'_, I, D> {

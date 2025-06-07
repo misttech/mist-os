@@ -170,6 +170,11 @@ impl<B: SplitByteSlice> UdpPacket<B> {
         self.body.deref()
     }
 
+    /// Returns the contents of the packet as a pair of slices.
+    pub fn as_bytes(&self) -> [&[u8]; 2] {
+        [&Ref::bytes(&self.header), self.body.deref()]
+    }
+
     /// Consumes this packet and returns the body.
     ///
     /// Note that the returned `B` has the same lifetime as the buffer from
@@ -257,6 +262,12 @@ impl<B: SplitByteSliceMut> UdpPacket<B> {
     /// Update the checksum to reflect an updated address in the pseudo header.
     pub fn update_checksum_pseudo_header_address<A: IpAddress>(&mut self, old: A, new: A) {
         self.header.update_checksum_pseudo_header_address(old, new);
+    }
+}
+
+impl<B: zerocopy::CloneableByteSlice + Clone> Clone for UdpPacket<B> {
+    fn clone(&self) -> Self {
+        UdpPacket { header: self.header.clone(), body: self.body.clone() }
     }
 }
 
