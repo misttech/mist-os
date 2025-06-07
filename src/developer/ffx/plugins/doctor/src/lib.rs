@@ -41,7 +41,6 @@ use timeout::timeout;
 
 mod doctor_ledger;
 mod ledger_view;
-mod single_target_diagnostics;
 
 const DOCTOR_OUTPUT_FILENAME: &str = "doctor_output.txt";
 const PLATFORM_INFO_FILENAME: &str = "platform.json";
@@ -407,7 +406,6 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
             recorder: recorder.clone(),
         },
         show_tool,
-        true,
     )
     .await?;
 
@@ -487,7 +485,6 @@ async fn doctor<W: Write>(
     env_context: &EnvironmentContext,
     record_params: DoctorRecorderParameters,
     show_tool: Option<ShowToolWrapper>,
-    run_additional_diagnostics: bool,
 ) -> Result<()> {
     if restart_daemon {
         doctor_daemon_restart(daemon_manager, retry_delay, ledger).await?;
@@ -502,7 +499,6 @@ async fn doctor<W: Write>(
         target_spec,
         env_context,
         show_tool,
-        run_additional_diagnostics,
         ledger,
     )
     .await?;
@@ -912,7 +908,6 @@ async fn doctor_summary<W: Write>(
     target_spec: Result<Option<String>, String>,
     env_context: &EnvironmentContext,
     mut show_tool: Option<ShowToolWrapper>,
-    run_additional_diagnostics: bool,
     ledger: &mut DoctorLedger<W>,
 ) -> Result<()> {
     match ledger.get_ledger_mode() {
@@ -1462,24 +1457,6 @@ async fn doctor_summary<W: Write>(
                     ledger.set_outcome(node, LedgerOutcome::Failure)?;
                 }
             };
-        }
-
-        // TODO(b/423023263): This function is missing test coverage. There should either be
-        // something mockable here, and the underlying crate should also be tested.
-        if run_additional_diagnostics {
-            let node = ledger.add_node(
-                &format!("Running additional diagnostics against {target_name}"),
-                LedgerMode::Verbose,
-            )?;
-
-            crate::single_target_diagnostics::run_single_target_diagnostics(
-                env_context,
-                target.clone(),
-                ledger,
-                retry_delay,
-            )
-            .await?;
-            ledger.close(node)?;
         }
 
         ledger.close(target_node)?;
@@ -2300,7 +2277,6 @@ mod test {
             &test_env.context,
             record_params_no_record(),
             None,
-            false,
         )
         .await
         .unwrap();
@@ -2366,7 +2342,6 @@ mod test {
             &test_env.context,
             record_params_no_record(),
             None,
-            false,
         )
         .await
         .unwrap();
@@ -2440,7 +2415,6 @@ mod test {
             &test_env.context,
             record_params_no_record(),
             None,
-            false,
         )
         .await
         .unwrap();
@@ -2507,7 +2481,6 @@ mod test {
             &test_env.context,
             record_params_no_record(),
             None,
-            false,
         )
         .await
         .unwrap();
@@ -2581,7 +2554,6 @@ mod test {
             &test_env.context,
             record_params_no_record(),
             None,
-            false,
         )
         .await
         .unwrap();
@@ -2763,7 +2735,6 @@ mod test {
             &test_env.context,
             record_params_no_record(),
             None,
-            false,
         )
         .await
         .unwrap();
@@ -2984,7 +2955,6 @@ mod test {
             &test_env.context,
             record_params_no_record(),
             None,
-            false,
         )
         .await
         .unwrap();
@@ -3070,7 +3040,6 @@ mod test {
             &test_env.context,
             record_params_no_record(),
             None,
-            false,
         )
         .await
         .unwrap();
@@ -3226,7 +3195,6 @@ mod test {
             &test_env.context,
             params,
             None,
-            false,
         )
         .await
         .unwrap();
@@ -3310,7 +3278,6 @@ mod test {
             &test_env.context,
             params,
             None,
-            false,
         )
         .await
         .is_err());
@@ -3405,7 +3372,6 @@ mod test {
             &test_env.context,
             record_params_no_record(),
             None,
-            false,
         )
         .await
         .unwrap();
@@ -3538,7 +3504,6 @@ mod test {
             &test_env.context,
             record_params_no_record(),
             None,
-            false,
         )
         .await
         .unwrap();
@@ -3615,7 +3580,6 @@ mod test {
             &test_env.context,
             record_params_no_record(),
             None,
-            false,
         )
         .await
         .unwrap();
@@ -3708,7 +3672,6 @@ mod test {
             &test_env.context,
             record_params_no_record(),
             None,
-            false,
         )
         .await
         .unwrap();

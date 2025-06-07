@@ -16,9 +16,6 @@ ffx_plugin("ffx_doctor") {
     "//src/developer/ffx/daemon:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/compat_info:lib",
-    "//src/developer/ffx/lib/diagnostics:lib",
-    "//src/developer/ffx/lib/diagnostics/checks:lib",
-    "//src/developer/ffx/lib/discovery:lib",
     "//src/developer/ffx/lib/doctor_utils:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
@@ -58,6 +55,5 @@ ffx_plugin("ffx_doctor") {
     "src/doctor_ledger.rs",
     "src/ledger_view.rs",
     "src/lib.rs",
-    "src/single_target_diagnostics.rs",
   ]
 }
