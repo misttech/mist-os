@@ -73,17 +73,16 @@ impl<'a, N> ResolveTarget<'a, N> {
 // This may need some tweaking if looking at too many/too few sources for each query type.
 fn sources_from_query(query: &TargetInfoQuery) -> DiscoverySources {
     match query {
-        TargetInfoQuery::NodenameOrSerial(_) | TargetInfoQuery::First => DiscoverySources::all(),
-        TargetInfoQuery::Serial(_) => {
-            DiscoverySources::USB
-                | DiscoverySources::MANUAL
-                | DiscoverySources::EMULATOR
-                | DiscoverySources::FASTBOOT_FILE
-        }
+        TargetInfoQuery::NodenameOrSerial(_)
+        | TargetInfoQuery::First
+        | TargetInfoQuery::Serial(_) => DiscoverySources::all(),
         TargetInfoQuery::VSock(_) => DiscoverySources::USB | DiscoverySources::EMULATOR,
         TargetInfoQuery::Usb(_) => DiscoverySources::USB,
         TargetInfoQuery::Addr(_) => {
-            DiscoverySources::FASTBOOT_FILE | DiscoverySources::EMULATOR | DiscoverySources::MANUAL
+            DiscoverySources::MDNS
+                | DiscoverySources::FASTBOOT_FILE
+                | DiscoverySources::EMULATOR
+                | DiscoverySources::MANUAL
         }
     }
 }
