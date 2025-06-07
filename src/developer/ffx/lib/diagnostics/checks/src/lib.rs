@@ -6,7 +6,7 @@ use discovery::query::TargetInfoQuery;
 use discovery::{DiscoverySources, FastbootConnectionState, TargetHandle, TargetState};
 use fdomain_fuchsia_hwinfo::{ProductInfo, ProductProxy};
 use ffx_config::EnvironmentContext;
-use ffx_diagnostics::{Check, CheckFut, Notifier};
+use ffx_diagnostics::{Check, CheckExt, CheckFut, Notifier};
 use ffx_fastboot as _;
 use ffx_fastboot_connection_factory::{
     ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind,
@@ -14,6 +14,65 @@ use ffx_fastboot_connection_factory::{
 use ffx_target::connection::ConnectionError;
 use ffx_target::ssh_connector::SshConnector;
 use ffx_target::{Connection, TargetConnection, TargetConnectionError, TargetConnector};
+use std::time::Duration;
+
+pub async fn run_diagnostics<N>(
+    env_context: &EnvironmentContext,
+    target_handle: TargetHandle,
+    notifier: &mut N,
+    product_timeout: Duration,
+) -> fho::Result<()>
+where
+    N: Notifier + std::marker::Unpin,
+{
+    match target_handle.state {
+        TargetState::Product { .. } => {
+            check_product_device(env_context, notifier, target_handle, product_timeout).await?
+        }
+        TargetState::Fastboot(_) => check_fastboot_device(notifier, target_handle).await?,
+        TargetState::Unknown => {
+            fho::return_user_error!("Device is in an unknown state. No way to check status.")
+        }
+        TargetState::Zedboot => {
+            fho::return_user_error!("Zedboot is not currently supported for this command.")
+        }
+    }
+    notifier.on_success("All checks passed.")?;
+    Ok(())
+}
+
+async fn check_product_device<N>(
+    env_context: &EnvironmentContext,
+    notifier: &mut N,
+    device: TargetHandle,
+    timeout: Duration,
+) -> fho::Result<()>
+where
+    N: Notifier + std::marker::Unpin,
+{
+    // Depending on the number of targets resolved and their types,
+    // this could go one of several ways. It may also be nice to mention where the devices
+    // originated. This does not check VSock devices.
+    let (info, notifier) = ConnectSsh::new(env_context)
+        .check_with_notifier(device, notifier)
+        .and_then_check(ConnectRemoteControlProxy::new(timeout))
+        .await
+        .map_err(|e| fho::Error::User(e.into()))?;
+    notifier.on_success(format!("Got device info: {:?}", info))?;
+    Ok(())
+}
+
+async fn check_fastboot_device<N>(notifier: &mut N, device: TargetHandle) -> fho::Result<()>
+where
+    N: Notifier + std::marker::Unpin,
+{
+    let (info, notifier) = FastbootDeviceStatus::new()
+        .check_with_notifier(device, notifier)
+        .await
+        .map_err(|e| fho::Error::User(e.into()))?;
+    notifier.on_success(format!("Got device info: {:?}", info))?;
+    Ok(())
+}
 
 pub struct GetTargetSpecifier<'a, N>(
     pub(crate) &'a EnvironmentContext,
