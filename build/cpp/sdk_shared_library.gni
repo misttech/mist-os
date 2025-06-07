@@ -502,9 +502,7 @@ template("sdk_shared_library") {
       },
     ]
     deps = sdk_deps
-    if (defined(invoker.symbols_api)) {
-      ifs = get_path_info(invoker.symbols_api, "file")
-    }
+    ifs = packaged_ifs_file
   }
 
   # LINT.ThenChange(//build/sdk/idk_prebuild_manifest.gni)
