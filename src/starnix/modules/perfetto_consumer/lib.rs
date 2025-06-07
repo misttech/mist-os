@@ -63,6 +63,8 @@ impl CallbackState {
         new_state: TraceState,
         current_task: &CurrentTask,
     ) -> Result<(), anyhow::Error> {
+        let prev_state = self.prev_state;
+        self.prev_state = new_state;
         match new_state {
             TraceState::Started => {
                 self.prolonged_context = ProlongedContext::acquire();
@@ -160,7 +162,7 @@ impl CallbackState {
                 )?;
             }
             TraceState::Stopping | TraceState::Stopped => {
-                if self.prev_state == TraceState::Started {
+                if prev_state == TraceState::Started {
                     let context = fuchsia_trace::Context::acquire();
                     // Now that we have acquired a context (or at least attempted to),
                     // we can drop the prolonged context. We want to do this early to
@@ -255,10 +257,15 @@ impl CallbackState {
                             current_task,
                             FreeBuffersRequest { buffer_ids: vec![0] },
                         )?;
+                } else {
+                    // If we receive a stop request and we don't think we're actually tracing, our
+                    // local state likely desynced from the global trace state. Clean up our state
+                    // and ensure we're stopped so we re-synchronize.
+                    self.prolonged_context = None;
+                    self.packet_data.clear();
                 }
             }
         }
-        self.prev_state = new_state;
         Ok(())
     }
 }
