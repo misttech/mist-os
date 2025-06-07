@@ -123,13 +123,6 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
   zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id) override;
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb) override;
 
-  // TODO(https://fxbug.dev/422844790): Remove this overload after drivers are migrated.
-  // This overload works around a linker error that's not worth debugging.
-  display::ConfigCheckResult CheckConfiguration(
-      display::DisplayId display_id, display::ModeId display_mode_id,
-      cpp20::span<const display::DriverLayer> layers,
-      cpp20::span<display::LayerCompositionOperations> layer_composition_operations) override;
-
  private:
   struct Expectation;
 

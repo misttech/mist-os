@@ -687,11 +687,9 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
   static constexpr display::DisplayId kDisplayId(1);
   static constexpr display::ModeId kModeId(1);
 
-  std::array<display::LayerCompositionOperations, kLayerCount> layer_composition_operations;
-
   // Check and apply the display configuration.
   display::ConfigCheckResult config_check_result =
-      fake_display_->CheckConfiguration(kDisplayId, kModeId, kLayers, layer_composition_operations);
+      fake_display_->CheckConfiguration(kDisplayId, kModeId, kLayers);
   ASSERT_EQ(display::ConfigCheckResult::kOk, config_check_result);
 
   static constexpr display::DriverConfigStamp kConfigStamp(1);
@@ -826,11 +824,9 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   static constexpr display::DisplayId kDisplayId(1);
   static constexpr display::ModeId kModeId(1);
 
-  std::array<display::LayerCompositionOperations, kLayerCount> layer_composition_operations;
-
   // Check and apply the display configuration.
   display::ConfigCheckResult config_check_result =
-      fake_display_->CheckConfiguration(kDisplayId, kModeId, kLayers, layer_composition_operations);
+      fake_display_->CheckConfiguration(kDisplayId, kModeId, kLayers);
   ASSERT_EQ(display::ConfigCheckResult::kOk, config_check_result);
 
   static constexpr display::DriverConfigStamp kConfigStamp(1);

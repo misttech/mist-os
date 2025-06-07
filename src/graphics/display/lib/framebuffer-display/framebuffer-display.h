@@ -36,7 +36,6 @@
 #include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
-#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 
@@ -83,8 +82,7 @@ class FramebufferDisplay : public HeapServer, public display::DisplayEngineInter
   void ReleaseImage(display::DriverImageId image_id) override;
   display::ConfigCheckResult CheckConfiguration(
       display::DisplayId display_id, display::ModeId display_mode_id,
-      cpp20::span<const display::DriverLayer> layers,
-      cpp20::span<display::LayerCompositionOperations> layer_composition_operations) override;
+      cpp20::span<const display::DriverLayer> layers) override;
   void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                           cpp20::span<const display::DriverLayer> layers,
                           display::DriverConfigStamp config_stamp) override;

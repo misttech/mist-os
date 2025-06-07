@@ -286,12 +286,4 @@ zx::result<> MockDisplayEngine::SetMinimumRgb(uint8_t minimum_rgb) {
   return call_expectation.set_minimum_rgb_checker(minimum_rgb);
 }
 
-display::ConfigCheckResult MockDisplayEngine::CheckConfiguration(
-    display::DisplayId display_id, display::ModeId display_mode_id,
-    cpp20::span<const display::DriverLayer> layers,
-    cpp20::span<display::LayerCompositionOperations> layer_composition_operations) {
-  ZX_ASSERT_MSG(false, "Deprected CheckConfiguration() overload");
-  return display::ConfigCheckResult::kUnsupportedConfig;
-}
-
 }  // namespace display::testing

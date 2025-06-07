@@ -21,7 +21,6 @@
 #include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
-#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 
 namespace display {
@@ -58,22 +57,9 @@ class DisplayEngineInterface {
   virtual zx::result<display::DriverCaptureImageId> ImportImageForCapture(
       display::DriverBufferCollectionId buffer_collection_id, uint32_t buffer_index) = 0;
   virtual void ReleaseImage(display::DriverImageId driver_image_id) = 0;
-
-  // TODO(https://fxbug.dev/422844790): Remove this overload after drivers are migrated.
-  //
-  // `layer_composition_operations` must have the same size as `layers`. All
-  // the elements must be empty (`display::LayerCompositionOperations::kNoOperations`).
   virtual display::ConfigCheckResult CheckConfiguration(
       display::DisplayId display_id, display::ModeId display_mode_id,
-      cpp20::span<const display::DriverLayer> layers,
-      cpp20::span<display::LayerCompositionOperations> layer_composition_operations);
-
-  // TODO(https://fxbug.dev/422844790): Make this method pure virtual after all
-  // drivers override it.
-  virtual display::ConfigCheckResult CheckConfiguration(
-      display::DisplayId display_id, display::ModeId display_mode_id,
-      cpp20::span<const display::DriverLayer> layers);
-
+      cpp20::span<const display::DriverLayer> layers) = 0;
   virtual void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                                   cpp20::span<const display::DriverLayer> layers,
                                   display::DriverConfigStamp driver_config_stamp) = 0;
