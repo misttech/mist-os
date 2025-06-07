@@ -4,9 +4,9 @@
 
 use crate::security::selinux_hooks::{
     check_permission, check_self_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
-    fs_node_set_label_with_task, has_file_permissions, task_consistent_attrs, task_effective_sid,
-    todo_check_permission, KernelPermission, PermissionCheck, ProcessPermission, TaskAttrs,
-    TaskAttrsOverride,
+    fs_node_set_label_with_task, has_file_permissions, permissions_from_flags,
+    task_consistent_attrs, task_effective_sid, todo_check_permission, todo_has_fs_node_permissions,
+    Auditable, KernelPermission, PermissionCheck, ProcessPermission, TaskAttrs, TaskAttrsOverride,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
@@ -75,20 +75,40 @@ fn close_inaccessible_file_descriptors(
     let null_file_handle =
         kernel_state.selinuxfs_null.get().expect("selinuxfs_init_null() has been called").clone();
 
-    let audit_context = current_task.into();
+    let audit_context: Auditable<'_> = current_task.into();
     let source_sid = new_sid;
     let permission_check = security_server.as_permission_check();
     // Remap-to-null any fds that failed a check for allowing
     // `[child-process] [fd-from-child-fd-table]:fd { use }`.
     current_task.files.remap_fds(|file| {
+        let permissions =
+            permissions_from_flags(file.flags().into(), file.node().security_state.lock().class);
         let fd_use_result = has_file_permissions(
             &permission_check,
             current_task.kernel(),
             source_sid,
             file,
             &[],
-            audit_context,
+            audit_context.into(),
         );
+        if !permissions.is_empty() {
+            let audit_context = &[audit_context, file.as_ref().as_ref().into()];
+            // Check FsNode permissions, but don't enforce them for now.
+            // TODO (https://fxbug.dev/322843830) - Enforce this check and remap the file descriptor
+            // to the null file node if the check fails.
+            let _ = todo_has_fs_node_permissions(
+                TODO_DENY!(
+                    "https://fxbug.dev/322843830",
+                    "Check FsNode permissions for open files upon exec."
+                ),
+                current_task.kernel(),
+                &permission_check,
+                source_sid,
+                file.node(),
+                &permissions,
+                audit_context.into(),
+            );
+        }
         fd_use_result.map_or_else(|_| Some(null_file_handle.clone()), |_| None)
     });
 }
