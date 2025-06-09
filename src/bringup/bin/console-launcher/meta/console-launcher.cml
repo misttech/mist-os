@@ -104,6 +104,7 @@
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.diagnostics.host.ArchiveAccessor",
                 "fuchsia.diagnostics.LogSettings",
+                "fuchsia.diagnostics.system.SerialLogControl",
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.feedback.DataProvider",
@@ -236,8 +237,6 @@
             // The source of this protocol may not be available on all products.
             availability: "optional",
         },
-        {
-            service: "fuchsia.hardware.power.suspend.SuspendService",
-        },
+        { service: "fuchsia.hardware.power.suspend.SuspendService" },
     ],
 }

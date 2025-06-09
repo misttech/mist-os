@@ -3,20 +3,63 @@
 // found in the LICENSE file.
 
 use crate::logs::repository::LogsRepository;
+use crate::logs::servers::LogFreezeServer;
 use anyhow::Error;
 use diagnostics_data::{Data, Logs};
 use fidl_fuchsia_diagnostics::{Selector, StreamMode};
+use fidl_fuchsia_diagnostics_system::SerialLogControlRequestStream;
+use fuchsia_async::OnSignals;
 use fuchsia_trace as ftrace;
-use futures::StreamExt;
+use futures::channel::mpsc::UnboundedReceiver;
+use futures::future::{select, Either};
+use futures::{FutureExt, StreamExt};
 use log::warn;
 use selectors::FastError;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt::Display;
 use std::io::{self, Write};
+use std::pin::pin;
 use std::sync::Arc;
+use zx::Signals;
 
 const MAX_SERIAL_WRITE_SIZE: usize = 256;
+
+/// Function that forwards logs from Archivist
+/// to the serial port. Logs will be filtered by allow_serial_log_tags
+/// to include logs in the serial output, and deny_serial_log_tags to exclude specific tags.
+pub async fn launch_serial(
+    allow_serial_log_tags: Vec<String>,
+    deny_serial_log_tags: Vec<String>,
+    logs_repo: Arc<LogsRepository>,
+    writer: impl Write,
+    mut freeze_receiver: UnboundedReceiver<SerialLogControlRequestStream>,
+) {
+    let mut write_logs_to_serial =
+        pin!(SerialConfig::new(allow_serial_log_tags, deny_serial_log_tags)
+            .write_logs(logs_repo, writer)
+            .fuse());
+    loop {
+        let log_freezer_future = pin!(async {
+            // Wait for FDIO to give us the channel
+            let stream = (freeze_receiver.next().await)?;
+            let (client, server) = zx::EventPair::create();
+            // Acquire the lock, and send the token.
+            LogFreezeServer::new(client).wait_for_client_freeze_request(stream).await;
+            Some(server)
+        }
+        .fuse());
+        let maybe_frozen_token = select(&mut write_logs_to_serial, log_freezer_future).await;
+        if let Either::Right((Some(token), _)) = maybe_frozen_token {
+            // Lock acquired, wait for it to be released before doing anything else.
+            // Ignore any errors, as we may either get PEER_CLOSED as an error or signal.
+            let _ = OnSignals::new(&token, Signals::EVENTPAIR_PEER_CLOSED).await;
+        } else {
+            // Serial writer exited, no work left to do.
+            break;
+        }
+    }
+}
 
 #[derive(Default)]
 pub struct SerialConfig {
@@ -190,15 +233,18 @@ impl<'a, S: Write> SerialWriter<'a, S> {
 
 #[cfg(test)]
 mod tests {
+    use fidl::endpoints::create_proxy_and_stream;
+    use fidl_fuchsia_diagnostics_system::SerialLogControlMarker;
+    use fuchsia_async::{self as fasync};
+    use futures::channel::mpsc::{self, unbounded};
+    use futures::SinkExt;
+    use std::future::{poll_fn, Future};
     use std::task::Poll;
 
     use super::*;
     use crate::identity::ComponentIdentity;
     use crate::logs::testing::make_message;
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, LogsField, LogsProperty, Severity};
-    use fuchsia_async as fasync;
-    use futures::channel::mpsc;
-    use futures::future::poll_fn;
     use futures::FutureExt;
     use moniker::ExtendedMoniker;
     use std::pin::pin;
@@ -293,6 +339,82 @@ mod tests {
             String::from_utf8(sink).unwrap(),
             "[00000.123] 01234:05678> [foo] INFO: my msg\n"
         );
+    }
+
+    async fn poll_once<F: Future + Unpin>(mut future: F) {
+        poll_fn(|context| {
+            let _ = future.poll_unpin(context);
+            Poll::Ready(())
+        })
+        .await;
+    }
+
+    #[fuchsia::test]
+    async fn pauses_logs_correctly() {
+        let repo = LogsRepository::for_test(fasync::Scope::new());
+
+        let bootstrap_foo_container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./bootstrap/foo").unwrap(),
+            "fuchsia-pkg://bootstrap-foo",
+        )));
+        let bootstrap_bar_container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./bootstrap/bar").unwrap(),
+            "fuchsia-pkg://bootstrap-bar",
+        )));
+
+        let core_foo_container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./core/foo").unwrap(),
+            "fuchsia-pkg://core-foo",
+        )));
+        let core_baz_container = repo.get_log_container(Arc::new(ComponentIdentity::new(
+            ExtendedMoniker::parse_str("./core/baz").unwrap(),
+            "fuchsia-pkg://core-baz",
+        )));
+
+        bootstrap_foo_container.ingest_message(make_message(
+            "a",
+            None,
+            zx::BootInstant::from_nanos(1),
+        ));
+
+        core_baz_container.ingest_message(make_message("c", None, zx::BootInstant::from_nanos(2)));
+        let (sink, mut rcv) = TestSink::new();
+        let cloned_repo = Arc::clone(&repo);
+        let (mut sender, receiver) = unbounded();
+        let mut serial_task = pin!(async move {
+            let allowed = vec!["bootstrap/**".into(), "/core/foo".into()];
+            let denied = vec!["foo".into()];
+            launch_serial(allowed, denied, cloned_repo, sink, receiver).await;
+        }
+        .fuse());
+        bootstrap_bar_container.ingest_message(make_message(
+            "b",
+            Some("foo"),
+            zx::BootInstant::from_nanos(3),
+        ));
+
+        poll_once(&mut serial_task).await;
+        let received = rcv.next().now_or_never().unwrap().unwrap();
+
+        assert_eq!(received, "[00000.000] 00001:00002> [foo] DEBUG: a\n");
+
+        let (client, server) = create_proxy_and_stream::<SerialLogControlMarker>();
+        sender.send(server).await.unwrap();
+        let freeze_token = futures::select! {
+            _ = serial_task => None,
+            token = client.freeze_serial_forwarding().fuse() => Some(token),
+        }
+        .unwrap();
+        core_foo_container.ingest_message(make_message("c", None, zx::BootInstant::from_nanos(4)));
+        let received_future = rcv.next();
+        poll_once(&mut serial_task).await;
+
+        assert!(received_future.now_or_never().is_none());
+        drop(freeze_token);
+        poll_once(&mut serial_task).await;
+        let received = rcv.next().now_or_never().unwrap().unwrap();
+
+        assert_eq!(received, "[00000.000] 00001:00002> [foo] DEBUG: c\n");
     }
 
     #[fuchsia::test]

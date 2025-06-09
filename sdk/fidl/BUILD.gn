@@ -54,6 +54,7 @@ _partner_idk_fidl_libraries_targets_list = [
   "//sdk/fidl/fuchsia.debugdata:fuchsia.debugdata",
   "//sdk/fidl/fuchsia.developer.tiles:fuchsia.developer.tiles",
   "//sdk/fidl/fuchsia.device.fs:fuchsia.device.fs",
+  "//sdk/fidl/fuchsia.diagnostics.system:fuchsia.diagnostics.system",
   "//sdk/fidl/fuchsia.diagnostics.types:fuchsia.diagnostics.types",
   "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics",
   "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development",

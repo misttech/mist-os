@@ -25,6 +25,13 @@ pub struct CommandLine {
 
     #[argh(subcommand)]
     pub command: SubCommand,
+
+    #[argh(option)]
+    /// optional tag to print to the console before and after the normal output
+    /// of this program.
+    /// This instructs the Archivist to suspend printing serial logs from other
+    /// sources until this program has finished.
+    pub serial_tag: Option<String>,
 }
 
 fn serialize<T: Serialize + ToString>(format: &Format, input: T) -> Result<String, Error> {

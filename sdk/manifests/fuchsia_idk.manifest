@@ -197,6 +197,7 @@ fidl_library://fidl/fuchsia.debugdata
 fidl_library://fidl/fuchsia.developer.tiles
 fidl_library://fidl/fuchsia.device.fs
 fidl_library://fidl/fuchsia.diagnostics
+fidl_library://fidl/fuchsia.diagnostics.system
 fidl_library://fidl/fuchsia.diagnostics.types
 fidl_library://fidl/fuchsia.driver.development
 fidl_library://fidl/fuchsia.driver.framework
