@@ -137,13 +137,13 @@ pub enum SocketIngressFilterResult {
 }
 
 /// Trait for a socket operations filter.
-pub trait SocketOpsFilter<D: StrongDeviceIdentifier, T> {
+pub trait SocketOpsFilter<D: StrongDeviceIdentifier> {
     /// Called on every outgoing packet originated from a local socket.
     fn on_egress<I: FilterIpExt, P: IpPacket<I> + PartialSerializer>(
         &self,
         packet: &P,
         device: &D,
-        tx_metadata: &T,
+        cookie: SocketCookie,
         marks: &Marks,
     ) -> SocketEgressFilterResult;
 
@@ -162,7 +162,7 @@ pub trait SocketOpsFilterBindingContext<D: StrongDeviceIdentifier>:
     TxMetadataBindingsTypes
 {
     /// Returns the filter that should be called for socket ops.
-    fn socket_ops_filter(&self) -> impl SocketOpsFilter<D, Self::TxMetadata>;
+    fn socket_ops_filter(&self) -> impl SocketOpsFilter<D>;
 }
 
 #[cfg(any(test, feature = "testutils"))]
@@ -187,7 +187,7 @@ impl<
     > SocketOpsFilterBindingContext<D>
     for netstack3_base::testutil::FakeBindingsCtx<TimerId, Event, State, FrameMeta>
 {
-    fn socket_ops_filter(&self) -> impl SocketOpsFilter<D, Self::TxMetadata> {
+    fn socket_ops_filter(&self) -> impl SocketOpsFilter<D> {
         crate::testutil::NoOpSocketOpsFilter
     }
 }

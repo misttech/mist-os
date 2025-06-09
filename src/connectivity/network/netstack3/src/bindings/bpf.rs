@@ -24,7 +24,6 @@ use netstack3_core::ip::{Mark, MarkDomain, Marks};
 use netstack3_core::socket::SocketCookie;
 use netstack3_core::sync::{Mutex, RwLock};
 use netstack3_core::trace::trace_duration;
-use netstack3_core::TxMetadata;
 use packet::{FragmentedByteSlice, PacketConstraints, PartialSerializer};
 use std::collections::{hash_map, HashMap};
 use std::mem::offset_of;
@@ -569,19 +568,14 @@ impl EbpfManager {
     }
 }
 
-impl SocketOpsFilter<DeviceId<BindingsCtx>, TxMetadata<BindingsCtx>> for &EbpfManager {
+impl SocketOpsFilter<DeviceId<BindingsCtx>> for &EbpfManager {
     fn on_egress<I: FilterIpExt, P: IpPacket<I> + PartialSerializer>(
         &self,
         packet: &P,
         device: &DeviceId<BindingsCtx>,
-        tx_metadata: &TxMetadata<BindingsCtx>,
+        socket_cookie: SocketCookie,
         marks: &Marks,
     ) -> SocketEgressFilterResult {
-        let Some(socket_cookie) = tx_metadata.socket_cookie() else {
-            // There is no socket associated with the packet.
-            return SocketEgressFilterResult::Pass { congestion: false };
-        };
-
         let state = self.state.read();
         let Some(prog) = state.root_cgroup_egress.as_ref() else {
             return SocketEgressFilterResult::Pass { congestion: false };

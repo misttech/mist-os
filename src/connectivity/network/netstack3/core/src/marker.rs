@@ -38,7 +38,7 @@ use netstack3_ip::{
 use netstack3_tcp::{self as tcp, TcpBindingsContext, TcpBindingsTypes, TcpContext};
 use netstack3_udp::{self as udp, UdpBindingsContext, UdpBindingsTypes, UdpCounterContext};
 
-use crate::transport::TxMetadata;
+use crate::transport::CoreTxMetadata;
 use crate::TimerId;
 
 /// A marker for extensions to IP types.
@@ -139,7 +139,7 @@ pub trait BindingsTypes:
     + RawIpSocketsBindingsTypes
     + UdpBindingsTypes
     + TimerBindingsTypes<DispatchId = TimerId<Self>>
-    + TxMetadataBindingsTypes<TxMetadata = TxMetadata<Self>>
+    + TxMetadataBindingsTypes<TxMetadata = CoreTxMetadata<Self>>
 {
 }
 
@@ -154,7 +154,7 @@ impl<O> BindingsTypes for O where
         + RawIpSocketsBindingsTypes
         + UdpBindingsTypes
         + TimerBindingsTypes<DispatchId = TimerId<Self>>
-        + TxMetadataBindingsTypes<TxMetadata = TxMetadata<Self>>
+        + TxMetadataBindingsTypes<TxMetadata = CoreTxMetadata<Self>>
 {
 }
 

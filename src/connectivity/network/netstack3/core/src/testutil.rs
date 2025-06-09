@@ -80,7 +80,7 @@ use crate::context::prelude::*;
 use crate::context::UnlockedCoreCtx;
 use crate::state::{StackState, StackStateBuilder};
 use crate::time::{TimerId, TimerIdInner};
-use crate::{BindingsContext, BindingsTypes, IpExt, TxMetadata};
+use crate::{BindingsContext, BindingsTypes, CoreTxMetadata, IpExt};
 
 /// The default interface routing metric for test interfaces.
 pub const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
@@ -762,9 +762,7 @@ impl FilterBindingsTypes for FakeBindingsCtx {
 }
 
 impl SocketOpsFilterBindingContext<DeviceId<FakeBindingsCtx>> for FakeBindingsCtx {
-    fn socket_ops_filter(
-        &self,
-    ) -> impl SocketOpsFilter<DeviceId<FakeBindingsCtx>, TxMetadata<FakeBindingsCtx>> {
+    fn socket_ops_filter(&self) -> impl SocketOpsFilter<DeviceId<FakeBindingsCtx>> {
         NoOpSocketOpsFilter
     }
 }
@@ -848,7 +846,7 @@ impl TimerContext for FakeBindingsCtx {
 }
 
 impl TxMetadataBindingsTypes for FakeBindingsCtx {
-    type TxMetadata = TxMetadata<Self>;
+    type TxMetadata = CoreTxMetadata<Self>;
 }
 
 impl RngContext for FakeBindingsCtx {

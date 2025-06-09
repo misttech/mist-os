@@ -85,12 +85,12 @@ pub mod testutil {
     /// No-op implementation of `SocketOpsFilter`.
     pub struct NoOpSocketOpsFilter;
 
-    impl<D: StrongDeviceIdentifier, T> SocketOpsFilter<D, T> for NoOpSocketOpsFilter {
+    impl<D: StrongDeviceIdentifier> SocketOpsFilter<D> for NoOpSocketOpsFilter {
         fn on_egress<I: FilterIpExt, P: IpPacket<I>>(
             &self,
             _packet: &P,
             _device: &D,
-            _tx_metadata: &T,
+            _cookie: SocketCookie,
             _marks: &Marks,
         ) -> SocketEgressFilterResult {
             SocketEgressFilterResult::Pass { congestion: false }

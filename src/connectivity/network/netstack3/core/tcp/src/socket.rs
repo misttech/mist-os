@@ -5868,7 +5868,7 @@ mod tests {
     }
 
     impl<D: FakeStrongDeviceId> SocketOpsFilterBindingContext<D> for TcpBindingsCtx<D> {
-        fn socket_ops_filter(&self) -> impl SocketOpsFilter<D, Self::TxMetadata> {
+        fn socket_ops_filter(&self) -> impl SocketOpsFilter<D> {
             NoOpSocketOpsFilter
         }
     }

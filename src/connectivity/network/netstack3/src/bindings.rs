@@ -108,9 +108,9 @@ use netstack3_core::udp::{
     UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId,
 };
 use netstack3_core::{
-    neighbor, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-    IpExt, RngContext, StackState, StackStateBuilder, TimerBindingsTypes, TimerContext, TimerId,
-    TxMetadata, TxMetadataBindingsTypes,
+    neighbor, CoreTxMetadata, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
+    InstantContext, IpExt, RngContext, StackState, StackStateBuilder, TimerBindingsTypes,
+    TimerContext, TimerId, TxMetadataBindingsTypes,
 };
 
 pub(crate) use inspect::InspectPublisher;
@@ -432,9 +432,7 @@ impl FilterBindingsTypes for BindingsCtx {
 }
 
 impl SocketOpsFilterBindingContext<DeviceId<BindingsCtx>> for BindingsCtx {
-    fn socket_ops_filter(
-        &self,
-    ) -> impl SocketOpsFilter<DeviceId<BindingsCtx>, TxMetadata<BindingsCtx>> {
+    fn socket_ops_filter(&self) -> impl SocketOpsFilter<DeviceId<BindingsCtx>> {
         &self.ebpf_manager
     }
 }
@@ -524,7 +522,7 @@ impl DeviceLayerStateTypes for BindingsCtx {
 }
 
 impl TxMetadataBindingsTypes for BindingsCtx {
-    type TxMetadata = TxMetadata<Self>;
+    type TxMetadata = CoreTxMetadata<Self>;
 }
 
 impl ReceiveQueueBindingsContext<LoopbackDeviceId<Self>> for BindingsCtx {

@@ -39,7 +39,7 @@ use netstack3_core::testutil::{
     new_simple_fake_network, CtxPairExt, DispatchedFrame, FakeBindingsCtx, FakeCtx, FakeCtxBuilder,
     FakeCtxNetworkSpec, DEFAULT_INTERFACE_METRIC,
 };
-use netstack3_core::{IpExt, TxMetadata, UnlockedCoreCtx};
+use netstack3_core::{CoreTxMetadata, IpExt, UnlockedCoreCtx};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
 use netstack3_ip::device::{
     IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, SlaacConfigurationUpdate,
@@ -341,7 +341,7 @@ fn ipv6_integration() {
 
     // Trigger a neighbor solicitation to be sent.
     let body = [u8::MAX];
-    let pending_frames = VecDeque::from([(Buf::new(body.to_vec(), ..), TxMetadata::default())]);
+    let pending_frames = VecDeque::from([(Buf::new(body.to_vec(), ..), CoreTxMetadata::default())]);
     assert_matches!(
         NudHandler::<Ipv6, EthernetLinkDevice, _>::send_ip_packet_to_neighbor(
             &mut core_ctx.context(),
@@ -349,7 +349,7 @@ fn ipv6_integration() {
             &eth_device_id,
             neighbor_ip.into_specified(),
             Buf::new(body, ..),
-            TxMetadata::default(),
+            CoreTxMetadata::default(),
         ),
         Ok(())
     );
