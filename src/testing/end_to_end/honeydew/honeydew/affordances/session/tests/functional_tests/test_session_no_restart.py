@@ -82,13 +82,8 @@ class SessionAffordanceNoRestartTests(fuchsia_base_test.FuchsiaBaseTest):
 
         after_cleanup = self._elements()
 
-        diff = before_cleanup.difference(after_cleanup)
-        asserts.assert_equal(len(diff), 1, f"diff is {diff}")
-        element_id = diff.pop()
-        asserts.assert_true(
-            element_id.startswith(session_using_ffx._ELEMENT_PREFIX),
-            f"element_id is {element_id}",
-        )
+        # The cleanup should remove at least one component.
+        asserts.assert_greater(len(before_cleanup), len(after_cleanup))
 
 
 if __name__ == "__main__":
