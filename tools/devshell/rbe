@@ -213,17 +213,23 @@ function bazel_auth_test() {
   cat <<EOF
 Testing a small remote-enabled bazel build end-to-end.
 If the first build attempt fails, follow the authentication prompts.
-It will retry until success.
+It will retry twice before reporting failure.
 EOF
-  until test_bazel_rbe
-  do
-    echo "If the previous build attempt failed due to authentication, follow the prompts to authenticate."
-    ensure_auth_for_bazel "$@" || {
-      echo "Failed to authenticate for bazel."
-      return 1
-    }
+  for tries in 1 2 3; do
+      printf "\n=== Attempt $tries/3 =====================\n"
+      if test_bazel_rbe; then
+          style::echo --green "bazel+RBE authentication successful"
+          return 0
+      fi
   done
-  style::echo --green "bazel+RBE authentication successful"
+  printf "\n======================================\n"
+  echo "If the previous build attempt failed due to authentication, follow the prompts to authenticate."
+  ensure_auth_for_bazel "$@" || {
+    echo "Failed to authenticate for bazel."
+    return 1
+  }
+  fx-error "Failed to use Bazel RBE for unknown reason! Please contact fuchsia-build-team@ !"
+  return 1
 }
 
 function auth_subcommand() {

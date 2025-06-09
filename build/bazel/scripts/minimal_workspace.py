@@ -70,6 +70,11 @@ def force_symlink(src: Path, dest: Path) -> None:
     src.symlink_to(dest)
 
 
+def write_file(dest: Path, content: str) -> None:
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    dest.write_text(content)
+
+
 def main(argv: Sequence[str]) -> int:
     args = _MAIN_ARG_PARSER.parse_args()
     verbosity = args.verbose - args.quiet
@@ -146,13 +151,14 @@ def main(argv: Sequence[str]) -> int:
         workspace_dir / "WORKSPACE.bazel",
         _SCRIPT_DIR / "minimal_workspace.WORKSPACE.bazel",
     )
-    (workspace_dir / "MODULE.bazel").write_text(
-        "\n"
-    )  # for bzlmod, can be empty
+    write_file(workspace_dir / "MODULE.bazel", "\n")  # for bzlmod, can be empty
     force_symlink(
         workspace_dir / "expect_pwd.txt",
         _SCRIPT_DIR / "expect_pwd.txt",
     )
+
+    # Generate args.json expected by fuchsia_platform_build.bzl
+    write_file(workspace_dir / "fuchsia_build_generated" / "args.json", "{}")
 
     # Generate remote_services.bazelrc
     remote_services_utils.generate_remote_services_bazelrc(
