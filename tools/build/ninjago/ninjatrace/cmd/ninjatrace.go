@@ -25,6 +25,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjagraph"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjalog"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/rbetrace"
+	"go.fuchsia.dev/fuchsia/tools/build/ninjago/readerwriters"
 )
 
 var (
@@ -118,7 +119,7 @@ func readArtifacts(logPath, compdbPath, graphPath string) (artifacts, error) {
 }
 
 func createAndWriteTrace(path string, traces []chrometrace.Trace) (err error) {
-	f, err := os.Create(*traceJSON)
+	f, err := readerwriters.Create(*traceJSON)
 	if err != nil {
 		return fmt.Errorf("creating trace output file %q: %v", path, err)
 	}

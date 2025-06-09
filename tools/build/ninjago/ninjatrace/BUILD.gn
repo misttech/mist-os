@@ -20,6 +20,7 @@ if (is_host) {
       "//tools/build/ninjago/ninjagraph",
       "//tools/build/ninjago/ninjalog",
       "//tools/build/ninjago/rbetrace",
+      "//tools/build/ninjago/readerwriters",
     ]
   }
 

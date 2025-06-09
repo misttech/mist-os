@@ -17,6 +17,7 @@ if (is_host) {
       "//tools/build/ninjago/compdb",
       "//tools/build/ninjago/ninjagraph",
       "//tools/build/ninjago/ninjalog",
+      "//tools/build/ninjago/readerwriters",
       "//tools/lib/color",
       "//tools/lib/logger",
     ]

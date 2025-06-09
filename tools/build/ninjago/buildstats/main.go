@@ -6,7 +6,8 @@
 // artifacts from Ninja.
 //
 // It combines information ninjalog, compdb and ninja graph, extracts and
-// serializes build stats from them.
+// serializes build stats from them. A .gz suffix in the output path will
+// generate a gzip-compressed file.
 //
 // usage:
 //
@@ -14,7 +15,7 @@
 //	    --ninjalog out/default/.ninja_log
 //	    --compdb path/to/compdb.json
 //	    --graph path/to/graph.dot
-//	    --output path/to/output.json
+//	    --output path/to/output.json.gz
 package main
 
 import (
@@ -29,6 +30,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/compdb"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjagraph"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjalog"
+	"go.fuchsia.dev/fuchsia/tools/build/ninjago/readerwriters"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
@@ -272,7 +274,7 @@ func main() {
 	}
 
 	log.Infof("Creating %s and serializing the build stats to it.", *outputPath)
-	outputFile, err := os.Create(*outputPath)
+	outputFile, err := readerwriters.Create(*outputPath)
 	if err != nil {
 		log.Fatalf("Failed to create output file: %v", err)
 	}
