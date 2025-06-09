@@ -31,6 +31,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.net.routes.admin:fuchsia.net.routes.admin_rust",
     "//sdk/fidl/fuchsia.net.stack:fuchsia.net.stack_rust",
     "//sdk/fidl/fuchsia.net.virtualization:fuchsia.net.virtualization_rust",
+    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
     "//sdk/rust/zx",
     "//src/connectivity/lib/fidl_fuchsia_net_dhcpv6_ext",
@@ -40,6 +41,8 @@ rustc_library("lib") {
     "//src/connectivity/network/dhcpv4/lib",
     "//src/connectivity/network/lib/dns_server_watcher",
     "//src/connectivity/network/lib/netfilter",
+    "//src/connectivity/network/lib/todo_unused",
+    "//src/connectivity/policy/socket-proxy:lib",
     "//src/lib/async-utils",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fdio/rust:fdio",
@@ -69,6 +72,7 @@ rustc_library("lib") {
 
   test_deps = [
     "//sdk/fidl/fuchsia.net.routes:fuchsia.net.routes_rust",
+    "//src/connectivity/policy/socket-proxy/testing:testing",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
     "//src/lib/network/fidl_fuchsia_net_routes_ext",
@@ -89,6 +93,7 @@ rustc_library("lib") {
     "src/masquerade.rs",
     "src/network/mod.rs",
     "src/network/token_map.rs",
+    "src/socketproxy.rs",
     "src/virtualization.rs",
   ]
 

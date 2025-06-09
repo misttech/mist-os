@@ -8,7 +8,8 @@ use anyhow::{Context, Error};
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl_fuchsia_net_policy_socketproxy::{
     self as fnp_socketproxy, FuchsiaNetworkInfo, FuchsiaNetworksRequest, Network,
-    NetworkDnsServers, NetworkInfo, StarnixNetworksRequest,
+    NetworkDnsServers, NetworkInfo, NetworkRegistryAddError, NetworkRegistryRemoveError,
+    NetworkRegistrySetDefaultError, StarnixNetworksRequest,
 };
 use fuchsia_inspect_derive::{IValue, Inspect, Unit};
 use futures::channel::mpsc;
@@ -74,6 +75,36 @@ impl NetworkInfoExt for NetworkInfo {
             // the mark to None.
             NetworkInfo::Fuchsia(_) | _ => None,
         }
+    }
+}
+
+// Errors produced when communicating updates to
+// the socket proxy.
+#[derive(Clone, Debug, Error)]
+pub enum NetworkRegistryError {
+    #[error("Error during socketproxy Add: {0:?}")]
+    Add(NetworkRegistryAddError),
+    #[error("Error during socketproxy Remove: {0:?}")]
+    Remove(NetworkRegistryRemoveError),
+    #[error("Error during socketproxy SetDefault: {0:?}")]
+    SetDefault(NetworkRegistrySetDefaultError),
+}
+
+impl From<NetworkRegistryAddError> for NetworkRegistryError {
+    fn from(error: NetworkRegistryAddError) -> Self {
+        NetworkRegistryError::Add(error)
+    }
+}
+
+impl From<NetworkRegistryRemoveError> for NetworkRegistryError {
+    fn from(error: NetworkRegistryRemoveError) -> Self {
+        NetworkRegistryError::Remove(error)
+    }
+}
+
+impl From<NetworkRegistrySetDefaultError> for NetworkRegistryError {
+    fn from(error: NetworkRegistrySetDefaultError) -> Self {
+        NetworkRegistryError::SetDefault(error)
     }
 }
 

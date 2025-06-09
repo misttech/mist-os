@@ -13,6 +13,7 @@ mod filter;
 mod interface;
 mod masquerade;
 mod network;
+mod socketproxy;
 mod virtualization;
 
 use ::dhcpv4::protocol::FromFidlExt as _;

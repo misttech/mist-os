@@ -24,7 +24,7 @@ mod dns_watcher;
 mod registry;
 mod socket_provider;
 
-pub use registry::{NetworkConversionError, NetworkExt};
+pub use registry::{NetworkConversionError, NetworkExt, NetworkRegistryError};
 
 #[derive(Copy, Clone, Debug)]
 struct SocketMarks {

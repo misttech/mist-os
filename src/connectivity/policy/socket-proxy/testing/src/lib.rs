@@ -2,14 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use assert_matches::assert_matches;
 use fidl_fuchsia_net::{IpAddress, SocketAddress};
 use fidl_fuchsia_net_policy_socketproxy::{
-    DnsServerList, FuchsiaNetworkInfo, FuchsiaNetworksProxy, Network, NetworkDnsServers,
-    NetworkInfo, NetworkRegistryAddResult, NetworkRegistryRemoveResult,
-    NetworkRegistrySetDefaultResult, NetworkRegistryUpdateResult, StarnixNetworkInfo,
-    StarnixNetworksProxy,
+    DnsServerList, FuchsiaNetworkInfo, FuchsiaNetworksProxy, FuchsiaNetworksRequest,
+    FuchsiaNetworksRequestStream, Network, NetworkDnsServers, NetworkInfo,
+    NetworkRegistryAddResult, NetworkRegistryRemoveResult, NetworkRegistrySetDefaultResult,
+    NetworkRegistryUpdateResult, StarnixNetworkInfo, StarnixNetworksProxy,
 };
 use fidl_fuchsia_posix_socket::OptionalUint32;
+use futures::{FutureExt as _, StreamExt as _};
+use socket_proxy::NetworkRegistryError;
 use std::future::Future;
 
 fn dns_server_list(id: u32) -> DnsServerList {
@@ -169,3 +172,44 @@ macro_rules! impl_network_registry {
 }
 
 impl_network_registry!(StarnixNetworksProxy, FuchsiaNetworksProxy);
+
+pub async fn respond_to_socketproxy(
+    socket_proxy_req_stream: &mut FuchsiaNetworksRequestStream,
+    result: Result<(), NetworkRegistryError>,
+) {
+    socket_proxy_req_stream
+        .next()
+        .map(|req| match req.expect("request stream ended").expect("receive request") {
+            FuchsiaNetworksRequest::SetDefault { network_id: _, responder } => {
+                let res = result.map_err(|e| {
+                    assert_matches!(e, NetworkRegistryError::SetDefault(err) => {
+                        return err;
+                    });
+                });
+                responder.send(res).expect("respond to SetDefault");
+            }
+            FuchsiaNetworksRequest::Add { network: _, responder } => {
+                let res = result.map_err(|e| {
+                    assert_matches!(e, NetworkRegistryError::Add(err) => {
+                        return err;
+                    });
+                });
+                responder.send(res).expect("respond to Add");
+            }
+            FuchsiaNetworksRequest::Update { network: _, responder: _ } => {
+                unreachable!("not called in tests");
+            }
+            FuchsiaNetworksRequest::Remove { network_id: _, responder } => {
+                let res = result.map_err(|e| {
+                    assert_matches!(e, NetworkRegistryError::Remove(err) => {
+                        return err;
+                    });
+                });
+                responder.send(res).expect("respond to Remove");
+            }
+            FuchsiaNetworksRequest::CheckPresence { responder: _ } => {
+                unreachable!("not called in tests");
+            }
+        })
+        .await;
+}
