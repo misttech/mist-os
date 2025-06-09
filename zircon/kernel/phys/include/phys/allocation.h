@@ -98,4 +98,40 @@ class Allocation {
   memalloc::Type type_ = memalloc::Type::kMaxAllocated;
 };
 
+// Memory concept implementation over `Allocation` for `trivial_allocator::PageAllocator`.
+class AllocationMemory {
+ public:
+  using Capability = Allocation;
+
+  // Delegate to environment.
+  size_t page_size() const;
+
+  template <memalloc::Type MemoryType>
+  std::pair<void*, Capability> Allocate(size_t size) {
+    fbl::AllocChecker ac;
+    auto alloc = Capability::New(ac, MemoryType, size);
+    if (!ac.check()) {
+      ZX_DEBUG_ASSERT(!alloc);
+      return {};
+    }
+    ZX_DEBUG_ASSERT(alloc);
+    return {alloc->data(), std::move(alloc)};
+  }
+
+  void Deallocate(Capability capability, void* address, size_t size) { capability.reset(); }
+
+  void Release(Capability capability, void* address, size_t size) {
+    ktl::ignore = capability.release();
+  }
+};
+
+// Helper tor templating only on `Allocate` method.
+template <memalloc::Type MemoryType>
+class TypedMemoryAllocation : public AllocationMemory {
+ public:
+  std::pair<void*, Capability> Allocate(size_t size) {
+    return AllocationMemory::template Allocate<MemoryType>(size);
+  }
+};
+
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ALLOCATION_H_

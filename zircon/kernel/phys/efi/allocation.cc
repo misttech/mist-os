@@ -129,6 +129,8 @@ void Allocation::reset() {
   }
 }
 
+size_t AllocationMemory::page_size() const { return kEfiPageSize; }
+
 // Plain new/delete is supported in EFI via AllocatePool/FreePool.
 // Aligned variants are not supported.
 void* operator new(size_t size, const std::nothrow_t&) noexcept {
