@@ -5,6 +5,9 @@
 #ifndef SRC_LIB_TRIVIAL_ALLOCATOR_INCLUDE_LIB_TRIVIAL_ALLOCATOR_PAGE_ALLOCATOR_H_
 #define SRC_LIB_TRIVIAL_ALLOCATOR_INCLUDE_LIB_TRIVIAL_ALLOCATOR_PAGE_ALLOCATOR_H_
 
+#include <zircon/compiler.h>
+
+#include <concepts>
 #include <cstddef>
 #include <limits>
 #include <type_traits>
@@ -12,37 +15,48 @@
 
 namespace trivial_allocator {
 
+// A memory resource that can be allocated and leaked.
+template <typename T>
+concept MemoryApi =
+    std::movable<typename T::Capability> &&
+    std::is_default_constructible_v<typename T::Capability> &&
+    requires(const T const_memory, T memory, typename T::Capability cap, void* alloc, size_t size) {
+      // The page_size() returned must be a power of two.
+      { const_memory.page_size() } -> std::convertible_to<std::size_t>;
+
+      // Allocate `size` bytes, where size is a multiple of `const_memory.page_size()`, and return
+      // a pointer to the allocation and a capability gating access to such allocation, where
+      // supported.
+      { memory.Allocate(size) } -> std::convertible_to<std::pair<void*, typename T::Capability>>;
+
+      // Free `size` bytes pointed by `alloc`.
+      { memory.Deallocate(std::move(cap), alloc, size) };
+
+      // Leak `size` bytes pointed by `alloc`.
+      { memory.Release(std::move(cap), alloc, size) };
+    };
+
+// A memory representation that can become read-only.
+template <typename T>
+concept SealableMemory =
+    MemoryApi<T> && requires(T memory, typename T::Capability cap, void* alloc, size_t size) {
+      // Seal `size` bytes pointed by `alloc`, and the leak them. Sealed memory is `read-only`.
+      { memory.Seal(std::move(cap), alloc, size) };
+    };
+
 // trivial_allocator::PageAllocator is an AllocateFunction compatible with
 // trivial_allocator::BasicLeakyAllocator.  It uses the Memory object to do
-// whole-page allocations.  Its constructor forwards arguments to the Memory
-// constructor, so the PageAllocator object is copyable and/or movable if the
-// Memory object is.  Some Memory object implementations are provided by
-// <lib/trivial-allocator/posix.h> and <lib/trivial-allocator/zircon.h>.  The
-// Memory object must define a type Memory::Capability, and these methods:
+// whole-page allocations.
 //
-//  * `size_t page_size() const;`
-//  * `std::pair<void*, Capability> Allocate(size_t);`
-//  * `void Deallocate(Capability, void*, size_t);`
-//  * `void Release(Capability, void*, size_t);`
-//  * `void Seal(Capability, void*, size_t);`
+// Its constructor forwards arguments to the Memory constructor, so the PageAllocator object is
+// copyable and/or movable if the Memory object is.
 //
-// The page_size() returned must be a power of two.  The size passed to
-// Allocate will always be a multiple of that size.
-//
-// The Capability is some default-constructible, movable object.  It's passed
-// back in the Deallocate, Release, or Seal call, or just destroyed if the
-// memory is leaked without being sealed.  At most one of Deallocate, Release,
-// and Seal may be called with the same capability, pointer, and size from an
-// Allocate call. Deallocate returns the memory.  Release intentionally leaks
-// the memory, Seal makes the memory read-only.
-
-template <class Memory>
+// Some Memory object implementations are provided by:
+//    * <lib/trivial-allocator/zircon.h>
+//    * <lib/trivial-allocator/posix.h>
+template <MemoryApi Memory>
 class PageAllocator {
  public:
-  static_assert(std::is_default_constructible_v<typename Memory::Capability>);
-  static_assert(std::is_move_constructible_v<typename Memory::Capability>);
-  static_assert(std::is_move_assignable_v<typename Memory::Capability>);
-
   class Allocation {
    public:
     Allocation() = default;
@@ -87,7 +101,9 @@ class PageAllocator {
     }
 
     // Seal the memory and then leak it.
-    void Seal() && {
+    void Seal() &&
+      requires SealableMemory<Memory>
+    {
       allocator_->memory().Seal(std::exchange(capability_, {}), std::exchange(ptr_, nullptr),
                                 std::exchange(size_, 0));
     }
@@ -98,7 +114,7 @@ class PageAllocator {
     friend PageAllocator;
 
     PageAllocator* allocator_ = nullptr;
-    [[no_unique_address]] typename Memory::Capability capability_;
+    __NO_UNIQUE_ADDRESS typename Memory::Capability capability_;
     void* ptr_ = nullptr;
     size_t size_ = 0;
   };
@@ -140,7 +156,7 @@ class PageAllocator {
 };
 
 // Deduction guide.
-template <class Memory>
+template <MemoryApi Memory>
 PageAllocator(Memory) -> PageAllocator<std::decay_t<Memory>>;
 
 }  // namespace trivial_allocator
