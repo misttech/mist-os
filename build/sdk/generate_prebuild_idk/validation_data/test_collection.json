@@ -140,6 +140,7 @@
     "atom_meta_json_file": "gen/sdk/lib/stdcompat/stdcompat_sdk.meta.json",
     "is_stable": true,
     "atom_type": "cc_source_library",
+    "category": "partner",
     "prebuild_info": {
       "deps": [
 
@@ -255,6 +256,7 @@
     "atom_meta_json_file": "gen/sdk/lib/fit/fit_sdk.meta.json",
     "is_stable": true,
     "atom_type": "cc_source_library",
+    "category": "partner",
     "prebuild_info": {
       "deps": [
         "//sdk/lib/stdcompat:stdcompat_sdk"
@@ -294,7 +296,8 @@
     },
     "atom_meta_json_file": "gen/src/zircon/lib/zircon/zircon_sdk.meta.json",
     "is_stable": true,
-    "atom_type": "none"
+    "atom_type": "none",
+    "category": "partner"
   },
   {
     "atom_files": [
@@ -364,6 +367,7 @@
     "atom_meta_json_file": "gen/sdk/lib/fdio/fdio_sdk_manifest.meta.json",
     "is_stable": true,
     "atom_type": "cc_prebuilt_library",
+    "category": "partner",
     "prebuild_info": {
       "atom_label": "//sdk/lib/fdio:fdio",
       "binaries": [
@@ -432,6 +436,7 @@
     },
     "atom_meta_json_file": "gen/sdk/lib/driver/fake-object/cpp/cpp_sdk.meta.json",
     "atom_type": "cc_source_library",
+    "category": "partner",
     "is_stable": true,
     "prebuild_info": {
       "deps": [
@@ -475,6 +480,7 @@
     "atom_meta_json_file": "fidling/gen/zircon/vdso/zx/zx_sdk.meta.json",
     "is_stable": true,
     "atom_type": "fidl_library",
+    "category": "partner",
     "prebuild_info": {
       "deps": [
 
@@ -500,6 +506,7 @@
     "atom_meta_json_file": "fidling/gen/sdk/fidl/fuchsia.unknown/fuchsia.unknown_sdk.meta.json",
     "is_stable": true,
     "atom_type": "fidl_library",
+    "category": "partner",
     "prebuild_info": {
       "deps": [
         "//zircon/vdso/zx:zx_sdk"
@@ -553,6 +560,7 @@
     "atom_meta_json_file": "fidling/gen/sdk/fidl/fuchsia.io/fuchsia.io_sdk.meta.json",
     "is_stable": true,
     "atom_type": "fidl_library",
+    "category": "partner",
     "prebuild_info": {
       "deps": [
         "//sdk/fidl/fuchsia.unknown:fuchsia.unknown_sdk",
@@ -585,7 +593,8 @@
     },
     "atom_meta_json_file": "host_x64/gen/zircon/tools/zbi/zbi_sdk.meta.json",
     "is_stable": true,
-    "atom_type": "host_tool"
+    "atom_type": "host_tool",
+    "category": "partner"
   },
   {
     "atom_files": [
@@ -623,7 +632,8 @@
     },
     "atom_meta_json_file": "host_x64/gen/src/developer/ffx/plugins/emulator/sdk.meta.json",
     "is_stable": true,
-    "atom_type": "ffx_tool"
+    "atom_type": "ffx_tool",
+    "category": "partner"
   },
   {
     "atom_files": [
@@ -638,6 +648,7 @@
     "atom_meta_json_file": "host_x64/gen/src/developer/ffx/plugins/emulator/aemu_internal.meta.json",
     "is_stable": true,
     "atom_type": "companion_host_tool",
+    "category": "partner",
     "prebuild_info": {
       "binary": "../../prebuilt/third_party/android/aemu/release/linux-x64/emulator",
       "dest_root": "tools/x64/aemu_internal",
@@ -661,6 +672,7 @@
     "atom_meta_json_file": "gen/src/devices/bind/fuchsia.serial/fuchsia.serial_sdk.meta.json",
     "is_stable": true,
     "atom_type": "bind_library",
+    "category": "partner",
     "prebuild_info": {
       "deps": [
 
@@ -701,7 +713,8 @@
     },
     "atom_meta_json_file": "gen/sdk/lib/syslog/shards/syslog_sdk.meta.json",
     "is_stable": true,
-    "atom_type": "data"
+    "atom_type": "data",
+    "category": "partner"
   },
   {
     "atom_files": [
@@ -717,6 +730,7 @@
     "atom_meta_json_file": "gen/sdk/version_history_sdk.meta.json",
     "is_stable": true,
     "atom_type": "version_history",
+    "category": "partner",
     "prebuild_info": {
       "daily_commit_hash_file": "../../build/info/jiri_generated/integration_daily_commit_hash.txt",
       "daily_commit_timestamp_file": "../../build/info/jiri_generated/integration_daily_commit_stamp.txt",
@@ -915,6 +929,7 @@
     "atom_meta_json_file": "dartlang/gen/sdk/testing/sl4f/client/client_sdk.meta.json",
     "is_stable": true,
     "atom_type": "dart_library",
+    "category": "partner",
     "prebuild_info": {
       "deps": [
 
@@ -1005,7 +1020,8 @@
     },
     "atom_meta_json_file": "gen/sdk/sdk_notice.meta.json",
     "is_stable": true,
-    "atom_type": "documentation"
+    "atom_type": "documentation",
+    "category": "partner"
   },
   {
     "atom_files": [
@@ -1020,6 +1036,7 @@
     "atom_meta_json_file": "host_x64/gen/src/tests/end_to_end/rtc/rtc_conformance_test_sdk.meta.json",
     "is_stable": true,
     "atom_type": "experimental_python_e2e_test",
+    "category": "partner",
     "prebuild_info": {
       "api_level": "unversioned",
       "file_base": "python/rtc_conformance_test",
@@ -2149,7 +2166,8 @@
     },
     "atom_meta_json_file": "gen/zircon/public/sysroot_sdk/sysroot_sdk.meta.json",
     "is_stable": true,
-    "atom_type": "sysroot"
+    "atom_type": "sysroot",
+    "category": "partner"
   },
   {
     "atom_files": [
@@ -2193,7 +2211,8 @@
     },
     "atom_meta_json_file": "gen/src/lib/vulkan/vulkan_layers.meta.json",
     "is_stable": true,
-    "atom_type": "loadable_module"
+    "atom_type": "loadable_module",
+    "category": "partner"
   },
   {
     "atom_id": "27.99991231.0.1",
@@ -2203,6 +2222,7 @@
     },
     "atom_meta_json_file": "sdk/exported/fuchsia_collection/meta/manifest.json",
     "atom_type": "collection",
+    "category": "partner",
     "prebuild_info": {
       "arch": {
         "host": "x86_64-linux-gnu",

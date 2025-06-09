@@ -646,6 +646,16 @@ class IdkGenerator(object):
         collection_parts: list[dict[str, T.Any]] = []
 
         for info in self._prebuild_map.values():
+            # Note: Due to the way the prebuild manifest is currently generated,
+            # any atom in the "partner" category that is a dependency of the IDK
+            # collection will be included in the IDK, even if it is an indirect
+            # dependency, such as within a prebuilt library.
+            # The IDK manifest golden build tests ensure any new IDK atoms that
+            # may result from this are caught.
+            assert (
+                info["category"] == "partner"
+            ), "Only partner is currently allowed."
+
             meta_json, additional_atom_files = self._prebuild_map.get_meta(info)
             assert meta_json or not additional_atom_files
             if meta_json:

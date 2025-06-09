@@ -407,6 +407,7 @@ template("sdk_atom") {
       ]
     }
     is_stable = is_stable
+    category = category
   }
 
   assert(defined(meta.source) != defined(meta.value),

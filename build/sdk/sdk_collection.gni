@@ -311,6 +311,7 @@ template("sdk_collection") {
             schema_version = sdk_metadata_schema_version
             root = ".."  # Hard-coded in build/sdk/create_molecule_manifest.py.
           }
+          category = invoker.category
         },
       ]
     }

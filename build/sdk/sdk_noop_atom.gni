@@ -55,6 +55,7 @@ template("sdk_noop_atom") {
     atom_meta_json_file = rebase_path(meta_file, root_build_dir)
     atom_files = []
     is_stable = false
+    category = invoker.category
   }
 
   generated_file(meta_target_name) {
@@ -130,6 +131,7 @@ template("sdk_noop_atom") {
       output_conversion = "json"
       public_deps = [ ":${meta_target_name}" ]
     }
+
+    not_needed(invoker, "*")
   }
-  not_needed(invoker, "*")
 }
