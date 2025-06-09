@@ -50,7 +50,7 @@ ElementDesc ElementDescBuilder::Build() {
   }
 
   if (this->element_runner_.has_value()) {
-    to_return.element_runner = std::move(this->element_runner_.value());
+    to_return.element_runner_client = std::move(this->element_runner_.value());
   } else {
     // Level control is deprecated, only use if element_runner is not supplied.
     fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> required_level_server;

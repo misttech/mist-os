@@ -61,7 +61,7 @@ TEST_F(ElementBuilderTests, ElementBuilderLevelControlFilledOut) {
   ASSERT_TRUE(desc.element_control_server.is_valid());
   ASSERT_TRUE(desc.level_control_servers.first.is_valid());
   ASSERT_TRUE(desc.level_control_servers.second.is_valid());
-  ASSERT_EQ(desc.element_runner, std::nullopt);
+  ASSERT_EQ(desc.element_runner_client, std::nullopt);
 
   ASSERT_TRUE(desc.assertive_token.is_valid());
   ASSERT_TRUE(desc.opportunistic_token.is_valid());
@@ -108,7 +108,7 @@ TEST_F(ElementBuilderTests, ElementBuilderElementRunnerFilledOut) {
   ASSERT_TRUE(desc.element_control_server.is_valid());
   ASSERT_FALSE(desc.level_control_servers.first.is_valid());
   ASSERT_FALSE(desc.level_control_servers.second.is_valid());
-  ASSERT_TRUE(desc.element_runner->is_valid());
+  ASSERT_TRUE(desc.element_runner_client->is_valid());
 
   ASSERT_TRUE(desc.assertive_token.is_valid());
   ASSERT_TRUE(desc.opportunistic_token.is_valid());
@@ -122,7 +122,7 @@ TEST_F(ElementBuilderTests, ElementBuilderElementRunnerFilledOut) {
   check_channels_peered(element_control.client.handle()->get(),
                         desc.element_control_server.handle()->get());
   check_channels_peered(element_runner.server.handle()->get(),
-                        desc.element_runner->handle()->get());
+                        desc.element_runner_client->handle()->get());
 }
 
 TEST_F(ElementBuilderTests, ElementBuilderMissingCurrentLevel) {

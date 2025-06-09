@@ -1382,14 +1382,23 @@ TEST_F(PowerLibTest, ApplyPowerConfiguration) {
   std::vector<fdf_power::PowerElementConfiguration> configs{df_config};
 
   // Now we've done all that, do the call and check that we get one thing back
-  ASSERT_EQ(fdf_power::ApplyPowerConfiguration(ns, configs).value().size(), static_cast<size_t>(1));
+  std::vector<fdf_power::ElementDesc> applied_configs =
+      fdf_power::ApplyPowerConfiguration(ns, configs, true).value();
+  ASSERT_EQ(applied_configs.size(), static_cast<size_t>(1));
+  ASSERT_NE(applied_configs[0].element_runner_server, std::nullopt);
+  ASSERT_TRUE(applied_configs[0].element_runner_server->is_valid());
 
   RunLoopUntil([&fake_element_control] { return fake_element_control != nullptr; });
+
+  applied_configs = fdf_power::ApplyPowerConfiguration(ns, configs, false).value();
+  ASSERT_EQ(applied_configs.size(), static_cast<size_t>(1));
+  ASSERT_EQ(applied_configs[0].element_runner_server, std::nullopt);
+
   loop.Shutdown();
   loop.JoinThreads();
 
   // Only one power broker topology instance should exist.
-  ASSERT_EQ(fake_power_brokers.size(), static_cast<size_t>(1));
+  ASSERT_EQ(fake_power_brokers.size(), static_cast<size_t>(2));
 }
 
 /// Check GetTokens with a power elements with a single level which depends

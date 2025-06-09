@@ -28,7 +28,8 @@ struct ElementDesc {
       level_control_servers;
   fidl::ServerEnd<fuchsia_power_broker::Lessor> lessor_server;
   fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_server;
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementRunner>> element_runner;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementRunner>> element_runner_client;
+  std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementRunner>> element_runner_server;
 
   // The below are created if the caller did not supply their corresponding server end
   std::optional<fidl::ClientEnd<fuchsia_power_broker::CurrentLevel>> current_level_client;

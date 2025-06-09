@@ -240,7 +240,8 @@ class LeaseDependency {
 /// In effect, this function converts the provided |power_configs| into their
 /// corresponding `ElementDesc` objects and returns them.
 fit::result<Error, std::vector<ElementDesc>> ApplyPowerConfiguration(
-    const fdf::Namespace& ns, cpp20::span<PowerElementConfiguration> power_configs);
+    const fdf::Namespace& ns, cpp20::span<PowerElementConfiguration> power_configs,
+    bool use_element_runner = false);
 
 /// Create a lease based on the set of dependencies represented by
 /// |dependencies|. When the lease is fulfilled those dependencies will be at

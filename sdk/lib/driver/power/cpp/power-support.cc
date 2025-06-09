@@ -665,7 +665,7 @@ fit::result<Error> AddElement(fidl::ClientEnd<fuchsia_power_broker::Topology>& p
                     std::move(description.level_control_servers),
                     std::move(description.lessor_server),
                     std::move(description.element_control_server), element_control_client,
-                    std::move(description.element_runner));
+                    std::move(description.element_runner_client));
 }
 
 void LeaseHelper::AcquireLease(
@@ -736,7 +736,8 @@ CreateLeaseHelper(const fidl::ClientEnd<fuchsia_power_broker::Topology>& topolog
 }
 
 fit::result<Error, std::vector<ElementDesc>> ApplyPowerConfiguration(
-    const fdf::Namespace& ns, cpp20::span<PowerElementConfiguration> power_configs) {
+    const fdf::Namespace& ns, cpp20::span<PowerElementConfiguration> power_configs,
+    bool use_element_runner) {
   if (power_configs.empty()) {
     return fit::success(std::vector<ElementDesc>{});
   }
@@ -753,7 +754,23 @@ fit::result<Error, std::vector<ElementDesc>> ApplyPowerConfiguration(
     if (token_request.is_error()) {
       return fit::error(token_request.error_value());
     }
-    ElementDesc description = ElementDescBuilder(config, std::move(token_request.value())).Build();
+    ElementDescBuilder builder = ElementDescBuilder(config, std::move(token_request.value()));
+
+    // If specified, use ElementRunner instead of CurrentLevel and RequiredLevel
+    std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementRunner>> runner_server;
+    if (use_element_runner) {
+      fidl::Endpoints<fuchsia_power_broker::ElementRunner> runner_endpoints =
+          fidl::Endpoints<fuchsia_power_broker::ElementRunner>::Create();
+      runner_server.emplace(std::move(runner_endpoints.server));
+      builder.SetElementRunner(std::move(runner_endpoints.client));
+    }
+
+    ElementDesc description = builder.Build();
+
+    if (runner_server.has_value()) {
+      description.element_runner_server.emplace(std::move(runner_server.value()));
+    }
+
     fit::result<Error> add_result = AddElement(topology_connection.value(), description);
     if (add_result.is_error()) {
       return fit::error(add_result.error_value());
