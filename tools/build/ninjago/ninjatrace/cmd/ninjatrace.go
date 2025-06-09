@@ -20,6 +20,7 @@ import (
 	"time"
 
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/chrometrace"
+	"go.fuchsia.dev/fuchsia/tools/build/ninjago/clangtrace"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/compdb"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjagraph"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjalog"
@@ -171,7 +172,7 @@ func main() {
 	traces := ninjalog.ToTraces(ninjalog.Flow(steps), 1)
 
 	if *buildDir != "" {
-		interleaved, err := ninjalog.ClangTracesToInterleave(traces, *buildDir, *granularity)
+		interleaved, err := clangtrace.ToInterleave(traces, *buildDir, *granularity)
 		if err != nil {
 			log.Fatalf("Failed to interleave clang trace: %v", err)
 		}

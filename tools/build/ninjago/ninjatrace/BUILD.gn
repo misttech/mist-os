@@ -15,6 +15,7 @@ if (is_host) {
     ]
     deps = [
       "//tools/build/ninjago/chrometrace",
+      "//tools/build/ninjago/clangtrace",
       "//tools/build/ninjago/compdb",
       "//tools/build/ninjago/ninjagraph",
       "//tools/build/ninjago/ninjalog",

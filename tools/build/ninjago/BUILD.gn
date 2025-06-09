@@ -8,6 +8,7 @@ group("tests") {
   deps = [
     "buildstats:buildstats_tests($host_toolchain)",
     "chrometrace:chrometrace_test($host_toolchain)",
+    "clangtrace:clangtrace_test($host_toolchain)",
     "compdb:compdb_tests($host_toolchain)",
     "ninjagraph:ninjagraph_tests($host_toolchain)",
     "ninjalog:ninjalog_tests($host_toolchain)",
