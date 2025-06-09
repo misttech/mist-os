@@ -4,8 +4,9 @@
 
 //! Netstack3 bindings system power handling.
 
-use futures::FutureExt as _;
-use log::debug;
+use fuchsia_async as fasync;
+use futures::{FutureExt as _, StreamExt};
+use log::{debug, warn};
 use netstack3_core::device::WeakDeviceId;
 
 use crate::bindings::devices::{DeviceSpecificInfo, EthernetInfo, PureIpDeviceInfo};
@@ -13,6 +14,8 @@ use crate::bindings::power::element::InternalPowerElement;
 use crate::bindings::power::suspension_block::MaybeSuspensionGuard;
 use crate::bindings::power::{BinaryPowerLevel, LessorRegistration};
 use crate::bindings::{BindingsCtx, Ctx, DeviceIdExt};
+
+const SUSPENSION_WARN_INTERVAL: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(10);
 
 /// Handles tx path suspension for devices.
 pub(crate) struct TransmitSuspensionHandler {
@@ -99,7 +102,13 @@ impl TransmitSuspensionRequest<'_> {
         // waiting for us to notify it that we've transitioned to the disabled
         // state.
         debug!("handling suspension for {name}. Waiting for tx done.");
-        wait_device_tx_suspension_ready(device).await;
+        let warn_interval = fasync::Interval::new(SUSPENSION_WARN_INTERVAL).map(|()| {
+            warn!("device {name} still pending tx suspension");
+        });
+        futures::select! {
+            () = wait_device_tx_suspension_ready(device).fuse() => (),
+            () = warn_interval.collect::<()>() => unreachable!(),
+        }
         debug!("suspension handling for {name} complete.");
 
         // Drop our guard on suspension.
