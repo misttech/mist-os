@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
-import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/legacy_image_metadata_overrides.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
@@ -26,13 +25,6 @@ files = {
   recovery_name = get_label_info(recovery_label, "name")
   recovery_outdir =
       get_label_info(recovery_label, "target_out_dir") + "/" + recovery_name
-}
-
-_partitions_config = "//boards/partitions:default"
-if (has_board) {
-  assert(partitions_config_label != false,
-         "Need to define partitions_config_label")
-  _partitions_config = partitions_config_label
 }
 
 assert(fuchsia_product_assembly_config_label != false,
@@ -71,7 +63,6 @@ product_bundle("product_bundle") {
   ]
 
   name = main_product_bundle_name
-  partitions = _partitions_config
   system_a = files.outdir
   system_r = files.recovery_outdir
 }

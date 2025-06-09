@@ -19,7 +19,6 @@ load(
 )
 load(
     ":providers.bzl",
-    "FuchsiaPartitionsConfigInfo",
     "FuchsiaProductBundleInfo",
     "FuchsiaProductImageInfo",
     "FuchsiaRepositoryKeysInfo",
@@ -38,7 +37,6 @@ def fuchsia_product_bundle(
         *,
         name,
         product_bundle_name = None,
-        partitions_config = None,
         main = None,
         testonly = None,
         visibility = None,
@@ -56,7 +54,6 @@ def fuchsia_product_bundle(
     fuchsia_product_bundle(
         name = "product_bundle",
         product_bundle_name = "<your_product_name>",
-        partitions_config = ":your_partitions_config",
         main = ":your_image",
     )
     ```
@@ -68,7 +65,6 @@ def fuchsia_product_bundle(
 
     _build_fuchsia_product_bundle(
         name = name,
-        partitions_config = partitions_config,
         main = main,
         product_bundle_name = product_bundle_name,
         testonly = testonly,
@@ -600,9 +596,6 @@ def _build_fuchsia_product_bundle_impl(ctx):
 
     if delivery_blob_type:
         ffx_invocation.append("--delivery-blob-type " + delivery_blob_type)
-    if ctx.attr.partitions_config:
-        partitions_config = ctx.attr.partitions_config[FuchsiaPartitionsConfigInfo]
-        ffx_invocation.append("--partitions " + partitions_config.directory)
 
     # Gather the environment variables needed in the script.
     env = {
@@ -614,7 +607,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
     }
 
     # Gather all the inputs.
-    inputs = ctx.files.partitions_config + ctx.files.main + get_ffx_product_inputs(fuchsia_toolchain)
+    inputs = ctx.files.main + get_ffx_product_inputs(fuchsia_toolchain)
 
     # Add virtual devices.
     for virtual_device in ctx.attr.virtual_devices:
@@ -672,7 +665,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         mnemonic = "CreatePB",
         **LOCAL_ONLY_ACTION_KWARGS
     )
-    deps = [pb_out_dir, size_report] + ctx.files.partitions_config + ctx.files.main
+    deps = [pb_out_dir, size_report] + ctx.files.main
 
     # Scrutiny Validation
     if ctx.attr.main_scrutiny_config:
@@ -739,10 +732,6 @@ _build_fuchsia_product_bundle = rule(
         "delivery_blob_type": attr.string(
             doc = "Delivery blob type of the product bundle.",
             values = [DELIVERY_BLOB_TYPE.UNCOMPRESSED, DELIVERY_BLOB_TYPE.COMPRESSED],
-        ),
-        "partitions_config": attr.label(
-            doc = "Partitions config to use.",
-            providers = [FuchsiaPartitionsConfigInfo],
         ),
         "main": attr.label(
             doc = "fuchsia_product target to put in slot A.",

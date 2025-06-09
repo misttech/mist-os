@@ -149,7 +149,6 @@ if (is_fuchsia) {
       ":assembly",
       ":version",
     ]
-    partitions = ":partitions"
     system_a = files.assembly_outdir
     update = {
       version_file = files.version

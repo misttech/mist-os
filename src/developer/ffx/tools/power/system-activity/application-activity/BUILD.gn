@@ -68,11 +68,6 @@ if (is_fuchsia && has_board) {
     testonly = true
     name = "application-activity-test"
 
-    if (target_cpu == "arm64") {
-      partitions = "//boards/partitions:arm64"
-    } else if (target_cpu == "x64") {
-      partitions = "//boards/partitions:x64"
-    }
     system_a = files.outdir
 
     deps = [ ":assembly" ]

@@ -158,7 +158,6 @@ if (is_fuchsia) {
         epoch = "${update_epoch}"
       }
 
-      partitions = _partitions_config
       system_a = files.outdir
       system_r = files.recovery_outdir
 

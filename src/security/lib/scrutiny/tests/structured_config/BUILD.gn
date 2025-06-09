@@ -102,7 +102,6 @@ if (is_fuchsia) {
       epoch = "1"
     }
 
-    partitions = ":partitions_config"
     system_a = files.outdir
   }
 

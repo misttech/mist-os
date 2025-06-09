@@ -60,6 +60,5 @@ fuchsia_product_bundle(
     name = "fake_bundle",
     testonly = True,
     main = ":fake_product",
-    partitions_config = ":fake_partitions_config",
     product_bundle_name = "fake_bundle.fake_board",
 )

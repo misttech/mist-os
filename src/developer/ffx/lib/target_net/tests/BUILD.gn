@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
-import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
@@ -50,7 +49,6 @@ if (is_host) {
     testonly = true
     name = "ffx-target-net-test"
 
-    partitions = "//boards/partitions:${target_cpu}"
     system_a = files.outdir
 
     deps = [ ":assembly" ]
