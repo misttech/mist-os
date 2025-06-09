@@ -78,16 +78,7 @@ if (current_toolchain == default_toolchain) {
   product_bundle("product_bundle") {
     testonly = true
     name = "verify_dupefinder_e2e"
-
-    if (target_cpu == "arm64") {
-      partitions = "//boards/partitions:arm64"
-    } else if (target_cpu == "x64") {
-      partitions = "//boards/partitions:x64"
-    } else {
-      assert(false, "unsupported arch $target_cpu")
-    }
     system_a = _outdir
-
     deps = [ ":assembly" ]
   }
 
