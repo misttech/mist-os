@@ -57,6 +57,10 @@ workstation.
 
 To build Fuchsia for NUC installation, do the following:
 
+Caution: **As of Jun 9, 2025**, the installation workflow using
+`recovery-installer` is broken at the moment. Please see the instructions in
+this [`README.md`][firmware-nuc-readme] file instead.
+
 1. Set your build configuration to an x64 target and include the
    `recovery-installer` package.
 
@@ -489,3 +493,4 @@ You can also turn on, turn off or reboot the NUC with the following terminal com
 [experimental-hardware]: /docs/contribute/governance/rfcs/0111_fuchsia_hardware_specifications.md#experimental-hardware
 [amt]: https://www.intel.com/content/www/us/en/architecture-and-technology/intel-active-management-technology.html
 [amtctrl]: https://github.com/sdague/amt
+[firmware-nuc-readme]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/firmware/gigaboot/boards/nuc/README.md
