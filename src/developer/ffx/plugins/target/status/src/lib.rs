@@ -4,15 +4,15 @@
 
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
-use ffx_diagnostics::{Check, CheckExt, NotificationType, Notifier};
+use ffx_diagnostics::{NotificationType, Notifier};
 use ffx_diagnostics_checks::run_diagnostics;
+use ffx_target_status_args as args;
 use ffx_writer::VerifiedMachineWriter;
 use fho::{FfxMain, FfxTool};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 use std::time::Duration;
-use {ffx_diagnostics_checks as checks, ffx_target_status_args as args};
 
 #[derive(Serialize, Deserialize, JsonSchema, Debug, PartialEq, Eq)]
 pub struct StatusUpdate {
@@ -60,15 +60,9 @@ impl FfxMain for Status {
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
         let mut notifier = DefaultNotifier { writer };
-        let (target, notifier) = checks::GetTargetSpecifier::new(&self.ctx)
-            .check_with_notifier((), &mut notifier)
-            .and_then_check(checks::ResolveTarget::new(&self.ctx))
-            .await
-            .map_err(|e| fho::Error::User(e.into()))?;
         run_diagnostics(
             &self.ctx,
-            target,
-            notifier,
+            &mut notifier,
             Duration::from_secs_f64(self.cmd.proxy_connect_timeout),
         )
         .await

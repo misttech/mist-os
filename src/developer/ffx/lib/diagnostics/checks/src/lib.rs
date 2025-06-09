@@ -16,7 +16,7 @@ use ffx_target::ssh_connector::SshConnector;
 use ffx_target::{Connection, TargetConnection, TargetConnectionError, TargetConnector};
 use std::time::Duration;
 
-pub async fn run_diagnostics<N>(
+pub async fn run_diagnostics_with_handle<N>(
     env_context: &EnvironmentContext,
     target_handle: TargetHandle,
     notifier: &mut N,
@@ -38,6 +38,23 @@ where
         }
     }
     notifier.on_success("All checks passed.")?;
+    Ok(())
+}
+
+pub async fn run_diagnostics<N>(
+    env: &EnvironmentContext,
+    notifier: &mut N,
+    product_timeout: Duration,
+) -> fho::Result<()>
+where
+    N: Notifier + std::marker::Unpin,
+{
+    let (target, notifier) = GetTargetSpecifier::new(&env)
+        .check_with_notifier((), notifier)
+        .and_then_check(ResolveTarget::new(&env))
+        .await?;
+
+    run_diagnostics_with_handle(&env, target, notifier, product_timeout).await?;
     Ok(())
 }
 

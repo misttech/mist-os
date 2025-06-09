@@ -6,7 +6,7 @@ use crate::doctor_ledger::{DoctorLedger, LedgerMode, LedgerOutcome};
 use discovery::TargetHandle;
 use ffx_config::EnvironmentContext;
 use ffx_diagnostics::{NotificationType, Notifier};
-use ffx_diagnostics_checks::run_diagnostics;
+use ffx_diagnostics_checks::run_diagnostics_with_handle;
 use fidl_fuchsia_developer_ffx::TargetInfo;
 use std::io::Write;
 
@@ -46,5 +46,7 @@ pub(crate) async fn run_single_target_diagnostics<W: Write>(
 ) -> anyhow::Result<()> {
     let handle: TargetHandle = TargetHandle::try_from(target_info)?;
     let mut notifier = LedgerNotifier::new(ledger);
-    run_diagnostics(env_context, handle, &mut notifier, product_timeout).await.map_err(Into::into)
+    run_diagnostics_with_handle(env_context, handle, &mut notifier, product_timeout)
+        .await
+        .map_err(Into::into)
 }
