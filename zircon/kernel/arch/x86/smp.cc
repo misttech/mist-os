@@ -6,6 +6,7 @@
 
 #include <align.h>
 #include <assert.h>
+#include <lib/arch/asm.h>
 #include <lib/arch/intrin.h>
 #include <lib/zircon-internal/macros.h>
 #include <stdint.h>
@@ -29,6 +30,8 @@
 #include "arch/x86/mp.h"
 
 #include <ktl/enforce.h>
+
+extern arch::AsmLabel x86_secondary_cpu_long_mode_entry;  // start16.S
 
 void x86_init_smp(uint32_t* apic_ids, uint32_t num_cpus) {
   DEBUG_ASSERT(num_cpus <= UINT8_MAX);
@@ -72,7 +75,7 @@ zx_status_t x86_bringup_aps(uint32_t* apic_ids, uint32_t count) {
 
   struct x86_ap_bootstrap_data* bootstrap_data = nullptr;
   paddr_t bootstrap_instr_ptr;
-  status = x86_bootstrap16_acquire((uintptr_t)_x86_secondary_cpu_long_mode_entry,
+  status = x86_bootstrap16_acquire(arch::kAsmLabelAddress<x86_secondary_cpu_long_mode_entry>,
                                    (void**)&bootstrap_data, &bootstrap_instr_ptr);
   if (status != ZX_OK) {
     return status;

@@ -8,6 +8,7 @@
 
 #include <align.h>
 #include <assert.h>
+#include <lib/arch/asm.h>
 #include <lib/fit/defer.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <string.h>
@@ -46,6 +47,10 @@ static fbl::RefPtr<VmAspace> bootstrap_aspace = nullptr;
 extern uint8_t _temp_gdt;
 extern uint8_t _temp_gdt_end;
 
+// start16.S
+extern arch::AsmLabel x86_bootstrap16_start, x86_bootstrap16_end,
+    x86_secondary_cpu_long_mode_high_entry;
+
 void x86_bootstrap16_init(paddr_t bootstrap_base) {
   DEBUG_ASSERT(!IS_PAGE_ALIGNED(bootstrap_phys_addr));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(bootstrap_base));
@@ -65,9 +70,9 @@ zx_status_t x86_bootstrap16_acquire(uintptr_t entry64, void** bootstrap_aperture
 
   LTRACEF("bootstrap_phys_addr %#lx\n", bootstrap_phys_addr);
 
-  // Make sure the entrypoint code is in the bootstrap code that will be
-  // loaded
-  if (entry64 < (uintptr_t)x86_bootstrap16_start || entry64 >= (uintptr_t)x86_bootstrap16_end) {
+  // Make sure the entrypoint code is in the bootstrap code that will be loaded
+  if (entry64 < arch::kAsmLabelAddress<x86_bootstrap16_start> ||
+      entry64 >= arch::kAsmLabelAddress<x86_bootstrap16_end>) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -128,7 +133,7 @@ zx_status_t x86_bootstrap16_acquire(uintptr_t entry64, void** bootstrap_aperture
   // Copy the bootstrap code and _temp_gdt to the bootstrap buffer. Compute where the offsets are
   // going to be up front.
   const uintptr_t bootstrap_code_len =
-      (uintptr_t)x86_bootstrap16_end - (uintptr_t)x86_bootstrap16_start;
+      arch::kAsmLabelSize<x86_bootstrap16_start, x86_bootstrap16_end>;
   void* const temp_gdt_virt_addr =
       (void*)((uintptr_t)bootstrap_virt_addr + ROUNDUP(bootstrap_code_len, 8));
 
@@ -159,7 +164,7 @@ zx_status_t x86_bootstrap16_acquire(uintptr_t entry64, void** bootstrap_aperture
       (struct x86_bootstrap16_data*)((uintptr_t)bootstrap_virt_addr + PAGE_SIZE);
 
   const uintptr_t long_mode_entry =
-      bootstrap_phys_addr + (entry64 - (uintptr_t)x86_bootstrap16_start);
+      bootstrap_phys_addr + (entry64 - arch::kAsmLabelAddress<x86_bootstrap16_start>);
   ASSERT(long_mode_entry <= UINT32_MAX);
 
   // Carve out the 3rd page of the bootstrap physical buffer to hold a copy of the top level
@@ -189,7 +194,7 @@ zx_status_t x86_bootstrap16_acquire(uintptr_t entry64, void** bootstrap_aperture
   bootstrap_data->long_mode_cs = CODE_64_SELECTOR;
 
   bootstrap_data->virt_long_mode_high_entry =
-      reinterpret_cast<uintptr_t>(_x86_secondary_cpu_long_mode_high_entry);
+      arch::kAsmLabelAddress<x86_secondary_cpu_long_mode_high_entry>;
 
   *bootstrap_aperture = (void*)((uintptr_t)bootstrap_virt_addr + PAGE_SIZE);
   *instr_ptr = bootstrap_phys_addr;

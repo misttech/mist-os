@@ -2106,7 +2106,10 @@ test_executable("llvm-profdata") {
 
 test_executable("backtrace") {
   sources = [ "backtrace.cc" ]
-  deps = [ "//zircon/system/public" ]
+  deps = [
+    "//zircon/kernel/lib/arch",
+    "//zircon/system/public",
+  ]
 }
 
 # Each dep module exports first(), second(), and third() return that multiplier
