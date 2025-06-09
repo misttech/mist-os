@@ -161,12 +161,15 @@ impl RequestingCounters {
 pub(crate) struct BoundCounters {
     /// The number of times the state was entered.
     pub(crate) entered: Counter,
+    /// The number of times the address transitions to `Assigned`.
+    pub(crate) assigned: Counter,
 }
 
 impl BoundCounters {
     fn record(&self, inspector: &mut impl Inspector) {
-        let Self { entered } = self;
+        let Self { entered, assigned } = self;
         inspector.record_inspectable_value("Entered", entered);
+        inspector.record_inspectable_value("Assigned", assigned);
     }
 }
 

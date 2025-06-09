@@ -6,24 +6,23 @@ use std::cell::RefCell;
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
-use anyhow::Context as _;
 use dhcp_client_core::inspect::Counters;
 use diagnostics_traits::Inspector;
-use fidl::endpoints::{self, Proxy as _};
+use fidl::endpoints;
 use fidl_fuchsia_net_dhcp::{
     self as fdhcp, ClientExitReason, ClientRequestStream, ClientWatchConfigurationResponse,
     ConfigurationToRequest, NewClientParams,
 };
 use fidl_fuchsia_net_ext::IntoExt as _;
 use futures::channel::mpsc;
-use futures::{select, FutureExt as _, TryStreamExt as _};
+use futures::{StreamExt, TryStreamExt as _};
 use net_types::ip::{Ipv4, Ipv4Addr, PrefixLength};
 use net_types::{SpecifiedAddr, Witness as _};
 use rand::SeedableRng as _;
-use std::pin::pin;
 use {
-    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fuchsia_async as fasync,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fuchsia_async as fasync,
 };
 
 use crate::inspect::{Inspect, LeaseChangeInspect, LeaseInspectProperties, StateInspect};
@@ -60,6 +59,9 @@ impl Error {
                     Self::Exit(ClientExitReason::NetworkUnreachable)
                 }
             },
+            dhcp_client_core::client::Error::AddressEventReceiverEnded => {
+                Self::Exit(ClientExitReason::AddressStateProviderError)
+            }
         }
     }
 }
@@ -183,37 +185,19 @@ struct Client {
 
 struct Lease {
     address_state_provider: fnet_interfaces_admin::AddressStateProviderProxy,
-    event_stream: fnet_interfaces_admin::AddressStateProviderEventStream,
+    // The stream of address_assignment state changes for the address.
+    // This stream is stateful and intertwined with the above
+    // address_state_provider proxy. Care must be taken not to call either
+    // `take_event_stream()` or `watch_address_assignment_state()` directly on
+    // the proxy.
+    assignment_state_stream: futures::stream::BoxStream<
+        'static,
+        Result<
+            fnet_interfaces::AddressAssignmentState,
+            fnet_interfaces_ext::admin::AddressStateProviderError,
+        >,
+    >,
     ip_address: SpecifiedAddr<net_types::ip::Ipv4Addr>,
-}
-
-impl Lease {
-    async fn watch_for_address_removal(
-        &mut self,
-    ) -> Result<fnet_interfaces_admin::AddressRemovalReason, anyhow::Error> {
-        let Self { address_state_provider, event_stream, ip_address: _ } = self;
-
-        let _: zx::Signals = address_state_provider
-            .on_closed()
-            .await
-            .context("unexpected zx::Status while awaiting AddressStateProvider channel close")?;
-
-        let event_stream = event_stream.try_filter_map(|event| async move {
-            match event {
-                fnet_interfaces_admin::AddressStateProviderEvent::OnAddressAdded {} => Ok(None),
-                fnet_interfaces_admin::AddressStateProviderEvent::OnAddressRemoved { error } => {
-                    Ok(Some(error))
-                }
-            }
-        });
-        let mut event_stream = pin!(event_stream);
-
-        event_stream
-            .try_next()
-            .await
-            .context("AddressStateProviderEventStream FIDL error")?
-            .context("AddressStateProvider event stream ended without yielding removal reason")
-    }
 }
 
 impl Client {
@@ -332,13 +316,14 @@ impl Client {
             endpoints::create_proxy::<fnet_interfaces_admin::AddressStateProviderMarker>();
 
         let previous_lease = current_lease.replace(Lease {
-            event_stream: asp_proxy.take_event_stream(),
-            address_state_provider: asp_proxy,
+            address_state_provider: asp_proxy.clone(),
+            assignment_state_stream: fnet_interfaces_ext::admin::assignment_state_stream(asp_proxy)
+                .boxed(),
             ip_address,
         });
 
         if let Some(previous_lease) = previous_lease {
-            self.handle_lease_drop(previous_lease).await?;
+            self.remove_address_for_lease(previous_lease).await?;
         }
 
         let lease_inspect_properties = LeaseInspectProperties {
@@ -437,7 +422,7 @@ impl Client {
             );
         }
 
-        let Lease { event_stream: _, address_state_provider, ip_address } =
+        let Lease { address_state_provider, assignment_state_stream: _, ip_address } =
             current_lease.as_mut().expect("should have current lease if we're handling a renewal");
 
         address_state_provider
@@ -472,37 +457,47 @@ impl Client {
         ))
     }
 
-    async fn handle_lease_drop(&mut self, mut lease: Lease) -> Result<(), Error> {
-        lease.address_state_provider.remove().map_err(Error::Fidl)?;
-        let watch_result = lease.watch_for_address_removal().await;
-        let Lease { address_state_provider: _, event_stream: _, ip_address } = lease;
+    async fn remove_address_for_lease(&mut self, lease: Lease) -> Result<(), Error> {
+        let Lease { address_state_provider, assignment_state_stream, ip_address } = lease;
+        address_state_provider.remove().map_err(Error::Fidl)?;
+        // Wait to observe an error on the assignment_state_stream.
+        let watch_result = assignment_state_stream
+            .filter_map(|result| futures::future::ready(result.err()))
+            .next()
+            .await;
         let debug_log_prefix = &self.config.debug_log_prefix;
 
         match watch_result {
-            Err(e) => {
+            None => log::error!(
+                "{debug_log_prefix} assignment_state_stream unexpectedly ended \
+                while watching for AddressRemovalReason after explicitly \
+                removing address {ip_address}",
+            ),
+            Some(fnet_interfaces_ext::admin::AddressStateProviderError::ChannelClosed) => {
                 log::error!(
-                    "{debug_log_prefix} error watching for \
-                     AddressRemovalReason after explicitly removing address \
-                     {}: {:?}",
-                    ip_address,
-                    e
-                );
+                    "{debug_log_prefix} channel closed while watching for \
+                    AddressRemovalReason after explicitly removing address {ip_address}",
+                )
             }
-            Ok(reason) => match reason {
-                fnet_interfaces_admin::AddressRemovalReason::UserRemoved => (),
-                reason @ (fnet_interfaces_admin::AddressRemovalReason::Invalid
-                | fnet_interfaces_admin::AddressRemovalReason::InvalidProperties
-                | fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned
-                | fnet_interfaces_admin::AddressRemovalReason::DadFailed
-                | fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved) => {
-                    log::error!(
-                        "{debug_log_prefix} unexpected removal reason \
-                        after explicitly removing address {}: {:?}",
-                        ip_address,
-                        reason
-                    );
+            Some(fnet_interfaces_ext::admin::AddressStateProviderError::Fidl(e)) => log::error!(
+                "{debug_log_prefix} error watching for \
+                AddressRemovalReason after explicitly removing address {ip_address}: {e:?}",
+            ),
+            Some(fnet_interfaces_ext::admin::AddressStateProviderError::AddressRemoved(reason)) => {
+                match reason {
+                    fnet_interfaces_admin::AddressRemovalReason::UserRemoved => (),
+                    reason @ (fnet_interfaces_admin::AddressRemovalReason::Invalid
+                    | fnet_interfaces_admin::AddressRemovalReason::InvalidProperties
+                    | fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned
+                    | fnet_interfaces_admin::AddressRemovalReason::DadFailed
+                    | fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved) => {
+                        log::error!(
+                            "{debug_log_prefix} unexpected removal reason \
+                            after explicitly removing address {ip_address}: {reason:?}",
+                        );
+                    }
                 }
-            },
+            }
         };
         Ok(())
     }
@@ -517,7 +512,7 @@ impl Client {
         loop {
             let step = self
                 .watch_configuration_step(packet_socket_provider, udp_socket_provider, counters)
-                .await;
+                .await?;
             let HandledWatchConfigurationStep { state_inspect, lease_inspect, response_to_return } =
                 self.handle_watch_configuration_step(step, packet_socket_provider).await?;
 
@@ -533,139 +528,83 @@ impl Client {
 
     async fn handle_watch_configuration_step(
         &mut self,
-        step: WatchConfigurationStep,
-        packet_socket_provider: &crate::packetsocket::PacketSocketProviderImpl,
+        step: dhcp_client_core::client::Step<fasync::MonotonicInstant, ClientExitReason>,
+        _packet_socket_provider: &crate::packetsocket::PacketSocketProviderImpl,
     ) -> Result<HandledWatchConfigurationStep, Error> {
-        let Self { core, rng: _, config, stop_receiver: _, current_lease, interface_id: _ } = self;
+        let Self { core, rng: _, config, stop_receiver: _, current_lease: _, interface_id: _ } =
+            self;
         match step {
-            WatchConfigurationStep::CurrentLeaseAddressRemoved((reason, ip_address)) => {
-                *current_lease = None;
-                let debug_log_prefix = &config.debug_log_prefix;
-                match reason {
-                    None => return Err(Error::Exit(ClientExitReason::AddressStateProviderError)),
-                    Some(reason) => match reason {
-                        fnet_interfaces_admin::AddressRemovalReason::Invalid => {
-                            panic!("yielded invalid address")
+            dhcp_client_core::client::Step::NextState(transition) => {
+                let (next_core, effect) = core.apply(config, transition);
+                *core = next_core;
+                match effect {
+                    Some(dhcp_client_core::client::TransitionEffect::DropLease {
+                        address_rejected,
+                    }) => {
+                        let current_lease =
+                            self.current_lease.take().expect("should have current lease");
+                        // Skip manual removal of the address, if it was
+                        // rejected (and hence already removed).
+                        if !address_rejected {
+                            self.remove_address_for_lease(current_lease).await?;
                         }
-                        fnet_interfaces_admin::AddressRemovalReason::InvalidProperties => {
-                            panic!("used invalid properties")
-                        }
-                        fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved => {
-                            log::warn!("{debug_log_prefix} interface removed; stopping");
-                            return Err(Error::Exit(ClientExitReason::InvalidInterface));
-                        }
-                        fnet_interfaces_admin::AddressRemovalReason::UserRemoved => {
-                            log::warn!(
-                                "{debug_log_prefix} address \
-                                administratively removed; stopping"
-                            );
-                            return Err(Error::Exit(ClientExitReason::AddressRemovedByUser));
-                        }
-                        fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned => {
-                            log::warn!(
-                                "{debug_log_prefix} address already assigned; notifying core"
-                            );
-                        }
-                        fnet_interfaces_admin::AddressRemovalReason::DadFailed => {
-                            log::warn!(
-                                "{debug_log_prefix} duplicate address detected; notifying core"
-                            );
-                        }
-                    },
-                };
-
-                match core
-                    .on_address_rejection(config, packet_socket_provider, &Clock, ip_address)
-                    .await
-                    .map_err(Error::from_core)?
-                {
-                    dhcp_client_core::client::AddressRejectionOutcome::ShouldBeImpossible => {
-                        unreachable!("should not observe address rejection without active lease");
-                    }
-                    dhcp_client_core::client::AddressRejectionOutcome::NextState(state) => {
-                        *core = state;
                         Ok(HandledWatchConfigurationStep {
                             state_inspect: StateInspect {
-                                state: *core,
+                                state: next_core,
                                 time: fasync::MonotonicInstant::now(),
                             },
                             lease_inspect: LeaseChangeInspect::LeaseDropped,
                             response_to_return: None,
                         })
                     }
-                }
-            }
-            WatchConfigurationStep::CoreStep(core_step) => {
-                match core_step? {
-                    dhcp_client_core::client::Step::NextState(transition) => {
-                        let (next_core, effect) = core.apply(config, transition);
-                        *core = next_core;
-                        match effect {
-                            Some(dhcp_client_core::client::TransitionEffect::DropLease) => {
-                                let current_lease =
-                                    self.current_lease.take().expect("should have current lease");
-                                self.handle_lease_drop(current_lease).await?;
-                                Ok(HandledWatchConfigurationStep {
-                                    state_inspect: StateInspect {
-                                        state: next_core,
-                                        time: fasync::MonotonicInstant::now(),
-                                    },
-                                    lease_inspect: LeaseChangeInspect::LeaseDropped,
-                                    response_to_return: None,
-                                })
-                            }
-                            Some(dhcp_client_core::client::TransitionEffect::HandleNewLease(
-                                newly_acquired_lease,
-                            )) => {
-                                let (response, lease_inspect) =
-                                    self.handle_newly_acquired_lease(newly_acquired_lease).await?;
-                                let start_time = fasync::MonotonicInstant::now();
-                                Ok(HandledWatchConfigurationStep {
-                                    state_inspect: StateInspect {
-                                        state: next_core,
-                                        time: start_time,
-                                    },
-                                    lease_inspect,
-                                    response_to_return: Some(response),
-                                })
-                            }
-                            Some(
-                                dhcp_client_core::client::TransitionEffect::HandleRenewedLease(
-                                    lease_renewal,
-                                ),
-                            ) => {
-                                let (response, lease_inspect) =
-                                    self.handle_lease_renewal(lease_renewal).await?;
-                                Ok(HandledWatchConfigurationStep {
-                                    state_inspect: StateInspect {
-                                        state: next_core,
-                                        time: fasync::MonotonicInstant::now(),
-                                    },
-                                    lease_inspect,
-                                    response_to_return: Some(response),
-                                })
-                            }
-                            None => Ok(HandledWatchConfigurationStep {
-                                state_inspect: StateInspect {
-                                    state: *core,
-                                    time: fasync::MonotonicInstant::now(),
-                                },
-                                lease_inspect: LeaseChangeInspect::NoChange,
-                                response_to_return: None,
-                            }),
-                        }
+                    Some(dhcp_client_core::client::TransitionEffect::HandleNewLease(
+                        newly_acquired_lease,
+                    )) => {
+                        let (response, lease_inspect) =
+                            self.handle_newly_acquired_lease(newly_acquired_lease).await?;
+                        let start_time = fasync::MonotonicInstant::now();
+                        Ok(HandledWatchConfigurationStep {
+                            state_inspect: StateInspect { state: next_core, time: start_time },
+                            lease_inspect,
+                            response_to_return: Some(response),
+                        })
                     }
-                    dhcp_client_core::client::Step::Exit(reason) => match reason {
-                        dhcp_client_core::client::ExitReason::GracefulShutdown => {
-                            if let Some(current_lease) = self.current_lease.take() {
-                                // TODO(https://fxbug.dev/42079439): Send DHCPRELEASE.
-                                self.handle_lease_drop(current_lease).await?;
-                            }
-                            return Err(Error::Exit(ClientExitReason::GracefulShutdown));
-                        }
-                    },
+                    Some(dhcp_client_core::client::TransitionEffect::HandleRenewedLease(
+                        lease_renewal,
+                    )) => {
+                        let (response, lease_inspect) =
+                            self.handle_lease_renewal(lease_renewal).await?;
+                        Ok(HandledWatchConfigurationStep {
+                            state_inspect: StateInspect {
+                                state: next_core,
+                                time: fasync::MonotonicInstant::now(),
+                            },
+                            lease_inspect,
+                            response_to_return: Some(response),
+                        })
+                    }
+                    None => Ok(HandledWatchConfigurationStep {
+                        state_inspect: StateInspect {
+                            state: *core,
+                            time: fasync::MonotonicInstant::now(),
+                        },
+                        lease_inspect: LeaseChangeInspect::NoChange,
+                        response_to_return: None,
+                    }),
                 }
             }
+            dhcp_client_core::client::Step::Exit(reason) => match reason {
+                dhcp_client_core::client::ExitReason::GracefulShutdown => {
+                    if let Some(current_lease) = self.current_lease.take() {
+                        // TODO(https://fxbug.dev/42079439): Send DHCPRELEASE.
+                        self.remove_address_for_lease(current_lease).await?;
+                    }
+                    return Err(Error::Exit(ClientExitReason::GracefulShutdown));
+                }
+                dhcp_client_core::client::ExitReason::AddressRemoved(reason) => {
+                    return Err(Error::Exit(reason))
+                }
+            },
         }
     }
 
@@ -674,73 +613,111 @@ impl Client {
         packet_socket_provider: &crate::packetsocket::PacketSocketProviderImpl,
         udp_socket_provider: &impl dhcp_client_core::deps::UdpSocketProvider,
         counters: &Counters,
-    ) -> WatchConfigurationStep {
+    ) -> Result<dhcp_client_core::client::Step<fasync::MonotonicInstant, ClientExitReason>, Error>
+    {
         let Self { core, rng, config, stop_receiver, current_lease, interface_id } = self;
         let clock = Clock;
 
-        // Notice that we are `select`ing between the following two futures,
-        // and when one of them completes we throw away progress on the
-        // other one:
-        // 1) Watching for a previously-acquired address to be removed
-        // 2) Running the current state machine state
-        //
-        // If (1) completes, throwing away progress on (2) is okay because
-        // we always need to either transition back to the Init state or
-        // exit the client when an address is removed -- in both cases we're
-        // fine with throwing away whatever state-execution progress we'd
-        // previously made.
-        //
-        // If (2) completes, throwing away progress on (1) is okay because
-        // we'll be in one of two scenarios:
-        // a) We've transitioned to another state that maintains the same
-        //    lease (e.g. going from Bound to Renewing for the same
-        //    address). In this case, we won't modify the `current_lease`
-        //    field, and we'll observe that the AddressStateProvider has
-        //    been closed on the next iteration of this loop.
-        // b) We've transitioned to a state that entails removing the lease
-        //    (e.g. failing to Rebind and having to go back to Init), at
-        //    which point `current_lease` will be cleared for the next
-        //    iteration.
-        let mut core_step_fut = pin!(core
-            .run(
-                config,
-                packet_socket_provider,
-                udp_socket_provider,
-                rng,
-                &clock,
-                stop_receiver,
-                counters
-            )
-            .fuse());
-        let mut address_removed_fut = pin!(async {
-            match current_lease {
-                Some(current_lease) => match current_lease.watch_for_address_removal().await {
-                    Ok(reason) => (Some(reason), current_lease.ip_address),
-                    Err(e) => {
-                        let debug_log_prefix = &config.debug_log_prefix;
-                        log::error!(
-                            "{debug_log_prefix} observed error {:?} while watching for removal \
-                            of address {} on interface {}; \
-                            removing address",
-                            e,
-                            *current_lease.ip_address,
-                            interface_id
-                        );
-                        (None, current_lease.ip_address)
-                    }
-                },
-                None => futures::future::pending().await,
+        let mut address_event_stream = match current_lease {
+            None => futures::stream::pending().left_stream(),
+            Some(Lease { address_state_provider: _, assignment_state_stream, ip_address }) => {
+                assignment_state_stream
+                    .map(|event| into_address_event(event, config, ip_address, interface_id))
+                    .right_stream()
             }
         }
-        .fuse());
+        .fuse();
 
-        select! {
-            address_removed = address_removed_fut => {
-                WatchConfigurationStep::CurrentLeaseAddressRemoved(address_removed)
-            },
-            core_step = core_step_fut => {
-                WatchConfigurationStep::CoreStep(core_step.map_err(Error::from_core))
-            },
+        core.run(
+            config,
+            packet_socket_provider,
+            udp_socket_provider,
+            rng,
+            &clock,
+            stop_receiver,
+            &mut address_event_stream,
+            counters,
+        )
+        .await
+        .map_err(Error::from_core)
+    }
+}
+
+/// Convert an event on the AddressStateProvider assignment_state_stream
+/// into a [`dhcp_client_core::client::AddressEvent`].
+fn into_address_event(
+    event: Result<
+        fnet_interfaces::AddressAssignmentState,
+        fnet_interfaces_ext::admin::AddressStateProviderError,
+    >,
+    config: &dhcp_client_core::client::ClientConfig,
+    ip_address: &SpecifiedAddr<Ipv4Addr>,
+    interface_id: &NonZeroU64,
+) -> dhcp_client_core::client::AddressEvent<ClientExitReason> {
+    let debug_log_prefix = &config.debug_log_prefix;
+    match event {
+        Ok(state) => {
+            let new_state = match state {
+                fnet_interfaces::AddressAssignmentState::Assigned => {
+                    dhcp_client_core::client::AddressAssignmentState::Assigned
+                }
+                fnet_interfaces::AddressAssignmentState::Tentative => {
+                    dhcp_client_core::client::AddressAssignmentState::Tentative
+                }
+                fnet_interfaces::AddressAssignmentState::Unavailable => {
+                    dhcp_client_core::client::AddressAssignmentState::Unavailable
+                }
+            };
+            dhcp_client_core::client::AddressEvent::AssignmentStateChanged(new_state)
+        }
+        Err(fnet_interfaces_ext::admin::AddressStateProviderError::AddressRemoved(reason)) => {
+            match reason {
+                r @ fnet_interfaces_admin::AddressRemovalReason::Invalid
+                | r @ fnet_interfaces_admin::AddressRemovalReason::InvalidProperties => {
+                    panic!("invalid address removal: {r:?}")
+                }
+                fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved => {
+                    log::warn!("{debug_log_prefix} interface removed");
+                    dhcp_client_core::client::AddressEvent::Removed(
+                        ClientExitReason::InvalidInterface,
+                    )
+                }
+                fnet_interfaces_admin::AddressRemovalReason::UserRemoved => {
+                    log::warn!("{debug_log_prefix} address administratively removed");
+                    dhcp_client_core::client::AddressEvent::Removed(
+                        ClientExitReason::AddressRemovedByUser,
+                    )
+                }
+                r @ fnet_interfaces_admin::AddressRemovalReason::AlreadyAssigned
+                | r @ fnet_interfaces_admin::AddressRemovalReason::DadFailed => {
+                    log::warn!("{debug_log_prefix} address rejected: {r:?}");
+                    dhcp_client_core::client::AddressEvent::Rejected
+                }
+            }
+        }
+        Err(fnet_interfaces_ext::admin::AddressStateProviderError::Fidl(e)) => {
+            log::error!(
+                "{debug_log_prefix} observed error {e:?} while watching for \
+                address event for address {ip_address} on interface {interface_id}; \
+                removing address",
+            );
+            // Note: treat AddressStateProvider FIDL errors the same as address
+            // removal. This ultimately leads to the client exiting.
+            dhcp_client_core::client::AddressEvent::Removed(
+                ClientExitReason::AddressStateProviderError,
+            )
+        }
+        Err(fnet_interfaces_ext::admin::AddressStateProviderError::ChannelClosed) => {
+            log::error!(
+                "{debug_log_prefix} observed channel closed while watching for \
+                address event for address {ip_address} on interface {interface_id};\
+                removing address",
+            );
+            // Note: treat AddressStateProvider channel closure the same as
+            // address removal. This ultimately leads to the client exiting.
+            dhcp_client_core::client::AddressEvent::Removed(
+                ClientExitReason::AddressStateProviderError,
+            )
         }
     }
 }
@@ -749,13 +726,6 @@ struct HandledWatchConfigurationStep {
     state_inspect: StateInspect,
     lease_inspect: LeaseChangeInspect,
     response_to_return: Option<ClientWatchConfigurationResponse>,
-}
-
-enum WatchConfigurationStep {
-    CurrentLeaseAddressRemoved(
-        (Option<fnet_interfaces_admin::AddressRemovalReason>, SpecifiedAddr<Ipv4Addr>),
-    ),
-    CoreStep(Result<dhcp_client_core::client::Step<fasync::MonotonicInstant>, Error>),
 }
 
 fn into_fidl_list(list: Vec<std::net::Ipv4Addr>) -> Vec<fidl_fuchsia_net::Ipv4Address> {

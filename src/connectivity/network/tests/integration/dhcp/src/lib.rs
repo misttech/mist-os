@@ -628,22 +628,26 @@ async fn does_not_crash_with_overlapping_subnet_route<
 #[netstack_test]
 #[variant(SERVER, Netstack)]
 #[variant(CLIENT, NetstackAndDhcpClient)]
+// The common case: Verify that the client successfully enters renewal after
+// having observed the address become assigned.
+#[test_case(1, 10; "renew_after_assigned")]
+// The uncommon case: Verify that if the address is not assigned by the time
+// the client enters renewal, the client handles it gracefully (deferring
+// renewal, until the address becomes available).
+#[test_case(5, 2; "renew_before_assigned")]
 async fn acquire_then_renew_with_dhcpd_bound_device<
     SERVER: Netstack,
     CLIENT: NetstackAndDhcpClient,
 >(
     name: &str,
+    num_dad_transmits: u16,
+    renew_seconds: u32,
 ) {
     let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
     let network = DhcpTestNetwork::new(DEFAULT_NETWORK_NAME, &sandbox);
 
     // A realistic lease length that won't expire within the test timeout of 2 minutes.
     const LONG_LEASE: u32 = 60 * 60 * 24;
-    // A short client renewal time which will trigger well before the test timeout of 2 minutes.
-    // This time is intentionally long enough to allow DAD to finish prior to entering renewal.
-    // TODO(https://fxbug.dev/420987904): Add test coverage of entering renewal
-    // before DAD finishes.
-    const SHORT_RENEW: u32 = 10;
 
     let mut parameters = dhcpv4_helper::DEFAULT_TEST_CONFIG.dhcp_parameters();
     parameters.push(fidl_fuchsia_net_dhcp::Parameter::Lease(fidl_fuchsia_net_dhcp::LeaseLength {
@@ -661,9 +665,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device<
                     ep_type: DhcpEndpointType::Client {
                         expected_acquired: dhcpv4_helper::DEFAULT_TEST_CONFIG.expected_acquired(),
                         static_address: None,
-                        // NB: Use fewer DAD transmits than the default to speed
-                        // up the test.
-                        ipv4_dad_transmits_override: Some(1),
+                        ipv4_dad_transmits_override: Some(num_dad_transmits),
                     },
                     network: &network,
                 }],
@@ -684,7 +686,7 @@ async fn acquire_then_renew_with_dhcpd_bound_device<
                     settings: Settings {
                         parameters: &mut parameters.to_vec(),
                         options: &mut [fidl_fuchsia_net_dhcp::Option_::RenewalTimeValue(
-                            SHORT_RENEW,
+                            renew_seconds,
                         )],
                     },
                 }],
