@@ -1,0 +1,120 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/assembly/assembled_system.gni")
+import("//build/assembly/product_assembly_configuration.gni")
+import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
+import("//build/sdk/product_bundle.gni")
+import("//build/testing/config.gni")
+import("//build/testing/symbols_dir_test_data.gni")
+import("//src/developer/ffx/lib/e2e_emu/ffx_e2e_test.gni")
+
+group("host_tests") {
+  testonly = true
+
+  # TODO(https://fxbug.dev/42073131): ASAN builds use a different allocator that
+  # heapdump's instrumentation does not support yet.
+  if (!is_asan) {
+    deps = [ ":verify_dupefinder_e2e($host_toolchain)" ]
+  }
+}
+
+if (is_host) {
+  _dupefinder_path = "$root_out_dir/dupefinder"
+  host_test_data("verify_dupefinder_data") {
+    sources = [ _dupefinder_path ]
+    deps = [ "//tools/dupefinder:bin" ]
+  }
+
+  ffx_e2e_test("verify_dupefinder_e2e") {
+    testonly = true
+    edition = "2021"
+    source_root = "lib.rs"
+    sources = [ source_root ]
+    deps = [
+      "//src/developer/ffx/lib/e2e_emu",
+      "//src/lib/fuchsia",
+      "//third_party/rust_crates:log",
+      "//third_party/rust_crates:serde_json",
+      "//tools/dupefinder:lib",
+    ]
+
+    data_deps = [ ":verify_dupefinder_data" ]
+
+    product_bundle = ":product_bundle($default_toolchain)"
+
+    env = [
+      "DUPEFINDER_PATH=" + rebase_path(_dupefinder_path, root_build_dir),
+      "EXPECTED_FILENAME=" +
+          rebase_path("duplicate_allocations.rs", root_build_dir),
+    ]
+  }
+}
+
+if (is_fuchsia) {
+  rustc_binary("duplicate_allocations_bin") {
+    testonly = true
+    edition = "2021"
+    source_root = "duplicate_allocations.rs"
+    sources = [ source_root ]
+    deps = [ "//src/performance/memory/heapdump/instrumentation" ]
+  }
+
+  fuchsia_package_with_single_component("duplicate_allocations") {
+    testonly = true
+    manifest = "meta/duplicates.cml"
+    deps = [ ":duplicate_allocations_bin" ]
+    subpackages = [ "//src/performance/memory/heapdump/collector" ]
+  }
+}
+
+# Don't let the assembly templates expand except on the default toolchain. Weirndess ensues if
+# they're expanded on variant toolchains like for asan.
+if (current_toolchain == default_toolchain) {
+  _outdir = target_out_dir + "/fuchsia"
+
+  product_bundle("product_bundle") {
+    testonly = true
+    name = "verify_dupefinder_e2e"
+
+    if (target_cpu == "arm64") {
+      partitions = "//boards/partitions:arm64"
+    } else if (target_cpu == "x64") {
+      partitions = "//boards/partitions:x64"
+    } else {
+      assert(false, "unsupported arch $target_cpu")
+    }
+    system_a = _outdir
+
+    deps = [ ":assembly" ]
+  }
+
+  assembled_system("assembly") {
+    testonly = true
+    image_name = "fuchsia"
+
+    if (target_cpu == "arm64") {
+      board_config_label = "//boards/arm64"
+    } else if (target_cpu == "x64") {
+      board_config_label = "//boards/x64"
+    } else {
+      assert(false, "unsupported arch $target_cpu")
+    }
+    generate_fxfs = true
+    product_assembly_config_label = ":product_assembly_config"
+  }
+
+  product_assembly_configuration("product_assembly_config") {
+    testonly = true
+    platform = {
+      build_type = "eng"
+    }
+    base_packages = [
+      {
+        package_target = ":duplicate_allocations"
+      },
+    ]
+  }
+}

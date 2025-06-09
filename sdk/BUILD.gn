@@ -1064,6 +1064,7 @@ if (current_toolchain == default_toolchain) {
         "//src/developer/ffx/plugins/target/package/explore/tests:verify_ffx_target_package_explore_emulator_data",
         "//src/developer/ffx/plugins/target/ssh:ffx_target_ssh_e2e_tests_emulator_data",
         "//src/developer/ffx/tools/power/system-activity/application-activity:ffx_power_system_activity_application_activity_e2e_tests_emulator_data",
+        "//tools/dupefinder/tests/e2e:verify_dupefinder_e2e_emulator_data",
         "//vendor/*",
       ]
 
