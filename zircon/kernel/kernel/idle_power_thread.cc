@@ -67,13 +67,13 @@ void IdlePowerThread::UpdateMonotonicClock(cpu_num_t current_cpu,
   DEBUG_ASSERT(arch_ints_disabled());
 
   if (current_cpu == BOOT_CPU_ID) {
-    if (current_state == kActiveToSuspend) {
+    if (current_state.current == State::Suspend) {
       // If we are suspending the system, the boot CPU has to pause the monotonic clock.
       timer_pause_monotonic();
       return;
     }
 
-    if (current_state == kSuspendToWakeup) {
+    if (current_state.current == State::Wakeup) {
       // If we are resuming the system, the boot CPU has to unpause the monotonic clock.
       // It must also update its platform timer to account for any monotonic timers that
       // are present.
@@ -86,7 +86,7 @@ void IdlePowerThread::UpdateMonotonicClock(cpu_num_t current_cpu,
     return;
   }
 
-  if (current_state == kSuspendToActive) {
+  if (current_state.current == State::Active) {
     // If we are resuming the system, the secondary CPUs have to reset their platform
     // timers to account for any monotonic timers that are present.
     percpu::Get(current_cpu).timer_queue.UpdatePlatformTimer();
@@ -132,16 +132,23 @@ int IdlePowerThread::Run(void* arg) {
         case State::Active:
         case State::Wakeup:
         case State::Suspend: {
-          // Update the monotonic clock if we need to.
-          UpdateMonotonicClock(cpu_num, state);
-
           // Complete the requested transition, which could be interrupted by a wake trigger.
+          //
+          // Take care to only update the monotonic clock after we have succeeded in transitioning
+          // to the desired state.
           StateMachine expected = state;
-          const bool success = this_idle_power_thread.CompareExchangeState(
-              expected, {.current = state.target, .target = state.target});
-          DEBUG_ASSERT_MSG(success || expected == kSuspendToWakeup || expected == kWakeup,
-                           "current=%s target=%s", ToString(expected.current),
-                           ToString(expected.target));
+          const StateMachine desired = {.current = state.target, .target = state.target};
+          const bool success = this_idle_power_thread.CompareExchangeState(expected, desired);
+          if (success) {
+            DEBUG_ASSERT_MSG(desired.current == desired.target, "current=%s target=%s",
+                             ToString(desired.current), ToString(desired.target));
+            UpdateMonotonicClock(cpu_num, desired);
+
+          } else {
+            DEBUG_ASSERT_MSG(expected == kSuspendToWakeup || expected == kWakeup,
+                             "current=%s target=%s", ToString(expected.current),
+                             ToString(expected.target));
+          }
           this_idle_power_thread.complete_.Signal();
           break;
         }

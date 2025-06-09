@@ -166,10 +166,10 @@ class IdlePowerThread final {
   // This function does different things depending on the current_cpu and current_state.
   //
   // 1. If the current_cpu is equal to the boot CPU, and:
-  //    a. If the state indicates that we are suspending, then pause the monotonic clock.
+  //    a. If the state indicates that we are suspended, then pause the monotonic clock.
   //    b. If the state indicates that we are waking up, then unpause the monotonic clock and update
   //       the platform timer.
-  // 2. If the current_cpu is a secondary CPU and the state indicates that we are resuming, then
+  // 2. If the current_cpu is a secondary CPU and the state indicates that we are active, then
   //    just update the platform timer.
   //
   // The boot CPU is responsible for pausing and resuming the clock since it is the last CPU to
