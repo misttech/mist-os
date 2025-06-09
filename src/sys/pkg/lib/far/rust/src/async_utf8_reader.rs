@@ -53,6 +53,10 @@ where
     pub async fn read_file(&mut self, path: &str) -> Result<Vec<u8>, Error> {
         self.reader.read_file(path.as_bytes()).await
     }
+
+    pub fn into_source(self) -> T {
+        self.reader.into_source()
+    }
 }
 
 #[cfg(test)]
