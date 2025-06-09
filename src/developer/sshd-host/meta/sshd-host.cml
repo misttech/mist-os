@@ -279,6 +279,8 @@
                 "fuchsia.storage.ext4.Server",
                 "fuchsia.test.manager.Query",
                 "fuchsia.test.manager.RunBuilder",
+                "fuchsia.test.manager.SuiteRunner",
+                "fuchsia.test.manager.TestCaseEnumerator",
                 "fuchsia.tracing.controller.Provisioner",
                 "fuchsia.tracing.controller.Session",
                 "fuchsia.tracing.perfetto.ProducerConnector",

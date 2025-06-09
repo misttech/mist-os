@@ -12,5 +12,5 @@ use {
 pub trait DriverConnector {
     async fn get_driver_development_proxy(&self, select: bool) -> Result<fdd::ManagerProxy>;
     async fn get_driver_registrar_proxy(&self, select: bool) -> Result<fdr::DriverRegistrarProxy>;
-    async fn get_run_builder_proxy(&self) -> Result<ftm::RunBuilderProxy>;
+    async fn get_suite_runner_proxy(&self) -> Result<ftm::SuiteRunnerProxy>;
 }

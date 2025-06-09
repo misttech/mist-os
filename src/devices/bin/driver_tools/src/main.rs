@@ -36,8 +36,9 @@ impl driver_connector::DriverConnector for DriverConnector {
             .context("Failed to connect to driver registrar service")
     }
 
-    async fn get_run_builder_proxy(&self) -> Result<ftm::RunBuilderProxy> {
-        unreachable!();
+    async fn get_suite_runner_proxy(&self) -> Result<ftm::SuiteRunnerProxy> {
+        client::connect_to_protocol::<ftm::SuiteRunnerMarker>()
+            .context("Failed to connect to test manager service")
     }
 }
 

@@ -120,8 +120,8 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
     fn new_entity(&self, entity: &EntityId, name: &str) -> Result<(), Error> {
         let mut map = self.entity_state_map.lock();
         map.insert(entity.clone(), EntityState::new(name));
-        if let EntityId::Case { suite, .. } = entity {
-            map.get_mut(&EntityId::Suite(*suite)).unwrap().children.push(entity.clone());
+        if let EntityId::Case { .. } = entity {
+            map.get_mut(&EntityId::Suite).unwrap().children.push(entity.clone());
         }
         Ok(())
     }
@@ -143,7 +143,7 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
         let name = entity_entry.name().to_string();
         match entity {
             EntityId::TestRun => (),
-            EntityId::Suite(_) => writeln!(writer, "Running test '{}'", name)?,
+            EntityId::Suite => writeln!(writer, "Running test '{}'", name)?,
             EntityId::Case { .. } => {
                 writeln!(writer, "[RUNNING]\t{}", name)?;
                 entity_entry.excessive_duration_task = Some(fasync::Task::spawn(async move {
@@ -177,7 +177,7 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
         let _ = entity_entry.excessive_duration_task.take();
         match entity {
             EntityId::TestRun => (),
-            EntityId::Suite(_) => (),
+            EntityId::Suite => (),
             EntityId::Case { .. } => {
                 // We don't list error result as it indicates the test didn't finish.
                 if *outcome != ReportedOutcome::Error {
@@ -200,7 +200,7 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
         let children: Vec<_> = entity_entry.children.iter().cloned().collect();
         match entity {
             EntityId::TestRun => (),
-            EntityId::Suite(_) => {
+            EntityId::Suite => {
                 if matches!(entity_entry.run_state, EntityRunningState::NotRunning) {
                     // no need to output a report if the test wasn't even started.
                     return Ok(());
@@ -363,14 +363,13 @@ impl<W: 'static + Write + Send + Sync> Reporter for ShellReporter<W> {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::output::{CaseId, RunReporter, SuiteId};
+    use crate::output::{CaseId, RunReporter};
 
     #[fuchsia::test]
     async fn report_case_events() {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
-        let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        let suite_reporter = run_reporter.new_suite("test-suite").expect("create suite");
         suite_reporter.started(Timestamp::Unknown).expect("case started");
         let mut expected = "Running test 'test-suite'\n".to_string();
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
@@ -417,8 +416,7 @@ mod test {
 
         for suite_number in 0..4 {
             let suite_name = format!("test-suite-{:?}", suite_number);
-            let suite_reporter =
-                run_reporter.new_suite(&suite_name, &SuiteId(0)).expect("create suite");
+            let suite_reporter = run_reporter.new_suite(&suite_name).expect("create suite");
             suite_reporter.started(Timestamp::Unknown).expect("case started");
             expected.push_str(&format!("Running test '{}'\n", &suite_name));
             assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
@@ -453,8 +451,7 @@ mod test {
     async fn report_case_skipped() {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
-        let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        let suite_reporter = run_reporter.new_suite("test-suite").expect("create suite");
         suite_reporter.started(Timestamp::Unknown).expect("case started");
         let mut expected = "Running test 'test-suite'\n".to_string();
         assert_eq!(String::from_utf8(output.lock().clone()).unwrap(), expected,);
@@ -489,8 +486,7 @@ mod test {
     async fn syslog_artifacts() {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
-        let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        let suite_reporter = run_reporter.new_suite("test-suite").expect("create suite");
         suite_reporter.started(Timestamp::Unknown).expect("case started");
         let mut syslog_writer =
             suite_reporter.new_artifact(&ArtifactType::Syslog).expect("create syslog");
@@ -516,8 +512,7 @@ mod test {
     async fn report_retricted_logs() {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
-        let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        let suite_reporter = run_reporter.new_suite("test-suite").expect("create suite");
         suite_reporter.started(Timestamp::Unknown).expect("case started");
 
         let case_reporter = suite_reporter.new_case("case-0", &CaseId(0)).expect("create case");
@@ -553,8 +548,7 @@ mod test {
     async fn stdout_artifacts() {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
-        let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        let suite_reporter = run_reporter.new_suite("test-suite").expect("create suite");
         suite_reporter.started(Timestamp::Unknown).expect("case started");
 
         let case_0_reporter = suite_reporter.new_case("case-0", &CaseId(0)).expect("create case");
@@ -598,8 +592,7 @@ mod test {
     async fn report_unfinished() {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
-        let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        let suite_reporter = run_reporter.new_suite("test-suite").expect("create suite");
         suite_reporter.started(Timestamp::Unknown).expect("suite started");
 
         let case_reporter = suite_reporter.new_case("case-0", &CaseId(0)).expect("create case");
@@ -640,8 +633,7 @@ mod test {
     async fn report_cancelled_suite() {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
-        let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        let suite_reporter = run_reporter.new_suite("test-suite").expect("create suite");
         suite_reporter.started(Timestamp::Unknown).expect("suite started");
 
         let case_reporter = suite_reporter.new_case("case", &CaseId(0)).expect("create new case");
@@ -666,8 +658,7 @@ mod test {
     async fn report_suite_did_not_finish() {
         let (shell_reporter, output) = ShellReporter::new_expose_writer_for_test();
         let run_reporter = RunReporter::new(shell_reporter);
-        let suite_reporter =
-            run_reporter.new_suite("test-suite", &SuiteId(0)).expect("create suite");
+        let suite_reporter = run_reporter.new_suite("test-suite").expect("create suite");
         suite_reporter.started(Timestamp::Unknown).expect("suite started");
 
         let case_reporter = suite_reporter.new_case("case", &CaseId(0)).expect("create new case");

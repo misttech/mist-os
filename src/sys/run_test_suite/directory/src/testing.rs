@@ -2,7 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{ArtifactMetadata, MaybeUnknown, Outcome, SuiteResult, TestCaseResult, TestRunResult};
+use crate::{
+    ArtifactMetadata, ArtifactType, MaybeUnknown, Outcome, SuiteResult, TestCaseResult,
+    TestRunResult,
+};
 use std::collections::{HashMap, HashSet};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
@@ -158,10 +161,25 @@ pub fn assert_suite_result(
 
     assert_eq!(tags, expected_tags);
 
+    // Filter out the debug artifacts. Debug artifacts can be generated or not by the same
+    // test. This optional presence can't be expressed gy the Expected types. This wasn't a
+    // problem when the debug artifact was associated with the run (rather than the suite),
+    // because we simply refrain from checking artifacts on the run. We do check artifacts
+    // on the suite, so we remove the debug artifact here. This turns out to be much easier
+    // than adding optionality to artifact expectations.
+    let filtered_artifacts: HashMap<PathBuf, ArtifactMetadata> = common
+        .deref()
+        .artifact_dir
+        .artifacts
+        .clone()
+        .into_iter()
+        .filter(|(_, value)| value.artifact_type != ArtifactType::Debug.into())
+        .collect();
+
     assert_artifacts(
         root,
         &common.deref().artifact_dir.root,
-        &common.deref().artifact_dir.artifacts,
+        &filtered_artifacts,
         &expected_suite.artifacts,
         context,
     );
