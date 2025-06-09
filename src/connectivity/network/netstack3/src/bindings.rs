@@ -76,6 +76,7 @@ use devices::{
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use multicast_admin::{MulticastAdminEventSinks, MulticastAdminWorkers};
 use ndp_watcher::RouterAdvertisementSinkError;
+use power::{PowerWorker, PowerWorkerSink};
 use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
 use crate::bindings::bpf::EbpfManager;
@@ -159,6 +160,7 @@ mod ctx {
             resource_removal: ResourceRemovalSink,
             multicast_admin: MulticastAdminEventSinks,
             ndp_ra_sink: ndp_watcher::WorkerRouterAdvertisementSink,
+            power: PowerWorkerSink,
         ) -> Self {
             let mut bindings_ctx = BindingsCtx(Arc::new(BindingsCtxInner::new(
                 config,
@@ -166,6 +168,7 @@ mod ctx {
                 resource_removal,
                 multicast_admin,
                 ndp_ra_sink,
+                power,
             )));
             let persistence::State { opaque_iid_secret_key } =
                 persistence::State::load_or_create(&mut bindings_ctx.rng());
@@ -222,6 +225,7 @@ mod ctx {
         pub(crate) neighbor_watcher_sink: mpsc::Sender<neighbor_worker::NewWatcher>,
         pub(crate) resource_removal_worker: ResourceRemovalWorker,
         pub(crate) multicast_admin_workers: MulticastAdminWorkers,
+        pub(crate) power_worker: PowerWorker,
     }
 
     impl NetstackSeed {
@@ -233,12 +237,14 @@ mod ctx {
             let (multicast_admin_workers, multicast_admin_sinks) =
                 multicast_admin::new_workers_and_sinks();
             let (ndp_watcher_worker, ndp_watcher_sink, ndp_ra_sink) = ndp_watcher::Worker::new();
+            let (power_worker, power_sink) = PowerWorker::new();
             let ctx = Ctx::new(
                 config,
                 routes_change_sink,
                 resource_removal_sink,
                 multicast_admin_sinks,
                 ndp_ra_sink,
+                power_sink,
             );
             let (neighbor_worker, neighbor_watcher_sink, neighbor_event_sink) =
                 neighbor_worker::new_worker();
@@ -253,6 +259,7 @@ mod ctx {
                 neighbor_watcher_sink,
                 resource_removal_worker,
                 multicast_admin_workers,
+                power_worker,
             }
         }
     }
@@ -373,6 +380,7 @@ pub(crate) struct BindingsCtxInner {
     config: GlobalConfig,
     counters: BindingsCounters,
     ebpf_manager: EbpfManager,
+    power: PowerWorkerSink,
 }
 
 impl BindingsCtxInner {
@@ -382,6 +390,7 @@ impl BindingsCtxInner {
         resource_removal: ResourceRemovalSink,
         multicast_admin: MulticastAdminEventSinks,
         ndp_ra_sink: ndp_watcher::WorkerRouterAdvertisementSink,
+        power: PowerWorkerSink,
     ) -> Self {
         Self {
             timers: Default::default(),
@@ -393,6 +402,7 @@ impl BindingsCtxInner {
             config,
             counters: Default::default(),
             ebpf_manager: Default::default(),
+            power,
         }
     }
 }
@@ -1198,6 +1208,7 @@ impl NetstackSeed {
             neighbor_watcher_sink,
             resource_removal_worker,
             mut multicast_admin_workers,
+            power_worker,
         } = self;
 
         // Declare distinct levels of workers, organized by shutdown order
@@ -1242,6 +1253,11 @@ impl NetstackSeed {
         let resource_removal_task = level2_workers
             .spawn_new_guard_assert_cancelled(resource_removal_worker.run())
             .expect("scope cancelled");
+
+        // We don't need to join the power worker task, it should be resilient
+        // to being dropped alongside the other level2 workers.
+        let _: fasync::JoinHandle<()> = level2_workers
+            .spawn(power_worker.run(netstack.ctx.bindings_ctx().config.suspend_enabled));
 
         netstack.add_default_rule::<Ipv4>().await;
         netstack.add_default_rule::<Ipv6>().await;

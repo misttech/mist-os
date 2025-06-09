@@ -13,7 +13,7 @@ use super::DeviceIdExt;
 use assert_matches::assert_matches;
 use derivative::Derivative;
 use fuchsia_async as fasync;
-use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _};
+use futures::{FutureExt as _, StreamExt as _};
 use itertools::Itertools as _;
 use net_types::ethernet::Mac;
 use net_types::ip::{IpAddr, Mtu};
@@ -453,12 +453,7 @@ pub(crate) async fn tx_task(
             Action::Suspension(s) => {
                 // Suspension requested, finish up in-progress work and block
                 // until we are allowed to resume.
-                match futures::future::ready(s).and_then(|s| s.handle_suspension()).await {
-                    Ok(()) => {}
-                    Err(e) => {
-                        suspension_handler.disable(e);
-                    }
-                }
+                s.handle_suspension().await;
                 continue;
             }
         };
