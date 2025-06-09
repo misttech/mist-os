@@ -652,9 +652,8 @@ class IdkGenerator(object):
             # dependency, such as within a prebuilt library.
             # The IDK manifest golden build tests ensure any new IDK atoms that
             # may result from this are caught.
-            assert (
-                info["category"] == "partner"
-            ), "Only partner is currently allowed."
+            if info["category"] != "partner":
+                continue
 
             meta_json, additional_atom_files = self._prebuild_map.get_meta(info)
             assert meta_json or not additional_atom_files

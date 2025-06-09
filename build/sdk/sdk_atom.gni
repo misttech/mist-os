@@ -591,12 +591,8 @@ template("sdk_atom") {
                                [ "idk_atom_prebuild_info" ])
       }
 
-      if (category == "partner") {
-        # Used by idk_prebuild_manifest() template.
-        idk_atom_prebuild_info = [ _idk_atom_prebuild_info ]
-      } else {
-        not_needed([ "_idk_atom_prebuild_info" ])
-      }
+      # Used by idk_prebuild_manifest() template.
+      idk_atom_prebuild_info = [ _idk_atom_prebuild_info ]
     }
 
     # The manifest output contains the output directory.

@@ -573,6 +573,33 @@
   {
     "atom_files": [
       {
+        "dest": "fidl/fuchsia.hardware.pty/pty.fidl",
+        "source": "../../sdk/fidl/fuchsia.hardware.pty/pty.fidl"
+      }
+    ],
+    "atom_id": "sdk://fidl/fuchsia.hardware.pty",
+    "atom_label": "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_sdk",
+    "atom_meta": {
+      "dest": "fidl/fuchsia.hardware.pty/meta.json",
+      "stable": true,
+      "type": "fidl_library"
+    },
+    "atom_meta_json_file": "fidling/gen/sdk/fidl/fuchsia.hardware.pty/fuchsia.hardware.pty_sdk.meta.json",
+    "atom_type": "fidl_library",
+    "category": "prebuilt",
+    "is_stable": true,
+    "prebuild_info": {
+      "deps": [
+        "//sdk/fidl/fuchsia.io:fuchsia.io_sdk",
+        "//sdk/fidl/fuchsia.unknown:fuchsia.unknown_sdk"
+      ],
+      "file_base": "fidl/fuchsia.hardware.pty",
+      "library_name": "fuchsia.hardware.pty"
+    }
+  },
+  {
+    "atom_files": [
+      {
         "dest": "tools/x64/zbi",
         "source": "host_x64/zbi"
       }
