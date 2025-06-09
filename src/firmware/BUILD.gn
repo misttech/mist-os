@@ -10,6 +10,7 @@ group("tests") {
     "fastboot-usb:tests",
     "gigaboot/cpp/tests:tests",
     "lib/abr/test",
+    "lib/boot-shim-utils:tests",
     "lib/fastboot:tests",
     "lib/storage/test",
     "lib/zbi-rs:tests",
