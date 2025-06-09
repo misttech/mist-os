@@ -103,7 +103,7 @@ impl FsNodeOps for ProcSysNetIpv4Conf {
                 "accept_redirects",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/conf/accept_redirects",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646442"),
                 ),
                 FILE_MODE,
             );
@@ -159,7 +159,7 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
                 "ucast_solicit",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/neigh/ucast_solicit",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646444"),
                 ),
                 FILE_MODE,
             );
@@ -167,7 +167,7 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
                 "retrans_time_ms",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/neigh/retrans_time_ms",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645762"),
                 ),
                 FILE_MODE,
             );
@@ -175,7 +175,7 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
                 "mcast_resolicit",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/neigh/mcast_resolicit",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645992"),
                 ),
                 FILE_MODE,
             );
@@ -183,7 +183,7 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
                 "base_reachable_time_ms",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/neigh/base_reachable_time_ms",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645348"),
                 ),
                 FILE_MODE,
             );
@@ -239,7 +239,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 "accept_ra",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_ra",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646365"),
                 ),
                 FILE_MODE,
             );
@@ -255,7 +255,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 "accept_ra_info_min_plen",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_info_min_plen",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645816"),
                 ),
                 FILE_MODE,
             );
@@ -271,7 +271,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 "accept_ra_rt_table",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_rt_table",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645566"),
                 ),
                 FILE_MODE,
             );
@@ -279,7 +279,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 "accept_redirects",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_redirects",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646442"),
                 ),
                 FILE_MODE,
             );
@@ -287,7 +287,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 "dad_transmits",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/dad_transmits",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646145"),
                 ),
                 FILE_MODE,
             );
@@ -295,7 +295,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 "use_tempaddr",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/use_tempaddr",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646346"),
                 ),
                 FILE_MODE,
             );
@@ -303,7 +303,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 "addr_gen_mode",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/addr_gen_mode",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645864"),
                 ),
                 FILE_MODE,
             );
@@ -311,7 +311,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 "stable_secret",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/stable_secret",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646722"),
                 ),
                 FILE_MODE,
             );
@@ -319,7 +319,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 "disable_ipv6",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/disable_ipv6",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645469"),
                 ),
                 FILE_MODE,
             );
@@ -327,7 +327,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 "optimistic_dad",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/optimistic_dad",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646584"),
                 ),
                 FILE_MODE,
             );
@@ -335,7 +335,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 "use_oif_addrs_only",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/use_oif_addrs_only",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645421"),
                 ),
                 FILE_MODE,
             );
@@ -343,7 +343,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 "use_optimistic",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/use_optimistic",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645883"),
                 ),
                 FILE_MODE,
             );
@@ -407,7 +407,7 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
                 "ucast_solicit",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/neigh/ucast_solicit",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646444"),
                 ),
                 FILE_MODE,
             );
@@ -415,7 +415,7 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
                 "retrans_time_ms",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/neigh/retrans_time_ms",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645762"),
                 ),
                 FILE_MODE,
             );
@@ -423,7 +423,7 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
                 "mcast_resolicit",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/neigh/mcast_resolicit",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645992"),
                 ),
                 FILE_MODE,
             );
@@ -431,7 +431,7 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
                 "base_reachable_time_ms",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/neigh/base_reachable_time_ms",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645348"),
                 ),
                 FILE_MODE,
             );
