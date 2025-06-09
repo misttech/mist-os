@@ -24,15 +24,16 @@ impl MonotonicZxTimer {
 impl TimerOps for MonotonicZxTimer {
     fn start(
         &self,
-        _currnet_task: &CurrentTask,
+        current_task: &CurrentTask,
         _source: Option<Weak<dyn OnWakeOps>>,
         deadline: TargetTime,
     ) -> Result<(), Errno> {
+        let timerslack =
+            zx::MonotonicDuration::from_nanos(current_task.read().get_timerslack_ns() as i64);
         match deadline {
-            TargetTime::Monotonic(t) => self
-                .timer
-                .set(t, zx::MonotonicDuration::default())
-                .map_err(|status| from_status_like_fdio!(status))?,
+            TargetTime::Monotonic(t) => {
+                self.timer.set(t, timerslack).map_err(|status| from_status_like_fdio!(status))?
+            }
             TargetTime::BootInstant(_) | TargetTime::RealTime(_) => return error!(EINVAL),
         };
 
@@ -65,18 +66,18 @@ impl BootZxTimer {
 impl TimerOps for BootZxTimer {
     fn start(
         &self,
-        _currnet_task: &CurrentTask,
+        current_task: &CurrentTask,
         _source: Option<Weak<dyn OnWakeOps>>,
         deadline: TargetTime,
     ) -> Result<(), Errno> {
+        let timerslack = zx::Duration::from_nanos(current_task.read().get_timerslack_ns() as i64);
         match deadline {
-            TargetTime::BootInstant(t) => self
-                .timer
-                .set(t, zx::Duration::default())
-                .map_err(|status| from_status_like_fdio!(status))?,
+            TargetTime::BootInstant(t) => {
+                self.timer.set(t, timerslack).map_err(|status| from_status_like_fdio!(status))?
+            }
             TargetTime::RealTime(t) => self
                 .timer
-                .set(estimate_boot_deadline_from_utc(t), zx::Duration::default())
+                .set(estimate_boot_deadline_from_utc(t), timerslack)
                 .map_err(|status| from_status_like_fdio!(status))?,
             TargetTime::Monotonic(_) => return error!(EINVAL),
         }
