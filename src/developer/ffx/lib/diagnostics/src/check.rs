@@ -4,6 +4,7 @@
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::fmt;
 use std::future::Future;
 use std::pin::Pin;
 
@@ -70,12 +71,24 @@ pub trait Check {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, JsonSchema, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, JsonSchema, Serialize, Deserialize)]
 pub enum NotificationType {
     Info,
     Success,
     Warning,
     Error,
+}
+
+impl fmt::Display for NotificationType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            NotificationType::Info => write!(f, "INFO")?,
+            NotificationType::Success => write!(f, "SUCCESS")?,
+            NotificationType::Warning => write!(f, "WARNING")?,
+            NotificationType::Error => write!(f, "ERROR")?,
+        }
+        Ok(())
+    }
 }
 
 /// A trait for updating the progress of a check as it continues.
@@ -100,5 +113,33 @@ pub trait Notifier {
 
     fn on_success(&mut self, status: impl Into<String>) -> anyhow::Result<()> {
         self.update_status(NotificationType::Success, status)
+    }
+}
+
+/// Simple Notifier when the goal is to just collect the messages into a String
+pub struct StringNotifier(String);
+
+impl StringNotifier {
+    pub fn new() -> Self {
+        Self(String::new())
+    }
+}
+
+impl From<StringNotifier> for String {
+    fn from(value: StringNotifier) -> Self {
+        value.0
+    }
+}
+
+impl Notifier for StringNotifier {
+    fn update_status(
+        &mut self,
+        ty: NotificationType,
+        status: impl Into<String>,
+    ) -> anyhow::Result<()> {
+        let msg: String = status.into();
+        let line = format!("\n{ty:>7}: {msg}");
+        self.0.push_str(&line);
+        Ok(())
     }
 }
