@@ -11,6 +11,7 @@
     ],
     program: {
         runner: "elf",
+        lifecycle: { stop_event: "notify" },
     },
     capabilities: [
         {
