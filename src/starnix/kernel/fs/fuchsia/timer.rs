@@ -28,8 +28,7 @@ impl TimerOps for MonotonicZxTimer {
         _source: Option<Weak<dyn OnWakeOps>>,
         deadline: TargetTime,
     ) -> Result<(), Errno> {
-        let timerslack =
-            zx::MonotonicDuration::from_nanos(current_task.read().get_timerslack_ns() as i64);
+        let timerslack = current_task.read().get_timerslack();
         match deadline {
             TargetTime::Monotonic(t) => {
                 self.timer.set(t, timerslack).map_err(|status| from_status_like_fdio!(status))?
@@ -70,7 +69,7 @@ impl TimerOps for BootZxTimer {
         _source: Option<Weak<dyn OnWakeOps>>,
         deadline: TargetTime,
     ) -> Result<(), Errno> {
-        let timerslack = zx::Duration::from_nanos(current_task.read().get_timerslack_ns() as i64);
+        let timerslack = current_task.read().get_timerslack();
         match deadline {
             TargetTime::BootInstant(t) => {
                 self.timer.set(t, timerslack).map_err(|status| from_status_like_fdio!(status))?

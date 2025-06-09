@@ -458,8 +458,8 @@ impl TaskMutableState {
         self.no_new_privs = true;
     }
 
-    pub fn get_timerslack_ns(&self) -> u64 {
-        self.timerslack_ns
+    pub fn get_timerslack<T: zx::Timeline>(&self) -> zx::Duration<T> {
+        zx::Duration::from_nanos(self.timerslack_ns as i64)
     }
 
     /// Sets the current timerslack of the task to `ns`.

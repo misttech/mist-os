@@ -319,7 +319,7 @@ fn clock_nanosleep_boot_with_deadline(
     waiter
         .wake_on_zircon_signals(&timer, zx::Signals::TIMER_SIGNALED, signal_handler)
         .expect("wait can only fail in OOM conditions");
-    let timer_slack = zx::Duration::from_nanos(current_task.read().get_timerslack_ns() as i64);
+    let timer_slack = current_task.read().get_timerslack();
     timer.set(deadline, timer_slack).expect("timer set cannot fail with valid handles and slack");
     match waiter.wait(locked, current_task) {
         Err(err) if err == EINTR && is_absolute => error!(ERESTARTNOHAND),
