@@ -267,6 +267,7 @@ rustc_library("starnix_core") {
     "vfs/pseudo/mod.rs",
     "vfs/pseudo/pseudo_directory.rs",
     "vfs/pseudo/pseudo_directory_builder.rs",
+    "vfs/pseudo/simple_directory.rs",
     "vfs/pseudo/simple_file.rs",
     "vfs/pseudo/static_directory.rs",
     "vfs/pseudo/stub_bytes_file.rs",

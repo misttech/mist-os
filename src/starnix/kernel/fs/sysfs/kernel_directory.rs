@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use crate::task::CurrentTask;
+use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::pseudo::simple_file::create_bytes_file_with_handler;
-use crate::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use crate::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use starnix_logging::bug_ref;
 use starnix_uapi::file_mode::mode;
@@ -12,7 +12,7 @@ use std::sync::Arc;
 
 /// This directory contains various files and subdirectories that provide information about
 /// the running kernel.
-pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirectoryBuilder<'_>) {
+pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &SimpleDirectoryMutator) {
     let kernel = current_task.kernel();
     dir.subdir("kernel", 0o755, |dir| {
         dir.subdir("tracing", 0o755, |_| ());

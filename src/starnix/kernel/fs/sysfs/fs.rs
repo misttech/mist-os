@@ -8,8 +8,8 @@ use crate::fs::sysfs::{
     VulnerabilitiesClassDirectory,
 };
 use crate::task::CurrentTask;
+use crate::vfs::pseudo::simple_directory::{SimpleDirectory, SimpleDirectoryMutator};
 use crate::vfs::pseudo::simple_file::BytesFile;
-use crate::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use crate::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use crate::vfs::{
     CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
@@ -58,7 +58,11 @@ impl SysFs {
             registry.objects.node_cache.clone(),
         )
         .expect("sysfs constructed with valid options");
-        let mut dir = StaticDirectoryBuilder::new(&fs);
+
+        let root = SimpleDirectory::new();
+        fs.create_root(fs.allocate_ino(), root.clone());
+        let dir = SimpleDirectoryMutator::new(fs.clone(), root);
+
         let dir_mode = mode!(IFDIR, 0o755);
         dir.subdir("fs", 0o755, |dir| {
             dir.subdir("selinux", 0o755, |_| ());
@@ -67,20 +71,16 @@ impl SysFs {
             dir.subdir("fuse", 0o755, |dir| {
                 dir.subdir("connections", 0o755, |_| ());
                 dir.subdir("features", 0o755, |dir| {
-                    dir.node(
+                    dir.entry(
                         "fuse_bpf",
-                        fs.create_node_and_allocate_node_id(
-                            BytesFile::new_node(b"supported\n".to_vec()),
-                            FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
-                        ),
+                        BytesFile::new_node(b"supported\n".to_vec()),
+                        mode!(IFREG, 0o444),
                     );
                 });
-                dir.node(
+                dir.entry(
                     "bpf_prog_type_fuse",
-                    fs.create_node_and_allocate_node_id(
-                        BytesFile::new_node(format!("{}\n", BPF_PROG_TYPE_FUSE).into_bytes()),
-                        FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
-                    ),
+                    BytesFile::new_node(format!("{}\n", BPF_PROG_TYPE_FUSE).into_bytes()),
+                    mode!(IFREG, 0o444),
                 );
             });
             dir.subdir("pstore", 0o755, |_| ());
@@ -92,8 +92,8 @@ impl SysFs {
         dir.entry(SYSFS_CLASS, registry.objects.class.ops(), dir_mode);
         dir.entry(SYSFS_DEV, registry.objects.dev.ops(), dir_mode);
 
-        sysfs_kernel_directory(current_task, &mut dir);
-        sysfs_power_directory(current_task, &mut dir);
+        sysfs_kernel_directory(current_task, &dir);
+        sysfs_power_directory(current_task, &dir);
 
         dir.subdir("module", 0o755, |dir| {
             dir.subdir("dm_verity", 0o755, |dir| {
@@ -119,7 +119,6 @@ impl SysFs {
             .get_or_create_child("cpu".into(), CpuClassDirectory::new)
             .get_or_create_child("vulnerabilities".into(), VulnerabilitiesClassDirectory::new);
 
-        dir.build_root();
         fs
     }
 }

@@ -7,12 +7,12 @@ use crate::power::{
     PowerWakeupCountFile,
 };
 use crate::task::CurrentTask;
+use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::pseudo::simple_file::create_bytes_file_with_handler;
-use crate::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_uapi::file_mode::mode;
 use std::sync::Arc;
 
-pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirectoryBuilder<'_>) {
+pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &SimpleDirectoryMutator) {
     let kernel = current_task.kernel();
     dir.subdir("power", 0o755, |dir| {
         dir.entry("wakeup_count", PowerWakeupCountFile::new_node(), mode!(IFREG, 0o644));
