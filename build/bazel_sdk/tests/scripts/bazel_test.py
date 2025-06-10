@@ -324,6 +324,9 @@ class BazelRepositoryMap(object):
             self._overrides[
                 "fuchsia_in_tree_idk"
             ] = explicit_fuchsia_in_tree_idk.resolve()
+            self._overrides[
+                "+fuchsia_idk+fuchsia_in_tree_idk"
+            ] = explicit_fuchsia_in_tree_idk.resolve()
 
         # These repository overrides are used when converting Bazel labels to actual paths.
         # NOTE: Mapping labels to repository inputs is considerably simpler than
@@ -833,7 +836,7 @@ def main() -> int:
             / "bazel"
             / "output_base"
             / "external"
-            / "fuchsia_sdk"
+            / "rules_fuchsia++fuchsia_sdk_ext+fuchsia_sdk"
         )
         explicit_fuchsia_in_tree_idk = (
             fuchsia_build_dir
@@ -842,7 +845,7 @@ def main() -> int:
             / "bazel"
             / "output_base"
             / "external"
-            / "fuchsia_in_tree_idk"
+            / "+fuchsia_idk+fuchsia_in_tree_idk"
         )
     elif input_mode == _INPUT_MODE_SDK:
         # Only override @fuchsia_sdk to point to the full SDK directory.

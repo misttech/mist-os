@@ -303,6 +303,7 @@ def _fuchsia_clang_repository_ext(ctx):
     local_path = None
     sdk_root_label = None
     rules_fuchsia_root_label = None
+    local_version_file = None
 
     for mod in ctx.modules:
         # only the root module can set tags
@@ -319,6 +320,7 @@ def _fuchsia_clang_repository_ext(ctx):
                 local_archive = mod.tags.archive[0].local_archive
             if mod.tags.local:
                 local_path = mod.tags.local[0].local_path
+                local_version_file = mod.tags.local[0].local_version_file
 
     fuchsia_clang_repository(
         name = "fuchsia_clang",
@@ -326,6 +328,7 @@ def _fuchsia_clang_repository_ext(ctx):
         sha256 = sha256,
         local_archive = local_archive,
         local_path = local_path,
+        local_version_file = local_version_file,
         sdk_root_label = sdk_root_label,
         rules_fuchsia_root_label = rules_fuchsia_root_label,
     )
@@ -366,6 +369,10 @@ _local_tag = tag_class(
     attrs = {
         "local_path": attr.string(
             doc = "local clang installation path, a full label, or relative to workspace dir",
+        ),
+        "local_version_file": attr.label(
+            doc = "Optional path to a workspace-relative path to a version file for this clang installation.",
+            allow_single_file = True,
         ),
     },
 )

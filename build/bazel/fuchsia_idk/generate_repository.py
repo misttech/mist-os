@@ -268,7 +268,7 @@ class PathRewriter(object):
 
     def __init__(
         self,
-        repo_name: str,
+        canonical_repo_name: str,
         output_idk: OutputIdk,
         input_dir: Path,
         ninja_build_dir: Path,
@@ -285,7 +285,7 @@ class PathRewriter(object):
                 be preserved as symlinks, even if they are generated
                 Ninja artifacts.
         """
-        self._repo_name = repo_name
+        self._canonical_repo_name = canonical_repo_name
         self._output_idk = output_idk
         self._input_dir = input_dir
         self._ninja_build_dir = ninja_build_dir
@@ -296,7 +296,7 @@ class PathRewriter(object):
     ) -> "PathRewriter":
         """Create new instance with a different list of exceptions."""
         return PathRewriter(
-            self._repo_name,
+            self._canonical_repo_name,
             self._output_idk,
             self._input_dir,
             self._ninja_build_dir,
@@ -335,7 +335,7 @@ class PathRewriter(object):
         else:
             # This is a Ninja generated file, return a label to
             # its Bazel package.
-            label = f"@{self._repo_name}//{package}:{name}"
+            label = f"@@{self._canonical_repo_name}//{package}:{name}"
             self._output_idk.add_artifact_file(path, label)
             return label
 

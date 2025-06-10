@@ -36,7 +36,7 @@ local_path_override(
     path = "third_party/abseil-cpp",
 )
 
-# Create @fuchsia_build_config which contains host_prebuils/xxxx symlinks
+# Create @fuchsia_build_config which contains host_prebuilts/xxxx symlinks
 # to access host prebuilts without an explicit fuchsia_host_tag in their path.
 bazel_dep(name = "fuchsia_sdk_common", version = "")
 local_path_override(
@@ -52,3 +52,63 @@ use_repo(fuchsia_build_config_ext, "fuchsia_build_config")
 
 go_sdk = use_extension("@io_bazel_rules_go//go:extensions.bzl", "go_sdk")
 go_sdk.wrap(root_file = "@fuchsia_build_config//:host_prebuilts/go/README.md")
+
+bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googletest")
+local_path_override(
+    module_name = "googletest",
+    path = "third_party/googletest/src",
+)
+
+bazel_dep(name = "rules_fuchsia", version = "", repo_name = "rules_fuchsia")
+local_path_override(
+    module_name = "rules_fuchsia",
+    path = "build/bazel_sdk/bazel_rules_fuchsia",
+)
+
+fuchsia_idk = use_extension(
+    "//build/bazel:module_extensions/fuchsia_idk_extensions.bzl",
+    "fuchsia_idk",
+)
+fuchsia_idk.in_tree_repository(path = "regenerator_outputs/fuchsia_in_tree_idk")
+use_repo(fuchsia_idk, "fuchsia_in_tree_idk")
+
+fuchsia_sdk_ext = use_extension(
+    "@rules_fuchsia//fuchsia/workspace:fuchsia_sdk_repository.bzl",
+    "fuchsia_sdk_ext",
+)
+fuchsia_sdk_ext.local(
+    buildifier = "@fuchsia_build_config//:host_prebuilts/buildifier",
+    # LINT.IfChange
+    local_sdk_version_file = "//:fuchsia_build_generated/fuchsia_in_tree_idk.hash",
+    # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
+    path = "@@+fuchsia_idk+fuchsia_in_tree_idk",
+    visibility_templates = {
+        "hlcpp": [
+            # Limit the scope of hlcpp to the sdk itself
+            "@internal_sdk//:__subpackages__",
+            "@fuchsia_sdk//:__subpackages__",
+            "@@//vendor/*/build:hlcpp_allowlist",
+        ],
+    },
+)
+use_repo(fuchsia_sdk_ext, "fuchsia_sdk")
+
+fuchsia_clang_ext = use_extension(
+    "@rules_fuchsia//fuchsia/workspace:fuchsia_clang_repository.bzl",
+    "fuchsia_clang_ext",
+)
+fuchsia_clang_ext.local(
+    local_path = "@@fuchsia_sdk_common++fuchsia_build_config_ext+fuchsia_build_config//:host_prebuilts/clang",
+    local_version_file = "//:fuchsia_build_generated/fuchsia_clang.hash",
+)
+use_repo(fuchsia_clang_ext, "fuchsia_clang")
+
+# `@fuchsia_clang` is hardcoded when generating SDK build files, so it is
+# necessary to inject it into `fuchsia_sdk_ext`. Without this, the SDK
+# repository can only refer to `@fuchsia_clang` with its canonical name, and
+# builds will fail with `@fuchsia_clang` not visible.
+inject_repo(fuchsia_sdk_ext, "fuchsia_clang")
+
+fake_fuchsia_sdk = use_extension("@com_google_googletest//:fake_fuchsia_sdk.bzl", "fuchsia_sdk")
+
+override_repo(fake_fuchsia_sdk, "fuchsia_sdk")

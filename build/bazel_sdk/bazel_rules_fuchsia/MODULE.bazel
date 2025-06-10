@@ -12,26 +12,20 @@ module(
 )
 
 # Required Dependencies
-bazel_dep(name = "bazel_skylib", version = "1.2.0")
-bazel_dep(name = "rules_cc", version = "0.0.1")
-bazel_dep(name = "platforms", version = "0.0.8")
-bazel_dep(name = "rules_python", version = "0.22.1")
-bazel_dep(name = "rules_license", version = "0.0.8")
-
-# Setup the cipd_tool repo for downloading content
-cipd_tool_ext = use_extension("//cipd:defs.bzl", "cipd_tool_ext")
-cipd_tool_ext.client(bin = "foo_tool")
-use_repo(cipd_tool_ext, "cipd_tool")
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "platforms", version = "0.0.11")
+bazel_dep(name = "rules_license", version = "1.0.0")
+bazel_dep(name = "rules_python", version = "0.36.0")
+bazel_dep(name = "rules_cc", version = "0.0.9")
 
 # Declare the fuchsia sdk
-fuchsia_sdk_ext = use_extension("//fuchsia:deps.bzl", "fuchsia_sdk_ext")
-use_repo(fuchsia_sdk_ext, "fuchsia_sdk")
+fuchsia_sdk_ext = use_extension("//fuchsia/workspace:fuchsia_sdk_repository.bzl", "fuchsia_sdk_ext")
+use_repo(fuchsia_sdk_ext, "fuchsia_sdk", "fuchsia_sdk_toolchain_decl")
 
-register_toolchains("@fuchsia_sdk//:fuchsia_toolchain_sdk")
+register_toolchains("@fuchsia_sdk_toolchain_decl//:all")
 
 # Declare clang
 fuchsia_clang_ext = use_extension("//fuchsia/workspace:fuchsia_clang_repository.bzl", "fuchsia_clang_ext")
 use_repo(fuchsia_clang_ext, "fuchsia_clang")
 
 register_toolchains("@fuchsia_clang//:all")
-#register_toolchains("@fuchsia_clang//:cc-aarch64")

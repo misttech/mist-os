@@ -69,7 +69,6 @@ _BAZEL_BUILTIN_REPOSITORIES = (
     "rules_python+",
     "rules_rust",
     # Created from in-tree top-level module
-    "fuchsia_build_config",
     "fuchsia_sdk_common",
 )
 
@@ -556,6 +555,17 @@ class BazelLabelMapper(object):
             If the corresponding repository has a content hash file, return
             its path. Otherwise, return an empty string.
         """
+        # TODO(jayzhuang): Refine the logic for bazel_action.py incremental
+        # builds.
+        #
+        # Use the innermost repository name for finding content hash file.
+        #
+        # The call here is unfortunately a bit awkward given how these helper
+        # functions are defined. We are planning on overhauling the logic for
+        # incremental builds so leaving it as-is for now.
+        repository_name = "@" + workspace_utils.innermost_repository_name(
+            f"{repository_name}//:root"
+        )
         hash_file = self._repository_hash_map.get(repository_name, None)
         if hash_file is None:
             # Canonical names like @@foo.<version> need to be converted to just `foo` here.
@@ -844,7 +854,7 @@ def label_requires_content_hash(label: str) -> bool:
     """Return True if the label or source file belongs to a repository
     that requires a content hash file."""
     return not (
-        workspace_utils.repository_name(label)
+        workspace_utils.innermost_repository_name(label)
         in _BAZEL_NO_CONTENT_HASH_REPOSITORIES
     )
 

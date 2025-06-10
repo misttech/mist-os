@@ -19,7 +19,7 @@ toolchain(
         executable = False,
     )
 
-_fuchsia_toolchain_decl = repository_rule(
+fuchsia_toolchain_decl = repository_rule(
     implementation = _fuchsia_toolchain_decl_impl,
     attrs = {
         "toolchain_path": attr.string(mandatory = True),
@@ -43,7 +43,7 @@ def register_fuchsia_sdk_toolchain(
         toolchain_path: The fully qualified path to the toolchain. This should only
           be needed if you are using a non-standard SDK.
     """
-    _fuchsia_toolchain_decl(
+    fuchsia_toolchain_decl(
         name = name,
         toolchain_path = toolchain_path,
     )
