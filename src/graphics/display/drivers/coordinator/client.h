@@ -20,8 +20,6 @@
 #include <list>
 #include <map>
 #include <memory>
-#include <type_traits>
-#include <variant>
 #include <vector>
 
 #include <fbl/auto_lock.h>
@@ -34,6 +32,7 @@
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
+#include "src/graphics/display/drivers/coordinator/display-config.h"
 #include "src/graphics/display/drivers/coordinator/fence.h"
 #include "src/graphics/display/drivers/coordinator/id-map.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
@@ -48,71 +47,9 @@
 #include "src/graphics/display/lib/api-types/cpp/event-id.h"
 #include "src/graphics/display/lib/api-types/cpp/image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/layer-id.h"
-#include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/api-types/cpp/vsync-ack-cookie.h"
 
 namespace display_coordinator {
-
-// Almost-POD used by Client to manage display configuration. Public state is used by Controller.
-class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display::DisplayId> {
- public:
-  explicit DisplayConfig(display::DisplayId display_id);
-
-  DisplayConfig(const DisplayConfig&) = delete;
-  DisplayConfig& operator=(const DisplayConfig&) = delete;
-  DisplayConfig(DisplayConfig&&) = delete;
-  DisplayConfig& operator=(DisplayConfig&&) = delete;
-
-  ~DisplayConfig();
-
-  void InitializeInspect(inspect::Node* parent);
-
-  bool apply_layer_change() {
-    bool ret = pending_apply_layer_change_;
-    pending_apply_layer_change_ = false;
-    pending_apply_layer_change_property_.Set(false);
-    return ret;
-  }
-
-  // Discards all the draft changes (except for draft layers lists)
-  // of a Display's `config`.
-  //
-  // The display draft layers' draft configs must be discarded before
-  // `DiscardNonLayerDraftConfig()` is called.
-  void DiscardNonLayerDraftConfig();
-
-  int applied_layer_count() const { return static_cast<int>(applied_.layer_count); }
-  const display_config_t* applied_config() const { return &applied_; }
-  const fbl::DoublyLinkedList<LayerNode*>& get_applied_layers() const { return applied_layers_; }
-
- private:
-  // The last configuration sent to the display engine.
-  display_config_t applied_;
-
-  // The display configuration modified by client calls.
-  display_config_t draft_;
-
-  // If true, the draft configuration's layer list may differ from the current
-  // configuration's list.
-  bool draft_has_layer_list_change_ = false;
-
-  bool pending_apply_layer_change_ = false;
-  fbl::DoublyLinkedList<LayerNode*> draft_layers_;
-  fbl::DoublyLinkedList<LayerNode*> applied_layers_;
-
-  fbl::Vector<display::PixelFormat> pixel_formats_;
-
-  bool has_draft_nonlayer_config_change_ = false;
-
-  friend Client;
-  friend ClientProxy;
-
-  inspect::Node node_;
-  // Reflects `draft_has_layer_list_change_`.
-  inspect::BoolProperty draft_has_layer_list_change_property_;
-  // Reflects `pending_apply_layer_change_`.
-  inspect::BoolProperty pending_apply_layer_change_property_;
-};
 
 // Manages the state associated with a display coordinator client connection.
 //

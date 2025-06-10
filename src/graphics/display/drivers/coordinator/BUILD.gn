@@ -58,6 +58,8 @@ source_set("shared") {
     "client.h",
     "controller.cc",
     "controller.h",
+    "display-config.cc",
+    "display-config.h",
     "display-info.cc",
     "display-info.h",
     "engine-driver-client.cc",
