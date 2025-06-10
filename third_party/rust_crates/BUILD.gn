@@ -4762,7 +4762,7 @@ rustc_library("csv-v1_3_1") {
   deps = []
   deps += [ ":csv-core-v0_1_12" ]
   deps += [ ":itoa-v1_0_14" ]
-  deps += [ ":ryu-v1_0_3" ]
+  deps += [ ":ryu-v1_0_20" ]
   deps += [ ":serde-v1_0_204" ]
 
   rustenv = []
@@ -15224,19 +15224,19 @@ rustc_library("rutabaga_gfx-v0_1_3") {
   applicable_licenses = [ ":rutabaga_gfx-v0_1_3.license" ]
 }
 
-license("ryu-v1_0_3.license") {
+license("ryu-v1_0_20.license") {
   public_package_name = "ryu"
   license_files = [
-    "//third_party/rust_crates/vendor/ryu-1.0.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/ryu-1.0.3/LICENSE-BOOST",
+    "//third_party/rust_crates/vendor/ryu-1.0.20/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/ryu-1.0.20/LICENSE-BOOST",
   ]
 }
 
-rustc_library("ryu-v1_0_3") {
+rustc_library("ryu-v1_0_20") {
   crate_name = "ryu"
-  source_root = "//third_party/rust_crates/vendor/ryu-1.0.3/src/lib.rs"
-  output_name = "ryu-892abe88d9705b75"
-  edition = "2015"
+  source_root = "//third_party/rust_crates/vendor/ryu-1.0.20/src/lib.rs"
+  output_name = "ryu-2956982172ffda0a"
+  edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
@@ -15247,16 +15247,13 @@ rustc_library("ryu-v1_0_3") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=892abe88d9705b75",
-    "-Cextra-filename=-892abe88d9705b75",
-    "--cfg=integer128",
-    "--cfg=must_use_return",
-    "--cfg=maybe_uninit",
+    "-Cmetadata=2956982172ffda0a",
+    "-Cextra-filename=-2956982172ffda0a",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":ryu-v1_0_3.license" ]
+  applicable_licenses = [ ":ryu-v1_0_20.license" ]
 }
 
 license("same-file-v1_0_4.license") {
@@ -15874,7 +15871,7 @@ rustc_library("serde_json-v1_0_128") {
   deps = []
   deps += [ ":memchr-v2_7_4" ]
   deps += [ ":itoa-v1_0_14" ]
-  deps += [ ":ryu-v1_0_3" ]
+  deps += [ ":ryu-v1_0_20" ]
   deps += [ ":serde-v1_0_204" ]
 
   rustenv = []
@@ -15984,7 +15981,7 @@ rustc_library("serde_yaml-v0_9_14") {
   deps = []
   deps += [ ":indexmap-v1_9_2" ]
   deps += [ ":itoa-v1_0_14" ]
-  deps += [ ":ryu-v1_0_3" ]
+  deps += [ ":ryu-v1_0_20" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":unsafe-libyaml-v0_2_4" ]
 
