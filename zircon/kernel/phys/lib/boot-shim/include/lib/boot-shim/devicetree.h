@@ -1183,6 +1183,61 @@ class ArmDevicetreeTimerMmioItem
   size_t unresolved_irqs_ = 0;
 };
 
+// Extract `idle-states` and `domain-idle-states` information.
+//
+// For `idle-states` see
+// https://www.kernel.org/doc/Documentation/devicetree/bindings/arm/idle-states.txt For
+// `domain-idle-states see
+// https://www.kernel.org/doc/Documentation/devicetree/bindings/power/domain-idle-state.yaml
+//
+// Note: There is inconsistency in the use of `domain-idle-states` and `idle-states, specifically on
+// where they are located in the devicetree with respect to the spec.
+class ArmDevicetreePsciCpuSuspendItem
+    : public DevicetreeItemBase<ArmDevicetreePsciCpuSuspendItem, 2>,
+      public ItemBase {
+  using Base = DevicetreeItemBase<ArmDevicetreePsciCpuSuspendItem, 2>;
+
+ public:
+  template <typename Shim>
+  void Init(Shim& shim) {
+    Base::Init(shim);
+    allocator_ = &shim.allocator();
+  }
+
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+
+  devicetree::ScanState OnSubtree(const devicetree::NodePath& root);
+  devicetree::ScanState OnScan();
+
+  constexpr size_t size_bytes() const {
+    return num_idle_states_ == 0
+               ? 0
+               : ItemSize(num_idle_states_ * sizeof(zbi_dcfg_arm_psci_cpu_suspend_state_t));
+  }
+
+  fit::result<DataZbi::Error> AppendItems(DataZbi& zbi);
+
+ private:
+  devicetree::ScanState OnIdleStateCount(const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState OnIdleStateFill(const devicetree::PropertyDecoder& decoder);
+
+  std::span<zbi_dcfg_arm_psci_cpu_suspend_state_t> idle_states() {
+    return {states_, num_idle_states_};
+  }
+
+  // Allocation is environment specific, so we delegate that to a lambda.
+  const DevicetreeBootShimAllocator* allocator_ = nullptr;
+
+  const devicetree::Node* idle_states_ = nullptr;
+  const devicetree::Node* domain_idle_states_ = nullptr;
+  uint32_t subtree_visited_count_ = 0;
+
+  uint32_t current_idle_state_ = 0;
+  uint32_t num_idle_states_ = 0;
+  zbi_dcfg_arm_psci_cpu_suspend_state_t* states_ = nullptr;
+};
+
 }  // namespace boot_shim
 
 #endif  // ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_DEVICETREE_H_
