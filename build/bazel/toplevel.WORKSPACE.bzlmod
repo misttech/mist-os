@@ -125,21 +125,6 @@ generate_prebuilt_llvm_repository(
     llvm_install_dir = "prebuilt/third_party/llvm/" + fuchsia_host_tag,
 )
 
-# buildifier: disable=load-on-top
-load(
-    "@rules_fuchsia//common:toolchains/python/repository_rule.bzl",
-    "compact_python_runtime_repository",
-)
-
-compact_python_runtime_repository(
-    name = "prebuilt_python",
-    # LINT.IfChange
-    content_hash_file = "fuchsia_build_generated/prebuilt_python.hash",
-    # LINT.ThenChange(scripts/workspace_utils.py)
-)
-
-register_toolchains("@prebuilt_python//:py_toolchain")
-
 # fuchsia_build_generated/gn_target_dir is a symlink to the content
 # of the @gn_targets repository. At `fx gen` time, it will point to
 # an empty repository, but bazel_action.py will update it just before

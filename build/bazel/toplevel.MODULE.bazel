@@ -112,3 +112,17 @@ inject_repo(fuchsia_sdk_ext, "fuchsia_clang")
 fake_fuchsia_sdk = use_extension("@com_google_googletest//:fake_fuchsia_sdk.bzl", "fuchsia_sdk")
 
 override_repo(fake_fuchsia_sdk, "fuchsia_sdk")
+
+compact_python_runtime_repository = use_repo_rule(
+    "@rules_fuchsia//common:toolchains/python/repository_rule.bzl",
+    "compact_python_runtime_repository",
+)
+
+compact_python_runtime_repository(
+    name = "prebuilt_python",
+    # LINT.IfChange
+    content_hash_file = "fuchsia_build_generated/prebuilt_python.hash",
+    # LINT.ThenChange(scripts/workspace_utils.py)
+)
+
+register_toolchains("@prebuilt_python//:py_toolchain")
