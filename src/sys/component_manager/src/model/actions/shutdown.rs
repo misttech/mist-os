@@ -22,7 +22,6 @@ use futures::future::select_all;
 use futures::prelude::*;
 use log::*;
 use moniker::ChildName;
-use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::{fmt, iter};
@@ -412,8 +411,7 @@ pub trait Component {
     /// Note: `name` is a `&str` because it could be either a `Name` or `LongName`.
     fn find_child(&self, name: &str, collection: Option<&Name>) -> Option<Child> {
         self.children().into_iter().find(|child| {
-            child.moniker.name().as_str() == name
-                && child.moniker.collection() == collection.map(Borrow::borrow)
+            child.moniker.name().as_str() == name && child.moniker.collection() == collection
         })
     }
 }
@@ -3286,7 +3284,7 @@ mod tests {
             let state = component_a.lock_state().await;
             match *state {
                 InstanceState::Shutdown(ref state, _) => {
-                    state.children.get("b").expect("child b not found").clone()
+                    state.children.get(&"b".try_into().unwrap()).expect("child b not found").clone()
                 }
                 _ => panic!("not shutdown"),
             }

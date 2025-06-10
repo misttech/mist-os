@@ -12,7 +12,7 @@ use async_trait::async_trait;
 use cm_rust::{CapabilityDecl, CollectionDecl, ExposeDecl, OfferDecl, OfferSource, UseDecl};
 use cm_types::{Name, Url};
 use derivative::Derivative;
-use moniker::{BorrowedChildName, ChildName, ExtendedMoniker, Moniker};
+use moniker::{ChildName, ExtendedMoniker, Moniker};
 use sandbox::{WeakInstanceToken, WeakInstanceTokenAny};
 use std::clone::Clone;
 use std::sync::{Arc, Weak};
@@ -29,7 +29,7 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
 
     /// Returns this `ComponentInstanceInterface`'s child moniker, if it is
     /// not the root instance.
-    fn child_moniker(&self) -> Option<&BorrowedChildName>;
+    fn child_moniker(&self) -> Option<&ChildName>;
 
     /// Returns this `ComponentInstanceInterface`'s moniker.
     fn moniker(&self) -> &Moniker;
@@ -110,10 +110,10 @@ pub trait ComponentInstanceInterface: Sized + Send + Sync {
             let remaining_path = target_moniker.strip_prefix(current.moniker()).expect(
                 "previous loop will only exit when current.moniker() is a prefix of target_moniker",
             );
-            for moniker_part in remaining_path.path() {
+            for moniker_part in remaining_path.path().iter() {
                 let child = current.lock_resolved_state().await?.get_child(moniker_part).ok_or(
                     ComponentInstanceError::InstanceNotFound {
-                        moniker: current.moniker().child(moniker_part.into()),
+                        moniker: current.moniker().child(moniker_part.clone()),
                     },
                 )?;
                 current = child;
@@ -156,7 +156,7 @@ pub trait ResolvedInstanceInterface: Send + Sync {
     fn collections(&self) -> Vec<CollectionDecl>;
 
     /// Returns a live child of this instance.
-    fn get_child(&self, moniker: &BorrowedChildName) -> Option<Arc<Self::Component>>;
+    fn get_child(&self, moniker: &ChildName) -> Option<Arc<Self::Component>>;
 
     /// Returns a vector of the live children in `collection`.
     fn children_in_collection(&self, collection: &Name) -> Vec<(ChildName, Arc<Self::Component>)>;
@@ -236,7 +236,7 @@ where
         T::Target::collections(&*self)
     }
 
-    fn get_child(&self, moniker: &BorrowedChildName) -> Option<Arc<Self::Component>> {
+    fn get_child(&self, moniker: &ChildName) -> Option<Arc<Self::Component>> {
         T::Target::get_child(&*self, moniker)
     }
 
@@ -423,7 +423,7 @@ pub mod tests {
     impl ComponentInstanceInterface for TestComponent {
         type TopInstance = TestTopInstance;
 
-        fn child_moniker(&self) -> Option<&BorrowedChildName> {
+        fn child_moniker(&self) -> Option<&ChildName> {
             todo!()
         }
 

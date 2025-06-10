@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use cm_types::{BorrowedLongName, BorrowedName};
+use cm_types::{LongName, Name};
 use flex_client::ProxyHasDomain;
 use fuchsia_url::AbsoluteComponentUrl;
 use futures::future::BoxFuture;
@@ -76,8 +76,8 @@ pub enum ResolveError {
 pub async fn create_instance_in_collection(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
     parent: &Moniker,
-    collection: &BorrowedName,
-    child_name: &BorrowedLongName,
+    collection: &Name,
+    child_name: &LongName,
     url: &AbsoluteComponentUrl,
     config_overrides: Vec<fdecl::ConfigOverride>,
     child_args: Option<fcomponent::CreateChildArgs>,
@@ -119,8 +119,8 @@ pub async fn create_instance_in_collection(
 pub async fn destroy_instance_in_collection(
     lifecycle_controller: &fsys::LifecycleControllerProxy,
     parent: &Moniker,
-    collection: &BorrowedName,
-    child_name: &BorrowedLongName,
+    collection: &Name,
+    child_name: &LongName,
 ) -> Result<(), DestroyError> {
     let child =
         fdecl::ChildRef { name: child_name.to_string(), collection: Some(collection.to_string()) };
@@ -471,8 +471,8 @@ mod test {
         create_instance_in_collection(
             &lc,
             &parent,
-            BorrowedName::new("foo").unwrap(),
-            BorrowedLongName::new("bar").unwrap(),
+            &"foo".parse().unwrap(),
+            &"bar".parse().unwrap(),
             &url,
             vec![],
             None,
@@ -504,8 +504,8 @@ mod test {
         create_instance_in_collection(
             &lc,
             &parent,
-            BorrowedName::new("foo").unwrap(),
-            BorrowedLongName::new("bar").unwrap(),
+            &"foo".parse().unwrap(),
+            &"bar".parse().unwrap(),
             &url,
             vec![],
             Some(child_args),
@@ -523,8 +523,8 @@ mod test {
         let err = create_instance_in_collection(
             &lc,
             &parent,
-            BorrowedName::new("foo").unwrap(),
-            BorrowedLongName::new("bar").unwrap(),
+            &"foo".parse().unwrap(),
+            &"bar".parse().unwrap(),
             &url,
             vec![],
             None,
@@ -541,8 +541,8 @@ mod test {
         destroy_instance_in_collection(
             &lc,
             &parent,
-            BorrowedName::new("foo").unwrap(),
-            BorrowedLongName::new("bar").unwrap(),
+            &"foo".parse().unwrap(),
+            &"bar".parse().unwrap(),
         )
         .await
         .unwrap();

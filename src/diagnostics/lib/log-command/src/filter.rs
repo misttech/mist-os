@@ -331,9 +331,10 @@ fn moniker_contains_in_last_segment(
     let query_tag = convert_to_lowercase_if_needed(query_tag, case_sensitive);
     match moniker {
         ExtendedMoniker::ComponentInstance(moniker) => moniker
-            .leaf()
+            .path()
+            .last()
             .map(|segment| {
-                convert_to_lowercase_if_needed(segment.as_ref(), case_sensitive)
+                convert_to_lowercase_if_needed(&segment.to_string(), case_sensitive)
                     .contains(&*query_tag)
             })
             .unwrap_or(false),

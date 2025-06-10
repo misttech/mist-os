@@ -632,15 +632,14 @@ where
             // look up the dynamic child from the parent and access its component input
             // from there. Unlike the code path for static children, this causes the child
             // to be resolved.
-            let child = target
-                .lock_resolved_state()
-                .await?
-                .get_child(&ChildName::from(child_ref.clone()))
-                .ok_or(RoutingError::OfferFromChildInstanceNotFound {
-                    child_moniker: child_ref.clone().into(),
-                    moniker: target.moniker().clone(),
-                    capability_id: offer.target_name().clone().to_string(),
-                })?;
+            let child =
+                target.lock_resolved_state().await?.get_child(&child_ref.clone().into()).ok_or(
+                    RoutingError::OfferFromChildInstanceNotFound {
+                        child_moniker: child_ref.clone().into(),
+                        moniker: target.moniker().clone(),
+                        capability_id: offer.target_name().clone().to_string(),
+                    },
+                )?;
             Ok(child.component_sandbox().await?.component_input.capabilities())
         }
         OfferTarget::Collection(collection_name) => {
@@ -1037,7 +1036,7 @@ where
     {
         return Err(RoutingError::ComponentNotInIdIndex {
             source_moniker,
-            target_name: instance.moniker().leaf().map(Into::into),
+            target_name: instance.moniker().leaf().cloned(),
         });
     }
     Ok(())

@@ -276,7 +276,7 @@ impl DictExt for Dict {
                     current_name = next_name;
                 }
                 None => {
-                    current_dict.remove(current_name);
+                    current_dict.remove(&current_name.into());
                     return;
                 }
             }

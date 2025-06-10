@@ -101,7 +101,7 @@ fn filter_ancestors(instances: Vec<Instance>, child_str: String) -> Vec<Instance
     // Find monikers with this child as the leaf.
     for instance in &instances {
         if let Some(child) = instance.moniker.leaf() {
-            if *child == child_str {
+            if child.to_string() == child_str {
                 // Add this moniker to ancestor list.
                 let mut cur_moniker = instance.moniker.clone();
                 ancestors.insert(cur_moniker.clone());
@@ -124,7 +124,7 @@ fn filter_descendants(instances: Vec<Instance>, child_str: String) -> Vec<Instan
     // Find monikers with this child as the leaf.
     for instance in &instances {
         if let Some(child) = instance.moniker.leaf() {
-            if *child == child_str {
+            if child.to_string() == child_str {
                 // Get all descendants of this moniker.
                 for possible_child_instance in &instances {
                     if possible_child_instance.moniker.has_prefix(&instance.moniker) {
@@ -144,7 +144,7 @@ fn filter_relatives(instances: Vec<Instance>, child_str: String) -> Vec<Instance
     // Find monikers with this child as the leaf.
     for instance in &instances {
         if let Some(child) = instance.moniker.leaf() {
-            if *child == child_str {
+            if child.to_string() == child_str {
                 // Loop over parents of this moniker and add them to relatives list.
                 let mut cur_moniker = instance.moniker.clone();
                 while let Some(parent) = cur_moniker.parent() {

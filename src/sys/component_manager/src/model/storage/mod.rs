@@ -372,12 +372,11 @@ pub async fn delete_isolated_storage(
 /// indicate a unique instance id).
 fn generate_moniker_based_storage_path(moniker: &Moniker) -> PathBuf {
     assert!(
-        !moniker.is_root(),
+        !moniker.path().is_empty(),
         "storage capability appears to have been exposed or used by its source"
     );
 
-    let path = moniker.path();
-    let mut path = path.iter();
+    let mut path = moniker.path().iter();
     let mut dir_path = vec![format!("{}:0", path.next().unwrap())];
     while let Some(p) = path.next() {
         dir_path.push("children".to_string());

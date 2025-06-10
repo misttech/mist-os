@@ -11,7 +11,6 @@ rustc_library("moniker") {
   edition = "2021"
 
   deps = [
-    "//src/lib/flyweights",
     "//src/sys/lib/cm_rust",
     "//src/sys/lib/cm_types",
     "//third_party/rust_crates:thiserror",

@@ -644,7 +644,7 @@ impl RoutingTest {
         reason: StartReason,
         wait_for_start: bool,
     ) -> Result<(Arc<ComponentInstance>, String), ModelError> {
-        let component_name = match moniker.leaf() {
+        let component_name = match moniker.path().last() {
             Some(part) => part.name().to_string(),
             None => self.root_component_name.to_string(),
         };

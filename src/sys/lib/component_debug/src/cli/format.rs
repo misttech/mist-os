@@ -4,7 +4,7 @@
 
 use crate::lifecycle::{ActionError, CreateError, DestroyError, ResolveError, StartError};
 use anyhow::{format_err, Error};
-use cm_types::BorrowedName;
+use cm_types::Name;
 use moniker::Moniker;
 
 static LIFECYCLE_ERROR_HELP: &'static str =
@@ -59,7 +59,7 @@ pub fn format_action_error(moniker: &Moniker, err: ActionError) -> Error {
 pub fn format_create_error(
     moniker: &Moniker,
     parent: &Moniker,
-    collection: &BorrowedName,
+    collection: &Name,
     err: CreateError,
 ) -> Error {
     match err {

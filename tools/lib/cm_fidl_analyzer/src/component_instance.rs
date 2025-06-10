@@ -14,7 +14,7 @@ use cm_config::RuntimeConfig;
 use cm_rust::{CapabilityDecl, CollectionDecl, ComponentDecl, ExposeDecl, OfferDecl, UseDecl};
 use cm_types::{Name, Url};
 use config_encoder::ConfigFields;
-use moniker::{BorrowedChildName, ChildName, Moniker};
+use moniker::{ChildName, Moniker};
 use router_error::RouterError;
 use routing::bedrock::program_output_dict::build_program_output_dictionary;
 use routing::bedrock::sandbox_construction::{build_component_sandbox, ComponentSandbox};
@@ -250,7 +250,7 @@ impl ComponentInstanceInterface for ComponentInstanceForAnalyzer {
         &self.moniker
     }
 
-    fn child_moniker(&self) -> Option<&BorrowedChildName> {
+    fn child_moniker(&self) -> Option<&ChildName> {
         self.moniker.leaf()
     }
 
@@ -325,7 +325,7 @@ impl ResolvedInstanceInterface for ComponentInstanceForAnalyzer {
         self.decl.collections.clone()
     }
 
-    fn get_child(&self, moniker: &BorrowedChildName) -> Option<Arc<Self>> {
+    fn get_child(&self, moniker: &ChildName) -> Option<Arc<Self>> {
         self.children.read().expect("failed to acquire read lock").get(moniker).map(Arc::clone)
     }
 

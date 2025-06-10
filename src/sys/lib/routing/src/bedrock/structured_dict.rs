@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::DictExt;
-use cm_types::{BorrowedName, IterablePath, Name};
+use cm_types::{IterablePath, Name};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use lazy_static::lazy_static;
 use sandbox::{Capability, Dict};
@@ -54,7 +54,7 @@ impl<T: StructuredDict> StructuredDictMap<T> {
         self.inner.insert(key, dict.into())
     }
 
-    pub fn get(&self, key: &BorrowedName) -> Option<T> {
+    pub fn get(&self, key: &Name) -> Option<T> {
         self.inner.get(key).expect("structured map entry must be cloneable").map(|cap| {
             let Capability::Dictionary(dict) = cap else {
                 unreachable!("structured map entry must be a dict: {cap:?}");
@@ -64,7 +64,7 @@ impl<T: StructuredDict> StructuredDictMap<T> {
     }
 
     pub fn remove(&self, key: &Name) -> Option<T> {
-        self.inner.remove(&*key).map(|cap| {
+        self.inner.remove(key).map(|cap| {
             let Capability::Dictionary(dict) = cap else {
                 unreachable!("structured map entry must be a dict: {cap:?}");
             };

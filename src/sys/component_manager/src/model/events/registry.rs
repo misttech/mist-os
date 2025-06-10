@@ -115,10 +115,9 @@ pub struct ComponentEventRoute {
 
 impl ComponentEventRoute {
     fn from_moniker(moniker: &Moniker, scope: Option<Vec<EventScope>>) -> ComponentEventRoute {
-        let component = moniker.leaf().map(|leaf| ChildRef {
-            name: leaf.name().into(),
-            collection: leaf.collection().map(Into::into),
-        });
+        let component = moniker
+            .leaf()
+            .map(|leaf| ChildRef { name: leaf.name.clone(), collection: leaf.collection.clone() });
         ComponentEventRoute { component, scope }
     }
 }
@@ -346,8 +345,8 @@ impl EventRegistry {
         if let Some(moniker) = component.child_moniker() {
             route.push(ComponentEventRoute {
                 component: Some(ChildRef {
-                    name: moniker.name().into(),
-                    collection: moniker.collection().map(Into::into),
+                    name: moniker.name().clone(),
+                    collection: moniker.collection().cloned(),
                 }),
                 scope: event_decl.scope,
             });

@@ -22,7 +22,7 @@ use fidl::endpoints;
 use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
 use hooks::{EventType, HooksRegistration};
-use moniker::{BorrowedChildName, ChildName, Moniker};
+use moniker::{ChildName, Moniker};
 use std::collections::HashSet;
 use std::sync::Arc;
 use zx::{self as zx, Koid};
@@ -126,10 +126,10 @@ pub async fn execution_is_shut_down(component: &ComponentInstance) -> bool {
 pub async fn has_child<'a>(component: &'a ComponentInstance, moniker: &'a str) -> bool {
     match *component.lock_state().await {
         InstanceState::Resolved(ref s) | InstanceState::Started(ref s, _) => {
-            s.children().map(|(k, _)| k.clone()).any(|m| m == moniker)
+            s.children().map(|(k, _)| k.clone()).any(|m| m == moniker.try_into().unwrap())
         }
         InstanceState::Shutdown(ref state, _) => {
-            state.children.iter().map(|(k, _)| k.clone()).any(|m| m == moniker)
+            state.children.iter().map(|(k, _)| k.clone()).any(|m| m == moniker.try_into().unwrap())
         }
         InstanceState::Destroyed => false,
         _ => panic!("not resolved"),
@@ -144,7 +144,7 @@ pub async fn get_incarnation_id<'a>(component: &'a ComponentInstance, moniker: &
         .await
         .get_resolved_state()
         .expect("not resolved")
-        .get_child(BorrowedChildName::parse(moniker).unwrap())
+        .get_child(&moniker.try_into().unwrap())
         .unwrap()
         .incarnation_id()
 }
@@ -171,7 +171,7 @@ pub async fn get_live_child<'a>(
         .await
         .get_resolved_state()
         .expect("not resolved")
-        .get_child(BorrowedChildName::parse(child).unwrap())
+        .get_child(&child.try_into().unwrap())
         .unwrap()
         .clone()
 }
