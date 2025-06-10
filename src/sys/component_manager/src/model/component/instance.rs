@@ -56,7 +56,7 @@ use fidl::endpoints::{create_proxy, ServerEnd};
 use futures::future::BoxFuture;
 use hooks::{CapabilityReceiver, EventPayload};
 use log::warn;
-use moniker::{ChildName, ExtendedMoniker, Moniker};
+use moniker::{BorrowedChildName, ChildName, ExtendedMoniker, Moniker};
 use router_error::RouterError;
 use sandbox::{
     Capability, Connector, Dict, DirEntry, RemotableCapability, Request, Routable, Router,
@@ -621,7 +621,7 @@ impl ResolvedInstanceState {
     }
 
     /// Returns a reference to a child.
-    pub fn get_child(&self, m: &ChildName) -> Option<&Arc<ComponentInstance>> {
+    pub fn get_child(&self, m: &BorrowedChildName) -> Option<&Arc<ComponentInstance>> {
         self.children.get(m)
     }
 
@@ -808,7 +808,7 @@ impl ResolvedInstanceState {
     }
 
     /// Removes a child.
-    pub fn remove_child(&mut self, moniker: &ChildName) {
+    pub fn remove_child(&mut self, moniker: &BorrowedChildName) {
         if self.children.remove(moniker).is_none() {
             return;
         }
@@ -818,13 +818,13 @@ impl ResolvedInstanceState {
         self.dynamic_offers.retain(|offer| {
             let source_matches = offer.source()
                 == &cm_rust::OfferSource::Child(cm_rust::ChildRef {
-                    name: moniker.name().clone(),
-                    collection: moniker.collection().map(|c| c.clone()),
+                    name: moniker.name().into(),
+                    collection: moniker.collection().map(|c| c.into()),
                 });
             let target_matches = offer.target()
                 == &cm_rust::OfferTarget::Child(cm_rust::ChildRef {
-                    name: moniker.name().clone(),
-                    collection: moniker.collection().map(|c| c.clone()),
+                    name: moniker.name().into(),
+                    collection: moniker.collection().map(|c| c.into()),
                 });
             !source_matches && !target_matches
         });
@@ -1105,11 +1105,11 @@ impl ResolvedInstanceState {
 
     async fn populate_child_inputs(&self, child_inputs: &StructuredDictMap<ComponentInput>) {
         for (child_name, child_instance) in &self.children {
-            if let Some(_) = child_name.collection {
+            if let Some(_) = child_name.collection() {
                 continue;
             }
             let child_name =
-                Name::new(child_name.name.as_str()).expect("child is static so name is not long");
+                Name::new(child_name.name().as_str()).expect("child is static so name is not long");
             let child_input = child_inputs.get(&child_name).expect("missing child dict");
             let mut state = child_instance.lock_state().await;
             let InstanceState::Unresolved(state) = &mut *state else {
@@ -1157,7 +1157,7 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
         self.resolved_component.decl.collections.clone()
     }
 
-    fn get_child(&self, moniker: &ChildName) -> Option<Arc<ComponentInstance>> {
+    fn get_child(&self, moniker: &BorrowedChildName) -> Option<Arc<ComponentInstance>> {
         ResolvedInstanceState::get_child(self, moniker).map(Arc::clone)
     }
 

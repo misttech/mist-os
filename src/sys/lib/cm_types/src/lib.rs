@@ -12,6 +12,7 @@ use serde::{de, ser, Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::ffi::CString;
 use std::fmt::{self, Display};
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::PathBuf;
 use std::str::FromStr;
@@ -123,7 +124,7 @@ pub type Name = BoundedName<MAX_NAME_LENGTH>;
 pub type LongName = BoundedName<MAX_LONG_NAME_LENGTH>;
 
 /// A `BoundedName` is a `Name` that can have a max length of `N` bytes.
-#[derive(Serialize, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct BoundedName<const N: usize>(FlyStr);
 
 impl Name {
@@ -188,9 +189,9 @@ impl<const N: usize> AsRef<BoundedName<N>> for BoundedName<N> {
     }
 }
 
-impl<const N: usize> Borrow<FlyStr> for BoundedName<N> {
+impl<const N: usize> Borrow<str> for BoundedName<N> {
     #[inline]
-    fn borrow(&self) -> &FlyStr {
+    fn borrow(&self) -> &str {
         &self.0
     }
 }
@@ -239,6 +240,20 @@ impl<const N: usize> PartialEq<String> for BoundedName<N> {
     }
 }
 
+impl<const N: usize> PartialEq<BoundedBorrowedName<N>> for BoundedName<N> {
+    #[inline]
+    fn eq(&self, o: &BoundedBorrowedName<N>) -> bool {
+        &self.0 == &o.0
+    }
+}
+
+impl<const N: usize> Hash for BoundedName<N> {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.as_str().hash(state)
+    }
+}
+
 impl<const N: usize> fmt::Display for BoundedName<N> {
     #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -283,7 +298,7 @@ pub type BorrowedLongName = BoundedBorrowedName<MAX_LONG_NAME_LENGTH>;
 
 /// Like [`BoundedName`], except it holds a string slice rather than an allocated string. For
 /// example, the [`Path`] API uses this to return path segments without making an allocation.
-#[derive(Serialize, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[repr(transparent)]
 pub struct BoundedBorrowedName<const N: usize>(str);
 
@@ -388,6 +403,20 @@ impl<const N: usize> PartialEq<String> for BoundedBorrowedName<N> {
     #[inline]
     fn eq(&self, o: &String) -> bool {
         &self.0 == &*o
+    }
+}
+
+impl<const N: usize> PartialEq<BoundedName<N>> for BoundedBorrowedName<N> {
+    #[inline]
+    fn eq(&self, o: &BoundedName<N>) -> bool {
+        self.0 == *o.0
+    }
+}
+
+impl<const N: usize> Hash for BoundedBorrowedName<N> {
+    #[inline]
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state)
     }
 }
 
@@ -1593,6 +1622,7 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use serde_json::json;
+    use std::collections::HashSet;
     use std::iter::repeat;
 
     macro_rules! expect_ok {
@@ -1685,6 +1715,48 @@ mod tests {
             ParseError::TooLong,
             repeat("/x").take(2048).collect::<String>().as_str()
         );
+    }
+
+    #[test]
+    fn test_name_hash() {
+        {
+            let n1 = Name::new("a").unwrap();
+            let s_b = repeat("b").take(255).collect::<String>();
+            let n2 = Name::new(&s_b).unwrap();
+            let b1 = BorrowedName::new("a").unwrap();
+            let b2 = BorrowedName::new(&s_b).unwrap();
+
+            let mut set = HashSet::new();
+            set.insert(n1.clone());
+            assert!(set.contains(&n1));
+            assert!(set.contains(b1));
+            assert!(!set.contains(&n2));
+            assert!(!set.contains(b2));
+            set.insert(n2.clone());
+            assert!(set.contains(&n1));
+            assert!(set.contains(b1));
+            assert!(set.contains(&n2));
+            assert!(set.contains(b2));
+        }
+        {
+            let n1 = LongName::new("a").unwrap();
+            let s_b = repeat("b").take(1024).collect::<String>();
+            let n2 = LongName::new(&s_b).unwrap();
+            let b1 = BorrowedLongName::new("a").unwrap();
+            let b2 = BorrowedLongName::new(&s_b).unwrap();
+
+            let mut set = HashSet::new();
+            set.insert(n1.clone());
+            assert!(set.contains(&n1));
+            assert!(set.contains(b1));
+            assert!(!set.contains(&n2));
+            assert!(!set.contains(b2));
+            set.insert(n2.clone());
+            assert!(set.contains(&n1));
+            assert!(set.contains(b1));
+            assert!(set.contains(&n2));
+            assert!(set.contains(b2));
+        }
     }
 
     // Keep in sync with test_relative_path_methods()

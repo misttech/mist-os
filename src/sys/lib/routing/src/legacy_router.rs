@@ -37,7 +37,8 @@ use cm_rust::{
 use cm_rust_derive::FidlDecl;
 use cm_types::{LongName, Name};
 use fidl_fuchsia_component_internal as finternal;
-use moniker::{ChildName, ExtendedMoniker, Moniker};
+use moniker::{BorrowedChildName, ChildName, ExtendedMoniker, Moniker};
+use std::borrow::Borrow;
 use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -87,7 +88,7 @@ where
                             child_component.child_moniker().expect("ChildName should exist");
                         <UseDecl as ErrorNotFoundInChild>::error_not_found_in_child(
                             use_target.moniker().clone(),
-                            child_moniker.clone(),
+                            child_moniker.into(),
                             use_decl.source_name().clone(),
                         )
                     })?;
@@ -889,7 +890,7 @@ where
                         child_component.child_moniker().expect("ChildName should exist");
                     <R as ErrorNotFoundInChild>::error_not_found_in_child(
                         target.moniker().clone(),
-                        child_moniker.clone(),
+                        child_moniker.into(),
                         registration.source_name().clone(),
                     )
                 })?;
@@ -1174,7 +1175,7 @@ where
                     child_component.child_moniker().expect("ChildName should exist");
                 <OfferDecl as ErrorNotFoundInChild>::error_not_found_in_child(
                     component.moniker().clone(),
-                    child_moniker.clone(),
+                    child_moniker.into(),
                     offer.source_name().clone(),
                 )
             })?;
@@ -1497,7 +1498,7 @@ impl Expose {
                         child_component.child_moniker().expect("ChildName should exist");
                     <ExposeDecl as ErrorNotFoundInChild>::error_not_found_in_child(
                         target.moniker().clone(),
-                        child_moniker.clone(),
+                        child_moniker.into(),
                         expose.source_name().clone(),
                     )
                 })?;
@@ -1514,14 +1515,14 @@ impl Expose {
     }
 }
 
-fn target_matches_moniker(target: &OfferTarget, child_moniker: &ChildName) -> bool {
+fn target_matches_moniker(target: &OfferTarget, child_moniker: &BorrowedChildName) -> bool {
     match target {
         OfferTarget::Child(target_ref) => {
             &target_ref.name == child_moniker.name()
-                && target_ref.collection.as_ref() == child_moniker.collection()
+                && target_ref.collection.as_ref().map(Borrow::borrow) == child_moniker.collection()
         }
         OfferTarget::Collection(target_collection) => {
-            Some(target_collection) == child_moniker.collection()
+            Some(target_collection.borrow()) == child_moniker.collection()
         }
         OfferTarget::Capability(_) => false,
     }
@@ -1554,7 +1555,7 @@ pub trait CapabilityVisitor {
 pub fn find_matching_offers(
     capability_type: CapabilityTypeName,
     source_name: &Name,
-    child_moniker: &ChildName,
+    child_moniker: &BorrowedChildName,
     offers: &Vec<OfferDecl>,
 ) -> Option<RouteBundle<OfferDecl>> {
     let offers: Vec<_> = offers
@@ -1562,7 +1563,7 @@ pub fn find_matching_offers(
         .filter(|offer: &&OfferDecl| {
             capability_type == CapabilityTypeName::from(*offer)
                 && *offer.target_name() == *source_name
-                && target_matches_moniker(offer.target(), &child_moniker)
+                && target_matches_moniker(offer.target(), child_moniker)
         })
         .cloned()
         .collect();

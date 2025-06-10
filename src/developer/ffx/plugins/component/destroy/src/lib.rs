@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
-use cm_types::{LongName, Name};
+use cm_types::{BorrowedLongName, BorrowedName};
 use component_debug::lifecycle::{destroy_instance_in_collection, DestroyError};
 use component_debug::query::get_cml_moniker_from_query;
 use ffx_command_error::{user_error, Error};
@@ -65,8 +65,8 @@ trait DestroyCmdImpl {
         &mut self,
         lifecycle_controller: &fsys::LifecycleControllerProxy,
         parent: &Moniker,
-        collection: &Name,
-        child_name: &LongName,
+        collection: &BorrowedName,
+        child_name: &BorrowedLongName,
     ) -> Result<(), DestroyError>;
 }
 
@@ -85,8 +85,8 @@ impl DestroyCmdImpl for DefaultDestroyCmdImpl {
         &mut self,
         lifecycle_controller: &fsys::LifecycleControllerProxy,
         parent: &Moniker,
-        collection: &Name,
-        child_name: &LongName,
+        collection: &BorrowedName,
+        child_name: &BorrowedLongName,
     ) -> Result<(), DestroyError> {
         destroy_instance_in_collection(lifecycle_controller, parent, collection, child_name).await
     }
@@ -158,8 +158,8 @@ mod test {
                 &mut self,
                 _lifecycle_controller: &fsys::LifecycleControllerProxy,
                 _parent: &Moniker,
-                _collection: &Name,
-                _child_name: &LongName,
+                _collection: &BorrowedName,
+                _child_name: &BorrowedLongName,
             ) -> Result<(), DestroyError> {
                 Ok(())
             }
@@ -201,8 +201,8 @@ mod test {
                 &mut self,
                 _lifecycle_controller: &fsys::LifecycleControllerProxy,
                 _parent: &Moniker,
-                _collection: &Name,
-                _child_name: &LongName,
+                _collection: &BorrowedName,
+                _child_name: &BorrowedLongName,
             ) -> Result<(), DestroyError> {
                 Ok(())
             }

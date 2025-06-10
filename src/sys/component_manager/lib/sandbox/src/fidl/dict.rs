@@ -145,7 +145,9 @@ impl RemotableCapability for Dict {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::dict::{HybridMap, Key, HYBRID_SWITCH_INSERTION_LEN, HYBRID_SWITCH_REMOVAL_LEN};
+    use crate::dict::{
+        BorrowedKey, HybridMap, Key, HYBRID_SWITCH_INSERTION_LEN, HYBRID_SWITCH_REMOVAL_LEN,
+    };
     use crate::{serve_capability_store, Data, Dict, DirEntry, Handle, Unit};
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, Proxy, ServerEnd};
@@ -1539,7 +1541,8 @@ mod tests {
 
         // Remove each entry from the dictionary, and observe the directory watcher API inform us
         // that it has been removed.
-        let _ = dict.remove(&"a".parse().unwrap()).expect("capability was not in dictionary");
+        let _ =
+            dict.remove(&BorrowedKey::new("a").unwrap()).expect("capability was not in dictionary");
         assert_eq!(
             watcher.next().await,
             Some(Ok(fuchsia_fs::directory::WatchMessage {
@@ -1548,7 +1551,8 @@ mod tests {
             })),
         );
 
-        let _ = dict.remove(&"b".parse().unwrap()).expect("capability was not in dictionary");
+        let _ =
+            dict.remove(&BorrowedKey::new("b").unwrap()).expect("capability was not in dictionary");
         assert_eq!(
             watcher.next().await,
             Some(Ok(fuchsia_fs::directory::WatchMessage {
@@ -1557,7 +1561,8 @@ mod tests {
             })),
         );
 
-        let _ = dict.remove(&"c".parse().unwrap()).expect("capability was not in dictionary");
+        let _ =
+            dict.remove(&BorrowedKey::new("c").unwrap()).expect("capability was not in dictionary");
         assert_eq!(
             watcher.next().await,
             Some(Ok(fuchsia_fs::directory::WatchMessage {

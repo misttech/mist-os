@@ -113,7 +113,8 @@ pub struct AllowlistEntry {
 
 impl AllowlistEntry {
     pub fn matches(&self, target_moniker: &Moniker) -> bool {
-        let mut iter = target_moniker.path().iter();
+        let path = target_moniker.path();
+        let mut iter = path.iter();
 
         if self.matchers.is_empty() && !target_moniker.is_root() {
             // If there are no matchers in the allowlist, the moniker must be the root.
@@ -130,7 +131,7 @@ impl AllowlistEntry {
             };
             match matcher {
                 AllowlistMatcher::Exact(child) => {
-                    if cur_child != child {
+                    if cur_child != &child {
                         // The child does not exactly match.
                         return false;
                     }
@@ -217,7 +218,8 @@ impl AllowlistEntryBuilder {
     }
 
     pub fn exact_from_moniker(mut self, m: &Moniker) -> Self {
-        let parts = m.path().iter().map(|c| AllowlistMatcher::Exact(c.clone()));
+        let path = m.path();
+        let parts = path.iter().map(|c| AllowlistMatcher::Exact((*c).into()));
         self.parts.extend(parts);
         self
     }

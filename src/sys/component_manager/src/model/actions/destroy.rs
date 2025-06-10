@@ -625,7 +625,7 @@ pub mod tests {
                 .children()
                 .map(|(k, _)| k.clone())
                 .collect();
-            assert_eq!(children, vec!["x".try_into().unwrap()]);
+            assert_eq!(children, vec!["x".parse::<ChildName>().unwrap()]);
         }
         {
             let mut events: Vec<_> = test

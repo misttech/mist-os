@@ -157,7 +157,7 @@ impl ModelBuilderForAnalyzer {
                 );
                 continue;
             };
-            if child_moniker.collection.is_none() {
+            if child_moniker.collection().is_none() {
                 errors.push(
                     BuildAnalyzerModelError::DynamicComponentWithoutCollection(
                         moniker.to_string(),
@@ -171,7 +171,7 @@ impl ModelBuilderForAnalyzer {
             let children = dynamic_components.entry(parent_moniker).or_insert_with(|| vec![]);
             match Url::new(&url.to_string()) {
                 Ok(url) => {
-                    children.push(Child { child_moniker, url, environment });
+                    children.push(Child { child_moniker: child_moniker.into(), url, environment });
                 }
                 Err(_) => {
                     errors.push(

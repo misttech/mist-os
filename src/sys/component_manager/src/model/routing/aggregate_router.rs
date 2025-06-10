@@ -345,7 +345,7 @@ impl AnonymizedAggregateCapabilityProvider for AnonymizedAggregateServiceProvide
                         panic!("found a parent or self in a collection? this is impossible, and surely a bug");
                     }
                 };
-                if child_name.collection.is_none() {
+                if child_name.collection().is_none() {
                     panic!("found a static child in a collection? this is impossible, and surely a bug");
                 }
                 let child_instance = {

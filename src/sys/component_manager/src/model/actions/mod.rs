@@ -278,7 +278,7 @@ pub(crate) mod test_utils {
         let moniker = child.moniker().leaf().expect("Root component cannot be destroyed");
 
         // Verify the parent-child relationship
-        assert_eq!(parent.moniker().child(moniker.clone()), *child.moniker());
+        assert_eq!(parent.moniker().child(moniker.into()), *child.moniker());
 
         let parent_state = parent.lock_state().await;
         let parent_resolved_state = parent_state.get_resolved_state().expect("not resolved");
