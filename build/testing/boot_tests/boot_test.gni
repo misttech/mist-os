@@ -308,33 +308,21 @@ template("boot_test") {
       deps = [ ":$partition_config_intermediate_target" ]
     }
 
-    _partition_config_label = ":$partition_config_target"
-  } else {
-    _partition_config_label = "//boards/partitions:default($default_toolchain)"
-    if (has_board) {
-      assert(partitions_config_label != false,
-             "Need to define partitions_config_label")
-      _partition_config_label = partitions_config_label
+    # Take the existing board, and shove the new partitions config in.
+    board_config_target = "_boot_test.${target_name}.create_board_config"
+    hybrid_board_configuration(board_config_target) {
+      board_config = board_configuration_label
+      replace_partitions_config = ":$partition_config_target"
     }
+    _board_config_label = ":${board_config_target}"
+  } else {
+    # Configurations that don't declare a board would fail to generate
+    # a hybrid board below. Passing an invalid board to assembled_system
+    # is alright for GN as long as it isn't built.
+    _board_config_label = board_configuration_label
   }
 
   if (current_toolchain == default_toolchain) {
-    if (!has_board) {
-      # Configurations that don't declare a board would fail to generate
-      # a hybrid board below. Passing an invalid board to assembled_system
-      # is alright for GN as long as it isn't built.
-      _board_config_label = board_configuration_label
-      not_needed([ "_partition_config_label" ])
-    } else {
-      # Take the existing board, and shove the new partitions config in.
-      board_config_target = "_boot_test.${target_name}.create_board_config"
-      hybrid_board_configuration(board_config_target) {
-        board_config = board_configuration_label
-        replace_partitions_config = _partition_config_label
-      }
-      _board_config_label = ":${board_config_target}"
-    }
-
     assembled_system_target = "_$main_target.assembled_system"
 
     assembled_system_kernel_zbi = "//build/testing/boot_tests:empty-zbi"
@@ -372,7 +360,7 @@ template("boot_test") {
       deps = [ ":$assembled_system_target" ]
     }
   } else {
-    not_needed([ "_partition_config_label" ])
+    not_needed([ "_board_config_label" ])
     group(product_bundle_target) {
       testonly = true
       deps = [ ":${product_bundle_target}($default_toolchain)" ]

@@ -121,17 +121,6 @@ template("_cuckoo_product_bundle") {
     generate_vbmeta = use_vbmeta
   }
 
-  # The following logic to determine the product bundle's partition information
-  # (including the location of the assembly manifest of the system A contents)
-  # is a standard dance with product bundles and is replicated from
-  # similar logic in `boot_test()`.
-  _partition_config_label = "//boards/partitions:default($default_toolchain)"
-  if (has_board) {
-    assert(partitions_config_label != false,
-           "Need to define partitions_config_label")
-    _partition_config_label = partitions_config_label
-  }
-
   product_bundle(main_target) {
     testonly = true
 
