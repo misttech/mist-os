@@ -37,13 +37,7 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
         super().setup_test()
         self.dut: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
-        # Stop the session for a clean state.
-        self.dut.session.stop()
-
-        self.dut.session.start()
-
-    def teardown_test(self) -> None:
-        self.dut.session.stop()
+        self.dut.session.ensure_started()
 
     def test_logic(self) -> None:
         # Add simplest-input-flatland-session-app to session.
