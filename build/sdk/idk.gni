@@ -186,12 +186,16 @@ template("idk") {
   python_action(target_name) {
     binary_label = "//build/sdk/generate_idk"
 
-    _schema_validator_tool = "//build/bazel:root_target.json_validator_valico"
+    _schema_validator_tool =
+        "//build/tools/json_validator:json_validator_valico($host_toolchain)"
 
     # Get the path to the schema validator executable.
-    host_executable = get_label_info(_schema_validator_tool, "target_out_dir") +
-                      "/json_validator_valico"
-
+    schema_validator_tool_output_name =
+        get_label_info(_schema_validator_tool, "name")
+    schema_validator_tool_output_dir =
+        get_label_info(_schema_validator_tool, "root_out_dir")
+    host_executable =
+        "$schema_validator_tool_output_dir/$schema_validator_tool_output_name"
     inputs = [ host_executable ]
 
     deps = _subbuild_targets + [ _schema_validator_tool ]

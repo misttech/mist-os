@@ -113,7 +113,7 @@ generate_merged_idk = rule(
         ),
         "json_validator": attr.label(
             doc = "The JSON validator executable for schema validation",
-            default = "//build/tools/json_validator:json_validator_valico",
+            default = "@gn_targets//build/tools/json_validator:json_validator_valico",
             allow_single_file = True,
         ),
         "_schema_files": attr.label(
