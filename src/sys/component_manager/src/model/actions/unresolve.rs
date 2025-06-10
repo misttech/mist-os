@@ -85,7 +85,7 @@ async fn do_unresolve(component: &Arc<ComponentInstance>) -> Result<(), ActionEr
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 pub mod tests {
     use crate::model::actions::test_utils::{
         is_destroyed, is_discovered, is_resolved, is_shutdown,

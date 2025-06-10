@@ -133,7 +133,7 @@ async fn do_resolve(
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 pub mod tests {
     use crate::model::actions::test_utils::{is_resolved, is_stopped};
     use crate::model::actions::{

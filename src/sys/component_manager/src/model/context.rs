@@ -109,7 +109,7 @@ impl ModelContext {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "src_model_tests"))]
     pub async fn add_framework_capability(&self, c: Box<dyn FrameworkCapability>) {
         // Internal capabilities added for a test should preempt existing ones that match the
         // same metadata.

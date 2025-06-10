@@ -133,27 +133,20 @@ _component_manager_bin = {
     "//sdk/fidl/fuchsia.data:fuchsia.data_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
-    "//src/lib/diagnostics/hierarchy/rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
-    "//src/lib/test_util",
     "//src/sys/lib/cm_config",
     "//src/sys/lib/cm_rust/testing",
     "//src/sys/lib/component_id_index",
     "//src/sys/lib/fuchsia-bootfs:testdata_bootfs",
-    "//src/sys/lib/library_loader",
     "//src/sys/lib/routing/testing:routing_test_helpers",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
-    "//third_party/rust_crates:paste",
-    "//third_party/rust_crates:pretty_assertions",
-    "//third_party/rust_crates:proptest",
-    "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
     "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:thiserror",
@@ -308,6 +301,27 @@ rustc_binary("bin") {
     # For tracing support, :bin_with_tracing is required
     "//src/lib/trace/rust:trace-provider",
   ]
+  test_deps += [
+    "//src/lib/test_util",
+    "//src/sys/lib/library_loader",
+    "//third_party/rust_crates:paste",
+    "//third_party/rust_crates:pretty_assertions",
+    "//third_party/rust_crates:proptest",
+    "//third_party/rust_crates:serde_json",
+  ]
+}
+
+rustc_test("src_model_tests") {
+  output_name = "component_manager_src_model_tests"
+  forward_variables_from(_component_manager_bin, "*")
+  source_root = "src/main.rs"
+  rustflags = [ "--cfg=feature=\"src_model_tests\"" ]
+  configs += configs_to_add
+  test_deps += [ "//src/lib/diagnostics/hierarchy/rust" ]
+  assert_no_deps += [
+    # For tracing support, :bin_with_tracing is required
+    "//src/lib/trace/rust:trace-provider",
+  ]
 }
 
 rustc_binary("bin_with_tracing") {
@@ -374,6 +388,12 @@ resource("component_manager_tests_invalid_manifest") {
   outputs = [ "meta/{{source_file_part}}" ]
 }
 
+fuchsia_test_component("model-tests-cmp") {
+  deps = [ ":src_model_tests" ]
+  component_name = "component_manager_src_model_tests"
+  manifest = "meta/component_manager_src_model_tests.cml"
+}
+
 fuchsia_test_component("component-manager-tests-cmp") {
   deps = [ ":bin_test" ]
   component_name = "component_manager_tests"
@@ -388,7 +408,10 @@ fuchsia_test_package("component-manager-tests") {
       max_severity = "ERROR"
     }
   }
-  test_components = [ ":component-manager-tests-cmp" ]
+  test_components = [
+    ":component-manager-tests-cmp",
+    ":model-tests-cmp",
+  ]
   deps = [
     ":component_manager_tests_invalid_manifest",
     "testing/signal_then_hang",

@@ -441,7 +441,7 @@ pub fn build_storage_admin_dictionary(
     storage_admin_dictionary
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::model::testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder};

@@ -134,7 +134,7 @@ fn ok_or_first_error(results: Vec<Result<(), ActionError>>) -> Result<(), Action
     results.into_iter().fold(Ok(()), |acc, r| acc.and(r))
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 pub mod tests {
     use super::*;
     use crate::model::actions::test_utils::{

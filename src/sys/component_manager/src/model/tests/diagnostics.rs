@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 /// This module tests the diagnostics code with the actual component hierarchy.
-#[cfg(test)]
 mod tests {
     use crate::model::component::testing::wait_until_event_get_timestamp;
     use crate::model::component::{ComponentInstance, StartReason};

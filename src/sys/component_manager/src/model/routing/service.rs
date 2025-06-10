@@ -855,7 +855,7 @@ impl MutableDirectory for Arc<SimpleImmutableDir> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::model::component::StartReason;

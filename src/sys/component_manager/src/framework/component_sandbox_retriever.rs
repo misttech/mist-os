@@ -94,7 +94,7 @@ async fn is_builtin_runner(program_input: &ProgramInput) -> bool {
     true
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::model::testing::test_helpers::*;

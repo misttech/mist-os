@@ -45,7 +45,7 @@ impl EscrowedState {
             .await;
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "src_model_tests")))]
     pub fn outgoing_dir_closed() -> Self {
         let (_, outgoing_dir) = fidl::endpoints::create_endpoints::<fio::DirectoryMarker>();
         Self { outgoing_dir, escrowed_dictionary: None }
@@ -321,7 +321,7 @@ impl ActorImpl {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use std::sync::{Arc, Weak};
     use std::task::Poll;

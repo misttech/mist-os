@@ -134,7 +134,7 @@ impl ActionNotifier {
 
     /// Returns the number of references that exist to the shared future in this notifier. Returns
     /// None if the future has completed.
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "src_model_tests")))]
     pub fn get_reference_count(&self) -> Option<usize> {
         self.fut.strong_count()
     }
@@ -223,7 +223,7 @@ impl ActionsManager {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 pub(crate) mod test_utils {
     use super::*;
     use crate::model::component::instance::InstanceState;

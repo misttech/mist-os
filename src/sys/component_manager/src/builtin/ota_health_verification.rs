@@ -213,7 +213,7 @@ fn write_to_inspect(node: &fuchsia_inspect::Node, errors: &OtaHealthVerification
     node.record(errors_node);
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use diagnostics_assertions::assert_json_diff;

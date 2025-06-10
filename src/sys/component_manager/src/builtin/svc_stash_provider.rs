@@ -36,7 +36,7 @@ impl SvcStashCapability {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use fidl::endpoints::create_proxy_and_stream;

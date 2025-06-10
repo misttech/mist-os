@@ -61,7 +61,7 @@ impl WriteOnlyLog {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use fuchsia_component::client::connect_to_protocol;

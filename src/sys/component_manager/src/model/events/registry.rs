@@ -383,7 +383,7 @@ impl EventRegistry {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "src_model_tests")))]
     async fn dispatchers_per_event_type(&self, event_type: EventType) -> usize {
         let dispatcher_map = self.dispatcher_map.lock().await;
         dispatcher_map
@@ -401,7 +401,7 @@ impl Hook for EventRegistry {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::model::testing::test_helpers::*;

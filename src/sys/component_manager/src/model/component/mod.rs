@@ -1266,7 +1266,7 @@ impl ComponentInstance {
 
     /// Finds a resolved component matching the moniker, if such a component exists.
     /// This function has no side-effects.
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "src_model_tests")))]
     pub async fn find_resolved(
         self: &Arc<Self>,
         find_moniker: &Moniker,
@@ -1513,7 +1513,7 @@ impl std::fmt::Debug for ComponentInstance {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "src_model_tests"))]
 pub mod testing {
     use fidl_fuchsia_component as fcomponent;
     use hooks::EventType;
@@ -1538,7 +1538,7 @@ pub mod testing {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 pub mod tests {
     use super::*;
     use crate::model::actions::test_utils::is_discovered;

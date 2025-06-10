@@ -221,7 +221,7 @@ impl Program {
     }
 
     /// Creates a program that does nothing but let us intercept requests to control its lifecycle.
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "src_model_tests")))]
     pub fn mock_from_controller(
         controller: endpoints::ClientEnd<fcrunner::ComponentControllerMarker>,
     ) -> Program {
@@ -358,7 +358,7 @@ struct FinalizedProgram {
     pub escrow_request: Option<EscrowRequest>,
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 pub mod tests {
     use super::*;
     use crate::model::testing::mocks::{

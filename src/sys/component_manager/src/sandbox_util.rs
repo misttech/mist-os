@@ -332,7 +332,7 @@ impl<T: Routable<Connector> + 'static> RoutableExt for T {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 pub mod tests {
     use crate::model::context::ModelContext;
     use crate::model::environment::Environment;

@@ -466,7 +466,7 @@ fn create_event_fidl_objects(event: Event) -> BoxStream<Result<fcomponent::Event
         .boxed()
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use crate::model::events::serve::{validate_and_filter_event, ComponentEventRoute};
     use cm_rust::{ChildRef, EventScope};

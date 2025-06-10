@@ -584,7 +584,7 @@ impl ResolvedInstanceState {
         &self.resolved_component.decl
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "src_model_tests"))]
     pub fn decl_as_mut(&mut self) -> &mut ComponentDecl {
         &mut self.resolved_component.decl
     }

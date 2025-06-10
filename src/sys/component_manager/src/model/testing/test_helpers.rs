@@ -6,40 +6,51 @@ use crate::builtin_environment::{BuiltinEnvironment, BuiltinEnvironmentBuilder};
 use crate::capability;
 use crate::framework::realm::Realm;
 use crate::model::component::instance::InstanceState;
-use crate::model::component::{ComponentInstance, StartReason};
+use crate::model::component::ComponentInstance;
 use crate::model::events::registry::EventSubscription;
 use crate::model::model::Model;
-use crate::model::testing::mocks::{ControlMessage, MockResolver, MockRunner};
+use crate::model::testing::mocks::{MockResolver, MockRunner};
 use crate::model::testing::test_hook::TestHook;
 use camino::Utf8PathBuf;
 use cm_config::RuntimeConfig;
 use cm_rust::{
-    Availability, CapabilityDecl, ComponentDecl, ConfigChecksum, ConfigDecl, ConfigField,
-    ConfigSingleValue, ConfigValue, ConfigValueSource, ConfigValueSpec, ConfigValueType,
-    ConfigValuesData, EventStreamDecl, NativeIntoFidl, RunnerDecl, UseEventStreamDecl, UseSource,
+    Availability, CapabilityDecl, ComponentDecl, ConfigValuesData, EventStreamDecl, RunnerDecl,
+    UseEventStreamDecl, UseSource,
 };
-use cm_rust_testing::*;
 use cm_types::Url;
 use fidl::endpoints;
-use futures::channel::mpsc::Receiver;
 use futures::lock::Mutex;
 use futures::{StreamExt, TryStreamExt};
 use hooks::{EventType, HooksRegistration};
 use moniker::{ChildName, Moniker};
 use std::collections::HashSet;
 use std::sync::Arc;
-use vfs::directory::entry::DirectoryEntry;
-use vfs::service;
 use zx::{self as zx, Koid};
+use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
+
+#[cfg(feature = "src_model_tests")]
 use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_component_runner as fcrunner, futures::channel::mpsc::Receiver,
+    vfs::directory::entry::DirectoryEntry, vfs::service,
+};
+
+#[cfg(not(feature = "src_model_tests"))]
+use {
+    crate::model::component::StartReason,
+    crate::model::testing::mocks::ControlMessage,
+    cm_rust::{
+        ConfigChecksum, ConfigDecl, ConfigField, ConfigSingleValue, ConfigValue, ConfigValueSource,
+        ConfigValueSpec, ConfigValueType, NativeIntoFidl,
+    },
+    cm_rust_testing::*,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys,
 };
 
 pub const TEST_RUNNER_NAME: &str = cm_rust_testing::TEST_RUNNER_NAME;
 
 // TODO(https://fxbug.dev/42140194): remove function wrappers once the routing_test_helpers
 // lib has a stable API.
+#[cfg(feature = "src_model_tests")]
 pub fn default_component_decl() -> ComponentDecl {
     ::routing_test_helpers::default_component_decl()
 }
@@ -49,6 +60,7 @@ pub fn component_decl_with_test_runner() -> ComponentDecl {
 }
 
 pub struct ComponentInfo {
+    #[allow(unused)]
     pub component: Arc<ComponentInstance>,
     pub channel_id: Koid,
 }
@@ -76,6 +88,7 @@ impl ComponentInfo {
     }
 
     /// Checks that the component is shut down, panics if this is not true.
+    #[cfg(not(feature = "src_model_tests"))]
     pub async fn check_is_shut_down(&self, runner: &MockRunner) {
         // Check the list of requests for this component
         let request_map = runner.get_request_map();
@@ -89,6 +102,7 @@ impl ComponentInfo {
     }
 
     /// Checks that the component has not been shut down, panics if it has.
+    #[cfg(not(feature = "src_model_tests"))]
     pub async fn check_not_shut_down(&self, runner: &MockRunner) {
         // If the MockController has started, check that no stop requests have
         // been received.
@@ -102,11 +116,13 @@ impl ComponentInfo {
     }
 }
 
+#[cfg(not(feature = "src_model_tests"))]
 pub async fn execution_is_shut_down(component: &ComponentInstance) -> bool {
     component.lock_state().await.is_shut_down()
 }
 
 /// Returns true if the given child (live or deleting) exists.
+#[cfg(not(feature = "src_model_tests"))]
 pub async fn has_child<'a>(component: &'a ComponentInstance, moniker: &'a str) -> bool {
     match *component.lock_state().await {
         InstanceState::Resolved(ref s) | InstanceState::Started(ref s, _) => {
@@ -121,6 +137,7 @@ pub async fn has_child<'a>(component: &'a ComponentInstance, moniker: &'a str) -
 }
 
 /// Return the incarnation id of the given child.
+#[cfg(not(feature = "src_model_tests"))]
 pub async fn get_incarnation_id<'a>(component: &'a ComponentInstance, moniker: &'a str) -> u64 {
     component
         .lock_state()
@@ -177,6 +194,7 @@ pub async fn list_directory_recursive<'a>(root_proxy: &'a fio::DirectoryProxy) -
     items
 }
 
+#[cfg(not(feature = "src_model_tests"))]
 pub async fn write_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str, contents: &'a str) {
     let file_proxy = fuchsia_fs::directory::open_file_async(
         &root_proxy,
@@ -194,6 +212,7 @@ pub async fn write_file<'a>(root_proxy: &'a fio::DirectoryProxy, path: &'a str, 
 
 /// Create a `DirectoryEntry` and `Channel` pair. The created `DirectoryEntry`
 /// provides the service `P`, sending all requests to the returned channel.
+#[cfg(feature = "src_model_tests")]
 pub fn create_service_directory_entry<P>(
 ) -> (Arc<dyn DirectoryEntry>, futures::channel::mpsc::Receiver<fidl::endpoints::Request<P>>)
 where
@@ -217,6 +236,7 @@ where
 /// the start info.
 ///
 /// Panics if the channel closes before we receive a request.
+#[cfg(feature = "src_model_tests")]
 pub async fn wait_for_runner_request(
     recv: &mut Receiver<fcrunner::ComponentRunnerRequest>,
 ) -> fcrunner::ComponentStartInfo {
@@ -272,6 +292,7 @@ impl TestEnvironmentBuilder {
         self
     }
 
+    #[cfg(not(feature = "src_model_tests"))]
     pub fn set_config_values(
         mut self,
         config_values: Vec<(&'static str, ConfigValuesData)>,
@@ -280,11 +301,13 @@ impl TestEnvironmentBuilder {
         self
     }
 
+    #[cfg(not(feature = "src_model_tests"))]
     pub fn set_component_id_index_path(mut self, path: Utf8PathBuf) -> Self {
         self.component_id_index_path = Some(path);
         self
     }
 
+    #[cfg(not(feature = "src_model_tests"))]
     pub fn set_runtime_config(mut self, runtime_config: RuntimeConfig) -> Self {
         self.runtime_config = runtime_config;
         self
@@ -300,6 +323,7 @@ impl TestEnvironmentBuilder {
         self
     }
 
+    #[cfg(not(feature = "src_model_tests"))]
     pub fn set_front_hooks(mut self, hooks: Vec<HooksRegistration>) -> Self {
         self.front_hooks = hooks;
         self
@@ -367,10 +391,13 @@ impl TestEnvironmentBuilder {
 /// A test harness for tests that wish to register or verify actions.
 pub struct ActionsTest {
     pub model: Arc<Model>,
+    #[allow(unused)]
     pub builtin_environment: Arc<Mutex<BuiltinEnvironment>>,
     pub test_hook: Arc<TestHook>,
+    #[allow(unused)]
     pub realm_proxy: Option<fcomponent::RealmProxy>,
     pub runner: Arc<MockRunner>,
+    #[allow(unused)]
     pub resolver: Arc<MockResolver>,
 }
 
@@ -419,6 +446,7 @@ impl ActionsTest {
             .unwrap_or_else(|e| panic!("could not look up {}: {:?}", moniker, e))
     }
 
+    #[cfg(not(feature = "src_model_tests"))]
     pub async fn start(&self, moniker: Moniker) -> Arc<ComponentInstance> {
         self.model
             .root()
@@ -430,6 +458,7 @@ impl ActionsTest {
     /// Add a dynamic child to the given collection, with the given name to the
     /// component that our proxy member variable corresponds to. Passes no
     /// `CreateChildArgs`.
+    #[cfg(not(feature = "src_model_tests"))]
     pub async fn create_dynamic_child(&self, coll: &str, name: &str) {
         self.create_dynamic_child_with_args(coll, name, fcomponent::CreateChildArgs::default())
             .await
@@ -438,6 +467,7 @@ impl ActionsTest {
 
     /// Add a dynamic child to the given collection, with the given name to the
     /// component that our proxy member variable corresponds to.
+    #[cfg(not(feature = "src_model_tests"))]
     pub async fn create_dynamic_child_with_args(
         &self,
         coll: &str,
@@ -533,6 +563,7 @@ pub async fn new_event_stream(
 }
 
 /// Create a test ConfigDecl and an associated ConfigValuesData and ConfigChecksum.
+#[cfg(not(feature = "src_model_tests"))]
 pub fn new_config_decl() -> (ConfigDecl, ConfigValuesData, ConfigChecksum) {
     let checksum = ConfigChecksum::Sha256([
         0x07, 0xA8, 0xE6, 0x85, 0xC8, 0x79, 0xA9, 0x79, 0xC3, 0x26, 0x17, 0xDC, 0x4E, 0x74, 0x65,
@@ -555,6 +586,7 @@ pub fn new_config_decl() -> (ConfigDecl, ConfigValuesData, ConfigChecksum) {
     (config, config_values, checksum)
 }
 
+#[cfg(not(feature = "src_model_tests"))]
 pub async fn lifecycle_controller(test: &TestModelResult) -> fsys::LifecycleControllerProxy {
     let host = {
         let env = test.builtin_environment.lock().await;
@@ -565,6 +597,7 @@ pub async fn lifecycle_controller(test: &TestModelResult) -> fsys::LifecycleCont
     proxy
 }
 
+#[cfg(not(feature = "src_model_tests"))]
 pub async fn config_override(test: &TestModelResult) -> fsys::ConfigOverrideProxy {
     let host = {
         let env = test.builtin_environment.lock().await;

@@ -1844,7 +1844,7 @@ impl BuiltinEnvironment {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "src_model_tests"))]
     pub fn inspector(&self) -> &Inspector {
         self.inspect_sink_provider.inspector()
     }

@@ -957,7 +957,7 @@ fn find_environment_sources(
         .collect()
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::model::actions::test_utils::MockAction;

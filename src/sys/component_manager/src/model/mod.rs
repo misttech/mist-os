@@ -19,7 +19,7 @@ pub(crate) mod routing_fns;
 pub(crate) mod storage;
 pub(crate) mod token;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "src_model_tests"))]
 mod tests;
 
 #[cfg(test)]

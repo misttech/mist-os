@@ -676,7 +676,7 @@ impl StorageAdmin {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::{DirType, StorageAdmin, StorageError};
     use fidl_fuchsia_io as fio;

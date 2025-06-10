@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bedrock::program::Program;
 use crate::builtin::runner::BuiltinRunnerFactory;
 use crate::model::resolver::Resolver;
 use ::namespace::Namespace;
@@ -11,7 +10,7 @@ use ::routing::resolving::{ComponentAddress, ResolvedComponent, ResolvedPackage,
 use anyhow::format_err;
 use async_trait::async_trait;
 use cm_rust::{ComponentDecl, ConfigValuesData};
-use fidl::endpoints::{create_endpoints, Proxy, RequestStream, ServerEnd};
+use fidl::endpoints::{Proxy, RequestStream, ServerEnd};
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_component_runner::{
     ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
@@ -30,6 +29,9 @@ use vfs::pseudo_directory;
 use vfs::service::endpoint;
 use zx::{self as zx, AsHandleRef, HandleBased, Koid};
 use {fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync};
+
+#[cfg(not(feature = "src_model_tests"))]
+use {crate::bedrock::program::Program, fidl::endpoints::create_endpoints};
 
 #[derive(Debug)]
 pub struct MockResolver {
@@ -127,6 +129,7 @@ impl MockResolver {
         self.inner.lock().unwrap().blockers.insert(path.to_string(), Some((send, recv)));
     }
 
+    #[cfg(not(feature = "src_model_tests"))]
     pub fn get_component_decl(&self, name: &str) -> Option<ComponentDecl> {
         self.inner.lock().unwrap().components.get(name).map(Clone::clone)
     }
@@ -212,11 +215,13 @@ impl MockRunner {
     }
 
     /// Cause the URL `url` to return an error when started.
+    #[cfg(not(feature = "src_model_tests"))]
     pub fn add_failing_url(&self, url: &str) {
         self.inner.lock().unwrap().failing_urls.insert(url.to_string());
     }
 
     /// Cause the component `name` to return an error when started.
+    #[cfg(not(feature = "src_model_tests"))]
     pub fn cause_failure(&self, name: &str) {
         self.add_failing_url(&format!("test:///{}_resolved", name))
     }
@@ -240,6 +245,7 @@ impl MockRunner {
         self.inner.lock().unwrap().namespaces.get(name).map(Arc::clone)
     }
 
+    #[cfg(not(feature = "src_model_tests"))]
     pub fn get_request_map(&self) -> Arc<Mutex<HashMap<Koid, Vec<ControlMessage>>>> {
         self.inner.lock().unwrap().runner_requests.clone()
     }
@@ -284,6 +290,7 @@ impl MockRunner {
     }
 
     /// Sends a `OnEscrow` event on the controller channel identified by `koid`.
+    #[cfg(feature = "src_model_tests")]
     pub fn send_on_escrow(
         &self,
         koid: &Koid,
@@ -295,6 +302,7 @@ impl MockRunner {
     }
 
     /// Sends a `OnStopInfo` event on the controller channel identified by `koid`.
+    #[cfg(feature = "src_model_tests")]
     pub fn send_on_stop_info(&self, koid: &Koid, info: fcrunner::ComponentStopInfo) {
         let state = self.inner.lock().unwrap();
         let handle = state.controller_control_handles.get(koid).expect("koid was not available");
@@ -601,6 +609,7 @@ impl MockController {
 }
 
 /// Starts a program that does nothing but let us intercept requests to control its lifecycle.
+#[cfg(not(feature = "src_model_tests"))]
 pub fn mock_program() -> (Program, ServerEnd<fcrunner::ComponentControllerMarker>) {
     let (controller, server_end) = create_endpoints::<fcrunner::ComponentControllerMarker>();
     (Program::mock_from_controller(controller), server_end)

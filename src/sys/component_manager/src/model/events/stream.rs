@@ -14,7 +14,7 @@ use std::pin::Pin;
 use std::sync::{Arc, Weak};
 use std::task::Poll;
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 use {
     hooks::{EventType, HasEventType},
     moniker::Moniker,
@@ -67,7 +67,7 @@ impl EventStream {
 
     /// Waits for an event with a particular EventType against a component with a
     /// particular moniker. Ignores all other events.
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "src_model_tests")))]
     pub async fn wait_until(
         &mut self,
         expected_event_type: EventType,
