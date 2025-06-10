@@ -4,7 +4,7 @@
 
 use anyhow::bail;
 use fuchsia_trace::{
-    category_enabled, trace_state, trace_string_ref_t, BufferingMode, ProlongedContext, TraceState,
+    category_enabled, trace_string_ref_t, BufferingMode, ProlongedContext, TraceState,
 };
 use fxt::blob::{BlobHeader, BlobType};
 use perfetto_protos::perfetto::protos::trace_config::buffer_config::FillPolicy;
@@ -18,13 +18,11 @@ use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::FsString;
 use starnix_logging::{log_error, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
 use starnix_sync::{Locked, Unlocked};
-use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
-use std::sync::mpsc::{channel, Sender};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
-/// Sender for the trace state, which sends a message each time trace state is updated.
-static TRACE_STATE_SENDER: OnceLock<Sender<TraceState>> = OnceLock::new();
+use fuchsia_async as fasync;
+use fuchsia_trace_observer::TraceObserver;
 
 const PERFETTO_BUFFER_SIZE_KB: u32 = 63488;
 
@@ -337,9 +335,21 @@ pub fn start_perfetto_consumer_thread(
     kernel: &Arc<Kernel>,
     socket_path: FsString,
 ) -> Result<(), Errno> {
-    let (sender, receiver) = channel::<TraceState>();
-    kernel.kthreads.spawner().spawn({
-        move |locked, current_task| {
+    // We unfortunately need to spawn a dedicated thread to run our async task.
+    //
+    // While the TraceObserver waits asynchronously, the interactions we do with Perfetto over the
+    // vfs::socket are blocking.
+    //
+    // It blocks in two scenarios:
+    // 1) When we forward a control plane request over the socket and block for a response. This is
+    //    for a few ms. See `perfetto::Consumer::enable_tracing`.
+    // 2) When a trace ends, we repeatedly do blocking reads on the socket until we read and
+    //    forward all the trace data. This servicing of trace data would hold the executor for
+    //    several seconds. See `perfetto::Consumer::next_frame_blocking`.
+    kernel.kthreads.spawner().spawn(|locked, current_task| {
+        let mut executor = fasync::LocalExecutor::new();
+        executor.run_singlethreaded(async move {
+            let observer = TraceObserver::new();
             let mut callback_state = CallbackState {
                 prev_state: TraceState::Stopped,
                 socket_path,
@@ -347,28 +357,13 @@ pub fn start_perfetto_consumer_thread(
                 prolonged_context: None,
                 packet_data: Vec::new(),
             };
-            while let Ok(state) = receiver.recv() {
+            while let Ok(state) = observer.on_state_changed().await {
                 callback_state.on_state_change(locked, state, &current_task).unwrap_or_else(|e| {
                     log_error!("perfetto_consumer callback error: {:?}", e);
                 })
             }
-        }
+        });
     });
-    // Store the other end of the channel so that it can be called from a static callback function
-    // when the trace is changed.
-    TRACE_STATE_SENDER.set(sender).or_else(|e| {
-        log_error!("Failed to set perfetto_consumer trace state sender: {:?}", e);
-        error!(EINVAL)
-    })?;
-    fuchsia_trace_observer::start_trace_observer(c_callback);
-    Ok(())
-}
 
-extern "C" fn c_callback() {
-    let state = trace_state();
-    if let Some(sender) = TRACE_STATE_SENDER.get() {
-        sender.send(state).unwrap_or_else(|e| log_error!("perfetto_consumer send failed: {:?}", e));
-    } else {
-        log_error!("perfetto_consumer sender was not set when the callback was called");
-    }
+    Ok(())
 }
