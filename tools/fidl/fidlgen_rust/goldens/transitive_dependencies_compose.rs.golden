@@ -101,6 +101,15 @@ impl From<fidl::Channel> for TopSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for TopSynchronousProxy {
+    type Protocol = TopMarker;
+
+    fn from_client(value: fidl::endpoints::ClientEnd<TopMarker>) -> Self {
+        Self::new(value.into_channel())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TopProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,

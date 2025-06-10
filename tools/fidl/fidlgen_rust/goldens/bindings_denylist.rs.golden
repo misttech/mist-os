@@ -85,6 +85,15 @@ impl From<fidl::Channel> for AllowedSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for AllowedSynchronousProxy {
+    type Protocol = AllowedMarker;
+
+    fn from_client(value: fidl::endpoints::ClientEnd<AllowedMarker>) -> Self {
+        Self::new(value.into_channel())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct AllowedProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -479,6 +488,15 @@ impl From<DenyEachBindingSynchronousProxy> for zx::Handle {
 impl From<fidl::Channel> for DenyEachBindingSynchronousProxy {
     fn from(value: fidl::Channel) -> Self {
         Self::new(value)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for DenyEachBindingSynchronousProxy {
+    type Protocol = DenyEachBindingMarker;
+
+    fn from_client(value: fidl::endpoints::ClientEnd<DenyEachBindingMarker>) -> Self {
+        Self::new(value.into_channel())
     }
 }
 
@@ -1448,6 +1466,15 @@ impl From<ImportsSameNameContextSynchronousProxy> for zx::Handle {
 impl From<fidl::Channel> for ImportsSameNameContextSynchronousProxy {
     fn from(value: fidl::Channel) -> Self {
         Self::new(value)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for ImportsSameNameContextSynchronousProxy {
+    type Protocol = ImportsSameNameContextMarker;
+
+    fn from_client(value: fidl::endpoints::ClientEnd<ImportsSameNameContextMarker>) -> Self {
+        Self::new(value.into_channel())
     }
 }
 

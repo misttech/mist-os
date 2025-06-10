@@ -136,6 +136,15 @@ impl From<fidl::Channel> for ExampleUseOfErrorSyntaxSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for ExampleUseOfErrorSyntaxSynchronousProxy {
+    type Protocol = ExampleUseOfErrorSyntaxMarker;
+
+    fn from_client(value: fidl::endpoints::ClientEnd<ExampleUseOfErrorSyntaxMarker>) -> Self {
+        Self::new(value.into_channel())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ExampleUseOfErrorSyntaxProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,

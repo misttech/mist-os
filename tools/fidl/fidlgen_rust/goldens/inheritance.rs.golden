@@ -99,6 +99,15 @@ impl From<fidl::Channel> for SubSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for SubSynchronousProxy {
+    type Protocol = SubMarker;
+
+    fn from_client(value: fidl::endpoints::ClientEnd<SubMarker>) -> Self {
+        Self::new(value.into_channel())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct SubProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -524,6 +533,15 @@ impl From<Super_SynchronousProxy> for zx::Handle {
 impl From<fidl::Channel> for Super_SynchronousProxy {
     fn from(value: fidl::Channel) -> Self {
         Self::new(value)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for Super_SynchronousProxy {
+    type Protocol = Super_Marker;
+
+    fn from_client(value: fidl::endpoints::ClientEnd<Super_Marker>) -> Self {
+        Self::new(value.into_channel())
     }
 }
 

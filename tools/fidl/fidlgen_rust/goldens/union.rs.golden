@@ -128,6 +128,15 @@ impl From<fidl::Channel> for TestProtocolSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for TestProtocolSynchronousProxy {
+    type Protocol = TestProtocolMarker;
+
+    fn from_client(value: fidl::endpoints::ClientEnd<TestProtocolMarker>) -> Self {
+        Self::new(value.into_channel())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct TestProtocolProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
