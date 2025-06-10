@@ -98,6 +98,11 @@ type ElementSchema = resource table {
     2: initial_current_level PowerLevel;
     /// All power levels that are valid for this element. Any level not
     /// specified here will be treated as invalid.
+    ///
+    /// Levels must be listed in ascending order from low to high. Note, levels are enums and their
+    /// integer values do not have an inherent meaning. For example, *theoretically* a binary
+    /// (off, on) could be represented with (0, 1), (1, 0), (17, 19) or any combination of two
+    /// two numbers. (But please use BinaryPowerLevel above!)
     3: valid_levels vector<PowerLevel>:MAX_VALID_POWER_LEVELS;
     /// List of dependencies for this element's power levels.
     /// Note: dependencies UPON this element's levels cannot be added here.
