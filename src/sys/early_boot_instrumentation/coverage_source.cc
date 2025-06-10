@@ -13,10 +13,14 @@
 #include <lib/fdio/io.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/connect_service.h>
+#include <lib/fit/defer.h>
 #include <lib/stdcompat/source_location.h>
 #include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/vfs/cpp/service.h>
+#include <lib/zbi-format/internal/debugdata.h>
+#include <lib/zbi-format/zbi.h>
+#include <lib/zbitl/items/debugdata.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/eventpair.h>
 #include <lib/zx/result.h>
@@ -303,6 +307,110 @@ SinkDirMap ExtractDebugData(fidl::ServerEnd<fuchsia_boot::SvcStash> svc_stash) {
   fidl::BindServer(loop.dispatcher(), std::move(svc_stash), &server);
   loop.RunUntilIdle();
   return server.TakeSinkToDir();
+}
+
+zx::result<> ExposeDebugDataZbiItem(fidl::ClientEnd<fuchsia_boot::Items> boot_items,
+                                    vfs::PseudoDir& log_out_dir, SinkDirMap& sink_map) {
+  fidl::WireSyncClient<fuchsia_boot::Items> client(std::move(boot_items));
+  fidl::WireResult wire_result = client->Get2(ZBI_TYPE_DEBUGDATA, nullptr);
+  if (!wire_result.ok()) {
+    FX_LOGS(ERROR) << "fuchsia.boot.Items::Get2 Transport FIDL Error: " << wire_result.error();
+    return zx::error(wire_result.status());
+  }
+  if (wire_result->is_error()) {
+    FX_LOGS(INFO) << "fuchsia.boot.Items::Get2 Protocol Error: " << wire_result->error_value();
+    return zx::error(wire_result->error_value());
+  }
+
+  auto& items = wire_result->value()->retrieved_items;
+  if (items.empty()) {
+    return zx::ok();
+  }
+  for (auto& item : items) {
+    zbi_debugdata_t trailer{};
+    if (auto res = item.payload.read(&trailer, item.length - sizeof(trailer), sizeof(trailer));
+        res != ZX_OK) {
+      FX_LOGS(ERROR) << "Failed to read `zbi_debugdata_t` trailer from VMO. Status " << res;
+      continue;
+    }
+
+    // Read the vmo name and sink and if there are logs, copy them out to a new vmo.
+    std::vector<char> names_buffer;
+    names_buffer.resize(trailer.vmo_name_size + trailer.sink_name_size);
+    if (auto res =
+            item.payload.read(names_buffer.data(), trailer.content_size, names_buffer.size());
+        res != ZX_OK) {
+      FX_LOGS(ERROR) << "Failed to read names from from ZBI_TYPE_DEBUGDATA VMO. Status " << res;
+      continue;
+    }
+    std::string_view names(names_buffer.data(), names_buffer.size());
+    std::string_view sink_name = names.substr(0, trailer.sink_name_size);
+    std::string_view vmo_name = names.substr(sink_name.size(), trailer.vmo_name_size);
+
+    auto& vfs_dir = GetOrCreate(sink_name, DataType::kStatic, sink_map);
+
+    zx::vmo content_slice;
+    if (auto res = item.payload.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, trailer.content_size,
+                                             &content_slice);
+        res != ZX_OK) {
+      FX_LOGS(ERROR) << "Failed to create slice of VMO for debugdata content"
+                     << zx_status_get_string(res);
+      continue;
+    }
+    auto vmo_file = std::make_unique<vfs::VmoFile>(std::move(content_slice), trailer.content_size);
+    if (auto res = vmo_file->vmo()->set_prop_content_size(trailer.content_size); res != ZX_OK) {
+      FX_LOGS(ERROR) << "Failed to set VMO's content size. " << zx_status_get_string(res);
+    }
+    if (auto res = vmo_file->vmo()->set_size(trailer.content_size); res != ZX_OK) {
+      if (res == ZX_ERR_UNAVAILABLE) {
+        FX_LOGS(INFO) << "Provided VMO is not resizable. " << zx_status_get_string(res);
+      } else {
+        FX_LOGS(ERROR) << "Failed to set VMO's size. " << zx_status_get_string(res);
+      }
+    }
+    vfs_dir.AddEntry(std::string(vmo_name), std::move(vmo_file));
+
+    if (trailer.log_size != 0) {
+      std::vector<char> logs;
+      logs.resize(trailer.log_size);
+      if (auto res = item.payload.read(
+              logs.data(), trailer.content_size + trailer.sink_name_size + trailer.vmo_name_size,
+              logs.size());
+          res != ZX_OK) {
+        FX_LOGS(ERROR) << "Failed to create VMO for ZBI_DEBUGDATA_ITEM logs Name: " << vmo_name
+                       << " Sink: " << sink_name << " Length: " << trailer.log_size
+                       << " with status " << res;
+        continue;
+      }
+
+      zx::vmo log_vmo;
+      if (auto res = zx::vmo::create(trailer.log_size, 0, &log_vmo); res != ZX_OK) {
+        FX_LOGS(ERROR) << "Failed to create VMO for ZBI_DEBUGDATA_ITEM logs Name: " << vmo_name
+                       << " Sink: " << sink_name << " Length: " << trailer.log_size
+                       << " with status " << res;
+        continue;
+      }
+
+      if (auto res = log_vmo.write(logs.data(), 0, logs.size()); res != ZX_OK) {
+        FX_LOGS(ERROR) << "Failed to create VMO for ZBI_DEBUGDATA_ITEM logs Name: " << vmo_name
+                       << " Sink: " << sink_name << " Length: " << trailer.log_size
+                       << " with status " << res;
+        continue;
+      }
+
+      if (auto res = log_vmo.set_prop_content_size(trailer.log_size); res != ZX_OK) {
+        FX_LOGS(ERROR) << "Failed to set VMO content size for ZBI_DEBUGDATA_ITEM logs Name: "
+                       << vmo_name << " Sink: " << sink_name << " Length: " << trailer.log_size
+                       << " with status " << res;
+      }
+
+      std::string log_file_name = std::string(sink_name) + "-" + std::string(vmo_name) + ".log";
+
+      auto vmo_file = std::make_unique<vfs::VmoFile>(std::move(log_vmo), logs.size());
+      log_out_dir.AddEntry(log_file_name, std::move(vmo_file));
+    }
+  }
+  return zx::ok();
 }
 
 zx::result<> ExposeLogs(fbl::unique_fd& boot_logs_dir, vfs::PseudoDir& out_dir) {
