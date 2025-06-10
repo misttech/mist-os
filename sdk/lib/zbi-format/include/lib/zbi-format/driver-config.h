@@ -21,6 +21,9 @@ typedef uint32_t zbi_kernel_driver_t;
 // 'PSCI'
 #define ZBI_KERNEL_DRIVER_ARM_PSCI ((zbi_kernel_driver_t)(0x49435350u))
 
+// 'PSCS'
+#define ZBI_KERNEL_DRIVER_ARM_PSCI_CPU_SUSPEND ((zbi_kernel_driver_t)(0x53435350u))
+
 // 'GIC2'
 #define ZBI_KERNEL_DRIVER_ARM_GIC_V2 ((zbi_kernel_driver_t)(0x32434947u))
 
@@ -287,6 +290,48 @@ typedef struct {
   uint32_t freq_hz;
   uint32_t reserved;
 } zbi_dcfg_riscv_generic_timer_driver_t;
+
+typedef uint32_t zbi_arm_psci_cpu_suspend_state_flags_t;
+
+// If set, when entering the associated low power state the CPU's architectural timer will be
+// turned off, making it an unsuitable source for exiting the low power state.
+// A different source must be programmed.
+#define ZBI_ARM_PSCI_CPU_SUSPEND_STATE_FLAGS_LOCAL_TIMER_STOPS \
+  ((zbi_arm_psci_cpu_suspend_state_flags_t)(1u << 0))
+
+// If set, the PSCI CPU Suspend operation will affect the entire power domain, implying all other
+// CPUs of the power domain must be in a low power mode. That is, the last CPU in the power
+// domain is the one to enter this power state.
+#define ZBI_ARM_PSCI_CPU_SUSPEND_STATE_FLAGS_TARGETS_POWER_DOMAIN \
+  ((zbi_arm_psci_cpu_suspend_state_flags_t)(1u << 1))
+
+// The ZBI_KERNEL_DRIVER_ARM_PSCI_CPU_SUSPEND's payload consists on any number of
+// `DcfgArmPsciCpuSuspendState` entries.
+//
+// The length of the item is `sizeof(zbi_dcfg_arm_psci_cou_suspend_state_t)` times the number of
+// entries. Each entry describes an 'idle state' that can be entered through PSCI CPU Suspend call.
+//
+// Entries in the table may be in any order, and only a single item of type
+// ZBI_KERNEL_DRIVER_ARM_PSCI_CPU_SUSPEND should be present in the ZBI.
+typedef struct {
+  // Unique identifier representing this suspend state.
+  uint32_t id;
+
+  // PSCI power_state as described in "Section 5.4.2. of Arm Power State Coordination Interface"
+  // v1.3.
+  uint32_t power_state;
+  zbi_arm_psci_cpu_suspend_state_flags_t flags;
+
+  // Latency in microseconds to enter the low power state.
+  uint32_t entry_latency_us;
+
+  // Latency in microseconds to exit the low power state.
+  uint32_t exit_latency_us;
+
+  // Minimum time in microseconds, including `entry_latency`, to stay in this low power state.
+  // Spending less time would be inefficient energy-wise.
+  uint32_t min_residency_us;
+} zbi_dcfg_arm_psci_cpu_suspend_state_t;
 
 #if defined(__cplusplus)
 }
