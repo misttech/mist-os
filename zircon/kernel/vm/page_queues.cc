@@ -177,6 +177,9 @@ PageQueues::PageQueues()
   for (uint32_t i = 0; i < PageQueueNumQueues; i++) {
     list_initialize(&page_queues_[i]);
   }
+  for (uint32_t i = 0; i < kNumIsolateQueues; i++) {
+    list_initialize(&isolate_queues_[i]);
+  }
 }
 
 PageQueues::~PageQueues() {
@@ -736,7 +739,7 @@ void PageQueues::RotateReclaimQueues(AgeReason reason) {
   }
 }
 
-ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessIsolateList(bool peek) {
+ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessIsolateList(ktl::optional<size_t> peek) {
   // Need to move every page out of the list and either put it back in the regular Isolate list,
   // or in its correct queue. If we hit active pages we may need to replace them with loaned.
 
@@ -759,54 +762,57 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessIsolateList(bool peek)
   // the isolate_cursor_, which requires holding the isolate_cursor_lock_.
   Guard<Mutex> isolate_cursor_guard{&isolate_cursor_lock_};
 
-  Guard<SpinLock, IrqSave> guard{&list_lock_};
-  DEBUG_ASSERT(isolate_cursor_ == nullptr);
-  vm_page_t* current =
-      list_peek_head_type(&page_queues_[PageQueueReclaimIsolate], vm_page_t, queue_node);
-  // Count work done separately to all iterations so we can periodically drop the lock and process
-  // the deferred_list.
-  uint64_t work_done = 0;
-  while (current) {
-    vm_page_t* page = current;
-    current = list_next_type(&page_queues_[PageQueueReclaimIsolate], &current->queue_node,
-                             vm_page_t, queue_node);
-    PageQueue page_queue =
-        static_cast<PageQueue>(page->object.get_page_queue_ref().load(ktl::memory_order_relaxed));
-    // Place in the correct list, preserving age
-    if (page_queue == PageQueueReclaimIsolate) {
-      if (peek) {
-        VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
-        DEBUG_ASSERT(cow);
-        // Upgrading to a refptr can never fail as all pages are removed from a VmCowPages, and
-        // hence from the page queues here, prior to the last reference to a cow pages being
-        // dropped.
-        fbl::RefPtr<VmCowPages> cow_pages = fbl::MakeRefPtrUpgradeFromRaw(cow, list_lock_);
-        DEBUG_ASSERT(cow_pages);
-        return VmoBacklink{ktl::move(cow_pages), page, page->object.get_page_offset()};
-      }
-    } else {
-      list_delete(&page->queue_node);
+  const size_t max_queue = ktl::min(peek.value_or(kNumIsolateQueues - 1), kNumIsolateQueues - 1);
 
-      // Only reason for a page to be in the Isolate list and have the wrong queue is if it was
-      // recently accessed. That means it's active and we can attempt to loan to it. As the entire
-      // Isolate queue is processed each time we change the LRU, we know this is a valid page queue
-      // that has not yet aged out.
-      // We have no way to know the relative age of this page with respect to its target queue, so
-      // the head is as good a place as any to put it.
-      list_add_head(&page_queues_[page_queue], &page->queue_node);
-      if (do_sweeping && !page->is_loaned()) {
-        deferred_list.AddLoanReplacement(page, this);
+  for (size_t i = 0; i <= max_queue; i++) {
+    deferred_list.Flush();
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    list_node_t* list = &isolate_queues_[i];
+    vm_page_t* current = list_peek_head_type(list, vm_page_t, queue_node);
+    // Count work done separately to all iterations so we can periodically drop the lock and process
+    // the deferred_list.
+    uint64_t work_done = 0;
+    while (current) {
+      vm_page_t* page = current;
+      current = list_next_type(list, &current->queue_node, vm_page_t, queue_node);
+      PageQueue page_queue =
+          static_cast<PageQueue>(page->object.get_page_queue_ref().load(ktl::memory_order_relaxed));
+      // Place in the correct list, preserving age
+      if (page_queue == PageQueueReclaimIsolate) {
+        if (peek) {
+          VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
+          DEBUG_ASSERT(cow);
+          // Upgrading to a refptr can never fail as all pages are removed from a VmCowPages, and
+          // hence from the page queues here, prior to the last reference to a cow pages being
+          // dropped.
+          fbl::RefPtr<VmCowPages> cow_pages = fbl::MakeRefPtrUpgradeFromRaw(cow, list_lock_);
+          DEBUG_ASSERT(cow_pages);
+          return VmoBacklink{
+              .cow = ktl::move(cow_pages), .page = page, .offset = page->object.get_page_offset()};
+        }
+      } else {
+        list_delete(&page->queue_node);
+
+        // Only reason for a page to be in the DontNeed list and have the wrong queue is if it was
+        // recently accessed. That means it's active and we can attempt to loan to it. As the entire
+        // DontNeed queue is processed each time we change the LRU, we know this is a valid page
+        // queue that has not yet aged out. We have no way to know the relative age of this page
+        // with respect to its target queue, so the head is as good a place as any to put it.
+        list_add_head(&page_queues_[page_queue], &page->queue_node);
+        if (do_sweeping && !page->is_loaned()) {
+          deferred_list.AddLoanReplacement(page, this);
+        }
       }
-    }
-    work_done++;
-    if (work_done >= kMaxDeferredWork) {
-      // Drop the lock and flush the deferred_list. Saving and restoring current to the
-      // isolate_cursor_.
-      isolate_cursor_ = current;
-      guard.CallUnlocked([&deferred_list]() { deferred_list.Flush(); });
-      current = isolate_cursor_;
-      isolate_cursor_ = nullptr;
-      work_done = 0;
+      work_done++;
+      if (work_done >= kMaxDeferredWork) {
+        // Drop the lock and flush the deferred_list. Saving and restoring current to the
+        // isolate_cursor_.
+        isolate_cursor_ = {.page = current, .list = list};
+        guard.CallUnlocked([&deferred_list]() { deferred_list.Flush(); });
+        current = isolate_cursor_.page;
+        isolate_cursor_ = {.page = nullptr, .list = nullptr};
+        work_done = 0;
+      }
     }
   }
   return ktl::nullopt;
@@ -823,7 +829,7 @@ void PageQueues::ProcessLruQueue(uint64_t target_gen, bool isolate) {
   {
     VM_KTRACE_DURATION(2, "ProcessIsolateList");
     // Process through the Isolate list and move out anything that has been updated.
-    ProcessIsolateList(false);
+    ProcessIsolateList(ktl::nullopt);
   }
 
   // Processing the LRU queue requires holding the page_queues_ lock_. The only other
@@ -901,13 +907,14 @@ void PageQueues::ProcessLruQueue(uint64_t target_gen, bool isolate) {
           // Force it into either our target queue or the isolate list, don't care about races. If
           // we happened to access it at the same time then too bad.
           PageQueue new_queue = isolate ? PageQueueReclaimIsolate : gen_to_queue(target_gen);
+          list_node_t* target_queue = isolate ? &isolate_queues_[0] : &page_queues_[new_queue];
           PageQueue old_queue =
               static_cast<PageQueue>(page->object.get_page_queue_ref().exchange(new_queue));
           DEBUG_ASSERT(old_queue >= PageQueueReclaimBase);
 
           page_queue_counts_[old_queue].fetch_sub(1, ktl::memory_order_relaxed);
           page_queue_counts_[new_queue].fetch_add(1, ktl::memory_order_relaxed);
-          list_add_tail(&page_queues_[new_queue], &page->queue_node);
+          list_add_tail(target_queue, &page->queue_node);
           // We should only have performed this step to move from one inactive bucket to the next,
           // so there should be no active/inactive count changes needed.
           DEBUG_ASSERT(!queue_is_active(new_queue, mru_queue));
@@ -1000,7 +1007,11 @@ void PageQueues::MoveToQueueLockedList(vm_page_t* page, PageQueue queue) {
 
   AdvanceIsolateCursorIf(page);
   list_delete(&page->queue_node);
-  list_add_head(&page_queues_[queue], &page->queue_node);
+  if (queue == PageQueueReclaimIsolate) {
+    list_add_tail(&isolate_queues_[0], &page->queue_node);
+  } else {
+    list_add_head(&page_queues_[queue], &page->queue_node);
+  }
   page_queue_counts_[old_queue].fetch_sub(1, ktl::memory_order_relaxed);
   page_queue_counts_[queue].fetch_add(1, ktl::memory_order_relaxed);
 }
@@ -1412,7 +1423,7 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::PeekIsolate(size_t lowest_que
 
   while (true) {
     // Peek the Isolate queue in case anything is ready for us.
-    ktl::optional<VmoBacklink> result = ProcessIsolateList(true);
+    ktl::optional<VmoBacklink> result = ProcessIsolateList(0);
     if (result) {
       return result;
     }
@@ -1425,7 +1436,7 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::PeekIsolate(size_t lowest_que
     // reclaimable page.
     const uint64_t lru_target = lru_gen_.load(ktl::memory_order_relaxed) + 1;
     if (lru_target > lru_limit) {
-      return ProcessIsolateList(true);
+      return ProcessIsolateList(kNumIsolateQueues - 1);
     }
     ProcessLruQueue(lru_target, true);
   }

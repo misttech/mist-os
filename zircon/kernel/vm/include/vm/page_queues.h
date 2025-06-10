@@ -67,6 +67,12 @@ class PageQueues {
   static constexpr size_t kNumOldestQueues = 2;
   static_assert(kNumOldestQueues + kNumActiveQueues <= kNumReclaim);
 
+  // Number of different isolate queues that are available. Different isolate queues allow for
+  // separating isolate pages into different buckets such that more nuanced choices on what page to
+  // reclaim can be made.
+  // Presently there is no mechanism to separate pages and so the number of queues is kept at 1.
+  static constexpr size_t kNumIsolateQueues = 1;
+
   static constexpr zx_duration_mono_t kDefaultMinMruRotateTime = ZX_SEC(5);
   static constexpr zx_duration_mono_t kDefaultMaxMruRotateTime = ZX_SEC(5);
 
@@ -438,8 +444,9 @@ class PageQueues {
   void ProcessLruQueue(uint64_t target_gen, bool isolate);
 
   // Processes the Isolate list with the goal to move any pages into the correct list, if their
-  // queue is no longer the Isolate list, or return the first Isolate page if |peek| is true.
-  ktl::optional<VmoBacklink> ProcessIsolateList(bool peek) TA_EXCL(lock_);
+  // queue is no longer the Isolate list. If |peek| contains a value then only the isolate lists up
+  // to and including that value are processed, and the first page found is returned.
+  ktl::optional<VmoBacklink> ProcessIsolateList(ktl::optional<size_t> peek) TA_EXCL(lock_);
 
   // Helpers for adding and removing to the queues. All of the public Set/Move/Remove operations
   // are convenience wrappers around these.
@@ -499,9 +506,9 @@ class PageQueues {
   bool DebugPageIsSpecificQueue(const vm_page_t* page, PageQueue queue, F validator) const;
 
   void AdvanceIsolateCursorIf(vm_page_t* page) TA_REQ(list_lock_) {
-    if (page == isolate_cursor_) {
-      isolate_cursor_ = list_next_type(&page_queues_[PageQueueReclaimIsolate], &page->queue_node,
-                                       vm_page_t, queue_node);
+    if (page == isolate_cursor_.page) {
+      isolate_cursor_.page =
+          list_next_type(isolate_cursor_.list, &page->queue_node, vm_page_t, queue_node);
     }
   }
 
@@ -618,6 +625,12 @@ class PageQueues {
   // |lru_gen_| and |mru_gen_|.
   ktl::array<list_node_t, PageQueueNumQueues> page_queues_ TA_GUARDED(list_lock_);
 
+  // When a page is in the PageQueueReclaimIsolate state, instead of being in the page_queues_ list
+  // it is in, potentially one of several different, isolate_queuse_ lists. This is just an
+  // implementation simplification as there's no need to 'save' the memory of the unused list_node_t
+  // in the other page_queues_ array.
+  ktl::array<list_node_t, kNumIsolateQueues> isolate_queues_ TA_GUARDED(list_lock_);
+
   // The generation counts are monotonic increasing counters and used to represent the effective age
   // of the oldest and newest reclaimable queues. The page queues themselves are treated as a fixed
   // size circular buffer that the generations map onto (see definition of |gen_to_queue|).This
@@ -693,7 +706,10 @@ class PageQueues {
   // being examined. Any operation that removes a page from the Isolate list must check if its
   // removing this page, and advance it to the next page in the list if it is. This is automated by
   // calling AdvanceDontNeedCursorIf.
-  vm_page_t* isolate_cursor_ TA_GUARDED(list_lock_) = nullptr;
+  struct {
+    vm_page_t* page = nullptr;
+    list_node_t* list = nullptr;
+  } isolate_cursor_ TA_GUARDED(list_lock_);
 
   // There is only a single cursor and this lock acts as a resource control for it. This process
   // needs to be done on LRU rotation / when peeking pages for reclamation, which need to be
