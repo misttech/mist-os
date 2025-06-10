@@ -1379,7 +1379,7 @@ TEST_F(ConnectionTest, Notification) {
 
 TEST_F(ConnectionTest, CoalescedNotification) {
   TestConnection test;
-  test.DestructionNotification();
+  test.CoalescedNotification();
 }
 
 TEST_F(ConnectionTest, DestructionNotification) {
@@ -1449,7 +1449,7 @@ TEST_F(ConnectionTest, JitAllocateWriteCombining) {
 
 TEST_F(ConnectionTest, JitAllocateReuseChoice) {
   TestConnection test;
-  test.JitAllocateWriteCombining();
+  test.JitAllocateReuseChoice();
 }
 
 TEST_F(ConnectionTest, JitAllocateInvalidCommitSize) {
