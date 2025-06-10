@@ -761,7 +761,7 @@ impl ResolvedInstanceState {
         // Filter out capabilities handled by bedrock routing
         let exposes = decl.exposes.iter().filter(|e| !sandbox_construction::is_supported_expose(e));
         let exposes_by_target_name = routing::aggregate_exposes(exposes);
-        for (target_name, exposes) in exposes_by_target_name {
+        for ((target_name, _target), exposes) in exposes_by_target_name {
             let first_expose = exposes.first().expect("invalid empty expose list");
             let request = match first_expose {
                 cm_rust::ExposeDecl::Service(_) | cm_rust::ExposeDecl::Directory(_) => {

@@ -138,7 +138,7 @@ impl RouteRequest {
         );
         match first_expose {
             ExposeDecl::Protocol(e) => {
-                assert!(exposes.len() == 1, "multiple exposes");
+                assert!(exposes.len() == 1, "multiple exposes: {:?}", exposes);
                 Ok(Self::ExposeProtocol(e.clone()))
             }
             ExposeDecl::Service(_) => {
