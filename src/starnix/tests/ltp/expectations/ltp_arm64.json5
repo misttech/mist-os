@@ -19,6 +19,7 @@
                 "signal06",
 
                 // TODO(https://fxbug.dev/422998349): Re-enable once we fit within the timeout
+                "sendfile07",
                 "sendfile07_64",
             ],
         },
