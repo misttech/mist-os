@@ -5,12 +5,13 @@ use anyhow::Result;
 use fuchsia_async::{Interval, MonotonicDuration};
 use fuchsia_trace::{category_enabled, counter};
 use fuchsia_trace_observer::TraceObserver;
-use futures::StreamExt;
+use futures::{select, StreamExt};
 use log::debug;
 use stalls::StallProvider;
 use std::ffi::CStr;
 use std::sync::Arc;
 const CATEGORY_MEMORY_KERNEL: &'static CStr = c"memory:kernel";
+use futures::future::FutureExt;
 
 // Continuously monitors the 'memory:kernel' trace category.
 // Once enabled, it periodically records memory statistics until the category is disabled.
@@ -32,7 +33,10 @@ pub async fn serve_forever(
                 log::warn!("Failed to trace on category {:?} : {:?}", CATEGORY_MEMORY_KERNEL, err);
             }
             debug!("Wait for {} second(s)", delay_in_secs);
-            interval.next().await;
+            select! {
+                _ = interval.next() => (),
+                _ = trace_observer.on_state_changed().fuse() => (),
+            };
         }
         debug!("Trace category {:?} not active. Waiting.", CATEGORY_MEMORY_KERNEL);
         let _ = trace_observer.on_state_changed().await;
