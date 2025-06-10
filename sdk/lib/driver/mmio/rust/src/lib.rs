@@ -98,6 +98,113 @@
 //! Callers can use `Mmio::align_offset` to determine the first offset within the MMIO region
 //! suitable for a given alignment.
 //!
+//! ## Usage Examples
+//! ### VmoMapping
+//! ```
+//! use mmio::{Mmio, MmioExt};
+//! use mmio::vmo::VmoMapping;
+//! const VMO_LEN: usize = 1024;
+//! # let vmo = zx::Vmo::create(VMO_LEN as u64).unwrap();
+//! // Map the Vmo memory, returning an `MmioRegion`. The returned region implements `Mmio`.
+//! let mut mmio = VmoMapping::map(0, VMO_LEN, vmo).unwrap();
+//! let _ = mmio.load32(0).unwrap();
+//! let _ = mmio.store16(32, 0x1234).unwrap();
+//! ```
+//!
+//! ### Splittable VmoMapping
+//! ```
+//! use mmio::{Mmio, MmioExt};
+//! use mmio::vmo::VmoMapping;
+//! const VMO_LEN: usize = 1024;
+//! # let vmo = zx::Vmo::create(VMO_LEN as u64).unwrap();
+//! // Map the Vmo memory and convert it into a splittable `MmioRegion`.
+//! // The returned region implements `Mmio + MmioSplit + Send`. If you only need split and not
+//! // you can use `into_split` instead.
+//! let mut mmio = VmoMapping::map(0, VMO_LEN, vmo).unwrap().into_split_send();
+//!
+//! // Split off a number of regions which have exclusive ownership of their ranges.
+//! // reg1 owns the first 8 bytes, which start at offset 0 in the original mapping.
+//! let mut reg1 = mmio.split_off(8).unwrap();
+//! // reg2 owns the next 4 bytes, which start at offset 8 in the original mapping.
+//! let mut reg2 = mmio.split_off(4).unwrap();
+//! // reg3 owns the next 4 bytes, which start at offset 12 in the original mapping.
+//! let mut reg3 = mmio.split_off(4).unwrap();
+//! // The original mmio owns the rest of the region, starting at offset 16 in the original
+//! // mapping.
+//!
+//! let _ = reg1.load64(0).unwrap();
+//! reg1.store16(2, 0x1234).unwrap();
+//!
+//! let _ = reg2.load32(0).unwrap();
+//! reg2.store8(3, 0xff).unwrap();
+//!
+//! let _ = reg3.load32(0).unwrap();
+//! reg3.store16(0, 0xff00).unwrap();
+//! ```
+//!
+//! ### Alignment and Capacity
+//! ```
+//! use mmio::{Mmio, MmioExt};
+//! use mmio::vmo::VmoMapping;
+//! const VMO_LEN: usize = 1024;
+//! # let vmo = zx::Vmo::create(VMO_LEN as u64).unwrap();
+//! // Map the Vmo memory. The returned mapping can be converted into an `MmioRegion`.
+//! let mut mmio = VmoMapping::map(0, VMO_LEN, vmo).unwrap().into_split();
+//!
+//! // Split off a number of regions which have exclusive ownership of their ranges.
+//! // reg1 owns the first 8 bytes, which start at offset 0 in the original mapping.
+//! let mut reg1 = mmio.split_off(8).unwrap();
+//! // reg2 owns the next 4 bytes, which start at offset 8 in the original mapping.
+//! let mut reg2 = mmio.split_off(4).unwrap();
+//! // reg3 owns the next 4 bytes, which start at offset 12 in the original mapping.
+//! let mut reg3 = mmio.split_off(4).unwrap();
+//! // The original mmio owns the rest of the region, starting at offset 16 in the original
+//! // mapping.
+//!
+//! // reg1 owns the region starting at offset 0 in the Vmo, which is mapped to a page aligned
+//! // boundary. It is suitably aligned for any type with an alignment <= Fuchsia's page size. It
+//! // covers an 8 byte range, to can hold any `MmioOperand` type.
+//! reg1.check_suitable_for::<u64>().unwrap();
+//!
+//! // reg2 owns the region starting at offset 8. It is aligned for any `MmioOperand` type but
+//! // covers a 4 byte range.
+//! reg2.check_aligned_for::<u64>().unwrap();
+//! reg2.check_capacity_for::<u64>().expect_err("expect MmioError::OutOfRange");
+//!
+//! reg2.check_suitable_for::<u32>().unwrap();
+//!
+//! // reg3 owns the region starting at offset 12. It is aligned for types with an alignment <= 4
+//! // and covers a 4 byte range.
+//! reg3.check_aligned_for::<u64>().expect_err("expect MmioError::Unaligned");
+//! reg3.check_capacity_for::<u64>().expect_err("expect MmioError::OutOfRange");
+//!
+//! reg3.check_suitable_for::<u32>().unwrap();
+//!
+//! // The original mmio object owns the region starting at offset 16 and covering the rest of the
+//! // mapping.
+//! mmio.check_suitable_for::<u64>().unwrap();
+//! mmio.check_suitable_for::<[u64; 8]>().unwrap();
+//! ```
+//!
+//! ## Testing
+//! ### Regular Memory Implementation
+//! ```
+//! use mmio::memory::Memory;
+//! use std::mem::MaybeUninit;
+//!
+//! let mut mem = MaybeUninit<[u64; 8]>::uninit();
+//! // A MaybeUninit's memory can be borrowed as an Mmio region.
+//! let mmio = Memory::borrow_uninit(&mut mem);
+//!
+//! run_test(mmio);
+//!
+//! // Safety: any bit pattern is valid for [u64; 8].
+//! let mem = unsafe { mem.assume_init() };
+//!
+//! // Check that the memory is in the expected state.
+//! validate_mem(mem);
+//! ```
+//!
 //! # Implementers Guide
 //! Implementers of `Mmio` and `MmioSplit` are required to uphold some guarantees. These are
 //! discussed more thoroughly in the corresponding trait's documentation. These requirements are
@@ -108,5 +215,6 @@ mod arch;
 mod memory;
 mod mmio;
 pub mod region;
+pub mod vmo;
 
 pub use mmio::*;

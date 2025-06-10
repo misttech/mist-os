@@ -14,8 +14,14 @@ rustc_library("mmio") {
     "src/memory.rs",
     "src/mmio.rs",
     "src/region.rs",
+    "src/vmo.rs",
   ]
-  deps = [ "//third_party/rust_crates:thiserror" ]
+  deps = [
+    "//sdk/rust/zx",
+    "//sdk/rust/zx-status",
+    "//src/lib/fuchsia-runtime",
+    "//third_party/rust_crates:thiserror",
+  ]
   test_deps = [
     "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:rand",
