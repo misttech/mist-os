@@ -10,7 +10,7 @@ using zx;
 type Asap = struct {};
 
 /// Specifies a real time using a system monotonic or reference clock time or an
-/// option specifying ‘as soon as possible’. This type is used when a transport
+/// option specifying 'as soon as possible'. This type is used when a transport
 /// control operation is to occur using a time value that is meaningful when the
 /// transport is stopped.
 type RealTime = flexible union {

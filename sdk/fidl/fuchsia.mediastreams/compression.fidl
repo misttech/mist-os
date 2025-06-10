@@ -13,7 +13,7 @@ type Compression = struct {
     /// The type of compression applied to the stream.
     type CompressionType;
 
-    /// Opaque ‘out-of-band’ parameters describing the compression
+    /// Opaque 'out-of-band' parameters describing the compression
     /// of the stream.
     parameters vector<uint8>:<MAX, optional>;
 };
