@@ -414,6 +414,16 @@ pub trait MmioExt: Mmio {
         T::try_load(self, offset)
     }
 
+    /// Loads an `MmioOperand` from the Mmio region at the given offset.
+    ///
+    /// # Panics
+    /// If `self.check_suitable_for::<T>(offset)` would fail.
+    ///
+    /// See `MmioExt::try_load` for a non-panicking version.
+    fn load<T: MmioOperand>(&self, offset: usize) -> T {
+        self.try_load(offset).unwrap()
+    }
+
     /// Stores an `MmioOperand` to the Mmio region at the given offset.
     ///
     /// # Errors
@@ -423,14 +433,35 @@ pub trait MmioExt: Mmio {
         T::try_store(self, offset, value)
     }
 
+    /// Stores an `MmioOperand` to the Mmio region at the given offset.
+    ///
+    /// # Panics
+    /// If `self.check_suitable_for::<T>(offset)` would fail.
+    ///
+    /// See `MmioExt::try_store` for a non-panicking version.
+    fn store<T: MmioOperand>(&mut self, offset: usize, value: T) {
+        self.try_store(offset, value).unwrap()
+    }
+
     /// Loads an `MmioOperand` value from an Mmio region at the given offset, returning only the bits
     /// set in the given mask.
     ///
     /// # Errors
     /// - MmioError::OutOfRange: if the load would exceed the bounds of this Mmio region.
     /// - MmioError::Unaligned: if the offset is not suitably aligned.
-    fn masked_load<T: MmioOperand>(&self, offset: usize, mask: T) -> Result<T, MmioError> {
+    fn try_masked_load<T: MmioOperand>(&self, offset: usize, mask: T) -> Result<T, MmioError> {
         self.try_load::<T>(offset).map(|v| v & mask)
+    }
+
+    /// Loads an `MmioOperand` value from an Mmio region at the given offset, returning only the bits
+    /// set in the given mask.
+    ///
+    /// # Panics
+    /// If `self.check_suitable_for::<T>(offset)` would fail.
+    ///
+    /// See `MmioExt::try_masked_load` for a non-panicking version.
+    fn masked_load<T: MmioOperand>(&self, offset: usize, mask: T) -> T {
+        self.try_masked_load::<T>(offset, mask).unwrap()
     }
 
     /// Updates the value in the MMIO region at the given offset, only modifying the bits set in
@@ -446,7 +477,7 @@ pub trait MmioExt: Mmio {
     /// # Errors
     /// - MmioError::OutOfRange: if the load would exceed the bounds of this Mmio region.
     /// - MmioError::Unaligned: if the offset is not suitably aligned.
-    fn masked_modify<T: MmioOperand>(
+    fn try_masked_modify<T: MmioOperand>(
         &mut self,
         offset: usize,
         mask: T,
@@ -456,6 +487,25 @@ pub trait MmioExt: Mmio {
         let unchanged_bits = current & !mask;
         let changed_bits = value & mask;
         self.try_store(offset, unchanged_bits | changed_bits)
+    }
+
+    /// Updates the value in the MMIO region at the given offset, only modifying the bits set in
+    /// the given mask.
+    ///
+    /// This operation performs a read-modify-write in order to only modify the bits matching the
+    /// mask. As this is performed as a load from device memory followed by a store to device
+    /// memory, the device may change state in between these operations.
+    ///
+    /// Callers must ensure that the this sequence of operations is valid for the device they're
+    /// accessing and their use case.
+    ///
+    /// # Panics
+    ///
+    /// If `self.check_suitable_for::<T>(offset)` would fail.
+    ///
+    /// See `MmioExt::try_masked_modify` for a non-panicking version.
+    fn masked_modify<T: MmioOperand>(&mut self, offset: usize, mask: T, value: T) {
+        self.try_masked_modify(offset, mask, value).unwrap()
     }
 }
 

@@ -308,4 +308,24 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_masked_access() {
+        use crate::mmio::MmioExt;
+
+        let mut mem = MaybeUninit::<u64>::zeroed();
+        let mut mmio = Memory::borrow_uninit(&mut mem);
+
+        mmio.store(0, 0xfedcba98_76543210_u64);
+        assert_eq!(0xfedcba98_76543210, mmio.masked_load(0, u64::MAX));
+        assert_eq!(0x00000000_76543210, mmio.masked_load(0, u32::MAX as u64));
+        assert_eq!(0xfedcba98_00000000, mmio.masked_load(0, (u32::MAX as u64) << 32));
+        assert_eq!(
+            0xfedcba98_76543210 & 0xaaaaaaaa_aaaaaaaa,
+            mmio.masked_load(0, 0xaaaaaaaa_aaaaaaaa_u64)
+        );
+
+        mmio.masked_modify(0, 0xff000000_00000000u64, 0);
+        assert_eq!(0x00dcba98_76543210, mmio.masked_load(0, u64::MAX));
+    }
 }
