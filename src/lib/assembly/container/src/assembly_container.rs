@@ -4,13 +4,14 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use assembly_package_copy::PackageCopier;
 use camino::{Utf8Path, Utf8PathBuf};
 use depfile::Depfile;
 use pathdiff::diff_paths;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::fs::{copy, create_dir_all};
 use std::path::Path;
 use walkdir::WalkDir;
@@ -101,6 +102,9 @@ pub trait AssemblyContainer {
         // Collect all inputs into a depfile.
         let mut depfile = Depfile::new_with_output(&config_path);
 
+        // Collect all output paths to ensure we don't have any duplicates.
+        let mut outputs = BTreeSet::new();
+
         // Copy each file referenced by the config into `dir`.
         self.walk_paths(&mut |path: &mut Utf8PathBuf, dest: Utf8PathBuf, filetype: FileType| {
             // Bazel does not like colons in filenames.
@@ -135,9 +139,16 @@ pub trait AssemblyContainer {
                         .file_name()
                         .ok_or_else(|| anyhow!("Path is missing a filename: {}", &path))?;
 
-                    // Copy the file to the right place.
+                    // Copy the file to the right place and ensure that we don't copy two files to
+                    // the same location.
                     let absolute_dir = dir.as_ref().join(&dest);
                     let absolute_path = absolute_dir.join(&name);
+                    if !outputs.insert(absolute_path.clone()) {
+                        bail!(
+                            "Two files in the container will clobber each other at destination: {}",
+                            &absolute_path
+                        );
+                    }
                     std::fs::create_dir_all(&absolute_dir)?;
                     assembly_util::fast_copy(&path, &absolute_path)
                         .with_context(|| format!("Copying file: {}", &path))?;
@@ -938,5 +949,43 @@ mod tests {
         let dst_file_path = dst_path.join("nested").join("file.txt");
         let data = std::fs::read_to_string(&dst_file_path).unwrap();
         assert_eq!("data", &data);
+    }
+
+    #[test]
+    fn test_walk_error_for_duplicate_path() {
+        #[derive(Deserialize, Serialize)]
+        #[assembly_container(config.json)]
+        struct ConfigWithDuplicate {
+            one: Utf8PathBuf,
+            two: Utf8PathBuf,
+        }
+
+        // Use a custom walk so that we can return two identical dests.
+        impl WalkPaths for ConfigWithDuplicate {
+            fn walk_paths_with_dest<F: crate::WalkPathsFn>(
+                &mut self,
+                found: &mut F,
+                dest: Utf8PathBuf,
+            ) -> anyhow::Result<()> {
+                found(&mut self.one, dest.clone(), FileType::Unknown)?;
+                found(&mut self.two, dest, FileType::Unknown)?;
+                Ok(())
+            }
+        }
+
+        // Prepare a directory for temporary files.
+        let dir = tempdir().unwrap();
+        let dir_path = Utf8PathBuf::from_path_buf(dir.path().to_path_buf()).unwrap();
+
+        // Create a config in memory that uses the same file for both fields.
+        // It doesn't have to be the same file to cause an error, but it does
+        // have to have the same filename in order to collide.
+        let input_path = dir_path.join("file.txt");
+        std::fs::write(&input_path, "").unwrap();
+        let config = ConfigWithDuplicate { one: input_path.clone(), two: input_path };
+
+        // Write the config to a hermetic directory.
+        let container_dir = dir_path.join("container");
+        assert!(config.write_to_dir(&container_dir, None::<Utf8PathBuf>).is_err());
     }
 }
