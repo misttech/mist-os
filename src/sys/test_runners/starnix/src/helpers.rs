@@ -7,6 +7,7 @@ use fidl::endpoints::{create_proxy, Proxy};
 use fidl::HandleBased;
 use fidl_fuchsia_test::{self as ftest};
 use frunner::ComponentNamespaceEntry;
+use ftest::CaseListenerProxy;
 use fuchsiaperf::FuchsiaPerfBenchmarkResult;
 use futures::StreamExt;
 use gtest_runner_lib::parser::read_file;
@@ -78,7 +79,7 @@ pub async fn run_starnix_benchmark(
 ) -> Result<(), Error> {
     let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>();
     let (numbered_handles, std_handles) = create_numbered_handles();
-    start_info.numbered_handles = numbered_handles;
+    start_info.numbered_handles = Some(numbered_handles);
 
     debug!("notifying client test case started");
     run_listener_proxy.on_test_case_started(&test, std_handles, case_listener)?;
@@ -163,7 +164,7 @@ pub fn clone_start_info(
 
 /// Creates numbered handles for a test component with a respective `StdHandles` that should be
 /// passed to the `RunListener`.
-pub fn create_numbered_handles() -> (Option<Vec<fprocess::HandleInfo>>, ftest::StdHandles) {
+pub fn create_numbered_handles() -> (Vec<fprocess::HandleInfo>, ftest::StdHandles) {
     let (test_stdin, _) = zx::Socket::create_stream();
     let (test_stdout, stdout_client) = zx::Socket::create_stream();
     let (test_stderr, stderr_client) = zx::Socket::create_stream();
@@ -180,7 +181,7 @@ pub fn create_numbered_handles() -> (Option<Vec<fprocess::HandleInfo>>, ftest::S
         id: fruntime::HandleInfo::new(fruntime::HandleType::FileDescriptor, 2).as_raw(),
     };
 
-    let numbered_handles = Some(vec![stdin_handle_info, stdout_handle_info, stderr_handle_info]);
+    let numbered_handles = vec![stdin_handle_info, stdout_handle_info, stderr_handle_info];
     let std_handles = ftest::StdHandles {
         out: Some(stdout_client),
         err: Some(stderr_client),
@@ -361,4 +362,31 @@ pub async fn read_file_from_component_ns(
     }
 
     Err(anyhow!("/pkg is not in the namespace"))
+}
+
+// This is a hacky workaround for run dashboard ergonomics, so that we get a top-level view of
+// the suite status (including logs from all test cases), while also retaining individual
+// test case pass/fail results. To do this, we'll send a placeholder overall test case to the
+// test manager, with stdio handles wired into that overall "test" case. The individual tests
+// will report into those same handles, by way of the component start_info.numbered_handles.
+pub fn start_top_level_report(
+    start_info: &mut frunner::ComponentStartInfo,
+    run_listener_proxy: &ftest::RunListenerProxy,
+    handle_info: Vec<fprocess::HandleInfo>,
+    handles: ftest::StdHandles,
+) -> Result<CaseListenerProxy, Error> {
+    start_info.numbered_handles = Some(handle_info);
+    let (overall_test_listener_proxy, overall_test_listener) =
+        create_proxy::<ftest::CaseListenerMarker>();
+    run_listener_proxy.on_test_case_started(
+        &ftest::Invocation {
+            name: Some(start_info.resolved_url.clone().unwrap_or_default()),
+            tag: None,
+            ..Default::default()
+        },
+        handles,
+        overall_test_listener,
+    )?;
+
+    Ok(overall_test_listener_proxy)
 }

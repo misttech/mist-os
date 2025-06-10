@@ -86,40 +86,28 @@ pub async fn run_gunit_cases(
     run_listener_proxy: &ftest::RunListenerProxy,
     component_runner: &frunner::ComponentRunnerProxy,
 ) -> Result<(), Error> {
+    // Before passing in the handles, we'll need to wire up an IO sink so that we can parse results.
     let (numbered_handles, mut std_handles) = create_numbered_handles();
-    start_info.numbered_handles = numbered_handles;
-
-    // Grab stdout for result parsing.
     let (stdout_reader, stdout_writer) = zx::Socket::create_stream();
-    let stdout_source = std_handles.out.take().unwrap();
+    let stdout_sink = std_handles.out.take().unwrap();
     std_handles.out = Some(stdout_reader);
 
-    // Hacky - send a fake case to test manager and use it to see all of stdout/stderr.
-    let (overall_test_listener_proxy, overall_test_listener) =
-        create_proxy::<ftest::CaseListenerMarker>();
-    run_listener_proxy.on_test_case_started(
-        &ftest::Invocation {
-            name: Some(start_info.resolved_url.clone().unwrap_or_default()),
-            tag: None,
-            ..Default::default()
-        },
-        std_handles,
-        overall_test_listener,
-    )?;
+    let top_level_report_proxy =
+        start_top_level_report(&mut start_info, run_listener_proxy, numbered_handles, std_handles)?;
 
     // Notify test manager of cases starting.
-    let (mut run_listener_proxies, test_filter_arg) =
-        start_tests(tests, run_listener_proxy, TestType::Gunit)?;
+    let mut run_listener_proxies = start_tests(&tests, run_listener_proxy)?;
+    let test_filter_arg = create_tests_filter_arg(&tests, TestType::Gunit);
     append_program_args(vec![test_filter_arg], start_info.program.as_mut().context("No program.")?);
 
     // Start the test component.
     let component_controller = start_test_component(start_info, component_runner)?;
     let _ = read_result(component_controller.take_event_stream()).await;
-    overall_test_listener_proxy
+    top_level_report_proxy
         .finished(&TestResult { status: Some(Status::Passed), ..Default::default() })?;
 
     // Parse stdout.
-    let mut reader = BufReader::new(fasync::Socket::from_socket(stdout_source));
+    let mut reader = BufReader::new(fasync::Socket::from_socket(stdout_sink));
     let mut line = String::new();
     while reader.read_line(&mut line).await? > 0 {
         // Copy output to test's stdout.
@@ -144,7 +132,7 @@ pub async fn run_gunit_cases(
         line.clear();
     }
 
-    resolve_remaining_cases(run_listener_proxies)?;
+    handle_unresolved_test_cases(run_listener_proxies)?;
     Ok(())
 }
 
@@ -166,28 +154,33 @@ pub async fn run_gtest_cases(
     component_runner: &frunner::ComponentRunnerProxy,
     test_type: TestType,
 ) -> Result<(), Error> {
-    // This is a hacky workaround for run dashboard ergonomics, so that we get a top-level view of
-    // the suite status (including logs from all test cases), while also retaining individual
-    // test case pass/fail results. To do this, we'll send a placeholder overall test case to the
-    // test manager, with stdio handles wired into that overall "test" case. The individual tests
-    // will report into those same handles, by way of the component start_info.numbered_handles.
     let (numbered_handles, std_handles) = create_numbered_handles();
-    start_info.numbered_handles = numbered_handles;
-    let (overall_test_listener_proxy, overall_test_listener) =
-        create_proxy::<ftest::CaseListenerMarker>();
-    run_listener_proxy.on_test_case_started(
-        &ftest::Invocation {
-            name: Some(start_info.resolved_url.clone().unwrap_or_default()),
-            tag: None,
-            ..Default::default()
-        },
-        std_handles,
-        overall_test_listener,
-    )?;
+    let top_level_report_proxy =
+        start_top_level_report(&mut start_info, run_listener_proxy, numbered_handles, std_handles)?;
+    let (run_listener_proxies, test_result_list) =
+        execute_gtests(component_runner, start_info, tests, run_listener_proxy, test_type).await?;
 
+    // Mark the overall test suite as completed. The status is always "Passed," but we will parse
+    // and report the actual status of individual tests below.
+    top_level_report_proxy
+        .finished(&TestResult { status: Some(Status::Passed), ..Default::default() })?;
+
+    report_test_results(run_listener_proxies, test_result_list)
+}
+
+/// Executes the given tests and returns a map of the tests to their listener proxy, as well as the
+/// test execution results. Callers can iterate through results, and report state to the proxies.
+/// If the given tests fail to execute gracefully (e.g. crash), an empty vector will be returned.
+pub async fn execute_gtests(
+    component_runner: &frunner::ComponentRunnerProxy,
+    mut start_info: frunner::ComponentStartInfo,
+    tests: Vec<ftest::Invocation>,
+    run_listener_proxy: &ftest::RunListenerProxy,
+    test_type: TestType,
+) -> Result<(HashMap<String, CaseListenerProxy>, Vec<TestSuiteOutput>), Error> {
     // Notify test manager of cases starting.
-    let (mut run_listener_proxies, test_filter_arg) =
-        start_tests(tests, run_listener_proxy, test_type)?;
+    let run_listener_proxies = start_tests(&tests, run_listener_proxy)?;
+    let test_filter_arg = create_tests_filter_arg(&tests, test_type);
 
     let output_file_name = unique_filename();
     let output_format = match test_type {
@@ -195,6 +188,7 @@ pub async fn run_gtest_cases(
         TestType::GtestXmlOutput => "xml",
         _ => panic!("unexpected test type"),
     };
+
     let output_arg = format_arg(
         test_type,
         &format!("output={}:{}{}", output_format, OUTPUT_PATH, output_file_name),
@@ -212,11 +206,6 @@ pub async fn run_gtest_cases(
     let component_controller = start_test_component(start_info, component_runner)?;
     let _ = read_result(component_controller.take_event_stream()).await;
 
-    // Mark the overall test suite as completed. The status is always "Passed," but we will parse
-    // and report the actual status of individual tests below.
-    overall_test_listener_proxy
-        .finished(&TestResult { status: Some(Status::Passed), ..Default::default() })?;
-
     // Parse test results.
     let test_results = read_file(&output_dir, &output_file_name)
         .await
@@ -226,14 +215,24 @@ pub async fn run_gtest_cases(
                 .with_context(|| format!("Failed to parse {}", output_file_name))
         });
 
-    // If tests crashes then we would fail to read or parse the output file. We
-    // still want to report these cases as failed before returning the error;
-    let (test_list, result) = match test_results {
-        Ok(results) => (results.testsuites, Ok(())),
-        Err(e) => (vec![], Err(e)),
+    // If tests crashes then we may fail to read or parse the output file. We should handle that
+    // edge case gracefully so that callers can decide how to proceed.
+    let test_result_list = match test_results {
+        Ok(results) => results.testsuites,
+        Err(e) => {
+            error!("Tests crashed whilst running: {}", e);
+            vec![]
+        }
     };
 
-    for suite in &test_list {
+    return Ok((run_listener_proxies, test_result_list));
+}
+
+pub fn report_test_results(
+    mut run_listener_proxies: HashMap<String, CaseListenerProxy>,
+    test_suite_output: Vec<TestSuiteOutput>,
+) -> Result<(), Error> {
+    for suite in &test_suite_output {
         for test in &suite.testsuite {
             let name = format!("{}.{}", suite.name, test.name);
             let status = match &test.status {
@@ -255,20 +254,17 @@ pub async fn run_gtest_cases(
         }
     }
 
-    resolve_remaining_cases(run_listener_proxies)?;
-    result
+    handle_unresolved_test_cases(run_listener_proxies)?;
+    Ok(())
 }
 
 fn start_tests(
-    tests: Vec<ftest::Invocation>,
+    tests: &Vec<ftest::Invocation>,
     run_listener_proxy: &ftest::RunListenerProxy,
-    test_type: TestType,
-) -> Result<(HashMap<String, CaseListenerProxy>, String), Error> {
-    let mut test_filter_arg = format_arg(test_type, FILTER_ARG);
+) -> Result<HashMap<String, CaseListenerProxy>, Error> {
     let mut run_listener_proxies = HashMap::new();
     for test in tests {
         let test_name = test.name.clone().expect("No test name.");
-        test_filter_arg = format!("{}{}:", test_filter_arg, &test_name);
 
         let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>();
         run_listener_proxy.on_test_case_started(
@@ -280,12 +276,24 @@ fn start_tests(
         run_listener_proxies.insert(test_name, case_listener_proxy);
     }
 
-    Ok((run_listener_proxies, test_filter_arg))
+    Ok(run_listener_proxies)
+}
+
+pub fn create_tests_filter_arg(tests: &Vec<ftest::Invocation>, test_type: TestType) -> String {
+    let mut test_filter_arg = format_arg(test_type, FILTER_ARG);
+    for test in tests {
+        let test_name = test.name.clone().expect("No test name.");
+        test_filter_arg = format!("{}{}:", test_filter_arg, &test_name);
+    }
+
+    test_filter_arg
 }
 
 fn format_arg(test_type: TestType, test_arg: &str) -> String {
     match test_type {
-        TestType::Gtest | TestType::GtestXmlOutput => format!("--gtest_{}", test_arg),
+        TestType::Gtest | TestType::GtestXmlOutput => {
+            format!("--gtest_{}", test_arg)
+        }
         TestType::Gunit => format!("--gunit_{}", test_arg),
         _ => panic!("unexpected test type"),
     }
@@ -295,13 +303,22 @@ fn unique_filename() -> String {
     format!("test_result-{}.json", uuid::Uuid::new_v4())
 }
 
-fn resolve_remaining_cases(
+/// We may have unresolved cases if the test was explicitly disabled, but also if running the test
+/// crashed or otherwise behaved in an unexpected way. This function resolves all hanging test cases
+/// and returns the number of tests which were marked as failing.
+fn handle_unresolved_test_cases(
     run_listener_proxies: HashMap<String, CaseListenerProxy>,
-) -> Result<(), Error> {
+) -> Result<i32, Error> {
+    let mut failing_count = 0;
     for (name, case_listener_proxy) in run_listener_proxies {
         log::warn!("Did not receive result for {name}. Marking as failed if not a disabled test.");
-        let status = if name.contains("DISABLED") { Status::Skipped } else { Status::Failed };
+        let status = if name.contains("DISABLED") {
+            Status::Skipped
+        } else {
+            failing_count += 1;
+            Status::Failed
+        };
         case_listener_proxy.finished(&TestResult { status: Some(status), ..Default::default() })?;
     }
-    Ok(())
+    Ok(failing_count)
 }
