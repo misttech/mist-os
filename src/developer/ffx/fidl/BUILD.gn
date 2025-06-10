@@ -38,5 +38,6 @@ fidl("fuchsia.developer.ffx") {
     "//src/sys/pkg/lib/*",
     "//tools/fidl/fidlgen_python/tests/*",
     "//tools/funnel/*",
+    "//vendor/google/tools/*",
   ]
 }
