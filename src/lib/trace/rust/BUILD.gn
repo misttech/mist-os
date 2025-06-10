@@ -118,22 +118,11 @@ rustc_library("trace-provider") {
   sources = [ "trace-provider/src/lib.rs" ]
 }
 
-shared_library("rust-trace-observer") {
-  visibility = [ ":*" ]
-  deps = [
-    "//sdk/lib/async-loop:async-loop-cpp",
-    "//sdk/lib/async-loop:async-loop-default",
-    "//zircon/system/ulib/trace",
-  ]
-  sources = [ "trace-observer/trace_observer.cc" ]
-}
-
 rustc_library("trace-observer") {
   name = "fuchsia_trace_observer"
   edition = "2021"
   source_root = "trace-observer/src/lib.rs"
   non_rust_deps = [
-    ":rust-trace-observer",
     ":trace",
     "//sdk/rust/zx",
     "//src/lib/fuchsia-async",
