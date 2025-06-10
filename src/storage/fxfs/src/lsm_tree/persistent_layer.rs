@@ -903,6 +903,13 @@ impl<W: WriteBytes, K: Key, V: LayerValue> PersistentLayerWriter<W, K, V> {
         Ok(self.bloom_filter.serialized_size())
     }
 
+    // Returns the bloom filter writer. Intended to be used for testing purposes, e.g., gain access
+    // to the bloom filter to then corrupt it.
+    #[cfg(test)]
+    pub(crate) fn bloom_filter(&mut self) -> &mut BloomFilterWriter<K> {
+        &mut self.bloom_filter
+    }
+
     fn data_blocks(&self) -> usize {
         if self.item_count == 0 {
             0

@@ -79,6 +79,7 @@ impl FsckTest {
         );
         Ok(())
     }
+    // TODO(https://fxbug.dev/422604584): Validate layer file contents for root store.
     async fn run(&self, test_options: TestOptions) -> Result<(), Error> {
         let options = FsckOptions {
             fail_on_warning: true,
@@ -3524,4 +3525,195 @@ async fn test_overwrite_extent_flag_not_set() {
         test.errors()[..],
         [FsckIssue::Error(FsckError::OverwriteExtentFlagUnset(..)), ..]
     );
+}
+
+#[fuchsia::test]
+async fn test_invalid_bloom_filter_for_allocator() {
+    let mut test = FsckTest::new().await;
+
+    {
+        let fs = test.filesystem();
+        let root_store = fs.root_store();
+        let device = fs.device();
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let layer_handle = ObjectStore::create_object(
+            &root_store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+        )
+        .await
+        .expect("create_object failed");
+        transaction.commit().await.expect("commit failed");
+
+        {
+            // Fill persistent layers with enough items to start using bloom filter. The following
+            // value was chosen from trial and error. The minimum number of items to add is
+            // complicated to calculate. It depends on the serialized size of the item,
+            // `MINIMUM_DATA_BLOCKS_FOR_BLOOM_FILTER`, and `fs.block_size()`. See the
+            // `PersistentLayerWriter`'s implementation of`LayerWriter::write(..)` for details of
+            // of how the items are written to the persistent layer.
+            let item_count = 600;
+            let mut items: Vec<Item<AllocatorKey, AllocatorValue>> = vec![];
+            for i in 0..item_count as u64 {
+                // The range per item needs to be disjoint to avoid them being merged.
+                items.push(Item::new(
+                    AllocatorKey { device_range: (2 * i * 100)..(2 * i + 1) * 100 },
+                    AllocatorValue::Abs { count: 1, owner_object_id: 1 },
+                ));
+            }
+
+            let mut writer = PersistentLayerWriter::<_, AllocatorKey, AllocatorValue>::new(
+                Writer::new(&layer_handle).await,
+                items.len(),
+                fs.block_size(),
+            )
+            .await
+            .expect("Writer::new failed");
+
+            // Write the items into the layer - requires a minimum amount of items before the bloom
+            // filter is used.
+            for item in AsRef::<Vec<Item<AllocatorKey, AllocatorValue>>>::as_ref(&items) {
+                writer.write(item.as_item_ref()).await.expect("write failed");
+            }
+
+            // Corrupt the bloom filter by clearing it. This will cause the filter to report that
+            // no items exist.
+            writer.bloom_filter().clear();
+
+            writer.flush().await.expect("flush failed");
+        }
+        let mut allocator_info = fs.allocator().info();
+        allocator_info.layers.push(layer_handle.object_id());
+        let mut allocator_info_vec = vec![];
+        allocator_info.serialize_with_version(&mut allocator_info_vec).expect("serialize failed");
+        let mut buf = device.allocate_buffer(allocator_info_vec.len()).await;
+        buf.as_mut_slice().copy_from_slice(&allocator_info_vec[..]);
+
+        let handle = ObjectStore::open_object(
+            &root_store,
+            fs.allocator().object_id(),
+            HandleOptions::default(),
+            None,
+        )
+        .await
+        .expect("open allocator handle failed");
+        let mut transaction = handle.new_transaction().await.expect("new_transaction failed");
+        handle.txn_write(&mut transaction, 0, buf.as_ref()).await.expect("txn_write failed");
+        transaction.commit().await.expect("commit failed");
+    }
+
+    test.remount().await.expect("remount failed");
+    test.run(TestOptions::default()).await.expect_err("Fsck should fail");
+    assert_matches!(test.errors()[..], [FsckIssue::Fatal(FsckFatal::InvalidBloomFilter(..))]);
+}
+
+#[fuchsia::test]
+async fn test_invalid_bloom_filter_for_volume() {
+    let mut test = FsckTest::new().await;
+
+    // The following is similar to `install_items_in_store` function above, but we need to interact
+    // with the persistent layer directly to corrupt the bloom filter.
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", NO_OWNER, None).await.unwrap();
+        let root_store = fs.root_store();
+        let device = fs.device();
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let layer_handle = ObjectStore::create_object(
+            &root_store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+        )
+        .await
+        .expect("create_object failed");
+        transaction.commit().await.expect("commit failed");
+
+        {
+            // Fill persistent layers with enough items to start using bloom filter. The following
+            // value was chosen from trial and error. The minimum number of items to add is
+            // complicated to calculate. It depends on the serialized size of the item,
+            // `MINIMUM_DATA_BLOCKS_FOR_BLOOM_FILTER`, and `fs.block_size()`. See the
+            // `PersistentLayerWriter`'s implementation of`LayerWriter::write(..)` for details of
+            // of how the items are written to the persistent layer.
+            let item_count = 600;
+            let mut items: Vec<Item<ObjectKey, ObjectValue>> = vec![];
+            for i in 0..item_count as u64 {
+                // The range per item needs to be disjoint to avoid them being merged.
+                items.push(Item::new(
+                    ObjectKey::extent(0, 0, (2 * i * 100)..(2 * i + 1) * 100),
+                    ObjectValue::deleted_extent(),
+                ));
+            }
+
+            let mut writer = PersistentLayerWriter::<_, ObjectKey, ObjectValue>::new(
+                Writer::new(&layer_handle).await,
+                items.len(),
+                fs.block_size(),
+            )
+            .await
+            .expect("Writer::new failed");
+
+            // Write the items into the layer - requires a minimum amount of items before the bloom
+            // filter is used.
+            for item in AsRef::<Vec<Item<ObjectKey, ObjectValue>>>::as_ref(&items) {
+                writer.write(item.as_item_ref()).await.expect("write failed");
+            }
+
+            // Corrupt the bloom filter by clearing it. This will cause the filter to report that
+            // no items exist.
+            writer.bloom_filter().clear();
+
+            writer.flush().await.expect("flush failed");
+        }
+        let store_info_handle = ObjectStore::open_object(
+            &root_store,
+            store.store_info_handle_object_id().unwrap(),
+            HandleOptions::default(),
+            None,
+        )
+        .await
+        .expect("open store info handle failed");
+
+        let mut store_info = if store_info_handle.get_size() == 0 {
+            StoreInfo::default()
+        } else {
+            let mut cursor = std::io::Cursor::new(
+                store_info_handle.contents(1000).await.expect("error reading content"),
+            );
+            StoreInfo::deserialize_with_version(&mut cursor).expect("deserialize_error").0
+        };
+        store_info.layers.push(layer_handle.object_id());
+        let mut store_info_vec = vec![];
+        store_info.serialize_with_version(&mut store_info_vec).expect("serialize failed");
+        let mut buf = device.allocate_buffer(store_info_vec.len()).await;
+        buf.as_mut_slice().copy_from_slice(&store_info_vec[..]);
+
+        let mut transaction =
+            store_info_handle.new_transaction().await.expect("new_transaction failed");
+        store_info_handle
+            .txn_write(&mut transaction, 0, buf.as_ref())
+            .await
+            .expect("txn_write failed");
+        transaction.commit().await.expect("commit failed");
+        store.store_object_id()
+    };
+
+    test.remount().await.expect("remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+    assert_matches!(test.errors()[..], [FsckIssue::Fatal(FsckFatal::InvalidBloomFilter(..))]);
 }

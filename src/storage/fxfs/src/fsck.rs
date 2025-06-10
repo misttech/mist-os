@@ -427,13 +427,14 @@ impl<'a> Fsck<'a> {
         V: Value + std::fmt::Debug,
     >(
         &self,
-        store_object_id: u64,
+        // This is the object ID of the store or allocator that the layer files belong to.
+        allocator_or_store_object_id: u64,
         layer_file_object_id: u64,
         layer: Arc<dyn Layer<K, V>>,
     ) -> Result<(), Error> {
         let mut iter: BoxedLayerIterator<'_, K, V> = self.assert(
             layer.seek(Bound::Unbounded).await,
-            FsckFatal::MalformedLayerFile(store_object_id, layer_file_object_id),
+            FsckFatal::MalformedLayerFile(allocator_or_store_object_id, layer_file_object_id),
         )?;
 
         let mut last_item: Option<Item<K, V>> = None;
@@ -441,23 +442,31 @@ impl<'a> Fsck<'a> {
             if let Some(last) = last_item {
                 if !last.key.cmp_upper_bound(&item.key).is_le() {
                     self.fatal(FsckFatal::MisOrderedLayerFile(
-                        store_object_id,
+                        allocator_or_store_object_id,
                         layer_file_object_id,
                     ))?;
                 }
                 if last.key.overlaps(&item.key) {
                     self.fatal(FsckFatal::OverlappingKeysInLayerFile(
-                        store_object_id,
+                        allocator_or_store_object_id,
                         layer_file_object_id,
                         item.into(),
                         last.as_item_ref().into(),
                     ))?;
                 }
             }
+            if !layer.maybe_contains_key(item.key) {
+                // Key reported as not existing in filter
+                self.fatal(FsckFatal::InvalidBloomFilter(
+                    allocator_or_store_object_id,
+                    layer_file_object_id,
+                    item.into(),
+                ))?;
+            }
             last_item = Some(item.cloned());
             self.assert(
                 iter.advance().await,
-                FsckFatal::MalformedLayerFile(store_object_id, layer_file_object_id),
+                FsckFatal::MalformedLayerFile(allocator_or_store_object_id, layer_file_object_id),
             )?;
         }
         Ok(())
