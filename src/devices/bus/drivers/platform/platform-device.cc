@@ -177,17 +177,37 @@ zx::result<zx::interrupt> PlatformDevice::GetInterrupt(uint32_t index, uint32_t 
   if (unlikely(!IsValid(irq))) {
     return zx::error(ZX_ERR_INTERNAL);
   }
-  if (flags == 0) {
-    flags = static_cast<uint32_t>(irq.mode().value());
+
+  // If the driver chose "default" for the IRQ mode, use the configuration we have instead.
+  const uint32_t cfg_mode = static_cast<uint32_t>(irq.mode().value()) & ZX_INTERRUPT_MODE_MASK;
+  const uint32_t drv_mode = flags & ZX_INTERRUPT_MODE_MASK;
+  const auto vector = irq.irq().value();
+
+  if (drv_mode == ZX_INTERRUPT_MODE_DEFAULT) {
+    fdf::info(
+        "IRQ vector {} for platform device \"{}\" has default mode {:#08x}.  "
+        "Using config mode {:08x} instead.",
+        vector, name_, drv_mode, cfg_mode);
+    flags = (flags & ~ZX_INTERRUPT_MODE_MASK) | cfg_mode;
+  } else {
+    // If the driver explicitly passed in a mode value which conflicts with our
+    // mode value, print a warning, but use their value anyway.
+    if (drv_mode != cfg_mode) {
+      fdf::warn(
+          "IRQ vector {} for platform device \"{}\" explicitly requesting mode {:#08x} which"
+          " does not match platform configuration {:#08x}",
+          vector, name_, drv_mode, cfg_mode);
+    }
   }
+
   if (flags & ZX_INTERRUPT_WAKE_VECTOR) {
     fdf::warn("Client passing in ZX_INTERRUPT_WAKE_VECTOR. This will be an error in the future.");
   }
   if (bus_->suspend_enabled() && irq.wake_vector().has_value() && irq.wake_vector().value()) {
-    flags &= ZX_INTERRUPT_WAKE_VECTOR;
+    flags |= ZX_INTERRUPT_WAKE_VECTOR;
   }
-  auto vector = irq.irq().value();
-  fdf::info("Creating interrupt with vector {} for platform device \"{}\"", vector, name_);
+  fdf::info("Creating interrupt with vector {} (flags {:#08x}) for platform device \"{}\"", vector,
+            flags, name_);
   zx::interrupt out_irq;
   zx_status_t status = zx::interrupt::create(*bus_->GetIrqResource(), vector, flags, &out_irq);
   if (status != ZX_OK) {
