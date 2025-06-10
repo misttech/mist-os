@@ -418,6 +418,7 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
   // The IRQ thread and its two top level event decoders.
   int IrqThread();
+  zx::result<> SetIrqThreadSchedulerRole();
   void HandleEvent(uint32_t event);
   void HandleEpEvent(uint32_t event);
 

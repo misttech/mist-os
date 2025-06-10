@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/defer.h>
 
@@ -174,7 +175,52 @@ void Dwc3::HandleEvent(uint32_t event) {
   }
 }
 
+zx::result<> Dwc3::SetIrqThreadSchedulerRole() {
+  const std::string_view kScheduleProfileRole = "fuchsia.devices.usb.drivers.dwc3.interrupt";
+  zx::unowned_thread thread{zx::thread::self()->get()};
+  zx::thread duplicate_thread;
+  zx_status_t status =
+      thread->duplicate(ZX_RIGHT_TRANSFER | ZX_RIGHT_MANAGE_THREAD, &duplicate_thread);
+  if (status != ZX_OK) {
+    FDF_LOG(WARNING, "Failed to duplicate thread: %s", zx_status_get_string(status));
+    return zx::error(status);
+  }
+
+  auto role_client = incoming()->Connect<fuchsia_scheduler::RoleManager>();
+  if (role_client.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to RoleManager: %s", role_client.status_string());
+    return role_client.take_error();
+  }
+
+  fidl::Arena arena;
+  auto request =
+      fuchsia_scheduler::wire::RoleManagerSetRoleRequest::Builder(arena)
+          .target(fuchsia_scheduler::wire::RoleTarget::WithThread(std::move(duplicate_thread)))
+          .role(fuchsia_scheduler::wire::RoleName{
+              fidl::StringView::FromExternal(kScheduleProfileRole)})
+          .Build();
+
+  fidl::WireResult result = fidl::WireCall(*role_client)->SetRole(request);
+  if (!result.ok()) {
+    FDF_LOG(WARNING, "Failed to apply role to dispatch thread: %s", result.status_string());
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  if (!result->is_ok()) {
+    FDF_LOG(WARNING, "Failed to apply role to dispatch thread: %s",
+            zx_status_get_string(result->error_value()));
+    return result->take_error();
+  }
+  return zx::ok();
+}
+
 int Dwc3::IrqThread() {
+  zx::result result = SetIrqThreadSchedulerRole();
+  if (result.is_error()) {
+    // This should be an error since we won't be able to guarantee we can meet deadlines.
+    // Failure to meet deadlines can result in undefined behavior on the bus.
+    zxlogf(ERROR, "Failed to apply role to IRQ thread: %s", result.status_string());
+  }
+
   auto* mmio = get_mmio();
   const uint32_t* const ring_start = static_cast<const uint32_t*>(event_buffer_->virt());
   const uint32_t* const ring_end = ring_start + (kEventBufferSize / sizeof(*ring_start));

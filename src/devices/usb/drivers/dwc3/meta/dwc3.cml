@@ -23,6 +23,7 @@
         { service: "fuchsia.hardware.usb.phy.Metadata" },
     ],
     use: [
+        { protocol: "fuchsia.scheduler.RoleManager" },
         { service: "fuchsia.hardware.interconnect.PathService" },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.boot.metadata.MacAddressMetadata" },
