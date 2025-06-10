@@ -125,10 +125,11 @@ def _fuchsia_board_configuration_impl(ctx):
             script_input = ctx.actions.declare_file(dest)
             ctx.actions.symlink(output = script_input, target_file = source_file)
             input_files.extend([source_file, script_input])
-            paths_map[dest] = script_input.path
 
             if dest == script.post_processing_script_path:
                 board_script_path = script_input.path
+            else:
+                paths_map[dest] = script_input.path
 
         if not board_script_path:
             fail("board_script_path must be present in the inputs.")

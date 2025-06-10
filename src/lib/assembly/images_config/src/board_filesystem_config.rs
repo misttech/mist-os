@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use assembly_container::{WalkPaths, WalkPathsFn};
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use camino::Utf8PathBuf;
@@ -250,8 +250,9 @@ impl WalkPaths for PostProcessingScript {
         found: &mut F,
         dest: Utf8PathBuf,
     ) -> Result<()> {
-        // Walk all the `inputs` and attempt to find the `board_script_path` inside the list.
-        let mut board_script_destination = Option::<Utf8PathBuf>::None;
+        // Walk all the `inputs` and ensure `board_script_path` is NOT inside the list.
+        // If it's inside the `inputs`, then we'll accidentally copy the file twice,
+        // causing issues.
         for (relative_path, path) in &mut self.inputs {
             let parent = relative_path
                 .parent()
@@ -262,17 +263,14 @@ impl WalkPaths for PostProcessingScript {
             // remember the destination for later.
             let path_owned = path.clone();
             if Some(path_owned) == self.board_script_path {
-                board_script_destination = Some(destination.clone());
+                bail!("The zbi signing script should not be inside the signing inputs");
             }
 
             path.walk_paths_with_dest(found, destination)?;
         }
 
-        // Walk board_script_path after determining the destination path above.
-        let board_script_destination = board_script_destination.ok_or_else(|| {
-            anyhow!("The board_script_path does not point to a file in the inputs.")
-        })?;
-        self.board_script_path.walk_paths_with_dest(found, board_script_destination)?;
+        // Walk board_script_path.
+        self.board_script_path.walk_paths_with_dest(found, dest)?;
         Ok(())
     }
 }
@@ -539,20 +537,10 @@ mod tests {
                 Utf8PathBuf::from_str("input/script.sh").unwrap(),
             )),
             args: vec![],
-            inputs: [
-                (
-                    Utf8PathBuf::from_str("dest/script.sh").unwrap(),
-                    FileRelativePathBuf::Resolved(
-                        Utf8PathBuf::from_str("input/script.sh").unwrap(),
-                    ),
-                ),
-                (
-                    Utf8PathBuf::from_str("dest/nested/resource").unwrap(),
-                    FileRelativePathBuf::Resolved(
-                        Utf8PathBuf::from_str("input/resource.txt").unwrap(),
-                    ),
-                ),
-            ]
+            inputs: [(
+                Utf8PathBuf::from_str("nested/resource").unwrap(),
+                FileRelativePathBuf::Resolved(Utf8PathBuf::from_str("input/resource.txt").unwrap()),
+            )]
             .into(),
         };
         let mut found_dest = vec![];
@@ -572,12 +560,8 @@ mod tests {
         found_dest.sort();
         assert_eq!(
             vec![
-                // This first one is the board_script_path
-                Utf8PathBuf::from_str("inner/path/dest").unwrap(),
-                // This second one is the board_script_path from the inputs map.
-                Utf8PathBuf::from_str("inner/path/dest").unwrap(),
-                // This third one is the other file in the inputs map.
-                Utf8PathBuf::from_str("inner/path/dest/nested").unwrap(),
+                Utf8PathBuf::from_str("inner/path").unwrap(),
+                Utf8PathBuf::from_str("inner/path/nested").unwrap(),
             ],
             found_dest
         );
