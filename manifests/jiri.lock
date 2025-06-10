@@ -1000,18 +1000,18 @@
     },
     {
         "package": "fuchsia/tools/buildstats/linux-amd64",
-        "version": "git_revision:5a90acfa50c2a6f54709275e771276b085075c47",
-        "instance_id": "iYM_JO7bReY30gmosuSmhO7ug4b5_oqZvMvVum9DP3IC"
+        "version": "git_revision:dad8eb1a264c3c37accff6b027449da58de3a62f",
+        "instance_id": "U68AqU3vRGnl0BmfEj96dQKnaWzdRLXVZmBXgnJokukC"
     },
     {
         "package": "fuchsia/tools/buildstats/mac-amd64",
-        "version": "git_revision:5a90acfa50c2a6f54709275e771276b085075c47",
-        "instance_id": "4OI4rZNrMAS6vVb9Tyblj7X6VqM-iM9dj1Byh805_c8C"
+        "version": "git_revision:dad8eb1a264c3c37accff6b027449da58de3a62f",
+        "instance_id": "M52Po1oDiZeYd70boxHD2ksU5HTgLmHwLhvtesujkLcC"
     },
     {
         "package": "fuchsia/tools/buildstats/mac-arm64",
-        "version": "git_revision:5a90acfa50c2a6f54709275e771276b085075c47",
-        "instance_id": "nnEM4LG-XlIVzk_cavxSK8LFTMYuHkRNQspGNcgc9GMC"
+        "version": "git_revision:dad8eb1a264c3c37accff6b027449da58de3a62f",
+        "instance_id": "l65slMKfBWFbnMiuaqvir8iXntVWNj67MivcURIiLEIC"
     },
     {
         "package": "fuchsia/tools/cgpt/linux-amd64",
