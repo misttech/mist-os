@@ -73,7 +73,7 @@ if (is_host) {
       testonly = true
       name = "ffx-profiler-test"
 
-      system_a = files.images_json
+      system_a = files.outdir
 
       deps = [ ":assembly" ]
     }

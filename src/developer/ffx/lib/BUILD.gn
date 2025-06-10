@@ -83,6 +83,7 @@ group("host_tests") {
   deps = [
     "e2e_emu:host_tests",
     "fuchsia-controller:host_tests",
+    "profiler:host_tests",
     "symbolize:host_tests",
     "target_net:host_tests",
   ]

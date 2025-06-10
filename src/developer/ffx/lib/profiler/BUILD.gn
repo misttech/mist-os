@@ -34,3 +34,10 @@ group("tests") {
   testonly = true
   deps = [ ":profiler_test" ]
 }
+
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    deps = [ "tests:host_tests" ]
+  }
+}
