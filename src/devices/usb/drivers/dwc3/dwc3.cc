@@ -638,29 +638,6 @@ void Dwc3::HandleConnectionDoneEvent() {
   }
 }
 
-void Dwc3::HandleDisconnectedEvent() {
-  FDF_LOG(INFO, "Dwc3::HandleDisconnectedEvent");
-
-  {
-    std::lock_guard<std::mutex> ep0_lock(ep0_.lock);
-    CmdEpEndTransfer(ep0_.out);
-    ep0_.state = Ep0::State::None;
-  }
-
-  {
-    std::lock_guard<std::mutex> lock(dci_lock_);
-    if (dci_intf_.is_valid()) {
-      DciIntfSetConnected(false);
-    }
-  }
-
-  for (UserEndpoint& uep : user_endpoints_) {
-    std::lock_guard<std::mutex> lock(uep.ep.lock);
-    EpEndTransfers(uep.ep, ZX_ERR_IO_NOT_PRESENT);
-    EpSetStall(uep.ep, false);
-  }
-}
-
 void Dwc3::Stop() {
   if (irq_thread_started_.load()) {
     zx_status_t status = SignalIrqThread(IrqSignal::Exit);
