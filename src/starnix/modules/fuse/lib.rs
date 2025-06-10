@@ -2087,6 +2087,10 @@ impl FuseMutableState {
         if payload_size > data.available() {
             return error!(EINVAL);
         }
+        if header.unique == 0 {
+            track_stub!(TODO("https://fxbug.dev/322873416"), "Fuse notification from userspace");
+            return error!(ENOTSUP);
+        }
         self.waiters.notify_value(header.unique);
         let mut running_operation = match self.operations.entry(header.unique) {
             Entry::Occupied(e) => e,
