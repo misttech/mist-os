@@ -513,19 +513,21 @@ class PrebuildMap(object):
 
         # Process required test sources from file.
         assert self._build_dir
+        additional_atom_files: dict[str, str] = {}
         with (self._build_dir / test_sources_list).open() as f:
             test_sources_json = json.load(f)
             for entry in test_sources_json:
-                files.append(
-                    f"{versioned_root}/{entry['name']}={entry['path']}"
-                )
+                dest_path = f"{versioned_root}/{entry['name']}"
+                source_path = entry["path"]
+                files.append(f"{dest_path}={source_path}")
+                additional_atom_files[dest_path] = source_path
 
         return {
             "name": prebuild["name"],
             "root": root,
             "type": info["atom_type"],
             "files": [f.split("=")[0] for f in files],
-        }, {}
+        }, additional_atom_files
 
     def _meta_for_noop(self, info: AtomInfo) -> tuple[None, dict[str, str]]:
         return (None, {})
