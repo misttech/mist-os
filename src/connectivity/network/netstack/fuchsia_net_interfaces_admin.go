@@ -338,7 +338,7 @@ func (pi *adminAddressStateProviderImpl) sendOnAddressRemovedEventAndCancelServe
 	if err := pi.mu.eventProxy.OnAddressRemoved(fidlconv.ToAddressRemovalReason(pi.mu.removedReason)); err != nil {
 		var zxError *zx.Error
 		if !errors.As(err, &zxError) || (zxError.Status != zx.ErrPeerClosed && zxError.Status != zx.ErrBadHandle) {
-			_ = syslog.ErrorTf(addressStateProviderName, "NICID=%d failed to send OnAddressRemoved(%s) for %s: %s", pi.nicid, pi.mu.removedReason, pi.protocolAddr.AddressWithPrefix.Address, err)
+			_ = syslog.WarnTf(addressStateProviderName, "NICID=%d failed to send OnAddressRemoved(%s) for %s: %s", pi.nicid, pi.mu.removedReason, pi.protocolAddr.AddressWithPrefix.Address, err)
 		}
 	}
 	pi.cancelServe()
