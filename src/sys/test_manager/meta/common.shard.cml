@@ -688,7 +688,10 @@
             rights: [ "r*" ],
         },
         {
-            protocol: "fuchsia.boot.SvcStashProvider",
+            protocol: [
+                "fuchsia.boot.Items",
+                "fuchsia.boot.SvcStashProvider",
+            ],
             from: "parent",
             to: [ "#early_boot_instrumentation" ],
         },
