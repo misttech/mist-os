@@ -39,6 +39,13 @@ _valid_data_atom_types = [
   # LINT.ThenChange(//build/sdk/generate_idk/validate_idk.py)
 ]
 
+# Atom types that may be cross-compiled in a single build directory (as opposed
+# to built for another CPU architecture in a sub-build).
+_cross_compiled_atom_types = [
+  "ffx_tool",
+  "host_tool",
+]
+
 # Defines an IDK element.
 #
 # Outputs
@@ -408,6 +415,13 @@ template("sdk_atom") {
     }
     is_stable = is_stable
     category = category
+
+    # Ensure tools that may be built multiple times in the same build directory
+    # have unique labels.
+    if (_cross_compiled_atom_types + [ atom_type ] - [ atom_type ] !=
+        _cross_compiled_atom_types) {
+      atom_label += "-${current_cpu}"
+    }
   }
 
   assert(defined(meta.source) != defined(meta.value),

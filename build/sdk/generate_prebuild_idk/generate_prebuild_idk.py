@@ -97,16 +97,19 @@ class DebugManifest(object):
 
 class PrebuildMap(object):
     def __init__(self, prebuild_manifest: T.Sequence[AtomInfo]):
-        self._labels_map = {
+        self._labels_map: dict[str, AtomInfo] = {
             atom["atom_label"]: atom
             for atom in prebuild_manifest
             if atom["atom_type"] != "alias"
         }
-        self._alias_map = {
+        self._alias_map: dict[str, str] = {
             atom["atom_label"]: atom["atom_actual"]
             for atom in prebuild_manifest
             if atom["atom_type"] == "alias"
         }
+        assert (len(self._labels_map) + len(self._alias_map)) == len(
+            prebuild_manifest
+        ), "Multiple atoms have the same `atom_label`."
         self._build_dir: T.Optional[Path] = None
         self._fuchsia_source_dir: T.Optional[Path] = None
         self._relative_source_prefix_from_build_dir = "../../"
