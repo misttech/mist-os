@@ -32,7 +32,10 @@
             path: "/dev/class",
         },
         {
-            protocol: [ "fuchsia.ui.scenic.Scenic" ],
+            protocol: [
+                "fuchsia.fxfs.FileBackedVolumeProvider",
+                "fuchsia.ui.scenic.Scenic",
+            ],
             from: "parent",
             availability: "optional",
         },

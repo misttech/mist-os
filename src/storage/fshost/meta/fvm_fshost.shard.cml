@@ -33,7 +33,10 @@
             from: "self",
         },
         {
-            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            protocol: [
+                "fuchsia.fshost.StarnixVolumeProvider",
+                "fuchsia.fxfs.FileBackedVolumeProvider",
+            ],
             from: "void",
             availability: "optional",
         },

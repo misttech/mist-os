@@ -138,6 +138,7 @@
         {
             protocol: [
                 "fuchsia.fshost.StarnixVolumeProvider",
+                "fuchsia.fxfs.FileBackedVolumeProvider",
                 "fuchsia.storage.partitions.PartitionsManager",
             ],
             from: "#fshost",
