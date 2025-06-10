@@ -22,7 +22,13 @@ load(":generated_constants.bzl", "constants")
 package(default_visibility = ["//visibility:public"])
 
 exports_files(
-    glob(["**/*"]),
+    glob(
+        include = ["**/*"],
+        # The MacOS SDK contains files that include colons which confuse Bazel,
+        # which will error, complaining about an invalid label, e.g.
+        # xcode/MacSDK/usr/share/man/mann/ttk::combobox.ntcl
+        exclude = ["xcode/**"],
+    ),
 )
 
 setup_clang_repository(constants)

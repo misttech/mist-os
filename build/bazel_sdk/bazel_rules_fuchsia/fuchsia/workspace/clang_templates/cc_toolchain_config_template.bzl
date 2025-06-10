@@ -11,9 +11,9 @@ load(
     "@bazel_tools//tools/cpp:cc_toolchain_config_lib.bzl",
     "tool_path",
 )
-load("//common:toolchains/clang/cc_features.bzl", "features")
 load("//common:toolchains/clang/toolchain_utils.bzl", "compute_clang_features")
-load("//common/platforms:utils.bzl", "to_fuchsia_cpu_name")
+load("//common:toolchains/clang/providers.bzl", "ClangInfo")
+load("//common/platforms:utils.bzl", "to_fuchsia_cpu_name", "to_fuchsia_os_name")
 
 def bazel_cpu_to_fuchsia_cpu(cpu):
     """Converts the Bazel cpu type to the Fuchsia cpu"""
@@ -30,7 +30,8 @@ _SYSROOT_PATHS = {
 }
 
 def _cc_toolchain_config_impl(ctx):
-    target_system_name = ctx.attr.cpu + "-unknown-fuchsia"
+    target_cpu = ctx.attr.target_cpu
+    target_system_name = target_cpu + "-unknown-fuchsia"
     tool_paths = [
         tool_path(name = "ar", path = "bin/llvm-ar"),
         tool_path(name = "cpp", path = "bin/clang++"),
@@ -47,25 +48,22 @@ def _cc_toolchain_config_impl(ctx):
         tool_path(name = "ld", path = "bin/ld.lld"),
     ]
 
-    cc_features = [
-        features.default_compile_flags,
-        features.target_system_name(target_system_name),
-        features.supports_pic,
-        features.no_runtime_library_search_directories,
-    ]
-    cc_features += compute_clang_features(
-        "{HOST_OS}",
-        "{HOST_CPU}",
-        "fuchsia",
-        to_fuchsia_cpu_name(ctx.attr.cpu),
+    sysroot = _SYSROOT_PATHS[target_cpu]
+
+    cc_features = compute_clang_features(
+        ctx.attr._clang_info[ClangInfo],
+        ctx.label.repo_name,
+        to_fuchsia_os_name(ctx.attr.target_os),
+        to_fuchsia_cpu_name(target_cpu),
+        sysroot = sysroot,
     )
 
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
-        toolchain_identifier = "crosstool-1.x.x-llvm-fuchsia-" + ctx.attr.cpu,
+        toolchain_identifier = "crosstool-1.x.x-llvm-fuchsia-" + target_cpu,
         host_system_name = "x86_64-unknown-linux-gnu",
         target_system_name = target_system_name,
-        target_cpu = ctx.attr.cpu,
+        target_cpu = target_cpu,
         target_libc = "fuchsia",
         compiler = "llvm",
         abi_version = "local",
@@ -74,12 +72,12 @@ def _cc_toolchain_config_impl(ctx):
         # Implicit dependencies for Fuchsia system functionality
         cxx_builtin_include_directories = [
             "%sysroot%/include",  # Platform parts of libc.
-            "$sysroot$/../include/%s-unknown-fuchsia/c++/v1" % ctx.attr.cpu,  # Platform libc++.
+            "$sysroot$/../include/%s-unknown-fuchsia/c++/v1" % target_cpu,  # Platform libc++.
             "$sysroot$/../include/c++/v1",  # Platform libc++.
             "$sysroot$/../lib/clang/%{CLANG_VERSION}/include",  # Platform libc++.
             "$sysroot$/../lib/clang/%{CLANG_VERSION}/share",  # Platform libc++.
         ],
-        builtin_sysroot = _SYSROOT_PATHS[ctx.attr.cpu],
+        builtin_sysroot = sysroot,
         cc_target_os = "fuchsia",
         features = cc_features,
     )
@@ -87,7 +85,18 @@ def _cc_toolchain_config_impl(ctx):
 cc_toolchain_config = rule(
     implementation = _cc_toolchain_config_impl,
     attrs = {
-        "cpu": attr.string(mandatory = True, values = ["aarch64", "riscv64", "x86_64"]),
+        "target_os": attr.string(
+            doc = "Target OS, following Fuchsia conventions",
+            mandatory = True,
+            values = ["fuchsia", "linux", "mac"],
+        ),
+        "target_cpu": attr.string(
+            doc = "Target CPU, following Fuchsia conventions",
+            mandatory = True,
+            values = ["aarch64", "riscv64", "x86_64"],
+        ),
+        # Access the ClangInfo provider
+        "_clang_info": attr.label(default = "//:clang_info", providers = [ClangInfo]),
     },
     provides = [CcToolchainConfigInfo],
 )

@@ -7,6 +7,7 @@
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("//common:repository_utils.bzl", "get_fuchsia_host_arch", "get_fuchsia_host_os")
 load("//common:toolchains/clang/clang_utils.bzl", "process_clang_builtins_output")
+load("//common:toolchains/clang/macos_xcode_utils.bzl", "create_repository_macos_symlinks")
 load("//common:toolchains/clang/providers.bzl", "ClangInfo")
 load("//common:toolchains/clang/toolchain_utils.bzl", "define_clang_runtime_filegroups")
 
@@ -19,6 +20,9 @@ def prepare_clang_repository(repo_ctx, clang_install_dir, needs_symlinks = True)
     The files created by this function are:
 
       - Symlinks to the clang bin/, lib/ and other directories.
+
+      - On MacOS, symlinks xcode/MacSDK/usr and xcode/MacSDK/Frameworks
+        pointing to system-installed XCode OSX SDK directories.
 
       - An `empty` file which is ... empty.
 
@@ -50,12 +54,20 @@ def prepare_clang_repository(repo_ctx, clang_install_dir, needs_symlinks = True)
     # Symlink top-level items from Clang prebuilt install to repository directory
     # Note that this is possible because our C++ toolchain configuration redefine
     # the "dependency_file" feature to use relative file paths.
-    clang_install_path = repo_ctx.path(clang_install_dir) if paths.is_absolute(clang_install_dir) else repo_ctx.path(workspace_dir + "/" + clang_install_dir)
+    if paths.is_absolute(clang_install_dir):
+        clang_install_path = repo_ctx.path(clang_install_dir)
+    else:
+        clang_install_path = repo_ctx.path(workspace_dir + "/" + clang_install_dir)
 
     # We only need to symlink when the contents exist outside of the repository.
     if needs_symlinks:
         for f in clang_install_path.readdir():
             repo_ctx.symlink(f, f.basename)
+
+    # On MacOS, create symlinks under xcode/MacSDK to access the SDK headers,
+    # libraries and frameworks.
+    if repo_ctx.os.name == "mac os x":
+        create_repository_macos_symlinks(repo_ctx)
 
     # Extract the builtin include paths by running the executable once.
     # Only care about C++ include paths. The list for compiling C is actually
@@ -164,6 +176,39 @@ def setup_clang_repository(constants):
     in the Clang repository. It creates a few targets that functions in
     toolchain_utils.bzl rely on.
 
+    The top-level targets will be:
+
+    - @repo//:clang_info
+
+      A target exposing the generated_constants.bzl values through
+      a ClangInfo provider, useful to access them at analysis time.
+
+    - @repo//:clang_all
+
+      A filegroup() covering all files requires for actions that need
+      to access all file from the remote.
+
+    - @repo//:cc-compiler-prebuilts
+
+      A filegroup() covering the binary tools that must appear in the
+      sandbox for all compile actions (independent from the target
+      architecture).
+
+    - @repo//:cc-linker-prebuilts
+
+      A filegroup() covering the binary tools that must appear in the
+      sandbox for all linking actions (independent from the target
+      architecture).
+
+    - @repo//:ar, @repo//:objcopy, @repo//:objdump, @repo//:nm, @repo//:strip
+
+      Each one is a filegroup() covering the binaries needed in the sandbox
+      for Bazel actions that perform one of the corresponding actions.
+
+    - @repo//:libunwind-headers
+
+      A filegroup exposing the libunwind headers.
+
     Args:
       constants: The value written to generated_constants.bzl by
          a call to prepare_clang_repository() that was performed in the
@@ -191,7 +236,7 @@ def setup_clang_repository(constants):
         name = "clang_all",
         srcs = native.glob(
             ["**/*"],
-            exclude = ["**/*.html", "**/*.pdf"],
+            exclude = ["**/*.html", "**/*.pdf", "xcode/**"],
         ),
     )
 

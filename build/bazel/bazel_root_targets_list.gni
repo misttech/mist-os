@@ -19,7 +19,15 @@ declare_args() {
   #    install_host_tool [boolean]: Optional, set to true to make it available
   #       to the `fx host-tool <ninja_name>` command.
   #
-  default_bazel_root_host_targets = []
+  default_bazel_root_host_targets = [
+    # First, a target that verifies that the host toolchains
+    # work properly, i.e. can compile and link C++ and Rust binaries properly.
+    {
+      bazel_label = "//build/bazel/toolchains/tests:build"
+      bazel_name = "build.stamp"
+      ninja_name = "bazel_toolchains_tests_build.stamp"
+    },
+  ]
 
   # A similar list to extend the list above for custom build configuration
   # in args.gn.
