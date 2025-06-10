@@ -28,7 +28,10 @@ impl From<usb_plat::DeviceHandleInner> for DeviceHandle {
 #[cfg(target_os = "linux")]
 impl DeviceHandle {
     pub fn from_path(path: impl AsRef<std::path::Path>) -> Self {
-        DeviceHandle(usb_plat::DeviceHandleInner(path.as_ref().to_string_lossy().into_owned()))
+        DeviceHandle(usb_plat::DeviceHandleInner {
+            hdl: path.as_ref().to_string_lossy().into_owned(),
+            serial: None,
+        })
     }
 }
 
@@ -36,6 +39,11 @@ impl DeviceHandle {
     /// A printable name for this device.
     pub fn debug_name(&self) -> String {
         self.0.debug_name()
+    }
+
+    /// The serial number for the device (if any)
+    pub fn serial(&self) -> Option<String> {
+        self.0.serial.clone()
     }
 
     /// Given a path to a USB device, scan each interface available on the device. Each interface's
@@ -52,7 +60,7 @@ impl DeviceHandle {
 
 impl std::fmt::Debug for DeviceHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_tuple("DeviceHandle").field(&self.debug_name()).finish()
+        f.debug_tuple("DeviceHandle").field(&self.debug_name()).field(&self.serial()).finish()
     }
 }
 

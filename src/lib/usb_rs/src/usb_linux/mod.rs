@@ -16,6 +16,7 @@ use std::fs::{File, OpenOptions};
 use std::future::Future;
 use std::io::Read;
 use std::os::fd::{AsRawFd, RawFd};
+use std::os::unix::fs::MetadataExt;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
@@ -28,16 +29,94 @@ use crate::{
     InterfaceDescriptor, Result,
 };
 
+/// The Linux sysfs folder where usb devices are stored
+static SYSFS_DEVICES_DIR: &str = "/sys/bus/usb/devices";
+
 #[derive(Debug)]
-pub struct DeviceHandleInner(pub(crate) String);
+pub struct DeviceHandleInner {
+    pub(crate) hdl: String,
+    pub(crate) serial: Option<String>,
+}
+
+/// Represents a USB device with its major and minor numbers.
+#[derive(Debug, PartialEq, Eq)]
+struct DeviceId {
+    major: u32,
+    minor: u32,
+}
+
+impl DeviceId {
+    /// Creates a new DeviceId from a given path by reading its metadata.
+    fn from_path<P>(path: P) -> Result<Self, std::io::Error>
+    where
+        P: AsRef<std::path::Path>,
+    {
+        let metadata = std::fs::metadata(path)?;
+        let rdev = metadata.rdev();
+        let major = libc::major(rdev);
+        let minor = libc::minor(rdev);
+        Ok(DeviceId { major, minor })
+    }
+}
+
+/// Finds the sysfs path for a given USB device ID.
+///
+/// It searches through `/sys/bus/usb/devices` to find a device directory
+/// that contains a 'dev' file matching the major and minor numbers.
+fn find_sysfs_path(device_id: &DeviceId) -> Option<std::path::PathBuf> {
+    let sys_usb_path = std::path::Path::new(SYSFS_DEVICES_DIR);
+    if let Ok(entries) = std::fs::read_dir(sys_usb_path) {
+        for entry in entries {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                if path.is_dir() {
+                    let dev_file_path = path.join("dev");
+                    if dev_file_path.exists() {
+                        if let Ok(content) = std::fs::read_to_string(&dev_file_path) {
+                            let parts: Vec<&str> = content.trim().split(':').collect();
+                            if parts.len() == 2 {
+                                if let (Ok(major), Ok(minor)) =
+                                    (parts[0].parse::<u32>(), parts[1].parse::<u32>())
+                                {
+                                    if device_id.major == major && device_id.minor == minor {
+                                        return Some(path);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Reads the serial number from the 'serial' file in the given sysfs device path.
+/// Returns None if there is an error
+fn get_serial_from_sysfs<P>(sysfs_path: P) -> Option<String>
+where
+    P: AsRef<std::path::Path>,
+{
+    let serial_path = sysfs_path.as_ref().join("serial");
+    std::fs::read_to_string(serial_path).map(|s| s.trim().to_string()).ok()
+}
 
 impl DeviceHandleInner {
     pub(crate) fn new(hdl: String) -> DeviceHandleInner {
-        DeviceHandleInner(hdl)
+        let devid = DeviceId::from_path(&hdl).ok();
+        let serial = match devid {
+            None => None,
+            Some(id) => match find_sysfs_path(&id) {
+                None => None,
+                Some(sysfs_path) => get_serial_from_sysfs(&sysfs_path),
+            },
+        };
+        DeviceHandleInner { hdl, serial }
     }
 
     pub fn debug_name(&self) -> String {
-        self.0.clone()
+        self.hdl.clone()
     }
 
     pub fn scan_interfaces(
@@ -52,16 +131,15 @@ impl DeviceHandleInner {
         // == 2.
         const OVERRUN: usize = (USB_DT_ENDPOINT_AUDIO_SIZE - USB_DT_ENDPOINT_SIZE) as usize;
 
-        let mut file = match OpenOptions::new().read(true).write(true).open(&self.0) {
+        let mut file = match OpenOptions::new().read(true).write(true).open(&self.hdl) {
             Ok(file) => file,
             Err(err) => {
                 if err.kind() != std::io::ErrorKind::PermissionDenied {
                     return Err(err.into());
                 }
-                OpenOptions::new().read(true).open(&self.0)?
+                OpenOptions::new().read(true).open(&self.hdl)?
             }
         };
-
         let mut descriptor_buf = [0u8; 4096 + OVERRUN];
         // The usbdevfs API suggests that one read will always return the whole descriptor.
         let descriptor_length = file.read(&mut descriptor_buf[..4096])?;
