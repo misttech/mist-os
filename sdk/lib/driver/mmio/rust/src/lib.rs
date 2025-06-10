@@ -104,6 +104,8 @@
 //! intended to guarantee the semantics required to interface with devices correctly, as discussed
 //! earlier.
 
+mod arch;
+mod memory;
 mod mmio;
 pub mod region;
 

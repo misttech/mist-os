@@ -9,7 +9,9 @@ rustc_library("mmio") {
   edition = "2024"
   with_unit_tests = true
   sources = [
+    "src/arch.rs",
     "src/lib.rs",
+    "src/memory.rs",
     "src/mmio.rs",
     "src/region.rs",
   ]
