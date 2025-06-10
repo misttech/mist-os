@@ -65,10 +65,11 @@ impl<'a> RawBlobRecord<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[repr(u8)]
 pub enum BlobType {
-    Data,
-    LastBranch,
-    Perfetto,
+    Data = BLOB_TYPE_DATA,
+    LastBranch = BLOB_TYPE_LAST_BRANCH,
+    Perfetto = BLOB_TYPE_PERFETTO,
     Unknown { raw: u8 },
 }
 
@@ -79,6 +80,17 @@ impl From<u8> for BlobType {
             BLOB_TYPE_LAST_BRANCH => BlobType::LastBranch,
             BLOB_TYPE_PERFETTO => BlobType::Perfetto,
             raw => BlobType::Unknown { raw },
+        }
+    }
+}
+
+impl Into<u8> for BlobType {
+    fn into(self) -> u8 {
+        match self {
+            BlobType::Data => BLOB_TYPE_DATA,
+            BlobType::LastBranch => BLOB_TYPE_LAST_BRANCH,
+            BlobType::Perfetto => BLOB_TYPE_PERFETTO,
+            BlobType::Unknown { raw } => raw,
         }
     }
 }

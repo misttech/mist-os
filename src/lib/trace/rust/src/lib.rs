@@ -12,7 +12,8 @@ use std::task::Poll;
 use std::{mem, ptr};
 
 pub use sys::{
-    trace_site_t, TRACE_BLOB_TYPE_DATA, TRACE_BLOB_TYPE_LAST_BRANCH, TRACE_BLOB_TYPE_PERFETTO,
+    trace_site_t, trace_string_ref_t, TRACE_BLOB_TYPE_DATA, TRACE_BLOB_TYPE_LAST_BRANCH,
+    TRACE_BLOB_TYPE_PERFETTO,
 };
 
 /// `Scope` represents the scope of a trace event.
@@ -61,6 +62,14 @@ pub fn trace_state() -> TraceState {
         sys::TRACE_STOPPING => TraceState::Stopping,
         s => panic!("Unknown trace state {:?}", s),
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(i32)]
+pub enum BufferingMode {
+    OneShot = sys::TRACE_BUFFERING_MODE_ONESHOT,
+    Circular = sys::TRACE_BUFFERING_MODE_CIRCULAR,
+    Streaming = sys::TRACE_BUFFERING_MODE_STREAMING,
 }
 
 /// An identifier for flows and async spans.
@@ -1590,6 +1599,30 @@ impl Context {
             );
         }
     }
+
+    // Write fxt formatted bytes to the trace buffer
+    //
+    // returns Ok(num_bytes_written) on success
+    pub fn copy_record(&self, buffer: &[u64]) -> Option<usize> {
+        unsafe {
+            let ptr =
+                sys::trace_context_alloc_record(self.context, 8 * buffer.len() as libc::size_t);
+            if ptr == std::ptr::null_mut() {
+                return None;
+            }
+            ptr.cast::<u64>().copy_from(buffer.as_ptr(), buffer.len());
+        };
+        Some(buffer.len())
+    }
+
+    pub fn buffering_mode(&self) -> BufferingMode {
+        match unsafe { sys::trace_context_get_buffering_mode(self.context) } {
+            sys::TRACE_BUFFERING_MODE_ONESHOT => BufferingMode::OneShot,
+            sys::TRACE_BUFFERING_MODE_CIRCULAR => BufferingMode::Circular,
+            sys::TRACE_BUFFERING_MODE_STREAMING => BufferingMode::Streaming,
+            m => panic!("Unknown trace buffering mode: {:?}", m),
+        }
+    }
 }
 
 impl std::ops::Drop for Context {
@@ -1663,6 +1696,11 @@ mod sys {
     pub const TRACE_BLOB_TYPE_DATA: trace_blob_type_t = 1;
     pub const TRACE_BLOB_TYPE_LAST_BRANCH: trace_blob_type_t = 2;
     pub const TRACE_BLOB_TYPE_PERFETTO: trace_blob_type_t = 3;
+
+    pub type trace_buffering_mode_t = libc::c_int;
+    pub const TRACE_BUFFERING_MODE_ONESHOT: trace_buffering_mode_t = 0;
+    pub const TRACE_BUFFERING_MODE_CIRCULAR: trace_buffering_mode_t = 1;
+    pub const TRACE_BUFFERING_MODE_STREAMING: trace_buffering_mode_t = 2;
 
     #[repr(C)]
     #[derive(Copy, Clone)]
@@ -2000,18 +2038,7 @@ mod sys {
         pub fn trace_context_alloc_record(
             context: *const trace_context_t,
             num_bytes: libc::size_t,
-        ) -> *const libc::c_void;
-
-        // From trace-engine/handler.h
-        /*
-        pub fn trace_start_engine(
-            async_ptr: *const async_t,
-            handler: *const trace_handler_t,
-            buffer: *const (),
-            buffer_num_bytes: libc::size_t) -> zx_status_t;
-            */
-
-        pub fn trace_stop_engine(disposition: zx_status_t) -> zx_status_t;
+        ) -> *mut libc::c_void;
 
         // From trace-engine/instrumentation.h
 
@@ -2045,6 +2072,10 @@ mod sys {
         pub fn trace_unregister_observer(event: zx_handle_t) -> zx_status_t;
 
         pub fn trace_notify_observer_updated(event: zx_handle_t);
+
+        pub fn trace_context_get_buffering_mode(
+            context: *const trace_context_t,
+        ) -> trace_buffering_mode_t;
     }
 }
 

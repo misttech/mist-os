@@ -16,6 +16,7 @@ rustc_library("perfetto_consumer") {
   deps = [
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-observer",
+    "//src/performance/lib/fxt/rust",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/perfetto",
