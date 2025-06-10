@@ -5,8 +5,6 @@
 import(
     "//build/bazel/assembly/board_configurations/verify_board_configuration.gni")
 import(
-    "//build/bazel/assembly/partitions_configurations/verify_partitions_configuration.gni")
-import(
     "//build/bazel/assembly/product_configurations/verify_product_configuration.gni")
 import("//build/bazel/bazel_build_group.gni")
 
@@ -48,26 +46,7 @@ import("//build/bazel/bazel_build_group.gni")
 #        A Bazel board config target used in verification.
 #
 #      deps
-#
-#  partitions_configs (optional)
-#    A list of partitions configs to verify.
-#    Type: list of scopes with the following fields.
-#
-#      name (required; string)
-#        A unique verification target name.
-#
-#      gn_target (required; GN label)
-#        A GN partitions config target used in verification.
-#
-#      extra_copy_outputs (optional; list of strings)
-#        A list of extra Bazel output files to copy. These paths are relative to
-#        Bazel output directory.
-#
-#      bazel_target (required; Bazel label)
-#        A Bazel partitions config target used in verification.
-#
-#      deps
-#
+##
 template("verify_assembly_configs") {
   # Verify required fields first.
   if (defined(invoker.product_configs)) {
@@ -156,49 +135,6 @@ template("verify_assembly_configs") {
             "${target_out_dir}/${_bazel_board_config_file}"
         golden_json = board_config.golden_json
         deps = [ ":${board_config.name}" ]
-      }
-    }
-  }
-
-  # Construct partitions config verifications.
-  if (defined(invoker.partitions_configs)) {
-    foreach(partitions_config, invoker.partitions_configs) {
-      _bazel_partitions_config_dir = "${target_name}/${partitions_config.name}"
-
-      _bazel_targets += [
-        {
-          bazel_target = partitions_config.bazel_target
-          gn_target_name = partitions_config.name
-          copy_outputs = [
-            {
-              bazel = "{{BAZEL_TARGET_OUT_PATH}}/partitions_config.json"
-              ninja = "${_bazel_partitions_config_dir}/partitions_config.json"
-            },
-          ]
-          if (defined(partitions_config.extra_copy_outputs)) {
-            foreach(path, partitions_config.extra_copy_outputs) {
-              copy_outputs += [
-                {
-                  bazel = "{{BAZEL_TARGET_OUT_PATH}}/${path}"
-                  ninja = "${_bazel_partitions_config_dir}/${path}"
-                },
-              ]
-            }
-          }
-          deps = []
-          if (defined(partitions_config.deps)) {
-            deps = partitions_config.deps
-          }
-        },
-      ]
-
-      _verification_target = "${target_name}.${partitions_config.name}.verify"
-      _all_verification_targets += [ ":${_verification_target}" ]
-      verify_partitions_configuration(_verification_target) {
-        forward_variables_from(invoker, [ "visibility" ])
-        partitions_config_file = "${target_out_dir}/${_bazel_partitions_config_dir}/partitions_config.json"
-        golden_partitions_config_target = partitions_config.gn_target
-        deps = [ ":${partitions_config.name}" ]
       }
     }
   }
