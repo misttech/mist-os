@@ -274,10 +274,18 @@ zx::result<> WriteOpaque(PartitionClient& partition, const PartitionSpec& spec, 
     if (vmo_size < payload_size + remaining_bytes) {
       const size_t new_size =
           fbl::round_up(payload_size + remaining_bytes, zx_system_get_page_size());
+      // First attempt to just resize the payload VMO.
       zx::result status = zx::make_result(payload_vmo.set_size(new_size));
       if (status.is_error()) {
-        ERROR("Couldn't grow vmo for \"%s\"\n", spec.ToString().c_str());
-        return status.take_error();
+        // If the resize failed then try and create a clone instead.
+        zx::vmo clone;
+        if (status = zx::make_result(payload_vmo.create_child(
+                ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE, 0, new_size, &clone));
+            status.is_error()) {
+          ERROR("Couldn't create clone for \"%s\"\n", spec.ToString().c_str());
+          return status.take_error();
+        }
+        payload_vmo = std::move(clone);
       }
     }
     auto buffer = std::make_unique<uint8_t[]>(remaining_bytes);
