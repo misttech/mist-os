@@ -139,7 +139,7 @@ pub trait AssemblyContainer {
                     let absolute_dir = dir.as_ref().join(&dest);
                     let absolute_path = absolute_dir.join(&name);
                     std::fs::create_dir_all(&absolute_dir)?;
-                    std::fs::copy(&path, &absolute_path)
+                    assembly_util::fast_copy(&path, &absolute_path)
                         .with_context(|| format!("Copying file: {}", &path))?;
 
                     // Replace the path with the relative path.
