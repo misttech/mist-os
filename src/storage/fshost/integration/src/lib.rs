@@ -30,6 +30,7 @@ pub mod fshost_builder;
 mod mocks;
 
 pub use disk_builder::write_test_blob;
+pub use fshost_assembly_config::{BlockDeviceConfig, BlockDeviceIdentifiers, BlockDeviceParent};
 
 pub const VFS_TYPE_BLOBFS: u32 = 0x9e694d21;
 pub const VFS_TYPE_MINFS: u32 = 0x6e694d21;
@@ -57,6 +58,7 @@ pub struct TestFixtureBuilder {
     fshost: fshost_builder::FshostBuilder,
     zbi_ramdisk: Option<disk_builder::DiskBuilder>,
     storage_host: bool,
+    device_config: Vec<BlockDeviceConfig>,
 }
 
 impl TestFixtureBuilder {
@@ -65,10 +67,11 @@ impl TestFixtureBuilder {
             netboot: false,
             no_fuchsia_boot: false,
             disk: None,
-            extra_disks: vec![],
+            extra_disks: Vec::new(),
             fshost: fshost_builder::FshostBuilder::new(fshost_component_name),
             zbi_ramdisk: None,
             storage_host,
+            device_config: Vec::new(),
         }
     }
 
@@ -111,16 +114,22 @@ impl TestFixtureBuilder {
         self
     }
 
+    pub fn with_device_config(mut self, device_config: Vec<BlockDeviceConfig>) -> Self {
+        self.device_config = device_config;
+        self
+    }
+
     pub async fn build(self) -> TestFixture {
         let builder = RealmBuilder::new().await.unwrap();
         let fshost = self.fshost.build(&builder).await;
 
+        let device_config = serde_json::to_string(&self.device_config).unwrap();
         let maybe_zbi_vmo = match self.zbi_ramdisk {
             Some(disk_builder) => Some(disk_builder.build_as_zbi_ramdisk().await),
             None => None,
         };
         let (tx, crash_reports) = mpsc::channel(32);
-        let mocks = mocks::new_mocks(self.netboot, maybe_zbi_vmo, tx).await;
+        let mocks = mocks::new_mocks(self.netboot, maybe_zbi_vmo, tx, device_config).await;
 
         let mocks = builder
             .add_local_child("mocks", move |h| mocks(h).boxed(), ChildOptions::new())

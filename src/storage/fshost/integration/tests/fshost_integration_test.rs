@@ -15,7 +15,10 @@ use fs_management::DATA_TYPE_GUID;
 use fshost_test_fixture::disk_builder::{
     DataSpec, VolumesSpec, BLOBFS_MAX_BYTES, TEST_DISK_BLOCK_SIZE,
 };
-use fshost_test_fixture::{round_down, TestFixture, VFS_TYPE_FXFS, VFS_TYPE_MEMFS, VFS_TYPE_MINFS};
+use fshost_test_fixture::{
+    round_down, BlockDeviceConfig, BlockDeviceIdentifiers, BlockDeviceParent, TestFixture,
+    VFS_TYPE_FXFS, VFS_TYPE_MEMFS, VFS_TYPE_MINFS,
+};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::FutureExt as _;
 use regex::Regex;
@@ -1605,6 +1608,67 @@ async fn fuse_gpt_once_container_found() {
     fixture.check_fs_type("data", data_fs_type()).await;
 
     task.join().await;
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+async fn device_config() {
+    let mut builder = new_builder().with_device_config(vec![
+        BlockDeviceConfig {
+            device: String::from("fts"),
+            from: BlockDeviceIdentifiers {
+                label: String::from("fts"),
+                parent: BlockDeviceParent::Gpt,
+            },
+        },
+        BlockDeviceConfig {
+            device: String::from("test-device"),
+            from: BlockDeviceIdentifiers {
+                label: String::from("boot_a"),
+                parent: BlockDeviceParent::Gpt,
+            },
+        },
+        BlockDeviceConfig {
+            device: String::from("boot_b"),
+            from: BlockDeviceIdentifiers {
+                label: String::from("boot_b"),
+                parent: BlockDeviceParent::Gpt,
+            },
+        },
+    ]);
+    builder
+        .with_disk()
+        .with_gpt()
+        .format_volumes(volumes_spec())
+        .with_extra_gpt_partition("fts")
+        .with_extra_gpt_partition("boot_a")
+        .with_extra_gpt_partition("boot_b");
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    let fts_dir = fixture.dir("block/fts", fio::PERM_READABLE);
+    let volume =
+        fuchsia_component::client::connect_to_protocol_at_dir_root::<VolumeMarker>(&fts_dir)
+            .unwrap();
+    let metadata = volume.get_metadata().await.unwrap().unwrap();
+    assert_eq!(metadata.num_blocks, Some(1));
+
+    let boot_a_dir = fixture.dir("block/test-device", fio::PERM_READABLE);
+    let volume =
+        fuchsia_component::client::connect_to_protocol_at_dir_root::<VolumeMarker>(&boot_a_dir)
+            .unwrap();
+    let metadata = volume.get_metadata().await.unwrap().unwrap();
+    assert_eq!(metadata.num_blocks, Some(1));
+
+    let boot_b_dir = fixture.dir("block/boot_b", fio::PERM_READABLE);
+    let volume =
+        fuchsia_component::client::connect_to_protocol_at_dir_root::<VolumeMarker>(&boot_b_dir)
+            .unwrap();
+    let metadata = volume.get_metadata().await.unwrap().unwrap();
+    assert_eq!(metadata.num_blocks, Some(1));
 
     fixture.tear_down().await;
 }

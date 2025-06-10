@@ -213,6 +213,7 @@ pub struct DiskBuilder {
     corrupt_data: bool,
     gpt: bool,
     extra_volumes: Vec<&'static str>,
+    extra_gpt_partitions: Vec<&'static str>,
     // Note: fvm also means fxfs acting as the volume manager when using fxblob.
     format_volume_manager: bool,
     legacy_data_label: bool,
@@ -239,6 +240,7 @@ impl DiskBuilder {
             corrupt_data: false,
             gpt: false,
             extra_volumes: Vec::new(),
+            extra_gpt_partitions: Vec::new(),
             format_volume_manager: true,
             legacy_data_label: false,
             fs_switch: None,
@@ -304,6 +306,11 @@ impl DiskBuilder {
         self
     }
 
+    pub fn with_extra_gpt_partition(&mut self, volume_name: &'static str) -> &mut Self {
+        self.extra_gpt_partitions.push(volume_name);
+        self
+    }
+
     pub fn with_extra_volume(&mut self, volume_name: &'static str) -> &mut Self {
         self.extra_volumes.push(volume_name);
         self
@@ -347,19 +354,30 @@ impl DiskBuilder {
         if self.gpt {
             // Format the disk with gpt, with a single empty partition named "fvm".
             let client = Arc::new(RemoteBlockClient::new(server.block_proxy()).await.unwrap());
-            let _ = gpt::Gpt::format(
-                client,
-                vec![gpt::PartitionInfo {
-                    label: "fvm".to_string(),
-                    type_guid: gpt::Guid::from_bytes(FVM_TYPE_GUID),
+            assert!(self.extra_gpt_partitions.len() < 10);
+            let fvm_num_blocks = self.size / TEST_DISK_BLOCK_SIZE as u64 - 138;
+            let mut partitions = Vec::new();
+            let mut start_block = 64;
+            for extra_partition in &self.extra_gpt_partitions {
+                partitions.push(gpt::PartitionInfo {
+                    label: extra_partition.to_string(),
+                    type_guid: gpt::Guid::from_bytes(DEFAULT_TEST_TYPE_GUID),
                     instance_guid: gpt::Guid::from_bytes(FVM_PART_INSTANCE_GUID),
-                    start_block: 64,
-                    num_blocks: self.size / TEST_DISK_BLOCK_SIZE as u64 - 128,
+                    start_block,
+                    num_blocks: 1,
                     flags: 0,
-                }],
-            )
-            .await
-            .expect("gpt format failed");
+                });
+                start_block += 1;
+            }
+            partitions.push(gpt::PartitionInfo {
+                label: "fvm".to_string(),
+                type_guid: gpt::Guid::from_bytes(FVM_TYPE_GUID),
+                instance_guid: gpt::Guid::from_bytes(FVM_PART_INSTANCE_GUID),
+                start_block,
+                num_blocks: fvm_num_blocks,
+                flags: 0,
+            });
+            let _ = gpt::Gpt::format(client, partitions).await.expect("gpt format failed");
         }
 
         if !self.format_volume_manager {
@@ -375,7 +393,10 @@ impl DiskBuilder {
             let dir =
                 vfs::directory::serve(partitions_dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
             gpt = Some(manager);
-            Box::new(DirBasedBlockConnector::new(dir, String::from("part-000/volume")))
+            Box::new(DirBasedBlockConnector::new(
+                dir,
+                format!("part-00{}/volume", self.extra_gpt_partitions.len()),
+            ))
         } else {
             // Format the volume manager onto the disk directly.
             Box::new(move |server_end| Ok(server.connect(server_end)))

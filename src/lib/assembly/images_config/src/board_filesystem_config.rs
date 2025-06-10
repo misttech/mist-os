@@ -6,6 +6,7 @@ use anyhow::{anyhow, Result};
 use assembly_container::{WalkPaths, WalkPathsFn};
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use camino::Utf8PathBuf;
+use fshost_assembly_config::BlockDeviceConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
@@ -45,6 +46,11 @@ pub struct BoardFilesystemConfig {
     /// Configures how GPT-formatted block devices are handled.
     #[serde(default)]
     pub gpt: GptMode,
+
+    /// Mapping of board-specific partition identifiers to semantic block device labels. These
+    /// semantic labels are then used by fshost to route the block devices in the platform.
+    #[serde(default)]
+    pub block_devices: Vec<BlockDeviceConfig>,
 
     /// DEPRECATED.  Use GptMode::AllowMultiple.
     #[serde(default)]
