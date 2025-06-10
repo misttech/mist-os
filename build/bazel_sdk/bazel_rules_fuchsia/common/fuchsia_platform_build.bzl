@@ -265,9 +265,12 @@ platform(
     prebuilt_host_tools = ["ninja", "gn", "buildifier"]
 
     # In case users set a custom clang prefix in GN, respect that config.
+    # LINT.IfChange
     gn_args = json.decode(
         repo_ctx.read("{}/fuchsia_build_generated/args.json".format(repo_ctx.workspace_root)),
     )
+
+    # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
     if "clang_prefix" in gn_args:
         clang_prefix = gn_args["clang_prefix"]
 

@@ -710,7 +710,7 @@ def record_fuchsia_workspace(
         "workspace/fuchsia_build_generated/args.json",
         gn_output_dir / "args.json",
     )
-    # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+    # LINT.ThenChange(//build/bazel_sdk/bazel_rules_fuchsia/common/fuchsia_platform_build.bzl)
 
     # Create a symlink to the git host executable to make it accessible
     # when running a Bazel action on bots where it is not installed in
@@ -730,20 +730,10 @@ def record_fuchsia_workspace(
     )
     # LINT.ThenChange(//build/info/info.gni)
 
-    # LINT.IfChange
-    generated.record_symlink(
-        "workspace/fuchsia_build_generated/com_google_googletest.hash",
-        gn_output_dir
-        / "regenerator_outputs"
-        / "bazel_content_hashes"
-        / "com_google_googletest.hash",
-    )
-    # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
-
     generated.record_symlink(
         # LINT.IfChange
         "workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash",
-        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bzlmod)
         # LINT.IfChange
         gn_output_dir / "sdk/prebuild/in_tree_collection.json",
         # LINT.ThenChange(//build/regenerator.py)
@@ -761,7 +751,7 @@ def record_fuchsia_workspace(
     generated.record_symlink(
         # LINT.IfChange
         "workspace/fuchsia_build_generated/fuchsia_internal_only_idk.hash",
-        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bzlmod)
         # LINT.IfChange
         gn_output_dir / "obj/build/bazel/fuchsia_internal_only_idk.hash",
         # LINT.ThenChange(//build/bazel/BUILD.gn)

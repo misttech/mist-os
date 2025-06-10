@@ -36,7 +36,7 @@ GnTargetsManifest: T.TypeAlias = list[dict[str, T.Any]]
 # The name of the root Bazel workspace as it appears in its WORKSPACE.bazel file.
 # LINT.IfChange
 _BAZEL_ROOT_WORKSPACE_NAME = "_main"
-# LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+# LINT.ThenChange(//build/bazel/toplevel.MODULE.bazel)
 
 # A list of built-in Bazel workspaces like @bazel_tools// which are actually
 # stored in the prebuilt Bazel install_base directory with a timestamp *far* in
@@ -1127,7 +1127,7 @@ def main() -> int:
                 args.workspace_dir, "fuchsia_build_generated/gn_targets_dir"
             ),
         )
-        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bzlmod)
 
     bazel_launcher = build_utils.BazelLauncher(
         args.bazel_launcher,
