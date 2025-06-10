@@ -4,8 +4,8 @@
 
 import(
     "//src/lib/testing/expectation/fuchsia_test_with_expectations_package.gni")
+import("//src/starnix/build/args.gni")
 import("//src/starnix/build/starnix_container_config_component.gni")
-import("//src/starnix/kernel/args.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/tests/starnix_test_subpackages.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")

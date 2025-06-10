@@ -43,4 +43,9 @@ declare_args() {
   } else {
     starnix_enable_arch32 = false
   }
+
+  # Whether to use tracing-mutex to detect cycles in the lock acquisition graph.
+  # Only enable this on debug builds by default because it makes balanced/release too slow for
+  # real use.
+  starnix_detect_lock_cycles = compilation_mode == "debug"
 }
