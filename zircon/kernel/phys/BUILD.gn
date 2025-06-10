@@ -121,7 +121,13 @@ if (toolchain_environment == "kernel.phys" ||
       # Required for legacy-boot-shim
       "//zircon/kernel/arch/x86/*",
     ]
+
     sources = [ "trampoline-boot.cc" ]
+
+    if (current_cpu == "arm64") {
+      sources += [ "trampoline-boot-arm64-zbi-boot.cc" ]
+    }
+
     public = [ "include/phys/trampoline-boot.h" ]
 
     public_deps = [ ":boot-zbi" ]

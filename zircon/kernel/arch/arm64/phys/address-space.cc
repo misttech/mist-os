@@ -55,8 +55,9 @@ void EnablePagingForEl(const AddressSpace& aspace) {
   arch::ArmSystemControlRegister sctlr_reg = SctlrReg::Read();
   ZX_ASSERT(!sctlr_reg.m() && !sctlr_reg.c());
 
-  // Clear out the data and instruction caches, and all TLBs.
-  arch::InvalidateLocalCaches();
+  // Clear out the instruction cache and TLBs. Pains were taken to ensure that
+  // there were no dirty data cache lines above any memory of interest.
+  arch::InvalidateGlobalInstructionCache();
   arch::InvalidateLocalTlbs();
   arch::DeviceMemoryBarrier();
   __isb(ARM_MB_SY);

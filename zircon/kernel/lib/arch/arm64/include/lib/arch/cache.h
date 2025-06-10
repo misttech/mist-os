@@ -7,14 +7,81 @@
 #ifndef ZIRCON_KERNEL_LIB_ARCH_ARM64_INCLUDE_LIB_ARCH_CACHE_H_
 #define ZIRCON_KERNEL_LIB_ARCH_ARM64_INCLUDE_LIB_ARCH_CACHE_H_
 
-#include <lib/arch/arm64/cache.h>
+#ifdef __ASSEMBLER__
+#include <lib/arch/arm64/system-asm.h>
+#include <lib/arch/asm.h>
 #include <lib/arch/internal/cache_loop.h>
+#else
+#include <lib/arch/arm64/cache.h>
 #include <lib/arch/intrin.h>
-
-#ifndef __ASSEMBLER__
 
 #include <cstddef>
 #include <cstdint>
+#endif
+
+#ifdef __ASSEMBLER__
+// clang-format off
+
+// Performs the provided cache operation across a provided virtual address
+// range, where x0 holds the base address of the range and x1 its size. This
+// routine can be instantiated for both data and instruction cache operations.
+//
+// Clobbers x2-x5.
+.macro cache_range_op, cache op ctr_shift ctr_width
+  mrs x4, ctr_el0
+  ubfx x4, x4, #\ctr_shift, #\ctr_width
+
+  // Cache line size fields carry the log2 of the number of words (in the
+  // minimum possible size). Shift left by word size to recover the line size
+  // in bytes.
+  mov x2, #4
+  lsl x4, x2, x4
+
+  add  x2, x0, x1  // End address
+  sub  x5, x4, #1  // Line size mask
+  bic  x3, x0, x5  // Align the start address by applying the inverse mask
+
+.Lcache_range_op_loop\@:
+  \cache  \op, x3
+  add  x3, x3, x4
+  cmp  x3, x2
+  blo  .Lcache_range_op_loop\@
+  dsb  sy
+.endm
+
+// Applies the data cache operation `op` to the provided address range, where
+// x0 holds its base address and x1 its size.
+//
+// Clobbers x2-x5.
+.macro data_cache_range_op op
+  cache_range_op dc \op CTR_EL0_DMIN_LINE_SHIFT CTR_EL0_DMIN_LINE_WIDTH
+.endm
+
+// Invalidates the the provided address range within the instruction cache,
+// where x0 holds its base address and x1 its size.
+//
+// Clobbers x2-x5.
+//
+// There is little use in defining a similar instruction_cache_range_op,
+// parameterized on \op, since ivau is the only VA instruction cache operation.
+.macro instruction_cache_range_invalidate
+  cache_range_op ic ivau CTR_EL0_IMIN_LINE_SHIFT CTR_EL0_IMIN_LINE_WIDTH
+.endm
+
+// Generate assembly to iterate over all ways/sets across all levels of data
+// caches from level 0 to the point of coherence.
+//
+// "op" should be an ARM64 operation that is called on each set/way, such as
+// "csw" (i.e., "Clean by Set and Way").
+//
+// Generated assembly does not use the stack, but clobbers registers [x0 -- x13].
+.macro data_cache_way_set_op op, name
+  data_cache_way_set_op_impl \op, \name
+.endm
+
+// clang-format on
+
+#else
 
 namespace arch {
 
@@ -41,8 +108,14 @@ class GlobalCacheConsistencyContext {
   void SyncRange(uintptr_t vaddr, size_t size);
 
  private:
-  bool possible_aliasing_ = CacheTypeEl0::Read().l1_ip() == ArmL1ICachePolicy::VIPT;
+  bool possible_aliasing_ = ArmCacheTypeEl0::Read().l1_ip() == ArmL1ICachePolicy::VIPT;
 };
+
+extern "C" void CleanDataCacheRange(uintptr_t addr, size_t size);
+extern "C" void CleanInvalidateDataCacheRange(uintptr_t addr, size_t size);
+extern "C" void InvalidateDataCacheRange(uintptr_t addr, size_t size);
+
+extern "C" void InvalidateInstructionCacheRange(uintptr_t addr, size_t size);
 
 // Invalidate the entire instruction cache.
 //
@@ -79,32 +152,7 @@ extern "C" void CleanAndInvalidateLocalCaches();
 // (along with the TLB).
 extern "C" void DisableLocalCachesAndMmu();
 
-// arch::DisableMmu() is a common name between a few architectures.
-// On ARM, disabling the MMU implies disabling the caches too.
-inline void DisableMmu() {
-  // Note this is an implied compiler barrier (like atomic_signal_fence)
-  // because the call is implemented in assembly.
-  DisableLocalCachesAndMmu();
-}
-
 }  // namespace arch
-
-#else  // __ASSEMBLER__
-
-// clang-format off
-
-// Generate assembly to iterate over all ways/sets across all levels of data
-// caches from level 0 to the point of coherence.
-//
-// "op" should be an ARM64 operation that is called on each set/way, such as
-// "csw" (i.e., "Clean by Set and Way").
-//
-// Generated assembly does not use the stack, but clobbers registers [x0 -- x13].
-.macro data_cache_way_set_op op, name
-  data_cache_way_set_op_impl \op, \name
-.endm
-
-// clang-format on
 
 #endif  // __ASSEMBLER__
 
