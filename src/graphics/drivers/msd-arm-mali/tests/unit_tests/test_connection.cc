@@ -123,10 +123,18 @@ class FailAllocateConnectionOwner : public FakeConnectionOwner {
 std::vector<std::vector<uint8_t>> g_status;
 
 class TestNotificationHandler : public msd::testing::StubNotificationHandler {
+ public:
+  bool is_killed() { return is_killed_; }
+
   // msd::NotificationHandler implementation.
   void NotificationChannelSend(cpp20::span<uint8_t> data) override {
     g_status.push_back(std::vector<uint8_t>(data.begin(), data.end()));
   }
+
+  void ContextKilled() override { is_killed_ = true; }
+
+ private:
+  bool is_killed_ = false;
 };
 }  // namespace
 
@@ -1345,6 +1353,41 @@ class TestConnection {
     auto connection = MsdArmConnection::Create(0, &owner);
     EXPECT_FALSE(connection);
   }
+
+  void TwoTerminatedAtomsAreKilled() {
+    FakeConnectionOwner owner;
+    auto connection = MsdArmConnection::Create(0, &owner);
+    EXPECT_TRUE(connection);
+
+    TestNotificationHandler handler;
+    connection->SetNotificationCallback(&handler);
+
+    MsdArmAtom atom(connection, 0, 1, 5, magma_arm_mali_user_data{7, 8}, 0);
+    atom.set_result_code(kArmMaliResultAtomTerminated);
+    connection->SendNotificationData(&atom);
+    ASSERT_EQ(1u, connection->terminated_atoms_);
+    ASSERT_EQ(false, handler.is_killed());
+
+    MsdArmAtom atom2(connection, 0, 1, 5, magma_arm_mali_user_data{7, 8}, 0);
+    atom2.set_result_code(kArmMaliResultAtomTerminated);
+    connection->SendNotificationData(&atom2);
+    ASSERT_EQ(2u, connection->terminated_atoms_);
+    ASSERT_EQ(true, handler.is_killed());
+  }
+
+  void TerminatedCoalescedAtomSent() {
+    FakeConnectionOwner owner;
+    auto connection = MsdArmConnection::Create(0, &owner);
+    EXPECT_TRUE(connection);
+
+    TestNotificationHandler handler;
+    connection->SetNotificationCallback(&handler);
+
+    MsdArmAtom atom(connection, 0, 1, 5, magma_arm_mali_user_data{7, 8}, 0, kAtomFlagCoalesce);
+    atom.set_result_code(kArmMaliResultAtomTerminated);
+    connection->SendNotificationData(&atom);
+    ASSERT_EQ(1u, g_status.size());
+  }
 };
 
 class ConnectionTest : public testing::Test {
@@ -1470,4 +1513,14 @@ TEST_F(ConnectionTest, MemoryPressure) {
 TEST_F(ConnectionTest, FailAllAllocation) {
   TestConnection test;
   test.FailAllAllocation();
+}
+
+TEST_F(ConnectionTest, TwoTerminatedAtomsAreKilled) {
+  TestConnection test;
+  test.TwoTerminatedAtomsAreKilled();
+}
+
+TEST_F(ConnectionTest, TerminatedCoalescedAtomSent) {
+  TestConnection test;
+  test.TerminatedCoalescedAtomSent();
 }

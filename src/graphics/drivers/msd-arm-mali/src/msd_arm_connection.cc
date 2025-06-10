@@ -985,8 +985,10 @@ void MsdArmConnection::SendNotificationData(MsdArmAtom* atom) {
   // Arbitrary limit to keep the max coalescing notifications list from growing forever.
   constexpr size_t kMaxCoalescingNotifications = 16;
 
-  if ((atom->flags() & kAtomFlagCoalesce) &&
-      (coalescing_notifications_.size() < kMaxCoalescingNotifications)) {
+  bool can_coalesce = (atom->result_code() != kArmMaliResultAtomTerminated) &&
+                      (atom->flags() & kAtomFlagCoalesce) &&
+                      (coalescing_notifications_.size() < kMaxCoalescingNotifications);
+  if (can_coalesce) {
     coalescing_notifications_.push_back(status);
   } else {
     for (auto& notification : coalescing_notifications_) {
@@ -997,6 +999,16 @@ void MsdArmConnection::SendNotificationData(MsdArmAtom* atom) {
     notification_handler_->NotificationChannelSend(GetStatusSpan(&status));
     notified_atom_count_++;
   }
+
+  if (atom->result_code() == kArmMaliResultAtomTerminated) {
+    MAGMA_LOG(WARNING, "Sending atom terminated result to connection %ld", client_id());
+    if (terminated_atoms_ > 0) {
+      MAGMA_LOG(WARNING, "Connection %ld already has %d terminated atoms, closing connection",
+                client_id(), terminated_atoms_.load());
+      notification_handler_->ContextKilled();
+    }
+    terminated_atoms_ += 1;
+  }
 }
 
 void MsdArmConnection::MarkDestroyed() {
@@ -1006,7 +1018,7 @@ void MsdArmConnection::MarkDestroyed() {
   uint64_t notified_atom_count = notified_atom_count_;
   if (received_atom_count != notified_atom_count) {
     // To help determine the cause of https://fxbug.dev/42069578
-    MAGMA_LOG(WARNING, "Connection %ld received %ld atoms and notified %ld\n", client_id(),
+    MAGMA_LOG(WARNING, "Connection %ld received %ld atoms and notified %ld", client_id(),
               received_atom_count, notified_atom_count);
   }
 
