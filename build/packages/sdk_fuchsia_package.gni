@@ -235,7 +235,8 @@ template("sdk_fuchsia_package") {
       action(_sdk_manifest_target) {
         forward_variables_from(invoker, [ "testonly" ])
 
-        script = "//build/packages/generate_sdk_package_manifest.py"
+        script =
+            "//build/sdk/generate_prebuild_idk/generate_sdk_package_manifest.py"
 
         inputs = [ package_manifest_file ]
         outputs = [
