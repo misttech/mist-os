@@ -191,12 +191,13 @@ class PrebuildMap(object):
 
     def get_meta(
         self, info: AtomInfo
-    ) -> tuple[T.Optional[MetaJson], list[dict[str, str]]]:
+    ) -> tuple[T.Optional[MetaJson], dict[str, str]]:
         """Generate meta.json content for a given AtomInfo
 
         Returns a tuple containing:
         * The meta.json content or None if an unsupported type
-        * A list of additional atom files
+        * A dictionary mapping additional additional atom files in the IDK to
+          their sources.
         """
         value = info["atom_meta"].get("value")
         if value is not None:
@@ -209,7 +210,7 @@ class PrebuildMap(object):
             #   "host_tool"
             #   "loadable_module"
             #   "sysroot"
-            return (value, [])
+            return (value, {})
 
         generator = {
             "fidl_library": self._meta_for_fidl_library,
@@ -227,14 +228,14 @@ class PrebuildMap(object):
             # expected output to `validation_data/expected_idk/`.
             # "package":
         }.get(info["atom_type"], None)
-        return generator(info) if generator else (None, [])
+        return generator(info) if generator else (None, {})
 
     def _meta_for_fidl_library(
         self, info: AtomInfo
-    ) -> tuple[MetaJson, list[dict[str, str]]]:
+    ) -> tuple[MetaJson, dict[str, str]]:
         prebuild = info["prebuild_info"]
         fidl_sources = [f["dest"] for f in info["atom_files"]]
-        fidl_deps = self.resolve_unique_labels(prebuild.get("deps", []))
+        fidl_deps = self.resolve_unique_labels(prebuild.get("deps", {}))
         return {
             "name": prebuild["library_name"],
             "root": prebuild["file_base"],
@@ -242,31 +243,31 @@ class PrebuildMap(object):
             "stable": info["is_stable"],
             "type": info["atom_type"],
             "deps": [self.label_to_library_name(d) for d in fidl_deps],
-        }, []
+        }, {}
 
     def _meta_for_bind_library(
         self, info: AtomInfo
-    ) -> tuple[MetaJson, list[dict[str, str]]]:
+    ) -> tuple[MetaJson, dict[str, str]]:
         prebuild = info["prebuild_info"]
         bind_sources = [f["dest"] for f in info["atom_files"]]
-        bind_deps = self.resolve_unique_labels(prebuild.get("deps", []))
+        bind_deps = self.resolve_unique_labels(prebuild.get("deps", {}))
         return {
             "name": prebuild["library_name"],
             "root": prebuild["file_base"],
             "deps": [self.label_to_library_name(d) for d in bind_deps],
             "sources": bind_sources,
             "type": info["atom_type"],
-        }, []
+        }, {}
 
     def _meta_for_cc_source_library(
         self, info: AtomInfo
-    ) -> tuple[MetaJson, list[dict[str, str]]]:
+    ) -> tuple[MetaJson, dict[str, str]]:
         prebuild = info["prebuild_info"]
-        all_deps = self.resolve_unique_labels(prebuild.get("deps", []))
+        all_deps = self.resolve_unique_labels(prebuild.get("deps", {}))
 
         fidl_deps = []
         fidl_layers = collections.defaultdict(list)
-        for dep_label in get_unique_sequence(prebuild.get("deps", [])):
+        for dep_label in get_unique_sequence(prebuild.get("deps", {})):
             dep_atom = self._labels_map[self.resolve_label(dep_label)]
             if dep_atom["atom_type"] != "fidl_library":
                 continue
@@ -297,11 +298,11 @@ class PrebuildMap(object):
             "sources": prebuild["sources"],
             "stable": info["is_stable"],
             "type": info["atom_type"],
-        }, []
+        }, {}
 
     def _meta_for_cc_prebuilt_library(
         self, info: AtomInfo
-    ) -> tuple[MetaJson, list[dict[str, str]]]:
+    ) -> tuple[MetaJson, dict[str, str]]:
         prebuild = info["prebuild_info"]
         binaries = {}
         variants = []
@@ -342,7 +343,7 @@ class PrebuildMap(object):
                     variant["values"]["debug"] = debug_lib
                 variants.append(variant)
 
-        all_deps = self.resolve_unique_labels(prebuild.get("deps", []))
+        all_deps = self.resolve_unique_labels(prebuild.get("deps", {}))
         result = {
             "name": prebuild["library_name"],
             "root": prebuild["file_base"],
@@ -357,11 +358,11 @@ class PrebuildMap(object):
             result["variants"] = variants
         if "ifs" in prebuild:
             result["ifs"] = prebuild["ifs"]
-        return (result, [])
+        return (result, {})
 
     def _meta_for_version_history(
         self, info: AtomInfo
-    ) -> tuple[MetaJson, list[dict[str, str]]]:
+    ) -> tuple[MetaJson, dict[str, str]]:
         prebuild = info["prebuild_info"]
         # prebuild contains enough information to generate the final version
         # history file  by calling a Python module function.
@@ -386,11 +387,11 @@ class PrebuildMap(object):
         # been updated to use "phase" and it is removed from the real instance.
         generate_version_history.add_deprecated_status_field(version_history)
 
-        return (version_history, [])
+        return (version_history, {})
 
     def _meta_for_companion_host_tool(
         self, info: AtomInfo
-    ) -> tuple[MetaJson, list[dict[str, str]]]:
+    ) -> tuple[MetaJson, dict[str, str]]:
         prebuild = info["prebuild_info"]
         result = {
             "name": prebuild["name"],
@@ -404,7 +405,7 @@ class PrebuildMap(object):
 
         binary_relpath = os.path.relpath(prebuild["binary"], src_root)
         files = [os.path.join(dest_root, binary_relpath)]
-        additional_atom_files = []
+        additional_atom_files: T.Dict[str, str] = {}
 
         prebuilt_files = None
         if "prebuilt_files" in prebuild:
@@ -421,12 +422,7 @@ class PrebuildMap(object):
             source_path = os.path.join(src_root, prebuilt_file)
             dest_path = os.path.join(dest_root, prebuilt_file)
             files.append(dest_path)
-            additional_atom_files.append(
-                {
-                    "source": source_path,
-                    "dest": dest_path,
-                }
-            )
+            additional_atom_files[dest_path] = source_path
 
         # Remove duplicates if any.
         files = get_unique_sequence(files)
@@ -438,7 +434,7 @@ class PrebuildMap(object):
 
     def _meta_for_dart_library(
         self, info: AtomInfo
-    ) -> tuple[MetaJson, list[dict[str, str]]]:
+    ) -> tuple[MetaJson, dict[str, str]]:
         prebuild = info["prebuild_info"]
 
         # The list of packages that should be pulled from a Flutter SDK instead of pub.
@@ -491,11 +487,11 @@ class PrebuildMap(object):
         }
         if prebuild["null_safe"]:
             result["dart_library_null_safe"] = True
-        return (result, [])
+        return (result, {})
 
     def _meta_for_experimental_python_e2e_test(
         self, info: AtomInfo
-    ) -> tuple[MetaJson, list[dict[str, str]]]:
+    ) -> tuple[MetaJson, dict[str, str]]:
         prebuild = info["prebuild_info"]
 
         root = prebuild["file_base"]
@@ -529,16 +525,14 @@ class PrebuildMap(object):
             "root": root,
             "type": info["atom_type"],
             "files": [f.split("=")[0] for f in files],
-        }, []
+        }, {}
 
-    def _meta_for_noop(
-        self, info: AtomInfo
-    ) -> tuple[None, list[dict[str, str]]]:
-        return (None, [])
+    def _meta_for_noop(self, info: AtomInfo) -> tuple[None, dict[str, str]]:
+        return (None, {})
 
     def _meta_for_collection(
         self, info: AtomInfo
-    ) -> tuple[MetaJson, list[dict[str, str]]]:
+    ) -> tuple[MetaJson, dict[str, str]]:
         prebuild = info["prebuild_info"]
         return {
             "arch": prebuild["arch"],
@@ -546,7 +540,7 @@ class PrebuildMap(object):
             "parts": list[dict[str, T.Any]],
             "root": prebuild["root"],
             "schema_version": prebuild["schema_version"],
-        }, []
+        }, {}
 
 
 def main() -> int:
@@ -619,7 +613,7 @@ class IdkGenerator(object):
         fuchsia_source_dir: T.Optional[Path],
     ):
         self._meta_files: T.Dict[str, MetaJson] = {}
-        self._atom_files: list[dict[str, str]] = []
+        self._atom_files: T.Dict[str, str] = {}
 
         self._build_dir = build_dir
 
@@ -677,10 +671,20 @@ class IdkGenerator(object):
                             "type": info["atom_type"],
                         }
                     )
-                    self._atom_files += info["atom_files"]
+                    for file in info["atom_files"]:
+                        dest = file["dest"]
+                        source = file["source"]
+                        assert (
+                            dest not in self._atom_files
+                        ), f"Path `{dest}` specified by multiple atoms."
+                        self._atom_files[dest] = source
 
                 if additional_atom_files:
-                    self._atom_files += additional_atom_files
+                    for dest in additional_atom_files.keys():
+                        assert (
+                            dest not in self._atom_files
+                        ), f"Path `{dest}` specified by multiple atoms."
+                    self._atom_files.update(additional_atom_files)
             elif info["atom_type"] != "none":
                 unhandled_labels.add(info["atom_label"])
 
@@ -796,20 +800,14 @@ class IdkGenerator(object):
                 json.dump(meta_json, file, sort_keys=True, indent=2)
 
         # Create symlinks for all "atom_files".
-        for f in self._atom_files:
-            target_path = self._build_dir / f["source"]
+        for dest, source in self._atom_files.items():
+            target_path = self._build_dir / source
             # The target directory must exist even if the file does not.
             target_path.parent.mkdir(parents=True, exist_ok=True)
-            dst_path = temp_out_dir / f["dest"]
-            dst_path.parent.mkdir(parents=True, exist_ok=True)
+            dest_path = temp_out_dir / dest
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
 
-            try:
-                os.symlink(target_path, dst_path)
-            except FileExistsError as e:
-                print(
-                    f"ERROR: File path '{dst_path}' is specified multiple times in one or more manifests:\n{e}"
-                )
-                return 1
+            os.symlink(target_path, dest_path)
 
         if output_dir.exists():
             shutil.rmtree(output_dir)
