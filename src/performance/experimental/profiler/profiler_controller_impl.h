@@ -21,13 +21,12 @@
 namespace profiler {
 class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session> {
  public:
-  explicit ProfilerControllerImpl(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
+  ProfilerControllerImpl(async_dispatcher_t* dispatcher, ComponentWatcher& event_stream)
+      : dispatcher_(dispatcher), component_watcher_(event_stream) {}
   void Configure(ConfigureRequest& request, ConfigureCompleter::Sync& completer) override;
   void Start(StartRequest& request, StartCompleter::Sync& completer) override;
   void Stop(StopCompleter::Sync& completer) override;
   void Reset(ResetCompleter::Sync& completer) override;
-
-  void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fuchsia_cpu_profiler::Session> server_end);
 
   ~ProfilerControllerImpl() override = default;
 
@@ -41,6 +40,9 @@ class ProfilerControllerImpl : public fidl::Server<fuchsia_cpu_profiler::Session
     Stopped,
   };
   async_dispatcher_t* dispatcher_;
+  // LIFETIME: Reference is to a ComponentWatcher created in main() which lives for the life of the
+  // program.
+  ComponentWatcher& component_watcher_;
   fxl::RefPtr<Sampler> sampler_;
   ProfilingState state_ = ProfilingState::Unconfigured;
 

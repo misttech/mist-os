@@ -19,9 +19,9 @@
 // work around to watch for the url.
 zx::result<std::unique_ptr<profiler::TestComponent>> profiler::TestComponent::Create(
     async_dispatcher_t* dispatcher, std::string url,
-    std::optional<fuchsia_test_manager::RunSuiteOptions> options) {
+    std::optional<fuchsia_test_manager::RunSuiteOptions> options, ComponentWatcher& event_stream) {
   std::unique_ptr test =
-      std::make_unique<TestComponent>(dispatcher, std::move(url), std::move(options));
+      std::make_unique<TestComponent>(dispatcher, std::move(url), std::move(options), event_stream);
   zx::result client_end = component::Connect<fuchsia_test_manager::SuiteRunner>();
   if (client_end.is_error()) {
     return client_end.take_error();
@@ -63,10 +63,6 @@ zx::result<> profiler::TestComponent::Start(fxl::WeakPtr<Sampler> notify) {
     return res.take_error();
   }
 
-  if (auto res = component_watcher_.Watch(); res.is_error()) {
-    return res.take_error();
-  }
-
   FX_LOGS(INFO) << "Running test url=" << url_;
 
   auto [suite_controller_client, suite_controller_server] =
@@ -98,9 +94,6 @@ zx::result<> profiler::TestComponent::Stop() {
   auto d = fit::defer(
       [this]() { suite_controller_ = fidl::Client<fuchsia_test_manager::SuiteController>{}; });
 
-  if (zx::result res = component_watcher_.Reset(); res.is_error()) {
-    return res;
-  }
   if (suite_controller_.is_valid()) {
     if (fit::result res = suite_controller_->Kill(); res.is_error()) {
       return zx::error(res.error_value().status());

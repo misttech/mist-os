@@ -31,9 +31,9 @@ zx::result<> profiler::ComponentWatcher::Watch() {
   return zx::ok();
 }
 
-zx::result<> profiler::ComponentWatcher::Reset() {
-  stream_client_ = fidl::Client<fuchsia_component::EventStream>();
-  return zx::ok();
+void profiler::ComponentWatcher::Clear() {
+  moniker_watchers_.clear();
+  url_watchers_.clear();
 }
 
 zx::result<> profiler::ComponentWatcher::WatchForMoniker(std::string moniker,
@@ -45,7 +45,7 @@ zx::result<> profiler::ComponentWatcher::WatchForMoniker(std::string moniker,
     normalized = normalized.substr(2);
   }
 
-  if (moniker_watchers_.find(normalized) != moniker_watchers_.end()) {
+  if (moniker_watchers_.contains(normalized)) {
     return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
   moniker_watchers_[std::move(normalized)] = std::move(handler);
@@ -54,7 +54,7 @@ zx::result<> profiler::ComponentWatcher::WatchForMoniker(std::string moniker,
 
 zx::result<> profiler::ComponentWatcher::WatchForUrl(std::string url,
                                                      ComponentEventHandler handler) {
-  if (url_watchers_.find(url) != url_watchers_.end()) {
+  if (url_watchers_.contains(url)) {
     return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
   url_watchers_[std::move(url)] = std::move(handler);
@@ -94,7 +94,6 @@ void profiler::ComponentWatcher::HandleEvent(
           }
           if (auto url_handler = url_watchers_.find(component_url);
               url_handler != url_watchers_.end()) {
-            FX_LOGS(INFO) << "Got debug started for " << moniker << " (" << component_url << ")";
             url_handler->second(moniker, component_url);
             url_watchers_.erase(url_handler);
           }

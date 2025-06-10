@@ -271,7 +271,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
           }
 
           zx::result<std::unique_ptr<profiler::ComponentTarget>> res =
-              profiler::ControlledComponent::Create(dispatcher_, url, moniker);
+              profiler::ControlledComponent::Create(url, moniker, component_watcher_);
           if (res.is_error()) {
             FX_PLOGS(INFO, res.error_value())
                 << "No access to fuchsia.sys2.LifecycleController.root. Component launching and attaching is disabled";
@@ -291,8 +291,9 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
             return;
           }
 
-          zx::result<std::unique_ptr<TestComponent>> res = TestComponent::Create(
-              dispatcher_, test_config->url().value(), std::move(test_config->options()));
+          zx::result<std::unique_ptr<TestComponent>> res =
+              TestComponent::Create(dispatcher_, test_config->url().value(),
+                                    std::move(test_config->options()), component_watcher_);
           if (res.is_error()) {
             FX_PLOGS(ERROR, res.error_value()) << "Failed to launch test: " << *test_config->url();
             completer.Reply(fit::error(fuchsia_cpu_profiler::SessionConfigureError::kBadState));
@@ -305,7 +306,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
         case fuchsia_cpu_profiler::AttachConfig::Tag::kAttachToComponentMoniker: {
           auto attach_moniker = attach_config->attach_to_component_moniker();
           zx::result<std::unique_ptr<profiler::ComponentTarget>> res =
-              profiler::UnownedComponent::Create(dispatcher_, attach_moniker, std::nullopt);
+              profiler::UnownedComponent::Create(attach_moniker, std::nullopt, component_watcher_);
           if (res.is_error()) {
             FX_PLOGS(ERROR, res.error_value())
                 << "Failed to attach to component: " << attach_moniker.value_or("<unspecified>");
@@ -319,7 +320,7 @@ void profiler::ProfilerControllerImpl::Configure(ConfigureRequest& request,
         case fuchsia_cpu_profiler::AttachConfig::Tag::kAttachToComponentUrl: {
           auto attach_url = attach_config->attach_to_component_url();
           zx::result<std::unique_ptr<profiler::ComponentTarget>> res =
-              profiler::UnownedComponent::Create(dispatcher_, std::nullopt, attach_url);
+              profiler::UnownedComponent::Create(std::nullopt, attach_url, component_watcher_);
           if (res.is_error()) {
             completer.Reply(
                 fit::error(fuchsia_cpu_profiler::SessionConfigureError::kInvalidConfiguration));
@@ -427,6 +428,7 @@ void profiler::ProfilerControllerImpl::Stop(StopCompleter::Sync& completer) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   FX_LOGS(DEBUG) << "Stopping profiler.";
 
+  component_watcher_.Clear();
   if (zx::result stop_res = sampler_->Stop(); stop_res.is_error()) {
     FX_PLOGS(ERROR, stop_res.status_value()) << "Sampler failed to stop";
     completer.Close(stop_res.status_value());
@@ -525,12 +527,6 @@ void profiler::ProfilerControllerImpl::Reset(ResetCompleter::Sync& completer) {
   completer.Reply();
 }
 
-void profiler::ProfilerControllerImpl::OnUnbound(
-    fidl::UnbindInfo info, fidl::ServerEnd<fuchsia_cpu_profiler::Session> server_end) {
-  TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
-  Reset();
-}
-
 void profiler::ProfilerControllerImpl::Reset() {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   sampler_.reset();
@@ -540,4 +536,5 @@ void profiler::ProfilerControllerImpl::Reset() {
   state_ = ProfilingState::Unconfigured;
   component_target_.reset();
   sample_specs_.clear();
+  component_watcher_.Clear();
 }

@@ -64,14 +64,14 @@ class ComponentTarget {
 
 class ControlledComponent : public ComponentTarget {
  public:
-  explicit ControlledComponent(async_dispatcher_t* dispatcher, std::string url, Moniker moniker)
+  explicit ControlledComponent(std::string url, Moniker moniker,
+                               ComponentWatcher& component_watcher)
       : ComponentTarget{},
         url_{std::move(url)},
         moniker_{std::move(moniker)},
-        component_watcher_(dispatcher) {}
-  static zx::result<std::unique_ptr<ControlledComponent>> Create(async_dispatcher_t* dispatcher,
-                                                                 const std::string& url,
-                                                                 const std::string& moniker);
+        component_watcher_(component_watcher) {}
+  static zx::result<std::unique_ptr<ControlledComponent>> Create(
+      const std::string& url, const std::string& moniker, ComponentWatcher& component_watcher);
 
   zx::result<> Start(fxl::WeakPtr<Sampler> notify) override;
   zx::result<> Stop() override;
@@ -84,7 +84,9 @@ class ControlledComponent : public ComponentTarget {
   std::string url_;
   Moniker moniker_;
 
-  ComponentWatcher component_watcher_;
+  // LIFETIME: Reference is to a ComponentWatcher created in main() which lives for the life of the
+  // program.
+  ComponentWatcher& component_watcher_;
   // Ensure that we only destroy this component once -- either explicitly through Destroy, or
   // implicitly in ~ControlledComponent.
   bool needs_destruction_ = true;
