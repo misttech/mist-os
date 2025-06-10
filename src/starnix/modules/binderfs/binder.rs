@@ -2641,7 +2641,7 @@ impl BinderObjectFlags {
             None
         } else {
             match SchedulerPolicy::from_binder(sched_policy, priority) {
-                Ok(policy) => policy,
+                Ok(policy) => Some(policy),
                 Err(e) => {
                     log_warn!("Unable to parse policy {sched_policy}:{priority}: {e:?}");
                     None
