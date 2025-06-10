@@ -72,26 +72,12 @@ class VmPageOrMarker {
     // used for internal metadata. This is declared here for convenience, and is asserted to be in
     // sync with the private VmPageOrMarker::kTypeBits.
     static constexpr int kAlignBits = 3;
-    // kExtraBits is used for bookkeeping on certain page providers, namely compressed storage.
-    static constexpr int kExtraBits = 2;
-    // Ensure the pmm page-to-index has enough zero bits.
-    static_assert((kAlignBits + kExtraBits) <= PmmNode::kIndexZeroBits);
-
-    explicit ReferenceValue(const vm_page_t* page, uint8_t extra)
-        : value_(Pmm::Node().PageToIndex(page) | (BIT_MASK32(kExtraBits) & extra) << kAlignBits) {
-      DEBUG_ASSERT((extra & ~BIT_MASK32(kExtraBits)) == 0);
-    }
 
     explicit constexpr ReferenceValue(uint32_t raw) : value_(raw) {
       DEBUG_ASSERT((value_ & BIT_MASK32(kAlignBits)) == 0);
     }
 
-    static ReferenceValue GetReservedValue() { return ReferenceValue(PmmNode::kIndexReserved0); }
-
     uint32_t value() const { return value_; }
-    vm_page_t* page() const { return Pmm::Node().IndexToPage(value_); }
-    uint8_t extra() const { return (value_ >> kAlignBits) & BIT_MASK32(kExtraBits); }
-    bool is_reserved() const { return value_ == PmmNode::kIndexReserved0; }
 
    private:
     uint32_t value_;
@@ -195,6 +181,8 @@ class VmPageOrMarker {
   static VmPageOrMarker ParentContent() { return VmPageOrMarker{kParentContentType}; }
 
   [[nodiscard]] static VmPageOrMarker Page(vm_page* p) {
+    // Ensure the pmm page-to-index has enough zero bits.
+    static_assert(kTypeBits <= PmmNode::kIndexZeroBits);
     // A null page is incorrect for two reasons
     // 1. It's a violation of the API of this method
     // 2. A null page cannot be represented internally as this is used to represent Empty

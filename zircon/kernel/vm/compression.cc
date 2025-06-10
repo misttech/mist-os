@@ -57,7 +57,7 @@ VmCompression::VmCompression(fbl::RefPtr<VmCompressedStorage> storage,
       compression_threshold_(ensure_threshold(compression_threshold)),
       // Currently only a single VmCompressor instance is supported, so only a single temporary
       // reference value (the reserved value) is needed.
-      instance_(*this, CompressedRef::GetReservedValue().value()) {
+      instance_(*this, kTempReferenceValue) {
   ASSERT(storage_);
   ASSERT(strategy_);
   // Ensure we can steal space to store the compression timestamp.

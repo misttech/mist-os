@@ -55,19 +55,17 @@ class PmmNode {
 
   vm_page_t* PaddrToPage(paddr_t addr) TA_NO_THREAD_SAFETY_ANALYSIS;
 
-  static constexpr int kIndexZeroBits = 5;
-  static constexpr uint32_t kIndexReserved0 = 0xffffff00;
+  static constexpr int kIndexZeroBits = 3;
 
   // Returns compressed representation a page_t*, with the following characteristics:
   // - zeros in the last kIndexZeroBits bits, used by clients to store metadata.
   // - The value 0 is never returned, it can be used as "no page" marker.
-  // - The value kIndexReserved0 is never returned, it can be used as a special marker.
   //
   // Note: This method needs to traverse (up to) all the memory pools so it's cost is
   //       low but not trivial.
   uint32_t PageToIndex(const vm_page_t* page) TA_NO_THREAD_SAFETY_ANALYSIS;
   // Converts the number returned by PageToIndex() back to a page_t* pointer.
-  // It does not check for invalid indexes such as 0 or kIndexReserved0.
+  // It does not check for invalid indexes such as 0.
   //
   // Note: This method is faster than PageToIndex(), about the cost of some basic math
   //       and bit manipulation.
@@ -484,11 +482,10 @@ class PmmNode {
 
   // Bit constants to fold a vm_page_t pointer into a uint32 and back. The format from LSB
   // to MSB is : zero-bits | arena-index | page-index |. Where arena-index is 4 bits wide and
-  // zero-bits is 4 bits wide. This limits the number of pages per arena to 2^24 -1 since the
-  // last arena index of 0xffffff is used by kIndexReserved0.
+  // zero-bits is 3 bits wide. This limits the number of pages per arena to 2^25.
   static constexpr int kArenaBits = 4;
   static_assert(kArenaCount == (1ul << kArenaBits));
-  static constexpr size_t kMaxPagesPerArena = (1u << (32u - (kArenaBits + kIndexZeroBits))) - 1;
+  static constexpr size_t kMaxPagesPerArena = 1u << (32u - (kArenaBits + kIndexZeroBits));
   static constexpr uint32_t kArenaMask = (1u << kArenaBits) - 1u;
 
   size_t used_arena_count_ TA_GUARDED(lock_) = 0;
