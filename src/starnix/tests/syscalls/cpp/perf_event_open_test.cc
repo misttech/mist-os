@@ -541,7 +541,7 @@ perf_event_attr example_sampling_attr() {
   return attr;
 }
 
-TEST(PerfEventOpenTest, MmapMetadataPageIsRead) {
+TEST(PerfEventOpenTest, MmapMetadataPageIsValid) {
   if (test_helper::HasSysAdmin()) {
     perf_event_attr attr = example_sampling_attr();
     int32_t file_descriptor =
@@ -582,6 +582,100 @@ TEST(PerfEventOpenTest, MmapMetadataPageIsRead) {
     EXPECT_EQ(metadata->data_tail, (uint64_t)0);
     EXPECT_EQ(metadata->data_offset, (uint64_t)getpagesize());
     EXPECT_EQ(metadata->data_size, (uint64_t)data_size);
+  }
+}
+
+// TODO(https://fxbug.dev/398914921): The Linux version of this test will fail because
+// we are currently testing against hardcoded values in the Starnix implementation.
+// Use better EXPECT statements when we grab real values.
+TEST(PerfEventOpenTest, MmapFirstRecordPageIsValid) {
+  if (test_helper::HasSysAdmin()) {
+    perf_event_attr attr = example_sampling_attr();
+    int32_t file_descriptor =
+        sys_perf_event_open(&attr, example_pid, example_cpu, example_group_fd, example_flags);
+
+    int num_pages = 2;
+    size_t data_size = num_pages * getpagesize();
+    // Ring buffer size, defined to be 1 + 2^n pages per the docs.
+    size_t buffer_size = getpagesize() + data_size;
+
+    // mmap() returns the address of the mapping. Note you MUST use MAP_SHARED because you're doing
+    // kernel and user stuff. The offset has to be 0 to access the metadata page (first page).
+    void* address = mmap(NULL, buffer_size, PROT_READ, MAP_SHARED, file_descriptor, 0);
+
+    // Address should not be 0xffffffffffffffff.
+    EXPECT_NE(address, MAP_FAILED);
+
+    // Docs say you can close here before reading anything.
+    EXPECT_NE(syscall(__NR_close, file_descriptor), EXIT_FAILURE);
+
+    char buffer[buffer_size];
+    EXPECT_EQ(buffer_size, sizeof(buffer));
+
+    // Verify metadata page has valid/reasonable info.
+    // Don't need to memcopy. Just read directly.
+    perf_event_mmap_page* metadata = (perf_event_mmap_page*)address;
+    EXPECT_LT(metadata->version, (uint32_t)10);
+    EXPECT_LT(metadata->compat_version, (uint32_t)10);
+    EXPECT_EQ(metadata->lock % 2, (uint32_t)0);
+    EXPECT_NE(metadata->index, (uint32_t)-1);
+    EXPECT_NE(metadata->offset, (int64_t)-1);
+    EXPECT_EQ(metadata->capabilities, (uint64_t)30);
+    EXPECT_EQ(metadata->cap_user_time, (uint64_t)1);
+    EXPECT_GT(metadata->time_enabled, (uint64_t)0);
+    EXPECT_GT(metadata->time_running, (uint64_t)0);
+    // Verify that there is a sample to read, this must be > 0.
+    EXPECT_GT(metadata->data_head, (uint64_t)0);
+    EXPECT_EQ(metadata->data_tail, (uint64_t)0);
+    EXPECT_EQ(metadata->data_offset, (uint64_t)getpagesize());
+    EXPECT_EQ(metadata->data_size, data_size);
+
+    // Start reading next page, which is the first sampling data page. From there
+    // you can keep iterating to read each sample. Layout:
+    //
+    // The whole object is a Record, comprised of a Header and a RecordDetails:
+    // ------           <-- sample_start, start of the header and the sample.
+    // |  |
+    // |  |                 perf_event_header size
+    // |  |
+    // |  ---           <-- record_details_start, start of the record_details.
+    // |  |
+    // |  |                 varying size based on `perf_event_header->type`
+    // |  |
+    // |  |
+    // ------
+    uint64_t curr_pointer = metadata->data_tail;
+    while (curr_pointer < metadata->data_head) {
+      char* record_start =
+          static_cast<char*>(address) + metadata->data_offset + metadata->data_tail + curr_pointer;
+      perf_event_header* header = (perf_event_header*)record_start;
+
+      // Increment by sample size, so that we can read the next sample in the next iteration.
+      curr_pointer += header->size;
+
+      EXPECT_EQ(header->type, PERF_RECORD_SAMPLE /* 9 */);
+      EXPECT_THAT(header->misc, testing::AnyOf(testing::Eq(PERF_RECORD_MISC_KERNEL) /* 1 */,
+                                               testing::Eq(PERF_RECORD_MISC_USER) /* 2 */));
+      EXPECT_GE(header->size, (uint16_t)8);  // Size of the whole sample, INCLUDING THIS HEADER.
+
+      // Now that we know the type, we can roll past the perf_event_header
+      // and read the rest of the struct, which is different for each type.
+      char* record_details_start = record_start + sizeof(perf_event_header);
+      // This is a subset of the real perf_record_sample which we will implement later.
+      struct perf_record_sample {
+        uint64_t sample_id;
+        uint64_t ip;
+        uint32_t pid;
+        uint32_t tid;
+        uint64_t time;
+      };
+      struct perf_record_sample* record_details = (struct perf_record_sample*)record_details_start;
+      EXPECT_GE(record_details->sample_id, (uint64_t)12);
+      EXPECT_GE(record_details->ip, (uint64_t)123);
+      EXPECT_GE(record_details->pid, (uint64_t)1234);
+      EXPECT_GE(record_details->tid, (uint64_t)12345);
+      EXPECT_GE(record_details->time, (uint64_t)123456);
+    }
   }
 }
 
