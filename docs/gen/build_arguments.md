@@ -369,7 +369,7 @@ in args.gn.
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/bazel_root_targets_list.gni:26
+From //build/bazel/bazel_root_targets_list.gni:38
 
 ### bazel_upload_build_events
 
@@ -980,7 +980,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -1052,7 +1052,7 @@ This should never be set as a build argument.
 }
   armv7_unknown_linux_gnueabihf = {
   libclang_rt_profile_a = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.profile.a"
-  libunwind_so = "../../../../out/not-default/libunwind.so"
+  libunwind_so = ""
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -1084,7 +1084,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -1142,10 +1142,10 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
+  clang_rt = ""
 }
   static = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
   clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
@@ -1162,7 +1162,7 @@ This should never be set as a build argument.
 }
   riscv64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = "../../../../out/not-default/libunwind.so"
+  libunwind_so = ""
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -1758,7 +1758,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -2225,7 +2225,18 @@ artifact. Schema is:
       to the `fx host-tool <ninja_name>` command.
 
 
-**Current value (from the default):** `[]`
+**Current value (from the default):**
+
+```none
+[{
+  bazel_label = "//build/bazel/toolchains/tests:build"
+  bazel_name = "build.stamp"
+  ninja_name = "bazel_toolchains_tests_build.stamp"
+}, {
+  bazel_label = "//build/tools/json_validator:json_validator_valico"
+  install_host_tool = true
+}]
+```
 
 From //build/bazel/bazel_root_targets_list.gni:22
 
