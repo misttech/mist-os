@@ -17,7 +17,7 @@ without using bzlmod as your dependency manager.
 
 ## Example
 
-We have an example of using Gazelle with Python located [here](https://github.com/bazelbuild/rules_python/tree/main/examples/bzlmod).
+We have an example of using Gazelle with Python located [here](https://github.com/bazel-contrib/rules_python/tree/main/examples/bzlmod).
 A fully-working example without using bzlmod is in [`examples/build_file_generation`](../examples/build_file_generation).
 
 The following documentation covers using bzlmod.
@@ -29,7 +29,7 @@ Get the current version of Gazelle from there releases here:  https://github.com
 
 
 See the installation `MODULE.bazel` snippet on the Releases page:
-https://github.com/bazelbuild/rules_python/releases in order to configure rules_python.
+https://github.com/bazel-contrib/rules_python/releases in order to configure rules_python.
 
 You will also need to add the `bazel_dep` for configuration for `rules_python_gazelle_plugin`.
 
@@ -119,6 +119,16 @@ gazelle_python_manifest(
     # the integrity field is not added to the manifest which can help avoid
     # merge conflicts in large repos.
     requirements = "//:requirements_lock.txt",
+    # include_stub_packages: bool (default: False)
+    # If set to True, this flag automatically includes any corresponding type stub packages
+    # for the third-party libraries that are present and used. For example, if you have 
+    # `boto3` as a dependency, and this flag is enabled, the corresponding `boto3-stubs`
+    # package will be automatically included in the BUILD file.
+    #
+    # Enabling this feature helps ensure that type hints and stubs are readily available 
+    # for tools like type checkers and IDEs, improving the development experience and 
+    # reducing manual overhead in managing separate stub packages.
+    include_stub_packages = True
 )
 ```
 
@@ -440,7 +450,7 @@ py_library(
 )
 ```
 
-[issue-1826]: https://github.com/bazelbuild/rules_python/issues/1826
+[issue-1826]: https://github.com/bazel-contrib/rules_python/issues/1826
 
 #### Directive: `python_generation_mode_per_package_require_test_entry_point`:
 When `# gazelle:python_generation_mode package`, whether a file called `__test__.py` or a target called `__test__`, a.k.a., entry point, is required to generate one test target per package. If this is set to true but no entry point is found, Gazelle will fall back to file mode and generate one test target per file. Setting this directive to false forces Gazelle to generate one test target per package even without entry point. However, this means the `main` attribute of the `py_test` will not be set and the target will not be runnable unless either:
@@ -543,7 +553,7 @@ target, building will result in an error saying:
 ```
 
 Adding non-Python targets to the generated target is a feature request being
-tracked in [Issue #1865](https://github.com/bazelbuild/rules_python/issues/1865).
+tracked in [Issue #1865](https://github.com/bazel-contrib/rules_python/issues/1865).
 
 The annotation can be added multiple times, and all values are combined
 and de-duplicated.
@@ -644,8 +654,7 @@ code into a separate script without a `main` line. Gazelle will then create a
 
 ## Developer Notes
 
-Gazelle extensions are written in Go. This gazelle plugin is a hybrid, as it uses Go to execute a
-Python interpreter as a subprocess to parse Python source files.
+Gazelle extensions are written in Go.
 See the gazelle documentation https://github.com/bazelbuild/bazel-gazelle/blob/master/extend.md
 for more information on extending Gazelle.
 

@@ -185,10 +185,11 @@ class RunfilesTest(unittest.TestCase):
     def testManifestBasedRlocation(self) -> None:
         with _MockFile(
             contents=[
-                "Foo/runfile1",
+                "Foo/runfile1 ",  # A trailing whitespace is always present in single entry lines.
                 "Foo/runfile2 C:/Actual Path\\runfile2",
                 "Foo/Bar/runfile3 D:\\the path\\run file 3.txt",
                 "Foo/Bar/Dir E:\\Actual Path\\Directory",
+                " Foo\\sBar\\bDir\\nNewline/runfile5 F:\\bActual Path\\bwith\\nnewline/runfile5",
             ]
         ) as mf:
             r = runfiles.CreateManifestBased(mf.Path())
@@ -204,6 +205,10 @@ class RunfilesTest(unittest.TestCase):
             self.assertEqual(
                 r.Rlocation("Foo/Bar/Dir/Deeply/Nested/runfile4"),
                 "E:\\Actual Path\\Directory/Deeply/Nested/runfile4",
+            )
+            self.assertEqual(
+                r.Rlocation("Foo Bar\\Dir\nNewline/runfile5"),
+                "F:\\Actual Path\\with\nnewline/runfile5",
             )
             self.assertIsNone(r.Rlocation("unknown"))
             if RunfilesTest.IsWindows():
@@ -547,7 +552,7 @@ class _MockFile:
     def __enter__(self) -> Any:
         tmpdir = os.environ.get("TEST_TMPDIR")
         self._path = os.path.join(tempfile.mkdtemp(dir=tmpdir), self._name)
-        with open(self._path, "wt") as f:
+        with open(self._path, "wt", encoding="utf-8", newline="\n") as f:
             f.writelines(l + "\n" for l in self._contents)
         return self
 

@@ -17,10 +17,13 @@
 This is a separate file to minimize transitive loads.
 """
 
-def enum(**kwargs):
+def enum(methods = {}, **kwargs):
     """Creates a struct whose primary purpose is to be like an enum.
 
     Args:
+        methods: {type}`dict[str, callable]` functions that will be
+            added to the created enum object, but will have the enum object
+            itself passed as the first positional arg when calling them.
         **kwargs: The fields of the returned struct. All uppercase names will
             be treated as enum values and added to `__members__`.
 
@@ -33,4 +36,30 @@ def enum(**kwargs):
         for key, value in kwargs.items()
         if key.upper() == key
     }
-    return struct(__members__ = members, **kwargs)
+
+    for name, unbound_method in methods.items():
+        # buildifier: disable=uninitialized
+        kwargs[name] = lambda *a, **k: unbound_method(self, *a, **k)
+
+    self = struct(__members__ = members, **kwargs)
+    return self
+
+def _FlagEnum_flag_values(self):
+    return sorted(self.__members__.values())
+
+def FlagEnum(**kwargs):
+    """Define an enum specialized for flags.
+
+    Args:
+        **kwargs: members of the enum.
+
+    Returns:
+        {type}`FlagEnum` struct. This is an enum with the following extras:
+        * `flag_values`: A function that returns a sorted list of the
+          flag values (enum `__members__`). Useful for passing to the
+          `values` attribute for string flags.
+    """
+    return enum(
+        methods = dict(flag_values = _FlagEnum_flag_values),
+        **kwargs
+    )

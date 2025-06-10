@@ -16,9 +16,9 @@
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
-load("//python/private:sentinel.bzl", "SentinelInfo")
-load("//python/private:toolchain_types.bzl", "TARGET_TOOLCHAIN_TYPE")
 load(":py_exec_tools_info.bzl", "PyExecToolsInfo")
+load(":sentinel.bzl", "SentinelInfo")
+load(":toolchain_types.bzl", "TARGET_TOOLCHAIN_TYPE")
 
 def _py_exec_tools_toolchain_impl(ctx):
     extra_kwargs = {}
@@ -29,13 +29,15 @@ def _py_exec_tools_toolchain_impl(ctx):
     if SentinelInfo in ctx.attr.exec_interpreter:
         exec_interpreter = None
 
-    return [platform_common.ToolchainInfo(
-        exec_tools = PyExecToolsInfo(
-            exec_interpreter = exec_interpreter,
-            precompiler = ctx.attr.precompiler,
+    return [
+        platform_common.ToolchainInfo(
+            exec_tools = PyExecToolsInfo(
+                exec_interpreter = exec_interpreter,
+                precompiler = ctx.attr.precompiler,
+            ),
+            **extra_kwargs
         ),
-        **extra_kwargs
-    )]
+    ]
 
 py_exec_tools_toolchain = rule(
     implementation = _py_exec_tools_toolchain_impl,
@@ -43,7 +45,7 @@ py_exec_tools_toolchain = rule(
 Provides a toolchain for build time tools.
 
 This provides `ToolchainInfo` with the following attributes:
-* `exec_tools`: {type}`PyExecToolsInfo` 
+* `exec_tools`: {type}`PyExecToolsInfo`
 * `toolchain_label`: {type}`Label` _only present when `--visibile_for_testing=True`
   for internal testing_. The rule's label; this allows identifying what toolchain
   implmentation was selected for testing purposes.
@@ -51,6 +53,11 @@ This provides `ToolchainInfo` with the following attributes:
     attrs = {
         "exec_interpreter": attr.label(
             default = "//python/private:current_interpreter_executable",
+            providers = [
+                DefaultInfo,
+                # Add the toolchain provider so that we can forward provider fields.
+                platform_common.ToolchainInfo,
+            ],
             cfg = "exec",
             doc = """
 An interpreter that is directly usable in the exec configuration
@@ -69,6 +76,11 @@ handle all the necessary transitions and runtime setup to invoke a program.
 :::
 
 See {obj}`PyExecToolsInfo.exec_interpreter` for further docs.
+
+:::{versionchanged} 1.4.0
+From now on the provided target also needs to provide `platform_common.ToolchainInfo`
+so that the toolchain `py_runtime` field can be correctly forwarded.
+:::
 """,
         ),
         "precompiler": attr.label(

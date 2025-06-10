@@ -18,7 +18,6 @@ import (
 	"flag"
 	"fmt"
 	"log"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -27,8 +26,7 @@ import (
 	"github.com/bazelbuild/bazel-gazelle/rule"
 	"github.com/bmatcuk/doublestar/v4"
 
-	"github.com/bazelbuild/rules_python/gazelle/manifest"
-	"github.com/bazelbuild/rules_python/gazelle/pythonconfig"
+	"github.com/bazel-contrib/rules_python/gazelle/pythonconfig"
 )
 
 // Configurer satisfies the config.Configurer interface. It's the
@@ -228,25 +226,5 @@ func (py *Configurer) Configure(c *config.Config, rel string, f *rule.File) {
 	}
 
 	gazelleManifestPath := filepath.Join(c.RepoRoot, rel, gazelleManifestFilename)
-	gazelleManifest, err := py.loadGazelleManifest(gazelleManifestPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if gazelleManifest != nil {
-		config.SetGazelleManifest(gazelleManifest)
-	}
-}
-
-func (py *Configurer) loadGazelleManifest(gazelleManifestPath string) (*manifest.Manifest, error) {
-	if _, err := os.Stat(gazelleManifestPath); err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil
-		}
-		return nil, fmt.Errorf("failed to load Gazelle manifest at %q: %w", gazelleManifestPath, err)
-	}
-	manifestFile := new(manifest.File)
-	if err := manifestFile.Decode(gazelleManifestPath); err != nil {
-		return nil, fmt.Errorf("failed to load Gazelle manifest at %q: %w", gazelleManifestPath, err)
-	}
-	return manifestFile.Manifest, nil
+	config.SetGazelleManifestPath(gazelleManifestPath)
 }

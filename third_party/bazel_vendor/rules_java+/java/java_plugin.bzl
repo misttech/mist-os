@@ -1,4 +1,4 @@
-# Copyright 2023 The Bazel Authors. All rights reserved.
+# Copyright 2024 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,6 +13,8 @@
 # limitations under the License.
 """java_plugin rule"""
 
+load("@compatibility_proxy//:proxy.bzl", _java_plugin = "java_plugin")
+
 def java_plugin(**attrs):
     """Bazel java_plugin rule.
 
@@ -22,5 +24,4 @@ def java_plugin(**attrs):
       **attrs: Rule attributes
     """
 
-    # buildifier: disable=native-java
-    native.java_plugin(**attrs)
+    _java_plugin(**attrs)

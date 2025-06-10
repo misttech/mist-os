@@ -1,4 +1,4 @@
-# Copyright 2023 The Bazel Authors. All rights reserved.
+# Copyright 2024 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # limitations under the License.
 """java_library rule"""
 
-# Do not touch: This line marks the end of loads; needed for PR importing.
+load("@compatibility_proxy//:proxy.bzl", _java_library = "java_library")
 
 def java_library(**attrs):
     """Bazel java_library rule.
@@ -24,5 +24,4 @@ def java_library(**attrs):
       **attrs: Rule attributes
     """
 
-    # buildifier: disable=native-java
-    native.java_library(**attrs)
+    _java_library(**attrs)

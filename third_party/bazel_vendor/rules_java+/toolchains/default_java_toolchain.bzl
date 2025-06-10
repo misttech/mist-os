@@ -14,8 +14,8 @@
 
 """Rules for defining default_java_toolchain"""
 
-load("//java:defs.bzl", "java_toolchain")
 load("//java/common:java_common.bzl", "java_common")
+load("//java/toolchains:java_toolchain.bzl", "java_toolchain")
 
 # JVM options, without patching java.compiler and jdk.compiler modules.
 BASE_JDK9_JVM_OPTS = [
@@ -56,6 +56,7 @@ JDK9_JVM_OPTS = BASE_JDK9_JVM_OPTS
 DEFAULT_JAVACOPTS = [
     "-XDskipDuplicateBridges=true",
     "-XDcompilePolicy=simple",
+    "--should-stop=ifError=FLOW",  # See b/27049950, https://github.com/google/error-prone/issues/4595
     "-g",
     "-parameters",
     # https://github.com/bazelbuild/bazel/issues/15219
@@ -67,6 +68,10 @@ DEFAULT_JAVACOPTS = [
     "-Xep:ReturnMissingNullable:OFF",
     "-Xep:UseCorrectAssertInTests:OFF",
 ]
+
+# If this is changed, the docs for "{,tool_}java_language_version" also
+# need to be updated in the Bazel user manual
+_DEFAULT_JAVA_LANGUAGE_VERSION = "11"
 
 # Default java_toolchain parameters
 _BASE_TOOLCHAIN_CONFIGURATION = dict(
@@ -88,12 +93,13 @@ _BASE_TOOLCHAIN_CONFIGURATION = dict(
     # Code to enumerate target JVM boot classpath uses host JVM. Because
     # java_runtime-s are involved, its implementation is in @bazel_tools.
     bootclasspath = [Label("//toolchains:platformclasspath")],
-    source_version = "8",
-    target_version = "8",
+    source_version = _DEFAULT_JAVA_LANGUAGE_VERSION,
+    target_version = _DEFAULT_JAVA_LANGUAGE_VERSION,
     reduced_classpath_incompatible_processors = [
         "dagger.hilt.processor.internal.root.RootProcessor",  # see b/21307381
     ],
     java_runtime = Label("//toolchains:remotejdk_21"),
+    oneversion = Label("//toolchains:one_version"),
 )
 
 DEFAULT_TOOLCHAIN_CONFIGURATION = _BASE_TOOLCHAIN_CONFIGURATION
@@ -125,6 +131,7 @@ VANILLA_TOOLCHAIN_CONFIGURATION = dict(
 PREBUILT_TOOLCHAIN_CONFIGURATION = dict(
     ijar = [Label("//toolchains:ijar_prebuilt_binary")],
     singlejar = [Label("//toolchains:prebuilt_singlejar")],
+    oneversion = Label("//toolchains:prebuilt_one_version"),
 )
 
 # The new toolchain is using all the tools from sources.
@@ -132,11 +139,8 @@ NONPREBUILT_TOOLCHAIN_CONFIGURATION = dict(
     ijar = [Label("@remote_java_tools//:ijar_cc_binary")],
     singlejar = [Label("@remote_java_tools//:singlejar_cc_bin")],
     header_compiler_direct = [Label("@remote_java_tools//:TurbineDirect")],
+    oneversion = Label("@remote_java_tools//:one_version_cc_bin"),
 )
-
-# If this is changed, the docs for "{,tool_}java_language_version" also
-# need to be updated in the Bazel user manual
-_DEFAULT_SOURCE_VERSION = "8"
 
 def default_java_toolchain(name, configuration = DEFAULT_TOOLCHAIN_CONFIGURATION, toolchain_definition = True, exec_compatible_with = [], target_compatible_with = [], **kwargs):
     """Defines a remote java_toolchain with appropriate defaults for Bazel.
@@ -161,7 +165,7 @@ def default_java_toolchain(name, configuration = DEFAULT_TOOLCHAIN_CONFIGURATION
     )
     if toolchain_definition:
         source_version = toolchain_args["source_version"]
-        if source_version == _DEFAULT_SOURCE_VERSION:
+        if source_version == _DEFAULT_JAVA_LANGUAGE_VERSION:
             native.config_setting(
                 name = name + "_default_version_setting",
                 values = {"java_language_version": ""},
@@ -208,11 +212,14 @@ def java_runtime_files(name, srcs):
             tags = ["manual"],
         )
 
-_JAVA_BOOTSTRAP_RUNTIME_TOOLCHAIN_TYPE = Label("@bazel_tools//tools/jdk:bootstrap_runtime_toolchain_type")
+_JAVA_BOOTSTRAP_RUNTIME_TOOLCHAIN_TYPE = Label("//toolchains:bootstrap_runtime_toolchain_type")
 
 # Opt the Java bootstrap actions into path mapping:
 # https://github.com/bazelbuild/bazel/commit/a239ea84832f18ee8706682145e9595e71b39680
 _SUPPORTS_PATH_MAPPING = {"supports-path-mapping": "1"}
+
+def _java_home(java_executable):
+    return java_executable.dirname[:-len("/bin")]
 
 def _bootclasspath_impl(ctx):
     exec_javabase = ctx.attr.java_runtime_alias[java_common.JavaRuntimeInfo]
@@ -252,10 +259,18 @@ def _bootclasspath_impl(ctx):
     args.add(bootclasspath)
 
     any_javabase = ctx.toolchains[_JAVA_BOOTSTRAP_RUNTIME_TOOLCHAIN_TYPE].java_runtime
-    args.add(any_javabase.java_home)
+    any_javabase_files = any_javabase.files.to_list()
+
+    # If possible, add the Java executable to the command line as a File so that it can be path
+    # mapped.
+    java_executable = [f for f in any_javabase_files if f.path == any_javabase.java_executable_exec_path]
+    if len(java_executable) == 1:
+        args.add_all(java_executable, map_each = _java_home)
+    else:
+        args.add(any_javabase.java_home)
 
     system_files = ("release", "modules", "jrt-fs.jar")
-    system = [f for f in any_javabase.files.to_list() if f.basename in system_files]
+    system = [f for f in any_javabase_files if f.basename in system_files]
     if len(system) != len(system_files):
         system = None
 

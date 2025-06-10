@@ -17,12 +17,13 @@ package python
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 
-	sitter "github.com/smacker/go-tree-sitter"
-	"github.com/smacker/go-tree-sitter/python"
+	sitter "github.com/dougthor42/go-tree-sitter"
+	"github.com/dougthor42/go-tree-sitter/python"
 )
 
 const (
@@ -55,7 +56,10 @@ func NewFileParser() *FileParser {
 	return &FileParser{}
 }
 
-func ParseCode(code []byte) (*sitter.Node, error) {
+// ParseCode instantiates a new tree-sitter Parser and parses the python code, returning
+// the tree-sitter RootNode.
+// It prints a warning if parsing fails.
+func ParseCode(code []byte, path string) (*sitter.Node, error) {
 	parser := sitter.NewParser()
 	parser.SetLanguage(python.GetLanguage())
 
@@ -64,9 +68,38 @@ func ParseCode(code []byte) (*sitter.Node, error) {
 		return nil, err
 	}
 
-	return tree.RootNode(), nil
+	root := tree.RootNode()
+	if !root.HasError() {
+		return root, nil
+	}
+
+	log.Printf("WARNING: failed to parse %q. The resulting BUILD target may be incorrect.", path)
+
+	// Note: we intentionally do not return an error even when root.HasError because the parse
+	// failure may be in some part of the code that Gazelle doesn't care about.
+	verbose, envExists := os.LookupEnv("RULES_PYTHON_GAZELLE_VERBOSE")
+	if !envExists || verbose != "1" {
+		return root, nil
+	}
+
+	for i := 0; i < int(root.ChildCount()); i++ {
+		child := root.Child(i)
+		if child.IsError() {
+			// Example logs:
+			// gazelle: Parse error at {Row:1 Column:0}:
+			// def search_one_more_level[T]():
+			log.Printf("Parse error at %+v:\n%+v", child.StartPoint(), child.Content(code))
+			// Log the internal tree-sitter representation of what was parsed. Eg:
+			// gazelle: The above was parsed as: (ERROR (identifier) (call function: (list (identifier)) arguments: (argument_list)))
+			log.Printf("The above was parsed as: %v", child.String())
+		}
+	}
+
+	return root, nil
 }
 
+// parseMain returns true if the python file has an `if __name__ == "__main__":` block,
+// which is a common idiom for python scripts/binaries.
 func (p *FileParser) parseMain(ctx context.Context, node *sitter.Node) bool {
 	for i := 0; i < int(node.ChildCount()); i++ {
 		if err := ctx.Err(); err != nil {
@@ -82,10 +115,10 @@ func (p *FileParser) parseMain(ctx context.Context, node *sitter.Node) bool {
 				a, b = b, a
 			}
 			if a.Type() == sitterNodeTypeIdentifier && a.Content(p.code) == "__name__" &&
-				// at github.com/smacker/go-tree-sitter@latest (after v0.0.0-20240422154435-0628b34cbf9c we used)
+				// at github.com/dougthor42/go-tree-sitter@latest (after v0.0.0-20240422154435-0628b34cbf9c we used)
 				// "__main__" is the second child of b. But now, it isn't.
 				// we cannot use the latest go-tree-sitter because of the top level reference in scanner.c.
-				// https://github.com/smacker/go-tree-sitter/blob/04d6b33fe138a98075210f5b770482ded024dc0f/python/scanner.c#L1
+				// https://github.com/dougthor42/go-tree-sitter/blob/04d6b33fe138a98075210f5b770482ded024dc0f/python/scanner.c#L1
 				b.Type() == sitterNodeTypeString && string(p.code[b.StartByte()+1:b.EndByte()-1]) == "__main__" {
 				return true
 			}
@@ -94,6 +127,8 @@ func (p *FileParser) parseMain(ctx context.Context, node *sitter.Node) bool {
 	return false
 }
 
+// parseImportStatement parses a node for an import statement, returning a `module` and a boolean
+// representing if the parse was OK or not.
 func parseImportStatement(node *sitter.Node, code []byte) (module, bool) {
 	switch node.Type() {
 	case sitterNodeTypeDottedName:
@@ -112,6 +147,9 @@ func parseImportStatement(node *sitter.Node, code []byte) (module, bool) {
 	return module{}, false
 }
 
+// parseImportStatements parses a node for import statements, returning true if the node is
+// an import statement. It updates FileParser.output.Modules with the `module` that the
+// import represents.
 func (p *FileParser) parseImportStatements(node *sitter.Node) bool {
 	if node.Type() == sitterNodeTypeImportStatement {
 		for j := 1; j < int(node.ChildCount()); j++ {
@@ -146,6 +184,8 @@ func (p *FileParser) parseImportStatements(node *sitter.Node) bool {
 	return true
 }
 
+// parseComments parses a node for comments, returning true if the node is a comment.
+// It updates FileParser.output.Comments with the parsed comment.
 func (p *FileParser) parseComments(node *sitter.Node) bool {
 	if node.Type() == sitterNodeTypeComment {
 		p.output.Comments = append(p.output.Comments, comment(node.Content(p.code)))
@@ -180,7 +220,7 @@ func (p *FileParser) parse(ctx context.Context, node *sitter.Node) {
 }
 
 func (p *FileParser) Parse(ctx context.Context) (*ParserOutput, error) {
-	rootNode, err := ParseCode(p.code)
+	rootNode, err := ParseCode(p.code, p.relFilepath)
 	if err != nil {
 		return nil, err
 	}

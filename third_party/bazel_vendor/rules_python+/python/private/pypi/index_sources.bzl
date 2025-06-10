@@ -26,28 +26,48 @@ def index_sources(line):
         line(str): The requirements.txt entry.
 
     Returns:
-        A struct with shas attribute containing a list of shas to download from pypi_index.
+        A struct with shas attribute containing:
+            * `shas` - list[str]; shas to download from pypi_index.
+            * `version` - str; version of the package.
+            * `marker` - str; the marker expression, as per PEP508 spec.
+            * `requirement` - str; a requirement line without the marker. This can
+                be given to `pip` to install a package.
+            * `url` - str; URL if the requirement specifies a direct URL, empty string otherwise.
     """
+    line = line.replace("\\", " ")
     head, _, maybe_hashes = line.partition(";")
     _, _, version = head.partition("==")
     version = version.partition(" ")[0].strip()
 
-    if "@" in head:
-        shas = []
-    else:
-        maybe_hashes = maybe_hashes or line
-        shas = [
-            sha.strip()
-            for sha in maybe_hashes.split("--hash=sha256:")[1:]
-        ]
+    marker, _, _ = maybe_hashes.partition("--hash=")
+    maybe_hashes = maybe_hashes or line
+    shas = [
+        sha.strip()
+        for sha in maybe_hashes.split("--hash=sha256:")[1:]
+    ]
 
+    marker = marker.strip()
     if head == line:
-        head = line.partition("--hash=")[0].strip()
+        requirement = line.partition("--hash=")[0].strip()
     else:
-        head = head + ";" + maybe_hashes.partition("--hash=")[0].strip()
+        requirement = head.strip()
+
+    requirement_line = "{} {}".format(
+        requirement,
+        " ".join(["--hash=sha256:{}".format(sha) for sha in shas]),
+    ).strip()
+
+    url = ""
+    if "@" in head:
+        requirement = requirement_line
+        _, _, url_and_rest = requirement.partition("@")
+        url = url_and_rest.strip().partition(" ")[0].strip()
 
     return struct(
-        requirement = line if not shas else head,
+        requirement = requirement,
+        requirement_line = requirement_line,
         version = version,
         shas = sorted(shas),
+        marker = marker,
+        url = url,
     )

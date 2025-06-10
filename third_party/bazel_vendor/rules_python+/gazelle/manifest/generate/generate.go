@@ -28,7 +28,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/bazelbuild/rules_python/gazelle/manifest"
+	"github.com/bazel-contrib/rules_python/gazelle/manifest"
 )
 
 func main() {
@@ -55,7 +55,7 @@ func main() {
 		&pipRepositoryName,
 		"pip-repository-name",
 		"",
-		"The name of the pip_install or pip_repository target.")
+		"The name of the pip_parse or pip.parse target.")
 	flag.StringVar(
 		&modulesMappingPath,
 		"modules-mapping",
@@ -151,7 +151,7 @@ func writeOutput(
 	}
 	defer outputFile.Close()
 
-	if _, err := fmt.Fprintf(outputFile, "%s\n", header); err != nil {
+	if _, err := fmt.Fprintf(outputFile, "%s\n---\n", header); err != nil {
 		return fmt.Errorf("failed to write output: %w", err)
 	}
 

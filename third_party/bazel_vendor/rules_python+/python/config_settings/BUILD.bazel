@@ -1,19 +1,21 @@
 load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
-load("//python:versions.bzl", "MINOR_MAPPING", "TOOL_VERSIONS")
+load("@pythons_hub//:versions.bzl", "DEFAULT_PYTHON_VERSION", "MINOR_MAPPING", "PYTHON_VERSIONS")
 load(
     "//python/private:flags.bzl",
+    "AddSrcsToRunfilesFlag",
     "BootstrapImplFlag",
     "ExecToolsToolchainFlag",
-    "PrecompileAddToRunfilesFlag",
+    "FreeThreadedFlag",
+    "LibcFlag",
     "PrecompileFlag",
     "PrecompileSourceRetentionFlag",
-    "PycCollectionFlag",
+    "VenvsSitePackages",
+    "VenvsUseDeclareSymlinkFlag",
 )
 load(
     "//python/private/pypi:flags.bzl",
     "UniversalWhlFlag",
     "UseWhlFlag",
-    "WhlLibcFlag",
     "define_pypi_internal_flags",
 )
 load(":config_settings.bzl", "construct_config_settings")
@@ -28,13 +30,31 @@ filegroup(
 
 construct_config_settings(
     name = "construct_config_settings",
+    default_version = DEFAULT_PYTHON_VERSION,
+    documented_flags = [
+        ":pip_whl",
+        ":pip_whl_glibc_version",
+        ":pip_whl_muslc_version",
+        ":pip_whl_osx_arch",
+        ":pip_whl_osx_version",
+        ":py_freethreaded",
+        ":py_linux_libc",
+    ],
     minor_mapping = MINOR_MAPPING,
-    versions = TOOL_VERSIONS.keys(),
+    versions = PYTHON_VERSIONS,
+)
+
+string_flag(
+    name = "add_srcs_to_runfiles",
+    build_setting_default = AddSrcsToRunfilesFlag.AUTO,
+    values = AddSrcsToRunfilesFlag.flag_values(),
+    # NOTE: Only public because it is dependency of public rules.
+    visibility = ["//visibility:public"],
 )
 
 string_flag(
     name = "exec_tools_toolchain",
-    build_setting_default = ExecToolsToolchainFlag.DISABLED,
+    build_setting_default = ExecToolsToolchainFlag.ENABLED,
     values = sorted(ExecToolsToolchainFlag.__members__.values()),
     # NOTE: Only public because it is used in py_toolchain_suite from toolchain
     # repositories
@@ -68,22 +88,6 @@ string_flag(
 )
 
 string_flag(
-    name = "precompile_add_to_runfiles",
-    build_setting_default = PrecompileAddToRunfilesFlag.ALWAYS,
-    values = sorted(PrecompileAddToRunfilesFlag.__members__.values()),
-    # NOTE: Only public because it's an implicit dependency
-    visibility = ["//visibility:public"],
-)
-
-string_flag(
-    name = "pyc_collection",
-    build_setting_default = PycCollectionFlag.DISABLED,
-    values = sorted(PycCollectionFlag.__members__.values()),
-    # NOTE: Only public because it's an implicit dependency
-    visibility = ["//visibility:public"],
-)
-
-string_flag(
     name = "bootstrap_impl",
     build_setting_default = BootstrapImplFlag.SYSTEM_PYTHON,
     values = sorted(BootstrapImplFlag.__members__.values()),
@@ -94,9 +98,35 @@ string_flag(
 # This is used for pip and hermetic toolchain resolution.
 string_flag(
     name = "py_linux_libc",
-    build_setting_default = WhlLibcFlag.GLIBC,
-    values = sorted(WhlLibcFlag.__members__.values()),
+    build_setting_default = LibcFlag.GLIBC,
+    values = LibcFlag.flag_values(),
     # NOTE: Only public because it is used in pip hub and toolchain repos.
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "py_freethreaded",
+    build_setting_default = FreeThreadedFlag.NO,
+    values = sorted(FreeThreadedFlag.__members__.values()),
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "is_py_freethreaded",
+    flag_values = {":py_freethreaded": FreeThreadedFlag.YES},
+    visibility = ["//visibility:public"],
+)
+
+config_setting(
+    name = "is_py_non_freethreaded",
+    flag_values = {":py_freethreaded": FreeThreadedFlag.NO},
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "venvs_use_declare_symlink",
+    build_setting_default = VenvsUseDeclareSymlinkFlag.YES,
+    values = VenvsUseDeclareSymlinkFlag.flag_values(),
     visibility = ["//visibility:public"],
 )
 
@@ -162,6 +192,13 @@ string_flag(
 string_flag(
     name = "pip_whl_osx_version",
     build_setting_default = "",
+    # NOTE: Only public because it is used in pip hub repos.
+    visibility = ["//visibility:public"],
+)
+
+string_flag(
+    name = "venvs_site_packages",
+    build_setting_default = VenvsSitePackages.NO,
     # NOTE: Only public because it is used in pip hub repos.
     visibility = ["//visibility:public"],
 )

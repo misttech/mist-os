@@ -1,4 +1,5 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
+load("@bazel_skylib//rules:build_test.bzl", "build_test")
 load("//python:py_test.bzl", "py_test")
 load("//python/private:util.bzl", "IS_BAZEL_7_OR_HIGHER")  # buildifier: disable=bzl-visibility
 load("//sphinxdocs:sphinx.bzl", "sphinx_build_binary", "sphinx_docs")
@@ -40,9 +41,17 @@ sphinx_docs(
     ],
 )
 
+build_test(
+    name = "docs_build_test",
+    targets = [":docs"],
+)
+
 sphinx_stardocs(
     name = "simple_bzl_docs",
-    srcs = [":bzl_rule_bzl"],
+    srcs = [
+        ":bzl_rule_bzl",
+        ":bzl_typedef_bzl",
+    ],
     target_compatible_with = _TARGET_COMPATIBLE_WITH,
 )
 
@@ -74,6 +83,11 @@ bzl_library(
     name = "bzl_rule_bzl",
     srcs = ["bzl_rule.bzl"],
     deps = [":func_and_providers_bzl"],
+)
+
+bzl_library(
+    name = "bzl_typedef_bzl",
+    srcs = ["bzl_typedef.bzl"],
 )
 
 sphinx_build_binary(

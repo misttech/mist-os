@@ -19,7 +19,7 @@ load("//python/private:envsubst.bzl", "envsubst")
 load("//python/private:is_standalone_interpreter.bzl", "is_standalone_interpreter")
 load("//python/private:repo_utils.bzl", "REPO_DEBUG_ENV_VAR", "repo_utils")
 load(":attrs.bzl", "ATTRS", "use_isolated")
-load(":deps.bzl", "all_repo_names")
+load(":deps.bzl", "all_repo_names", "record_files")
 load(":generate_whl_library_build_bazel.bzl", "generate_whl_library_build_bazel")
 load(":parse_whl_name.bzl", "parse_whl_name")
 load(":patch_whl.bzl", "patch_whl")
@@ -30,12 +30,12 @@ _CPPFLAGS = "CPPFLAGS"
 _COMMAND_LINE_TOOLS_PATH_SLUG = "commandlinetools"
 _WHEEL_ENTRY_POINT_PREFIX = "rules_python_wheel_entry_point"
 
-def _get_xcode_location_cflags(rctx):
+def _get_xcode_location_cflags(rctx, logger = None):
     """Query the xcode sdk location to update cflags
 
     Figure out if this interpreter target comes from rules_python, and patch the xcode sdk location if so.
-    Pip won't be able to compile c extensions from sdists with the pre built python distributions from indygreg
-    otherwise. See https://github.com/indygreg/python-build-standalone/issues/103
+    Pip won't be able to compile c extensions from sdists with the pre built python distributions from astral-sh
+    otherwise. See https://github.com/astral-sh/python-build-standalone/issues/103
     """
 
     # Only run on MacOS hosts
@@ -46,6 +46,7 @@ def _get_xcode_location_cflags(rctx):
         rctx,
         op = "GetXcodeLocation",
         arguments = [repo_utils.which_checked(rctx, "xcode-select"), "--print-path"],
+        logger = logger,
     )
     if xcode_sdk_location.return_code != 0:
         return []
@@ -55,16 +56,44 @@ def _get_xcode_location_cflags(rctx):
         # This is a full xcode installation somewhere like /Applications/Xcode13.0.app/Contents/Developer
         # so we need to change the path to to the macos specific tools which are in a different relative
         # path than xcode installed command line tools.
-        xcode_root = "{}/Platforms/MacOSX.platform/Developer".format(xcode_root)
+        xcode_sdks_json = repo_utils.execute_checked(
+            rctx,
+            op = "LocateXCodeSDKs",
+            arguments = [
+                repo_utils.which_checked(rctx, "xcrun"),
+                "xcodebuild",
+                "-showsdks",
+                "-json",
+            ],
+            environment = {
+                "DEVELOPER_DIR": xcode_root,
+            },
+            logger = logger,
+        ).stdout
+        xcode_sdks = json.decode(xcode_sdks_json)
+        potential_sdks = [
+            sdk
+            for sdk in xcode_sdks
+            if "productName" in sdk and
+               sdk["productName"] == "macOS" and
+               "darwinos" not in sdk["canonicalName"]
+        ]
+
+        # Now we'll get two entries here (one for internal and another one for public)
+        # It shouldn't matter which one we pick.
+        xcode_sdk_path = potential_sdks[0]["sdkPath"]
+    else:
+        xcode_sdk_path = "{}/SDKs/MacOSX.sdk".format(xcode_root)
+
     return [
-        "-isysroot {}/SDKs/MacOSX.sdk".format(xcode_root),
+        "-isysroot {}".format(xcode_sdk_path),
     ]
 
 def _get_toolchain_unix_cflags(rctx, python_interpreter, logger = None):
     """Gather cflags from a standalone toolchain for unix systems.
 
-    Pip won't be able to compile c extensions from sdists with the pre built python distributions from indygreg
-    otherwise. See https://github.com/indygreg/python-build-standalone/issues/103
+    Pip won't be able to compile c extensions from sdists with the pre built python distributions from astral-sh
+    otherwise. See https://github.com/astral-sh/python-build-standalone/issues/103
     """
 
     # Only run on Unix systems
@@ -75,14 +104,20 @@ def _get_toolchain_unix_cflags(rctx, python_interpreter, logger = None):
     if not is_standalone_interpreter(rctx, python_interpreter, logger = logger):
         return []
 
-    stdout = repo_utils.execute_checked_stdout(
+    stdout = pypi_repo_utils.execute_checked_stdout(
         rctx,
         op = "GetPythonVersionForUnixCflags",
+        python = python_interpreter,
         arguments = [
-            python_interpreter,
+            # Run the interpreter in isolated mode, this options implies -E, -P and -s.
+            # Ensures environment variables are ignored that are set in userspace, such as PYTHONPATH,
+            # which may interfere with this invocation.
+            "-I",
             "-c",
             "import sys; print(f'{sys.version_info[0]}.{sys.version_info[1]}', end='')",
         ],
+        srcs = [],
+        logger = logger,
     )
     _python_version = stdout
     include_path = "{}/include/python{}".format(
@@ -139,11 +174,28 @@ def _parse_optional_attrs(rctx, args, extra_pip_args = None):
     if rctx.attr.enable_implicit_namespace_pkgs:
         args.append("--enable_implicit_namespace_pkgs")
 
+    env = {}
     if rctx.attr.environment != None:
-        args += [
-            "--environment",
-            json.encode(struct(arg = rctx.attr.environment)),
-        ]
+        for key, value in rctx.attr.environment.items():
+            env[key] = value
+
+    # This is super hacky, but working out something nice is tricky.
+    # This is in particular needed for psycopg2 which attempts to link libpython.a,
+    # in order to point the linker at the correct python intepreter.
+    if rctx.attr.add_libdir_to_library_search_path:
+        if "LDFLAGS" in env:
+            fail("Can't set both environment LDFLAGS and add_libdir_to_library_search_path")
+        command = [pypi_repo_utils.resolve_python_interpreter(rctx), "-c", "import sys ; sys.stdout.write('{}/lib'.format(sys.exec_prefix))"]
+        result = rctx.execute(command)
+        if result.return_code != 0:
+            fail("Failed to get LDFLAGS path: command: {}, exit code: {}, stdout: {}, stderr: {}".format(command, result.return_code, result.stdout, result.stderr))
+        libdir = result.stdout
+        env["LDFLAGS"] = "-L{}".format(libdir)
+
+    args += [
+        "--environment",
+        json.encode(struct(arg = env)),
+    ]
 
     return args
 
@@ -158,19 +210,23 @@ def _create_repository_execution_environment(rctx, python_interpreter, logger = 
         Dictionary of environment variable suitable to pass to rctx.execute.
     """
 
-    # Gather any available CPPFLAGS values
-    cppflags = []
-    cppflags.extend(_get_xcode_location_cflags(rctx))
-    cppflags.extend(_get_toolchain_unix_cflags(rctx, python_interpreter, logger = logger))
-
     env = {
         "PYTHONPATH": pypi_repo_utils.construct_pythonpath(
             rctx,
             entries = rctx.attr._python_path_entries,
         ),
-        _CPPFLAGS: " ".join(cppflags),
     }
 
+    # Gather any available CPPFLAGS values
+    #
+    # We may want to build in an environment without a cc toolchain.
+    # In those cases, we're limited to --download-only, but we should respect that here.
+    is_wheel = rctx.attr.filename and rctx.attr.filename.endswith(".whl")
+    if not (rctx.attr.download_only or is_wheel):
+        cppflags = []
+        cppflags.extend(_get_xcode_location_cflags(rctx, logger = logger))
+        cppflags.extend(_get_toolchain_unix_cflags(rctx, python_interpreter, logger = logger))
+        env[_CPPFLAGS] = " ".join(cppflags)
     return env
 
 def _whl_library_impl(rctx):
@@ -181,7 +237,6 @@ def _whl_library_impl(rctx):
         python_interpreter_target = rctx.attr.python_interpreter_target,
     )
     args = [
-        python_interpreter,
         "-m",
         "python.private.pypi.whl_installer.wheel_installer",
         "--requirement",
@@ -219,6 +274,12 @@ def _whl_library_impl(rctx):
             sha256 = rctx.attr.sha256,
             auth = get_auth(rctx, urls),
         )
+        if not rctx.attr.sha256:
+            # this is only seen when there is a direct URL reference without sha256
+            logger.warn("Please update the requirement line to include the hash:\n{} \\\n    --hash=sha256:{}".format(
+                rctx.attr.requirement,
+                result.sha256,
+            ))
 
         if not result.success:
             fail("could not download the '{}' from {}:\n{}".format(filename, urls, result))
@@ -230,7 +291,7 @@ def _whl_library_impl(rctx):
             # and, allow getting build dependencies from PYTHONPATH, which we
             # setup in this repository rule, but still download any necessary
             # build deps from PyPI (e.g. `flit_core`) if they are missing.
-            extra_pip_args.extend(["--no-build-isolation", "--find-links", "."])
+            extra_pip_args.extend(["--find-links", "."])
 
     args = _parse_optional_attrs(rctx, args, extra_pip_args)
 
@@ -242,11 +303,16 @@ def _whl_library_impl(rctx):
         else:
             op_tmpl = "whl_library.ResolveRequirement({name}, {requirement})"
 
-        repo_utils.execute_checked(
+        pypi_repo_utils.execute_checked(
             rctx,
-            op = op_tmpl.format(name = rctx.attr.name, requirement = rctx.attr.requirement),
+            # truncate the requirement value when logging it / reporting
+            # progress since it may contain several ' --hash=sha256:...
+            # --hash=sha256:...' substrings that fill up the console
+            python = python_interpreter,
+            op = op_tmpl.format(name = rctx.attr.name, requirement = rctx.attr.requirement.split(" ", 1)[0]),
             arguments = args,
             environment = environment,
+            srcs = rctx.attr._python_srcs,
             quiet = rctx.attr.quiet,
             timeout = rctx.attr.timeout,
             logger = logger,
@@ -263,37 +329,41 @@ def _whl_library_impl(rctx):
             if whl_path.basename in patch_dst.whls:
                 patches[patch_file] = patch_dst.patch_strip
 
-        whl_path = patch_whl(
-            rctx,
-            op = "whl_library.PatchWhl({}, {})".format(rctx.attr.name, rctx.attr.requirement),
-            python_interpreter = python_interpreter,
-            whl_path = whl_path,
-            patches = patches,
-            quiet = rctx.attr.quiet,
-            timeout = rctx.attr.timeout,
-        )
+        if patches:
+            whl_path = patch_whl(
+                rctx,
+                op = "whl_library.PatchWhl({}, {})".format(rctx.attr.name, rctx.attr.requirement),
+                python_interpreter = python_interpreter,
+                whl_path = whl_path,
+                patches = patches,
+                quiet = rctx.attr.quiet,
+                timeout = rctx.attr.timeout,
+            )
 
-    target_platforms = rctx.attr.experimental_target_platforms
+    target_platforms = rctx.attr.experimental_target_platforms or []
     if target_platforms:
         parsed_whl = parse_whl_name(whl_path.basename)
+
+        # NOTE @aignas 2023-12-04: if the wheel is a platform specific wheel, we
+        # only include deps for that target platform
         if parsed_whl.platform_tag != "any":
-            # NOTE @aignas 2023-12-04: if the wheel is a platform specific
-            # wheel, we only include deps for that target platform
             target_platforms = [
                 p.target_platform
                 for p in whl_target_platforms(
                     platform_tag = parsed_whl.platform_tag,
-                    abi_tag = parsed_whl.abi_tag,
+                    abi_tag = parsed_whl.abi_tag.strip("tm"),
                 )
             ]
 
-    repo_utils.execute_checked(
+    pypi_repo_utils.execute_checked(
         rctx,
         op = "whl_library.ExtractWheel({}, {})".format(rctx.attr.name, whl_path),
+        python = python_interpreter,
         arguments = args + [
             "--whl-file",
             whl_path,
         ] + ["--platform={}".format(p) for p in target_platforms],
+        srcs = rctx.attr._python_srcs,
         environment = environment,
         quiet = rctx.attr.quiet,
         timeout = rctx.attr.timeout,
@@ -328,19 +398,20 @@ def _whl_library_impl(rctx):
         entry_points[entry_point_without_py] = entry_point_script_name
 
     build_file_contents = generate_whl_library_build_bazel(
+        name = whl_path.basename,
         dep_template = rctx.attr.dep_template or "@{}{{name}}//:{{target}}".format(rctx.attr.repo_prefix),
-        whl_name = whl_path.basename,
+        entry_points = entry_points,
+        # TODO @aignas 2025-04-14: load through the hub:
         dependencies = metadata["deps"],
         dependencies_by_platform = metadata["deps_by_platform"],
-        group_name = rctx.attr.group_name,
-        group_deps = rctx.attr.group_deps,
-        data_exclude = rctx.attr.pip_data_exclude,
-        tags = [
-            "pypi_name=" + metadata["name"],
-            "pypi_version=" + metadata["version"],
-        ],
-        entry_points = entry_points,
         annotation = None if not rctx.attr.annotation else struct(**json.decode(rctx.read(rctx.attr.annotation))),
+        data_exclude = rctx.attr.pip_data_exclude,
+        group_deps = rctx.attr.group_deps,
+        group_name = rctx.attr.group_name,
+        tags = [
+            "pypi_name={}".format(metadata["name"]),
+            "pypi_version={}".format(metadata["version"]),
+        ],
     )
     rctx.file("BUILD.bazel", build_file_contents)
 
@@ -401,7 +472,6 @@ and the target that we need respectively.
         doc = "Name of the group, if any.",
     ),
     "repo": attr.string(
-        mandatory = True,
         doc = "Pointer to parent repo name. Used to make these rules rerun if the parent repo changes.",
     ),
     "repo_prefix": attr.string(
@@ -445,6 +515,16 @@ attr makes `extra_pip_args` and `download_only` ignored.""",
             Label("@" + repo + "//:BUILD.bazel")
             for repo in all_repo_names
         ],
+    ),
+    "_python_srcs": attr.label_list(
+        # Used as a default value in a rule to ensure we fetch the dependencies.
+        default = [
+            Label("//python/private/pypi/whl_installer:platform.py"),
+            Label("//python/private/pypi/whl_installer:wheel.py"),
+            Label("//python/private/pypi/whl_installer:wheel_installer.py"),
+            Label("//python/private/pypi/whl_installer:arguments.py"),
+            Label("//python/private/pypi/whl_installer:namespace_pkgs.py"),
+        ] + record_files.values(),
     ),
     "_rule_name": attr.string(default = "whl_library"),
 }, **ATTRS)

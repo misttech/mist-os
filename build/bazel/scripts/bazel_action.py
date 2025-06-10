@@ -67,6 +67,7 @@ _BAZEL_BUILTIN_REPOSITORIES = (
     "rules_license",
     "rules_license+",
     "rules_python+",
+    "pythons_hub",  # A sub-repo created by rule_python+
     "rules_rust",
     # Created from in-tree top-level module
     "fuchsia_sdk_common",

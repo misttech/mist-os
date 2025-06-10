@@ -132,6 +132,7 @@ def _extract_wheel(
             "name": whl.name,
             "version": whl.version,
             "deps": dependencies.deps,
+            "python_version": f"{sys.version_info[0]}.{sys.version_info[1]}.{sys.version_info[2]}",
             "deps_by_platform": dependencies.deps_select,
             "entry_points": [
                 {

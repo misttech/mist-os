@@ -15,18 +15,17 @@ defaults:
 
 jobs:
   ci:
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       # Checkout the code
       - uses: actions/checkout@v4
       - uses: jpetrucciani/mypy-check@master
         with:
           requirements: 1.6.0
-          python_version: 3.8
+          python_version: 3.9
           path: 'python/runfiles'
       - uses: jpetrucciani/mypy-check@master
         with:
           requirements: 1.6.0
-          python_version: 3.8
+          python_version: 3.9
           path: 'tests/runfiles'
-      

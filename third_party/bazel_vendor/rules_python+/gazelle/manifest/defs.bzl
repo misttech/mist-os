@@ -39,7 +39,7 @@ def gazelle_python_manifest(
             manifest, meaning testing it is just as expensive as generating it,
             but modifying it is much less likely to result in a merge conflict.
         pip_repository_name: the name of the pip_install or pip_repository target.
-        pip_deps_repository_name: deprecated - the old pip_install target name.
+        pip_deps_repository_name: deprecated - the old {bzl:obj}`pip_parse` target name.
         manifest: the Gazelle manifest file.
             defaults to the same value as manifest.
         **kwargs: other bazel attributes passed to the generate and test targets
@@ -79,7 +79,7 @@ def gazelle_python_manifest(
 
     update_args = [
         "--manifest-generator-hash=$(execpath {})".format(manifest_generator_hash),
-        "--requirements=$(rootpath {})".format(requirements) if requirements else "--requirements=",
+        "--requirements=$(execpath {})".format(requirements) if requirements else "--requirements=",
         "--pip-repository-name={}".format(pip_repository_name),
         "--modules-mapping=$(execpath {})".format(modules_mapping),
         "--output=$(execpath {})".format(generated_manifest),
@@ -161,7 +161,7 @@ AllSourcesInfo = provider(fields = {"all_srcs": "All sources collected from the 
 _rules_python_workspace = Label("@rules_python//:WORKSPACE")
 
 def _get_all_sources_impl(target, ctx):
-    is_rules_python = target.label.workspace_name == _rules_python_workspace.workspace_name
+    is_rules_python = target.label.repo_name == _rules_python_workspace.repo_name
     if not is_rules_python:
         # Avoid adding third-party dependency files to the checksum of the srcs.
         return AllSourcesInfo(all_srcs = depset())

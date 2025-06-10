@@ -15,6 +15,15 @@
 
 set -o errexit -o nounset -o pipefail
 
+# Exclude dot directories, specifically, this file so that we don't
+# find the substring we're looking for in our own file.
+# Exclude CONTRIBUTING.md, RELEASING.md because they document how to use these strings.
+if grep --exclude=CONTRIBUTING.md --exclude=RELEASING.md --exclude-dir=.* VERSION_NEXT_ -r; then
+  echo
+  echo "Found VERSION_NEXT markers indicating version needs to be specified"
+  exit 1
+fi
+
 # Set by GH actions, see
 # https://docs.github.com/en/actions/learn-github-actions/environment-variables#default-environment-variables
 TAG=${GITHUB_REF_NAME}
@@ -25,24 +34,31 @@ git archive --format=tar --prefix=${PREFIX}/ ${TAG} | gzip > $ARCHIVE
 SHA=$(shasum -a 256 $ARCHIVE | awk '{print $1}')
 
 cat > release_notes.txt << EOF
-## Using Bzlmod with Bazel 6
 
-**NOTE: bzlmod support is still beta. APIs subject to change.**
+For more detailed setup instructions, see https://rules-python.readthedocs.io/en/latest/getting-started.html
+
+For the user-facing changelog see [here](https://rules-python.readthedocs.io/en/latest/changelog.html#v${TAG//./-})
+
+## Using Bzlmod
 
 Add to your \`MODULE.bazel\` file:
 
 \`\`\`starlark
 bazel_dep(name = "rules_python", version = "${TAG}")
 
-pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    python_version = "3.13",
+)
 
+pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
 pip.parse(
-    hub_name = "pip",
-    python_version = "3.11",
+    hub_name = "pypi",
+    python_version = "3.13",
     requirements_lock = "//:requirements_lock.txt",
 )
 
-use_repo(pip, "pip")
+use_repo(pip, "pypi")
 \`\`\`
 
 ## Using WORKSPACE
@@ -56,7 +72,7 @@ http_archive(
     name = "rules_python",
     sha256 = "${SHA}",
     strip_prefix = "${PREFIX}",
-    url = "https://github.com/bazelbuild/rules_python/releases/download/${TAG}/rules_python-${TAG}.tar.gz",
+    url = "https://github.com/bazel-contrib/rules_python/releases/download/${TAG}/rules_python-${TAG}.tar.gz",
 )
 
 load("@rules_python//python:repositories.bzl", "py_repositories")
@@ -74,7 +90,7 @@ http_archive(
     name = "rules_python_gazelle_plugin",
     sha256 = "${SHA}",
     strip_prefix = "${PREFIX}/gazelle",
-    url = "https://github.com/bazelbuild/rules_python/releases/download/${TAG}/rules_python-${TAG}.tar.gz",
+    url = "https://github.com/bazel-contrib/rules_python/releases/download/${TAG}/rules_python-${TAG}.tar.gz",
 )
 
 # To compile the rules_python gazelle extension from source,

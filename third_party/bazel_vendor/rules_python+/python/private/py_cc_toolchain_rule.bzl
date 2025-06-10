@@ -15,11 +15,11 @@
 """Implementation of py_cc_toolchain rule.
 
 NOTE: This is a beta-quality feature. APIs subject to change until
-https://github.com/bazelbuild/rules_python/issues/824 is considered done.
+https://github.com/bazel-contrib/rules_python/issues/824 is considered done.
 """
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
-load("@rules_cc//cc:defs.bzl", "CcInfo")
+load("@rules_cc//cc/common:cc_info.bzl", "CcInfo")
 load(":py_cc_toolchain_info.bzl", "PyCcToolchainInfo")
 
 def _py_cc_toolchain_impl(ctx):

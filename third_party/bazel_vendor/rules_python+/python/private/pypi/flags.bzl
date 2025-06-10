@@ -18,7 +18,7 @@ NOTE: The transitive loads of this should be kept minimal. This avoids loading
 unnecessary files when all that are needed are flag definitions.
 """
 
-load("@bazel_skylib//rules:common_settings.bzl", "string_flag")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo", "string_flag")
 load("//python/private:enum.bzl", "enum")
 
 # Determines if we should use whls for third party
@@ -44,17 +44,7 @@ UniversalWhlFlag = enum(
     UNIVERSAL = "universal",
 )
 
-# Determines which libc flavor is preferred when selecting the linux whl distributions.
-#
-# buildifier: disable=name-conventions
-WhlLibcFlag = enum(
-    # Prefer glibc wheels (e.g. manylinux_2_17_x86_64 or linux_x86_64)
-    GLIBC = "glibc",
-    # Prefer musl wheels (e.g. musllinux_2_17_x86_64)
-    MUSL = "musl",
-)
-
-INTERNAL_FLAGS = [
+_STRING_FLAGS = [
     "dist",
     "whl_plat",
     "whl_plat_py3",
@@ -62,7 +52,6 @@ INTERNAL_FLAGS = [
     "whl_plat_pycp3x",
     "whl_plat_pycp3x_abi3",
     "whl_plat_pycp3x_abicp",
-    "whl_py2_py3",
     "whl_py3",
     "whl_py3_abi3",
     "whl_pycp3x",
@@ -70,11 +59,41 @@ INTERNAL_FLAGS = [
     "whl_pycp3x_abicp",
 ]
 
+INTERNAL_FLAGS = [
+    "whl",
+] + _STRING_FLAGS
+
 def define_pypi_internal_flags(name):
-    for flag in INTERNAL_FLAGS:
+    """define internal PyPI flags used in PyPI hub repository by pkg_aliases.
+
+    Args:
+        name: not used
+    """
+    for flag in _STRING_FLAGS:
         string_flag(
             name = "_internal_pip_" + flag,
             build_setting_default = "",
             values = [""],
             visibility = ["//visibility:public"],
         )
+
+    _allow_wheels_flag(
+        name = "_internal_pip_whl",
+        visibility = ["//visibility:public"],
+    )
+
+def _allow_wheels_flag_impl(ctx):
+    input = ctx.attr._setting[BuildSettingInfo].value
+    value = "yes" if input in ["auto", "only"] else "no"
+    return [config_common.FeatureFlagInfo(value = value)]
+
+_allow_wheels_flag = rule(
+    implementation = _allow_wheels_flag_impl,
+    attrs = {
+        "_setting": attr.label(default = "//python/config_settings:pip_whl"),
+    },
+    doc = """\
+This rule allows us to greatly reduce the number of config setting targets at no cost even
+if we are duplicating some of the functionality of the `native.config_setting`.
+""",
+)

@@ -23,7 +23,7 @@ bazel_dep(name = "platforms", version = "0.0.11")
 bazel_dep(name = "rules_go", version = "0.54.0", repo_name = "io_bazel_rules_go")
 bazel_dep(name = "rules_license", version = "1.0.0")
 bazel_dep(name = "rules_rust", version = "0.59.1")
-bazel_dep(name = "rules_python", version = "0.36.0")
+bazel_dep(name = "rules_python", version = "1.4.0")
 bazel_dep(name = "protobuf", version = "", repo_name = "com_google_protobuf")
 local_path_override(
     module_name = "protobuf",
@@ -125,4 +125,4 @@ compact_python_runtime_repository(
     # LINT.ThenChange(scripts/workspace_utils.py)
 )
 
-register_toolchains("@prebuilt_python//:py_toolchain")
+register_toolchains("@prebuilt_python//:all")

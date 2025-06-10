@@ -13,6 +13,55 @@
 # limitations under the License.
 """Allows detecting of rules_python features that aren't easily detected."""
 
+load("@rules_python_internal//:rules_python_config.bzl", "config")
+
+# This is a magic string expanded by `git archive`, as set by `.gitattributes`
+# See https://git-scm.com/docs/git-archive/2.29.0#Documentation/git-archive.txt-export-subst
+_VERSION_PRIVATE = "1.4.0"
+
+def _features_typedef():
+    """Information about features rules_python has implemented.
+
+    ::::{field} precompile
+    :type: bool
+
+    True if the precompile attributes are available.
+
+    :::{versionadded} 0.33.0
+    :::
+    ::::
+
+    ::::{field} py_info_site_packages_symlinks
+
+    True if the `PyInfo.site_packages_symlinks` field is available.
+
+    :::{versionadded} 1.4.0
+    :::
+    ::::
+
+    ::::{field} uses_builtin_rules
+    :type: bool
+
+    True if the rules are using the Bazel-builtin implementation.
+
+    :::{versionadded} 1.1.0
+    :::
+    ::::
+
+    ::::{field} version
+    :type: str
+
+    The rules_python version. This is a semver format, e.g. `X.Y.Z` with
+    optional trailing `-rcN`. For unreleased versions, it is an empty string.
+    :::{versionadded} 0.38.0
+    ::::
+    """
+
 features = struct(
+    TYPEDEF = _features_typedef,
+    # keep sorted
     precompile = True,
+    py_info_site_packages_symlinks = True,
+    uses_builtin_rules = not config.enable_pystar,
+    version = _VERSION_PRIVATE if "$Format" not in _VERSION_PRIVATE else "",
 )

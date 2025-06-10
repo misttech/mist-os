@@ -19,7 +19,21 @@ unnecessary files when all that are needed are flag definitions.
 """
 
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
-load("//python/private:enum.bzl", "enum")
+load(":enum.bzl", "FlagEnum", "enum")
+
+def _AddSrcsToRunfilesFlag_is_enabled(ctx):
+    value = ctx.attr._add_srcs_to_runfiles_flag[BuildSettingInfo].value
+    if value == AddSrcsToRunfilesFlag.AUTO:
+        value = AddSrcsToRunfilesFlag.ENABLED
+    return value == AddSrcsToRunfilesFlag.ENABLED
+
+# buildifier: disable=name-conventions
+AddSrcsToRunfilesFlag = FlagEnum(
+    AUTO = "auto",
+    ENABLED = "enabled",
+    DISABLED = "disabled",
+    is_enabled = _AddSrcsToRunfilesFlag_is_enabled,
+)
 
 def _bootstrap_impl_flag_get_value(ctx):
     return ctx.attr._bootstrap_impl_flag[BuildSettingInfo].value
@@ -55,17 +69,13 @@ PrecompileFlag = enum(
     # Automatically decide the effective value based on environment,
     # target platform, etc.
     AUTO = "auto",
-    # Compile Python source files at build time. Note that
-    # --precompile_add_to_runfiles affects how the compiled files are included
-    # into a downstream binary.
+    # Compile Python source files at build time.
     ENABLED = "enabled",
     # Don't compile Python source files at build time.
     DISABLED = "disabled",
-    # Compile Python source files, but only if they're a generated file.
-    IF_GENERATED_SOURCE = "if_generated_source",
     # Like `enabled`, except overrides target-level setting. This is mostly
     # useful for development, testing enabling precompilation more broadly, or
-    # as an escape hatch if build-time compiling is not available.
+    # as an escape hatch to force all transitive deps to precompile.
     FORCE_ENABLED = "force_enabled",
     # Like `disabled`, except overrides target-level setting. This is useful
     # useful for development, testing enabling precompilation more broadly, or
@@ -90,32 +100,57 @@ PrecompileSourceRetentionFlag = enum(
     KEEP_SOURCE = "keep_source",
     # Don't include the original py source.
     OMIT_SOURCE = "omit_source",
-    # Keep the original py source if it's a regular source file, but omit it
-    # if it's a generated file.
-    OMIT_IF_GENERATED_SOURCE = "omit_if_generated_source",
     get_effective_value = _precompile_source_retention_flag_get_effective_value,
 )
 
-# Determines if a target adds its compiled files to its runfiles. When a target
-# compiles its files, but doesn't add them to its own runfiles, it relies on
-# a downstream target to retrieve them from `PyInfo.transitive_pyc_files`
+def _venvs_use_declare_symlink_flag_get_value(ctx):
+    return ctx.attr._venvs_use_declare_symlink_flag[BuildSettingInfo].value
+
+# Decides if the venv created by bootstrap=script uses declare_file() to
+# create relative symlinks. Workaround for #2489 (packaging rules not supporting
+# declare_link() files).
 # buildifier: disable=name-conventions
-PrecompileAddToRunfilesFlag = enum(
-    # Always include the compiled files in the target's runfiles.
-    ALWAYS = "always",
-    # Don't include the compiled files in the target's runfiles; they are
-    # still added to `PyInfo.transitive_pyc_files`. See also:
-    # `py_binary.pyc_collection` attribute. This is useful for allowing
-    # incrementally enabling precompilation on a per-binary basis.
-    DECIDED_ELSEWHERE = "decided_elsewhere",
+VenvsUseDeclareSymlinkFlag = FlagEnum(
+    # Use declare_file() and relative symlinks in the venv
+    YES = "yes",
+    # Do not use declare_file() and relative symlinks in the venv
+    NO = "no",
+    get_value = _venvs_use_declare_symlink_flag_get_value,
 )
 
-# Determine if `py_binary` collects transitive pyc files.
-# NOTE: This flag is only respect if `py_binary.pyc_collection` is `inherit`.
+def _venvs_site_packages_is_enabled(ctx):
+    if not ctx.attr.experimental_venvs_site_packages:
+        return False
+    flag_value = ctx.attr.experimental_venvs_site_packages[BuildSettingInfo].value
+    return flag_value == VenvsSitePackages.YES
+
+# Decides if libraries try to use a site-packages layout using site_packages_symlinks
 # buildifier: disable=name-conventions
-PycCollectionFlag = enum(
-    # Include `PyInfo.transitive_pyc_files` as part of the binary.
-    INCLUDE_PYC = "include_pyc",
-    # Don't include `PyInfo.transitive_pyc_files` as part of the binary.
-    DISABLED = "disabled",
+VenvsSitePackages = FlagEnum(
+    # Use site_packages_symlinks
+    YES = "yes",
+    # Don't use site_packages_symlinks
+    NO = "no",
+    is_enabled = _venvs_site_packages_is_enabled,
+)
+
+# Used for matching freethreaded toolchains and would have to be used in wheels
+# as well.
+# buildifier: disable=name-conventions
+FreeThreadedFlag = enum(
+    # Use freethreaded python toolchain and wheels.
+    YES = "yes",
+    # Do not use freethreaded python toolchain and wheels.
+    NO = "no",
+)
+
+# Determines which libc flavor is preferred when selecting the toolchain and
+# linux whl distributions.
+#
+# buildifier: disable=name-conventions
+LibcFlag = FlagEnum(
+    # Prefer glibc wheels (e.g. manylinux_2_17_x86_64 or linux_x86_64)
+    GLIBC = "glibc",
+    # Prefer musl wheels (e.g. musllinux_2_17_x86_64)
+    MUSL = "musl",
 )

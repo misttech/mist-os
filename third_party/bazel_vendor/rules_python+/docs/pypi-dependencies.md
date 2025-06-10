@@ -71,7 +71,7 @@ In some cases you may not want to generate the requirements.bzl file as a reposi
 while Bazel is fetching dependencies. For example, if you produce a reusable Bazel module
 such as a ruleset, you may want to include the requirements.bzl file rather than make your users
 install the WORKSPACE setup to generate it.
-See https://github.com/bazelbuild/rules_python/issues/608
+See https://github.com/bazel-contrib/rules_python/issues/608
 
 This is the same workflow as Gazelle, which creates `go_repository` rules with
 [`update-repos`](https://github.com/bazelbuild/bazel-gazelle#update-repos)
@@ -180,7 +180,7 @@ buildozer command:
 buildozer 'substitute deps @old//([^/]+) @new//${1}' //...:*
 ```
 
-[requirements-drawbacks]: https://github.com/bazelbuild/rules_python/issues/414
+[requirements-drawbacks]: https://github.com/bazel-contrib/rules_python/issues/414
 
 ### Entry points
 
@@ -308,6 +308,59 @@ perhaps `apache-airflow-providers-common-sql`.
 
 
 (bazel-downloader)=
+### Multi-platform support
+
+Multi-platform support of cross-building the wheels can be done in two ways - either
+using {bzl:attr}`experimental_index_url` for the {bzl:obj}`pip.parse` bzlmod tag class
+or by using the {bzl:attr}`pip.parse.download_only` setting. In this section we
+are going to outline quickly how one can use the latter option.
+
+Let's say you have 2 requirements files:
+```
+# requirements.linux_x86_64.txt
+--platform=manylinux_2_17_x86_64
+--python-version=39
+--implementation=cp
+--abi=cp39
+
+foo==0.0.1 --hash=sha256:deadbeef
+bar==0.0.1 --hash=sha256:deadb00f
+```
+
+```
+# requirements.osx_aarch64.txt contents
+--platform=macosx_10_9_arm64
+--python-version=39
+--implementation=cp
+--abi=cp39
+
+foo==0.0.3 --hash=sha256:deadbaaf
+```
+
+With these 2 files your {bzl:obj}`pip.parse` could look like:
+```
+pip.parse(
+    hub_name = "pip",
+    python_version = "3.9",
+    # Tell `pip` to ignore sdists
+    download_only = True,
+    requirements_by_platform = {
+        "requirements.linux_x86_64.txt": "linux_x86_64",
+        "requirements.osx_aarch64.txt": "osx_aarch64",
+    },
+)
+```
+
+With this, the `pip.parse` will create a hub repository that is going to
+support only two platforms - `cp39_osx_aarch64` and `cp39_linux_x86_64` and it
+will only use `wheels` and ignore any sdists that it may find on the PyPI
+compatible indexes.
+
+```{note}
+This is only supported on `bzlmd`.
+```
+
+(bazel-downloader)=
 ### Bazel downloader and multi-platform wheel hub repository.
 
 The `bzlmod` `pip.parse` call supports pulling information from `PyPI` (or a
@@ -333,11 +386,13 @@ This does not mean that `rules_python` is fetching the wheels eagerly, but it
 rather means that it is calling the PyPI server to get the Simple API response
 to get the list of all available source and wheel distributions. Once it has
 got all of the available distributions, it will select the right ones depending
-on the `sha256` values in your `requirements_lock.txt` file. The compatible
-distribution URLs will be then written to the `MODULE.bazel.lock` file. Currently
-users wishing to use the lock file with `rules_python` with this feature have
-to set an environment variable `RULES_PYTHON_OS_ARCH_LOCK_FILE=0` which will
-become default in the next release.
+on the `sha256` values in your `requirements_lock.txt` file. If `sha256` hashes
+are not present in the requirements file, we will fallback to matching by version
+specified in the lock file. The compatible distribution URLs will be then
+written to the `MODULE.bazel.lock` file. Currently users wishing to use the
+lock file with `rules_python` with this feature have to set an environment
+variable `RULES_PYTHON_OS_ARCH_LOCK_FILE=0` which will become default in the
+next release.
 
 Fetching the distribution information from the PyPI allows `rules_python` to
 know which `whl` should be used on which target platform and it will determine

@@ -1,4 +1,4 @@
-# Copyright 2023 The Bazel Authors. All rights reserved.
+# Copyright 2024 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # limitations under the License.
 """java_test rule"""
 
-# Do not touch: This line marks the end of loads; needed for PR importing.
+load("@compatibility_proxy//:proxy.bzl", _java_test = "java_test")
 
 def java_test(**attrs):
     """Bazel java_test rule.
@@ -24,5 +24,4 @@ def java_test(**attrs):
       **attrs: Rule attributes
     """
 
-    # buildifier: disable=native-java
-    native.java_test(**attrs)
+    _java_test(**attrs)

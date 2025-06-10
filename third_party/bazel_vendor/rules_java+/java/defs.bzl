@@ -13,6 +13,8 @@
 # limitations under the License.
 """Starlark rules for building Java projects."""
 
+load("@com_google_protobuf//bazel:java_lite_proto_library.bzl", _java_lite_proto_library = "java_lite_proto_library")
+load("@com_google_protobuf//bazel:java_proto_library.bzl", _java_proto_library = "java_proto_library")
 load("//java:java_binary.bzl", _java_binary = "java_binary")
 load("//java:java_import.bzl", _java_import = "java_import")
 load("//java:java_library.bzl", _java_library = "java_library")
@@ -41,8 +43,17 @@ java_package_configuration = _java_package_configuration
 
 # Proto rules
 # Deprecated: don't use java proto libraries from here
-java_proto_library = native.java_proto_library
-java_lite_proto_library = native.java_lite_proto_library
+def java_proto_library(**kwargs):
+    if "deprecation" not in kwargs:
+        _java_proto_library(deprecation = "Use java_proto_library from com_google_protobuf", **kwargs)
+    else:
+        _java_proto_library(**kwargs)
+
+def java_lite_proto_library(**kwargs):
+    if "deprecation" not in kwargs:
+        _java_lite_proto_library(deprecation = "Use java_lite_proto_library from com_google_protobuf", **kwargs)
+    else:
+        _java_lite_proto_library(**kwargs)
 
 # Modules and providers
 

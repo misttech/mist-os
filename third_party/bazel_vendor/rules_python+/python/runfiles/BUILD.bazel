@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-load("//python:defs.bzl", "py_library")
 load("//python:packaging.bzl", "py_wheel")
+load("//python:py_library.bzl", "py_library")
 load("//python/private:bzlmod_enabled.bzl", "BZLMOD_ENABLED")
 
 filegroup(
@@ -39,7 +39,7 @@ py_library(
 
 # This can be manually tested by running tests/runfiles/runfiles_wheel_integration_test.sh
 # We ought to have an automated integration test for it, too.
-# see https://github.com/bazelbuild/rules_python/issues/1002
+# see https://github.com/bazel-contrib/rules_python/issues/1002
 py_wheel(
     name = "wheel",
     # From https://pypi.org/classifiers/
@@ -50,7 +50,7 @@ py_wheel(
     description_file = "README.md",
     dist_folder = "dist",
     distribution = "bazel_runfiles",
-    homepage = "https://github.com/bazelbuild/rules_python",
+    homepage = "https://github.com/bazel-contrib/rules_python",
     python_requires = ">=3.7",
     strip_path_prefixes = ["python"],
     twine = None if BZLMOD_ENABLED else "@rules_python_publish_deps_twine//:pkg",

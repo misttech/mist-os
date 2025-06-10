@@ -14,10 +14,7 @@
 
 "This file managed by `bazel run //:gazelle_update_repos`"
 
-load(
-    "@bazel_gazelle//:deps.bzl",
-    _go_repository = "go_repository",
-)
+load("@bazel_gazelle//:deps.bzl", _go_repository = "go_repository")
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 
 def go_repository(name, **kwargs):
@@ -29,9 +26,9 @@ def python_stdlib_list_deps():
     http_archive(
         name = "python_stdlib_list",
         build_file_content = """exports_files(glob(["stdlib_list/lists/*.txt"]))""",
-        sha256 = "3f6fc8fba0a99ce8fa76c1b794a24f38962f6275ea9d5cfb43a874abe472571e",
-        strip_prefix = "stdlib-list-0.10.0",
-        url = "https://github.com/pypi/stdlib-list/releases/download/v0.10.0/v0.10.0.tar.gz",
+        sha256 = "aa21a4f219530e85ecc364f0bbff2df4e6097a8954c63652af060f4e64afa65d",
+        strip_prefix = "stdlib-list-0.11.0",
+        url = "https://github.com/pypi/stdlib-list/releases/download/v0.11.0/v0.11.0.tar.gz",
     )
 
 def gazelle_deps():
@@ -70,8 +67,8 @@ def go_deps():
     go_repository(
         name = "com_github_bmatcuk_doublestar_v4",
         importpath = "github.com/bmatcuk/doublestar/v4",
-        sum = "h1:FH9SifrbvJhnlQpztAx++wlkk70QBf0iBWDwNy7PA4I=",
-        version = "v4.6.1",
+        sum = "h1:fdDeAqgT47acgwd9bd9HxJRDmc9UAmPpc+2m0CXv75Q=",
+        version = "v4.7.1",
     )
 
     go_repository(
@@ -186,10 +183,10 @@ def go_deps():
         version = "v0.0.0-20190812154241-14fe0d1b01d4",
     )
     go_repository(
-        name = "com_github_smacker_go_tree_sitter",
-        importpath = "github.com/smacker/go-tree-sitter",
-        sum = "h1:7QZKUmQfnxncZIJGyvX8M8YeMfn8kM10j3J/2KwVTN4=",
-        version = "v0.0.0-20240422154435-0628b34cbf9c",
+        name = "com_github_dougthor42_go_tree_sitter",
+        importpath = "github.com/dougthor42/go-tree-sitter",
+        sum = "h1:b9s96BulIARx0konX36sJ5oZhWvAvjQBBntxp1eUukQ=",
+        version = "v0.0.0-20241210060307-2737e1d0de6b",
     )
     go_repository(
         name = "com_github_stretchr_objx",

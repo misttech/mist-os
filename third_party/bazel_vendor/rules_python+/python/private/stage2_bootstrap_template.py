@@ -4,34 +4,33 @@
 
 import sys
 
-# The Python interpreter unconditionally prepends the directory containing this
+# By default the Python interpreter prepends the directory containing this
 # script (following symlinks) to the import path. This is the cause of #9239,
-# and is a special case of #7091. We therefore explicitly delete that entry.
-# TODO(#7091): Remove this hack when no longer necessary.
-# TODO: Use sys.flags.safe_path to determine whether this removal should be
-# performed
-del sys.path[0]
+# and is a special case of #7091.
+#
+# Python 3.11 introduced an PYTHONSAFEPATH (-P) option that disables this
+# behaviour, which we set in the stage 1 bootstrap.
+# So the prepended entry needs to be removed only if the above option is either
+# unset or not supported by the interpreter.
+# NOTE: This can be removed when Python 3.10 and below is no longer supported
+if not getattr(sys.flags, "safe_path", False):
+    del sys.path[0]
 
 import contextlib
 import os
 import re
 import runpy
-import subprocess
 import uuid
 
 # ===== Template substitutions start =====
 # We just put them in one place so its easy to tell which are used.
 
 # Runfiles-relative path to the main Python source file.
-MAIN = "%main%"
-# Colon-delimited string of runfiles-relative import paths to add
-IMPORTS_STR = "%imports%"
-WORKSPACE_NAME = "%workspace_name%"
-# Though the import all value is the correct literal, we quote it
-# so this file is parsable by tools.
-IMPORT_ALL = True if "%import_all%" == "True" else False
-# Runfiles-relative path to the coverage tool entry point, if any.
-COVERAGE_TOOL = "%coverage_tool%"
+# Empty if MAIN_MODULE is used
+MAIN_PATH = "%main%"
+
+# Module name to execute. Empty if MAIN is used.
+MAIN_MODULE = "%main_module%"
 
 # ===== Template substitutions end =====
 
@@ -111,52 +110,13 @@ def print_verbose(*args, mapping=None, values=None):
 
 def print_verbose_coverage(*args):
     """Print output if VERBOSE_COVERAGE is non-empty in the environment."""
-    if os.environ.get("VERBOSE_COVERAGE"):
-        print(*args, file=sys.stderr, flush=True)
+    if is_verbose_coverage():
+        print("bootstrap: stage 2: coverage:", *args, file=sys.stderr, flush=True)
 
 
 def is_verbose_coverage():
     """Returns True if VERBOSE_COVERAGE is non-empty in the environment."""
     return os.environ.get("VERBOSE_COVERAGE") or is_verbose()
-
-
-def find_coverage_entry_point(module_space):
-    cov_tool = COVERAGE_TOOL
-    if cov_tool:
-        print_verbose_coverage("Using toolchain coverage_tool %r" % cov_tool)
-    else:
-        cov_tool = os.environ.get("PYTHON_COVERAGE")
-        if cov_tool:
-            print_verbose_coverage("PYTHON_COVERAGE: %r" % cov_tool)
-    if cov_tool:
-        return find_binary(module_space, cov_tool)
-    return None
-
-
-def find_binary(module_space, bin_name):
-    """Finds the real binary if it's not a normal absolute path."""
-    if not bin_name:
-        return None
-    if bin_name.startswith("//"):
-        # Case 1: Path is a label. Not supported yet.
-        raise AssertionError(
-            "Bazel does not support execution of Python interpreters via labels yet"
-        )
-    elif os.path.isabs(bin_name):
-        # Case 2: Absolute path.
-        return bin_name
-    # Use normpath() to convert slashes to os.sep on Windows.
-    elif os.sep in os.path.normpath(bin_name):
-        # Case 3: Path is relative to the repo root.
-        return os.path.join(module_space, bin_name)
-    else:
-        # Case 4: Path has to be looked up in the search path.
-        return search_path(bin_name)
-
-
-def create_python_path_entries(python_imports, module_space):
-    parts = python_imports.split(":")
-    return [module_space] + ["%s/%s" % (module_space, path) for path in parts]
 
 
 def find_runfiles_root(main_rel_path):
@@ -203,15 +163,6 @@ def find_runfiles_root(main_rel_path):
     raise AssertionError("Cannot find .runfiles directory for %s" % sys.argv[0])
 
 
-# Returns repository roots to add to the import path.
-def get_repositories_imports(module_space, import_all):
-    if import_all:
-        repo_dirs = [os.path.join(module_space, d) for d in os.listdir(module_space)]
-        repo_dirs.sort()
-        return [d for d in repo_dirs if os.path.isdir(d)]
-    return [os.path.join(module_space, WORKSPACE_NAME)]
-
-
 def runfiles_envvar(module_space):
     """Finds the runfiles manifest or the runfiles directory.
 
@@ -249,15 +200,6 @@ def runfiles_envvar(module_space):
         return ("RUNFILES_DIR", module_space)
 
     return (None, None)
-
-
-def deduplicate(items):
-    """Efficiently filter out duplicates, keeping the first element only."""
-    seen = set()
-    for it in items:
-        if it not in seen:
-            seen.add(it)
-            yield it
 
 
 def instrumented_file_paths():
@@ -311,7 +253,7 @@ def unresolve_symlinks(output_filename):
         os.unlink(unfixed_file)
 
 
-def _run_py(main_filename, *, args, cwd=None):
+def _run_py_path(main_filename, *, args, cwd=None):
     # type: (str, str, list[str], dict[str, str]) -> ...
     """Executes the given Python file using the various environment settings."""
 
@@ -331,11 +273,24 @@ def _run_py(main_filename, *, args, cwd=None):
         sys.argv = orig_argv
 
 
+def _run_py_module(module_name):
+    # Match `python -m` behavior, so modify sys.argv and the run name
+    runpy.run_module(module_name, alter_sys=True, run_name="__main__")
+
+
 @contextlib.contextmanager
 def _maybe_collect_coverage(enable):
+    print_verbose_coverage("enabled:", enable)
     if not enable:
         yield
         return
+
+    instrumented_files = [abs_path for abs_path, _ in instrumented_file_paths()]
+    unique_dirs = {os.path.dirname(file) for file in instrumented_files}
+    source = "\n\t".join(unique_dirs)
+
+    print_verbose_coverage("Instrumented Files:\n" + "\n".join(instrumented_files))
+    print_verbose_coverage("Sources:\n" + "\n".join(unique_dirs))
 
     import uuid
 
@@ -345,11 +300,15 @@ def _maybe_collect_coverage(enable):
     unique_id = uuid.uuid4()
 
     # We need for coveragepy to use relative paths.  This can only be configured
+    # using an rc file.
     rcfile_name = os.path.join(coverage_dir, ".coveragerc_{}".format(unique_id))
+    print_verbose_coverage("coveragerc file:", rcfile_name)
     with open(rcfile_name, "w") as rcfile:
         rcfile.write(
-            """[run]
+            f"""[run]
 relative_files = True
+source =
+\t{source}
 """
         )
     try:
@@ -380,6 +339,7 @@ relative_files = True
         finally:
             cov.stop()
             lcov_path = os.path.join(coverage_dir, "pylcov.dat")
+            print_verbose_coverage("generating lcov from:", lcov_path)
             cov.lcov_report(
                 outfile=lcov_path,
                 # Ignore errors because sometimes instrumented files aren't
@@ -405,133 +365,79 @@ def main():
     print_verbose("initial environ:", mapping=os.environ)
     print_verbose("initial sys.path:", values=sys.path)
 
-    main_rel_path = MAIN
-    if is_windows():
-        main_rel_path = main_rel_path.replace("/", os.sep)
+    main_rel_path = None
+    # todo: things happen to work because find_runfiles_root
+    # ends up using stage2_bootstrap, and ends up computing the proper
+    # runfiles root
+    if MAIN_PATH:
+        main_rel_path = MAIN_PATH
+        if is_windows():
+            main_rel_path = main_rel_path.replace("/", os.sep)
 
-    module_space = find_runfiles_root(main_rel_path)
-    print_verbose("runfiles root:", module_space)
-
-    # Recreate the "add main's dir to sys.path[0]" behavior to match the
-    # system-python bootstrap / typical Python behavior.
-    #
-    # Without safe path enabled, when `python foo/bar.py` is run, python will
-    # resolve the foo/bar.py symlink to its real path, then add the directory
-    # of that path to sys.path. But, the resolved directory for the symlink
-    # depends on if the file is generated or not.
-    #
-    # When foo/bar.py is a source file, then it's a symlink pointing
-    # back to the client source directory. This means anything from that source
-    # directory becomes importable, i.e. most code is importable.
-    #
-    # When foo/bar.py is a generated file, then it's a symlink pointing to
-    # somewhere under bazel-out/.../bin, i.e. where generated files are. This
-    # means only other generated files are importable (not source files).
-    #
-    # To replicate this behavior, we add main's directory within the runfiles
-    # when safe path isn't enabled.
-    if not getattr(sys.flags, "safe_path", False):
-        prepend_path_entries = [
-            os.path.join(module_space, os.path.dirname(main_rel_path))
-        ]
+        runfiles_root = find_runfiles_root(main_rel_path)
     else:
-        prepend_path_entries = []
-    python_path_entries = create_python_path_entries(IMPORTS_STR, module_space)
-    python_path_entries += get_repositories_imports(module_space, IMPORT_ALL)
-    python_path_entries = [
-        get_windows_path_with_unc_prefix(d) for d in python_path_entries
-    ]
+        runfiles_root = find_runfiles_root("")
 
-    # Remove duplicates to avoid overly long PYTHONPATH (#10977). Preserve order,
-    # keep first occurrence only.
-    python_path_entries = deduplicate(python_path_entries)
+    print_verbose("runfiles root:", runfiles_root)
 
-    if is_windows():
-        python_path_entries = [p.replace("/", os.sep) for p in python_path_entries]
-    else:
-        # deduplicate returns a generator, but we need a list after this.
-        python_path_entries = list(python_path_entries)
-
-    # We're emulating PYTHONPATH being set, so we insert at the start
-    # This isn't a great idea (it can shadow the stdlib), but is the historical
-    # behavior.
-    runfiles_envkey, runfiles_envvalue = runfiles_envvar(module_space)
+    runfiles_envkey, runfiles_envvalue = runfiles_envvar(runfiles_root)
     if runfiles_envkey:
         os.environ[runfiles_envkey] = runfiles_envvalue
 
-    main_filename = os.path.join(module_space, main_rel_path)
-    main_filename = get_windows_path_with_unc_prefix(main_filename)
-    assert os.path.exists(main_filename), (
-        "Cannot exec() %r: file not found." % main_filename
-    )
-    assert os.access(main_filename, os.R_OK), (
-        "Cannot exec() %r: file not readable." % main_filename
-    )
-
-    # COVERAGE_DIR is set if coverage is enabled and instrumentation is configured
-    # for something, though it could be another program executing this one or
-    # one executed by this one (e.g. an extension module).
-    if os.environ.get("COVERAGE_DIR"):
-        cov_tool = find_coverage_entry_point(module_space)
-        if cov_tool is None:
-            print_verbose_coverage(
-                "Coverage was enabled, but python coverage tool was not configured."
-                + "To enable coverage, consult the docs at "
-                + "https://rules-python.readthedocs.io/en/latest/coverage.html"
-            )
+    if MAIN_PATH:
+        # Recreate the "add main's dir to sys.path[0]" behavior to match the
+        # system-python bootstrap / typical Python behavior.
+        #
+        # Without safe path enabled, when `python foo/bar.py` is run, python will
+        # resolve the foo/bar.py symlink to its real path, then add the directory
+        # of that path to sys.path. But, the resolved directory for the symlink
+        # depends on if the file is generated or not.
+        #
+        # When foo/bar.py is a source file, then it's a symlink pointing
+        # back to the client source directory. This means anything from that source
+        # directory becomes importable, i.e. most code is importable.
+        #
+        # When foo/bar.py is a generated file, then it's a symlink pointing to
+        # somewhere under bazel-out/.../bin, i.e. where generated files are. This
+        # means only other generated files are importable (not source files).
+        #
+        # To replicate this behavior, we add main's directory within the runfiles
+        # when safe path isn't enabled.
+        if not getattr(sys.flags, "safe_path", False):
+            prepend_path_entries = [
+                os.path.join(runfiles_root, os.path.dirname(main_rel_path))
+            ]
         else:
-            # Inhibit infinite recursion:
-            if "PYTHON_COVERAGE" in os.environ:
-                del os.environ["PYTHON_COVERAGE"]
+            prepend_path_entries = []
 
-            if not os.path.exists(cov_tool):
-                raise EnvironmentError(
-                    "Python coverage tool %r not found. "
-                    "Try running with VERBOSE_COVERAGE=1 to collect more information."
-                    % cov_tool
-                )
+        main_filename = os.path.join(runfiles_root, main_rel_path)
+        main_filename = get_windows_path_with_unc_prefix(main_filename)
+        assert os.path.exists(main_filename), (
+            "Cannot exec() %r: file not found." % main_filename
+        )
+        assert os.access(main_filename, os.R_OK), (
+            "Cannot exec() %r: file not readable." % main_filename
+        )
 
-            # coverage library expects sys.path[0] to contain the library, and replaces
-            # it with the directory of the program it starts. Our actual sys.path[0] is
-            # the runfiles directory, which must not be replaced.
-            # CoverageScript.do_execute() undoes this sys.path[0] setting.
-            #
-            # Update sys.path such that python finds the coverage package. The coverage
-            # entry point is coverage.coverage_main, so we need to do twice the dirname.
-            coverage_dir = os.path.dirname(os.path.dirname(cov_tool))
-            print_verbose("coverage: adding to sys.path:", coverage_dir)
-            python_path_entries.append(coverage_dir)
-            python_path_entries = deduplicate(python_path_entries)
+        sys.stdout.flush()
+
+        sys.path[0:0] = prepend_path_entries
     else:
-        cov_tool = None
+        main_filename = None
 
-    sys.stdout.flush()
+    if os.environ.get("COVERAGE_DIR"):
+        import _bazel_site_init
 
-    # Add the user imports after the stdlib, but before the runtime's
-    # site-packages directory. This gives the stdlib precedence, while allowing
-    # users to override non-stdlib packages that may have been bundled with
-    # the runtime (usually pip).
-    # NOTE: There isn't a good way to identify the stdlib paths, so we just
-    # expect site-packages comes after it, per
-    # https://docs.python.org/3/library/sys_path_init.html#sys-path-init
-    for i, path in enumerate(sys.path):
-        # dist-packages is a debian convention, see
-        # https://wiki.debian.org/Python#Deviations_from_upstream
-        if os.path.basename(path) in ("site-packages", "dist-packages"):
-            sys.path[i:i] = python_path_entries
-            break
+        coverage_enabled = _bazel_site_init.COVERAGE_SETUP
     else:
-        # Otherwise, no site-packages directory was found, which is odd but ok.
-        sys.path.extend(python_path_entries)
+        coverage_enabled = False
 
-    # NOTE: The sys.path must be modified before coverage is imported/activated
-    # NOTE: Perform this after the user imports are appended. This avoids a
-    # user import accidentally triggering the site-packages logic above.
-    sys.path[0:0] = prepend_path_entries
-
-    with _maybe_collect_coverage(enable=cov_tool is not None):
-        # The first arg is this bootstrap, so drop that for the re-invocation.
-        _run_py(main_filename, args=sys.argv[1:])
+    with _maybe_collect_coverage(enable=coverage_enabled):
+        if MAIN_PATH:
+            # The first arg is this bootstrap, so drop that for the re-invocation.
+            _run_py_path(main_filename, args=sys.argv[1:])
+        else:
+            _run_py_module(MAIN_MODULE)
         sys.exit(0)
 
 

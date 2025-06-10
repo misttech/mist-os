@@ -15,7 +15,6 @@
 """Implementation of sphinx rules."""
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
-load("@bazel_skylib//rules:build_test.bzl", "build_test")
 load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("//python:py_binary.bzl", "py_binary")
 load("//python/private:util.bzl", "add_tag", "copy_propagating_kwargs")  # buildifier: disable=bzl-visibility
@@ -177,6 +176,9 @@ def sphinx_docs(
         **common_kwargs
     )
 
+    common_kwargs_with_manual_tag = dict(common_kwargs)
+    common_kwargs_with_manual_tag["tags"] = list(common_kwargs.get("tags") or []) + ["manual"]
+
     py_binary(
         name = name + ".serve",
         srcs = [_SPHINX_SERVE_MAIN_SRC],
@@ -185,17 +187,12 @@ def sphinx_docs(
         args = [
             "$(execpath {})".format(html_name),
         ],
-        **common_kwargs
+        **common_kwargs_with_manual_tag
     )
     sphinx_run(
         name = name + ".run",
         docs = name,
-    )
-
-    build_test(
-        name = name + "_build_test",
-        targets = [name],
-        **kwargs  # kwargs used to pick up target_compatible_with
+        **common_kwargs_with_manual_tag
     )
 
 def _sphinx_docs_impl(ctx):
@@ -325,7 +322,12 @@ def _sphinx_source_tree_impl(ctx):
     def _relocate(source_file, dest_path = None):
         if not dest_path:
             dest_path = source_file.short_path.removeprefix(ctx.attr.strip_prefix)
-        dest_file = ctx.actions.declare_file(paths.join(source_prefix, dest_path))
+
+        dest_path = paths.join(source_prefix, dest_path)
+        if source_file.is_directory:
+            dest_file = ctx.actions.declare_directory(dest_path)
+        else:
+            dest_file = ctx.actions.declare_file(dest_path)
         ctx.actions.symlink(
             output = dest_file,
             target_file = source_file,

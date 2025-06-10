@@ -19,7 +19,8 @@ NOTE @aignas 2024-06-23: We are using the implementation specific name here to
 make it possible to have multiple tools inside the `pypi` directory
 """
 
-load("//python:defs.bzl", _py_binary = "py_binary", _py_test = "py_test")
+load("//python:py_binary.bzl", _py_binary = "py_binary")
+load("//python:py_test.bzl", _py_test = "py_test")
 
 def pip_compile(
         name,
@@ -154,18 +155,12 @@ def pip_compile(
         "visibility": visibility,
     }
 
-    # setuptools (the default python build tool) attempts to find user
-    # configuration in the user's home direcotory. This seems to work fine on
-    # linux and macOS, but fails on Windows, so we conditionally provide a fake
-    # USERPROFILE env variable to allow setuptools to proceed without finding
-    # user-provided configuration.
-    kwargs["env"] = select({
-        "@@platforms//os:windows": {"USERPROFILE": "Z:\\FakeSetuptoolsHomeDirectoryHack"},
-        "//conditions:default": {},
-    }) | kwargs.get("env", {})
+    env = kwargs.pop("env", {})
 
     py_binary(
         name = name + ".update",
+        env = env,
+        python_version = kwargs.get("python_version", None),
         **attrs
     )
 
@@ -174,6 +169,15 @@ def pip_compile(
     py_test(
         name = name + "_test",
         timeout = timeout,
-        # kwargs could contain test-specific attributes like size or timeout
+        # setuptools (the default python build tool) attempts to find user
+        # configuration in the user's home direcotory. This seems to work fine on
+        # linux and macOS, but fails on Windows, so we conditionally provide a fake
+        # USERPROFILE env variable to allow setuptools to proceed without finding
+        # user-provided configuration.
+        env = select({
+            "@@platforms//os:windows": {"USERPROFILE": "Z:\\FakeSetuptoolsHomeDirectoryHack"},
+            "//conditions:default": {},
+        }) | env,
+        # kwargs could contain test-specific attributes like size
         **dict(attrs, **kwargs)
     )

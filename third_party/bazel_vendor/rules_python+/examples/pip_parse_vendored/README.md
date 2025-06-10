@@ -1,7 +1,7 @@
 # pip_parse vendored
 
 This example is like pip_parse, however we avoid loading from the generated file.
-See https://github.com/bazelbuild/rules_python/issues/608
+See https://github.com/bazel-contrib/rules_python/issues/608
 and https://blog.aspect.dev/avoid-eager-fetches.
 
 The requirements now form a triple:
@@ -20,12 +20,11 @@ python_register_toolchains(
     name = "python39",
     python_version = "3.9",
 )
-load("@python39//:defs.bzl", "interpreter")
 
 # Load dependencies vendored by some other ruleset.
 load("@some_rules//:py_deps.bzl", "install_deps")
 
 install_deps(
-    python_interpreter_target = interpreter,
+    python_interpreter_target = "@python39_host//:python",
 )
 ```

@@ -4,18 +4,26 @@ module(
     compatibility_level = 1,
 )
 
-bazel_dep(name = "bazel_skylib", version = "1.4.1")
+bazel_dep(name = "bazel_skylib", version = "1.7.1")
+bazel_dep(name = "platforms", version = "0.0.4")
 bazel_dep(name = "rules_python", version = "0.0.0")
 local_path_override(
     module_name = "rules_python",
     path = "../..",
 )
 
-# (py_proto_library specific) We are using rules_proto to define rules_proto targets to be consumed by py_proto_library.
-bazel_dep(name = "rules_proto", version = "5.3.0-21.7")
-
 # (py_proto_library specific) Add the protobuf library for well-known types (e.g. `Any`, `Timestamp`, etc)
-bazel_dep(name = "protobuf", version = "24.4", repo_name = "com_google_protobuf")
+bazel_dep(name = "protobuf", version = "27.0", repo_name = "com_google_protobuf")
+
+# Only needed to make rules_python's CI happy. rules_java 8.3.0+ is needed so
+# that --java_runtime_version=remotejdk_11 works with Bazel 8.
+bazel_dep(name = "rules_java", version = "8.3.1")
+
+# Only needed to make rules_python's CI happy. A test verifies that
+# MODULE.bazel.lock is cross-platform friendly, and there are transitive
+# dependencies on rules_rust, so we need rules_rust 0.54.1+ where such issues
+# were fixed.
+bazel_dep(name = "rules_rust", version = "0.54.1")
 
 # We next initialize the python toolchain using the extension.
 # You can set different Python versions in this block.
@@ -40,19 +48,20 @@ python.toolchain(
 # One can override the actual toolchain versions that are available, which can be useful
 # when optimizing what gets downloaded and when.
 python.override(
-    available_python_versions = [
-        "3.10.9",
-        "3.9.19",
-        # The following is used by the `other_module` and we need to include it here
-        # as well.
-        "3.11.8",
-    ],
+    # NOTE: These are disabled in the example because transitive dependencies
+    # require versions not listed here.
+    # available_python_versions = [
+    #     "3.10.9",
+    #     "3.9.18",
+    #     "3.9.19",
+    #     # The following is used by the `other_module` and we need to include it here
+    #     # as well.
+    #     "3.11.8",
+    # ],
     # Also override the `minor_mapping` so that the root module,
-    # instead of rules_python's defaults, controls what full version
-    # is used when `3.x` is requested.
+    # instead of rules_python's defaulting to the latest available version,
+    # controls what full version is used when `3.x` is requested.
     minor_mapping = {
-        "3.10": "3.10.9",
-        "3.11": "3.11.8",
         "3.9": "3.9.19",
     },
 )
@@ -90,14 +99,17 @@ python.single_version_platform_override(
 # See the tests folder for various examples on using multiple Python versions.
 # The names "python_3_9" and "python_3_10" are autmatically created by the repo
 # rules based on the `python_version` arg values.
-use_repo(python, "python_3_10", "python_3_9", "python_versions")
+use_repo(python, "python_3_10", "python_3_9", "python_versions", "pythons_hub")
 
-# EXPERIMENTAL: This is experimental and may be removed without notice
-uv = use_extension("@rules_python//python/uv:extensions.bzl", "uv")
-uv.toolchain(uv_version = "0.2.23")
-use_repo(uv, "uv_toolchains")
-
-register_toolchains("@uv_toolchains//:all")
+# EXPERIMENTAL: This is experimental and may be changed or removed without notice
+uv = use_extension(
+    "@rules_python//python/uv:uv.bzl",
+    "uv",
+    # Use `dev_dependency` so that the toolchains are not defined pulled when your
+    # module is used elsewhere.
+    dev_dependency = True,
+)
+uv.configure(version = "0.6.2")
 
 # This extension allows a user to create modifications to how rules_python
 # creates different wheel repositories.  Different attributes allow the user
@@ -182,6 +194,9 @@ pip.parse(
         "cp39_linux_*",
         "cp39_*",
     ],
+    extra_hub_aliases = {
+        "wheel": ["generated_file"],
+    },
     hub_name = "pip",
     python_version = "3.9",
     requirements_lock = "requirements_lock_3_9.txt",
@@ -257,3 +272,12 @@ local_path_override(
     module_name = "other_module",
     path = "other_module",
 )
+
+bazel_dep(name = "foo_external", version = "")
+local_path_override(
+    module_name = "foo_external",
+    path = "py_proto_library/foo_external",
+)
+
+# example test dependencies
+bazel_dep(name = "rules_shell", version = "0.3.0", dev_dependency = True)

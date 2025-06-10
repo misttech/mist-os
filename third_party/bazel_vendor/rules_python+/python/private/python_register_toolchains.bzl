@@ -23,7 +23,6 @@ load(
     "TOOL_VERSIONS",
     "get_release_info",
 )
-load(":bzlmod_enabled.bzl", "BZLMOD_ENABLED")
 load(":coverage_deps.bzl", "coverage_dep")
 load(":full_version.bzl", "full_version")
 load(":python_repository.bzl", "python_repository")
@@ -74,10 +73,12 @@ def python_register_toolchains(
         minor_mapping: {type}`dict[str, str]` contains a mapping from `X.Y` to `X.Y.Z`
             version.
         **kwargs: passed to each {obj}`python_repository` call.
-    """
 
-    if BZLMOD_ENABLED:
-        # you cannot used native.register_toolchains when using bzlmod.
+    Returns:
+        On bzlmod this returns the loaded platform labels. Otherwise None.
+    """
+    bzlmod_toolchain_call = kwargs.pop("_internal_bzlmod_toolchain_call", False)
+    if bzlmod_toolchain_call:
         register_toolchains = False
 
     base_url = kwargs.pop("base_url", DEFAULT_RELEASE_BASE_URL)
@@ -159,7 +160,11 @@ def python_register_toolchains(
                 platform = platform,
             ))
 
-    host_toolchain(name = name + "_host")
+    host_toolchain(
+        name = name + "_host",
+        platforms = loaded_platforms,
+        python_version = python_version,
+    )
 
     toolchain_aliases(
         name = name,
@@ -169,12 +174,14 @@ def python_register_toolchains(
     )
 
     # in bzlmod we write out our own toolchain repos
-    if BZLMOD_ENABLED:
-        return
+    if bzlmod_toolchain_call:
+        return loaded_platforms
 
     toolchains_repo(
         name = toolchain_repo_name,
         python_version = python_version,
         set_python_version_constraint = set_python_version_constraint,
         user_repository_name = name,
+        platforms = loaded_platforms,
     )
+    return None

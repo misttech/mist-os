@@ -14,7 +14,7 @@
 
 """Rules for importing a local JDK."""
 
-load("//java:defs.bzl", "java_runtime")
+load("//java/toolchains:java_runtime.bzl", "java_runtime")
 load(":default_java_toolchain.bzl", "default_java_toolchain")
 
 def _detect_java_version(repository_ctx, java_bin):
@@ -110,7 +110,7 @@ def local_java_runtime(name, java_home, version, runtime_name = None, visibility
     native.toolchain(
         name = "bootstrap_runtime_toolchain_definition",
         target_settings = [":%s_settings_alias" % name],
-        toolchain_type = Label("@bazel_tools//tools/jdk:bootstrap_runtime_toolchain_type"),
+        toolchain_type = Label("//toolchains:bootstrap_runtime_toolchain_type"),
         toolchain = runtime_name,
     )
 
@@ -178,8 +178,7 @@ def _local_java_repository_impl(repository_ctx):
 
     java_home = _determine_java_home(repository_ctx)
 
-    # When Bzlmod is enabled, the Java runtime name should be the last segment of the repository name.
-    local_java_runtime_name = repository_ctx.name.split("~")[-1]
+    local_java_runtime_name = repository_ctx.attr.runtime_name
 
     repository_ctx.file(
         "WORKSPACE",
@@ -269,7 +268,7 @@ toolchain(
 toolchain(
    name = "bootstrap_runtime_toolchain_definition",
    target_settings = [":localjdk_setting"],
-   toolchain_type = "@bazel_tools//tools/jdk:bootstrap_runtime_toolchain_type",
+   toolchain_type = "@rules_java//toolchains:bootstrap_runtime_toolchain_type",
    toolchain = ":jdk",
 )
 '''
@@ -293,6 +292,7 @@ _local_java_repository_rule = repository_rule(
     configure = True,
     environ = ["JAVA_HOME"],
     attrs = {
+        "runtime_name": attr.string(),
         "build_file": attr.label(),
         "build_file_content": attr.string(),
         "java_home": attr.string(),
@@ -332,4 +332,4 @@ def local_java_repository(name, java_home = "", version = "", build_file = None,
       version: optionally java version
       **kwargs: additional arguments for repository rule
     """
-    _local_java_repository_rule(name = name, java_home = java_home, version = version, build_file = build_file, build_file_content = build_file_content, **kwargs)
+    _local_java_repository_rule(name = name, runtime_name = name, java_home = java_home, version = version, build_file = build_file, build_file_content = build_file_content, **kwargs)

@@ -38,4 +38,5 @@ fx-update-bazel-workspace
     --repo='@@rules_rust++i+rules_rust_tinyjson' \
     --repo='@@rules_shell+' \
     --stub-repo='@@apple_support+' \
-    --stub-repo='@@bazel_tools+remote_coverage_tools_extension+remote_coverage_tools'
+    --stub-repo='@@bazel_tools+remote_coverage_tools_extension+remote_coverage_tools' \
+    --stub-repo='@@rules_kotlin+'

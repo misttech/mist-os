@@ -27,10 +27,43 @@ other patches ensures that the users have overview on exactly what has changed
 within the wheel.
 """
 
-load("//python/private:repo_utils.bzl", "repo_utils")
 load(":parse_whl_name.bzl", "parse_whl_name")
+load(":pypi_repo_utils.bzl", "pypi_repo_utils")
 
 _rules_python_root = Label("//:BUILD.bazel")
+
+def patched_whl_name(original_whl_name):
+    """Return the new filename to output the patched wheel.
+
+    Args:
+        original_whl_name: {type}`str` the whl name of the original file.
+
+    Returns:
+        {type}`str` an output name to write the patched wheel to.
+    """
+    parsed_whl = parse_whl_name(original_whl_name)
+    version = parsed_whl.version
+    suffix = "patched"
+    if "+" in version:
+        # This already has some local version, so we just append one more
+        # identifier here. We comply with the spec and mark the file as patched
+        # by adding a local version identifier at the end.
+        #
+        # By doing this we can still install the package using most of the package
+        # managers
+        #
+        # See https://packaging.python.org/en/latest/specifications/version-specifiers/#local-version-identifiers
+        version = "{}.{}".format(version, suffix)
+    else:
+        version = "{}+{}".format(version, suffix)
+
+    return "{distribution}-{version}-{python_tag}-{abi_tag}-{platform_tag}.whl".format(
+        distribution = parsed_whl.distribution,
+        version = version,
+        python_tag = parsed_whl.python_tag,
+        abi_tag = parsed_whl.abi_tag,
+        platform_tag = parsed_whl.platform_tag,
+    )
 
 def patch_whl(rctx, *, python_interpreter, whl_path, patches, **kwargs):
     """Patch a whl file and repack it to ensure that the RECORD metadata stays correct.
@@ -60,26 +93,23 @@ def patch_whl(rctx, *, python_interpreter, whl_path, patches, **kwargs):
     if not rctx.delete(whl_file_zip):
         fail("Failed to remove the symlink after extracting")
 
+    if not patches:
+        fail("Trying to patch wheel without any patches")
+
     for patch_file, patch_strip in patches.items():
         rctx.patch(patch_file, strip = patch_strip)
 
-    # Generate an output filename, which we will be returning
-    parsed_whl = parse_whl_name(whl_input.basename)
-    whl_patched = "{}.whl".format("-".join([
-        parsed_whl.distribution,
-        parsed_whl.version,
-        (parsed_whl.build_tag or "") + "patched",
-        parsed_whl.python_tag,
-        parsed_whl.abi_tag,
-        parsed_whl.platform_tag,
-    ]))
-
     record_patch = rctx.path("RECORD.patch")
+    whl_patched = patched_whl_name(whl_input.basename)
 
-    repo_utils.execute_checked(
+    pypi_repo_utils.execute_checked(
         rctx,
+        python = python_interpreter,
+        srcs = [
+            Label("//python/private/pypi:repack_whl.py"),
+            Label("//tools:wheelmaker.py"),
+        ],
         arguments = [
-            python_interpreter,
             "-m",
             "python.private.pypi.repack_whl",
             "--record-patch",
@@ -98,7 +128,7 @@ def patch_whl(rctx, *, python_interpreter, whl_path, patches, **kwargs):
         warning_msg = """WARNING: the resultant RECORD file of the patch wheel is different
 
     If you are patching on Windows, you may see this warning because of
-    a known issue (bazelbuild/rules_python#1639) with file endings.
+    a known issue (bazel-contrib/rules_python#1639) with file endings.
 
     If you would like to silence the warning, you can apply the patch that is stored in
       {record_patch}. The contents of the file are below:

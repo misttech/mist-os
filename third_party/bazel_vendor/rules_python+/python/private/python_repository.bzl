@@ -15,7 +15,7 @@
 """This file contains repository rules and macros to support toolchain registration.
 """
 
-load("//python:versions.bzl", "PLATFORMS")
+load("//python:versions.bzl", "FREETHREADED", "INSTALL_ONLY", "PLATFORMS")
 load(":auth.bzl", "get_auth")
 load(":repo_utils.bzl", "REPO_DEBUG_ENV_VAR", "repo_utils")
 load(":text_util.bzl", "render")
@@ -63,55 +63,21 @@ def _python_repository_impl(rctx):
     platform = rctx.attr.platform
     python_version = rctx.attr.python_version
     python_version_info = python_version.split(".")
-    python_short_version = "{0}.{1}".format(*python_version_info)
     release_filename = rctx.attr.release_filename
+    version_suffix = "t" if FREETHREADED in release_filename else ""
+    python_short_version = "{0}.{1}{suffix}".format(
+        suffix = version_suffix,
+        *python_version_info
+    )
     urls = rctx.attr.urls or [rctx.attr.url]
     auth = get_auth(rctx, urls)
 
-    if release_filename.endswith(".zst"):
-        rctx.download(
+    if INSTALL_ONLY in release_filename:
+        rctx.download_and_extract(
             url = urls,
             sha256 = rctx.attr.sha256,
-            output = release_filename,
+            stripPrefix = rctx.attr.strip_prefix,
             auth = auth,
-        )
-        unzstd = rctx.which("unzstd")
-        if not unzstd:
-            url = rctx.attr.zstd_url.format(version = rctx.attr.zstd_version)
-            rctx.download_and_extract(
-                url = url,
-                sha256 = rctx.attr.zstd_sha256,
-                auth = auth,
-            )
-            working_directory = "zstd-{version}".format(version = rctx.attr.zstd_version)
-
-            repo_utils.execute_checked(
-                rctx,
-                op = "python_repository.MakeZstd",
-                arguments = [
-                    repo_utils.which_checked(rctx, "make"),
-                    "--jobs=4",
-                ],
-                timeout = 600,
-                quiet = True,
-                working_directory = working_directory,
-                logger = logger,
-            )
-            zstd = "{working_directory}/zstd".format(working_directory = working_directory)
-            unzstd = "./unzstd"
-            rctx.symlink(zstd, unzstd)
-
-        repo_utils.execute_checked(
-            rctx,
-            op = "python_repository.ExtractRuntime",
-            arguments = [
-                repo_utils.which_checked(rctx, "tar"),
-                "--extract",
-                "--strip-components=2",
-                "--use-compress-program={unzstd}".format(unzstd = unzstd),
-                "--file={}".format(release_filename),
-            ],
-            logger = logger,
         )
     else:
         rctx.download_and_extract(
@@ -120,6 +86,12 @@ def _python_repository_impl(rctx):
             stripPrefix = rctx.attr.strip_prefix,
             auth = auth,
         )
+
+        # Strip the things that are not present in the INSTALL_ONLY builds
+        # NOTE: if the dirs are not present, we will not fail here
+        rctx.delete("python/build")
+        rctx.delete("python/licenses")
+        rctx.delete("python/PYTHON.json")
 
     patches = rctx.attr.patches
     if patches:
@@ -143,12 +115,11 @@ def _python_repository_impl(rctx):
         # dyld lookup errors. To fix, set the full path to the dylib as
         # it appears in the Bazel workspace as its LC_ID_DYLIB using
         # the `install_name_tool` bundled with macOS.
-        dylib = "lib/libpython{}.dylib".format(python_short_version)
-        full_dylib_path = rctx.path(dylib)
+        dylib = "libpython{}.dylib".format(python_short_version)
         repo_utils.execute_checked(
             rctx,
             op = "python_repository.FixUpDyldIdPath",
-            arguments = [repo_utils.which_checked(rctx, "install_name_tool"), "-id", full_dylib_path, dylib],
+            arguments = [repo_utils.which_checked(rctx, "install_name_tool"), "-id", "@rpath/{}".format(dylib), "lib/{}".format(dylib)],
             logger = logger,
         )
 
@@ -156,20 +127,23 @@ def _python_repository_impl(rctx):
     # pycs being generated at runtime:
     # * The pycs are not deterministic (they contain timestamps)
     # * Multiple processes trying to write the same pycs can result in errors.
-    if not rctx.attr.ignore_root_user_error:
-        if "windows" not in platform:
-            lib_dir = "lib" if "windows" not in platform else "Lib"
+    #
+    # Note, when on Windows the `chmod` may not work
+    if "windows" not in platform and "windows" != repo_utils.get_platforms_os_name(rctx):
+        repo_utils.execute_checked(
+            rctx,
+            op = "python_repository.MakeReadOnly",
+            arguments = [repo_utils.which_checked(rctx, "chmod"), "-R", "ugo-w", "lib"],
+            logger = logger,
+        )
 
-            repo_utils.execute_checked(
-                rctx,
-                op = "python_repository.MakeReadOnly",
-                arguments = [repo_utils.which_checked(rctx, "chmod"), "-R", "ugo-w", lib_dir],
-                logger = logger,
-            )
+        # If the user is not ignoring the warnings, then proceed to run a check,
+        # otherwise these steps can be skipped, as they both result in some warning.
+        if not rctx.attr.ignore_root_user_error:
             exec_result = repo_utils.execute_unchecked(
                 rctx,
                 op = "python_repository.TestReadOnly",
-                arguments = [repo_utils.which_checked(rctx, "touch"), "{}/.test".format(lib_dir)],
+                arguments = [repo_utils.which_checked(rctx, "touch"), "lib/.test"],
                 logger = logger,
             )
 
@@ -184,14 +158,14 @@ def _python_repository_impl(rctx):
                 )
                 uid = int(stdout.strip())
                 if uid == 0:
-                    fail("The current user is root, please run as non-root when using the hermetic Python interpreter. See https://github.com/bazelbuild/rules_python/pull/713.")
+                    logger.warn("The current user is root, which can cause spurious cache misses or build failures with the hermetic Python interpreter. See https://github.com/bazel-contrib/rules_python/pull/713.")
                 else:
-                    fail("The current user has CAP_DAC_OVERRIDE set, please drop this capability when using the hermetic Python interpreter. See https://github.com/bazelbuild/rules_python/pull/713.")
+                    logger.warn("The current user has CAP_DAC_OVERRIDE set, which can cause spurious cache misses or build failures with the hermetic Python interpreter. See https://github.com/bazel-contrib/rules_python/pull/713.")
 
     python_bin = "python.exe" if ("windows" in platform) else "bin/python3"
 
     if "linux" in platform:
-        # Workaround around https://github.com/indygreg/python-build-standalone/issues/231
+        # Workaround around https://github.com/astral-sh/python-build-standalone/issues/231
         for url in urls:
             head_and_release, _, _ = url.rpartition("/")
             _, _, release = head_and_release.rpartition("/")
@@ -207,7 +181,7 @@ def _python_repository_impl(rctx):
                 # building on.
                 #
                 # Link to the first affected release:
-                # https://github.com/indygreg/python-build-standalone/releases/tag/20240224
+                # https://github.com/astral-sh/python-build-standalone/releases/tag/20240224
                 rctx.delete("share/terminfo")
                 break
 
@@ -218,9 +192,10 @@ def _python_repository_impl(rctx):
             # These pycache files are created on first use of the associated python files.
             # Exclude them from the glob because otherwise between the first time and second time a python toolchain is used,"
             # the definition of this filegroup will change, and depending rules will get invalidated."
-            # See https://github.com/bazelbuild/rules_python/issues/1008 for unconditionally adding these to toolchains so we can stop ignoring them."
-            "**/__pycache__/*.pyc",
-            "**/__pycache__/*.pyo",
+            # See https://github.com/bazel-contrib/rules_python/issues/1008 for unconditionally adding these to toolchains so we can stop ignoring them."
+            # pyc* is ignored because pyc creation creates temporary .pyc.NNNN files
+            "**/__pycache__/*.pyc*",
+            "**/__pycache__/*.pyo*",
         ]
 
     if "windows" in platform:
@@ -323,7 +298,7 @@ For more information see {attr}`py_runtime.coverage_tool`.
             mandatory = False,
         ),
         "ignore_root_user_error": attr.bool(
-            default = False,
+            default = True,
             doc = "Whether the check for root should be ignored or not. This causes cache misses with .pyc files.",
             mandatory = False,
         ),
@@ -374,15 +349,6 @@ function defaults (e.g. `single_version_override` for `MODULE.bazel` files.
         ),
         "urls": attr.string_list(
             doc = "The URL of the interpreter to download. Exactly one of url and urls must be set.",
-        ),
-        "zstd_sha256": attr.string(
-            default = "7c42d56fac126929a6a85dbc73ff1db2411d04f104fae9bdea51305663a83fd0",
-        ),
-        "zstd_url": attr.string(
-            default = "https://github.com/facebook/zstd/releases/download/v{version}/zstd-{version}.tar.gz",
-        ),
-        "zstd_version": attr.string(
-            default = "1.5.2",
         ),
         "_rule_name": attr.string(default = "python_repository"),
     },

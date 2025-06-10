@@ -31,7 +31,7 @@ _CPU_ALIASES = {
     "arm64": "aarch64",
     "ppc": "ppc",
     "ppc64": "ppc",
-    "ppc64le": "ppc",
+    "ppc64le": "ppc64le",
     "s390x": "s390x",
     "arm": "arm",
     "armv6l": "arm",
@@ -75,8 +75,11 @@ def select_whls(*, whls, want_platforms = [], logger = None):
             fail("expected all platforms to start with ABI, but got: {}".format(p))
 
         abi, _, os_cpu = p.partition("_")
+        abi, _, _ = abi.partition(".")
         _want_platforms[os_cpu] = None
-        _want_platforms[p] = None
+
+        # TODO @aignas 2025-04-20: add a test
+        _want_platforms["{}_{}".format(abi, os_cpu)] = None
 
         version_limit_candidate = int(abi[3:])
         if not version_limit:
@@ -88,6 +91,10 @@ def select_whls(*, whls, want_platforms = [], logger = None):
         _want_platforms["{}m_{}".format(abi, os_cpu)] = None
         want_abis[abi] = None
         want_abis[abi + "m"] = None
+
+        # Also add freethreaded wheels if we find them since we started supporting them
+        _want_platforms["{}t_{}".format(abi, os_cpu)] = None
+        want_abis[abi + "t"] = None
 
     want_platforms = sorted(_want_platforms)
 

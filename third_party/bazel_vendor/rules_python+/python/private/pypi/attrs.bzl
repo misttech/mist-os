@@ -15,6 +15,15 @@
 "common attributes for whl_library and pip_repository"
 
 ATTRS = {
+    "add_libdir_to_library_search_path": attr.bool(
+        default = False,
+        doc = """
+If true, add the lib dir of the bundled interpreter to the library search path via `LDFLAGS`.
+
+:::{versionadded} 1.3.0
+:::
+""",
+    ),
     "download_only": attr.bool(
         doc = """
 Whether to use "pip download" instead of "pip wheel". Disables building wheels from source, but allows use of
@@ -114,6 +123,9 @@ Warning:
     "experimental_target_platforms": attr.string_list(
         default = [],
         doc = """\
+*NOTE*: This will be removed in the next major version, so please consider migrating
+to `bzlmod` and rely on {attr}`pip.parse.requirements_by_platform` for this feature.
+
 A list of platforms that we will generate the conditional dependency graph for
 cross platform wheels by parsing the wheel metadata. This will generate the
 correct dependencies for packages like `sphinx` or `pylint`, which include
@@ -140,6 +152,16 @@ Special values: `host` (for generating deps for the host platform only) and
 
 NOTE: this is not for cross-compiling Python wheels but rather for parsing the `whl` METADATA correctly.
 """,
+    ),
+    "extra_hub_aliases": attr.string_list_dict(
+        doc = """\
+Extra aliases to make for specific wheels in the hub repo. This is useful when
+paired with the {attr}`whl_modifications`.
+
+:::{versionadded} 0.38.0
+:::
+""",
+        mandatory = False,
     ),
     "extra_pip_args": attr.string_list(
         doc = """Extra arguments to pass on to pip. Must not contain spaces.

@@ -22,33 +22,34 @@ load("//toolchains:remote_java_repository.bzl", "remote_java_repository")
 
 # visible for tests
 JAVA_TOOLS_CONFIG = {
-    "version": "v13.6.1",
+    "version": "v13.13",
     "release": "true",
     "artifacts": {
         "java_tools_linux": {
-            "mirror_url": "https://mirror.bazel.build/bazel_java_tools/releases/java/v13.6.1/java_tools_linux-v13.6.1.zip",
-            "github_url": "https://github.com/bazelbuild/java_tools/releases/download/java_13.6.1/java_tools_linux-v13.6.1.zip",
-            "sha": "0d3fcae7ae40d0a25f17c3adc30a3674f526953c55871189e2efe3463fce3496",
+            "mirror_url": "https://mirror.bazel.build/bazel_java_tools/releases/java/v13.13/java_tools_linux-v13.13.zip",
+            "github_url": "https://github.com/bazelbuild/java_tools/releases/download/java_v13.13/java_tools_linux-v13.13.zip",
+            "sha": "60c10e91f5900801423f9c5b020cc0c7da16dbaeee9c22891b38e7017306a8e7",
         },
         "java_tools_windows": {
-            "mirror_url": "https://mirror.bazel.build/bazel_java_tools/releases/java/v13.6.1/java_tools_windows-v13.6.1.zip",
-            "github_url": "https://github.com/bazelbuild/java_tools/releases/download/java_13.6.1/java_tools_windows-v13.6.1.zip",
-            "sha": "5a7d00e42c0b35f08eb5c8577eb115f8f57dd36ef8b6940c2190bd0d0e4ddcf0",
+            "mirror_url": "https://mirror.bazel.build/bazel_java_tools/releases/java/v13.13/java_tools_windows-v13.13.zip",
+            "github_url": "https://github.com/bazelbuild/java_tools/releases/download/java_v13.13/java_tools_windows-v13.13.zip",
+            "sha": "f5de3f2afc49d1a457efa63926bcc0ca4cdb5fc4887160bf9163e49f059dd12c",
         },
         "java_tools_darwin_x86_64": {
-            "mirror_url": "https://mirror.bazel.build/bazel_java_tools/releases/java/v13.6.1/java_tools_darwin_x86_64-v13.6.1.zip",
-            "github_url": "https://github.com/bazelbuild/java_tools/releases/download/java_13.6.1/java_tools_darwin_x86_64-v13.6.1.zip",
-            "sha": "465dcb1da77a0c83c49f178c11bad29b3d703df1756722ec42fe5afd7c8129f8",
+            "mirror_url": "https://mirror.bazel.build/bazel_java_tools/releases/java/v13.13/java_tools_darwin_x86_64-v13.13.zip",
+            "github_url": "https://github.com/bazelbuild/java_tools/releases/download/java_v13.13/java_tools_darwin_x86_64-v13.13.zip",
+            "sha": "d002ff57bd5e36d6d69a1c282fa571841816a1ccc5d28060cf7fe4c7257e376a",
         },
         "java_tools_darwin_arm64": {
-            "mirror_url": "https://mirror.bazel.build/bazel_java_tools/releases/java/v13.6.1/java_tools_darwin_arm64-v13.6.1.zip",
-            "github_url": "https://github.com/bazelbuild/java_tools/releases/download/java_13.6.1/java_tools_darwin_arm64-v13.6.1.zip",
-            "sha": "eb54c4e5fa23d6e9e9fc14c106a682dbefc54659d8e389a2f3c0d61d51cae274",
+            "mirror_url": "https://mirror.bazel.build/bazel_java_tools/releases/java/v13.13/java_tools_darwin_arm64-v13.13.zip",
+            "github_url": "https://github.com/bazelbuild/java_tools/releases/download/java_v13.13/java_tools_darwin_arm64-v13.13.zip",
+            "sha": "6d4b4e3a12cc5fd9f600b383465d0860afd5c11ba7c7386867bb621a55fa8452",
         },
         "java_tools": {
-            "mirror_url": "https://mirror.bazel.build/bazel_java_tools/releases/java/v13.6.1/java_tools-v13.6.1.zip",
-            "github_url": "https://github.com/bazelbuild/java_tools/releases/download/java_13.6.1/java_tools-v13.6.1.zip",
-            "sha": "74c978eab040ad4ec38ce0d0970ac813cc2c6f4f6f4f121c0414719487edc991",
+            "mirror_url": "https://mirror.bazel.build/bazel_java_tools/releases/java/v13.13/java_tools-v13.13.zip",
+            "github_url": "https://github.com/bazelbuild/java_tools/releases/download/java_v13.13/java_tools-v13.13.zip",
+            "sha": "df895d5067f2dad4524109ebfddac442d2514d0e2f95f6abc098cfae98b9bbb5",
+            "build_file": "@rules_java//toolchains:BUILD.java_tools",
         },
     },
 }
@@ -64,6 +65,7 @@ def java_tools_repos():
                 config["mirror_url"],
                 config["github_url"],
             ],
+            build_file = config.get("build_file"),
         )
 
 def local_jdk_repo():
@@ -74,7 +76,7 @@ def local_jdk_repo():
     )
 
 # DO NOT MANUALLY UPDATE! Update java/bazel/repositories_util.bzl instead and
-# run the java/bazel:dump_remote_jdk_configs target to generate this list
+# build the java/bazel:dump_remote_jdk_configs target to generate this list
 _REMOTE_JDK_CONFIGS_LIST = [
     struct(
         name = "remote_jdk8_linux_aarch64",
@@ -255,65 +257,65 @@ _REMOTE_JDK_CONFIGS_LIST = [
     struct(
         name = "remotejdk21_linux_aarch64",
         target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:aarch64"],
-        sha256 = "c898d4ce365c8926e22859c06be4a81bafb9fd0126088867e15a528fe99b1599",
-        strip_prefix = "zulu21.34.19-ca-jdk21.0.3-linux_aarch64",
-        urls = ["https://cdn.azul.com/zulu/bin/zulu21.34.19-ca-jdk21.0.3-linux_aarch64.tar.gz", "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu21.34.19-ca-jdk21.0.3-linux_aarch64.tar.gz"],
+        sha256 = "da3c2d7db33670bcf66532441aeb7f33dcf0d227c8dafe7ce35cee67f6829c4c",
+        strip_prefix = "zulu21.36.17-ca-jdk21.0.4-linux_aarch64",
+        urls = ["https://cdn.azul.com/zulu/bin/zulu21.36.17-ca-jdk21.0.4-linux_aarch64.tar.gz", "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu21.36.17-ca-jdk21.0.4-linux_aarch64.tar.gz"],
         version = "21",
     ),
     struct(
         name = "remotejdk21_linux",
         target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:x86_64"],
-        sha256 = "ca763d1308a6bcc768382f160733a08e591d5f595a7dd9e51b60d27d54828dcc",
-        strip_prefix = "zulu21.34.19-ca-jdk21.0.3-linux_x64",
-        urls = ["https://cdn.azul.com/zulu/bin/zulu21.34.19-ca-jdk21.0.3-linux_x64.tar.gz", "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu21.34.19-ca-jdk21.0.3-linux_x64.tar.gz"],
+        sha256 = "318d0c2ed3c876fb7ea2c952945cdcf7decfb5264ca51aece159e635ac53d544",
+        strip_prefix = "zulu21.36.17-ca-jdk21.0.4-linux_x64",
+        urls = ["https://cdn.azul.com/zulu/bin/zulu21.36.17-ca-jdk21.0.4-linux_x64.tar.gz", "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu21.36.17-ca-jdk21.0.4-linux_x64.tar.gz"],
         version = "21",
     ),
     struct(
         name = "remotejdk21_macos_aarch64",
         target_compatible_with = ["@platforms//os:macos", "@platforms//cpu:aarch64"],
-        sha256 = "4f42a561909d71868a700cf2efa1390e1b9e04863f3fa75ea30c4965e5a702f0",
-        strip_prefix = "zulu21.34.19-ca-jdk21.0.3-macosx_aarch64",
-        urls = ["https://cdn.azul.com/zulu/bin/zulu21.34.19-ca-jdk21.0.3-macosx_aarch64.tar.gz", "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu21.34.19-ca-jdk21.0.3-macosx_aarch64.tar.gz"],
+        sha256 = "bc2750f81a166cc6e9c30ae8aaba54f253a8c8ec9d8cfc04a555fe20712c7bff",
+        strip_prefix = "zulu21.36.17-ca-jdk21.0.4-macosx_aarch64",
+        urls = ["https://cdn.azul.com/zulu/bin/zulu21.36.17-ca-jdk21.0.4-macosx_aarch64.tar.gz", "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu21.36.17-ca-jdk21.0.4-macosx_aarch64.tar.gz"],
         version = "21",
     ),
     struct(
         name = "remotejdk21_macos",
         target_compatible_with = ["@platforms//os:macos", "@platforms//cpu:x86_64"],
-        sha256 = "148006a220a18922d7a9c52ac0bad099c5b4e60334a8d02b11f8c945e9ec9a34",
-        strip_prefix = "zulu21.34.19-ca-jdk21.0.3-macosx_x64",
-        urls = ["https://cdn.azul.com/zulu/bin/zulu21.34.19-ca-jdk21.0.3-macosx_x64.tar.gz", "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu21.34.19-ca-jdk21.0.3-macosx_x64.tar.gz"],
-        version = "21",
-    ),
-    struct(
-        name = "remotejdk21_win",
-        target_compatible_with = ["@platforms//os:windows", "@platforms//cpu:x86_64"],
-        sha256 = "fb9f0dc6a484b0b169b3b3a3c2425d5f62bebfd15cb06c1597e33f77959c72af",
-        strip_prefix = "zulu21.34.19-ca-jdk21.0.3-win_x64",
-        urls = ["https://cdn.azul.com/zulu/bin/zulu21.34.19-ca-jdk21.0.3-win_x64.zip", "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu21.34.19-ca-jdk21.0.3-win_x64.zip"],
-        version = "21",
-    ),
-    struct(
-        name = "remotejdk21_linux_ppc64le",
-        target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:ppc"],
-        sha256 = "d08de863499d8851811c893e8915828f2cd8eb67ed9e29432a6b4e222d80a12f",
-        strip_prefix = "jdk-21.0.2+13",
-        urls = ["https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2+13/OpenJDK21U-jdk_ppc64le_linux_hotspot_21.0.2_13.tar.gz", "https://mirror.bazel.build/github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2+13/OpenJDK21U-jdk_ppc64le_linux_hotspot_21.0.2_13.tar.gz"],
-        version = "21",
-    ),
-    struct(
-        name = "remotejdk21_linux_s390x",
-        target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:s390x"],
-        sha256 = "0d5676c50821e0d0b951bf3ffd717e7a13be2a89d8848a5c13b4aedc6f982c78",
-        strip_prefix = "jdk-21.0.2+13",
-        urls = ["https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2+13/OpenJDK21U-jdk_s390x_linux_hotspot_21.0.2_13.tar.gz", "https://mirror.bazel.build/github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.2+13/OpenJDK21U-jdk_s390x_linux_hotspot_21.0.2_13.tar.gz"],
+        sha256 = "5ce75a6a247c7029b74c4ca7cf6f60fd2b2d68ce1e8956fb448d2984316b5fea",
+        strip_prefix = "zulu21.36.17-ca-jdk21.0.4-macosx_x64",
+        urls = ["https://cdn.azul.com/zulu/bin/zulu21.36.17-ca-jdk21.0.4-macosx_x64.tar.gz", "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu21.36.17-ca-jdk21.0.4-macosx_x64.tar.gz"],
         version = "21",
     ),
     struct(
         name = "remotejdk21_win_arm64",
         target_compatible_with = ["@platforms//os:windows", "@platforms//cpu:arm64"],
-        sha256 = "975603e684f2ec5a525b3b5336d6aa0b09b5b7d2d0d9e271bd6a9892ad550181",
-        strip_prefix = "jdk-21+35",
-        urls = ["https://aka.ms/download-jdk/microsoft-jdk-21.0.0-windows-aarch64.zip", "https://mirror.bazel.build/aka.ms/download-jdk/microsoft-jdk-21.0.0-windows-aarch64.zip"],
+        sha256 = "9f873eccf030b1d3dc879ec1eb0ff5e11bf76002dc81c5c644c3462bf6c5146b",
+        strip_prefix = "zulu21.36.17-ca-jdk21.0.4-win_aarch64",
+        urls = ["https://cdn.azul.com/zulu/bin/zulu21.36.17-ca-jdk21.0.4-win_aarch64.zip", "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu21.36.17-ca-jdk21.0.4-win_aarch64.zip"],
+        version = "21",
+    ),
+    struct(
+        name = "remotejdk21_win",
+        target_compatible_with = ["@platforms//os:windows", "@platforms//cpu:x86_64"],
+        sha256 = "d771dad10d3f0b440c3686d1f3d2b68b320802ac97b212d87671af3f2eef8848",
+        strip_prefix = "zulu21.36.17-ca-jdk21.0.4-win_x64",
+        urls = ["https://cdn.azul.com/zulu/bin/zulu21.36.17-ca-jdk21.0.4-win_x64.zip", "https://mirror.bazel.build/cdn.azul.com/zulu/bin/zulu21.36.17-ca-jdk21.0.4-win_x64.zip"],
+        version = "21",
+    ),
+    struct(
+        name = "remotejdk21_linux_ppc64le",
+        target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:ppc"],
+        sha256 = "c208cd0fb90560644a90f928667d2f53bfe408c957a5e36206585ad874427761",
+        strip_prefix = "jdk-21.0.4+7",
+        urls = ["https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4+7/OpenJDK21U-jdk_ppc64le_linux_hotspot_21.0.4_7.tar.gz", "https://mirror.bazel.build/github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4+7/OpenJDK21U-jdk_ppc64le_linux_hotspot_21.0.4_7.tar.gz"],
+        version = "21",
+    ),
+    struct(
+        name = "remotejdk21_linux_s390x",
+        target_compatible_with = ["@platforms//os:linux", "@platforms//cpu:s390x"],
+        sha256 = "c900c8d64fab1e53274974fa4a4c736a5a3754485a5c56f4947281480773658a",
+        strip_prefix = "jdk-21.0.4+7",
+        urls = ["https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4+7/OpenJDK21U-jdk_s390x_linux_hotspot_21.0.4_7.tar.gz", "https://mirror.bazel.build/github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.4+7/OpenJDK21U-jdk_s390x_linux_hotspot_21.0.4_7.tar.gz"],
         version = "21",
     ),
 ]
@@ -361,17 +363,8 @@ def remote_jdk21_repos():
     _remote_jdk_repos_for_version("21")
 
 def rules_java_dependencies():
-    """An utility method to load all dependencies of rules_java.
-
-    Loads the remote repositories used by default in Bazel.
-    """
-
-    local_jdk_repo()
-    remote_jdk8_repos()
-    remote_jdk11_repos()
-    remote_jdk17_repos()
-    remote_jdk21_repos()
-    java_tools_repos()
+    """DEPRECATED: No-op, kept for backwards compatibility"""
+    print("DEPRECATED: use rules_java_dependencies() from rules_java_deps.bzl")  # buildifier: disable=print
 
 def rules_java_toolchains(name = "toolchains"):
     """An utility method to load all Java toolchains.
@@ -379,6 +372,13 @@ def rules_java_toolchains(name = "toolchains"):
     Args:
         name: The name of this macro (not used)
     """
+    local_jdk_repo()
+    remote_jdk8_repos()
+    remote_jdk11_repos()
+    remote_jdk17_repos()
+    remote_jdk21_repos()
+    java_tools_repos()
+
     native.register_toolchains(
         "//toolchains:all",
         "@local_jdk//:runtime_toolchain_definition",

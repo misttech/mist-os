@@ -92,11 +92,12 @@ class TestWhlFilegroup(unittest.TestCase):
             metadata_file_content = json.load(metadata_file)
 
         want = dict(
-            version="0.0.1",
-            name="example-minimal-package",
             deps=[],
             deps_by_platform={},
             entry_points=[],
+            name="example-minimal-package",
+            python_version="3.11.11",
+            version="0.0.1",
         )
         self.assertEqual(want, metadata_file_content)
 

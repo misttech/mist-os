@@ -15,9 +15,10 @@
 load("@bazel_skylib//rules:build_test.bzl", "build_test")
 load("@bazel_skylib//rules:write_file.bzl", "write_file")
 load("//examples/wheel/private:wheel_utils.bzl", "directory_writer", "make_variable_tags")
-load("//python:defs.bzl", "py_library", "py_test")
 load("//python:packaging.bzl", "py_package", "py_wheel")
 load("//python:pip.bzl", "compile_pip_requirements")
+load("//python:py_library.bzl", "py_library")
+load("//python:py_test.bzl", "py_test")
 load("//python:versions.bzl", "gen_python_config_settings")
 load("//python/entry_points:py_console_script_binary.bzl", "py_console_script_binary")
 load("//python/private:bzlmod_enabled.bzl", "BZLMOD_ENABLED")  # buildifier: disable=bzl-visibility
@@ -32,6 +33,7 @@ py_library(
     deps = [
         "//examples/wheel/lib:simple_module",
         "//examples/wheel/lib:module_with_data",
+        "//examples/wheel/lib:module_with_type_annotations",
         # Example dependency which is not packaged in the wheel
         # due to "packages" filter on py_package rule.
         "//tests/load_from_macro:foo",
@@ -66,6 +68,7 @@ py_wheel(
     version = "0.0.1",
     deps = [
         "//examples/wheel/lib:module_with_data",
+        "//examples/wheel/lib:module_with_type_annotations",
         "//examples/wheel/lib:simple_module",
     ],
 )
@@ -89,6 +92,7 @@ py_wheel(
     version = "$(VERSION)",
     deps = [
         "//examples/wheel/lib:module_with_data",
+        "//examples/wheel/lib:module_with_type_annotations",
         "//examples/wheel/lib:simple_module",
     ],
 )
@@ -108,6 +112,7 @@ py_wheel(
     version = "0.1.{BUILD_TIMESTAMP}",
     deps = [
         "//examples/wheel/lib:module_with_data",
+        "//examples/wheel/lib:module_with_type_annotations",
         "//examples/wheel/lib:simple_module",
     ],
 )
@@ -290,6 +295,12 @@ starlark  # Example comment
 )
 
 write_file(
+    name = "empty_requires_file",
+    out = "empty_requires.txt",
+    content = [""],
+)
+
+write_file(
     name = "extra_requires_file",
     out = "extra_requires.txt",
     content = """\
@@ -315,6 +326,15 @@ py_wheel(
     # can be convenient for users of `compile_pip_requirements` who have
     # granular `requirements.in` files per package.
     requires_file = ":requires.txt",
+    version = "0.0.1",
+    deps = [":example_pkg"],
+)
+
+py_wheel(
+    name = "empty_requires_files",
+    distribution = "empty_requires_files",
+    python_tag = "py3",
+    requires_file = ":empty_requires.txt",
     version = "0.0.1",
     deps = [":example_pkg"],
 )
@@ -362,6 +382,7 @@ py_test(
         ":custom_package_root_multi_prefix",
         ":custom_package_root_multi_prefix_reverse_order",
         ":customized",
+        ":empty_requires_files",
         ":extra_requires",
         ":filename_escaping",
         ":minimal_data_files",

@@ -1,5 +1,5 @@
 load("@bazel_skylib//:bzl_library.bzl", "bzl_library")
-load("@rules_cc//cc:defs.bzl", "cc_library")
+load("@rules_cc//cc:cc_library.bzl", "cc_library")
 load(
     ":default_java_toolchain.bzl",
     "DEFAULT_TOOLCHAIN_CONFIGURATION",
@@ -66,8 +66,8 @@ filegroup(
 #
 # Toolchains of this type are only consumed internally by the bootclasspath rule and should not be
 # accessed from Starlark.
-# TODO: migrate away from using @bazel_tools//tools/jdk:bootstrap_runtime_toolchain_type ?
-# toolchain_type(name = "bootstrap_runtime_toolchain_type")
+
+toolchain_type(name = "bootstrap_runtime_toolchain_type")
 
 # Points to toolchain[":runtime_toolchain_type"] (was :legacy_current_java_runtime)
 java_runtime_alias(name = "current_java_runtime")
@@ -136,9 +136,9 @@ cc_library(
         "@bazel_tools//src/conditions:darwin": ["include/darwin"],
         "@bazel_tools//src/conditions:freebsd": ["include/freebsd"],
         "@bazel_tools//src/conditions:linux_aarch64": ["include/linux"],
-        "@bazel_tools//src/conditions:linux_mips64": [":include/linux"],
+        "@bazel_tools//src/conditions:linux_mips64": ["include/linux"],
         "@bazel_tools//src/conditions:linux_ppc64le": ["include/linux"],
-        "@bazel_tools//src/conditions:linux_riscv64": [":include/linux"],
+        "@bazel_tools//src/conditions:linux_riscv64": ["include/linux"],
         "@bazel_tools//src/conditions:linux_s390x": ["include/linux"],
         "@bazel_tools//src/conditions:linux_x86_64": ["include/linux"],
         "@bazel_tools//src/conditions:openbsd": ["include/openbsd"],
@@ -158,6 +158,11 @@ cc_library(
         alias(
             name = "prebuilt_singlejar_%s" % OS,
             actual = "@remote_java_tools_%s//:prebuilt_singlejar" % OS,
+            visibility = ["//visibility:private"],
+        ),
+        alias(
+            name = "prebuilt_one_version_%s" % OS,
+            actual = "@remote_java_tools_%s//:prebuilt_one_version" % OS,
             visibility = ["//visibility:private"],
         ),
         alias(
@@ -226,6 +231,32 @@ alias(
 )
 
 alias(
+    name = "one_version",
+    actual = ":one_version_prebuilt_or_cc_binary",
+)
+
+alias(
+    name = "one_version_prebuilt_or_cc_binary",
+    actual = select({
+        "@bazel_tools//src/conditions:darwin_arm64": ":prebuilt_one_version_darwin_arm64",
+        "@bazel_tools//src/conditions:darwin_x86_64": ":prebuilt_one_version_darwin_x86_64",
+        "@bazel_tools//src/conditions:linux_x86_64": ":prebuilt_one_version_linux",
+        "@bazel_tools//src/conditions:windows": ":prebuilt_one_version_windows",
+        "//conditions:default": "@remote_java_tools//:one_version_cc_bin",
+    }),
+)
+
+alias(
+    name = "prebuilt_one_version",
+    actual = select({
+        "@bazel_tools//src/conditions:darwin_arm64": ":prebuilt_one_version_darwin_arm64",
+        "@bazel_tools//src/conditions:darwin_x86_64": ":prebuilt_one_version_darwin_x86_64",
+        "@bazel_tools//src/conditions:linux_x86_64": ":prebuilt_one_version_linux",
+        "@bazel_tools//src/conditions:windows": ":prebuilt_one_version_windows",
+    }),
+)
+
+alias(
     name = "turbine_direct",
     actual = ":turbine_direct_graal_or_java",
 )
@@ -290,18 +321,6 @@ default_java_toolchain(
 java_runtime_version_alias(
     name = "remote_jdk11",
     runtime_version = "remotejdk_11",
-    visibility = ["//visibility:public"],
-)
-
-java_runtime_version_alias(
-    name = "remotejdk_15",
-    runtime_version = "remotejdk_15",
-    visibility = ["//visibility:public"],
-)
-
-java_runtime_version_alias(
-    name = "remotejdk_16",
-    runtime_version = "remotejdk_16",
     visibility = ["//visibility:public"],
 )
 

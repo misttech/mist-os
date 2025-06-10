@@ -14,7 +14,7 @@ bzl_library(
     name = "toolchain_rules",
     srcs = glob(["*.bzl"]),
     visibility = ["//visibility:public"],
-    deps = ["//java/private"],
+    deps = ["@compatibility_proxy//:proxy_bzl"],
 )
 
 filegroup(

@@ -14,9 +14,10 @@
 
 "Implementation of py_wheel rule"
 
-load("//python/private:stamp.bzl", "is_stamping_enabled")
+load(":py_info.bzl", "PyInfo")
 load(":py_package.bzl", "py_package_lib")
 load(":py_wheel_normalize_pep440.bzl", "normalize_pep440")
+load(":stamp.bzl", "is_stamping_enabled")
 
 PyWheelInfo = provider(
     doc = "Information about a wheel produced by `py_wheel`",
@@ -33,6 +34,10 @@ _distribution_attrs = {
     "abi": attr.string(
         default = "none",
         doc = "Python ABI tag. 'none' for pure-Python wheels.",
+    ),
+    "compress": attr.bool(
+        default = True,
+        doc = "Enable compression of the final archive.",
     ),
     "distribution": attr.string(
         mandatory = True,
@@ -315,8 +320,13 @@ def _py_wheel_impl(ctx):
 
     name_file = ctx.actions.declare_file(ctx.label.name + ".name")
 
+    direct_pyi_files = []
+    for dep in ctx.attr.deps:
+        if PyInfo in dep:
+            direct_pyi_files.extend(dep[PyInfo].direct_pyi_files.to_list())
+
     inputs_to_package = depset(
-        direct = ctx.files.deps,
+        direct = ctx.files.deps + direct_pyi_files,
     )
 
     # Inputs to this rule which are not to be packaged.
@@ -466,6 +476,9 @@ def _py_wheel_impl(ctx):
         args.add("--description_file", description_file)
         other_inputs.append(description_file)
 
+    if not ctx.attr.compress:
+        args.add("--no_compress")
+
     for target, filename in ctx.attr.extra_distinfo_files.items():
         target_files = target.files.to_list()
         if len(target_files) != 1:
@@ -507,6 +520,9 @@ def _py_wheel_impl(ctx):
         outputs = [outfile, name_file],
         arguments = [args],
         executable = ctx.executable._wheelmaker,
+        # The default shell env is used to better support toolchains that look
+        # up python at runtime using PATH.
+        use_default_shell_env = True,
         progress_message = "Building wheel {}".format(ctx.label),
     )
     return [

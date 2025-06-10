@@ -5,9 +5,70 @@
 
 # //python/config_settings
 
+:::{bzl:flag} add_srcs_to_runfiles
+Determines if the `srcs` of targets are added to their runfiles.
+
+More specifically, the sources added to runfiles are the `.py` files in `srcs`.
+If precompiling is performed, it is the `.py` files that are kept according
+to {obj}`precompile_source_retention`.
+
+Values:
+* `auto`: (default) Automatically decide the effective value; the current
+  behavior is `disabled`.
+* `disabled`: Don't add `srcs` to a target's runfiles.
+* `enabled`:  Add `srcs` to a target's runfiles.
+::::{versionadded} 0.37.0
+::::
+::::{deprecated} 0.37.0
+This is a transition flag and will be removed in a subsequent release.
+::::
+:::
+
 :::{bzl:flag} python_version
 Determines the default hermetic Python toolchain version. This can be set to
 one of the values that `rules_python` maintains.
+:::
+
+:::{bzl:target} python_version_major_minor
+Parses the value of the `python_version` and transforms it into a `X.Y` value.
+:::
+
+:::{bzl:target} is_python_*
+config_settings to match Python versions
+
+The name pattern is `is_python_X.Y` (to match major.minor) and `is_python_X.Y.Z`
+(to match major.minor.patch).
+
+Note that the set of available targets depends on the configured
+`TOOL_VERSIONS`. Versions may not always be available if the root module has
+customized them, or as older Python versions are removed from rules_python's set
+of builtin, known versions.
+
+If you need to match a version that isn't present, then you have two options:
+1. Manually define a `config_setting` and have it match {obj}`--python_version`
+   or {obj}`python_version_major_minor`. This works best when you don't control the
+   root module, or don't want to rely on the MODULE.bazel configuration. Such
+   a config settings would look like:
+   ```
+   # Match any 3.5 version
+   config_setting(
+       name = "is_python_3.5",
+       flag_values = {
+           "@rules_python//python/config_settings:python_version_major_minor": "3.5",
+       }
+   )
+   # Match exactly 3.5.1
+   config_setting(
+       name = "is_python_3.5.1",
+       flag_values = {
+           "@rules_python//python/config_settings:python_version": "3.5.1",
+       }
+   )
+   ```
+
+2. Use {obj}`python.single_override` to re-introduce the desired version so
+   that the corresponding `//python/config_setting:is_python_XXX` target is
+   generated.
 :::
 
 ::::{bzl:flag} exec_tools_toolchain
@@ -38,12 +99,8 @@ Values:
 
 * `auto`: (default) Automatically decide the effective value based on environment,
   target platform, etc.
-* `enabled`: Compile Python source files at build time. Note that
-  {bzl:obj}`--precompile_add_to_runfiles` affects how the compiled files are included into
-  a downstream binary.
+* `enabled`: Compile Python source files at build time.
 * `disabled`: Don't compile Python source files at build time.
-* `if_generated_source`: Compile Python source files, but only if they're a
-  generated file.
 * `force_enabled`: Like `enabled`, except overrides target-level setting. This
   is mostly useful for development, testing enabling precompilation more
   broadly, or as an escape hatch if build-time compiling is not available.
@@ -51,6 +108,9 @@ Values:
   is useful useful for development, testing enabling precompilation more
   broadly, or as an escape hatch if build-time compiling is not available.
 :::{versionadded} 0.33.0
+:::
+:::{versionchanged} 0.37.0
+The `if_generated_source` value was removed
 :::
 ::::
 
@@ -69,45 +129,14 @@ Values:
   target platform, etc.
 * `keep_source`: Include the original Python source.
 * `omit_source`: Don't include the orignal py source.
-* `omit_if_generated_source`: Keep the original source if it's a regular source
-  file, but omit it if it's a generated file.
 
 :::{versionadded} 0.33.0
 :::
 :::{versionadded} 0.36.0
 The `auto` value
 :::
-::::
-
-::::{bzl:flag} precompile_add_to_runfiles
-Determines if a target adds its compiled files to its runfiles.
-
-When a target compiles its files, but doesn't add them to its own runfiles, it
-relies on a downstream target to retrieve them from
-{bzl:obj}`PyInfo.transitive_pyc_files`
-
-Values:
-* `always`: Always include the compiled files in the target's runfiles.
-* `decided_elsewhere`: Don't include the compiled files in the target's
-  runfiles; they are still added to {bzl:obj}`PyInfo.transitive_pyc_files`. See
-  also: {bzl:obj}`py_binary.pyc_collection` attribute. This is useful for allowing
-  incrementally enabling precompilation on a per-binary basis.
-:::{versionadded} 0.33.0
-:::
-::::
-
-::::{bzl:flag} pyc_collection
-Determine if `py_binary` collects transitive pyc files.
-
-:::{note}
-This flag is overridden by the target level `pyc_collection` attribute.
-:::
-
-Values:
-* `include_pyc`: Include `PyInfo.transitive_pyc_files` as part of the binary.
-* `disabled`: Don't include `PyInfo.transitive_pyc_files` as part of the binary.
-:::{versionadded} 0.33.0
-:::
+:::{versionchanged} 0.37.0
+The `omit_if_generated_source` value was removed
 ::::
 
 ::::{bzl:flag} py_linux_libc
@@ -117,6 +146,16 @@ Values:
 * `glibc`: Use `glibc`, default.
 * `muslc`: Use `muslc`.
 :::{versionadded} 0.33.0
+:::
+::::
+
+::::{bzl:flag} py_freethreaded
+Set whether to use an interpreter with the experimental freethreaded option set to true.
+
+Values:
+* `no`: Use regular Python toolchains, default.
+* `yes`: Use the experimental Python toolchain with freethreaded compile option enabled.
+:::{versionadded} 0.38.0
 :::
 ::::
 
@@ -173,6 +212,24 @@ Values:
 :::
 ::::
 
+
+::::
+
+:::{flag} venvs_site_packages
+
+Determines if libraries use a site-packages layout for their files.
+
+Note this flag only affects PyPI dependencies of `--bootstrap_impl=script` binaries
+
+:::{include} /_includes/experimental_api.md
+:::
+
+
+Values:
+* `no` (default): Make libraries importable by adding to `sys.path`
+* `yes`: Make libraries importable by creating paths in a binary's site-packages directory.
+::::
+
 ::::{bzl:flag} bootstrap_impl
 Determine how programs implement their startup process.
 
@@ -200,4 +257,45 @@ instead.
 :::{versionadded} 0.33.0
 :::
 
+::::
+
+::::{bzl:flag} current_config
+Fail the build if the current build configuration does not match the
+{obj}`pip.parse` defined wheels.
+
+Values:
+* `fail`: Will fail in the build action ensuring that we get the error
+  message no matter the action cache.
+* ``: (empty string) The default value, that will just print a warning.
+
+:::{seealso}
+{obj}`pip.parse`
+:::
+
+:::{versionadded} 1.1.0
+:::
+
+::::
+
+::::{bzl:flag} venvs_use_declare_symlink
+
+Determines if relative symlinks are created using `declare_symlink()` at build
+time.
+
+This is only intended to work around
+[#2489](https://github.com/bazel-contrib/rules_python/issues/2489), where some
+packaging rules don't support `declare_symlink()` artifacts.
+
+Values:
+* `yes`: Use `declare_symlink()` and create relative symlinks at build time.
+* `no`: Do not use `declare_symlink()`. Instead, the venv will be created at
+  runtime.
+
+:::{seealso}
+{envvar}`RULES_PYTHON_EXTRACT_ROOT` for customizing where the runtime venv
+is created.
+:::
+
+:::{versionadded} 1.2.0
+:::
 ::::

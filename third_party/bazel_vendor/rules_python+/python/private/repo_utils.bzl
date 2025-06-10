@@ -41,6 +41,10 @@ def _logger(mrctx, name = None):
 
     Returns:
         A struct with attributes logging: trace, debug, info, warn, fail.
+        Please use `return logger.fail` when using the `fail` method, because
+        it makes `buildifier` happy and ensures that other implementation of
+        the logger injected into the function work as expected by terminating
+        on the given line.
     """
     if _is_repo_debug_enabled(mrctx):
         verbosity_level = "DEBUG"
@@ -52,6 +56,7 @@ def _logger(mrctx, name = None):
 
     verbosity = {
         "DEBUG": 2,
+        "FAIL": -1,
         "INFO": 1,
         "TRACE": 3,
     }.get(verbosity_level, 0)
@@ -140,7 +145,7 @@ def _execute_internal(
     result = mrctx.execute(arguments, environment = environment, **kwargs)
 
     if fail_on_error and result.return_code != 0:
-        logger.fail((
+        return logger.fail((
             "repo.execute: {op}: end: failure:\n" +
             "  command: {cmd}\n" +
             "  return code: {return_code}\n" +
@@ -252,7 +257,7 @@ def _which_checked(mrctx, binary_name):
 def _which_unchecked(mrctx, binary_name):
     """Tests to see if a binary exists.
 
-    This is also watch the `PATH` environment variable.
+    Watches the `PATH` environment variable if the binary doesn't exist.
 
     Args:
         binary_name: name of the binary to find.
@@ -264,12 +269,12 @@ def _which_unchecked(mrctx, binary_name):
         * `describe_failure`: `Callable | None`; takes no args. If the
           binary couldn't be found, provides a detailed error description.
     """
-    path = _getenv(mrctx, "PATH", "")
     binary = mrctx.which(binary_name)
     if binary:
         _watch(mrctx, binary)
         describe_failure = None
     else:
+        path = _getenv(mrctx, "PATH", "")
         describe_failure = lambda: _which_describe_failure(binary_name, path)
 
     return struct(
@@ -387,8 +392,10 @@ def _get_platforms_cpu_name(mrctx):
         return "x86_32"
     if arch in ["amd64", "x86_64", "x64"]:
         return "x86_64"
-    if arch in ["ppc", "ppc64", "ppc64le"]:
+    if arch in ["ppc", "ppc64"]:
         return "ppc"
+    if arch in ["ppc64le"]:
+        return "ppc64le"
     if arch in ["arm", "armv7l"]:
         return "arm"
     if arch in ["aarch64"]:

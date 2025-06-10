@@ -14,18 +14,42 @@
 
 """A simple function that evaluates markers using a python interpreter."""
 
+load(":deps.bzl", "record_files")
+load(":pep508_env.bzl", "env")
+load(":pep508_evaluate.bzl", "evaluate")
+load(":pep508_platform.bzl", "platform_from_str")
+load(":pep508_requirement.bzl", "requirement")
 load(":pypi_repo_utils.bzl", "pypi_repo_utils")
 
 # Used as a default value in a rule to ensure we fetch the dependencies.
 SRCS = [
     # When the version, or any of the files in `packaging` package changes,
     # this file will change as well.
-    Label("@pypi__packaging//:packaging-24.0.dist-info/RECORD"),
+    record_files["pypi__packaging"],
     Label("//python/private/pypi/requirements_parser:resolve_target_platforms.py"),
     Label("//python/private/pypi/whl_installer:platform.py"),
 ]
 
-def evaluate_markers(mrctx, *, requirements, python_interpreter, python_interpreter_target, srcs, logger = None):
+def evaluate_markers(requirements, python_version = None):
+    """Return the list of supported platforms per requirements line.
+
+    Args:
+        requirements: {type}`dict[str, list[str]]` of the requirement file lines to evaluate.
+        python_version: {type}`str | None` the version that can be used when evaluating the markers.
+
+    Returns:
+        dict of string lists with target platforms
+    """
+    ret = {}
+    for req_string, platforms in requirements.items():
+        req = requirement(req_string)
+        for platform in platforms:
+            if evaluate(req.marker, env = env(platform_from_str(platform, python_version))):
+                ret.setdefault(req_string, []).append(platform)
+
+    return ret
+
+def evaluate_markers_py(mrctx, *, requirements, python_interpreter, python_interpreter_target, srcs, logger = None):
     """Return the list of supported platforms per requirements line.
 
     Args:
@@ -54,12 +78,12 @@ def evaluate_markers(mrctx, *, requirements, python_interpreter, python_interpre
     pypi_repo_utils.execute_checked(
         mrctx,
         op = "ResolveRequirementEnvMarkers({})".format(in_file),
+        python = pypi_repo_utils.resolve_python_interpreter(
+            mrctx,
+            python_interpreter = python_interpreter,
+            python_interpreter_target = python_interpreter_target,
+        ),
         arguments = [
-            pypi_repo_utils.resolve_python_interpreter(
-                mrctx,
-                python_interpreter = python_interpreter,
-                python_interpreter_target = python_interpreter_target,
-            ),
             "-m",
             "python.private.pypi.requirements_parser.resolve_target_platforms",
             in_file,

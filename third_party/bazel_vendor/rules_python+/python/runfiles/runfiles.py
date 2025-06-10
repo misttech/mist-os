@@ -56,15 +56,26 @@ class _ManifestBased:
     def _LoadRunfiles(path: str) -> Dict[str, str]:
         """Loads the runfiles manifest."""
         result = {}
-        with open(path, "r") as f:
+        with open(path, "r", encoding="utf-8", newline="\n") as f:
             for line in f:
-                line = line.strip()
-                if line:
-                    tokens = line.split(" ", 1)
-                    if len(tokens) == 1:
-                        result[line] = line
-                    else:
-                        result[tokens[0]] = tokens[1]
+                line = line.rstrip("\n")
+                if line.startswith(" "):
+                    # In lines that start with a space, spaces, newlines, and backslashes are escaped as \s, \n, and \b in
+                    # link and newlines and backslashes are escaped in target.
+                    escaped_link, escaped_target = line[1:].split(" ", maxsplit=1)
+                    link = (
+                        escaped_link.replace(r"\s", " ")
+                        .replace(r"\n", "\n")
+                        .replace(r"\b", "\\")
+                    )
+                    target = escaped_target.replace(r"\n", "\n").replace(r"\b", "\\")
+                else:
+                    link, target = line.split(" ", maxsplit=1)
+
+                if target:
+                    result[link] = target
+                else:
+                    result[link] = link
         return result
 
     def _GetRunfilesDir(self) -> str:
@@ -356,7 +367,7 @@ def _ParseRepoMapping(repo_mapping_path: Optional[str]) -> Dict[Tuple[str, str],
     if not repo_mapping_path:
         return {}
     try:
-        with open(repo_mapping_path, "r") as f:
+        with open(repo_mapping_path, "r", encoding="utf-8", newline="\n") as f:
             content = f.read()
     except FileNotFoundError:
         return {}

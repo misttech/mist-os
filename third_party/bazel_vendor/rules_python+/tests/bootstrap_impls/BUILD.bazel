@@ -1,3 +1,5 @@
+load("@rules_shell//shell:sh_test.bzl", "sh_test")
+
 # Copyright 2023 The Bazel Authors. All rights reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,14 +13,39 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+load("//tests/support:sh_py_run_test.bzl", "py_reconfig_binary", "py_reconfig_test", "sh_py_run_test")
+load("//tests/support:support.bzl", "SUPPORTS_BOOTSTRAP_SCRIPT")
+load(":venv_relative_path_tests.bzl", "relative_path_test_suite")
 
-load("//python/private:util.bzl", "IS_BAZEL_7_OR_HIGHER")  # buildifier: disable=bzl-visibility
-load("//tests/support:sh_py_run_test.bzl", "py_reconfig_test", "sh_py_run_test")
+py_reconfig_binary(
+    name = "bootstrap_script_zipapp_bin",
+    srcs = ["bin.py"],
+    bootstrap_impl = "script",
+    # Force it to not be self-executable
+    build_python_zip = "no",
+    main = "bin.py",
+    target_compatible_with = SUPPORTS_BOOTSTRAP_SCRIPT,
+)
 
-_SUPPORTS_BOOTSTRAP_SCRIPT = select({
-    "@platforms//os:windows": ["@platforms//:incompatible"],
-    "//conditions:default": [],
-}) if IS_BAZEL_7_OR_HIGHER else ["@platforms//:incompatible"]
+filegroup(
+    name = "bootstrap_script_zipapp_zip",
+    testonly = 1,
+    srcs = [":bootstrap_script_zipapp_bin"],
+    output_group = "python_zip_file",
+)
+
+sh_test(
+    name = "bootstrap_script_zipapp_test",
+    srcs = ["bootstrap_script_zipapp_test.sh"],
+    data = [":bootstrap_script_zipapp_zip"],
+    env = {
+        "ZIP_RLOCATION": "$(rlocationpaths :bootstrap_script_zipapp_zip)".format(),
+    },
+    target_compatible_with = SUPPORTS_BOOTSTRAP_SCRIPT,
+    deps = [
+        "@bazel_tools//tools/bash/runfiles",
+    ],
+)
 
 sh_py_run_test(
     name = "run_binary_zip_no_test",
@@ -35,12 +62,28 @@ sh_py_run_test(
 )
 
 sh_py_run_test(
+    name = "run_binary_venvs_use_declare_symlink_no_test",
+    bootstrap_impl = "script",
+    py_src = "bin.py",
+    sh_src = "run_binary_venvs_use_declare_symlink_no_test.sh",
+    target_compatible_with = SUPPORTS_BOOTSTRAP_SCRIPT,
+    venvs_use_declare_symlink = "no",
+)
+
+sh_py_run_test(
+    name = "run_binary_find_runfiles_test",
+    py_src = "bin.py",
+    sh_src = "run_binary_find_runfiles_test.sh",
+    target_compatible_with = SUPPORTS_BOOTSTRAP_SCRIPT,
+)
+
+sh_py_run_test(
     name = "run_binary_bootstrap_script_zip_yes_test",
     bootstrap_impl = "script",
     build_python_zip = "yes",
     py_src = "bin.py",
     sh_src = "run_binary_zip_yes_test.sh",
-    target_compatible_with = _SUPPORTS_BOOTSTRAP_SCRIPT,
+    target_compatible_with = SUPPORTS_BOOTSTRAP_SCRIPT,
 )
 
 sh_py_run_test(
@@ -49,7 +92,15 @@ sh_py_run_test(
     build_python_zip = "no",
     py_src = "bin.py",
     sh_src = "run_binary_zip_no_test.sh",
-    target_compatible_with = _SUPPORTS_BOOTSTRAP_SCRIPT,
+    target_compatible_with = SUPPORTS_BOOTSTRAP_SCRIPT,
+)
+
+sh_py_run_test(
+    name = "run_binary_bootstrap_script_find_runfiles_test",
+    bootstrap_impl = "script",
+    py_src = "bin.py",
+    sh_src = "run_binary_find_runfiles_test.sh",
+    target_compatible_with = SUPPORTS_BOOTSTRAP_SCRIPT,
 )
 
 py_reconfig_test(
@@ -57,9 +108,9 @@ py_reconfig_test(
     srcs = ["sys_path_order_test.py"],
     bootstrap_impl = "script",
     env = {"BOOTSTRAP": "script"},
-    imports = ["./site-packages"],
+    imports = ["./USER_IMPORT/site-packages"],
     main = "sys_path_order_test.py",
-    target_compatible_with = _SUPPORTS_BOOTSTRAP_SCRIPT,
+    target_compatible_with = SUPPORTS_BOOTSTRAP_SCRIPT,
 )
 
 py_reconfig_test(
@@ -71,10 +122,39 @@ py_reconfig_test(
     main = "sys_path_order_test.py",
 )
 
+py_reconfig_test(
+    name = "main_module_test",
+    srcs = ["main_module.py"],
+    bootstrap_impl = "script",
+    imports = ["."],
+    main_module = "tests.bootstrap_impls.main_module",
+    target_compatible_with = SUPPORTS_BOOTSTRAP_SCRIPT,
+)
+
 sh_py_run_test(
     name = "inherit_pythonsafepath_env_test",
     bootstrap_impl = "script",
     py_src = "bin.py",
     sh_src = "inherit_pythonsafepath_env_test.sh",
-    target_compatible_with = _SUPPORTS_BOOTSTRAP_SCRIPT,
+    target_compatible_with = SUPPORTS_BOOTSTRAP_SCRIPT,
 )
+
+sh_py_run_test(
+    name = "sys_executable_inherits_sys_path",
+    bootstrap_impl = "script",
+    imports = ["./MARKER"],
+    py_src = "call_sys_exe.py",
+    sh_src = "sys_executable_inherits_sys_path_test.sh",
+    target_compatible_with = SUPPORTS_BOOTSTRAP_SCRIPT,
+)
+
+py_reconfig_test(
+    name = "interpreter_args_test",
+    srcs = ["interpreter_args_test.py"],
+    bootstrap_impl = "script",
+    interpreter_args = ["-XSPECIAL=1"],
+    main = "interpreter_args_test.py",
+    target_compatible_with = SUPPORTS_BOOTSTRAP_SCRIPT,
+)
+
+relative_path_test_suite(name = "relative_path_tests")
