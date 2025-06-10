@@ -79,14 +79,13 @@ class ScreenCapture2Test : public gtest::TestLoopFixture {
       EXPECT_CALL(*mock_renderer_.get(), ImportBufferImage(_, _))
           .WillRepeatedly(testing::Return(true));
 
-      EXPECT_CALL(*mock_renderer_.get(), Render(_, _, _, _, _))
+      EXPECT_CALL(*mock_renderer_.get(), Render(_, _, _, _))
           .WillRepeatedly([](const allocation::ImageMetadata& render_target,
                              const std::vector<ImageRect>& rectangles,
                              const std::vector<allocation::ImageMetadata>& images,
-                             const std::vector<zx::event>& release_fences,
-                             bool apply_color_conversion) {
+                             const flatland::Renderer::RenderArgs render_args) {
             // Fire all of the release fences.
-            for (auto& fence : release_fences) {
+            for (auto& fence : render_args.release_fences) {
               fence.signal(0, ZX_EVENT_SIGNALED);
             }
           });

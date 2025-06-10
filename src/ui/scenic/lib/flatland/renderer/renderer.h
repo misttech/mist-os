@@ -32,6 +32,17 @@ class Renderer : public allocation::BufferCollectionImporter {
  public:
   ~Renderer() override = default;
 
+  // Optional arguments passed to Renderer::Render().
+  struct RenderArgs {
+    // Fences that will be signaled once rendering has completed. Clients can use these fences to
+    // coordinate with other work that cannot be executed until rendering is completed.
+    std::span<zx::event> release_fences;
+
+    // If true, instructs the renderer to apply color conversion using the values specified by
+    // |SetColorConversionValues|.
+    bool apply_color_conversion = false;
+  };
+
   // This function is responsible for rendering a single batch of Flatland rectangles into a
   // render target. This function is designed to be called on the render thread, not on any
   // Flatland instance thread. The specific behavior may differ depending on the specific subclass
@@ -44,17 +55,15 @@ class Renderer : public allocation::BufferCollectionImporter {
   // The size of the arrays |rectangles| and |images| must match or else this function will CHECK.
   // Entries in each array with the same index will be used together in rendering.
   //
-  // The vector of release fences will be signaled once rendering has completed. Clients can use
-  // these fences to coordinate with other work that needs to wait until rendering is completed
-  // to be executed.
+  // The final argument |render_args| contains optional arguments that affect rendering.  See the
+  // doc comments on each field of |struct RenderArgs|.
   //
   // If any of the |images| use protected memory but the |render_target| is not using protected
   // memory, the renderer replaces protected content with black solid color.
   virtual void Render(const allocation::ImageMetadata& render_target,
                       const std::vector<ImageRect>& rectangles,
                       const std::vector<allocation::ImageMetadata>& images,
-                      const std::vector<zx::event>& release_fences = {},
-                      bool apply_color_conversion = false) = 0;
+                      const RenderArgs& render_args) = 0;
 
   // Values needed to adjust the color of the framebuffer as a postprocessing effect.
   virtual void SetColorConversionValues(const fidl::Array<float, 9>& coefficients,

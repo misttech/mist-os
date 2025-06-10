@@ -165,8 +165,7 @@ void CpuRenderer::SetColorConversionValues(const fidl::Array<float, 9>& coeffici
 void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
                          const std::vector<ImageRect>& rectangles,
                          const std::vector<allocation::ImageMetadata>& images,
-                         const std::vector<zx::event>& release_fences = {},
-                         bool apply_color_conversion = false) {
+                         const RenderArgs& render_args) {
   TRACE_DURATION("gfx", "CpuRenderer::Render");
   std::scoped_lock lock(lock_);
   FX_CHECK(images.size() == rectangles.size());
@@ -303,7 +302,7 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
   }
 
   // Fire all of the release fences.
-  for (auto& fence : release_fences) {
+  for (auto& fence : render_args.release_fences) {
     fence.signal(0, ZX_EVENT_SIGNALED);
   }
 }

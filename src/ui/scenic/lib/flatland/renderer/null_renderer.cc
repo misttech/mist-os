@@ -148,8 +148,7 @@ void NullRenderer::SetColorConversionValues(const fidl::Array<float, 9>& coeffic
 void NullRenderer::Render(const allocation::ImageMetadata& render_target,
                           const std::vector<ImageRect>& rectangles,
                           const std::vector<allocation::ImageMetadata>& images,
-                          const std::vector<zx::event>& release_fences,
-                          bool apply_color_conversion) {
+                          const RenderArgs& render_args) {
   std::scoped_lock lock(lock_);
   for (const auto& image : images) {
     auto image_id = image.identifier;
@@ -165,7 +164,7 @@ void NullRenderer::Render(const allocation::ImageMetadata& render_target,
   }
 
   // Fire all of the release fences.
-  for (auto& fence : release_fences) {
+  for (auto& fence : render_args.release_fences) {
     fence.signal(0, ZX_EVENT_SIGNALED);
   }
 }

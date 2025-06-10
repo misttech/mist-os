@@ -177,8 +177,9 @@ void ScreenCapture::MaybeRenderFrame() {
   // TODO(https://fxbug.dev/42174813): Clean up current_release_fences_ once bug is fixed.
   FX_DCHECK(current_release_fences_.empty());
   current_release_fences_.push_back(std::move(release_fence));
+
   // Render content into user-provided buffer, which will signal the release_fence.
-  renderer_->Render(metadata, rects, image_metadatas, current_release_fences_);
+  renderer_->Render(metadata, rects, image_metadatas, {.release_fences = current_release_fences_});
 }
 
 void ScreenCapture::HandleRender(uint32_t buffer_index, uint64_t timestamp) {

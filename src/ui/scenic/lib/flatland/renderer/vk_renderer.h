@@ -56,9 +56,7 @@ class VkRenderer final : public Renderer {
   // |Renderer|.
   // Only called from the main thread.
   void Render(const ImageMetadata& render_target, const std::vector<ImageRect>& rectangles,
-              const std::vector<ImageMetadata>& images,
-              const std::vector<zx::event>& release_fences = {},
-              bool apply_color_conversion = false) override;
+              const std::vector<ImageMetadata>& images, const RenderArgs& render_args) override;
 
   // |Renderer|.
   // Only called from the main thread.

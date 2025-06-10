@@ -48,8 +48,7 @@ class NullRenderer final : public Renderer {
   void Render(const allocation::ImageMetadata& render_target,
               const std::vector<ImageRect>& rectangles,
               const std::vector<allocation::ImageMetadata>& images,
-              const std::vector<zx::event>& release_fences = {},
-              bool apply_color_conversion = false) override;
+              const RenderArgs& render_args) override;
 
   // |Renderer|.
   void SetColorConversionValues(const fidl::Array<float, 9>& coefficients,

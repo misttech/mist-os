@@ -823,17 +823,23 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
       }
     }
 
-    const auto apply_cc = (cc_state_machine_.GetDataToApply() != std::nullopt);
     std::vector<zx::event> render_fences;
     render_fences.push_back(std::move(event_data.wait_event));
+
+    Renderer::RenderArgs render_args{
+        .release_fences = render_fences,
+        .apply_color_conversion = cc_state_machine_.GetDataToApply().has_value(),
+    };
+
     // Only add render_finished_fence if we're rendering the final display's framebuffer.
     if (is_final_display) {
       render_fences.push_back(std::move(render_finished_fence));
-      renderer_->Render(render_target, render_data.rectangles, images, render_fences, apply_cc);
+      render_args.release_fences = render_fences;
+      renderer_->Render(render_target, render_data.rectangles, images, render_args);
       // Retrieve fence.
       render_finished_fence = std::move(render_fences.back());
     } else {
-      renderer_->Render(render_target, render_data.rectangles, images, render_fences, apply_cc);
+      renderer_->Render(render_target, render_data.rectangles, images, render_args);
     }
 
     // Retrieve fence.
