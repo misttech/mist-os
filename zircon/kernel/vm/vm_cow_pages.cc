@@ -7680,6 +7680,9 @@ zx::result<uint64_t> VmCowPages::ReclaimDiscardable(vm_page_t* page, uint64_t of
     return ZX_ERR_STOP;
   });
   if (!first) {
+    // Mark the page accessed so that it's no longer a reclamation candidate. The other error path
+    // above already does this inside the CanReclaimPageLocked() helper.
+    pmm_page_queues()->MarkAccessed(page);
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
