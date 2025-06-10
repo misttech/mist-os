@@ -20,8 +20,9 @@
 #include <fbl/auto_lock.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
-#include "src/graphics/display/drivers/coordinator/client.h"
+#include "src/graphics/display/drivers/coordinator/client-proxy.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"

@@ -43,7 +43,7 @@
 #include "src/graphics/display/drivers/coordinator/added-display-info.h"
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
-#include "src/graphics/display/drivers/coordinator/client.h"
+#include "src/graphics/display/drivers/coordinator/client-proxy.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"

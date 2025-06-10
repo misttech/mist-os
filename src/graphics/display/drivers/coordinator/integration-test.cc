@@ -32,6 +32,7 @@
 #include <gtest/gtest.h>
 
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
+#include "src/graphics/display/drivers/coordinator/client-proxy.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"

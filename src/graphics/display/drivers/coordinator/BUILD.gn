@@ -54,6 +54,8 @@ source_set("shared") {
     "client-id.h",
     "client-priority.cc",
     "client-priority.h",
+    "client-proxy.cc",
+    "client-proxy.h",
     "client.cc",
     "client.h",
     "controller.cc",
