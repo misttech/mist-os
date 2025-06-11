@@ -66,7 +66,6 @@ static_library("boot-shim") {
     "cmdline.cc",
     "debugdata.cc",
     "devicetree-arm-gic-item.cc",
-    "devicetree-arm-psci-cpu-suspend-item.cc",
     "devicetree-arm-psci-item.cc",
     "devicetree-arm-timer-item.cc",
     "devicetree-arm-timer-mmio-item.cc",
@@ -147,7 +146,6 @@ if (!is_kernel) {
     sources = [
       "devicetree-arm-cpu-topology-item-test.cc",
       "devicetree-arm-gic-item-test.cc",
-      "devicetree-arm-psci-cpu-suspend-item-test.cc",
       "devicetree-arm-psci-item-test.cc",
       "devicetree-arm-timer-item-test.cc",
       "devicetree-arm-timer-mmio-item-test.cc",
