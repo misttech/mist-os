@@ -166,14 +166,14 @@ pub async fn exec_playground(
             Err(anyhow!("Cannot specify a command and a file at the same time"))
         } else {
             let res = interpreter.run(cmd.as_str()).await;
-            analytics::emit_playground_cmd_event(res.is_ok(), "argument");
+            analytics::emit_playground_cmd_event(res.is_ok(), "argument").await;
             display_result(&mut AllowStdIo::new(&io::stdout()), res, &interpreter).await?;
             Ok(())
         }
     } else if let Some(file) = command.file {
         afs::File::open(&file).await?.read_to_string(&mut text).await?;
         let res = interpreter.run(text.as_str()).await;
-        analytics::emit_playground_cmd_event(res.is_ok(), "script");
+        analytics::emit_playground_cmd_event(res.is_ok(), "script").await;
         display_result(&mut AllowStdIo::new(&io::stdout()), res, &interpreter).await?;
         Ok(())
     } else {
@@ -206,7 +206,7 @@ pub async fn exec_playground(
             if let Some(line) = line? {
                 fasync::Task::local(async move {
                     let res = interpreter.run(line.as_str()).await;
-                    analytics::emit_playground_cmd_event(res.is_ok(), "interactive");
+                    analytics::emit_playground_cmd_event(res.is_ok(), "interactive").await;
                     display_result(&mut repl::ReplWriter::new(&*repl), res, &interpreter)
                         .await
                         .unwrap();
