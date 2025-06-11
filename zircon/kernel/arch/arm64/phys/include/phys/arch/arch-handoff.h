@@ -17,8 +17,6 @@
 #include <optional>
 #include <variant>
 
-#include <phys/handoff-ptr.h>
-
 struct ArchPatchInfo {
   Arm64AlternateVbar alternate_vbar = Arm64AlternateVbar::kNone;
 };
@@ -55,9 +53,6 @@ struct ArchPhysHandoff {
 
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_ARM_PSCI) payload.
   std::optional<zbi_dcfg_arm_psci_driver_t> psci_driver;
-
-  // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_ARM_PSCI_CPU_SUSPEND_DRIVER) payload.
-  PhysHandoffTemporarySpan<const zbi_dcfg_arm_psci_cpu_suspend_state_t> psci_cpu_suspend_driver;
 
   // (ZBI_TYPE_KERNEL_DRIVER, ZBI_KERNEL_DRIVER_GENERIC32_WATCHDOG) payload.
   std::optional<zbi_dcfg_generic32_watchdog_t> generic32_watchdog_driver;

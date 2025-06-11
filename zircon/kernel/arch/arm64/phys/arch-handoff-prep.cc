@@ -200,18 +200,6 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
               *reinterpret_cast<const zbi_dcfg_arm_psci_driver_t*>(payload.data());
           SaveForMexec(header, payload);
           break;
-        case ZBI_KERNEL_DRIVER_ARM_PSCI_CPU_SUSPEND: {
-          fbl::AllocChecker ac;
-          ZX_ASSERT_MSG(
-              payload.size() % sizeof(zbi_dcfg_arm_psci_cpu_suspend_state_t) == 0,
-              "Payload size of ZBI_KERNEL_DRIVER_ARM_PSCI_CPU_SUSPEND was %zu, must be multiple of %zu",
-              payload.size(), sizeof(zbi_dcfg_arm_psci_cpu_suspend_state_t));
-          ktl::span buffer = New(arch_handoff.psci_cpu_suspend_driver, ac, payload.size());
-          ZX_ASSERT_MSG(ac.check(),
-                        "cannot allocate %zu bytes for ZBI_KERNEL_DRIVER_ARM_PSCI_CPU_SUSPEND",
-                        payload.size());
-          memcpy(buffer.data(), payload.data(), payload.size_bytes());
-        } break;
         case ZBI_KERNEL_DRIVER_GENERIC32_WATCHDOG:
           ZX_ASSERT(payload.size() >= sizeof(zbi_dcfg_generic32_watchdog_t));
           arch_handoff.generic32_watchdog_driver =
