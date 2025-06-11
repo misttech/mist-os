@@ -104,6 +104,11 @@ func TestCopyDir(t *testing.T) {
 		t.Fatalf("failed to create dst %q: %v", dstDir, err)
 	}
 
+	otherDir := filepath.Join(tmpDir, "other")
+	if err := os.Mkdir(otherDir, 0o700); err != nil {
+		t.Fatalf("failed to create other %q: %v", otherDir, err)
+	}
+
 	srcPaths := map[string]string{
 		"a":     "a",
 		"b":     "",
@@ -130,11 +135,25 @@ func TestCopyDir(t *testing.T) {
 			}
 		}
 	}
+	otherSymlinkTargetPath := filepath.Join(otherDir, "z")
+	if err := os.WriteFile(otherSymlinkTargetPath, []byte("z"), 0o400); err != nil {
+		t.Fatalf("failed to write contents to src %q: %v", otherSymlinkTargetPath, err)
+	}
 
+	expectedDstSymlinkTarget := map[string]string{}
 	if err := os.Symlink(filepath.Join(srcDir, "a"), filepath.Join(srcDir, "c")); err != nil {
 		t.Fatalf("failed to create symlink: %v", err)
 	}
 	srcPaths["c"] = "a"
+	expectedDstSymlinkTarget[filepath.Join(dstDir, "c")] = filepath.Join(dstDir, "a")
+	if err := os.Symlink(otherSymlinkTargetPath, filepath.Join(srcDir, "d")); err != nil {
+		t.Fatalf("failed to create symlink: %v", err)
+	}
+	// If the symlink target is outside the srcDir, the symlink target should not
+	// be copied to the dstDir. Instead the dstPath should point towards the
+	// original symlink target.
+	srcPaths["d"] = "../other/z"
+	expectedDstSymlinkTarget[filepath.Join(dstDir, "d")] = otherSymlinkTargetPath
 
 	if skippedFiles, err := CopyDir(srcDir, dstDir, SkipUnknownFiles); err != nil {
 		t.Fatalf("failed to copy directory: %v", err)
@@ -184,6 +203,16 @@ func TestCopyDir(t *testing.T) {
 
 			if !bytes.Equal(srcContents, dstContents) {
 				t.Fatalf("src %q has different contents than dst %q", srcPath, dstPath)
+			}
+
+			if srcInfo.Mode()&os.ModeType == os.ModeSymlink {
+				dstSymlinkTarget, err := filepath.EvalSymlinks(dstPath)
+				if err != nil {
+					t.Fatalf("cannot find target for symlink in the dstDir %q", dstPath)
+				}
+				if dstSymlinkTarget != expectedDstSymlinkTarget[dstPath] {
+					t.Fatalf("the destination symlink target %s did not match the expected symlink target %s", dstSymlinkTarget, expectedDstSymlinkTarget[dstPath])
+				}
 			}
 		}
 
