@@ -62,10 +62,26 @@ int main(int argc, char** argv) {
     sink_map = early_boot_instrumentation::ExtractDebugData(std::move(response->resource));
   }();
 
+  auto out_logs = std::make_unique<vfs::PseudoDir>();
+  [&sink_map, &out_logs]() {
+    zx::result client_end = component::Connect<fuchsia_boot::Items>();
+    if (client_end.is_error()) {
+      FX_PLOGS(ERROR, client_end.status_value())
+          << "Failed to connect to "
+          << fidl::DiscoverableProtocolDefaultPath<fuchsia_boot::SvcStashProvider>;
+      return;
+    }
+    if (auto res = early_boot_instrumentation::ExposeDebugDataZbiItem(std::move(client_end).value(),
+                                                                      *out_logs, sink_map);
+        res.is_error()) {
+      FX_PLOGS(ERROR, res.status_value()) << "Failed to expose ZBI_ITEM_TYPE_DEBUGDATA";
+      return;
+    }
+  }();
+
   // Even if we fail to populate from the sources, we expose empty directories,
   // such that the contract remains.
   fbl::unique_fd boot_instrumentation_data_dir(open("/boot/kernel/i", O_RDONLY));
-  auto out_logs = std::make_unique<vfs::PseudoDir>();
   if (!boot_instrumentation_data_dir) {
     if (errno != ENOENT) {
       const char* err = strerror(errno);

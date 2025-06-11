@@ -26,7 +26,10 @@
             path: "/boot",
         },
         {
-            protocol: [ "fuchsia.boot.SvcStashProvider" ],
+            protocol: [
+                "fuchsia.boot.Items",
+                "fuchsia.boot.SvcStashProvider",
+            ],
         },
     ],
     expose: [

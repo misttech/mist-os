@@ -408,6 +408,7 @@ zx::result<> ExposeDebugDataZbiItem(fidl::ClientEnd<fuchsia_boot::Items> boot_it
 
       auto vmo_file = std::make_unique<vfs::VmoFile>(std::move(log_vmo), logs.size());
       log_out_dir.AddEntry(log_file_name, std::move(vmo_file));
+      FX_LOGS(INFO) << "Log file " << log_file_name << " exposed on log dir.";
     }
   }
   return zx::ok();

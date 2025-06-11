@@ -69,3 +69,33 @@ TEST(EarlyBootInstrumentationTest, HasSvcStashDataWithCustomSink) {
   ASSERT_TRUE(dynamic_file);
   ASSERT_TRUE(CheckContents("43218765", std::move(dynamic_file)));
 }
+
+TEST(EarlyBootInstrumentationTest, HasLogsFromZbiDebugDataItem) {
+  auto entries = cpp20::to_array<std::string_view>({"bar-fooz.log", "llvm-profile-foo.log"});
+  for (auto entry : entries) {
+    std::string path = "/logs/" + std::string(entry);
+    fbl::unique_fd file(open(path.c_str(), O_RDONLY));
+    ASSERT_TRUE(file);
+    ASSERT_TRUE(CheckContents("Fooz Barz", std::move(file)));
+  }
+}
+
+TEST(EarlyBootInstrumentationTest, HasLlvmProfileSinkFromZbiDebugDataItem) {
+  fbl::unique_fd static_file(open("/debugdata/llvm-profile/static/foo", O_RDONLY));
+  ASSERT_TRUE(static_file);
+  ASSERT_TRUE(CheckContents("foozbarz", std::move(static_file)));
+}
+
+TEST(EarlyBootInstrumentationTest, HasCustomSinkFromZbiDebugDataItem) {
+  {
+    fbl::unique_fd static_file(open("/debugdata/bar/static/foo", O_RDONLY));
+    ASSERT_TRUE(static_file);
+    ASSERT_TRUE(CheckContents("foozbarz", std::move(static_file)));
+  }
+
+  {
+    fbl::unique_fd static_file(open("/debugdata/bar/static/fooz", O_RDONLY));
+    ASSERT_TRUE(static_file);
+    ASSERT_TRUE(CheckContents("foozbarz", std::move(static_file)));
+  }
+}
