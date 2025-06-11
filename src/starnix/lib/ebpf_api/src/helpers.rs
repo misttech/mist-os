@@ -117,8 +117,7 @@ fn bpf_ktime_get_ns<C: EbpfProgramContext>(
     _: BpfValue,
     _: BpfValue,
 ) -> BpfValue {
-    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_ktime_get_ns");
-    42.into()
+    zx::MonotonicInstant::get().into_nanos().into()
 }
 
 fn bpf_ringbuf_reserve<C: EbpfProgramContext>(
