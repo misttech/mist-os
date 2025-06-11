@@ -1155,6 +1155,10 @@ impl<PS: ParseStrategy> Role<PS> {
     pub(super) fn name_bytes(&self) -> &[u8] {
         PS::deref_slice(&self.metadata.data)
     }
+
+    pub(super) fn types(&self) -> &ExtensibleBitmap<PS> {
+        &self.role_types
+    }
 }
 
 impl<PS: ParseStrategy> Parse<PS> for Role<PS>
