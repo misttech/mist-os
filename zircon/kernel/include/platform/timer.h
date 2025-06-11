@@ -308,4 +308,11 @@ inline void timer_unpause_monotonic() {
   internal::mono_ticks_modifier.store(new_offset, ktl::memory_order_relaxed);
 }
 
+// Returns true iff the monotonic clock is paused.
+//
+// Intended to be used in asserts.  Does not synchronize-with anything.
+inline bool timer_is_monotonic_paused() {
+  return internal::mono_ticks_modifier.load(ktl::memory_order_relaxed) > 0;
+}
+
 #endif  // ZIRCON_KERNEL_INCLUDE_PLATFORM_TIMER_H_

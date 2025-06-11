@@ -278,6 +278,12 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_instant_boot_t resu
   // Prevent re-entrant calls to suspend.
   Guard<Mutex> guard{TransitionLock::Get()};
 
+  // Ensure that the monotonic clock is running and is returned to the running state no matter how
+  // we leave this function.  This is a CYA check to ensure we don't inadvertently leave the clock
+  // paused.
+  DEBUG_ASSERT(!timer_is_monotonic_paused());
+  auto ensure_mono_not_paused = fit::defer([] { DEBUG_ASSERT(!timer_is_monotonic_paused()); });
+
   const zx_instant_boot_t suspend_request_boot_time = current_boot_time();
   if (resume_at < suspend_request_boot_time) {
     return ZX_ERR_TIMED_OUT;
