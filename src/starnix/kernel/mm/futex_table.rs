@@ -52,7 +52,10 @@ impl<Key: FutexKey> FutexTable<Key> {
         let mut state = self.state.lock();
         // As the state is locked, no wake can happen before the waiter is registered.
         // If the addr is remapped, we will read stale data, but we will not miss a futex wake.
-        let loaded_value = Self::load_futex_value(current_task, addr)?;
+        // Acquire ordering to synchronize with userspace modifications to the value on other
+        // threads.
+        let loaded_value =
+            current_task.mm().ok_or_else(|| errno!(EINVAL))?.atomic_load_u32_acquire(addr)?;
         if value != loaded_value {
             return error!(EAGAIN);
         }
@@ -94,7 +97,10 @@ impl<Key: FutexKey> FutexTable<Key> {
         let mut state = self.state.lock();
         // As the state is locked, no wake can happen before the waiter is registered.
         // If the addr is remapped, we will read stale data, but we will not miss a futex wake.
-        let loaded_value = Self::load_futex_value(current_task, addr)?;
+        // Acquire ordering to synchronize with userspace modifications to the value on other
+        // threads.
+        let loaded_value =
+            current_task.mm().ok_or_else(|| errno!(EINVAL))?.atomic_load_u32_acquire(addr)?;
         if value != loaded_value {
             return error!(EAGAIN);
         }
@@ -145,7 +151,10 @@ impl<Key: FutexKey> FutexTable<Key> {
         let new_key = Key::get(current_task, new_addr)?;
         let mut state = self.state.lock();
         if let Some(expected) = expected_value {
-            let value = Self::load_futex_value(current_task, addr)?;
+            // Use acquire ordering here to synchronize with mutex impls that store w/ release
+            // ordering.
+            let value =
+                current_task.mm().ok_or_else(|| errno!(EINVAL))?.atomic_load_u32_acquire(addr)?;
             if value != expected {
                 return error!(EAGAIN);
             }
@@ -310,11 +319,6 @@ impl<Key: FutexKey> FutexTable<Key> {
         }
 
         Ok(())
-    }
-
-    fn load_futex_value(current_task: &CurrentTask, addr: FutexAddress) -> Result<u32, Errno> {
-        // Use acquire ordering here to synchronize with mutex impls that store w/ release ordering.
-        current_task.mm().ok_or_else(|| errno!(EINVAL))?.atomic_load_u32_acquire(addr)
     }
 }
 
