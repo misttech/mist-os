@@ -383,7 +383,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	message := "The build directory for this build is " + cmd.buildDir + "\n"
 	nudge, _ := isNudgeOn(env, "balanced")
 	if cmd.isRelease && nudge {
-		message += "[Nudge] You have set --release, consider --balanced: https://fuchsia.dev/fuchsia-src/development/build/build_system/fuchsia_build_system_overview?hl=en#quick_comparison\n"
+		message += "[Nudge] You have set --release, consider --balanced: https://fuchsia.dev/fuchsia-src/development/build/build_system/fuchsia_build_system_overview#quick_comparison\n"
 		message += "(Silence nudge with `ffx config set ffx.ui.nudges.balanced false`)\n"
 	}
 	fmt.Printf(message)
