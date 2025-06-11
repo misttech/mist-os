@@ -331,7 +331,10 @@ async fn test_get_device_info_no_filter() -> Result<()> {
     let sys = &root.child_nodes[0];
 
     assert_eq!(sys.info.moniker.as_ref().expect("node missing moniker"), "dev.sys");
-    assert_eq!(sys.info.bound_driver_url.as_ref().expect("node missing driver URL"), "unbound");
+    assert_eq!(
+        sys.info.bound_driver_url.as_ref().expect("node missing driver URL"),
+        "owned by parent"
+    );
     assert_eq!(
         sys.info.node_property_list.as_ref().map(|x| x.as_slice()),
         get_no_protocol_property_list().as_ref().map(|x| x.as_slice())

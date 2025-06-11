@@ -79,6 +79,8 @@ void CompositeNodeSpecImpl::RemoveImpl(RemoveCompositeNodeCallback callback) {
     return;
   }
 
+  parent_set_collector_->ReleaseNodes();
+
   // TODO(https://fxbug.dev/42075799): Once we start enforcing the multibind composite flag, move
   // the parent nodes back to the orphaned nodes if they can't multibind.
   auto node = parent_set_collector_->completed_composite_node();

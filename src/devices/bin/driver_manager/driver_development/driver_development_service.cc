@@ -136,7 +136,9 @@ DriverDevelopmentService::DriverDevelopmentService(driver_manager::DriverRunner&
 void DriverDevelopmentService::Publish(component::OutgoingDirectory& outgoing) {
   auto result = outgoing.AddUnmanagedProtocol<fdd::Manager>(
       bindings_.CreateHandler(this, dispatcher_, [](fidl::UnbindInfo info) {
-        LOGF(WARNING, "development service closed. %s", info.FormatDescription().c_str());
+        if (!info.is_peer_closed()) {
+          LOGF(WARNING, "development service closed. %s", info.FormatDescription().c_str());
+        }
       }));
   ZX_ASSERT(result.is_ok());
 }

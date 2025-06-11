@@ -9,6 +9,7 @@ use super::subcommands::list_composite_node_specs::args::ListCompositeNodeSpecsC
 use super::subcommands::list_composites::args::ListCompositesCommand;
 use super::subcommands::list_devices::args::ListDevicesCommand;
 use super::subcommands::list_hosts::args::ListHostsCommand;
+use super::subcommands::node::args::NodeCommand;
 use super::subcommands::register::args::RegisterCommand;
 use super::subcommands::restart::args::RestartCommand;
 use super::subcommands::test_node::args::TestNodeCommand;
@@ -20,6 +21,10 @@ use static_checks_lib::args::StaticChecksCommand;
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(name = "driver", description = "Support driver development workflows")]
 pub struct DriverCommand {
+    /// if this exists, the user will be prompted for a component to select.
+    #[argh(switch, short = 's', long = "select")]
+    pub select: bool,
+
     #[argh(subcommand)]
     pub subcommand: DriverSubCommand,
 }
@@ -38,6 +43,8 @@ pub enum DriverSubCommand {
     Register(RegisterCommand),
     Restart(RestartCommand),
     TestNode(TestNodeCommand),
+    // New and improved driver commands.
+    Node(NodeCommand),
 }
 
 // TODO(https://fxbug.dev/324167674): fix.
@@ -57,4 +64,6 @@ pub enum DriverSubCommand {
     Restart(RestartCommand),
     StaticChecks(StaticChecksCommand),
     TestNode(TestNodeCommand),
+    // New and improved driver commands.
+    Node(NodeCommand),
 }

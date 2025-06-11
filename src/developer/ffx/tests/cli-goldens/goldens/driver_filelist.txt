@@ -6,6 +6,12 @@ ffx/driver/list-composites.golden
 ffx/driver/list-devices.golden
 ffx/driver/list-hosts.golden
 ffx/driver/list.golden
+ffx/driver/node.golden
+ffx/driver/node/add.golden
+ffx/driver/node/graph.golden
+ffx/driver/node/list.golden
+ffx/driver/node/remove.golden
+ffx/driver/node/show.golden
 ffx/driver/register.golden
 ffx/driver/restart.golden
 ffx/driver/static-checks.golden

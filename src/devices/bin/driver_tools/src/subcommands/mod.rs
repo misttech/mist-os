@@ -9,6 +9,7 @@ pub mod list_composite_node_specs;
 pub mod list_composites;
 pub mod list_devices;
 pub mod list_hosts;
+pub mod node;
 pub mod register;
 pub mod restart;
 pub mod test_node;

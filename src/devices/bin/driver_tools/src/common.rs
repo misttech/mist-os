@@ -61,6 +61,14 @@ pub fn write_node_properties(
     Ok(())
 }
 
+pub fn colorized(string: &str, color: ansi_term::Colour, with_style: bool) -> String {
+    if with_style {
+        color.paint(string).to_string()
+    } else {
+        string.to_string()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

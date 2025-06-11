@@ -53,7 +53,7 @@ pub async fn validate_host_koids(
         }
 
         // Skip comparison and should_not_exist check as the koid is not valid when its unbound.
-        if matches!(dev.bound_driver_url.as_deref(), Some("unbound") | Some("owned by parent")) {
+        if matches!(dev.bound_driver_url.as_deref(), Some("unbound")) {
             continue;
         }
 

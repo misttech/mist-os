@@ -284,6 +284,10 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
     dictionary_ref_ = dictionary_ref;
   }
 
+  void MarkAsCompositeParent() { is_composite_parent_ = true; }
+
+  void UnmarkAsCompositeParent() { is_composite_parent_ = false; }
+
   std::optional<uint64_t> dictionary_ref() { return dictionary_ref_; }
 
   const Collection& collection() const { return collection_; }
@@ -504,7 +508,8 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::Node>> node_ref_;
   std::optional<fidl::ServerBinding<fuchsia_driver_framework::NodeController>> controller_ref_;
 
-  bool owned_by_parent_ = true;
+  bool owned_by_parent_ = false;
+  bool is_composite_parent_ = false;
 
   // The device's inspect information.
   DeviceInspect inspect_;

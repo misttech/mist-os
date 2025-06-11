@@ -34,6 +34,8 @@ class ParentSetCollector {
                        const std::vector<fuchsia_driver_framework::NodeProperty2>& node_properties,
                        std::weak_ptr<Node> node);
 
+  void ReleaseNodes();
+
   // Check if all parents are found. If so, then create and return the composite node. If the
   // node is already created, return ZX_ERR_ALREADY_EXISTS.
   zx::result<std::shared_ptr<Node>> TryToAssemble(NodeManager* node_manager,
