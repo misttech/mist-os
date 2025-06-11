@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Error, Result};
-use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker};
 use fuchsia_component_test::{
     Capability, ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder, Route,
 };
@@ -118,7 +118,7 @@ async fn test_smoke_test() -> Result<()> {
     instance.driver_test_realm_start(fdt::RealmArgs::default()).await?;
 
     // Connect to a protocol to ensure that it starts, then immediately exit.
-    let _ = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
+    let _: ClientEnd<fdd::ManagerMarker> = instance.root.connect_to_protocol_at_exposed_dir()?;
     Ok(())
 }
 
@@ -133,7 +133,7 @@ async fn test_empty_args() -> Result<()> {
 
     instance.driver_test_realm_start(fdt::RealmArgs::default()).await?;
 
-    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
+    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir()?;
 
     let info = get_driver_info(&driver_dev, &[]).await?;
     assert!(info
@@ -162,7 +162,7 @@ async fn test_pkg_dir() -> Result<()> {
 
     instance.driver_test_realm_start(args).await?;
 
-    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
+    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir()?;
 
     let info = get_driver_info(&driver_dev, &[]).await?;
     assert!(info

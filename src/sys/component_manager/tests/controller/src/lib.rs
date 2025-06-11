@@ -84,8 +84,8 @@ async fn launch_child_in_a_collection_in_nested_component_manager(
                 let child_args = child_args.clone();
                 let child_creation_tx = child_creation_tx.clone();
                 async move {
-                    let realm_proxy =
-                        handles.connect_to_protocol::<fcomponent::RealmMarker>().unwrap();
+                    let realm_proxy: fcomponent::RealmProxy =
+                        handles.connect_to_protocol().unwrap();
                     let child_args = {
                         let mut child_args_guard = child_args.lock().unwrap();
                         child_args_guard.take().unwrap()
@@ -250,10 +250,8 @@ async fn spawn_local_child_controller_from_open_controller() -> SpawnedChild {
     let (child_ref, cm_realm_instance) =
         spawn_child_with_url_with_args(&url, fcomponent::CreateChildArgs::default()).await;
 
-    let realm_proxy = cm_realm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
-        .unwrap();
+    let realm_proxy: fcomponent::RealmProxy =
+        cm_realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (controller_proxy, server_end) = create_proxy::<fcomponent::ControllerMarker>();
     realm_proxy.open_controller(&child_ref, server_end).await.unwrap().unwrap();
 
@@ -312,11 +310,8 @@ async fn destroy(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
     assert_matches!(spawned_child.controller_proxy.destroy().await.unwrap(), Ok(()));
     assert_matches!(spawned_child.controller_proxy.take_event_stream().try_next().await, Ok(None));
 
-    let realm_proxy = spawned_child
-        .cm_realm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
-        .unwrap();
+    let realm_proxy: fcomponent::RealmProxy =
+        spawned_child.cm_realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_controller, server) = create_proxy::<fcomponent::ControllerMarker>();
     assert_matches!(
         realm_proxy.open_controller(&spawned_child.child_ref, server).await.unwrap(),
@@ -327,11 +322,8 @@ async fn destroy(spawn_child_future: BoxFuture<'static, SpawnedChild>) {
 #[fuchsia::test]
 async fn destroy_err() {
     let spawned_child = spawn_local_child_controller_from_create_child().await;
-    let realm_proxy = spawned_child
-        .cm_realm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
-        .unwrap();
+    let realm_proxy: fcomponent::RealmProxy =
+        spawned_child.cm_realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (controller, server) = create_proxy::<fcomponent::ControllerMarker>();
     let static_child_ref = fcdecl::ChildRef { name: STATIC_CHILD_NAME.into(), collection: None };
     realm_proxy.open_controller(&static_child_ref, server).await.unwrap().unwrap();
@@ -430,11 +422,8 @@ async fn start_with_numbered_handles() {
 async fn start_with_dict() {
     let mut spawned_child = spawn_local_child_controller_from_create_child().await;
 
-    let store = spawned_child
-        .cm_realm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fsandbox::CapabilityStoreMarker>()
-        .unwrap();
+    let store: fsandbox::CapabilityStoreProxy =
+        spawned_child.cm_realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     // StartChild dictionary entries must be Sender capabilities.
     let (receiver_client, mut receiver_stream) =
         create_request_stream::<fsandbox::ReceiverMarker>();
@@ -508,9 +497,8 @@ async fn start_with_dict() {
 
     let local_component_handles = spawned_child.handles_receiver.next().await.unwrap();
 
-    let echo_proxy = local_component_handles
-        .connect_to_protocol::<fecho::EchoMarker>()
-        .expect("failed to connect to Echo");
+    let echo_proxy: fecho::EchoProxy =
+        local_component_handles.connect_to_protocol().expect("failed to connect to Echo");
 
     let response = echo_proxy.echo_string(Some("hello")).await.expect("failed to call EchoString");
     assert!(response.is_some());
@@ -646,10 +634,8 @@ async fn get_exposed_dictionary() {
     let (controller_proxy, _child_ref, instance) =
         spawn_child_with_url("#meta/echo_server.cm").await;
     let exposed_dict = controller_proxy.get_exposed_dictionary().await.unwrap().unwrap();
-    let store = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fsandbox::CapabilityStoreMarker>()
-        .unwrap();
+    let store: fsandbox::CapabilityStoreProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     let exposed_dict_id = 1;
     store
         .import(exposed_dict_id, fsandbox::Capability::Dictionary(exposed_dict))

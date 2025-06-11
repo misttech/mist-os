@@ -207,7 +207,7 @@ impl TestEnvBuilder {
         let realm_instance = builder.build().await.unwrap();
         let commit_status_provider = realm_instance
             .root
-            .connect_to_protocol_at_exposed_dir::<CommitStatusProviderMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect to commit status provider");
 
         TestEnv {
@@ -247,7 +247,7 @@ impl TestEnv {
     fn fresh_commit_status_provider_proxy(&self) -> CommitStatusProviderProxy {
         self.realm_instance
             .root
-            .connect_to_protocol_at_exposed_dir::<CommitStatusProviderMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect to commit status provider")
     }
 

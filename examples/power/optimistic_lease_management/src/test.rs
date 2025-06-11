@@ -149,8 +149,8 @@ async fn run_components() -> Result<()> {
     let realm = realm_builder.build().await?;
 
     // Give us one suspend state since this is required
-    let suspend_controller =
-        realm.root.connect_to_protocol_at_exposed_dir::<fsuspend_control::DeviceMarker>()?;
+    let suspend_controller: fsuspend_control::DeviceProxy =
+        realm.root.connect_to_protocol_at_exposed_dir()?;
     suspend_controller
         .set_suspend_states(&fsuspend_control::DeviceSetSuspendStatesRequest {
             suspend_states: Some(vec![fhardware_suspend::SuspendState {
@@ -163,8 +163,7 @@ async fn run_components() -> Result<()> {
         .expect("setting suspend states failed");
 
     // For informational purposes, monitor the state of SAG
-    let sag_controller =
-        realm.root.connect_to_protocol_at_exposed_dir::<sagcontrol::StateMarker>()?;
+    let sag_controller: sagcontrol::StateProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
     let sag_controller_copy = sag_controller.clone();
     fasync::Task::local(async move {
         loop {
@@ -187,9 +186,9 @@ async fn run_components() -> Result<()> {
 
     // SAG suspended the system, see what the respective counts are from the
     // server and client.
-    let server_count_protocol = realm
+    let server_count_protocol: fexample::CounterProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fexample::CounterMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("failed to connect to server's counter protocol");
 
     let server_count = server_count_protocol.get().await.expect("Call to get SERVER count failed.");
@@ -221,9 +220,8 @@ impl TestController {
         let duration_ms = 10000u16;
 
         // Acquire a lease until we can have the server take over managing any wake lease
-        let sag = handles
-            .connect_to_protocol::<fsag::ActivityGovernorMarker>()
-            .expect("couldn't connec to SAG");
+        let sag: fsag::ActivityGovernorProxy =
+            handles.connect_to_protocol().expect("couldn't connec to SAG");
 
         let lease = sag
             .acquire_wake_lease("initial")
@@ -246,9 +244,8 @@ impl TestController {
         let offset =
             std::cmp::max(500, (fraction * Into::<f64>::into(duration_ms)).abs().round() as u64);
 
-        let fctrl = handles
-            .connect_to_protocol::<fexample::FrameControlMarker>()
-            .context("couldn't access frame control")?;
+        let fctrl: fexample::FrameControlProxy =
+            handles.connect_to_protocol().context("couldn't access frame control")?;
 
         fctrl.start_frame(duration_ms, duration_ms / 2).await.context("start frame failed")?;
 

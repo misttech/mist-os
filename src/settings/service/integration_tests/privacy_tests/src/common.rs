@@ -30,9 +30,6 @@ impl PrivacyTest {
     }
 
     pub fn connect_to_privacymarker(instance: &RealmInstance) -> PrivacyProxy {
-        return instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<PrivacyMarker>()
-            .expect("connecting to Privacy");
+        return instance.root.connect_to_protocol_at_exposed_dir().expect("connecting to Privacy");
     }
 }

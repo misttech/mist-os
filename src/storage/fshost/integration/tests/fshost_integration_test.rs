@@ -6,7 +6,7 @@ use assert_matches::assert_matches;
 use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
 use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker as _};
 use fidl_fuchsia_fs_startup::VolumeMarker as FsStartupVolumeMarker;
-use fidl_fuchsia_fshost::AdminMarker;
+use fidl_fuchsia_fshost::AdminProxy;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
 use fidl_fuchsia_update_verify::HealthStatus;
 use fs_management::format::constants::DATA_PARTITION_LABEL;
@@ -25,8 +25,8 @@ use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio, fuchsia_async as fas
 use {
     blob_writer::BlobWriter,
     fidl::endpoints::Proxy,
-    fidl_fuchsia_fshost::StarnixVolumeProviderMarker,
-    fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker},
+    fidl_fuchsia_fshost::StarnixVolumeProviderProxy,
+    fidl_fuchsia_fxfs::{BlobCreatorProxy, BlobReaderProxy},
     fshost_test_fixture::STARNIX_VOLUME_NAME,
 };
 
@@ -162,8 +162,8 @@ async fn wipe_storage_not_supported() {
     let builder = new_builder();
     let fixture = builder.build().await;
 
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
 
@@ -386,11 +386,10 @@ async fn create_unmount_and_remount_starnix_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -429,11 +428,10 @@ async fn create_unmount_and_remount_starnix_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -471,11 +469,10 @@ async fn create_mount_and_remount_starnix_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -539,11 +536,10 @@ async fn create_starnix_volume_wipes_previous_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -582,11 +578,10 @@ async fn create_starnix_volume_wipes_previous_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -692,10 +687,10 @@ async fn set_data_and_blob_max_bytes_zero_new_write_api() {
     let hash = fuchsia_merkle::from_slice(&blob_contents).root();
     let compressed_data: Vec<u8> = Type1Blob::generate(&blob_contents, CompressionMode::Always);
 
-    let blob_proxy = fixture
+    let blob_proxy: BlobCreatorProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<BlobCreatorMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protocol_at_exposed_dir failed");
 
     let writer_client_end = blob_proxy
@@ -763,10 +758,10 @@ async fn shred_data_volume_not_supported() {
     builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
-    let admin = fixture
+    let admin: AdminProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<AdminMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protcol_at_exposed_dir failed");
 
     admin
@@ -793,10 +788,10 @@ async fn shred_data_volume_when_mounted() {
     .await
     .expect("open_file failed");
 
-    let admin = fixture
+    let admin: AdminProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<AdminMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protcol_at_exposed_dir failed");
 
     admin
@@ -841,11 +836,10 @@ async fn shred_data_deletes_starnix_volume() {
 
     // Need to connect to the StarnixVolumeProvider protocol that fshost exposes and Mount the
     // starnix volume.
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (_exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -855,10 +849,10 @@ async fn shred_data_deletes_starnix_volume() {
         .expect("fidl transport error")
         .expect("create failed");
 
-    let admin = fixture
+    let admin: AdminProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<AdminMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protcol_at_exposed_dir failed");
 
     admin
@@ -899,11 +893,10 @@ async fn vend_a_fresh_starnix_test_volume_on_each_mount() {
 
     // Need to connect to the StarnixVolumeProvider protocol that fshost exposes and Mount the
     // starnix volume.
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -941,11 +934,10 @@ async fn vend_a_fresh_starnix_test_volume_on_each_mount() {
 
     // Need to connect to the StarnixVolumeProvider protocol that fshost exposes and Mount the
     // starnix volume.
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -993,10 +985,10 @@ async fn shred_data_volume_from_recovery() {
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
-    let admin = fixture
+    let admin: AdminProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<AdminMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protcol_at_exposed_dir failed");
 
     admin
@@ -1223,10 +1215,10 @@ async fn health_check_blobs() {
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
-    let blobfs_health_check = fixture
+    let blobfs_health_check: fidl_fuchsia_update_verify::ComponentOtaHealthCheckProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protcol_at_exposed_dir failed");
     let status = blobfs_health_check.get_health_status().await.expect("FIDL failure");
     assert_eq!(status, HealthStatus::Healthy);
@@ -1291,10 +1283,10 @@ async fn delivery_blob_support_fxblob() {
     let hash = fuchsia_merkle::from_slice(&data).root();
     let payload = Type1Blob::generate(&data, CompressionMode::Always);
 
-    let blob_creator = fixture
+    let blob_creator: BlobCreatorProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<BlobCreatorMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protocol_at_exposed_dir failed");
     let blob_writer_client_end = blob_creator
         .create(&hash.into(), false)
@@ -1309,10 +1301,10 @@ async fn delivery_blob_support_fxblob() {
     blob_writer.write(&payload).await.unwrap();
 
     // We should now be able to open the blob by its hash and read the contents back.
-    let blob_reader = fixture
+    let blob_reader: BlobReaderProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<BlobReaderMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protocol_at_exposed_dir failed");
     let vmo = blob_reader.get_vmo(&hash.into()).await.unwrap().unwrap();
 
@@ -1427,8 +1419,8 @@ async fn reset_uninitialized_gpt() {
 
     assert_eq!(gpt_num_partitions(&fixture).await, 0);
 
-    let recovery =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::RecoveryMarker>().unwrap();
+    let recovery: fshost::RecoveryProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     recovery
         .init_system_partition_table(&[fpartitions::PartitionInfo {
             name: "part".to_string(),
@@ -1459,8 +1451,8 @@ async fn reset_initialized_gpt() {
 
     assert_eq!(gpt_num_partitions(&fixture).await, 1);
 
-    let recovery =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::RecoveryMarker>().unwrap();
+    let recovery: fshost::RecoveryProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     recovery
         .init_system_partition_table(&[
             fpartitions::PartitionInfo {

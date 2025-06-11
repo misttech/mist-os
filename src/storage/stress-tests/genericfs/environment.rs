@@ -10,10 +10,9 @@ use anyhow::{anyhow, format_err};
 use async_trait::async_trait;
 use diagnostics_reader::ArchiveReader;
 use either::Either;
-use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_device::ControllerMarker;
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
-use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
+use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptManagementProxy, CryptMarker, KeyPurpose};
 use fs_management::filesystem::Filesystem;
 use fs_management::FSConfig;
 use fuchsia_component::client::connect_to_protocol_at_path;
@@ -99,8 +98,8 @@ pub async fn create_hermetic_crypt_service(
         .await
         .unwrap();
     let realm = builder.build().await.expect("realm build failed");
-    let crypt_management =
-        realm.root.connect_to_protocol_at_exposed_dir::<CryptManagementMarker>().unwrap();
+    let crypt_management: CryptManagementProxy =
+        realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let wrapping_key_id_0 = [0; 16];
     let mut wrapping_key_id_1 = [0; 16];
     wrapping_key_id_1[0] = 1;
@@ -178,16 +177,7 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
 
         let instance = if fs.config().is_multi_volume() {
             let crypt = Some(
-                crypt_realm
-                    .as_ref()
-                    .unwrap()
-                    .root
-                    .connect_to_protocol_at_exposed_dir::<CryptMarker>()
-                    .unwrap()
-                    .into_channel()
-                    .unwrap()
-                    .into_zx_channel()
-                    .into(),
+                crypt_realm.as_ref().unwrap().root.connect_to_protocol_at_exposed_dir().unwrap(),
             );
             let mut instance = fs.serve_multi_volume().await.unwrap();
             let vol = instance
@@ -361,12 +351,8 @@ impl<FSC: 'static + FSConfig + Clone + Send + Sync> Environment for FsEnvironmen
                         .as_ref()
                         .unwrap()
                         .root
-                        .connect_to_protocol_at_exposed_dir::<CryptMarker>()
-                        .unwrap()
-                        .into_channel()
-                        .unwrap()
-                        .into_zx_channel()
-                        .into(),
+                        .connect_to_protocol_at_exposed_dir()
+                        .unwrap(),
                 );
                 instance.check_volume("default", crypt).await.unwrap();
                 let crypt = Some(
@@ -374,12 +360,8 @@ impl<FSC: 'static + FSConfig + Clone + Send + Sync> Environment for FsEnvironmen
                         .as_ref()
                         .unwrap()
                         .root
-                        .connect_to_protocol_at_exposed_dir::<CryptMarker>()
-                        .unwrap()
-                        .into_channel()
-                        .unwrap()
-                        .into_zx_channel()
-                        .into(),
+                        .connect_to_protocol_at_exposed_dir()
+                        .unwrap(),
                 );
                 let vol = instance
                     .open_volume("default", MountOptions { crypt, ..MountOptions::default() })

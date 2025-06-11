@@ -187,10 +187,7 @@ impl DisplayTest {
     }
 
     pub fn connect_to_displaymarker(instance: &RealmInstance) -> DisplayProxy {
-        return instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<DisplayMarker>()
-            .expect("connecting to Display");
+        return instance.root.connect_to_protocol_at_exposed_dir().expect("connecting to Display");
     }
 
     pub fn get_init_manual_brightness() -> Arc<Mutex<Option<f32>>> {

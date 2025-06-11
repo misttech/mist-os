@@ -86,7 +86,7 @@ async fn routes_from_echo() -> Result<(), Error> {
     // [END get_child_name_rust]
 
     // [START call_echo_rust]
-    let echo = realm.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
+    let echo: fecho::EchoProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
     assert_eq!(echo.echo_string(Some("hello")).await?, Some("hello".to_owned()));
     // [END call_echo_rust]
 
@@ -167,7 +167,7 @@ async fn routes_from_mock_echo() -> Result<(), Error> {
 
     let realm = builder.build().await?;
 
-    let echo = realm.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
+    let echo: fecho::EchoProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
     assert_eq!(echo.echo_string(Some("hello")).await?, Some("hello".to_owned()));
 
     Ok(())

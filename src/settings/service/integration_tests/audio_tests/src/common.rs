@@ -206,10 +206,7 @@ impl AudioTest {
     }
 
     fn connect_to_audio_marker_internal(instance: &RealmInstance) -> AudioProxy {
-        return instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<AudioMarker>()
-            .expect("connecting to Audio");
+        return instance.root.connect_to_protocol_at_exposed_dir().expect("connecting to Audio");
     }
 
     pub(crate) fn connect_to_audio_marker(&mut self) -> AudioProxy {

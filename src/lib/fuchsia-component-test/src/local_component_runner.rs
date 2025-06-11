@@ -4,9 +4,10 @@
 
 use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints::{
-    create_request_stream, ClientEnd, ControlHandle, DiscoverableProtocolMarker, ProtocolMarker,
-    RequestStream, ServerEnd, ServiceMarker, ServiceProxy,
+    create_request_stream, ClientEnd, ControlHandle, DiscoverableProtocolMarker, RequestStream,
+    ServerEnd, ServiceMarker, ServiceProxy,
 };
+use fuchsia_component::client::Connect;
 use fuchsia_component::DEFAULT_SERVICE_INSTANCE;
 use futures::channel::oneshot;
 use futures::future::BoxFuture;
@@ -95,19 +96,16 @@ impl LocalComponentHandles {
     }
 
     /// Connects to a FIDL protocol and returns a proxy to that protocol.
-    pub fn connect_to_protocol<P: DiscoverableProtocolMarker>(&self) -> Result<P::Proxy, Error> {
-        self.connect_to_named_protocol::<P>(P::PROTOCOL_NAME)
+    pub fn connect_to_protocol<T: Connect>(&self) -> Result<T, Error> {
+        self.connect_to_named_protocol(T::Protocol::PROTOCOL_NAME)
     }
 
     /// Connects to a FIDL protocol with the given name and returns a proxy to that protocol.
-    pub fn connect_to_named_protocol<P: ProtocolMarker>(
-        &self,
-        name: &str,
-    ) -> Result<P::Proxy, Error> {
+    pub fn connect_to_named_protocol<T: Connect>(&self, name: &str) -> Result<T, Error> {
         let svc_dir_proxy = self.namespace.get("/svc").ok_or_else(|| {
             format_err!("the component's namespace doesn't have a /svc directory")
         })?;
-        fuchsia_component::client::connect_to_named_protocol_at_dir_root::<P>(svc_dir_proxy, name)
+        T::connect_at_dir_root_with_name(svc_dir_proxy, name)
     }
 
     /// Opens a FIDL service as a directory, which holds instances of the service.

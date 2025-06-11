@@ -560,10 +560,7 @@ impl TestEnv {
 
     /// Opens a connection to the installer fidl service.
     fn installer_proxy(&self) -> finstaller::InstallerProxy {
-        self.realm_instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<finstaller::InstallerMarker>()
-            .unwrap()
+        self.realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap()
     }
 
     async fn get_ota_metrics(&self) -> OtaMetrics {

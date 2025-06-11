@@ -11,18 +11,15 @@ use futures::stream::{self as stream, StreamExt, TryStreamExt};
 use futures::TryFutureExt;
 use log::Log;
 use std::sync::Arc;
-use {
-    fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_logger as flogger,
-    fuchsia_async as fasync,
-};
+use {fidl_fidl_examples_routing_echo as fecho, fuchsia_async as fasync};
 
 async fn echo_server_mock(handles: LocalComponentHandles) -> Result<(), Error> {
     // Create a new ServiceFs to host FIDL protocols from
     let mut fs = fserver::ServiceFs::new();
     let mut tasks = vec![];
-    let log_proxy = handles.connect_to_protocol::<flogger::LogSinkMarker>()?;
+    let log_client = handles.connect_to_protocol()?;
     let publisher = diagnostics_log::Publisher::new(
-        diagnostics_log::PublisherOptions::default().use_log_sink(log_proxy),
+        diagnostics_log::PublisherOptions::default().use_log_sink(log_client),
     )?;
     let publisher = Arc::new(publisher);
 
@@ -83,7 +80,7 @@ async fn spam_logs_from_child() -> Result<(), Error> {
 
     let realm = builder.build().await?;
 
-    let echo = realm.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
+    let echo: fecho::EchoProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
 
     for _ in 0..500 {
         assert_eq!(echo.echo_string(Some("hello")).await?, Some("hello".to_owned()));

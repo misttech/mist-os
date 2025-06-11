@@ -383,7 +383,7 @@ mod tests {
         handles: LocalComponentHandles,
         mut receiver: mpsc::Receiver<(crate::DnsServersUpdateSource, Vec<fnet_name::DnsServer_>)>,
     ) -> Result<(), anyhow::Error> {
-        let connection = handles.connect_to_protocol::<fnet_name::LookupAdminMarker>()?;
+        let connection = handles.connect_to_protocol()?;
 
         let mut fs = ServiceFs::new();
         let _: &mut ServiceFsDir<'_, _> =
@@ -492,13 +492,13 @@ mod tests {
     async fn test_dns_server_watcher() -> Result<(), anyhow::Error> {
         let (realm, mut tx) = setup_test().await?;
 
-        let watcher1 = realm
+        let watcher1: fnet_name::DnsServerWatcherProxy = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnet_name::DnsServerWatcherMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to DnsServerWatcher")?;
-        let watcher2 = realm
+        let watcher2: fnet_name::DnsServerWatcherProxy = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnet_name::DnsServerWatcherMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to DnsServerWatcher")?;
 
         assert_eq!(watcher1.watch_servers().await?, vec![]);

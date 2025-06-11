@@ -36,9 +36,8 @@ async fn create_instance(
     token: fviews::ViewCreationToken,
     realm: &ScopedInstance,
 ) -> (flatland::FlatlandProxy, fviews::ViewRef, flatland::TransformId) {
-    let flatland_instance = realm
-        .connect_to_protocol_at_exposed_dir::<flatland::FlatlandMarker>()
-        .expect("Failed to connect Flatland instance");
+    let flatland_instance: flatland::FlatlandProxy =
+        realm.connect_to_protocol_at_exposed_dir().expect("Failed to connect Flatland instance");
     let view_identity = fviews::ViewIdentityOnCreation::from(
         scenic::ViewRefPair::new().expect("failed to create ViewRefPair"),
     );
@@ -197,8 +196,8 @@ impl FlatlandInstance {
         } = fuchsia_scenic::flatland::ViewCreationTokenPair::new()
             .expect("failed to create token pair");
 
-        let flatland_display = realm
-            .connect_to_protocol_at_exposed_dir::<flatland::FlatlandDisplayMarker>()
+        let flatland_display: flatland::FlatlandDisplayProxy = realm
+            .connect_to_protocol_at_exposed_dir()
             .expect("Failed to connect Flatland display. Called new_root more than once?");
         {
             // Hook up root view to display.
@@ -255,8 +254,8 @@ impl FlatlandInstance {
 
     // Create a child instance.
     async fn new_child(realm: &ScopedInstance) -> (Self, fviews::ViewportCreationToken) {
-        let flatland_instance = realm
-            .connect_to_protocol_at_exposed_dir::<flatland::FlatlandMarker>()
+        let flatland_instance: flatland::FlatlandProxy = realm
+            .connect_to_protocol_at_exposed_dir()
             .expect("Failed to connect Flatland instance");
         let fuchsia_scenic::flatland::ViewCreationTokenPair {
             view_creation_token,

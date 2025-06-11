@@ -6,6 +6,7 @@ use anyhow::{format_err, Error};
 use assert_matches::assert_matches;
 use cm_rust::FidlIntoNative;
 use cm_rust_testing::*;
+use fidl::endpoints::ClientEnd;
 use fidl_fidl_examples_routing_echo::{self as fecho, EchoMarker as EchoClientStatsMarker};
 use fidl_fuchsia_component::{self as fcomponent, EventStreamMarker};
 use fuchsia_component::server as fserver;
@@ -65,7 +66,7 @@ async fn absolute_component_route_to_parent() -> Result<(), Error> {
         )
         .await?;
     let instance = builder.build().await?;
-    let echo_proxy = instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
+    let echo_proxy: fecho::EchoProxy = instance.root.connect_to_protocol_at_exposed_dir()?;
     assert_eq!(
         Some(DEFAULT_ECHO_STR.to_string()),
         echo_proxy.echo_string(Some(DEFAULT_ECHO_STR)).await?,
@@ -95,7 +96,7 @@ async fn relative_component_route_to_parent() -> Result<(), Error> {
         )
         .await?;
     let instance = builder.build().await?;
-    let echo_proxy = instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
+    let echo_proxy: fecho::EchoProxy = instance.root.connect_to_protocol_at_exposed_dir()?;
     assert_eq!(
         Some(DEFAULT_ECHO_STR.to_string()),
         echo_proxy.echo_string(Some(DEFAULT_ECHO_STR)).await?,
@@ -131,7 +132,7 @@ async fn local_component_route_to_parent() -> Result<(), Error> {
         )
         .await?;
     let instance = builder.build().await?;
-    let echo_proxy = instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
+    let echo_proxy: fecho::EchoProxy = instance.root.connect_to_protocol_at_exposed_dir()?;
     assert_eq!(
         Some(DEFAULT_ECHO_STR.to_string()),
         echo_proxy.echo_string(Some(DEFAULT_ECHO_STR)).await?,
@@ -182,7 +183,7 @@ async fn absolute_component_route_to_parent_in_sub_realm() -> Result<(), Error> 
         )
         .await?;
     let instance = builder.build().await?;
-    let echo_proxy = instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
+    let echo_proxy: fecho::EchoProxy = instance.root.connect_to_protocol_at_exposed_dir()?;
     assert_eq!(
         Some(DEFAULT_ECHO_STR.to_string()),
         echo_proxy.echo_string(Some(DEFAULT_ECHO_STR)).await?,
@@ -229,7 +230,7 @@ async fn relative_component_route_to_parent_in_sub_realm() -> Result<(), Error> 
         )
         .await?;
     let instance = builder.build().await?;
-    let echo_proxy = instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
+    let echo_proxy: fecho::EchoProxy = instance.root.connect_to_protocol_at_exposed_dir()?;
     assert_eq!(
         Some(DEFAULT_ECHO_STR.to_string()),
         echo_proxy.echo_string(Some(DEFAULT_ECHO_STR)).await?,
@@ -282,7 +283,7 @@ async fn local_component_route_to_parent_in_sub_realm() -> Result<(), Error> {
         )
         .await?;
     let instance = builder.build().await?;
-    let echo_proxy = instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
+    let echo_proxy: fecho::EchoProxy = instance.root.connect_to_protocol_at_exposed_dir()?;
     assert_eq!(
         Some(DEFAULT_ECHO_STR.to_string()),
         echo_proxy.echo_string(Some(DEFAULT_ECHO_STR)).await?,
@@ -549,11 +550,11 @@ async fn examples() -> Result<(), Error> {
         // [START connect_to_protocol]
         // Connects to `fidl.examples.routing.echo.EchoClientStats`, which is provided
         // by `b` in the created realm
-        let echo_client_stats_proxy =
-            realm_instance.root.connect_to_protocol_at_exposed_dir::<EchoClientStatsMarker>()?;
+        let echo_client_stats_client: ClientEnd<EchoClientStatsMarker> =
+            realm_instance.root.connect_to_protocol_at_exposed_dir()?;
         // [END connect_to_protocol]
         // [END route_to_above_root_example]
-        drop(echo_client_stats_proxy);
+        drop(echo_client_stats_client);
     }
     #[allow(unused, unused_mut)]
     {
@@ -592,7 +593,7 @@ async fn mock_component_with_a_relative_dynamic_child() -> Result<(), Error> {
                 let collection_name_for_mock = collection_name_for_mock.clone();
                 let mut send_echo_client_results = send_echo_client_results.clone();
                 async move {
-                    let realm_proxy = handles.connect_to_protocol::<fcomponent::RealmMarker>()?;
+                    let realm_proxy: fcomponent::RealmProxy = handles.connect_to_protocol()?;
                     realm_proxy
                         .create_child(
                             &fcdecl::CollectionRef { name: collection_name_for_mock.clone() },
@@ -1142,10 +1143,8 @@ async fn nested_component_manager_with_passthrough_directory() -> Result<(), Err
 
     // component_manager_for_rights_test.cm uses debug configuration, so
     // manually start the component tree.
-    let lifecycle_controller = cm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_sys2::LifecycleControllerMarker>()
-        .unwrap();
+    let lifecycle_controller: fidl_fuchsia_sys2::LifecycleControllerProxy =
+        cm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_, binder_server) = fidl::endpoints::create_endpoints();
     lifecycle_controller.start_instance(".", binder_server).await.unwrap().unwrap();
 
@@ -1195,7 +1194,7 @@ async fn nested_component_manager_with_passthrough() -> Result<(), Error> {
     let cm_instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await?;
 
-    let echo_proxy = cm_instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
+    let echo_proxy: fecho::EchoProxy = cm_instance.root.connect_to_protocol_at_exposed_dir()?;
     assert_eq!(
         Some(DEFAULT_ECHO_STR.to_string()),
         echo_proxy.echo_string(Some(DEFAULT_ECHO_STR)).await?,
@@ -1982,7 +1981,7 @@ async fn echo_client_mock(
     mut send_echo_client_results: mpsc::Sender<()>,
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
-    let echo = handles.connect_to_protocol::<fecho::EchoMarker>()?;
+    let echo: fecho::EchoProxy = handles.connect_to_protocol()?;
     let out = echo.echo_string(Some(DEFAULT_ECHO_STR)).await?;
     if Some(DEFAULT_ECHO_STR.to_string()) != out {
         return Err(format_err!("unexpected echo result: {:?}", out));

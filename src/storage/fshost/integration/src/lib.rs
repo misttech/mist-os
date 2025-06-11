@@ -7,10 +7,7 @@ use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::ArchiveReader;
 use disk_builder::Disk;
 use fidl::endpoints::{create_proxy, ServiceMarker as _};
-use fidl_fuchsia_fxfs::{
-    BlobReaderMarker, CryptManagementMarker, CryptManagementProxy, CryptMarker, CryptProxy,
-    KeyPurpose,
-};
+use fidl_fuchsia_fxfs::{BlobReaderMarker, CryptManagementProxy, CryptProxy, KeyPurpose};
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
@@ -402,19 +399,19 @@ impl TestFixture {
     pub fn connect_to_crypt(&self) -> CryptProxy {
         self.realm
             .root
-            .connect_to_protocol_at_exposed_dir::<CryptMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect_to_protocol_at_exposed_dir failed for the Crypt protocol")
     }
 
     pub async fn setup_starnix_crypt(&self) -> (CryptProxy, CryptManagementProxy) {
-        let crypt_management =
-            self.realm.root.connect_to_protocol_at_exposed_dir::<CryptManagementMarker>().expect(
+        let crypt_management: CryptManagementProxy =
+            self.realm.root.connect_to_protocol_at_exposed_dir().expect(
                 "connect_to_protocol_at_exposed_dir failed for the CryptManagement protocol",
             );
         let crypt = self
             .realm
             .root
-            .connect_to_protocol_at_exposed_dir::<CryptMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect_to_protocol_at_exposed_dir failed for the Crypt protocol");
         let key = vec![0xABu8; 32];
         crypt_management

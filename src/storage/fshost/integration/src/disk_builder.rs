@@ -5,9 +5,10 @@
 use blob_writer::BlobWriter;
 use block_client::{BlockClient as _, RemoteBlockClient};
 use delivery_blob::{CompressionMode, Type1Blob};
-use fidl::endpoints::Proxy as _;
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
-use fidl_fuchsia_fxfs::{BlobCreatorProxy, CryptManagementMarker, CryptMarker, KeyPurpose};
+use fidl_fuchsia_fxfs::{
+    BlobCreatorProxy, CryptManagementMarker, CryptManagementProxy, CryptMarker, KeyPurpose,
+};
 use fs_management::filesystem::{
     BlockConnector, DirBasedBlockConnector, Filesystem, ServingMultiVolumeFilesystem,
 };
@@ -114,8 +115,8 @@ async fn create_hermetic_crypt_service(
         .await
         .unwrap();
     let realm = builder.build().await.expect("realm build failed");
-    let crypt_management =
-        realm.root.connect_to_protocol_at_exposed_dir::<CryptManagementMarker>().unwrap();
+    let crypt_management: CryptManagementProxy =
+        realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let wrapping_key_id_0 = [0; 16];
     let mut wrapping_key_id_1 = [0; 16];
     wrapping_key_id_1[0] = 1;
@@ -583,20 +584,16 @@ impl DiskBuilder {
             fuchsia_fs::file::close(keys_file).await.unwrap();
             fuchsia_fs::directory::close(keys_dir).await.unwrap();
 
-            let crypt_service = Some(
+            let crypt = Some(
                 crypt_realm
                     .root
-                    .connect_to_protocol_at_exposed_dir::<CryptMarker>()
-                    .expect("Unable to connect to Crypt service")
-                    .into_channel()
-                    .unwrap()
-                    .into_zx_channel()
-                    .into(),
+                    .connect_to_protocol_at_exposed_dir()
+                    .expect("Unable to connect to Crypt service"),
             );
             fs.create_volume(
                 "data",
                 CreateOptions::default(),
-                MountOptions { crypt: crypt_service, ..MountOptions::default() },
+                MountOptions { crypt, ..MountOptions::default() },
             )
             .await
             .expect("create_volume failed")

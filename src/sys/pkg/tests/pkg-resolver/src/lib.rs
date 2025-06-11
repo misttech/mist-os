@@ -14,8 +14,8 @@ use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _};
 use fidl::persist;
 use fidl_fuchsia_metrics::{self as fmetrics, MetricEvent, MetricEventPayload};
 use fidl_fuchsia_pkg::{
-    self as fpkg, CupMarker, CupProxy, GetInfoError, PackageCacheMarker, PackageResolverMarker,
-    PackageResolverProxy, RepositoryManagerMarker, RepositoryManagerProxy, WriteError,
+    self as fpkg, CupProxy, GetInfoError, PackageResolverMarker, PackageResolverProxy,
+    RepositoryManagerProxy, WriteError,
 };
 use fidl_fuchsia_pkg_ext::{
     self as pkg, RepositoryConfig, RepositoryConfigBuilder, RepositoryConfigs,
@@ -837,7 +837,7 @@ impl Proxies {
     fn from_instance(realm: &ScopedInstance) -> Proxies {
         Proxies {
             resolver: realm
-                .connect_to_protocol_at_exposed_dir::<PackageResolverMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .expect("connect to package resolver"),
             resolver_ota: realm
                 .connect_to_named_protocol_at_exposed_dir::<PackageResolverMarker>(&format!(
@@ -846,14 +846,14 @@ impl Proxies {
                 ))
                 .expect("connect to package resolver"),
             repo_manager: realm
-                .connect_to_protocol_at_exposed_dir::<RepositoryManagerMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .expect("connect to repository manager"),
             rewrite_engine: realm
-                .connect_to_protocol_at_exposed_dir::<fpkg_rewrite::EngineMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .expect("connect to rewrite engine"),
-            cup: realm.connect_to_protocol_at_exposed_dir::<CupMarker>().expect("connect to cup"),
+            cup: realm.connect_to_protocol_at_exposed_dir().expect("connect to cup"),
             space_manager: realm
-                .connect_to_protocol_at_exposed_dir::<fspace::ManagerMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .expect("connect to space manager"),
         }
     }
@@ -918,11 +918,8 @@ impl<B: Blobfs> TestEnv<B> {
     }
 
     pub async fn restart_pkg_resolver(&mut self) {
-        let lifecycle_controller = self
-            .realm_instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
-            .unwrap();
+        let lifecycle_controller: fsys2::LifecycleControllerProxy =
+            self.realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
         let () = lifecycle_controller
             .stop_instance(&format!("./{PKG_RESOLVER_CHILD_NAME}"))
             .await
@@ -951,7 +948,7 @@ impl<B: Blobfs> TestEnv<B> {
     pub fn connect_to_resolver(&self) -> PackageResolverProxy {
         self.realm_instance
             .root
-            .connect_to_protocol_at_exposed_dir::<PackageResolverMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect to package resolver")
     }
 
@@ -993,10 +990,7 @@ impl<B: Blobfs> TestEnv<B> {
         hash: pkg::BlobId,
     ) -> Result<fio::DirectoryProxy, pkg::cache::GetAlreadyCachedError> {
         pkg::cache::Client::from_proxy(
-            self.realm_instance
-                .root
-                .connect_to_protocol_at_exposed_dir::<PackageCacheMarker>()
-                .unwrap(),
+            self.realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap(),
         )
         .get_already_cached(hash)
         .await

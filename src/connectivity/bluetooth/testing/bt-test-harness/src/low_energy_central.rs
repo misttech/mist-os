@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use fidl_fuchsia_bluetooth_le::{CentralEvent, CentralMarker, CentralProxy};
+use fidl_fuchsia_bluetooth_le::{CentralEvent, CentralProxy};
 use fidl_fuchsia_hardware_bluetooth::EmulatorProxy;
 use fuchsia_bluetooth::expectation::asynchronous::{
     expectable, Expectable, ExpectableExt, ExpectableState,
@@ -80,7 +80,7 @@ impl TestHarness for CentralHarness {
             let fake_host = ActivatedFakeHost::new(realm.clone()).await?;
             let central = realm
                 .instance()
-                .connect_to_protocol_at_exposed_dir::<CentralMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .context("Failed to connect to BLE Central service")?;
 
             let harness = CentralHarness(expectable(

@@ -828,19 +828,19 @@ where
         let proxies = Proxies {
             commit_status_provider: realm_instance
                 .root
-                .connect_to_protocol_at_exposed_dir::<fupdate::CommitStatusProviderMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .expect("connect to commit status provider"),
             space_manager: realm_instance
                 .root
-                .connect_to_protocol_at_exposed_dir::<fspace::ManagerMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .expect("connect to space manager"),
             package_cache: realm_instance
                 .root
-                .connect_to_protocol_at_exposed_dir::<fpkg::PackageCacheMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .expect("connect to package cache"),
             retained_packages: realm_instance
                 .root
-                .connect_to_protocol_at_exposed_dir::<fpkg::RetainedPackagesMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .expect("connect to retained packages"),
             pkgfs: fuchsia_fs::directory::open_directory_async(
                 realm_instance.root.get_exposed_dir(),

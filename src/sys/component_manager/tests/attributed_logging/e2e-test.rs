@@ -36,10 +36,8 @@ async fn verify_routing_failure_messages() {
 
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
-    let proxy = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
-        .unwrap();
+    let proxy: fcomponent::EventStreamProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     proxy.wait_for_ready().await.unwrap();
     let event_stream = EventStream::new(proxy);
 

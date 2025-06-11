@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use fidl_fuchsia_bluetooth_bredr::{ProfileMarker, ProfileProxy};
+use fidl_fuchsia_bluetooth_bredr::ProfileProxy;
 use fidl_fuchsia_hardware_bluetooth::EmulatorProxy;
 use fuchsia_bluetooth::expectation::asynchronous::{expectable, Expectable, ExpectableExt};
 use futures::future::BoxFuture;
@@ -73,7 +73,7 @@ impl TestHarness for ProfileHarness {
             let host = ActivatedFakeHost::new(realm.clone()).await?;
             let profile = realm
                 .instance()
-                .connect_to_protocol_at_exposed_dir::<ProfileMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .context("failed to connect to Profile service")?;
             let harness = ProfileHarness(expectable(
                 Default::default(),

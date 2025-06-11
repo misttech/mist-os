@@ -263,10 +263,7 @@ struct TestEnv {
 
 impl TestEnv {
     fn package_resolver(&self) -> fpkg::PackageResolverProxy {
-        self.realm_instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<fpkg::PackageResolverMarker>()
-            .unwrap()
+        self.realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap()
     }
 
     async fn resolve_package(
@@ -301,10 +298,7 @@ impl TestEnv {
     }
 
     fn component_resolver(&self) -> fcomponent_resolution::ResolverProxy {
-        self.realm_instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<fcomponent_resolution::ResolverMarker>()
-            .unwrap()
+        self.realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap()
     }
 
     async fn resolve_component(
@@ -323,10 +317,7 @@ impl TestEnv {
     }
 
     fn package_cache(&self) -> fpkg::PackageCacheProxy {
-        self.realm_instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<fpkg::PackageCacheMarker>()
-            .unwrap()
+        self.realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap()
     }
 
     async fn set_upgradable_urls(

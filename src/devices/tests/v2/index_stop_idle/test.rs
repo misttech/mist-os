@@ -27,8 +27,8 @@ async fn test_index_stop_on_idle() -> Result<()> {
 
     // Add some composite node specs to the index.
     {
-        let composite_manager =
-            realm.root.connect_to_protocol_at_exposed_dir::<fdf::CompositeNodeManagerMarker>()?;
+        let composite_manager: fdf::CompositeNodeManagerProxy =
+            realm.root.connect_to_protocol_at_exposed_dir()?;
         composite_manager
             .add_spec(&fdf::CompositeNodeSpec {
                 name: Some("composite_spec_name_unmatched".to_owned()),
@@ -111,7 +111,7 @@ async fn test_index_stop_on_idle() -> Result<()> {
     // Collect the composite node specs we added for comparison later.
     let mut all_specs = Vec::new();
     {
-        let driver_dev = realm.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
+        let driver_dev: fdd::ManagerProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
 
         let (node_spec, server) = fidl::endpoints::create_proxy();
         driver_dev.get_composite_node_specs(None, server)?;
@@ -138,7 +138,7 @@ async fn test_index_stop_on_idle() -> Result<()> {
     // saved state. We will query the composite node specs to compare them with before.
     let mut all_specs_after = Vec::new();
     {
-        let driver_dev = realm.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
+        let driver_dev: fdd::ManagerProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
 
         let (node_spec, server) = fidl::endpoints::create_proxy();
         driver_dev.get_composite_node_specs(None, server)?;

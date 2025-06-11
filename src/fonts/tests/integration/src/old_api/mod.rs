@@ -74,7 +74,7 @@ async fn get_provider(
     fonts_cm: &'static str,
 ) -> Result<fonts::ProviderProxy, Error> {
     info!("getting provider for: {:?}", fonts_cm);
-    factory.get_provider::<fonts::ProviderMarker>(fonts_cm).await
+    factory.get_provider(fonts_cm).await
 }
 
 // Add new tests here so we don't overload component manager with requests (b/42136076).

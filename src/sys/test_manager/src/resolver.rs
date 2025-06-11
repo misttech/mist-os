@@ -339,11 +339,10 @@ pub async fn serve_hermetic_resolver(
     let mut fs = ServiceFs::new();
     let mut resolver_tasks = vec![];
     let mut pkg_resolver_tasks = vec![];
-    let log_proxy = handles
-        .connect_to_named_protocol::<flogger::LogSinkMarker>(flogger::LogSinkMarker::DEBUG_NAME)?;
+    let log_client = handles.connect_to_named_protocol(flogger::LogSinkMarker::DEBUG_NAME)?;
     let tags = ["test_resolver"];
     let log_publisher = match flog::Publisher::new(
-        flog::PublisherOptions::default().tags(&tags).use_log_sink(log_proxy),
+        flog::PublisherOptions::default().tags(&tags).use_log_sink(log_client),
     ) {
         Ok(publisher) => Arc::new(publisher) as Arc<LogSubscriber>,
         Err(e) => {

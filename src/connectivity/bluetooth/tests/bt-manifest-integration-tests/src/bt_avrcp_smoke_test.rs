@@ -40,13 +40,13 @@ async fn mock_avrcp_client(
     mut sender: mpsc::Sender<Event>,
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
-    let peer_manager_svc = handles.connect_to_protocol::<PeerManagerMarker>()?;
+    let peer_manager_svc: PeerManagerProxy = handles.connect_to_protocol()?;
     sender
         .send(Event::PeerManager { _peer_manager: Some(peer_manager_svc) })
         .await
         .expect("failed sending ack to test");
 
-    let peer_manager_ext_svc = handles.connect_to_protocol::<PeerManagerExtMarker>()?;
+    let peer_manager_ext_svc: PeerManagerExtProxy = handles.connect_to_protocol()?;
     sender
         .send(Event::PeerManagerExt { _peer_manager_ext: Some(peer_manager_ext_svc) })
         .await

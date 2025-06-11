@@ -5,7 +5,7 @@
 use component_events::events::{EventStream, ExitStatus, Stopped};
 use component_events::matcher::EventMatcher;
 use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_component::{CreateChildArgs, RealmMarker};
+use fidl_fuchsia_component::{CreateChildArgs, RealmProxy};
 use fidl_fuchsia_component_decl::{Child, CollectionRef, StartupMode};
 use fidl_fuchsia_process as fprocess;
 use fidl_fuchsia_scheduler::{
@@ -80,7 +80,7 @@ async fn main() {
     let (stdin_recv, stdin_send) = zx::Socket::create_stream();
 
     info!("kernel and container init have requested thread roles, starting puppet");
-    let test_realm = realm.root.connect_to_protocol_at_exposed_dir::<RealmMarker>().unwrap();
+    let test_realm: RealmProxy = realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     test_realm
         .create_child(
             &CollectionRef { name: "puppets".to_string() },

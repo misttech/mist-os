@@ -4,6 +4,7 @@
 
 use component_events::matcher::*;
 use component_events::sequence::{EventSequence, Ordering};
+use fidl_fuchsia_io as fio;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::*;
 use futures::future::BoxFuture;
@@ -11,7 +12,6 @@ use futures::{FutureExt, StreamExt};
 use log::*;
 use vfs::file::vmo::read_only;
 use vfs::pseudo_directory;
-use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
 
 // This value must be kept consistent with the value in maintainer.rs
 const EXPECTED_BACKSTOP_TIME_SEC_STR: &str = "1589910459";
@@ -86,10 +86,7 @@ async fn builtin_time_service_and_clock_routed() {
 
     let instance = component_manager_realm.build().await.unwrap();
 
-    let proxy = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
-        .unwrap();
+    let proxy = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let event_stream = component_events::events::EventStream::new(proxy);
 

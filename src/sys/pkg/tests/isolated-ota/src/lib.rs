@@ -303,12 +303,10 @@ impl TestExecutor<TestResult> for IsolatedOtaTestExecutor {
 
         let installer_proxy = realm_instance
             .root
-            .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_update_installer::InstallerMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect to system updater");
-        let paver_proxy = realm_instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_paver::PaverMarker>()
-            .expect("connect to paver");
+        let paver_proxy =
+            realm_instance.root.connect_to_protocol_at_exposed_dir().expect("connect to paver");
 
         let updater = Updater::new_with_proxies(installer_proxy, paver_proxy);
 

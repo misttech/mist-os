@@ -193,10 +193,10 @@ impl Environment for FlatlandEnvironment {
         };
 
         let input_runner = {
-            let injector_registry_proxy = self
+            let injector_registry_proxy: pointerinjector::RegistryProxy = self
                 .realm_instance
                 .root
-                .connect_to_protocol_at_exposed_dir::<pointerinjector::RegistryMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .expect("Failed to connect to pointerinjector registry");
             let identity_matrix = [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0];
             let viewport = pointerinjector::Viewport {

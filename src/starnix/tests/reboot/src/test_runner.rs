@@ -82,10 +82,8 @@ async fn build_realm() -> (RealmInstance, oneshot::Receiver<RebootOptions>) {
 #[fasync::run_singlethreaded(test)]
 async fn test_reboot_ota_update() {
     let (realm_instance, reboot_options_receiver) = build_realm().await;
-    let lifecycle_controller = realm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
-        .unwrap();
+    let lifecycle_controller: fsys2::LifecycleControllerProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let (_, binder_server) = fidl::endpoints::create_endpoints();
     lifecycle_controller
@@ -103,10 +101,8 @@ async fn test_reboot_ota_update() {
 #[fasync::run_singlethreaded(test)]
 async fn test_reboot_no_args() {
     let (realm_instance, reboot_options_receiver) = build_realm().await;
-    let lifecycle_controller = realm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
-        .unwrap();
+    let lifecycle_controller: fsys2::LifecycleControllerProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let (_, binder_server) = fidl::endpoints::create_endpoints();
     lifecycle_controller.start_instance("./reboot_no_args", binder_server).await.unwrap().unwrap();

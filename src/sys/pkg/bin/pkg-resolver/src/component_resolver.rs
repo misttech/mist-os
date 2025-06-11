@@ -306,7 +306,7 @@ mod tests {
         url: String,
         handles: LocalComponentHandles,
     ) -> Result<(), Error> {
-        let resolver_proxy = handles.connect_to_protocol::<fresolution::ResolverMarker>()?;
+        let resolver_proxy: fresolution::ResolverProxy = handles.connect_to_protocol()?;
         let _ = resolver_proxy.resolve(&url).await?;
         fasync::Task::local(async move {
             let mut lock = trigger.lock().await;

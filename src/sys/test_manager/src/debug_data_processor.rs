@@ -444,10 +444,8 @@ mod test {
         let processor_server_fut = run_test_processor(stream, vmo_request_received_send);
         // Future running the 'test' (client of fuchsia.debugdata.Publisher)
         let test_fut = async move {
-            let proxy = test_realm
-                .root
-                .connect_to_protocol_at_exposed_dir::<fdebug::PublisherMarker>()
-                .expect("connect to publisher");
+            let proxy: fdebug::PublisherProxy =
+                test_realm.root.connect_to_protocol_at_exposed_dir().expect("connect to publisher");
             let vmo_1 = zx::Vmo::create(VMO_SIZE).unwrap();
             let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create();
             proxy.publish("data-sink-1", vmo_1, vmo_token_server_1).expect("publish vmo");
@@ -508,10 +506,8 @@ mod test {
         let processor_server_fut = run_test_processor(stream, vmo_request_received_send);
         // Future running the 'test' (client of fuchsia.debugdata.Publisher)
         let test_fut = async move {
-            let proxy = test_realm
-                .root
-                .connect_to_protocol_at_exposed_dir::<fdebug::PublisherMarker>()
-                .expect("connect to publisher");
+            let proxy: fdebug::PublisherProxy =
+                test_realm.root.connect_to_protocol_at_exposed_dir().expect("connect to publisher");
             let vmo_1 = zx::Vmo::create(VMO_SIZE).unwrap();
             let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create();
             proxy.publish("data-sink-1", vmo_1, vmo_token_server_1).expect("publish vmo");
@@ -577,18 +573,14 @@ mod test {
         let processor_server_fut = run_test_processor(stream, vmo_request_received_send);
         // Future running the 'test' (client of fuchsia.debugdata.Publisher)
         let test_fut = async move {
-            let proxy_1 = test_realm
-                .root
-                .connect_to_protocol_at_exposed_dir::<fdebug::PublisherMarker>()
-                .expect("connect to publisher");
+            let proxy_1: fdebug::PublisherProxy =
+                test_realm.root.connect_to_protocol_at_exposed_dir().expect("connect to publisher");
             let vmo_1 = zx::Vmo::create(VMO_SIZE).unwrap();
             let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create();
             proxy_1.publish("data-sink-1", vmo_1, vmo_token_server_1).expect("publish vmo");
             drop(vmo_token_1);
-            let proxy_2 = test_realm
-                .root
-                .connect_to_protocol_at_exposed_dir::<fdebug::PublisherMarker>()
-                .expect("connect to publisher");
+            let proxy_2: fdebug::PublisherProxy =
+                test_realm.root.connect_to_protocol_at_exposed_dir().expect("connect to publisher");
             let vmo_2 = zx::Vmo::create(VMO_SIZE).unwrap();
             let (vmo_token_2, vmo_token_server_2) = zx::EventPair::create();
             proxy_2.publish("data-sink-2", vmo_2, vmo_token_server_2).expect("publish vmo");
@@ -646,18 +638,14 @@ mod test {
         let processor_server_fut = run_test_processor(stream, vmo_request_received_send);
         // Future running the 'test' (client of fuchsia.debugdata.Publisher)
         let test_fut = async move {
-            let proxy_1 = test_realm
-                .root
-                .connect_to_protocol_at_exposed_dir::<fdebug::PublisherMarker>()
-                .expect("connect to publisher");
+            let proxy_1: fdebug::PublisherProxy =
+                test_realm.root.connect_to_protocol_at_exposed_dir().expect("connect to publisher");
             let vmo_1 = zx::Vmo::create(VMO_SIZE).unwrap();
             let (vmo_token_1, vmo_token_server_1) = zx::EventPair::create();
             proxy_1.publish("data-sink-1", vmo_1, vmo_token_server_1).expect("publish vmo");
             drop(vmo_token_1);
-            let proxy_2 = test_realm
-                .root
-                .connect_to_protocol_at_exposed_dir::<fdebug::PublisherMarker>()
-                .expect("connect to publisher");
+            let proxy_2: fdebug::PublisherProxy =
+                test_realm.root.connect_to_protocol_at_exposed_dir().expect("connect to publisher");
             let vmo_2 = zx::Vmo::create(VMO_SIZE).unwrap();
             let (vmo_token_2, vmo_token_server_2) = zx::EventPair::create();
             proxy_2.publish("data-sink-2", vmo_2, vmo_token_server_2).expect("publish vmo");

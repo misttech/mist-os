@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use fidl_fuchsia_bluetooth_le::{
-    ConnectionProxy, PeripheralEvent, PeripheralMarker, PeripheralProxy,
-};
+use fidl_fuchsia_bluetooth_le::{ConnectionProxy, PeripheralEvent, PeripheralProxy};
 use fidl_fuchsia_hardware_bluetooth::EmulatorProxy;
 use fuchsia_bluetooth::expectation::asynchronous::{
     expectable, Expectable, ExpectableExt, ExpectableState,
@@ -96,7 +94,7 @@ impl TestHarness for PeripheralHarness {
             let host = ActivatedFakeHost::new(realm.clone()).await?;
             let peripheral = realm
                 .instance()
-                .connect_to_protocol_at_exposed_dir::<PeripheralMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .context("Failed to connect to BLE Peripheral service")?;
             let harness = PeripheralHarness(expectable(
                 Default::default(),

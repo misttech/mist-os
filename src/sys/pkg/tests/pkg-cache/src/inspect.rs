@@ -10,7 +10,7 @@ use assert_matches::assert_matches;
 use diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_pkg::{self as fpkg, BlobInfo, NeededBlobsMarker, PackageCacheMarker};
+use fidl_fuchsia_pkg::{self as fpkg, BlobInfo, NeededBlobsMarker};
 use fidl_fuchsia_pkg_ext::BlobId;
 use fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder};
 use futures::prelude::*;
@@ -307,11 +307,11 @@ async fn package_cache_concurrent_gets() {
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
     // Initiate concurrent connection to `PackageCache`.
-    let package_cache_proxy2 = env
+    let package_cache_proxy2: fpkg::PackageCacheProxy = env
         .apps
         .realm_instance
         .root
-        .connect_to_protocol_at_exposed_dir::<PackageCacheMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect to package cache");
 
     let blob_id2 = BlobId::from(*package2.hash());

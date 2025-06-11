@@ -41,9 +41,8 @@ async fn set_up_test_driver_realm(
     realm_args.root_driver = Some(ROOT_DRIVER_URL.to_owned());
     instance.driver_test_realm_start(realm_args).await?;
 
-    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
-    let driver_registar =
-        instance.root.connect_to_protocol_at_exposed_dir::<fdr::DriverRegistrarMarker>()?;
+    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir()?;
+    let driver_registar = instance.root.connect_to_protocol_at_exposed_dir()?;
 
     Ok((instance, driver_dev, driver_registar))
 }

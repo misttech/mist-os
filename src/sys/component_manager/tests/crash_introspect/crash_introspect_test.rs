@@ -16,7 +16,7 @@ async fn crash_receiver(
     expected_crash_info: fsys::ComponentCrashInfo,
     mut success_reporter: mpsc::Sender<()>,
 ) -> Result<(), Error> {
-    let crash_introspect_proxy = handles.connect_to_protocol::<fsys::CrashIntrospectMarker>()?;
+    let crash_introspect_proxy: fsys::CrashIntrospectProxy = handles.connect_to_protocol()?;
 
     let (thread_koid_sender, mut thread_koid_receiver) = mpsc::channel(1);
 

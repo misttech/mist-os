@@ -7,7 +7,7 @@ use crate::host_realm::mpsc::Receiver;
 use anyhow::{format_err, Error};
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_bluetooth_host::{HostMarker, ReceiverMarker, ReceiverRequestStream};
-use fidl_fuchsia_component::{CreateChildArgs, RealmMarker};
+use fidl_fuchsia_component::{CreateChildArgs, RealmMarker, RealmProxy};
 use fidl_fuchsia_component_decl::{
     Child, CollectionRef, ConfigOverride, ConfigSingleValue, ConfigValue, Durability, StartupMode,
 };
@@ -216,8 +216,8 @@ impl HostRealm {
             ..Default::default()
         };
 
-        let realm_proxy =
-            realm.instance().connect_to_protocol_at_exposed_dir::<RealmMarker>().unwrap();
+        let realm_proxy: RealmProxy =
+            realm.instance().connect_to_protocol_at_exposed_dir().unwrap();
         let _ = realm_proxy
             .create_child(&collection_ref, &child_decl, CreateChildArgs::default())
             .await

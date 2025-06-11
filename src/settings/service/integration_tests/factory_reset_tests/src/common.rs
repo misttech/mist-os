@@ -77,7 +77,7 @@ impl FactoryResetTest {
     pub fn connect_to_factoryresetmarker(instance: &RealmInstance) -> FactoryResetProxy {
         return instance
             .root
-            .connect_to_protocol_at_exposed_dir::<FactoryResetMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connecting to FactoryReset");
     }
 }

@@ -311,10 +311,7 @@ impl VolumeChangeEarconsTest {
     }
 
     fn connect_to_audio_marker(instance: &RealmInstance) -> AudioProxy {
-        return instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<AudioMarker>()
-            .expect("connecting to Audio");
+        return instance.root.connect_to_protocol_at_exposed_dir().expect("connecting to Audio");
     }
 
     // Creates a listener to notify when a sound is played.

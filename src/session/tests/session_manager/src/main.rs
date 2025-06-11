@@ -294,8 +294,8 @@ impl SessionManagerPowerTest {
             )
             .await?;
         let realm = builder.build().await?;
-        let launcher =
-            realm.root.connect_to_protocol_at_exposed_dir::<fsession::LauncherMarker>().unwrap();
+        let launcher: fsession::LauncherProxy =
+            realm.root.connect_to_protocol_at_exposed_dir().unwrap();
         launcher
             .launch(&fsession::LaunchConfiguration {
                 session_url: Some("#meta/use-power-fidl.cm".to_string()),
@@ -315,8 +315,8 @@ impl SessionManagerPowerTest {
         );
 
         // Open the session's namespace dir.
-        let realm_query =
-            realm.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
+        let realm_query: fsys2::RealmQueryProxy =
+            realm.root.connect_to_protocol_at_exposed_dir().unwrap();
         let (namespace, server_end) = create_endpoints::<fio::DirectoryMarker>();
         realm_query
             .open_directory(
@@ -405,11 +405,8 @@ async fn take_power_lease_and_restart() -> anyhow::Result<()> {
     let lease = test.handoff.take().await.unwrap().unwrap();
 
     // Restart the session.
-    let restarter = test
-        .session_manager_realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<fsession::RestarterMarker>()
-        .unwrap();
+    let restarter: fsession::RestarterProxy =
+        test.session_manager_realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     restarter.restart().await.unwrap().unwrap();
 
     // Drop the power lease. This simulates the session getting killed as part of restart.
@@ -464,8 +461,8 @@ async fn test_launch_with_config_capabilities() -> anyhow::Result<()> {
         .await?;
 
     let realm = builder.build().await?;
-    let launcher =
-        realm.root.connect_to_protocol_at_exposed_dir::<fsession::LauncherMarker>().unwrap();
+    let launcher: fsession::LauncherProxy =
+        realm.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     // Launch the component and with the needed configuration capabilities.
     launcher
@@ -493,8 +490,8 @@ async fn test_launch_with_config_capabilities() -> anyhow::Result<()> {
 
     // Verify that the configuration has been read correctly.
     // Use RealmQuery to get the resolved structured config values.
-    let realm_query =
-        realm.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
+    let realm_query: fsys2::RealmQueryProxy =
+        realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let resolved_config = realm_query
         .get_structured_config("session-manager/session:session")
         .await

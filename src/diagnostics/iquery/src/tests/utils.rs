@@ -158,10 +158,8 @@ impl TestBuilder {
     async fn start(self) -> TestInExecution {
         let instance = self.builder.build().await.expect("create instance");
         // Ensure archivist has been resolved.
-        let lifecycle = instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<fsys2::LifecycleControllerMarker>()
-            .expect("can connect to lifecycle");
+        let lifecycle: fsys2::LifecycleControllerProxy =
+            instance.root.connect_to_protocol_at_exposed_dir().expect("can connect to lifecycle");
         lifecycle
             .resolve_instance("archivist")
             .await
@@ -248,7 +246,7 @@ impl TestInExecution {
         let realm_query = self
             .instance
             .root
-            .connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("can connect to realm query");
         let provider = ArchiveAccessorProvider::new(realm_query);
         for format in Format::all() {
@@ -269,7 +267,7 @@ impl TestInExecution {
         let realm_query = self
             .instance
             .root
-            .connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("can connect to realm query");
         let provider = ArchiveAccessorProvider::new(realm_query);
         execute_command(command, &provider).await

@@ -80,17 +80,15 @@ async fn boot_resolver_can_be_routed_from_component_manager() {
 
     let realm_instance = builder.build().await.unwrap();
 
-    let lifecycle_controller = realm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>()
-        .unwrap();
+    let lifecycle_controller: fsys::LifecycleControllerProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let (_, binder_server) = fidl::endpoints::create_endpoints();
     lifecycle_controller.start_instance(".", binder_server).await.unwrap().unwrap();
 
     // Get to the Trigger protocol exposed by the root component in this nested component manager
-    let realm_query =
-        realm_instance.root.connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>().unwrap();
+    let realm_query: fsys::RealmQueryProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     realm_query
         .open_directory(".", fsys::OpenDirType::ExposedDir, server_end)

@@ -814,11 +814,11 @@ mod test {
         let (realm, _) = setup_test().await?;
         let starnix_networks = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::StarnixNetworksMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to StarnixNetworks")?;
         let fuchsia_networks = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::FuchsiaNetworksMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to FuchsiaNetworks")?;
 
         for op in operations {
@@ -875,7 +875,7 @@ mod test {
         let (realm, mut dns_rx) = setup_test().await?;
         let starnix_networks = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::StarnixNetworksMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to StarnixNetworks")?;
 
         let mut last_dns = None;
@@ -945,11 +945,11 @@ mod test {
         let (realm, mut dns_rx) = setup_test().await?;
         let starnix_networks = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::StarnixNetworksMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to StarnixNetworks")?;
         let fuchsia_networks = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::FuchsiaNetworksMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to FuchsiaNetworks")?;
 
         let mut last_dns = None;

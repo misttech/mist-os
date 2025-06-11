@@ -83,7 +83,7 @@ struct TestEnv {
 impl TestEnv {
     /// Connects to a protocol exposed by a component within the RealmInstance.
     pub fn connect_to_protocol<P: DiscoverableProtocolMarker>(&self) -> P::Proxy {
-        self.realm_instance.root.connect_to_protocol_at_exposed_dir::<P>().unwrap()
+        self.realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap()
     }
 }
 

@@ -170,16 +170,14 @@ async fn setup_realm(mock_runner: Arc<MockRunner>) -> Fixture {
         .unwrap();
 
     let instance = builder.build().await.unwrap();
-    let proxy = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
-        .unwrap();
+    let proxy: fcomponent::EventStreamProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     proxy.wait_for_ready().await.unwrap();
     let event_stream = EventStream::new(proxy);
     instance.start_component_tree().await.unwrap();
 
-    let realm_query =
-        instance.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
+    let realm_query: fsys2::RealmQueryProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (exposed_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
     realm_query
         .open_directory(".", fsys2::OpenDirType::ExposedDir, server_end)

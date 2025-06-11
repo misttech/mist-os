@@ -76,9 +76,6 @@ impl SetupTest {
     }
 
     pub fn connect_to_setup_marker(instance: &RealmInstance) -> SetupProxy {
-        return instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<SetupMarker>()
-            .expect("connecting to Setup");
+        return instance.root.connect_to_protocol_at_exposed_dir().expect("connecting to Setup");
     }
 }

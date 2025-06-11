@@ -412,7 +412,7 @@ macro_rules! log_every_n_seconds {
 mod tests {
     use super::*;
     use diagnostics_reader::ArchiveReader;
-    use fidl_fuchsia_diagnostics_crasher::CrasherMarker;
+    use fidl_fuchsia_diagnostics_crasher::{CrasherMarker, CrasherProxy};
     use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
     use futures::{future, StreamExt};
     use log::{debug, info};
@@ -438,7 +438,7 @@ mod tests {
         let child_name = realm.root.child_name();
         let reader = ArchiveReader::logs();
         let (logs, _) = reader.snapshot_then_subscribe().unwrap().split_streams();
-        let proxy = realm.root.connect_to_protocol_at_exposed_dir::<CrasherMarker>().unwrap();
+        let proxy: CrasherProxy = realm.root.connect_to_protocol_at_exposed_dir().unwrap();
         let target_moniker =
             ExtendedMoniker::parse_str(&format!("realm_builder:{}/rust-crasher", child_name))
                 .unwrap();

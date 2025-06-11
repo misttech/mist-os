@@ -70,7 +70,7 @@ impl IntegrationTest {
     }
 
     pub fn connect_to_reverser(&self) -> Result<ReverserProxy, Error> {
-        self.instance.root.connect_to_protocol_at_exposed_dir::<ReverserMarker>()
+        self.instance.root.connect_to_protocol_at_exposed_dir()
     }
 
     pub fn reverser_moniker_for_selectors(&self) -> String {

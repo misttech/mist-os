@@ -63,17 +63,15 @@ fn bench_write_read_log(b: &mut criterion::Bencher, format: Format) {
         let builder = create_realm().await;
         builder.build().await.expect("create instance")
     });
-    let log_sink_proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<LogSinkMarker>().unwrap();
-    let accessor_proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>().unwrap();
+    let log_sink_client = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
+    let accessor_proxy = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     let mut reader = ArchiveReader::logs();
     reader.with_archive(accessor_proxy).with_format(format);
 
     let options = PublisherOptions::default()
         .tags(&["some-tag"])
         .wait_for_initial_interest(false)
-        .use_log_sink(log_sink_proxy);
+        .use_log_sink(log_sink_client);
     let publisher = Publisher::new(options).unwrap();
     let (stream, _errors) =
         reader.snapshot_then_subscribe().expect("subscribed to logs").split_streams();

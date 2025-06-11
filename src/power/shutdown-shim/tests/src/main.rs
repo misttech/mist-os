@@ -227,8 +227,8 @@ async fn verify_shutdown_shim_common_behavior(
 #[fuchsia::test]
 async fn test_poweroff(is_power_framework_available: bool) -> Result<(), Error> {
     let (realm_instance, recv_signals) = new_realm(is_power_framework_available).await?;
-    let shim_statecontrol =
-        realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
+    let shim_statecontrol: fstatecontrol::AdminProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir()?;
 
     let _task = fasync::Task::spawn(async move {
         shim_statecontrol.poweroff().await.expect_err(
@@ -244,8 +244,8 @@ async fn test_poweroff(is_power_framework_available: bool) -> Result<(), Error> 
 #[fuchsia::test]
 async fn test_mexec(is_power_framework_available: bool) -> Result<(), Error> {
     let (realm_instance, recv_signals) = new_realm(is_power_framework_available).await?;
-    let shim_statecontrol =
-        realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
+    let shim_statecontrol: fstatecontrol::AdminProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir()?;
 
     let _task = fasync::Task::spawn(async move {
         let kernel_zbi = zx::Vmo::create(0).unwrap();
@@ -271,8 +271,8 @@ async fn test_reboot(
     reason: RebootReason,
 ) -> Result<(), Error> {
     let (realm_instance, recv_signals) = new_realm(is_power_framework_available).await?;
-    let shim_statecontrol =
-        realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
+    let shim_statecontrol: fstatecontrol::AdminProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir()?;
 
     fasync::Task::spawn(async move {
         match reboot_type {
@@ -296,13 +296,10 @@ async fn test_reboot(
 #[fuchsia::test]
 async fn test_collaborative_reboot(is_power_framework_available: bool) -> Result<(), Error> {
     let (realm_instance, recv_signals) = new_realm(is_power_framework_available).await?;
-    let shim_scheduler = realm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fpower_internal::CollaborativeRebootSchedulerMarker>(
-        )?;
-    let shim_initiator = realm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fpower::CollaborativeRebootInitiatorMarker>()?;
+    let shim_scheduler: fpower_internal::CollaborativeRebootSchedulerProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir()?;
+    let shim_initiator: fpower::CollaborativeRebootInitiatorProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir()?;
 
     shim_scheduler
         .schedule_reboot(fpower_internal::CollaborativeRebootReason::SystemUpdate, None)
@@ -335,8 +332,8 @@ async fn deprecated_shutdown_test(is_power_framework_available: bool) -> Result<
     let mut deprecated_reboot_watcher = DeprecatedRebootWatcherClient::new(&realm_instance).await;
 
     // Send a reboot request to shutdown-shim (in a separate Task because it never returns)
-    let shim_statecontrol =
-        realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
+    let shim_statecontrol: fstatecontrol::AdminProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir()?;
     let _shutdown_task =
         fasync::Task::local(shim_statecontrol.reboot(fstatecontrol::RebootReason::SystemUpdate));
 
@@ -370,8 +367,8 @@ async fn shutdown_test(is_power_framework_available: bool) -> Result<(), Error> 
     let mut deprecated_reboot_watcher = DeprecatedRebootWatcherClient::new(&realm_instance).await;
 
     // Send a reboot request to the shutdown-shim (in a separate Task because it never returns)
-    let shim_statecontrol =
-        realm_instance.root.connect_to_protocol_at_exposed_dir::<fstatecontrol::AdminMarker>()?;
+    let shim_statecontrol: fstatecontrol::AdminProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir()?;
     let options = fstatecontrol::RebootOptions {
         reasons: Some(vec![
             fstatecontrol::RebootReason2::SystemUpdate,

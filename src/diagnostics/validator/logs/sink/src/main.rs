@@ -195,8 +195,7 @@ impl Puppet {
         });
 
         let start_time = zx::BootInstant::get();
-        let proxy =
-            instance.root.connect_to_protocol_at_exposed_dir::<LogSinkPuppetMarker>().unwrap();
+        let proxy: LogSinkPuppetProxy = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
         info!("Waiting for first LogSink connection (from Component Manager) (to be ignored).");
         let _ = incoming_log_sink_requests.next().await.unwrap();

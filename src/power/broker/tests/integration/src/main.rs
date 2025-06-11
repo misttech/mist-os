@@ -7,7 +7,7 @@ use assert_matches::assert_matches;
 use fidl::endpoints::{create_endpoints, create_proxy, Proxy};
 use fidl_fuchsia_power_broker::{
     self as fpb, BinaryPowerLevel, DependencyType, ElementSchema, LeaseStatus, LevelDependency,
-    StatusMarker, TopologyMarker,
+    StatusMarker, TopologyMarker, TopologyProxy,
 };
 use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
@@ -49,7 +49,7 @@ mod tests {
 
         // Create a topology with only two elements and a single dependency:
         // P <- C
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let topology: TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
         let parent_token = zx::Event::create();
         let (parent_current, parent_current_server) = create_proxy::<CurrentLevelMarker>();
         let (parent_required, parent_required_server) = create_proxy::<RequiredLevelMarker>();
@@ -326,7 +326,7 @@ mod tests {
 
         // Create a topology with only two elements and a single dependency:
         // P <- C
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let topology: TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
         let (element_runner_client, _) = create_endpoints::<ElementRunnerMarker>();
         let (_, current_server) = create_proxy::<CurrentLevelMarker>();
         let (_, required_server) = create_proxy::<RequiredLevelMarker>();
@@ -359,7 +359,7 @@ mod tests {
 
         // Create a topology with only two elements and a single dependency:
         // P <- C
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let topology: TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
         let parent_token = zx::Event::create();
         let (parent_element_runner_client, parent_element_runner_server) =
             create_endpoints::<ElementRunnerMarker>();
@@ -574,7 +574,7 @@ mod tests {
         // C depends on B, which in turn depends on A.
         // D has no dependencies or dependents.
         // A <- B <- C   D
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let topology: TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
         let element_a_token = zx::Event::create();
         let (element_a_current, current_server) = create_proxy::<CurrentLevelMarker>();
         let (element_a_required, required_server) = create_proxy::<RequiredLevelMarker>();
@@ -919,7 +919,7 @@ mod tests {
         // C depends on B, which in turn depends on A.
         // D has no dependencies or dependents.
         // A <- B <- C   D
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let topology: TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
         let element_a_token = zx::Event::create();
         let (element_a_runner_client, element_a_runner_server) =
             create_endpoints::<ElementRunnerMarker>();
@@ -1246,7 +1246,7 @@ mod tests {
         // All other elements have a default of 0.
         let mut executor = fasync::TestExecutor::new();
         let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let topology: TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
         let grandparent_token = zx::Event::create();
         let (grandparent_current, current_server) = create_proxy::<CurrentLevelMarker>();
         let (grandparent_required, required_server) = create_proxy::<RequiredLevelMarker>();
@@ -1705,7 +1705,7 @@ mod tests {
         // All other elements have a default of 0.
         let mut executor = fasync::TestExecutor::new();
         let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let topology: TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
         let grandparent_token = zx::Event::create();
         let (grandparent_runner_client, grandparent_runner_server) =
             create_endpoints::<ElementRunnerMarker>();
@@ -2135,7 +2135,7 @@ mod tests {
 
         // Create a topology with only two elements and a single dependency:
         // P <- C
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let topology: TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
         let parent_token = zx::Event::create();
         let (parent_current, parent_current_server) = create_proxy::<CurrentLevelMarker>();
         let (parent_required, parent_required_server) = create_proxy::<RequiredLevelMarker>();
@@ -2390,7 +2390,7 @@ mod tests {
         let mut executor = fasync::TestExecutor::new();
         let realm =
             executor.run_singlethreaded(async { build_power_broker_realm().await }).unwrap();
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let topology: TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
         let token_a = zx::Event::create();
         let (current_a, current_server) = create_proxy::<CurrentLevelMarker>();
         let (required_a, required_server) = create_proxy::<RequiredLevelMarker>();
@@ -2939,7 +2939,7 @@ mod tests {
         let mut executor = fasync::TestExecutor::new();
         let realm =
             executor.run_singlethreaded(async { build_power_broker_realm().await }).unwrap();
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let topology: TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
         let token_a = zx::Event::create();
         let (element_runner_a_client, element_runner_a_server) =
             create_endpoints::<ElementRunnerMarker>();
@@ -3480,7 +3480,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_add_element_errors() -> Result<(), Error> {
         let realm = build_power_broker_realm().await?;
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let topology: TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
 
         // Create a root element
         let earth_token = zx::Event::create();
@@ -3568,7 +3568,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_closing_element_control_closes_status() -> Result<(), Error> {
         let realm = build_power_broker_realm().await?;
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let topology: TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
 
         let (element_control, element_control_server) = create_proxy::<ElementControlMarker>();
         assert!(topology
@@ -3601,7 +3601,7 @@ mod tests {
         let realm = executor.run_singlethreaded(async { build_power_broker_realm().await })?;
 
         // Create a topology with only one element:
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<TopologyMarker>()?;
+        let topology: TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
         let (current, current_server) = create_proxy::<CurrentLevelMarker>();
         let (_required, required_server) = create_proxy::<RequiredLevelMarker>();
         let (_lessor, lessor_server) = create_proxy::<LessorMarker>();

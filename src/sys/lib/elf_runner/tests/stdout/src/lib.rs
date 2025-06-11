@@ -72,7 +72,7 @@ async fn test_inner(url: &str, moniker: &str, expected: Expected) {
         ScopedInstance::new_with_name(moniker.into(), COLLECTION_NAME.into(), url.into())
             .await
             .unwrap();
-    let binder = instance.connect_to_protocol_at_exposed_dir::<fcomponent::BinderMarker>().unwrap();
+    let binder: fcomponent::BinderProxy = instance.connect_to_protocol_at_exposed_dir().unwrap();
     let full_moniker = &format!("{}:{}", COLLECTION_NAME, moniker);
 
     // wait a little to increase chances we detect extra messages we don't want

@@ -32,7 +32,7 @@ impl NightModeTest {
     pub fn connect_to_night_mode_marker(instance: &RealmInstance) -> NightModeProxy {
         return instance
             .root
-            .connect_to_protocol_at_exposed_dir::<NightModeMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connecting to NightMode");
     }
 }

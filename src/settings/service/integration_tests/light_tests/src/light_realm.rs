@@ -104,10 +104,7 @@ impl LightRealm {
     }
 
     pub fn connect_to_light_marker(instance: &RealmInstance) -> LightProxy {
-        return instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<LightMarker>()
-            .expect("connecting to Light");
+        return instance.root.connect_to_protocol_at_exposed_dir().expect("connecting to Light");
     }
 
     async fn input_device_registry_service(

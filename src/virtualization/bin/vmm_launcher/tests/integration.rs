@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use fidl_fuchsia_component::{ChildIteratorMarker, RealmMarker};
+use fidl_fuchsia_component::{ChildIteratorMarker, RealmProxy};
 use fidl_fuchsia_component_decl as cdecl;
-use fidl_fuchsia_virtualization::{GuestError, GuestLifecycleMarker, GuestLifecycleProxy};
+use fidl_fuchsia_virtualization::{GuestError, GuestLifecycleProxy};
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 
 static VMM_URL: &'static str = "#meta/vmm.cm";
@@ -58,7 +58,7 @@ async fn build_test_realm(vmm_url: &'static str) -> Result<RealmInstance, Error>
 }
 
 async fn list_realm_children(test_realm: &RealmInstance) -> Result<Vec<cdecl::ChildRef>, Error> {
-    let realm = test_realm.root.connect_to_protocol_at_exposed_dir::<RealmMarker>()?;
+    let realm: RealmProxy = test_realm.root.connect_to_protocol_at_exposed_dir()?;
     let collection_ref = cdecl::CollectionRef { name: "virtual_machine_managers".to_string() };
     let (child_iterator, child_iterator_server_end) =
         fidl::endpoints::create_proxy::<ChildIteratorMarker>();
@@ -75,7 +75,7 @@ async fn list_realm_children(test_realm: &RealmInstance) -> Result<Vec<cdecl::Ch
 }
 
 async fn start_vmm(realm: &RealmInstance) -> Result<GuestLifecycleProxy, Error> {
-    let lifecycle = realm.root.connect_to_protocol_at_exposed_dir::<GuestLifecycleMarker>()?;
+    let lifecycle: GuestLifecycleProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
     // Send a run RPC to the guest. This is to ensure that the component is completely started.
     let response = lifecycle.run().await.expect("Failed to connect to vmm");
     assert_eq!(Err(GuestError::NotCreated), response);

@@ -4,7 +4,6 @@
 
 use component_events::events::*;
 use component_events::matcher::*;
-use fidl_fuchsia_component as fcomponent;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
 use test_case::test_case;
 
@@ -28,10 +27,7 @@ async fn scoped_instances(root_component: &'static str) {
         .unwrap();
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
-    let proxy = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
-        .unwrap();
+    let proxy = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let mut event_stream = EventStream::new(proxy);
 

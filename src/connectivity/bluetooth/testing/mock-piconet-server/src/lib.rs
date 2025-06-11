@@ -530,7 +530,7 @@ async fn piconet_member(
     peer_observer: bredr_test::PeerObserverProxy,
 ) -> Result<(), Error> {
     // connect to the profile service to drive the mock peer
-    let pro_test = handles.connect_to_protocol::<bredr_test::ProfileTestMarker>()?;
+    let pro_test: bredr_test::ProfileTestProxy = handles.connect_to_protocol()?;
     let mut fs = ServiceFs::new();
 
     let _ = fs.dir("svc").add_service_at(profile_svc_path, move |chan: zx::Channel| {

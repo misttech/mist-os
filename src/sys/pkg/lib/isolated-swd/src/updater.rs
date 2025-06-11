@@ -421,12 +421,8 @@ pub(crate) mod for_tests {
 
             let realm_instance = realm_builder.build().await.unwrap();
 
-            let installer_proxy = realm_instance
-                .root
-                .connect_to_protocol_at_exposed_dir::<InstallerMarker>()
-                .unwrap();
-            let paver_proxy =
-                realm_instance.root.connect_to_protocol_at_exposed_dir::<PaverMarker>().unwrap();
+            let installer_proxy = realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
+            let paver_proxy = realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
             let updater = Updater::new_with_proxies(installer_proxy, paver_proxy);
 

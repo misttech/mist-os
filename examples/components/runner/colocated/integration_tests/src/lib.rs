@@ -46,15 +46,9 @@ async fn test_attribute_memory() {
                 async move {
                     capabilities_sender
                         .send(Capabilities {
-                            attribution_provider: handles
-                                .connect_to_protocol::<fattribution::ProviderMarker>()
-                                .unwrap(),
-                            introspector: handles
-                                .connect_to_protocol::<fcomponent::IntrospectorMarker>()
-                                .unwrap(),
-                            realm: handles
-                                .connect_to_protocol::<fcomponent::RealmMarker>()
-                                .unwrap(),
+                            attribution_provider: handles.connect_to_protocol().unwrap(),
+                            introspector: handles.connect_to_protocol().unwrap(),
+                            realm: handles.connect_to_protocol().unwrap(),
                         })
                         .await
                         .unwrap();

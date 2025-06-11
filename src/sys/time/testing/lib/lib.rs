@@ -7,12 +7,8 @@ use chrono::{Datelike, TimeZone, Timelike};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_hardware_rtc::{DeviceRequest, DeviceRequestStream};
 use fidl_fuchsia_metrics::MetricEvent;
-use fidl_fuchsia_metrics_test::{
-    LogMethod, MetricEventLoggerQuerierMarker, MetricEventLoggerQuerierProxy,
-};
-use fidl_fuchsia_testing::{
-    FakeClockControlMarker, FakeClockControlProxy, FakeClockMarker, FakeClockProxy,
-};
+use fidl_fuchsia_metrics_test::{LogMethod, MetricEventLoggerQuerierProxy};
+use fidl_fuchsia_testing::{FakeClockControlProxy, FakeClockProxy};
 use fidl_fuchsia_time::{MaintenanceRequest, MaintenanceRequestStream};
 use fidl_fuchsia_time_external::{PushSourceMarker, Status, TimeSample};
 use fidl_test_time::{TimeSourceControlRequest, TimeSourceControlRequestStream};
@@ -235,14 +231,8 @@ impl NestedTimekeeper {
         let realm_instance = builder.build().await.unwrap();
 
         let fake_clock_control = if use_fake_clock {
-            let control_proxy = realm_instance
-                .root
-                .connect_to_protocol_at_exposed_dir::<FakeClockControlMarker>()
-                .unwrap();
-            let clock_proxy = realm_instance
-                .root
-                .connect_to_protocol_at_exposed_dir::<FakeClockMarker>()
-                .unwrap();
+            let control_proxy = realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
+            let clock_proxy = realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
             Some(FakeClockController { control_proxy, clock_proxy })
         } else {
             None
@@ -250,7 +240,7 @@ impl NestedTimekeeper {
 
         let cobalt_querier = realm_instance
             .root
-            .connect_to_protocol_at_exposed_dir::<MetricEventLoggerQuerierMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("the connection succeeds");
 
         let nested_timekeeper = Self { _realm_instance: realm_instance };
@@ -585,9 +575,7 @@ async fn setup_rtc(
         .add_route(
             Route::new()
                 .capability(
-                    Capability::directory("dev-rtc")
-                        .path("/dev/class/rtc")
-                        .rights(fio::R_STAR_DIR),
+                    Capability::directory("dev-rtc").path("/dev/class/rtc").rights(fio::R_STAR_DIR),
                 )
                 .from(&fake_rtc_server)
                 .to(&*timekeeper),

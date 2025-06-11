@@ -4,6 +4,7 @@
 
 use diagnostics_assertions::{assert_data_tree, AnyProperty};
 use diagnostics_reader::{ArchiveReader, Severity};
+use fidl::endpoints::ClientEnd;
 use fuchsia_component_test::ScopedInstance;
 use futures::{future, StreamExt};
 use log::debug;
@@ -18,8 +19,8 @@ async fn test_isolated_diagnostics_can_be_read_by_the_test() {
     let mut instance =
         ScopedInstance::new("coll".into(), URL.into()).await.expect("Created instance");
 
-    let _ = instance
-        .connect_to_protocol_at_exposed_dir::<fcomponent::BinderMarker>()
+    let _: ClientEnd<fcomponent::BinderMarker> = instance
+        .connect_to_protocol_at_exposed_dir()
         .expect("failed to connect fuchsia.component.Binder");
 
     // Read inspect
