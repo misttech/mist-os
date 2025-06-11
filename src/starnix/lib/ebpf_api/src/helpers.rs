@@ -81,14 +81,20 @@ fn bpf_map_update_elem<C: EbpfProgramContext>(
 
 fn bpf_map_delete_elem<C: EbpfProgramContext>(
     _context: &mut C::RunContext<'_>,
-    _map: BpfValue,
-    _key: BpfValue,
+    map: BpfValue,
+    key: BpfValue,
     _: BpfValue,
     _: BpfValue,
     _: BpfValue,
 ) -> BpfValue {
-    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_map_delete_elem");
-    u64::MAX.into()
+    // SAFETY
+    //
+    // The safety of the operation is ensured by the bpf verifier. The `map` must be a reference to
+    // a `Map` object kept alive by the program itself.
+    let map: &Map = unsafe { &*map.as_ptr::<Map>() };
+    let key =
+        unsafe { std::slice::from_raw_parts(key.as_ptr::<u8>(), map.schema.key_size as usize) };
+    map.delete(key).map(|_| 0).unwrap_or(u64::MAX).into()
 }
 
 fn bpf_trace_printk<C: EbpfProgramContext>(

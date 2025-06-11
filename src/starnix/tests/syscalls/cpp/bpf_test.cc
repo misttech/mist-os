@@ -432,6 +432,28 @@ TEST_F(BpfMapTest, Map) {
     EXPECT_EQ(v, i + 1);
   }
 
+  for (int i = 0; i < NUM_VALUES; ++i) {
+    EXPECT_EQ(bpf(BPF_MAP_DELETE_ELEM,
+                  (union bpf_attr){
+                      .map_fd = (unsigned)map_fd(),
+                      .key = (uintptr_t)(&i),
+                  }),
+              0)
+        << strerror(errno);
+  }
+
+  for (int i = 0; i < NUM_VALUES; ++i) {
+    int v;
+    EXPECT_EQ(bpf(BPF_MAP_LOOKUP_ELEM,
+                  (union bpf_attr){
+                      .map_fd = (unsigned)map_fd(),
+                      .key = (uintptr_t)(&i),
+                      .value = (uintptr_t)(&v),
+                  }),
+              -1);
+    EXPECT_EQ(errno, ENOENT);
+  }
+
   CheckMapInfo();
 }
 
