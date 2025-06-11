@@ -2688,16 +2688,10 @@ fn check_access(
         // At least one of the EXEC bits must be set to execute files.
         0o6 | (mode_bits & 0o100) >> 6 | (mode_bits & 0o010) >> 3 | mode_bits & 0o001
     };
-    if (capability_check_mode_rwx_bits & access.rwx_bits() as u32) == access.rwx_bits() as u32 {
-        // TODO: https://fxbug.dev/401196505 - upgrade to security::check_task_capable.
-        if current_task.creds().has_capability(CAP_DAC_OVERRIDE) {
-            Ok(())
-        } else {
-            error!(EACCES)
-        }
-    } else {
-        error!(EACCES)
+    if (capability_check_mode_rwx_bits & access.rwx_bits() as u32) != access.rwx_bits() as u32 {
+        return error!(EACCES);
     }
+    security::check_task_capable(current_task, CAP_DAC_OVERRIDE).map_err(|_| errno!(EACCES))
 }
 
 #[cfg(test)]

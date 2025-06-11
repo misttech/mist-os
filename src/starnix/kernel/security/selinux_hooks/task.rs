@@ -17,6 +17,7 @@ use selinux::{
     KernelClass, NullessByteStr,
 };
 use starnix_types::ownership::TempRef;
+use starnix_uapi::auth::CAP_DAC_OVERRIDE;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
@@ -582,6 +583,12 @@ pub(in crate::security) fn check_task_capable(
     capabilities: starnix_uapi::auth::Capabilities,
 ) -> Result<(), Errno> {
     let sid = task_effective_sid(current_task);
+
+    // TODO: https://fxbug.dev/401196505 - Use "kernel act as" to eliminate this.
+    if sid == InitialSid::Kernel.into() && capabilities == CAP_DAC_OVERRIDE {
+        return Ok(());
+    }
+
     let permission = permission_from_capability(capabilities);
     check_self_permission(
         &permission_check,
