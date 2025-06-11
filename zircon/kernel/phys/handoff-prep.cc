@@ -91,7 +91,8 @@ constexpr ktl::string_view VmoNameString(const PhysVmo::Name& name) {
 
 HandoffPrep::HandoffPrep(ElfImage kernel)
     : kernel_(ktl::move(kernel)),
-      temporary_data_allocator_(VirtualAddressAllocator::TemporaryHandoffDataAllocator(kernel_)) {
+      temporary_data_allocator_(VirtualAddressAllocator::TemporaryHandoffDataAllocator(kernel_)),
+      permanent_data_allocator_(VirtualAddressAllocator::PermanentHandoffDataAllocator(kernel_)) {
   PhysHandoffTemporaryPtr<const PhysHandoff> handoff;
   fbl::AllocChecker ac;
   handoff_ = New(handoff, ac);
@@ -153,6 +154,11 @@ void HandoffPrep::FinishVmObjects() {
   populate_vmar(temporary_vmar, "temporary hand-off data",
                 temporary_data_allocator_.allocate_function().memory().TakeMappings());
 
+  PhysVmar permanent_data_vmar;
+  populate_vmar(&permanent_data_vmar, "permanent hand-off data",
+                permanent_data_allocator_.allocate_function().memory().TakeMappings());
+  vmars_.push_front(HandoffVmar::New(ktl::move(permanent_data_vmar)));
+
   NewFromList(handoff()->vmars, ktl::move(vmars_));
   NewFromList(handoff()->extra_vmos, ktl::move(extra_vmos_));
 }
@@ -178,6 +184,7 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kKernel:
       case memalloc::Type::kKernelPageTables:
       case memalloc::Type::kPhysDebugdata:
+      case memalloc::Type::kPermanentPhysHandoff:
       case memalloc::Type::kPeripheral:
       case memalloc::Type::kPhysLog:
       case memalloc::Type::kReservedLow:

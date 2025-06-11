@@ -157,14 +157,12 @@ using PhysHandoffTemporarySpan = PhysHandoffSpan<T, PhysHandoffPtrLifetime::Temp
 
 using PhysHandoffTemporaryString = PhysHandoffString<PhysHandoffPtrLifetime::Temporary>;
 
-// TODO(https://fxbug.dev/42164859): permanent handoff pointers are not yet available
-//
-// template <typename T>
-// using PhysHandoffPermanentPtr = PhysHandoffPtr<T, PhysHandoffPtrLifetime::Permanent>;
-//
-// template <typename T>
-// using PhysHandoffPermanentSpan = PhysHandoffSpan<T, PhysHandoffPtrLifetime::Permanent>;
-//
-// using PhysHandoffPermanentString = PhysHandoffString<PhysHandoffPtrLifetime::Permanent>;
+template <typename T>
+using PhysHandoffPermanentPtr = PhysHandoffPtr<T, PhysHandoffPtrLifetime::Permanent>;
+
+template <typename T>
+using PhysHandoffPermanentSpan = PhysHandoffSpan<T, PhysHandoffPtrLifetime::Permanent>;
+
+using PhysHandoffPermanentString = PhysHandoffString<PhysHandoffPtrLifetime::Permanent>;
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_HANDOFF_PTR_H_

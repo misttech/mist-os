@@ -273,14 +273,12 @@ struct PhysHandoff {
   // The physical address at which the kernel is to be loaded.
   uintptr_t kernel_physical_load_address = 0;
 
-  // TODO(https://fxbug.dev/42164859): This will eventually be made a permanent pointer.
-  PhysHandoffTemporaryPtr<const BootOptions> boot_options;
+  PhysHandoffPermanentPtr<const BootOptions> boot_options;
 
   PhysBootTimes times;
   static_assert(std::is_default_constructible_v<PhysBootTimes>);
 
-  // TODO(https://fxbug.dev/42164859): This will eventually be made a permanent pointer.
-  PhysHandoffTemporaryString version_string;
+  PhysHandoffPermanentString version_string;
 
   // Permanent VMARs to construct along with mapped regions within. The VMARs
   // will be sorted by base address, and the mappings within each VMAR will
@@ -308,9 +306,7 @@ struct PhysHandoff {
   std::optional<crypto::EntropyPool> entropy_pool;
 
   // ZBI container of items to be propagated in mexec.
-  // TODO(https://fxbug.dev/42164859): later this will be propagated
-  // as a whole page the kernel can stuff into a VMO.
-  PhysHandoffTemporarySpan<const std::byte> mexec_data;
+  PhysHandoffPermanentSpan<const std::byte> mexec_data;
 
   // Architecture-specific content.
   ArchPhysHandoff arch_handoff;

@@ -70,6 +70,15 @@ HandoffPrep::VirtualAddressAllocator::TemporaryHandoffDataAllocator(const ElfIma
   };
 }
 
+HandoffPrep::VirtualAddressAllocator
+HandoffPrep::VirtualAddressAllocator::PermanentHandoffDataAllocator(const ElfImage& kernel) {
+  return {
+      /*start=*/kernel.load_address() - ZX_PAGE_SIZE,
+      /*strategy=*/HandoffPrep::VirtualAddressAllocator::Strategy::kDown,
+      /*boundary=*/kernel.load_address() - k1GiB,
+  };
+}
+
 uintptr_t HandoffPrep::VirtualAddressAllocator::AllocatePages(size_t size) {
   ZX_DEBUG_ASSERT(IsPageAligned(size));
   switch (strategy_) {

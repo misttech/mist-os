@@ -54,6 +54,8 @@ std::string_view ToString(Type type) {
       return "data ZBI"sv;
     case Type::kTemporaryPhysHandoff:
       return "phys hand-off data (temporary)"sv;
+    case Type::kPermanentPhysHandoff:
+      return "phys hand-off data (permanent)"sv;
     case Type::kVdso:
       return "vDSO"sv;
     case Type::kUserboot:

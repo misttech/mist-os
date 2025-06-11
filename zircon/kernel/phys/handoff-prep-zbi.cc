@@ -48,10 +48,6 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
       MakePhysVmo({zbi.data(), (zbi_size + ZX_PAGE_SIZE - 1) & -ZX_PAGE_SIZE}, "zbi"sv, zbi_size);
 
   // Allocate some pages to fill up with the ZBI items to save for mexec.
-  // TODO(https://fxbug.dev/42164859): Currently this is in scratch space and gets
-  // copied into the handoff allocator when its final size is known.
-  // Later, it will allocated with its own type and be handed off to
-  // the kernel as a whole range of pages that can be turned into a VMO.
   fbl::AllocChecker ac;
   Allocation mexec_buffer =
       Allocation::New(ac, memalloc::Type::kPhysScratch, ZX_PAGE_SIZE, ZX_PAGE_SIZE);
@@ -183,9 +179,6 @@ void HandoffPrep::SummarizeMiscZbiItems(ktl::span<ktl::byte> zbi) {
   // formatted.
   ZX_ASSERT(view.take_error().is_ok());
 
-  // Copy mexec data into handoff temporary space.
-  // TODO(https://fxbug.dev/42164859): Later this won't be required since we'll pass
-  // the contents of mexec_image_ to the kernel in the handoff by address.
   ktl::span handoff_mexec = New(handoff_->mexec_data, ac, mexec_image_.size_bytes());
   ZX_ASSERT(ac.check());
   memcpy(handoff_mexec.data(), mexec_image_.storage().get(), handoff_mexec.size_bytes());

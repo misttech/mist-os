@@ -34,11 +34,6 @@ PhysHandoff* gPhysHandoff;
 
 namespace {
 
-// TODO(https://fxbug.dev/42164859): Eventually physboot will hand off a permanent pointer
-// we can store in gBootOptions.  For now, handoff only provides temporary
-// pointers that we must copy out of.
-BootOptions gBootOptionsInstance;
-
 paddr_t gKernelPhysicalLoadAddress;
 
 // When using physboot, other samples are available in the handoff data too.
@@ -185,8 +180,7 @@ void HandoffFromPhys(PhysHandoff* handoff) {
   // the kernel was booted; if unpatched, we would trap here and halt.
   CodePatchingNopTest();
 
-  gBootOptionsInstance = *gPhysHandoff->boot_options;
-  gBootOptions = &gBootOptionsInstance;
+  gBootOptions = gPhysHandoff->boot_options.get();
 
   gKernelPhysicalLoadAddress = gPhysHandoff->kernel_physical_load_address;
   ZX_DEBUG_ASSERT(KernelPhysicalAddressOf<__executable_start>() == gKernelPhysicalLoadAddress);

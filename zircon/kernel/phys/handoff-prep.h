@@ -46,9 +46,14 @@ class HandoffPrep {
 
   // This returns new T(args...) using the temporary handoff allocator and
   // fills in the handoff_ptr to point to it.
-  template <typename T, typename... Args>
-  T* New(PhysHandoffTemporaryPtr<const T>& handoff_ptr, fbl::AllocChecker& ac, Args&&... args) {
-    T* ptr = new (temporary_data_allocator_, ac) T(ktl::forward<Args>(args)...);
+  template <typename T, PhysHandoffPtrLifetime Lifetime, typename... Args>
+  T* New(PhysHandoffPtr<const T, Lifetime>& handoff_ptr, fbl::AllocChecker& ac, Args&&... args) {
+    T* ptr;
+    if constexpr (Lifetime == PhysHandoffPtrLifetime::Temporary) {
+      ptr = new (temporary_data_allocator_, ac) T(ktl::forward<Args>(args)...);
+    } else {
+      ptr = new (permanent_data_allocator_, ac) T(ktl::forward<Args>(args)...);
+    }
     if (ptr) {
       handoff_ptr.ptr_ = ptr;
     }
@@ -56,10 +61,15 @@ class HandoffPrep {
   }
 
   // Similar but for new T[n] using spans instead of pointers.
-  template <typename T>
-  ktl::span<T> New(PhysHandoffTemporarySpan<const T>& handoff_span, fbl::AllocChecker& ac,
+  template <typename T, PhysHandoffPtrLifetime Lifetime>
+  ktl::span<T> New(PhysHandoffSpan<const T, Lifetime>& handoff_span, fbl::AllocChecker& ac,
                    size_t n) {
-    T* ptr = new (temporary_data_allocator_, ac) T[n];
+    T* ptr;
+    if constexpr (Lifetime == PhysHandoffPtrLifetime::Temporary) {
+      ptr = new (temporary_data_allocator_, ac) T[n];
+    } else {
+      ptr = new (permanent_data_allocator_, ac) T[n];
+    }
     if (ptr) {
       handoff_span.ptr_.ptr_ = ptr;
       handoff_span.size_ = n;
@@ -68,7 +78,8 @@ class HandoffPrep {
     return {};
   }
 
-  ktl::string_view New(PhysHandoffTemporaryString& handoff_string, fbl::AllocChecker& ac,
+  template <PhysHandoffPtrLifetime Lifetime>
+  ktl::string_view New(PhysHandoffString<Lifetime>& handoff_string, fbl::AllocChecker& ac,
                        ktl::string_view str) {
     ktl::span chars = New(handoff_string, ac, str.size());
     if (chars.empty()) {
@@ -129,6 +140,9 @@ class HandoffPrep {
     // The allocator for temporary hand-off data.
     static VirtualAddressAllocator TemporaryHandoffDataAllocator(const ElfImage& kernel);
 
+    // The allocator for permanent hand-off data.
+    static VirtualAddressAllocator PermanentHandoffDataAllocator(const ElfImage& kernel);
+
     VirtualAddressAllocator(uintptr_t start, Strategy strategy,
                             ktl::optional<uintptr_t> boundary = ktl::nullopt)
         : start_{start}, strategy_{strategy}, boundary_{boundary} {
@@ -169,7 +183,8 @@ class HandoffPrep {
       if constexpr (Type == memalloc::Type::kTemporaryPhysHandoff) {
         mapping_name = "temporary hand-off data";
       } else {
-        static_assert(false, "TODO(https://fxbug.dev/42164859): Support permanent hand-off memory");
+        static_assert(Type == memalloc::Type::kPermanentPhysHandoff);
+        mapping_name = "permanent hand-off data";
       }
 
       uintptr_t vaddr = va_allocator_.AllocatePages(size);
@@ -208,6 +223,7 @@ class HandoffPrep {
   using Allocator = trivial_allocator::BasicLeakyAllocator<PageAllocationFunction<Type>>;
 
   using TemporaryDataAllocator = Allocator<memalloc::Type::kTemporaryPhysHandoff>;
+  using PermanentDataAllocator = Allocator<memalloc::Type::kPermanentPhysHandoff>;
 
   // TODO(https://fxbug.dev/42164859): kMmio too.
   enum class MappingType { kNormal };
@@ -339,6 +355,7 @@ class HandoffPrep {
   const ElfImage kernel_;
   PhysHandoff* handoff_ = nullptr;
   TemporaryDataAllocator temporary_data_allocator_;
+  PermanentDataAllocator permanent_data_allocator_;
   zbitl::Image<Allocation> mexec_image_;
   HandoffVmarList vmars_;
   HandoffVmoList extra_vmos_;
