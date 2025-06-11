@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::SuperDeviceRange;
 use anyhow::{anyhow, ensure, Error};
 use bitflags::bitflags;
 use sha2::Digest;
@@ -427,7 +428,9 @@ impl AdjustSlotSuffix for MetadataPartition {
     }
 }
 
+/// If this is set as `target_type`, implies that the extent is a dm-linear target.
 pub const TARGET_TYPE_LINEAR: u32 = 0;
+/// This extent is a dm-zero target. The index is ignored and must be zero.
 pub const TARGET_TYPE_ZERO: u32 = 1;
 
 #[repr(C, packed)]
@@ -435,7 +438,7 @@ pub const TARGET_TYPE_ZERO: u32 = 1;
 pub struct MetadataExtent {
     /// Length of the extent, in 512-byte sectors.
     pub num_sectors: u64,
-    /// Target type for device-mapper. See constants `TARGET_TYPE_*` for possible values.
+    /// Target type for device-mapper on Linux. See constants `TARGET_TYPE_*` for possible values.
     pub target_type: u32,
     /// If `target_type` is:
     ///   * `TARGET_TYPE_LINEAR`: this is the sector on the physical partition that this extent maps
@@ -466,6 +469,23 @@ impl ValidateTable for MetadataExtent {
             }
         }
         Ok(())
+    }
+}
+
+impl MetadataExtent {
+    pub fn as_range(&self) -> Result<SuperDeviceRange, Error> {
+        let start = self
+            .target_data
+            .checked_mul(SECTOR_SIZE as u64)
+            .ok_or_else(|| anyhow!("overflow occured when calculating start range"))?;
+        let length = self
+            .num_sectors
+            .checked_mul(SECTOR_SIZE as u64)
+            .ok_or_else(|| anyhow!("overflow occured when calculating length of range"))?;
+        let end = start
+            .checked_add(length)
+            .ok_or_else(|| anyhow!("overflow occured when calculating end of range"))?;
+        Ok(SuperDeviceRange(start..end))
     }
 }
 
@@ -608,6 +628,7 @@ impl MetadataBlockDevice {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SuperDeviceRange;
 
     const VALID_METADATA_GEOMETRY_BEFORE_COMPUTING_CHECKSUM: MetadataGeometry = MetadataGeometry {
         magic: METADATA_GEOMETRY_MAGIC,
@@ -965,6 +986,31 @@ mod tests {
                 .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
                 .expect_err("metadata extent passed validation unexpectedly");
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_extent_as_range() {
+        let extent = MetadataExtent {
+            num_sectors: 3,
+            target_type: TARGET_TYPE_LINEAR,
+            target_data: 1,
+            target_source: 0,
+        };
+        let range = extent.as_range().expect("failed to convert metadata extent to range");
+        let start = 1 * SECTOR_SIZE as u64;
+        let end = start + 3 * SECTOR_SIZE as u64;
+        assert_eq!(range, SuperDeviceRange(start..end));
+    }
+
+    #[fuchsia::test]
+    async fn test_extent_as_range_overflow() {
+        let extent = MetadataExtent {
+            num_sectors: u64::MAX,
+            target_type: TARGET_TYPE_LINEAR,
+            target_data: 1,
+            target_source: 0,
+        };
+        extent.as_range().expect_err("converting extent to range should have failed");
     }
 
     const VALID_PARTITION_GROUP: MetadataPartitionGroup = MetadataPartitionGroup {
