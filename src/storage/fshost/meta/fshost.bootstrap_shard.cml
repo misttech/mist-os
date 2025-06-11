@@ -113,7 +113,6 @@
         {
             directory: [
                 "blob",
-                "block",
                 "data",
                 "factory",
                 "tmp",

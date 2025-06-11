@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{Device, Parent};
+use crate::device::Device;
 use anyhow::{anyhow, Context, Error};
 use async_trait::async_trait;
 use crypt_policy::{format_sources, get_policy, unseal_sources, KeyConsumer};
@@ -119,6 +119,10 @@ impl Device for ZxcryptDevice {
         self.inner_device.get_block_info().await
     }
 
+    fn is_managed(&self) -> bool {
+        false
+    }
+
     fn is_nand(&self) -> bool {
         self.parent_is_nand
     }
@@ -137,10 +141,6 @@ impl Device for ZxcryptDevice {
 
     fn source(&self) -> &str {
         "zxcrypt"
-    }
-
-    fn parent(&self) -> Parent {
-        self.inner_device.parent()
     }
 
     async fn partition_label(&mut self) -> Result<&str, Error> {

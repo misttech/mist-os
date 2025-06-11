@@ -5,7 +5,6 @@ config/build_info/minimum_utc_stamp
 ?config/component_manager
 ?config/cpu_manager/energy_model_config.json
 ?config/cpu_manager/node_config.json
-?config/fshost
 ?config/power_manager/node_config.json
 ?config/power_manager/system_power_mode_config.json
 ?config/power_manager/thermal_config.json

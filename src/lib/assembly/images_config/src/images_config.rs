@@ -530,7 +530,6 @@ mod tests {
                 }),
             },
             gpt: bfc::GptMode::Enabled,
-            block_devices: vec![],
             gpt_all: false,
         }
     }
@@ -579,7 +578,6 @@ mod tests {
                 fastboot_output: None,
             },
             gpt: bfc::GptMode::Disabled,
-            block_devices: vec![],
             gpt_all: false,
         }
     }

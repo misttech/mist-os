@@ -25,24 +25,18 @@ use std::task::Poll;
 use std::thread::JoinHandle;
 use vmo_backed_block_server::{VmoBackedServer, VmoBackedServerConnector};
 
-/// The parent of the block device.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Parent {
-    /// The parent is the system partition table, this is a gpt partition in the main gpt.
-    SystemPartitionTable,
-
-    /// The parent is a df driver. In non-storage-host, this includes any meta drivers like fvm or
-    /// zxcrypt as long as they aren't on a gpt.
-    Dev,
-
-    /// The parent is fshost. This is mainly for the fshost ramdisk.
-    Fshost,
-}
-
 #[async_trait]
 pub trait Device: Send + Sync {
     /// Returns BlockInfo (the result of calling fuchsia.hardware.block/Block.Query).
     async fn get_block_info(&self) -> Result<fidl_fuchsia_hardware_block::BlockInfo, Error>;
+
+    /// True if the device is managed by fshost (such as devices within the system GPT).
+    /// Devices are considered managed if either of the following hold:
+    /// - The device was matched by fshost, or
+    /// - The device comes from a component launched by fshost (e.g. the GPT component).
+    /// In practice, this means that low-level block drivers which fshost doesn't bind to are
+    /// unmanaged.
+    fn is_managed(&self) -> bool;
 
     /// True if this is a NAND device.
     fn is_nand(&self) -> bool;
@@ -62,10 +56,6 @@ pub trait Device: Send + Sync {
     /// topological path, for services it starts with the service path in the fshost namespace, and
     /// for component sources it starts with the component moniker.
     fn source(&self) -> &str;
-
-    /// Get the parent of this block device. This is determined by the watch source when the device
-    /// is discovered, if it's relevant for this device.
-    fn parent(&self) -> Parent;
 
     /// If this device is a partition, this returns the label. Otherwise, an error is returned.
     async fn partition_label(&mut self) -> Result<&str, Error>;
@@ -152,6 +142,10 @@ impl Device for NandDevice {
         true
     }
 
+    fn is_managed(&self) -> bool {
+        false
+    }
+
     async fn get_block_info(&self) -> Result<fidl_fuchsia_hardware_block::BlockInfo, Error> {
         Err(anyhow!("not supported by nand device"))
     }
@@ -188,10 +182,6 @@ impl Device for NandDevice {
 
     fn source(&self) -> &str {
         self.topological_path()
-    }
-
-    fn parent(&self) -> Parent {
-        Parent::Dev
     }
 
     async fn partition_label(&mut self) -> Result<&str, Error> {
@@ -270,7 +260,6 @@ pub struct BlockDevice {
     partition_instance: Option<[u8; 16]>,
 
     is_fshost_ramdisk: bool,
-    parent: Parent,
 }
 
 impl BlockDevice {
@@ -299,16 +288,7 @@ impl BlockDevice {
             partition_type: None,
             partition_instance: None,
             is_fshost_ramdisk: false,
-            // All of these devices are technically from dev. The system partition table takes
-            // precedence, and may be set later if the topological path matches.
-            // TODO(https://fxbug.dev/394970436): This field can go away once storage host is the
-            // only configuration.
-            parent: Parent::Dev,
         })
-    }
-
-    pub fn set_parent(&mut self, parent: Parent) {
-        self.parent = parent;
     }
 }
 
@@ -318,6 +298,10 @@ impl Device for BlockDevice {
         let block_proxy = self.block_proxy()?;
         let info = block_proxy.get_info().await?.map_err(zx::Status::from_raw)?;
         Ok(info)
+    }
+
+    fn is_managed(&self) -> bool {
+        false
     }
 
     fn is_nand(&self) -> bool {
@@ -342,10 +326,6 @@ impl Device for BlockDevice {
 
     fn source(&self) -> &str {
         self.topological_path()
-    }
-
-    fn parent(&self) -> Parent {
-        self.parent
     }
 
     async fn partition_label(&mut self) -> Result<&str, Error> {
@@ -450,6 +430,7 @@ impl Device for BlockDevice {
 pub struct VolumeProtocolDevice {
     connector: Box<DirBasedBlockConnector>,
     source: String,
+    is_managed: bool,
 
     // Cache a proxy to the device's Volume interface so we can use it internally.  (This assumes
     // that devices speak Volume, which is currently always true).
@@ -460,8 +441,6 @@ pub struct VolumeProtocolDevice {
     partition_label: Option<String>,
     partition_type: Option<[u8; 16]>,
     partition_instance: Option<[u8; 16]>,
-
-    parent: Parent,
 }
 
 impl VolumeProtocolDevice {
@@ -469,7 +448,7 @@ impl VolumeProtocolDevice {
         dir: fio::DirectoryProxy,
         path: impl ToString,
         source: impl ToString,
-        parent: Parent,
+        is_managed: bool,
     ) -> Result<Self, Error> {
         let source = format!("{}/{}", source.to_string(), path.to_string());
         let connector = Box::new(DirBasedBlockConnector::new(dir, path.to_string() + "/volume"));
@@ -477,12 +456,12 @@ impl VolumeProtocolDevice {
         Ok(Self {
             connector,
             source,
+            is_managed,
             volume_proxy,
             content_format: None,
             partition_label: None,
             partition_type: None,
             partition_instance: None,
-            parent,
         })
     }
 }
@@ -493,6 +472,10 @@ impl Device for VolumeProtocolDevice {
         let block_proxy = self.block_proxy()?;
         let info = block_proxy.get_info().await?.map_err(zx::Status::from_raw)?;
         Ok(info)
+    }
+
+    fn is_managed(&self) -> bool {
+        self.is_managed
     }
 
     fn is_nand(&self) -> bool {
@@ -517,10 +500,6 @@ impl Device for VolumeProtocolDevice {
 
     fn source(&self) -> &str {
         &self.source
-    }
-
-    fn parent(&self) -> Parent {
-        self.parent
     }
 
     async fn partition_label(&mut self) -> Result<&str, Error> {
@@ -652,6 +631,10 @@ impl Device for LocalBlockDevice {
         Ok(info)
     }
 
+    fn is_managed(&self) -> bool {
+        true
+    }
+
     fn is_nand(&self) -> bool {
         false
     }
@@ -673,10 +656,6 @@ impl Device for LocalBlockDevice {
 
     fn source(&self) -> &str {
         "fshost-ramdisk"
-    }
-
-    fn parent(&self) -> Parent {
-        Parent::Fshost
     }
 
     async fn partition_label(&mut self) -> Result<&str, Error> {

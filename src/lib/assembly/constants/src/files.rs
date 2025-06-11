@@ -78,8 +78,6 @@ pub enum BootfsDestination {
     ThreadRoles(String),
     /// The zxcrypt config for the Storage subsystem.
     Zxcrypt,
-    /// The fshost config for the Storage subsystem.
-    Fshost,
     /// Variant specifically for making tests easier.
     ForTest,
     /// Any file that came from an AIB.
@@ -107,7 +105,6 @@ impl std::fmt::Display for BootfsDestination {
                 Self::SshAuthorizedKeys => "data/ssh/authorized_keys",
                 Self::ThreadRoles(s) => return write!(f, "config/profiles/{}", s),
                 Self::Zxcrypt => "config/zxcrypt",
-                Self::Fshost => "config/fshost",
                 Self::ForTest => "for-test",
             }
         )

@@ -20,14 +20,12 @@ pub async fn new_mocks(
     netboot: bool,
     vmo: Option<zx::Vmo>,
     crash_reports_sink: mpsc::Sender<ffeedback::CrashReport>,
-    device_config: String,
 ) -> impl Fn(LocalComponentHandles) -> BoxFuture<'static, Result<(), Error>> + Sync + Send + 'static
 {
     let vmo = vmo.map(Arc::new);
     let mock = move |handles: LocalComponentHandles| {
         let vmo_clone = vmo.clone();
-        let config_clone = device_config.clone();
-        run_mocks(handles, netboot, vmo_clone, crash_reports_sink.clone(), config_clone).boxed()
+        run_mocks(handles, netboot, vmo_clone, crash_reports_sink.clone()).boxed()
     };
 
     mock
@@ -38,12 +36,10 @@ async fn run_mocks(
     netboot: bool,
     vmo: Option<Arc<zx::Vmo>>,
     crash_reports_sink: mpsc::Sender<ffeedback::CrashReport>,
-    device_config: String,
 ) -> Result<(), Error> {
     let export = vfs::pseudo_directory! {
         "boot" => vfs::pseudo_directory! {
             "config" => vfs::pseudo_directory! {
-                "fshost" => vfs::file::read_only(&device_config),
                 // Tests are expected to use a null zxcrypt policy.
                 "zxcrypt" => vfs::file::read_only("null"),
             },
