@@ -228,8 +228,6 @@
         {
             // Used by run-test-suite.
             protocol: [
-                "fuchsia.test.manager.Query",
-                "fuchsia.test.manager.RunBuilder",
                 "fuchsia.test.manager.SuiteRunner",
                 "fuchsia.test.manager.TestCaseEnumerator",
             ],
