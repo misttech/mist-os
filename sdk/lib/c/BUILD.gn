@@ -32,6 +32,7 @@ libc_components = [
   "setjmp",
   "stdio",
   "stdlib",
+  "wchar",
   "zircon",
 ]
 

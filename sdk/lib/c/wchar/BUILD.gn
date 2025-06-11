@@ -1,0 +1,23 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../libc.gni")
+
+llvm_libc_source_set("wchar") {
+  functions = [
+    "wcscat",
+    "wcschr",
+    "wcscpy",
+    "wcslen",
+    "wcsncat",
+    "wcsncmp",
+    "wcspbrk",
+    "wcsspn",
+    "wcsstr",
+    "wmemchr",
+    "wmemcmp",
+    "wmemcpy",
+    "wmemset",
+  ]
+}

@@ -162,6 +162,12 @@ template("hermetic_source_set") {
     output_name = link_output_name
     output_extension = "o"
 
+    if (linker == "") {
+      # Resolve COMDAT groups in this link and then drop the groups so they
+      # don't participate in the outer link's COMDAT groups.
+      ldflags += [ "-Wl,--force-group-allocation" ]
+    }
+
     # Force the exported symbols to be treated as GC roots.
     foreach(symbol, invoker.global_symbols) {
       if (linker == "") {  # Presumed BFD.
