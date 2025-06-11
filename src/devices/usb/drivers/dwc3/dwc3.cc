@@ -48,11 +48,7 @@ class QualcommExtension final : public PlatformExtension {
       : clients_(std::move(clients)) {}
 
   // PlatformExtension interface implementation.
-  zx::result<> Start() override {
-    return zx::ok();
-    // TODO(b/405206028): Re-enable vote in the future.
-    // return VoteBandwidth(State::kSvs);
-  }
+  zx::result<> Start() override { return VoteBandwidth(State::kSvs); }
   zx::result<> Suspend() override { return VoteBandwidth(State::kNone); }
   zx::result<> Resume() override { return VoteBandwidth(State::kSvs); }
 
