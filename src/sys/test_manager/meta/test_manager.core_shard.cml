@@ -585,5 +585,14 @@
             to: "#test_manager",
             dependency: "weak",
         },
+
+        // Proprietary TEE manager's session capabilitites for system tests.
+        {
+            dictionary: "tee_session",
+            from: "#tee_manager",
+            to: "#test_manager",
+            availability: "optional",
+            source_availability: "unknown",
+        },
     ],
 }

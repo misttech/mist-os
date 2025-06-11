@@ -718,5 +718,14 @@
             from: "parent",
             to: "#testing",
         },
+
+        // Proprietary TEE manager's session capabilitites for system tests.
+        {
+            dictionary: "tee_session",
+            from: "#tee_manager",
+            to: "#testing",
+            availability: "optional",
+            source_availability: "unknown",
+        },
     ],
 }
