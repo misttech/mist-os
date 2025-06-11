@@ -59,6 +59,7 @@ pub enum TelemetryEvent {
     UnclearPowerDemand(UnclearPowerDemand),
     BatteryChargeStatus(fidl_battery::ChargeStatus),
     RecoveryEvent,
+    SmeTimeout,
 }
 
 /// Attempts to connect to the Cobalt service.
@@ -153,6 +154,7 @@ pub fn serve_telemetry(
     let power_logger = processors::power::PowerLogger::new(cobalt_proxy.clone(), &inspect_node);
     let recovery_logger = processors::recovery::RecoveryLogger::new(cobalt_proxy.clone());
     let mut scan_logger = processors::scan::ScanLogger::new(cobalt_proxy.clone());
+    let sme_timeout_logger = processors::sme_timeout::SmeTimeoutLogger::new(cobalt_proxy.clone());
     let mut toggle_logger =
         processors::toggle_events::ToggleLogger::new(cobalt_proxy.clone(), &inspect_node);
 
@@ -222,6 +224,9 @@ pub fn serve_telemetry(
                         }
                         RecoveryEvent => {
                             recovery_logger.handle_recovery_event().await;
+                        }
+                        SmeTimeout => {
+                            sme_timeout_logger.handle_sme_timeout_event().await;
                         }
                     }
                 }

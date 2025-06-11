@@ -7,4 +7,5 @@ pub mod connect_disconnect;
 pub mod power;
 pub mod recovery;
 pub mod scan;
+pub mod sme_timeout;
 pub mod toggle_events;
