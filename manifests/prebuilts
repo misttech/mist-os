@@ -542,7 +542,7 @@
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"/>
     <package name="fuchsia/infra/lkg/${platform}"
              path="prebuilt/tools/lkg"
-             version="git_revision:876cb424d201ced8084c0f376a1f26bf96abcc9c"
+             version="git_revision:6c1aba977be6e58e18c8b0d2bd64b3e51ae5e3f9"
              platforms="linux-amd64,linux-arm64,mac-amd64,mac-arm64"/>
 
     <!-- Zedmon -->
