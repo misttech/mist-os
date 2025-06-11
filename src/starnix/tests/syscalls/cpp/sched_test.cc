@@ -306,16 +306,16 @@ TEST(SetPriorityTest, NonRootCanSetNicenessOfEuidFriendlyProcess) {
   pid_t target_pid =
       SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
         // Remove rlimits from consideration in this test.
-        struct rlimit limit = {
+        rlimit niceness_rlimit = {
             .rlim_cur = RLIM_INFINITY,
             .rlim_max = RLIM_INFINITY,
         };
-        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &limit));
+        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &niceness_rlimit));
 
         // A target process with a different UID but an effective UID that
         // matches the effective UID of the effective UID of the
-        // calling-the-setpriority-syscall process counts as "friendly" and
-        // the syscall will succeed.
+        // calling-the-setpriority-syscall process counts as "euid-friendly"
+        // and the syscall will succeed.
         //
         // See "Linux 2.6.12 and later require the effective user ID of
         // the caller to match the real or effective user ID of the process
@@ -354,11 +354,11 @@ TEST(SetPriorityTest, NonRootCannotSetNicenessOfEuidUnfriendlyProcess) {
   pid_t target_pid =
       SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
         // Remove rlimits from consideration in this test.
-        struct rlimit limit = {
+        rlimit niceness_rlimit = {
             .rlim_cur = RLIM_INFINITY,
             .rlim_max = RLIM_INFINITY,
         };
-        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &limit));
+        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &niceness_rlimit));
 
         EXPECT_EQ(setpriority(PRIO_PROCESS, 0, target_niceness), 0);
 
@@ -394,13 +394,13 @@ TEST(SetPriorityTest, OutOfRangeNicenessValuesGetClamped) {
   }
 
   test_helper::ForkHelper().RunInForkedProcess([]() {
-    int too_nice = 88;            // Higher than 19.
-    int not_nice_enough = -1337;  // Lower than -20.
+    constexpr int too_nice_niceness = 88;            // Higher than 19.
+    constexpr int not_nice_enough_niceness = -1337;  // Lower than -20.
 
-    EXPECT_EQ(setpriority(PRIO_PROCESS, 0, too_nice), 0);
+    EXPECT_EQ(setpriority(PRIO_PROCESS, 0, too_nice_niceness), 0);
     EXPECT_EQ(getpriority(PRIO_PROCESS, 0), 19);
 
-    EXPECT_EQ(setpriority(PRIO_PROCESS, 0, not_nice_enough), 0);
+    EXPECT_EQ(setpriority(PRIO_PROCESS, 0, not_nice_enough_niceness), 0);
     EXPECT_EQ(getpriority(PRIO_PROCESS, 0), -20);
   });
 }
@@ -420,11 +420,11 @@ TEST(SetPriorityTest, RootCanExceedRLimits) {
 
   pid_t target_pid =
       SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
-        struct rlimit limit = {
+        rlimit niceness_rlimit = {
             .rlim_cur = static_cast<rlim_t>(niceness_rlimit_cur),
             .rlim_max = static_cast<rlim_t>(niceness_rlimit_max),
         };
-        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &limit));
+        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &niceness_rlimit));
 
         Become(kUser1Uid, kUser1Uid);
       });
@@ -439,6 +439,122 @@ TEST(SetPriorityTest, RootCanExceedRLimits) {
   }
 
   complete.poker.poke();
+}
+
+TEST(SetPriorityTest, NonRootCannotExceedRLimits) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  // Not the min, not the max, otherwise arbitrary.
+  constexpr int niceness_rlimit_cur = 24;
+  constexpr int niceness_rlimit_max = niceness_rlimit_cur + 5;
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
+        rlimit niceness_rlimit = {
+            .rlim_cur = static_cast<rlim_t>(niceness_rlimit_cur),
+            .rlim_max = static_cast<rlim_t>(niceness_rlimit_max),
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &niceness_rlimit));
+
+        Become(kUser1Uid, kUser1Uid);
+      });
+
+  ready.holder.hold();
+
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
+
+    ready.hold();
+
+    for (int niceness = 19; niceness >= 20 - niceness_rlimit_cur; niceness--) {
+      EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, niceness), 0);
+      EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), niceness);
+    }
+
+    for (int niceness = 19 - niceness_rlimit_cur; niceness >= -20; niceness--) {
+      errno = 0;
+      EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, niceness), -1);
+      EXPECT_EQ(errno, EACCES);
+
+      EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), 20 - niceness_rlimit_cur);
+    }
+
+    complete.poke();
+  });
+}
+
+TEST(SetPriorityTest, MaintainingAndIncreasingNicenessAllowedDespiteExceededRLimits) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  // Not the min, not the max, otherwise arbitrary.
+  constexpr int niceness_rlimit_cur = 24;
+  constexpr int niceness_rlimit_max = niceness_rlimit_cur + 4;
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
+        rlimit niceness_rlimit = {
+            .rlim_cur = static_cast<rlim_t>(niceness_rlimit_cur),
+            .rlim_max = static_cast<rlim_t>(niceness_rlimit_max),
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &niceness_rlimit));
+
+        // Set this process' niceness to something *beyond* what the rlimit
+        // allows.
+        EXPECT_EQ(setpriority(PRIO_PROCESS, 0, -20), 0);
+
+        Become(kUser1Uid, kUser1Uid);
+      });
+
+  ready.holder.hold();
+
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
+
+    ready.hold();
+
+    for (int niceness = -20; niceness <= 19; niceness++) {
+      // Increasing niceness is never disallowed by the rlimit.
+      EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, niceness), 0);
+      EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), niceness);
+
+      // Maintaining niceness is never disallowed by the rlimit. It's a
+      // no-op, but it's never disallowed by the rlimit.
+      EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, niceness), 0);
+      EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), niceness);
+
+      // While we are in the space outside the rlimit (or just at the boundary)
+      // *decreasing* the niceness is *not* allowed.
+      if (niceness - 1 >= -20 && niceness - 1 < 20 - niceness_rlimit_cur) {
+        errno = 0;
+        EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, niceness - 1), -1);
+        EXPECT_EQ(errno, EACCES);
+
+        EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), niceness);
+      }
+    }
+
+    complete.poke();
+  });
 }
 
 TEST(SetPriorityTest, RLimitedAndEuidUnfriendly) {
@@ -458,11 +574,11 @@ TEST(SetPriorityTest, RLimitedAndEuidUnfriendly) {
 
   pid_t target_pid =
       SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
-        struct rlimit limit = {
+        rlimit niceness_rlimit = {
             .rlim_cur = static_cast<rlim_t>(niceness_rlimit_cur),
             .rlim_max = static_cast<rlim_t>(niceness_rlimit_max),
         };
-        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &limit));
+        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &niceness_rlimit));
         sched_param param = {.sched_priority = 0};
         SAFE_SYSCALL(sched_setscheduler(0, SCHED_OTHER, &param));
         SAFE_SYSCALL(setpriority(PRIO_PROCESS, 0, within_rlimit_niceness));
@@ -476,8 +592,8 @@ TEST(SetPriorityTest, RLimitedAndEuidUnfriendly) {
 
     ready.hold();
 
-    // It's the unfriendliness that "wins"; attempting to set the niceness fails
-    // with EPERM and the rlimit doesn't get a chance to fail with EACCES.
+    // It's the euid-unfriendliness that "wins"; attempting to set the niceness
+    // fails with EPERM and the rlimit doesn't get a chance to fail with EACCES.
     errno = 0;
     EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, beyond_rlimit_niceness), -1);
     EXPECT_EQ(errno, EPERM);
@@ -823,11 +939,11 @@ TEST(SchedSetSchedulerTest, NonRootCanSetOwnScheduler) {
 
   test_helper::ForkHelper().RunInForkedProcess([]() {
     // Remove rlimits from consideration in this test.
-    struct rlimit limit = {
+    rlimit rtpriority_rlimit = {
         .rlim_cur = RLIM_INFINITY,
         .rlim_max = RLIM_INFINITY,
     };
-    SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
+    SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
 
     Become(kUser1Uid, kUser1Uid);
 
@@ -847,11 +963,11 @@ TEST(SchedSetSchedulerTest, NonRootCanSetSchedulerOfEuidFriendlyProcess) {
   pid_t target_pid =
       SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
         // Remove rlimits from consideration in this test.
-        struct rlimit limit = {
+        rlimit rtpriority_rlimit = {
             .rlim_cur = RLIM_INFINITY,
             .rlim_max = RLIM_INFINITY,
         };
-        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
+        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
 
         Become(kUser1Uid, kUser1Uid);
       });
@@ -880,11 +996,11 @@ TEST(SchedSetSchedulerTest, NonRootCannotSetSchedulerOfEuidUnfriendlyProcess) {
   pid_t target_pid =
       SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
         // Remove rlimits from consideration in this test.
-        struct rlimit limit = {
+        rlimit rtpriority_rlimit = {
             .rlim_cur = RLIM_INFINITY,
             .rlim_max = RLIM_INFINITY,
         };
-        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
+        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
 
         Become(kUser2Uid, kUser2Uid);
       });
@@ -934,6 +1050,212 @@ TEST(SchedSetSchedulerTest, NonRootCannotSetSchedulerOfEuidUnfriendlyProcess) {
   });
 }
 
+TEST(SchedSetSchedulerTest, RootCanExceedRLimits) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  // Not the min, not the max, otherwise arbitrary.
+  constexpr int rtpriority_rlimit_cur = 47;
+  constexpr int rtpriority_rlimit_max = rtpriority_rlimit_cur + 17;
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
+        rlimit rtpriority_rlimit = {
+            .rlim_cur = static_cast<rlim_t>(rtpriority_rlimit_cur),
+            .rlim_max = static_cast<rlim_t>(rtpriority_rlimit_max),
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
+
+        Become(kUser1Uid, kUser1Uid);
+      });
+
+  ready.holder.hold();
+
+  EXPECT_TRUE(SetScheduler(target_pid));
+
+  complete.poker.poke();
+}
+
+TEST(SchedSetSchedulerTest, NonRootCannotExceedRLimits) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  // Not the min, not the max, otherwise arbitrary.
+  constexpr int rtpriority_rlimit_cur = 43;
+  constexpr int rtpriority_rlimit_max = rtpriority_rlimit_cur + 11;
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
+        rlimit rtpriority_rlimit = {
+            .rlim_cur = static_cast<rlim_t>(rtpriority_rlimit_cur),
+            .rlim_max = static_cast<rlim_t>(rtpriority_rlimit_max),
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
+
+        Become(kUser1Uid, kUser1Uid);
+      });
+
+  ready.holder.hold();
+
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
+
+    ready.hold();
+
+    sched_param param;
+
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_OTHER, &param), 0);
+    EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(target_pid)), SCHED_OTHER);
+
+    int min_fifo_priority = SAFE_SYSCALL(sched_get_priority_min(SCHED_FIFO));
+    int max_fifo_priority = SAFE_SYSCALL(sched_get_priority_max(SCHED_FIFO));
+    for (auto priority = min_fifo_priority; priority <= rtpriority_rlimit_cur; priority++) {
+      errno = 0;
+      param.sched_priority = priority;
+      EXPECT_EQ(sched_setscheduler(target_pid, SCHED_FIFO, &param), 0);
+      EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(target_pid)), SCHED_FIFO);
+      sched_param observed_param = {.sched_priority = -1};
+      SAFE_SYSCALL(sched_getparam(target_pid, &observed_param));
+      EXPECT_EQ(priority, observed_param.sched_priority);
+    }
+    for (auto priority = rtpriority_rlimit_cur + 1; priority <= max_fifo_priority; priority++) {
+      errno = 0;
+      param.sched_priority = priority;
+      EXPECT_EQ(sched_setscheduler(target_pid, SCHED_FIFO, &param), -1);
+      EXPECT_EQ(errno, EPERM);
+    }
+
+    int min_rr_priority = SAFE_SYSCALL(sched_get_priority_min(SCHED_RR));
+    int max_rr_priority = SAFE_SYSCALL(sched_get_priority_max(SCHED_RR));
+    for (auto priority = min_rr_priority; priority <= rtpriority_rlimit_cur; priority++) {
+      errno = 0;
+      param.sched_priority = priority;
+      EXPECT_EQ(sched_setscheduler(target_pid, SCHED_RR, &param), 0);
+      EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(target_pid)), SCHED_RR);
+      sched_param observed_param = {.sched_priority = -1};
+      SAFE_SYSCALL(sched_getparam(target_pid, &observed_param));
+      EXPECT_EQ(priority, observed_param.sched_priority);
+    }
+    for (auto priority = rtpriority_rlimit_cur + 1; priority <= max_rr_priority; priority++) {
+      errno = 0;
+      param.sched_priority = priority;
+      EXPECT_EQ(sched_setscheduler(target_pid, SCHED_RR, &param), -1);
+      EXPECT_EQ(errno, EPERM);
+    }
+
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_BATCH, &param), 0);
+    EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(target_pid)), SCHED_BATCH);
+
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_IDLE, &param), 0);
+    EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(target_pid)), SCHED_IDLE);
+
+    complete.poke();
+  });
+}
+
+TEST(SchedSetSchedulerTest, MaintainingAndDecreasingPriorityAllowedDespiteExceededRLimits) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  // Not the min, not the max, otherwise arbitrary.
+  constexpr int rtpriority_rlimit_cur = 37;
+  constexpr int rtpriority_rlimit_max = rtpriority_rlimit_cur + 19;
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
+        rlimit rtpriority_rlimit = {
+            .rlim_cur = static_cast<rlim_t>(rtpriority_rlimit_cur),
+            .rlim_max = static_cast<rlim_t>(rtpriority_rlimit_max),
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
+
+        // Set this process' priority to something *beyond* what the rlimit
+        // allows.
+        sched_param param = {.sched_priority = SAFE_SYSCALL(sched_get_priority_max(SCHED_FIFO))};
+        EXPECT_EQ(sched_setscheduler(0, SCHED_FIFO, &param), 0);
+
+        Become(kUser1Uid, kUser1Uid);
+      });
+
+  ready.holder.hold();
+
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
+
+    ready.hold();
+
+    sched_param param;
+    sched_param observed_param;
+    int min_priority = SAFE_SYSCALL(sched_get_priority_min(SCHED_FIFO));
+    int max_priority = SAFE_SYSCALL(sched_get_priority_max(SCHED_FIFO));
+
+    for (auto priority = max_priority; priority >= min_priority; priority--) {
+      // Lowering the priority is never disallowed by the rlimit.
+      errno = 0;
+      param.sched_priority = priority;
+      EXPECT_EQ(sched_setscheduler(target_pid, SCHED_FIFO, &param), 0);
+      EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(target_pid)), SCHED_FIFO);
+      observed_param.sched_priority = -1;
+      SAFE_SYSCALL(sched_getparam(target_pid, &observed_param));
+      EXPECT_EQ(priority, observed_param.sched_priority);
+
+      // Maintaining the priority is never disallowed by the rlimit. It's a
+      // no-op, but it's never disallowed by the rlimit.
+      errno = 0;
+      param.sched_priority = priority;
+      EXPECT_EQ(sched_setscheduler(target_pid, SCHED_FIFO, &param), 0);
+      EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(target_pid)), SCHED_FIFO);
+      observed_param.sched_priority = -1;
+      SAFE_SYSCALL(sched_getparam(target_pid, &observed_param));
+      EXPECT_EQ(priority, observed_param.sched_priority);
+
+      // Raising the priority to a value beyond the rlimit is disallowed.
+      if (priority + 1 <= max_priority && priority + 1 > rtpriority_rlimit_cur) {
+        errno = 0;
+        param.sched_priority = priority + 1;
+        EXPECT_EQ(sched_setscheduler(target_pid, SCHED_FIFO, &param), -1);
+        EXPECT_EQ(errno, EPERM);
+
+        EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(target_pid)), SCHED_FIFO);
+        observed_param.sched_priority = -1;
+        SAFE_SYSCALL(sched_getparam(target_pid, &observed_param));
+        EXPECT_EQ(priority, observed_param.sched_priority);
+      }
+    }
+
+    complete.poke();
+  });
+}
+
 TEST(SchedSetSchedulerTest, RLimitedAndEuidUnfriendly) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
@@ -949,11 +1271,11 @@ TEST(SchedSetSchedulerTest, RLimitedAndEuidUnfriendly) {
 
   pid_t target_pid =
       SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
-        struct rlimit limit = {
+        rlimit rtpriority_rlimit = {
             .rlim_cur = static_cast<rlim_t>(rtpriority_rlimit_cur),
             .rlim_max = static_cast<rlim_t>(rtpriority_rlimit_max),
         };
-        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
+        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
 
         Become(kUser2Uid, kUser2Uid);
       });
@@ -1016,6 +1338,26 @@ TEST(SchedSetSchedulerTest, RootCanClearResetOnFork) {
 
     EXPECT_EQ(sched_setscheduler(0, SCHED_FIFO, &param), 0);
     EXPECT_EQ(sched_getscheduler(0), SCHED_FIFO);
+  });
+}
+
+TEST(SchedSetSchedulerTest, NonRootCannotClearResetOnFork) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  test_helper::ForkHelper().RunInForkedProcess([]() {
+    sched_param param = {.sched_priority = 2};
+    EXPECT_EQ(sched_setscheduler(0, SCHED_FIFO | SCHED_RESET_ON_FORK, &param), 0);
+
+    Become(kUser1Uid, kUser1Uid);
+
+    errno = 0;
+    EXPECT_EQ(sched_setscheduler(0, SCHED_FIFO, &param), -1);
+    EXPECT_EQ(errno, EPERM);
   });
 }
 
@@ -1085,6 +1427,36 @@ TEST(SchedSetSchedulerTest, ResetOnForkZeroesNegativeNiceness) {
 
     EXPECT_EQ(sched_getscheduler(target_pid), SCHED_BATCH);
     EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), 0);
+
+    complete.poker.poke();
+  });
+}
+
+TEST(SchedSetSchedulerTest, ResetOnForkPreservesPositiveNiceness) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  test_helper::ForkHelper().RunInForkedProcess([]() {
+    constexpr int policy_variant = SCHED_IDLE;
+    constexpr int positive_niceness = 10;
+
+    sched_param param = {.sched_priority = 0};
+    EXPECT_EQ(sched_setscheduler(0, policy_variant | SCHED_RESET_ON_FORK, &param), 0);
+    EXPECT_EQ(setpriority(PRIO_PROCESS, 0, positive_niceness), 0);
+
+    Become(kUser1Uid, kUser1Uid);
+
+    test_helper::ForkHelper target_process_fork_helper;
+    Rendezvous complete = MakeRendezvous();
+    pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
+        [complete = std::move(complete.holder)]() mutable { complete.hold(); });
+
+    EXPECT_EQ(sched_getscheduler(target_pid), policy_variant);
+    EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), positive_niceness);
 
     complete.poker.poke();
   });
@@ -1401,11 +1773,11 @@ TEST(SchedSetParamTest, NonRootCanSetOwnParam) {
 
   test_helper::ForkHelper().RunInForkedProcess([]() {
     // Remove rlimits from consideration in this test.
-    struct rlimit limit = {
+    rlimit rtpriority_rlimit = {
         .rlim_cur = RLIM_INFINITY,
         .rlim_max = RLIM_INFINITY,
     };
-    SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
+    SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
 
     Become(kUser1Uid, kUser1Uid);
 
@@ -1425,11 +1797,11 @@ TEST(SchedSetParamTest, NonRootCanSetParamOfEuidFriendlyProcess) {
   pid_t target_pid =
       SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
         // Remove rlimits from consideration in this test.
-        struct rlimit limit = {
+        rlimit rtpriority_rlimit = {
             .rlim_cur = RLIM_INFINITY,
             .rlim_max = RLIM_INFINITY,
         };
-        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
+        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
 
         Become(kUser1Uid, kUser1Uid);
       });
@@ -1463,11 +1835,11 @@ TEST(SchedSetParamTest, NonRootCannotSetParamOfEuidUnfriendlyProcess) {
   pid_t target_pid = SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder),
                                  [min_priority]() {
                                    // Remove rlimits from consideration in this test.
-                                   struct rlimit limit = {
+                                   rlimit rtpriority_rlimit = {
                                        .rlim_cur = RLIM_INFINITY,
                                        .rlim_max = RLIM_INFINITY,
                                    };
-                                   SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &limit));
+                                   SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
 
                                    sched_param param = {.sched_priority = min_priority};
                                    SAFE_SYSCALL(sched_setscheduler(0, policy, &param));
@@ -1493,6 +1865,547 @@ TEST(SchedSetParamTest, NonRootCannotSetParamOfEuidUnfriendlyProcess) {
     }
 
     complete.poke();
+  });
+}
+
+TEST(SchedSetParamTest, RootCanExceedRLimits) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  // Not the min, not the max, otherwise arbitrary.
+  constexpr int rtpriority_rlimit_cur = 65;
+  constexpr int rtpriority_rlimit_max = rtpriority_rlimit_cur + 20;
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
+        rlimit rtpriority_rlimit = {
+            .rlim_cur = static_cast<rlim_t>(rtpriority_rlimit_cur),
+            .rlim_max = static_cast<rlim_t>(rtpriority_rlimit_max),
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
+
+        Become(kUser1Uid, kUser1Uid);
+      });
+
+  ready.holder.hold();
+
+  EXPECT_TRUE(SetParam(target_pid));
+
+  complete.poker.poke();
+}
+
+TEST(SchedSetParamTest, NonRootCannotExceedRLimits) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  constexpr int policy = SCHED_FIFO;
+  int min_priority = SAFE_SYSCALL(sched_get_priority_min(policy));
+  int max_priority = SAFE_SYSCALL(sched_get_priority_max(policy));
+  int rtpriority_rlimit_cur = (min_priority + max_priority) / 2;
+  int rtpriority_rlimit_max = rtpriority_rlimit_cur + 7;
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid = SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder),
+                                 [min_priority, rtpriority_rlimit_cur, rtpriority_rlimit_max]() {
+                                   rlimit rtpriority_rlimit = {
+                                       .rlim_cur = static_cast<rlim_t>(rtpriority_rlimit_cur),
+                                       .rlim_max = static_cast<rlim_t>(rtpriority_rlimit_max),
+                                   };
+                                   SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
+
+                                   sched_param param = {.sched_priority = min_priority};
+                                   SAFE_SYSCALL(sched_setscheduler(0, policy, &param));
+
+                                   Become(kUser1Uid, kUser1Uid);
+                                 });
+
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), min_priority, max_priority,
+                                  rtpriority_rlimit_cur, target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
+
+    ready.hold();
+
+    for (auto priority = min_priority; priority <= rtpriority_rlimit_cur; priority++) {
+      errno = 0;
+      sched_param param = {.sched_priority = priority};
+      EXPECT_EQ(sched_setparam(target_pid, &param), 0);
+      sched_param observed_param = {.sched_priority = -1};
+      SAFE_SYSCALL(sched_getparam(target_pid, &observed_param));
+      EXPECT_EQ(priority, observed_param.sched_priority);
+    }
+    for (auto priority = rtpriority_rlimit_cur + 1; priority <= max_priority; priority++) {
+      errno = 0;
+      sched_param param = {.sched_priority = priority};
+      EXPECT_EQ(sched_setparam(target_pid, &param), -1);
+      EXPECT_EQ(errno, EPERM);
+      sched_param observed_param = {.sched_priority = -1};
+      SAFE_SYSCALL(sched_getparam(target_pid, &observed_param));
+      EXPECT_EQ(observed_param.sched_priority, rtpriority_rlimit_cur);
+    }
+
+    complete.poke();
+  });
+}
+
+TEST(SuccessivePoliciesTest, NicenessIsPreservedByPoliciesThatDoNotUseNiceness) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  test_helper::ForkHelper().RunInForkedProcess([]() {
+    constexpr int niceness = 10;
+    sched_param param;
+    sched_param observed_param;
+
+    param.sched_priority = 0;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_BATCH, &param));
+    SAFE_SYSCALL(setpriority(PRIO_PROCESS, 0, niceness));
+    observed_param.sched_priority = -1;
+    EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(0)), SCHED_BATCH);
+    SAFE_SYSCALL(sched_getparam(0, &observed_param));
+    EXPECT_EQ(observed_param.sched_priority, 0);
+    errno = 0;
+    EXPECT_EQ(SAFE_SYSCALL(getpriority(PRIO_PROCESS, 0)), niceness);
+    EXPECT_EQ(errno, 0);
+
+    param.sched_priority = 33;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_FIFO, &param));
+    observed_param.sched_priority = -1;
+    EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(0)), SCHED_FIFO);
+    SAFE_SYSCALL(sched_getparam(0, &observed_param));
+    EXPECT_EQ(observed_param.sched_priority, 33);
+
+    param.sched_priority = 0;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_OTHER, &param));
+    EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(0)), SCHED_OTHER);
+    EXPECT_EQ(SAFE_SYSCALL(getpriority(PRIO_PROCESS, 0)), niceness);
+  });
+}
+
+TEST(SuccessivePoliciesTest, UnusedNicenessCanBeAccessed) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  test_helper::ForkHelper().RunInForkedProcess([]() {
+    constexpr int niceness = 16;
+    sched_param param;
+    sched_param observed_param;
+
+    param.sched_priority = 0;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_BATCH, &param));
+    SAFE_SYSCALL(setpriority(PRIO_PROCESS, 0, niceness));
+    observed_param.sched_priority = -1;
+    EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(0)), SCHED_BATCH);
+    SAFE_SYSCALL(sched_getparam(0, &observed_param));
+    EXPECT_EQ(observed_param.sched_priority, 0);
+    errno = 0;
+    EXPECT_EQ(SAFE_SYSCALL(getpriority(PRIO_PROCESS, 0)), niceness);
+    EXPECT_EQ(errno, 0);
+
+    param.sched_priority = 33;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_FIFO, &param));
+    observed_param.sched_priority = -1;
+    EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(0)), SCHED_FIFO);
+    SAFE_SYSCALL(sched_getparam(0, &observed_param));
+    EXPECT_EQ(observed_param.sched_priority, 33);
+
+    EXPECT_EQ(getpriority(PRIO_PROCESS, 0), niceness);
+  });
+}
+
+TEST(SuccessivePoliciesTest, UnusedNicenessCanBeChanged) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  constexpr int first_niceness = 12;
+  constexpr int second_niceness = first_niceness + 2;
+  sched_param param;
+  sched_param observed_param;
+
+  param.sched_priority = 0;
+  SAFE_SYSCALL(sched_setscheduler(0, SCHED_BATCH, &param));
+  SAFE_SYSCALL(setpriority(PRIO_PROCESS, 0, first_niceness));
+  observed_param.sched_priority = -1;
+  EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(0)), SCHED_BATCH);
+  SAFE_SYSCALL(sched_getparam(0, &observed_param));
+  EXPECT_EQ(observed_param.sched_priority, 0);
+  errno = 0;
+  EXPECT_EQ(SAFE_SYSCALL(getpriority(PRIO_PROCESS, 0)), first_niceness);
+  EXPECT_EQ(errno, 0);
+
+  param.sched_priority = 33;
+  SAFE_SYSCALL(sched_setscheduler(0, SCHED_FIFO, &param));
+  observed_param.sched_priority = -1;
+  EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(0)), SCHED_FIFO);
+  SAFE_SYSCALL(sched_getparam(0, &observed_param));
+  EXPECT_EQ(observed_param.sched_priority, 33);
+
+  SAFE_SYSCALL(setpriority(PRIO_PROCESS, 0, second_niceness));
+
+  param.sched_priority = 35;
+  SAFE_SYSCALL(sched_setscheduler(0, SCHED_RR, &param));
+  observed_param.sched_priority = -1;
+  EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(0)), SCHED_RR);
+  SAFE_SYSCALL(sched_getparam(0, &observed_param));
+  EXPECT_EQ(observed_param.sched_priority, 35);
+
+  param.sched_priority = 0;
+  SAFE_SYSCALL(sched_setscheduler(0, SCHED_OTHER, &param));
+  EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(0)), SCHED_OTHER);
+  EXPECT_EQ(SAFE_SYSCALL(getpriority(PRIO_PROCESS, 0)), second_niceness);
+
+  test_helper::ForkHelper().RunInForkedProcess([]() {
+    constexpr int first_niceness = 12;
+    constexpr int second_niceness = first_niceness + 2;
+    sched_param param;
+    sched_param observed_param;
+
+    param.sched_priority = 0;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_BATCH, &param));
+    SAFE_SYSCALL(setpriority(PRIO_PROCESS, 0, first_niceness));
+    observed_param.sched_priority = -1;
+    EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(0)), SCHED_BATCH);
+    SAFE_SYSCALL(sched_getparam(0, &observed_param));
+    EXPECT_EQ(observed_param.sched_priority, 0);
+    errno = 0;
+    EXPECT_EQ(SAFE_SYSCALL(getpriority(PRIO_PROCESS, 0)), first_niceness);
+    EXPECT_EQ(errno, 0);
+
+    param.sched_priority = 33;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_FIFO, &param));
+    observed_param.sched_priority = -1;
+    EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(0)), SCHED_FIFO);
+    SAFE_SYSCALL(sched_getparam(0, &observed_param));
+    EXPECT_EQ(observed_param.sched_priority, 33);
+
+    SAFE_SYSCALL(setpriority(PRIO_PROCESS, 0, second_niceness));
+
+    param.sched_priority = 35;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_RR, &param));
+    observed_param.sched_priority = -1;
+    EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(0)), SCHED_RR);
+    SAFE_SYSCALL(sched_getparam(0, &observed_param));
+    EXPECT_EQ(observed_param.sched_priority, 35);
+
+    param.sched_priority = 0;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_OTHER, &param));
+    EXPECT_EQ(SAFE_SYSCALL(sched_getscheduler(0)), SCHED_OTHER);
+    EXPECT_EQ(SAFE_SYSCALL(getpriority(PRIO_PROCESS, 0)), second_niceness);
+  });
+}
+
+TEST(SuccessivePoliciesTest, UnusedNicenessIsStillSubjectToRLimit) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  // Not the min, not the max, otherwise arbitrary.
+  constexpr int niceness_rlimit_cur = 11;
+  constexpr int niceness_rlimit_max = niceness_rlimit_cur + 3;
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
+        sched_param param;
+
+        param.sched_priority = 0;
+        SAFE_SYSCALL(sched_setscheduler(0, SCHED_IDLE, &param));
+        SAFE_SYSCALL(setpriority(PRIO_PROCESS, 0, -20));
+
+        rlimit niceness_rlimit = {
+            .rlim_cur = static_cast<rlim_t>(niceness_rlimit_cur),
+            .rlim_max = static_cast<rlim_t>(niceness_rlimit_max),
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &niceness_rlimit));
+
+        param.sched_priority = 35;
+        SAFE_SYSCALL(sched_setscheduler(0, SCHED_FIFO | SCHED_RESET_ON_FORK, &param));
+
+        Become(kUser1Uid, kUser1Uid);
+      });
+
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    ready.hold();
+
+    Become(kUser1Uid, kUser1Uid);
+
+    // We can hold the niceness where it is:
+    EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, -20), 0);
+
+    // We can increase the niceness:
+    EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, -19), 0);
+
+    // We cannot decrease the niceness to a value disallowed by the rlimit:
+    EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, -20), -1);
+    EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), -19);
+
+    // But the niceness can be adjusted within the rlimit-allowed range:
+    EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, 19), 0);
+    EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), 19);
+    EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, 20 - niceness_rlimit_cur), 0);
+    EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), 20 - niceness_rlimit_cur);
+    EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, 19 - niceness_rlimit_cur), -1);
+    EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), 20 - niceness_rlimit_cur);
+
+    // All this is happening while the target is still using SCHED_FIFO
+    // and making no use of the niceness.
+    EXPECT_EQ(sched_getscheduler(target_pid), SCHED_FIFO | SCHED_RESET_ON_FORK);
+
+    complete.poke();
+  });
+}
+
+TEST(SuccessivePoliciesTest, ChangingPolicyWhenExceedingNicenessRLimitAllowedExceptOutOfIdle) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  // Not the min, not the max, otherwise arbitrary.
+  constexpr int rtpriority_rlimit_cur = 47;
+  constexpr int rtpriority_rlimit_max = rtpriority_rlimit_cur + 5;
+  constexpr int niceness_rlimit_cur = 11;
+  constexpr int niceness_rlimit_max = niceness_rlimit_cur + 23;
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
+        rlimit rtpriority_rlimit = {
+            .rlim_cur = static_cast<rlim_t>(rtpriority_rlimit_cur),
+            .rlim_max = static_cast<rlim_t>(rtpriority_rlimit_max),
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
+        rlimit niceness_rlimit = {
+            .rlim_cur = static_cast<rlim_t>(niceness_rlimit_cur),
+            .rlim_max = static_cast<rlim_t>(niceness_rlimit_max),
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_NICE, &niceness_rlimit));
+
+        // Set this process' niceness and priority to something
+        // *beyond* what the rlimits allow.
+        sched_param param = {.sched_priority = SAFE_SYSCALL(sched_get_priority_max(SCHED_FIFO))};
+        SAFE_SYSCALL(sched_setscheduler(0, SCHED_FIFO, &param));
+        EXPECT_EQ(setpriority(PRIO_PROCESS, 0, -10000), 0);
+
+        Become(kUser1Uid, kUser1Uid);
+      });
+
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
+
+    ready.hold();
+
+    sched_param param;
+    int max_priority = SAFE_SYSCALL(sched_get_priority_max(SCHED_FIFO));
+
+    // Shifting between real-time policies is allowed despite currently
+    // having a priority above the RLIMIT_RTPRIO value.
+    errno = 0;
+    param.sched_priority = max_priority;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_RR, &param), 0);
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_FIFO, &param), 0);
+
+    // Shifting to a non-real-time policy is allowed despite currently
+    // having a niceness exceeding the RLIMIT_NICE value.
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_OTHER, &param), 0);
+
+    // The shift didn't change the current exceeding-the-RLIMIT_NICE
+    // niceness value.
+    errno = 0;
+    EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), -20);
+    EXPECT_EQ(errno, 0);
+
+    // Shifting among SCHED_OTHER and SCHED_BATCH is fine and doesn't
+    // affect the exceeding-the-RLIMIT_NICE niceness.
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_BATCH, &param), 0);
+    errno = 0;
+    EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), -20);
+    EXPECT_EQ(errno, 0);
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_OTHER, &param), 0);
+    errno = 0;
+    EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), -20);
+    EXPECT_EQ(errno, 0);
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_BATCH, &param), 0);
+    EXPECT_EQ(errno, 0);
+    errno = 0;
+    EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), -20);
+    EXPECT_EQ(errno, 0);
+
+    // We can shift back to a real-time policy, but in this case the
+    // RLIMIT_RTPRIO does apply!
+    param.sched_priority = rtpriority_rlimit_cur + 1;
+    errno = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_FIFO, &param), -1);
+    EXPECT_EQ(errno, EPERM);
+    param.sched_priority = rtpriority_rlimit_cur;
+    errno = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_FIFO, &param), 0);
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_RR, &param), 0);
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_FIFO, &param), 0);
+
+    // SCHED_IDLE is something of a "trap" - see "Special rules apply
+    // for the SCHED_IDLE policy [...] an unprivileged thread can switch
+    // to either the SCHED_BATCH or the SCHED_OTHER policy so long as
+    // its nice value falls within the range permitted by its RLIMIT_NICE
+    // resource limit" at sched(7). So with the target niceness-rlimited,
+    // we can transition it into SCHED_IDLE, but not from there into
+    // either SCHED_BATCH or SCHED_OTHER:
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_IDLE, &param), 0);
+    errno = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_OTHER, &param), -1);
+    EXPECT_EQ(errno, EPERM);
+    errno = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_BATCH, &param), -1);
+    EXPECT_EQ(errno, EPERM);
+    // Although sched(7) doesn't specifically address it, we see that we
+    // also can't transition to either of the real-time policies:
+    param.sched_priority = rtpriority_rlimit_cur;
+    errno = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_FIFO, &param), -1);
+    EXPECT_EQ(errno, EPERM);
+    errno = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_RR, &param), -1);
+    EXPECT_EQ(errno, EPERM);
+    // But we can no-op "transition" from SCHED_IDLE to SCHED_IDLE:
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_IDLE, &param), 0);
+    // To be able to get out of SCHED_IDLE, we bring the niceness into
+    // the allowed range:
+    EXPECT_EQ(setpriority(PRIO_PROCESS, target_pid, 20 - niceness_rlimit_cur), 0);
+    // Now we can transition to any other policy.
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_OTHER, &param), 0);
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_IDLE, &param), 0);
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_BATCH, &param), 0);
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_IDLE, &param), 0);
+    param.sched_priority = rtpriority_rlimit_cur;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_FIFO, &param), 0);
+    param.sched_priority = 0;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_IDLE, &param), 0);
+    param.sched_priority = rtpriority_rlimit_cur;
+    EXPECT_EQ(sched_setscheduler(target_pid, SCHED_RR, &param), 0);
+
+    complete.poke();
+  });
+}
+
+TEST(SuccessivePoliciesTest, UnusedNegativeNicenessIsStillZeroedByResetOnFork) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  test_helper::ForkHelper().RunInForkedProcess([]() {
+    constexpr int very_unnice_niceness = -18;
+
+    sched_param param;
+
+    param.sched_priority = 0;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_IDLE, &param));
+    SAFE_SYSCALL(setpriority(PRIO_PROCESS, 0, very_unnice_niceness));
+
+    param.sched_priority = 35;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_FIFO | SCHED_RESET_ON_FORK, &param));
+
+    test_helper::ForkHelper target_process_fork_helper;
+    Rendezvous complete = MakeRendezvous();
+    pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
+        [complete = std::move(complete.holder)]() mutable { complete.hold(); });
+
+    EXPECT_EQ(sched_getscheduler(target_pid), SCHED_OTHER);
+    EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), 0);
+
+    // Meanwhile, this process' unused niceness hasn't changed.
+    EXPECT_EQ(getpriority(PRIO_PROCESS, 0), very_unnice_niceness);
+
+    complete.poker.poke();
+  });
+}
+
+// NOTE(nathaniel): The behavior verified here (that the unused positive
+// niceness of a task running with a real-time policy and the reset-on-fork
+// flag is not preserved in child processes) is not what I had supposed
+// would happen (I had guessed it would have been preserved); this means
+// that administrators cannot use the reset-on-fork flag to put tasks in a
+// condition of "you get to run with a real-time policy but all your
+// children run with a non-real-time-policy *and* with positive niceness".
+TEST(SuccessivePoliciesTest, UnusedPositiveNicenessIsZeroedDuringResetOnFork) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+  if (test_helper::IsStarnix()) {
+    GTEST_SKIP() << "Will be landing soon for Starnix!";
+  }
+
+  test_helper::ForkHelper().RunInForkedProcess([]() {
+    constexpr int very_nice_niceness = 17;
+
+    sched_param param;
+
+    param.sched_priority = 0;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_IDLE, &param));
+    SAFE_SYSCALL(setpriority(PRIO_PROCESS, 0, very_nice_niceness));
+
+    param.sched_priority = 35;
+    SAFE_SYSCALL(sched_setscheduler(0, SCHED_RR | SCHED_RESET_ON_FORK, &param));
+
+    test_helper::ForkHelper target_process_fork_helper;
+    Rendezvous complete = MakeRendezvous();
+    pid_t target_pid = target_process_fork_helper.RunInForkedProcess(
+        [complete = std::move(complete.holder)]() mutable { complete.hold(); });
+
+    EXPECT_EQ(sched_getscheduler(target_pid), SCHED_OTHER);
+    EXPECT_EQ(getpriority(PRIO_PROCESS, target_pid), 0);
+
+    // Meanwhile, this process' unused niceness hasn't changed.
+    EXPECT_EQ(getpriority(PRIO_PROCESS, 0), very_nice_niceness);
+
+    complete.poker.poke();
   });
 }
 
