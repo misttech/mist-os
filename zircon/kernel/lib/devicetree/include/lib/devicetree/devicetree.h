@@ -246,7 +246,7 @@ class StringList {
     using value_type = std::string_view;
     using pointer = std::string_view*;
     using reference = std::string_view&;
-    using iterator_category = std::input_iterator_tag;
+    using iterator_category = std::forward_iterator_tag;
 
     constexpr iterator() = default;
     constexpr iterator(const iterator&) = default;
