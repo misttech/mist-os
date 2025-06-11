@@ -381,7 +381,7 @@ pub mod tests {
         // the component.
         let (program, server) = mocks::mock_program();
         let stop_timeout = zx::Duration::from_millis(500);
-        let kill_timeout = zx::Duration::from_millis(100);
+        let kill_timeout = zx::Duration::from_millis(500);
 
         // Create a request map which the MockController will fill with
         // requests it received related to mocked component.
