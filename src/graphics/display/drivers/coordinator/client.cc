@@ -1571,19 +1571,6 @@ void Client::AcknowledgeVsync(AcknowledgeVsyncRequestView request,
   fdf::trace("Cookie {} Acked\n", ack_cookie.value());
 }
 
-std::string GetObjectName(zx_handle_t handle) {
-  char name[ZX_MAX_NAME_LEN];
-  zx_status_t status = zx_object_get_property(handle, ZX_PROP_NAME, name, sizeof(name));
-  return status == ZX_OK ? std::string(name) : std::string();
-}
-
-zx_koid_t GetKoid(zx_handle_t handle) {
-  zx_info_handle_basic_t info;
-  zx_status_t status =
-      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  return status == ZX_OK ? info.koid : ZX_KOID_INVALID;
-}
-
 void Client::Bind(
     fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server_end,
     fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener> coordinator_listener_client_end,
