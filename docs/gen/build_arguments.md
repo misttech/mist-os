@@ -89,7 +89,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2124
+From //build/config/BUILDCONFIG.gn:2164
 
 ### allowed_test_device_types
 
@@ -369,7 +369,7 @@ in args.gn.
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/bazel_root_targets_list.gni:38
+From //build/bazel/bazel_root_targets_list.gni:34
 
 ### bazel_upload_build_events
 
@@ -980,7 +980,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -1052,7 +1052,7 @@ This should never be set as a build argument.
 }
   armv7_unknown_linux_gnueabihf = {
   libclang_rt_profile_a = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.profile.a"
-  libunwind_so = ""
+  libunwind_so = "../../../../out/not-default/libunwind.so"
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -1142,7 +1142,7 @@ This should never be set as a build argument.
 }
   tsan = {
   shared = {
-  clang_rt = ""
+  clang_rt = "../../../../out/not-default/libclang_rt.tsan.so"
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
@@ -1162,7 +1162,7 @@ This should never be set as a build argument.
 }
   riscv64_unknown_linux_gnu = {
   libclang_rt_profile_a = "lib/clang/21/lib/riscv64-unknown-linux-gnu/libclang_rt.profile.a"
-  libunwind_so = ""
+  libunwind_so = "../../../../out/not-default/libunwind.so"
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -2232,9 +2232,6 @@ artifact. Schema is:
   bazel_label = "//build/bazel/toolchains/tests:build"
   bazel_name = "build.stamp"
   ninja_name = "bazel_toolchains_tests_build.stamp"
-}, {
-  bazel_label = "//build/tools/json_validator:json_validator_valico"
-  install_host_tool = true
 }]
 ```
 
@@ -2829,7 +2826,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1900
+From //build/config/BUILDCONFIG.gn:1940
 
 ### fastboot_product
 
@@ -3856,7 +3853,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1684
+From //build/config/BUILDCONFIG.gn:1724
 
 ### link_rbe_check
 
@@ -5652,7 +5649,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2114
+From //build/config/BUILDCONFIG.gn:2154
 
 ### select_variant_canonical
 
@@ -5662,7 +5659,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2119
+From //build/config/BUILDCONFIG.gn:2159
 
 ### select_variant_shortcuts
 
@@ -5727,7 +5724,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1907
+From //build/config/BUILDCONFIG.gn:1947
 
 ### size_checker_input
 
@@ -5855,13 +5852,23 @@ https://clang.llvm.org/docs/ClangCommandLineReference.html#cmdoption-clang-fstac
 
 From //build/config/clang/stack_size_section.gni:8
 
+### starnix_detect_lock_cycles
+
+Whether to use tracing-mutex to detect cycles in the lock acquisition graph.
+Only enable this on debug builds by default because it makes balanced/release too slow for
+real use.
+
+**Current value (from the default):** `false`
+
+From //src/starnix/build/args.gni:50
+
 ### starnix_disable_logging
 
 Whether or not logging is disabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/args.gni:7
+From //src/starnix/build/args.gni:7
 
 ### starnix_enable_alternate_anon_allocs
 
@@ -5869,13 +5876,13 @@ Whether to use an alternate strategy for anonymous memory allocations.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/args.gni:32
+From //src/starnix/build/args.gni:32
 
 ### starnix_enable_arch32
 
 **Current value (from the default):** `true`
 
-From //src/starnix/kernel/args.gni:42
+From //src/starnix/build/args.gni:42
 
 ### starnix_enable_console_tool
 
@@ -5901,7 +5908,7 @@ https://fuchsia-review.googlesource.com/c/fuchsia/+/929995.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/args.gni:23
+From //src/starnix/build/args.gni:23
 
 ### starnix_enable_tracing
 
@@ -5909,7 +5916,7 @@ Whether or not tracing is enabled globally.
 
 **Current value (from the default):** `true`
 
-From //src/starnix/kernel/args.gni:10
+From //src/starnix/build/args.gni:10
 
 ### starnix_enable_tracing_firehose
 
@@ -5917,7 +5924,7 @@ Whether or not high-throughput tracing (e.g. per-syscall) is enabled globally.
 
 **Current value (from the default):** `true`
 
-From //src/starnix/kernel/args.gni:13
+From //src/starnix/build/args.gni:13
 
 ### starnix_enable_wake_locks
 
@@ -5925,7 +5932,7 @@ Whether or not the kernel manages wake locks internally.
 
 **Current value (from the default):** `true`
 
-From //src/starnix/kernel/args.gni:38
+From //src/starnix/build/args.gni:38
 
 ### starnix_log_dev_null_writes_at_info
 
@@ -5933,7 +5940,7 @@ Whether to log writes to `/dev/null` at the INFO level.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/args.gni:35
+From //src/starnix/build/args.gni:35
 
 ### starnix_syscall_stats
 
@@ -5941,7 +5948,7 @@ Whether or not syscall status inspect is enabled globally.
 
 **Current value (from the default):** `false`
 
-From //src/starnix/kernel/args.gni:26
+From //src/starnix/build/args.gni:26
 
 ### starnix_unified_aspace
 
@@ -5949,7 +5956,7 @@ Whether or not unified address spaces are leveraged.
 
 **Current value (from the default):** `true`
 
-From //src/starnix/kernel/args.gni:29
+From //src/starnix/build/args.gni:29
 
 ### sysmem_contiguous_guard_page_count
 
