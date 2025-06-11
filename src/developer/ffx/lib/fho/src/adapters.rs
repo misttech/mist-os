@@ -9,6 +9,7 @@
 #[macro_export]
 macro_rules! embedded_plugin {
     ($tool:ty) => {
+        /// FFX Plugin implementation.
         pub async fn ffx_plugin_impl(
             env: &$crate::macro_deps::fho::FhoEnvironment,
             cmd: <$tool as $crate::FfxTool>::Command,
@@ -49,11 +50,13 @@ macro_rules! embedded_plugin {
             env.wrap_main_result(res)
         }
 
+        /// Returns whether or not this plugin supports the `--machine` flag.
         pub fn ffx_plugin_is_machine_supported() -> bool {
             use $crate::macro_deps::writer::ToolIO;
             <<$tool as $crate::FfxMain>::Writer as ToolIO>::is_machine_supported()
         }
 
+        /// Returns whether or not this plugin has a defined output schema.
         pub fn ffx_plugin_has_schema() -> bool {
             use $crate::macro_deps::writer::ToolIO;
             <<$tool as $crate::FfxMain>::Writer as ToolIO>::has_schema()
