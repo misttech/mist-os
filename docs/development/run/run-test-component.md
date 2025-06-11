@@ -81,7 +81,7 @@ when setting your product and board environment:
 For a Fuchsia emulator with the minimum build configuration, the command is:
 
 ```posix-terminal
-fx set core.x64 --with //examples/hello_world:tests
+fx set core.x64 --with //examples/hello_world
 ```
 
 In this example, `core` is a product with a minimal feature set, which includes
@@ -90,7 +90,7 @@ common network capabilities, and `x64` refers to the x64 architecture.
 For a Fuchsia device with the minimum build configuration, the command is:
 
 ```posix-terminal
-fx set core.x64 --with //examples/hello_world:tests
+fx set core.x64 --with //examples/hello_world
 ```
 
 See [Configure a build](/docs/development/build/fx.md#configure-a-build) for
