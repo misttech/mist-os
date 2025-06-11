@@ -203,8 +203,10 @@ impl<Key: FutexKey> FutexTable<Key> {
         let tid = current_task.get_tid() as u32;
         let mm = current_task.mm().ok_or_else(|| errno!(EINVAL))?;
 
-        // Use acquire to synchronize with the release ordering used in mutex impl's lock path.
-        let mut current_value = mm.atomic_load_u32_acquire(addr)?;
+        // Use a relaxed ordering because the compare/exchange below creates a synchronization
+        // point with userspace threads in the success case. No synchronization is required in
+        // failure cases.
+        let mut current_value = mm.atomic_load_u32_relaxed(addr)?;
         let new_owner_tid = loop {
             let new_owner_tid = current_value & FUTEX_TID_MASK;
             if new_owner_tid == tid {
@@ -272,8 +274,11 @@ impl<Key: FutexKey> FutexTable<Key> {
         let mm = current_task.mm().ok_or_else(|| errno!(EINVAL))?;
 
         let key = Key::get(current_task, addr)?;
-        // Use acquire to synchronize with the release ordering used in mutex impl's lock path.
-        let current_value = mm.atomic_load_u32_acquire(addr)?;
+
+        // Use a relaxed ordering because the compare/exchange below creates a synchronization
+        // point with userspace threads in the success case. No synchronization is required in
+        // failure cases.
+        let current_value = mm.atomic_load_u32_relaxed(addr)?;
         if current_value & FUTEX_TID_MASK != tid {
             // From <https://man7.org/linux/man-pages/man2/futex.2.html>:
             //
