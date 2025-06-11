@@ -68,8 +68,8 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
      curl -s "https://static.rust-lang.org/dist/${STAGE0_DATE}/channel-rust-${STAGE0_VERSION}.toml" \
      | python3 -c 'import tomllib, sys; print(tomllib.load(sys.stdin.buffer)["pkg"]["rust"]["git_commit_hash"])')
    echo "@Subdir stage0" >> cipd.ensure
-   echo "fuchsia/third_party/rust/host/\${platform} git_revision:${STAGE0_COMMIT_HASH}" >> cipd.ensure
-   echo "fuchsia/third_party/rust/target/${HOST_TRIPLE} git_revision:${STAGE0_COMMIT_HASH}" >> cipd.ensure
+   echo "fuchsia/third_party/rust/host/\${platform} rust_revision:${STAGE0_COMMIT_HASH}" >> cipd.ensure
+   echo "fuchsia/third_party/rust/target/${HOST_TRIPLE} rust_revision:${STAGE0_COMMIT_HASH}" >> cipd.ensure
    $DEV_ROOT/infra/fuchsia/prebuilt/tools/cipd ensure --root $DEV_ROOT --ensure-file cipd.ensure
    ```
 
@@ -99,6 +99,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
        --clang-prefix=$DEV_ROOT/clang \
        --host-sysroot=$DEV_ROOT/sysroot/linux \
        --stage0=$DEV_ROOT/stage0 \
+       --targets=aarch64-unknown-linux-gnu,x86_64-unknown-linux-gnu,thumbv6m-none-eabi,thumbv7m-none-eabi,riscv32imc-unknown-none-elf,riscv64gc-unknown-linux-gnu \
        --prefix=$(pwd)/install/fuchsia-rust \
       | tee fuchsia-config.toml
 
@@ -109,6 +110,7 @@ Prior to building a custom Rust toolchain for Fuchsia, you need to do the follow
          --clang-prefix=$DEV_ROOT/clang \
          --sdk-dir=$DEV_ROOT/sdk \
          --stage0=$DEV_ROOT/stage0 \
+         --targets=aarch64-unknown-linux-gnu,x86_64-unknown-linux-gnu,thumbv6m-none-eabi,thumbv7m-none-eabi,riscv32imc-unknown-none-elf,riscv64gc-unknown-linux-gnu \
          --linux-sysroot=$DEV_ROOT/sysroot/linux \
          --linux-riscv64-sysroot=$DEV_ROOT/sysroot/focal \
       | tee fuchsia-env.sh
