@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "src/graphics/display/drivers/coordinator/client-proxy.h"
+
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire_test_base.h>
@@ -22,7 +24,6 @@
 
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
-#include "src/graphics/display/drivers/coordinator/client-proxy.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/engine-driver-client.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
@@ -99,12 +100,12 @@ class MockCoordinatorListener
   display::ConfigStamp latest_applied_config_stamp_ = display::kInvalidConfigStamp;
 };
 
-class CoordinatorClientWithListenerTest : public ::testing::Test {
+class ClientProxyTest : public ::testing::Test {
  private:
   fdf_testing::ScopedGlobalLogger logger_;
 };
 
-TEST_F(CoordinatorClientWithListenerTest, ClientVSyncOk) {
+TEST_F(ClientProxyTest, ClientVSyncOk) {
   fdf_testing::DriverRuntime driver_runtime;
 
   constexpr display::DriverConfigStamp kDriverStampValue(1);
@@ -150,7 +151,7 @@ TEST_F(CoordinatorClientWithListenerTest, ClientVSyncOk) {
   shutdown_completion->Wait();
 }
 
-TEST_F(CoordinatorClientWithListenerTest, ClientVSyncPeerClosed) {
+TEST_F(ClientProxyTest, ClientVSyncPeerClosed) {
   fdf_testing::DriverRuntime driver_runtime;
 
   auto [coordinator_client_end, coordinator_server_end] =
@@ -181,7 +182,7 @@ TEST_F(CoordinatorClientWithListenerTest, ClientVSyncPeerClosed) {
   shutdown_completion->Wait();
 }
 
-TEST_F(CoordinatorClientWithListenerTest, ClientVSyncNotSupported) {
+TEST_F(ClientProxyTest, ClientVSyncNotSupported) {
   fdf_testing::DriverRuntime driver_runtime;
 
   auto [coordinator_client_end, coordinator_server_end] =
@@ -211,7 +212,7 @@ TEST_F(CoordinatorClientWithListenerTest, ClientVSyncNotSupported) {
   shutdown_completion->Wait();
 }
 
-TEST_F(CoordinatorClientWithListenerTest, ClientMustDrainPendingStamps) {
+TEST_F(ClientProxyTest, ClientMustDrainPendingStamps) {
   fdf_testing::DriverRuntime driver_runtime;
 
   constexpr size_t kNumPendingStamps = 5;

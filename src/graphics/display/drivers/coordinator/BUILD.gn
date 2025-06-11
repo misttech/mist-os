@@ -121,8 +121,8 @@ source_set("preferred-scanout-image-type") {
 test("display-coordinator-unittests") {
   sources = [
     "added-display-info-test.cc",
+    "client-proxy-test.cc",
     "display-info-test.cc",
-    "display-test.cc",
     "fence-test.cc",
     "image-test.cc",
     "inspect-test.cc",
