@@ -282,10 +282,14 @@ struct PhysHandoff {
   // TODO(https://fxbug.dev/42164859): This will eventually be made a permanent pointer.
   PhysHandoffTemporaryString version_string;
 
-  // VMARs to construct along with mapped regions within. The VMARs will be
-  // sorted by base address, and the mappings within each VMAR will similarly
-  // be sorted by virtual address.
+  // Permanent VMARs to construct along with mapped regions within. The VMARs
+  // will be sorted by base address, and the mappings within each VMAR will
+  // similarly be sorted by virtual address.
   PhysHandoffTemporarySpan<const PhysVmar> vmars;
+
+  // A VMAR comprising all temporary hand-off mappings, including that of the
+  // PhysHandoff itself.
+  PhysHandoffTemporaryPtr<const PhysVmar> temporary_vmar;
 
   // The data ZBI.
   PhysVmo zbi;

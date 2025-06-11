@@ -23,6 +23,7 @@
 #include <ktl/span.h>
 #include <ktl/tuple.h>
 #include <ktl/utility.h>
+#include <phys/elf-image.h>
 #include <phys/handoff-ptr.h>
 #include <phys/handoff.h>
 #include <phys/kernel-package.h>
@@ -38,21 +39,18 @@ class Log;
 
 class HandoffPrep {
  public:
-  // This must be called first.
-  void Init();
+  explicit HandoffPrep(ElfImage kernel);
 
-  // This is the main structure.  After Init has been called the pointer is
-  // valid but the data is in default-constructed state.
+  // This is the main structure.
   PhysHandoff* handoff() { return handoff_; }
 
   // This returns new T(args...) using the temporary handoff allocator and
   // fills in the handoff_ptr to point to it.
   template <typename T, typename... Args>
   T* New(PhysHandoffTemporaryPtr<const T>& handoff_ptr, fbl::AllocChecker& ac, Args&&... args) {
-    T* ptr = new (temporary_allocator_, ac) T(ktl::forward<Args>(args)...);
+    T* ptr = new (temporary_data_allocator_, ac) T(ktl::forward<Args>(args)...);
     if (ptr) {
-      void* generic_ptr = static_cast<void*>(ptr);
-      handoff_ptr.ptr_ = reinterpret_cast<uintptr_t>(generic_ptr);
+      handoff_ptr.ptr_ = ptr;
     }
     return ptr;
   }
@@ -61,10 +59,9 @@ class HandoffPrep {
   template <typename T>
   ktl::span<T> New(PhysHandoffTemporarySpan<const T>& handoff_span, fbl::AllocChecker& ac,
                    size_t n) {
-    T* ptr = new (temporary_allocator_, ac) T[n];
+    T* ptr = new (temporary_data_allocator_, ac) T[n];
     if (ptr) {
-      void* generic_ptr = static_cast<void*>(ptr);
-      handoff_span.ptr_.ptr_ = reinterpret_cast<uintptr_t>(generic_ptr);
+      handoff_span.ptr_.ptr_ = ptr;
       handoff_span.size_ = n;
       return {ptr, n};
     }
@@ -85,9 +82,8 @@ class HandoffPrep {
   // `boot` to transfer control to the kernel entry point with the handoff()
   // pointer as its argument. The `boot` function should do nothing but hand
   // off to the kernel; in particular, state has already been captured from
-  // `uart` so no additional printing should be done at this stage.  Init()
-  // must have been called first.
-  [[noreturn]] void DoHandoff(const ElfImage& kernel, UartDriver& uart, ktl::span<ktl::byte> zbi,
+  // `uart` so no additional printing should be done at this stage.
+  [[noreturn]] void DoHandoff(UartDriver& uart, ktl::span<ktl::byte> zbi,
                               const KernelStorage::Bootfs& kernel_package,
                               const ArchPatchInfo& patch_info);
 
@@ -125,10 +121,40 @@ class HandoffPrep {
   using HandoffMapping = HandoffVmObject<PhysMapping>;
   using HandoffMappingList = HandoffVmObjectList<PhysMapping>;
 
+  // Defined in handoff-prep-vm.cc.
+  class VirtualAddressAllocator {
+   public:
+    enum class Strategy : bool { kDown };
+
+    // The allocator for temporary hand-off data.
+    static VirtualAddressAllocator TemporaryHandoffDataAllocator(const ElfImage& kernel);
+
+    VirtualAddressAllocator(uintptr_t start, Strategy strategy,
+                            ktl::optional<uintptr_t> boundary = ktl::nullopt)
+        : start_{start}, strategy_{strategy}, boundary_{boundary} {
+      ZX_DEBUG_ASSERT(!boundary || start >= *boundary);
+    }
+
+    uintptr_t AllocatePages(size_t size);
+
+   private:
+    uintptr_t start_;
+    Strategy strategy_;
+    ktl::optional<uintptr_t> boundary_;
+  };
+
   template <memalloc::Type Type>
   class PhysPages {
    public:
-    using Capability = Allocation;
+    struct Capability {
+      Allocation phys;
+      void* virt;
+    };
+
+    template <typename... Args>
+    explicit PhysPages(Args&&... args) : va_allocator_(ktl::forward<Args>(args)...) {}
+
+    HandoffMappingList&& TakeMappings() { return ktl::move(mappings_); }
 
     size_t page_size() const { return ZX_PAGE_SIZE; }
 
@@ -138,22 +164,41 @@ class HandoffPrep {
       if (!ac.check()) {
         return {};
       }
-      return {pages.get(), ktl::move(pages)};
+
+      const char* mapping_name;
+      if constexpr (Type == memalloc::Type::kTemporaryPhysHandoff) {
+        mapping_name = "temporary hand-off data";
+      } else {
+        static_assert(false, "TODO(https://fxbug.dev/42164859): Support permanent hand-off memory");
+      }
+
+      uintptr_t vaddr = va_allocator_.AllocatePages(size);
+      uintptr_t paddr = reinterpret_cast<uintptr_t>(pages.get());
+      PhysMapping mapping(mapping_name, vaddr, size, paddr, PhysMapping::Permissions::Rw());
+      void* ptr = CreateMapping(mapping, MappingType::kNormal);
+      mappings_.push_front(HandoffMapping::New(ktl::move(mapping)));
+
+      return {ptr, Capability{ktl::move(pages), ptr}};
     }
 
     void Deallocate(Capability allocation, void* ptr, size_t size) {
-      ZX_DEBUG_ASSERT(ptr == allocation.get());
-      ZX_DEBUG_ASSERT(size == allocation.size_bytes());
-      allocation.reset();
+      ZX_DEBUG_ASSERT(ptr == allocation.virt);
+      ZX_DEBUG_ASSERT(size == allocation.phys.size_bytes());
+      // Note: `allocation.phys` will free itself when it goes out of scope
+      // on returning.
     }
 
     void Release(Capability allocation, void* ptr, size_t size) {
-      ZX_DEBUG_ASSERT(ptr == allocation.get());
-      ZX_DEBUG_ASSERT(size == allocation.size_bytes());
-      ktl::ignore = allocation.release();
+      ZX_DEBUG_ASSERT(ptr == allocation.virt);
+      ZX_DEBUG_ASSERT(size == allocation.phys.size_bytes());
+      ktl::ignore = allocation.phys.release();
     }
 
     void Seal(Capability, void*, size_t) { ZX_PANIC("Unexpected call to Seal::Capability"); }
+
+   private:
+    VirtualAddressAllocator va_allocator_;
+    HandoffMappingList mappings_;
   };
 
   template <memalloc::Type Type>
@@ -162,7 +207,7 @@ class HandoffPrep {
   template <memalloc::Type Type>
   using Allocator = trivial_allocator::BasicLeakyAllocator<PageAllocationFunction<Type>>;
 
-  using TemporaryAllocator = Allocator<memalloc::Type::kTemporaryPhysHandoff>;
+  using TemporaryDataAllocator = Allocator<memalloc::Type::kTemporaryPhysHandoff>;
 
   // TODO(https://fxbug.dev/42164859): kMmio too.
   enum class MappingType { kNormal };
@@ -206,15 +251,13 @@ class HandoffPrep {
     size_t size_bytes = 0;
   };
 
-  inline static TemporaryAllocator temporary_allocator_;
-
   // Constructs a PhysVmo from the provided information, enforcing that `data`
   // is page-aligned and that page-rounding `content_size` up yields
   // `data.size_bytes()`.
   static PhysVmo MakePhysVmo(ktl::span<const ktl::byte> data, ktl::string_view name,
                              size_t content_size);
 
-  static void CreateMapping(const PhysMapping& mapping, MappingType type);
+  static void* CreateMapping(const PhysMapping& mapping, MappingType type);
 
   // Packs a list of pending VM objects into a single hand-off span in sorted
   // order.
@@ -291,9 +334,11 @@ class HandoffPrep {
   // This must be the very last set-up routine called within DoHandoff().
   void SetMemory();
 
-  void ConstructKernelAddressSpace(const ElfImage& kernel);
+  void ConstructKernelAddressSpace();
 
+  const ElfImage kernel_;
   PhysHandoff* handoff_ = nullptr;
+  TemporaryDataAllocator temporary_data_allocator_;
   zbitl::Image<Allocation> mexec_image_;
   HandoffVmarList vmars_;
   HandoffVmoList extra_vmos_;

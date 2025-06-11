@@ -14,6 +14,7 @@
 #include <arch/defines.h>
 #include <ktl/bit.h>
 #include <ktl/optional.h>
+#include <phys/handoff.h>
 #include <vm/vm.h>
 #include <vm/vm_address_region.h>
 #include <vm/vm_aspace.h>
@@ -302,8 +303,13 @@ int cmd_peripheral_map(int argc, const cmd_args* argv, uint32_t flags) {
 }  // namespace
 
 zx_status_t add_periph_range(paddr_t base_phys, size_t length) {
-  // peripheral ranges are allocated below the kernel image.
-  uintptr_t base_virt = (uintptr_t)__executable_start;
+  // peripheral ranges are allocated below the temporary hand-off data, which
+  // is itself located below the kernel image.
+  //
+  // TODO(https://fxbug.dev/42164859): This dependency on the location of the
+  // temporary hand-off VMAR will soon go away once periphmap mappings are made
+  // in physboot.
+  uintptr_t base_virt = gPhysHandoff->temporary_vmar.get()->base;
 
   // give ourselves an extra gap of space to try to catch overruns
   base_virt -= 0x10000;

@@ -48,7 +48,10 @@ paddr_t zero_page_paddr;
 namespace {
 
 // The initialized VMARs described in the phys hand-off.
+//
+// TODO(mcgrathr): Consider moving these to a stack- or heap-allocated object.
 fbl::Vector<fbl::RefPtr<VmAddressRegion>> handoff_vmars;
+fbl::RefPtr<VmAddressRegion> temporary_handoff_vmar;
 
 constexpr uint32_t ToVmarFlags(PhysMapping::Permissions perms) {
   uint32_t flags = VMAR_FLAG_SPECIFIC | VMAR_FLAG_CAN_MAP_SPECIFIC;
@@ -150,6 +153,7 @@ void vm_init() {
 
   arch_zero_page(ptr);
 
+  // Register the permanent and temporary hand-off VMARs.
   fbl::AllocChecker ac;
   handoff_vmars.reserve(gPhysHandoff->vmars.size(), &ac);
   ASSERT(ac.check());
@@ -158,6 +162,7 @@ void vm_init() {
     handoff_vmars.push_back(ktl::move(vmar), &ac);
     ASSERT(ac.check());
   }
+  temporary_handoff_vmar = RegisterVmar(*gPhysHandoff->temporary_vmar.get());
 
   // Protect the regions of the physmap that are not backed by normal memory.
   //
@@ -166,6 +171,11 @@ void vm_init() {
   physmap_protect_non_arena_regions();
 
   cmpct_set_fill_on_alloc_threshold(gBootOptions->alloc_fill_threshold);
+}
+
+void vm_end_handoff() {
+  DEBUG_ASSERT(temporary_handoff_vmar);
+  temporary_handoff_vmar = nullptr;
 }
 
 paddr_t vaddr_to_paddr(const void* va) {

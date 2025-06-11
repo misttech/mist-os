@@ -574,6 +574,7 @@ if (toolchain_environment == "kernel.phys" ||
     public = [ "handoff-prep.h" ]
 
     public_deps = [
+      ":elf-image",
       ":handoff",
       ":kernel-package",
       ":new",

@@ -14,7 +14,42 @@
 
 #include <ktl/enforce.h>
 
+//
+// At a high-level, the kernel virtual address space is constructed as
+// follows (taking the kernel's load address as an input):
+//
+// * The physmap is a fixed mapping below the rest of the others
+// * Virtual addresses for temporary and permanent hand-off data are
+//   bump-allocated downward (in 1GiB-separated ranges) below the kernel's
+//   memory image (wherever it was loaded)
+// * The remaining, various first-class mappings are made just above the
+//   kernel's memory image (wherever it was loaded), with virtual address
+//   ranges bump-allocated upward.
+//
+//            ...
+//     other first-class     (↑)
+//          mappings
+// -------------------------
+//       hole (1 page)
+// -------------------------
+//    kernel memory image
+// -------------------------
+//       hole (1 page)
+// -------------------------
+//  permanent hand-off data  (↓)
+// ------------------------- kernel load address - 1GiB
+//  temporary hand-off data  (↓)
+//            ...
+// ------------------------- kArchPhysmapVirtualBase
+//          physmap
+// ------------------------- kArchPhysmapVirtualBase + kArchPhysmapSize
+//
+
 namespace {
+
+constexpr size_t k1GiB = 0x4000'0000;
+
+constexpr bool IsPageAligned(uintptr_t p) { return p % ZX_PAGE_SIZE == 0; }
 
 constexpr arch::AccessPermissions ToAccessPermissions(PhysMapping::Permissions perms) {
   return {
@@ -26,7 +61,32 @@ constexpr arch::AccessPermissions ToAccessPermissions(PhysMapping::Permissions p
 
 }  // namespace
 
-void HandoffPrep::CreateMapping(const PhysMapping& mapping, MappingType type) {
+HandoffPrep::VirtualAddressAllocator
+HandoffPrep::VirtualAddressAllocator::TemporaryHandoffDataAllocator(const ElfImage& kernel) {
+  return {
+      /*start=*/kernel.load_address() - k1GiB,
+      /*strategy=*/HandoffPrep::VirtualAddressAllocator::Strategy::kDown,
+      /*boundary=*/kArchPhysmapVirtualBase + kArchPhysmapSize,
+  };
+}
+
+uintptr_t HandoffPrep::VirtualAddressAllocator::AllocatePages(size_t size) {
+  ZX_DEBUG_ASSERT(IsPageAligned(size));
+  switch (strategy_) {
+    case Strategy::kDown:
+      ZX_DEBUG_ASSERT(start_ >= size);
+      if (boundary_) {
+        ZX_DEBUG_ASSERT(start_ - size >= *boundary_);
+      }
+      start_ -= size;
+      return start_;
+  }
+  __UNREACHABLE;
+}
+
+void* HandoffPrep::CreateMapping(const PhysMapping& mapping, MappingType type) {
+  // TODO(https://fxbug.dev/42164859): Debug assert that mapping.vaddr is >= to
+  // the base of the high kernel address space.
   AddressSpace::MapSettings settings;
   switch (type) {
     case MappingType::kNormal: {
@@ -36,6 +96,8 @@ void HandoffPrep::CreateMapping(const PhysMapping& mapping, MappingType type) {
   }
   AddressSpace::PanicIfError(
       gAddressSpace->Map(mapping.vaddr, mapping.size, mapping.paddr, settings));
+
+  return reinterpret_cast<void*>(mapping.vaddr);
 }
 
 void HandoffPrep::PublishSingleMappingVmar(PhysMapping mapping, MappingType type) {
@@ -45,7 +107,7 @@ void HandoffPrep::PublishSingleMappingVmar(PhysMapping mapping, MappingType type
   ktl::move(prep).Publish();
 }
 
-void HandoffPrep::ConstructKernelAddressSpace(const ElfImage& kernel) {
+void HandoffPrep::ConstructKernelAddressSpace() {
   // Physmap.
   {
     // Shadowing the entire physmap would be redundantly wasteful.
@@ -56,10 +118,10 @@ void HandoffPrep::ConstructKernelAddressSpace(const ElfImage& kernel) {
 
   // The kernel's mapping.
   {
-    PhysVmarPrep prep = PrepareVmarAt("kernel"sv, kernel.load_address(), kernel.vaddr_size());
-    kernel.load_info().VisitSegments([&kernel, &prep](const auto& segment) {
-      uintptr_t vaddr = segment.vaddr() + kernel.load_bias();
-      uintptr_t paddr = kernel.physical_load_address() + segment.offset();
+    PhysVmarPrep prep = PrepareVmarAt("kernel"sv, kernel_.load_address(), kernel_.vaddr_size());
+    kernel_.load_info().VisitSegments([this, &prep](const auto& segment) {
+      uintptr_t vaddr = segment.vaddr() + kernel_.load_bias();
+      uintptr_t paddr = kernel_.physical_load_address() + segment.offset();
 
       PhysMapping::Permissions perms = PhysMapping::Permissions::FromSegment(segment);
       // If the segment is executable and the hardware doesn't support

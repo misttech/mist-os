@@ -39,7 +39,7 @@ namespace {
 
 constexpr ktl::string_view kElfPhysKernel = "physzircon";
 
-void PatchElfKernel(ElfImage& elf_kernel, const ArchPatchInfo& patch_info) {
+void PatchElfKernel(ElfImage& kernel, const ArchPatchInfo& patch_info) {
   auto apply_patch = [&patch_info](
                          code_patching::Patcher& patcher, CodePatchId id,
                          ktl::span<ktl::byte> code_to_patch,
@@ -52,30 +52,30 @@ void PatchElfKernel(ElfImage& elf_kernel, const ArchPatchInfo& patch_info) {
              static_cast<uint32_t>(id));
   };
 
-  debugf("%s: Applying %zu patches...\n", gSymbolize->name(), elf_kernel.patch_count());
+  debugf("%s: Applying %zu patches...\n", gSymbolize->name(), kernel.patch_count());
   // Apply patches to the kernel image.
-  auto result = elf_kernel.ForEachPatch<CodePatchId>(apply_patch);
+  auto result = kernel.ForEachPatch<CodePatchId>(apply_patch);
   if (result.is_error()) {
     zbitl::PrintBootfsError(result.error_value());
     abort();
   }
 
   // There's always the self-test patch, so there should never be none.
-  ZX_ASSERT(elf_kernel.has_patches());
+  ZX_ASSERT(kernel.has_patches());
 }
 
-void RelocateElfKernel(ElfImage& elf_kernel) {
+void RelocateElfKernel(ElfImage& kernel) {
   debugf("%s: Relocating ELF kernel to [%#" PRIx64 ", %#" PRIx64 ")...\n", gSymbolize->name(),
-         elf_kernel.load_address(), elf_kernel.load_address() + elf_kernel.vaddr_size());
-  elf_kernel.Relocate();
+         kernel.load_address(), kernel.load_address() + kernel.vaddr_size());
+  kernel.Relocate();
 }
 
 [[noreturn]] void BootZircon(UartDriver& uart, KernelStorage kernel_storage) {
   KernelStorage::Bootfs package = kernel_storage.GetKernelPackage();
 
-  ElfImage elf_kernel;
+  ElfImage kernel;
   debugf("%s: Locating ELF kernel in kernel package...\n", gSymbolize->name());
-  if (auto result = elf_kernel.Init(package, kElfPhysKernel, true); result.is_error()) {
+  if (auto result = kernel.Init(package, kElfPhysKernel, true); result.is_error()) {
     printf("%s: Cannot load ELF kernel \"%.*s/%.*s\" from STORAGE_KERNEL item BOOTFS: ",
            gSymbolize->name(), static_cast<int>(package.directory().size()),
            package.directory().data(), static_cast<int>(kElfPhysKernel.size()),
@@ -85,34 +85,33 @@ void RelocateElfKernel(ElfImage& elf_kernel) {
   }
 
   // Make sure the kernel was built to match this physboot binary.
-  elf_kernel.AssertInterpMatchesBuildId(gSymbolize->name(), gSymbolize->build_id());
+  kernel.AssertInterpMatchesBuildId(gSymbolize->name(), gSymbolize->build_id());
 
   // Use the putative eventual virtual address to relocate the kernel.
   const uint64_t kernel_vaddr = kArchHandoffVirtualAddress;
 
-  Allocation loaded_elf_kernel = elf_kernel.Load(memalloc::Type::kKernel, kernel_vaddr);
+  Allocation loaded_kernel = kernel.Load(memalloc::Type::kKernel, kernel_vaddr);
 
   const ArchPatchInfo patch_info = ArchPreparePatchInfo();
-  PatchElfKernel(elf_kernel, patch_info);
+  PatchElfKernel(kernel, patch_info);
 
-  RelocateElfKernel(elf_kernel);
+  RelocateElfKernel(kernel);
 
-  if (elf_kernel.memory_image().size_bytes() > KERNEL_IMAGE_MAX_SIZE) {
+  if (kernel.memory_image().size_bytes() > KERNEL_IMAGE_MAX_SIZE) {
     ZX_PANIC(
         "%s: Attempting to load kernel of size %#zx. Max supported kernel size is %#zx (\"KERNEL_IMAGE_MAX_SIZE\").\n",
-        gSymbolize->name(), elf_kernel.memory_image().size_bytes(),
+        gSymbolize->name(), kernel.memory_image().size_bytes(),
         static_cast<size_t>(KERNEL_IMAGE_MAX_SIZE));
   }
 
   // Prepare the handoff data structures.
-  HandoffPrep prep;
-  prep.Init();
+  HandoffPrep prep(ktl::move(kernel));
 
   if (gBootOptions->phys_verbose) {
     Allocation::GetPool().PrintMemoryRanges(gSymbolize->name());
   }
 
-  prep.DoHandoff(elf_kernel, uart, kernel_storage.zbi().storage(), package, patch_info);
+  prep.DoHandoff(uart, kernel_storage.zbi().storage(), package, patch_info);
 }
 
 }  // namespace

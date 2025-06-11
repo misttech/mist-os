@@ -21,8 +21,8 @@
 // Forward declaration; defined in <vm/vm_object.h>
 class VmObject;
 
-// Called as soon as the physmap is available to set the gPhysHandoff pointer.
-void HandoffFromPhys(paddr_t handoff_paddr);
+// Called as soon as the kernel is entered to set the gPhysHandoff pointer.
+void HandoffFromPhys(PhysHandoff* handoff);
 
 // Valid to call only after HandoffFromPhys().
 paddr_t KernelPhysicalLoadAddress();
