@@ -21,7 +21,7 @@
     "pkg/fdio/include/lib/fdio/limits.h",
     "pkg/fdio/include/lib/fdio/vfs.h"
   ],
-  "ifs": "fdio.ifs",
+  "ifs": "pkg/fdio/fdio.ifs",
   "include_dir": "pkg/fdio/include",
   "name": "fdio",
   "root": "pkg/fdio",
