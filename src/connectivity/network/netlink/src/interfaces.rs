@@ -1110,7 +1110,9 @@ mod fake_ifb0 {
 
     pub(super) const FAKE_IFB0_LINK_NAME: &str = "ifb0";
 
-    pub(super) const FAKE_IFB0_LINK_ID: u64 = 255;
+    // Chosen to look super arbitrary and human-allocated, and also large enough
+    // to be very unlikely to collide with another interface in practice.
+    pub(super) const FAKE_IFB0_LINK_ID: u64 = 13371337;
 
     pub(super) fn fake_ifb0_properties(
     ) -> fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest> {
