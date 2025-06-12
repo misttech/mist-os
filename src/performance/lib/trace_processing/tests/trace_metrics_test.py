@@ -91,45 +91,6 @@ class MetricProcessorsTest(unittest.TestCase):
             os.path.join(runtime_deps_path, model_file_name)
         )
 
-    def test_constant_processor(self) -> None:
-        metrics = [
-            TCR(label="test", unit=U.countBiggerIsBetter, values=[1234, 5678])
-        ]
-        processor = trace_metrics.ConstantMetricsProcessor(
-            metrics=metrics,
-        )
-        self.assertSequenceEqual(
-            processor.process_metrics(_EMPTY_MODEL), metrics
-        )
-        self.assertEqual(
-            processor.process_freeform_metrics(_EMPTY_MODEL), ("", None)
-        )
-
-    def test_constant_processor_freeform(self) -> None:
-        freeform = ("test", ["hello"])
-        processor = trace_metrics.ConstantMetricsProcessor(
-            freeform_metrics=freeform,
-        )
-        self.assertSequenceEqual(processor.process_metrics(_EMPTY_MODEL), [])
-        self.assertEqual(
-            processor.process_freeform_metrics(_EMPTY_MODEL), freeform
-        )
-
-    def test_constant_processor_both(self) -> None:
-        freeform = ("test", ["hello"])
-        metrics = [
-            TCR(label="test", unit=U.countBiggerIsBetter, values=[1234, 5678])
-        ]
-        processor = trace_metrics.ConstantMetricsProcessor(
-            metrics=metrics, freeform_metrics=freeform
-        )
-        self.assertSequenceEqual(
-            processor.process_metrics(_EMPTY_MODEL), metrics
-        )
-        self.assertEqual(
-            processor.process_freeform_metrics(_EMPTY_MODEL), freeform
-        )
-
     @parameterized.expand(
         [
             param(
@@ -306,7 +267,9 @@ class MetricProcessorsTest(unittest.TestCase):
         actual_results = list(processor.process_metrics(model))
 
         docs = processor.describe(actual_results)
-        self.assertEqual(docs["classname"], processor.__class__.__name__)
+        self.assertEqual(
+            docs.get("classname", ""), processor.__class__.__name__
+        )
         self.assertNotEqual(docs["doc"], "")
         self.assertNotEqual(docs["code_path"], "")
 
@@ -319,6 +282,6 @@ class MetricProcessorsTest(unittest.TestCase):
 
     def test_auto_doc(self) -> None:
         docs = self.TestMetricsProcessor().describe([])
-        self.assertEqual(docs["classname"], "TestMetricsProcessor")
+        self.assertEqual(docs.get("classname", ""), "TestMetricsProcessor")
         self.assertEqual(docs["doc"], "TEST")
         self.assertEqual(docs["code_path"], py_inspect.getfile(self.__class__))

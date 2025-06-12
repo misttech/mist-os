@@ -209,7 +209,7 @@ class ProfileTest(unittest.TestCase):
                     unit=trace_metrics.Unit.bytes,
                     values=[303595520],
                     doc=(
-                        f"{profile.MemoryProfileMetrics.DESCRIPTION_BASE}: "
+                        f"{profile._MemoryProfileMetrics.DESCRIPTION_BASE}: "
                         "starnix_kernel"
                     ),
                 ),
@@ -218,7 +218,7 @@ class ProfileTest(unittest.TestCase):
                     unit=trace_metrics.Unit.bytes,
                     values=[0],
                     doc=(
-                        f"{profile.MemoryProfileMetrics.DESCRIPTION_BASE}: "
+                        f"{profile._MemoryProfileMetrics.DESCRIPTION_BASE}: "
                         "binder"
                     ),
                 ),
