@@ -201,7 +201,7 @@ impl GlobalPolicyChecker {
                 let parts = target_moniker
                     .path()
                     .iter()
-                    .map(|c| AllowlistMatcher::Exact(c.clone()))
+                    .map(|c| AllowlistMatcher::Exact((*c).into()))
                     .collect();
                 let entry = AllowlistEntry { matchers: parts };
 

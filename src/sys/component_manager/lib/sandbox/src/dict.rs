@@ -178,7 +178,7 @@ impl Dict {
 
     /// Removes `key` from the entries, returning the capability at `key` if the key was already in
     /// the entries.
-    pub fn remove(&self, key: &Key) -> Option<Capability> {
+    pub fn remove(&self, key: &BorrowedKey) -> Option<Capability> {
         let DictInner { entries, update_notifiers, .. } = &mut *self.lock();
         entries.remove(key, update_notifiers)
     }
@@ -335,13 +335,13 @@ impl HybridMap {
 
     pub fn remove(
         &mut self,
-        key: &Key,
+        key: &BorrowedKey,
         update_notifiers: &mut UpdateNotifiers,
     ) -> Option<Capability> {
         let result = match self {
             Self::Vec(vec) => match Self::sorted_vec_index_of(vec, key) {
                 Ok(index) => {
-                    update_notifiers.update(EntryUpdate::Remove(&key));
+                    update_notifiers.update(EntryUpdate::Remove(key));
                     Some(vec.remove(index).1)
                 }
                 Err(_) => None,
@@ -349,7 +349,7 @@ impl HybridMap {
             Self::Map(map) => {
                 let result = map.remove(key);
                 if result.is_some() {
-                    update_notifiers.update(EntryUpdate::Remove(&key));
+                    update_notifiers.update(EntryUpdate::Remove(key));
                     if self.len() <= HYBRID_SWITCH_REMOVAL_LEN {
                         self.switch_to_vec();
                     }

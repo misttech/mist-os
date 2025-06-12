@@ -2714,8 +2714,8 @@ async fn list_service_instances_from_collections() {
         })
         .collect();
     assert_eq!(instances.len(), 2);
-    assert!(instances.contains(&"coll1:service_child_a".try_into().unwrap()));
-    assert!(instances.contains(&"coll2:service_child_b".try_into().unwrap()));
+    assert!(instances.contains("coll1:service_child_a"));
+    assert!(instances.contains("coll2:service_child_b"));
 }
 
 ///   a

@@ -6,7 +6,7 @@ use crate::model::events::event::Event;
 use crate::model::events::registry::ComponentEventRoute;
 use crate::model::events::stream::EventStream;
 use cm_rust::{ChildRef, EventScope};
-use cm_types::{LongName, Name};
+use cm_types::{BorrowedLongName, BorrowedName};
 use cm_util::io::clone_dir;
 use fidl::endpoints::Proxy;
 use futures::stream::Peekable;
@@ -15,6 +15,7 @@ use hooks::{CapabilityReceiver, EventPayload, EventType, HasEventType};
 use log::{error, warn};
 use measure_tape_for_events::Measurable;
 use moniker::{ExtendedMoniker, Moniker};
+use std::borrow::Borrow;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::task::Poll;
@@ -66,17 +67,19 @@ fn is_moniker_valid_within_scope(moniker: &ExtendedMoniker, route: &[ComponentEv
 // Returns true if the filter contains a specific Ref
 fn event_filter_contains_ref(
     filter: &Option<Vec<EventScope>>,
-    name: &LongName,
-    collection: Option<&Name>,
+    name: &BorrowedLongName,
+    collection: Option<&BorrowedName>,
 ) -> bool {
     filter.as_ref().map_or(true, |value| {
         value
             .iter()
             .map(|value| match value {
                 EventScope::Child(ChildRef { collection: child_coll, name: child_name }) => {
-                    collection == child_coll.as_ref() && child_name == name
+                    collection == child_coll.as_ref().map(Borrow::borrow) && child_name == name
                 }
-                EventScope::Collection(collection_name) => Some(collection_name) == collection,
+                EventScope::Collection(collection_name) => {
+                    Some(collection_name.borrow()) == collection
+                }
             })
             .any(|val| val)
     })
@@ -106,8 +109,8 @@ fn validate_component_instance(
                 return false;
             }
             let child_ref = ChildRef {
-                name: event_part.name().clone(),
-                collection: event_part.collection().cloned(),
+                name: event_part.name().into(),
+                collection: event_part.collection().map(Into::into),
             };
             if Some(child_ref) != component.component {
                 // Reject due to path mismatch
@@ -121,7 +124,7 @@ fn validate_component_instance(
     }
     match (active_scope, event_iter.next()) {
         (Some(scopes), Some(event)) => {
-            if !event_filter_contains_ref(&Some(scopes), event.name(), event.collection.as_ref()) {
+            if !event_filter_contains_ref(&Some(scopes), event.name(), event.collection()) {
                 return false;
             }
         }
@@ -149,7 +152,7 @@ fn filter_event(moniker: &mut ExtendedMoniker, route: &[ComponentEventRoute]) ->
     // for each event, ambiguous component monikers are possible here.
     if let ExtendedMoniker::ComponentInstance(instance) = moniker {
         let path = &instance.path()[scope_length..];
-        *instance = Moniker::new(path);
+        *instance = Moniker::new_from_borrowed(path);
     }
     true
 }

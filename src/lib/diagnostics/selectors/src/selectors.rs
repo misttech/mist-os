@@ -13,11 +13,14 @@ use fidl_fuchsia_diagnostics::{
 use fidl_fuchsia_diagnostics_types::{Interest, Severity};
 use fidl_fuchsia_inspect::DEFAULT_TREE_NAME;
 use itertools::Itertools;
-use moniker::{ChildName, ExtendedMoniker, Moniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR};
+use moniker::{
+    BorrowedChildName, ExtendedMoniker, Moniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR,
+};
 use std::borrow::{Borrow, Cow};
 use std::fs;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use std::sync::Arc;
 
 // Character used to delimit the different sections of an inspect selector,
 // the component selector, the tree selector, and the property selector.
@@ -937,7 +940,7 @@ impl SelectorExt for Moniker {
 }
 
 enum SegmentIterator<'a> {
-    Iter { path: &'a [ChildName], current_index: usize },
+    Iter { path: Arc<[&'a BorrowedChildName]>, current_index: usize },
     Root(bool),
 }
 
@@ -946,7 +949,7 @@ impl<'a> From<&'a Moniker> for SegmentIterator<'a> {
         if moniker.is_root() {
             return SegmentIterator::Root(false);
         }
-        SegmentIterator::Iter { path: moniker.path(), current_index: 0 }
+        SegmentIterator::Iter { path: moniker.path().into(), current_index: 0 }
     }
 }
 
@@ -957,7 +960,7 @@ impl Iterator for SegmentIterator<'_> {
             Self::Iter { path, current_index } => {
                 let segment = path.get(*current_index)?;
                 let result = segment.to_string();
-                *self = Self::Iter { path, current_index: *current_index + 1 };
+                *self = Self::Iter { path: path.clone(), current_index: *current_index + 1 };
                 Some(result)
             }
             Self::Root(true) => None,

@@ -167,7 +167,8 @@ pub fn generate_storage_path(
     if let Some(id) = instance_id {
         return id.to_string().into();
     }
-    let mut path = moniker.path().iter();
+    let path = moniker.path();
+    let mut path = path.iter();
     let mut dir_path = vec![];
     if let Some(subdir) = subdir {
         dir_path.push(subdir);

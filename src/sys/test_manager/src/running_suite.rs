@@ -417,7 +417,7 @@ impl RunningSuite {
             let moniker_relative_to_test_root = if moniker_parsed.is_root() {
                 moniker_parsed
             } else {
-                Moniker::new(&moniker_parsed.path()[1..])
+                Moniker::new_from_borrowed(&moniker_parsed.path()[1..])
             };
             sender
                 .send(Ok(SuiteEvents::suite_custom_artifact(ftest_manager::CustomArtifact {
