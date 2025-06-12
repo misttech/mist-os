@@ -101,6 +101,12 @@ function main {
     fi
   fi
 
+  # Remove trailing slash.
+  # This can potentially lead to the file `out/foo/.device` being written to
+  # when calling `fx set-device` instead `out/foo.device`.
+  # shellcheck disable=SC2001
+  build_dir="$(echo "$build_dir" | sed 's:/*$::')"
+
   if [[ "$build_dir" == /* ]]; then
     local -r full_build_dir="${build_dir}"
   else
@@ -116,28 +122,52 @@ function main {
 
   fx-change-build-dir "${build_dir}"
 
+  # Refresh $FUCHSIA_NODENAME to ensure the below checks will report the correct
+  # error message.
+  if [[ -e "${FUCHSIA_BUILD_DIR}.device" ]]; then
+    FUCHSIA_NODENAME="$(<"${FUCHSIA_BUILD_DIR}.device")"
+  else
+    FUCHSIA_NODENAME=""
+  fi
+
+  # Print the default target status message.
+  # If it's already been printed before, do nothing.
+  has_default_target_status_been_printed="false"
+  function print-default-target-status-once {
+    [[ $has_default_target_status_been_printed == "true" ]] && return
+    out_dir="$(realpath -s --relative-to="$FUCHSIA_DIR" "$FUCHSIA_BUILD_DIR")"
+    if [[ -n "${FUCHSIA_NODENAME}" ]]; then
+      fx-info "The default device for ${out_dir} is \"${FUCHSIA_NODENAME}\"."
+    else
+      fx-info "The default device for ${out_dir} is not set."
+    fi
+    has_default_target_status_been_printed="true"
+  }
+  if [[ -n "${FUCHSIA_NODENAME}" ]]; then
+    print-default-target-status-once
+  fi
+
+  # Check if the user has set a default target via environment variable(s)
+  # which can override default targets set by `fx set-device`.
   function external-default-target-env-warning {
-    fx-warn "The default device configured for ${build_dir} is \"${FUCHSIA_NODENAME}\"."
-    fx-warn "However, you've overriden this by setting ${ENV_VARS}."
-    fx-warn "If you want to use \"${FUCHSIA_NODENAME}\", please unset the ${ENV_VAR_NAMES} environment variable."
+    print-default-target-status-once
+    fx-warn "However, you've overridden this by setting ${ENV_VARS}."
+    if [[ -n "${FUCHSIA_NODENAME}" ]]; then
+      fx-warn "If you want to use \"${FUCHSIA_NODENAME}\", please unset the ${ENV_VAR_NAMES} environment variable."
+    else
+      fx-warn "If you want to use leave it unset, please unset the ${ENV_VAR_NAMES} environment variable."
+    fi
 
     # Add a newline to distinguish this as a separate warning than the potential
     # ffx-related warning below.
     echo >&2
   }
-  if [[ -e "${FUCHSIA_BUILD_DIR}.device" ]]; then
-    # Ensure the below checks will report the correct error message.
-    FUCHSIA_NODENAME="$(<"${FUCHSIA_BUILD_DIR}.device")"
+  fx-if-target-set-by-env external-default-target-env-warning
 
-    # Check if the user has set a default target via environment variable(s)
-    # which can override default targets set by `fx set-device`.
-    fx-if-target-set-by-env external-default-target-env-warning
-
-    # Check if the user has set a default target via `ffx target default set`
-    # which can override default targets set by `fx set-device`.
-    # Ignore the return code since this will just be a warning.
-    fx-check-ffx-default-target || true
-  fi
+  # Check if the user has set a default target via `ffx target default set`
+  # which can override default targets set by `fx set-device`.
+  # Ignore the return code since this will just be a warning.
+  fx-check-ffx-default-target || true
 }
 
 main "$@"
