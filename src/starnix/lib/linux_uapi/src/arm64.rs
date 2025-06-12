@@ -880,6 +880,7 @@ pub const IOCB_FLAG_RESFD: u32 = 1;
 pub const IOCB_FLAG_IOPRIO: u32 = 2;
 pub const B_TYPE_LARGE: u32 = 133;
 pub const BINDER_CURRENT_PROTOCOL_VERSION: u32 = 8;
+pub const BINDERFS_MAX_NAME: u32 = 255;
 pub const ASHMEM_NAME_LEN: u32 = 256;
 pub const ASHMEM_NAME_DEF: &'static std::ffi::CStr = c"dev/ashmem";
 pub const ASHMEM_NOT_PURGED: u32 = 0;
@@ -7584,6 +7585,22 @@ pub const binder_driver_command_protocol_BC_CLEAR_FREEZE_NOTIFICATION:
 pub const binder_driver_command_protocol_BC_FREEZE_NOTIFICATION_DONE:
     binder_driver_command_protocol = 1074291477;
 pub type binder_driver_command_protocol = crate::types::c_uint;
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct binderfs_device {
+    pub name: [crate::types::c_char; 256usize],
+    pub major: __u32,
+    pub minor: __u32,
+}
+impl Default for binderfs_device {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct ashmem_pin {
@@ -22864,6 +22881,7 @@ pub struct remote_binder_wait_command {
 }
 pub const REMOTE_BINDER_START: __u32 = 2148028929;
 pub const REMOTE_BINDER_WAIT: __u32 = 1073828354;
+pub const BINDER_CTL_ADD: __u32 = 3238552065;
 pub const FIBMAP: __u32 = 1;
 pub const FIGETBSZ: __u32 = 2;
 pub const FS_IOC_GETVERSION: __u32 = 2148038145;

@@ -15,6 +15,7 @@
                 // keep-sorted start
                 "atsecure",
                 "bounds",
+                "bpf",
                 "capable_file",
                 "capable_net",
                 "cgroupfs_label",
@@ -50,6 +51,9 @@
         {
             type: "skip",
             matchers: [
+                // TODO: https://fxbug.dev/364570053 - The binder tests hang due to missing set_context_mgr check.
+                "binder",
+
                 // TODO: https://fxbug.dev/398663317 - This sub-directory was mistakenly added to the test list.
                 "inet_socket",
 

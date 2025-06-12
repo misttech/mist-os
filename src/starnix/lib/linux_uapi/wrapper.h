@@ -18,6 +18,7 @@
 #include <asm/statfs.h>
 #include <linux/aio_abi.h>
 #include <linux/android/binder.h>
+#include <linux/android/binderfs.h>
 #include <linux/ashmem.h>
 #include <linux/audit.h>
 #include <linux/auxvec.h>

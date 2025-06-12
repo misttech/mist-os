@@ -16,7 +16,6 @@ use starnix_core::mm::{
     DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryAccessorExt, ProtectionFlags,
 };
 use starnix_core::mutable_state::Guard;
-use starnix_core::security;
 use starnix_core::task::{
     CurrentTask, EventHandler, Kernel, SchedulerPolicy, SimpleWaiter, Task, ThreadGroupKey,
     WaitCanceler, WaitQueue, Waiter,
@@ -26,10 +25,11 @@ use starnix_core::vfs::pseudo::simple_file::BytesFile;
 use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly, CacheMode,
-    CurrentTaskAndLocked, DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject, FileOps,
-    FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef, FsNode,
-    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
+    CurrentTaskAndLocked, DirEntry, DirectoryEntryType, FdFlags, FdNumber, FileHandle, FileObject,
+    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FileWriteGuardRef,
+    FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, NamespaceNode, SpecialNode,
 };
+use starnix_core::{fileops_impl_dataless, security};
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{
     log_error, log_trace, log_warn, trace_duration, trace_instaflow_begin, trace_instaflow_end,
@@ -92,6 +92,7 @@ use starnix_uapi::{
     BINDERFS_SUPER_MAGIC, BINDER_BUFFER_FLAG_HAS_PARENT, BINDER_CURRENT_PROTOCOL_VERSION,
     BINDER_TYPE_BINDER, BINDER_TYPE_FD, BINDER_TYPE_FDA, BINDER_TYPE_HANDLE, BINDER_TYPE_PTR,
 };
+use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, VecDeque};
 use std::ffi::CStr;
 use std::mem::MaybeUninit;
@@ -5213,37 +5214,45 @@ impl FileSystemOps for BinderFs {
 
 const DEFAULT_BINDERS: [&str; 3] = ["binder", "hwbinder", "vndbinder"];
 const FEATURES_DIR: &str = "features";
+const BINDER_CONTROL_DEVICE: &str = "binder-control";
+// Binders with these names cannot be dynamically created using binder-control.
+const RESERVED_NAMES: [&str; 2] = [FEATURES_DIR, BINDER_CONTROL_DEVICE];
 
 #[derive(Debug)]
 struct BinderFsDir {
-    devices: BTreeMap<FsString, DeviceType>,
+    control_device: DeviceType,
+    state: Arc<BinderFsState>,
+}
+
+#[derive(Debug)]
+struct BinderFsState {
+    devices: Mutex<BTreeMap<FsString, DeviceType>>,
 }
 
 impl BinderFsDir {
-    fn new(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) -> Result<Self, Errno> {
+    fn new(current_task: &CurrentTask) -> Result<Self, Errno> {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
         let mut devices = BTreeMap::<FsString, DeviceType>::default();
-        let remote_device = registry.register_misc_device(
-            locked,
-            current_task,
-            "remote-binder".into(),
-            RemoteBinderDevice {},
-        )?;
-        devices.insert(
-            "remote".into(),
-            remote_device.metadata.expect("misc devices have metadata").device_type,
-        );
+        let remote_device =
+            registry.register_silent_dyn_device("remote-binder".into(), RemoteBinderDevice {})?;
+        devices.insert("remote".into(), remote_device.device_type);
 
         for name in DEFAULT_BINDERS {
-            let driver = BinderDevice::default();
-            let device =
-                registry.register_misc_device(locked, current_task, name.into(), driver.clone())?;
-            let metadata = device.metadata.expect("misc devices have metadata");
-            devices.insert(name.into(), metadata.device_type);
+            let device_metadata =
+                registry.register_silent_dyn_device(name.into(), BinderDevice::default())?;
+            devices.insert(name.into(), device_metadata.device_type);
         }
+        let state = Arc::new(BinderFsState { devices: devices.into() });
 
-        Ok(Self { devices })
+        let control_device = registry
+            .register_silent_dyn_device(
+                BINDER_CONTROL_DEVICE.into(),
+                BinderControlDevice { state: state.clone() },
+            )?
+            .device_type;
+
+        Ok(Self { control_device, state })
     }
 }
 
@@ -5258,7 +5267,9 @@ impl FsNodeOps for BinderFsDir {
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let mut entries = self
+            .state
             .devices
+            .lock()
             .keys()
             .map(|name| VecDirectoryEntry {
                 entry_type: DirectoryEntryType::CHR,
@@ -5269,6 +5280,11 @@ impl FsNodeOps for BinderFsDir {
         entries.push(VecDirectoryEntry {
             entry_type: DirectoryEntryType::DIR,
             name: FEATURES_DIR.into(),
+            inode: None,
+        });
+        entries.push(VecDirectoryEntry {
+            entry_type: DirectoryEntryType::CHR,
+            name: BINDER_CONTROL_DEVICE.into(),
             inode: None,
         });
         Ok(VecDirectory::new_file(entries))
@@ -5286,7 +5302,11 @@ impl FsNodeOps for BinderFsDir {
                 BinderFeaturesDir::new(),
                 FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             ))
-        } else if let Some(dev) = self.devices.get(name) {
+        } else if name == BINDER_CONTROL_DEVICE {
+            let mut info = FsNodeInfo::new(mode!(IFCHR, 0o600), FsCred::root());
+            info.rdev = self.control_device;
+            Ok(node.fs().create_node_and_allocate_node_id(SpecialNode, info))
+        } else if let Some(dev) = self.state.devices.lock().get(name) {
             let mode = if name == "remote" { mode!(IFCHR, 0o444) } else { mode!(IFCHR, 0o600) };
             let mut info = FsNodeInfo::new(mode, FsCred::root());
             info.rdev = *dev;
@@ -5299,16 +5319,90 @@ impl FsNodeOps for BinderFsDir {
 
 impl BinderFs {
     pub fn new_fs(
-        locked: &mut Locked<Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BinderFs, options)?;
-        let ops = BinderFsDir::new(locked, current_task)?;
+        let ops = BinderFsDir::new(current_task)?;
         let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, ops);
         Ok(fs)
+    }
+}
+
+#[derive(Clone)]
+struct BinderControlDevice {
+    state: Arc<BinderFsState>,
+}
+
+impl DeviceOps for BinderControlDevice {
+    fn open(
+        &self,
+        _locked: &mut Locked<DeviceOpen>,
+        _current_task: &CurrentTask,
+        _device_type: DeviceType,
+        _node: &FsNode,
+        _flags: OpenFlags,
+    ) -> Result<Box<dyn FileOps>, Errno> {
+        Ok(Box::new(self.clone()))
+    }
+}
+
+impl FileOps for BinderControlDevice {
+    fileops_impl_dataless!();
+    fileops_impl_nonseekable!();
+    fileops_impl_noop_sync!();
+
+    fn ioctl(
+        &self,
+        _locked: &mut Locked<Unlocked>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        request: u32,
+        arg: SyscallArg,
+    ) -> Result<SyscallResult, Errno> {
+        if request == uapi::BINDER_CTL_ADD {
+            let user_arg = UserAddress::from(arg);
+            if user_arg.is_null() {
+                return error!(EINVAL);
+            }
+            let user_ref = UserRef::<uapi::binderfs_device>::new(user_arg);
+            let mut request = current_task.read_object(user_ref)?;
+            let name: Vec<u8> =
+                request.name.iter().copied().map(|x| x as u8).take_while(|x| *x != 0).collect();
+            // Invalid names return EACCES.
+            if DirEntry::is_reserved_name((*name).into()) {
+                return error!(EACCES);
+            }
+            if name.contains(&('/' as u8)) {
+                return error!(EACCES);
+            }
+            // Names of already-existing objects return EEXIST.
+            for reserved_name in RESERVED_NAMES {
+                if *name == *reserved_name.as_bytes() {
+                    return error!(EEXIST);
+                }
+            }
+            let mut devices = self.state.devices.lock();
+            match devices.entry(FsString::from(name.clone())) {
+                Entry::Occupied(_) => error!(EEXIST),
+                Entry::Vacant(entry) => {
+                    let kernel = current_task.kernel();
+                    let device_metadata = kernel
+                        .device_registry
+                        .register_silent_dyn_device((*name).into(), BinderDevice::default())?;
+                    entry.insert(device_metadata.device_type);
+                    request.major = device_metadata.device_type.major();
+                    request.minor = device_metadata.device_type.minor();
+                    current_task.write_object(user_ref, &request)?;
+                    Ok(SUCCESS)
+                }
+            }
+        } else {
+            error!(EINVAL)
+        }
     }
 }
 

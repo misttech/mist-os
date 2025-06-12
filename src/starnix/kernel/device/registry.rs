@@ -419,6 +419,24 @@ impl DeviceRegistry {
         ))
     }
 
+    /// Register a "silent" dynamic device with major numbers 234..255.
+    ///
+    /// Only use for devices that should not be registered with the KObjectStore/appear in sysfs.
+    /// This is a rare occurrence.
+    ///
+    /// See `register_dyn_device` for an explanation of dyn devices and of the parameters.
+    pub fn register_silent_dyn_device(
+        &self,
+        name: &FsStr,
+        dev_ops: impl DeviceOps,
+    ) -> Result<DeviceMetadata, Errno> {
+        let device_type = self.state.lock().dyn_chardev_allocator.allocate()?;
+        let metadata = DeviceMetadata::new(name.into(), device_type, DeviceMode::Char);
+        let entry = DeviceEntry::new(name.into(), dev_ops);
+        self.devices(metadata.mode).register_minor(metadata.device_type, entry);
+        Ok(metadata)
+    }
+
     /// Directly add a device to the KObjectStore.
     ///
     /// This function should be used only by device that have registered an entire major device
