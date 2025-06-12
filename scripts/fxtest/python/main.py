@@ -664,6 +664,15 @@ class AsyncMain:
             recorder.emit_end()
             return 0
 
+        if flags.list_runtime_deps:
+            recorder.emit_info_message("Listing runtime_deps for all tests...")
+            recorder.emit_instruction_message(
+                "Will not run any tests, --list-host-test-data specified"
+            )
+            self._list_runtime_deps(selections)
+            recorder.emit_end()
+            return 0
+
         # From this point on, separately handle exit requests so that tests can
         # close cleanly.
         _immediate_exit_task.cancel()
@@ -1530,6 +1539,36 @@ class AsyncMain:
             not test_failure_observed
             and not self._end_execution_request_event.is_set()
         )
+
+    def _list_runtime_deps(
+        self,
+        tests: selection_types.TestSelections,
+    ) -> None:
+        flags = self._flags
+        recorder = self._recorder
+        exec_env = self._exec_env
+        assert exec_env is not None
+        for t in tests.selected:
+            recorder.emit_verbatim_message(
+                statusinfo.green_highlight(f"{t.name()}:", style=flags.style)
+            )
+            runtime_deps = t.build.test.runtime_deps
+            if runtime_deps is not None:
+                runtime_deps_path = os.path.join(exec_env.out_dir, runtime_deps)
+                with open(runtime_deps_path, "r") as deps_file:
+                    deps: list[str] = json.load(deps_file)
+                    recorder.emit_instruction_message(
+                        f"  Runtime deps file at: {runtime_deps_path}"
+                    )
+                    if len(deps) > 0:
+                        for dep in deps:
+                            recorder.emit_verbatim_message(f"  {dep}")
+                    else:
+                        recorder.emit_instruction_message(f"  File is empty")
+            else:
+                recorder.emit_verbatim_message(
+                    "  No runtime deps found for this test"
+                )
 
     async def _enumerate_test_cases(
         self,
