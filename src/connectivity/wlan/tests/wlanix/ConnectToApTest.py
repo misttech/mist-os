@@ -117,9 +117,9 @@ class ConnectToApTest(AsyncAdapter, base_test.ConnectionBaseTestClass):
         # TODO(https://fxbug.dev/369151951): Implement a Nl80211Multicast server to
         # wait for the scan to complete.
         logger.info(
-            "Waiting 5 seconds for scan to complete. See https://fxbug.dev/369151951"
+            "Waiting 10 seconds for scan to complete. See https://fxbug.dev/369151951"
         )
-        time.sleep(5)
+        time.sleep(10)
 
         with SupplicantStaIfaceCallbackServer() as ctx:
             state_change_queue = ctx.state_change_queue
