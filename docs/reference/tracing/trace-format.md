@@ -27,7 +27,8 @@ them together with some special metadata records to form a trace archive.
 
 Once the trace completes, tools such as the `trace` command-line program
 can read the trace records within the trace archive to visualize the results
-or save them to a file for later consumption.
+or save them to a file for later consumption. Trace archives can also be
+visualized using the [Perfetto UI](https://ui.perfetto.dev/#!/).
 
 ## Features
 
@@ -114,7 +115,16 @@ of the trace produced by each trace provider.
 
 Trace archives are intended to be read sequentially since records that
 appear earlier in the trace may influence the interpretation of records
-which appear later in the trace.  The trace system provides tools for
+which appear later in the trace. Examples of records that affect subsequent records
+in the archive are [String references](#string-references) and
+[Thread references](#thread-references).
+
+Event records which have timestamps associated with them are not guaranteed to be
+in timestamp order. Some record types such as [Flow events](#flow-begin-event)
+require processing events in timestamp order, therefore programs processing
+trace data should sort events by timestamp before processing.
+
+The trace system provides tools for
 extracting information from trace archives and converting it into other
 forms for visualization.
 
