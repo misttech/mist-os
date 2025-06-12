@@ -2393,8 +2393,20 @@ mod tests {
                 child("childB") => hashset![child("childC")],
                 child("childC") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let dynamic_offers = vec![];
+        let sorted_map =
+            process_deps(&fidl_decl, &vec![], &dynamic_offers).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childC", None),
+            DependencyNode::Child("childB", None),
+            DependencyNode::Child("childA", None),
+            DependencyNode::Self_,
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     /// Tests a graph that looks like the below, tildes indicate a
@@ -2480,29 +2492,6 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_target_does_not_exist() {
-        // This declaration is invalid because the offer target doesn't exist
-        let decl = ComponentDeclBuilder::new()
-            .offer(
-                OfferBuilder::protocol()
-                    .name("childBOffer")
-                    .target_name("serviceSibling")
-                    .source_static_child("childA")
-                    .target_static_child("childB"),
-            )
-            .child_default("childA")
-            .build();
-
-        pretty_assertions::assert_eq!(
-            hashmap! {
-                ComponentRef::Self_ => hashset![child("childA")],
-                child("childA") => hashset![],
-            },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        );
-    }
-
-    #[fuchsia::test]
     fn test_service_from_collection() {
         let decl = ComponentDeclBuilder::new()
             .collection_default("coll")
@@ -2516,7 +2505,7 @@ mod tests {
             .build();
 
         let dynamic_child = ChildName::try_new("dynamic_child", Some("coll")).unwrap();
-        let mut fake = FakeComponent::from_decl(decl);
+        let mut fake = FakeComponent::from_decl(decl.clone());
         fake.dynamic_children
             .push(Child { moniker: dynamic_child.clone(), environment_name: None });
 
@@ -2530,6 +2519,21 @@ mod tests {
             },
             process_component_dependencies(&fake)
         );
+
+        let fidl_decl = decl.into();
+        let dynamic_offers = vec![];
+
+        let sorted_map =
+            process_deps(&fidl_decl, &vec![("dynamic_child", "coll")], &dynamic_offers)
+                .topological_sort()
+                .unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("static_child", None),
+            DependencyNode::Collection("coll"),
+            DependencyNode::Child("dynamic_child", Some("coll")),
+            DependencyNode::Self_,
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -2545,7 +2549,7 @@ mod tests {
 
         let dynamic_child1 = ChildName::try_new("dynamic_child1", Some("coll")).unwrap();
         let dynamic_child2 = ChildName::try_new("dynamic_child2", Some("coll")).unwrap();
-        let mut fake = FakeComponent::from_decl(decl);
+        let mut fake = FakeComponent::from_decl(decl.clone());
         fake.dynamic_children
             .push(Child { moniker: dynamic_child1.clone(), environment_name: None });
         fake.dynamic_children
@@ -2559,6 +2563,23 @@ mod tests {
             },
             process_component_dependencies(&fake)
         );
+
+        let fidl_decl = decl.into();
+        let dynamic_offers = vec![];
+
+        let sorted_map = process_deps(
+            &fidl_decl,
+            &vec![("dynamic_child1", "coll"), ("dynamic_child2", "coll")],
+            &dynamic_offers,
+        )
+        .topological_sort()
+        .unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("dynamic_child1", Some("coll")),
+            DependencyNode::Child("dynamic_child2", Some("coll")),
+            DependencyNode::Self_,
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -2576,7 +2597,7 @@ mod tests {
 
         let dynamic_child1 = ChildName::try_new("dynamic_child1", Some("coll")).unwrap();
         let dynamic_child2 = ChildName::try_new("dynamic_child2", Some("coll")).unwrap();
-        let mut fake = FakeComponent::from_decl(decl);
+        let mut fake = FakeComponent::from_decl(decl.clone());
         fake.dynamic_children
             .push(Child { moniker: dynamic_child1.clone(), environment_name: None });
         fake.dynamic_children
@@ -2595,6 +2616,25 @@ mod tests {
             },
             process_component_dependencies(&fake)
         );
+
+        let fidl_decl = decl.into();
+        let dynamic_offers = vec![];
+
+        let sorted_map = process_deps(
+            &fidl_decl,
+            &vec![("dynamic_child1", "coll"), ("dynamic_child2", "coll")],
+            &dynamic_offers,
+        )
+        .topological_sort()
+        .unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("static_child", None),
+            DependencyNode::Collection("coll"),
+            DependencyNode::Child("dynamic_child1", Some("coll")),
+            DependencyNode::Child("dynamic_child2", Some("coll")),
+            DependencyNode::Self_,
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -2615,7 +2655,7 @@ mod tests {
         let target_child1 = ChildName::try_new("target_child1", Some("coll2")).unwrap();
         let target_child2 = ChildName::try_new("target_child2", Some("coll2")).unwrap();
 
-        let mut fake = FakeComponent::from_decl(decl);
+        let mut fake = FakeComponent::from_decl(decl.clone());
         fake.dynamic_children
             .push(Child { moniker: source_child1.clone(), environment_name: None });
         fake.dynamic_children
@@ -2646,29 +2686,32 @@ mod tests {
             },
             process_component_dependencies(&fake)
         };
-    }
 
-    #[fuchsia::test]
-    fn test_source_does_not_exist() {
-        // This declaration is invalid because the offer target doesn't exist
-        let decl = ComponentDeclBuilder::new()
-            .offer(
-                OfferBuilder::protocol()
-                    .name("childBOffer")
-                    .target_name("serviceSibling")
-                    .source_static_child("childB")
-                    .target_static_child("childA"),
-            )
-            .child_default("childA")
-            .build();
+        let fidl_decl = decl.into();
+        let dynamic_offers = vec![];
 
-        pretty_assertions::assert_eq!(
-            hashmap! {
-                ComponentRef::Self_ => hashset![child("childA")],
-                child("childA") => hashset![],
-            },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        );
+        let sorted_map = process_deps(
+            &fidl_decl,
+            &vec![
+                ("target_child1", "coll2"),
+                ("source_child2", "coll1"),
+                ("target_child2", "coll2"),
+                ("source_child1", "coll1"),
+            ],
+            &dynamic_offers,
+        )
+        .topological_sort()
+        .unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("target_child1", Some("coll2")),
+            DependencyNode::Child("target_child2", Some("coll2")),
+            DependencyNode::Collection("coll2"),
+            DependencyNode::Collection("coll1"),
+            DependencyNode::Child("source_child1", Some("coll1")),
+            DependencyNode::Child("source_child2", Some("coll1")),
+            DependencyNode::Self_,
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -2690,8 +2733,17 @@ mod tests {
                 ComponentRef::Self_ => hashset![],
                 child("childA") => hashset![ComponentRef::Self_],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
         );
+
+        let fidl_decl = decl.into();
+        let dynamic_offers = vec![];
+
+        let sorted_map =
+            process_deps(&fidl_decl, &vec![], &dynamic_offers).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> =
+            vec![DependencyNode::Self_, DependencyNode::Child("childA", None)];
+        assert_eq!(ans, sorted_map);
     }
 
     #[fuchsia::test]
@@ -2726,8 +2778,21 @@ mod tests {
                 child("childA") => hashset![capability("dict")],
                 capability("dict") => hashset![ComponentRef::Self_],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
         );
+
+        let fidl_decl = decl.into();
+        let dynamic_offers = vec![];
+
+        let sorted_map =
+            process_deps(&fidl_decl, &vec![], &dynamic_offers).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Capability("dict"),
+            DependencyNode::Child("childA", None),
+            DependencyNode::Self_,
+            DependencyNode::Capability("serviceA"),
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -2742,8 +2807,17 @@ mod tests {
                 ComponentRef::Self_ => hashset![],
                 child("childA") => hashset![ComponentRef::Self_],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
         );
+
+        let fidl_decl = decl.into();
+        let dynamic_offers = vec![];
+
+        let sorted_map =
+            process_deps(&fidl_decl, &vec![], &dynamic_offers).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> =
+            vec![DependencyNode::Self_, DependencyNode::Child("childA", None)];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -2770,8 +2844,20 @@ mod tests {
                 child("childA") => hashset![ComponentRef::Self_],
                 child("childB") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
         );
+
+        let fidl_decl = decl.into();
+        let dynamic_offers = vec![];
+
+        let sorted_map =
+            process_deps(&fidl_decl, &vec![], &dynamic_offers).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childB", None),
+            DependencyNode::Self_,
+            DependencyNode::Child("childA", None),
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -2814,8 +2900,22 @@ mod tests {
                 capability("pdata") => hashset![child("childA")],
                 capability("cdata") => hashset![child("childA")],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let dynamic_offers = vec![];
+
+        let sorted_map =
+            process_deps(&fidl_decl, &vec![], &dynamic_offers).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Self_,
+            DependencyNode::Child("childA", None),
+            DependencyNode::Capability("cdata"),
+            DependencyNode::Child("childB", None),
+            DependencyNode::Capability("pdata"),
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -2841,8 +2941,17 @@ mod tests {
                 ComponentRef::Self_ => hashset![child("childA")],
                 child("childA") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let dynamic_offers = vec![];
+
+        let sorted_map =
+            process_deps(&fidl_decl, &vec![], &dynamic_offers).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> =
+            vec![DependencyNode::Child("childA", None), DependencyNode::Self_];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -2873,8 +2982,20 @@ mod tests {
                 child("childA") => hashset![ComponentRef::Self_],
                 child("childB") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let dynamic_offers = vec![];
+
+        let sorted_map =
+            process_deps(&fidl_decl, &vec![], &dynamic_offers).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childB", None),
+            DependencyNode::Self_,
+            DependencyNode::Child("childA", None),
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]
@@ -2896,8 +3017,20 @@ mod tests {
                 child("childA") => hashset![child("childB")],
                 child("childB") => hashset![],
             },
-            process_component_dependencies(&FakeComponent::from_decl(decl))
-        )
+            process_component_dependencies(&FakeComponent::from_decl(decl.clone()))
+        );
+
+        let fidl_decl = decl.into();
+        let dynamic_offers = vec![];
+
+        let sorted_map =
+            process_deps(&fidl_decl, &vec![], &dynamic_offers).topological_sort().unwrap();
+        let ans: Vec<DependencyNode<'_>> = vec![
+            DependencyNode::Child("childB", None),
+            DependencyNode::Child("childA", None),
+            DependencyNode::Self_,
+        ];
+        assert_eq!(ans, sorted_map)
     }
 
     #[fuchsia::test]

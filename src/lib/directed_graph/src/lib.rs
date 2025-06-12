@@ -33,19 +33,32 @@ impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> DirectedGraph<T> {
     /// all nodes that the `start` node depends on, directly or indirectly. This
     /// includes `start` itself.
     pub fn get_closure(&self, start: T) -> HashSet<T> {
-        let mut nodes_to_consider = vec![start];
         let mut res = HashSet::new();
-        while let Some(node) = nodes_to_consider.pop() {
-            if res.contains(&node) {
-                // We've already visited this node.
-                continue;
+        res.insert(start);
+        loop {
+            let mut entries_added = false;
+
+            for source in self.0.keys() {
+                match self.get_targets(*source) {
+                    None => continue,
+                    Some(targets) if targets.is_empty() => continue,
+                    Some(targets) => {
+                        for target in targets {
+                            if !res.contains(target) {
+                                continue;
+                            }
+                            if res.insert(source.clone()) {
+                                entries_added = true
+                            }
+                        }
+                    }
+                }
             }
-            res.insert(node);
-            if let Some(targets) = self.get_targets(node) {
-                nodes_to_consider.append(&mut targets.iter().cloned().collect::<Vec<_>>());
+
+            if !entries_added {
+                return res;
             }
         }
-        res
     }
 
     /// Returns the nodes of the graph in reverse topological order, or an error if the graph
