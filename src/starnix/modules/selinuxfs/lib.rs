@@ -373,8 +373,10 @@ impl SeLinuxApiOps for CreateApi {
             return error!(EBUSY);
         }
 
+        let data = str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
+
         // Requests consist of three mandatory space-separated elements.
-        let mut parts = data.split(|x| *x == b' ');
+        let mut parts = data.split_whitespace();
 
         // <scontext>: describes the subject that is creating the new object.
         let scontext = parts.next().ok_or_else(|| errno!(EINVAL))?;
@@ -393,7 +395,6 @@ impl SeLinuxApiOps for CreateApi {
         // <tclass>: the policy-specific Id of the created object's class, as a decimal integer.
         // Class Ids are obtained via lookups in the SELinuxFS "class" directory.
         let tclass = parts.next().ok_or_else(|| errno!(EINVAL))?;
-        let tclass = str::from_utf8(tclass).map_err(|_| errno!(EINVAL))?;
         let tclass = u32::from_str(tclass).map_err(|_| errno!(EINVAL))?;
         let tclass = ClassId::new(NonZeroU32::new(tclass).ok_or_else(|| errno!(EINVAL))?);
 
@@ -641,8 +642,10 @@ impl SeLinuxApiOps for AccessApi {
             return error!(EBUSY);
         }
 
+        let data = str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
+
         // Requests consist of three mandatory space-separated elements, and one optional element.
-        let mut parts = data.split(|x| *x == b' ');
+        let mut parts = data.split_whitespace();
 
         // <scontext>: describes the subject acting on the class.
         let scontext = parts.next().ok_or_else(|| errno!(EINVAL))?;
@@ -661,13 +664,11 @@ impl SeLinuxApiOps for AccessApi {
         // <tclass>: the policy-specific Id of the target class, as a decimal integer.
         // Class Ids are obtained via lookups in the SELinuxFS "class" directory.
         let tclass = parts.next().ok_or_else(|| errno!(EINVAL))?;
-        let tclass = str::from_utf8(tclass).map_err(|_| errno!(EINVAL))?;
         let tclass = u32::from_str(tclass).map_err(|_| errno!(EINVAL))?;
         let tclass = ClassId::new(NonZeroU32::new(tclass).ok_or_else(|| errno!(EINVAL))?).into();
 
         // <request>: the set of permissions that the caller requests.
         let requested = if let Some(requested) = parts.next() {
-            let requested = str::from_utf8(requested).map_err(|_| errno!(EINVAL))?;
             AccessVector::from_str(requested).map_err(|_| errno!(EINVAL))?
         } else {
             AccessVector::ALL
