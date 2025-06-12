@@ -384,6 +384,8 @@ trait IoctlStub: Send + Sync {
     fn reap_urb(&self, fd: RawFd, urb_ptr: *mut *mut usbdevfs_urb) -> Result<(), std::io::Error>;
     /// Stub for USBDEVFS_DISCARDURB
     fn discard_urb(&self, fd: RawFd, urb: *mut usbdevfs_urb) -> Result<(), std::io::Error>;
+    /// Stub for USBDEVFS_RELEASEINTERFACE
+    fn release_interface(&self, fd: RawFd, iface: *mut u32) -> Result<(), std::io::Error>;
 }
 
 /// Internal state of [`Interface`]
@@ -537,8 +539,33 @@ pub struct Interface {
     /// Internal interface state.
     inner: Arc<InterfaceInner>,
 
-    /// Descriptors for all the endpoints this interface supports.
-    endpoints: Vec<EndpointDescriptor>,
+    /// Descriptor for the Interface
+    descriptor: InterfaceDescriptor,
+}
+
+impl Drop for Interface {
+    fn drop(&mut self) -> () {
+        let fd = self.inner.file.as_raw_fd();
+        let mut iface = usbdevfs_setinterface {
+            interface: self.descriptor.id as u32,
+            altsetting: self.descriptor.alternate as u32,
+        };
+        if let Some(stubs) = self.inner.stubs.as_ref() {
+            let _ = stubs.release_interface(fd, &mut iface.interface as *mut libc::c_uint);
+        } else {
+            // SAFETY: These ioctls will only reference this memory for their own runtime, during which
+            // they will block this thread, preserving scope. Their arguments have been checked to match
+            // the documentation.
+            unsafe {
+                // Cannot return error. Just swallow the result
+                let _ = ioctl!(
+                    fd,
+                    USBDEVFS_RELEASEINTERFACE,
+                    &mut iface.interface as *mut libc::c_uint
+                );
+            }
+        }
+    }
 }
 
 impl Interface {
@@ -634,12 +661,12 @@ impl Interface {
             Arc::new(InterfaceInner { file, urb_queue, urbs, pending_urbs, reaper_thread, stubs });
         sender.send(Arc::downgrade(&inner)).expect("Reaper thread disappeared immediately!");
 
-        Ok(Interface { inner, endpoints: descriptor.endpoints })
+        Ok(Interface { inner, descriptor })
     }
 
     /// Iterate all the endpoints available for this device.
     pub fn endpoints(&self) -> impl std::iter::Iterator<Item = Endpoint> + '_ {
-        self.endpoints.iter().cloned().map(|descriptor| match descriptor.ty {
+        self.descriptor.endpoints.iter().cloned().map(|descriptor| match descriptor.ty {
             EndpointType::Bulk => {
                 if descriptor.direction() == EndpointDirection::In {
                     Endpoint::BulkIn(BulkInEndpoint { inner: Arc::clone(&self.inner), descriptor })
@@ -917,6 +944,7 @@ mod test {
         reap_receiver: Receiver<*mut usbdevfs_urb>,
         reap_sender: Sender<*mut usbdevfs_urb>,
         claimed: AtomicU8,
+        released: AtomicU8,
         set: AtomicU8,
         endpoint_buffers: Mutex<HashMap<u8, EndpointBuffer>>,
     }
@@ -924,6 +952,9 @@ mod test {
     impl FakeDev {
         fn times_claimed(&self) -> u8 {
             self.claimed.load(Ordering::Relaxed)
+        }
+        fn times_released(&self) -> u8 {
+            self.released.load(Ordering::Relaxed)
         }
         fn times_interface_set(&self) -> u8 {
             self.set.load(Ordering::Relaxed)
@@ -973,6 +1004,7 @@ mod test {
                 reap_sender,
                 reap_receiver,
                 claimed: AtomicU8::new(0),
+                released: AtomicU8::new(0),
                 set: AtomicU8::new(0),
                 endpoint_buffers: Mutex::new(HashMap::new()),
             };
@@ -1018,6 +1050,17 @@ mod test {
                 return Err(std::io::Error::from_raw_os_error(libc::ENODEV));
             }
             let _ = dev.claimed.fetch_add(1, Ordering::Relaxed);
+            Ok(())
+        }
+
+        fn release_interface(&self, fd: RawFd, iface: *mut u32) -> Result<(), std::io::Error> {
+            // SAFETY: The crate under test should never pass us an invalid pointer.
+            let iface = unsafe { *iface };
+            let dev = self.get_dev(fd)?;
+            if dev.descriptor.id as u32 != iface {
+                return Err(std::io::Error::from_raw_os_error(libc::ENODEV));
+            }
+            let _ = dev.released.fetch_add(1, Ordering::Relaxed);
             Ok(())
         }
 
@@ -1192,6 +1235,9 @@ mod test {
 
         assert_eq!(1, env.get_dev(fd).unwrap().times_claimed());
         assert_eq!(1, env.get_dev(fd).unwrap().times_interface_set());
+
+        drop(iface);
+        assert_eq!(1, env.get_dev(fd).unwrap().times_released());
     }
 
     #[fuchsia::test]
@@ -1240,6 +1286,9 @@ mod test {
 
         assert_eq!(1, env.get_dev(fd).unwrap().times_claimed());
         assert_eq!(1, env.get_dev(fd).unwrap().times_interface_set());
+
+        drop(iface);
+        assert_eq!(1, env.get_dev(fd).unwrap().times_released());
     }
 
     #[fuchsia::test]
