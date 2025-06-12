@@ -165,8 +165,7 @@ class PrebuildMap(object):
         return sorted(
             self.label_to_library_name(d)
             for d in deps_labels
-            if d in self._labels_map
-            and self._labels_map[d]["atom_type"] in atom_types
+            if self._labels_map[d]["atom_type"] in atom_types
         )
 
     def labels_to_bind_library_names(
