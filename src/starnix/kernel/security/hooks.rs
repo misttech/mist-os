@@ -923,23 +923,26 @@ pub fn check_exec_access(
 
 /// Checks if creating a socket is allowed.
 /// Corresponds to the `socket_create()` LSM hook.
-pub fn check_socket_create_access(
+pub fn check_socket_create_access<L>(
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     domain: SocketDomain,
     socket_type: SocketType,
     protocol: SocketProtocol,
-    sockfs: &FileSystemHandle,
     kernel_private: bool,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     profile_duration!("security.hooks.socket_create");
     if_selinux_else_default_ok(current_task, |security_server| {
         selinux_hooks::socket::check_socket_create_access(
+            locked,
             &security_server,
             current_task,
             domain,
             socket_type,
             protocol,
-            sockfs,
             kernel_private,
         )
     })

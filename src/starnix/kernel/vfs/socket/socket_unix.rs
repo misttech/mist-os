@@ -177,21 +177,33 @@ impl UnixSocket {
         L: LockBefore<FileOpsCore>,
     {
         let credentials = current_task.as_ucred();
-        let left = Socket::new(current_task, domain, socket_type, SocketProtocol::default())?;
-        let right = Socket::new(current_task, domain, socket_type, SocketProtocol::default())?;
+        let left = Socket::new(
+            locked,
+            current_task,
+            domain,
+            socket_type,
+            SocketProtocol::default(),
+            /* kernel_private = */ false,
+        )?;
+        let right = Socket::new(
+            locked,
+            current_task,
+            domain,
+            socket_type,
+            SocketProtocol::default(),
+            /* kernel_private = */ false,
+        )?;
         downcast_socket_to_unix(&left).lock().state = UnixSocketState::Connected(right.clone());
         downcast_socket_to_unix(&left).lock().credentials = Some(credentials.clone());
         downcast_socket_to_unix(&right).lock().state = UnixSocketState::Connected(left.clone());
         downcast_socket_to_unix(&right).lock().credentials = Some(credentials);
         let left = SocketFile::from_socket(
-            locked,
             current_task,
             left,
             open_flags,
             /* kernel_private= */ false,
         )?;
         let right = SocketFile::from_socket(
-            locked,
             current_task,
             right,
             open_flags,
@@ -202,6 +214,7 @@ impl UnixSocket {
 
     fn connect_stream(
         &self,
+        locked: &mut Locked<FileOpsCore>,
         socket: &SocketHandle,
         current_task: &CurrentTask,
         peer: &SocketHandle,
@@ -233,8 +246,14 @@ impl UnixSocket {
             return error!(EAGAIN);
         }
 
-        let server =
-            Socket::new(current_task, peer.domain, peer.socket_type, SocketProtocol::default())?;
+        let server = Socket::new(
+            locked,
+            current_task,
+            peer.domain,
+            peer.socket_type,
+            SocketProtocol::default(),
+            /* kernel_private = */ true,
+        )?;
         security::unix_stream_connect(current_task, socket, peer, &server)?;
         client.state = UnixSocketState::Connected(server.clone());
         client.credentials = Some(current_task.as_ucred());
@@ -436,7 +455,7 @@ impl UnixSocket {
 impl SocketOps for UnixSocket {
     fn connect(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &SocketHandle,
         current_task: &CurrentTask,
         peer: SocketPeer,
@@ -447,7 +466,7 @@ impl SocketOps for UnixSocket {
         };
         match socket.socket_type {
             SocketType::Stream | SocketType::SeqPacket => {
-                self.connect_stream(socket, current_task, &peer)
+                self.connect_stream(locked, socket, current_task, &peer)
             }
             SocketType::Datagram | SocketType::Raw => self.connect_datagram(socket, &peer),
             _ => error!(EINVAL),
@@ -1108,10 +1127,12 @@ mod tests {
     async fn test_socket_send_capacity() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let socket = Socket::new(
+            &mut locked,
             &current_task,
             SocketDomain::Unix,
             SocketType::Stream,
             SocketProtocol::default(),
+            /* kernel_private = */ false,
         )
         .expect("Failed to create socket.");
         socket
@@ -1119,10 +1140,12 @@ mod tests {
             .expect("Failed to bind socket.");
         socket.listen(&mut locked, &current_task, 10).expect("Failed to listen.");
         let connecting_socket = Socket::new(
+            &mut locked,
             &current_task,
             SocketDomain::Unix,
             SocketType::Stream,
             SocketProtocol::default(),
+            /* kernel_private = */ false,
         )
         .expect("Failed to connect socket.");
         connecting_socket

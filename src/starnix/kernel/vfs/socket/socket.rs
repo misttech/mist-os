@@ -446,13 +446,29 @@ impl Socket {
     ///
     /// # Parameters
     /// - `domain`: The domain of the socket (e.g., `AF_UNIX`).
-    pub fn new(
+    pub fn new<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         domain: SocketDomain,
         socket_type: SocketType,
         protocol: SocketProtocol,
-    ) -> Result<SocketHandle, Errno> {
+        kernel_private: bool,
+    ) -> Result<SocketHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let protocol = resolve_protocol(domain, socket_type, protocol);
+        // Checking access in `Socket::new()` prevents creating socket handles when not allowed,
+        // while skipping the "create" permission check for accepted sockets created with
+        // `Socket::new_with_ops()` and `Socket::new_with_ops_and_info()`.
+        security::check_socket_create_access(
+            locked,
+            current_task,
+            domain,
+            socket_type,
+            protocol,
+            kernel_private,
+        )?;
         let ops = create_socket_ops(current_task, domain, socket_type, protocol)?;
         Ok(Self::new_with_ops_and_info(ops, domain, socket_type, protocol))
     }
@@ -1419,10 +1435,12 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let bind_address = SocketAddress::Unix(b"dgram_test".into());
         let rec_dgram = Socket::new(
+            &mut locked,
             &current_task,
             SocketDomain::Unix,
             SocketType::Datagram,
             SocketProtocol::default(),
+            /* kernel_private = */ false,
         )
         .expect("Failed to create socket.");
         let passcred: u32 = 1;
@@ -1442,10 +1460,12 @@ mod tests {
         let xfer_bytes = xfer_value.to_ne_bytes();
 
         let send = Socket::new(
+            &mut locked,
             &current_task,
             SocketDomain::Unix,
             SocketType::Datagram,
             SocketProtocol::default(),
+            /* kernel_private = */ false,
         )
         .expect("Failed to connect socket.");
         send.ops

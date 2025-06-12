@@ -7,12 +7,13 @@ use super::fs_node::compute_new_fs_node_sid;
 use super::{
     check_permission, fs_node_effective_sid_and_class, task_effective_sid, todo_check_permission,
 };
+use crate::security::selinux_hooks::superblock;
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::socket::{
-    NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketFile, SocketPeer, SocketProtocol,
-    SocketShutdownFlags, SocketType,
+    socket_fs, NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketFile, SocketPeer,
+    SocketProtocol, SocketShutdownFlags, SocketType,
 };
-use crate::vfs::{Anon, DowncastedFile, FileSystemHandle, FsNode};
+use crate::vfs::{Anon, DowncastedFile, FsNode};
 use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
 use selinux::{
@@ -20,6 +21,7 @@ use selinux::{
     SecurityId, SecurityServer, SocketClass, UnixStreamSocketPermission,
 };
 use starnix_logging::{track_stub, BugRef};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::errors::Errno;
 
 /// Checks that `current_task` has the specified `permission` for the `socket_node`.
@@ -163,20 +165,27 @@ fn compute_socket_security_class(
 
 /// Checks that `current_task` has permission to create a socket with `domain`, `socket_type` and
 /// `protocol`.
-pub(in crate::security) fn check_socket_create_access(
+pub(in crate::security) fn check_socket_create_access<L>(
+    locked: &mut Locked<L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     domain: SocketDomain,
     socket_type: SocketType,
     protocol: SocketProtocol,
-    sockfs: &FileSystemHandle,
     kernel_private: bool,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     // Creating kernel sockets is allowed.
     if kernel_private {
         return Ok(());
     }
 
+    let sockfs = socket_fs(current_task.kernel());
+    // Ensure sockfs gets labeled, in case it was mounted after the SELinux policy has been loaded.
+    superblock::file_system_resolve_security(locked, security_server, &current_task, &sockfs)
+        .expect("resolve fs security");
     let effective_sid = task_effective_sid(current_task);
     let new_socket_class = compute_socket_security_class(domain, socket_type, protocol);
     let new_socket_sid = compute_new_fs_node_sid(

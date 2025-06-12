@@ -266,12 +266,16 @@ impl SocketOps for VsockSocket {
 }
 
 impl VsockSocket {
-    pub fn remote_connection(
+    pub fn remote_connection<L>(
         &self,
+        locked: &mut Locked<L>,
         socket: &Socket,
         current_task: &CurrentTask,
         file: FileHandle,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // we only allow non-blocking files here, so that
         // read and write on file can return EAGAIN.
         assert!(file.flags().contains(OpenFlags::NONBLOCK));
@@ -289,10 +293,12 @@ impl VsockSocket {
                     return error!(EAGAIN);
                 }
                 let remote_socket = Socket::new(
+                    locked,
                     current_task,
                     SocketDomain::Vsock,
                     SocketType::Stream,
                     SocketProtocol::default(),
+                    /* kernel_private = */ false,
                 )?;
                 downcast_socket_to_vsock(&remote_socket).lock().state =
                     VsockSocketState::Connected(file);
@@ -350,10 +356,12 @@ mod tests {
         const VSOCK_PORT: u32 = 5555;
 
         let listen_socket = Socket::new(
+            &mut locked,
             &current_task,
             SocketDomain::Vsock,
             SocketType::Stream,
             SocketProtocol::default(),
+            /* kernel_private = */ false,
         )
         .expect("Failed to create socket.");
         current_task
@@ -371,7 +379,7 @@ mod tests {
         listen_socket
             .downcast_socket::<VsockSocket>()
             .unwrap()
-            .remote_connection(&listen_socket, &current_task, remote)
+            .remote_connection(&mut locked, &listen_socket, &current_task, remote)
             .unwrap();
 
         let server_socket = listen_socket.accept(&mut locked).unwrap();
@@ -405,17 +413,18 @@ mod tests {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (fs1, fs2) = fidl::Socket::create_stream();
         let socket = Socket::new(
+            &mut locked,
             &current_task,
             SocketDomain::Vsock,
             SocketType::Stream,
             SocketProtocol::default(),
+            /* kernel_private = */ false,
         )
         .expect("Failed to create socket.");
         let remote =
             create_fuchsia_pipe(&current_task, fs2, OpenFlags::RDWR | OpenFlags::NONBLOCK).unwrap();
         downcast_socket_to_vsock(&socket).lock().state = VsockSocketState::Connected(remote);
         let socket_file = SocketFile::from_socket(
-            &mut locked,
             &current_task,
             socket,
             OpenFlags::RDWR,
@@ -455,15 +464,16 @@ mod tests {
             .expect("create_fuchsia_pipe");
         let server_zxio = Zxio::create(server.into_handle()).expect("Zxio::create");
         let socket_object = Socket::new(
+            &mut locked,
             &current_task,
             SocketDomain::Vsock,
             SocketType::Stream,
             SocketProtocol::default(),
+            /* kernel_private = */ false,
         )
         .expect("Failed to create socket.");
         downcast_socket_to_vsock(&socket_object).lock().state = VsockSocketState::Connected(pipe);
         let socket = SocketFile::from_socket(
-            &mut locked,
             &current_task,
             socket_object,
             OpenFlags::RDWR,
