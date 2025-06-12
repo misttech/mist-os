@@ -6,11 +6,9 @@ use std::marker::PhantomData;
 
 use anyhow::{anyhow, Context, Error};
 use cm_types::{IterablePath, RelativePath};
-use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServiceMarker, ServiceProxy};
+use fidl::endpoints::{DiscoverableProtocolMarker, ServiceMarker, ServiceProxy};
 use fidl_fuchsia_io::Flags;
-use fuchsia_component::client::{
-    connect_to_protocol_at_dir_svc, connect_to_service_instance_at_dir_svc,
-};
+use fuchsia_component::client::{connect_to_service_instance_at_dir_svc, Connect};
 use fuchsia_component::directory::{AsRefDirectory, Directory};
 use fuchsia_component::DEFAULT_SERVICE_INSTANCE;
 use log::error;
@@ -24,36 +22,16 @@ use zx::Status;
 pub struct Incoming(Vec<Entry>);
 
 impl Incoming {
-    /// Creates a connector to the given protocol by its marker type. This can be convenient when
-    /// the compiler can't deduce the [`Proxy`] type on its own.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// let proxy = context.incoming.protocol_marker(fidl_fuchsia_logger::LogSinkMarker).connect()?;
-    /// ```
-    pub fn protocol_marker<M: DiscoverableProtocolMarker>(
-        &self,
-        _marker: M,
-    ) -> ProtocolConnector<'_, M::Proxy> {
-        ProtocolConnector(self, PhantomData)
-    }
-
-    /// Creates a connector to the given protocol by its proxy type. This can be convenient when
-    /// the compiler can deduce the [`Proxy`] type on its own.
-    ///
-    /// # Example
-    ///
-    /// ```ignore
-    /// struct MyProxies {
-    ///     log_sink: fidl_fuchsia_logger::LogSinkProxy,
-    /// }
-    /// let proxies = MyProxies {
-    ///     log_sink: context.incoming.protocol().connect()?;
-    /// };
-    /// ```
-    pub fn protocol<P>(&self) -> ProtocolConnector<'_, P> {
-        ProtocolConnector(self, PhantomData)
+    /// Connects to the protocol in the service instance's path in the incoming namespace. Logs and
+    /// returns a [`Status::CONNECTION_REFUSED`] if the service instance couldn't be opened.
+    pub fn connect_protocol<T: Connect>(&self) -> Result<T, Status> {
+        T::connect_at_dir_svc(&self).map_err(|e| {
+            error!(
+                "Failed to connect to discoverable protocol `{}`: {e}",
+                T::Protocol::PROTOCOL_NAME
+            );
+            Status::CONNECTION_REFUSED
+        })
     }
 
     /// Creates a connector to the given service's default instance by its marker type. This can be
@@ -88,26 +66,6 @@ impl Incoming {
     /// ```
     pub fn service<P>(&self) -> ServiceConnector<'_, P> {
         ServiceConnector { incoming: self, instance: DEFAULT_SERVICE_INSTANCE, _p: PhantomData }
-    }
-}
-
-/// A builder for connecting to a protocol in the driver's incoming namespace.
-pub struct ProtocolConnector<'incoming, Proxy>(&'incoming Incoming, PhantomData<Proxy>);
-
-impl<'a, P: Proxy> ProtocolConnector<'a, P>
-where
-    P::Protocol: DiscoverableProtocolMarker,
-{
-    /// Connects to the service instance's path in the incoming namespace. Logs and returns
-    /// a [`Status::CONNECTION_REFUSED`] if the service instance couldn't be opened.
-    pub fn connect(self) -> Result<P, Status> {
-        connect_to_protocol_at_dir_svc::<P::Protocol>(&self.0).map_err(|e| {
-            error!(
-                "Failed to connect to discoverable protocol `{}`: {e}",
-                P::Protocol::PROTOCOL_NAME
-            );
-            Status::CONNECTION_REFUSED
-        })
     }
 }
 
@@ -261,14 +219,7 @@ mod tests {
         let incoming = make_incoming().await;
         // try a protocol that we did set up
         incoming
-            .protocol_marker(fidl_fuchsia_hardware_i2c::DeviceMarker)
-            .connect()?
-            .get_name()
-            .await?
-            .unwrap();
-        incoming
-            .protocol::<fidl_fuchsia_hardware_i2c::DeviceProxy>()
-            .connect()?
+            .connect_protocol::<fidl_fuchsia_hardware_i2c::DeviceProxy>()?
             .get_name()
             .await?
             .unwrap();
@@ -280,14 +231,7 @@ mod tests {
         let incoming = make_incoming().await;
         // try one we didn't
         incoming
-            .protocol_marker(fidl_fuchsia_hwinfo::DeviceMarker)
-            .connect()?
-            .get_info()
-            .await
-            .unwrap_err();
-        incoming
-            .protocol::<fidl_fuchsia_hwinfo::DeviceProxy>()
-            .connect()?
+            .connect_protocol::<fidl_fuchsia_hwinfo::DeviceProxy>()?
             .get_info()
             .await
             .unwrap_err();
