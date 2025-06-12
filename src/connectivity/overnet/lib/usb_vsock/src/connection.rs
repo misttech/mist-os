@@ -15,7 +15,12 @@ use fuchsia_async::{Scope, Socket};
 use futures::io::{ReadHalf, WriteHalf};
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt};
 
+use crate::connection::overflow_writer::OverflowHandleFut;
 use crate::{Address, Header, Packet, PacketType, UsbPacketBuilder, UsbPacketFiller};
+
+mod overflow_writer;
+
+use overflow_writer::OverflowWriter;
 
 /// A marker trait for types that are capable of being used as buffers for a [`Connection`].
 pub trait PacketBuffer: DerefMut<Target = [u8]> + Send + Unpin + 'static {}
@@ -36,9 +41,10 @@ impl<T> PacketBuffer for T where T: DerefMut<Target = [u8]> + Send + Unpin + 'st
 pub struct Connection<B> {
     control_socket_writer: Mutex<WriteHalf<Socket>>,
     packet_filler: Arc<UsbPacketFiller<B>>,
+    reset_backlog: Arc<std::sync::Mutex<Vec<Address>>>,
     connections: std::sync::Mutex<HashMap<Address, VsockConnection>>,
     incoming_requests_tx: mpsc::Sender<ConnectionRequest>,
-    _task_scope: Scope,
+    task_scope: Scope,
 }
 
 impl<B: PacketBuffer> Connection<B> {
@@ -54,6 +60,7 @@ impl<B: PacketBuffer> Connection<B> {
         let (control_socket_reader, control_socket_writer) = control_socket.split();
         let control_socket_writer = Mutex::new(control_socket_writer);
         let packet_filler = Arc::new(UsbPacketFiller::default());
+        let reset_backlog = Arc::new(std::sync::Mutex::new(Vec::new()));
         let connections = Default::default();
         let task_scope = Scope::new_with_name("vsock_usb");
         task_scope.spawn(Self::run_socket(
@@ -64,9 +71,10 @@ impl<B: PacketBuffer> Connection<B> {
         Self {
             control_socket_writer,
             packet_filler,
+            reset_backlog,
             connections,
             incoming_requests_tx,
-            _task_scope: task_scope,
+            task_scope,
         }
     }
 
@@ -137,7 +145,7 @@ impl<B: PacketBuffer> Connection<B> {
     /// for the connection to be closed.
     pub async fn connect(&self, addr: Address, socket: Socket) -> Result<ConnectionState, Error> {
         let (read_socket, write_socket) = socket.split();
-        let write_socket = Arc::new(Mutex::new(write_socket));
+        let write_socket = Arc::new(Mutex::new(OverflowWriter::new(write_socket)));
         let (connected_tx, connected_rx) = oneshot::channel();
 
         self.set_connection(
@@ -200,7 +208,7 @@ impl<B: PacketBuffer> Connection<B> {
             };
 
             let (read_socket, write_socket) = socket.split();
-            let writer = Arc::new(Mutex::new(write_socket));
+            let writer = Arc::new(Mutex::new(OverflowWriter::new(write_socket)));
             let notify_closed = mpsc::channel(2);
             notify_closed_rx = notify_closed.1;
             let notify_closed = notify_closed.0;
@@ -255,8 +263,7 @@ impl<B: PacketBuffer> Connection<B> {
     async fn handle_data_packet(&self, address: Address, payload: &[u8]) -> Result<(), Error> {
         // all zero data packets go to the control channel
         if address.is_zeros() {
-            let written = self.control_socket_writer.lock().await.write(payload).await?;
-            assert_eq!(written, payload.len());
+            self.control_socket_writer.lock().await.write_all(payload).await?;
             Ok(())
         } else {
             let payload_socket;
@@ -272,13 +279,46 @@ impl<B: PacketBuffer> Connection<B> {
                 warn!("Received data packet for connection that didn't exist at {address:?}");
                 return Ok(());
             }
-            if let Err(err) = payload_socket.lock().await.write_all(payload).await {
-                debug!(
-                    "Write to socket address {address:?} failed, resetting connection immediately: {err:?}"
-                );
-                self.reset(&address).await.inspect_err(|err| warn!("Attempt to reset connection to {address:?} failed after write error: {err:?}")).ok();
+            let mut socket_guard = payload_socket.lock().await;
+            match socket_guard.write_all(payload) {
+                Err(err) => {
+                    debug!(
+                        "Write to socket address {address:?} failed, resetting connection immediately: {err:?}"
+                    );
+                    self.reset(&address).await.inspect_err(|err| warn!("Attempt to reset connection to {address:?} failed after write error: {err:?}")).ok();
+                }
+                Ok(status) => {
+                    if status.overflowed() {
+                        let weak_payload_socket = Arc::downgrade(&payload_socket);
+                        let reset_backlog = Arc::clone(&self.reset_backlog);
+                        self.task_scope.spawn(async move {
+                            let res = OverflowHandleFut::new(weak_payload_socket).await;
+
+                            if let Err(err) = res {
+                                debug!(
+                                    "Write to socket address {address:?} failed while processing backlog, resetting connection at next poll: {err:?}"
+                                );
+                                reset_backlog.lock().unwrap().push(address);
+                            }
+                        });
+                    }
+                }
             }
             Ok(())
+        }
+    }
+
+    /// Handles sending reset messages to connections that we discovered failed
+    /// while we were processing their backlog of buffered packets.
+    async fn handle_reset_backlog(&self) {
+        let reset_backlog = std::mem::take(&mut *self.reset_backlog.lock().unwrap());
+
+        for address in reset_backlog {
+            if let Err(err) = self.reset(&address).await {
+                warn!(
+                    "Attempt to reset connection to {address:?} failed after write error: {err:?}"
+                );
+            }
         }
     }
 
@@ -416,6 +456,7 @@ impl<B: PacketBuffer> Connection<B> {
     /// or the overall state of the connection.
     pub async fn handle_vsock_packet(&self, packet: Packet<'_>) -> Result<(), Error> {
         trace!("received vsock packet {header:?}", header = packet.header);
+        self.handle_reset_backlog().await;
         let payload_len = packet.header.payload_len.get() as usize;
         let payload = &packet.payload[..payload_len];
         let address = Address::from(packet.header);
@@ -438,19 +479,20 @@ impl<B: PacketBuffer> Connection<B> {
     ///
     /// Panics if called while another [`Self::fill_usb_packet`] future is pending.
     pub async fn fill_usb_packet(&self, builder: UsbPacketBuilder<B>) -> UsbPacketBuilder<B> {
+        self.handle_reset_backlog().await;
         self.packet_filler.fill_usb_packet(builder).await
     }
 }
 
 enum VsockConnectionState {
     ConnectingOutgoing(
-        Arc<Mutex<WriteHalf<Socket>>>,
+        Arc<Mutex<OverflowWriter>>,
         ReadHalf<Socket>,
         oneshot::Sender<Result<ConnectionState, Error>>,
     ),
     ConnectingIncoming,
     Connected {
-        writer: Arc<Mutex<WriteHalf<Socket>>>,
+        writer: Arc<Mutex<OverflowWriter>>,
         notify_closed: mpsc::Sender<Result<(), Error>>,
         _reader_scope: Scope,
     },
