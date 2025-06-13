@@ -37,6 +37,34 @@ class IdkGeneratorTest(unittest.TestCase):
         "atom_files": [],
         "is_stable": True,
     }
+    _SIMPLE_CC_SOURCE_LIBRARY_INFO: AtomInfo = {
+        "atom_label": "//sdk/lib/simple:simple_cc_sdk",
+        "atom_type": "cc_source_library",
+        "category": "partner",
+        "atom_meta": {"dest": "pkg/simple_cc_source/meta.json"},
+        "prebuild_info": {
+            "library_name": "simple_cc_source",
+            "file_base": "pkg/simple_cc_source",
+            "deps": [],
+            "headers": [],
+            "include_dir": "include",
+            "sources": [],
+        },
+        "atom_files": [],
+        "is_stable": True,
+    }
+    _SIMPLE_DATA_INFO: AtomInfo = {
+        "atom_label": "//sdk/data/invalid:some_data_sdk",
+        "atom_type": "data",
+        "category": "partner",
+        "atom_meta": {
+            "dest": "data/some/meta.json",
+            "value": {"name": "some_data", "type": "data"},
+        },
+        "prebuild_info": {},  # No prebuild_info for data atoms.
+        "atom_files": [],
+        "is_stable": True,
+    }
 
     def setUp(self) -> None:
         self.tmpdir = tempfile.TemporaryDirectory()
@@ -256,6 +284,187 @@ class IdkGeneratorTest(unittest.TestCase):
             ),
         ]
         mock_symlink.assert_has_calls(expected_symlink_calls, any_order=True)
+
+    def test_verify_dependency_relationships_valid(self) -> None:
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            self._SIMPLE_FIDL_LIBRARY_INFO,
+            {
+                "atom_label": "//sdk/lib/test:test_cc_sdk",
+                "atom_type": "cc_source_library",
+                "category": "partner",
+                "atom_meta": {"dest": "pkg/test_cc_source/meta.json"},
+                "prebuild_info": {
+                    "library_name": "test_cc_source",
+                    "file_base": "pkg/test_cc_source",
+                    "deps": [self._SIMPLE_FIDL_LIBRARY_INFO["atom_label"]],
+                    "headers": [],
+                    "include_dir": "include",
+                    "sources": [],
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        ret_code = generator.GenerateMetaFileContents()
+        self.assertEqual(ret_code, 0)
+
+    def test_verify_dependency_relationships_bind_invalid_deps(self) -> None:
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            self._SIMPLE_CC_SOURCE_LIBRARY_INFO,
+            {
+                "atom_label": "//sdk/bind/fuchsia.test:fuchsia.test_bind_sdk",
+                "atom_type": "bind_library",
+                "category": "partner",
+                "atom_meta": {"dest": "bind/fuchsia.test/meta.json"},
+                "prebuild_info": {
+                    "library_name": "fuchsia.test",
+                    "file_base": "bind/fuchsia.test",
+                    "deps": [self._SIMPLE_CC_SOURCE_LIBRARY_INFO["atom_label"]],
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        with self.assertRaisesRegex(
+            AssertionError,
+            "ERROR: 'bind_library' atom '//sdk/bind/fuchsia.test:fuchsia.test_bind_sdk' has a dependency on '//sdk/lib/simple:simple_cc_sdk' of type 'cc_source_library', which is not allowed.",
+        ):
+            generator.GenerateMetaFileContents()
+
+    def test_verify_dependency_relationships_cc_prebuilt_invalid_deps(
+        self,
+    ) -> None:
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            self._SIMPLE_DATA_INFO,
+            {
+                "atom_label": "//sdk/lib/test:test_cc_sdk",
+                "atom_type": "cc_prebuilt_library",
+                "category": "partner",
+                "atom_meta": {"dest": "pkg/test_cc/meta.json"},
+                "prebuild_info": {
+                    "library_name": "test_cc",
+                    "file_base": "pkg/test_cc",
+                    "deps": [self._SIMPLE_DATA_INFO["atom_label"]],
+                    "headers": [],
+                    "include_dir": "include",
+                    "sources": [],
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        with self.assertRaisesRegex(
+            AssertionError,
+            "ERROR: 'cc_prebuilt_library' atom '//sdk/lib/test:test_cc_sdk' has a dependency on '//sdk/data/invalid:some_data_sdk' of type 'data', which is not allowed.",
+        ):
+            generator.GenerateMetaFileContents()
+
+    def test_verify_dependency_relationships_cc_source_invalid_deps(
+        self,
+    ) -> None:
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            self._SIMPLE_DATA_INFO,
+            {
+                "atom_label": "//sdk/lib/test:test_cc_sdk",
+                "atom_type": "cc_source_library",
+                "category": "partner",
+                "atom_meta": {"dest": "pkg/test_cc/meta.json"},
+                "prebuild_info": {
+                    "library_name": "test_cc",
+                    "file_base": "pkg/test_cc",
+                    "deps": [self._SIMPLE_DATA_INFO["atom_label"]],
+                    "headers": [],
+                    "include_dir": "include",
+                    "sources": [],
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        with self.assertRaisesRegex(
+            AssertionError,
+            "ERROR: 'cc_source_library' atom '//sdk/lib/test:test_cc_sdk' has a dependency on '//sdk/data/invalid:some_data_sdk' of type 'data', which is not allowed.",
+        ):
+            generator.GenerateMetaFileContents()
+
+    def test_verify_dependency_relationships_fidl_invalid_deps(self) -> None:
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            self._SIMPLE_CC_SOURCE_LIBRARY_INFO,
+            {
+                "atom_label": "//sdk/fidl/fuchsia.test:fuchsia.test_fidl_sdk",
+                "atom_type": "fidl_library",
+                "category": "partner",
+                "atom_meta": {"dest": "fidl/fuchsia.test/meta.json"},
+                "prebuild_info": {
+                    "library_name": "fuchsia.test",
+                    "file_base": "fidl/fuchsia.test",
+                    "deps": [self._SIMPLE_CC_SOURCE_LIBRARY_INFO["atom_label"]],
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        with self.assertRaisesRegex(
+            AssertionError,
+            "ERROR: 'fidl_library' atom '//sdk/fidl/fuchsia.test:fuchsia.test_fidl_sdk' has a dependency on '//sdk/lib/simple:simple_cc_sdk' of type 'cc_source_library', which is not allowed.",
+        ):
+            generator.GenerateMetaFileContents()
+
+    def test_verify_dependency_relationships_no_prebuild_info(self) -> None:
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            {  # This atom has no "prebuild_info", so it should be skipped
+                "atom_label": "//sdk/partner/no_prebuild",
+                "atom_type": "data",
+                "category": "partner",
+                "atom_meta": {
+                    "dest": "partner/no_prebuild/meta.json",
+                    "value": {"name": "no_prebuild", "type": "data"},
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        ret_code = generator.GenerateMetaFileContents()
+        self.assertEqual(ret_code, 0)
+
+    def test_verify_dependency_relationships_deps_in_unexpected_atom_type(
+        self,
+    ) -> None:
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            self._SIMPLE_FIDL_LIBRARY_INFO,
+            {
+                "atom_label": "//sdk/data:data_with_deps_sdk",
+                "atom_type": "data",
+                "category": "partner",
+                "atom_meta": {
+                    "dest": "data/data_with_deps/meta.json",
+                    "value": {"name": "data_with_deps", "type": "data"},
+                },
+                "prebuild_info": {  # Data atoms shouldn't have deps
+                    "deps": [self._SIMPLE_FIDL_LIBRARY_INFO["atom_label"]],
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        with self.assertRaisesRegex(
+            AssertionError, "Unexpected atom type with deps: data"
+        ):
+            generator.GenerateMetaFileContents()
 
 
 if __name__ == "__main__":
