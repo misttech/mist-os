@@ -227,7 +227,6 @@
                 "ClockNanosleepProcessTest.SleepFiveSeconds",
 
                 // epoll_test - https://fxbug.dev/42159478
-                "EpollTest.CloseFile",
                 "EpollTest.PipeWriterErrAfterReaderClosed",
 
                 // eventfd_test - splice() isn't implemented https://fxbug.dev/42070385
@@ -900,12 +899,10 @@
                 "ConcurrencyTest.MultiProcessConcurrency",
                 "ElfTest.PIE",
                 "ElfTest.PIENonZeroStart",
-                "EpollTest.DoubleEpollOneShot",
                 "EpollTest.UnblockWithSignal",
                 "SharedPrivate/PrivateAndSharedFutexTest.Wake0/*",
                 "SharedPrivate/PrivateAndSharedFutexTest.WakeOpCondSuccess/*",
                 "SharedPrivate/PrivateAndSharedFutexTest.WakeOpCondFailure/*",
-                "Inotify.EpollNoDeadlock",
 
                 // These tests hang.
                 "AllInetTests/UdpSocketTest.ReconnectDoesNotClearReadShutdown/*",

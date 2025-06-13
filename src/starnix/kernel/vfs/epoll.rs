@@ -14,10 +14,10 @@ use crate::vfs::{
 use itertools::Itertools;
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
-use starnix_uapi::errors::{Errno, EBADF, EINTR, ETIMEDOUT};
+use starnix_uapi::error;
+use starnix_uapi::errors::{Errno, EINTR, ETIMEDOUT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::{EpollEvent, FdEvents};
-use starnix_uapi::{errno, error};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
@@ -39,12 +39,12 @@ struct WaitObject {
 }
 
 impl WaitObject {
-    // TODO(https://fxbug.dev/42142887) we should not report an error if the file was closed while it was
-    // registered for epoll(). Either the file needs to be removed from our lists when it is closed,
-    // we need to ignore/remove WaitObjects when the file is gone, or (more likely) both because of
-    // race conditions removing the file object.
-    fn target(&self) -> Result<FileHandle, Errno> {
-        self.target.upgrade().ok_or_else(|| errno!(EBADF))
+    /// Returns the target `FileHandle` of the `WaitObject`, or `None` if the file has been closed.
+    ///
+    /// It is fine for the `FileHandle` to be closed after being added to an epoll, and subsequent
+    /// epoll_waits end up timing out (importantly not returning EBADF).
+    fn target(&self) -> Option<FileHandle> {
+        self.target.upgrade()
     }
 }
 
@@ -126,8 +126,6 @@ impl EpollFileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let target = wait_object.target()?;
-
         // First start the wait. If an event happens after this, we'll get it.
         self.wait_on_file_edge_triggered(locked, current_task, key, wait_object)?;
 
@@ -136,7 +134,10 @@ impl EpollFileObject {
         //
         // That said, if an event happens between the wait and the query_events, we'll get two
         // notifications. We handle this by deduping on the epoll_wait end.
-        let events = target.query_events(locked, current_task)?;
+        let events = match wait_object.target() {
+            Some(t) => t.query_events(locked, current_task)?,
+            None => FdEvents::empty(),
+        };
         if !(events & wait_object.events).is_empty() {
             self.waiter.wake_immediately(events, self.new_wait_handler(key));
             if let Some(wait_canceler) = wait_object.wait_canceler.take() {
@@ -158,7 +159,11 @@ impl EpollFileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        wait_object.wait_canceler = wait_object.target()?.wait_async(
+        let Some(target) = wait_object.target() else {
+            return Ok(());
+        };
+
+        wait_object.wait_canceler = target.wait_async(
             locked,
             current_task,
             &self.waiter,
@@ -179,15 +184,17 @@ impl EpollFileObject {
 
         let state = self.state.lock();
         for nested_object in state.wait_objects.values() {
-            match nested_object.target()?.downcast_file::<EpollFileObject>() {
-                None => continue,
-                Some(target) => {
-                    if Arc::ptr_eq(&nested_object.target()?, epoll_file_handle) {
-                        return error!(ELOOP);
-                    }
-                    target.check_monitors(epoll_file_handle, depth_left - 1)?;
-                }
+            let Some(target) = nested_object.target() else {
+                continue;
+            };
+            let Some(target_file) = target.downcast_file::<EpollFileObject>() else {
+                continue;
+            };
+
+            if Arc::ptr_eq(&target, epoll_file_handle) {
+                return error!(ELOOP);
             }
+            target_file.check_monitors(epoll_file_handle, depth_left - 1)?;
         }
 
         Ok(())
@@ -318,13 +325,7 @@ impl EpollFileObject {
                             pending_list.push(ready);
                         } else {
                             // Another thread already handled this event, wait for another one.
-                            // Files can be legitimately closed out from under us so bad file
-                            // descriptors are not an error.
-                            match self.wait_on_file(locked, current_task, pending.key, wait) {
-                                Err(err) if err == EBADF => {} // File closed.
-                                Err(err) => return Err(err),
-                                _ => {}
-                            }
+                            self.wait_on_file(locked, current_task, pending.key, wait)?;
                         }
                     }
                 }
@@ -445,16 +446,12 @@ impl EpollFileObject {
                 if wait.events.contains(FdEvents::EPOLLET) {
                     // The file can be closed while registered for epoll which is not an error.
                     // We do not expect other errors from waiting.
-                    match self.wait_on_file_edge_triggered(
+                    self.wait_on_file_edge_triggered(
                         locked,
                         current_task,
                         pending_event.key,
                         wait,
-                    ) {
-                        Err(err) if err == EBADF => {} // File closed, ignore.
-                        Err(err) => log_warn!("Unexpected wait result {:#?}", err),
-                        _ => {}
-                    }
+                    )?;
                     continue;
                 }
                 // When this is the first time epoll_wait on this epoll fd, create and
