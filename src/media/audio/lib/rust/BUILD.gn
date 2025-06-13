@@ -52,6 +52,7 @@ rustc_library("fuchsia-audio") {
     deps += [
       "//sdk/rust/zx",
       "//src/lib/fuchsia-runtime",
+      "//src/lib/trace/rust:trace",
     ]
 
     test_deps = [

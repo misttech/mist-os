@@ -74,9 +74,8 @@ impl VmoBuffer {
         let byte_offset = frame_offset as usize * self.format.bytes_per_frame() as usize;
         let num_frames_in_buf = buf.len() as u64 / self.format.bytes_per_frame() as u64;
 
-        let frames_per_mili = self.format.frames_per_second / 1000;
-        let mili_elapsed = frame / frames_per_mili as u64;
-        let seconds = mili_elapsed as f64 / 1000.0;
+        let frames_per_milli = self.format.frames_per_second / 1000;
+        let milli_elapsed = frame / frames_per_milli as u64;
 
         // Check whether the buffer can be written to contiguously or if the write needs to be
         // split into two: one until the end of the buffer and one starting from the beginning.
@@ -85,10 +84,23 @@ impl VmoBuffer {
             // Flush cache so that hardware reads most recent write.
             self.flush_cache(byte_offset, buf.len()).map_err(VmoBufferError::VmoFlushCache)?;
             log::debug!(
-                "frame {} wrote starting from position {} Time {}s",
-                frame,
-                byte_offset,
-                seconds
+                "Wrote {} bytes ({} frames) from buf, to ring_buf frame {} (running frame {}: {}ms)",
+                buf.len(), num_frames_in_buf,
+                frame_offset, frame, milli_elapsed
+            );
+            fuchsia_trace::instant!(
+                c"audio-streaming",
+                c"AudioLib::VmoBuffer::write_to_frame",
+                fuchsia_trace::Scope::Process,
+                "source bytes to write" => buf.len(),
+                "source frames to write" => num_frames_in_buf,
+                "frame size" => self.format.bytes_per_frame(),
+                "dest RB size (frames)" => self.num_frames,
+                "dest RB running time (ms)" => milli_elapsed,
+                "dest RB running frame" => frame,
+                "dest RB frame position" => frame_offset,
+                "vmo write start" => byte_offset,
+                "vmo write len (bytes)" => buf.len()
             );
         } else {
             let frames_to_write_until_end = self.num_frames - frame_offset;
@@ -101,6 +113,11 @@ impl VmoBuffer {
             // Flush cache so that hardware reads most recent write.
             self.flush_cache(byte_offset, bytes_until_buffer_end)
                 .map_err(VmoBufferError::VmoFlushCache)?;
+            log::debug!(
+                "First wrote {} bytes ({} frames) from buf, to ring_buf frame {} (running frame {}: {}ms)",
+                bytes_until_buffer_end, frames_to_write_until_end,
+                frame_offset, frame, milli_elapsed
+            );
 
             if buf[bytes_until_buffer_end..].len() > self.vmo_size_bytes as usize {
                 log::error!("Remainder of write buffer is too big for the vmo.");
@@ -110,14 +127,31 @@ impl VmoBuffer {
             self.vmo.write(&buf[bytes_until_buffer_end..], 0).map_err(VmoBufferError::VmoWrite)?;
             self.flush_cache(0, buf.len() - bytes_until_buffer_end)
                 .map_err(VmoBufferError::VmoFlushCache)?;
-
+            fuchsia_trace::instant!(
+                c"audio-streaming",
+                c"AudioLib::VmoBuffer::write_to_frame",
+                fuchsia_trace::Scope::Process,
+                "source bytes to write" => buf.len(),
+                "source frames to write" => num_frames_in_buf,
+                "frame size" => self.format.bytes_per_frame(),
+                "dest RB size (frames)" => self.num_frames,
+                "dest RB running time (ms)" => milli_elapsed,
+                "dest RB running frame" => frame,
+                "dest RB frame position" => frame_offset,
+                "first vmo write start" => byte_offset,
+                "first vmo write len (bytes)" => bytes_until_buffer_end,
+                "second vmo write start" => 0,
+                "second vmo write len (bytes)" => buf.len() - bytes_until_buffer_end
+            );
+            let millisec_elapsed_wraparound =
+                (frame + frames_to_write_until_end) / frames_per_milli as u64;
             log::debug!(
-                "frame {} wrote starting from position {}  (with looparound) Time {}s",
-                frame,
-                byte_offset,
-                seconds
+                "Then wrote {} bytes ({} frames) from buf, to ring_buf frame 0 (running frame {}: {}ms)",
+                buf.len() - bytes_until_buffer_end, num_frames_in_buf - frames_to_write_until_end,
+                frame + frames_to_write_until_end, millisec_elapsed_wraparound
             );
         }
+
         Ok(())
     }
 
@@ -130,9 +164,9 @@ impl VmoBuffer {
         let byte_offset = frame_offset as usize * self.format.bytes_per_frame() as usize;
         let num_frames_in_buf = buf.len() as u64 / self.format.bytes_per_frame() as u64;
 
-        let frames_per_mili = self.format.frames_per_second / 1000; // 96
-        let mili_elapsed = frame / frames_per_mili as u64;
-        let seconds = mili_elapsed as f64 / 1000.0;
+        let frames_per_milli = self.format.frames_per_second / 1000;
+        let milli_elapsed = frame / frames_per_milli as u64;
+        let seconds = milli_elapsed as f64 / 1000.0;
 
         // Check whether the buffer can be read from contiguously or if the read needs to be
         // split into two: one until the end of the buffer and one starting from the beginning.

@@ -265,6 +265,8 @@ impl Device {
         mut socket: WavSocket,
         active_channels_bitmask: Option<u64>,
     ) -> Result<fac::PlayerPlayResponse, ControllerError> {
+        fuchsia_trace::duration!(c"audio-streaming", c"audio_ffx_daemon::Device::play");
+
         let spec = socket.read_header().await?;
         let format = Format::from(spec);
 
@@ -300,9 +302,23 @@ impl Device {
         if let Some(active_channels_bitmask) = active_channels_bitmask {
             active_channels_set_time =
                 Some(ring_buffer.set_active_channels(active_channels_bitmask).await?);
+
+            fuchsia_trace::instant!(
+                c"audio-streaming",
+                c"audio_ffx_daemon::Device::play->set_active_channels",
+                fuchsia_trace::Scope::Process,
+                "active_channels_bitmask" => active_channels_bitmask,
+                "active_channels_set_time" => active_channels_set_time.unwrap().into_nanos()
+            );
         }
 
         let start_time = ring_buffer.start().await?;
+        fuchsia_trace::instant!(
+            c"audio-streaming",
+            c"audio_ffx_daemon::Device::play->start",
+            fuchsia_trace::Scope::Process,
+            "start_time" => start_time.into_nanos()
+        );
 
         let t_zero = zx::MonotonicInstant::from_nanos(std::cmp::max(
             active_channels_set_time.unwrap_or(zx::MonotonicInstant::from_nanos(0)).into_nanos(),
@@ -350,6 +366,8 @@ impl Device {
 
         loop {
             timer.next().await;
+
+            fuchsia_trace::duration!(c"audio-streaming", c"audio_ffx_daemon::Device::play loop");
 
             // Check that we woke up on time. Approximate ring buffer pointer position based on
             // the current time and the expected rate of how fast it moves.
@@ -415,6 +433,19 @@ impl Device {
                 .write_to_frame(next_frame_to_write, &buf)
                 .context("Failed to write to buffer")?;
             next_frame_to_write += new_frames_available_to_write;
+
+            fuchsia_trace::instant!(
+                c"audio-streaming",
+                c"audio_ffx_daemon::Device::play write",
+                fuchsia_trace::Scope::Process,
+                "rb_frames_elapsed_since_last_wakeup" => rb_frames_elapsed_since_last_wakeup,
+                "bytes_read_from_socket" => bytes_read_from_socket,
+                "new_frames_available_to_write" => new_frames_available_to_write,
+                "num_bytes_to_write" => num_bytes_to_write,
+                "prev frame written" => next_frame_to_write - new_frames_available_to_write,
+                "next_frame_to_write" => next_frame_to_write,
+                "silenced_frames" => silenced_frames
+            );
 
             // We want entire ring buffer to be silenced.
             if silenced_frames * format.bytes_per_frame() as u64 >= bytes_in_rb {

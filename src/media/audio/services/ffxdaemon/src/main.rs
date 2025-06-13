@@ -225,6 +225,9 @@ async fn serve_device_control(
 
 #[fuchsia::main(logging = true)]
 async fn main() -> Result<(), Error> {
+    // Register a trace provider
+    fuchsia_trace_provider::trace_provider_create_with_fdio();
+
     let mut service_fs = ServiceFs::new_local();
 
     // Initialize inspect
