@@ -67,8 +67,15 @@ constexpr uint32_t ToVmarFlags(PhysMapping::Permissions perms) {
   return flags;
 }
 
-constexpr uint ToArchMmuFlags(PhysMapping::Permissions perms) {
-  uint flags = ARCH_MMU_FLAG_CACHED;
+constexpr uint ToArchMmuFlags(PhysMapping::Permissions perms, PhysMapping::Type type) {
+  uint flags = 0;
+  switch (type) {
+    case PhysMapping::Type::kNormal:
+      flags |= ARCH_MMU_FLAG_CACHED;
+      break;
+    case PhysMapping::Type::kMmio:
+      flags |= ARCH_MMU_FLAG_UNCACHED_DEVICE;
+  }
   if (perms.readable()) {
     flags |= ARCH_MMU_FLAG_PERM_READ;
   }
@@ -104,7 +111,7 @@ void RegisterMappings(ktl::span<const PhysMapping> mappings, fbl::RefPtr<VmAddre
             mapping.name.data(), PermissionsName(mapping.perms).data(), mapping.paddr,
             mapping.paddr_end(), mapping.vaddr, mapping.vaddr_end());
     zx_status_t status = vmar->ReserveSpace(mapping.name.data(), mapping.vaddr, mapping.size,
-                                            ToArchMmuFlags(mapping.perms));
+                                            ToArchMmuFlags(mapping.perms, mapping.type));
     ASSERT(status == ZX_OK);
 
 #if __has_feature(address_sanitizer)

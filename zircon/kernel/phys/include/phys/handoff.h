@@ -117,6 +117,9 @@ static_assert(std::is_default_constructible_v<PhysVmo>);
 // Describes a virtual mapping present at the time of hand-off, the virtual
 // address range of which should be reserved during VM initialization.
 struct PhysMapping : public PhysVmObject {
+  // The type of memory being mapped.
+  enum class Type { kNormal, kMmio };
+
   class Permissions {
    public:
     static Permissions Ro() { return Permissions{}.set_readable(); }
@@ -172,9 +175,14 @@ struct PhysMapping : public PhysVmObject {
 
   constexpr PhysMapping() = default;
 
-  constexpr PhysMapping(std::string_view name, uintptr_t vaddr, size_t size, uintptr_t paddr,
-                        Permissions perms, bool kasan_shadow = true)
-      : vaddr(vaddr), size(size), paddr(paddr), perms(perms), kasan_shadow(kasan_shadow) {
+  constexpr PhysMapping(std::string_view name, Type type, uintptr_t vaddr, size_t size,
+                        uintptr_t paddr, Permissions perms, bool kasan_shadow = true)
+      : type(type),
+        vaddr(vaddr),
+        size(size),
+        paddr(paddr),
+        perms(perms),
+        kasan_shadow(kasan_shadow) {
     set_name(name);
   }
 
@@ -185,6 +193,7 @@ struct PhysMapping : public PhysVmObject {
   constexpr uintptr_t vaddr_end() const { return vaddr + size; }
   constexpr uintptr_t paddr_end() const { return paddr + size; }
 
+  Type type = Type::kNormal;
   uintptr_t vaddr = 0;
   size_t size = 0;
   uintptr_t paddr = 0;
@@ -243,6 +252,11 @@ struct PhysElfImage {
   PhysVmo vmo;
   PhysVmar vmar;
   Info info;
+};
+
+struct MappedMmioRange {
+  volatile void* base = nullptr;
+  size_t size = 0;
 };
 
 // This holds (or points to) everything that is handed off from physboot to the
@@ -351,6 +365,9 @@ struct PhysHandoff {
 
   // Initialized UART to be used by the kernel, if any.
   uart::all::Driver uart;
+
+  // The UART's mapped MMIO range, if present and MMIO-based.
+  MappedMmioRange uart_mmio;
 };
 static_assert(std::is_default_constructible_v<PhysHandoff>);
 

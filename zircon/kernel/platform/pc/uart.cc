@@ -17,11 +17,8 @@
 #include <platform/uart.h>
 #include <vm/physmap.h>
 
-volatile void* PlatformUartMapMmio(paddr_t paddr, size_t size) {
-  volatile void* vaddr = paddr_to_physmap(paddr);
-  physmap_preserve_gaps_for_mmio();
+void PlatformUartPrepareMmio(paddr_t paddr, size_t size) {
   root_resource_filter_add_deny_region(paddr, size, ZX_RSRC_KIND_MMIO);
-  return vaddr;
 }
 
 PlatformUartIoProvider<zbi_dcfg_simple_pio_t, uart::IoRegisterType::kPio>::PlatformUartIoProvider(

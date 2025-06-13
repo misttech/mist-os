@@ -545,9 +545,6 @@ zx_status_t platform_mp_cpu_unplug(cpu_num_t cpu_id) { return arch_mp_cpu_unplug
 
 zx_status_t platform_append_mexec_data(ktl::span<ktl::byte> data_zbi) { return ZX_OK; }
 
-ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num) { return irq_num; }
+void PlatformUartPrepareMmio(paddr_t paddr, size_t size) {}
 
-volatile void* PlatformUartMapMmio(paddr_t paddr, size_t size) {
-  physmap_preserve_gaps_for_mmio();
-  return reinterpret_cast<volatile void*>(paddr_to_physmap(paddr));
-}
+ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num) { return irq_num; }

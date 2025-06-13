@@ -92,7 +92,8 @@ constexpr ktl::string_view VmoNameString(const PhysVmo::Name& name) {
 HandoffPrep::HandoffPrep(ElfImage kernel)
     : kernel_(ktl::move(kernel)),
       temporary_data_allocator_(VirtualAddressAllocator::TemporaryHandoffDataAllocator(kernel_)),
-      permanent_data_allocator_(VirtualAddressAllocator::PermanentHandoffDataAllocator(kernel_)) {
+      permanent_data_allocator_(VirtualAddressAllocator::PermanentHandoffDataAllocator(kernel_)),
+      first_class_mapping_allocator_(VirtualAddressAllocator::FirstClassMappingAllocator(kernel_)) {
   PhysHandoffTemporaryPtr<const PhysHandoff> handoff;
   fbl::AllocChecker ac;
   handoff_ = New(handoff, ac);
@@ -395,6 +396,7 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
         mappings = mappings.subspan(1);
         mapping = PhysMapping{
             "",
+            PhysMapping::Type::kNormal,
             segment.vaddr() + load_bias,
             segment.memsz(),
             segment.filesz() == 0 ? PhysElfImage::kZeroFill : segment.offset(),
@@ -437,7 +439,7 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
   handoff()->times = gBootTimes;
 
   handoff()->kernel_physical_load_address = kernel_.physical_load_address();
-  ConstructKernelAddressSpace();
+  ConstructKernelAddressSpace(uart);
 
   // Finalize the published VMOs (e.g., the log published just above), VMARs,
   // and mappings.
