@@ -25,7 +25,10 @@
         },
         {
             // This service replaces the directory capability above.
-            service: "fuchsia.gpu.magma.Service",
+            service: [
+                "fuchsia.gpu.magma.Service",
+                "fuchsia.gpu.magma.TrustedService",
+            ],
         },
         {
             // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
@@ -49,7 +52,10 @@
         },
         {
             // This service replaces the directory capability above.
-            service: "fuchsia.gpu.magma.Service",
+            service: [
+                "fuchsia.gpu.magma.Service",
+                "fuchsia.gpu.magma.TrustedService",
+            ],
             from: "self",
         },
         {

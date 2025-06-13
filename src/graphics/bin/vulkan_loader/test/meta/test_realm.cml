@@ -37,7 +37,10 @@
         },
         {
             // This service replaces the directory capability above.
-            service: "fuchsia.gpu.magma.Service",
+            service: [
+                "fuchsia.gpu.magma.Service",
+                "fuchsia.gpu.magma.TrustedService",
+            ],
             from: "#test_lib_provider",
             to: [ "#vulkan_loader" ],
         },
@@ -116,6 +119,10 @@
     expose: [
         {
             protocol: "fuchsia.vulkan.loader.Loader",
+            from: "#vulkan_loader",
+        },
+        {
+            service: "fuchsia.vulkan.loader.TrustedService",
             from: "#vulkan_loader",
         },
         {

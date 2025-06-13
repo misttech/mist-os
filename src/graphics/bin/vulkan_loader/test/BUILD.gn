@@ -21,6 +21,7 @@ cc_test_executable("test_bin") {
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fdio",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//src/lib/fxl:fxl_cli",

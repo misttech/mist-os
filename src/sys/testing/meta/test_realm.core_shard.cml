@@ -204,6 +204,12 @@
             source_availability: "unknown",
         },
         {
+            service: "fuchsia.vulkan.loader.TrustedService",
+            from: "#vulkan_loader",
+            to: "#testing",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.mediacodec.CodecFactory",
             from: "#codec_factory",
             to: "#testing",

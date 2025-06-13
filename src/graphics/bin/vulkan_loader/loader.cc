@@ -7,20 +7,31 @@
 #include <fidl/fuchsia.kernel/cpp/wire.h>
 #include <lib/component/incoming/cpp/protocol.h>
 
-fidl::ProtocolHandler<fuchsia_vulkan_loader::Loader> LoaderImpl::GetHandler(
-    LoaderApp* app, async_dispatcher_t* dispatcher) {
-  return [=](fidl::ServerEnd<fuchsia_vulkan_loader::Loader> server_end) {
-    std::unique_ptr<LoaderImpl> impl(new LoaderImpl(app));
-    auto binding = fidl::BindServer(dispatcher, std::move(server_end), std::move(impl));
-  };
-}
-
 LoaderImpl::~LoaderImpl() { app_->RemoveObserver(this); }
 
 zx::result<> LoaderImpl::Add(component::OutgoingDirectory& outgoing_dir, LoaderApp* app,
                              async_dispatcher_t* dispatcher) {
-  return outgoing_dir.AddUnmanagedProtocol<fuchsia_vulkan_loader::Loader>(
-      GetHandler(app, dispatcher));
+  auto protocol_handler = [app,
+                           dispatcher](fidl::ServerEnd<fuchsia_vulkan_loader::Loader> server_end) {
+    std::unique_ptr<LoaderImpl> impl(new LoaderImpl(app, false));
+    fidl::BindServer(dispatcher, std::move(server_end), std::move(impl));
+  };
+  if (auto result =
+          outgoing_dir.AddUnmanagedProtocol<fuchsia_vulkan_loader::Loader>(protocol_handler);
+      result.is_error()) {
+    return result;
+  }
+
+  auto trusted_protocol_handler =
+      [app, dispatcher](fidl::ServerEnd<fuchsia_vulkan_loader::Loader> server_end) mutable {
+        std::unique_ptr<LoaderImpl> impl(new LoaderImpl(app, true));
+        fidl::BindServer(dispatcher, std::move(server_end), std::move(impl));
+      };
+
+  fuchsia_vulkan_loader::TrustedService::InstanceHandler handler(
+      {.loader = std::move(trusted_protocol_handler)});
+
+  return outgoing_dir.AddService<fuchsia_vulkan_loader::TrustedService>(std::move(handler));
 }
 
 // LoaderApp::Observer implementation.
@@ -53,7 +64,12 @@ void LoaderImpl::Get(GetRequest& request, GetCompleter::Sync& completer) {
 
 void LoaderImpl::ConnectToDeviceFs(ConnectToDeviceFsRequest& request,
                                    ConnectToDeviceFsCompleter::Sync& completer) {
-  app_->ServeDeviceFs(fidl::ServerEnd<fuchsia_io::Directory>{std::move(request.channel())});
+  if (trusted_) {
+    app_->ServeTrustedDeviceFs(
+        fidl::ServerEnd<fuchsia_io::Directory>{std::move(request.channel())});
+  } else {
+    app_->ServeDeviceFs(fidl::ServerEnd<fuchsia_io::Directory>{std::move(request.channel())});
+  }
 }
 
 void LoaderImpl::ConnectToManifestFs(ConnectToManifestFsRequest& request,

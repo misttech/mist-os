@@ -61,6 +61,7 @@ class LoaderApp {
   zx_status_t InitDeviceWatcher();
 
   zx_status_t ServeDeviceFs(fidl::ServerEnd<fuchsia_io::Directory> server_end);
+  zx_status_t ServeTrustedDeviceFs(fidl::ServerEnd<fuchsia_io::Directory> server_end);
   zx_status_t ServeManifestFs(fidl::ServerEnd<fuchsia_io::Directory> server_end);
 
   // Initialize and serve the debug directory for the loader app.
@@ -106,6 +107,8 @@ class LoaderApp {
   void NotifyIcdsChangedLocked() FXL_REQUIRE(pending_action_mutex_);
 
   zx_status_t InitDeviceFs();
+  zx_status_t InitTrustedDeviceFs();
+  zx_status_t InitCommonDeviceFs(fbl::RefPtr<fs::PseudoDir>& root_node);
 
   FIT_DECLARE_THREAD_CHECKER(main_thread_)
 
@@ -125,6 +128,8 @@ class LoaderApp {
   fs::SynchronousVfs debug_fs_;
   fbl::RefPtr<fs::PseudoDir> debug_root_node_;
   fbl::RefPtr<fs::PseudoDir> device_root_node_;
+  // Like device_root_node_, but contains trusted services
+  fbl::RefPtr<fs::PseudoDir> trusted_device_root_node_;
   fbl::RefPtr<fs::PseudoDir> manifest_fs_root_node_;
 
   std::unique_ptr<fsl::DeviceWatcher> gpu_watcher_;

@@ -34,6 +34,11 @@
             to: "#vulkan-tests",
         },
         {
+            service: [ "fuchsia.vulkan.loader.TrustedService" ],
+            from: "parent",
+            to: "#vulkan-tests",
+        },
+        {
             dictionary: "diagnostics",
             from: "parent",
             to: "#vulkan-tests",

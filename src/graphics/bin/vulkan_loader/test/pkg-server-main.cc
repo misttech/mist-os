@@ -103,6 +103,17 @@ int main(int argc, const char* const* argv) {
     status = service_instance_dir->AddEntry(
         "device", fbl::MakeRefCounted<fs::Service>(magma_device.ProtocolConnector()));
     ZX_ASSERT_MSG(status == ZX_OK, "Failed to add service: %s", zx_status_get_string(status));
+
+    auto trusted_magma_service_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+    svc_dir->AddEntry("fuchsia.gpu.magma.TrustedService", trusted_magma_service_dir);
+
+    auto trusted_service_instance_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+    trusted_magma_service_dir->AddEntry("some-instance-name", trusted_service_instance_dir);
+
+    status = trusted_service_instance_dir->AddEntry(
+        "device", fbl::MakeRefCounted<fs::Service>(magma_device.ProtocolConnector()));
+    ZX_ASSERT_MSG(status == ZX_OK, "Failed to add trusted service: %s",
+                  zx_status_get_string(status));
   }
 
   auto dev_gpu_dir = fbl::MakeRefCounted<fs::PseudoDir>();
