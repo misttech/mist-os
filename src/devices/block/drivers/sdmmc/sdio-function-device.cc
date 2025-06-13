@@ -666,40 +666,28 @@ zx::result<> SdioFunctionDevice::ConfigurePowerManagement() {
     return power_element_config.take_error();
   }
 
-  fit::result tokens = fdf_power::GetDependencyTokens(*sdio_parent_->parent()->driver_incoming(),
-                                                      *power_element_config);
-  if (tokens.is_error()) {
-    std::pair error = MapPowerError(tokens.error_value());
-    FDF_LOGL(ERROR, logger(), "Failed to get dependency tokens: %s", error.second);
-    return error.first;
-  }
+  std::vector<fdf_power::PowerElementConfiguration> configs{
+      std::move(power_element_config.value())};
 
-  fdf_power::ElementDescBuilder builder(*std::move(power_element_config), *std::move(tokens));
+  fit::result<fdf_power::Error, std::vector<fdf_power::ElementDesc>> add_result =
+      fdf_power::ApplyPowerConfiguration(*sdio_parent_->parent()->driver_incoming(), configs, true);
 
-  {
-    auto [element_runner_client, element_runner_server] =
-        fidl::Endpoints<fuchsia_power_broker::ElementRunner>::Create();
-    builder.SetElementRunner(std::move(element_runner_client));
-    element_runner_server_binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                           std::move(element_runner_server), this,
-                                           fidl::kIgnoreBindingClosure);
-  }
-
-  zx::result topology_client_end =
-      sdio_parent_->parent()->driver_incoming()->Connect<fuchsia_power_broker::Topology>();
-  if (topology_client_end.is_error()) {
-    FDF_LOGL(ERROR, logger(), "Failed to connect to Topology: %s",
-             topology_client_end.status_string());
-    return topology_client_end.take_error();
-  }
-
-  fdf_power::ElementDesc element_desc = builder.Build();
-  if (fit::result result = fdf_power::AddElement(*topology_client_end, element_desc);
-      result.is_error()) {
-    std::pair error = MapPowerError(result.error_value());
+  if (add_result.is_error()) {
+    std::pair error = MapPowerError(add_result.error_value());
     FDF_LOGL(ERROR, logger(), "Failed to add power element: %s", error.second);
     return error.first;
   }
+
+  if (add_result.value().size() != 1) {
+    FDF_LOGL(ERROR, logger(), "Unexpected number of power elements: %lu",
+             add_result.value().size());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  fdf_power::ElementDesc element_desc = std::move(add_result.value()[0]);
+  element_runner_server_binding_.emplace(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                         std::move(element_desc.element_runner_server.value()),
+                                         this, fidl::kIgnoreBindingClosure);
 
   assertive_token_ = std::move(element_desc.assertive_token);
   element_control_client_end_ = *std::move(element_desc.element_control_client);
