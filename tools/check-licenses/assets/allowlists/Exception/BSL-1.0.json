@@ -21,7 +21,7 @@
           },
           {
             "projects": [
-              "third_party/rust_crates/vendor/ryu-1.0.20"
+              "third_party/rust_crates/vendor/ryu-1.0.3"
             ],
             "bug": "",
             "notes": []

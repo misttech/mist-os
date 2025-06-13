@@ -970,6 +970,9 @@ rustflags = []
 [gn.package.rutabaga_gfx."0.1.3"]
 # Has build script but no config needed.
 
+[gn.package.ryu."1.0.3"]
+rustflags = ["--cfg=integer128", "--cfg=must_use_return", "--cfg=maybe_uninit"]
+
 [gn.package.schemars."0.8.10"]
 rustflags = ["--cfg=std_atomic64", "--cfg=std_atomic"]
 
