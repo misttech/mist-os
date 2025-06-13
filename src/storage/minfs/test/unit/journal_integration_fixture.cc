@@ -94,7 +94,13 @@ void JournalIntegrationFixture::PerformOperationWithTransactionLimit(
   device->SetWriteBlockLimit(write_count);
   bcache = Bcache::Create(std::move(device), kBlockCount);
   ASSERT_TRUE(bcache.is_ok());
-  MountOptions options = {};
+  // The journal tests purposely cause I/O operations to fail in order to test consistency after
+  // a subset of operations make it to the device. We don't want it to crash out here and any other
+  // state within minfs will not be persisted anyways so it doesn't matter how behaviour may diverge
+  // after this.
+  MountOptions options = {
+      .die_on_mutation_failure = false,
+  };
   auto fs = Runner::Create(dispatcher(), *std::move(bcache), options);
   ASSERT_TRUE(fs.is_ok());
 

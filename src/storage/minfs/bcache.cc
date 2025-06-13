@@ -13,7 +13,9 @@
 #include <string.h>
 #include <unistd.h>
 #include <zircon/compiler.h>
+#include <zircon/errors.h>
 
+#include <atomic>
 #include <utility>
 
 #include <fbl/alloc_checker.h>
@@ -24,6 +26,8 @@
 
 #include "src/storage/lib/trace/trace.h"
 #include "src/storage/minfs/format.h"
+#include "zircon/assert.h"
+#include "zircon/status.h"
 
 namespace minfs {
 
@@ -49,6 +53,35 @@ zx::result<> Bcache::Readblk(blk_t bno, void* data) {
   }
   memcpy(data, buffer_.Data(0), kMinfsBlockSize);
   return zx::ok();
+}
+
+void Bcache::DieOnMutationFailure(bool setting) {
+  die_on_mutation_failure_.store(setting, std::memory_order::relaxed);
+}
+
+zx_status_t Bcache::RunRequests(const std::vector<storage::BufferedOperation>& operations) {
+  zx_status_t status;
+  {
+    std::shared_lock lock(mutex_);
+    status = DeviceTransactionHandler::RunRequests(operations);
+  }
+#ifdef __Fuchsia__
+  // Any mutation failures can leave the device in an unknown state.
+  if (status != ZX_OK && die_on_mutation_failure_.load(std::memory_order_relaxed)) {
+    for (const storage::BufferedOperation& op : operations) {
+      switch (op.op.type) {
+        case storage::OperationType::kWrite:
+        case storage::OperationType::kWriteFua:
+        case storage::OperationType::kTrim:
+          ZX_PANIC("Mutation failure. Disk no longer consistent: %s", zx_status_get_string(status));
+          break;
+        default:
+          break;
+      }
+    }
+  }
+#endif
+  return status;
 }
 
 zx::result<> Bcache::Writeblk(blk_t bno, const void* data) {

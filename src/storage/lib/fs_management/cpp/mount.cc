@@ -135,9 +135,10 @@ fidl::ClientEnd<fuchsia_io::Directory> StartedSingleVolumeFilesystem::Release() 
 
 __EXPORT
 zx::result<> StartedSingleVolumeFilesystem::Unmount() {
-  auto res = Shutdown(ExportRoot());
+  auto resp = fidl::WireCall(admin_)->Shutdown();
+  admin_.reset();
   export_root_.reset();
-  return res;
+  return zx::make_result(resp.status());
 }
 
 __EXPORT
@@ -175,9 +176,10 @@ StartedMultiVolumeFilesystem::Release() {
 __EXPORT
 zx::result<> StartedMultiVolumeFilesystem::Unmount() {
   volumes_.clear();
-  auto res = Shutdown(exposed_dir_);
+  auto resp = fidl::WireCall(admin_)->Shutdown();
+  admin_.reset();
   exposed_dir_.reset();
-  return res;
+  return zx::make_result(resp.status());
 }
 
 __EXPORT
@@ -238,9 +240,10 @@ fidl::ClientEnd<fuchsia_io::Directory> StartedSingleVolumeMultiVolumeFilesystem:
 __EXPORT
 zx::result<> StartedSingleVolumeMultiVolumeFilesystem::Unmount() {
   volume_.reset();
-  auto res = Shutdown(exposed_dir_);
+  auto resp = fidl::WireCall(admin_)->Shutdown();
+  admin_.reset();
   exposed_dir_.reset();
-  return res;
+  return zx::make_result(resp.status());
 }
 
 __EXPORT SingleVolumeFilesystemInterface::~SingleVolumeFilesystemInterface() = default;
@@ -253,14 +256,17 @@ zx::result<StartedSingleVolumeFilesystem> Mount(
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
-  StartedSingleVolumeFilesystem fs;
-
   auto exposed_dir = InitFsComponent(std::move(device), component, options);
   if (exposed_dir.is_error()) {
     return exposed_dir.take_error();
   }
 
-  return zx::ok(StartedSingleVolumeFilesystem(std::move(*exposed_dir)));
+  auto admin_or = component::ConnectAt<fuchsia_fs::Admin>(*exposed_dir);
+  if (admin_or.is_error()) {
+    return admin_or.take_error();
+  }
+
+  return zx::ok(StartedSingleVolumeFilesystem(std::move(*exposed_dir), std::move(*admin_or)));
 }
 
 __EXPORT
@@ -275,7 +281,13 @@ zx::result<StartedMultiVolumeFilesystem> MountMultiVolume(
   if (outgoing_dir.is_error()) {
     return outgoing_dir.take_error();
   }
-  return zx::ok(StartedMultiVolumeFilesystem(std::move(*outgoing_dir)));
+
+  auto admin_or = component::ConnectAt<fuchsia_fs::Admin>(*outgoing_dir);
+  if (admin_or.is_error()) {
+    return admin_or.take_error();
+  }
+
+  return zx::ok(StartedMultiVolumeFilesystem(std::move(*outgoing_dir), std::move(*admin_or)));
 }
 
 __EXPORT
@@ -289,6 +301,11 @@ zx::result<StartedSingleVolumeMultiVolumeFilesystem> MountMultiVolumeWithDefault
   auto outgoing_dir_or = InitFsComponent(std::move(device), component, options);
   if (outgoing_dir_or.is_error()) {
     return outgoing_dir_or.take_error();
+  }
+
+  auto admin_or = component::ConnectAt<fuchsia_fs::Admin>(*outgoing_dir_or);
+  if (admin_or.is_error()) {
+    return admin_or.take_error();
   }
 
   auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
@@ -311,21 +328,8 @@ zx::result<StartedSingleVolumeMultiVolumeFilesystem> MountMultiVolumeWithDefault
     return volume.take_error();
   }
 
-  return zx::ok(StartedSingleVolumeMultiVolumeFilesystem(std::move(*outgoing_dir_or),
-                                                         MountedVolume(std::move(client))));
-}
-
-__EXPORT
-zx::result<> Shutdown(fidl::UnownedClientEnd<Directory> svc_dir) {
-  auto admin_or = component::ConnectAt<fuchsia_fs::Admin>(svc_dir);
-  if (admin_or.is_error()) {
-    return admin_or.take_error();
-  }
-
-  auto resp = fidl::WireCall(*admin_or)->Shutdown();
-  if (resp.status() != ZX_OK)
-    return zx::error(resp.status());
-  return zx::ok();
+  return zx::ok(StartedSingleVolumeMultiVolumeFilesystem(
+      std::move(*outgoing_dir_or), std::move(*admin_or), MountedVolume(std::move(client))));
 }
 
 }  // namespace fs_management

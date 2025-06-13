@@ -1173,6 +1173,7 @@ zx::result<std::unique_ptr<Minfs>> Minfs::Create(FuchsiaDispatcher dispatcher,
   Superblock& info = info_or.value();
 
 #ifdef __Fuchsia__
+  bc->DieOnMutationFailure(options.die_on_mutation_failure);
   // In Terminate we rely on the default dispatcher being set for the dispatcher thread, so
   // assert that now.
   async::PostTask(dispatcher,
