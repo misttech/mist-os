@@ -56,6 +56,12 @@ type Test struct {
 
 	// Test owner information and other metadata
 	Metadata metadata.TestMetadata `json:"metadata,omitempty"`
+
+	// Test filters to select or reject test case names
+	TestFilters []string `json:"test_filters,omitempty"`
+
+	// Whether an empty set of test cases counts as success or failure
+	NoCasesEqualsSuccess bool `json:"no_cases_equals_success,omitempty"`
 }
 
 func (t *Test) applyModifier(m TestModifier, s *Shard) {
@@ -109,6 +115,8 @@ func (t *Test) maxRuns() int {
 func (t *Test) updateFromTestList(tl build.TestListEntry) {
 	t.Tags = tl.Tags
 	t.Realm = tl.Execution.Realm
+	t.TestFilters = tl.Execution.TestFilters
+	t.NoCasesEqualsSuccess = tl.Execution.NoCasesEqualsSuccess
 }
 
 func (t *Test) Hermetic() bool {

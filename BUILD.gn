@@ -1349,9 +1349,11 @@ compiled_action("test-list") {
   tool_output_name = "test_list_tool"
   test_list_file = "$root_build_dir/test-list.json"
   test_config_file = "$root_build_dir/test-config.json"
+  disabled_tests_file = "//sdk/ctf/disabled_tests.json"
   inputs = [
     "$root_build_dir/tests.json",
     "$root_build_dir/test_components.json",
+    disabled_tests_file,
   ]
   outputs = [
     test_list_file,
@@ -1376,6 +1378,8 @@ compiled_action("test-list") {
     "tests.json",
     "--test-components",
     "test_components.json",
+    "--disabled-ctf-tests",
+    rebase_path(disabled_tests_file, root_build_dir),
     "--output",
     rebase_path(test_list_file, root_build_dir),
     "--experimental-test-config",

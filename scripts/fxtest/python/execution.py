@@ -156,8 +156,16 @@ class TestExecution:
                     "--no-exception-channel",
                 ]
 
-            for test_filter in self._flags.test_filter:
-                extra_args += ["--test-filter", test_filter]
+            # If command line filters are given, they should override (cancel)
+            # any filters that may be in test-list.json.
+            test_execution_filters = self._test.info.execution.test_filters
+            if self._flags.test_filter:
+                for test_filter in self._flags.test_filter:
+                    extra_args += ["--test-filter", test_filter]
+            elif test_execution_filters:
+                extra_args.append("--no-cases-equals-success")
+                for test_filter in test_execution_filters:
+                    extra_args += ["--test-filter", test_filter]
             if self._flags.also_run_disabled_tests:
                 extra_args += ["--run-disabled"]
             if self._flags.show_full_moniker_in_logs:

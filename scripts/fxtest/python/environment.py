@@ -33,6 +33,9 @@ class ExecutionEnvironment:
     # Path to the input tests.json file.
     test_json_file: str
 
+    # Path to //sdk/ctf/disabled_tests.json
+    disabled_ctf_tests_file: str
+
     # Path to the log file to write to. If unset, do not log.
     log_file: str | None = None
 
@@ -111,11 +114,15 @@ class ExecutionEnvironment:
         # Get the input files from their expected locations directly
         # under the output directory.
         tests_json_file = os.path.join(out_dir, "tests.json")
+        disabled_ctf_tests_file = os.path.join(
+            fuchsia_dir, "sdk/ctf/disabled_tests.json"
+        )
         package_repositories_file = os.path.join(
             out_dir, "package-repositories.json"
         )
         for expected_file in [
             tests_json_file,
+            disabled_ctf_tests_file,
         ]:
             if not os.path.isfile(expected_file):
                 raise EnvironmentError(f"Expected a file at {expected_file}")
@@ -123,6 +130,7 @@ class ExecutionEnvironment:
             fuchsia_dir,
             out_dir,
             tests_json_file,
+            disabled_ctf_tests_file,
             log_file=log_file,
             package_repositories_file=(
                 package_repositories_file

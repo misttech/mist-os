@@ -23,6 +23,9 @@ pub struct TestParams {
     /// Filter tests based on glob pattern(s).
     pub test_filters: Option<Vec<String>>,
 
+    /// Whether an empty test case set means success or failure.
+    pub no_cases_equals_success: Option<bool>,
+
     /// Run disabled tests.
     pub also_run_disabled_tests: bool,
 

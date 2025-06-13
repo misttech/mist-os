@@ -112,6 +112,14 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             f"path was {self.test_data_path} for {__file__}",
         )
 
+        disabled_tests_source_file = os.path.join(
+            self.test_data_path, "disabled_tests.json"
+        )
+        self.assertTrue(
+            os.path.isfile(disabled_tests_source_file),
+            f"path was {self.test_data_path} for {__file__}",
+        )
+
         with open(
             os.path.join(self.fuchsia_dir.name, ".fx-build-dir"), "w"
         ) as f:
@@ -131,6 +139,16 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 os.path.join(self.test_data_path, name),
                 os.path.join(self.out_dir, name),
             )
+
+        # disabled_tests.json must be in place for e2e tests to pass.
+        disabled_tests_dest_path = os.path.join(
+            self.fuchsia_dir.name, "sdk", "ctf"
+        )
+        os.makedirs(disabled_tests_dest_path)
+        shutil.copy(
+            disabled_tests_source_file,
+            os.path.join(disabled_tests_dest_path, "disabled_tests.json"),
+        )
 
         # Simulate the generated package metadata to test merging.
         gen_dir = os.path.join(
@@ -157,7 +175,8 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        # Make sure that generated test list is identical to input.
+        # Provide hard-coded predictable test-list.json content rather than
+        # actually running the generate_test_list program.
         self._mock_generate_test_list()
 
         return super().setUp()
@@ -260,6 +279,31 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 ret.add(tuple(cur))
 
         return ret
+
+    def _assert_ffx_test_has_args(
+        self, call_list: mock._CallList, desired_args: list[str]
+    ) -> None:
+        """Verifies args were passed to "ffx test".
+
+        Given a list of mock calls, verifies it includes a call to
+        "ffx test run" which includes the given sequence of args."""
+
+        for call in call_list:
+            try:
+                call_args = list(call.args)
+                ffx_pos = call_args.index("ffx")
+            except:
+                continue
+            if call_args[ffx_pos : ffx_pos + 3] != ["ffx", "test", "run"]:
+                continue
+            args_after_ffx_run = call_args[ffx_pos + 3 :]
+            for index, item in enumerate(args_after_ffx_run):
+                if (
+                    desired_args
+                    == args_after_ffx_run[index : index + len(desired_args)]
+                ):
+                    return
+            self.fail(f"{desired_args} not found in {call_list}")
 
     def _mock_get_device_environment(
         self, env: environment.DeviceEnvironment
@@ -580,6 +624,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         call_prefixes = self._make_call_args_prefix_set(
             command_mock.call_args_list
         )
+
         call_prefixes.update(
             self._make_call_args_prefix_set(subprocess_mock.call_args_list)
         )
@@ -619,6 +664,18 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 ),
             },
             call_prefixes,
+        )
+
+        # Make sure we properly exclude the "broken_case" and "bad_case"
+        # and count an empty test case set as passing.
+        self._assert_ffx_test_has_args(
+            command_mock.call_args_list, ["--test-filter", "-broken_case"]
+        )
+        self._assert_ffx_test_has_args(
+            command_mock.call_args_list, ["--test-filter", "-bad_case"]
+        )
+        self._assert_ffx_test_has_args(
+            command_mock.call_args_list, ["--no-cases-equals-success"]
         )
 
         # Make sure we ran the host tests.

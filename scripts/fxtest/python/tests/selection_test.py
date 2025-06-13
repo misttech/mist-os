@@ -211,6 +211,7 @@ class SelectTestsTest(unittest.IsolatedAsyncioTestCase):
             fuchsia_dir="",
             out_dir="",
             test_json_file="",
+            disabled_ctf_tests_file="",
             log_file=None,
             test_list_file="",
         )

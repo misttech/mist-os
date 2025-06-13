@@ -8,7 +8,7 @@ use crate::diagnostics::{self, LogDisplayConfiguration};
 use crate::outcome::{Outcome, RunTestSuiteError};
 use crate::output::{self, RunReporter, Timestamp};
 use crate::params::{RunParams, TestParams, TimeoutBehavior};
-use crate::running_suite::{run_suite_and_collect_logs, RunningSuite};
+use crate::running_suite::{run_suite_and_collect_logs, RunningSuite, WaitForStartArgs};
 use diagnostics_data::LogTextDisplayOptions;
 use fidl_fuchsia_test_manager::{self as ftest_manager, SuiteRunnerProxy};
 use futures::prelude::*;
@@ -130,13 +130,14 @@ async fn run_test_chunk<'a, F: 'a + Future<Output = ()> + Unpin>(
     }
     let (suite_controller, suite_server_end) =
         fidl::endpoints::create_proxy::<ftest_manager::SuiteControllerMarker>();
-    let suite_start_fut = RunningSuite::wait_for_start(
-        suite_controller,
-        test_params.max_severity_logs,
+    let suite_start_fut = RunningSuite::wait_for_start(WaitForStartArgs {
+        proxy: suite_controller,
+        max_severity_logs: test_params.max_severity_logs,
         timeout,
-        std::time::Duration::from_secs(run_params.timeout_grace_seconds as u64),
-        None,
-    );
+        timeout_grace: std::time::Duration::from_secs(run_params.timeout_grace_seconds as u64),
+        max_pipelined: None,
+        no_cases_equals_success: test_params.no_cases_equals_success,
+    });
 
     runner_proxy.run(&test_params.test_url, run_options, suite_server_end)?;
 

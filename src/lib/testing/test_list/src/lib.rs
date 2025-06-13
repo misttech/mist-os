@@ -71,6 +71,9 @@ pub struct FuchsiaComponentExecutionEntry {
     /// Filters for which test cases in the suite to execute.
     pub test_filters: Option<Vec<String>>,
 
+    /// Whether an empty set of test cases counts as success or failure.
+    pub no_cases_equals_success: Option<bool>,
+
     /// If true, test cases in the suite marked "disabled" will be run anyway.
     #[serde(default)]
     pub also_run_disabled_tests: bool,

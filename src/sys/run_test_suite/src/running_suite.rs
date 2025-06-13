@@ -10,9 +10,9 @@ use crate::trace::duration;
 use crate::{artifacts, diagnostics};
 use diagnostics_data::Severity;
 use fidl_fuchsia_test_manager::{
-    self as ftest_manager, SuiteArtifactGeneratedEventDetails, SuiteStoppedEventDetails,
-    TestCaseArtifactGeneratedEventDetails, TestCaseFinishedEventDetails, TestCaseFoundEventDetails,
-    TestCaseStartedEventDetails, TestCaseStoppedEventDetails,
+    self as ftest_manager, LaunchError, SuiteArtifactGeneratedEventDetails,
+    SuiteStoppedEventDetails, TestCaseArtifactGeneratedEventDetails, TestCaseFinishedEventDetails,
+    TestCaseFoundEventDetails, TestCaseStartedEventDetails, TestCaseStoppedEventDetails,
 };
 use fuchsia_async as fasync;
 use futures::future::Either;
@@ -48,7 +48,13 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
     duration!(c"collect_suite");
 
     let RunningSuite {
-        mut event_stream, stopper, timeout, timeout_grace, max_severity_logs, ..
+        mut event_stream,
+        stopper,
+        timeout,
+        timeout_grace,
+        max_severity_logs,
+        no_cases_equals_success,
+        ..
     } = running_suite;
 
     let log_opts =
@@ -67,12 +73,17 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
     let collect_results_fut = async {
         while let Some(event_result) = event_stream.next().named("next_event").await {
             match event_result {
-                Err(e) => {
-                    suite_state
-                        .reporter
-                        .stopped(&output::ReportedOutcome::Error, Timestamp::Unknown)?;
-                    return Err(e);
-                }
+                Err(e) => match (e, no_cases_equals_success) {
+                    (RunTestSuiteError::Launch(LaunchError::NoMatchingCases), Some(true)) => {
+                        suite_state.lifecycle = Lifecycle::Stopped;
+                    }
+                    (e, _) => {
+                        suite_state
+                            .reporter
+                            .stopped(&output::ReportedOutcome::Error, Timestamp::Unknown)?;
+                        return Err(e);
+                    }
+                },
                 Ok(event) => {
                     let timestamp = Timestamp::from_nanos(event.timestamp);
                     match event.details.expect("event cannot be None") {
@@ -438,6 +449,7 @@ pub(crate) struct RunningSuite {
     max_severity_logs: Option<Severity>,
     timeout: Option<std::time::Duration>,
     timeout_grace: std::time::Duration,
+    no_cases_equals_success: Option<bool>,
 }
 
 struct RunningSuiteStopper(Arc<ftest_manager::SuiteControllerProxy>);
@@ -448,18 +460,30 @@ impl RunningSuiteStopper {
     }
 }
 
+pub(crate) struct WaitForStartArgs {
+    pub(crate) proxy: ftest_manager::SuiteControllerProxy,
+    pub(crate) max_severity_logs: Option<Severity>,
+    pub(crate) timeout: Option<std::time::Duration>,
+    pub(crate) timeout_grace: std::time::Duration,
+    pub(crate) max_pipelined: Option<usize>,
+    pub(crate) no_cases_equals_success: Option<bool>,
+}
+
 impl RunningSuite {
     /// Number of concurrently active WatchEvents requests. Chosen by testing powers of 2 when
     /// running a set of tests using ffx test against an emulator, and taking the value at
     /// which improvement stops.
     const DEFAULT_PIPELINED_REQUESTS: usize = 8;
-    pub(crate) async fn wait_for_start(
-        proxy: ftest_manager::SuiteControllerProxy,
-        max_severity_logs: Option<Severity>,
-        timeout: Option<std::time::Duration>,
-        timeout_grace: std::time::Duration,
-        max_pipelined: Option<usize>,
-    ) -> Self {
+    pub(crate) async fn wait_for_start(args: WaitForStartArgs) -> Self {
+        let WaitForStartArgs {
+            proxy,
+            max_severity_logs,
+            timeout,
+            timeout_grace,
+            max_pipelined,
+            no_cases_equals_success,
+        } = args;
+
         let proxy = Arc::new(proxy);
         let proxy_clone = proxy.clone();
         // Stream of fidl responses, with multiple concurrently active requests.
@@ -491,6 +515,7 @@ impl RunningSuite {
             timeout,
             timeout_grace,
             max_severity_logs,
+            no_cases_equals_success,
         }
     }
 
@@ -587,9 +612,15 @@ mod test {
             drop(suite_request_stream);
         });
 
-        let mut running_suite =
-            RunningSuite::wait_for_start(suite_proxy, None, None, std::time::Duration::ZERO, None)
-                .await;
+        let mut running_suite = RunningSuite::wait_for_start(WaitForStartArgs {
+            proxy: suite_proxy,
+            max_severity_logs: None,
+            timeout: None,
+            timeout_grace: std::time::Duration::ZERO,
+            max_pipelined: None,
+            no_cases_equals_success: None,
+        })
+        .await;
         assert_empty_events_eq!(
             running_suite.event_stream.next().await.unwrap().unwrap(),
             create_empty_event(0)
@@ -619,9 +650,15 @@ mod test {
             drop(suite_request_stream);
         });
 
-        let mut running_suite =
-            RunningSuite::wait_for_start(suite_proxy, None, None, std::time::Duration::ZERO, None)
-                .await;
+        let mut running_suite = RunningSuite::wait_for_start(WaitForStartArgs {
+            proxy: suite_proxy,
+            max_severity_logs: None,
+            timeout: None,
+            timeout_grace: std::time::Duration::ZERO,
+            max_pipelined: None,
+            no_cases_equals_success: None,
+        })
+        .await;
 
         for num in 0..4 {
             assert_empty_events_eq!(
@@ -642,9 +679,15 @@ mod test {
             drop(suite_request_stream);
         });
 
-        let mut running_suite =
-            RunningSuite::wait_for_start(suite_proxy, None, None, std::time::Duration::ZERO, None)
-                .await;
+        let mut running_suite = RunningSuite::wait_for_start(WaitForStartArgs {
+            proxy: suite_proxy,
+            max_severity_logs: None,
+            timeout: None,
+            timeout_grace: std::time::Duration::ZERO,
+            max_pipelined: None,
+            no_cases_equals_success: None,
+        })
+        .await;
         assert_empty_events_eq!(
             running_suite.event_stream.next().await.unwrap().unwrap(),
             create_empty_event(1)
@@ -790,9 +833,15 @@ mod test {
             let run_reporter = output::RunReporter::new(reporter.clone());
             let suite_reporter = run_reporter.new_suite("test-url").expect("create new suite");
 
-            let suite =
-                RunningSuite::wait_for_start(proxy, None, None, std::time::Duration::ZERO, None)
-                    .await;
+            let suite = RunningSuite::wait_for_start(WaitForStartArgs {
+                proxy,
+                max_severity_logs: None,
+                timeout: None,
+                timeout_grace: std::time::Duration::ZERO,
+                max_pipelined: None,
+                no_cases_equals_success: None,
+            })
+            .await;
             assert_eq!(
                 run_suite_and_collect_logs(
                     suite,
@@ -857,9 +906,15 @@ mod test {
             let run_reporter = output::RunReporter::new(reporter.clone());
             let suite_reporter = run_reporter.new_suite("test-url").expect("create new suite");
 
-            let suite =
-                RunningSuite::wait_for_start(proxy, None, None, std::time::Duration::ZERO, None)
-                    .await;
+            let suite = RunningSuite::wait_for_start(WaitForStartArgs {
+                proxy,
+                max_severity_logs: None,
+                timeout: None,
+                timeout_grace: std::time::Duration::ZERO,
+                max_pipelined: None,
+                no_cases_equals_success: None,
+            })
+            .await;
             assert_eq!(
                 run_suite_and_collect_logs(
                     suite,
@@ -939,9 +994,15 @@ mod test {
             let run_reporter = output::RunReporter::new(reporter.clone());
             let suite_reporter = run_reporter.new_suite("test-url").expect("create new suite");
 
-            let suite =
-                RunningSuite::wait_for_start(proxy, None, None, std::time::Duration::ZERO, Some(1))
-                    .await;
+            let suite = RunningSuite::wait_for_start(WaitForStartArgs {
+                proxy,
+                max_severity_logs: None,
+                timeout: None,
+                timeout_grace: std::time::Duration::ZERO,
+                max_pipelined: Some(1),
+                no_cases_equals_success: None,
+            })
+            .await;
             assert_eq!(
                 run_suite_and_collect_logs(
                     suite,
@@ -1018,9 +1079,15 @@ mod test {
             let run_reporter = output::RunReporter::new(reporter.clone());
             let suite_reporter = run_reporter.new_suite("test-url").expect("create new suite");
 
-            let suite =
-                RunningSuite::wait_for_start(proxy, None, None, std::time::Duration::ZERO, None)
-                    .await;
+            let suite = RunningSuite::wait_for_start(WaitForStartArgs {
+                proxy,
+                max_severity_logs: None,
+                timeout: None,
+                timeout_grace: std::time::Duration::ZERO,
+                max_pipelined: None,
+                no_cases_equals_success: None,
+            })
+            .await;
             assert_eq!(
                 run_suite_and_collect_logs(
                     suite,
@@ -1087,13 +1154,14 @@ mod test {
             let run_reporter = output::RunReporter::new(reporter.clone());
             let suite_reporter = run_reporter.new_suite("test-url").expect("create new suite");
 
-            let suite = RunningSuite::wait_for_start(
+            let suite = RunningSuite::wait_for_start(WaitForStartArgs {
                 proxy,
-                None,
-                Some(std::time::Duration::from_secs(2)),
-                std::time::Duration::ZERO,
-                None,
-            )
+                max_severity_logs: None,
+                timeout: Some(std::time::Duration::from_secs(2)),
+                timeout_grace: std::time::Duration::ZERO,
+                max_pipelined: None,
+                no_cases_equals_success: None,
+            })
             .await;
             assert_eq!(
                 run_suite_and_collect_logs(

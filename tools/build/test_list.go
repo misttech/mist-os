@@ -38,14 +38,16 @@ type TestListEntry struct {
 }
 
 type ExecutionDef struct {
-	Type                     string `json:"type"`
-	ComponentURL             string `json:"component_url"`
-	TimeoutSeconds           int    `json:"timeout_seconds,omitempty"`
-	Parallel                 uint16 `json:"parallel,omitempty"`
-	MaxSeverityLogs          string `json:"max_severity_logs,omitempty"`
-	MinSeverityLogs          string `json:"min_severity_logs,omitempty"`
-	Realm                    string `json:"realm,omitempty"`
-	CreateNoExceptionChannel bool   `json:"create_no_exception_channel,omitempty"`
+	Type                     string   `json:"type"`
+	ComponentURL             string   `json:"component_url"`
+	TimeoutSeconds           int      `json:"timeout_seconds,omitempty"`
+	Parallel                 uint16   `json:"parallel,omitempty"`
+	MaxSeverityLogs          string   `json:"max_severity_logs,omitempty"`
+	MinSeverityLogs          string   `json:"min_severity_logs,omitempty"`
+	TestFilters              []string `json:"test_filters,omitempty"`
+	NoCasesEqualsSuccess     bool     `json:"no_cases_equals_success,omitempty"`
+	Realm                    string   `json:"realm,omitempty"`
+	CreateNoExceptionChannel bool     `json:"create_no_exception_channel,omitempty"`
 }
 
 // TestTag represents arbitrary test metadata.
@@ -58,6 +60,7 @@ type TestTag struct {
 // testListEntries.
 func LoadTestList(testListPath string) (map[string]TestListEntry, error) {
 	var testList TestList
+
 	if err := jsonutil.ReadFromFile(testListPath, &testList); err != nil {
 		if os.IsNotExist(err) {
 			return nil, nil

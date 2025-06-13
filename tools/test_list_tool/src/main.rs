@@ -60,6 +60,25 @@ struct LogSettings {
     max_severity: Option<Severity>,
     min_severity: Option<Severity>,
 }
+#[derive(Debug, Eq, PartialEq, Deserialize)]
+struct CtfDisableSuite {
+    name: String,
+    compact_name: Option<String>,
+    cases: Vec<CtfDisableCase>,
+}
+
+#[derive(Debug, Eq, PartialEq, Deserialize)]
+struct CtfDisableCase {
+    name: String,
+    disabled: bool,
+    bug: String,
+}
+
+type DisableSuiteMap = HashMap<String, Vec<CtfDisableCase>>;
+
+fn ctf_suites_into_map(suites: Vec<CtfDisableSuite>) -> DisableSuiteMap {
+    suites.into_iter().map(|suite| (suite.name.clone(), suite.cases)).collect()
+}
 
 #[derive(Debug, Eq, PartialEq, Serialize, Deserialize, Clone)]
 struct TestComponentsJsonEntry {
@@ -227,20 +246,44 @@ fn update_tags_from_facets(
     Ok(())
 }
 
-fn to_test_list_entry(test_entry: &TestEntry, realm: Option<String>) -> TestListEntry {
+struct ToTestListEntryArgs<'a, 'b> {
+    test_entry: &'a TestEntry,
+    realm: Option<String>,
+    disable_suites: &'b DisableSuiteMap,
+}
+
+fn to_test_list_entry(args: ToTestListEntryArgs<'_, '_>) -> TestListEntry {
+    let ToTestListEntryArgs { test_entry, realm, disable_suites } = args;
     let execution = match &test_entry.package_url {
-        Some(url) => Some(ExecutionEntry::FuchsiaComponent(FuchsiaComponentExecutionEntry {
-            component_url: url.to_string(),
-            test_args: vec![],
-            timeout_seconds: None,
-            test_filters: None,
-            also_run_disabled_tests: false,
-            parallel: None,
-            max_severity_logs: test_entry.get_max_log_severity(),
-            min_severity_logs: test_entry.get_min_log_severity(),
-            realm: realm,
-            create_no_exception_channel: test_entry.create_no_exception_channel.unwrap_or(false),
-        })),
+        Some(url) => {
+            let mut filters = Vec::new();
+            if let Some(cases) = disable_suites.get(url) {
+                for case in cases {
+                    if case.disabled {
+                        filters.push(format!("-{}", case.name));
+                    }
+                }
+            }
+            let (filters, no_cases_equals_success) = match filters.len() {
+                0 => (None, None),
+                _ => (Some(filters), Some(true)),
+            };
+            Some(ExecutionEntry::FuchsiaComponent(FuchsiaComponentExecutionEntry {
+                component_url: url.to_string(),
+                test_args: vec![],
+                timeout_seconds: None,
+                test_filters: filters,
+                no_cases_equals_success,
+                also_run_disabled_tests: false,
+                parallel: None,
+                max_severity_logs: test_entry.get_max_log_severity(),
+                min_severity_logs: test_entry.get_min_log_severity(),
+                realm: realm,
+                create_no_exception_channel: test_entry
+                    .create_no_exception_channel
+                    .unwrap_or(false),
+            }))
+        }
         None => None,
     };
 
@@ -305,6 +348,18 @@ fn read_tests_json(file: &Utf8PathBuf) -> Result<Vec<TestsJsonEntry>, Error> {
     fs::File::open(&file)?.read_to_string(&mut buffer)?;
     let t: Vec<TestsJsonEntry> = serde_json::from_str(&buffer)?;
     Ok(t)
+}
+
+fn read_ctf_disable(file: &Option<Utf8PathBuf>) -> Result<Option<Vec<CtfDisableSuite>>, Error> {
+    match file {
+        None => Ok(None),
+        Some(file) => {
+            let mut buffer = String::new();
+            fs::File::open(&file)?.read_to_string(&mut buffer)?;
+            let t: Vec<CtfDisableSuite> = serde_json::from_str(&buffer)?;
+            Ok(Some(t))
+        }
+    }
 }
 
 fn read_test_components_json(file: &Utf8PathBuf) -> Result<Vec<TestComponentsJsonEntry>, Error> {
@@ -382,6 +437,10 @@ fn run_tool() -> Result<(), Error> {
     }
 
     let tests_json = read_tests_json(&opt.input)?;
+    let ctf_disable_map = match read_ctf_disable(&opt.disabled_ctf_tests)? {
+        None => HashMap::new(),
+        Some(suites) => ctf_suites_into_map(suites),
+    };
     let test_components_json = read_test_components_json(&opt.test_components_list)?;
     let test_components_map = TestComponentsJsonEntry::convert_to_map(test_components_json)?;
 
@@ -396,7 +455,11 @@ fn run_tool() -> Result<(), Error> {
                 None => None,
             };
             // Construct the base TestListEntry.
-            let mut test_list_entry = to_test_list_entry(&entry.test, realm.clone());
+            let mut test_list_entry = to_test_list_entry(ToTestListEntryArgs {
+                test_entry: &entry.test,
+                realm: realm.clone(),
+                disable_suites: &ctf_disable_map,
+            });
             let mut test_tags = FuchsiaTestTags::new();
             let pkg_manifests = entry.test.package_manifests.clone().unwrap_or(vec![]);
             test_tags.realm = realm;
@@ -790,6 +853,7 @@ mod tests {
                     test_args: vec![],
                     timeout_seconds: None,
                     test_filters: None,
+                    no_cases_equals_success: None,
                     also_run_disabled_tests: false,
                     parallel: None,
                     max_severity_logs,
@@ -800,38 +864,60 @@ mod tests {
             };
 
         // Default severity.
-        let test_list_entry = to_test_list_entry(&make_test_entry(None, None), None);
+        let test_list_entry = to_test_list_entry(ToTestListEntryArgs {
+            test_entry: &make_test_entry(None, None),
+            realm: None,
+            disable_suites: &HashMap::new(),
+        });
         assert_eq!(test_list_entry, make_expected_test_list_entry(None, None, false),);
 
         // Inner default severity.
-        let test_list_entry = to_test_list_entry(
-            &make_test_entry(Some(LogSettings { max_severity: None, min_severity: None }), None),
-            None,
-        );
+        let test_list_entry = to_test_list_entry(ToTestListEntryArgs {
+            test_entry: &make_test_entry(
+                Some(LogSettings { max_severity: None, min_severity: None }),
+                None,
+            ),
+
+            realm: None,
+            disable_suites: &HashMap::new(),
+        });
         assert_eq!(test_list_entry, make_expected_test_list_entry(None, None, false),);
 
         // Explicit severity
-        let test_list_entry = to_test_list_entry(
-            &make_test_entry(
+        let test_list_entry = to_test_list_entry(ToTestListEntryArgs {
+            test_entry: &make_test_entry(
                 Some(LogSettings { max_severity: Some(Severity::Error), min_severity: None }),
                 None,
             ),
-            None,
-        );
+
+            realm: None,
+            disable_suites: &HashMap::new(),
+        });
         assert_eq!(
             test_list_entry,
             make_expected_test_list_entry(Some(Severity::Error), None, false)
         );
 
         // Explicit create_no_exception_channel.
-        let test_list_entry = to_test_list_entry(&make_test_entry(None, Some(true)), None);
+        let test_list_entry = to_test_list_entry(ToTestListEntryArgs {
+            test_entry: &make_test_entry(None, Some(true)),
+            realm: None,
+            disable_suites: &HashMap::new(),
+        });
         assert_eq!(test_list_entry, make_expected_test_list_entry(None, None, true),);
-        let test_list_entry = to_test_list_entry(&make_test_entry(None, Some(false)), None);
+        let test_list_entry = to_test_list_entry(ToTestListEntryArgs {
+            test_entry: &make_test_entry(None, Some(false)),
+            realm: None,
+            disable_suites: &HashMap::new(),
+        });
         assert_eq!(test_list_entry, make_expected_test_list_entry(None, None, false),);
 
         // pass in realm
-        let test_list_entry =
-            to_test_list_entry(&make_test_entry(None, None), Some("/some/moniker".into()));
+        let test_list_entry = to_test_list_entry(ToTestListEntryArgs {
+            test_entry: &make_test_entry(None, None),
+            realm: Some("/some/moniker".into()),
+            disable_suites: &HashMap::new(),
+        });
         let expected_list = TestListEntry {
             name: "test-name".to_string(),
             labels: vec!["test-label".to_string()],
@@ -843,6 +929,7 @@ mod tests {
                 test_args: vec![],
                 timeout_seconds: None,
                 test_filters: None,
+                no_cases_equals_success: None,
                 also_run_disabled_tests: false,
                 parallel: None,
                 max_severity_logs: None,
@@ -854,7 +941,11 @@ mod tests {
         assert_eq!(test_list_entry, expected_list);
 
         // Host test
-        let test_list_entry = to_test_list_entry(&host_test_entry, None);
+        let test_list_entry = to_test_list_entry(ToTestListEntryArgs {
+            test_entry: &host_test_entry,
+            realm: None,
+            disable_suites: &HashMap::new(),
+        });
         assert_eq!(
             test_list_entry,
             TestListEntry {
@@ -1203,6 +1294,69 @@ mod tests {
                     },
                 }
             ],
+        );
+    }
+
+    #[test]
+    fn test_read_ctf_disable() {
+        let data = r#"
+                [
+                {
+                    "name": "fuchsia-pkg://fuchsia.com/fdio-spawn-tests-package#meta/test-root.cm",
+                    "cases": [
+                        {
+                            "name": "main",
+                            "disabled": true,
+                            "bug": ""
+                        }
+                    ],
+                    "compact_name": "fx/fdio-spawn-tests-package#meta/test-root.cm"
+                },
+                {
+                    "name": "fuchsia-pkg://fuchsia.com/fdio-spawn-tests-package#meta/resolve-test-root.cm",
+                    "cases": [
+                        {
+                            "name": "main2",
+                            "disabled": false,
+                            "bug": "b/12345"
+                        }
+                    ],
+                    "compact_name": "fx/fdio-spawn-tests-package#meta/resolve-test-root.cm"
+                }
+            ]"#;
+        let tmp = tempdir().expect("failed to get tempdir");
+        let dir = Utf8Path::from_path(tmp.path()).unwrap();
+        let disable_json_path = dir.join("tests.json");
+        fs::write(&disable_json_path, data)
+            .expect("failed to write disabled_tests.json to tempfile");
+        let disable_json =
+            read_ctf_disable(&Some(disable_json_path)).expect("read_ctf_disable() failed");
+        assert_eq!(
+            disable_json,
+            Some(vec![
+                CtfDisableSuite {
+                    name: "fuchsia-pkg://fuchsia.com/fdio-spawn-tests-package#meta/test-root.cm".to_string(),
+                    compact_name: Some("fx/fdio-spawn-tests-package#meta/test-root.cm".to_string()),
+                    cases: vec![
+                        CtfDisableCase {
+                            name: "main".to_string(),
+                            disabled: true,
+                            bug: "".to_string(),
+                        }
+                    ]
+                },
+                CtfDisableSuite {
+                    name: "fuchsia-pkg://fuchsia.com/fdio-spawn-tests-package#meta/resolve-test-root.cm".to_string(),
+                    compact_name: Some("fx/fdio-spawn-tests-package#meta/resolve-test-root.cm".to_string()),
+                    cases: vec![
+                        CtfDisableCase {
+                            name: "main2".to_string(),
+                            disabled: false,
+                            bug: "b/12345".to_string(),
+                        }
+                    ]
+                },
+            ]),
         );
     }
 

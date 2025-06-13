@@ -29,6 +29,7 @@ def _make_exec_env(
         fuchsia_dir,
         out_dir,
         test_json_file="",
+        disabled_ctf_tests_file="",
         log_file=None,
         test_list_file="",
     )
@@ -179,6 +180,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                         realm="foo_tests",
                         max_severity_logs="INFO",
                         min_severity_logs="TRACE",
+                        test_filters=["-foo", "-bar"],
                     ),
                 ),
             ),
@@ -197,6 +199,15 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 "run",
                 "--realm",
                 "foo_tests",
+            ],
+            command_line,
+        )
+        self.assertContainsSublist(
+            [
+                "--test-filter",
+                "-foo",
+                "--test-filter",
+                "-bar",
             ],
             command_line,
         )

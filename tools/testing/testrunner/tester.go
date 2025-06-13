@@ -632,6 +632,8 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 			Parallel:                 test.Parallel,
 			MaxSeverityLogs:          test.LogSettings.MaxSeverity,
 			MinSeverityLogs:          test.LogSettings.MinSeverity,
+			TestFilters:              test.TestFilters,
+			NoCasesEqualsSuccess:     test.NoCasesEqualsSuccess,
 			Realm:                    test.Realm,
 			CreateNoExceptionChannel: test.CreateNoExceptionChannel,
 		},

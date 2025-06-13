@@ -771,6 +771,8 @@ class AsyncMain:
                     exec_env.out_dir,
                     "--input",
                     exec_env.test_json_file,
+                    "--disabled-ctf-tests",
+                    exec_env.disabled_ctf_tests_file,
                     "--output",
                     out_path,
                     "--test-components",

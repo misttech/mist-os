@@ -48,6 +48,13 @@ class TestListExecutionEntry:
     # If set, this is the --min-severity-logs argument for ffx test.
     min_severity_logs: str | None = None
 
+    # If set, this is test filters to pass to ffx test.
+    test_filters: list[str] | None = None
+
+    # If set, the test_filter selecting an empty set of cases to run is
+    # treated as success rather than failure.
+    no_cases_equals_success: bool = False
+
 
 @dataparse
 @dataclass

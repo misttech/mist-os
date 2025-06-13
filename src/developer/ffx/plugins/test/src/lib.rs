@@ -259,6 +259,7 @@ async fn run_test<W: 'static + Write + Send + Sync>(
         show_full_moniker: cmd.show_full_moniker_in_logs,
     };
 
+    let no_cases_equals_success = cmd.no_cases_equals_success;
     let test_definitions =
         test_params_from_args(&remote_control, cmd, experiments.json_input.enabled).await?;
 
@@ -338,7 +339,11 @@ capabilities, pass in correct realm. See https://fuchsia.dev/go/components/non-h
                     ffx_bail!("An internal error occurred. Please check logs and report bug.")
                 }
                 ftest_manager::LaunchError::NoMatchingCases => {
-                    return_user_error!("No test cases match specified test filters.")
+                    if no_cases_equals_success {
+                        Ok(())
+                    } else {
+                        return_user_error!("No test cases match specified test filters.")
+                    }
                 }
                 ftest_manager::LaunchError::InvalidManifest => {
                     return_user_error!("Test manifest is invalid.")
@@ -419,6 +424,8 @@ async fn test_params_from_args(
                 realm: provided_realm.into(),
                 timeout_seconds: cmd.timeout.and_then(std::num::NonZeroU32::new),
                 test_filters: if cmd.test_filter.len() == 0 { None } else { Some(cmd.test_filter) },
+                // If generating from args, empty cases from negative filter means fail.
+                no_cases_equals_success: None,
                 max_severity_logs: cmd.max_severity_logs,
                 min_severity_logs: cmd.min_severity_logs,
                 also_run_disabled_tests: cmd.run_disabled,
@@ -662,12 +669,14 @@ mod test {
                     experimental_parallel_execution: None,
                     break_on_failure: false,
                     no_exception_channel: false,
+                    no_cases_equals_success: false,
                 },
                 vec![run_test_suite_lib::TestParams {
                     test_url: "my-test-url".to_string(),
                     realm: None.into(),
                     timeout_seconds: None,
                     test_filters: None,
+                    no_cases_equals_success: None,
                     also_run_disabled_tests: false,
                     parallel: None,
                     test_args: vec![],
@@ -699,12 +708,14 @@ mod test {
                     experimental_parallel_execution: None,
                     break_on_failure: false,
                     no_exception_channel: true,
+                    no_cases_equals_success: false,
                 },
                 vec![run_test_suite_lib::TestParams {
                     test_url: "my-test-url".to_string(),
                     realm: None.into(),
                     timeout_seconds: None,
                     test_filters: None,
+                    no_cases_equals_success: None,
                     also_run_disabled_tests: false,
                     parallel: None,
                     test_args: vec![],
@@ -736,6 +747,7 @@ mod test {
                     experimental_parallel_execution: None,
                     break_on_failure: false,
                     no_exception_channel: false,
+                    no_cases_equals_success: false,
                 },
                 vec![
                     run_test_suite_lib::TestParams {
@@ -743,6 +755,7 @@ mod test {
                         realm: None.into(),
                         timeout_seconds: None,
                         test_filters: None,
+                        no_cases_equals_success: None,
                         also_run_disabled_tests: false,
                         max_severity_logs: Some(diagnostics_data::Severity::Warn),
                         min_severity_logs: vec![],
@@ -776,12 +789,14 @@ mod test {
                     experimental_parallel_execution: None,
                     break_on_failure: false,
                     no_exception_channel: false,
+                    no_cases_equals_success: false,
                 },
                 vec![run_test_suite_lib::TestParams {
                     test_url: "my-test-url".to_string(),
                     realm: None.into(),
                     timeout_seconds: Some(NonZeroU32::new(10).unwrap()),
                     test_filters: Some(vec!["filter".to_string()]),
+                    no_cases_equals_success: None,
                     also_run_disabled_tests: true,
                     max_severity_logs: None,
                     min_severity_logs: vec![],
@@ -815,6 +830,7 @@ mod test {
                     experimental_parallel_execution: None,
                     break_on_failure: false,
                     no_exception_channel: false,
+                    no_cases_equals_success: false,
                 },
                 vec![
                     run_test_suite_lib::TestParams {
@@ -822,6 +838,7 @@ mod test {
                         realm: None.into(),
                         timeout_seconds: None,
                         test_filters: None,
+                        no_cases_equals_success: None,
                         also_run_disabled_tests: false,
                         max_severity_logs: None,
                         min_severity_logs: vec![],
@@ -836,6 +853,7 @@ mod test {
                         realm: None.into(),
                         timeout_seconds: Some(NonZeroU32::new(60).unwrap()),
                         test_filters: None,
+                        no_cases_equals_success: None,
                         also_run_disabled_tests: false,
                         max_severity_logs: None,
                         min_severity_logs: vec![],
@@ -850,6 +868,7 @@ mod test {
                         realm: None.into(),
                         timeout_seconds: None,
                         test_filters: Some(vec!["Unit".to_string()]),
+                        no_cases_equals_success: None,
                         also_run_disabled_tests: true,
                         max_severity_logs: Some(diagnostics_data::Severity::Info),
                         min_severity_logs: vec![],
@@ -912,6 +931,7 @@ mod test {
                 experimental_parallel_execution: None,
                 break_on_failure: false,
                 no_exception_channel: false,
+                no_cases_equals_success: false,
             },
             true,
         )
@@ -950,6 +970,7 @@ mod test {
                     experimental_parallel_execution: None,
                     break_on_failure: false,
                     no_exception_channel: false,
+                    no_cases_equals_success: false,
                 },
             ),
             (
@@ -976,6 +997,7 @@ mod test {
                     experimental_parallel_execution: None,
                     break_on_failure: false,
                     no_exception_channel: false,
+                    no_cases_equals_success: false,
                 },
             ),
             (
@@ -1002,6 +1024,7 @@ mod test {
                     experimental_parallel_execution: None,
                     break_on_failure: false,
                     no_exception_channel: false,
+                    no_cases_equals_success: false,
                 },
             ),
         ];

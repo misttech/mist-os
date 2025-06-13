@@ -190,6 +190,11 @@ pub struct RunCommand {
     /// with those created by the test.
     #[argh(switch)]
     pub no_exception_channel: bool,
+
+    /// when set, the test_filter selecting an empty set of cases to run is treated
+    /// as success rather than failure.
+    #[argh(switch)]
+    pub no_cases_equals_success: bool,
 }
 
 #[derive(ArgsInfo, FromArgs, Debug, PartialEq)]

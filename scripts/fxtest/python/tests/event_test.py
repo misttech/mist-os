@@ -84,7 +84,11 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
         recorder.emit_parse_flags({"test": True})
         recorder.emit_process_env(
             environment.ExecutionEnvironment(
-                fuchsia_dir=".", out_dir=".", log_file=None, test_json_file="."
+                fuchsia_dir=".",
+                out_dir=".",
+                log_file=None,
+                test_json_file=".",
+                disabled_ctf_tests_file="",
             )
         )
         recorder.emit_instruction_message("This is just a test")
