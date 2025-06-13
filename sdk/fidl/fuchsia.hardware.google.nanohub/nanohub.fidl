@@ -6,6 +6,8 @@ library fuchsia.hardware.google.nanohub;
 
 using zx;
 
+alias FirmwareName = string:64;
+
 /// Client is expected to pass the vmo handle to nanohub when issuing a DownloadFirmware request.
 @discoverable
 open protocol Device {
@@ -16,6 +18,11 @@ open protocol Device {
         // Specify the location to jump to for reading the firmware.
         offset uint64;
     }) -> () error zx.Status;
+
+    /// The name of the firmware binary running on the MCU.
+    strict GetFirmwareName() -> (struct {
+        firmware_name FirmwareName;
+    });
 };
 
 service Service {
