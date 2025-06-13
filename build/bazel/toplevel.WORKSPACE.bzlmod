@@ -29,77 +29,6 @@ fuchsia_host_tag_alt = build_config.host_tag_alt
 fuchsia_host_os = build_config.host_os
 ninja_output_dir = build_config.ninja_output_dir
 
-# Create the @fuchsia_icu_config repository which contains the constants.bzl file
-# exporting generating configuration constants related to the ICU library flavors
-# buildifier: disable=load-on-top
-load(
-    "//build/bazel/icu:repository_rules.bzl",
-    "fuchsia_icu_config_repository",
-)
-
-fuchsia_icu_config_repository(
-    name = "fuchsia_icu_config",
-    # LINT.IfChange
-    content_hash_file = "fuchsia_build_generated/fuchsia_icu_config.hash",
-    # LINT.ThenChange(scripts/workspace_utils.py)
-)
-
-# buildifier: disable=load-on-top
-load(
-    "//build/bazel/toolchains/rust:repository_rules.bzl",
-    "generate_prebuilt_rust_toolchain_repository",
-)
-
-generate_prebuilt_rust_toolchain_repository(
-    name = "fuchsia_prebuilt_rust",
-    rust_install_dir = "prebuilt/third_party/rust/" + fuchsia_host_tag,
-)
-
-register_toolchains(
-    "@fuchsia_prebuilt_rust//:rust_" + fuchsia_host_tag_alt,
-    "@fuchsia_prebuilt_rust//:rust_fuchsia_x64",
-    "@fuchsia_prebuilt_rust//:rust_fuchsia_arm64",
-    "@fuchsia_prebuilt_rust//:rust_fuchsia_riscv64",
-)
-
-# buildifier: disable=load-on-top
-load("//build/bazel/repository_rules:boringssl_repository.bzl", "boringssl_repository")
-
-boringssl_repository(
-    name = "boringssl",
-    # LINT.IfChange
-    content_hash_file = "fuchsia_build_generated/boringssl.hash",
-    # LINT.ThenChange(scripts/workspace_utils.py)
-)
-
-# buildifier: disable=load-on-top
-load(
-    "//build/bazel/toolchains/clang:repository_rules.bzl",
-    "generate_prebuilt_clang_toolchain_repository",
-    "generate_prebuilt_llvm_repository",
-)
-
-generate_prebuilt_clang_toolchain_repository(
-    name = "prebuilt_clang",
-    clang_install_dir = "@fuchsia_build_config//:host_prebuilts/clang",
-    # LINT.IfChange
-    repository_version_file = "fuchsia_build_generated/prebuilt_clang.hash",
-    # LINT.ThenChange(scripts/workspace_utils.py)
-)
-register_toolchains("@prebuilt_clang//:host_clang_%s_x64_cc_toolchain" % fuchsia_host_os)
-register_toolchains("@prebuilt_clang//:host_clang_%s_arm64_cc_toolchain" % fuchsia_host_os)
-
-generate_prebuilt_llvm_repository(
-    name = "prebuilt_llvm",
-    # NOTE: We don't have Fuchsia variant of LLVM libraries yet, so always use
-    # host_platform's prebuilts for now. Currently, this repository is only used
-    # to expose headers from prebuilt LLVM, so it should make no difference as
-    # headers are the same across different platforms.
-    #
-    # See https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/llvm/BUILD.gn;l=51;drc=468d94479b10f5613ca928d782990e5340e943a4
-    llvm_install_dir = "prebuilt/third_party/llvm/" + fuchsia_host_tag,
-)
-
 # buildifier: disable=load-on-top
 load(
     "//build/bazel/fuchsia_idk:repository_rules.bzl",
@@ -127,7 +56,6 @@ load(
     "@rules_fuchsia//fuchsia:deps.bzl",
     "fuchsia_sdk_repository",
     "register_fuchsia_sdk_toolchain",
-    "rules_fuchsia_deps",
 )
 
 # A repository used to expose SDK atoms that are not yet ready to be
@@ -154,21 +82,3 @@ fuchsia_sdk_repository(
 register_fuchsia_sdk_toolchain()
 
 register_toolchains("//:fuchsia_sdk_devicetree_toolchain")
-
-# buildifier: disable=load-on-top
-load(
-    "@fuchsia_clang//:defs.bzl",
-    "register_clang_toolchains",
-)
-
-register_clang_toolchains()
-
-load(
-    "//build/bazel/assembly:developer_overrides/repository_rules.bzl",
-    "assembly_developer_overrides_repository",
-)
-
-assembly_developer_overrides_repository(
-    name = "assembly_developer_overrides",
-    overrides_map_from_gn = "fuchsia_build_generated/assembly_developer_overrides.json",
-)

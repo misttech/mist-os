@@ -132,6 +132,8 @@ fuchsia_clang_ext.local(
 )
 use_repo(fuchsia_clang_ext, "fuchsia_clang")
 
+register_toolchains("@fuchsia_clang//:all")
+
 # `@fuchsia_clang` is hardcoded when generating SDK build files, so it is
 # necessary to inject it into `fuchsia_sdk_ext`. Without this, the SDK
 # repository can only refer to `@fuchsia_clang` with its canonical name, and
@@ -155,3 +157,82 @@ compact_python_runtime_repository(
 )
 
 register_toolchains("@prebuilt_python//:all")
+
+# Create the @fuchsia_icu_config repository which contains the constants.bzl file
+# exporting generating configuration constants related to the ICU library flavors
+fuchsia_icu_config_repository = use_repo_rule(
+    "//build/bazel/icu:repository_rules.bzl",
+    "fuchsia_icu_config_repository",
+)
+
+fuchsia_icu_config_repository(
+    name = "fuchsia_icu_config",
+    # LINT.IfChange
+    content_hash_file = "fuchsia_build_generated/fuchsia_icu_config.hash",
+    # LINT.ThenChange(scripts/workspace_utils.py)
+)
+
+generate_prebuilt_rust_toolchain_repository = use_repo_rule(
+    "//build/bazel/toolchains/rust:repository_rules.bzl",
+    "generate_prebuilt_rust_toolchain_repository",
+)
+
+generate_prebuilt_rust_toolchain_repository(
+    name = "fuchsia_prebuilt_rust",
+    rust_install_dir = "@@fuchsia_sdk_common++fuchsia_build_config_ext+fuchsia_build_config//:host_prebuilts/rust",
+)
+
+register_toolchains("@fuchsia_prebuilt_rust//:all")
+
+assembly_developer_overrides_repository = use_repo_rule(
+    "//build/bazel/assembly:developer_overrides/repository_rules.bzl",
+    "assembly_developer_overrides_repository",
+)
+
+assembly_developer_overrides_repository(
+    name = "assembly_developer_overrides",
+    overrides_map_from_gn = "fuchsia_build_generated/assembly_developer_overrides.json",
+)
+
+boringssl_repository = use_repo_rule(
+    "//build/bazel/repository_rules:boringssl_repository.bzl",
+    "boringssl_repository",
+)
+
+boringssl_repository(
+    name = "boringssl",
+    # LINT.IfChange
+    content_hash_file = "fuchsia_build_generated/boringssl.hash",
+    # LINT.ThenChange(scripts/workspace_utils.py)
+)
+
+generate_prebuilt_clang_toolchain_repository = use_repo_rule(
+    "//build/bazel/toolchains/clang:repository_rules.bzl",
+    "generate_prebuilt_clang_toolchain_repository",
+)
+
+generate_prebuilt_clang_toolchain_repository(
+    name = "prebuilt_clang",
+    clang_install_dir = "@@fuchsia_sdk_common++fuchsia_build_config_ext+fuchsia_build_config//:host_prebuilts/clang",
+    # LINT.IfChange
+    repository_version_file = "fuchsia_build_generated/prebuilt_clang.hash",
+    # LINT.ThenChange(scripts/workspace_utils.py)
+)
+
+register_toolchains("@prebuilt_clang//:all")
+
+generate_prebuilt_llvm_repository = use_repo_rule(
+    "//build/bazel/toolchains/clang:repository_rules.bzl",
+    "generate_prebuilt_llvm_repository",
+)
+
+generate_prebuilt_llvm_repository(
+    name = "prebuilt_llvm",
+    # NOTE: We don't have Fuchsia variant of LLVM libraries yet, so always use
+    # host_platform's prebuilts for now. Currently, this repository is only used
+    # to expose headers from prebuilt LLVM, so it should make no difference as
+    # headers are the same across different platforms.
+    #
+    # See https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/llvm/BUILD.gn;l=51;drc=468d94479b10f5613ca928d782990e5340e943a4
+    llvm_install_dir = "@@fuchsia_sdk_common++fuchsia_build_config_ext+fuchsia_build_config//:host_prebuilts/llvm",
+)

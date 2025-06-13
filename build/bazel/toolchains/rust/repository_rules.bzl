@@ -4,15 +4,21 @@
 
 """Repository rules used to populate Rust-based repositories."""
 
-def _generate_prebuilt_rust_toolchain_repository_impl(repo_ctx):
-    repo_ctx.file("WORKSPACE.bazel", content = "")
+load(
+    "@rules_fuchsia//fuchsia/workspace:utils.bzl",
+    "abspath_from_full_label_or_repo_relpath",
+)
 
+def _generate_prebuilt_rust_toolchain_repository_impl(repo_ctx):
     # Symlink the content of the Rust installation directory into the repository.
     # This allows us to add Bazel-specific files in this location.
     repo_ctx.execute(
         [
             repo_ctx.path(Label("@//build/bazel/scripts:symlink-directory.py")),
-            repo_ctx.attr.rust_install_dir,
+            abspath_from_full_label_or_repo_relpath(
+                repo_ctx,
+                repo_ctx.attr.rust_install_dir,
+            ),
             ".",
         ],
         quiet = False,  # False for debugging!
@@ -29,7 +35,7 @@ generate_prebuilt_rust_toolchain_repository = repository_rule(
     attrs = {
         "rust_install_dir": attr.string(
             mandatory = True,
-            doc = "Location of prebuilt Rust toolchain installation",
+            doc = "Location of prebuilt Rust toolchain installation, a full label, or relative to workspace dir",
         ),
     },
 )

@@ -261,7 +261,7 @@ platform(
     # Create symlinks used to locate host prebuilts without an explicit
     # fuchsia_host_tag in their path, making the top-level MODULE.bazel easier
     # to write.
-    prebuilt_host_subdirs = ["go", "rust"]
+    prebuilt_host_subdirs = ["go", "rust", "llvm"]
     prebuilt_host_tools = ["ninja", "gn", "buildifier"]
 
     # In case users set a custom clang prefix in GN, respect that config.

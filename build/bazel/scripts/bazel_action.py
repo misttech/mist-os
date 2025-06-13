@@ -95,6 +95,14 @@ _BAZEL_NO_CONTENT_HASH_REPOSITORIES = (
     "gn_targets",
 )
 
+# Maps from apparent repo names to canonical repo names.
+#
+# This dictionary is created for determining the paths for external
+# repositories, which use canonical repo names as directory names.
+_APPARENT_REPO_NAME_TO_CANONICAL = {
+    "fuchsia_prebuilt_rust": "+_repo_rules+fuchsia_prebuilt_rust",
+}
+
 # Technical notes on input (source and build files) located in Bazel external
 # repositories.
 #
@@ -671,7 +679,12 @@ class BazelLabelMapper(object):
 
             # @@ is used with canonical repo names, so remove both @@ and @.
             repository_name = repository.removeprefix("@@").removeprefix("@")
-            repository_dir = self._external_dir_prefix + repository_name
+            repository_dir = (
+                self._external_dir_prefix
+                + _APPARENT_REPO_NAME_TO_CANONICAL.get(
+                    repository_name, repository_name
+                )
+            )
             from_external_repository = True
 
         package, colon, target = package_label.partition(":")

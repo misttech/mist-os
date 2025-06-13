@@ -36,8 +36,6 @@ def _generate_prebuilt_clang_toolchain_impl(repo_ctx):
         # re-generated.
         repo_ctx.path(Label("@//:" + repo_ctx.attr.repository_version_file))
 
-    repo_ctx.file("WORKSPACE.bazel", content = "")
-
     repo_ctx.symlink(
         repo_ctx.path(Label("@//build/bazel/toolchains/clang:prebuilt_clang.BUILD.bazel")),
         "BUILD.bazel",
@@ -63,8 +61,6 @@ generate_prebuilt_clang_toolchain_repository = repository_rule(
 )
 
 def _generate_prebuilt_llvm_repository_impl(repo_ctx):
-    repo_ctx.file("WORKSPACE.bazel", content = "")
-
     workspace_dir = str(repo_ctx.workspace_root)
 
     # Symlink the content of the LLVM installation directory into the repository.
@@ -77,7 +73,10 @@ def _generate_prebuilt_llvm_repository_impl(repo_ctx):
     repo_ctx.execute(
         [
             script_path,
-            repo_ctx.attr.llvm_install_dir,
+            abspath_from_full_label_or_repo_relpath(
+                repo_ctx,
+                repo_ctx.attr.llvm_install_dir,
+            ),
             ".",
         ],
         quiet = False,  # False for debugging!
@@ -94,7 +93,7 @@ generate_prebuilt_llvm_repository = repository_rule(
     attrs = {
         "llvm_install_dir": attr.string(
             mandatory = True,
-            doc = "Location of prebuilt LLVM toolchain installation",
+            doc = "Location of prebuilt LLVM toolchain installation, a full label, or relative to workspace dir",
         ),
     },
 )
