@@ -879,11 +879,6 @@ func infraToolLogChecks() []FailureModeCheck {
 			Type: swarmingOutputType,
 		},
 		&stringInLogCheck{
-			String:             "Sending signal 9 to service 'zygote'",
-			Type:               syslogType,
-			SkipAllPassedTests: true,
-		},
-		&stringInLogCheck{
 			String: fmt.Sprintf("botanist ERROR: %s", sshutilconstants.FailedToStartSshSessionMsg),
 			Type:   swarmingOutputType,
 		},
