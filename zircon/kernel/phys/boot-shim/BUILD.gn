@@ -7,6 +7,7 @@
 import("//build/testing/boot_tests/zbi_test.gni")
 import("//build/testing/environments.gni")
 import("//build/zbi/kernel_cmdline.gni")
+import("//build/zircon/zircon_cpu.gni")
 import("//zircon/kernel/phys/boot-shim/devicetree.gni")
 import("//zircon/kernel/phys/efi/efi_executable.gni")
 import("//zircon/kernel/phys/phys_executable.gni")
@@ -28,7 +29,7 @@ group("boot-shim") {
 template("devicetree_zbi_test") {
   test_target = "devicetree-shim-$target_name"
   zbi_test(test_target) {
-    qemu_kernel = "//zircon/kernel/arch/$current_cpu/phys/boot-shim:linux-$current_cpu-boot-shim(${phys_toolchain})"
+    qemu_kernel = "//zircon/kernel/arch/$zircon_cpu/phys/boot-shim:linux-$zircon_cpu-boot-shim(${phys_toolchain})"
 
     environments = [ qemu_env ]
 
@@ -133,7 +134,7 @@ if (toolchain_environment == "kernel.phys") {
     ]
 
     deps = [
-      "//zircon/kernel/arch/$current_cpu/phys:linuxboot",
+      "//zircon/kernel/arch/$zircon_cpu/phys:linuxboot",
       "//zircon/kernel/lib/arch",
       "//zircon/system/ulib/uart",
     ]
