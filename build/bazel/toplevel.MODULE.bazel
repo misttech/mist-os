@@ -101,6 +101,23 @@ fuchsia_idk = use_extension(
 fuchsia_idk.in_tree_repository(path = "regenerator_outputs/fuchsia_in_tree_idk")
 use_repo(fuchsia_idk, "fuchsia_in_tree_idk")
 
+fuchsia_idk_repository = use_repo_rule(
+    "//build/bazel/fuchsia_idk:repository_rules.bzl",
+    "fuchsia_idk_repository",
+)
+
+# A repository that wraps //sdk:bazel_internal_only_idk in the Bazel graph.
+# This is used to populate the @internal_sdk repository only.
+fuchsia_idk_repository(
+    name = "fuchsia_internal_only_idk",
+    # LINT.IfChange
+    content_hash_file = "//:fuchsia_build_generated/fuchsia_internal_only_idk.hash",
+    # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
+    idk_export_dir = "fuchsia_build_generated/ninja_root_build_dir/sdk/exported/bazel_internal_only_idk",
+    ninja_build_dir = "fuchsia_build_generated/ninja_root_build_dir",
+    python_executable = "@@fuchsia_sdk_common++fuchsia_build_config_ext+fuchsia_build_config//:host_prebuilts/python3/bin/python3",
+)
+
 fuchsia_sdk_ext = use_extension(
     "@rules_fuchsia//fuchsia/workspace:fuchsia_sdk_repository.bzl",
     "fuchsia_sdk_ext",
@@ -114,13 +131,42 @@ fuchsia_sdk_ext.local(
     visibility_templates = {
         "hlcpp": [
             # Limit the scope of hlcpp to the sdk itself
-            "@internal_sdk//:__subpackages__",
-            "@fuchsia_sdk//:__subpackages__",
+            "@@internal_sdk//:__subpackages__",
+            "@@fuchsia_sdk//:__subpackages__",
             "@@//vendor/*/build:hlcpp_allowlist",
         ],
     },
 )
 use_repo(fuchsia_sdk_ext, "fuchsia_sdk")
+
+fuchsia_sdk_repository = use_repo_rule(
+    "@rules_fuchsia//fuchsia:deps.bzl",
+    "fuchsia_sdk_repository",
+)
+
+# A repository used to expose SDK atoms that are not yet ready to be
+# distributed to partners, but required by some Fuchsia in-tree targets.
+#
+# TODO(https://fxbug.dev/333907192): Remove this
+fuchsia_sdk_repository(
+    name = "internal_sdk",
+    local_paths = ["@@+_repo_rules+fuchsia_internal_only_idk"],
+    # The @internal_sdk repository is populated from the same content as @fuchsia_internal_only_idk.
+    local_sdk_version_file = "//:fuchsia_build_generated/fuchsia_internal_only_idk.hash",
+    # NOTE: It's unclear why @@rules_fuchsia++fuchsia_sdk_ext+fuchsia_sdk does
+    # NOT work here. Leaving it as-is for now since this target is planned to be
+    # removed.
+    parent_sdk = "@@fuchsia_sdk",
+    parent_sdk_local_paths = ["@@+fuchsia_idk+fuchsia_in_tree_idk"],
+    visibility_templates = {
+        "hlcpp": [
+            # Limit the scope of hlcpp to the sdk itself
+            "@@internal_sdk//:__subpackages__",
+            "@@fuchsia_sdk//:__subpackages__",
+            "@@//vendor/*/build:hlcpp_allowlist",
+        ],
+    },
+)
 
 fuchsia_clang_ext = use_extension(
     "@rules_fuchsia//fuchsia/workspace:fuchsia_clang_repository.bzl",
@@ -236,3 +282,5 @@ generate_prebuilt_llvm_repository(
     # See https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/llvm/BUILD.gn;l=51;drc=468d94479b10f5613ca928d782990e5340e943a4
     llvm_install_dir = "@@fuchsia_sdk_common++fuchsia_build_config_ext+fuchsia_build_config//:host_prebuilts/llvm",
 )
+
+register_toolchains("//:fuchsia_sdk_devicetree_toolchain")
