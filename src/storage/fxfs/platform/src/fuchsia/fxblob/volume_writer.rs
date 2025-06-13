@@ -30,9 +30,7 @@ use vfs::directory::entry_container::MutableDirectory as _;
 
 const CHUNK_READ_SIZE: u64 = 131_072; /* 128 KiB */
 
-// TODO(https://fxbug.dev/397515768): Use correct blob volume name. Right now this is just set to
-// the same thing as we use for testing.
-const BLOB_VOLUME_NAME: &str = "vol";
+const BLOB_VOLUME_NAME: &str = "blob";
 
 /// Helper type that implements a read-only [`Device`] for a [`DataObjectHandle`].
 struct ReadOnlyDevice {
@@ -363,16 +361,21 @@ async fn copy_blob(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fuchsia::fxblob::testing::{new_blob_fixture, open_blob_fixture, BlobFixture};
-    use crate::fuchsia::testing::{TestFixture, TestFixtureOptions};
+    use crate::fuchsia::fxblob::testing::{new_blob_fixture, open_blob_fixture, BlobFixture as _};
     use delivery_blob::CompressionMode;
     use fidl_fuchsia_fxfs::BlobVolumeWriterMarker;
     use fuchsia_component_client::connect_to_protocol_at_dir_svc;
-    use fxfs::filesystem::SyncOptions;
+    use fxfs_make_blob_image::FxBlobBuilder;
     use ramdevice_client::RamdiskClientBuilder;
     use storage_device::block_device::BlockDevice;
     use zx::HandleBased as _;
     use {fidl_fuchsia_mem as fmem, fuchsia_async as fasync};
+
+    // Ensure the volume name from `make-blob-image` matches what we expect here.
+    #[test]
+    fn volume_name_matches() {
+        assert_eq!(BLOB_VOLUME_NAME, fxfs_make_blob_image::BLOB_VOLUME_NAME);
+    }
 
     const TEST_BLOBS: [(&str, &[u8]); 2] = [
         (
@@ -388,6 +391,8 @@ mod tests {
     async fn create_blob_image_vmo() -> (zx::Vmo, u64) {
         let vmo = zx::Vmo::create(DEVICE_SIZE).unwrap();
 
+        // TODO(https://fxbug.dev/397515768): It would be preferable if we avoid using a ramdisk
+        // here and instead used vmo_backed_block_server.
         let ramdisk = RamdiskClientBuilder::new_with_vmo(
             vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
             Some(BLOCK_SIZE),
@@ -410,31 +415,20 @@ mod tests {
             .unwrap(),
         );
 
-        let fixture = TestFixture::open(
-            device,
-            TestFixtureOptions {
-                as_blob: true,
-                format: true,
-                encrypted: false,
-                ..Default::default()
-            },
-        )
-        .await;
-
-        for (original_hash, data) in TEST_BLOBS {
-            let hash = fixture.write_blob(data, CompressionMode::Never).await;
-            assert_eq!(hash.to_string(), original_hash);
+        let fxblob = FxBlobBuilder::new(device, /*compression_enabled*/ true).await.unwrap();
+        for (hash, data) in TEST_BLOBS {
+            let blob = fxblob.generate_blob(data.to_vec()).unwrap();
+            assert_eq!(blob.hash(), hash.try_into().unwrap());
+            fxblob.install_blob(&blob).await.unwrap();
         }
 
-        fixture.fs().journal().compact().await.unwrap();
-        fixture.fs().sync(SyncOptions { flush_device: true, ..Default::default() }).await.unwrap();
-        // TODO(https://fxbug.dev/423696656): We should just call `close` here, but `BlockDevice`
-        // cannot be reopened for running fsck.
-        fixture.close_no_fsck().await;
+        let _image_size = fxblob.finalize().await.unwrap();
         ramdisk.destroy_and_wait_for_removal().await.unwrap();
 
-        // TODO(https://fxbug.dev/397515768): Only pass the bytes in the image that were used (i.e.
-        // based on the maximum offset used by the allocator).
+        // TODO(https://fxbug.dev/397515768): We need to make sure this works using the sparse image
+        // format, and that we only need to pass in the bytes that were used in the image (i.e. that
+        // we only need to send as many bytes as reported by finalize() above).
+
         (vmo, DEVICE_SIZE)
     }
 
@@ -443,7 +437,6 @@ mod tests {
         // Create a new filesystem which contains the empty blob.
         let fixture = new_blob_fixture().await;
         let empty_blob_hash = fixture.write_blob(&[], CompressionMode::Never).await;
-        assert_eq!(&fixture.read_blob(empty_blob_hash.clone()).await, &[]);
 
         // Generate a new fxfs filesystem in a VMO containing different blobs, and write it into
         // the existing filesystem using our protocol.
@@ -461,8 +454,12 @@ mod tests {
 
         // Verify that we find the new blobs we expect.
         for (hash, data) in TEST_BLOBS {
-            assert_eq!(&fixture.read_blob(hash.try_into().unwrap()).await, data);
+            let hash = hash.try_into().unwrap();
+            assert_eq!(fixture.read_blob(hash).await.as_slice(), data);
         }
+
+        // Ensure the empty blob was deleted.
+        assert!(!fixture.blob_exists(empty_blob_hash).await);
 
         fixture.close().await;
     }

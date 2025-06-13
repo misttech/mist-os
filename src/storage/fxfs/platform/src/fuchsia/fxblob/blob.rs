@@ -893,7 +893,7 @@ mod tests {
             let data = vec![0xffu8; 252 * 1024];
             let hash = fixture.write_blob(&data, CompressionMode::Never).await;
 
-            let blob = fixture.get_blob(hash).await;
+            let blob = fixture.get_blob(hash).await.unwrap();
             assert_eq!(blob.chunks_supplied.len(), 8);
             blob.vmo.read_to_vec(32 * 1024, 4096).unwrap();
 

@@ -8,7 +8,7 @@ use fuchsia_async as fasync;
 use fuchsia_merkle::{Hash, HASH_SIZE};
 use futures::{try_join, SinkExt as _, StreamExt as _, TryStreamExt as _};
 use fxfs::errors::FxfsError;
-use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder};
+use fxfs::filesystem::{FxFilesystemBuilder, OpenFxFilesystem};
 use fxfs::object_handle::WriteBytes;
 use fxfs::object_store::directory::Directory;
 use fxfs::object_store::journal::super_block::SuperBlockInstance;
@@ -16,7 +16,7 @@ use fxfs::object_store::journal::RESERVED_SPACE;
 use fxfs::object_store::transaction::{lock_keys, LockKey};
 use fxfs::object_store::volume::root_volume;
 use fxfs::object_store::{
-    DirectWriter, HandleOptions, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID, NO_OWNER,
+    DataObjectHandle, DirectWriter, HandleOptions, ObjectStore, BLOB_MERKLE_ATTRIBUTE_ID, NO_OWNER,
 };
 use fxfs::round::round_up;
 use fxfs::serialized_types::BlobMetadata;
@@ -25,9 +25,10 @@ use rayon::ThreadPoolBuilder;
 use serde::{Deserialize, Serialize};
 use std::io::{BufWriter, Read};
 use std::path::PathBuf;
-use std::sync::Arc;
 use storage_device::file_backed_device::FileBackedDevice;
 use storage_device::DeviceHolder;
+
+pub const BLOB_VOLUME_NAME: &str = "blob";
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
 struct BlobsJsonOutputEntry {
@@ -96,28 +97,18 @@ pub async fn make_blob_image(
         BLOCK_SIZE,
         block_count,
     ));
-    let filesystem = FxFilesystemBuilder::new()
-        .format(true)
-        .trim_config(None)
-        .image_builder_mode(Some(SuperBlockInstance::A))
-        .open(device)
-        .await
-        .context("Failed to format filesystem")?;
-    let blobs_json = install_blobs(filesystem.clone(), "blob", blobs, compression_enabled)
-        .await
-        .map_err(|e| {
-            if target_size != 0 && FxfsError::NoSpace.matches(&e) {
-                e.context(format!(
-                    "Configured image size {} is too small to fit the base system image.",
-                    target_size
-                ))
-            } else {
-                e
-            }
-        })?;
-    filesystem.finalize().await?;
-    let actual_size = filesystem.allocator().maximum_offset();
-    filesystem.close().await?;
+    let fxblob = FxBlobBuilder::new(device, compression_enabled).await?;
+    let blobs_json = install_blobs(&fxblob, blobs).await.map_err(|e| {
+        if target_size != 0 && FxfsError::NoSpace.matches(&e) {
+            e.context(format!(
+                "Configured image size {} is too small to fit the base system image.",
+                target_size
+            ))
+        } else {
+            e
+        }
+    })?;
+    let actual_size = fxblob.finalize().await?;
 
     if target_size == 0 {
         // Apply a default heuristic of 2x the actual image size.  This is necessary to use the
@@ -174,6 +165,107 @@ fn create_sparse_image(
         .build(&mut output)
 }
 
+/// Builder used to construct a new Fxblob instance ready for flashing to a device.
+pub struct FxBlobBuilder {
+    blob_directory: Directory<ObjectStore>,
+    compression_enabled: bool,
+    filesystem: OpenFxFilesystem,
+}
+
+impl FxBlobBuilder {
+    /// Creates a new [`FxBlobBuilder`] backed by the given `device`.
+    pub async fn new(device: DeviceHolder, compression_enabled: bool) -> Result<Self, Error> {
+        let filesystem = FxFilesystemBuilder::new()
+            .format(true)
+            .trim_config(None)
+            .image_builder_mode(Some(SuperBlockInstance::A))
+            .open(device)
+            .await
+            .context("Failed to format filesystem")?;
+        let root_volume = root_volume(filesystem.clone()).await?;
+        let vol = root_volume
+            .new_volume(BLOB_VOLUME_NAME, NO_OWNER, None)
+            .await
+            .context("Failed to create volume")?;
+        let blob_directory = Directory::open(&vol, vol.root_directory_object_id())
+            .await
+            .context("Unable to open root blob directory")?;
+        Ok(Self { blob_directory, compression_enabled, filesystem })
+    }
+
+    /// Finalizes building the FxBlob instance this builder represents. The filesystem will not be
+    /// usable unless this is called. Returns the last offset in bytes which was used on the device.
+    pub async fn finalize(self) -> Result<u64, Error> {
+        self.filesystem.finalize().await?;
+        let actual_size = self.filesystem.allocator().maximum_offset();
+        self.filesystem.close().await?;
+        Ok(actual_size)
+    }
+
+    /// Installs the given `blob` into the filesystem, returning a handle to the new object.
+    pub async fn install_blob(
+        &self,
+        blob: &BlobToInstall,
+    ) -> Result<DataObjectHandle<ObjectStore>, Error> {
+        let handle;
+        let keys = lock_keys![LockKey::object(
+            self.blob_directory.store().store_object_id(),
+            self.blob_directory.object_id(),
+        )];
+        let mut transaction = self
+            .filesystem
+            .clone()
+            .new_transaction(keys, Default::default())
+            .await
+            .context("new transaction")?;
+        handle = self
+            .blob_directory
+            .create_child_file_with_options(
+                &mut transaction,
+                &blob.hash.to_string(),
+                // Checksums are redundant for blobs, which are already content-verified.
+                HandleOptions { skip_checksums: true, ..Default::default() },
+            )
+            .await
+            .context("create child file")?;
+        transaction.commit().await.context("transaction commit")?;
+
+        // Write the blob data directly into the object handle.
+        {
+            let mut writer = DirectWriter::new(&handle, Default::default()).await;
+            match &blob.data {
+                BlobData::Uncompressed(data) => {
+                    writer.write_bytes(data).await.context("write blob contents")?;
+                }
+                BlobData::Compressed(archive) => {
+                    for chunk in archive.chunks() {
+                        writer
+                            .write_bytes(&chunk.compressed_data)
+                            .await
+                            .context("write blob contents")?;
+                    }
+                }
+            }
+            writer.complete().await.context("flush blob contents")?;
+        }
+
+        // Write serialized metadata, if present.
+        if !blob.metadata.is_empty() {
+            handle
+                .write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &blob.metadata)
+                .await
+                .context("write blob metadata")?;
+        }
+
+        Ok(handle)
+    }
+
+    /// Helper function to quickly create a blob to install from in-memory data. Mainly for testing.
+    pub fn generate_blob(&self, data: Vec<u8>) -> Result<BlobToInstall, Error> {
+        BlobToInstall::new(data, self.filesystem.block_size() as usize, self.compression_enabled)
+    }
+}
+
 enum BlobData {
     Uncompressed(Vec<u8>),
     Compressed(ChunkedArchive),
@@ -205,157 +297,48 @@ impl BlobData {
     }
 }
 
-struct BlobToInstall {
+/// Represents a blob ready to be installed into an FxBlob instance.
+pub struct BlobToInstall {
+    /// The validated Merkle root of this blob.
     hash: Hash,
-    path: PathBuf,
+    /// On-disk representation of the blob data (either compressed or uncompressed).
     data: BlobData,
+    /// Uncompressed size of the blob's data.
     uncompressed_size: usize,
-    serialized_metadata: Vec<u8>,
+    /// Serialized metadata for this blob (Merkle tree and compressed offsets).
+    metadata: Vec<u8>,
+    /// Path, if any, corresponding to the on-disk location of the source for this blob. Only set
+    /// if created via [`Self::new_from_file`].
+    source: Option<PathBuf>,
 }
 
-async fn install_blobs(
-    filesystem: Arc<FxFilesystem>,
-    volume_name: &str,
-    blobs: Vec<(Hash, PathBuf)>,
-    compression_enabled: bool,
-) -> Result<BlobsJsonOutput, Error> {
-    let root_volume = root_volume(filesystem.clone()).await?;
-    let vol = root_volume
-        .new_volume(volume_name, NO_OWNER, None)
-        .await
-        .context("Failed to create volume")?;
-    let directory = Directory::open(&vol, vol.root_directory_object_id())
-        .await
-        .context("Unable to open root directory")?;
-    let num_blobs = blobs.len();
-    let fs_block_size = filesystem.block_size() as usize;
-    // We don't need any backpressure as the channel guarantees at least one slot per sender.
-    let (tx, rx) = futures::channel::mpsc::channel::<BlobToInstall>(0);
-    // Generate each blob in parallel using a thread pool.
-    let num_threads: usize = std::thread::available_parallelism().unwrap().into();
-    let thread_pool = ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap();
-    let generate = fasync::unblock(move || {
-        thread_pool.install(|| {
-            blobs.par_iter().try_for_each(|(hash, path)| {
-                let blob =
-                    generate_blob(hash.clone(), path.clone(), fs_block_size, compression_enabled)?;
-                futures::executor::block_on(tx.clone().send(blob))
-                    .context("send blob to install task")
-            })
-        })?;
-        Ok(())
-    });
-    // We can buffer up to this many blobs after processing.
-    const MAX_INSTALL_CONCURRENCY: usize = 10;
-    let install = rx
-        .map(|blob| install_blob(blob, &filesystem, &directory))
-        .buffer_unordered(MAX_INSTALL_CONCURRENCY)
-        .try_collect::<BlobsJsonOutput>();
-    let (installed_blobs, _) = try_join!(install, generate)?;
-    assert_eq!(installed_blobs.len(), num_blobs);
-    Ok(installed_blobs)
-}
-
-async fn install_blob(
-    blob: BlobToInstall,
-    filesystem: &Arc<FxFilesystem>,
-    directory: &Directory<ObjectStore>,
-) -> Result<BlobsJsonOutputEntry, Error> {
-    let merkle = blob.hash.to_string();
-
-    let handle;
-    let keys =
-        lock_keys![LockKey::object(directory.store().store_object_id(), directory.object_id())];
-    let mut transaction = filesystem
-        .clone()
-        .new_transaction(keys, Default::default())
-        .await
-        .context("new transaction")?;
-    handle = directory
-        .create_child_file_with_options(
-            &mut transaction,
-            merkle.as_str(),
-            // Checksums are redundant for blobs, which are already content-verified.
-            HandleOptions { skip_checksums: true, ..Default::default() },
-        )
-        .await
-        .context("create child file")?;
-    transaction.commit().await.context("transaction commit")?;
-
-    {
-        let mut writer = DirectWriter::new(&handle, Default::default()).await;
-        match blob.data {
-            BlobData::Uncompressed(data) => {
-                writer.write_bytes(&data).await.context("write blob contents")?;
-            }
-            BlobData::Compressed(archive) => {
-                for chunk in archive.chunks() {
-                    writer
-                        .write_bytes(&chunk.compressed_data)
-                        .await
-                        .context("write blob contents")?;
+impl BlobToInstall {
+    /// Create a new blob ready for installation with [`FxBlobBuilder::install_blob`].
+    pub fn new(
+        data: Vec<u8>,
+        fs_block_size: usize,
+        compression_enabled: bool,
+    ) -> Result<Self, Error> {
+        let (hash, hashes) = {
+            let tree = fuchsia_merkle::from_slice(&data);
+            let mut hashes: Vec<[u8; HASH_SIZE]> = Vec::new();
+            let levels = tree.as_ref();
+            if levels.len() > 1 {
+                // We only need to store the leaf hashes.
+                for hash in &levels[0] {
+                    hashes.push(hash.clone().into());
                 }
             }
-        }
-        writer.complete().await.context("flush blob contents")?;
-    }
-
-    if !blob.serialized_metadata.is_empty() {
-        handle
-            .write_attr(BLOB_MERKLE_ATTRIBUTE_ID, &blob.serialized_metadata)
-            .await
-            .context("write blob metadata")?;
-    }
-    let properties = handle.get_properties().await.context("get properties")?;
-    Ok(BlobsJsonOutputEntry {
-        source_path: blob.path.to_str().context("blob path to utf8")?.to_string(),
-        merkle,
-        bytes: blob.uncompressed_size,
-        size: properties.allocated_size,
-        file_size: blob.uncompressed_size,
-        compressed_file_size: properties.data_attribute_size,
-        merkle_tree_size: blob.serialized_metadata.len(),
-        used_space_in_blobfs: properties.allocated_size,
-    })
-}
-
-fn generate_blob(
-    hash: Hash,
-    path: PathBuf,
-    fs_block_size: usize,
-    compression_enabled: bool,
-) -> Result<BlobToInstall, Error> {
-    let mut contents = Vec::new();
-    std::fs::File::open(&path)
-        .with_context(|| format!("Unable to open `{:?}'", &path))?
-        .read_to_end(&mut contents)
-        .with_context(|| format!("Unable to read contents of `{:?}'", &path))?;
-    let hashes = {
-        // TODO(https://fxbug.dev/42073036): Refactor to share implementation with blob.rs.
-        let tree = fuchsia_merkle::from_slice(&contents);
-        assert_eq!(tree.root(), hash);
-        let mut hashes: Vec<[u8; HASH_SIZE]> = Vec::new();
-        let levels = tree.as_ref();
-        if levels.len() > 1 {
-            // We only need to store the leaf hashes.
-            for hash in &levels[0] {
-                hashes.push(hash.clone().into());
-            }
-        }
-        hashes
-    };
-
-    let uncompressed_size = contents.len();
-
-    let data = if compression_enabled {
-        maybe_compress(contents, fuchsia_merkle::BLOCK_SIZE, fs_block_size)
-    } else {
-        BlobData::Uncompressed(contents)
-    };
-
-    // We only need to store metadata with the blob if it's large enough or was compressed.
-    let serialized_metadata: Vec<u8> =
-        if !hashes.is_empty() || matches!(data, BlobData::Compressed(_)) {
+            (tree.root(), hashes)
+        };
+        let uncompressed_size = data.len();
+        let data = if compression_enabled {
+            maybe_compress(data, fuchsia_merkle::BLOCK_SIZE, fs_block_size)
+        } else {
+            BlobData::Uncompressed(data)
+        };
+        // We only need to store metadata with the blob if it's large enough or was compressed.
+        let metadata: Vec<u8> = if !hashes.is_empty() || matches!(data, BlobData::Compressed(_)) {
             let metadata = BlobMetadata {
                 hashes,
                 chunk_size: data.chunk_size().unwrap_or_default(),
@@ -366,8 +349,93 @@ fn generate_blob(
         } else {
             vec![]
         };
+        Ok(BlobToInstall { hash, data, uncompressed_size, metadata, source: None })
+    }
 
-    Ok(BlobToInstall { hash, path, data, uncompressed_size, serialized_metadata })
+    /// Create a new blob ready for installation with [`FxBlobBuilder::install_blob`] from an
+    /// existing file on disk.
+    pub fn new_from_file(
+        path: PathBuf,
+        fs_block_size: usize,
+        compression_enabled: bool,
+    ) -> Result<Self, Error> {
+        let mut data = Vec::new();
+        std::fs::File::open(&path)
+            .with_context(|| format!("Unable to open `{:?}'", &path))?
+            .read_to_end(&mut data)
+            .with_context(|| format!("Unable to read contents of `{:?}'", &path))?;
+        let blob = Self::new(data, fs_block_size, compression_enabled)?;
+        Ok(Self { source: Some(path), ..blob })
+    }
+
+    pub fn hash(&self) -> Hash {
+        self.hash.clone()
+    }
+}
+
+async fn install_blobs(
+    fxblob: &FxBlobBuilder,
+    blobs: Vec<(Hash, PathBuf)>,
+) -> Result<BlobsJsonOutput, Error> {
+    let num_blobs = blobs.len();
+    let fs_block_size = fxblob.filesystem.block_size() as usize;
+    let compression_enabled = fxblob.compression_enabled;
+    // We don't need any backpressure as the channel guarantees at least one slot per sender.
+    let (tx, rx) = futures::channel::mpsc::channel::<BlobToInstall>(0);
+    // Generate each blob in parallel using a thread pool.
+    let num_threads: usize = std::thread::available_parallelism().unwrap().into();
+    let thread_pool = ThreadPoolBuilder::new().num_threads(num_threads).build().unwrap();
+    let generate = fasync::unblock(move || {
+        thread_pool.install(|| {
+            blobs.par_iter().try_for_each(|(hash, path)| {
+                let blob =
+                    BlobToInstall::new_from_file(path.clone(), fs_block_size, compression_enabled)?;
+                if &blob.hash != hash {
+                    let calculated_hash = &blob.hash;
+                    let path = path.display();
+                    return Err(anyhow!(
+                        "Hash mismatch for {path}: calculated={calculated_hash}, expected={hash}"
+                    ));
+                }
+                futures::executor::block_on(tx.clone().send(blob))
+                    .context("send blob to install task")
+            })
+        })?;
+        Ok(())
+    });
+    // We can buffer up to this many blobs after processing.
+    const MAX_INSTALL_CONCURRENCY: usize = 10;
+    let install = rx
+        .map(|blob| install_blob_with_json_output(fxblob, blob))
+        .buffer_unordered(MAX_INSTALL_CONCURRENCY)
+        .try_collect::<BlobsJsonOutput>();
+    let (installed_blobs, _) = try_join!(install, generate)?;
+    assert_eq!(installed_blobs.len(), num_blobs);
+    Ok(installed_blobs)
+}
+
+async fn install_blob_with_json_output(
+    fxblob: &FxBlobBuilder,
+    blob: BlobToInstall,
+) -> Result<BlobsJsonOutputEntry, Error> {
+    let handle = fxblob.install_blob(&blob).await?;
+    let properties = handle.get_properties().await.context("get properties")?;
+    let source_path = blob
+        .source
+        .expect("missing source path")
+        .to_str()
+        .context("blob path to utf8")?
+        .to_string();
+    Ok(BlobsJsonOutputEntry {
+        source_path,
+        merkle: blob.hash.to_string(),
+        bytes: blob.uncompressed_size,
+        size: properties.allocated_size,
+        file_size: blob.uncompressed_size,
+        compressed_file_size: properties.data_attribute_size,
+        merkle_tree_size: blob.metadata.len(),
+        used_space_in_blobfs: properties.allocated_size,
+    })
 }
 
 fn maybe_compress(buf: Vec<u8>, block_size: usize, filesystem_block_size: usize) -> BlobData {

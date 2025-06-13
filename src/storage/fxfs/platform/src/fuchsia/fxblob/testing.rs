@@ -6,12 +6,14 @@ use crate::fuchsia::fxblob::blob::FxBlob;
 use crate::fuchsia::fxblob::BlobDirectory;
 use crate::fuchsia::testing::{TestFixture, TestFixtureOptions};
 use crate::fuchsia::volume::FxVolume;
+use anyhow::Error;
 use async_trait::async_trait;
 use blob_writer::BlobWriter;
 use delivery_blob::{CompressionMode, Type1Blob};
 use fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker, BlobWriterProxy, CreateBlobError};
 use fuchsia_component_client::connect_to_protocol_at_dir_svc;
 use fuchsia_merkle::Hash;
+use fxfs::errors::FxfsError;
 use fxfs::object_store::directory::Directory;
 use fxfs::object_store::{DataObjectHandle, HandleOptions, ObjectStore};
 use std::sync::Arc;
@@ -45,7 +47,10 @@ pub trait BlobFixture {
         hash: &[u8; 32],
         allow_existing: bool,
     ) -> Result<BlobWriterProxy, CreateBlobError>;
-    async fn get_blob(&self, hash: Hash) -> Arc<FxBlob>;
+    async fn get_blob(&self, hash: Hash) -> Result<Arc<FxBlob>, Error>;
+    /// Returns `true` if we could lookup the blob, or `false` if we get [`FxfsError::NotFound`].
+    /// Panics otherwise.
+    async fn blob_exists(&self, hash: Hash) -> bool;
 }
 
 #[async_trait]
@@ -88,7 +93,7 @@ impl BlobFixture for TestFixture {
             .expect("get_vmo failed")
     }
 
-    async fn get_blob(&self, hash: Hash) -> Arc<FxBlob> {
+    async fn get_blob(&self, hash: Hash) -> Result<Arc<FxBlob>, Error> {
         self.volume()
             .root()
             .clone()
@@ -97,7 +102,6 @@ impl BlobFixture for TestFixture {
             .unwrap()
             .lookup_blob(hash)
             .await
-            .unwrap()
     }
 
     async fn create_blob(
@@ -110,5 +114,15 @@ impl BlobFixture for TestFixture {
         let blob_writer =
             blob_proxy.create(hash, allow_existing).await.expect("transport error on create")?;
         Ok(blob_writer.into_proxy())
+    }
+
+    async fn blob_exists(&self, hash: Hash) -> bool {
+        match self.get_blob(hash).await {
+            Ok(_) => true,
+            Err(e) => match e.downcast::<FxfsError>().expect("expected FxfsError") {
+                FxfsError::NotFound => false,
+                other => panic!("error during lookup: {:?}", other),
+            },
+        }
     }
 }

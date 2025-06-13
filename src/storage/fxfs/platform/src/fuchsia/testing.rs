@@ -158,38 +158,6 @@ impl TestFixture {
         }
     }
 
-    /// Closes the filesystem without running fsck. Used for block devices that can't be reopened.
-    // TODO(https://fxbug.dev/423696656): This is a workaround intended for use with ramdisks (or
-    // other block devices) that can't be reopened once closed by the filesystem.
-    pub async fn close_no_fsck(mut self) {
-        let State { filesystem, volume, volume_out_dir, root, volumes_directory } =
-            std::mem::take(&mut self.state).unwrap();
-        volume_out_dir
-            .close()
-            .await
-            .expect("FIDL call failed")
-            .map_err(Status::from_raw)
-            .expect("close out_dir failed");
-
-        root.close()
-            .await
-            .expect("FIDL call failed")
-            .map_err(Status::from_raw)
-            .expect("close root failed");
-        volumes_directory.terminate().await;
-        std::mem::drop(volumes_directory);
-        // Wait for the volume to terminate. If we don't do this, it's possible that we haven't
-        // yet noticed that a connection has closed, and so tasks can still be running and they can
-        // hold references to the volume which we want to unwrap.
-        volume.volume().terminate().await;
-        if volume.into_volume().try_unwrap().is_none() {
-            log::error!("References to volume still exist; hanging");
-            let () = std::future::pending().await;
-        }
-        filesystem.close().await.expect("close filesystem failed");
-        ensure_unique_or_poison(filesystem.take_device().await);
-    }
-
     /// Closes the test fixture, shutting down the filesystem. Returns the device, which can be
     /// reused for another TestFixture.
     ///
