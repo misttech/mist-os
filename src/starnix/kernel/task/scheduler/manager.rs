@@ -332,7 +332,8 @@ impl SchedulerPolicyKind {
             Self::RoundRobin { priority } | Self::Fifo { priority } => (3, *priority),
             Self::Normal { priority } => (2, *priority),
             Self::Batch { priority } => (1, *priority),
-            Self::Idle { priority } => (0, *priority),
+            // see "the [...] nice value has no influence for [the SCHED_IDLE] policy" at sched(7).
+            Self::Idle { .. } => (0, 0),
         }
     }
 
@@ -342,7 +343,7 @@ impl SchedulerPolicyKind {
     /// The range of 32 Zircon priorities is divided into a region for each flavor of Linux
     /// scheduling:
     ///
-    /// 1. 0-3 (inclusive) is used for SCHED_IDLE, the lowest priority Linux tasks.
+    /// 1. 0 is used for SCHED_IDLE, the lowest priority Linux tasks.
     /// 2. 6-15 (inclusive) is used for lower-than-default-priority SCHED_OTHER/SCHED_BATCH tasks.
     /// 3. 16 is used for the default priority SCHED_OTHER/SCHED_BATCH, the same as Zircon's
     ///    default for Fuchsia processes.
@@ -350,8 +351,9 @@ impl SchedulerPolicyKind {
     /// 5. Realtime tasks receive their own profile name.
     fn role_name(&self) -> &'static str {
         match self {
-            // Configured with nice 0-40, mapped to 0-3.
-            Self::Idle { priority } => FAIR_PRIORITY_ROLE_NAMES[*priority as usize / 11],
+            // Mapped to 0; see "the [...] nice value has no influence for [the SCHED_IDLE] policy"
+            // at sched(7).
+            Self::Idle { .. } => FAIR_PRIORITY_ROLE_NAMES[0],
 
             // Configured with nice 0-40 and mapped to 6-26. 20 is the default nice which we want to
             // map to 16.
@@ -463,6 +465,19 @@ mod tests {
         assert_eq!(
             SchedulerPolicyKind::Fifo { priority: 99 }.role_name(),
             "fuchsia.starnix.realtime",
+        );
+    }
+
+    #[fuchsia::test]
+    fn idle_role_name() {
+        assert_eq!(SchedulerPolicyKind::Idle { priority: 1 }.role_name(), "fuchsia.starnix.fair.0");
+        assert_eq!(
+            SchedulerPolicyKind::Idle { priority: 20 }.role_name(),
+            "fuchsia.starnix.fair.0"
+        );
+        assert_eq!(
+            SchedulerPolicyKind::Idle { priority: 40 }.role_name(),
+            "fuchsia.starnix.fair.0"
         );
     }
 
