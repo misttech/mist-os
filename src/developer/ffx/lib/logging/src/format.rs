@@ -29,7 +29,13 @@ pub struct FormatOpts {
 
 impl FormatOpts {
     pub fn new(id: u64) -> Self {
-        FormatOpts { id, display_target: true, display_line_number: true, ..Default::default() }
+        FormatOpts {
+            id,
+            display_target: true,
+            display_filename: true,
+            display_line_number: true,
+            ..Default::default()
+        }
     }
 }
 
