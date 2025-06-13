@@ -52,6 +52,14 @@ local_path_override(
     path = "build/bazel/local_repositories/fuchsia_sdk_common",
 )
 
+bazel_dep(name = "fuchsia_build_info", version = "")
+local_path_override(
+    module_name = "fuchsia_build_info",
+    # LINT.IfChange
+    path = "fuchsia_build_generated/fuchsia_build_info",
+    # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
+)
+
 # TODO(https://fxbug.dev/131788): Use //third_party/re2 when it's upgraded to this version.
 bazel_dep(name = "re2", version = "2024-07-02.bcr.1")
 

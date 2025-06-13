@@ -63,12 +63,6 @@ register_toolchains(
 )
 
 # buildifier: disable=load-on-top
-local_repository(
-    name = "fuchsia_build_info",
-    path = "%s/regenerator_outputs/fuchsia_build_info" % ninja_output_dir,
-)
-
-# buildifier: disable=load-on-top
 load("//build/bazel/repository_rules:boringssl_repository.bzl", "boringssl_repository")
 
 boringssl_repository(

@@ -566,7 +566,7 @@ absolute_fizz = "/path/to/prebuilt/third_party/fuzz"
 ''',
         )
 
-    def test_record_fuchsia_build_config_dir(self) -> None:
+    def test_record_fuchsia_build_info_dir(self) -> None:
         generated = workspace_utils.GeneratedWorkspaceFiles()
 
         main_args_path = self._build_root / "gn_build_variables_for_bazel.json"
@@ -613,7 +613,7 @@ absolute_fizz = "/path/to/prebuilt/third_party/fuzz"
             )
         )
 
-        GnBuildArgs.record_fuchsia_build_config_dir(
+        GnBuildArgs.record_fuchsia_build_info_dir(
             self._root, self._build_root, generated
         )
 
@@ -658,8 +658,8 @@ zoo2 = "non-false string"
                     "content": "",
                     "type": "file",
                 },
-                "WORKSPACE.bazel": {
-                    "content": "",
+                "MODULE.bazel": {
+                    "content": 'module(name = "fuchsia_build_info", version = "1")',
                     "type": "file",
                 },
                 "args.bzl": {

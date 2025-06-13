@@ -458,7 +458,9 @@ def main() -> int:
         workspace_utils.GnBuildArgs.generate_fuchsia_build_info(
             fuchsia_dir=fuchsia_dir,
             build_dir=build_dir,
+            # LINT.IfChange
             repository_dir=regenerator_outputs_dir / "fuchsia_build_info",
+            # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
         )
 
         # Generate the bazel launcher and Bazel workspace files.

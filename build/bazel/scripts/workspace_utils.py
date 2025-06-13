@@ -800,6 +800,15 @@ def record_fuchsia_workspace(
         / "empty_gn_targets",
     )
 
+    generated.record_symlink(
+        # LINT.IfChange
+        "workspace/fuchsia_build_generated/fuchsia_build_info",
+        # LINT.ThenChange(//build/bazel/toplevel.MODULE.bazel)
+        # LINT.IfChange
+        gn_output_dir / "regenerator_outputs/fuchsia_build_info",
+        # LINT.ThenChange(//build/regenerator.py)
+    )
+
 
 def generate_fuchsia_workspace(
     fuchsia_dir: Path,
@@ -991,7 +1000,7 @@ class GnBuildArgs(object):
         return args_contents
 
     @staticmethod
-    def record_fuchsia_build_config_dir(
+    def record_fuchsia_build_info_dir(
         fuchsia_dir: Path,
         build_dir: Path,
         generated: GeneratedWorkspaceFiles,
@@ -1004,7 +1013,10 @@ class GnBuildArgs(object):
             generated: A GeneratedWorkspaceFiles instance. Its record_file_content()
                 method will be called to populate the repository.
         """
-        generated.record_file_content("WORKSPACE.bazel", "")
+        generated.record_file_content(
+            "MODULE.bazel",
+            'module(name = "fuchsia_build_info", version = "1")',
+        )
         generated.record_file_content("BUILD.bazel", "")
 
         args_files_relative_paths = (
@@ -1033,7 +1045,7 @@ class GnBuildArgs(object):
         fuchsia_dir: Path, build_dir: Path, repository_dir: Path
     ) -> None:
         generated = GeneratedWorkspaceFiles()
-        GnBuildArgs.record_fuchsia_build_config_dir(
+        GnBuildArgs.record_fuchsia_build_info_dir(
             fuchsia_dir, build_dir, generated
         )
 
