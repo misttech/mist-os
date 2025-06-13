@@ -142,15 +142,15 @@ pub(crate) async fn handle_monitor_request(
         }
         DeviceMonitorRequest::PowerDown { phy_id, responder } => {
             let status = power_down(phys, phy_id).await;
-            responder.send(Err(status.into_raw()))?;
+            responder.send(zx::Status::ok(status.into_raw()).map_err(|e| e.into_raw()))?;
         }
         DeviceMonitorRequest::PowerUp { phy_id, responder } => {
             let status = power_up(phys, phy_id).await;
-            responder.send(Err(status.into_raw()))?;
+            responder.send(zx::Status::ok(status.into_raw()).map_err(|e| e.into_raw()))?;
         }
         DeviceMonitorRequest::Reset { phy_id, responder } => {
             let status = reset(phys, phy_id).await;
-            responder.send(Err(status.into_raw()))?;
+            responder.send(zx::Status::ok(status.into_raw()).map_err(|e| e.into_raw()))?;
         }
         DeviceMonitorRequest::GetPowerState { phy_id, responder } => {
             responder.send(
