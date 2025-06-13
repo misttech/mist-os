@@ -1326,13 +1326,17 @@ impl NamespaceNode {
                         child = match child.readlink(locked, current_task)? {
                             SymlinkTarget::Path(link_target) => {
                                 let link_directory = if link_target[0] == b'/' {
+                                    // If the path is absolute, we'll resolve the root directory.
                                     match &context.resolve_base {
                                         ResolveBase::None => current_task.fs().root(),
                                         ResolveBase::Beneath(_) => return error!(EXDEV),
                                         ResolveBase::InRoot(root) => root.clone(),
                                     }
                                 } else {
-                                    self.clone()
+                                    // If the path is not absolute, it's a relative directory. Let's
+                                    // try to get the parent of the current child, or in the case
+                                    // that the child is the root we can just use that directly.
+                                    child.parent().unwrap_or(child)
                                 };
                                 current_task.lookup_path(
                                     locked,
@@ -1794,11 +1798,13 @@ impl Borrow<ArcKey<DirEntry>> for Submount {
 mod test {
     use crate::fs::tmpfs::TmpFs;
     use crate::testing::create_kernel_task_and_unlocked;
+    use crate::vfs::namespace::DeviceType;
     use crate::vfs::{
-        LookupContext, Namespace, NamespaceNode, RenameFlags, UnlinkKind, WhatToMount,
+        CallbackSymlinkNode, FsNodeInfo, LookupContext, MountInfo, Namespace, NamespaceNode,
+        RenameFlags, SymlinkMode, SymlinkTarget, UnlinkKind, WhatToMount,
     };
-    use starnix_uapi::errno;
     use starnix_uapi::mount_flags::MountFlags;
+    use starnix_uapi::{errno, mode};
     use std::sync::Arc;
 
     #[::fuchsia::test]
@@ -2093,6 +2099,110 @@ mod test {
             errno!(ENOENT)
         );
 
+        Ok(())
+    }
+
+    /// Symlinks which need to be traversed across types (nodes and paths), as well as across
+    /// owning directories, can be tricky to get right.
+    #[::fuchsia::test]
+    async fn test_lookup_with_symlink_chain() -> anyhow::Result<()> {
+        // Set up the root filesystem
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let root_fs = TmpFs::new_fs(&kernel);
+        let root_node = Arc::clone(root_fs.root());
+        let _first_subdir_node = root_node
+            .create_dir(&mut locked, &current_task, "first_subdir".into())
+            .expect("failed to mkdir dev");
+        let _second_subdir_node = root_node
+            .create_dir(&mut locked, &current_task, "second_subdir".into())
+            .expect("failed to mkdir dev");
+
+        // Set up two subdirectories under the root filesystem
+        let first_subdir_fs = TmpFs::new_fs(&kernel);
+        let second_subdir_fs = TmpFs::new_fs(&kernel);
+
+        let ns = Namespace::new(root_fs);
+        let mut context = LookupContext::default();
+        let first_subdir = ns
+            .root()
+            .lookup_child(&mut locked, &current_task, &mut context, "first_subdir".into())
+            .expect("failed to lookup first_subdir");
+        first_subdir
+            .mount(WhatToMount::Fs(first_subdir_fs), MountFlags::empty())
+            .expect("failed to mount first_subdir fs node");
+        let second_subdir = ns
+            .root()
+            .lookup_child(&mut locked, &current_task, &mut context, "second_subdir".into())
+            .expect("failed to lookup second_subdir");
+        second_subdir
+            .mount(WhatToMount::Fs(second_subdir_fs), MountFlags::empty())
+            .expect("failed to mount second_subdir fs node");
+
+        // Create the symlink structure. To trigger potential symlink traversal bugs, we're going
+        // for the following directory structure:
+        // / (root)
+        //     + first_subdir/
+        //         - real_file
+        //         - path_symlink (-> real_file)
+        //     + second_subdir/
+        //         - node_symlink (-> path_symlink)
+        let real_file_node = first_subdir
+            .create_node(
+                &mut locked,
+                &current_task,
+                "real_file".into(),
+                mode!(IFREG, 0o777),
+                DeviceType::NONE,
+            )
+            .expect("failed to create real_file");
+        first_subdir
+            .create_symlink(&mut locked, &current_task, "path_symlink".into(), "real_file".into())
+            .expect("failed to create path_symlink");
+
+        let mut no_follow_lookup_context = LookupContext::new(SymlinkMode::NoFollow);
+        let path_symlink_node = first_subdir
+            .lookup_child(
+                &mut locked,
+                &current_task,
+                &mut no_follow_lookup_context,
+                "path_symlink".into(),
+            )
+            .expect("Failed to lookup path_symlink");
+
+        // The second symlink needs to be of type SymlinkTarget::Node in order to trip the sensitive
+        // code path. There's no easy method for creating this type of symlink target, so we'll need
+        // to construct a node from scratch and insert it into the directory manually.
+        let node_symlink_node = second_subdir.entry.node.fs().create_node_and_allocate_node_id(
+            CallbackSymlinkNode::new(move || {
+                let node = path_symlink_node.clone();
+                Ok(SymlinkTarget::Node(node))
+            }),
+            FsNodeInfo::new(mode!(IFLNK, 0o777), current_task.as_fscred()),
+        );
+        second_subdir
+            .entry
+            .create_entry(
+                &mut locked,
+                &current_task,
+                &MountInfo::detached(),
+                "node_symlink".into(),
+                move |_locked, _dir, _mount, _name| Ok(node_symlink_node),
+            )
+            .expect("failed to create node_symlink entry");
+
+        // Finally, exercise the lookup under test.
+        let mut follow_lookup_context = LookupContext::new(SymlinkMode::Follow);
+        let node_symlink_resolution = second_subdir
+            .lookup_child(
+                &mut locked,
+                &current_task,
+                &mut follow_lookup_context,
+                "node_symlink".into(),
+            )
+            .expect("lookup with symlink chain failed");
+
+        // The lookup resolution should have correctly followed the symlinks to the real_file node.
+        assert!(node_symlink_resolution.entry.node.ino == real_file_node.entry.node.ino);
         Ok(())
     }
 }
