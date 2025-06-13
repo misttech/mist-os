@@ -2707,14 +2707,14 @@ alias(
 )
 
 alias(
-    name = "syn-2.0.101",
-    actual = "//third_party/rust_crates/vendor/syn-2.0.101:syn",
+    name = "syn-2.0.103",
+    actual = "//third_party/rust_crates/vendor/syn-2.0.103:syn",
     tags = ["manual"],
 )
 
 alias(
     name = "syn",
-    actual = "//third_party/rust_crates/vendor/syn-2.0.101:syn",
+    actual = "//third_party/rust_crates/vendor/syn-2.0.103:syn",
     tags = ["manual"],
 )
 

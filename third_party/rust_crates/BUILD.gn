@@ -1022,7 +1022,7 @@ group("strum_macros") {
 
 if (!(current_os == "fuchsia")) {
   group("syn") {
-    public_deps = [ ":syn-v2_0_101" ]
+    public_deps = [ ":syn-v2_0_103" ]
   }
 }
 
@@ -1768,7 +1768,7 @@ rustc_macro("argh_derive-v0_1_12") {
   deps += [ ":argh_shared-v0_1_12" ]
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -1970,7 +1970,7 @@ rustc_macro("askama_derive-v0_12_5") {
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
   deps += [ ":serde-v1_0_204" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -2286,7 +2286,7 @@ rustc_macro("async-stream-impl-v0_3_5") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -2355,7 +2355,7 @@ rustc_macro("async-trait-v0_1_88") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -4993,7 +4993,7 @@ rustc_library("darling_core-v0_20_11") {
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
   deps += [ ":strsim-v0_11_1" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -5063,7 +5063,7 @@ rustc_macro("darling_macro-v0_20_11") {
   deps = []
   deps += [ ":darling_core-v0_20_11" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -5284,7 +5284,7 @@ rustc_macro("der_derive-v0_7_3") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -5960,7 +5960,7 @@ rustc_macro("enumn-v0_1_14") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -7040,7 +7040,7 @@ rustc_macro("futures-macro-v0_3_30") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = [ "CARGO_PKG_NAME=futures-macro" ]
 
@@ -10110,7 +10110,7 @@ rustc_macro("munge_macro-v0_4_4") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -10814,7 +10814,7 @@ rustc_macro("num-derive-v0_4_2") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -11245,7 +11245,7 @@ rustc_macro("openssl-macros-v0_1_1") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -11960,7 +11960,7 @@ rustc_library("pest_generator-v2_7_8") {
   deps += [ ":pest_meta-v2_7_8" ]
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -14024,7 +14024,7 @@ rustc_macro("ref-cast-impl-v1_0_24") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -14236,7 +14236,7 @@ rustc_macro("remain-v0_2_14") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -15802,7 +15802,7 @@ rustc_macro("serde_derive-v1_0_204") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -17021,7 +17021,7 @@ rustc_macro("strum_macros-v0_25_3") {
   deps += [ ":heck-v0_4_1" ]
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -17153,18 +17153,18 @@ rustc_library("syn-v1_0_98") {
   applicable_licenses = [ ":syn-v1_0_98.license" ]
 }
 
-license("syn-v2_0_101.license") {
+license("syn-v2_0_103.license") {
   public_package_name = "syn"
   license_files = [
-    "//third_party/rust_crates/vendor/syn-2.0.101/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/syn-2.0.101/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/syn-2.0.103/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/syn-2.0.103/LICENSE-MIT",
   ]
 }
 
-rustc_library("syn-v2_0_101") {
+rustc_library("syn-v2_0_103") {
   crate_name = "syn"
-  source_root = "//third_party/rust_crates/vendor/syn-2.0.101/src/lib.rs"
-  output_name = "syn-42529c4f75b1acf"
+  source_root = "//third_party/rust_crates/vendor/syn-2.0.103/src/lib.rs"
+  output_name = "syn-7e1e5e89abe2f38e"
   edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
@@ -17179,8 +17179,8 @@ rustc_library("syn-v2_0_101") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=42529c4f75b1acf",
-    "-Cextra-filename=-42529c4f75b1acf",
+    "-Cmetadata=7e1e5e89abe2f38e",
+    "-Cextra-filename=-7e1e5e89abe2f38e",
     "--cfg=feature=\"clone-impls\"",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"derive\"",
@@ -17195,7 +17195,7 @@ rustc_library("syn-v2_0_101") {
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":syn-v2_0_101.license" ]
+  applicable_licenses = [ ":syn-v2_0_103.license" ]
 }
 
 license("synstructure-v0_13_1.license") {
@@ -17217,7 +17217,7 @@ rustc_library("synstructure-v0_13_1") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -17642,7 +17642,7 @@ rustc_library("test-case-core-v3_2_1") {
   deps += [ ":proc-macro-error-v1_0_4" ]
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -17677,7 +17677,7 @@ rustc_macro("test-case-macros-v3_2_1") {
   deps += [ ":proc-macro-error-v1_0_4" ]
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
   deps += [ ":test-case-core-v3_2_1" ]
 
   rustenv = []
@@ -17841,7 +17841,7 @@ rustc_macro("thiserror-impl-v1_0_69") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -17877,7 +17877,7 @@ rustc_macro("thiserror-impl-v2_0_11") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -18082,7 +18082,7 @@ rustc_macro("tls_codec_derive-v0_4_2") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -18395,7 +18395,7 @@ rustc_macro("tracing-attributes-v0_1_27") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -20762,7 +20762,7 @@ rustc_macro("zerocopy-derive-v0_7_35") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -20799,7 +20799,7 @@ rustc_macro("zerocopy-derive-v0_8_26-alpha") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 
@@ -20872,7 +20872,7 @@ rustc_macro("zeroize_derive-v1_4_2") {
   deps = []
   deps += [ ":proc-macro2-v1_0_94" ]
   deps += [ ":quote-v1_0_40" ]
-  deps += [ ":syn-v2_0_101" ]
+  deps += [ ":syn-v2_0_103" ]
 
   rustenv = []
 

@@ -73,6 +73,6 @@ rust_proc_macro(
     deps = [
         "//third_party/rust_crates/vendor/darling_core-0.20.11:darling_core",
         "//third_party/rust_crates/vendor/quote-1.0.40:quote",
-        "//third_party/rust_crates/vendor/syn-2.0.101:syn",
+        "//third_party/rust_crates/vendor/syn-2.0.103:syn",
     ],
 )
