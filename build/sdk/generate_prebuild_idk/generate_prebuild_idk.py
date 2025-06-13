@@ -312,8 +312,8 @@ class PrebuildMap(object):
         dist_lib = binary.get("dist_lib")
         dist_path = binary.get("dist_path")
         link_lib = binary["link_lib"]
-
         debug_lib = binary.get("debug_lib", None)
+        ifs_file = binary.get("ifs", None)
 
         # TODO(https://fxbug.dev/310006516): Remove the `if` block when the
         # `arch/` directory is removed from the IDK.
@@ -356,8 +356,8 @@ class PrebuildMap(object):
         }
         if variants:
             result["variants"] = variants
-        if "ifs" in prebuild:
-            result["ifs"] = prebuild["ifs"]
+        if ifs_file:
+            result["ifs"] = ifs_file
         return (result, {})
 
     def _meta_for_version_history(

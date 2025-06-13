@@ -116,6 +116,10 @@ template("idk_prebuild_manifest") {
   #              Only for "shared" prebuilts. Path of unstripped version of the prebuilt
   #              library, relative to SDK export dir (e.g. "arch/x64/symbols/libfdio.so")
   #
+  #          ifs  (string)
+  #              Only for "shared" prebuilts. Path of the IFS file for the prebuilt
+  #              library, relative to SDK export dir (e.g. "pkg/fdio/fdio.ifs")
+  #
   #   deps         (list[string])
   #   include_dir  (string)
   #   headers      (list[string])

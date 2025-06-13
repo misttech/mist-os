@@ -376,6 +376,7 @@
         "debug_lib": "arch/x64/debug/libfdio.so",
         "dist_lib": "arch/x64/dist/libfdio.so",
         "dist_path": "lib/libfdio.so",
+        "ifs": "pkg/fdio/fdio.ifs",
         "link_lib": "arch/x64/lib/libfdio.so"
       },
       "deps": [
@@ -396,7 +397,6 @@
         "pkg/fdio/include/lib/fdio/limits.h",
         "pkg/fdio/include/lib/fdio/vfs.h"
       ],
-      "ifs": "pkg/fdio/fdio.ifs",
       "include_dir": "pkg/fdio/include",
       "library_name": "fdio"
     }

@@ -498,9 +498,9 @@ template("sdk_shared_library") {
       dist_path = "lib/${lib_name}"
       link_lib = link_lib
       debug_lib = debug_lib
+      ifs = packaged_ifs_file
     }
     deps = sdk_deps
-    ifs = packaged_ifs_file
   }
 
   # LINT.ThenChange(//build/sdk/idk_prebuild_manifest.gni)
