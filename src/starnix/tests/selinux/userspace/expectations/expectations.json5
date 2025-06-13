@@ -12,6 +12,11 @@
         {
             type: "expect_failure",
             matchers: [
+                // TODO: https://fxbug.dev/422968534 - Make (SE)Starnix match the (SE)Linux behavior
+                // regarding opening binder.
+                "BinderTest.OpenBinderNoTestDomain",
+                "BinderTest.OpenBinderWithTestDomain",
+
                 // TODO: https://fxbug.dev/322843830 - Make (SE)Starnix match the (SE)Linux behavior
                 // demonstrated in this test.
                 "InheritTest.ExecutableFdRemappedToNull",

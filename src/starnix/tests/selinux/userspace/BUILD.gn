@@ -100,6 +100,7 @@ source_set("userspace_test_main") {
 test_names = [
   # keep-sorted start
   "anon_inode",
+  "binder",
   "inherit",
   "ioctl",
   "load_policy",
@@ -129,6 +130,7 @@ inherit_test_executable_names = [
 resource("policies") {
   sources = [
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/anon_inode_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/binder.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/file_transition_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/inherit_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/ioctl_policy.pp",
