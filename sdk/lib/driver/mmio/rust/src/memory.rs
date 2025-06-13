@@ -4,7 +4,7 @@
 
 //! MMIO regions backed by memory.
 //!
-//! This module defines the primary `Mmio` implementation, backed by memory.
+//! This module defines the primary [Mmio] implementation, backed by memory.
 
 use crate::arch;
 use crate::region::{MmioRegion, UnsafeMmio};

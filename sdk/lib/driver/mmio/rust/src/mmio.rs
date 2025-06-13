@@ -46,18 +46,18 @@ pub enum MmioError {
 /// If these guarantees can't be provided statically for a given use case, the following functions
 /// can be used to ensure these requirements:
 ///
-/// - `MmioExt::check_aligned_for<T>`: returns an `MmioError::Unaligned` error if the given offset is
+/// - [MmioExt::check_aligned_for<T>]: returns an [MmioError::Unaligned] error if the given offset is
 /// not suitably aligned.
-/// - `MmioExt::check_capacity_for<T>`: returns an `MmioError::OutOfRange` error if there is not
+/// - [MmioExt::check_capacity_for<T>]: returns an [MmioError::OutOfRange] error if there is not
 /// sufficient capacity at the given offset.
-/// - `MmioExt::check_suitable_for<T>`: returns an `MmioError` if there is not sufficient capacity at
+/// - [MmioExt::check_suitable_for<T>]: returns an [MmioError] if there is not sufficient capacity at
 /// the given offset or it is not suitably aligned.
 ///
 /// # Dyn Compatibility
-/// This trait is dyn compatible. See the `MmioExt` trait for useful utilities that extend this
+/// This trait is dyn compatible. See the [MmioExt] trait for useful utilities that extend this
 /// trait.
 pub trait Mmio {
-    /// Returns the size in bytes of this Mmio region.
+    /// Returns the size in bytes of this MMIO region.
     fn len(&self) -> usize;
 
     /// Computes the first offset within this region that is aligned to `align`.
@@ -68,190 +68,190 @@ pub trait Mmio {
     /// If `align` is not a power of 2.
     fn align_offset(&self, align: usize) -> usize;
 
-    /// Loads one byte from this Mmio region at the given offset.
+    /// Loads one byte from this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the load would exceed the bounds of this Mmio region.
+    /// - [MmioError::OutOfRange]: if the load would exceed the bounds of this MMIO region.
     fn try_load8(&self, offset: usize) -> Result<u8, MmioError>;
 
-    /// Loads one byte from this Mmio region at the given offset.
+    /// Loads one byte from this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Panics
-    /// - If the load would exceed the bounds of this Mmio region.
+    /// - If the load would exceed the bounds of this MMIO region.
     ///
-    /// See `Mmio::try_load8` for a non-panicking version.
+    /// See [Mmio::try_load8] for a non-panicking version.
     fn load8(&self, offset: usize) -> u8 {
         self.try_load8(offset).unwrap()
     }
 
-    /// Loads two bytes from this Mmio region at the given offset.
+    /// Loads two bytes from this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the load would exceed the bounds of this Mmio region.
-    /// - MmioError::Unaligned: if the offset is not suitably aligned.
+    /// - [MmioError::OutOfRange]: if the load would exceed the bounds of this MMIO region.
+    /// - [MmioError::Unaligned]: if the offset is not suitably aligned.
     fn try_load16(&self, offset: usize) -> Result<u16, MmioError>;
 
-    /// Loads two bytes from this Mmio region at the given offset.
+    /// Loads two bytes from this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Panics
-    /// - If the load would exceed the bounds of this Mmio region.
+    /// - If the load would exceed the bounds of this MMIO region.
     /// - If the offset is not suitably aligned.
     ///
-    /// See `Mmio::try_load16` for a non-panicking version.
+    /// See [Mmio::try_load16] for a non-panicking version.
     fn load16(&self, offset: usize) -> u16 {
         self.try_load16(offset).unwrap()
     }
 
-    /// Loads four bytes from this Mmio region at the given offset.
+    /// Loads four bytes from this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the load would exceed the bounds of this Mmio region.
-    /// - MmioError::Unaligned: if the offset is not suitably aligned.
+    /// - [MmioError::OutOfRange]: if the load would exceed the bounds of this MMIO region.
+    /// - [MmioError::Unaligned]: if the offset is not suitably aligned.
     fn try_load32(&self, offset: usize) -> Result<u32, MmioError>;
 
-    /// Loads four bytes from this Mmio region at the given offset.
+    /// Loads four bytes from this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Panics
-    /// - If the load would exceed the bounds of this Mmio region.
+    /// - If the load would exceed the bounds of this MMIO region.
     /// - If the offset is not suitably aligned.
     ///
-    /// See `Mmio::try_load32` for a non-panicking version.
+    /// See [Mmio::try_load32] for a non-panicking version.
     fn load32(&self, offset: usize) -> u32 {
         self.try_load32(offset).unwrap()
     }
 
-    /// Loads eight bytes from this Mmio region at the given offset.
+    /// Loads eight bytes from this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the load would exceed the bounds of this Mmio region.
-    /// - MmioError::Unaligned: if the offset is not suitably aligned.
+    /// - [MmioError::OutOfRange]: if the load would exceed the bounds of this MMIO region.
+    /// - [MmioError::Unaligned]: if the offset is not suitably aligned.
     fn try_load64(&self, offset: usize) -> Result<u64, MmioError>;
 
-    /// Loads eight bytes from this Mmio region at the given offset.
+    /// Loads eight bytes from this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Panics
-    /// - If the load would exceed the bounds of this Mmio region.
+    /// - If the load would exceed the bounds of this MMIO region.
     /// - If the offset is not suitably aligned.
     ///
-    /// See `Mmio::try_load64` for a non-panicking version.
+    /// See [Mmio::try_load64] for a non-panicking version.
     fn load64(&self, offset: usize) -> u64 {
         self.try_load64(offset).unwrap()
     }
 
-    /// Stores one byte to this Mmio region at the given offset.
+    /// Stores one byte to this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the store would exceed the bounds of this Mmio region.
+    /// - [MmioError::OutOfRange]: if the store would exceed the bounds of this MMIO region.
     fn try_store8(&mut self, offset: usize, value: u8) -> Result<(), MmioError>;
 
-    /// Stores one byte to this Mmio region at the given offset.
+    /// Stores one byte to this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Panics
-    /// - If the store would exceed the bounds of this Mmio region.
+    /// - If the store would exceed the bounds of this MMIO region.
     ///
-    /// See `Mmio::try_store8` for a non-panicking version.
+    /// See [Mmio::try_store8] for a non-panicking version.
     fn store8(&mut self, offset: usize, value: u8) {
         self.try_store8(offset, value).unwrap();
     }
 
-    /// Stores two bytes to this Mmio region at the given offset.
+    /// Stores two bytes to this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the store would exceed the bounds of this Mmio region.
-    /// - MmioError::Unaligned: if the offset is not suitably aligned.
+    /// - [MmioError::OutOfRange]: if the store would exceed the bounds of this MMIO region.
+    /// - [MmioError::Unaligned]: if the offset is not suitably aligned.
     fn try_store16(&mut self, offset: usize, value: u16) -> Result<(), MmioError>;
 
-    /// Stores two bytes to this Mmio region at the given offset.
+    /// Stores two bytes to this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Panics
-    /// - If the store would exceed the bounds of this Mmio region.
+    /// - If the store would exceed the bounds of this MMIO region.
     /// - If the offset is not suitably aligned.
     ///
-    /// See `Mmio::try_store16` for a non-panicking version.
+    /// See [Mmio::try_store16] for a non-panicking version.
     fn store16(&mut self, offset: usize, value: u16) {
         self.try_store16(offset, value).unwrap();
     }
 
-    /// Stores four bytes to this Mmio region at the given offset.
+    /// Stores four bytes to this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the store would exceed the bounds of this Mmio region.
-    /// - MmioError::Unaligned: if the offset is not suitably aligned.
+    /// - [MmioError::OutOfRange]: if the store would exceed the bounds of this MMIO region.
+    /// - [MmioError::Unaligned]: if the offset is not suitably aligned.
     fn try_store32(&mut self, offset: usize, value: u32) -> Result<(), MmioError>;
 
-    /// Stores four bytes to this Mmio region at the given offset.
+    /// Stores four bytes to this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Panics
-    /// - If the store would exceed the bounds of this Mmio region.
+    /// - If the store would exceed the bounds of this MMIO region.
     /// - If the offset is not suitably aligned.
     ///
-    /// See `Mmio::try_store32` for a non-panicking version.
+    /// See [Mmio::try_store32] for a non-panicking version.
     fn store32(&mut self, offset: usize, value: u32) {
         self.try_store32(offset, value).unwrap();
     }
 
-    /// Stores eight bytes to this region at the given offset.
+    /// Stores eight bytes to this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the store would exceed the bounds of this Mmio region.
-    /// - MmioError::Unaligned: if the offset is not suitably aligned.
+    /// - [MmioError::OutOfRange]: if the store would exceed the bounds of this MMIO region.
+    /// - [MmioError::Unaligned]: if the offset is not suitably aligned.
     fn try_store64(&mut self, offset: usize, value: u64) -> Result<(), MmioError>;
 
-    /// Stores eight bytes to this region at the given offset.
+    /// Stores eight bytes to this MMIO region at the given offset.
     ///
     /// See the trait-level documentation for information about offset requirements.
     ///
     /// # Panics
-    /// - If the store would exceed the bounds of this Mmio region.
+    /// - If the store would exceed the bounds of this MMIO region.
     /// - If the offset is not suitably aligned.
     ///
-    /// See `Mmio::try_store64` for a non-panicking version.
+    /// See [Mmio::try_store64] for a non-panicking version.
     fn store64(&mut self, offset: usize, value: u64) {
         self.try_store64(offset, value).unwrap();
     }
 }
 
-/// An Mmio region from which ownership of disjoint sub-regions can be split off.
+/// An MMIO region from which ownership of disjoint sub-regions can be split off.
 pub trait MmioSplit: Mmio + Sized {
     /// Splits this Mmio region into two at the given mid-point and returns the left-hand-side.
-    /// This Mmio region's bounds are updated to contain only the right-hand-side.
+    /// This MMIO region's bounds are updated to contain only the right-hand-side.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if `mid > self.len()`.
+    /// - [MmioError::OutOfRange]: if `mid > self.len()`.
     fn try_split_off(&mut self, mid: usize) -> Result<Self, MmioError>;
 
-    /// Splits this Mmio region into two at the given mid-point and returns the left-hand-side.
-    /// This Mmio region's bounds are updated to contain only the right-hand-side.
+    /// Splits this MMIO region into two at the given mid-point and returns the left-hand-side.
+    /// This MMIO region's bounds are updated to contain only the right-hand-side.
     ///
     /// # Panics
     /// - If `mid > self.len()`.
@@ -260,7 +260,7 @@ pub trait MmioSplit: Mmio + Sized {
     }
 }
 
-/// Implemented for the fundamental types supported by all Mmio implementations.
+/// Implemented for the fundamental types supported by all [Mmio] implementations.
 ///
 /// This is a sealed trait, implemented for the types: u8, u16, u32, u64.
 pub trait MmioOperand:
@@ -274,18 +274,18 @@ pub trait MmioOperand:
     + Display
     + Sized
 {
-    /// Loads a value of the this type from the Mmio region at the given offset.
+    /// Loads a value of the this type from the MMIO region at the given offset.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the load would exceed the bounds of this Mmio region.
-    /// - MmioError::Unaligned: if the offset is not suitably aligned.
+    /// - [MmioError::OutOfRange]: if the load would exceed the bounds of this MMIO region.
+    /// - [MmioError::Unaligned]: if the offset is not suitably aligned.
     fn try_load<M: Mmio + ?Sized>(mmio: &M, offset: usize) -> Result<Self, MmioError>;
 
-    /// Stores a value of this type to the Mmio region at the given offset.
+    /// Stores a value of this type to the MMIO region at the given offset.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the store would exceed the bounds of this Mmio region.
-    /// - MmioError::Unaligned: if the offset is not suitably aligned.
+    /// - [MmioError::OutOfRange]: if the store would exceed the bounds of this MMIO region.
+    /// - [MmioError::Unaligned: if the offset is not suitably aligned.
     fn try_store<M: Mmio + ?Sized>(
         mmio: &mut M,
         offset: usize,
@@ -360,20 +360,20 @@ impl MmioOperand for u64 {
     }
 }
 
-/// This trait extends `Mmio` with some useful utilities. There is a blanket implementation for all
-/// types implementing `Mmio`.
+/// This trait extends [Mmio] with some useful utilities. There is a blanket implementation for all
+/// types implementing [Mmio].
 ///
-/// Functions may go into this trait instead of `Mmio` if any of the following is true:
+/// Functions may go into this trait instead of [Mmio] if any of the following is true:
 /// - their behavior shouldn't differ across Mmio implementations
 /// - they would make Mmio not dyn compatible
-/// - they would introduce an unnecessary burden on Mmio implementers
+/// - they would introduce an unnecessary burden on [Mmio] implementers
 pub trait MmioExt: Mmio {
-    /// Check that the given offset into this Mmio region would be suitable aligned for type `T`.
-    /// There is no guarantee that this offset is within the bounds of the Mmio region or that
+    /// Check that the given offset into this MMIO region would be suitable aligned for type `T`.
+    /// There is no guarantee that this offset is within the bounds of the MMIO region or that
     /// there would be sufficient capacity to hold a `T` at that offset. See
-    /// `MmioExt::check_suitable_for`.
+    /// [MmioExt::check_suitable_for].
     ///
-    /// Returns `MmioError::Unaligned` if the offset os not suitably aligned.
+    /// Returns [MmioError::Unaligned] if the offset os not suitably aligned.
     fn check_aligned_for<T>(&self, offset: usize) -> Result<(), MmioError> {
         let align = align_of::<T>();
         let align_offset = self.align_offset(align);
@@ -385,9 +385,9 @@ pub trait MmioExt: Mmio {
         }
     }
 
-    /// Checks that the given offset into this Mmio region has sufficient capacity to hold a value
+    /// Checks that the given offset into this MMIO region has sufficient capacity to hold a value
     /// of type `T`. There is no guarantee that the offset is suitably aligned. See
-    /// `MmioExt::check_capacity_for`.
+    /// [MmioExt::check_capacity_for].
     fn check_capacity_for<T>(&self, offset: usize) -> Result<(), MmioError> {
         let capacity_at_offset = self.len().checked_sub(offset).ok_or(MmioError::OutOfRange)?;
         if capacity_at_offset >= size_of::<T>() {
@@ -397,7 +397,7 @@ pub trait MmioExt: Mmio {
         }
     }
 
-    /// Checks that the given offset into this Mmio rgion is suitably aligned and has sufficient
+    /// Checks that the given offset into this MMIO rgion is suitably aligned and has sufficient
     /// capacity for a value of type `T`.
     fn check_suitable_for<T>(&self, offset: usize) -> Result<(), MmioError> {
         self.check_aligned_for::<T>(offset)?;
@@ -405,61 +405,61 @@ pub trait MmioExt: Mmio {
         Ok(())
     }
 
-    /// Loads an `MmioOperand` from the Mmio region at the given offset.
+    /// Loads an [MmioOperand] from the MMIO region at the given offset.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the load would exceed the bounds of this Mmio region.
-    /// - MmioError::Unaligned: if the offset is not suitably aligned.
+    /// - [MmioError::OutOfRange]: if the load would exceed the bounds of this MMIO region.
+    /// - [MmioError::Unaligned]: if the offset is not suitably aligned.
     fn try_load<T: MmioOperand>(&self, offset: usize) -> Result<T, MmioError> {
         T::try_load(self, offset)
     }
 
-    /// Loads an `MmioOperand` from the Mmio region at the given offset.
+    /// Loads an [MmioOperand] from the MMIO region at the given offset.
     ///
     /// # Panics
     /// If `self.check_suitable_for::<T>(offset)` would fail.
     ///
-    /// See `MmioExt::try_load` for a non-panicking version.
+    /// See [MmioExt::try_load] for a non-panicking version.
     fn load<T: MmioOperand>(&self, offset: usize) -> T {
         self.try_load(offset).unwrap()
     }
 
-    /// Stores an `MmioOperand` to the Mmio region at the given offset.
+    /// Stores an [MmioOperand] to the MMIO region at the given offset.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the store would exceed the bounds of this Mmio region.
-    /// - MmioError::Unaligned: if the offset is not suitably aligned.
+    /// - [MmioError::OutOfRange]: if the store would exceed the bounds of this MMIO region.
+    /// - [MmioError::Unaligned]: if the offset is not suitably aligned.
     fn try_store<T: MmioOperand>(&mut self, offset: usize, value: T) -> Result<(), MmioError> {
         T::try_store(self, offset, value)
     }
 
-    /// Stores an `MmioOperand` to the Mmio region at the given offset.
+    /// Stores an [MmioOperand] to the MMIO region at the given offset.
     ///
     /// # Panics
     /// If `self.check_suitable_for::<T>(offset)` would fail.
     ///
-    /// See `MmioExt::try_store` for a non-panicking version.
+    /// See [MmioExt::try_store] for a non-panicking version.
     fn store<T: MmioOperand>(&mut self, offset: usize, value: T) {
         self.try_store(offset, value).unwrap()
     }
 
-    /// Loads an `MmioOperand` value from an Mmio region at the given offset, returning only the bits
+    /// Loads an [MmioOperand] value from an MMIO region at the given offset, returning only the bits
     /// set in the given mask.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the load would exceed the bounds of this Mmio region.
-    /// - MmioError::Unaligned: if the offset is not suitably aligned.
+    /// - [MmioError::OutOfRange]: if the load would exceed the bounds of this MMIO region.
+    /// - [MmioError::Unaligned]: if the offset is not suitably aligned.
     fn try_masked_load<T: MmioOperand>(&self, offset: usize, mask: T) -> Result<T, MmioError> {
         self.try_load::<T>(offset).map(|v| v & mask)
     }
 
-    /// Loads an `MmioOperand` value from an Mmio region at the given offset, returning only the bits
+    /// Loads an [MmioOperand] value from an MMIO region at the given offset, returning only the bits
     /// set in the given mask.
     ///
     /// # Panics
     /// If `self.check_suitable_for::<T>(offset)` would fail.
     ///
-    /// See `MmioExt::try_masked_load` for a non-panicking version.
+    /// See [MmioExt::try_masked_load] for a non-panicking version.
     fn masked_load<T: MmioOperand>(&self, offset: usize, mask: T) -> T {
         self.try_masked_load::<T>(offset, mask).unwrap()
     }
@@ -475,8 +475,8 @@ pub trait MmioExt: Mmio {
     /// accessing and their use case.
     ///
     /// # Errors
-    /// - MmioError::OutOfRange: if the load would exceed the bounds of this Mmio region.
-    /// - MmioError::Unaligned: if the offset is not suitably aligned.
+    /// - [MmioError::OutOfRange]: if the load would exceed the bounds of this MMIO region.
+    /// - [MmioError::Unaligned]: if the offset is not suitably aligned.
     fn try_masked_modify<T: MmioOperand>(
         &mut self,
         offset: usize,
@@ -503,7 +503,7 @@ pub trait MmioExt: Mmio {
     ///
     /// If `self.check_suitable_for::<T>(offset)` would fail.
     ///
-    /// See `MmioExt::try_masked_modify` for a non-panicking version.
+    /// See [MmioExt::try_masked_modify] for a non-panicking version.
     fn masked_modify<T: MmioOperand>(&mut self, offset: usize, mask: T, value: T) {
         self.try_masked_modify(offset, mask, value).unwrap()
     }

@@ -26,9 +26,9 @@ impl VmoMapping {
     /// return an object that maintains the mapping for its lifetime.
     ///
     /// Errors:
-    /// - OUT_OF_RANGE: if size > isize::MAX.
-    /// - OUT_OF_RANGE: if the requested region falls outside of the vmo's memory.
-    /// - An error returned by `Vmar::map`: if the mapping fails.
+    /// - [Status::OUT_OF_RANGE]: if `size > isize::MAX`.
+    /// - [Status::OUT_OF_RANGE]: if the requested region falls outside of the vmo's memory.
+    /// - An error returned by [zx::Vmar::map]: if the mapping fails.
     pub fn map(offset: usize, size: usize, vmo: Vmo) -> Result<MmioRegion<VmoMemory>, Status> {
         Self::map_with_cache_policy(offset, size, vmo, CachePolicy::UnCachedDevice)
     }

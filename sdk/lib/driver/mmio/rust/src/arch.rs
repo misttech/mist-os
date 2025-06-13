@@ -159,7 +159,7 @@ macro_rules! load_fn {
         /// - the pointer must be valid
         /// - the pointer must be aligned
         /// - there must not be concurrent stores overlapping this load
-        /// - this pointer must be safe to access as with `core::ptr::read_volatile`
+        /// - this pointer must be safe to access as with [core::ptr::read_volatile]
         pub(crate) unsafe fn $name(ptr: NonNull<$type>) -> $type {
             load_op!($type, ptr)
         }
@@ -180,7 +180,7 @@ macro_rules! store_fn {
         /// - the pointer must be valid
         /// - the pointer must be aligned
         /// - there must be any concurrent operations overlapping this store
-        /// - this pointer must be safe to access as with `core::ptr::write_volatile`
+        /// - this pointer must be safe to access as with [core::ptr::write_volatile]
         pub(crate) unsafe fn $name(ptr: NonNull<$type>, value: $type) {
             store_op!($type, ptr, value)
         }

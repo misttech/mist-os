@@ -4,15 +4,15 @@
 
 //! Support for implementing splittable MMIO regions.
 //!
-//! This module defines the `MmioRegion` type which provides safe `Mmio` and `MmioSplit`
-//! implementations on top of the more relaxed `UnsafeMmio` trait.
+//! This module defines the [MmioRegion] type which provides safe [Mmio] and [MmioSplit]
+//! implementations on top of the more relaxed [UnsafeMmio] trait.
 //!
-//! The `UnsafeMmio` trait allows mutations through a shared reference, provided the caller
+//! The [UnsafeMmio] trait allows mutations through a shared reference, provided the caller
 //! ensures that store operations are not performed concurrently with any other operation that may
 //! overlap it.
 //!
-//! Implementing `UnsafeMmio` correctly is likely to be simpler than implementing `Mmio` and
-//! `MmioSplit` for many use cases.
+//! Implementing [UnsafeMmio] correctly is likely to be simpler than implementing [Mmio] and
+//! [MmioSplit] for many use cases.
 
 use crate::{Mmio, MmioError, MmioExt, MmioSplit};
 use core::borrow::Borrow;
@@ -24,11 +24,11 @@ use std::sync::Arc;
 /// An MMIO region that can be stored to through a shared reference.
 ///
 /// This trait requires the caller to uphold some safety constraints, but enables a generic
-/// implementation of `MmioSplit`. See the `MmioRegion` which provides a safe wrapper on top of
+/// implementation of [MmioSplit]. See the [MmioRegion] which provides a safe wrapper on top of
 /// this trait.
 ///
-/// This is primarily intended to simplify implementing the `MmioSplit` trait, not for users of the
-/// library. However, it is possible to use `UnsafeMmio` directly, provided the safety requirements
+/// This is primarily intended to simplify implementing the [MmioSplit] trait, not for users of the
+/// library. However, it is possible to use [UnsafeMmio] directly, provided the safety requirements
 /// are met.
 ///
 /// # Safety
@@ -95,17 +95,17 @@ pub trait UnsafeMmio {
     unsafe fn store64_unchecked(&self, offset: usize, v: u64);
 }
 
-/// An `MmioRegion` provides a safe implementation of `Mmio` and `MmioSplit` on top of an
-/// `UnsafeMmio` implementation.
+/// An `MmioRegion` provides a safe implementation of [Mmio] and [MmioSplit] on top of an
+/// [UnsafeMmio] implementation.
 ///
-/// The safety constraints of `UnsafeMmio` require callers to ensure that stores are not performed
+/// The safety constraints of [UnsafeMmio] require callers to ensure that stores are not performed
 /// concurrently with loads for any overlapping range.
 ///
 /// This type meets these requirements while supporting being split into independently owned due to
 /// the following:
 ///
-/// 1. An MmioRegion has exclusive ownership of a sub-region from the wrapped `UnsafeMmio`
-///    implementation (required by `MmioRegion::new`).
+/// 1. An MmioRegion has exclusive ownership of a sub-region from the wrapped [UnsafeMmio]
+///    implementation (required by [MmioRegion::new]).
 /// 2. An MmioRegion only performs operations that are fully contained within the region it owns.
 /// 3. All stores are performed through a mutable reference (ensuring stores are exclusive with all
 ///    other operations to the owned region).
@@ -115,7 +115,7 @@ pub trait UnsafeMmio {
 ///
 /// # Type Parameters
 /// An MmioRegion is parameterized by two types:
-/// - `Impl`: the `UnsafeMmio` implementation wrapped by this region.
+/// - `Impl`: the [UnsafeMmio] implementation wrapped by this region.
 /// - `Owner`: an object with shared ownership of the `Impl` instance.
 ///
 /// An MmioRegion is splittable if `Owner` can be cloned.

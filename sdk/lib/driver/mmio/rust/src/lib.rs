@@ -64,23 +64,23 @@
 //!
 //! # User Guide
 //!
-//! Users of this crate interact with device memory through the `Mmio` trait. This trait exposes
+//! Users of this crate interact with device memory through the [Mmio] trait. This trait exposes
 //! the low-level load and store operations to safely interact with device memory. All stores
-//! performed through an `Mmio` instance are issued through a mutable reference.
+//! performed through an [Mmio] instance are issued through a mutable reference.
 //!
-//! If an `Mmio` implementation also implements `MmioSplit`, it is possible to split off
+//! If an [Mmio] implementation also implements [MmioSplit], it is possible to split off
 //! independently owned sub-regions from it. This allows concurrent mutable access to disjoint
 //! MMIO regions.
 //!
 //! ## Operand Types
-//! The `Mmio` trait provides load and store operations for the following types:
+//! The [Mmio] trait provides load and store operations for the following types:
 //!
-//! - u8
-//! - u16
-//! - u32
-//! - u64
+//! - `u8`
+//! - `u16`
+//! - `u32`
+//! - `u64`
 //!
-//! Conforming implementations of `Mmio` must perform these operations in the code order relative
+//! Conforming implementations of [Mmio] must perform these operations in the code order relative
 //! to each other on the same thread, and in 1:1 correspondence with calls to corresponding
 //! function.
 //!
@@ -88,14 +88,14 @@
 //! sub-operations in increasing address order.
 //!
 //! ## Dyn Compatibility and Trait Extensions
-//! The `Mmio` trait is dyn compatible. Callers may want to also import the `MmioExt` trait which
-//! defines some useful utilities on top of `Mmio` that would otherwise break dyn compatibility.
-//! This trait is implemented automatically for any `Mmio`.
+//! The [Mmio] trait is dyn compatible. Callers may want to also import the [MmioExt] trait which
+//! defines some useful utilities on top of [Mmio] that would otherwise break dyn compatibility.
+//! This trait is implemented automatically for any [Mmio].
 //!
 //! ## Alignment
-//! The `Mmio` trait exposes offsets instead of addresses. Operations must be performed at a
+//! The [Mmio] trait exposes offsets instead of addresses. Operations must be performed at a
 //! suitable offset for the operand type. Valid alignment is not an intrinsic property of an offset.
-//! Callers can use `Mmio::align_offset` to determine the first offset within the MMIO region
+//! Callers can use [Mmio::align_offset] to determine the first offset within the MMIO region
 //! suitable for a given alignment.
 //!
 //! ## Usage Examples
@@ -103,12 +103,15 @@
 //! ```
 //! use mmio::{Mmio, MmioExt};
 //! use mmio::vmo::VmoMapping;
+//! const VMO_OFFSET: usize = 0;
 //! const VMO_LEN: usize = 1024;
 //! # let vmo = zx::Vmo::create(VMO_LEN as u64).unwrap();
 //! // Map the Vmo memory, returning an `MmioRegion`. The returned region implements `Mmio`.
-//! let mut mmio = VmoMapping::map(0, VMO_LEN, vmo).unwrap();
-//! let _ = mmio.load32(0).unwrap();
-//! let _ = mmio.store16(32, 0x1234).unwrap();
+//! let mut mmio = VmoMapping::map(VMO_OFFSET, VMO_LEN, vmo).unwrap();
+//! // Load 4 bytes starting at offset 0.
+//! let _ = mmio.load32(0);
+//! // Store 2 bytes starting at offset 32.
+//! let _ = mmio.store16(32, 0x1234);
 //! ```
 //!
 //! ### Splittable VmoMapping
@@ -124,22 +127,22 @@
 //!
 //! // Split off a number of regions which have exclusive ownership of their ranges.
 //! // reg1 owns the first 8 bytes, which start at offset 0 in the original mapping.
-//! let mut reg1 = mmio.split_off(8).unwrap();
+//! let mut reg1 = mmio.split_off(8);
 //! // reg2 owns the next 4 bytes, which start at offset 8 in the original mapping.
-//! let mut reg2 = mmio.split_off(4).unwrap();
+//! let mut reg2 = mmio.split_off(4);
 //! // reg3 owns the next 4 bytes, which start at offset 12 in the original mapping.
-//! let mut reg3 = mmio.split_off(4).unwrap();
+//! let mut reg3 = mmio.split_off(4);
 //! // The original mmio owns the rest of the region, starting at offset 16 in the original
 //! // mapping.
 //!
-//! let _ = reg1.load64(0).unwrap();
-//! reg1.store16(2, 0x1234).unwrap();
+//! let _ = reg1.load64(0);
+//! reg1.store16(2, 0x1234);
 //!
-//! let _ = reg2.load32(0).unwrap();
-//! reg2.store8(3, 0xff).unwrap();
+//! let _ = reg2.load32(0);
+//! reg2.store8(3, 0xff);
 //!
-//! let _ = reg3.load32(0).unwrap();
-//! reg3.store16(0, 0xff00).unwrap();
+//! let _ = reg3.load32(0);
+//! reg3.store16(0, 0xff00);
 //! ```
 //!
 //! ### Alignment and Capacity
@@ -153,11 +156,11 @@
 //!
 //! // Split off a number of regions which have exclusive ownership of their ranges.
 //! // reg1 owns the first 8 bytes, which start at offset 0 in the original mapping.
-//! let mut reg1 = mmio.split_off(8).unwrap();
+//! let mut reg1 = mmio.split_off(8);
 //! // reg2 owns the next 4 bytes, which start at offset 8 in the original mapping.
-//! let mut reg2 = mmio.split_off(4).unwrap();
+//! let mut reg2 = mmio.split_off(4);
 //! // reg3 owns the next 4 bytes, which start at offset 12 in the original mapping.
-//! let mut reg3 = mmio.split_off(4).unwrap();
+//! let mut reg3 = mmio.split_off(4);
 //! // The original mmio owns the rest of the region, starting at offset 16 in the original
 //! // mapping.
 //!
@@ -206,7 +209,7 @@
 //! ```
 //!
 //! # Implementers Guide
-//! Implementers of `Mmio` and `MmioSplit` are required to uphold some guarantees. These are
+//! Implementers of [Mmio] and [MmioSplit] are required to uphold some guarantees. These are
 //! discussed more thoroughly in the corresponding trait's documentation. These requirements are
 //! intended to guarantee the semantics required to interface with devices correctly, as discussed
 //! earlier.
