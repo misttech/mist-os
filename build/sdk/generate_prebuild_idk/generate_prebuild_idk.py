@@ -188,87 +188,6 @@ class PrebuildMap(object):
             deps_labels, ("cc_source_library", "cc_prebuilt_library")
         )
 
-    def _is_valid_dependency_type(
-        self, atom_type: str, dep_atom_type: str
-    ) -> bool:
-        """Checks if a single dependency relationship is valid.
-
-        Args:
-            atom_type: The type of the depending atom.
-            dep_atom_type: The type of the dependency atom.
-
-        Returns:
-            True if the dependency is valid, False otherwise.
-        """
-        allowed_deps_types: list[str] = []
-        match atom_type:
-            case "cc_source_library":
-                allowed_deps_types = [
-                    "bind_library",
-                    "cc_prebuilt_library",
-                    "cc_source_library",
-                    "fidl_library",
-                    "none",
-                ]
-            case "cc_prebuilt_library":
-                allowed_deps_types = [
-                    "cc_prebuilt_library",
-                    # TODO(https://fxbug.dev/42131085): verify that such
-                    # libraries are header-only.
-                    "cc_source_library",
-                ]
-            case "fidl_library":
-                allowed_deps_types = ["fidl_library"]
-            case "bind_library":
-                allowed_deps_types = ["bind_library"]
-            case _:
-                assert False, f"Unexpected atom type with deps: {atom_type}"
-
-        return dep_atom_type in allowed_deps_types
-
-    def verify_dependency_relationships(self) -> int:
-        """Verifies relationships between IDK atoms.
-
-        Verifies atom dependencies are of allowed types.
-        TODO(https://fxbug.dev/419105478): Add category validation.
-
-        Returns:
-            0 on success, a positive integer on failure.
-        """
-        for atom_info in self._labels_map.values():
-            if atom_info["atom_type"] == "none":
-                assert (
-                    atom_info["atom_label"]
-                    == "//src/zircon/lib/zircon:zircon_sdk"
-                ), atom_info["atom_label"]
-                continue
-            if "prebuild_info" not in atom_info:
-                # Atoms without prebuild info do not have deps.
-                continue
-
-            atom_type = atom_info["atom_type"]
-            all_deps = self.resolve_unique_labels(
-                atom_info["prebuild_info"].get("deps", {})
-            )
-            for dep_label in all_deps:
-                dep_atom = self._labels_map[self.resolve_label(dep_label)]
-
-                # Verify the atom type of the dependency is valid for the
-                # current atom type.
-                assert self._is_valid_dependency_type(
-                    atom_type, dep_atom["atom_type"]
-                ), (
-                    "ERROR: '%s' atom '%s' has a dependency on '%s' of type '%s', which is not allowed."
-                    % (
-                        atom_type,
-                        atom_info["atom_label"],
-                        dep_label,
-                        dep_atom["atom_type"],
-                    )
-                )
-
-        return 0
-
     def get_meta(
         self, info: AtomInfo
     ) -> tuple[T.Optional[MetaJson], dict[str, str]]:
@@ -723,10 +642,6 @@ class IdkGenerator(object):
             0 upon success and a positive integer otherwise.
         """
         assert not self._meta_files and not self._atom_files
-
-        result = self._prebuild_map.verify_dependency_relationships()
-        if result != 0:
-            return result
 
         unhandled_labels = set()
         collection_meta_path = None
