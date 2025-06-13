@@ -28,10 +28,10 @@ enum {
   kPanelTypeUnknown = 0,
   kPanelTypeKdFiti9364 = 1,
   kPanelTypeBoeFiti9364 = 2,
-  kPanelTypeInxFiti9364 = 3,
+  // 3 was for kPanelTypeInxFiti9364
   kPanelTypeKdFiti9365 = 4,
   kPanelTypeBoeFiti9365 = 5,
-  kPanelTypeBoeSit7703 = 6,
+  // 6 was for kPanelTypeBoeSit7703
 };
 
 // Refer to <internal>/vendor/amlogic/video-common/ambient_temp/lp8556.cc
@@ -44,7 +44,6 @@ constexpr std::array<double,
                      static_cast<std::size_t>(Lp8556Device::PanelType::kNumTypes)>
     kLowBrightnessSlopeTable = {
         22.4,  // PanelType::kBoe
-        22.1,  // PanelType::kInx
         22.2,  // PanelType::kKd
         22.2,  // PanelType::kUnknown
 };
@@ -52,7 +51,6 @@ constexpr std::array<double,
                      static_cast<std::size_t>(Lp8556Device::PanelType::kNumTypes)>
     kLowBrightnessInterceptTable = {
         1236.0,  // PanelType::kBoe
-        1431.0,  // PanelType::kInx
         1319.0,  // PanelType::kKd
         1329.0,  // PanelType::kUnknown
 };
@@ -69,9 +67,6 @@ constexpr std::array<std::array<double, kTableSize>,
         // PanelType::kBoe
         {19.80, 19.80, 19.80, 19.80, 19.90, 20.00, 20.10, 20.20, 20.30, 20.40, 20.50, 20.53, 20.53,
          20.53, 20.53, 20.53},
-        // PanelType::kInx
-        {19.70, 19.70, 19.70, 19.70, 19.80, 19.90, 20.00, 20.10, 20.20, 20.27, 20.30, 20.30, 20.30,
-         20.30, 20.30, 20.30},
         // PanelType::kKd
         {19.67, 19.67, 19.67, 19.67, 19.77, 19.93, 20.03, 20.13, 20.20, 20.27, 20.37, 20.37, 20.37,
          20.37, 20.37, 20.37},
@@ -316,10 +311,15 @@ zx_status_t Lp8556Device::Init() {
     }
   }
 
-  if (zx_status_t status =
-          device_get_fragment_metadata(parent(), "pdev", DEVICE_METADATA_BOARD_PRIVATE,
-                                       &panel_type_id_, sizeof(panel_type_id_), &actual);
-      status != ZX_OK) {
+  zx_status_t get_panel_type_status =
+      device_get_fragment_metadata(parent(), "pdev", DEVICE_METADATA_BOARD_PRIVATE, &panel_type_id_,
+                                   sizeof(panel_type_id_), &actual);
+
+  // If the panel type is not available to the backlight driver (on Astro and
+  // Sherlock), or the panel type is unknown to the board driver (on Nelson),
+  // we use `kPanelTypeUnknown` to fall back to the default backlight power
+  // configurations.
+  if (get_panel_type_status != ZX_OK) {
     panel_type_id_ = kPanelTypeUnknown;
   } else if (actual != sizeof(panel_type_id_)) {
     LOG_ERROR("Unexpected panel ID size: %zu", actual);
@@ -475,10 +475,7 @@ Lp8556Device::PanelType Lp8556Device::GetPanelType() const {
   switch (panel_type_id_) {
     case kPanelTypeBoeFiti9364:
     case kPanelTypeBoeFiti9365:
-    case kPanelTypeBoeSit7703:
       return Lp8556Device::PanelType::kBoe;
-    case kPanelTypeInxFiti9364:
-      return Lp8556Device::PanelType::kInx;
     case kPanelTypeKdFiti9364:
     case kPanelTypeKdFiti9365:
       return Lp8556Device::PanelType::kKd;

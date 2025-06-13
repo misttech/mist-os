@@ -102,10 +102,9 @@ class Lp8556Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_BA
   zx::vmo InspectVmo() { return inspector_.DuplicateVmo(); }
   enum class PanelType {
     kBoe = 0,
-    kInx = 1,
-    kKd = 2,
-    kUnknown = 3,
-    kNumTypes = 4,
+    kKd = 1,
+    kUnknown = 2,
+    kNumTypes = 3,
   };
 
   double GetBacklightPower(double backlight_brightness) const;
