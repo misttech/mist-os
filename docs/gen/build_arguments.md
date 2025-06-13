@@ -89,7 +89,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2164
+From //build/config/BUILDCONFIG.gn:2203
 
 ### allowed_test_device_types
 
@@ -1052,7 +1052,7 @@ This should never be set as a build argument.
 }
   armv7_unknown_linux_gnueabihf = {
   libclang_rt_profile_a = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.profile.a"
-  libunwind_so = ""
+  libunwind_so = "../../../../out/not-default/libunwind.so"
   resource_dir = "lib/clang/21"
   variants = {
   asan = {
@@ -1146,7 +1146,7 @@ This should never be set as a build argument.
 }
   static = {
   clang_rt = "../../../../out/not-default/libclang_rt.tsan.a"
-  clang_rt_cxx = ""
+  clang_rt_cxx = "../../../../out/not-default/libclang_rt.tsan_cxx.a"
 }
 }
   ubsan = {
@@ -1801,7 +1801,7 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "lib/clang/21/lib/x86_64-unknown-linux-gnu/libclang_rt.lsan.a"
@@ -2826,7 +2826,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1940
+From //build/config/BUILDCONFIG.gn:1961
 
 ### fastboot_product
 
@@ -3815,6 +3815,12 @@ Each element of the list is one variant, which is a scope defining:
   remove_common_configs = []
   tags = ["asan", "instrumentation-runtime", "instrumented", "needs-compiler-abi", "needs-writable-globals", "lsan", "replaces-allocator", "uses-shadow", "kernel-only"]
   toolchain_args = { }
+}, {
+  configs = ["//build/config/lto", "//build/config/sanitizers:cfi"]
+  tags = ["lto", "custom-runtime"]
+}, {
+  configs = ["//build/config/lto:thinlto", "//build/config/sanitizers:cfi"]
+  tags = ["lto", "custom-runtime"]
 }, {
   configs = ["//build/config/sanitizers:asan", "//build/config:no-safe-stack", "//build/config/sanitizers:sancov"]
   host_only = {
@@ -5649,7 +5655,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2154
+From //build/config/BUILDCONFIG.gn:2193
 
 ### select_variant_canonical
 
@@ -5659,7 +5665,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2159
+From //build/config/BUILDCONFIG.gn:2198
 
 ### select_variant_shortcuts
 
@@ -5715,6 +5721,18 @@ a list that can be spliced into [`select_variant`](#select_variant).
   variant = "tsan"
 }]
 }, {
+  name = "kernel_lto-cfi"
+  select_variant = [{
+  kernel = true
+  variant = "lto-cfi"
+}]
+}, {
+  name = "kernel_thinlto-cfi"
+  select_variant = [{
+  kernel = true
+  variant = "thinlto-cfi"
+}]
+}, {
   name = "kubsan"
   select_variant = [{
   _zircon_cpu = "arm64"
@@ -5724,7 +5742,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1947
+From //build/config/BUILDCONFIG.gn:1968
 
 ### size_checker_input
 
