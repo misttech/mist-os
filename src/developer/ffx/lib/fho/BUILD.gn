@@ -40,6 +40,7 @@ rustc_library("lib") {
     "src/fho_env.rs",
     "src/from_env.rs",
     "src/lib.rs",
+    "src/null_writer.rs",
     "src/subtool.rs",
     "src/try_from_env.rs",
   ]

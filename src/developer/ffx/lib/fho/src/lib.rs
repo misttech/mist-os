@@ -7,6 +7,7 @@ mod fho_env;
 mod from_env;
 mod try_from_env;
 
+pub mod null_writer;
 pub mod subtool;
 
 pub use subtool::{FfxMain, FfxTool};
