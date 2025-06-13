@@ -327,6 +327,7 @@ template("board_configuration") {
           label =
               get_label_info(":${labels.main_target}", "label_with_toolchain")
           name = board_name
+          cipd_name = board_name
           outdir = rebase_path(files.board_config_dir, root_build_dir)
         },
       ]
