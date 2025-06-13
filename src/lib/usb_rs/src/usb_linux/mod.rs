@@ -587,14 +587,18 @@ impl Interface {
 
         if let Some(stubs) = stubs.as_ref() {
             stubs.claim_interface(fd, &mut iface.interface as *mut libc::c_uint)?;
-            stubs.set_interface(fd, &mut iface as *mut usbdevfs_setinterface)?;
+            if iface.altsetting != 0 {
+                stubs.set_interface(fd, &mut iface as *mut usbdevfs_setinterface)?;
+            }
         } else {
             // SAFETY: These ioctls will only reference this memory for their own runtime, during which
             // they will block this thread, preserving scope. Their arguments have been checked to match
             // the documentation.
             unsafe {
                 ioctl!(fd, USBDEVFS_CLAIMINTERFACE, &mut iface.interface as *mut libc::c_uint)?;
-                ioctl!(fd, USBDEVFS_SETINTERFACE, &mut iface as *mut usbdevfs_setinterface)?;
+                if iface.altsetting != 0 {
+                    ioctl!(fd, USBDEVFS_SETINTERFACE, &mut iface as *mut usbdevfs_setinterface)?;
+                }
             }
         }
 
