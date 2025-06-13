@@ -252,8 +252,9 @@ int Dwc3::IrqThread() {
       // process these.
       irq_.ack();
 
-      uint32_t event_count;
-      while ((event_count = GEVNTCOUNT::Get(0).ReadFrom(mmio).EVNTCOUNT()) > 0) {
+      uint32_t event_bytes;
+      while ((event_bytes = GEVNTCOUNT::Get(0).ReadFrom(mmio).EVNTCOUNT()) > 0) {
+        uint32_t event_count = event_bytes / sizeof(uint32_t);
         // invalidate cache so we can read fresh events
         const zx_off_t offset = (ring_cur - ring_start) * sizeof(*ring_cur);
         const size_t todo = std::min<size_t>(ring_end - ring_cur, event_count);
@@ -262,7 +263,7 @@ int Dwc3::IrqThread() {
           CacheFlushInvalidate(event_buffer_.get(), 0, (event_count - todo) * sizeof(*ring_cur));
         }
 
-        for (uint32_t i = 0; i < event_count; i += sizeof(uint32_t)) {
+        for (uint32_t i = 0; i < event_count; i++) {
           uint32_t event = *ring_cur++;
           if (ring_cur == ring_end) {
             ring_cur = ring_start;
@@ -272,7 +273,7 @@ int Dwc3::IrqThread() {
         }
 
         // acknowledge the events we have processed
-        GEVNTCOUNT::Get(0).FromValue(0).set_EVNTCOUNT(event_count).WriteTo(mmio);
+        GEVNTCOUNT::Get(0).FromValue(0).set_EVNTCOUNT(event_bytes).WriteTo(mmio);
       }
     } else if (wakeup_pkt.type == ZX_PKT_TYPE_USER) {
       const IrqSignal signal = GetIrqSignal(wakeup_pkt);
