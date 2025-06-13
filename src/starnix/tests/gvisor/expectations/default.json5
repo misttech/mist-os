@@ -226,9 +226,6 @@
                 // clock_nanosleep_test
                 "ClockNanosleepProcessTest.SleepFiveSeconds",
 
-                // epoll_test - https://fxbug.dev/42159478
-                "EpollTest.PipeWriterErrAfterReaderClosed",
-
                 // eventfd_test - splice() isn't implemented https://fxbug.dev/42070385
                 "EventfdTest.SpliceReturnsEINVAL",
 
@@ -899,6 +896,10 @@
                 "ConcurrencyTest.MultiProcessConcurrency",
                 "ElfTest.PIE",
                 "ElfTest.PIENonZeroStart",
+
+                // This test depends on pthread_cancel, which in turn depends on a shared library
+                // that is missing in the container that these tests run. The failure happens after
+                // the main test logic.
                 "EpollTest.UnblockWithSignal",
                 "SharedPrivate/PrivateAndSharedFutexTest.Wake0/*",
                 "SharedPrivate/PrivateAndSharedFutexTest.WakeOpCondSuccess/*",

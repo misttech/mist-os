@@ -738,7 +738,7 @@ impl PipeFileObject {
             assert!(pipe.reader_count > 0);
             pipe.reader_count -= 1;
             if pipe.reader_count == 0 {
-                events |= FdEvents::POLLOUT;
+                events |= FdEvents::POLLOUT | FdEvents::POLLERR;
             }
         }
         if flags.can_write() {
