@@ -328,14 +328,14 @@ impl VsockDevice {
     ) -> Result<(), zx::Status> {
         self.port_manager.borrow_mut().add_listener(host_port)?;
 
-        let closed = acceptor.on_closed().extend_lifetime();
-        if let Some(_) = self.listeners.borrow_mut().insert(host_port, acceptor) {
+        if let Some(_) = self.listeners.borrow_mut().insert(host_port, acceptor.clone()) {
             panic!("Client already listening on port {} but the port was untracked", host_port);
         };
 
         // Remove the Listener when the client closes the acceptor.
         let device = self.clone();
         fasync::Task::local(async move {
+            let closed = acceptor.on_closed();
             if let Err(err) = closed.await {
                 panic!("Failed to wait on peer closed signal: {}", err);
             };

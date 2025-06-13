@@ -1281,20 +1281,6 @@ pub mod on_signals {
                 _lifetime: PhantomData,
             })
         }
-
-        /// This function allows the `OnSignals` object to live for the `'static` lifetime.
-        ///
-        /// It is functionally a no-op, but callers of this method should note that
-        /// `OnSignals` will not fire if the handle that was used to create it is dropped or
-        /// transferred to another process.
-        pub fn extend_lifetime(self) -> OnSignalsRef<'static> {
-            OnSignalsRef {
-                h: self.h,
-                koid: self.koid,
-                signals: self.signals,
-                _lifetime: PhantomData,
-            }
-        }
     }
 
     impl Future for OnSignalsRef<'_> {

@@ -550,7 +550,8 @@ impl Provider {
     /// have been exhausted.
     pub async fn run(mut self, mut requests: mpsc::Receiver<ServiceRequest>) -> Result<(), Error> {
         loop {
-            let mut upstream_client_closed_fut = self.upstream.on_upstream_client_closed().fuse();
+            let mut upstream_client_closed_fut =
+                pin!(self.upstream.on_upstream_client_closed().fuse());
             select! {
                 // It's OK if the advertisement terminates for any reason. We use `select_next_some`
                 // to ignore cases where the stream is exhausted. It can always be set again if

@@ -93,31 +93,6 @@ impl<'a, H: AsHandleRef + 'a> OnSignals<'a, H> {
         std::mem::replace(&mut self.handle, zx::Handle::invalid().into())
     }
 
-    /// This function allows the `OnSignals` object to live for the `'static` lifetime, at the cost
-    /// of disabling automatic cleanup of the port wait.
-    ///
-    /// WARNING: Do not use unless you can guarantee that either:
-    /// - The future is not dropped before it completes, or
-    /// - The handle is dropped without creating additional OnSignals futures for it.
-    ///
-    /// Creating an OnSignals calls zx_object_wait_async, which consumes a small amount of kernel
-    /// resources. Dropping the OnSignals calls zx_port_cancel to clean up. But calling
-    /// extend_lifetime disables this cleanup, since the zx_port_wait call requires a reference to
-    /// the handle. The port registration can also be cleaned up by closing the handle or by
-    /// waiting for the signal to be triggered. But if neither of these happens, the registration
-    /// is leaked. This wastes kernel memory and the kernel will eventually kill your process to
-    /// force a cleanup.
-    ///
-    /// Note that `OnSignals` will not fire if the handle that was used to create it is dropped or
-    /// transferred to another process.
-    // TODO(https://fxbug.dev/42182035): Try to remove this footgun.
-    pub fn extend_lifetime(mut self) -> LeakedOnSignals {
-        match self.registration.take() {
-            Some(r) => LeakedOnSignals { registration: Ok(r) },
-            None => LeakedOnSignals { registration: self.register(None) },
-        }
-    }
-
     fn register(
         &self,
         cx: Option<&mut Context<'_>>,
@@ -284,12 +259,6 @@ mod test {
 
             std::mem::drop(signals);
             assert!(ehandle.port().cancel(&event, key) == Err(zx::Status::NOT_FOUND));
-
-            // try again but with extend_lifetime
-            let signals = OnSignals::new(&event, zx::Signals::EVENT_SIGNALED).extend_lifetime();
-            let key = signals.registration.as_ref().unwrap().key();
-            std::mem::drop(signals);
-            assert!(ehandle.port().cancel(&event, key) == Ok(()));
         });
 
         assert!(TestExecutor::new().run_until_stalled(&mut fut).is_ready());

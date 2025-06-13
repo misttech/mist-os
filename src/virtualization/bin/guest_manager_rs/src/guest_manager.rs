@@ -164,10 +164,10 @@ impl GuestManager {
 
     pub async fn run<St: Stream<Item = GuestManagerRequestStream> + Unpin>(
         &mut self,
-        mut lifecycle: Rc<GuestLifecycleProxy>,
+        mut lifecycle: GuestLifecycleProxy,
         request_streams: St,
     ) -> Result<(), Error> {
-        let mut on_closed = lifecycle.on_closed().extend_lifetime().fuse();
+        let mut on_closed = lifecycle.on_closed().fuse();
 
         let mut request_streams = request_streams.fuse();
         let mut connections = SelectAll::new();
@@ -187,8 +187,9 @@ impl GuestManager {
 
                     // The VMM component has terminated, create a new one by opening a new
                     // lifecycle channel.
-                    lifecycle = Rc::new(connect_to_protocol::<GuestLifecycleMarker>()?);
-                    on_closed = lifecycle.on_closed().extend_lifetime().fuse();
+                    drop(on_closed);
+                    lifecycle = connect_to_protocol::<GuestLifecycleMarker>()?;
+                    on_closed = lifecycle.on_closed().fuse();
 
                     // Any pending run future is now invalid.
                     run_futures.clear();
@@ -508,7 +509,7 @@ impl GuestManager {
     }
 
     async fn send_create_request(
-        lifecycle: Rc<GuestLifecycleProxy>,
+        lifecycle: GuestLifecycleProxy,
         config: GuestConfig,
     ) -> Result<(), GuestError> {
         let result = lifecycle.create(config).await;
@@ -520,7 +521,7 @@ impl GuestManager {
         }
     }
 
-    async fn send_run_request(lifecycle: Rc<GuestLifecycleProxy>) -> Result<(), GuestError> {
+    async fn send_run_request(lifecycle: GuestLifecycleProxy) -> Result<(), GuestError> {
         let result = lifecycle.run().await;
         if let Err(err) = result {
             log::error!(err:%; "failed to send Run FIDL call");
@@ -695,7 +696,7 @@ mod tests {
             self.manager
                 .borrow_mut()
                 .run(
-                    Rc::new(self.lifecycle_proxy.take().expect("manager already run")),
+                    self.lifecycle_proxy.take().expect("manager already run"),
                     self.state_rx.take().expect("manager already run"),
                 )
                 .await
@@ -790,7 +791,7 @@ mod tests {
 
         let (proxy, server) = create_proxy_and_stream::<GuestLifecycleMarker>();
 
-        let run_fut = manager.run(Rc::new(proxy), state_rx).fuse();
+        let run_fut = manager.run(proxy, state_rx).fuse();
         futures::pin_mut!(run_fut);
         let mut vmm = MockVmm::new(server);
 

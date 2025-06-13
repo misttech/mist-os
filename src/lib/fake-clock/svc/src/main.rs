@@ -11,11 +11,11 @@ use fidl_fuchsia_testing_deadline::DeadlineId;
 use fuchsia_async as fasync;
 use fuchsia_component::server::ServiceFs;
 use futures::stream::{StreamExt, TryStreamExt};
-use futures::FutureExt;
 use log::{debug, error, trace, warn};
 use zx::{self as zx, AsHandleRef, Peered};
 
 use std::collections::{hash_map, BinaryHeap, HashMap, HashSet};
+use std::rc::Rc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use std::sync::{Arc, Mutex};
@@ -29,7 +29,7 @@ struct PendingEvent<E = zx::Koid> {
 }
 
 struct RegisteredEvent {
-    event: zx::EventPair,
+    event: Rc<zx::EventPair>,
     pending: bool,
 }
 
@@ -234,17 +234,11 @@ impl<T: FakeClockObserver> FakeClock<T> {
             return;
         }
 
-        let closed_fut = fasync::OnSignals::new(&event, zx::Signals::EVENTPAIR_PEER_CLOSED)
-            .extend_lifetime()
-            .map(move |_| {
-                let mut mc = arc_self.lock().unwrap();
-                mc.cancel_event(koid);
-                mc.registered_events.remove(&koid).expect("Registered event disappeared");
-                mc.observer.event_removed(koid);
-            });
+        let event = Rc::new(event);
 
         let pending = PendingEvent { time, event: koid };
-        let mut registered = RegisteredEvent { pending: pending.time > self.time, event };
+        let mut registered =
+            RegisteredEvent { pending: pending.time > self.time, event: event.clone() };
 
         if registered.pending {
             debug!("Registering event at {:?} -> {:?}", time, time - self.time);
@@ -255,7 +249,16 @@ impl<T: FakeClockObserver> FakeClock<T> {
         };
 
         self.registered_events.insert(koid, registered);
-        fasync::Task::local(closed_fut).detach();
+        fasync::Task::local(async move {
+            if let Ok(_) = fasync::OnSignals::new(&*event, zx::Signals::EVENTPAIR_PEER_CLOSED).await
+            {
+                let mut mc = arc_self.lock().unwrap();
+                mc.cancel_event(koid);
+                mc.registered_events.remove(&koid).expect("Registered event disappeared");
+                mc.observer.event_removed(koid);
+            }
+        })
+        .detach();
     }
 
     fn reschedule_event(&mut self, time: zx::MonotonicInstant, koid: zx::Koid) {

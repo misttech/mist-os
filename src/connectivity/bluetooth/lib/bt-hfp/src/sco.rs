@@ -7,7 +7,7 @@ use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::profile::ValidScoConnectionParameters;
 use fuchsia_bluetooth::types::PeerId;
 use fuchsia_inspect_derive::Unit;
-use futures::{Future, FutureExt};
+use futures::Future;
 use profile_client::Error as ProfileError;
 use thiserror::Error;
 
@@ -76,7 +76,10 @@ impl Unit for Connection {
 
 impl Connection {
     pub fn on_closed(&self) -> impl Future<Output = ()> + 'static {
-        self.proxy.on_closed().extend_lifetime().map(|_| ())
+        let proxy = self.proxy.clone();
+        async move {
+            let _ = proxy.on_closed().await;
+        }
     }
 
     pub fn is_closed(&self) -> bool {

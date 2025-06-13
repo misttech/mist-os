@@ -10,7 +10,6 @@ use fidl_fuchsia_virtualization::{GuestLifecycleMarker, GuestManagerRequestStrea
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server;
 use guest_manager::GuestManager;
-use std::rc::Rc;
 
 #[fuchsia::main(logging = true)]
 async fn main() -> Result<(), Error> {
@@ -20,7 +19,7 @@ async fn main() -> Result<(), Error> {
         .map_err(|err| anyhow!("Error starting server: {}", err))?;
 
     let mut manager = GuestManager::new_with_defaults();
-    let lifecycle = Rc::new(connect_to_protocol::<GuestLifecycleMarker>()?);
+    let lifecycle = connect_to_protocol::<GuestLifecycleMarker>()?;
     if let Err(err) = manager.run(lifecycle, fs).await {
         log::error!(err:%; "failed to run guest manager");
         Err(err)
