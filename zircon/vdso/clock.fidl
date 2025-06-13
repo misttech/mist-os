@@ -151,6 +151,11 @@ closed protocol Clockfuncs {
     ///   update the clock within the limits defined by the monotonic and continuous
     ///   properties specified at create time, the handle rights, and the backstop time
     ///   of the clock.
+    /// + `ZX_CLOCK_OPT_MAPPABLE` : When set, creates a clock that can be turned into a
+    ///   memory-mapped clock using `zx_vmar_map_clock()`.
+    ///   See [mappable clocks][mcc] for more details.
+    ///
+    ///  [mcc]: /docs/reference/kernel_objects/clock.md#mappable_clocks
     ///
     /// ### Arguments
     ///
