@@ -29,10 +29,11 @@ import (
 )
 
 var (
-	ninjalogPath = flag.String("ninjalog", "", "path of .ninja_log")
-	compdbPath   = flag.String("compdb", "", "path of JSON compilation database")
-	graphPath    = flag.String("graph", "", "path of graphviz dot file for ninja targets")
-	criticalPath = flag.Bool("critical-path", false, "whether to highlight critical path in this build, --graph must be set for this to work")
+	ninjaBuildTracePath = flag.String("ninjabuildtrace", "", "path of ninja_build_trace.json")
+	ninjalogPath        = flag.String("ninjalog", "", "path of .ninja_log")
+	compdbPath          = flag.String("compdb", "", "path of JSON compilation database")
+	graphPath           = flag.String("graph", "", "path of graphviz dot file for ninja targets")
+	criticalPath        = flag.Bool("critical-path", false, "whether to highlight critical path in this build, --graph must be set for this to work")
 
 	// Flags for interleaving subtraces.
 	buildDir      = flag.String("build-dir", "", "path of the directory where ninja is run; when non-empty, ninjatrace will look for subtraces in this directory to interleave in the main trace")
@@ -118,6 +119,42 @@ func readArtifacts(logPath, compdbPath, graphPath string) (artifacts, error) {
 	return ret, nil
 }
 
+func readNinjaBuildTrace(tracePath string) (traces []chrometrace.Trace, err error) {
+	file, err := readerwriters.Open(tracePath)
+	if err != nil {
+		return nil, fmt.Errorf("opening Ninja build trace file: %v", err)
+	}
+	defer func() {
+		if cerr := file.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}()
+
+	if err := json.NewDecoder(file).Decode(&traces); err != nil {
+		return nil, err
+	}
+
+	// Augment trace.Category with categories computed from the build
+	// command itself. This takes care of ignoring Fuchsia wrapper scripts
+	// (that are used for remoting with RBE, tracing or hermeticity checks).
+	for i := 0; i < len(traces); i++ {
+		if traces[i].Args == nil {
+			// Workflow events do not have any arguments.
+			continue
+		}
+		command, ok := traces[i].Args["command"].(string)
+		if !ok { // this event doesn't have any command'
+			continue
+		}
+		categories := ninjalog.ComputeCommandCategories(command)
+		if categories == "" {
+			continue
+		}
+		traces[i].Category = traces[i].Category + "," + categories
+	}
+	return
+}
+
 func createAndWriteTrace(path string, traces []chrometrace.Trace) (err error) {
 	f, err := readerwriters.Create(*traceJSON)
 	if err != nil {
@@ -139,14 +176,22 @@ func main() {
 	flag.Parse()
 	ctx := context.Background()
 
-	if *ninjalogPath == "" {
-		log.Fatalf("--ninjalog is required")
-	}
-
-	if *criticalPath {
-		if *graphPath == "" {
-			log.Fatalf("--graph must be set when --critical-path is true")
+	if *ninjaBuildTracePath == "" {
+		if *ninjalogPath == "" {
+			log.Fatalf("--ninjalog is required")
 		}
+
+		if *criticalPath {
+			if *graphPath == "" {
+				log.Fatalf("--graph must be set when --critical-path is true")
+			}
+		}
+	} else if *ninjalogPath != "" {
+		log.Fatalf("-ninjabuildtrace and -ninjalog cannot be used together.")
+	} else if *compdbPath != "" {
+		log.Fatalf("-ninjabuildtrace and -compdbpath cannot be used together.")
+	} else if *graphPath != "" {
+		log.Fatalf("-ninjabuildtrace and -graph cannto be used together.")
 	}
 
 	if *cpuprofile != "" {
@@ -161,16 +206,27 @@ func main() {
 		defer pprof.StopCPUProfile()
 	}
 
-	as, err := readArtifacts(*ninjalogPath, *compdbPath, *graphPath)
-	if err != nil {
-		log.Fatalf("Failed to read artifacts: %v", err)
-	}
+	var traces []chrometrace.Trace
 
-	steps, err := join(as, *criticalPath)
-	if err != nil {
-		log.Fatalf("Failed to join information from ninjalog, compdb and ninjagraph together: %v", err)
+	if *ninjaBuildTracePath != "" {
+		// Read build trace directly.
+		ninja_traces, err := readNinjaBuildTrace(*ninjaBuildTracePath)
+		if err != nil {
+			log.Fatalf("Failed to read Ninja build trace: %v", err)
+		}
+		traces = ninja_traces
+	} else {
+		as, err := readArtifacts(*ninjalogPath, *compdbPath, *graphPath)
+		if err != nil {
+			log.Fatalf("Failed to read artifacts: %v", err)
+		}
+
+		steps, err := join(as, *criticalPath)
+		if err != nil {
+			log.Fatalf("Failed to join information from ninjalog, compdb and ninjagraph together: %v", err)
+		}
+		traces = ninjalog.ToTraces(ninjalog.Flow(steps), 1)
 	}
-	traces := ninjalog.ToTraces(ninjalog.Flow(steps), 1)
 
 	if *buildDir != "" {
 		interleaved, err := clangtrace.ToInterleave(traces, *buildDir, *granularity)

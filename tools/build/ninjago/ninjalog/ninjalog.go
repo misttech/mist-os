@@ -159,12 +159,8 @@ func baseCmd(cmd string) string {
 	return strings.Trim(path.Base(cmd), "()")
 }
 
-// category returns a comma separated list of executed commands.
-func (s Step) Category() string {
-	if s.Command == nil {
-		return "unknown"
-	}
-	tokens, err := shlex.Split(s.Command.Command)
+func ComputeCommandCategories(command string) string {
+	tokens, err := shlex.Split(command)
 	if err != nil {
 		return "invalid command"
 	}
@@ -188,6 +184,14 @@ func (s Step) Category() string {
 		}
 	}
 	return strings.Join(categories, ",")
+}
+
+// category returns a comma separated list of executed commands.
+func (s Step) Category() string {
+	if s.Command == nil {
+		return "unknown"
+	}
+	return ComputeCommandCategories(s.Command.Command)
 }
 
 // Steps is a list of Step.
