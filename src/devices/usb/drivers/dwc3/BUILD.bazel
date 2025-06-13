@@ -39,6 +39,8 @@ cc_library(
         "dwc3-event-fifo.h",
         "dwc3-events.cc",
         "dwc3-regs.h",
+        "dwc3-trb-fifo.cc",
+        "dwc3-trb-fifo.h",
         "dwc3-types.h",
     ],
     defines = [

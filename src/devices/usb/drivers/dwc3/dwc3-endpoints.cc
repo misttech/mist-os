@@ -9,40 +9,6 @@
 
 namespace dwc3 {
 
-zx_status_t Dwc3::Fifo::Init(zx::bti& bti) {
-  if (buffer) {
-    Reset();
-    return ZX_OK;
-  }
-
-  zx_status_t status =
-      dma_buffer::CreateBufferFactory()->CreateContiguous(bti, Fifo::kFifoSize, 12, true, &buffer);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  first = static_cast<dwc3_trb_t*>(buffer->virt());
-  next = first;
-  current = nullptr;
-  last = first + (Fifo::kFifoSize / sizeof(dwc3_trb_t)) - 1;
-
-  // set up link TRB pointing back to the start of the fifo
-  dwc3_trb_t* trb = last;
-  zx_paddr_t trb_phys = buffer->phys();
-  trb->ptr_low = (uint32_t)trb_phys;
-  trb->ptr_high = (uint32_t)(trb_phys >> 32);
-  trb->status = 0;
-  trb->control = TRB_TRBCTL_LINK | TRB_HWO;
-  CacheFlush(buffer.get(), (trb - first) * sizeof(*trb), sizeof(*trb));
-
-  return ZX_OK;
-}
-
-void Dwc3::Fifo::Release() {
-  first = next = current = last = nullptr;
-  buffer.reset();
-}
-
 void Dwc3::EpEnable(const Endpoint& ep, bool enable) {
   std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
@@ -129,15 +95,6 @@ void Dwc3::EpEndTransfers(Endpoint& ep, zx_status_t reason) {
       std::optional<RequestInfo> info{pending_completions_.pop()};
       info->uep->server->RequestComplete(info->status, info->actual, std::move(info->req));
     }
-  }
-}
-
-void Dwc3::EpReadTrb(Endpoint& ep, Fifo& fifo, const dwc3_trb_t* src, dwc3_trb_t* dst) {
-  if (src >= fifo.first && src < fifo.last) {
-    CacheFlushInvalidate(fifo.buffer.get(), (src - fifo.first) * sizeof(*src), sizeof(*src));
-    memcpy(dst, src, sizeof(*dst));
-  } else {
-    FDF_LOG(ERROR, "bad trb");
   }
 }
 

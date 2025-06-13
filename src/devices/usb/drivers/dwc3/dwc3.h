@@ -34,6 +34,7 @@
 #include <usb/sdk/request-fidl.h>
 
 #include "src/devices/usb/drivers/dwc3/dwc3-event-fifo.h"
+#include "src/devices/usb/drivers/dwc3/dwc3-trb-fifo.h"
 #include "src/devices/usb/drivers/dwc3/dwc3-types.h"
 
 namespace dwc3 {
@@ -190,28 +191,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
    private:
     mutable std::mutex lock_;
     std::deque<RequestInfo> q_ __TA_GUARDED(lock_);  // Queued front-to-back.
-  };
-
-  struct Fifo {
-    static inline const uint32_t kFifoSize = zx_system_get_page_size();
-
-    zx_status_t Init(zx::bti& bti);
-    void Release();
-    void Reset() {
-      current = nullptr;
-      next = first;
-    }
-
-    zx_paddr_t GetTrbPhys(dwc3_trb_t* trb) const {
-      ZX_DEBUG_ASSERT((trb >= first) && (trb <= last));
-      return buffer->phys() + ((trb - first) * sizeof(*trb));
-    }
-
-    std::unique_ptr<dma_buffer::ContiguousBuffer> buffer;
-    dwc3_trb_t* first{nullptr};    // first TRB in the fifo
-    dwc3_trb_t* next{nullptr};     // next free TRB in the fifo
-    dwc3_trb_t* current{nullptr};  // TRB for currently pending transaction
-    dwc3_trb_t* last{nullptr};     // last TRB in the fifo (link TRB)
   };
 
   class EpServer : public usb::EndpointServer {
