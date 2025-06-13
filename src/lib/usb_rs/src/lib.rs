@@ -161,4 +161,9 @@ pub fn wait_for_devices(
     usb_plat::wait_for_devices(notify_added, notify_removed)
 }
 
+/// Lists all USB devices currently on the bus.
+pub fn enumerate_devices() -> Result<Vec<DeviceHandle>> {
+    usb_plat::enumerate_devices()
+}
+
 pub type Result<T, E = Error> = std::result::Result<T, E>;

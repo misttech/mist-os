@@ -6,7 +6,7 @@ mod usbdevice_fs;
 use futures::lock::Mutex as AsyncMutex;
 use usbdevice_fs::*;
 mod discovery;
-pub use discovery::wait_for_devices;
+pub use discovery::{enumerate_devices, wait_for_devices};
 
 use futures::future::poll_fn;
 use futures::task::AtomicWaker;
