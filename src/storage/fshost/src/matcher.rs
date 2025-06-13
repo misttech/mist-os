@@ -155,7 +155,7 @@ impl PublisherMatcher {
 #[async_trait]
 impl Matcher for PublisherMatcher {
     async fn match_device(&self, device: &mut dyn Device) -> bool {
-        !device.is_managed()
+        !device.is_managed() && !device.is_nand()
     }
 
     async fn process_device(
