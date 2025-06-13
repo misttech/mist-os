@@ -164,6 +164,19 @@ class MetricsProcessor:
     def name(self) -> str:
         return self.__class__.__name__
 
+    def process_metrics_with_fxt(
+        self, fxt_path: str
+    ) -> Sequence[TestCaseResult]:
+        """Generates metrics from the file at the given fxt_path.
+
+        Args:
+            fxt_path: The path of the fxt tracing file.
+
+        Returns:
+            The generated metrics.
+        """
+        return []
+
     def process_metrics(
         self, model: trace_model.Model
     ) -> Sequence[TestCaseResult]:
