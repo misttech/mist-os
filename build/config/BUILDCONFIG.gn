@@ -1878,6 +1878,27 @@ declare_args() {
       forward_variables_from(_kasan_variant, "*")
     },
 
+    {
+      configs = [
+        "//build/config/lto",
+        "//build/config/sanitizers:cfi",
+      ]
+      tags = [
+        "lto",
+        "custom-runtime",
+      ]
+    },
+    {
+      configs = [
+        "//build/config/lto:thinlto",
+        "//build/config/sanitizers:cfi",
+      ]
+      tags = [
+        "lto",
+        "custom-runtime",
+      ]
+    },
+
     # Same for 'kasan-sancov' that mimics 'asan-sancov'.
     {
       name = "kasan-sancov"
@@ -2017,6 +2038,24 @@ declare_args() {
         {
           variant = "tsan"
           host = true
+        },
+      ]
+    },
+    {
+      name = "kernel_lto-cfi"
+      select_variant = [
+        {
+          kernel = true
+          variant = "lto-cfi"
+        },
+      ]
+    },
+    {
+      name = "kernel_thinlto-cfi"
+      select_variant = [
+        {
+          kernel = true
+          variant = "thinlto-cfi"
         },
       ]
     },

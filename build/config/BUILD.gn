@@ -1319,6 +1319,7 @@ config("symbol_visibility_hidden") {
   # outside of our build since not every user uses hidden visibility by default.
   defines = [ "_LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS" ]
   cflags = [ "-fvisibility=hidden" ]
+  asmflags = cflags
   if (zircon_toolchain != false) {
     cflags_cc = [ "-fvisibility-inlines-hidden" ]
   }
