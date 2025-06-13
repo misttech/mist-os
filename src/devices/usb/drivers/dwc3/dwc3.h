@@ -11,6 +11,7 @@
 #include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.usb.phy/cpp/fidl.h>
+#include <lib/async/cpp/irq.h>
 #include <lib/dma-buffer/buffer.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/logging/cpp/logger.h>
@@ -32,6 +33,7 @@
 #include <usb/descriptors.h>
 #include <usb/sdk/request-fidl.h>
 
+#include "src/devices/usb/drivers/dwc3/dwc3-event-fifo.h"
 #include "src/devices/usb/drivers/dwc3/dwc3-types.h"
 
 namespace dwc3 {
@@ -45,12 +47,6 @@ class PlatformExtension {
   virtual zx::result<> Suspend() = 0;
   virtual zx::result<> Resume() = 0;
 };
-
-// A dma_buffer::ContiguousBuffer is cached, but leaves cache management to the user. These methods
-// wrap zx_cache_flush with sensible boundary checking and validation.
-zx_status_t CacheFlush(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset, size_t length);
-zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset,
-                                 size_t length);
 
 class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dci::UsbDci> {
  public:
@@ -90,6 +86,8 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
                              fidl::UnknownMethodCompleter::Sync& completer) override { /* no-op */ }
 
  private:
+  const std::string_view kScheduleProfileRole = "fuchsia.devices.usb.drivers.dwc3.interrupt";
+
   zx::result<> CommonCancelAll(uint8_t ep_addr);
   void DciIntfSetSpeed(fuchsia_hardware_usb_descriptor::wire::UsbSpeed speed)
       __TA_REQUIRES(dci_lock_);
@@ -99,7 +97,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
                                     uint8_t* read_buffer, size_t read_size)
       __TA_REQUIRES(dci_lock_);
 
-  static inline const uint32_t kEventBufferSize = zx_system_get_page_size();
   static inline const uint32_t kEp0BufferSize = UINT16_MAX + 1;
 
   // physical endpoint numbers.  We use 0 and 1 for EP0, and let the device-mode
@@ -193,12 +190,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
    private:
     mutable std::mutex lock_;
     std::deque<RequestInfo> q_ __TA_GUARDED(lock_);  // Queued front-to-back.
-  };
-
-  enum class IrqSignal : uint32_t {
-    Invalid = 0,
-    Exit = 1,
-    Wakeup = 2,
   };
 
   struct Fifo {
@@ -416,33 +407,9 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   libsync::Completion init_done_;  // Signaled at the end of Init().
   void ReleaseResources();
 
-  // The IRQ thread and its two top level event decoders.
-  int IrqThread();
-  zx::result<> SetIrqThreadSchedulerRole();
+  // IRQ thread's two top level event decoders.
   void HandleEvent(uint32_t event);
   void HandleEpEvent(uint32_t event);
-
-  [[nodiscard]] zx_status_t SignalIrqThread(IrqSignal signal) {
-    if (!irq_bound_to_port_) {
-      return ZX_ERR_BAD_STATE;
-    }
-
-    zx_port_packet_t pkt{
-        .key = 0,
-        .type = ZX_PKT_TYPE_USER,
-        .status = ZX_OK,
-    };
-    pkt.user.u32[0] = static_cast<std::underlying_type_t<decltype(signal)>>(signal);
-
-    return irq_port_.queue(&pkt);
-  }
-
-  IrqSignal GetIrqSignal(const zx_port_packet_t& pkt) {
-    if (pkt.type != ZX_PKT_TYPE_USER) {
-      return IrqSignal::Invalid;
-    }
-    return static_cast<IrqSignal>(pkt.user.u32[0]);
-  }
 
   // Handlers for global events posted to the event buffer by the controller HW.
   void HandleResetEvent() __TA_EXCLUDES(lock_);
@@ -506,6 +473,10 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   void StartPeripheralMode() __TA_EXCLUDES(lock_);
   void ResetConfiguration() __TA_EXCLUDES(lock_);
 
+  void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
+                 const zx_packet_interrupt_t* interrupt);
+  void CompletePendingRequests();
+
   std::mutex lock_;
   std::mutex dci_lock_;
 
@@ -519,13 +490,11 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   bool has_pinned_memory_{false};
 
   zx::interrupt irq_;
-  zx::port irq_port_;
-  bool irq_bound_to_port_{false};
 
-  thrd_t irq_thread_;
-  std::atomic<bool> irq_thread_started_{false};
-
-  std::unique_ptr<dma_buffer::ContiguousBuffer> event_buffer_;
+  EventFifo event_fifo_;
+  fdf::SynchronizedDispatcher irq_dispatcher_;
+  async::IrqMethod<Dwc3, &Dwc3::HandleIrq> irq_handler_{this};
+  async::TaskClosureMethod<Dwc3, &Dwc3::CompletePendingRequests> complete_pending_requests_{this};
 
   Ep0 ep0_;
   UserEndpointCollection user_endpoints_;

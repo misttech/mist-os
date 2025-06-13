@@ -283,18 +283,13 @@ zx_status_t Dwc3::AcquirePDevResources() {
     return irq.error_value();
   }
   irq_ = std::move(*irq);
-
-  if (zx_status_t status = zx::port::create(ZX_PORT_BIND_TO_INTERRUPT, &irq_port_);
-      status != ZX_OK) {
-    FDF_LOG(ERROR, "zx::port::create failed: %s", zx_status_get_string(status));
-    return status;
+  auto result = fdf::SynchronizedDispatcher::Create(
+      {}, "dwc3-irq", [](fdf_dispatcher_t*) {}, kScheduleProfileRole);
+  if (result.is_error()) {
+    FDF_LOG(ERROR, "SynchronizedDispatcher::Create failed: %s", result.status_string());
+    return result.error_value();
   }
-
-  if (zx_status_t status = irq_.bind(irq_port_, 0, ZX_INTERRUPT_BIND); status != ZX_OK) {
-    FDF_LOG(ERROR, "irq bind to port failed: %s", zx_status_get_string(status));
-    return status;
-  }
-  irq_bound_to_port_ = true;
+  irq_dispatcher_ = std::move(*result);
 
   return ZX_OK;
 }
@@ -347,17 +342,11 @@ zx_status_t Dwc3::Init() {
   // allocated dma buffers.
   auto cleanup = fit::defer([this]() { ReleaseResources(); });
 
-  // Strictly speaking, we should not need RW access to this buffer.
-  // Unfortunately, attempting to writeback and invalidate the cache before
-  // reading anything from the buffer produces a page fault right if this buffer
-  // is mapped read only, so for now, we keep the buffer mapped RW.
-  zx_status_t status = dma_buffer::CreateBufferFactory()->CreateContiguous(
-      bti_, kEventBufferSize, 12, true, &event_buffer_);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "dma_buffer init fails: %s", zx_status_get_string(status));
-    return status;
+  zx::result result = event_fifo_.Init(bti_);
+  if (result.is_error()) {
+    FDF_LOG(ERROR, "Event FIFO init failed: %s", result.status_string());
+    return result.error_value();
   }
-  CacheFlushInvalidate(event_buffer_.get(), 0, kEventBufferSize);
 
   // Now that we have allocated our event buffer, we have at least one region
   // pinned.  We need to be sure to place the hardware into reset before
@@ -386,15 +375,6 @@ zx_status_t Dwc3::Init() {
 }
 
 void Dwc3::ReleaseResources() {
-  // The IRQ thread had better not be running at this point.
-  ZX_ASSERT(!irq_thread_started_.load());
-
-  // Unbind the interrupt from the interrupt port.
-  if (irq_bound_to_port_) {
-    irq_.bind(irq_port_, 0, ZX_INTERRUPT_UNBIND);
-    irq_bound_to_port_ = false;
-  }
-
   {
     std::lock_guard<std::mutex> lock(lock_);
     // If we managed to get our registers mapped, place the device into reset so
@@ -435,7 +415,7 @@ void Dwc3::ReleaseResources() {
     uep.ep.enabled = false;
   }
 
-  event_buffer_.reset();
+  event_fifo_.Release();
   has_pinned_memory_ = false;
 }
 
@@ -662,14 +642,8 @@ void Dwc3::HandleDisconnectedEvent() {
 }
 
 void Dwc3::Stop() {
-  if (irq_thread_started_.load()) {
-    zx_status_t status = SignalIrqThread(IrqSignal::Exit);
-    // if we can't signal the thread, we are not going to be able to shut down
-    // and we should just terminate the process instead.
-    ZX_ASSERT(status == ZX_OK);
-    thrd_join(irq_thread_, nullptr);
-    irq_thread_started_.store(false);
-  }
+  irq_handler_.Cancel();
+  complete_pending_requests_.Post(irq_dispatcher_.async_dispatcher());
 
   ReleaseResources();
 }
@@ -713,16 +687,14 @@ void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Syn
 }
 
 void Dwc3::StartController(StartControllerCompleter::Sync& completer) {
-  ZX_ASSERT(!irq_thread_started_);
-  // Start the interrupt thread.
-  auto irq_thunk = +[](void* arg) -> int { return static_cast<Dwc3*>(arg)->IrqThread(); };
-  if (int rc = thrd_create_with_name(&irq_thread_, irq_thunk, static_cast<void*>(this),
-                                     "dwc3-interrupt-thread");
-      rc != thrd_success) {
-    completer.Reply(zx::error(ZX_ERR_INTERNAL));
+  zx::result result = event_fifo_.Init(bti_);
+  if (result.is_error()) {
+    FDF_LOG(ERROR, "Failed to init event fifo %s", result.status_string());
+    completer.Reply(result.take_error());
     return;
   }
-  irq_thread_started_.store(true);
+  irq_handler_.set_object(irq_.get());
+  irq_handler_.Begin(irq_dispatcher_.async_dispatcher());
 
   StartPeripheralMode();
   completer.Reply(zx::ok());
@@ -736,15 +708,8 @@ void Dwc3::StopController(StopControllerCompleter::Sync& completer) {
     uep.Reset();
   }
 
-  if (irq_thread_started_.load()) {
-    zx_status_t status = SignalIrqThread(IrqSignal::Exit);
-    // if we can't signal the thread, we are not going to be able to shut down
-    // and we should just terminate the process instead.
-    ZX_ASSERT(status == ZX_OK);
-    thrd_join(irq_thread_, nullptr);
-    irq_thread_started_.store(false);
-  }
-  irq_port_.cancel_key(0, 0);
+  async::PostTask(irq_dispatcher_.async_dispatcher(), [this]() { irq_handler_.Cancel(); });
+  complete_pending_requests_.Post(irq_dispatcher_.async_dispatcher());
 
   zx_status_t status;
   {
@@ -1007,9 +972,7 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
       FDF_LOG(ERROR, "failing request with status %s", zx_status_get_string(status));
       RequestComplete(status, 0, std::move(freq));
 
-      if (status = dwc3_->SignalIrqThread(IrqSignal::Wakeup); status != ZX_OK) {
-        FDF_LOG(DEBUG, "Failed to signal IRQ thread %s", zx_status_get_string(status));
-      }
+      dwc3_->complete_pending_requests_.Post(dwc3_->irq_dispatcher_.async_dispatcher());
       continue;
     }
 

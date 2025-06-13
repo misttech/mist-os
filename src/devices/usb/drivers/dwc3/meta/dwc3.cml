@@ -14,6 +14,7 @@
         colocate: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         service_connect_validation: "true",
+        allowed_scheduler_roles: [ "fuchsia.devices.usb.drivers.dwc3.interrupt" ],
     },
     capabilities: [
         { protocol: "fuchsia.hardware.usb.endpoint.Endpoint" },
@@ -23,7 +24,6 @@
         { service: "fuchsia.hardware.usb.phy.Metadata" },
     ],
     use: [
-        { protocol: "fuchsia.scheduler.RoleManager" },
         { service: "fuchsia.hardware.interconnect.PathService" },
         { service: "fuchsia.hardware.platform.device.Service" },
         { service: "fuchsia.boot.metadata.MacAddressMetadata" },
