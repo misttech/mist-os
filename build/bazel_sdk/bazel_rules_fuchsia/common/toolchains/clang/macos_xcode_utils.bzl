@@ -107,7 +107,7 @@ def generate_macos_system_filegroups(compiler_files_name = "", linker_files_name
 
     if linker_files_name != "":
         native.filegroup(
-            name = "system-linker-files",
+            name = linker_files_name,
             srcs = select({
                 "@platforms//os:macos": native.glob(
                     include = ["xcode/MacSDK/usr/lib/**"] + [

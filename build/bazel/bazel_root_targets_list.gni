@@ -27,6 +27,10 @@ declare_args() {
       bazel_name = "build.stamp"
       ninja_name = "bazel_toolchains_tests_build.stamp"
     },
+    {
+      bazel_label = "//build/tools/json_validator:json_validator_valico"
+      install_host_tool = true
+    },
   ]
 
   # A similar list to extend the list above for custom build configuration

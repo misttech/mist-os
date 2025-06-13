@@ -213,12 +213,7 @@ final_fuchsia_idk_for_cpus_and_levels("final_fuchsia_idk.exported") {
 bazel_build_action("bazel_built_fuchsia_idk") {
   testonly = true
   bazel_target = "//build/bazel/bazel_sdk:final_fuchsia_idk"
-  deps = [
-    "//sdk:fuchsia_collection_all_subbuilds_for_merge",
-
-    # Used by the Bazel rule.
-    "//build/tools/json_validator:json_validator_valico.bazel_input",
-  ]
+  deps = [ "//sdk:fuchsia_collection_all_subbuilds_for_merge" ]
   ninja_base_dir = root_build_dir
   directory_outputs = [
     {
@@ -1157,6 +1152,10 @@ copy("idk_build_tools") {
     "//tools/fidl/measure-tape/src:measure-tape($host_toolchain)",
     "//zircon/tools/zither($host_toolchain)",
   ]
+
+  # The following tools are generated directly from Bazel.
+  sources += [ "$host_out_dir/json_validator_valico" ]
+  deps += [ "//build/bazel:bazel_root_host_targets" ]
 }
 
 # Controls the maximum number of simultaneous subbuilds.

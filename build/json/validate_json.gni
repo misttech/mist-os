@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/bazel/bazel_tool_action.gni")
 import("//build/compiled_action.gni")
 
 # Validate a JSON file against a JSON schema.
@@ -46,7 +47,7 @@ template("validate_json") {
   allow_comments = defined(invoker.allow_comments) && invoker.allow_comments
   use_valico = !defined(invoker.use_valico) || invoker.use_valico
 
-  compiled_action(target_name) {
+  _action_args = {
     forward_variables_from(invoker,
                            [
                              "applicable_licenses",
@@ -57,17 +58,6 @@ template("validate_json") {
                              "testonly",
                              "visibility",
                            ])
-
-    # The fact that the underlying binary is chosen by the `use_valico` variable
-    # makes supporting the "previously built tools" strategy complicated. Don't
-    # bother - it's fine to rebuild this tool multiple times in subbuilds.
-    can_use_previously_built_tool = false
-
-    if (use_valico) {
-      tool = "//build/tools/json_validator:json_validator_valico"
-    } else {
-      tool = "//build/tools/json_validator"
-    }
 
     stamp_file = "$target_gen_dir/$target_name.json_validated"
 
@@ -93,6 +83,23 @@ template("validate_json") {
       rebase_path(invoker.data, root_build_dir),
       rebase_path(stamp_file, root_build_dir),
     ]
+  }
+
+  if (use_valico) {
+    bazel_tool_action(target_name) {
+      forward_variables_from(_action_args, "*")
+      tool_label = "//build/tools/json_validator:json_validator_valico"
+    }
+  } else {
+    compiled_action(target_name) {
+      forward_variables_from(_action_args, "*")
+
+      # The fact that the underlying binary is chosen by the `use_valico` variable
+      # makes supporting the "previously built tools" strategy complicated. Don't
+      # bother - it's fine to rebuild this tool multiple times in subbuilds.
+      can_use_previously_built_tool = false
+      tool = "//build/tools/json_validator"
+    }
   }
 }
 
@@ -128,7 +135,7 @@ template("validate_json5") {
   assert(defined(invoker.data), "data is required")
   assert(defined(invoker.schema), "schema is required")
 
-  compiled_action(target_name) {
+  bazel_tool_action(target_name) {
     forward_variables_from(invoker,
                            [
                              "applicable_licenses",
@@ -139,7 +146,7 @@ template("validate_json5") {
                              "visibility",
                            ])
 
-    tool = "//build/tools/json_validator:json_validator_valico"
+    tool_label = "//build/tools/json_validator:json_validator_valico"
     stamp_file = "$target_gen_dir/$target_name.json5_validated"
 
     inputs = [
