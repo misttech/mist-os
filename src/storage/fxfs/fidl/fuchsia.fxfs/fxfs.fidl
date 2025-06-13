@@ -6,6 +6,7 @@ library fuchsia.fxfs;
 
 using fuchsia.io;
 using fuchsia.hardware.block.volume;
+using fuchsia.mem;
 using zx;
 
 type EmptyStruct = struct {};
@@ -305,4 +306,27 @@ closed protocol FileBackedVolumeProvider {
         name fuchsia.io.Name;
         server_end server_end:fuchsia.hardware.block.volume.Volume;
     });
+};
+
+/// Internal protocol used for streaming a new blob volume to disk.
+///
+/// This is intended primarily for use with paving/fastboot workflows which need to overwrite the
+/// system blob volume, while preserving other existing volumes (e.g. userdata).
+///
+/// *WARNING*: Still under development, may result in unrecoverable data loss. Use at your own risk!
+@discoverable
+closed protocol BlobVolumeWriter {
+    /// Writes the blob volume from `payload` into this partition. `payload` must be an fxfs
+    /// partition containing a single volume named "blob". `payload` may be truncated to exclude
+    /// unused blocks.
+    ///
+    /// *WARNING*: The system may not boot if this process is interrupted.
+    ///
+    // TODO(https://fxbug.dev/415300916): Figure out what format we should use in production.
+    // TODO(https://fxbug.dev/415300916): Split this method up into separate steps so we can report
+    // more detailed logs from fastboot (e.g. first wipe all existing blobs, then stream payload to
+    // disk, and finally post-process the blobs).
+    strict Write(resource struct {
+        payload fuchsia.mem.Buffer;
+    }) -> () error zx.Status;
 };

@@ -292,7 +292,7 @@ impl FxDirectory {
         }
     }
 
-    async fn create_unnamed_temporary_file(
+    pub(crate) async fn create_unnamed_temporary_file(
         self: &Arc<Self>,
         create_attributes: Option<&fio::MutableNodeAttributes>,
     ) -> Result<OpenedNode<dyn FxNode>, Error> {

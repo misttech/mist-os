@@ -15,7 +15,8 @@ use anyhow::{anyhow, ensure, Context as _, Error};
 use fidl::endpoints::{create_request_stream, ClientEnd, DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_fxfs::{
     BlobCreatorMarker, BlobCreatorRequest, BlobCreatorRequestStream, BlobReaderMarker,
-    BlobReaderRequest, BlobReaderRequestStream, BlobWriterMarker, CreateBlobError,
+    BlobReaderRequest, BlobReaderRequestStream, BlobVolumeWriterMarker, BlobVolumeWriterRequest,
+    BlobVolumeWriterRequestStream, BlobWriterMarker, CreateBlobError,
 };
 use fidl_fuchsia_io::{self as fio, FilesystemInfo, NodeMarker, WatchMask};
 use fuchsia_hash::Hash;
@@ -97,10 +98,19 @@ impl RootDir for BlobDirectory {
             BlobCreatorMarker::PROTOCOL_NAME,
             vfs::service::host(move |r| this.clone().handle_blob_creator_requests(r)),
         )?;
+
+        let this = self.clone();
         svc_dir.add_entry(
             BlobReaderMarker::PROTOCOL_NAME,
-            vfs::service::host(move |r| self.clone().handle_blob_reader_requests(r)),
+            vfs::service::host(move |r| this.clone().handle_blob_reader_requests(r)),
         )?;
+
+        // TODO(https://fxbug.dev/397515768): Only enable in recovery builds?
+        svc_dir.add_entry(
+            BlobVolumeWriterMarker::PROTOCOL_NAME,
+            vfs::service::host(move |r| self.clone().handle_blob_volume_writer_requests(r)),
+        )?;
+
         Ok(())
     }
 }
@@ -337,6 +347,28 @@ impl BlobDirectory {
                         });
                 }
             };
+        }
+    }
+
+    async fn handle_blob_volume_writer_requests(
+        self: Arc<Self>,
+        mut requests: BlobVolumeWriterRequestStream,
+    ) {
+        while let Ok(Some(request)) = requests.try_next().await {
+            match request {
+                BlobVolumeWriterRequest::Write {
+                    payload: fidl_fuchsia_mem::Buffer { vmo, size },
+                    responder,
+                } => {
+                    let response = crate::fuchsia::fxblob::volume_writer::write_new_blob_volume(
+                        &self, vmo, size,
+                    )
+                    .await;
+                    responder.send(response.map_err(map_to_raw_status)).unwrap_or_else(|error| {
+                        log::error!(error:?; "failed to send BlobVolumeWriter.Write response");
+                    });
+                }
+            }
         }
     }
 
