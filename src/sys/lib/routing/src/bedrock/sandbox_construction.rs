@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::bedrock::aggregate_router::{AggregateRouterFn, AggregateSource};
-use crate::bedrock::request_metadata::{service_metadata, Metadata, METADATA_KEY_TYPE};
+use crate::bedrock::request_metadata::{Metadata, METADATA_KEY_TYPE};
 use crate::bedrock::structured_dict::{
     ComponentEnvironment, ComponentInput, ComponentOutput, StructuredDictMap,
 };
@@ -20,7 +20,7 @@ use async_trait::async_trait;
 use cm_rust::{
     CapabilityTypeName, ExposeDeclCommon, OfferDeclCommon, SourceName, SourcePath, UseDeclCommon,
 };
-use cm_types::{IterablePath, Name, SeparatedPath};
+use cm_types::{Availability, IterablePath, Name, SeparatedPath};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use itertools::Itertools;
 use lazy_static::lazy_static;
@@ -29,11 +29,12 @@ use moniker::{ChildName, Moniker};
 use router_error::RouterError;
 use sandbox::{
     Capability, CapabilityBound, Connector, Data, Dict, DirEntry, Request, Routable, Router,
-    RouterResponse,
+    RouterResponse, WeakInstanceToken,
 };
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
+use strum::IntoEnumIterator;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
 lazy_static! {
@@ -263,6 +264,8 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 let cm_rust::UseSource::Collection(collection_name) = use_.source() else {
                     unreachable!();
                 };
+                let availability = *use_.availability();
+                let target: WeakInstanceToken = component.as_weak().into();
                 let aggregate = (aggregate_router_fn)(
                     component.clone(),
                     vec![AggregateSource::Collection { collection_name: collection_name.clone() }],
@@ -274,10 +277,11 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                         instances: vec![],
                     }),
                 )
-                .with_default(Request {
-                    metadata: service_metadata(*use_.availability()),
-                    target: component.as_weak().into(),
-                })
+                .with_default(
+                    metadata_for_porcelain_type(CapabilityTypeName::Service),
+                    availability,
+                    target,
+                )
                 .with_error_reporter(RouteRequestErrorInfo::from(use_), error_reporter.clone());
                 if let Err(e) = program_input
                     .namespace()
@@ -523,6 +527,8 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                         other_value => panic!("unexpected dictionary entry: {:?}", other_value),
                     }
                 }
+                let availability = *first_expose.availability();
+                let target: WeakInstanceToken = component.as_weak().into();
                 let aggregate = (aggregate_router_fn)(
                     component.clone(),
                     aggregate_sources,
@@ -539,10 +545,11 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                         instances: vec![],
                     }),
                 )
-                .with_default(Request {
-                    metadata: service_metadata(*first_expose.availability()),
-                    target: component.as_weak().into(),
-                });
+                .with_default(
+                    metadata_for_porcelain_type(CapabilityTypeName::Service),
+                    availability,
+                    target,
+                );
                 component_output
                     .capabilities()
                     .insert(first_expose.target_name().clone(), aggregate.into())
@@ -675,10 +682,13 @@ fn new_aggregate_router_from_service_offers<C: ComponentInstanceInterface + 'sta
             other => warn!("found unexpected entry in dictionary: {:?}", other),
         }
     }
-    (aggregate_router_fn)(component.clone(), aggregate_sources, source).with_default(Request {
-        metadata: service_metadata(*offer_bundle.first().unwrap().availability()),
-        target: component.as_weak().into(),
-    })
+    let availability = *offer_bundle.first().unwrap().availability();
+    let target: WeakInstanceToken = component.as_weak().into();
+    (aggregate_router_fn)(component.clone(), aggregate_sources, source).with_default(
+        metadata_for_porcelain_type(CapabilityTypeName::Service),
+        availability,
+        target,
+    )
 }
 
 fn new_aggregate_capability_source(
@@ -991,20 +1001,13 @@ fn extend_dict_with_config_use<C: ComponentInstanceInterface + 'static>(
         cm_rust::UseSource::Collection(_) => return,
     };
 
-    let metadata = Dict::new();
-    metadata
-        .insert(
-            Name::new(METADATA_KEY_TYPE).unwrap(),
-            Capability::Data(Data::String(porcelain_type.to_string())),
-        )
-        .expect("failed to build default use metadata?");
-    metadata.set_metadata(*config_use.availability());
-    let default_request = Request { metadata, target: component.as_weak().into() };
+    let availability = *config_use.availability();
+    let target: WeakInstanceToken = component.as_weak().into();
     match program_input.config().insert_capability(
         &config_use.target_name,
         router
-            .with_availability(moniker.clone(), *config_use.availability())
-            .with_default(default_request)
+            .with_availability(moniker.clone(), availability)
+            .with_default(metadata_for_porcelain_type(porcelain_type), availability, target)
             .with_error_reporter(RouteRequestErrorInfo::from(config_use), error_reporter)
             .into(),
     ) {
@@ -1143,18 +1146,12 @@ fn extend_dict_with_use<T, C: ComponentInstanceInterface + 'static>(
             return;
         }
     };
-    let metadata = Dict::new();
-    metadata
-        .insert(
-            Name::new(METADATA_KEY_TYPE).unwrap(),
-            Capability::Data(Data::String(porcelain_type.to_string())),
-        )
-        .expect("failed to build default use metadata?");
-    metadata.set_metadata(*use_.availability());
-    let default_request = Request { metadata, target: component.as_weak().into() };
+
+    let availability = *use_.availability();
+    let target: WeakInstanceToken = component.as_weak().into();
     let router = router
-        .with_availability(moniker.clone(), *use_.availability())
-        .with_default(default_request)
+        .with_availability(moniker.clone(), availability)
+        .with_default(metadata_for_porcelain_type(porcelain_type), availability, target)
         .with_error_reporter(RouteRequestErrorInfo::from(use_), error_reporter);
 
     if let Some(target_path) = use_.path() {
@@ -1170,6 +1167,34 @@ fn extend_dict_with_use<T, C: ComponentInstanceInterface + 'static>(
             _ => panic!("unexpected capability type: {:?}", use_),
         }
     }
+}
+
+fn metadata_for_porcelain_type(
+    typename: CapabilityTypeName,
+) -> Arc<dyn Fn(Availability) -> Dict + Send + Sync + 'static> {
+    type MetadataMap =
+        HashMap<CapabilityTypeName, Arc<dyn Fn(Availability) -> Dict + Send + Sync + 'static>>;
+    static CLOSURES: LazyLock<MetadataMap> = LazyLock::new(|| {
+        fn entry_for_typename(
+            typename: CapabilityTypeName,
+        ) -> (CapabilityTypeName, Arc<dyn Fn(Availability) -> Dict + Send + Sync + 'static>)
+        {
+            let v = Arc::new(move |availability: Availability| {
+                let metadata = Dict::new();
+                metadata
+                    .insert(
+                        Name::new(METADATA_KEY_TYPE).unwrap(),
+                        Capability::Data(Data::String(typename.to_string())),
+                    )
+                    .expect("failed to build default metadata?");
+                metadata.set_metadata(availability);
+                metadata
+            });
+            (typename, v)
+        }
+        CapabilityTypeName::iter().map(entry_for_typename).collect()
+    });
+    CLOSURES.get(&typename).unwrap().clone()
 }
 
 /// Builds a router that obtains a capability that the program uses from `parent`.
@@ -1321,14 +1346,7 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
             return;
         }
     };
-    let metadata = Dict::new();
-    metadata
-        .insert(
-            Name::new(METADATA_KEY_TYPE).unwrap(),
-            Capability::Data(Data::String(porcelain_type.to_string())),
-        )
-        .expect("failed to build default offer metadata?");
-    metadata.set_metadata(*offer.availability());
+
     // Offered capabilities need to support default requests in the case of offer-to-dictionary.
     // This is a corollary of the fact that program_input_dictionary and
     // component_output_dictionary support default requests, and we need this to cover the case
@@ -1337,10 +1355,11 @@ fn extend_dict_with_offer<T, C: ComponentInstanceInterface + 'static>(
     // Technically, we could restrict this to the case of offer-to-dictionary, not offer in
     // general. However, supporting the general case simplifies the logic and establishes a nice
     // symmetry between program_input_dict, component_output_dict, and {child,collection}_inputs.
-    let default_request = Request { metadata, target: component.as_weak().into() };
+    let availability = *offer.availability();
+    let target: WeakInstanceToken = component.as_weak().into();
     let router = router
-        .with_availability(component.moniker().clone(), *offer.availability())
-        .with_default(default_request)
+        .with_availability(component.moniker().clone(), availability)
+        .with_default(metadata_for_porcelain_type(porcelain_type), availability, target)
         .with_error_reporter(RouteRequestErrorInfo::from(offer), error_reporter)
         .with_service_renames_and_filter(offer.clone());
     match target_dict.insert_capability(target_name, router.into()) {
@@ -1462,20 +1481,13 @@ fn extend_dict_with_expose<T, C: ComponentInstanceInterface + 'static>(
         // different way by whoever called `extend_dict_with_expose`.
         cm_rust::ExposeSource::Collection(_name) => return,
     };
-    let metadata = Dict::new();
-    metadata
-        .insert(
-            Name::new(METADATA_KEY_TYPE).unwrap(),
-            Capability::Data(Data::String(porcelain_type.to_string())),
-        )
-        .expect("failed to build default expose metadata?");
-    metadata.set_metadata(*expose.availability());
-    let default_request = Request { metadata, target: component.as_weak().into() };
+    let availability = *expose.availability();
+    let target: WeakInstanceToken = component.as_weak().into();
     match target_dict.insert_capability(
         target_name,
         router
-            .with_availability(component.moniker().clone(), *expose.availability())
-            .with_default(default_request)
+            .with_availability(component.moniker().clone(), availability)
+            .with_default(metadata_for_porcelain_type(porcelain_type), availability, target)
             .with_error_reporter(RouteRequestErrorInfo::from(expose), error_reporter)
             .into(),
     ) {

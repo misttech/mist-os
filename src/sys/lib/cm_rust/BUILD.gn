@@ -22,6 +22,8 @@ rustc_library("cm_rust") {
     "//src/sys/lib/cm_types",
     "//third_party/rust_crates:bitflags",
     "//third_party/rust_crates:lazy_static",
+    "//third_party/rust_crates:strum",
+    "//third_party/rust_crates:strum_macros",
     "//third_party/rust_crates:thiserror",
   ]
   sources = [ "src/lib.rs" ]
