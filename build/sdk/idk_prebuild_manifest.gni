@@ -93,9 +93,8 @@ template("idk_prebuild_manifest") {
   #   api_level  (string)
   #      API level, can be "PLATFORM" or a decimal string (e.g. "11").
   #
-  #   binaries  (list)
-  #      A list of scopes, each one describing one variant of the prebuilt library.
-  #      Each scope having the following schema:
+  #   binaries  (scope)
+  #      Describes one variant of the prebuilt library. Has the following schema:
   #
   #          arch  (string)
   #              CPU architecture name of the binary (e.g. "x64" or "arm64").

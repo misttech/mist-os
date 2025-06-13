@@ -370,16 +370,14 @@
     "category": "partner",
     "prebuild_info": {
       "atom_label": "//sdk/lib/fdio:fdio",
-      "binaries": [
-        {
-          "api_level": "PLATFORM",
-          "arch": "x64",
-          "debug_lib": "arch/x64/debug/libfdio.so",
-          "dist_lib": "arch/x64/dist/libfdio.so",
-          "dist_path": "lib/libfdio.so",
-          "link_lib": "arch/x64/lib/libfdio.so"
-        }
-      ],
+      "binaries": {
+        "api_level": "PLATFORM",
+        "arch": "x64",
+        "debug_lib": "arch/x64/debug/libfdio.so",
+        "dist_lib": "arch/x64/dist/libfdio.so",
+        "dist_path": "lib/libfdio.so",
+        "link_lib": "arch/x64/lib/libfdio.so"
+      },
       "deps": [
 
       ],

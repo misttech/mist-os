@@ -305,42 +305,43 @@ class PrebuildMap(object):
         prebuild = info["prebuild_info"]
         binaries = {}
         variants = []
-        for binary in prebuild["binaries"]:
-            arch = binary["arch"]
-            api_level = binary["api_level"]
-            dist_lib = binary.get("dist_lib")
-            dist_path = binary.get("dist_path")
-            link_lib = binary["link_lib"]
 
-            debug_lib = binary.get("debug_lib", None)
+        binary = prebuild["binaries"]
+        arch = binary["arch"]
+        api_level = binary["api_level"]
+        dist_lib = binary.get("dist_lib")
+        dist_path = binary.get("dist_path")
+        link_lib = binary["link_lib"]
 
-            # TODO(https://fxbug.dev/310006516): Remove the `if` block when the
-            # `arch/` directory is removed from the IDK.
-            if api_level == "PLATFORM":
-                binaries[arch] = {
-                    "link": link_lib,
-                }
-                if dist_lib:
-                    binaries[arch]["dist"] = dist_lib
-                    binaries[arch]["dist_path"] = dist_path
-                if debug_lib:
-                    binaries[arch]["debug"] = debug_lib
-            else:
-                variant = {
-                    "constraints": {
-                        "api_level": api_level,
-                        "arch": arch,
-                    },
-                    "values": {
-                        "link_lib": link_lib,
-                    },
-                }
-                if dist_lib:
-                    variant["values"]["dist_lib"] = dist_lib
-                    variant["values"]["dist_lib_dest"] = dist_path
-                if debug_lib:
-                    variant["values"]["debug"] = debug_lib
-                variants.append(variant)
+        debug_lib = binary.get("debug_lib", None)
+
+        # TODO(https://fxbug.dev/310006516): Remove the `if` block when the
+        # `arch/` directory is removed from the IDK.
+        if api_level == "PLATFORM":
+            binaries[arch] = {
+                "link": link_lib,
+            }
+            if dist_lib:
+                binaries[arch]["dist"] = dist_lib
+                binaries[arch]["dist_path"] = dist_path
+            if debug_lib:
+                binaries[arch]["debug"] = debug_lib
+        else:
+            variant = {
+                "constraints": {
+                    "api_level": api_level,
+                    "arch": arch,
+                },
+                "values": {
+                    "link_lib": link_lib,
+                },
+            }
+            if dist_lib:
+                variant["values"]["dist_lib"] = dist_lib
+                variant["values"]["dist_lib_dest"] = dist_path
+            if debug_lib:
+                variant["values"]["debug"] = debug_lib
+            variants.append(variant)
 
         all_deps = self.resolve_unique_labels(prebuild.get("deps", {}))
         result = {
