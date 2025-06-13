@@ -62,18 +62,24 @@
 namespace {
 
 KCOUNTER(vm_vmo_high_priority, "vm.vmo.high_priority")
-KCOUNTER(vm_vmo_no_reclamation_strategy, "vm.vmo.no_reclamation_strategy")
 KCOUNTER(vm_vmo_dont_need, "vm.vmo.dont_need")
 KCOUNTER(vm_vmo_always_need, "vm.vmo.always_need")
-KCOUNTER(vm_vmo_always_need_skipped_reclaim, "vm.vmo.always_need_skipped_reclaim")
 KCOUNTER(vm_vmo_compression_zero_slot, "vm.vmo.compression.zero_empty_slot")
 KCOUNTER(vm_vmo_compression_marker, "vm.vmo.compression_zero_marker")
-KCOUNTER(vm_vmo_discardable_failed_reclaim, "vm.vmo.discardable_failed_reclaim")
 KCOUNTER(vm_vmo_range_update_from_parent_skipped, "vm.vmo.range_updated_from_parent.skipped")
 KCOUNTER(vm_vmo_range_update_from_parent_performed, "vm.vmo.range_updated_from_parent.performed")
 
-KCOUNTER(vm_vmo_evict_accessed, "vm.vmo.evict_accessed")
-KCOUNTER(vm_vmo_compress_accessed, "vm.vmo.compress_accessed")
+KCOUNTER(vm_reclaim_evict_accessed, "vm.reclaim.evict_accessed")
+KCOUNTER(vm_reclaim_compress_accessed, "vm.reclaim.compress_accessed")
+KCOUNTER(vm_reclaim_no_reclamation_strategy, "vm.reclaim.no_reclamation_strategy")
+KCOUNTER(vm_reclaim_always_need_skipped, "vm.reclaim.always_need_skipped")
+KCOUNTER(vm_reclaim_discardable_failed, "vm.reclaim.discardable_failed")
+KCOUNTER(vm_reclaim_incorrect_page, "vm.reclaim.incorrect_page")
+KCOUNTER(vm_reclaim_high_priority, "vm.reclaim.high_priority")
+KCOUNTER(vm_reclaim_pinned, "vm.reclaim.pinned")
+KCOUNTER(vm_reclaim_dirty, "vm.reclaim.dirty")
+KCOUNTER(vm_reclaim_not_pager_backed, "vm.reclaim.not_pager_backed")
+KCOUNTER(vm_reclaim_uncached, "vm.reclaim.uncached")
 
 template <typename T>
 uint32_t GetShareCount(T p) {
@@ -6650,6 +6656,7 @@ bool VmCowPages::CanReclaimPageLocked(vm_page_t* page, T actual) {
   // Check this page is still a part of this VMO. After this any failures should mark the page as
   // accessed to prevent the page from remaining a reclamation candidate.
   if (!actual || !actual->IsPage() || actual->Page() != page) {
+    vm_reclaim_incorrect_page.Add(1);
     return false;
   }
   // Pinned pages could be in use by DMA so we cannot safely reclaim them.
@@ -6657,6 +6664,7 @@ bool VmCowPages::CanReclaimPageLocked(vm_page_t* page, T actual) {
     // Loaned pages should never end up pinned.
     DEBUG_ASSERT(!page->is_loaned());
     pmm_page_queues()->MarkAccessed(page);
+    vm_reclaim_pinned.Add(1);
     return false;
   }
   return true;
@@ -6667,6 +6675,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   canary_.Assert();
   // Without a page source to bring the page back in we cannot even think about eviction.
   if (!can_evict()) {
+    vm_reclaim_not_pager_backed.Add(1);
     return ReclaimCounts{};
   }
 
@@ -6681,6 +6690,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   // Now allowed to reclaim if high priority, unless being required to do so.
   if (high_priority_count_ != 0 && (eviction_action != EvictionAction::Require)) {
     pmm_page_queues()->MarkAccessed(page);
+    vm_reclaim_high_priority.Add(1);
     return ReclaimCounts{};
   }
   DEBUG_ASSERT(is_page_dirty_tracked(page));
@@ -6689,6 +6699,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   // moved to the dirty page queue.
   if (!is_page_clean(page)) {
     DEBUG_ASSERT(!page->is_loaned());
+    vm_reclaim_dirty.Add(1);
     return ReclaimCounts{};
   }
 
@@ -6706,7 +6717,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
     // eviction. Pages move out of said queue when accessed, and continue aging as other pages.
     // Pages in the queue are considered for eviction pre-OOM, but ignored otherwise.
     pmm_page_queues()->MarkAccessed(page);
-    vm_vmo_always_need_skipped_reclaim.Add(1);
+    vm_reclaim_always_need_skipped.Add(1);
     return ReclaimCounts{};
   }
 
@@ -6719,7 +6730,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   // TODO(https://fxbug.dev/412464435): don't unmap & return accessed status to avoid checking page
   // queues.
   if ((old_queue != new_queue) && (eviction_action != EvictionAction::Require)) {
-    vm_vmo_evict_accessed.Add(1);
+    vm_reclaim_evict_accessed.Add(1);
     return ReclaimCounts{};
   }
 
@@ -6768,12 +6779,14 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
                         ZX_CACHE_POLICY_MASK) != ZX_CACHE_POLICY_CACHED)) {
       // To avoid this page remaining in the reclamation list we simulate an access.
       pmm_page_queues()->MarkAccessed(page);
+      vm_reclaim_uncached.Add(1);
       return ReclaimCounts{};
     }
 
     // Not allows to reclaim if high priority.
     if (high_priority_count_ != 0) {
       pmm_page_queues()->MarkAccessed(page);
+      vm_reclaim_high_priority.Add(1);
       return ReclaimCounts{};
     }
 
@@ -6799,7 +6812,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
       // TODO(https://fxbug.dev/412464435): don't unmap & return accessed status to avoid checking
       // page queues.
       if (old_queue != new_queue) {
-        vm_vmo_compress_accessed.Add(1);
+        vm_reclaim_compress_accessed.Add(1);
         return ReclaimCounts{};
       }
 
@@ -6937,12 +6950,12 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offs
     if (result.is_ok()) {
       return ReclaimCounts{.discarded = *result};
     }
-    vm_vmo_discardable_failed_reclaim.Add(1);
+    vm_reclaim_discardable_failed.Add(1);
     return ReclaimCounts{};
   }
 
   // Keep a count as having no reclamation strategy is probably a sign of miss-configuration.
-  vm_vmo_no_reclamation_strategy.Add(1);
+  vm_reclaim_no_reclamation_strategy.Add(1);
 
   // Either no other strategies, or reclamation failed, so to avoid this page remaining in a
   // reclamation list we simulate an access. Do not want to place it in the ReclaimFailed queue
