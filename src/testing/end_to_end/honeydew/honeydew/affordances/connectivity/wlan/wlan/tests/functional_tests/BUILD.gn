@@ -22,7 +22,7 @@ if (is_host) {
     }
     environments = [ wlan_vim3_ap_env ]
     test_data_deps =
-        [ "//src/developer/ffx/plugins/driver:ffx_driver_tool_test_data" ]
+        [ "//src/developer/ffx/tools/driver:ffx_driver_tool_test_data" ]
   }
 }
 
