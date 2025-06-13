@@ -415,19 +415,23 @@ void Device::DestroyIface(uint16_t iface_id, fit::callback<void(zx_status_t)>&& 
     return;
   }
 
-  if (!device_powered_on_) {
-    BRCMF_ERR("Device is powered off");
-    on_complete(ZX_ERR_BAD_STATE);
-    return;
-  }
 
   InterfaceInfo info = GetInterfaceInfoForRole(GetMacRoleForInterfaceId(iface_id));
 
+  // First check if the interface is present
   WlanInterface* iface = iface_ptr->get();
   if (!iface) {
     // Check the pointer inside the pointer, the actual interface pointer.
     BRCMF_WARN("%s interface not found", info.display_name);
     on_complete(ZX_ERR_NOT_FOUND);
+    return;
+  }
+
+  // Beyond this point interface deletion might involve accessing the hardware. So fail the request
+  // if the device is powered off or in the middle of reset.
+  if (!device_powered_on_) {
+    BRCMF_ERR("Device is powered off");
+    on_complete(ZX_ERR_BAD_STATE);
     return;
   }
 
