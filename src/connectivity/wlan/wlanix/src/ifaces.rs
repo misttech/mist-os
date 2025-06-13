@@ -912,6 +912,8 @@ pub mod test_utils {
         pub calls: Arc<Mutex<Vec<IfaceManagerCall>>>,
         country: Arc<Mutex<[u8; 2]>>,
         power_state: Arc<Mutex<bool>>,
+        mock_create_client_iface_result: Result<u16, Error>,
+        mock_destroy_client_iface_result: Result<(), Error>,
     }
 
     impl TestIfaceManager {
@@ -921,6 +923,8 @@ pub mod test_utils {
                 calls: Arc::new(Mutex::new(vec![])),
                 country: Arc::new(Mutex::new(*b"WW")),
                 power_state: Arc::new(Mutex::new(true)),
+                mock_create_client_iface_result: Ok(FAKE_IFACE_RESPONSE.id),
+                mock_destroy_client_iface_result: Ok(()),
             }
         }
 
@@ -930,6 +934,8 @@ pub mod test_utils {
                 calls: Arc::new(Mutex::new(vec![])),
                 country: Arc::new(Mutex::new(*b"WW")),
                 power_state: Arc::new(Mutex::new(true)),
+                mock_create_client_iface_result: Ok(FAKE_IFACE_RESPONSE.id),
+                mock_destroy_client_iface_result: Ok(()),
             }
         }
 
@@ -945,6 +951,8 @@ pub mod test_utils {
                     calls: Arc::new(Mutex::new(vec![])),
                     country: Arc::new(Mutex::new(*b"WW")),
                     power_state: Arc::new(Mutex::new(true)),
+                    mock_create_client_iface_result: Ok(FAKE_IFACE_RESPONSE.id),
+                    mock_destroy_client_iface_result: Ok(()),
                 },
                 sender,
             )
@@ -958,6 +966,24 @@ pub mod test_utils {
             let iface = self.client_iface.lock();
             let iface_ref = iface.as_ref().expect("client iface should exist");
             Arc::clone(&iface_ref.calls)
+        }
+
+        pub fn mock_create_client_iface_failure(self) -> Self {
+            Self {
+                mock_create_client_iface_result: Err(format_err!(
+                    "mocked CreateClientIface failure"
+                )),
+                ..self
+            }
+        }
+
+        pub fn mock_destroy_client_iface_failure(self) -> Self {
+            Self {
+                mock_destroy_client_iface_result: Err(format_err!(
+                    "mocked DestroyClientIface failure"
+                )),
+                ..self
+            }
         }
     }
 
@@ -1004,12 +1030,16 @@ pub mod test_utils {
 
         async fn create_client_iface(&self, phy_id: u16) -> Result<u16, Error> {
             self.calls.lock().push(IfaceManagerCall::CreateClientIface(phy_id));
+            let iface_id = match &self.mock_create_client_iface_result {
+                Ok(iface_id) => *iface_id,
+                Err(e) => bail!("{e}"),
+            };
             assert!(self.client_iface.lock().is_none());
             let _ = self.client_iface.lock().replace(Arc::new(TestClientIface {
                 scan_end_receiver: Mutex::new(None),
                 ..TestClientIface::new()
             }));
-            Ok(FAKE_IFACE_RESPONSE.id)
+            Ok(iface_id)
         }
 
         async fn get_client_iface(&self, iface_id: u16) -> Result<Arc<TestClientIface>, Error> {
@@ -1026,7 +1056,10 @@ pub mod test_utils {
 
         async fn destroy_iface(&self, iface_id: u16) -> Result<(), Error> {
             self.calls.lock().push(IfaceManagerCall::DestroyIface(iface_id));
-            *self.client_iface.lock() = None;
+            match &self.mock_destroy_client_iface_result {
+                Ok(()) => *self.client_iface.lock() = None,
+                Err(e) => bail!("{e}"),
+            }
             Ok(())
         }
 

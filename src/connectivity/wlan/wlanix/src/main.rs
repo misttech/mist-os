@@ -7,7 +7,7 @@ use fidl::endpoints::ProtocolMarker;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
 use futures::future::OptionFuture;
-use futures::{FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt, TryFutureExt};
 use ieee80211::{Bssid, MacAddrBytes};
 use log::{debug, error, info, warn};
 use netlink_packet_core::{NetlinkDeserializable, NetlinkHeader, NetlinkSerializable};
@@ -82,7 +82,12 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
             match payload.iface {
                 Some(iface) => {
                     let reqs = iface.into_stream();
-                    let iface_id = iface_manager.create_client_iface(chip_id).await?;
+                    let iface_id = iface_manager
+                        .create_client_iface(chip_id)
+                        .inspect_err(|_e| {
+                            telemetry_sender.send(TelemetryEvent::IfaceCreationFailure)
+                        })
+                        .await?;
                     telemetry_sender.send(TelemetryEvent::ClientIfaceCreated { iface_id });
                     responder.send(Ok(())).context("send CreateStaIface response")?;
                     serve_wifi_sta_iface(iface_id, reqs).await;
@@ -149,6 +154,7 @@ async fn handle_wifi_chip_request<I: IfaceManager>(
                     }
                     Err(e) => {
                         error!("Failed to remove iface: {}", e);
+                        telemetry_sender.send(TelemetryEvent::IfaceDestructionFailure);
                         responder
                             .send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))
                             .context("send RemoveStaIface response")?;
@@ -344,6 +350,7 @@ async fn handle_wifi_request<I: IfaceManager>(
                     // Tear down all ifaces before calling power_down.
                     for iface in iface_manager.list_ifaces() {
                         if let Err(e) = iface_manager.destroy_iface(iface).await {
+                            telemetry_sender.send(TelemetryEvent::IfaceDestructionFailure);
                             error!(
                                 "Failed to destroy iface {} in response to WifiRequest::Stop: {}",
                                 iface, e
@@ -1912,6 +1919,37 @@ mod tests {
     }
 
     #[test]
+    fn test_wifi_stop_fails_to_destroy_iface() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test_with_iface_manager(
+            TestIfaceManager::new().mock_destroy_client_iface_failure(),
+        );
+
+        let start_fut = test_helper.wifi_proxy.start();
+        let mut start_fut = pin!(start_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut start_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        // Clear out the client connections toggle event so that we can test for the telemetry
+        // event we are interested in later in this test.
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::ClientConnectionsToggle {
+                event: wlan_telemetry::ClientConnectionsToggleEvent::Enabled
+            }))
+        );
+
+        let stop_fut = test_helper.wifi_proxy.stop();
+        let mut stop_fut = pin!(stop_fut);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut stop_fut), Poll::Pending);
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+
+        // Verify that telemetry event for iface destruction failure is sent.
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::IfaceDestructionFailure))
+        );
+    }
+
+    #[test]
     fn test_wifi_get_chip_ids() {
         let (mut test_helper, mut test_fut) = setup_wifi_test();
 
@@ -1947,6 +1985,88 @@ mod tests {
         assert_variant!(
             &calls[1],
             ifaces::test_utils::IfaceManagerCall::SetCountry { country, .. } => { assert_eq!(*country, COUNTRY_CODE) }
+        );
+    }
+
+    #[test]
+    fn test_wifi_chip_create_sta_iface_fails() {
+        // Set up
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+
+        let (wlanix_proxy, wlanix_stream) = create_proxy_and_stream::<fidl_wlanix::WlanixMarker>();
+        let (wifi_proxy, wifi_server_end) = create_proxy::<fidl_wlanix::WifiMarker>();
+        let result = wlanix_proxy.get_wifi(fidl_wlanix::WlanixGetWifiRequest {
+            wifi: Some(wifi_server_end),
+            ..Default::default()
+        });
+        assert_variant!(result, Ok(()));
+
+        let (wifi_chip_proxy, wifi_chip_server_end) = create_proxy::<fidl_wlanix::WifiChipMarker>();
+        let get_chip_fut = wifi_proxy.get_chip(fidl_wlanix::WifiGetChipRequest {
+            chip_id: Some(CHIP_ID),
+            chip: Some(wifi_chip_server_end),
+            ..Default::default()
+        });
+        let mut get_chip_fut = pin!(get_chip_fut);
+        assert_variant!(exec.run_until_stalled(&mut get_chip_fut), Poll::Pending);
+
+        let (_wifi_sta_iface_proxy, wifi_sta_iface_server_end) =
+            create_proxy::<fidl_wlanix::WifiStaIfaceMarker>();
+        let create_sta_iface_fut =
+            wifi_chip_proxy.create_sta_iface(fidl_wlanix::WifiChipCreateStaIfaceRequest {
+                iface: Some(wifi_sta_iface_server_end),
+                ..Default::default()
+            });
+        let mut create_sta_iface_fut = pin!(create_sta_iface_fut);
+        assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Pending);
+
+        let wifi_state = Arc::new(Mutex::new(WifiState::default()));
+        let iface_manager = Arc::new(TestIfaceManager::new().mock_create_client_iface_failure());
+        let (telemetry_sender, mut telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let test_fut = serve_wlanix(
+            wlanix_stream,
+            wifi_state,
+            Arc::clone(&iface_manager),
+            TelemetrySender::new(telemetry_sender),
+        );
+        let mut test_fut = Box::pin(test_fut);
+        assert_eq!(exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(exec.run_until_stalled(&mut get_chip_fut), Poll::Ready(Ok(Ok(()))));
+
+        // Execute test
+        assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Ready(Err(_)));
+
+        // Verify telemetry event for iface creation failure is sent
+        assert_variant!(
+            telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::IfaceCreationFailure))
+        );
+    }
+
+    #[test]
+    fn test_wifi_chip_remove_sta_iface_fails() {
+        let (mut test_helper, mut test_fut) = setup_wifi_test_with_iface_manager(
+            TestIfaceManager::new().mock_destroy_client_iface_failure(),
+        );
+
+        let request = fidl_wlanix::WifiChipRemoveStaIfaceRequest {
+            iface_name: Some("mock-sta-iface".to_string()),
+            ..Default::default()
+        };
+        let remove_sta_iface_fut = test_helper.wifi_chip_proxy.remove_sta_iface(request);
+        let mut remove_sta_iface_fut = pin!(remove_sta_iface_fut);
+
+        assert_eq!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(
+            test_helper.exec.run_until_stalled(&mut remove_sta_iface_fut),
+            Poll::Ready(Ok(Err(_)))
+        );
+
+        // Verify telemetry event for iface destruction failure is sent
+        assert_variant!(
+            test_helper.telemetry_receiver.try_next(),
+            Ok(Some(TelemetryEvent::IfaceDestructionFailure))
         );
     }
 
@@ -2176,6 +2296,12 @@ mod tests {
     }
 
     fn setup_wifi_test() -> (WifiTestHelper, Pin<Box<impl Future<Output = ()>>>) {
+        setup_wifi_test_with_iface_manager(TestIfaceManager::new())
+    }
+
+    fn setup_wifi_test_with_iface_manager(
+        iface_manager: TestIfaceManager,
+    ) -> (WifiTestHelper, Pin<Box<impl Future<Output = ()>>>) {
         let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
 
@@ -2207,7 +2333,7 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut create_sta_iface_fut), Poll::Pending);
 
         let wifi_state = Arc::new(Mutex::new(WifiState::default()));
-        let iface_manager = Arc::new(TestIfaceManager::new());
+        let iface_manager = Arc::new(iface_manager);
         let (telemetry_sender, mut telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
         let test_fut = serve_wlanix(
             wlanix_stream,
