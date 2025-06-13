@@ -9,6 +9,8 @@ use thiserror::Error;
 #[cfg_attr(target_os = "macos", path = "usb_osx/mod.rs")]
 mod usb_plat;
 
+pub mod bulk_interface;
+
 pub use usb_plat::{
     BulkInEndpoint, BulkOutEndpoint, ControlEndpoint, Interface, InterruptEndpoint,
     IsochronousEndpoint,
