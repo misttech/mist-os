@@ -722,7 +722,6 @@ class GnTargetsDirTest(unittest.TestCase):
             [
                 "BUILD.bazel",
                 "MODULE.bazel",
-                "WORKSPACE.bazel",
                 "_files/obj/bundles/assembly/eng/platform_artifacts",
                 "_files/obj/src/drivers/virtio/package.far",
                 "all_licenses.spdx.json",
@@ -754,12 +753,11 @@ license(
 
         self.assertEqual(
             generated_json["MODULE.bazel"]["content"],
-            'module(name = "gn_targets", version = "1")\n',
-        )
+            """# AUTO-GENERATED - DO NOT EDIT
 
-        self.assertEqual(
-            generated_json["WORKSPACE.bazel"]["content"],
-            'workspace(name = "gn_targets")\n',
+module(name = "gn_targets", version = "1")
+
+bazel_dep(name = "rules_license", version = "1.0.0")""",
         )
 
         self.assertDictEqual(

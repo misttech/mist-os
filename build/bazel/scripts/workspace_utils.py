@@ -793,7 +793,11 @@ def record_fuchsia_workspace(
     # to its parent bazel_action() target.
     generated.record_symlink(
         f"workspace/{GN_TARGETS_DIR_SYMLINK}",
-        fuchsia_dir / "build" / "bazel" / "local_repositories" / "empty",
+        fuchsia_dir
+        / "build"
+        / "bazel"
+        / "local_repositories"
+        / "empty_gn_targets",
     )
 
 
@@ -1218,10 +1222,12 @@ license(
 """
     generated.record_file_content("BUILD.bazel", build_content)
     generated.record_file_content(
-        "WORKSPACE.bazel", 'workspace(name = "gn_targets")\n'
-    )
-    generated.record_file_content(
-        "MODULE.bazel", 'module(name = "gn_targets", version = "1")\n'
+        "MODULE.bazel",
+        """# AUTO-GENERATED - DO NOT EDIT
+
+module(name = "gn_targets", version = "1")
+
+bazel_dep(name = "rules_license", version = "1.0.0")""",
     )
 
 

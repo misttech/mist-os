@@ -17,27 +17,8 @@ load(
 setup_pigweed_repository_dependencies()
 
 local_repository(
-    name = "rules_cc",
-    path = "third_party/bazel_rules_cc",
-)
-
-# @rules_proto is the deprecated set of rules to generate protobuf-related
-# actions. @com_google_protobuf should be used instead, but many other
-# repositories still depend on it implicitly.
-local_repository(
-    name = "rules_proto",
-    path = "third_party/bazel_rules_proto",
-)
-
-local_repository(
     name = "pigweed",
     path = "third_party/pigweed/src",
-)
-
-# This is a @pigweed dependency.
-local_repository(
-    name = "com_google_emboss",
-    path = "third_party/github.com/google/emboss/src",
 )
 
 # buildifier: disable=load-on-top
@@ -123,18 +104,6 @@ generate_prebuilt_llvm_repository(
     #
     # See https://cs.opensource.google/fuchsia/fuchsia/+/main:src/lib/llvm/BUILD.gn;l=51;drc=468d94479b10f5613ca928d782990e5340e943a4
     llvm_install_dir = "prebuilt/third_party/llvm/" + fuchsia_host_tag,
-)
-
-# fuchsia_build_generated/gn_target_dir is a symlink to the content
-# of the @gn_targets repository. At `fx gen` time, it will point to
-# an empty repository, but bazel_action.py will update it just before
-# invoking Bazel to point to a directory whose content matches the
-# current `bazel_action()` target.
-local_repository(
-    name = "gn_targets",
-    # LINT.IfChange
-    path = "fuchsia_build_generated/gn_targets_dir",
-    # LINT.ThenChange(//build/bazel/scripts/bazel_action.py)
 )
 
 # buildifier: disable=load-on-top

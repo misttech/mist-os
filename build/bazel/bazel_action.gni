@@ -625,7 +625,7 @@ template("bazel_action") {
       ":${_gn_targets_repository_manifest_target}",
     ]
 
-    outputs = [ "${_gn_targets_repository_path}/WORKSPACE.bazel" ]
+    outputs = [ "${_gn_targets_repository_path}/MODULE.bazel" ]
 
     script = "//build/bazel/scripts/create_gn_targets_dir.py"
     args = [
