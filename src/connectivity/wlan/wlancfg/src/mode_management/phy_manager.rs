@@ -867,13 +867,14 @@ async fn destroy_iface(
     let (destroy_iface_response, metric) = match proxy.destroy_iface(&request).await {
         Ok(status) => match status {
             zx::sys::ZX_OK => (Ok(()), Some(Ok(()))),
-            ref e => {
-                let metric = match *e {
-                    zx::sys::ZX_ERR_NOT_FOUND => None,
-                    _ => Some(Err(())),
-                };
+            zx::sys::ZX_ERR_NOT_FOUND => {
+                info!("Interface not found, assuming it is already destroyed");
+                // Don't return a metric here, we neither succeeded nor failed to destroy
+                (Ok(()), None)
+            }
+            e => {
                 warn!("failed to destroy iface {}: {}", iface_id, e);
-                (Err(PhyManagerError::IfaceDestroyFailure), metric)
+                (Err(PhyManagerError::IfaceDestroyFailure), Some(Err(())))
             }
         },
         Err(e) => {
@@ -3627,10 +3628,7 @@ mod tests {
         send_destroy_iface_response(&mut exec, &mut test_values.monitor_stream, ZX_ERR_NOT_FOUND);
 
         // The future should complete.
-        assert_variant!(
-            exec.run_until_stalled(&mut fut),
-            Poll::Ready(Err(PhyManagerError::IfaceDestroyFailure))
-        );
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
 
         // Verify that no metric has been logged.
         assert_variant!(test_values.telemetry_receiver.try_next(), Err(_))
