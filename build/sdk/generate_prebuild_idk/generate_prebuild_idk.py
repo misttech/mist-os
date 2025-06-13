@@ -341,6 +341,8 @@ class PrebuildMap(object):
                 variant["values"]["dist_lib_dest"] = dist_path
             if debug_lib:
                 variant["values"]["debug"] = debug_lib
+            if ifs_file:
+                variant["values"]["ifs"] = ifs_file
             variants.append(variant)
 
         all_deps = self.resolve_unique_labels(prebuild.get("deps", {}))
@@ -352,12 +354,13 @@ class PrebuildMap(object):
             "include_dir": prebuild["include_dir"],
             "type": info["atom_type"],
             "deps": self.labels_to_cc_library_names(all_deps),
-            "binaries": binaries,
         }
+        if binaries:
+            result["binaries"] = binaries
+            if ifs_file:
+                result["ifs"] = ifs_file
         if variants:
             result["variants"] = variants
-        if ifs_file:
-            result["ifs"] = ifs_file
         return (result, {})
 
     def _meta_for_version_history(

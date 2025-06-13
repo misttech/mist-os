@@ -287,6 +287,85 @@
   },
   {
     "atom_files": [
+      {
+        "dest": "pkg/async/include/lib/async/dispatcher.h",
+        "source": "../../sdk/lib/async/include/lib/async/dispatcher.h"
+      },
+      {
+        "dest": "pkg/async/include/lib/async/irq.h",
+        "source": "../../sdk/lib/async/include/lib/async/irq.h"
+      },
+      {
+        "dest": "pkg/async/include/lib/async/paged_vmo.h",
+        "source": "../../sdk/lib/async/include/lib/async/paged_vmo.h"
+      },
+      {
+        "dest": "pkg/async/include/lib/async/receiver.h",
+        "source": "../../sdk/lib/async/include/lib/async/receiver.h"
+      },
+      {
+        "dest": "pkg/async/include/lib/async/sequence_id.h",
+        "source": "../../sdk/lib/async/include/lib/async/sequence_id.h"
+      },
+      {
+        "dest": "pkg/async/include/lib/async/task.h",
+        "source": "../../sdk/lib/async/include/lib/async/task.h"
+      },
+      {
+        "dest": "pkg/async/include/lib/async/time.h",
+        "source": "../../sdk/lib/async/include/lib/async/time.h"
+      },
+      {
+        "dest": "pkg/async/include/lib/async/trap.h",
+        "source": "../../sdk/lib/async/include/lib/async/trap.h"
+      },
+      {
+        "dest": "pkg/async/include/lib/async/wait.h",
+        "source": "../../sdk/lib/async/include/lib/async/wait.h"
+      },
+      {
+        "dest": "pkg/async/ops.c",
+        "source": "../../sdk/lib/async/ops.c"
+      }
+    ],
+    "atom_id": "sdk://pkg/async",
+    "atom_label": "//sdk/lib/async:async_sdk",
+    "atom_meta": {
+      "dest": "pkg/async/meta.json",
+      "stable": true,
+      "type": "cc_source_library"
+    },
+    "atom_meta_json_file": "gen/sdk/lib/async/async_sdk.meta.json",
+    "atom_type": "cc_source_library",
+    "category": "partner",
+    "is_stable": true,
+    "prebuild_info": {
+      "deps": [
+        "//sdk/lib/fit:fit_sdk",
+        "//src/zircon/lib/zircon:zircon_sdk",
+        "//sdk/lib/fit:fit_sdk"
+      ],
+      "file_base": "pkg/async",
+      "headers": [
+        "pkg/async/include/lib/async/dispatcher.h",
+        "pkg/async/include/lib/async/irq.h",
+        "pkg/async/include/lib/async/paged_vmo.h",
+        "pkg/async/include/lib/async/receiver.h",
+        "pkg/async/include/lib/async/sequence_id.h",
+        "pkg/async/include/lib/async/task.h",
+        "pkg/async/include/lib/async/time.h",
+        "pkg/async/include/lib/async/trap.h",
+        "pkg/async/include/lib/async/wait.h"
+      ],
+      "include_dir": "pkg/async/include",
+      "library_name": "async",
+      "sources": [
+        "pkg/async/ops.c"
+      ]
+    }
+  },
+  {
+    "atom_files": [
 
     ],
     "atom_id": "zircon_sdk",
@@ -451,6 +530,63 @@
         "pkg/driver_fake_object_cpp/fake-object.cc",
         "pkg/driver_fake_object_cpp/internal.h"
       ]
+    }
+  },
+  {
+    "atom_files": [
+      {
+        "dest": "pkg/svc/include/lib/svc/dir.h",
+        "source": "../../../sdk/lib/svc/dir.h"
+      },
+      {
+        "dest": "obj/x64-api-NEXT/lib/libsvc.so",
+        "source": "x64-shared/link_stub/libsvc.so"
+      },
+      {
+        "dest": "obj/x64-api-NEXT/dist/libsvc.so",
+        "source": "x64-shared/libsvc.so"
+      },
+      {
+        "dest": "obj/x64-api-NEXT/debug/libsvc.so",
+        "source": "x64-shared/lib.unstripped/libsvc.so"
+      },
+      {
+        "dest": "obj/x64-api-NEXT/lib/libsvc.ifs",
+        "source": "../../../sdk/history/NEXT/libsvc.ifs"
+      }
+    ],
+    "atom_id": "sdk://pkg/svc",
+    "atom_label": "//sdk/lib/svc:svc_sdk_manifest",
+    "atom_meta": {
+      "dest": "pkg/svc/meta.json",
+      "type": "cc_prebuilt_library"
+    },
+    "atom_meta_json_file": "gen/sdk/lib/svc/svc_sdk_manifest.meta.json",
+    "atom_type": "cc_prebuilt_library",
+    "category": "partner",
+    "is_stable": true,
+    "prebuild_info": {
+      "atom_label": "//sdk/lib/svc:svc",
+      "binaries": {
+        "api_level": "NEXT",
+        "arch": "x64",
+        "debug_lib": "obj/x64-api-NEXT/debug/libsvc.so",
+        "dist_lib": "obj/x64-api-NEXT/dist/libsvc.so",
+        "dist_path": "lib/libsvc.so",
+        "ifs": "obj/x64-api-NEXT/lib/libsvc.ifs",
+        "link_lib": "obj/x64-api-NEXT/lib/libsvc.so"
+      },
+      "deps": [
+        "//sdk/lib/async:async_sdk"
+      ],
+      "file_base": "pkg/svc",
+      "format": "shared",
+      "generator_label": "//sdk/lib/svc:svc(//build/toolchain/fuchsia:x64-shared)",
+      "headers": [
+        "pkg/svc/include/lib/svc/dir.h"
+      ],
+      "include_dir": "pkg/svc/include",
+      "library_name": "svc"
     }
   },
   {

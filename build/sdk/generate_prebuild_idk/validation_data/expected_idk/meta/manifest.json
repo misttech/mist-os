@@ -38,6 +38,11 @@
       "type": "fidl_library"
     },
     {
+      "meta": "pkg/async/meta.json",
+      "stable": true,
+      "type": "cc_source_library"
+    },
+    {
       "meta": "pkg/driver_fake_object_cpp/meta.json",
       "stable": true,
       "type": "cc_source_library"
@@ -56,6 +61,11 @@
       "meta": "pkg/stdcompat/meta.json",
       "stable": true,
       "type": "cc_source_library"
+    },
+    {
+      "meta": "pkg/svc/meta.json",
+      "stable": true,
+      "type": "cc_prebuilt_library"
     },
     {
       "meta": "pkg/syslog/syslog_sdk.json",
