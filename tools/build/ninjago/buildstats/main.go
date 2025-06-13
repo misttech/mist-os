@@ -3,30 +3,44 @@
 // found in the LICENSE file.package main
 
 // ninja_buildstats is an utility for extracting useful stats out of build
-// artifacts from Ninja.
+// artifacts from Ninja. It has two modes of operation.
 //
-// It combines information ninjalog, compdb and ninja graph, extracts and
-// serializes build stats from them. A .gz suffix in the output path will
-// generate a gzip-compressed file.
+// In the first mode, it takes the output of the ninjatrace tool as input:
 //
-// usage:
+//	$ buildstats --ninjatrace out/default/ninjatrace.json \
+//	             --output path/to/output.json
+//
+// In the second mode, it combines information ninjalog, compdb and ninja graph,
+// extracts and serializes build stats from them. This mode is deprecated as it
+// is much slower.
 //
 //	$ buildstats \
 //	    --ninjalog out/default/.ninja_log
 //	    --compdb path/to/compdb.json
 //	    --graph path/to/graph.dot
-//	    --output path/to/output.json.gz
+//	    --output path/to/output.json
+//
+// Finally, the tool can read and write gzip-compressed files, by specifying
+// a .gz prefix in file paths, for example:
+//
+//	$ buildstats --ninjatrace out/default/ninjatrace.json.gz \
+//	             --output path/to/output.json.gz
 package main
 
 import (
+	"container/heap"
 	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
+	"log"
 	"os"
+	"slices"
 	"sort"
+	"strings"
 	"time"
 
+	"go.fuchsia.dev/fuchsia/tools/build/ninjago/chrometrace"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/compdb"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjagraph"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjalog"
@@ -36,6 +50,7 @@ import (
 )
 
 var (
+	ninjaTracePath     = flag.String("ninjatrace", "", "path of ninjatrace.json file")
 	ninjalogPath       = flag.String("ninjalog", "", "path of .ninja_log")
 	compdbPath         = flag.String("compdb", "", "path of JSON compilation database")
 	graphPath          = flag.String("graph", "", "path of graphviz dot file for ninja targets")
@@ -219,6 +234,246 @@ func toAction(s ninjalog.Step) action {
 	return a
 }
 
+func traceToOutputs(t *chrometrace.Trace) []string {
+	var outputs []string
+	if outputs_value, ok := t.Args["outputs"]; ok {
+		for _, outputValue := range outputs_value.([]interface{}) {
+			outputs = append(outputs, outputValue.(string))
+		}
+	}
+	return outputs
+}
+
+func traceToAction(t *chrometrace.Trace) *action {
+	var command string
+	if commandValue, ok := t.Args["command"]; ok {
+		command = commandValue.(string)
+	}
+
+	startTime := time.Duration(t.TimestampMicros) * time.Microsecond
+	endTime := time.Duration(t.TimestampMicros+t.DurationMicros) * time.Microsecond
+
+	var drag time.Duration
+	eventCategories := strings.Split(t.Category, ",")
+	if slices.Contains(eventCategories, "critical_path") {
+		drag = endTime - startTime
+	}
+
+	var totalFloat time.Duration
+	if totalFloatValue, ok := t.Args["total float"]; ok {
+		// The "total float" value is in seconds, followed by "s"
+		totalFloatDuration, err := time.ParseDuration(totalFloatValue.(string))
+		if err != nil {
+			log.Fatalf("Invalid total float value in chrome trace event: %q", totalFloatValue)
+		}
+		totalFloat = totalFloatDuration
+	}
+
+	return &action{
+		Command:    command,
+		Outputs:    traceToOutputs(t),
+		Start:      startTime,
+		End:        endTime,
+		Category:   t.Category,
+		TotalFloat: totalFloat,
+		Drag:       drag,
+	}
+}
+
+// traceMinHeap is a heap of `chrometrace.Trace` pointers. Its root is always the shortest
+// trace in terms of duration.
+type traceMinHeap []*chrometrace.Trace
+
+func (h traceMinHeap) Len() int      { return len(h) }
+func (h traceMinHeap) Swap(i, j int) { h[i], h[j] = h[j], h[i] }
+func (h traceMinHeap) Less(i, j int) bool {
+	return h[i].DurationMicros < h[j].DurationMicros
+}
+func (h *traceMinHeap) Push(x any) { *h = append(*h, x.(*chrometrace.Trace)) }
+func (h *traceMinHeap) Pop() any {
+	l := (*h).Len()
+	if l == 0 {
+		return nil
+	}
+	trace := (*h)[l-1]
+	*h = (*h)[:l-1]
+	return trace
+}
+
+// SlowestTraces returns the `n` traces that took the longest time to finish.
+//
+// Returned traces are sorted on build time in descending order (trace takes the
+// longest time to build is the first element).
+func slowestTraces(traces []*chrometrace.Trace, n int) []*chrometrace.Trace {
+	mh := new(traceMinHeap)
+	for _, trace := range traces {
+		heap.Push(mh, trace)
+		if mh.Len() > n {
+			heap.Pop(mh)
+		}
+	}
+	var res []*chrometrace.Trace
+	for mh.Len() > 0 {
+		res = append(res, heap.Pop(mh).(*chrometrace.Trace))
+	}
+	slices.Reverse(res)
+	return res
+}
+
+// traceStat represents statistics for a trace event.
+type traceStat struct {
+	// Type used to group this stat, this is determined by the grouping function
+	// provided by the caller when this stat is calculated.
+	Type string
+	// Count of builds for this type.
+	Count int32
+	// Accumulative build time for this type.
+	Time time.Duration
+	// Accumulative weighted build time for this time.
+	Weighted time.Duration
+	// Build times of all actions grouped under this stat.
+	Times []time.Duration
+}
+
+// StatsByType summarizes build step statistics with weighted and typeOf.
+// Order of the returned slice is undefined.
+func statsByTraceType(traces []*chrometrace.Trace, weighted map[string]time.Duration, typeOf func(*chrometrace.Trace) string) []traceStat {
+	if len(traces) == 0 {
+		return nil
+	}
+	m := make(map[string]int) // type to index of stats.
+	var stats []traceStat
+	for _, trace := range traces {
+		t := typeOf(trace)
+		traceDuration := time.Duration(trace.DurationMicros) * time.Microsecond
+		var traceOutput string
+		outputs := traceToOutputs(trace)
+		if len(outputs) > 0 {
+			traceOutput = outputs[0]
+		}
+		if i, ok := m[t]; ok {
+			stats[i].Count++
+			stats[i].Time += traceDuration
+			stats[i].Weighted += weighted[traceOutput]
+			stats[i].Times = append(stats[i].Times, traceDuration)
+			continue
+		}
+		stats = append(stats, traceStat{
+			Type:     t,
+			Count:    1,
+			Time:     traceDuration,
+			Times:    []time.Duration{traceDuration},
+			Weighted: weighted[traceOutput],
+		})
+		m[t] = len(stats) - 1
+	}
+	return stats
+}
+
+// readChromeTrace reads an input chrome trace file, and returns a slice of pointers
+// to individual trace events. Flow events are filtered out of the result.
+func readChromeTrace(tracePath string) (result []*chrometrace.Trace, err error) {
+	traceFile, err := readerwriters.Open(tracePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read Ninja trace %q: %v", tracePath, err)
+	}
+	defer func() {
+		if closeErr := traceFile.Close(); closeErr != nil && err == nil {
+			err = closeErr
+		}
+	}()
+
+	// Traces can be very large (e.g. > 500 MiB), reading them into an
+	// array would require tremendous amount of heap reallocations, so
+	// instead read each trace event individually and allocate a single
+	// chrometrace.Trace instance for it in the heap.
+	decoder := json.NewDecoder(traceFile)
+
+	// Consume the initial opening list bracket
+	_, err = decoder.Token()
+	if err != nil {
+		return nil, fmt.Errorf("error decoding opening bracket: %v", err)
+	}
+
+	for decoder.More() {
+		var trace chrometrace.Trace
+		if err := decoder.Decode(&trace); err != nil {
+			return nil, fmt.Errorf("error decoding trace event %v", err)
+		}
+		if trace.EventType == chrometrace.FlowEventStart || trace.EventType == chrometrace.FlowEventEnd {
+			continue
+		}
+		result = append(result, &trace)
+	}
+
+	// The closing bracket is optional in Chrome traces to allow
+	// for unexpected generator crashes. Do not read it here.
+	return
+}
+
+func extractBuildStatsFromTrace(ninjaTracePath string, minActionBuildTime time.Duration) (buildStats, error) {
+	traces, err := readChromeTrace(ninjaTracePath)
+	if err != nil {
+		return buildStats{}, err
+	}
+
+	ret := buildStats{}
+	for _, trace := range traces {
+		if strings.Contains(trace.Category, "critical_path") {
+			action := traceToAction(trace)
+			if action != nil {
+				ret.CriticalPath = append(ret.CriticalPath, *action)
+			}
+		}
+	}
+	sort.Slice(ret.CriticalPath, func(i, j int) bool { return ret.CriticalPath[i].Start < ret.CriticalPath[j].Start })
+
+	for _, trace := range slowestTraces(traces, 30) {
+		ret.Slowests = append(ret.Slowests, *traceToAction(trace))
+	}
+
+	for _, trace := range traces {
+		traceDuration := time.Duration(trace.DurationMicros) * time.Microsecond
+		if traceDuration >= minActionBuildTime {
+			traceAction := *traceToAction(trace)
+			ret.All = append(ret.All, traceAction)
+			ret.Actions = append(ret.Actions, traceAction)
+		}
+
+		ret.TotalBuildTime += traceDuration
+		// The first action always starts at time zero, so build duration equals to
+		// the end time of the last action.
+		traceEnd := time.Duration(trace.TimestampMicros+trace.DurationMicros) * time.Microsecond
+		if traceEnd > ret.BuildDuration {
+			ret.BuildDuration = traceEnd
+		}
+	}
+
+	for _, stat := range statsByTraceType(traces, nil, func(t *chrometrace.Trace) string { return t.Category }) {
+		var minBuildTime, maxBuildTime time.Duration
+		for i, t := range stat.Times {
+			if i == 0 {
+				minBuildTime, maxBuildTime = t, t
+				continue
+			}
+			if t < minBuildTime {
+				minBuildTime = t
+			}
+			if t > maxBuildTime {
+				maxBuildTime = t
+			}
+		}
+		ret.CatBuildTimes = append(ret.CatBuildTimes, catBuildTime{
+			Category:     stat.Type,
+			Count:        stat.Count,
+			BuildTime:    stat.Time,
+			MinBuildTime: minBuildTime,
+			MaxBuildTime: maxBuildTime,
+		})
+	}
+	return ret, nil
+}
+
 func serializeBuildStats(s buildStats, w io.Writer) error {
 	return json.NewEncoder(w).Encode(s)
 }
@@ -229,48 +484,67 @@ func main() {
 	painter := color.NewColor(colors)
 	log := logger.NewLogger(level, painter, os.Stdout, os.Stderr, "")
 
-	if *ninjalogPath == "" {
-		log.Fatalf("--ninjalog is required")
-	}
-	if *compdbPath == "" {
-		log.Fatalf("--compdb is required")
-	}
-	if *graphPath == "" {
-		log.Fatalf("--graph is required")
+	if *ninjaTracePath == "" {
+		if *ninjalogPath == "" {
+			log.Fatalf("Either --ninjalog or --ninjatrace is required")
+		}
+		if *compdbPath == "" {
+			log.Fatalf("--compdb is required")
+		}
+		if *graphPath == "" {
+			log.Fatalf("--graph is required")
+		}
+	} else if *ninjalogPath != "" {
+		log.Fatalf("--ninjalog cannot be used with --ninjatrace")
+	} else if *compdbPath != "" {
+		log.Fatalf("--compdb cannot be used with --ninjatrace")
+	} else if *graphPath != "" {
+		log.Fatalf("--graph cannot be used with --ninjatrace")
 	}
 	if *outputPath == "" {
 		log.Fatalf("--output is required")
 	}
 
-	log.Infof("Reading input files and constructing graph.")
-	ninjalog, err := os.Open(*ninjalogPath)
-	if err != nil {
-		log.Fatalf("Failed to read Ninja log %q: %v", *ninjalogPath, err)
-	}
-	defer ninjalog.Close()
-	compdb, err := os.Open(*compdbPath)
-	if err != nil {
-		log.Fatalf("Failed to read compdb %q: %v", *compdbPath, err)
-	}
-	defer compdb.Close()
-	graphFile, err := os.Open(*graphPath)
-	if err != nil {
-		log.Fatalf("Failed to read graph %q: %v", *graphPath, err)
-	}
-	defer graphFile.Close()
-	graph, err := constructGraph(inputs{
-		ninjalog: ninjalog,
-		compdb:   compdb,
-		graph:    graphFile,
-	})
-	if err != nil {
-		log.Fatalf("Failed to construct graph: %v", err)
-	}
+	var stats buildStats
 
-	log.Infof("Extracting build stats from graph.")
-	stats, err := extractBuildStats(&graph, *minActionBuildTime)
-	if err != nil {
-		log.Fatalf("Failed to extract build stats from graph: %v", err)
+	if *ninjaTracePath != "" {
+		extractedStats, err := extractBuildStatsFromTrace(*ninjaTracePath, *minActionBuildTime)
+		if err != nil {
+			log.Fatalf("Failed to extract build stats from trace %q: %v", *ninjaTracePath, err)
+		}
+		stats = extractedStats
+	} else {
+		log.Infof("Reading input files and constructing graph.")
+		ninjalog, err := os.Open(*ninjalogPath)
+		if err != nil {
+			log.Fatalf("Failed to read Ninja log %q: %v", *ninjalogPath, err)
+		}
+		defer ninjalog.Close()
+		compdb, err := os.Open(*compdbPath)
+		if err != nil {
+			log.Fatalf("Failed to read compdb %q: %v", *compdbPath, err)
+		}
+		defer compdb.Close()
+		graphFile, err := os.Open(*graphPath)
+		if err != nil {
+			log.Fatalf("Failed to read graph %q: %v", *graphPath, err)
+		}
+		defer graphFile.Close()
+		graph, err := constructGraph(inputs{
+			ninjalog: ninjalog,
+			compdb:   compdb,
+			graph:    graphFile,
+		})
+		if err != nil {
+			log.Fatalf("Failed to construct graph: %v", err)
+		}
+
+		log.Infof("Extracting build stats from graph.")
+		extractedStats, err := extractBuildStats(&graph, *minActionBuildTime)
+		if err != nil {
+			log.Fatalf("Failed to extract build stats from graph: %v", err)
+		}
+		stats = extractedStats
 	}
 
 	log.Infof("Creating %s and serializing the build stats to it.", *outputPath)
