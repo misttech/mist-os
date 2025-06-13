@@ -80,6 +80,7 @@ class Evictor {
       compressed += counts.compressed;
       return *this;
     }
+    uint64_t total() const { return pager_backed + pager_backed_loaned + discardable + compressed; }
   };
 
   Evictor();

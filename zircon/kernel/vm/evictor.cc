@@ -86,6 +86,33 @@ ktl::optional<Evictor::EvictedPageCounts> ReclaimFromGlobalPageQueues(
   return ktl::nullopt;
 }
 
+struct ReclaimFailures {
+  static constexpr uint64_t kComparisonBase = 1000;
+  uint64_t consecutive_reclaim_failures = 0;
+  uint64_t failures_to_compare = kComparisonBase;
+
+  void Update(bool reclaim_failed) {
+    if (reclaim_failed) {
+      consecutive_reclaim_failures++;
+    } else {
+      consecutive_reclaim_failures = 0;
+      failures_to_compare = kComparisonBase;
+    }
+  }
+
+  bool ShouldPrint() {
+    if (consecutive_reclaim_failures == failures_to_compare) {
+      // Wait for longer before logging the next time to avoid spamming in an actual livelock.
+      // Multiply checking for overflow.
+      if (failures_to_compare < failures_to_compare * 10) {
+        failures_to_compare *= 10;
+      }
+      return true;
+    }
+    return false;
+  }
+};
+
 }  // namespace
 
 // static
@@ -358,6 +385,7 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
     compression = Pmm::Node().GetPageCompression();
   }
 
+  ReclaimFailures reclaim_failures;
   // Evict until we've counted enough pages to hit the target_pages. Explicitly do not consider
   // pager_backed_loaned towards our total, as loaned pages do not go to the free memory pool.
   while (counts.pager_backed + counts.compressed + counts.discardable < target_pages) {
@@ -368,6 +396,15 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
     if (!reclaimed.has_value()) {
       break;
     }
+
+    // If we've looped many times without being able to reclaim anything, make some noise.
+    reclaim_failures.Update(reclaimed->total() == 0);
+    if (unlikely(reclaim_failures.ShouldPrint())) {
+      printf("WARNING: Evictor failed %zu reclaims in a row, possible livelock\n",
+             reclaim_failures.consecutive_reclaim_failures);
+      pmm_page_queues()->Dump();
+    }
+
     counts += *reclaimed;
   }
 

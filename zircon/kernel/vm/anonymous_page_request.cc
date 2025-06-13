@@ -31,6 +31,15 @@ zx_status_t AnonymousPageRequest::Wait() {
   while ((status = pmm_wait_till_should_retry_single_alloc(
               Deadline::after_mono(kReportWaitTime))) == ZX_ERR_TIMED_OUT) {
     waited++;
+    // If we've been waiting for more than 20 mins without being able to get more memory and without
+    // declaring OOM, the memory watchdog is probably wedged and the system is in an unrecoverable
+    // state. It would be nice to get some diagnostics here but we don't want to risk trying to
+    // acquire any locks; just panic.
+    if (waited >= ZX_MIN(20) / kReportWaitTime) {
+      panic("AnonymousPageRequest waited for %" PRIi64 " seconds\n",
+            (kReportWaitTime * waited) / ZX_SEC(1));
+      return ZX_ERR_NO_MEMORY;
+    }
     printf("WARNING: Waited %" PRIi64 " seconds to retry PMM allocations\n",
            (kReportWaitTime * waited) / ZX_SEC(1));
   }
