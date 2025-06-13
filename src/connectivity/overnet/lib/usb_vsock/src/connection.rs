@@ -16,7 +16,9 @@ use futures::io::{ReadHalf, WriteHalf};
 use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt};
 
 use crate::connection::overflow_writer::OverflowHandleFut;
-use crate::{Address, Header, Packet, PacketType, UsbPacketBuilder, UsbPacketFiller};
+use crate::{
+    Address, Header, Packet, PacketType, ProtocolVersion, UsbPacketBuilder, UsbPacketFiller,
+};
 
 mod overflow_writer;
 
@@ -54,6 +56,7 @@ impl<B: PacketBuffer> Connection<B> {
     /// - An `incoming_requests_tx` that is the sender half of a request queue for incoming
     /// connection requests from the other side.
     pub fn new(
+        _protocol_version: ProtocolVersion,
         control_socket: Socket,
         incoming_requests_tx: mpsc::Sender<ConnectionRequest>,
     ) -> Self {
@@ -591,8 +594,11 @@ mod test {
         let (socket, other_socket) = SyncSocket::create_stream();
         let (incoming_requests_tx, _incoming_requests) = mpsc::channel(5);
         let mut socket = Socket::from_socket(socket);
-        let connection =
-            Arc::new(Connection::new(Socket::from_socket(other_socket), incoming_requests_tx));
+        let connection = Arc::new(Connection::new(
+            ProtocolVersion::LATEST,
+            Socket::from_socket(other_socket),
+            incoming_requests_tx,
+        ));
 
         let echo_task = Task::spawn(usb_echo_server(connection.clone()));
 
@@ -610,8 +616,11 @@ mod test {
     async fn data_over_normal_outgoing_socket() {
         let (_control_socket, other_socket) = SyncSocket::create_stream();
         let (incoming_requests_tx, _incoming_requests) = mpsc::channel(5);
-        let connection =
-            Arc::new(Connection::new(Socket::from_socket(other_socket), incoming_requests_tx));
+        let connection = Arc::new(Connection::new(
+            ProtocolVersion::LATEST,
+            Socket::from_socket(other_socket),
+            incoming_requests_tx,
+        ));
 
         let echo_task = Task::spawn(usb_echo_server(connection.clone()));
 
@@ -639,8 +648,11 @@ mod test {
     async fn data_over_normal_incoming_socket() {
         let (_control_socket, other_socket) = SyncSocket::create_stream();
         let (incoming_requests_tx, mut incoming_requests) = mpsc::channel(5);
-        let connection =
-            Arc::new(Connection::new(Socket::from_socket(other_socket), incoming_requests_tx));
+        let connection = Arc::new(Connection::new(
+            ProtocolVersion::LATEST,
+            Socket::from_socket(other_socket),
+            incoming_requests_tx,
+        ));
 
         let echo_task = Task::spawn(usb_echo_server(connection.clone()));
 
@@ -699,10 +711,16 @@ mod test {
         let (incoming_requests_tx1, incoming_requests1) = mpsc::channel(5);
         let (incoming_requests_tx2, incoming_requests2) = mpsc::channel(5);
 
-        let connection1 =
-            Arc::new(Connection::new(Socket::from_socket(other_socket1), incoming_requests_tx1));
-        let connection2 =
-            Arc::new(Connection::new(Socket::from_socket(other_socket2), incoming_requests_tx2));
+        let connection1 = Arc::new(Connection::new(
+            ProtocolVersion::LATEST,
+            Socket::from_socket(other_socket1),
+            incoming_requests_tx1,
+        ));
+        let connection2 = Arc::new(Connection::new(
+            ProtocolVersion::LATEST,
+            Socket::from_socket(other_socket2),
+            incoming_requests_tx2,
+        ));
 
         let conn1 = connection1.clone();
         let conn2 = connection2.clone();

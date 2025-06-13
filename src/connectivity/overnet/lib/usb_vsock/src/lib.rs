@@ -10,16 +10,60 @@ mod packet;
 pub use connection::*;
 pub use packet::*;
 
-/// Magic sent in the sync packet of the USB protocol.
-///
-/// The 0 indicates protocol version 0, and we expect the reply sync packet to
-/// have the exact same contents. As we version the protocol this may increment.
-///
-/// To document the semantics, let's say this header were "vsock:3". The device
-/// could reply with a lower number, say "vsock:1". This is the device
-/// requesting a downgrade, and if we accept we send the final sync with
-/// "vsock:1". Otherwise we hang up.
-pub const VSOCK_MAGIC: &[u8; 7] = b"vsock:0";
+/// Protocol version. This can be extracted from the payload of the sync packet
+/// and will determine what features a connection supports.
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub enum ProtocolVersion {
+    /// Protocol version 0
+    V0,
+}
+
+impl ProtocolVersion {
+    /// The latest protocol version.
+    pub const LATEST: ProtocolVersion = ProtocolVersion::V0;
+
+    /// Magic sent in the sync packet of the USB protocol.
+    ///
+    /// The format is a byte string of the form `vsock:0`, where the 0 indicates
+    /// protocol version 0, and we expect the reply sync packet to have the
+    /// exact same contents. As we version the protocol this may increment.
+    ///
+    /// To document the semantics, let's say this header were "vsock:3". The device
+    /// could reply with a lower number, say "vsock:1". This is the device
+    /// requesting a downgrade, and if we accept we send the final sync with
+    /// "vsock:1". Otherwise we hang up.
+    pub fn magic(&self) -> &[u8] {
+        match self {
+            ProtocolVersion::V0 => b"vsock:0",
+        }
+    }
+
+    /// Derive the protocol version from the magic sent in the sync packet.
+    pub fn from_magic(magic: &[u8]) -> Option<ProtocolVersion> {
+        if magic == b"vsock:0" {
+            Some(ProtocolVersion::V0)
+        } else {
+            None
+        }
+    }
+
+    /// Given `self` is the protocol version the target prefers and
+    /// `host_version` is the protocol version sent in the magic as the host
+    /// connects, find the protocol version that should be sent in the reply
+    /// magic and used for the connection. If `None`, negotiation has broken
+    /// down.
+    pub fn negotiate(&self, _host_version: &ProtocolVersion) -> Option<ProtocolVersion> {
+        Some(ProtocolVersion::V0)
+    }
+}
+
+impl std::fmt::Display for ProtocolVersion {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ProtocolVersion::V0 => write!(f, "0"),
+        }
+    }
+}
 
 /// A placeholder CID indicating "any" CID is acceptable.
 pub const CID_ANY: u32 = u32::MAX;

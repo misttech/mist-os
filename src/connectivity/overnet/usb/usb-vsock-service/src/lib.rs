@@ -17,8 +17,8 @@ use std::pin::pin;
 use std::sync::Arc;
 use std::time::Duration;
 use usb_vsock::{
-    Connection, ConnectionRequest, Header, Packet, PacketType, UsbPacketBuilder,
-    VsockPacketIterator, CID_HOST, VSOCK_MAGIC,
+    Connection, ConnectionRequest, Header, Packet, PacketType, ProtocolVersion, UsbPacketBuilder,
+    VsockPacketIterator, CID_HOST,
 };
 use zx::{SocketOpts, Status};
 use {fidl_fuchsia_hardware_overnet as overnet, fidl_fuchsia_hardware_vsock as vsock};
@@ -125,8 +125,11 @@ impl UsbConnection {
     }
 
     /// Waits for an [`PacketType::Sync`] packet and sends the reply back, and then returns the
-    /// negotiated device CID for the connection.
-    async fn next_socket(&mut self, mut found_magic: Option<Vec<u8>>) -> Option<u32> {
+    /// negotiated device CID for the connection as well as the negotiated protocol version.
+    async fn next_socket(
+        &mut self,
+        mut found_magic: Option<Vec<u8>>,
+    ) -> Option<(ProtocolVersion, u32)> {
         let mut data = [0; MTU];
         while found_magic.is_none() {
             let mut packets = match read_packet_stream(&mut self.usb_socket_reader, &mut data).await
@@ -164,17 +167,29 @@ impl UsbConnection {
         let found_magic =
             found_magic.expect("read loop should not terminate until sync packet is read");
 
+        let Some(incoming_version) = ProtocolVersion::from_magic(&found_magic) else {
+            error!("Could not parse device magic '{found_magic:?}'");
+            return None;
+        };
+
         // send echo packets until we get back an expected reply
         // TODO(406262417): this is only here because the host side has trouble with hanging
         // gets and sending some data immediately after will help it clear and re-establish its state.
         self.clear_host_requests(&found_magic).await?;
 
+        let Some(outgoing_version) = ProtocolVersion::LATEST.negotiate(&incoming_version) else {
+            error!("Could not negotiate protocol version: driver has {}, host wants {incoming_version}", ProtocolVersion::LATEST);
+            return None;
+        };
+
+        let outgoing_magic = outgoing_version.magic();
+
         debug!("Read sync packet, sending it back and setting up a new link");
         let mut header = Header::new(PacketType::Sync);
-        header.payload_len = (found_magic.len() as u32).into();
+        header.payload_len = (outgoing_magic.len() as u32).into();
         header.device_cid.set(self.vsock_service.current_cid());
         header.host_cid.set(CID_HOST);
-        let packet = Packet { header: &header, payload: VSOCK_MAGIC };
+        let packet = Packet { header: &header, payload: outgoing_magic };
         packet.write_to_unchecked(&mut data);
         if let Err(err) = self.usb_socket_writer.write(&data[..packet.size()]).await {
             error!("Error writing overnet magic string to the usb socket: {err:?}");
@@ -203,11 +218,11 @@ impl UsbConnection {
                         header: Header { packet_type: PacketType::Sync, device_cid, .. },
                         payload,
                     }) => {
-                        if payload != VSOCK_MAGIC {
+                        if payload != outgoing_magic {
                             error!("Host gave unsupported protocol version string {payload:?}. Giving up.");
                             return None;
                         }
-                        return Some(device_cid.get());
+                        return Some((outgoing_version, device_cid.get()));
                     }
                     Ok(packet) => {
                         warn!("Got unexpected packet of type {:?} and length {} while waiting for sync packet. Ignoring.", packet.header.packet_type, packet.header.payload_len);
@@ -223,7 +238,7 @@ impl UsbConnection {
     async fn run(mut self, mut synchronized: Option<oneshot::Sender<()>>) {
         let mut found_magic = None;
         loop {
-            let Some(cid) = self.next_socket(found_magic).await else {
+            let Some((protocol_version, cid)) = self.next_socket(found_magic).await else {
                 info!("USB socket closed or failed");
                 return;
             };
@@ -235,6 +250,7 @@ impl UsbConnection {
             // between the host and driver, this is the socket it would go in.
             let (control_socket, _other_end) = zx::Socket::create_stream();
             let connection = Arc::new(Connection::new(
+                protocol_version,
                 Socket::from_socket(control_socket),
                 self.connection_tx.clone(),
             ));
@@ -479,12 +495,15 @@ mod tests {
 
         let (incoming_tx, incoming_rx) = mpsc::channel(1);
         let (_control_socket, other_end) = zx::Socket::create_stream();
-        let host_connection =
-            Arc::new(Connection::new(Socket::from_socket(other_end), incoming_tx));
+        let host_connection = Arc::new(Connection::new(
+            ProtocolVersion::LATEST,
+            Socket::from_socket(other_end),
+            incoming_tx,
+        ));
 
         // send the initial sync packet with
         let header = &mut Header::new(PacketType::Sync);
-        let payload = VSOCK_MAGIC;
+        let payload = ProtocolVersion::LATEST.magic();
         header.host_cid.set(CID_HOST);
         header.device_cid.set(CID_ANY);
         header.payload_len.set(payload.len() as u32);
@@ -509,7 +528,7 @@ mod tests {
             trace!("received packet {packet:?}");
             match packet.header.packet_type {
                 PacketType::Sync => {
-                    assert_eq!(packet.payload, VSOCK_MAGIC);
+                    assert_eq!(packet.payload, ProtocolVersion::LATEST.magic());
                     assert_eq!(packet.header.device_cid.get(), 3);
                     assert_eq!(packet.header.host_cid.get(), CID_HOST);
                     break;
@@ -533,7 +552,7 @@ mod tests {
         // send back a different cid just to make sure that works
         let device_cid = 300;
         let header = &mut Header::new(PacketType::Sync);
-        let payload = VSOCK_MAGIC;
+        let payload = ProtocolVersion::LATEST.magic();
         header.host_cid.set(CID_HOST);
         header.device_cid.set(device_cid);
         header.payload_len.set(payload.len() as u32);

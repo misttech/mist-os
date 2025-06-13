@@ -20,8 +20,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex, Weak};
 use thiserror::Error;
 use usb_vsock::{
-    Address, Header, Packet, PacketType, UsbPacketBuilder, VsockPacketIterator, CID_ANY, CID_HOST,
-    CID_LOOPBACK, VSOCK_MAGIC,
+    Address, Header, Packet, PacketType, ProtocolVersion, UsbPacketBuilder, VsockPacketIterator,
+    CID_ANY, CID_HOST, CID_LOOPBACK,
 };
 
 /// How long to wait for the USB protocol to synchronize.
@@ -71,27 +71,29 @@ enum SyncError {
 
 /// Creates a new magic packet used to synchronize a USB VSOCK connection.
 fn sync_packet() -> Vec<u8> {
+    let magic = ProtocolVersion::LATEST.magic();
     let header = &mut Header::new(PacketType::Sync);
-    header.payload_len = (VSOCK_MAGIC.len() as u32).into();
+    header.payload_len = (magic.len() as u32).into();
     header.host_cid = CID_HOST.into();
     header.host_port = 0.into();
     header.device_cid = CID_ANY.into();
     header.device_port = 0.into();
-    let packet = Packet { header, payload: VSOCK_MAGIC };
+    let packet = Packet { header, payload: magic };
     let mut packet_storage = vec![0; header.packet_size()];
     packet.write_to_unchecked(&mut packet_storage);
     packet_storage
 }
 
 /// Creates a new magic packet used to finish synchronizing a USB VSOCK connection.
-fn sync_ack_packet(cid: u32) -> Vec<u8> {
+fn sync_ack_packet(cid: u32, version: ProtocolVersion) -> Vec<u8> {
+    let magic = version.magic();
     let header = &mut Header::new(PacketType::Sync);
-    header.payload_len = (VSOCK_MAGIC.len() as u32).into();
+    header.payload_len = (magic.len() as u32).into();
     header.host_cid = CID_HOST.into();
     header.host_port = 0.into();
     header.device_cid = cid.into();
     header.device_port = 0.into();
-    let packet = Packet { header, payload: VSOCK_MAGIC };
+    let packet = Packet { header, payload: magic };
     let mut packet_storage = vec![0; header.packet_size()];
     packet.write_to_unchecked(&mut packet_storage);
     packet_storage
@@ -108,13 +110,19 @@ fn echo_reply_packet(address: &Address, payload: &[u8]) -> Vec<u8> {
     packet_storage
 }
 
+/// Information we got about the connection after the magic exchange.
+struct ConnectionInfo {
+    protocol_version: ProtocolVersion,
+    requested_cid: u32,
+}
+
 /// Wait on a USB port for the magic packet indicating the start of our USB
 /// VSOCK protocol.
 async fn wait_for_magic(
     debug_name: &str,
     out_ep: &usb_rs::BulkOutEndpoint,
     in_ep: &usb_rs::BulkInEndpoint,
-) -> Result<u32, SyncError> {
+) -> Result<ConnectionInfo, SyncError> {
     let mut magic_timer = fasync::Timer::new(MAGIC_TIMEOUT);
     let mut buf = [0u8; MTU];
     out_ep.write(&sync_packet()).await.map_err(SyncError::Send)?;
@@ -144,10 +152,11 @@ async fn wait_for_magic(
             };
             match packet.header.packet_type {
                 PacketType::Sync => {
-                    let magic = <&[u8; 7]>::try_from(packet.payload).ok();
-
-                    if magic.filter(|x| **x == *VSOCK_MAGIC).is_some() {
-                        return Ok(packet.header.device_cid.get());
+                    if let Some(protocol_version) = ProtocolVersion::from_magic(packet.payload) {
+                        return Ok(ConnectionInfo {
+                            protocol_version,
+                            requested_cid: packet.header.device_cid.get(),
+                        });
                     }
 
                     log::warn!(
@@ -235,9 +244,10 @@ async fn run_usb_link(
     let in_ep = in_ep.ok_or(LinkError::InMissing)?;
     let out_ep = out_ep.ok_or(LinkError::OutMissing)?;
 
-    let requested_cid = wait_for_magic(debug_name, &out_ep, &in_ep).await?;
+    let ConnectionInfo { protocol_version, requested_cid } =
+        wait_for_magic(debug_name, &out_ep, &in_ep).await?;
 
-    let (conn_state, incoming_requests) = ConnectionState::new();
+    let (conn_state, incoming_requests) = ConnectionState::new(protocol_version);
     let connection = Arc::clone(&conn_state.connection);
     let cid = if let Some(host) = host.upgrade() {
         let cid = {
@@ -271,7 +281,7 @@ async fn run_usb_link(
 
     let debug_name = format!("usb:cid:{cid} ({debug_name})");
 
-    out_ep.write(&sync_ack_packet(cid)).await.map_err(SyncError::Send)?;
+    out_ep.write(&sync_ack_packet(cid, protocol_version)).await.map_err(SyncError::Send)?;
 
     let tx_conn = connection.clone();
     let tx = async move {
@@ -440,12 +450,15 @@ struct ConnectionState {
 
 impl ConnectionState {
     /// Create a new connection state.
-    fn new() -> (Self, mpsc::Receiver<usb_vsock::ConnectionRequest>) {
+    fn new(
+        protocol_version: ProtocolVersion,
+    ) -> (Self, mpsc::Receiver<usb_vsock::ConnectionRequest>) {
         let (incoming_requests_tx, incoming_requests) = mpsc::channel(1);
         let (control_socket, other_end) = fuchsia_async::emulated_handle::Socket::create_stream();
         let control_socket = fuchsia_async::Socket::from_socket(control_socket);
         let other_end = fuchsia_async::Socket::from_socket(other_end);
-        let connection = Arc::new(usb_vsock::Connection::new(other_end, incoming_requests_tx));
+        let connection =
+            Arc::new(usb_vsock::Connection::new(protocol_version, other_end, incoming_requests_tx));
 
         (
             ConnectionState {
@@ -838,6 +851,7 @@ impl TestConnection {
             fasync::emulated_handle::Socket::create_stream();
         let a_control_socket_other_end = fasync::Socket::from_socket(a_control_socket_other_end);
         let a = Arc::new(usb_vsock::Connection::new(
+            ProtocolVersion::LATEST,
             a_control_socket_other_end,
             a_incoming_requests_tx,
         ));
@@ -847,6 +861,7 @@ impl TestConnection {
             fasync::emulated_handle::Socket::create_stream();
         let b_control_socket_other_end = fasync::Socket::from_socket(b_control_socket_other_end);
         let b = Arc::new(usb_vsock::Connection::new(
+            ProtocolVersion::LATEST,
             b_control_socket_other_end,
             b_incoming_requests_tx,
         ));
