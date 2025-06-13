@@ -693,12 +693,11 @@ class IdkGenerator(object):
             elif info["atom_type"] != "none":
                 unhandled_labels.add(info["atom_label"])
 
-        if unhandled_labels:
-            print(
-                "ERROR: Unhandled labels:\n%s\n"
-                % "\n".join(sorted(unhandled_labels))
-            )
-            return 1
+        assert (
+            not unhandled_labels
+        ), "ERROR: Unhandled labels:\n%s\n" % "\n".join(
+            sorted(unhandled_labels)
+        )
 
         collection_parts.sort(key=lambda a: (a["meta"], a["type"]))
 

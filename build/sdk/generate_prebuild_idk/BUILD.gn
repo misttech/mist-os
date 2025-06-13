@@ -7,6 +7,8 @@ import("//build/testing/python_build_time_tests.gni")
 group("tests") {
   testonly = true
 
+  # TODO(https://fxbug.dev/417997995): Add generate_prebuild_idk_unittest.py
+  # when making generate_prebuild_idk.py runnable from GN.
   deps = [ ":generate_prebuild_idk_integration_test" ]
 }
 

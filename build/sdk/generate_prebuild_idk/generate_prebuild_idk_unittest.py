@@ -1,0 +1,262 @@
+#!/usr/bin/env fuchsia-vendored-python
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import tempfile
+import unittest
+from pathlib import Path
+from unittest import mock
+
+from generate_prebuild_idk import AtomInfo, IdkGenerator
+
+
+class IdkGeneratorTest(unittest.TestCase):
+    _COLLECTION_INFO: AtomInfo = {
+        "atom_id": "1.2.3.4",
+        "atom_label": "//test_idk:collection",
+        "atom_type": "collection",
+        "category": "partner",
+        "atom_meta": {"dest": "meta/manifest.json"},
+        "prebuild_info": {
+            "arch": {"host": "x86_64-linux-gnu", "target": ["arm64"]},
+            "root": ".",
+            "schema_version": "1",
+        },
+    }
+    _SIMPLE_FIDL_LIBRARY_INFO: AtomInfo = {
+        "atom_label": "//sdk/fidl/fuchsia.simple:fuchsia.simple_fidl_sdk",
+        "atom_type": "fidl_library",
+        "category": "partner",
+        "atom_meta": {"dest": "fidl/fuchsia.simple/meta.json"},
+        "prebuild_info": {
+            "library_name": "fuchsia.simple",
+            "file_base": "fidl/fuchsia.simple",
+            "deps": [],
+        },
+        "atom_files": [],
+        "is_stable": True,
+    }
+
+    def setUp(self) -> None:
+        self.tmpdir = tempfile.TemporaryDirectory()
+        self.build_dir = Path(self.tmpdir.name) / "build_out"
+        self.source_dir = Path(self.tmpdir.name) / "fuchsia"
+        self.output_dir = Path(self.tmpdir.name) / "idk_output"
+
+        self.build_dir.mkdir(parents=True, exist_ok=True)
+        self.source_dir.mkdir(parents=True, exist_ok=True)
+
+    def tearDown(self) -> None:
+        self.tmpdir.cleanup()
+
+    def _write_build_file(self, relative_path: str, content: str) -> Path:
+        """Write content a file in the mocked build_dir."""
+        path = self.build_dir / relative_path
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content)
+        return path
+
+    def test_generate_meta_file_contents_simple_collection(self) -> None:
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+        ]
+
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        ret_code = generator.GenerateMetaFileContents()
+        self.assertEqual(ret_code, 0)
+        self.assertIn("meta/manifest.json", generator._meta_files)
+        self.assertEqual(
+            generator._meta_files["meta/manifest.json"]["parts"], []
+        )
+
+    def test_generate_meta_file_contents_unhandled_label(self) -> None:
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            {
+                "atom_label": "//sdk/unhandled",
+                "atom_type": "unhandled_type",
+                "category": "partner",
+                "atom_meta": {"dest": "pkg/unhandled/meta.json"},
+                "prebuild_info": {},
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        with self.assertRaisesRegex(
+            AssertionError, "ERROR: Unhandled labels:\n//sdk/unhandled\n"
+        ):
+            generator.GenerateMetaFileContents()
+
+    def test_generate_meta_file_contents_multiple_collections_error(
+        self,
+    ) -> None:
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            {
+                "atom_id": "1.2.3.4",
+                "atom_label": "//sdk/collection:collection2",
+                "atom_type": "collection",
+                "category": "partner",
+                "atom_meta": {"dest": "meta/manifest2.json"},
+                "prebuild_info": {
+                    "arch": {"host": "x86_64-linux-gnu", "target": ["arm64"]},
+                    "root": ".",
+                    "schema_version": "1",
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        with self.assertRaisesRegex(
+            AssertionError, "More than one collection info provided."
+        ):
+            generator.GenerateMetaFileContents()
+
+    def test_generate_meta_file_contents_missing_deps(self) -> None:
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            {
+                "atom_label": "//sdk/lib/test:test_cc_sdk",
+                "atom_type": "cc_source_library",
+                "category": "partner",
+                "atom_meta": {"dest": "pkg/test_cc_source/meta.json"},
+                "prebuild_info": {
+                    "library_name": "test_cc_source",
+                    "file_base": "pkg/test_cc_source",
+                    "deps": [self._SIMPLE_FIDL_LIBRARY_INFO["atom_label"]],
+                    "headers": [],
+                    "include_dir": "include",
+                    "sources": [],
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        with self.assertRaisesRegex(
+            KeyError, "//sdk/fidl/fuchsia.simple:fuchsia.simple_fidl_sdk"
+        ):
+            generator.GenerateMetaFileContents()
+
+    def test_generate_meta_file_contents_with_excluded_category(self) -> None:
+        self._write_build_file("path/to/source.file", "")
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            {
+                "atom_label": "//sdk/partner/prebuilt_category_atom",
+                "atom_type": "data",
+                "category": "prebuilt",
+                "atom_meta": {
+                    "dest": "partner/prebuilt_category_atom/meta.json",
+                    "value": {"name": "prebuilt_category_atom", "type": "data"},
+                },
+                "prebuild_info": {},
+                "atom_files": [
+                    {
+                        "dest": "partner/prebuilt_category_atom/file.txt",
+                        "source": "path/to/source.file",
+                    }
+                ],
+                "is_stable": True,
+            },
+            {
+                "atom_label": "//sdk/partner/partner_atom",
+                "atom_type": "data",
+                "category": "partner",
+                "atom_meta": {
+                    "dest": "partner/partner_atom/meta.json",
+                    "value": {"name": "partner_atom", "type": "data"},
+                },
+                "prebuild_info": {},
+                "atom_files": [
+                    {
+                        "dest": "partner/partner_atom/file.txt",
+                        "source": "path/to/source.file",
+                    }
+                ],
+                "is_stable": True,
+            },
+        ]
+
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        ret_code = generator.GenerateMetaFileContents()
+        self.assertEqual(ret_code, 0)
+        self.assertIn("partner/partner_atom/meta.json", generator._meta_files)
+        self.assertEqual(
+            generator._meta_files["partner/partner_atom/meta.json"],
+            {"name": "partner_atom", "type": "data"},
+        )
+        self.assertIn("partner/partner_atom/file.txt", generator._atom_files)
+        self.assertEqual(
+            generator._atom_files["partner/partner_atom/file.txt"],
+            "path/to/source.file",
+        )
+        collection_meta = generator._meta_files["meta/manifest.json"]
+        self.assertEqual(len(collection_meta["parts"]), 1)
+        self.assertEqual(
+            collection_meta["parts"][0]["meta"],
+            "partner/partner_atom/meta.json",
+        )
+
+    @mock.patch("os.rename")
+    @mock.patch("os.mkdir")
+    @mock.patch("io.open", new_callable=mock.mock_open)
+    @mock.patch("os.symlink")
+    def test_write_idk_contents_to_directory(
+        self,
+        mock_symlink: mock.Mock,
+        mock_open: mock.Mock,
+        mock_mkdir: mock.Mock,
+        mock_rename: mock.Mock,
+    ) -> None:
+        # Prepare generator with some data
+        self._write_build_file("src/file1.txt", "")
+        self._write_build_file("src/file2.dat", "")
+        self._write_build_file("pkg/blobA", "")
+
+        generator = IdkGenerator([], self.build_dir, self.source_dir)
+        generator._meta_files = {
+            "meta/manifest.json": {"id": "1.2.3.4", "parts": []},
+            "data/foo/meta.json": {"name": "foo", "type": "data"},
+        }
+        generator._atom_files = {"data/foo/file1.txt": "src/file1.txt"}
+
+        ret_code = generator.WriteIdkContentsToDirectory(self.output_dir)
+        self.assertEqual(ret_code, 0)
+
+        # Verify that directories were created for expected files.
+        made_dirs = {call.args[0] for call in mock_mkdir.call_args_list}
+        temp_out_dir = Path(str(self.output_dir) + ".tmp")
+        self.assertIn(
+            temp_out_dir / "meta", made_dirs
+        )  # For meta/manifest.json
+        self.assertIn(
+            temp_out_dir / "data/foo", made_dirs
+        )  # For data/foo/meta.json
+
+        # Verify that expected files were opened for writing.
+        written_file_paths = {
+            call.args[0]
+            for call in mock_open.call_args_list
+            if call.args[1] == "w"
+        }
+        self.assertIn(temp_out_dir / "meta/manifest.json", written_file_paths)
+        self.assertIn(temp_out_dir / "data/foo/meta.json", written_file_paths)
+
+        # Verify symlink calls.
+        expected_symlink_calls = [
+            mock.call(
+                self.build_dir / "src/file1.txt",
+                temp_out_dir / "data/foo/file1.txt",
+            ),
+        ]
+        mock_symlink.assert_has_calls(expected_symlink_calls, any_order=True)
+
+
+if __name__ == "__main__":
+    unittest.main()
