@@ -35,8 +35,11 @@
 
 namespace {
 
-void WriteHeaders(const cpp20::span<const Elf64_Phdr>& phdrs, const zx::vmo& vmo) {
-  const Elf64_Ehdr ehdr = {
+template <typename Ehdr, typename Phdr>
+void WriteHeaders(const cpp20::span<const Phdr>& phdrs, const zx::vmo& vmo,
+                  std::optional<elfldltl::ElfClass> elf_class = elfldltl::ElfClass::kNative,
+                  std::optional<elfldltl::ElfMachine> machine = elfldltl::ElfMachine::kNative) {
+  const Ehdr ehdr = {
 #if defined(__clang__)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wc99-designator"
@@ -47,7 +50,7 @@ void WriteHeaders(const cpp20::span<const Elf64_Phdr>& phdrs, const zx::vmo& vmo
               [EI_MAG1] = ELFMAG1,
               [EI_MAG2] = ELFMAG2,
               [EI_MAG3] = ELFMAG3,
-              [EI_CLASS] = ELFCLASS64,
+              [EI_CLASS] = static_cast<uint8_t>(*elf_class),
               [EI_DATA] = ELFDATA2LSB,
               [EI_VERSION] = EV_CURRENT,
               [EI_OSABI] = ELFOSABI_NONE,
@@ -56,28 +59,29 @@ void WriteHeaders(const cpp20::span<const Elf64_Phdr>& phdrs, const zx::vmo& vmo
 #pragma GCC diagnostic pop
 #endif
       .e_type = ET_DYN,
-      .e_machine = static_cast<uint16_t>(elfldltl::ElfMachine::kNative),
+      .e_machine = static_cast<uint16_t>(*machine),
       .e_version = EV_CURRENT,
       .e_entry = 0,
-      .e_phoff = sizeof(Elf64_Ehdr),
+      .e_phoff = sizeof(Ehdr),
       .e_shoff = 0,
       .e_flags = 0,
-      .e_ehsize = sizeof(Elf64_Ehdr),
-      .e_phentsize = sizeof(Elf64_Phdr),
-      .e_phnum = static_cast<Elf64_Half>(phdrs.size()),
+      .e_ehsize = sizeof(Ehdr),
+      .e_phentsize = sizeof(Phdr),
+      .e_phnum = static_cast<uint16_t>(phdrs.size()),
       .e_shentsize = 0,
       .e_shnum = 0,
       .e_shstrndx = 0,
   };
   EXPECT_OK(vmo.write(&ehdr, 0, sizeof(ehdr)));
-  EXPECT_OK(vmo.write(phdrs.data(), sizeof(ehdr), sizeof(Elf64_Phdr) * phdrs.size()));
+  EXPECT_OK(vmo.write(phdrs.data(), sizeof(ehdr), sizeof(Phdr) * phdrs.size()));
 }
 
 // TODO(jakehehrlich): Switch all uses of uint8_t to std::byte once libc++ lands.
 
+template <typename Nhdr = Elf64_Nhdr>
 void WriteBuildID(cpp20::span<const uint8_t> build_id, const zx::vmo& vmo, uint64_t note_offset) {
   uint8_t buf[64];
-  const Elf64_Nhdr nhdr = {
+  const Nhdr nhdr = {
       .n_namesz = sizeof(ELF_NOTE_GNU),
       .n_descsz = static_cast<Elf64_Word>(build_id.size()),
       .n_type = NT_GNU_BUILD_ID,
@@ -93,14 +97,15 @@ void WriteBuildID(cpp20::span<const uint8_t> build_id, const zx::vmo& vmo, uint6
   EXPECT_OK(vmo.write(buf, note_offset, note_size));
 }
 
+template <typename Phdr>
 struct Module {
   std::string_view name;
-  cpp20::span<const Elf64_Phdr> phdrs;
+  cpp20::span<const Phdr> phdrs;
   cpp20::span<const uint8_t> build_id;
   zx::vmo vmo;
 };
 
-void MakeELF(Module* mod) {
+void MakeELF(Module<Elf64_Phdr>* mod) {
   size_t size = 0;
   for (const auto& phdr : mod->phdrs) {
     size = std::max(size, phdr.p_offset + phdr.p_filesz);
@@ -108,10 +113,31 @@ void MakeELF(Module* mod) {
   ASSERT_OK(zx::vmo::create(size, 0, &mod->vmo));
   EXPECT_OK(mod->vmo.set_property(ZX_PROP_NAME, mod->name.data(), mod->name.size()));
   EXPECT_OK(mod->vmo.replace_as_executable(zx::resource(), &mod->vmo));
-  ASSERT_NO_FATAL_FAILURE(WriteHeaders(mod->phdrs, mod->vmo));
+
+  ASSERT_NO_FATAL_FAILURE((WriteHeaders<Elf64_Ehdr, Elf64_Phdr>(mod->phdrs, mod->vmo)));
+
   for (const auto& phdr : mod->phdrs) {
     if (phdr.p_type == PT_NOTE) {
       ASSERT_NO_FATAL_FAILURE(WriteBuildID(mod->build_id, mod->vmo, phdr.p_offset));
+    }
+  }
+}
+
+void MakeELF(Module<Elf32_Phdr>* mod) {
+  uint32_t size = 0;
+  for (const auto& phdr : mod->phdrs) {
+    size = std::max(size, phdr.p_offset + phdr.p_filesz);
+  }
+  ASSERT_OK(zx::vmo::create(size, 0, &mod->vmo));
+  EXPECT_OK(mod->vmo.set_property(ZX_PROP_NAME, mod->name.data(), mod->name.size()));
+  EXPECT_OK(mod->vmo.replace_as_executable(zx::resource(), &mod->vmo));
+
+  ASSERT_NO_FATAL_FAILURE((WriteHeaders<Elf32_Ehdr, Elf32_Phdr>(
+      mod->phdrs, mod->vmo, elfldltl::ElfClass::k32, elfldltl::ElfMachine::kArm)));
+
+  for (const auto& phdr : mod->phdrs) {
+    if (phdr.p_type == PT_NOTE) {
+      ASSERT_NO_FATAL_FAILURE(WriteBuildID<Elf32_Nhdr>(mod->build_id, mod->vmo, phdr.p_offset));
     }
   }
 }
@@ -130,6 +156,20 @@ constexpr Elf64_Phdr MakePhdr(uint32_t type, uint64_t size, uint64_t offset, uin
   };
 }
 
+constexpr Elf32_Phdr MakePhdr32(uint32_t type, uint32_t size, uint32_t offset, uint32_t addr,
+                                uint32_t flags, uint32_t align) {
+  return Elf32_Phdr{
+      .p_type = type,
+      .p_offset = offset,
+      .p_vaddr = addr,
+      .p_paddr = addr,
+      .p_filesz = size,
+      .p_memsz = size,
+      .p_flags = flags,
+      .p_align = align,
+  };
+}
+
 void GetKoid(const zx::vmo& obj, zx_koid_t* out) {
   zx_info_handle_basic_t info;
   ASSERT_OK(obj.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr));
@@ -137,9 +177,6 @@ void GetKoid(const zx::vmo& obj, zx_koid_t* out) {
 }
 
 zx_status_t LoadElf(const zx::vmar& vmar, const zx::vmo& vmo, uintptr_t& base, uintptr_t& entry) {
-  using LoadInfo =
-      elfldltl::LoadInfo<elfldltl::Elf<>, elfldltl::StdContainer<std::vector>::Container>;
-
   // Ignore any error details, but capture the zx_status_t of a SystemError.
   // Tell the toolkit code to keep going after a SystemError if possible.  No
   // other kinds of errors should be possible since those would indicate an
@@ -155,30 +192,43 @@ zx_status_t LoadElf(const zx::vmar& vmar, const zx::vmo& vmo, uintptr_t& base, u
     };
     return (check(args) || ...);
   };
+
   auto diag = elfldltl::Diagnostics(report, elfldltl::DiagnosticsPanicFlags());
 
   elfldltl::UnownedVmoFile file(vmo.borrow(), diag);
-  LoadInfo load_info;
   elfldltl::RemoteVmarLoader loader{vmar};
-  if (auto headers = elfldltl::LoadHeadersFromFile<elfldltl::Elf<>>(
-          diag, file,
-          elfldltl::ContainerArrayFromFile<
-              elfldltl::StdContainer<std::vector>::Container<elfldltl::Elf<>::Phdr>>(
-              diag, "impossible"))) {
-    auto& [ehdr, phdrs_result] = *headers;
-    cpp20::span<const elfldltl::Elf<>::Phdr> phdrs = phdrs_result;
-    if (elfldltl::DecodePhdrs(diag, phdrs, load_info.GetPhdrObserver(loader.page_size())) &&
+
+  auto phdr_allocator = [&diag]<typename T>(size_t count) {
+    return elfldltl::ContainerArrayFromFile<elfldltl::StdContainer<std::vector>::Container<T>>(
+        diag, "impossible")(count);
+  };
+
+  auto load = [&]<class Ehdr, class Phdr>(const Ehdr& ehdr, std::span<const Phdr> phdrs) -> bool {
+    using Elf = typename Ehdr::ElfLayout;
+    using LoadInfo = elfldltl::LoadInfo<Elf, elfldltl::StdContainer<std::vector>::Container>;
+
+    // Now that we know the type of module, we can load the segments.
+    LoadInfo load_info;
+    if (elfldltl::DecodePhdrs(
+            diag, phdrs,
+            load_info.GetPhdrObserver(static_cast<LoadInfo::size_type>(loader.page_size()))) &&
         loader.Load(diag, load_info, vmo.borrow())) {
-      ZX_ASSERT(status == ZX_OK);
       ZX_ASSERT(load_info.vaddr_start() == 0);
       base = loader.load_bias();
       entry = ehdr.entry + loader.load_bias();
-      std::ignore = std::move(loader).Commit(LoadInfo::Region{});
-      return ZX_OK;
+      std::ignore = std::move(loader).Commit(typename LoadInfo::Region{});
+      return true;
     }
-  }
 
-  ZX_ASSERT(status != ZX_OK);
+    return false;
+  };
+
+  // Use |WithLoadHeadersFromFile| so we can deal with both 32 and 64 bit ELF modules. Ensure to
+  // pass std::nullopt for the machine type since the 32 bit module we will construct will not be
+  // the same as the native machine type.
+  EXPECT_TRUE(elfldltl::WithLoadHeadersFromFile(diag, file, phdr_allocator, std::move(load),
+                                                std::nullopt, std::nullopt));
+
   return status;
 }
 
@@ -215,14 +265,26 @@ TEST(ElfSearchTest, ForEachModule) {
   constexpr uint8_t mod4_build_id[] = {0x44, 0x33, 0x22, 0x11};
   Elf64_Dyn mod4_dyns[] = {{DT_STRTAB, {0x900}}, {DT_SONAME, {1}}, {DT_NULL, {}}};
   constexpr const char* mod4_soname = "another_soname";
-  Module mods[] = {
-      {"mod0", mod0_phdrs, mod0_build_id, {}}, {"mod1", mod1_phdrs, mod1_build_id, {}},
-      {"mod2", mod2_phdrs, mod2_build_id, {}}, {"mod3", mod3_phdrs, mod3_build_id, {}},
-      {"mod4", mod4_phdrs, mod4_build_id, {}},
+  // Define a 32 bit module.
+  constexpr Elf32_Phdr mod5_phdrs[] = {
+      MakePhdr32(PT_LOAD, 0x2000, 0, 0, PF_R, 0x1000),
+      MakePhdr32(PT_NOTE, 20, 0x1000, 0x1000, PF_R, 4),
+      MakePhdr32(PT_LOAD, 0x1000, 0x2000, 0x2000, PF_R | PF_W, 0x1000),
+      MakePhdr32(PT_LOAD, 0x1000, 0x3000, 0x3000, PF_R | PF_X, 0x1000)};
+  constexpr uint8_t mod5_build_id[] = {0xba, 0xdb, 0x10, 0x0d};
+
+  using ModuleVariant = std::variant<Module<Elf32_Phdr>, Module<Elf64_Phdr>>;
+  ModuleVariant mods[] = {
+      Module<Elf64_Phdr>{.name = "mod0", .phdrs = mod0_phdrs, .build_id = mod0_build_id, .vmo = {}},
+      Module<Elf64_Phdr>{.name = "mod1", .phdrs = mod1_phdrs, .build_id = mod1_build_id, .vmo = {}},
+      Module<Elf64_Phdr>{.name = "mod2", .phdrs = mod2_phdrs, .build_id = mod2_build_id, .vmo = {}},
+      Module<Elf64_Phdr>{.name = "mod3", .phdrs = mod3_phdrs, .build_id = mod3_build_id, .vmo = {}},
+      Module<Elf64_Phdr>{.name = "mod4", .phdrs = mod4_phdrs, .build_id = mod4_build_id, .vmo = {}},
+      Module<Elf32_Phdr>{.name = "mod5", .phdrs = mod5_phdrs, .build_id = mod5_build_id, .vmo = {}},
   };
 
-  // Create the test process using the Launcher service, which has the proper clearance to spawn new
-  // processes. This has the side effect of loading in the VDSO and dynamic linker, which are
+  // Create the test process using the Launcher service, which has the proper clearance to spawn
+  // new processes. This has the side effect of loading in the VDSO and dynamic linker, which are
   // explicitly ignored below.
   const char* file = "bin/elf-search-test-helper";
   const char* root_dir = getenv("TEST_ROOT_DIR");
@@ -238,25 +300,32 @@ TEST(ElfSearchTest, ForEachModule) {
   zx::vmar vmar{springboard_get_root_vmar_handle(sb)};
 
   uintptr_t base, entry;
-  for (auto& mod : mods) {
-    ASSERT_NO_FATAL_FAILURE(MakeELF(&mod));
-    if (mod.name == "mod3") {
-      // Handle mod3's string table.
-      EXPECT_OK(mods[3].vmo.write(&mod3_dyns, 0x1800, sizeof(mod3_dyns)));
-      EXPECT_OK(mods[3].vmo.write(mod3_soname, 0x1901, strlen(mod3_soname) + 1));
-    }
-    if (mod.name == "mod4") {
-      // Setup mod4's dynamic table, otherwise LoadElf will fail.
-      EXPECT_OK(mods[4].vmo.write(&mod4_dyns, 0xc00, sizeof(mod4_dyns)));
-    }
-    ASSERT_OK(LoadElf(vmar, mod.vmo, base, entry), "Unable to load extra ELF");
-    if (mod.name == "mod4") {
-      // Relocate the dynamic table and populate the soname.
-      mod4_dyns[0].d_un.d_val += base;
-      EXPECT_OK(mods[4].vmo.write(&mod4_dyns, 0xc00, sizeof(mod4_dyns)));
-      EXPECT_OK(mods[4].vmo.write(mod4_soname, 0x901, strlen(mod4_soname) + 1));
-    }
+  for (auto& module_variant : mods) {
+    std::visit(
+        [&](auto&& mod) {
+          ASSERT_NO_FATAL_FAILURE(MakeELF(&mod));
+          if (mod.name == "mod3") {
+            // Handle mod3's string table.
+            EXPECT_OK(mod.vmo.write(&mod3_dyns, 0x1800, sizeof(mod3_dyns)));
+            EXPECT_OK(mod.vmo.write(mod3_soname, 0x1901, strlen(mod3_soname) + 1));
+          }
+          if (mod.name == "mod4") {
+            // Setup mod4's dynamic table, otherwise LoadElf will fail.
+            EXPECT_OK(mod.vmo.write(&mod4_dyns, 0xc00, sizeof(mod4_dyns)));
+          }
+
+          ASSERT_OK(LoadElf(vmar, mod.vmo, base, entry), "Unable to load extra ELF");
+
+          if (mod.name == "mod4") {
+            // Relocate the dynamic table and populate the soname.
+            mod4_dyns[0].d_un.d_val += base;
+            EXPECT_OK(mod.vmo.write(&mod4_dyns, 0xc00, sizeof(mod4_dyns)));
+            EXPECT_OK(mod.vmo.write(mod4_soname, 0x901, strlen(mod4_soname) + 1));
+          }
+        },
+        module_variant);
   }
+
   zx::process process;
   EXPECT_NE(ZX_HANDLE_INVALID,
             *process.reset_and_get_address() = springboard_get_process_handle(sb));
@@ -280,25 +349,31 @@ TEST(ElfSearchTest, ForEachModule) {
       }
     }
     ++moduleCount;
-    for (const auto& mod : mods) {
-      if (mod.build_id.size() == info.build_id.size() &&
-          std::equal(mod.build_id.begin(), mod.build_id.end(), info.build_id.begin())) {
-        ++matchCount;
-        char name[ZX_MAX_NAME_LEN];
-        zx_koid_t vmo_koid = 0;
-        ASSERT_NO_FATAL_FAILURE(GetKoid(mod.vmo, &vmo_koid));
-        if (mod.name == "mod3") {
-          snprintf(name, sizeof(name), "%s", mod3_soname);
-        } else if (mod.name == "mod4") {
-          snprintf(name, sizeof(name), "%s", mod4_soname);
-        } else {
-          snprintf(name, sizeof(name), "<VMO#%" PRIu64 "=%.*s>", vmo_koid,
-                   static_cast<int>(mod.name.size()), mod.name.data());
-        }
-        EXPECT_STREQ(info.name, name);
-        EXPECT_EQ(mod.phdrs.size(), info.phdrs.size(), "expected same number of phdrs");
-      }
+    for (const auto& module_variant : mods) {
+      std::visit(
+          [&](auto&& mod) {
+            if (mod.build_id.size() == info.build_id.size() &&
+                std::equal(mod.build_id.begin(), mod.build_id.end(), info.build_id.begin())) {
+              ++matchCount;
+              zx_koid_t vmo_koid = 0;
+              ASSERT_NO_FATAL_FAILURE(GetKoid(mod.vmo, &vmo_koid));
+              EXPECT_EQ(mod.phdrs.size(), info.phdrs.size(), "expected same number of phdrs");
+
+              char name[ZX_MAX_NAME_LEN];
+              if (mod.name == "mod3") {
+                snprintf(name, sizeof(name), "%s", mod3_soname);
+              } else if (mod.name == "mod4") {
+                snprintf(name, sizeof(name), "%s", mod4_soname);
+              } else {
+                snprintf(name, sizeof(name), "<VMO#%" PRIu64 "=%.*s>", vmo_koid,
+                         static_cast<int>(mod.name.size()), mod.name.data());
+              }
+              EXPECT_STREQ(info.name, name);
+            }
+          },
+          module_variant);
     }
+
     EXPECT_EQ(moduleCount, matchCount, "Build for module was not found.");
   });
   EXPECT_OK(status);
