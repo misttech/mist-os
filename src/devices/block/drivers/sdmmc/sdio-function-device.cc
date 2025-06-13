@@ -726,14 +726,20 @@ void SdioFunctionDevice::SetLevel(fuchsia_power_broker::wire::ElementRunnerSetLe
   switch (request->level) {
     case PowerLevel::kOn:
       // Our client has connected; we should drop the lease we took in order to follow the client's
-      // policy from now on.
+      // policy from now on. This also causes subsequent calls to SetLevel(OFF) to be respected (see
+      // below).
       boot_level_lease_.reset();
       __FALLTHROUGH;
     case PowerLevel::kBoot:
-      // TODO(420863702): Propagate this state transition up to the SDIO root.
+      sdio_parent_->FunctionPowerOn(function_);
       break;
     case PowerLevel::kOff:
-      // TODO(420863702): Propagate this state transition up to the SDIO root.
+      if (!boot_level_lease_.is_valid()) {
+        // Power Framework will immediately call SetLevel(OFF) after we've added our power element.
+        // We should ignore this call, otherwise it will result in Probe() being called twice during
+        // initialization with no corresponding transition in the controller driver.
+        sdio_parent_->FunctionPowerOff(function_);
+      }
       break;
     default:
       FDF_LOGL(ERROR, logger(), "Unexpected level %u", request->level);

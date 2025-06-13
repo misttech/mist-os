@@ -246,7 +246,10 @@ FakeSdmmcDevice TestSdmmcRootDevice::sdmmc_;
 class Environment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    if (zx::result result = metadata_server_.SetMetadata({}); result.is_error()) {
+    fuchsia_hardware_sdmmc::SdmmcMetadata metadata{{
+        .vccq_off_with_controller_off = true,
+    }};
+    if (zx::result result = metadata_server_.SetMetadata(metadata); result.is_error()) {
       return result.take_error();
     }
     if (zx::result result = metadata_server_.Serve(
@@ -2370,6 +2373,263 @@ TEST_F(SdioControllerDeviceTest, GetToken) {
   ASSERT_OK(
       token3.get_info(ZX_INFO_HANDLE_BASIC, &token_info, sizeof(token_info), nullptr, nullptr));
   EXPECT_EQ(dependency_info.koid, token_info.koid);
+}
+
+TEST_F(SdioControllerDeviceTest, PowerOnProbesDevice) {
+  uint32_t probe_count = 0;
+  sdmmc_.set_command_callback(SDIO_SEND_OP_COND, [&probe_count](uint32_t out_response[4]) -> void {
+    out_response[0] = OpCondFunctions(3) | SDIO_SEND_OP_COND_RESP_S18A;
+    probe_count++;
+  });
+  sdmmc_.set_host_info({
+      .caps = SDMMC_HOST_CAP_VOLTAGE_330,
+      .max_transfer_size = 0x1000,
+  });
+
+  ASSERT_OK(StartDriver());
+  EXPECT_EQ(probe_count, 1u);
+
+  std::vector element_runner_client_ends = driver_test().RunInEnvironmentTypeContext(
+      fit::callback<std::vector<fidl::ClientEnd<fuchsia_power_broker::ElementRunner>>(
+          Environment&)>(
+          [](Environment& env) { return env.fake_power_broker().TakeElementRunnerClientEnds(); }));
+  ASSERT_EQ(element_runner_client_ends.size(), 3ul);
+
+  std::vector<fidl::Client<fuchsia_power_broker::ElementRunner>> function_runners;
+  function_runners.reserve(3);
+  for (auto& client_end : element_runner_client_ends) {
+    function_runners.emplace_back(std::move(client_end),
+                                  fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  }
+
+  // Do the initial SetLevel calls to move from the functions to OFF. This simulates the behavior of
+  // Power Framework.
+  for (auto& runner : function_runners) {
+    runner->SetLevel(SdioFunctionDevice::kOff)
+        .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          ASSERT_TRUE(result.is_ok());
+        });
+  }
+  driver_test().runtime().RunUntilIdle();
+  EXPECT_EQ(probe_count, 1u);
+
+  // Move all functions from OFF to BOOT to simulate taking the boot leases. This should have no
+  // effect as the functions were not actually off previously.
+  for (auto& runner : function_runners) {
+    runner->SetLevel(SdioFunctionDevice::kBoot)
+        .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          ASSERT_TRUE(result.is_ok());
+        });
+  }
+  driver_test().runtime().RunUntilIdle();
+  EXPECT_EQ(probe_count, 1u);
+
+  // Now move all functions to ON to simulate a client connecting.
+  for (auto& runner : function_runners) {
+    runner->SetLevel(SdioFunctionDevice::kOn)
+        .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          ASSERT_TRUE(result.is_ok());
+        });
+  }
+  driver_test().runtime().RunUntilIdle();
+  EXPECT_EQ(probe_count, 1u);
+
+  // Move all functions to OFF, then move one to ON and verify that the device is probed again.
+  for (auto& runner : function_runners) {
+    runner->SetLevel(SdioFunctionDevice::kOff)
+        .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+          ASSERT_TRUE(result.is_ok());
+        });
+  }
+  driver_test().runtime().RunUntilIdle();
+  EXPECT_EQ(probe_count, 1u);
+
+  function_runners[1]
+      ->SetLevel(SdioFunctionDevice::kOn)
+      .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+        ASSERT_TRUE(result.is_ok());
+      });
+  driver_test().runtime().RunUntilIdle();
+  EXPECT_EQ(probe_count, 2u);
+
+  // Move another function to ON, which should not result in the device being probed.
+  function_runners[0]
+      ->SetLevel(SdioFunctionDevice::kOn)
+      .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel> result) {
+        ASSERT_TRUE(result.is_ok());
+      });
+  driver_test().runtime().RunUntilIdle();
+  EXPECT_EQ(probe_count, 2u);
+}
+
+TEST_F(SdioControllerDeviceTest, DoRwByteFailsWhenFunctionPoweredOff) {
+  sdmmc_.set_command_callback(SDIO_SEND_OP_COND, [](uint32_t out_response[4]) -> void {
+    out_response[0] = OpCondFunctions(3);
+  });
+  sdmmc_.set_host_info({
+      .caps = 0,
+      .max_transfer_size = 16,
+  });
+
+  ASSERT_OK(StartDriver());
+
+  std::vector<fidl::ClientEnd<fuchsia_power_broker::ElementRunner>> element_runner_client_ends =
+      driver_test().RunInEnvironmentTypeContext(
+          fit::callback<std::vector<fidl::ClientEnd<fuchsia_power_broker::ElementRunner>>(
+              Environment&)>([](Environment& env) {
+            return env.fake_power_broker().TakeElementRunnerClientEnds();
+          }));
+  ASSERT_EQ(element_runner_client_ends.size(), 3ul);
+
+  fidl::Client<fuchsia_power_broker::ElementRunner> function1_runner(
+      std::move(element_runner_client_ends[0]), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+
+  // Power off function 1, but don't touch the other functions.
+  function1_runner->SetLevel(SdioFunctionDevice::kOn)
+      .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel>& result) {
+        ASSERT_TRUE(result.is_ok());
+      });
+  function1_runner->SetLevel(SdioFunctionDevice::kOff)
+      .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel>& result) {
+        ASSERT_TRUE(result.is_ok());
+      });
+  driver_test().runtime().RunUntilIdle();
+
+  fidl::WireClient client1 = ConnectDeviceClient(1);
+  ASSERT_TRUE(client1.is_valid());
+
+  fidl::WireClient client2 = ConnectDeviceClient(2);
+  ASSERT_TRUE(client2.is_valid());
+
+  sdmmc_.Write(0x1234, std::vector<uint8_t>{0xaa}, 1);
+  sdmmc_.Write(0x1234, std::vector<uint8_t>{0x55}, 2);
+
+  // This read should fail with ZX_ERR_BAD_STATE as the function is powered off.
+  client1->DoRwByte(false, 0x1234, 0).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_error());
+    EXPECT_EQ(result->error_value(), ZX_ERR_BAD_STATE);
+  });
+  // This one should succeed as function 2 is still powered on.
+  client2->DoRwByte(false, 0x1234, 0).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_EQ(result->value()->read_byte, 0x55);
+  });
+  driver_test().runtime().RunUntilIdle();
+
+  // Power on function 1 and verify that the read now succeeds.
+  function1_runner->SetLevel(SdioFunctionDevice::kOn)
+      .ThenExactlyOnce([&](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel>& result) {
+        ASSERT_TRUE(result.is_ok());
+      });
+  driver_test().runtime().RunUntilIdle();
+
+  client1->DoRwByte(false, 0x1234, 0).ThenExactlyOnce([&](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_EQ(result->value()->read_byte, 0xaa);
+  });
+  driver_test().runtime().RunUntilIdle();
+}
+
+TEST_F(SdioControllerDeviceTest, Function0AccessesSucceedWhenFunctionPoweredOff) {
+  sdmmc_.set_command_callback(SDIO_SEND_OP_COND, [](uint32_t out_response[4]) -> void {
+    out_response[0] = OpCondFunctions(3);
+  });
+  sdmmc_.set_host_info({
+      .caps = 0,
+      .max_transfer_size = 16,
+  });
+
+  ASSERT_OK(StartDriver());
+
+  std::vector<fidl::ClientEnd<fuchsia_power_broker::ElementRunner>> element_runner_client_ends =
+      driver_test().RunInEnvironmentTypeContext(
+          fit::callback<std::vector<fidl::ClientEnd<fuchsia_power_broker::ElementRunner>>(
+              Environment&)>([](Environment& env) {
+            return env.fake_power_broker().TakeElementRunnerClientEnds();
+          }));
+  ASSERT_EQ(element_runner_client_ends.size(), 3ul);
+
+  std::vector<fidl::Client<fuchsia_power_broker::ElementRunner>> function_runners;
+  function_runners.reserve(3);
+  for (auto& client_end : element_runner_client_ends) {
+    function_runners.emplace_back(std::move(client_end),
+                                  fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  }
+
+  // Power off function 1, but don't touch the other functions.
+  function_runners[0]
+      ->SetLevel(SdioFunctionDevice::kOn)
+      .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel>& result) {
+        ASSERT_TRUE(result.is_ok());
+      });
+  function_runners[0]
+      ->SetLevel(SdioFunctionDevice::kOff)
+      .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel>& result) {
+        ASSERT_TRUE(result.is_ok());
+      });
+  driver_test().runtime().RunUntilIdle();
+
+  fidl::WireClient client1 = ConnectDeviceClient(1);
+  ASSERT_TRUE(client1.is_valid());
+
+  sdmmc_.Write(0xf0, std::vector<uint8_t>{0xaa}, 0);
+
+  // This read only accesses function 0, so it should succeed even though function 1 is powered off.
+  client1->DoVendorControlRwByte(false, 0xf0, 0).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_EQ(result->value()->read_byte, 0xaa);
+  });
+  driver_test().runtime().RunUntilIdle();
+
+  // Power off the other functions.
+  function_runners[1]
+      ->SetLevel(SdioFunctionDevice::kOn)
+      .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel>& result) {
+        ASSERT_TRUE(result.is_ok());
+      });
+  function_runners[1]
+      ->SetLevel(SdioFunctionDevice::kOff)
+      .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel>& result) {
+        ASSERT_TRUE(result.is_ok());
+      });
+  function_runners[2]
+      ->SetLevel(SdioFunctionDevice::kOn)
+      .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel>& result) {
+        ASSERT_TRUE(result.is_ok());
+      });
+  function_runners[2]
+      ->SetLevel(SdioFunctionDevice::kOff)
+      .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel>& result) {
+        ASSERT_TRUE(result.is_ok());
+      });
+  driver_test().runtime().RunUntilIdle();
+
+  // The read should now fail.
+  client1->DoVendorControlRwByte(false, 0xf0, 0).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_error());
+    EXPECT_EQ(result->error_value(), ZX_ERR_BAD_STATE);
+  });
+  driver_test().runtime().RunUntilIdle();
+
+  // Power on another function and it should succeed again.
+  function_runners[2]
+      ->SetLevel(SdioFunctionDevice::kOn)
+      .ThenExactlyOnce([](fidl::Result<fuchsia_power_broker::ElementRunner::SetLevel>& result) {
+        ASSERT_TRUE(result.is_ok());
+      });
+  driver_test().runtime().RunUntilIdle();
+
+  client1->DoVendorControlRwByte(false, 0xf0, 0).ThenExactlyOnce([](auto& result) {
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    EXPECT_EQ(result->value()->read_byte, 0xaa);
+  });
+  driver_test().runtime().RunUntilIdle();
 }
 
 }  // namespace sdmmc

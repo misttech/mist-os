@@ -17,6 +17,7 @@
 
 #include <array>
 #include <atomic>
+#include <bitset>
 #include <memory>
 #include <mutex>
 
@@ -81,7 +82,7 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
   template <typename T>
   zx_status_t SdioDoRwTxn(uint8_t fn_idx, const SdioRwTxn<T>& txn);
 
-  zx_status_t SdioRequestCardReset() TA_EXCL(lock_);
+  zx_status_t SdioRequestCardReset();
   zx_status_t SdioPerformTuning();
 
   void InBandInterruptCallback();
@@ -94,6 +95,9 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
                                    .buffers = {txn->buffers_list, txn->buffers_count},
                                });
   }
+
+  void FunctionPowerOn(uint8_t fn_idx);
+  void FunctionPowerOff(uint8_t fn_idx);
 
   // Called by children of this device.
   fidl::WireSyncClient<fuchsia_driver_framework::Node>& sdio_controller_node() {
@@ -159,6 +163,8 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
 
   zx::result<uint8_t> ReadCccrByte(uint32_t addr) TA_REQ(lock_);
 
+  zx_status_t PowerOnReset() TA_EXCL(lock_);
+
   template <typename T>
   struct SdioTxnPosition {
     cpp20::span<const T> buffers;  // The buffers remaining to be processed.
@@ -198,6 +204,15 @@ class SdioControllerDevice : public ddk::InBandInterruptProtocol<SdioControllerD
   std::array<std::unique_ptr<SdioFunctionDevice>, SDIO_MAX_FUNCS> child_sdio_function_devices_ = {};
 
   bool in_band_interrupt_supported_ = true;
+
+  // A set bit means that the corresponding function's power element is in the ON state. Function 0
+  // is always considered to be powered on if at least one I/O function is on. Default to all
+  // functions on so that probe works.
+  std::bitset<SDIO_MAX_FUNCS> function_power_on_{UINT8_MAX};
+
+  // This value comes from metadata. If true, the device must be re-initialized after leaving the
+  // OFF state.
+  bool vccq_off_with_controller_off_ = false;
 };
 
 }  // namespace sdmmc
