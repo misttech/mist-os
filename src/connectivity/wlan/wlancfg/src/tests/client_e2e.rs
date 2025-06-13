@@ -1000,6 +1000,7 @@ fn test_save_and_fail_to_connect(
 #[test_case(fidl_policy::NetworkConfigChangeError::CredentialLenError, TEST_SSID.clone().into(), Saved::Wpa2, fidl_policy::Credential::Psk(hex::decode(b"12345678").unwrap()))]
 // Saving this network should fail because the password is too short.
 #[test_case(fidl_policy::NetworkConfigChangeError::CredentialLenError, TEST_SSID.clone().into(), Saved::Wpa2, fidl_policy::Credential::Password(b"12".to_vec()))]
+#[fuchsia::test(add_test_attr = false)]
 fn test_fail_to_save(
     save_error: fidl_policy::NetworkConfigChangeError,
     ssid: Vec<u8>,

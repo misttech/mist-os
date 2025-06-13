@@ -4055,6 +4055,7 @@ mod tests {
         Defect::Iface(IfaceFailure::CanceledScan { iface_id: 456 }) ;
         "recommend canceled scan recovery"
     )]
+    #[fuchsia::test(add_test_attr = false)]
     fn log_defect_for_destroyed_iface(defect: Defect) {
         let _exec = TestExecutor::new();
         let test_values = test_setup();
