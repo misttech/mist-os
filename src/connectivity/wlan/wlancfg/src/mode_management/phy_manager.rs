@@ -827,6 +827,17 @@ impl PhyManagerApi for PhyManager {
                                 warn!("Resetting PHY {} failed: {:?}", phy_id, e);
                             }
 
+                            // The phy reset may clear its country code. Re-set it now if we have one.
+                            if let Some(country_code) = self.saved_country_code {
+                                info!("Setting country code after phy reset");
+                                if let Err(e) =
+                                    set_phy_country_code(&self.device_monitor, phy_id, country_code)
+                                        .await
+                                {
+                                    warn!("Proceeding with default country code because we failed to set the cached one: {}", e);
+                                }
+                            };
+
                             return;
                         }
                     }
@@ -4550,8 +4561,10 @@ mod tests {
         assert!(phy_manager.phys[&0].destroyed_ifaces.contains(&2));
     }
 
-    #[fuchsia::test]
-    fn test_perform_recovery_reset_does_nothing() {
+    #[test_case(Some([4, 2]); "Cached country code")]
+    #[test_case(None; "No cached country code")]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_perform_recovery_reset_requests_phy_reset(cached_country_code: Option<[u8; 2]>) {
         let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = phy_manager_for_recovery_test(
@@ -4560,6 +4573,9 @@ mod tests {
             test_values.telemetry_sender,
             test_values.recovery_sender,
         );
+
+        // Set a country code in the phy manager
+        phy_manager.saved_country_code = cached_country_code;
 
         // Suggest a recovery action to reset the PHY.
         let summary = recovery::RecoverySummary {
@@ -4587,6 +4603,28 @@ mod tests {
                     .expect("failed to send reset response.");
             }
         );
+
+        // Check that we set the country code if we had a cached country code
+        if let Some(cached_cc) = cached_country_code {
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_variant!(
+                exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+                Poll::Ready(Some(Ok(
+                    fidl_service::DeviceMonitorRequest::SetCountry {
+                        req: fidl_service::SetCountryRequest {
+                            phy_id: 0,
+                            alpha2: cc_in_req,
+                        },
+                        responder,
+                    }
+                ))) => {
+                    assert_eq!(cc_in_req, cached_cc);
+                    responder
+                        .send(zx::sys::ZX_OK)
+                        .expect("failed to send setCountry response.");
+                }
+            );
+        }
 
         // The future should complete now.
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
