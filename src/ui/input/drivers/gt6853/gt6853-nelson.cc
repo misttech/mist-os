@@ -13,8 +13,7 @@ enum {
   // These values are shared with the bootloader, and must be kept in sync.
   kPanelTypeKdFiti9364 = 1,
   kPanelTypeBoeFiti9364 = 2,
-  // TODO(https://fxbug.dev/324461617): Remove this.
-  kPanelTypeInxFiti9364 = 3,
+  // 3 was for kPanelTypeInxFiti9364
   kPanelTypeKdFiti9365 = 4,
   kPanelTypeBoeFiti9365 = 5,
   // 6 was for kPanelTypeBoeSit7703.
@@ -26,7 +25,6 @@ inline const char* PanelTypeToConfigPath(uint32_t panel_type_id) {
   switch (panel_type_id) {
     case kPanelTypeKdFiti9364:
     case kPanelTypeBoeFiti9364:
-    case kPanelTypeInxFiti9364:
       return GT6853_CONFIG_9364_PATH;
     case kPanelTypeKdFiti9365:
     case kPanelTypeBoeFiti9365:
@@ -42,8 +40,6 @@ inline const char* PanelTypeToNameString(uint32_t panel_type_id) {
       return "kd_fiti9364";
     case kPanelTypeBoeFiti9364:
       return "boe_fiti9364";
-    case kPanelTypeInxFiti9364:
-      return "inx_fiti9364";
     case kPanelTypeKdFiti9365:
       return "kd_fiti9365";
     case kPanelTypeBoeFiti9365:
