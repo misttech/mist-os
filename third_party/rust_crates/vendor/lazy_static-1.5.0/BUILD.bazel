@@ -22,7 +22,7 @@ package_info(
     name = "package_info",
     package_name = "lazy_static",
     package_url = "https://github.com/rust-lang-nursery/lazy-static.rs",
-    package_version = "1.4.0",
+    package_version = "1.5.0",
 )
 
 license(
@@ -72,5 +72,5 @@ rust_library(
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
     }),
-    version = "1.4.0",
+    version = "1.5.0",
 )

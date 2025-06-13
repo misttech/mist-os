@@ -476,7 +476,7 @@ group("json5format") {
 import("//third_party/rust_crates/visibility.gni")
 
 group("lazy_static") {
-  public_deps = [ ":lazy_static-v1_4_0" ]
+  public_deps = [ ":lazy_static-v1_5_0" ]
 
   visibility = lazy_static_visibility
 }
@@ -3142,7 +3142,7 @@ rustc_library("bt-common-v0_0_1") {
 
   deps = []
   deps += [ ":futures-v0_3_30" ]
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":thiserror-v2_0_11" ]
   deps += [ ":uuid-v1_1_2" ]
 
@@ -4287,7 +4287,7 @@ rustc_library("criterion-v0_2_11") {
   deps += [ ":cast-v0_2_2" ]
   deps += [ ":clap-v2_34_0" ]
   deps += [ ":itertools-v0_8_0" ]
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":libc-v0_2_171" ]
   deps += [ ":num-traits-v0_2_19" ]
   deps += [ ":rand_core-v0_3_1" ]
@@ -4554,7 +4554,7 @@ rustc_library("crossterm-v0_19_0") {
 
   deps = []
   deps += [ ":bitflags-v1_3_2" ]
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":parking_lot-v0_11_1" ]
   if (true) {
     deps += [ ":libc-v0_2_171" ]
@@ -8932,7 +8932,7 @@ rustc_library("json5format-v0_2_6") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":regex-v1_7_3" ]
 
   rustenv = []
@@ -9042,18 +9042,18 @@ rustc_library("kqueue-sys-v1_0_3") {
   applicable_licenses = [ ":kqueue-sys-v1_0_3.license" ]
 }
 
-license("lazy_static-v1_4_0.license") {
+license("lazy_static-v1_5_0.license") {
   public_package_name = "lazy_static"
   license_files = [
-    "//third_party/rust_crates/vendor/lazy_static-1.4.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/lazy_static-1.4.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/lazy_static-1.5.0/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/lazy_static-1.5.0/LICENSE-MIT",
   ]
 }
 
-rustc_library("lazy_static-v1_4_0") {
+rustc_library("lazy_static-v1_5_0") {
   crate_name = "lazy_static"
-  source_root = "//third_party/rust_crates/vendor/lazy_static-1.4.0/src/lib.rs"
-  output_name = "lazy_static-cdf593bd3fb3d68f"
+  source_root = "//third_party/rust_crates/vendor/lazy_static-1.5.0/src/lib.rs"
+  output_name = "lazy_static-5683d883f41296b9"
   edition = "2015"
   disable_clippy = true
   enforce_source_listing = false
@@ -9065,13 +9065,13 @@ rustc_library("lazy_static-v1_4_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=cdf593bd3fb3d68f",
-    "-Cextra-filename=-cdf593bd3fb3d68f",
+    "-Cmetadata=5683d883f41296b9",
+    "-Cextra-filename=-5683d883f41296b9",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":lazy_static-v1_4_0.license" ]
+  applicable_licenses = [ ":lazy_static-v1_5_0.license" ]
 }
 
 license("libc-v0_2_171.license") {
@@ -9975,7 +9975,7 @@ rustc_library("mockall-v0_9_0") {
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":downcast-v0_10_0" ]
   deps += [ ":fragile-v1_0_0" ]
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":mockall_derive-v0_9_0($host_toolchain)" ]
   deps += [ ":predicates-tree-v1_0_2" ]
   deps += [ ":predicates-v1_0_8" ]
@@ -10692,7 +10692,7 @@ rustc_library("num-bigint-dig-v0_8_4") {
   deps += [ ":byteorder-v1_5_0" ]
   deps += [ ":libm-v0_2_15" ]
   deps += [ ":zeroize-v1_8_1" ]
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":num-integer-v0_1_46" ]
   deps += [ ":num-iter-v0_1_45" ]
   deps += [ ":num-traits-v0_2_19" ]
@@ -12727,7 +12727,7 @@ rustc_library("prettytable-rs-v0_8_0") {
   deps += [ ":csv-v1_3_1" ]
   deps += [ ":atty-v0_2_11" ]
   deps += [ ":encode_unicode-v0_3_5" ]
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":term-v0_5_1" ]
   deps += [ ":unicode-width-v0_1_14" ]
 
@@ -12883,7 +12883,7 @@ rustc_library("proptest-v1_5_0") {
   deps += [ ":bit-set-v0_5_3" ]
   deps += [ ":bit-vec-v0_6_3" ]
   deps += [ ":bitflags-v2_8_0" ]
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":num-traits-v0_2_19" ]
   deps += [ ":rand-v0_8_4" ]
   deps += [ ":rand_chacha-v0_3_1" ]
@@ -13004,7 +13004,7 @@ rustc_library("prost-build-v0_11_1") {
   deps += [ ":bytes-v1_10_0" ]
   deps += [ ":heck-v0_4_1" ]
   deps += [ ":itertools-v0_10_1" ]
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":log-v0_4_22" ]
   deps += [ ":multimap-v0_8_3" ]
   deps += [ ":petgraph-v0_6_2" ]
@@ -13118,7 +13118,7 @@ rustc_library("publicsuffix-v1_5_4") {
   deps = []
   deps += [ ":error-chain-v0_12_0" ]
   deps += [ ":idna-v0_2_3" ]
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":regex-v1_7_3" ]
   deps += [ ":url-v2_3_1" ]
 
@@ -15339,7 +15339,7 @@ rustc_library("schannel-v0_1_19") {
 
   deps = []
   deps += [ ":winapi-v0_3_9" ]
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
 
   rustenv = []
 
@@ -16052,7 +16052,7 @@ rustc_library("serial_test-v0_5_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":parking_lot-v0_11_1" ]
   deps += [ ":serial_test_derive-v0_5_1($host_toolchain)" ]
 
@@ -16197,7 +16197,7 @@ rustc_library("sharded-slab-v0_1_4") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
 
   rustenv = []
 
@@ -16914,7 +16914,7 @@ rustc_library("structopt-v0_3_26") {
 
   deps = []
   deps += [ ":clap-v2_34_0" ]
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":structopt-derive-v0_4_18($host_toolchain)" ]
 
   rustenv = []
@@ -18638,7 +18638,7 @@ rustc_library("trust-dns-proto-v0_22_0") {
   deps += [ ":futures-util-v0_3_30" ]
   deps += [ ":idna-v0_2_3" ]
   deps += [ ":ipnet-v2_3_1" ]
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":rand-v0_8_4" ]
   deps += [ ":smallvec-v1_14_0" ]
   deps += [ ":thiserror-v1_0_69" ]
@@ -18681,7 +18681,7 @@ rustc_library("trust-dns-resolver-v0_22_0") {
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
   deps += [ ":futures-util-v0_3_30" ]
-  deps += [ ":lazy_static-v1_4_0" ]
+  deps += [ ":lazy_static-v1_5_0" ]
   deps += [ ":lru-cache-v0_1_2" ]
   deps += [ ":parking_lot-v0_12_0" ]
   deps += [ ":smallvec-v1_14_0" ]

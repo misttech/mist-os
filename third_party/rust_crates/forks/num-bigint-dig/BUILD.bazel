@@ -85,7 +85,7 @@ rust_library(
         "//third_party/rust_crates/forks/libm",
         "//third_party/rust_crates/forks/num-bigint-dig:build_script_build",
         "//third_party/rust_crates/forks/zeroize",
-        "//third_party/rust_crates/vendor/lazy_static-1.4.0:lazy_static",
+        "//third_party/rust_crates/vendor/lazy_static-1.5.0:lazy_static",
         "//third_party/rust_crates/vendor/num-integer-0.1.46:num_integer",
         "//third_party/rust_crates/vendor/num-iter-0.1.45:num_iter",
         "//third_party/rust_crates/vendor/num-traits-0.2.19:num_traits",

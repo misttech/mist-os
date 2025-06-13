@@ -139,7 +139,7 @@ iota = "0.2.3"
 itertools = "0.14"
 itoa = "1.0"
 json5format = "0.2.6"
-lazy_static = "1.4"
+lazy_static = "1.5"
 libc = { version = "0.2.171", features = ["extra_traits"] }
 libm = "0.2.15"
 linked-hash-map = "0.5.6"
@@ -649,7 +649,7 @@ rustflags = [
 [gn.package.indexmap."1.9.2"]
 rustflags = ["--cfg=has_std"]
 
-[gn.package.lazy_static."1.4.0"]
+[gn.package.lazy_static."1.5.0"]
 group_visibility = { import = "//third_party/rust_crates/visibility.gni", variable = "lazy_static_visibility" }
 
 [gn.package.libc."0.2.171"]

@@ -71,6 +71,6 @@ rust_library(
     }),
     version = "0.1.4",
     deps = [
-        "//third_party/rust_crates/vendor/lazy_static-1.4.0:lazy_static",
+        "//third_party/rust_crates/vendor/lazy_static-1.5.0:lazy_static",
     ],
 )

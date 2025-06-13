@@ -88,7 +88,7 @@ rust_library(
         "//third_party/rust_crates/vendor/futures-util-0.3.30:futures_util",
         "//third_party/rust_crates/vendor/idna-0.2.3:idna",
         "//third_party/rust_crates/vendor/ipnet-2.3.1:ipnet",
-        "//third_party/rust_crates/vendor/lazy_static-1.4.0:lazy_static",
+        "//third_party/rust_crates/vendor/lazy_static-1.5.0:lazy_static",
         "//third_party/rust_crates/vendor/rand-0.8.4:rand",
         "//third_party/rust_crates/vendor/smallvec-1.14.0:smallvec",
         "//third_party/rust_crates/vendor/thiserror-1.0.69:thiserror",

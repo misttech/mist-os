@@ -76,7 +76,7 @@ rust_library(
     deps = [
         "//third_party/rust_crates/vendor/error-chain-0.12.0:error_chain",
         "//third_party/rust_crates/vendor/idna-0.2.3:idna",
-        "//third_party/rust_crates/vendor/lazy_static-1.4.0:lazy_static",
+        "//third_party/rust_crates/vendor/lazy_static-1.5.0:lazy_static",
         "//third_party/rust_crates/vendor/regex-1.7.3:regex",
         "//third_party/rust_crates/vendor/url-2.3.1:url",
     ],
