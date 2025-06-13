@@ -250,7 +250,6 @@ fn has_ioctl_permission<P: ClassPermission + Into<KernelPermission> + Clone + 's
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::access_vector_cache::DenyAll;
     use crate::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use crate::policy::{AccessDecision, AccessVector, IoctlAccessDecision};
     use crate::{
@@ -300,16 +299,16 @@ mod tests {
     }
 
     #[derive(Default)]
-    pub struct DenyAllPermissions(DenyAll);
+    pub struct DenyAllPermissions;
 
     impl Query for DenyAllPermissions {
         fn compute_access_decision(
             &self,
-            source_sid: SecurityId,
-            target_sid: SecurityId,
-            target_class: ObjectClass,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _target_class: ObjectClass,
         ) -> AccessDecision {
-            self.0.compute_access_decision(source_sid, target_sid, target_class)
+            AccessDecision::allow(AccessVector::NONE)
         }
 
         fn compute_new_fs_node_sid(
@@ -333,12 +332,12 @@ mod tests {
 
         fn compute_ioctl_access_decision(
             &self,
-            source_sid: SecurityId,
-            target_sid: SecurityId,
-            target_class: ObjectClass,
-            ioctl_prefix: u8,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _target_class: ObjectClass,
+            _ioctl_prefix: u8,
         ) -> IoctlAccessDecision {
-            self.0.compute_ioctl_access_decision(source_sid, target_sid, target_class, ioctl_prefix)
+            IoctlAccessDecision::DENY_ALL
         }
     }
 

@@ -182,58 +182,6 @@ pub(super) trait ProxyMut<D> {
     fn set_delegate(&mut self, delegate: D) -> D;
 }
 
-/// A default implementation for [`AccessQueryable`] that permits no [`AccessVector`].
-#[derive(Default)]
-pub(super) struct DenyAll;
-
-impl Query for DenyAll {
-    fn compute_access_decision(
-        &self,
-        _source_sid: SecurityId,
-        _target_sid: SecurityId,
-        _target_class: ObjectClass,
-    ) -> AccessDecision {
-        AccessDecision::default()
-    }
-
-    fn compute_new_fs_node_sid(
-        &self,
-        _source_sid: SecurityId,
-        _target_sid: SecurityId,
-        _fs_node_class: FsNodeClass,
-    ) -> Result<SecurityId, anyhow::Error> {
-        unreachable!()
-    }
-
-    fn compute_new_fs_node_sid_with_name(
-        &self,
-        _source_sid: SecurityId,
-        _target_sid: SecurityId,
-        _fs_node_class: FsNodeClass,
-        _fs_node_name: NullessByteStr<'_>,
-    ) -> Option<SecurityId> {
-        unreachable!()
-    }
-
-    fn compute_ioctl_access_decision(
-        &self,
-        _source_sid: SecurityId,
-        _target_sid: SecurityId,
-        _target_class: ObjectClass,
-        _ioctl_prefix: u8,
-    ) -> IoctlAccessDecision {
-        IoctlAccessDecision::DENY_ALL
-    }
-}
-
-impl Reset for DenyAll {
-    /// A no-op implementation: [`DenyAll`] has no state to reset and no delegates to notify
-    /// when it is being treated as a cache to be reset.
-    fn reset(&self) -> bool {
-        true
-    }
-}
-
 #[derive(Clone, Hash, PartialEq, Eq)]
 struct AccessQueryArgs {
     source_sid: SecurityId,
@@ -255,70 +203,8 @@ struct IoctlAccessQueryArgs {
     ioctl_prefix: u8,
 }
 
-/// An empty access vector cache that delegates to an [`AccessQueryable`].
-#[derive(Default)]
-struct Empty<D = DenyAll> {
-    delegate: D,
-}
-
-impl<D> Empty<D> {
-    /// Constructs an empty access vector cache that delegates to `delegate`.
-    ///
-    /// TODO: Eliminate `dead_code` guard.
-    #[allow(dead_code)]
-    pub fn new(delegate: D) -> Self {
-        Self { delegate }
-    }
-}
-
-impl<D: QueryMut> QueryMut for Empty<D> {
-    fn compute_access_decision(
-        &mut self,
-        source_sid: SecurityId,
-        target_sid: SecurityId,
-        target_class: ObjectClass,
-    ) -> AccessDecision {
-        self.delegate.compute_access_decision(source_sid, target_sid, target_class)
-    }
-
-    fn compute_new_fs_node_sid(
-        &mut self,
-        _source_sid: SecurityId,
-        _target_sid: SecurityId,
-        _fs_node_class: FsNodeClass,
-    ) -> Result<SecurityId, anyhow::Error> {
-        unreachable!()
-    }
-
-    fn compute_new_fs_node_sid_with_name(
-        &mut self,
-        _source_sid: SecurityId,
-        _target_sid: SecurityId,
-        _fs_node_class: FsNodeClass,
-        _fs_node_name: NullessByteStr<'_>,
-    ) -> Option<SecurityId> {
-        unreachable!()
-    }
-
-    fn compute_ioctl_access_decision(
-        &mut self,
-        _source_sid: SecurityId,
-        _target_sid: SecurityId,
-        _target_class: ObjectClass,
-        _ioctl_prefix: u8,
-    ) -> IoctlAccessDecision {
-        todo!()
-    }
-}
-
-impl<D: ResetMut> ResetMut for Empty<D> {
-    fn reset(&mut self) -> bool {
-        self.delegate.reset()
-    }
-}
-
 /// Thread-hostile associative cache with capacity defined at construction and FIFO eviction.
-pub(super) struct FifoQueryCache<D = DenyAll> {
+pub(super) struct FifoQueryCache<D> {
     access_cache: FifoCache<AccessQueryArgs, AccessQueryResult>,
     ioctl_access_cache: FifoCache<IoctlAccessQueryArgs, IoctlAccessDecision>,
     delegate: D,
@@ -486,7 +372,7 @@ impl<D> ProxyMut<D> for FifoQueryCache<D> {
 }
 
 /// A locked access vector cache.
-pub(super) struct Locked<D = DenyAll> {
+pub(super) struct Locked<D> {
     delegate: Arc<Mutex<D>>,
 }
 
@@ -722,7 +608,7 @@ impl<R: Reset> Reset for Weak<R> {
 /// results in at most one `reset()` call to the query delegate on the next query. This strategy
 /// allows [`ThreadLocalQuery`] to expose thread-safe reset implementation over thread-hostile
 /// access vector cache implementations.
-pub(super) struct ThreadLocalQuery<D = DenyAll> {
+pub(super) struct ThreadLocalQuery<D> {
     delegate: D,
     current_version: u64,
     active_version: Arc<AtomicVersion>,
@@ -901,14 +787,14 @@ mod tests {
 
     use std::sync::atomic::AtomicUsize;
 
+    /// No-op policy query delegate that allows all permissions and maintains no internal state, for testing.
     #[derive(Default)]
-    struct Counter<D = DenyAll> {
+    struct TestDelegate {
         query_count: AtomicUsize,
         reset_count: AtomicUsize,
-        delegate: D,
     }
 
-    impl<D> Counter<D> {
+    impl TestDelegate {
         fn query_count(&self) -> usize {
             self.query_count.load(Ordering::Relaxed)
         }
@@ -918,15 +804,15 @@ mod tests {
         }
     }
 
-    impl<D: Query> Query for Counter<D> {
+    impl Query for TestDelegate {
         fn compute_access_decision(
             &self,
-            source_sid: SecurityId,
-            target_sid: SecurityId,
-            target_class: ObjectClass,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _target_class: ObjectClass,
         ) -> AccessDecision {
             self.query_count.fetch_add(1, Ordering::Relaxed);
-            self.delegate.compute_access_decision(source_sid, target_sid, target_class)
+            AccessDecision::allow(AccessVector::ALL)
         }
 
         fn compute_new_fs_node_sid(
@@ -950,49 +836,29 @@ mod tests {
 
         fn compute_ioctl_access_decision(
             &self,
-            source_sid: SecurityId,
-            target_sid: SecurityId,
-            target_class: ObjectClass,
-            ioctl_prefix: u8,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _target_class: ObjectClass,
+            _ioctl_prefix: u8,
         ) -> IoctlAccessDecision {
             self.query_count.fetch_add(1, Ordering::Relaxed);
-            self.delegate.compute_ioctl_access_decision(
-                source_sid,
-                target_sid,
-                target_class,
-                ioctl_prefix,
-            )
+            IoctlAccessDecision::ALLOW_ALL
         }
     }
 
-    impl<D: Reset> Reset for Counter<D> {
+    impl Reset for TestDelegate {
         fn reset(&self) -> bool {
             self.reset_count.fetch_add(1, Ordering::Relaxed);
-            self.delegate.reset();
             true
         }
     }
 
     #[test]
-    fn empty_access_vector_cache_default_deny_all() {
-        let mut avc = Empty::<DenyAll>::default();
-        assert_eq!(
-            AccessVector::NONE,
-            avc.compute_access_decision(
-                A_TEST_SID.clone(),
-                A_TEST_SID.clone(),
-                KernelClass::Process.into()
-            )
-            .allow
-        );
-    }
-
-    #[test]
     fn fixed_access_vector_cache_add_entry() {
-        let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
+        let mut avc = FifoQueryCache::<_>::new(TestDelegate::default(), TEST_CAPACITY);
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
-            AccessVector::NONE,
+            AccessVector::ALL,
             avc.compute_access_decision(
                 A_TEST_SID.clone(),
                 A_TEST_SID.clone(),
@@ -1002,7 +868,7 @@ mod tests {
         );
         assert_eq!(1, avc.delegate.query_count());
         assert_eq!(
-            AccessVector::NONE,
+            AccessVector::ALL,
             avc.compute_access_decision(
                 A_TEST_SID.clone(),
                 A_TEST_SID.clone(),
@@ -1016,14 +882,14 @@ mod tests {
 
     #[test]
     fn fixed_access_vector_cache_reset() {
-        let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
+        let mut avc = FifoQueryCache::<_>::new(TestDelegate::default(), TEST_CAPACITY);
 
         avc.reset();
         assert_eq!(false, avc.access_cache_is_full());
 
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
-            AccessVector::NONE,
+            AccessVector::ALL,
             avc.compute_access_decision(
                 A_TEST_SID.clone(),
                 A_TEST_SID.clone(),
@@ -1040,7 +906,7 @@ mod tests {
 
     #[test]
     fn fixed_access_vector_cache_fill() {
-        let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
+        let mut avc = FifoQueryCache::<_>::new(TestDelegate::default(), TEST_CAPACITY);
 
         for sid in unique_sids(avc.access_cache.capacity()) {
             avc.compute_access_decision(sid, A_TEST_SID.clone(), KernelClass::Process.into());
@@ -1061,7 +927,7 @@ mod tests {
 
     #[test]
     fn fixed_access_vector_cache_full_miss() {
-        let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
+        let mut avc = FifoQueryCache::<_>::new(TestDelegate::default(), TEST_CAPACITY);
 
         // Make the test query, which will trivially miss.
         avc.compute_access_decision(
@@ -1112,7 +978,7 @@ mod tests {
     #[test]
     fn thread_local_query_access_vector_cache_reset() {
         let cache_version = Arc::new(AtomicVersion::default());
-        let mut avc = ThreadLocalQuery::new(cache_version.clone(), Counter::<DenyAll>::default());
+        let mut avc = ThreadLocalQuery::new(cache_version.clone(), TestDelegate::default());
 
         // Reset deferred to next query.
         assert_eq!(0, avc.delegate.reset_count());
@@ -1128,10 +994,10 @@ mod tests {
 
     #[test]
     fn access_vector_cache_ioctl_hit() {
-        let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
+        let mut avc = FifoQueryCache::<_>::new(TestDelegate::default(), TEST_CAPACITY);
         assert_eq!(0, avc.delegate.query_count());
         assert_eq!(
-            XpermsBitmap::NONE,
+            XpermsBitmap::ALL,
             avc.compute_ioctl_access_decision(
                 A_TEST_SID.clone(),
                 A_TEST_SID.clone(),
@@ -1143,7 +1009,7 @@ mod tests {
         assert_eq!(1, avc.delegate.query_count());
         // The second request for the same key is a cache hit.
         assert_eq!(
-            XpermsBitmap::NONE,
+            XpermsBitmap::ALL,
             avc.compute_ioctl_access_decision(
                 A_TEST_SID.clone(),
                 A_TEST_SID.clone(),
@@ -1157,7 +1023,7 @@ mod tests {
 
     #[test]
     fn access_vector_cache_ioctl_miss() {
-        let mut avc = FifoQueryCache::<_>::new(Counter::<DenyAll>::default(), TEST_CAPACITY);
+        let mut avc = FifoQueryCache::<_>::new(TestDelegate::default(), TEST_CAPACITY);
 
         // Make the test query, which will trivially miss.
         avc.compute_ioctl_access_decision(
