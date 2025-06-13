@@ -615,6 +615,9 @@ template("bazel_action") {
     inputs = [
       _all_licenses_spdx_file,
       _gn_targets_repository_manifest,
+
+      # Imported by create_gn_targets_dir.py
+      "//build/bazel/scripts/workspace_utils.py",
     ]
 
     deps = [
