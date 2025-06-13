@@ -54,6 +54,17 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         let inline_crypto =
             Config::new_bool(context.board_info.provides_feature("fuchsia::storage_inline_crypto"));
 
+        let block_config_path = gendir.join("fshost_block_config.json");
+        let block_config_json =
+            serde_json::to_string(&context.board_info.filesystems.block_devices)
+                .context("Serializing devices config")?;
+        std::fs::write(&block_config_path, &block_config_json)
+            .context("Writing serialized devices config")?;
+        builder
+            .bootfs()
+            .file(FileEntry { source: block_config_path, destination: BootfsDestination::Fshost })
+            .context("Adding fshost config to bootfs")?;
+
         builder
             .bootfs()
             .file(FileEntry {

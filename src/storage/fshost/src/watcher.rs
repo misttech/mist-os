@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{BlockDevice, Device, NandDevice, VolumeProtocolDevice};
+use crate::device::{BlockDevice, Device, NandDevice, Parent, VolumeProtocolDevice};
 use anyhow::{Context as _, Error};
 use async_trait::async_trait;
 use fuchsia_fs::directory::{WatchEvent, WatchMessage};
@@ -40,11 +40,18 @@ fn common_filters(watcher: fuchsia_fs::directory::Watcher) -> stream::BoxStream<
     }))
 }
 
+pub type GetParentCallback = Arc<dyn Fn(&str) -> Parent + Send + Sync>;
+
 /// An implementation of `WatchSource` based on a path in the local namespace.
-#[derive(Clone, Debug)]
 pub struct PathSource {
     path: &'static str,
     source_type: PathSourceType,
+    // TODO(https://fxbug.dev/394970436): once storage-host is enabled on all products, we can
+    // remove this side-channel check. For non-storage-host configurations, once we find the block
+    // device that represents the SystemPartitionTable, we need to configure its children, based on
+    // the path prefix, as having the SystemPartitionTable parent instead of the Dev parent. Post
+    // storage-host, they are separate sources, and thus static.
+    get_parent: Option<GetParentCallback>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -54,8 +61,12 @@ pub enum PathSourceType {
 }
 
 impl PathSource {
-    pub fn new(path: &'static str, source_type: PathSourceType) -> Self {
-        PathSource { path, source_type }
+    pub fn new(
+        path: &'static str,
+        source_type: PathSourceType,
+        get_parent: Option<GetParentCallback>,
+    ) -> Self {
+        PathSource { path, source_type, get_parent }
     }
 }
 
@@ -64,26 +75,41 @@ impl WatchSource for PathSource {
     async fn as_stream(&mut self) -> Result<stream::BoxStream<'static, Box<dyn Device>>, Error> {
         let path = self.path;
         let source_type = self.source_type;
+        let get_parent = self.get_parent.clone();
         let dir_proxy = fuchsia_fs::directory::open_in_namespace(path, fio::Flags::empty())
             .with_context(|| format!("Failed to open directory at {path}"))?;
         let watcher = fuchsia_fs::directory::Watcher::new(&dir_proxy)
             .await
             .with_context(|| format!("Failed to watch {path}"))?;
-        Ok(Box::pin(common_filters(watcher).filter_map(move |filename| async move {
-            let path = format!("{}/{}", path, filename);
-            match source_type {
-                PathSourceType::Block => {
-                    BlockDevice::new(path).await.map(|d| Box::new(d) as Box<dyn Device>)
-                }
-                PathSourceType::Nand => {
-                    NandDevice::new(path).await.map(|d| Box::new(d) as Box<dyn Device>)
+        Ok(Box::pin(common_filters(watcher).filter_map(move |filename| {
+            let get_parent = get_parent.clone();
+            async move {
+                let path = format!("{}/{}", path, filename);
+                match source_type {
+                    PathSourceType::Block => {
+                        let mut device = BlockDevice::new(path)
+                            .await
+                            .inspect_err(|e| {
+                                log::warn!(
+                                    "Failed to create device (maybe it went away?): {:?}",
+                                    e
+                                );
+                            })
+                            .ok()?;
+                        if let Some(get_parent) = get_parent {
+                            device.set_parent(get_parent(device.topological_path()))
+                        }
+                        Some(Box::new(device) as Box<dyn Device>)
+                    }
+                    PathSourceType::Nand => NandDevice::new(path)
+                        .await
+                        .map(|d| Box::new(d) as Box<dyn Device>)
+                        .inspect_err(|e| {
+                            log::warn!("Failed to create device (maybe it went away?): {:?}", e);
+                        })
+                        .ok(),
                 }
             }
-            .map_err(|e| {
-                log::warn!("Failed to create device (maybe it went away?): {:?}", e);
-                e
-            })
-            .ok()
         })))
     }
 }
@@ -96,17 +122,14 @@ pub struct DirSource {
     // The name of the source of these devices, for example the moniker of a component providing
     // them. Used for logging and debugging.
     source: String,
-    // Whether the block devices yielded by the source are managed by fshost or not; see
-    // `Device::is_managed`.
-    is_managed: bool,
+    // The parent to set for these devices.
+    parent: Parent,
 }
 
 impl DirSource {
     /// Creates a `DirSource` that connects a `VolumeProtocolDevice` to each entry in `dir`.
-    /// `is_managed` indicates that the yielded devices are fshost-managed and should be set for
-    /// sources that fshost creates and feeds back to itself.  See `Device::is_managed`.
-    pub fn new(dir: fio::DirectoryProxy, source: impl ToString, is_managed: bool) -> Self {
-        Self { dir, source: source.to_string(), is_managed }
+    pub fn new(dir: fio::DirectoryProxy, source: impl ToString, parent: Parent) -> Self {
+        Self { dir, source: source.to_string(), parent }
     }
 }
 
@@ -118,7 +141,7 @@ impl WatchSource for DirSource {
             .with_context(|| format!("Failed to watch dir"))?;
         let dir = Arc::new(fuchsia_fs::directory::clone(&self.dir)?);
         let source = self.source.clone();
-        let is_managed = self.is_managed;
+        let parent = self.parent;
         Ok(Box::pin(common_filters(watcher).filter_map(move |filename| {
             let dir = dir.clone();
             let source = source.clone();
@@ -126,7 +149,7 @@ impl WatchSource for DirSource {
                 let dir_clone = fuchsia_fs::directory::clone(&dir)
                     .map_err(|err| log::warn!(err:?; "Failed to clone dir"))
                     .ok()?;
-                VolumeProtocolDevice::new(dir_clone, filename, source, is_managed)
+                VolumeProtocolDevice::new(dir_clone, filename, source, parent)
                     .map(|d| Box::new(d) as Box<dyn Device>)
                     .map_err(|err| {
                         log::warn!(err:?; "Failed to create device (maybe it went away?)");
@@ -185,6 +208,7 @@ impl Watcher {
 #[cfg(test)]
 mod tests {
     use super::{DirSource, PathSource, PathSourceType, Watcher};
+    use crate::device::Parent;
     use fidl::endpoints::Proxy as _;
     use fidl_fuchsia_device::{ControllerRequest, ControllerRequestStream};
     use fidl_fuchsia_hardware_block_volume::VolumeRequestStream;
@@ -273,9 +297,9 @@ mod tests {
 
         let client = vfs::directory::serve_read_only(partitions_dir);
         let (_watcher, mut device_stream) = Watcher::new(vec![
-            Box::new(PathSource::new("/test-dev/class/block", PathSourceType::Block)),
-            Box::new(PathSource::new("/test-dev/class/nand", PathSourceType::Nand)),
-            Box::new(DirSource::new(client, "test-dir-source", false)),
+            Box::new(PathSource::new("/test-dev/class/block", PathSourceType::Block, None)),
+            Box::new(PathSource::new("/test-dev/class/nand", PathSourceType::Nand, None)),
+            Box::new(DirSource::new(client, "test-dir-source", Parent::Dev)),
         ])
         .await
         .expect("failed to make watcher");
@@ -352,6 +376,7 @@ mod tests {
         let (mut watcher, mut device_stream) = Watcher::new(vec![Box::new(PathSource::new(
             "/test-dev/class/block",
             PathSourceType::Block,
+            None,
         ))])
         .await
         .expect("failed to make watcher");
@@ -365,7 +390,11 @@ mod tests {
 
         // Existing entries in the new source are yielded immediately
         watcher
-            .add_source(Box::new(PathSource::new("/test-dev/class/nand", PathSourceType::Nand)))
+            .add_source(Box::new(PathSource::new(
+                "/test-dev/class/nand",
+                PathSourceType::Nand,
+                None,
+            )))
             .await
             .expect("failed to add_source");
 

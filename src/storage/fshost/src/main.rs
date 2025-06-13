@@ -7,7 +7,8 @@ use crate::config::apply_boot_args_to_config;
 use crate::environment::{DevicePublisher, Environment, FshostEnvironment};
 use crate::inspect::register_stats;
 use crate::watcher::{DirSource, PathSource, PathSourceType, WatchSource, Watcher};
-use anyhow::{format_err, Error};
+use anyhow::{format_err, Context as _, Error};
+use device::{DeviceTag, Parent};
 use fidl::prelude::*;
 use fuchsia_runtime::{take_startup_handle, HandleType};
 use futures::channel::mpsc;
@@ -64,26 +65,45 @@ async fn main() -> Result<(), Error> {
             format_err!("missing DirectoryRequest startup handle - not launched as a component?")
         })?;
 
+    let registered_devices = Arc::new(device::RegisteredDevices::default());
     let (shutdown_tx, mut shutdown_rx) = mpsc::channel::<service::FshostShutdownResponder>(1);
     let (watcher, device_stream) = Watcher::new(if config.storage_host {
         let mut sources = vec![
-            Box::new(PathSource::new(DEV_CLASS_BLOCK, PathSourceType::Block))
+            Box::new(PathSource::new(
+                DEV_CLASS_BLOCK,
+                PathSourceType::Block,
+                Some(Arc::new(|_| Parent::Dev)),
+            )) as Box<dyn WatchSource>,
+            Box::new(PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand, None))
                 as Box<dyn WatchSource>,
-            Box::new(PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand)) as Box<dyn WatchSource>,
         ];
         sources.extend(
             fuchsia_fs::directory::open_in_namespace(VOLUME_SERVICE_PATH, fio::Flags::empty()).map(
                 |d| {
-                    Box::new(DirSource::new(d, VOLUME_SERVICE_PATH, /*is_managed=*/ false))
+                    Box::new(DirSource::new(d, VOLUME_SERVICE_PATH, Parent::Dev))
                         as Box<dyn WatchSource>
                 },
             ),
         );
         sources
     } else {
+        let registered_devices = registered_devices.clone();
         vec![
-            Box::new(PathSource::new(DEV_CLASS_BLOCK, PathSourceType::Block)),
-            Box::new(PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand)),
+            Box::new(PathSource::new(
+                DEV_CLASS_BLOCK,
+                PathSourceType::Block,
+                Some(Arc::new(move |path| {
+                    if registered_devices
+                        .get_topological_path(DeviceTag::SystemPartitionTable)
+                        .is_some_and(|topo_path| path.starts_with(&topo_path))
+                    {
+                        Parent::SystemPartitionTable
+                    } else {
+                        Parent::Dev
+                    }
+                })),
+            )),
+            Box::new(PathSource::new(DEV_CLASS_NAND, PathSourceType::Nand, None)),
         ]
     })
     .await?;
@@ -113,6 +133,7 @@ async fn main() -> Result<(), Error> {
         matcher_lock.clone(),
         inspector.clone(),
         watcher,
+        registered_devices,
         device_publisher,
     );
 
@@ -191,7 +212,9 @@ async fn main() -> Result<(), Error> {
 
     // Run the main loop of fshost, handling devices as they appear according to our filesystem
     // policy.
-    let mut fs_manager = manager::Manager::new(&config, env, matcher_lock);
+    let extra_matchers =
+        matcher::get_config_matchers().await.context("failed to get configured matchers")?;
+    let mut fs_manager = manager::Manager::new(&config, env, matcher_lock, extra_matchers);
     let shutdown_responder = if config.disable_block_watcher {
         // If the block watcher is disabled, fshost just waits on the shutdown receiver instead of
         // processing devices.
