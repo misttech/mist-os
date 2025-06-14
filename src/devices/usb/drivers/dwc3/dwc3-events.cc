@@ -190,12 +190,11 @@ void Dwc3::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_sta
   uint32_t event_bytes;
   while ((event_bytes = GEVNTCOUNT::Get(0).ReadFrom(mmio).EVNTCOUNT()) > 0) {
     uint32_t event_count = event_bytes / sizeof(uint32_t);
-    event_fifo_.Read(event_count);
-
-    for (uint32_t i = 0; i < event_count; i++) {
-      HandleEvent(event_fifo_.Advance());
+    for (uint32_t event : event_fifo_.Read(event_count)) {
+      HandleEvent(event);
     }
 
+    event_fifo_.Advance(event_count);
     // acknowledge the events we have processed
     GEVNTCOUNT::Get(0).FromValue(0).set_EVNTCOUNT(event_bytes).WriteTo(mmio);
   }
@@ -213,11 +212,7 @@ void Dwc3::StartEvents() {
   ZX_DEBUG_ASSERT(paddr != 0);
 
   GEVNTADR::Get(0).FromValue(0).set_EVNTADR(paddr).WriteTo(mmio);
-  GEVNTSIZ::Get(0)
-      .FromValue(0)
-      .set_EVENTSIZ(EventFifo::kEventBufferSize)
-      .set_EVNTINTRPTMASK(0)
-      .WriteTo(mmio);
+  GEVNTSIZ::Get(0).FromValue(0).set_EVENTSIZ(kBufferSize).set_EVNTINTRPTMASK(0).WriteTo(mmio);
   GEVNTCOUNT::Get(0).FromValue(0).set_EVNTCOUNT(0).WriteTo(mmio);
 
   // enable events

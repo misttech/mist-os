@@ -5,52 +5,47 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_DWC3_DWC3_TRB_FIFO_H_
 #define SRC_DEVICES_USB_DRIVERS_DWC3_DWC3_TRB_FIFO_H_
 
-#include <lib/dma-buffer/buffer.h>
-#include <lib/driver/logging/cpp/logger.h>
-#include <lib/zx/result.h>
-
+#include "src/devices/usb/drivers/dwc3/dwc3-fifo.h"
 #include "src/devices/usb/drivers/dwc3/dwc3-types.h"
 
 namespace dwc3 {
 
-// A dma_buffer::ContiguousBuffer is cached, but leaves cache management to the user. These methods
-// wrap zx_cache_flush with sensible boundary checking and validation.
-zx_status_t CacheFlush(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset, size_t length);
-zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset,
-                                 size_t length);
-
-class TrbFifo {
+class TrbFifo : public Fifo<dwc3_trb_t> {
  public:
-  zx::result<> Init(zx::bti& bti);
-  void Release();
+  zx::result<> Init(zx::bti& bti) override {
+    bool needs_init = !buffer_;
+    auto result = Fifo::Init(bti);
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to init FIFO %s", result.status_string());
+      return result.take_error();
+    }
 
-  dwc3_trb_t ReadCurrent();
-  zx_paddr_t Write(dwc3_trb_t* trb);
-  dwc3_trb_t* AdvanceNext() { return Advance(next_); }
-  void AdvanceCurrent() {
-    if (current_ == next_) {
-      FDF_LOG(ERROR, "Advancing current_ past next_. Invalid!");
+    if (needs_init) {
+      // set up link TRB pointing back to the start of the fifo
+      zx_paddr_t trb_phys = Fifo::GetPhys(first_);
+      last_--;
+      last_->ptr_low = (uint32_t)trb_phys;
+      last_->ptr_high = (uint32_t)(trb_phys >> 32);
+      last_->status = 0;
+      last_->control = TRB_TRBCTL_LINK | TRB_HWO;
+      CacheFlush(buffer_.get(), (last_ - first_) * sizeof(dwc3_trb_t), sizeof(dwc3_trb_t));
+    }
+    return zx::ok();
+  }
+
+  dwc3_trb_t Read() {
+    std::vector<dwc3_trb_t> trbs = Fifo::Read(read_, 1);
+    ZX_DEBUG_ASSERT(trbs.size() == 1);
+    return trbs[0];
+  }
+  dwc3_trb_t* AdvanceWrite() { return Fifo::Advance(write_); }
+  void AdvanceRead() {
+    if (read_ == write_) {
+      FDF_LOG(ERROR, "Advancing read_ past write_. Invalid!");
       return;
     }
-    Advance(current_);
+    Fifo::Advance(read_);
   }
-
-  void Clear() { current_ = next_; }
-
- private:
-  static inline const uint32_t kFifoSize = zx_system_get_page_size();
-
-  dwc3_trb_t* Advance(dwc3_trb_t*& trb);
-  zx_paddr_t GetTrbPhys(dwc3_trb_t* trb) const {
-    ZX_DEBUG_ASSERT((trb >= first_) && (trb <= last_));
-    return buffer_->phys() + ((trb - first_) * sizeof(*trb));
-  }
-
-  std::unique_ptr<dma_buffer::ContiguousBuffer> buffer_;
-  dwc3_trb_t* first_{nullptr};    // first TRB in the fifo
-  dwc3_trb_t* next_{nullptr};     // next free TRB in the fifo
-  dwc3_trb_t* current_{nullptr};  // TRB for currently pending transaction
-  dwc3_trb_t* last_{nullptr};     // last TRB in the fifo (link TRB)
 };
 
 }  // namespace dwc3

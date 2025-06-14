@@ -85,9 +85,8 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
   ZX_DEBUG_ASSERT(is_ep0_num(ep_num));
 
   // Only DataOut state needs TRB read.
-  dwc3_trb_t trb =
-      ep0_.state == Ep0::State::DataOut ? ep0_.shared_fifo.ReadCurrent() : dwc3_trb_t{};
-  ep0_.shared_fifo.AdvanceCurrent();
+  dwc3_trb_t trb = ep0_.state == Ep0::State::DataOut ? ep0_.shared_fifo.Read() : dwc3_trb_t{};
+  ep0_.shared_fifo.AdvanceRead();
 
   switch (ep0_.state) {
     case Ep0::State::Setup: {

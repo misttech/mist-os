@@ -5,34 +5,15 @@
 #ifndef SRC_DEVICES_USB_DRIVERS_DWC3_DWC3_EVENT_FIFO_H_
 #define SRC_DEVICES_USB_DRIVERS_DWC3_DWC3_EVENT_FIFO_H_
 
-#include <lib/dma-buffer/buffer.h>
-#include <lib/driver/logging/cpp/logger.h>
-#include <lib/zx/result.h>
+#include "src/devices/usb/drivers/dwc3/dwc3-fifo.h"
 
 namespace dwc3 {
 
-// A dma_buffer::ContiguousBuffer is cached, but leaves cache management to the user. These methods
-// wrap zx_cache_flush with sensible boundary checking and validation.
-zx_status_t CacheFlush(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset, size_t length);
-zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset,
-                                 size_t length);
-
-class EventFifo {
+class EventFifo : public Fifo<uint32_t> {
  public:
-  zx::result<> Init(zx::bti& bti);
-  void Release() { buffer_.reset(); }
-
-  void Read(size_t count);
-  uint32_t Advance();
-
-  zx_paddr_t GetPhys() const { return buffer_->phys(); }
-  static inline const uint32_t kEventBufferSize = zx_system_get_page_size();
-
- private:
-  std::unique_ptr<dma_buffer::ContiguousBuffer> buffer_;
-  uint32_t* first_{nullptr};    // first event in the fifo
-  uint32_t* current_{nullptr};  // next event in the fifo
-  uint32_t* last_{nullptr};     // last event in the fifo
+  std::vector<uint32_t> Read(size_t count) { return Fifo::Read(read_, count); }
+  void Advance(size_t count) { Fifo::Advance(read_, count); }
+  zx_paddr_t GetPhys() const { return Fifo::GetPhys(first_); }
 };
 
 }  // namespace dwc3
