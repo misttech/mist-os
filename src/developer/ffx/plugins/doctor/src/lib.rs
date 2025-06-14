@@ -41,6 +41,7 @@ use termion::{color, style};
 use timeout::timeout;
 
 mod doctor_ledger;
+mod gcheck;
 mod ledger_view;
 mod single_target_diagnostics;
 
@@ -284,6 +285,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
     show_tool: Option<ShowToolWrapper>,
     mut writer: W,
 ) -> Result<()> {
+    let gchecker = gcheck::DefaultGChecker;
     let node = overnet_core::Router::new(None)
         .with_context(|| ffx_error!("Could not initialize Overnet"))?;
     let ascendd_path = context.get_ascendd_path().await?;
@@ -407,6 +409,7 @@ pub async fn doctor_cmd_impl<W: Write + Send + Sync + 'static>(
             output_dir,
             recorder: recorder.clone(),
         },
+        gchecker,
         show_tool,
         true,
     )
@@ -487,6 +490,7 @@ async fn doctor<W: Write>(
     target_spec: Result<Option<String>, String>,
     env_context: &EnvironmentContext,
     record_params: DoctorRecorderParameters,
+    gchecker: impl gcheck::GChecker,
     show_tool: Option<ShowToolWrapper>,
     run_additional_diagnostics: bool,
 ) -> Result<()> {
@@ -504,6 +508,7 @@ async fn doctor<W: Write>(
         env_context,
         show_tool,
         run_additional_diagnostics,
+        gchecker,
         ledger,
     )
     .await?;
@@ -914,6 +919,7 @@ async fn doctor_summary<W: Write>(
     env_context: &EnvironmentContext,
     mut show_tool: Option<ShowToolWrapper>,
     run_additional_diagnostics: bool,
+    gchecker: impl gcheck::GChecker,
     ledger: &mut DoctorLedger<W>,
 ) -> Result<()> {
     match ledger.get_ledger_mode() {
@@ -1041,7 +1047,7 @@ async fn doctor_summary<W: Write>(
     match SshKeyFiles::load(None).await {
         Ok(ssh_files) => {
             let ( description, outcome) = match ssh_files.check_keys(false) {
-                Ok(_) => (format!("SSH Public/Private keys match"), LedgerOutcome::Success),
+                Ok(_) => (format!("The public & private Fuchsia keys are consistent"), LedgerOutcome::Success),
                 Err(e)  => {
                     match e.kind {
                         SshKeyErrorKind::BadKeyType => (format!("SSH keys type not supported: {}", e.message), LedgerOutcome::Warning),
@@ -1237,7 +1243,18 @@ async fn doctor_summary<W: Write>(
                     ledger.close(main_node)?;
                 }
                 None => {
-                    // no gdoctor
+                    if gchecker.is_gcorp_machine() {
+                        let network_check_node =
+                            ledger.add_node("Google Network Checks", LedgerMode::Automatic)?;
+                        let node = ledger.add_node(
+                                &format!(
+                                    "Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`"
+                                ),
+                                LedgerMode::Automatic,
+                            )?;
+                        ledger.set_outcome(node, LedgerOutcome::Failure)?;
+                        ledger.close(network_check_node)?;
+                    }
                 }
             }
         }
@@ -1602,6 +1619,14 @@ mod test {
     const ABI_REVISION_STR: &str = "0xECCEA2F70ACD6F00";
     const FAKE_API_LEVEL: u64 = 7;
     const ANOTHER_FAKE_API_LEVEL: u64 = 8;
+
+    struct FakeGChecker;
+
+    impl gcheck::GChecker for FakeGChecker {
+        fn is_gcorp_machine(&self) -> bool {
+            true
+        }
+    }
 
     #[derive(PartialEq)]
     struct TestStep {
@@ -2353,6 +2378,7 @@ mod test {
             Ok(Some(NODENAME.to_string())),
             &test_env.context,
             record_params_no_record(),
+            FakeGChecker,
             None,
             false,
         )
@@ -2375,7 +2401,7 @@ mod test {
                    \n    [✓] Config Lock Files\
                    \n        [✓] {user_file} locked by {user_file}.lock\
                    \n        [✓] {global_file} locked by {global_file}.lock\
-                   \n    [✓] SSH Public/Private keys match\
+                   \n    [✓] The public & private Fuchsia keys are consistent\
                    \n[✗] Checking daemon\
                    \n    [✗] No running daemons found. Run `ffx doctor --restart-daemon`\n",
                 ffx_path=ffx_path(),
@@ -2419,6 +2445,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            FakeGChecker,
             None,
             false,
         )
@@ -2441,7 +2468,7 @@ mod test {
                    \n    [✓] Config Lock Files\
                    \n        [✓] {user_file} locked by {user_file}.lock\
                    \n        [✓] {global_file} locked by {global_file}.lock\
-                   \n    [✓] SSH Public/Private keys match\
+                   \n    [✓] The public & private Fuchsia keys are consistent\
                    \n[✓] Checking daemon\
                    \n    [✓] Daemon found: [1]\
                    \n    [✓] Connecting to daemon\
@@ -2450,6 +2477,8 @@ mod test {
                    \n    [✓] abi-revision: {ABI_REVISION_STR}\
                    \n    [✓] api-level: {FAKE_API_LEVEL}\
                    \n    [✓] Default target: (none)\
+                   \n[✗] Google Network Checks\
+                   \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
                    \n[✗] Searching for targets\
                    \n    [✗] No targets found!\n",
                 ffx_path=ffx_path(),
@@ -2493,6 +2522,7 @@ mod test {
             Ok(Some("".to_string())),
             &test_env.context,
             record_params_no_record(),
+            FakeGChecker,
             None,
             false,
         )
@@ -2515,7 +2545,7 @@ mod test {
                    \n    [✓] Config Lock Files\
                    \n        [✓] {user_file} locked by {user_file}.lock\
                    \n        [✓] {global_file} locked by {global_file}.lock\
-                   \n    [✓] SSH Public/Private keys match\
+                   \n    [✓] The public & private Fuchsia keys are consistent\
                    \n[✗] Checking daemon\
                    \n    [✓] Daemon found: [1]\
                    \n    [✗] Error connecting to daemon: Some error message. Run `ffx doctor --restart-daemon`\n",
@@ -2560,6 +2590,7 @@ mod test {
             Ok(Some("".to_string())),
             &test_env.context,
             record_params_no_record(),
+            FakeGChecker,
             None,
             false,
         )
@@ -2582,7 +2613,7 @@ mod test {
                    \n    [✓] Config Lock Files\
                    \n        [✓] {user_file} locked by {user_file}.lock\
                    \n        [✓] {global_file} locked by {global_file}.lock\
-                   \n    [✓] SSH Public/Private keys match\
+                   \n    [✓] The public & private Fuchsia keys are consistent\
                    \n[✓] Checking daemon\
                    \n    [✓] Daemon found: [1]\
                    \n    [✓] Connecting to daemon\
@@ -2591,6 +2622,8 @@ mod test {
                    \n    [✓] abi-revision: {ABI_REVISION_STR}\
                    \n    [✓] api-level: {FAKE_API_LEVEL}\
                    \n    [✓] Default target: (none)\
+                   \n[✗] Google Network Checks\
+                   \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
                    \n[✗] Searching for targets\
                    \n    [✗] No targets found!\n",
                 ffx_path=ffx_path(),
@@ -2634,6 +2667,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            FakeGChecker,
             None,
             false,
         )
@@ -2656,7 +2690,7 @@ mod test {
             \n    [✓] Config Lock Files\
             \n        [✓] {user_file} locked by {user_file}.lock\
             \n        [✓] {global_file} locked by {global_file}.lock\
-            \n    [✓] SSH Public/Private keys match\
+            \n    [✓] The public & private Fuchsia keys are consistent\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
             \n    [✓] Connecting to daemon\
@@ -2665,6 +2699,8 @@ mod test {
             \n    [✓] abi-revision: {ABI_REVISION_STR}\
             \n    [✓] api-level: {FAKE_API_LEVEL}\
             \n    [✓] Default target: (none)\
+            \n[✗] Google Network Checks\
+            \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
             \n[✗] Searching for targets\
             \n    [✗] No targets found!\n",
                 ffx_path=ffx_path(),
@@ -2816,6 +2852,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            FakeGChecker,
             None,
             false,
         )
@@ -2852,7 +2889,7 @@ mod test {
             \n    [✓] Config Lock Files\
             \n        [✓] {user_file} locked by {user_file}.lock\
             \n        [✓] {global_file} locked by {global_file}.lock\
-            \n    [✓] SSH Public/Private keys match\
+            \n    [✓] The public & private Fuchsia keys are consistent\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
             \n    [✓] Connecting to daemon\
@@ -2861,6 +2898,8 @@ mod test {
             \n    [✓] abi-revision: {ABI_REVISION_STR}\
             \n    [✓] api-level: {FAKE_API_LEVEL}\
             \n    [✓] Default target: (none)\
+            \n[✗] Google Network Checks\
+            \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
             \n[✓] Searching for targets\
             \n    [✓] 1 targets found\
             \n[✗] Verifying Targets\
@@ -2936,7 +2975,7 @@ mod test {
             \n    [✓] Config Lock Files\
             \n        [✓] {user_file} locked by {user_file}.lock\
             \n        [✓] {global_file} locked by {global_file}.lock\
-            \n    [✓] SSH Public/Private keys match\
+            \n    [✓] The public & private Fuchsia keys are consistent\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
             \n    [✓] Connecting to daemon\
@@ -2945,6 +2984,8 @@ mod test {
             \n    [✓] abi-revision: {ABI_REVISION_STR}\
             \n    [✓] api-level: {FAKE_API_LEVEL}\
             \n    [✓] Default target: (none)\
+            \n[✗] Google Network Checks\
+            \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
             \n[✓] Searching for targets\
             \n    [✓] 2 targets found\
             \n[✓] Verifying Targets\
@@ -2986,10 +3027,12 @@ mod test {
                 \n    [✓] Config Lock Files\
                 \n        [✓] {user_file} locked by {user_file}.lock\
                 \n        [✓] {global_file} locked by {global_file}.lock\
-                \n    [✓] SSH Public/Private keys match\
+                \n    [✓] The public & private Fuchsia keys are consistent\
                 \n[✓] Checking daemon\
                 \n    [✓] Daemon found: [1]\
                 \n    [✓] Connecting to daemon\
+                \n[✗] Google Network Checks\
+                \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
                 \n[✓] Searching for targets\
                 \n    [✓] 2 targets found\
                 \n[✓] Verifying Targets\
@@ -3037,6 +3080,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            FakeGChecker,
             None,
             false,
         )
@@ -3060,7 +3104,7 @@ mod test {
             \n    [✓] Config Lock Files\
             \n        [✓] {user_file} locked by {user_file}.lock\
             \n        [✓] {global_file} locked by {global_file}.lock\
-            \n    [✓] SSH Public/Private keys match\
+            \n    [✓] The public & private Fuchsia keys are consistent\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
             \n    [✓] Connecting to daemon\
@@ -3069,6 +3113,8 @@ mod test {
             \n    [✓] abi-revision: {ABI_REVISION_STR}\
             \n    [✓] api-level: {FAKE_API_LEVEL}\
             \n    [✓] Default target: (none)\
+            \n[✗] Google Network Checks\
+            \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
             \n[✓] Searching for targets\
             \n    [✓] 1 targets found\
             \n[✓] Verifying Targets\
@@ -3123,6 +3169,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            FakeGChecker,
             None,
             false,
         )
@@ -3146,7 +3193,7 @@ mod test {
             \n    [✓] Config Lock Files\
             \n        [✓] {user_file} locked by {user_file}.lock\
             \n        [✓] {global_file} locked by {global_file}.lock\
-            \n    [✓] SSH Public/Private keys match\
+            \n    [✓] The public & private Fuchsia keys are consistent\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
             \n    [✓] Connecting to daemon\
@@ -3155,6 +3202,8 @@ mod test {
             \n    [✓] abi-revision: {ABI_REVISION_STR}\
             \n    [✓] api-level: {FAKE_API_LEVEL}\
             \n    [✓] Default target: (none)\
+            \n[✗] Google Network Checks\
+            \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
             \n[✗] Searching for targets\
             \n    [✗] No targets found!\n",
                 ffx_path=ffx_path(),
@@ -3279,6 +3328,7 @@ mod test {
             Ok(None),
             &test_env.context,
             params,
+            FakeGChecker,
             None,
             false,
         )
@@ -3303,7 +3353,7 @@ mod test {
                     \n    [✓] Config Lock Files\
                     \n        [✓] {user_file} locked by {user_file}.lock\
                     \n        [✓] {global_file} locked by {global_file}.lock\
-                    \n    [✓] SSH Public/Private keys match\n\
+                    \n    [✓] The public & private Fuchsia keys are consistent\n\
                     \n[✓] Checking daemon\
                     \n    [✓] Daemon found: [1]\
                     \n    [✓] Connecting to daemon\
@@ -3311,8 +3361,10 @@ mod test {
                     \n    [✓] path: {ffx_path}\
                     \n    [✓] abi-revision: {ABI_REVISION_STR}\
                     \n    [✓] api-level: {FAKE_API_LEVEL}\
-                    \n    [✓] Default target: (none)\n\n\
-                    [✗] Searching for targets\
+                    \n    [✓] Default target: (none)\n\
+                    \n[✗] Google Network Checks\
+                    \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
+                    \n\n[✗] Searching for targets\
                     \n    [✗] No targets found!\n\n",
                     ffx_path=ffx_path(),
                     isolated_root=test_env.isolate_root.path().display(),
@@ -3363,6 +3415,7 @@ mod test {
             Ok(None),
             &test_env.context,
             params,
+            FakeGChecker,
             None,
             false,
         )
@@ -3387,7 +3440,7 @@ mod test {
                     \n    [✓] Config Lock Files\
                     \n        [✓] {user_file} locked by {user_file}.lock\
                     \n        [✓] {global_file} locked by {global_file}.lock\
-                    \n    [✓] SSH Public/Private keys match\n\
+                    \n    [✓] The public & private Fuchsia keys are consistent\n\
                     \n[✓] Checking daemon\
                     \n    [✓] Daemon found: [1]\
                     \n    [✓] Connecting to daemon\
@@ -3395,8 +3448,10 @@ mod test {
                     \n    [✓] path: {ffx_path}\
                     \n    [✓] abi-revision: {ABI_REVISION_STR}\
                     \n    [✓] api-level: {FAKE_API_LEVEL}\
-                    \n    [✓] Default target: (none)\n\n\
-                    [✗] Searching for targets\
+                    \n    [✓] Default target: (none)\n\
+                    \n[✗] Google Network Checks\
+                    \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
+                    \n\n[✗] Searching for targets\
                     \n    [✗] No targets found!\n\n",
                     ffx_path=ffx_path(),
                     isolated_root=test_env.isolate_root.path().display(),
@@ -3458,6 +3513,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            FakeGChecker,
             None,
             false,
         )
@@ -3491,7 +3547,7 @@ mod test {
                 \n    [✓] Config Lock Files\
                 \n        [✓] {user_file} locked by {user_file}.lock\
                 \n        [✓] {global_file} locked by {global_file}.lock\
-                \n    [✓] SSH Public/Private keys match\
+                \n    [✓] The public & private Fuchsia keys are consistent\
                 \n[✓] Checking daemon\
                 \n    [✓] Daemon found: [1]\
                 \n    [✓] Connecting to daemon\
@@ -3500,6 +3556,8 @@ mod test {
                 \n    [✓] abi-revision: {ABI_REVISION_STR}\
                 \n    [✓] api-level: {FAKE_API_LEVEL}\
                 \n    [✓] Default target: (none)\
+                \n[✗] Google Network Checks\
+                \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
                 \n[✓] Searching for targets\
                 \n    [✓] 2 targets found\
                 \n[✗] Verifying Targets\
@@ -3541,10 +3599,12 @@ mod test {
                 \n    [✓] Config Lock Files\
                 \n        [✓] {user_file} locked by {user_file}.lock\
                 \n        [✓] {global_file} locked by {global_file}.lock\
-                \n    [✓] SSH Public/Private keys match\
+                \n    [✓] The public & private Fuchsia keys are consistent\
                 \n[✓] Checking daemon\
                 \n    [✓] Daemon found: [1]\
                 \n    [✓] Connecting to daemon\
+                \n[✗] Google Network Checks\
+                \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
                 \n[✓] Searching for targets\
                 \n    [✓] 2 targets found\
                 \n[✗] Verifying Targets\
@@ -3591,6 +3651,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            FakeGChecker,
             None,
             false,
         )
@@ -3613,7 +3674,7 @@ mod test {
             \n    [✓] Config Lock Files\
             \n        [✓] {user_file} locked by {user_file}.lock\
             \n        [✓] {global_file} locked by {global_file}.lock\
-            \n    [✓] SSH Public/Private keys match\
+            \n    [✓] The public & private Fuchsia keys are consistent\
             \n[✓] Checking daemon\
             \n    [✓] Daemon found: [1]\
             \n    [✓] Connecting to daemon\
@@ -3622,6 +3683,8 @@ mod test {
             \n    [✓] abi-revision: {ABI_REVISION_STR}\
             \n    [✓] api-level: {FAKE_API_LEVEL}\
             \n    [✓] Default target: (none)\
+            \n[✗] Google Network Checks\
+            \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
             \n[✓] Searching for targets\
             \n    [✓] 1 targets found\
             \n[✓] Verifying Targets\
@@ -3668,6 +3731,7 @@ mod test {
             Ok(Some("".to_string())),
             &test_env.context,
             record_params_no_record(),
+            FakeGChecker,
             None,
             false,
         )
@@ -3690,7 +3754,7 @@ mod test {
                    \n    [✓] Config Lock Files\
                    \n        [✓] {user_file} locked by {user_file}.lock\
                    \n        [✓] {global_file} locked by {global_file}.lock\
-                   \n    [✓] SSH Public/Private keys match\
+                   \n    [✓] The public & private Fuchsia keys are consistent\
                    \n[✓] Checking daemon\
                    \n    [✓] Daemon found: [1]\
                    \n    [✓] Connecting to daemon\
@@ -3700,6 +3764,8 @@ mod test {
                    \n    [✓] api-level: {FAKE_API_LEVEL}\
                    \n    [!] Daemon and frontend are at different API levels. Run `ffx doctor --restart-daemon`\
                    \n    [✓] Default target: (none)\
+                   \n[✗] Google Network Checks\
+                   \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
                    \n[✗] Searching for targets\
                    \n    [✗] No targets found!\n",
                 ffx_path=ffx_path(),
@@ -3761,6 +3827,7 @@ mod test {
             Ok(None),
             &test_env.context,
             record_params_no_record(),
+            FakeGChecker,
             None,
             false,
         )
@@ -3792,6 +3859,8 @@ mod test {
             \n    [✓] abi-revision: {ABI_REVISION_STR}\
             \n    [✓] api-level: {FAKE_API_LEVEL}\
             \n    [✓] Default target: (none)\
+            \n[✗] Google Network Checks\
+            \n    [✗] Google-corp tool missing, please run `fx add-internal-tools` and `fx build --host //vendor/google/tools/gdoctor`\
             \n[✓] Searching for targets\
             \n    [✓] 1 targets found\
             \n[✓] Verifying Targets\
@@ -3901,6 +3970,7 @@ mod test {
             Ok(None),
             &testenv.context,
             record_params_no_record(),
+            FakeGChecker,
             None,
             false,
         )
