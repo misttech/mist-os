@@ -712,7 +712,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                 let state = sta_network_state.lock();
                 (state.ssid.clone(), state.passphrase.clone(), state.bssid)
             };
-            let (result, status_code, connection_ctx) = match ssid {
+            let (result, status_code, connected_bssid, connection_ctx) = match ssid {
                 Some(ssid) => match iface.connect_to_network(&ssid[..], passphrase, bssid).await {
                     Ok(ConnectResult::Success(connected)) => {
                         info!("Connected to requested network");
@@ -736,6 +736,7 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                         (
                             Ok(()),
                             fidl_ieee80211::StatusCode::Success,
+                            Some(connected.bss.bssid),
                             Some(ConnectionContext {
                                 stream: connected.transaction_stream,
                                 original_bss_desc: connected.bss.clone(),
@@ -765,13 +766,14 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                             |callback_proxy| callback_proxy.on_association_rejected(&event),
                             &mut sta_iface_state.lock().callback,
                         );
-                        (Ok(()), fail.status_code, None)
+                        (Ok(()), fail.status_code, None, None)
                     }
                     Err(e) => {
                         error!("Error while connecting to network: {}", e);
                         (
                             Err(zx::sys::ZX_ERR_INTERNAL),
                             fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
+                            None,
                             None,
                         )
                     }
@@ -782,19 +784,20 @@ async fn handle_supplicant_sta_network_request<C: ClientIface>(
                         Err(zx::sys::ZX_ERR_BAD_STATE),
                         fidl_ieee80211::StatusCode::RefusedReasonUnspecified,
                         None,
+                        None,
                     )
                 }
             };
             responder.send(result).context("send Select response")?;
             if let Some(proxy) = state.lock().mlme_multicast_proxy.as_ref() {
+                let bssid = connected_bssid.map(|bssid| bssid.to_array()).unwrap_or_default();
                 proxy
                     .message(fidl_wlanix::Nl80211MulticastMessageRequest {
                         message: Some(build_nl80211_message(
                             Nl80211Cmd::Connect,
                             vec![
                                 Nl80211Attr::IfaceIndex(iface_id.into()),
-                                // TODO(b/316035583): Do we need to send the actual station MAC?
-                                Nl80211Attr::Mac([0u8; 6]),
+                                Nl80211Attr::Mac(bssid),
                                 Nl80211Attr::StatusCode(status_code.into_primitive()),
                             ],
                         )),
@@ -2469,6 +2472,7 @@ mod tests {
 
         let mcast_msg = assert_variant!(test_helper.exec.run_until_stalled(&mut next_mcast), Poll::Ready(msg) => msg);
         assert_eq!(mcast_msg.payload.cmd, Nl80211Cmd::Connect);
+        assert!(mcast_msg.payload.attrs.contains(&Nl80211Attr::Mac([42, 42, 42, 42, 42, 42])));
 
         assert_variant!(
             test_helper.telemetry_receiver.try_next(),
