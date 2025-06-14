@@ -258,6 +258,7 @@ if (is_host) {
       rebase_path("//src/developer/ffx/data/config.json"),
       rebase_path("//src/developer/ffx/daemon/data/config.json"),
       rebase_path("//src/developer/ffx/lib/pbms/data/config.json"),
+      rebase_path("//src/developer/ffx/plugins/product/data/config.json"),
     ]
 
     # Add in the 'dual-mode' config default files if we're doing dual mode

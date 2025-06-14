@@ -9,7 +9,6 @@ use ::gcs::client::{Client, ProgressResponse};
 use anyhow::{Context, Result};
 use ffx_config::sdk::{in_tree_sdk_version, SdkVersion};
 use ffx_config::EnvironmentContext;
-use ffx_product_list_args::ListCommand;
 use ffx_writer::{MachineWriter, ToolIO as _};
 use fho::{bug, return_user_error, FfxMain, FfxTool};
 use gcs::gs_url::split_gs_url;
@@ -23,6 +22,9 @@ use std::collections::HashMap;
 use std::io::{stderr, stdin, stdout, Write};
 use std::str::FromStr;
 use structured_ui::{Notice, Presentation};
+
+mod args;
+pub use args::ListCommand;
 
 const PB_MANIFEST_NAME: &'static str = "product_bundles.json";
 const CONFIG_BASE_URLS: &'static str = "pbms.base_urls";

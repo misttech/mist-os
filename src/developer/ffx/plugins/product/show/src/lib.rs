@@ -7,7 +7,6 @@
 
 use anyhow::{bail, Context, Result};
 
-use ffx_product_show_args::ShowCommand;
 use ffx_writer::{SimpleWriter, ToolIO as _};
 use fho::{FfxMain, FfxTool};
 use product_bundle::{ProductBundle, ProductBundleV2};
@@ -16,18 +15,21 @@ use serde_json::to_string_pretty;
 use std::io::{stdin, stdout};
 use structured_ui::{Notice, Presentation, TableRows};
 
+mod args;
+pub use args::ShowCommand;
+
 /// `ffx product show` sub-command.
 #[derive(FfxTool)]
-pub struct ProductCreateTool {
+pub struct ProductShowTool {
     #[command]
     pub cmd: ShowCommand,
 }
 
-fho::embedded_plugin!(ProductCreateTool);
+fho::embedded_plugin!(ProductShowTool);
 
 /// Create a product bundle.
 #[async_trait::async_trait(?Send)]
-impl FfxMain for ProductCreateTool {
+impl FfxMain for ProductShowTool {
     type Writer = SimpleWriter;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         let mut input = stdin();

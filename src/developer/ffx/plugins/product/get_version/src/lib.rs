@@ -14,11 +14,13 @@ use anyhow::{Context, Result};
 use assembly_partitions_config::Slot;
 use assembly_release_info::SystemReleaseInfo;
 use async_trait::async_trait;
-use ffx_product_get_version_args::GetVersionCommand;
 use ffx_writer::{MachineWriter, ToolIO as _};
 use fho::{FfxContext, FfxMain, FfxTool};
 use product_bundle::{ProductBundle, ProductBundleV2};
 use std::collections::BTreeMap;
+
+mod args;
+pub use args::GetVersionCommand;
 
 /// This plugin will get the the product version of a Product Bundle.
 #[derive(FfxTool)]

@@ -2,31 +2,36 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//build/rust/rustc_library.gni")
 import("//src/developer/ffx/build/ffx_tool.gni")
+_subtools = [
+  "create",
+  "download",
+  "get_artifacts",
+  "get_image_path",
+  "get_repository",
+  "get_version",
+  "list",
+  "lookup",
+  "show",
+]
 
-ffx_plugin("ffx_product") {
-  sdk_category = "partner"
+rustc_library("lib") {
+  name = "ffx_product"
   version = "0.1.0"
   edition = "2021"
-  config_data = [ "data/config.json" ]
 
-  plugin_deps = [
-    "create:ffx_product_create",
-    "download:ffx_product_download",
-    "get_artifacts:ffx_product_get_artifacts",
-    "get_image_path:ffx_product_get_image_path",
-    "get_repository:ffx_product_get_repository",
-    "get_version:ffx_product_get_version",
-    "list:ffx_product_list",
-    "lookup:ffx_product_lookup",
-    "show:ffx_product_show",
-  ]
-
-  args_sources = [ "src/args.rs" ]
-  args_deps = [
-    "//src/developer/ffx/core:lib",
+  deps = [
+    "//src/developer/ffx/lib/fho:lib",
     "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:async-trait",
+  ]
+  foreach(subtool, _subtools) {
+    deps += [ "$subtool:lib" ]
+  }
+  sources = [
+    "src/args.rs",
+    "src/lib.rs",
   ]
 }
 
@@ -40,11 +45,13 @@ ffx_plugin("ffx_product") {
 ffx_tool("ffx_product_tool") {
   edition = "2021"
   output_name = "ffx-product"
+  sources = [ "src/main.rs" ]
+
   deps = [
-    ":ffx_product_suite",
+    ":lib",
+    "//src/developer/ffx/lib/fho:lib",
     "//src/lib/fuchsia-async",
   ]
-  sources = [ "src/main.rs" ]
 
   sdk_target_name = "sdk"
   sdk_category = "partner"
@@ -70,8 +77,8 @@ group("bin") {
 
 group("tests") {
   testonly = true
-  deps = [
-    ":ffx_product_tests($host_toolchain)",
-    "common:tests",
-  ]
+  deps = [ "common:tests" ]
+  foreach(subtool, _subtools) {
+    deps += [ "$subtool:lib_test($host_toolchain)" ]
+  }
 }

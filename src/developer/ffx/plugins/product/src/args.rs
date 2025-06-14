@@ -3,14 +3,28 @@
 // found in the LICENSE file.
 
 use argh::{ArgsInfo, FromArgs};
-use ffx_core::ffx_command;
-use ffx_product_sub_command::SubCommand;
 
-/// Discover and access product bundle metadata and image data.
-#[ffx_command()]
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
-#[argh(subcommand, name = "product")]
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
+#[argh(subcommand)]
+pub enum ProductSubCommand {
+    Create(ffx_product_create::CreateCommand),
+    Download(ffx_product_download::DownloadCommand),
+    GetArtifacts(ffx_product_get_artifacts::GetArtifactsCommand),
+    GetImagePath(ffx_product_get_image_path::GetImagePathCommand),
+    GetRepository(ffx_product_get_repository::GetRepositoryCommand),
+    GetVersion(ffx_product_get_version::GetVersionCommand),
+    List(ffx_product_list::ListCommand),
+    Lookup(ffx_product_lookup::LookupCommand),
+    Show(ffx_product_show::ShowCommand),
+}
+
+#[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
+#[argh(
+    subcommand,
+    name = "product",
+    description = "Discover and access product bundle metadata and image data."
+)]
 pub struct ProductCommand {
     #[argh(subcommand)]
-    pub subcommand: SubCommand,
+    pub subcommand: ProductSubCommand,
 }
