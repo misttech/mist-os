@@ -18,20 +18,32 @@ use std::path::PathBuf;
 use std::process::ExitStatus;
 use writer::ToolIO;
 
-/// The main trait for defining an ffx tool. This is not intended to be implemented directly
-/// by the user, but instead derived via `#[derive(FfxTool)]`.
+/// The main trait for defining an ffx tool. This is not intended
+/// to be implemented directly by the user, but instead derived via
+/// `#[derive(FfxTool)]`. Tools that have subcommands ("suites") should
+/// instead use `FfxSubtoolSuite`.
+// An FfxTool must be sized, but we enforce it only in certain methods, not
+// in the trait itself. This is required for FfxTool to be "dyn compatible"
+// (https://doc.rust-lang.org/std/keyword.dyn.html). It means that methods such
+// as from_env() that need to know the size can still work, while allowing the
+// dynamically-sized trait objects to be referred to in a dyn context.
 #[async_trait(?Send)]
-pub trait FfxTool: FfxMain + Sized {
+pub trait FfxTool: FfxMain {
     type Command: FromArgs + SubCommand + ArgsInfo;
 
     fn supports_machine_output(&self) -> bool;
     fn has_schema(&self) -> bool;
     fn requires_target() -> bool;
 
-    async fn from_env(env: FhoEnvironment, cmd: Self::Command) -> Result<Self>;
+    async fn from_env(env: FhoEnvironment, cmd: Self::Command) -> Result<Self>
+    where
+        Self: Sized;
 
     /// Executes the tool. This is intended to be invoked by the user in main.
-    async fn execute_tool() {
+    async fn execute_tool()
+    where
+        Self: Sized,
+    {
         let result = ffx_command::run::<FhoSuite<Self>>(ExecutableKind::Subtool).await;
         let should_format = match FfxCommandLine::from_env() {
             Ok(cli) => cli.global.machine.is_some(),
@@ -48,7 +60,7 @@ pub trait FfxTool: FfxMain + Sized {
 }
 
 #[async_trait(?Send)]
-pub trait FfxMain: Sized {
+pub trait FfxMain {
     type Writer: TryFromEnv + ToolIO;
 
     /// The entrypoint of the tool. Once FHO has set up the environment for the tool, this is
@@ -58,7 +70,10 @@ pub trait FfxMain: Sized {
     /// Given the writer, print the output schema. This is exposed to allow
     /// traversing the subtool adapters which combine more than one subtool which
     /// probably have different writers since they will have different output.
-    async fn try_print_schema(self, mut writer: Self::Writer) -> Result<()> {
+    async fn try_print_schema(self, mut writer: Self::Writer) -> Result<()>
+    where
+        Self: Sized,
+    {
         writer.try_print_schema().map_err(|e| e.into())
     }
 
