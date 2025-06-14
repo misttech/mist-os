@@ -48,25 +48,18 @@ zx_status_t Dwc3::EpSetStall(Endpoint& ep, bool stall) {
   return ZX_OK;
 }
 
-void Dwc3::EpStartTransfer(Endpoint& ep, Fifo& fifo, uint32_t type, zx_paddr_t buffer,
+void Dwc3::EpStartTransfer(Endpoint& ep, TrbFifo& fifo, uint32_t type, zx_paddr_t buffer,
                            size_t length) {
   FDF_LOG(DEBUG, "Dwc3::EpStartTransfer ep %u type %u length %zu", ep.ep_num, type, length);
 
-  dwc3_trb_t* trb = fifo.next++;
-  if (fifo.next == fifo.last) {
-    fifo.next = fifo.first;
-  }
-  if (fifo.current == nullptr) {
-    fifo.current = trb;
-  }
-
+  dwc3_trb_t* trb = fifo.AdvanceNext();
   trb->ptr_low = static_cast<uint32_t>(buffer);
   trb->ptr_high = static_cast<uint32_t>(buffer >> 32);
   trb->status = TRB_BUFSIZ(static_cast<uint32_t>(length));
   trb->control = type | TRB_LST | TRB_IOC | TRB_HWO;
-  CacheFlush(fifo.buffer.get(), (trb - fifo.first) * sizeof(*trb), sizeof(*trb));
+  zx_paddr_t trb_phys = fifo.Write(trb);
 
-  CmdEpStartTransfer(ep, fifo.GetTrbPhys(trb));
+  CmdEpStartTransfer(ep, trb_phys);
 }
 
 void Dwc3::EpEndTransfers(Endpoint& ep, zx_status_t reason) {
@@ -178,8 +171,7 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
       FDF_LOG(ERROR, "no usb request found to complete!");
       return;
     }
-    dwc3_trb_t trb;
-    EpReadTrb(uep->ep, uep->fifo, uep->fifo.current, &trb);
+    dwc3_trb_t trb = uep->fifo.ReadCurrent();
 
     if (trb.control & TRB_HWO) {
       FDF_LOG(ERROR, "TRB_HWO still set in dwc3_ep_xfer_complete %d", uep->ep.ep_num);
@@ -188,7 +180,7 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
 
     opt_info.emplace(std::move(*uep->ep.current_req));
     uep->ep.current_req.reset();
-    uep->fifo.current = nullptr;
+    uep->fifo.AdvanceCurrent();
     opt_info->actual = std::get<usb::FidlRequest>(opt_info->req)->data()->at(0).size().value() -
                        TRB_BUFSIZ(trb.status);
     opt_info->status = ZX_OK;

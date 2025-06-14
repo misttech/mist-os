@@ -535,6 +535,7 @@ void Dwc3::ResetConfiguration() {
     std::lock_guard<std::mutex> lock(uep.ep.lock);
     EpEndTransfers(uep.ep, ZX_ERR_IO_NOT_PRESENT);
     EpSetStall(uep.ep, false);
+    uep.fifo.Clear();
   }
 }
 
@@ -547,6 +548,7 @@ void Dwc3::HandleResetEvent() {
     std::lock_guard<std::mutex> lock(uep.ep.lock);
     EpEndTransfers(uep.ep, ZX_ERR_IO_NOT_PRESENT);
     EpSetStall(uep.ep, false);
+    uep.fifo.Clear();
   }
 
   {
@@ -751,9 +753,9 @@ void Dwc3::ConfigureEndpoint(ConfigureEndpointRequest& request,
     return;
   }
 
-  if (zx_status_t status = uep->fifo.Init(bti_); status != ZX_OK) {
-    FDF_LOG(ERROR, "fifo init failed %s", zx_status_get_string(status));
-    completer.Reply(zx::error(status));
+  if (zx::result result = uep->fifo.Init(bti_); result.is_error()) {
+    FDF_LOG(ERROR, "fifo init failed %s", result.status_string());
+    completer.Reply(result.take_error());
     return;
   }
 
@@ -842,6 +844,8 @@ zx::result<> Dwc3::CommonCancelAll(uint8_t ep_addr) {
   if (zx_status_t status = CancelAll(uep->ep); status != ZX_OK) {
     return zx::error(status);
   }
+  std::lock_guard<std::mutex> lock(uep->ep.lock);
+  uep->fifo.Clear();
   return zx::ok();
 }
 

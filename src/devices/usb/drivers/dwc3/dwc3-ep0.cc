@@ -16,8 +16,8 @@ namespace fdescriptor = fuchsia_hardware_usb_descriptor;
 zx_status_t Dwc3::Ep0Init() {
   std::lock_guard<std::mutex> lock(ep0_.lock);
 
-  if (zx_status_t status = ep0_.shared_fifo.Init(bti_); status != ZX_OK) {
-    return status;
+  if (zx::result result = ep0_.shared_fifo.Init(bti_); result.is_error()) {
+    return result.error_value();
   }
 
   const std::array eps{&ep0_.out, &ep0_.in};
@@ -33,6 +33,7 @@ zx_status_t Dwc3::Ep0Init() {
 
 void Dwc3::Ep0Reset() {
   std::lock_guard<std::mutex> lock(ep0_.lock);
+  ep0_.shared_fifo.Clear();
   CancelAll(ep0_.out);
   CancelAll(ep0_.in);
   ep0_.state = Ep0::State::None;
@@ -83,6 +84,11 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
   std::lock_guard<std::mutex> lock(ep0_.lock);
   ZX_DEBUG_ASSERT(is_ep0_num(ep_num));
 
+  // Only DataOut state needs TRB read.
+  dwc3_trb_t trb =
+      ep0_.state == Ep0::State::DataOut ? ep0_.shared_fifo.ReadCurrent() : dwc3_trb_t{};
+  ep0_.shared_fifo.AdvanceCurrent();
+
   switch (ep0_.state) {
     case Ep0::State::Setup: {
       void* const vaddr = ep0_.buffer->virt();
@@ -100,6 +106,7 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
         zx::result<size_t> status = HandleEp0Setup(setup, nullptr, 0);
         if (status.is_error()) {
           FDF_LOG(DEBUG, "HandleSetup returned %s", zx_status_get_string(status.error_value()));
+          ep0_.shared_fifo.Clear();
           CmdEpSetStall(ep0_.out);
           Ep0QueueSetupLocked();
           break;
@@ -139,14 +146,11 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
     }
     case Ep0::State::DataOut: {
       ZX_DEBUG_ASSERT(ep_num == kEp0Out);
-
-      dwc3_trb_t trb;
-      EpReadTrb(ep0_.out, ep0_.shared_fifo, ep0_.shared_fifo.current, &trb);
-      ep0_.shared_fifo.current = nullptr;
       zx_off_t received = ep0_.buffer->size() - TRB_BUFSIZ(trb.status);
 
       zx::result<size_t> status = HandleEp0Setup(ep0_.cur_setup, ep0_.buffer->virt(), received);
       if (status.is_error()) {
+        ep0_.shared_fifo.Clear();
         CmdEpSetStall(ep0_.out);
         Ep0QueueSetupLocked();
         break;
@@ -175,6 +179,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
       if ((stage == DEPEVT_XFER_NOT_READY_STAGE_DATA) ||
           (stage == DEPEVT_XFER_NOT_READY_STAGE_STATUS)) {
         // Stall if we receive xfer not ready data/status while waiting for setup to complete
+        ep0_.shared_fifo.Clear();
         CmdEpSetStall(ep0_.out);
         Ep0QueueSetupLocked();
       }
@@ -182,6 +187,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
     case Ep0::State::DataOut:
       if ((ep_num == kEp0In) && (stage == DEPEVT_XFER_NOT_READY_STAGE_DATA)) {
         // end transfer and stall if we receive xfer not ready in the opposite direction
+        ep0_.shared_fifo.Clear();
         CmdEpEndTransfer(ep0_.out);
         CmdEpSetStall(ep0_.out);
         Ep0QueueSetupLocked();
@@ -190,6 +196,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
     case Ep0::State::DataIn:
       if ((ep_num == kEp0Out) && (stage == DEPEVT_XFER_NOT_READY_STAGE_DATA)) {
         // end transfer and stall if we receive xfer not ready in the opposite direction
+        ep0_.shared_fifo.Clear();
         CmdEpEndTransfer(ep0_.in);
         CmdEpSetStall(ep0_.out);
         Ep0QueueSetupLocked();

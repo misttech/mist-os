@@ -274,11 +274,10 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
     void Reset() {
       std::lock_guard<std::mutex> _(ep.lock);
-      fifo.Reset();
       ep.Reset();
     }
 
-    __TA_GUARDED(ep.lock) Fifo fifo;
+    __TA_GUARDED(ep.lock) TrbFifo fifo;
     Endpoint ep;
     std::optional<EpServer> server;
   };
@@ -335,7 +334,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
     void Reset() {
       std::lock_guard<std::mutex> _(lock);
-      shared_fifo.Reset();
       cur_setup = {};
       cur_speed = fuchsia_hardware_usb_descriptor::wire::UsbSpeed::kUndefined;
       out.Reset();
@@ -354,7 +352,7 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
     std::mutex lock;
 
-    __TA_GUARDED(lock) Fifo shared_fifo;
+    __TA_GUARDED(lock) TrbFifo shared_fifo;
     __TA_GUARDED(lock) std::unique_ptr<dma_buffer::ContiguousBuffer> buffer;
     __TA_GUARDED(lock) State state { Ep0::State::None };
     __TA_GUARDED(lock) Endpoint out;
@@ -422,11 +420,9 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   void EpEnable(const Endpoint& ep, bool enable) __TA_EXCLUDES(lock_);
   void EpSetConfig(Endpoint& ep, bool enable) __TA_EXCLUDES(lock_);
   zx_status_t EpSetStall(Endpoint& ep, bool stall) __TA_EXCLUDES(lock_);
-  void EpStartTransfer(Endpoint& ep, Fifo& fifo, uint32_t type, zx_paddr_t buffer, size_t length)
+  void EpStartTransfer(Endpoint& ep, TrbFifo& fifo, uint32_t type, zx_paddr_t buffer, size_t length)
       __TA_EXCLUDES(lock_);
   void EpEndTransfers(Endpoint& ep, zx_status_t reason) __TA_EXCLUDES(lock_);
-  void EpReadTrb(Endpoint& ep, Fifo& fifo, const dwc3_trb_t* src, dwc3_trb_t* dst)
-      __TA_EXCLUDES(lock_);
 
   // Methods specific to user endpoints
   void UserEpQueueNext(UserEndpoint& uep) __TA_REQUIRES(uep.ep.lock) __TA_EXCLUDES(lock_);
