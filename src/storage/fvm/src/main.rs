@@ -418,15 +418,10 @@ impl Fvm {
         }
 
         info!(
-            "Mounted fvm, slice size {} ({}/{} allocated) partitions: {:?}",
+            "Mounted fvm, slice size {} partitions: {:?}",
             metadata.header.slice_size,
-            assigned_slice_count,
-            metadata.header.pslice_count,
             metadata.partitions.iter().map(|(_, e)| e.name()).collect::<Vec<_>>()
         );
-        for (idx, partition) in metadata.partitions.iter() {
-            info!("  {idx}: {partition:?}");
-        }
 
         let slice_blocks = metadata.header.slice_size / client.block_size() as u64;
         Ok(Self {

@@ -78,7 +78,6 @@ source_set("commands") {
     ":empty-partition",
     ":minfs-partition",
     "//src/storage/fvm",
-    "//src/storage/minfs",
     "//src/storage/volume_image/fvm:fvm-descriptor",
     "//src/storage/volume_image/fvm:fvm-image-extend",
     "//src/storage/volume_image/fvm:fvm-sparse-image",
