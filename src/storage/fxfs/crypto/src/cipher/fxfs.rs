@@ -80,9 +80,6 @@ impl Cipher for FxfsCipher {
     }
 
     fn hash_code(&self, filename: &[u8], casefold: bool) -> u32 {
-        if filename.is_empty() {
-            return 0;
-        }
         let mut hasher = rustc_hash::FxHasher::default();
         if casefold {
             for ch in fxfs_unicode::casefold(filename.iter().map(|x| *x as char)) {
