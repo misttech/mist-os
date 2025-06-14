@@ -303,7 +303,7 @@ async fn main() -> Result<()> {
 
     if config.has_always_on_counter() {
         // A read only RTC implementation using an always-on counter.
-        let hrtimer_proxy = alarms::connect_to_hrtimer_async()
+        let hrtimer_proxy = alarms::connect_to_hrtimer_async().await
             .map_err(|err| {
                 warn!("could not connect to fuchsia.hardware.hrtimer/Device, falling back to non-persistent RTC: {err:?}");
                 err
@@ -382,22 +382,16 @@ async fn main() -> Result<()> {
     let time_test_mutex: Rc<RefCell<()>> = Rc::new(RefCell::new(()));
 
     let timer_loop = if serve_fuchsia_time_alarms {
-        // Instantiate connections to wake alarms. Allow graceful handling of failures,
-        // though we probably want to be loud about issues.
-        Rc::new(
-            alarms::connect_to_hrtimer_async()
-                .map_err(|e| {
-                    // This may not be a bug, if access to wake alarms is not used.
-                    // Make this a warning, but attempted connections will be errors.
-                    warn!("could not connect to hrtimer: {}", &e);
-                    e
-                })
-                .map(|proxy| Rc::new(alarms::Loop::new(proxy, loop_inspect))),
-        )
+        // Instantiate connections to wake alarms. Wait for hrtimer device to enumerate before
+        // proceeding and exit if it is failed to be found.
+        alarms::connect_to_hrtimer_async()
+            .await
+            .inspect_err(|e| error!("could not connect to hrtimer: {}", &e))
+            .map(|proxy| Rc::new(alarms::Loop::new(proxy, loop_inspect)))?
     } else {
         // Emulate wake alarms. This is used on platforms that do not have
         // power management, and will *not* actually sleep.
-        Rc::new(Ok(Rc::new(alarms::Loop::new_emulated(loop_inspect))))
+        Rc::new(alarms::Loop::new_emulated(loop_inspect))
     };
 
     // Look for this text to know whether connections have succeeded.
@@ -463,13 +457,8 @@ async fn main() -> Result<()> {
                             warn!("prevented a second client for fuchsia.time.test/RPC");
                         }
                     }
-                    Rpcs::Wake(stream) => match *timer_loop {
-                        Ok(ref this_loop) => {
-                            alarms::serve(this_loop.clone(), stream).await;
-                        }
-                        Err(ref e) => {
-                            warn!("can not serve fuchsia.time.alarms/Wake: {}", e);
-                        }
+                    Rpcs::Wake(stream) => {
+                        alarms::serve(timer_loop.clone(), stream).await;
                     },
                     Rpcs::Adjust(stream) => match *adjust_server {
                         Some(ref server) => {

@@ -28,15 +28,16 @@
 mod emu;
 
 use crate::emu::EmulationTimerOps;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use async_trait::async_trait;
 use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::RequestStream;
 use fidl::HandleBased;
+use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use fuchsia_inspect::{HistogramProperty, Property};
 use futures::channel::mpsc;
 use futures::sink::SinkExt;
-use futures::StreamExt;
+use futures::{StreamExt, TryStreamExt};
 use log::{debug, error, warn};
 use scopeguard::defer;
 use std::cell::RefCell;
@@ -1520,25 +1521,23 @@ fn notify_all(
 const HRTIMER_DIRECTORY: &str = "/dev/class/hrtimer";
 
 /// Connects to the high resolution timer device driver.
-pub fn connect_to_hrtimer_async() -> Result<ffhh::DeviceProxy> {
+pub async fn connect_to_hrtimer_async() -> Result<ffhh::DeviceProxy> {
     debug!("connect_to_hrtimer: trying directory: {}", HRTIMER_DIRECTORY);
-    let mut dir = std::fs::read_dir(HRTIMER_DIRECTORY)
-        .map_err(|e| anyhow!("Failed to open hrtimer directory: {e}"))?;
-    let entry = dir
-        .next()
-        .ok_or_else(|| anyhow!("No entry in the hrtimer directory"))?
-        .map_err(|e| anyhow!("Failed to find hrtimer device: {e}"))?;
-    let path = entry
-        .path()
-        .into_os_string()
-        .into_string()
-        .map_err(|e| anyhow!("Failed to parse the device entry path: {e:?}"))?;
-
-    let (hrtimer, server_end) = fidl::endpoints::create_proxy::<ffhh::DeviceMarker>();
-    fdio::service_connect(&path, server_end.into_channel())
-        .map_err(|e| anyhow!("Failed to open hrtimer device: {e}"))?;
-
-    Ok(hrtimer)
+    let dir =
+        fuchsia_fs::directory::open_in_namespace(HRTIMER_DIRECTORY, fidl_fuchsia_io::PERM_READABLE)
+            .with_context(|| format!("Opening {}", HRTIMER_DIRECTORY))?;
+    let path = device_watcher::watch_for_files(&dir)
+        .await
+        .with_context(|| format!("Watching for files in {}", HRTIMER_DIRECTORY))?
+        .try_next()
+        .await
+        .with_context(|| format!("Getting a file from {}", HRTIMER_DIRECTORY))?;
+    let path = path.ok_or_else(|| anyhow!("Could not find {}", HRTIMER_DIRECTORY))?;
+    let path = path
+        .to_str()
+        .ok_or_else(|| anyhow!("Could not find a valid str for {}", HRTIMER_DIRECTORY))?;
+    connect_to_named_protocol_at_dir_root::<ffhh::DeviceMarker>(&dir, path)
+        .context("Failed to connect built-in service")
 }
 
 #[cfg(test)]

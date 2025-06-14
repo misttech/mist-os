@@ -16,7 +16,6 @@ use anyhow::{Context, Result};
 use fidl_fuchsia_time_alarms as ffta;
 use fuchsia_component::server::ServiceFs;
 use futures::StreamExt;
-use log::warn;
 use std::rc::Rc;
 
 // This is the production alarms crate.
@@ -42,10 +41,8 @@ async fn main() -> Result<()> {
         .context("while trying to serve fuchsia.time.alarms/Wake")?;
 
     let timer_loop = alarms::connect_to_hrtimer_async()
-        .map_err(|e| {
-            warn!("could not connect to hrtimer: {}", &e);
-            e
-        })
+        .await
+        .inspect_err(|e| log::error!("could not connect to hrtimer: {}", &e))
         .map(|proxy| {
             Rc::new(alarms::Loop::new(proxy, inspector.root().create_child("wake_alarms")))
         })?;
