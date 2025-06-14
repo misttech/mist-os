@@ -12,6 +12,7 @@ driver_bind_rules("dwc3_bind") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.interconnect:fuchsia.hardware.interconnect_bindlib",
     "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy_bindlib",
+    "//src/devices/bind/fuchsia.clock",
     "//src/devices/bind/fuchsia.designware.platform",
     "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.interconnect",

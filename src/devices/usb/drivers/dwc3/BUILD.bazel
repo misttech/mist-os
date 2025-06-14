@@ -18,6 +18,7 @@ fuchsia_driver_bind_bytecode(
     output = "dwc3.bindbc",
     rules = "meta/dwc3.bind",
     deps = [
+        "@fuchsia_sdk//bind/fuchsia.clock",
         "@fuchsia_sdk//bind/fuchsia.designware.platform",
         "@fuchsia_sdk//bind/fuchsia.devicetree",
         "@fuchsia_sdk//bind/fuchsia.interconnect",
@@ -55,6 +56,7 @@ cc_library(
         "@fuchsia_sdk//bind/fuchsia.designware.platform:fuchsia.designware.platform_cc",
         "@fuchsia_sdk//bind/fuchsia:fuchsia_cc",
         "@fuchsia_sdk//fidl/fuchsia.boot.metadata:fuchsia.boot.metadata_cpp",
+        "@fuchsia_sdk//fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.interconnect:fuchsia.hardware.interconnect_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.usb.dci:fuchsia.hardware.usb.dci_cpp",
