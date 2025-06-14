@@ -32,6 +32,8 @@ class DevicetreeBootloaderFilesItem
     : public boot_shim::DevicetreeItemBase<DevicetreeBootloaderFilesItem, 1>,
       public boot_shim::ItemBase {
  public:
+  // Sets a scratch buffer for storing the bootloader files extracted from the device tree. The
+  // buffer must be aligned to `ZBI_ALIGNMENT`.
   void SetScratchBuffer(std::span<std::byte> buffer);
 
   // Following are all required methods from base classes.
