@@ -484,8 +484,6 @@ template("sdk_shared_library") {
 
   # LINT.IfChange
   _prebuild_info = {
-    atom_label = get_label_info(":${main_target_name}", "label_no_toolchain")
-    generator_label = get_label_info(shared_lib_target, "label_with_toolchain")
     format = "shared"
     include_dir = include_dest
     library_name = atom_name

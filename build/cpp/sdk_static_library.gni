@@ -350,15 +350,11 @@ template("sdk_static_library") {
 
   # LINT.IfChange
   _prebuild_info = {
-    atom_label =
-        get_label_info(":${manifest_target_name}", "label_no_toolchain")
     format = "static"
     include_dir = include_dest
     library_name = sdk_name
     file_base = sdk_root_path
     headers = sdk_metadata_headers
-    generator_label =
-        get_label_info(":${main_target_name}", "label_with_toolchain")
     binaries = {
       api_level = current_build_target_api_level
       arch = target_cpu
