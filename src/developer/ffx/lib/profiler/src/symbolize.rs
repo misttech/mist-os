@@ -45,12 +45,12 @@ pub struct SymbolizedRecords {
 #[derive(Clone, Debug)]
 pub struct SymbolizedRecord {
     pub tid: Tid,
-    backtraces: Vec<ResolvedAddress>,
+    call_stacks: Vec<Vec<ResolvedAddress>>,
 }
 
 impl SymbolizedRecord {
-    fn add_backtrace(&mut self, backtrace: ResolvedAddress) {
-        self.backtraces.push(backtrace);
+    fn add_backtraces(&mut self, backtraces: Vec<ResolvedAddress>) {
+        self.call_stacks.push(backtraces);
     }
 }
 
@@ -100,20 +100,27 @@ impl UnsymbolizedSamples {
                         }
                     }
                     for (tid, backtraces) in handler.get_backtrace_records() {
-                        let mut symbolized_record =
-                            SymbolizedRecord { tid: *tid, backtraces: Vec::new() };
-                        for backtrace in backtraces {
-                            let resolved_addr =
-                                seen_bt.entry(*backtrace).or_insert_with_key(|bt_key| {
-                                    let resolved_locations = symbolizer
-                                        .resolve_addr(bt_key.0)
-                                        .unwrap_or_else(|_| Vec::new());
-                                    ResolvedAddress {
-                                        addr: bt_key.0,
-                                        locations: resolved_locations,
-                                    }
-                                }).to_owned();
-                            symbolized_record.add_backtrace(resolved_addr);
+                        let mut symbolized_record = SymbolizedRecord {
+                            tid: *tid,
+                            call_stacks: Vec::new(),
+                        };
+
+                        for call_stack in backtraces {
+                            let mut current_call_stack = vec![];
+                            for backtrace in call_stack {
+                                let resolved_addr =
+                                    seen_bt.entry(*backtrace).or_insert_with_key(|bt_key| {
+                                        let resolved_locations = symbolizer
+                                            .resolve_addr(bt_key.0)
+                                            .unwrap_or_else(|_| Vec::new());
+                                        ResolvedAddress {
+                                            addr: bt_key.0,
+                                            locations: resolved_locations,
+                                        }
+                                    }).to_owned();
+                                current_call_stack.push(resolved_addr);
+                            }
+                            symbolized_record.add_backtraces(current_call_stack);
                         }
                         res_per_pid.push(symbolized_record);
                     }
