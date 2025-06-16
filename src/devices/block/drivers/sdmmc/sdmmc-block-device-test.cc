@@ -145,15 +145,14 @@ class FakeSystemActivityGovernor
 
 class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
  public:
-  void AddSideEffect(fit::function<void()> side_effect) { side_effect_ = std::move(side_effect); }
+  fidl::ServerEnd<fuchsia_power_broker::LeaseControl> TakeLeaseControlServerEnd() {
+    return std::move(lease_control_server_end_);
+  }
 
   void Lease(LeaseRequest& req, LeaseCompleter::Sync& completer) override {
-    if (side_effect_) {
-      side_effect_();
-    }
-
     auto [lease_control_client_end, lease_control_server_end] =
         fidl::Endpoints<fuchsia_power_broker::LeaseControl>::Create();
+    lease_control_server_end_ = std::move(lease_control_server_end);
     completer.Reply(fit::success(std::move(lease_control_client_end)));
   }
 
@@ -161,7 +160,7 @@ class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
 
  private:
-  fit::function<void()> side_effect_;
+  fidl::ServerEnd<fuchsia_power_broker::LeaseControl> lease_control_server_end_;
 };
 
 class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
@@ -2278,6 +2277,11 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
 
   ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/{}, /*supply_power_framework=*/true));
 
+  fidl::ServerEnd lease_control_server_end = incoming_.SyncCall([](IncomingNamespace* incoming) {
+    return incoming->power_broker.hardware_power_lessor_->TakeLeaseControlServerEnd();
+  });
+  ASSERT_TRUE(lease_control_server_end.is_valid());
+
   // Initial power level is kPowerLevelOff.
   runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
 
@@ -2301,13 +2305,52 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   ASSERT_NOT_NULL(power_suspended);
   EXPECT_TRUE(power_suspended->value());
 
-  // Trigger power level change to kPowerLevelOn.
+  // The driver should have obtained a lease on kPowerLevelBoot.
+  zx_signals_t observed{};
+  EXPECT_EQ(lease_control_server_end.channel().wait_one(ZX_CHANNEL_PEER_CLOSED,
+                                                        zx::time::infinite_past(), &observed),
+            ZX_ERR_TIMED_OUT);
+  EXPECT_FALSE(observed & ZX_CHANNEL_PEER_CLOSED);
+
+  // Trigger power level change to kPowerLevelBoot.
   awake_complete.Reset();
+  incoming_.SyncCall([](IncomingNamespace* incoming) {
+    incoming->power_broker.hardware_power_required_level_->required_level_ =
+        SdmmcBlockDevice::kPowerLevelBoot;
+  });
+  runtime_.PerformBlockingWork([&] { awake_complete.Wait(); });
+
+  // The lease should still be held after moving to kPowerLevelBoot.
+  EXPECT_EQ(lease_control_server_end.channel().wait_one(ZX_CHANNEL_PEER_CLOSED,
+                                                        zx::time::infinite_past(), &observed),
+            ZX_ERR_TIMED_OUT);
+  EXPECT_FALSE(observed & ZX_CHANNEL_PEER_CLOSED);
+
+  inspector.ReadInspect(block_device_->inspect());
+
+  root = inspector.hierarchy().GetByPath({"sdmmc_core"});
+  ASSERT_NOT_NULL(root);
+
+  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NOT_NULL(power_suspended);
+  EXPECT_FALSE(power_suspended->value());
+
+  // Trigger power level change to kPowerLevelOn. This should be a no-op other than dropping the
+  // lease.
   incoming_.SyncCall([](IncomingNamespace* incoming) {
     incoming->power_broker.hardware_power_required_level_->required_level_ =
         SdmmcBlockDevice::kPowerLevelOn;
   });
-  runtime_.PerformBlockingWork([&] { awake_complete.Wait(); });
+
+  // Wait until the lease has been dropped.
+  runtime_.PerformBlockingWork([lease_control_server_end = std::move(lease_control_server_end)] {
+    zx_status_t status;
+    zx_signals_t observed;
+    do {
+      status = lease_control_server_end.channel().wait_one(ZX_CHANNEL_PEER_CLOSED,
+                                                           zx::time::infinite_past(), &observed);
+    } while (status != ZX_OK || !(observed & ZX_CHANNEL_PEER_CLOSED));
+  });
 
   inspector.ReadInspect(block_device_->inspect());
 

@@ -413,6 +413,14 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
         const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
         switch (required_level) {
           case kPowerLevelOn:
+            // If we're rising above the boot power level, it must because an
+            // external lease raised our power level. This means we can drop
+            // our self-lease and allow the external entity to drive our power
+            // state.
+            if (hardware_power_lease_control_client_end_.is_valid()) {
+              hardware_power_lease_control_client_end_.reset();
+            }
+            __FALLTHROUGH;
           case kPowerLevelBoot: {
             const zx::time start = zx::clock::get_monotonic();
 
@@ -424,14 +432,6 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
               FDF_LOGL(ERROR, logger(), "Failed to resume power after %ld us: %s",
                        duration.to_usecs(), zx_status_get_string(status));
               return;
-            }
-
-            // If we're rising above the boot power level, it must because an
-            // external lease raised our power level. This means we can drop
-            // our self-lease and allow the external entity to drive our power
-            // state.
-            if (kPowerLevelOn && hardware_power_lease_control_client_end_.is_valid()) {
-              hardware_power_lease_control_client_end_.reset();
             }
 
             // Communicate to Power Broker that the hardware power level has been raised.
