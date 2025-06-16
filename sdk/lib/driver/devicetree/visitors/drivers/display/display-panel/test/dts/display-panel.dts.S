@@ -14,7 +14,5 @@
     hdmi-display {
       compatible = "test,display";
       panel-type = < TEST_PANEL_TYPE >;
-      display-width = < TEST_DISPLAY_WIDTH >;
-      display-height = < TEST_DISPLAY_HEIGHT >;
     };
 };

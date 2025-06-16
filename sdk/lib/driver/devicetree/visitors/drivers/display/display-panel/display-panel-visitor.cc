@@ -16,8 +16,6 @@ namespace display_panel_visitor_dt {
 DisplayPanelVisitor::DisplayPanelVisitor() {
   fdf_devicetree::Properties properties = {};
   properties.emplace_back(std::make_unique<fdf_devicetree::Uint32Property>(kPanelType));
-  properties.emplace_back(std::make_unique<fdf_devicetree::Uint32Property>(kDisplayWidth));
-  properties.emplace_back(std::make_unique<fdf_devicetree::Uint32Property>(kDisplayHeight));
   parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(properties));
 }
 
@@ -45,10 +43,9 @@ zx::result<> DisplayPanelVisitor::Visit(fdf_devicetree::Node& node,
     return zx::ok();
   }
 
-  display_panel_t display_panel_info;
-  display_panel_info.panel_type = parser_output->at(kPanelType)[0].AsUint32().value();
-  display_panel_info.width = parser_output->at(kDisplayWidth)[0].AsUint32().value();
-  display_panel_info.height = parser_output->at(kDisplayHeight)[0].AsUint32().value();
+  display_panel_t display_panel_info = {
+      .panel_type = parser_output->at(kPanelType)[0].AsUint32().value(),
+  };
 
   fuchsia_hardware_platform_bus::Metadata display_panel_metadata{{
       .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_CONFIG),
@@ -59,8 +56,7 @@ zx::result<> DisplayPanelVisitor::Visit(fdf_devicetree::Node& node,
 
   node.AddMetadata(display_panel_metadata);
 
-  FDF_LOG(DEBUG, "Display panel info - type(%d) size (%d x %d) added to node '%s'",
-          display_panel_info.panel_type, display_panel_info.width, display_panel_info.height,
+  FDF_LOG(DEBUG, "Display panel info - type(%d) added to node '%s'", display_panel_info.panel_type,
           node.name().c_str());
 
   return zx::ok();
