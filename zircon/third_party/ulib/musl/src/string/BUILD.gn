@@ -11,7 +11,6 @@ group("string") {
     ":strsignal",
     ":strverscmp",
     ":wcs",
-    ":wmem",
   ]
   if (!use_llvm_libc_string_functions) {
     deps += [
@@ -300,29 +299,13 @@ source_set("wcs") {
     "wcpcpy.c",
     "wcpncpy.c",
     "wcscasecmp.c",
-    "wcscmp.c",
     "wcscspn.c",
     "wcsdup.c",
     "wcsncasecmp.c",
-    "wcsncpy.c",
     "wcsnlen.c",
-    "wcsrchr.c",
     "wcstok.c",
     "wcswcs.c",
   ]
-
-  if (zircon_toolchain != false) {
-    configs -= [ "//build/config:symbol_visibility_hidden" ]
-  } else {
-    defines = [ "HIDDEN=1" ]
-  }
-}
-
-source_set("wmem") {
-  visibility = [ ":*" ]
-
-  deps = [ "//zircon/third_party/ulib/musl:musl_internal" ]
-  sources = [ "wmemmove.c" ]
 
   if (zircon_toolchain != false) {
     configs -= [ "//build/config:symbol_visibility_hidden" ]
