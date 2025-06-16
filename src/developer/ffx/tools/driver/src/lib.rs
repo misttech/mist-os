@@ -16,7 +16,7 @@ use {
 mod args;
 
 struct DriverConnector {
-    remote_control: Option<RemoteControlProxyHolder>,
+    remote_control: fho::Result<RemoteControlProxyHolder>,
 }
 
 struct CapabilityOptions {
@@ -96,7 +96,7 @@ async fn user_choose_selector(
 }
 
 impl DriverConnector {
-    fn new(remote_control: Option<RemoteControlProxyHolder>) -> Self {
+    fn new(remote_control: fho::Result<RemoteControlProxyHolder>) -> Self {
         Self { remote_control }
     }
 
@@ -160,21 +160,20 @@ impl DriverConnector {
         let CapabilityOptions { capability_name, default_capability_name_for_query } =
             capability_options.into();
 
-        if let Some(ref remote_control) = self.remote_control {
-            let (moniker, capability): (String, &str) = match select {
-                true => {
-                    let query_proxy =
-                        rcs::root_realm_query(remote_control, std::time::Duration::from_secs(15))
-                            .await
-                            .context("opening query")?;
-                    (user_choose_selector(&query_proxy, capability_name).await?, capability_name)
-                }
-                false => (moniker.to_string(), default_capability_name_for_query),
-            };
-            remotecontrol_connect::<S>(&remote_control, &moniker, &capability).await
-        } else {
-            anyhow::bail!("Failed to get remote control proxy");
-        }
+        let Ok(ref remote_control) = self.remote_control else {
+            anyhow::bail!("{}", self.remote_control.as_ref().unwrap_err());
+        };
+        let (moniker, capability): (String, &str) = match select {
+            true => {
+                let query_proxy =
+                    rcs::root_realm_query(remote_control, std::time::Duration::from_secs(15))
+                        .await
+                        .context("opening query")?;
+                (user_choose_selector(&query_proxy, capability_name).await?, capability_name)
+            }
+            false => (moniker.to_string(), default_capability_name_for_query),
+        };
+        remotecontrol_connect::<S>(&remote_control, &moniker, &capability).await
     }
 }
 
@@ -225,7 +224,7 @@ impl FfxMain for DriverTool {
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
         driver_tools::driver(
             self.cmd.into(),
-            DriverConnector::new(self.remote_control.ok()),
+            DriverConnector::new(self.remote_control),
             &mut writer,
         )
         .await
