@@ -16,7 +16,7 @@ use netext::TokioAsyncWrapper;
 use std::net::SocketAddr;
 use std::path::PathBuf;
 use tokio::net::TcpStream;
-use usb_bulk::AsyncInterface;
+use usb_fastboot_discovery::Interface as AsyncInterface;
 
 pub enum FastbootConnectionKind {
     Usb(String),
@@ -123,7 +123,7 @@ impl FastbootNetworkConnectionConfig {
 pub async fn usb_proxy(serial_number: String) -> Result<FastbootProxy<AsyncInterface>> {
     let mut interface_factory = UsbFactory::new(serial_number.clone());
     let interface = interface_factory.open().await.with_context(|| {
-        format!("Failed to open target usb interface by serial {serial_number}")
+        format!("Usb Proxy: Failed to open target usb interface by serial {serial_number}")
     })?;
 
     Ok(FastbootProxy::<AsyncInterface>::new(serial_number, interface, interface_factory))

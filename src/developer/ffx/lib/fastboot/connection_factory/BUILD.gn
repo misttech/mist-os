@@ -22,7 +22,7 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/fastboot/transport/interface:lib",
     "//src/developer/ffx/lib/fastboot_file_discovery:lib",
     "//src/developer/ffx/lib/netext:lib",
-    "//src/lib/usb_bulk/rust:lib",
+    "//src/developer/ffx/lib/usb_fastboot_discovery:lib",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:tokio",
