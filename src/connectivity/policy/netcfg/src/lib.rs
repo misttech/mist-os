@@ -3723,6 +3723,7 @@ fn map_address_state_provider_error(
                 }
                 fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::AlreadyAssigned
                 | fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::DadFailed
+                | fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::Forfeited
                 | fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::InterfaceRemoved
                 | fidl_fuchsia_net_interfaces_admin::AddressRemovalReason::UserRemoved => {
                     errors::Error::NonFatal

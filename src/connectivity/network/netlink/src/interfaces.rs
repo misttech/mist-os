@@ -866,6 +866,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         }
                         AddressRemovalReason::AlreadyAssigned => RequestError::AlreadyExists,
                         reason @ (AddressRemovalReason::DadFailed
+                        | AddressRemovalReason::Forfeited
                         | AddressRemovalReason::InterfaceRemoved
                         | AddressRemovalReason::UserRemoved) => {
                             // These errors are only returned when the address

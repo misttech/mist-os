@@ -59,6 +59,13 @@ type AddressRemovalReason = strict enum {
     /// Invalid address properties or parameters during addition or properties
     /// update.
     INVALID_PROPERTIES = 6;
+
+    /// The address was voluntarily forfeited.
+    ///
+    /// While performing ongoing address conflict detection, a neighbor was
+    /// found to be using the address. This error is similar to `DAD_FAILED`,
+    /// except that it may occur at any time after the address becomes assigned.
+    FORFEITED = 7;
 };
 
 /// Offers state information about an IP address.
