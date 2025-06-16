@@ -7,7 +7,7 @@
 
 #include "aml-nna.h"
 
-static aml_nna::AmlNnaDevice::NnaBlock A5NnaBlock{
+static aml_nna::AmlNnaDriver::NnaBlock A5NnaBlock{
     .nna_power_version = kNnaPowerDomain,
     // RESET2_LEVEL
     .nna_domain_id = A5_PDID_NNA,

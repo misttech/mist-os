@@ -11,7 +11,7 @@
 
 #include "aml-nna.h"
 
-static aml_nna::AmlNnaDevice::NnaBlock T931NnaBlock{
+static aml_nna::AmlNnaDriver::NnaBlock T931NnaBlock{
     .nna_power_version = kNnaPowerDomainLegacy,
     .nna_regs =
         {
