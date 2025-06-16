@@ -4,18 +4,15 @@
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
-use fastboot::command::{ClientVariable, Command};
-use fastboot::reply::Reply;
-use fastboot::{send, FastbootContext};
 use ffx_fastboot_interface::interface_factory::{
     InterfaceFactory, InterfaceFactoryBase, InterfaceFactoryError,
 };
 use fuchsia_async::MonotonicDuration;
 use futures::channel::oneshot::{channel, Sender};
+use usb_bulk::AsyncInterface;
 use usb_fastboot_discovery::{
-    open_interface_with_serial, wait_for_live, DefaultSerialFinder, FastbootEvent,
-    FastbootEventHandler, FastbootUsbLiveTester, FastbootUsbWatcher, Interface as AsyncInterface,
-    UnversionedFastbootUsbTester,
+    find_serial_numbers, open_interface_with_serial, wait_for_live, FastbootEvent,
+    FastbootEventHandler, FastbootUsbLiveTester, FastbootUsbWatcher, UnversionedFastbootUsbTester,
 };
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -44,7 +41,7 @@ struct UsbTargetHandler {
 impl FastbootEventHandler for UsbTargetHandler {
     async fn handle_event(&mut self, event: Result<FastbootEvent>) {
         if self.tx.is_none() {
-            log::warn!("Handling event: {:?} but our sender is none. Returning early.", event);
+            log::warn!("Handling an event but our sender is none. Returning early.");
             return;
         }
         match event {
@@ -84,35 +81,7 @@ pub struct StrictGetVarFastbootUsbLiveTester {
 
 impl FastbootUsbLiveTester for StrictGetVarFastbootUsbLiveTester {
     async fn is_fastboot_usb_live(&mut self, serial: &str) -> bool {
-        if !(*serial == self.serial) {
-            return false;
-        }
-        let Ok(mut interface) = open_interface_with_serial(serial).await else {
-            return false;
-        };
-
-        match send(FastbootContext::new(), Command::GetVar(ClientVariable::Version), &mut interface)
-            .await
-        {
-            Ok(Reply::Okay(version)) => {
-                log::debug!("USB serial {serial}: fastboot version: {version}");
-                true
-            }
-            Ok(Reply::Fail(message)) => {
-                log::warn!("Failed to get variable \"version\" with message: \"{message}\". but we communicated over fastboot protocol... continuing");
-                true
-            }
-            Err(e) => {
-                log::warn!(
-                "USB serial {serial}: could not communicate over Fastboot protocol. Error: {e:#?}"
-            );
-                false
-            }
-            e => {
-                log::warn!("USB serial {serial}: got unexpected response getting variable: {e:#?}");
-                false
-            }
-        }
+        *serial == self.serial && open_interface_with_serial(serial).await.is_ok()
     }
 }
 
@@ -120,7 +89,7 @@ impl FastbootUsbLiveTester for StrictGetVarFastbootUsbLiveTester {
 impl InterfaceFactoryBase<AsyncInterface> for UsbFactory {
     async fn open(&mut self) -> Result<AsyncInterface, InterfaceFactoryError> {
         let interface = open_interface_with_serial(&self.serial).await.with_context(|| {
-            format!("USB Factory: Failed to open target usb interface by serial {}", self.serial)
+            format!("Failed to open target usb interface by serial {}", self.serial)
         })?;
         log::debug!("serial now in use: {}", self.serial);
         Ok(interface)
@@ -143,7 +112,7 @@ impl InterfaceFactoryBase<AsyncInterface> for UsbFactory {
         // This is usb therefore we only need to find usb targets
         let watcher = FastbootUsbWatcher::new(
             handler,
-            DefaultSerialFinder {},
+            find_serial_numbers,
             // This tester will not attempt to talk to the USB devices to extract version info, it
             // only inspects the USB interface
             UnversionedFastbootUsbTester {},
