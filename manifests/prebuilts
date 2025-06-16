@@ -697,7 +697,7 @@
              version="git_revision:dae4a6ef25d94c128a967476b89597fa0a2d8b79"/>
     <package name="fuchsia/drivers/rtc/board_input_bundle_set"
              path="prebuilt/drivers/rtc/pcf8563/board_input_bundle_set"
-             version="git_revision:524b5c953081831a6ab09a0600adbe208fe935e3"/>
+             version="git_revision:744e86b7d5b2803bcd5874ff3cc5bf54e3f5788e"/>
     <package name="fuchsia/drivers/rtc/pcf8563/debug-symbols-arm64"
              path="prebuilt/.build-id"
              version="git_revision:dae4a6ef25d94c128a967476b89597fa0a2d8b79"

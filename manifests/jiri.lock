@@ -96,8 +96,8 @@
     },
     {
         "package": "fuchsia/drivers/rtc/board_input_bundle_set",
-        "version": "git_revision:524b5c953081831a6ab09a0600adbe208fe935e3",
-        "instance_id": "RQpobCc1WGZ84FHZDWSRVmJlWOno7nFhzIu7kE_CsfgC"
+        "version": "git_revision:744e86b7d5b2803bcd5874ff3cc5bf54e3f5788e",
+        "instance_id": "ULUHY009YQUVQK5Y4I2jMOAOxi8tL5cqjUVchiH_4jIC"
     },
     {
         "package": "fuchsia/drivers/rtc/pcf8563/arm64",
