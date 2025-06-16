@@ -9,21 +9,18 @@ import("//build/rust/rustc_test.gni")
 rustc_binary("bin") {
   name = "ext4_readonly"
   edition = "2021"
-  with_unit_tests = true
+  with_unit_tests = false
 
   deps = [
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-runtime",
     "//src/storage/ext4/lib/parser",
-    "//src/storage/ext4/read-only:ext4-read-only",
-    "//src/storage/ext4/server/fidl:ext4_readonly_rust",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
   ]
 
@@ -35,20 +32,17 @@ rustc_test("ext4_server_integration_test") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/rust/zx",
-    "//src/lib/fdio/rust:fdio",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",
-    "//src/lib/fuchsia-runtime",
-    "//src/lib/scoped_task",
-    "//src/storage/ext4/server/fidl:ext4_readonly_rust",
-    "//src/storage/lib/block_client/rust",
-    "//src/storage/lib/ramdevice_client/rust:ramdevice_client",
+    "//src/storage/lib/block_server:vmo_backed_block_server",
+    "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:futures",
     "//third_party/rust_crates:hex",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:sha2",
@@ -58,10 +52,6 @@ rustc_test("ext4_server_integration_test") {
   data_deps = [ ":bin" ]
 
   sources = [ "tests/ext4_server_test.rs" ]
-}
-
-group("server") {
-  deps = [ ":ext4_readonly" ]
 }
 
 fuchsia_component("ext4_readonly_comp") {
@@ -74,14 +64,8 @@ fuchsia_package("ext4_readonly") {
   deps = [ ":ext4_readonly_comp" ]
 }
 
-fuchsia_unittest_package("ext4_server_tests") {
-  deps = [ ":bin_test" ]
-}
-
-fuchsia_component("ext4_server_integration_test_comp") {
-  testonly = true
-  component_name = "ext4_server_integration_test"
-  manifest = "meta/ext4_server_integration_test.cml"
+fuchsia_unittest_component("ext4_server_integration_test_component") {
+  component_name = "ext4_readonly_integration_test"
   deps = [ ":ext4_server_integration_test" ]
 }
 
@@ -96,18 +80,14 @@ resource("ext4_server_integration_test_data") {
 }
 
 fuchsia_test_package("ext4_server_integration_tests") {
-  test_components = [ ":ext4_server_integration_test_comp" ]
+  test_components = [ ":ext4_server_integration_test_component" ]
   deps = [
     ":ext4_readonly_comp",
     ":ext4_server_integration_test_data",
-    "//src/storage/testing:storage_driver_test_realm",
   ]
 }
 
 group("tests") {
   testonly = true
-  deps = [
-    ":ext4_server_integration_tests",
-    ":ext4_server_tests",
-  ]
+  deps = [ ":ext4_server_integration_tests" ]
 }
