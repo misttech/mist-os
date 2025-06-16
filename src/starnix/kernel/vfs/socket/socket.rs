@@ -14,7 +14,7 @@ use crate::vfs::buffers::{
     AncillaryData, InputBuffer, MessageReadInfo, OutputBuffer, VecInputBuffer, VecOutputBuffer,
 };
 use crate::vfs::socket::SocketShutdownFlags;
-use crate::vfs::{default_ioctl, FileHandle, FileObject, FsNodeHandle};
+use crate::vfs::{default_ioctl, DowncastedFile, FileHandle, FileObject, FsNodeHandle};
 use byteorder::{ByteOrder as _, NativeEndian};
 use starnix_uapi::user_address::ArchSpecific;
 use starnix_uapi::{arch_struct_with_union, AF_INET};
@@ -1183,6 +1183,21 @@ impl Socket {
     // infallible.
     pub fn fs_node(&self) -> Option<FsNodeHandle> {
         self.state.lock().fs_node.clone()
+    }
+}
+
+impl DowncastedFile<'_, SocketFile> {
+    pub fn connect<L>(
+        self,
+        locked: &mut Locked<L>,
+        current_task: &CurrentTask,
+        peer: SocketPeer,
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        security::check_socket_connect_access(current_task, self, &peer)?;
+        self.socket.ops.connect(&mut locked.cast_locked(), &self.socket, current_task, peer)
     }
 }
 

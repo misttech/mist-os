@@ -23,7 +23,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
 use zx::HandleBased;
 
-use super::{socket_fs, SocketPeer};
+use super::socket_fs;
 
 pub struct SocketFile {
     pub(super) socket: SocketHandle,
@@ -300,20 +300,5 @@ impl SocketFile {
             result?;
         }
         Ok(read_info)
-    }
-}
-
-impl DowncastedFile<'_, SocketFile> {
-    pub fn connect<L>(
-        self,
-        locked: &mut Locked<L>,
-        current_task: &CurrentTask,
-        peer: SocketPeer,
-    ) -> Result<(), Errno>
-    where
-        L: LockEqualOrBefore<FileOpsCore>,
-    {
-        security::check_socket_connect_access(current_task, self, &peer)?;
-        self.socket.ops.connect(&mut locked.cast_locked(), &self.socket, current_task, peer)
     }
 }
