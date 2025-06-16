@@ -104,24 +104,6 @@ const std::vector<fpbus::Bti> display_btis{
     }},
 };
 
-// The keys in the map must match the enum used by the bootloader.
-const std::map<uint32_t, uint32_t> kBootloaderPanelTypeToDisplayPanelType = {
-    {1, PANEL_KD_KD070D82_FITIPOWER_JD9364},
-    {2, PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON},
-    // 3 was for PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364.
-    {4, PANEL_KD_KD070D82_FITIPOWER_JD9365},
-    {5, PANEL_BOE_TV070WSM_FITIPOWER_JD9365},
-    // 6 was for PANEL_TV070WSM_ST7703I.
-};
-
-zx::result<uint32_t> GetDisplayPanelTypeFromBootloaderMetadata(uint32_t bootloader_metadata) {
-  if (kBootloaderPanelTypeToDisplayPanelType.find(bootloader_metadata) !=
-      kBootloaderPanelTypeToDisplayPanelType.end()) {
-    return zx::ok(kBootloaderPanelTypeToDisplayPanelType.at(bootloader_metadata));
-  }
-  return zx::error(ZX_ERR_NOT_FOUND);
-}
-
 zx::result<uint32_t> GetDisplayPanelTypeFromGpioPanelPins(uint32_t gpio_panel_type_pins) {
   switch (gpio_panel_type_pins) {
     case 0b10:
@@ -140,35 +122,14 @@ zx::result<uint32_t> GetDisplayPanelTypeFromGpioPanelPins(uint32_t gpio_panel_ty
 }  // namespace
 
 zx::result<> PostInit::InitDisplay() {
-  // The value of the metadata is provided by the bootloader which performs the
-  // panel detection logic.
-  zx::result<std::unique_ptr<uint32_t>> metadata =
-      compat::GetMetadata<uint32_t>(incoming(), DEVICE_METADATA_BOARD_PRIVATE, "pbus");
-
-  uint32_t panel_type = PANEL_UNKNOWN;
-  if (metadata.is_ok() && metadata.value() != nullptr) {
-    uint32_t metadata_value = *metadata.value();
-    FDF_LOG(DEBUG, "Detecting panel from bootloader-provided metadata (%" PRIu32 ")",
-            metadata_value);
-    zx::result<uint32_t> panel_type_result =
-        GetDisplayPanelTypeFromBootloaderMetadata(metadata_value);
-    if (!panel_type_result.is_ok()) {
-      FDF_LOG(ERROR, "Failed to get display type from bootloader metadata (%" PRIu32 "): %s",
-              metadata_value, panel_type_result.status_string());
-      return panel_type_result.take_error();
-    }
-    panel_type = panel_type_result.value();
-  } else {
-    FDF_LOG(INFO, "Failed to get panel data (%s), falling back to GPIO inspection",
-            zx_status_get_string(metadata.error_value()));
-    zx::result<uint32_t> panel_type_result = GetDisplayPanelTypeFromGpioPanelPins(display_id_);
-    if (!panel_type_result.is_ok()) {
-      FDF_LOG(ERROR, "Failed to get display type from GPIO inspection (%" PRIu32 "): %s",
-              display_id_, panel_type_result.status_string());
-      return panel_type_result.take_error();
-    }
-    panel_type = panel_type_result.value();
+  zx::result<uint32_t> panel_type_result = GetDisplayPanelTypeFromGpioPanelPins(display_id_);
+  if (!panel_type_result.is_ok()) {
+    FDF_LOG(ERROR, "Failed to get display type from GPIO inspection (%" PRIu32 "): %s", display_id_,
+            panel_type_result.status_string());
+    return panel_type_result.take_error();
   }
+  const uint32_t panel_type = panel_type_result.value();
+  FDF_LOG(DEBUG, "Display panel type: %" PRIu32, panel_type);
 
   display_panel_t display_panel_info = {
       .panel_type = panel_type,
