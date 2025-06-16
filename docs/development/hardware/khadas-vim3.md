@@ -235,7 +235,7 @@ modified U-Boot from source:
 
    ./fastboot flash bootloader ~/fuchsia/prebuilt/third_party/firmware/vim3/u-boot.bin.unsigned
 
-   ./fastboot reboot
+   ./fastboot reboot bootloader
    ```
 
    Important: When working with Fuchsia, remember to use the
@@ -251,13 +251,13 @@ Use this workflow only the first time you flash Fuchsia onto the VIM3. If you've
 already got Fuchsia running on the VIM3, use the [Update your Fuchsia image]
 workflow because it's faster.
 
-1. If you just ran the `./fastboot reboot` command from the last section then
-   your VIM3 should already be in `fastboot` mode. You can check your `fx serial`
-   logs to confirm. Otherwise press the reset button and then repeatedly press
-   the <kbd>F</kbd> key in your `fx serial` console until you see `USB RESET`
-   and `SPEED ENUM` again.
+1. If you just ran the `./fastboot reboot bootloader` command from the last
+   section then your VIM3 should already be in `fastboot` mode. You can check
+   your `fx serial` logs to confirm. Otherwise press the reset button and then
+   repeatedly press the <kbd>f</kbd> key in your `fx serial` console until you
+   see `USB RESET` and `SPEED ENUM` again.
 
-   Caution: You have to press the <kbd>F</kbd> key now to enter
+   Caution: You have to press the <kbd>f</kbd> key now to enter
    <code>fastboot</code> mode. Previously you pressed the <kbd>Space</kbd> key.
 
 1. From a separate terminal on your host run the following command:
