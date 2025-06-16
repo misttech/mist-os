@@ -1670,7 +1670,7 @@ testing::AssertionResult SetParam(pid_t pid) {
   return testing::AssertionSuccess();
 }
 
-TEST(SchedSetParamTest, InvalidArguments) {
+TEST(SchedSetParamTest, InvalidArgument) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
@@ -1702,7 +1702,51 @@ TEST(SchedSetParamTest, InvalidArguments) {
   });
 }
 
-TEST(SchedSetParamTest, RootCanSetOwnScheduler) {
+TEST(SchedSetParamTest, InvalidArgumentAndEuidUnfriendly) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
+  }
+
+  test_helper::ForkHelper fork_helper;
+  Rendezvous ready = MakeRendezvous();
+  Rendezvous complete = MakeRendezvous();
+
+  pid_t target_pid =
+      SpawnTarget(fork_helper, std::move(ready.poker), std::move(complete.holder), []() {
+        // Remove rlimits from consideration in this test.
+        rlimit rtpriority_rlimit = {
+            .rlim_cur = RLIM_INFINITY,
+            .rlim_max = RLIM_INFINITY,
+        };
+        SAFE_SYSCALL(setrlimit(RLIMIT_RTPRIO, &rtpriority_rlimit));
+
+        sched_param param = {.sched_priority = 25};
+        SAFE_SYSCALL(sched_setscheduler(0, SCHED_RR, &param));
+
+        Become(kUser2Uid, kUser2Uid);
+      });
+
+  fork_helper.RunInForkedProcess([ready = std::move(ready.holder),
+                                  complete = std::move(complete.poker), target_pid]() mutable {
+    Become(kUser1Uid, kUser1Uid);
+
+    ready.hold();
+
+    // 0 is a valid priority for some scheduling policies, but not for
+    // SCHED_RR, so the EINVAL here (rather than EPERM) tells us that the
+    // "this priority doesn't make sense for the current policy" "wins"
+    // over "the caller does not have permission sufficient to change the
+    // target".
+    errno = 0;
+    sched_param param{.sched_priority = 0};
+    EXPECT_EQ(sched_setparam(target_pid, &param), -1);
+    EXPECT_EQ(errno, EINVAL);
+
+    complete.poke();
+  });
+}
+
+TEST(SchedSetParamTest, RootCanSetOwnParam) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping test.";
   }
