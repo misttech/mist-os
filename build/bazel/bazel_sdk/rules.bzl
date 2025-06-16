@@ -21,7 +21,6 @@ def _generate_merged_idk(ctx):
 
     if len(ctx.files._schema_files) == 0:
         fail("No schema files specified.")
-    inputs = ctx.files._schema_files
     schema_dir_path = ctx.files._schema_files[0].dirname
 
     _collection_relative_path = "sdk/exported/%s" % ctx.attr.collection_name
@@ -40,6 +39,10 @@ def _generate_merged_idk(ctx):
         "--release-version",
         sdk_id,
     ]
+
+    inputs = depset(
+        [ctx.file.json_validator] + ctx.files._schema_files,
+    )
 
     for cpu in ctx.attr.buildable_cpus:
         args += [
@@ -115,6 +118,7 @@ generate_merged_idk = rule(
             doc = "The JSON validator executable for schema validation",
             default = "//build/tools/json_validator:json_validator_valico",
             allow_single_file = True,
+            cfg = "exec",
         ),
         "_schema_files": attr.label(
             doc = "The IDK schema files. They must all be in the same directory.",

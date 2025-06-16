@@ -11,6 +11,7 @@ rust_binary(
     rustc_flags = [
         "-Cpanic=abort",
     ],
+    visibility = ["//visibility:public"],
     deps = [
         "//third_party/rust_crates/vendor:argh",
         "//third_party/rust_crates/vendor:serde_json",
