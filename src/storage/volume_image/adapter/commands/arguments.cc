@@ -12,6 +12,7 @@
 #include <utility>
 
 #include "src/storage/fvm/format.h"
+#include "src/storage/minfs/format.h"
 #include "src/storage/volume_image/adapter/commands.h"
 #include "src/storage/volume_image/options.h"
 
@@ -192,8 +193,15 @@ fpromise::result<std::vector<PartitionParams>, std::string> PartitionParams::Fro
     empty_data_partition.type_guid = GUID_DATA_VALUE;
     // Doesn't need to be encrypted, it will be found by GUID and label and reformated.
     empty_data_partition.encrypted = false;
-    // Reserve 1 slice for zxcrypt, and 8MiB for data.
-    empty_data_partition.options.max_bytes = options.slice_size + 8388608;
+    // Reserve the minimum amount of space required for minfs, plus an extra slice for zxcrypt.
+    // This ensures that generated images will always be big enough to format minfs.
+    // NB: we always give at least 8MiB for data (plus 1 slice for zxcrypt), which is only relevant
+    // for products which have a non-default slice size.  This limit is selected to preserve
+    // compatibility with old behaviour, and because minfs might actually need more space when very
+    // small slices are used.
+    empty_data_partition.options.max_bytes =
+        std::max(options.slice_size + (8ul * 1024 * 1024),
+                 (1 + minfs::kMinfsMinimumSlices) * options.slice_size);
 
     partitions.push_back(empty_data_partition);
   }
