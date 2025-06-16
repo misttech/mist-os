@@ -78,8 +78,6 @@
 #define PANEL_UNKNOWN UINT8_C(0xFF)
 
 typedef struct {
-  uint32_t width;
-  uint32_t height;
   uint32_t panel_type;
 } display_panel_t;
 

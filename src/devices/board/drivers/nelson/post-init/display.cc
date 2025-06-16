@@ -170,12 +170,8 @@ zx::result<> PostInit::InitDisplay() {
     panel_type = panel_type_result.value();
   }
 
-  display_panel_t display_panel_info[] = {
-      {
-          .width = 600,
-          .height = 1024,
-          .panel_type = panel_type,
-      },
+  display_panel_t display_panel_info = {
+      .panel_type = panel_type,
   };
 
   const std::vector<fpbus::Metadata> display_panel_metadata{
