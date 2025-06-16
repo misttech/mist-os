@@ -22,14 +22,13 @@
 namespace internal {
 
 // A modifier that converts a raw ticks counter value to a point on the monotonic ticks timeline.
-// This modifier has two different modes of operation, and the mode is selected using the sign of
-// the variable.
-//
-// If the value is positive (> 0), the monotonic clock is paused and this variable contains the
-// value of the clock when it was paused.
-//
-// If the value is non-positive (<= 0), the monotonic clock is ticking and this variable contains
-// the offset between the monotonic ticks and the raw ticks counter.
+// This modifier has three different modes of operation.
+// 1. If the value is ZX_TIME_INFINITE_PAST, then the modifier is being updated and all attempts
+//    to read it should be retried.
+// 2. If the value is positive (> 0), the monotonic clock is paused and this variable contains the
+//    value of the clock when it was paused.
+// 3. If the value is non-positive (<= 0), the monotonic clock is ticking and this variable contains
+//    the offset between the monotonic ticks and the raw ticks counter.
 inline ktl::atomic<zx_ticks_t> mono_ticks_modifier{0};
 
 // This threshold detects when the initial ticks offset is set to a value that is "Very Close" to
@@ -215,7 +214,7 @@ inline zx_instant_mono_ticks_t timer_current_mono_ticks_synchronized() {
     const zx_ticks_t obs1 = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
     const zx_ticks_t raw_ticks = platform_current_raw_ticks_synchronized<Flags>();
     const zx_ticks_t obs2 = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
-    if (obs1 == obs2) {
+    if (obs1 == obs2 && obs1 != ZX_TIME_INFINITE_PAST) {
       // If the observation is positive, it's the value of the paused monotonic clock, so return
       // the observation directly. Otherwise, it's an offset, so return the sum of the observation
       // and the raw ticks counter.
@@ -263,7 +262,7 @@ inline CurrentTicksObservation timer_current_mono_and_boot_ticks() {
                                                 GetTicksSyncFlag::kBeforeSubsequentLoads>();
     const zx_ticks_t boot_off2 = internal::boot_ticks_offset.load(ktl::memory_order_relaxed);
     const zx_ticks_t mono_obs2 = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
-    if (boot_off1 == boot_off2 && mono_obs1 == mono_obs2) {
+    if (boot_off1 == boot_off2 && mono_obs1 == mono_obs2 && mono_obs1 != ZX_TIME_INFINITE_PAST) {
       // If our monotonic modifier observation was positive, the clock is paused and the observation
       // is the current monotonic ticks value.
       const zx_instant_mono_ticks_t mono_now = mono_obs1 > 0 ? mono_obs1 : raw_ticks + mono_obs1;
@@ -283,12 +282,35 @@ inline zx_instant_boot_ticks_t current_boot_ticks() { return timer_current_boot_
 //
 // These functions are safe to call concurrently with `timer_current_mono_ticks_synchronized`, as
 // that function will retry its read of the current ticks if the value of the `mono_ticks_modifier`
-// is changed.
+// is ZX_TIME_INFINITE_PAST, which we set it to before our update, or if it notices that the value
+// has changed during its read.
 //
-// It is NOT safe to call timer_pause_monotonic and timer_unpause_monotonic concurrently.
+// It is NOT safe to call timer_pause_monotonic and timer_unpause_monotonic concurrently, nor is it
+// safe to call this function concurrently with itself.
 inline void timer_pause_monotonic() {
-  const zx_instant_mono_ticks_t paused_ticks = current_mono_ticks();
-  DEBUG_ASSERT(paused_ticks > 0);
+  // Read the current value of the modifier. We can do this without performing a sequential read
+  // because this function is the only function that can modify the modifier after the timer has
+  // been initialized.
+  const zx_ticks_t modifier = internal::mono_ticks_modifier.load(ktl::memory_order_relaxed);
+  DEBUG_ASSERT(modifier != ZX_TIME_INFINITE_PAST);
+  DEBUG_ASSERT(modifier <= 0);
+
+  // Set the modifier to ZX_TIME_INFINITE_PAST to signal to any concurrent calls to
+  // timer_current_mono_ticks that the modifier is being updated and they should therefore retry
+  // their read.
+  internal::mono_ticks_modifier.store(ZX_TIME_INFINITE_PAST, ktl::memory_order_relaxed);
+
+  // Compute the current monotonic time. To do so, we load the raw ticks with synchronization
+  // barriers that will prevent it from being reordered above the previous load and store. This is
+  // necessary to prevent this call from retrieving a raw ticks value from before we started the
+  // pause operation. We don't need to specify `GetTicksSyncFlag::kBeforeSubsequentStores` because
+  // the store of the mono_ticks_modifier below has a data dependency on this call.
+  const zx_instant_mono_ticks_t raw_ticks =
+      platform_current_raw_ticks_synchronized<GetTicksSyncFlag::kAfterPreviousLoads |
+                                              GetTicksSyncFlag::kAfterPreviousStores>();
+
+  // Finally, update the mono_ticks_modifier to the paused ticks value.
+  const zx_instant_mono_ticks_t paused_ticks = raw_ticks + modifier;
   internal::mono_ticks_modifier.store(paused_ticks, ktl::memory_order_relaxed);
 }
 inline void timer_unpause_monotonic() {
