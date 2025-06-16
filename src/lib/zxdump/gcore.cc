@@ -5,7 +5,6 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <lib/fit/defer.h>
-#include <lib/stdcompat/functional.h>
 #include <lib/zxdump/dump.h>
 #include <lib/zxdump/elf-search.h>
 #include <lib/zxdump/fd-writer.h>
@@ -16,6 +15,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -320,7 +320,7 @@ class ProcessDumper : public DumperBase {
 
     // TODO(mcgrathr): more filtering switches
 
-    return cpp20::bind_front(&ProcessDumper::PruneDefault, this);
+    return std::bind_front(&ProcessDumper::PruneDefault, this);
   }
 
   static fit::result<zxdump::Error, zxdump::SegmentDisposition> PruneAll(

@@ -7,10 +7,10 @@
 
 #include <lib/elfldltl/layout.h>
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 #include <zircon/syscalls/object.h>
 
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 
@@ -65,7 +65,7 @@ struct ElfIdentity {
 // doesn't have to be one returned by DetectElf (i.e. by process.read_memory)
 // but it can be.
 fit::result<Error, ElfIdentity> DetectElfIdentity(  //
-    Process& process, const zx_info_maps_t& segment, cpp20::span<const Elf::Phdr> phdrs);
+    Process& process, const zx_info_maps_t& segment, std::span<const Elf::Phdr> phdrs);
 
 // This uses zxdump::DetectElf to search a range of the address space for an
 // ELF image.  It returns a {first, last} pair giving the [first, last)
@@ -73,7 +73,7 @@ fit::result<Error, ElfIdentity> DetectElfIdentity(  //
 // {last, last} if none is found.  If it encounters errors, it returns {it, it}
 // pointing to the segment where zxdump::DetectElf or zxdump::DetectElfIdentity
 // returned an error.
-using MapsInfoSpanIterator = cpp20::span<const zx_info_maps_t>::iterator;
+using MapsInfoSpanIterator = std::span<const zx_info_maps_t>::iterator;
 using ElfSearchResult = std::pair<MapsInfoSpanIterator, MapsInfoSpanIterator>;
 ElfSearchResult ElfSearch(Process& process, MapsInfoSpanIterator first, MapsInfoSpanIterator last);
 

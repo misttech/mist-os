@@ -158,7 +158,7 @@ void TestProcessForElfSearch::CheckDump(zxdump::TaskHolder& holder) {
       ASSERT_EQ(segment.type, ZX_INFO_MAPS_TYPE_MAPPING);
       auto detect = zxdump::DetectElf(read_process, segment);
       ASSERT_TRUE(detect.is_ok()) << detect.error_value();
-      cpp20::span phdrs = **detect;
+      std::span phdrs = **detect;
       EXPECT_THAT(phdrs, Not(IsEmpty()));
       auto identity = zxdump::DetectElfIdentity(read_process, segment, phdrs);
       ASSERT_TRUE(identity.is_ok()) << identity.error_value();
@@ -200,14 +200,14 @@ void TestProcessForElfSearch::CheckDump(zxdump::TaskHolder& holder) {
 
 void TestProcessForElfSearch::CheckNotes(int fd) {
   auto must_read = [fd](auto&& span, off_t pos) {
-    cpp20::span data(span);
+    std::span data(span);
     ssize_t nread = pread(fd, data.data(), data.size_bytes(), pos);
     ASSERT_GE(nread, 0) << strerror(errno);
     ASSERT_EQ(data.size_bytes(), static_cast<size_t>(nread));
   };
 
   zxdump::Elf::Ehdr ehdr;
-  ASSERT_NO_FATAL_FAILURE(must_read(cpp20::span(&ehdr, 1), 0));
+  ASSERT_NO_FATAL_FAILURE(must_read(std::span(&ehdr, 1), 0));
 
   std::vector<zxdump::Elf::Phdr> phdrs(ehdr.phnum);
   ASSERT_NO_FATAL_FAILURE(must_read(phdrs, ehdr.phoff));

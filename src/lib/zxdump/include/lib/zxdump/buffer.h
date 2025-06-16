@@ -5,10 +5,9 @@
 #ifndef SRC_LIB_ZXDUMP_INCLUDE_LIB_ZXDUMP_BUFFER_H_
 #define SRC_LIB_ZXDUMP_INCLUDE_LIB_ZXDUMP_BUFFER_H_
 
-#include <lib/stdcompat/span.h>
-
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -40,7 +39,7 @@ class BufferImpl {
 // after either the zxdump::Buffer object or the associated zxdump::TaskHolder
 // object has been destroyed.
 //
-// zxdump::Buffer<T> acts like a smart-pointer type to cpp20::span<const T> (or
+// zxdump::Buffer<T> acts like a smart-pointer type to std::span<const T> (or
 // a similar type) in that it has get() and the * and -> operators to access
 // that object's standard methods.  Unlike other smart-pointer types, a
 // zxdump::Buffer has no nullptr-like state (except when default-constructed)
@@ -58,7 +57,7 @@ class BufferImpl {
 // Note that all memory will appear to have been elided if the dump was read in
 // by a zxdump::TaskHolder::Insert with read_memory=false.
 
-template <typename T = std::byte, class View = cpp20::span<const T>>
+template <typename T = std::byte, class View = std::span<const T>>
 class Buffer {
  public:
   Buffer() = default;
@@ -122,7 +121,7 @@ class Buffer {
 };
 
 // This is just zxdump::Buffer using std::string_view and cousins instead of
-// cpp20::span to present the data.
+// std::span to present the data.
 template <typename T = char>
 using StringBuffer = Buffer<T, std::basic_string_view<T>>;
 

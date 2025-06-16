@@ -5,13 +5,13 @@
 #include <lib/elfldltl/layout.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
-#include <lib/stdcompat/string_view.h>
 #include <zircon/types.h>
 
 #include <cerrno>
 #include <cstdlib>
 #include <ctime>
 #include <string>
+#include <string_view>
 #include <vector>
 
 #include "job-archive.h"
@@ -82,8 +82,8 @@ void UsageTest(int expected_status, const std::vector<std::string>& args = {}) {
   EXPECT_EQ(status, expected_status);
   EXPECT_EQ(child.collected_stdout(), "");
   std::string text = child.collected_stderr();
-  EXPECT_TRUE(cpp20::starts_with(std::string_view(text), "Usage: ")) << text;
-  EXPECT_TRUE(cpp20::ends_with(std::string_view(text), '\n')) << text;
+  EXPECT_TRUE(std::string_view(text).starts_with("Usage: ")) << text;
+  EXPECT_TRUE(std::string_view(text).ends_with('\n')) << text;
 }
 
 TEST(ZxdumpTests, GcoreHelp) { UsageTest(EXIT_SUCCESS, {"--help"}); }
@@ -158,8 +158,7 @@ TEST(ZxdumpTests, GcoreJobRequiresSwitch) {
   EXPECT_EQ(status, EXIT_FAILURE);
   EXPECT_EQ(child.collected_stdout(), "");
   std::string error_text = child.collected_stderr();
-  EXPECT_TRUE(cpp20::ends_with(std::string_view(error_text), ": KOID is not a process\n"))
-      << error_text;
+  EXPECT_TRUE(std::string_view(error_text).ends_with(": KOID is not a process\n")) << error_text;
 }
 
 // With --jobs, you still just get an ET_CORE file (for each process).
@@ -234,7 +233,7 @@ TEST(ZxdumpTests, GcoreJobDumpIsArchive) {
   char buffer[zxdump::kMinimumArchive];
   ASSERT_EQ(read(fd.get(), buffer, sizeof(buffer)), static_cast<ssize_t>(sizeof(buffer)))
       << strerror(errno);
-  EXPECT_TRUE(cpp20::starts_with(std::string_view(buffer, sizeof(buffer)), zxdump::kArchiveMagic));
+  EXPECT_TRUE(std::string_view(buffer, sizeof(buffer)).starts_with(zxdump::kArchiveMagic));
 }
 
 TEST(ZxdumpTests, GcoreProcessDumpPropertiesAndInfo) {

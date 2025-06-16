@@ -5,7 +5,6 @@
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <getopt.h>
-#include <lib/stdcompat/span.h>
 #include <sys/mman.h>
 #include <unistd.h>
 #include <zircon/assert.h>
@@ -16,6 +15,7 @@
 #include <cstring>
 #include <locale>
 #include <optional>
+#include <span>
 #include <string_view>
 #include <thread>
 #include <vector>
@@ -90,7 +90,7 @@ void Cat(fbl::unique_fd from, int to) {
   char buf[BUFSIZ];
   ssize_t nread;
   while ((nread = read(from.get(), buf, sizeof(buf))) > 0) {
-    cpp20::span<const char> chunk(buf, static_cast<size_t>(nread));
+    std::span<const char> chunk(buf, static_cast<size_t>(nread));
     while (!chunk.empty()) {
       ssize_t nwrote = write(to, chunk.data(), chunk.size());
       if (nwrote < 0) {

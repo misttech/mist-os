@@ -4,7 +4,6 @@
 
 #include "lib/zxdump/dump.h"
 
-#include <lib/stdcompat/span.h>
 #include <lib/zxdump/dump.h>
 #include <lib/zxdump/elf-search.h>
 #include <zircon/assert.h>
@@ -20,6 +19,7 @@
 #include <limits>
 #include <map>
 #include <optional>
+#include <span>
 #include <tuple>
 #include <vector>
 
@@ -1344,7 +1344,7 @@ class ProcessDump::Collector : public CollectorBase<ProcessRemarkClass> {
     place(phdrs_[0]);
 
     // Now place the remaining segments, if any.
-    for (auto& phdr : cpp20::span(phdrs_).subspan(1)) {
+    for (auto& phdr : std::span(phdrs_).subspan(1)) {
       switch (phdr.type) {
         case elfldltl::ElfPhdrType::kLoad:
           place(phdr);
@@ -1627,7 +1627,7 @@ class JobDump::Collector : public CollectorBase<JobRemarkClass> {
   JobNotes notes_;
 };
 
-ByteView JobDump::ArchiveMagic() { return cpp20::as_bytes(cpp20::span(kArchiveMagic)); }
+ByteView JobDump::ArchiveMagic() { return std::as_bytes(std::span(kArchiveMagic)); }
 
 JobDump::JobDump(JobDump&&) noexcept = default;
 JobDump& JobDump::operator=(JobDump&&) noexcept = default;

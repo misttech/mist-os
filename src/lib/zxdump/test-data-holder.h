@@ -75,13 +75,13 @@ struct TestDataValueType {
 // When Traits::type is a span, this default specialization just checks for
 // matching elements by instantiating again on the element type.
 template <typename T>
-struct TestDataValueType<cpp20::span<const T>> {
+struct TestDataValueType<std::span<const T>> {
   using type = std::vector<T>;
 
   static constexpr bool kIsVector = true;
 
-  static void Check(std::string_view name, cpp20::span<const T> old_value,
-                    cpp20::span<const T> new_value) {
+  static void Check(std::string_view name, std::span<const T> old_value,
+                    std::span<const T> new_value) {
     ASSERT_EQ(old_value.size(), new_value.size()) << name;
     for (size_t i = 0; i < old_value.size(); ++i) {
       TestDataValueType<T>::Check(std::string(name) + "[" + std::to_string(i) + "]", old_value[i],

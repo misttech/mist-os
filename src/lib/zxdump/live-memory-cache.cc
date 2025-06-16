@@ -4,13 +4,13 @@
 
 #include "live-memory-cache.h"
 
-#include <lib/stdcompat/span.h>
 #include <lib/zx/process.h>
 #include <lib/zxdump/buffer.h>
 #include <zircon/assert.h>
 #include <zircon/syscalls.h>
 
 #include <cinttypes>
+#include <span>
 
 #include "buffer-impl.h"
 
@@ -21,7 +21,7 @@ const size_t kPagesize = zx_system_get_page_size();
 
 }  // namespace
 
-cpp20::span<const std::byte> TaskHolder::LiveMemoryCache::Page::contents() const {
+std::span<const std::byte> TaskHolder::LiveMemoryCache::Page::contents() const {
   return {contents_.get(), kPagesize};
 }
 
@@ -183,7 +183,7 @@ fit::result<Error, Buffer<>> Process::LiveMemory::ReadLiveMemory(
   }
 
   Buffer<> buffer;
-  buffer.data_ = cpp20::span(*copy);
+  buffer.data_ = std::span(*copy);
   buffer.impl_ = std::move(copy);
   return fit::ok(std::move(buffer));
 }

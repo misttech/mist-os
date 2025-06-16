@@ -34,9 +34,6 @@ zx_library("zxdump") {
     # <lib/zxdump/fd-writer.h> has #include <fbl/unique_fd.h>.
     "//zircon/system/ulib/fbl",
 
-    # <lib/zxdump/types.h> has #include <lib/stdcompat/span.h>.
-    "//sdk/lib/stdcompat",
-
     # <lib/zxdump/elf-search.h> has #include <lib/elfldltl/layout.h>.
     "//src/lib/elfldltl",
   ]
@@ -97,7 +94,6 @@ zx_library("zxdump") {
       "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
       "//sdk/lib/component/incoming/cpp",
       "//sdk/lib/fdio",
-      "//sdk/lib/stdcompat",
       "//src/zircon/lib/zircon",
       "//zircon/system/ulib/zx",
     ]
@@ -146,10 +142,7 @@ source_set("test-tool-process") {
   testonly = true
 
   public = [ "test-tool-process.h" ]
-  public_deps = [
-    "//sdk/lib/stdcompat",
-    "//zircon/system/ulib/fbl",
-  ]
+  public_deps = [ "//zircon/system/ulib/fbl" ]
 
   sources = [ "test-tool-process.cc" ]
   deps = [
@@ -274,10 +267,7 @@ cc_test_executable("zxdump-test-child") {
   exclude_toolchain_tags = [ "uses-shadow" ]
 
   sources = [ "test-child.cc" ]
-  deps = [
-    "//sdk/lib/stdcompat",
-    "//zircon/system/ulib/fbl",
-  ]
+  deps = [ "//zircon/system/ulib/fbl" ]
 
   metadata = {
   }

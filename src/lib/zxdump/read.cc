@@ -4,7 +4,6 @@
 
 #include <lib/elfldltl/note.h>
 #include <lib/fit/defer.h>
-#include <lib/stdcompat/string_view.h>
 #include <lib/zxdump/task.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -14,6 +13,7 @@
 
 #include <charconv>
 #include <forward_list>
+#include <string_view>
 #include <variant>
 
 #include <rapidjson/document.h>
@@ -106,7 +106,7 @@ bool HandleLongName(std::string_view name_table, MemberHeader& member) {
 // was a valid note that wasn't already in the map.
 template <typename Key>
 fit::result<Error, std::optional<Key>> JobNoteName(std::string_view match, std::string_view name) {
-  if (name.size() > match.size() && name[match.size()] == '.' && cpp20::starts_with(name, match)) {
+  if (name.size() > match.size() && name[match.size()] == '.' && name.starts_with(match)) {
     name.remove_prefix(match.size() + 1);
     if (name.empty()) {
       return CorruptedDump();
@@ -895,7 +895,7 @@ fit::result<Error> TaskHolder::JobTree::Read(DumpFile& real_file, bool read_memo
         reinterpret_cast<const char*>(header.data()),
         header.size(),
     };
-    if (cpp20::starts_with(header_string, kArchiveMagic)) {
+    if (header_string.starts_with(kArchiveMagic)) {
       return ReadArchive(*file, where, header, read_memory);
     }
 
@@ -1047,7 +1047,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
       }
 
       // Check for dump remarks.
-      if (cpp20::starts_with(name, kRemarkNotePrefix)) {
+      if (name.starts_with(kRemarkNotePrefix)) {
         process.remarks_.emplace_back(name.substr(kRemarkNotePrefix.size()), desc);
         continue;
       }
@@ -1228,7 +1228,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
       }
     } else if (phdr.type == elfldltl::ElfPhdrType::kLoad && phdr.memsz > 0) {
       uint64_t page_size = std::max<uint64_t>(process.dump_page_size_, phdr.align);
-      if (!cpp20::has_single_bit(process.dump_page_size_)) {
+      if (!std::has_single_bit(process.dump_page_size_)) {
         return fit::error(Error{
             "ELF core file PT_LOAD p_align not a power of two",
             ZX_ERR_IO_DATA_INTEGRITY,
@@ -1253,7 +1253,7 @@ fit::result<Error> TaskHolder::JobTree::ReadElf(DumpFile& file, FileRange where,
   // no PT_LOADs, use that to set the page size.
   if (process.dump_page_size_ == 1) {
     if (uint64_t page_size = system_get_page_size()) {
-      if (!cpp20::has_single_bit(page_size)) {
+      if (!std::has_single_bit(page_size)) {
         return fit::error(Error{
             "system page size not a power of two",
             ZX_ERR_IO_DATA_INTEGRITY,
@@ -1424,7 +1424,7 @@ fit::result<Error> TaskHolder::JobTree::ReadArchive(DumpFile& file, FileRange ar
     }
 
     // Check for dump remarks.
-    if (cpp20::starts_with(member.name, kRemarkNotePrefix)) {
+    if (member.name.starts_with(kRemarkNotePrefix)) {
       auto result = file.ReadPermanent(contents);
       if (result.is_error()) {
         return result.take_error();

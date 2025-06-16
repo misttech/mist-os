@@ -58,7 +58,7 @@ class TaskHolder::LiveMemoryCache {
 
     ~Page();
 
-    cpp20::span<const std::byte> contents() const;
+    std::span<const std::byte> contents() const;
 
     // fbl::TaggedWAVLTree uses this to get the sort key.
     uint64_t GetKey() const { return vaddr_; }

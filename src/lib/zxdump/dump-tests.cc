@@ -5,7 +5,6 @@
 #include "dump-tests.h"
 
 #include <lib/fit/defer.h>
-#include <lib/stdcompat/string_view.h>
 #include <lib/zxdump/dump.h>
 #include <lib/zxdump/fd-writer.h>
 #include <lib/zxdump/task.h>
@@ -16,6 +15,7 @@
 #include <array>
 #include <cinttypes>
 #include <cstdio>
+#include <string_view>
 #include <type_traits>
 
 #include <fbl/unique_fd.h>
@@ -283,7 +283,7 @@ void TestProcessForRemarks::CheckDump(zxdump::TaskHolder& holder) {
   }
 }
 
-std::string IntsString(cpp20::span<const int> ints) {
+std::string IntsString(std::span<const int> ints) {
   std::string str;
   for (int i : ints) {
     if (!str.empty()) {
@@ -319,11 +319,11 @@ void TestProcessForMemory::StartChild() {
       "-m",
       kMemoryText.data(),
       "-M",
-      IntsString(cpp20::span(kMemoryInts)).c_str(),
+      IntsString(std::span(kMemoryInts)).c_str(),
       "-w",
       kMemoryText.data(),
       "-p",
-      IntsString(cpp20::span(memory_sizes)).c_str(),
+      IntsString(std::span(memory_sizes)).c_str(),
   }));
 
   // The test-child wrote the pointers where the -m text and -M int array
@@ -377,7 +377,7 @@ void TestProcessForMemory::CheckDump(zxdump::TaskHolder& holder, bool memory_eli
     auto memory_result = read_process.read_memory<int>(ints_ptr_, kMemoryInts.size());
     ASSERT_TRUE(memory_result.is_ok())
         << memory_result.error_value() << " reading 0x" << std::hex << ints_ptr_;
-    cpp20::span ints = **memory_result;
+    std::span ints = **memory_result;
     if (memory_elided) {
       EXPECT_TRUE(ints.empty()) << " read " << ints.size_bytes();
     } else {
@@ -403,13 +403,13 @@ void TestProcessForMemory::CheckDump(zxdump::TaskHolder& holder, bool memory_eli
       // Even if the whole string ended on a page boundary, that much (which we
       // know is more than the minimum requested) will be available.
       ASSERT_GE(text.size(), kMemoryText.size());
-      EXPECT_TRUE(cpp20::starts_with(text, kMemoryText));
+      EXPECT_TRUE(text.starts_with(kMemoryText));
     }
   }
 
   // Test a read crossing a page boundary.
   auto test_memory_pages = [memory_elided](uint64_t ptr, size_t sample_size,
-                                           cpp20::span<const uint8_t> contents) {
+                                           std::span<const uint8_t> contents) {
     if (memory_elided) {
       EXPECT_TRUE(contents.empty()) << " read " << contents.size_bytes();
     } else {

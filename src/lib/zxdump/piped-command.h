@@ -6,9 +6,9 @@
 #define SRC_LIB_ZXDUMP_PIPED_COMMAND_H_
 
 #include <lib/fit/result.h>
-#include <lib/stdcompat/span.h>
 
 #include <map>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -61,9 +61,9 @@ class PipedCommand {
  private:
   static std::vector<const char*> MakeArgv(const std::string& command,
                                            const std::vector<std::string>& args);
-  fit::result<std::string> StartArgv(cpp20::span<const char*> argv);
+  fit::result<std::string> StartArgv(std::span<const char*> argv);
 #ifdef __Fuchsia__
-  fit::result<std::string> StartArgv(cpp20::span<const char*> argv, uint32_t flags,
+  fit::result<std::string> StartArgv(std::span<const char*> argv, uint32_t flags,
                                      std::vector<fdio_spawn_action_t> actions);
 #endif
 
