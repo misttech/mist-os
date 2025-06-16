@@ -260,6 +260,9 @@ pub enum RoutingError {
     #[error("`{capability_id}` was not exposed to `{moniker}` from `#{child_moniker}`")]
     UseFromChildExposeNotFound { child_moniker: ChildName, moniker: Moniker, capability_id: String },
 
+    #[error("`{capability_id}` was not exposed from `/`")]
+    UseFromRootExposeNotFound { capability_id: String },
+
     #[error("routing a capability from an unsupported source type `{source_type}` at `{moniker}`")]
     UnsupportedRouteSource { source_type: String, moniker: ExtendedMoniker },
 
@@ -380,6 +383,7 @@ impl Explain for RoutingError {
             | RoutingError::ExposeFromChildExposeNotFound { .. }
             | RoutingError::ExposeFromFrameworkNotFound { .. }
             | RoutingError::UseFromChildExposeNotFound { .. }
+            | RoutingError::UseFromRootExposeNotFound { .. }
             | RoutingError::UnsupportedRouteSource { .. }
             | RoutingError::UnsupportedCapabilityType { .. }
             | RoutingError::EventsRoutingError(_)
@@ -465,9 +469,8 @@ impl From<RoutingError> for ExtendedMoniker {
             RoutingError::CapabilityFromComponentManagerNotFound { .. }
             | RoutingError::OfferFromComponentManagerNotFound { .. }
             | RoutingError::RegisterFromComponentManagerNotFound { .. }
-            | RoutingError::UseFromComponentManagerNotFound { .. } => {
-                ExtendedMoniker::ComponentManager
-            }
+            | RoutingError::UseFromComponentManagerNotFound { .. }
+            | RoutingError::UseFromRootExposeNotFound { .. } => ExtendedMoniker::ComponentManager,
         }
     }
 }

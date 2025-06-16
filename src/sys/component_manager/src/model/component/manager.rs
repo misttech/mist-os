@@ -2,14 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::model::component::ComponentInstance;
+use crate::model::component::{ComponentInstance, RouterError, RouterResponse};
 use ::routing::capability_source::{BuiltinCapabilities, NamespaceCapabilities};
 use ::routing::component_instance::TopInstanceInterface;
+use async_trait::async_trait;
 use cm_util::TaskGroup;
 use errors::RebootError;
 use fidl::endpoints::{self};
 use fuchsia_component::client;
 use log::warn;
+use routing::error::RoutingError;
+use sandbox::{Connector, Request, Routable};
 use std::sync::{Arc, Mutex};
 use vfs::directory::entry::OpenRequest;
 use vfs::path::Path;
@@ -73,6 +76,53 @@ impl ComponentManagerInstance {
     /// REQUIRES: The root has already been set. Otherwise panics.
     pub fn root(&self) -> Arc<ComponentInstance> {
         self.state.lock().unwrap().root.as_ref().expect("root not set").clone()
+    }
+
+    /// Returns a connector that lazily resolves the given protocol exposed by `/`.
+    ///
+    /// REQUIRES: The root has already been set. Otherwise panics.
+    // TODO(https://fxbug.dev/422537652): The allow(dead_code) is currently necessary because
+    // this function is only called if #[cfg(feature="heapdump")]. The next CL in the stack
+    // will also call it from other places that are not conditionally compiled.
+    #[allow(dead_code)]
+    pub fn get_root_exposed_capability_router(
+        &self,
+        source_name: cm_types::Name,
+    ) -> impl Routable<Connector> {
+        struct RootCapabilityRouter {
+            root: Arc<ComponentInstance>,
+            source_name: cm_types::Name,
+        }
+
+        #[async_trait]
+        impl Routable<Connector> for RootCapabilityRouter {
+            async fn route(
+                &self,
+                request: Option<Request>,
+                debug: bool,
+            ) -> Result<RouterResponse<Connector>, RouterError> {
+                let component_output = self
+                    .root
+                    .lock_resolved_state()
+                    .await
+                    .map_err(|e| RouterError::NotFound(Arc::new(e)))?
+                    .sandbox
+                    .component_output
+                    .clone();
+                match component_output.capabilities().get(&self.source_name) {
+                    Ok(Some(sandbox::Capability::ConnectorRouter(router))) => {
+                        Ok(router.route(request, debug).await?)
+                    }
+                    _ => Err(RouterError::NotFound(Arc::new(
+                        RoutingError::UseFromRootExposeNotFound {
+                            capability_id: self.source_name.to_string(),
+                        },
+                    ))),
+                }
+            }
+        }
+
+        RootCapabilityRouter { root: self.root(), source_name }
     }
 
     /// Initializes the state of the instance. Panics if already initialized.

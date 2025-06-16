@@ -293,6 +293,11 @@ _component_manager_bin = {
   ]
 }
 
+_deps_for_tracing = [
+  "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
+  "//src/lib/trace/rust:trace-provider",
+]
+
 rustc_binary("bin") {
   output_name = "component_manager"
   forward_variables_from(_component_manager_bin, "*")
@@ -329,10 +334,19 @@ rustc_binary("bin_with_tracing") {
   forward_variables_from(_component_manager_bin, "*")
   configs += configs_to_add
   features = [ "tracing" ]
-  deps += [
-    "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_rust",
-    "//src/lib/trace/rust:trace-provider",
+  deps += _deps_for_tracing
+}
+
+rustc_binary("bin_with_tracing_and_heapdump") {
+  output_name = "component_manager_with_tracing_and_heapdump"
+  forward_variables_from(_component_manager_bin, "*")
+  configs += configs_to_add
+  features = [
+    "heapdump",
+    "tracing",
   ]
+  deps += _deps_for_tracing
+  deps += [ "//src/performance/memory/heapdump/instrumentation:rust" ]
 }
 
 # This v2 component bundles component manager with a config suitable for running
@@ -478,6 +492,16 @@ renamed_binary("renamed_bin_with_tracing") {
 
 bootfs_files_for_assembly("bootfs_with_tracing") {
   deps = [ ":renamed_bin_with_tracing" ]
+}
+
+renamed_binary("renamed_bin_with_tracing_and_heapdump") {
+  dest = "bin/component_manager"
+  source = "$root_out_dir/component_manager_with_tracing_and_heapdump"
+  source_deps = [ ":bin_with_tracing_and_heapdump" ]
+}
+
+bootfs_files_for_assembly("bootfs_with_tracing_and_heapdump") {
+  deps = [ ":renamed_bin_with_tracing_and_heapdump" ]
 }
 
 component_config("component_manager_realm_builder_config") {

@@ -187,6 +187,14 @@ assembly_input_bundle("component_manager_with_tracing") {
   ]
 }
 
+# This AIB contains Component Manager linked with with tracing and the Heapdump
+# instrumentation library for memory profiling. It should not be used in
+# production.
+assembly_input_bundle("component_manager_with_tracing_and_heapdump") {
+  bootfs_files_labels =
+      [ "//src/sys/component_manager:bootfs_with_tracing_and_heapdump" ]
+}
+
 # The most minimal AIB that is included in assembled systems that are meant to be
 # standalone, regardless of build-type.
 #
@@ -1041,6 +1049,36 @@ assembly_input_bundle("core_realm") {
           component_name = "system-update-realm"
 
           shards = [ "//src/sys/pkg/meta/system-update-realm.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+# Global Heapdump collector instance for heap memory profiling
+#
+# This AIB adds an instance of the Heapdump collector `/core/heapdump-collector`
+# whose `fuchsia.memory.heapdump.process.Registry` capability is then routed to
+# `/`.
+assembly_input_bundle("heapdump_global_collector") {
+  base_packages = [ "//src/performance/memory/heapdump/collector" ]
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "root"
+      components = [
+        {
+          component_name = "root"
+          shards = [ "//src/sys/core/meta/heapdump.root_shard.cml" ]
+        },
+      ]
+    },
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/sys/core/meta/heapdump.core_shard.cml" ]
         },
       ]
     },
