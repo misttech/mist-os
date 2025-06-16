@@ -61,8 +61,6 @@ pub struct ProductListTool {
     pub context: EnvironmentContext,
 }
 
-fho::embedded_plugin!(ProductListTool);
-
 /// This plugin will get list the available product bundles.
 #[async_trait::async_trait(?Send)]
 impl FfxMain for ProductListTool {

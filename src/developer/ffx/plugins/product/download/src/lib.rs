@@ -106,8 +106,6 @@ impl PbDownloadTool {
     }
 }
 
-fho::embedded_plugin!(PbDownloadTool);
-
 pub async fn pb_download_impl<I: structured_ui::Interface>(
     auth: &AuthFlowChoice,
     force: bool,

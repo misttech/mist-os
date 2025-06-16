@@ -23,8 +23,6 @@ pub struct ProductGetRepoTool {
     pub cmd: GetRepositoryCommand,
 }
 
-fho::embedded_plugin!(ProductGetRepoTool);
-
 /// This plugin will get the info of repository inside product bundle.
 #[async_trait::async_trait(?Send)]
 impl FfxMain for ProductGetRepoTool {

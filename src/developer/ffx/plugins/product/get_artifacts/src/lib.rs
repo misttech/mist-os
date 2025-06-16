@@ -38,8 +38,6 @@ pub struct PbGetArtifactsTool {
     env: EnvironmentContext,
 }
 
-fho::embedded_plugin!(PbGetArtifactsTool);
-
 #[async_trait(?Send)]
 impl FfxMain for PbGetArtifactsTool {
     type Writer = VerifiedMachineWriter<CommandStatus>;

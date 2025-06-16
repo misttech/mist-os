@@ -25,8 +25,6 @@ pub struct ProductShowTool {
     pub cmd: ShowCommand,
 }
 
-fho::embedded_plugin!(ProductShowTool);
-
 /// Create a product bundle.
 #[async_trait::async_trait(?Send)]
 impl FfxMain for ProductShowTool {

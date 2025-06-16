@@ -29,8 +29,6 @@ pub struct PbGetVersionTool {
     cmd: GetVersionCommand,
 }
 
-fho::embedded_plugin!(PbGetVersionTool);
-
 #[async_trait(?Send)]
 impl FfxMain for PbGetVersionTool {
     type Writer = MachineWriter<Vec<UniqueReleaseInfo>>;

@@ -24,8 +24,6 @@ pub struct PbLookupTool {
     context: EnvironmentContext,
 }
 
-fho::embedded_plugin!(PbLookupTool);
-
 #[async_trait::async_trait(?Send)]
 impl FfxMain for PbLookupTool {
     type Writer = VerifiedMachineWriter<MachineOutput<ProductBundle>>;

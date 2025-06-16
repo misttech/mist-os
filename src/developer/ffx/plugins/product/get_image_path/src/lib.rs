@@ -41,8 +41,6 @@ pub struct PbGetImagePathTool {
     env: EnvironmentContext,
 }
 
-fho::embedded_plugin!(PbGetImagePathTool);
-
 #[async_trait(?Send)]
 impl FfxMain for PbGetImagePathTool {
     type Writer = VerifiedMachineWriter<CommandStatus>;
