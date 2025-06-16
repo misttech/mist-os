@@ -150,25 +150,43 @@ zx_status_t AmlUsbPhy::InitPhy3() {
   return ZX_OK;
 }
 
-void AmlUsbPhy::ChangeMode(UsbPhyBase& phy, fuchsia_hardware_usb_phy::Mode new_mode) {
+zx::result<> AmlUsbPhy::ChangeMode(UsbPhyBase& phy, fuchsia_hardware_usb_phy::Mode new_mode) {
   auto old_mode = phy.phy_mode();
   if (new_mode == old_mode) {
-    fdf::error("Already in {} mode", static_cast<uint32_t>(new_mode));
-    return;
+    fdf::warn("Already in {} mode", static_cast<uint32_t>(new_mode));
+    return zx::ok();
   }
+
   phy.SetMode(new_mode, usbctrl_mmio_);
 
+  AmlUsbPhyDevice::ChildNode* unpublish_child = nullptr;
+  AmlUsbPhyDevice::ChildNode* publish_child = nullptr;
   if (new_mode == fuchsia_hardware_usb_phy::Mode::kHost) {
-    ++controller_->xhci_;
+    publish_child = &controller_->xhci_;
     if (old_mode != fuchsia_hardware_usb_phy::Mode::kUnknown) {
-      --controller_->dwc2_;
+      unpublish_child = &controller_->dwc2_;
     }
   } else {
-    ++controller_->dwc2_;
+    publish_child = &controller_->dwc2_;
     if (old_mode != fuchsia_hardware_usb_phy::Mode::kUnknown) {
-      --controller_->xhci_;
+      unpublish_child = &controller_->xhci_;
     }
   }
+
+  if (unpublish_child) {
+    zx::result unpublish = unpublish_child->UnPublish();
+    if (unpublish.is_error()) {
+      fdf::warn("Failed to unpublish {}: {}", unpublish_child->name(), unpublish.status_string());
+    }
+  }
+
+  zx::result publish = publish_child->Publish();
+  if (publish.is_error()) {
+    fdf::error("Failed to publish {}: {}", publish_child->name(), publish.status_string());
+    return publish.take_error();
+  }
+
+  return zx::ok();
 }
 
 void AmlUsbPhy::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
@@ -192,8 +210,13 @@ void AmlUsbPhy::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, z
         continue;
       }
 
-      ChangeMode(phy, r5.iddig_curr() == 0 ? fuchsia_hardware_usb_phy::Mode::kHost
-                                           : fuchsia_hardware_usb_phy::Mode::kPeripheral);
+      zx::result ret =
+          ChangeMode(phy, r5.iddig_curr() == 0 ? fuchsia_hardware_usb_phy::Mode::kHost
+                                               : fuchsia_hardware_usb_phy::Mode::kPeripheral);
+      if (ret.is_error()) {
+        fdf::error("ChangeMode() failed. {}. Unbinding usb phy driver.", ret.status_string());
+        controller_->UnbindOnFailure();
+      }
     }
   }
 
@@ -233,7 +256,11 @@ zx_status_t AmlUsbPhy::Init() {
                  : fuchsia_hardware_usb_phy::Mode::kPeripheral;
     }
 
-    ChangeMode(phy, mode);
+    zx::result mode_ret = ChangeMode(phy, mode);
+    if (mode_ret.is_error()) {
+      fdf::error("ChangeMode() failed - {}", mode_ret);
+      return mode_ret.error_value();
+    }
   }
 
   for (auto& phy : usbphy3_) {
@@ -241,7 +268,11 @@ zx_status_t AmlUsbPhy::Init() {
       fdf::error("Not support USB3 in non-host mode yet");
     }
 
-    ChangeMode(phy, fuchsia_hardware_usb_phy::Mode::kHost);
+    zx::result mode_ret = ChangeMode(phy, fuchsia_hardware_usb_phy::Mode::kHost);
+    if (mode_ret.is_error()) {
+      fdf::error("ChangeMode() failed - {}", mode_ret);
+      return mode_ret.error_value();
+    }
   }
 
   if (has_otg) {

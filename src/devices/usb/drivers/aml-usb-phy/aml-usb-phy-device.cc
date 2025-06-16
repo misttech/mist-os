@@ -265,11 +265,11 @@ zx::result<> AmlUsbPhyDevice::CreateNode() {
   return zx::ok();
 }
 
-AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator++() {
+zx::result<> AmlUsbPhyDevice::ChildNode::Publish() {
   std::lock_guard<std::mutex> _(lock_);
   count_++;
   if (count_ != 1) {
-    return *this;
+    return zx::ok();
   }
 
   // Serve fuchsia_hardware_usb_phy.
@@ -281,14 +281,20 @@ AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator++() {
                                                        fidl::kIgnoreBindingClosure),
         }),
         name_);
-    ZX_ASSERT_MSG(result.is_ok(), "Failed to add Device service: %s", result.status_string());
+    if (result.is_error()) {
+      fdf::error("Failed to add Device service: {} for device {}", result, name_);
+      return result.take_error();
+    }
   }
 
   {
     auto result = compat_server_.Initialize(
         parent_->incoming(), parent_->outgoing(), parent_->node_name(), name_,
         compat::ForwardMetadata::None(), std::nullopt, std::string(kDeviceName) + "/");
-    ZX_ASSERT_MSG(result.is_ok(), "Failed to initialize compat server: %s", result.status_string());
+    if (result.is_error()) {
+      fdf::error("Failed to initialize compat server: {} for device {}", result, name_);
+      return result.take_error();
+    }
   }
 
   auto offers = compat_server_.CreateOffers2();
@@ -302,40 +308,46 @@ AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator++() {
   };
   zx::result child = fdf::AddChild(parent_->node_.client_end(), *fdf::Logger::GlobalInstance(),
                                    name_, properties, offers);
-  ZX_ASSERT_MSG(child.is_ok(), "Failed to add child: %s", child.status_string());
-  controller_.Bind(std::move(child.value()));
-
-  return *this;
+  if (child.is_error()) {
+    fdf::error("Failed to add child: {} for device {}", child, name_);
+    return child.take_error();
+  }
+  child_controller_.Bind(std::move(child.value()));
+  return zx::ok();
 }
 
-AmlUsbPhyDevice::ChildNode& AmlUsbPhyDevice::ChildNode::operator--() {
+zx::result<> AmlUsbPhyDevice::ChildNode::UnPublish() {
   std::lock_guard<std::mutex> _(lock_);
   if (count_ == 0) {
     // Nothing to remove.
-    return *this;
+    return zx::ok();
   }
   count_--;
   if (count_ != 0) {
     // Has more instances.
-    return *this;
+    return zx::ok();
   }
 
+  zx::result<> ret = zx::ok();
   // Reset.
-  if (controller_) {
-    auto result = controller_->Remove();
+  if (child_controller_) {
+    auto result = child_controller_->Remove();
     if (!result.ok()) {
       fdf::error("Failed to remove {}. {}", name_.data(), result.FormatDescription().c_str());
+      ret = zx::error(result.status());
     }
-    controller_.TakeClientEnd().reset();
+    child_controller_.TakeClientEnd().reset();
   }
   compat_server_.reset();
   {
-    auto result = parent_->outgoing()->RemoveService<fuchsia_hardware_usb_phy::Service>(name_);
+    zx::result result =
+        parent_->outgoing()->RemoveService<fuchsia_hardware_usb_phy::Service>(name_);
     if (result.is_error()) {
-      fdf::error("Failed to remove Device service {}", result);
+      fdf::error("Failed to remove device service for {}:{}", name_.data(), result);
+      ret = result;
     }
   }
-  return *this;
+  return ret;
 }
 
 void AmlUsbPhyDevice::Stop() {
@@ -348,6 +360,8 @@ void AmlUsbPhyDevice::Stop() {
 zx::result<fdf::MmioBuffer> AmlUsbPhyDevice::MapMmio(fdf::PDev& pdev, uint32_t idx) {
   return pdev.MapMmio(idx);
 }
+
+void AmlUsbPhyDevice::UnbindOnFailure() { node_.TakeClientEnd().TakeChannel().reset(); }
 
 }  // namespace aml_usb_phy
 
