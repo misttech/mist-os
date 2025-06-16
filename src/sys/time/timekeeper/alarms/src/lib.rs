@@ -69,6 +69,9 @@ const MAIN_TIMER_ID: usize = 6;
 const TEMPORARY_STARNIX_TIMER_ID: &str = "starnix-hrtimer";
 static TEMPORARY_STARNIX_CID: LazyLock<zx::Event> = LazyLock::new(|| zx::Event::create());
 
+/// This is what we consider a "long" delay in alarm operations.
+const LONG_DELAY_NANOS: i64 = 2000 * MSEC_IN_NANOS;
+
 /// Compares two optional deadlines and returns true if the `before is different from `after.
 /// Nones compare as equal.
 fn is_deadline_changed(
@@ -1090,6 +1093,24 @@ async fn wake_timer_loop(
             buckets: 16,
         },
     );
+    let slack_histogram_prop = inspect.create_int_exponential_histogram(
+        "slack_ns",
+        finspect::ExponentialHistogramParams {
+            floor: 0,
+            initial_step: zx::BootDuration::from_micros(1).into_nanos(),
+            step_multiplier: 10,
+            buckets: 16,
+        },
+    );
+    let schedule_delay_prop = inspect.create_int_exponential_histogram(
+        "schedule_delay_ns",
+        finspect::ExponentialHistogramParams {
+            floor: 0,
+            initial_step: zx::BootDuration::from_micros(1).into_nanos(),
+            step_multiplier: 10,
+            buckets: 16,
+        },
+    );
     // Internals of what was programmed into the wake alarms hardware.
     let hw_node = inspect.create_child("hardware");
     let current_hw_deadline_prop = hw_node.create_string("current_deadline", "");
@@ -1178,6 +1199,7 @@ async fn wake_timer_loop(
                                 schedulable_deadline,
                                 snd.clone(),
                                 &timer_config,
+                                &schedule_delay_prop,
                             )
                             .await,
                         );
@@ -1208,6 +1230,7 @@ async fn wake_timer_loop(
                             deadline,
                             snd.clone(),
                             &timer_config,
+                            &schedule_delay_prop,
                         )
                         .await;
                         let old_hrtimer_status = hrtimer_status.replace(new_timer_state);
@@ -1236,7 +1259,8 @@ async fn wake_timer_loop(
                     keep_alive.get_koid().unwrap(),
                 );
                 let expired_count =
-                    notify_all(&mut timers, &keep_alive, now).expect("notification succeeds");
+                    notify_all(&mut timers, &keep_alive, now, &slack_histogram_prop)
+                        .expect("notification succeeds");
                 if expired_count == 0 {
                     // This could be a resolution switch, or a straggler notification.
                     // Either way, the hardware timer is still ticking, cancel it.
@@ -1247,8 +1271,15 @@ async fn wake_timer_loop(
                 hrtimer_status = match timers.peek_deadline() {
                     None => None,
                     Some(deadline) => Some(
-                        schedule_hrtimer(now, &timer_proxy, deadline, snd.clone(), &timer_config)
-                            .await,
+                        schedule_hrtimer(
+                            now,
+                            &timer_proxy,
+                            deadline,
+                            snd.clone(),
+                            &timer_config,
+                            &schedule_delay_prop,
+                        )
+                        .await,
                     ),
                 }
             }
@@ -1267,12 +1298,20 @@ async fn wake_timer_loop(
                 // Maybe use Option instead?
                 let (_dummy_lease, peer) = zx::EventPair::create();
                 debug!("XXX: [{}] bogus lease: 1 {:?}", line!(), &peer.get_koid().unwrap());
-                notify_all(&mut timers, &peer, now).expect("notification succeeds");
+                notify_all(&mut timers, &peer, now, &slack_histogram_prop)
+                    .expect("notification succeeds");
                 hrtimer_status = match timers.peek_deadline() {
                     None => None, // No remaining timers, nothing to schedule.
                     Some(deadline) => Some(
-                        schedule_hrtimer(now, &timer_proxy, deadline, snd.clone(), &timer_config)
-                            .await,
+                        schedule_hrtimer(
+                            now,
+                            &timer_proxy,
+                            deadline,
+                            snd.clone(),
+                            &timer_config,
+                            &schedule_delay_prop,
+                        )
+                        .await,
                     ),
                 }
             }
@@ -1280,7 +1319,8 @@ async fn wake_timer_loop(
                 trace::duration!(c"alarms", c"Cmd::AlarmDriverError");
                 let (_dummy_lease, peer) = zx::EventPair::create();
                 debug!("XXX: [{}] bogus lease: {:?}", line!(), &peer.get_koid().unwrap());
-                notify_all(&mut timers, &peer, now).expect("notification succeeds");
+                notify_all(&mut timers, &peer, now, &slack_histogram_prop)
+                    .expect("notification succeeds");
                 match error {
                     fidl_fuchsia_hardware_hrtimer::DriverError::Canceled => {
                         // Nothing to do here, cancelation is handled in Stop code.
@@ -1308,6 +1348,7 @@ async fn wake_timer_loop(
                                     deadline,
                                     snd.clone(),
                                     &timer_config,
+                                    &schedule_delay_prop,
                                 )
                                 .await,
                             ),
@@ -1375,6 +1416,7 @@ async fn schedule_hrtimer(
     deadline: fasync::BootInstant,
     mut command_send: mpsc::Sender<Cmd>,
     timer_config: &TimerConfig,
+    schedule_delay_histogram: &finspect::IntExponentialHistogramProperty,
 ) -> TimerState {
     let timeout = std::cmp::max(zx::BootDuration::ZERO, deadline - now);
     trace::duration!(c"alarms", c"schedule_hrtimer", "timeout" => timeout.into_nanos());
@@ -1444,7 +1486,7 @@ async fn schedule_hrtimer(
     wait_signaled(&hrtimer_scheduled).await;
     let now_after_signaled = fasync::BootInstant::now();
     let duration_until_scheduled: zx::BootDuration = (now_after_signaled - now).into();
-    if duration_until_scheduled > zx::BootDuration::from_nanos(1000 * MSEC_IN_NANOS) {
+    if duration_until_scheduled > zx::BootDuration::from_nanos(LONG_DELAY_NANOS) {
         trace::duration!(c"alarms", c"schedule_hrtimer:unusual_duration",
             "duration" => duration_until_scheduled.into_nanos());
         warn!(
@@ -1452,6 +1494,7 @@ async fn schedule_hrtimer(
             format_duration(duration_until_scheduled)
         );
     }
+    schedule_delay_histogram.insert(duration_until_scheduled.into_nanos());
     debug!("schedule_hrtimer: hrtimer wake alarm has been scheduled.");
     TimerState { task: hrtimer_task, deadline }
 }
@@ -1469,6 +1512,7 @@ fn notify_all(
     timers: &mut Timers,
     lease_prototype: &zx::EventPair,
     reference_instant: fasync::BootInstant,
+    unusual_slack_histogram: &finspect::IntExponentialHistogramProperty,
 ) -> Result<usize> {
     trace::duration!(c"alarms", c"notify_all");
     let now = fasync::BootInstant::now();
@@ -1480,7 +1524,7 @@ fn notify_all(
         let alarm_id = timer_node.get_alarm_id().to_string();
         let cid = timer_node.get_cid().clone();
         let slack: zx::BootDuration = deadline - now;
-        if slack < zx::BootDuration::from_nanos(-1000 * MSEC_IN_NANOS) {
+        if slack < zx::BootDuration::from_nanos(-LONG_DELAY_NANOS) {
             trace::duration!(c"alarms", c"schedule_hrtimer:unusual_slack", "slack" => slack.into_nanos());
             // This alarm triggered noticeably later than it should have.
             warn!(
@@ -1488,6 +1532,9 @@ fn notify_all(
                 alarm_id,
                 format_duration(slack)
             );
+        }
+        if slack < zx::BootDuration::ZERO {
+            unusual_slack_histogram.insert(-slack.into_nanos());
         }
         debug!(
             concat!(
@@ -2240,6 +2287,8 @@ mod tests {
                         pending_timers: "\n\t",
                         pending_timers_count: 0u64,
                         requested_deadlines_ns: AnyProperty,
+                        schedule_delay_ns: AnyProperty,
+                        slack_ns: AnyProperty,
                     },
                 });
             },
