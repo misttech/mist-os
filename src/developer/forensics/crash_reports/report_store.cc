@@ -197,7 +197,7 @@ std::optional<ItemLocation> ReportStore::Add(Report report,
     report_size += StorageSize::Bytes(data.size());
   }
 
-  auto& root_metadata = PickRootForStorage(report_size);
+  auto& root_metadata = PickRootForStorage(report.Id(), report_size);
 
   const auto report_location = AddToRoot(report.Id(), report.ProgramShortname(), report_size,
                                          attachments, root_metadata, garbage_collected_reports);
@@ -474,16 +474,29 @@ ReportStoreMetadata& ReportStore::RootFor(const ReportId id) {
   return cache_metadata_;
 }
 
-ReportStoreMetadata& ReportStore::PickRootForStorage(const StorageSize report_size) {
+ReportStoreMetadata& ReportStore::PickRootForStorage(const ReportId id,
+                                                     const StorageSize report_size) {
   // Attempt to make |cache_metadata_| usable if it isn't already.
   if (!cache_metadata_.IsDirectoryUsable()) {
     RecreateFromFilesystem(cache_metadata_);
   }
 
   // Only use cache if it's valid and there's enough space to put the report there.
-  return (!cache_metadata_.IsDirectoryUsable() || cache_metadata_.RemainingSpace() < report_size)
-             ? tmp_metadata_
-             : cache_metadata_;
+  if (!cache_metadata_.IsDirectoryUsable()) {
+    FX_LOGST(INFO, tags_->Get(id))
+        << "Putting report in " << ToString(ItemLocation::kTmp) << " because cache is unusable";
+    return tmp_metadata_;
+  }
+
+  if (const StorageSize remaining = cache_metadata_.RemainingSpace(); remaining < report_size) {
+    FX_LOGST(INFO, tags_->Get(id))
+        << "Putting report in " << ToString(ItemLocation::kTmp) << " because "
+        << report_size.ToBytes() << "B were required but cache has " << remaining.ToBytes()
+        << "B remaining";
+    return tmp_metadata_;
+  }
+
+  return cache_metadata_;
 }
 
 bool ReportStore::HasFallbackRoot(const ReportStoreMetadata& store_root) {

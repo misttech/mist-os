@@ -86,7 +86,7 @@ class ReportStore {
   ReportStoreMetadata& RootFor(ReportId id);
 
   // Pick the root to store a report with size of |report_size| under.
-  ReportStoreMetadata& PickRootForStorage(StorageSize report_size);
+  ReportStoreMetadata& PickRootForStorage(ReportId id, StorageSize report_size);
 
   // Returns true if another storage root can be used.
   bool HasFallbackRoot(const ReportStoreMetadata& store_root);
