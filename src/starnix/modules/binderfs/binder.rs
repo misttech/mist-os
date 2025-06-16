@@ -3695,7 +3695,7 @@ impl BinderDriver {
                 }
                 uapi::BINDER_SET_CONTEXT_MGR | uapi::BINDER_SET_CONTEXT_MGR_EXT => {
                     // A process is registering itself as the context manager.
-
+                    security::binder_set_context_mgr(current_task)?;
                     let flags = if request == uapi::BINDER_SET_CONTEXT_MGR_EXT {
                         if user_arg.is_null() {
                             return error!(EINVAL);

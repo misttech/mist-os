@@ -85,6 +85,8 @@ enumerable_enum! {
         // keep-sorted start
         /// The SELinux "anon_inode" object class.
         AnonFsNode,
+        /// The SELinux "binder" object class.
+        Binder,
         /// The SELinux "blk_file" object class.
         Block,
         /// The SELinux "bpf" object class.
@@ -179,6 +181,7 @@ impl KernelClass {
         match self {
             // keep-sorted start
             Self::AnonFsNode => "anon_inode",
+            Self::Binder => "binder",
             Self::Block => "blk_file",
             Self::Bpf => "bpf",
             Self::Capability => "capability",
@@ -469,6 +472,8 @@ permission_enum! {
         // keep-sorted start
         /// Permissions for the well-known SELinux "anon_inode" file-like object class.
         AnonFsNode(AnonFsNodePermission),
+        /// Permissions for the well-known SELinux "binder" file-like object class.
+        Binder(BinderPermission),
         /// Permissions for the well-known SELinux "blk_file" file-like object class.
         Block(BlockFilePermission),
         /// Permissions for the well-known SELinux "bpf" file-like object class.
@@ -1114,6 +1119,18 @@ class_permission_enum! {
     /// into any directory structures.
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     AnonFsNodePermission extends CommonFilePermission {
+    }
+}
+
+class_permission_enum! {
+    /// A well-known "binder" class permission in SELinux policy that has a particular meaning in
+    /// policy enforcement hooks.
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    BinderPermission {
+        // keep-sorted start
+        /// Permission to set oneself as a context manager.
+        SetContextMgr("set_context_mgr"),
+        // keep-sorted end
     }
 }
 

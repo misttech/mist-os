@@ -193,6 +193,15 @@ pub fn kernel_init_security(
     KernelState { state: enabled.then(|| selinux_hooks::kernel_init_security(options, exceptions)) }
 }
 
+/// Checks whether the given `current_task` can become the binder context manager.
+/// Corresponds to the `binder_set_context_mgr` hook.
+pub fn binder_set_context_mgr(current_task: &CurrentTask) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.binder_set_context_mgr");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::binder::binder_set_context_mgr(security_server, current_task)
+    })
+}
+
 /// Consumes the mount options from the supplied `MountParams` and returns the security mount
 /// options for the given `MountParams`.
 /// Corresponds to the `sb_eat_lsm_opts` hook.

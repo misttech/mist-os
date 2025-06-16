@@ -6,6 +6,7 @@
 #![allow(non_upper_case_globals)]
 
 mod audit;
+pub(super) mod binder;
 pub(super) mod bpf;
 pub(super) mod file;
 pub(super) mod fs_node;

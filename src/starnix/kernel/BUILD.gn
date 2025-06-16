@@ -176,6 +176,7 @@ rustc_library("starnix_core") {
     "security/hooks.rs",
     "security/mod.rs",
     "security/selinux_hooks/audit.rs",
+    "security/selinux_hooks/binder.rs",
     "security/selinux_hooks/bpf.rs",
     "security/selinux_hooks/file.rs",
     "security/selinux_hooks/fs_node.rs",
