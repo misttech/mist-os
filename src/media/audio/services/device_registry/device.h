@@ -349,9 +349,9 @@ class Device : public std::enable_shared_from_this<Device> {
   // Correctly functioning hardware and drivers should never result in any timeouts.
   //
   // We use this value for individual driver FIDL calls, by default.
-  static constexpr zx::duration kDefaultShortCmdTimeout = zx::sec(2);
+  static constexpr zx::duration kDefaultShortCmdTimeout = zx::sec(10);
   // We use this value only for 2 "meta-commands" of multiple FIDL calls issued as a set.
-  static constexpr zx::duration kDefaultLongCmdTimeout = zx::sec(4);
+  static constexpr zx::duration kDefaultLongCmdTimeout = zx::sec(20);
 
   enum class DriverCommandState : uint8_t { Idle, Waiting, Overdue, Unresponsive };
   void SetDriverCommandState(DriverCommandState state) { driver_cmd_state_ = state; }

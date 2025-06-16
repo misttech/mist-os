@@ -351,11 +351,14 @@ void ControlServer::DaiFormatIsChanged(
   }
 }
 
+// SetDaiFormat did NOT result in a change to the controlled device's DaiFormat.
 void ControlServer::DaiFormatIsNotChanged(ElementId element_id, const fha::DaiFormat& dai_format,
                                           fad::ControlSetDaiFormatError error) {
   ADR_LOG_METHOD(kLogControlServerMethods || kLogNotifyMethods)
       << "(" << element_id << ", error " << fidl::ToUnderlying(error) << ") for dai_format:";
-  LogDaiFormat(dai_format);
+  if constexpr (kLogControlServerMethods || kLogNotifyMethods) {
+    LogDaiFormat(dai_format);
+  }
 
   // SetDaiFormat was called, but now we don't have a completer.
   if (set_dai_format_completers_.find(element_id) == set_dai_format_completers_.end()) {

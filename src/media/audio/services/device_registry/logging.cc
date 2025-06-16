@@ -787,7 +787,7 @@ void LogElementDaiFormatSet(const fad::ElementDaiFormatSet& element_dai_format_s
 }
 
 void LogDaiFormatSets(const std::vector<fha::DaiSupportedFormats>& dai_format_sets) {
-  if constexpr (!kLogCodecFidlResponseValues) {
+  if constexpr (!kLogCodecFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
 
@@ -837,7 +837,7 @@ void LogDaiFormatSets(const std::vector<fha::DaiSupportedFormats>& dai_format_se
 }
 
 void LogDaiFormat(std::optional<fha::DaiFormat> dai_format) {
-  if constexpr (!kLogCodecFidlResponseValues) {
+  if constexpr (!kLogCodecFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
 
@@ -859,7 +859,7 @@ void LogDaiFormat(std::optional<fha::DaiFormat> dai_format) {
 }
 
 void LogCodecFormatInfo(std::optional<fha::CodecFormatInfo> format_info) {
-  if constexpr (!kLogCodecFidlResponseValues) {
+  if constexpr (!kLogCodecFidlResponseValues && !kLogCompositeFidlResponseValues) {
     return;
   }
 

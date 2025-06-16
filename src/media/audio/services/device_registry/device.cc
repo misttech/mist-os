@@ -648,7 +648,8 @@ void Device::DropRingBuffer(ElementId element_id) {
   if (rb_record.inspect_instance) {
     rb_record.inspect_instance->RecordDestructionTime(zx::clock::get_monotonic());
   } else {
-    ADR_WARN_METHOD() << "cannot RecordDestructionTime: inspect node was not yet created";
+    ADR_WARN_METHOD()
+        << "cannot RecordDestructionTime: no RB inspect node (CreateRingBuffer must have failed)";
   }
 
   if (!rb_record.ring_buffer_client.has_value() || !rb_record.ring_buffer_client->is_valid()) {
@@ -1921,7 +1922,8 @@ void Device::SetDaiFormat(ElementId element_id, const fha::DaiFormat& dai_format
           }
 
           // Reset DaiFormat (and Start state if it's a change). Notify our controlling entity.
-          codec_format_ = CodecFormat{dai_format, result->state()};
+          codec_format_ =
+              CodecFormat{.dai_format = dai_format, .codec_format_info = result->state()};
           if (codec_start_state_.started) {
             codec_start_state_ = CodecStartState{false, zx::clock::get_monotonic()};
             notify->CodecIsStopped(codec_start_state_.start_stop_time);
