@@ -36,8 +36,7 @@ class Vout {
   // Returns a non-null pointer to the Vout instance outputting DSI signal on
   // success.
   static zx::result<std::unique_ptr<Vout>> CreateDsiVout(fdf::Namespace& incoming,
-                                                         uint32_t panel_type, uint32_t width,
-                                                         uint32_t height, inspect::Node node);
+                                                         uint32_t panel_type, inspect::Node node);
 
   // Returns a non-null pointer to the Vout instance outputting HDMI signal on
   // success.
@@ -45,16 +44,15 @@ class Vout {
                                                           inspect::Node node,
                                                           uint8_t visual_debug_level);
 
-  // Sets only the display size, feature bits and panel settings for testing.
+  // Sets only the display feature bits and panel settings for testing.
   // Returns a non-null pointer to the Vout instance on success.
-  static zx::result<std::unique_ptr<Vout>> CreateDsiVoutForTesting(uint32_t panel_type,
-                                                                   uint32_t width, uint32_t height);
+  static zx::result<std::unique_ptr<Vout>> CreateDsiVoutForTesting(uint32_t panel_type);
 
   // Creates a Vout instance that outputs MIPI-DSI signal.
   //
   // `panel_config` must be non-null and must outlive the `Vout` instance.
-  Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock, uint32_t width,
-       uint32_t height, const PanelConfig* panel_config, inspect::Node node);
+  Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock,
+       const PanelConfig* panel_config, inspect::Node node);
 
   // Creates a Vout instance that outputs HDMI signal.
   Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node, uint8_t visual_debug_level);
@@ -119,10 +117,6 @@ class Vout {
   struct dsi_t {
     std::unique_ptr<DsiHost> dsi_host;
     std::unique_ptr<Clock> clock;
-
-    // display dimensions and format
-    uint32_t width = 0;
-    uint32_t height = 0;
 
     // TODO(https://fxbug.dev/318800903): Use const reference when `dsi_` moves
     // to its own implementation class.

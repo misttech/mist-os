@@ -1092,13 +1092,11 @@ zx_status_t DisplayEngine::InitializeHdmiVout() {
 zx_status_t DisplayEngine::InitializeMipiDsiVout(display_panel_t panel_info) {
   ZX_DEBUG_ASSERT(vout_ == nullptr);
 
-  fdf::info("Provided Display Info: {} x {} with panel type {}", panel_info.width,
-            panel_info.height, panel_info.panel_type);
+  fdf::info("Provided panel type: {}", panel_info.panel_type);
   {
     fbl::AutoLock lock(&display_mutex_);
     zx::result<std::unique_ptr<Vout>> create_dsi_vout_result =
-        Vout::CreateDsiVout(*incoming_, panel_info.panel_type, panel_info.width, panel_info.height,
-                            root_node_.CreateChild("vout"));
+        Vout::CreateDsiVout(*incoming_, panel_info.panel_type, root_node_.CreateChild("vout"));
     if (!create_dsi_vout_result.is_ok()) {
       fdf::error("Failed to initialize DSI Vout device: {}", create_dsi_vout_result);
       return create_dsi_vout_result.status_value();

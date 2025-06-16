@@ -47,16 +47,14 @@ constexpr supported_features_t kHdmiSupportedFeatures = supported_features_t{
 
 }  // namespace
 
-Vout::Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock, uint32_t width,
-           uint32_t height, const PanelConfig* panel_config, inspect::Node node)
+Vout::Vout(std::unique_ptr<DsiHost> dsi_host, std::unique_ptr<Clock> dsi_clock,
+           const PanelConfig* panel_config, inspect::Node node)
     : type_(VoutType::kDsi),
       supports_hpd_(kDsiSupportedFeatures.hpd),
       node_(std::move(node)),
       dsi_{
           .dsi_host = std::move(dsi_host),
           .clock = std::move(dsi_clock),
-          .width = width,
-          .height = height,
           .panel_config = *panel_config,
           .banjo_display_mode = display::ToBanjoDisplayMode(panel_config->display_timing),
       } {
@@ -74,7 +72,6 @@ Vout::Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node, uint8_t visu
 }
 
 zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(fdf::Namespace& incoming, uint32_t panel_type,
-                                                      uint32_t width, uint32_t height,
                                                       inspect::Node node) {
   fdf::info("Fixed panel type is {}", panel_type);
   const PanelConfig* panel_config = GetPanelConfig(panel_type);
@@ -114,9 +111,8 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(fdf::Namespace& incoming, 
   std::unique_ptr<Clock> clock = std::move(clock_result).value();
 
   fbl::AllocChecker alloc_checker;
-  std::unique_ptr<Vout> vout =
-      fbl::make_unique_checked<Vout>(&alloc_checker, std::move(dsi_host), std::move(clock), width,
-                                     height, panel_config, std::move(node));
+  std::unique_ptr<Vout> vout = fbl::make_unique_checked<Vout>(
+      &alloc_checker, std::move(dsi_host), std::move(clock), panel_config, std::move(node));
   if (!alloc_checker.check()) {
     fdf::error("Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);
@@ -124,8 +120,7 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(fdf::Namespace& incoming, 
   return zx::ok(std::move(vout));
 }
 
-zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_type, uint32_t width,
-                                                                uint32_t height) {
+zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_type) {
   const PanelConfig* panel_config = GetPanelConfig(panel_type);
   if (panel_config == nullptr) {
     fdf::error("Failed to get panel config for panel {}", panel_type);
@@ -135,7 +130,7 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_t
   fbl::AllocChecker alloc_checker;
   std::unique_ptr<Vout> vout = fbl::make_unique_checked<Vout>(
       &alloc_checker,
-      /*dsi_host=*/nullptr, /*dsi_clock=*/nullptr, width, height, panel_config, inspect::Node{});
+      /*dsi_host=*/nullptr, /*dsi_clock=*/nullptr, panel_config, inspect::Node{});
   if (!alloc_checker.check()) {
     fdf::error("Failed to allocate memory for Vout.");
     return zx::error(ZX_ERR_NO_MEMORY);
