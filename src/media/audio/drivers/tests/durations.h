@@ -21,7 +21,7 @@ inline constexpr zx::duration kRingBufferDisconnectCooldownDuration = zx::msec(1
 
 // Used with CooldownAfterSignalProcessingDisconnect, which is called after each time that we expect
 // our SignalProcessing connection to unbind.
-inline constexpr zx::duration kSignalProcessingDisconnectCooldownDuration = zx::msec(10);
+inline constexpr zx::duration kSignalProcessingDisconnectCooldownDuration = zx::msec(25);
 
 // Audio drivers can have multiple StreamConfig channels open, but only one can be 'privileged':
 // the one that can in turn create a RingBuffer channel. Each test case starts from scratch,
