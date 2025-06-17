@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/result.h>
@@ -36,7 +37,8 @@ class Vout {
   // Returns a non-null pointer to the Vout instance outputting DSI signal on
   // success.
   static zx::result<std::unique_ptr<Vout>> CreateDsiVout(fdf::Namespace& incoming,
-                                                         uint32_t panel_type, inspect::Node node);
+                                                         display::PanelType panel_type,
+                                                         inspect::Node node);
 
   // Returns a non-null pointer to the Vout instance outputting HDMI signal on
   // success.
@@ -46,7 +48,7 @@ class Vout {
 
   // Sets only the display feature bits and panel settings for testing.
   // Returns a non-null pointer to the Vout instance on success.
-  static zx::result<std::unique_ptr<Vout>> CreateDsiVoutForTesting(uint32_t panel_type);
+  static zx::result<std::unique_ptr<Vout>> CreateDsiVoutForTesting(display::PanelType panel_type);
 
   // Creates a Vout instance that outputs MIPI-DSI signal.
   //

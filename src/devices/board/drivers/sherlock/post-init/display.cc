@@ -107,23 +107,22 @@ static const std::vector<fpbus::Bti> display_btis{
 }  // namespace
 
 zx::result<> PostInit::InitDisplay() {
-  const uint32_t panel_type = [&]() -> uint32_t {
+  const display::PanelType panel_type = [&]() {
     if (display_vendor_) {
-      return PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364;
+      return display::PanelType::kInnoluxP101dezFitipowerJd9364;
     }
     if (ddic_version_) {
-      return PANEL_BOE_TV101WXM_FITIPOWER_JD9364;
+      return display::PanelType::kBoeTv101wxmFitipowerJd9364;
     }
-    return PANEL_BOE_TV101WXM_FITIPOWER_JD9365;
+    return display::PanelType::kBoeTv101wxmFitipowerJd9365;
   }();
-  display_panel_t display_panel_info = {.panel_type = panel_type};
 
   std::vector<fpbus::Metadata> display_panel_metadata{
       {{
-          .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_CONFIG),
+          .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_TYPE),
           .data = std::vector<uint8_t>(
-              reinterpret_cast<uint8_t*>(&display_panel_info),
-              reinterpret_cast<uint8_t*>(&display_panel_info) + sizeof(display_panel_info)),
+              reinterpret_cast<const uint8_t*>(&panel_type),
+              reinterpret_cast<const uint8_t*>(&panel_type) + sizeof(display::PanelType)),
       }},
   };
 

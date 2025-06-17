@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -71,12 +72,13 @@ Vout::Vout(std::unique_ptr<HdmiHost> hdmi_host, inspect::Node node, uint8_t visu
   node_.RecordInt("vout_type", static_cast<int>(type()));
 }
 
-zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(fdf::Namespace& incoming, uint32_t panel_type,
+zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(fdf::Namespace& incoming,
+                                                      display::PanelType panel_type,
                                                       inspect::Node node) {
-  fdf::info("Fixed panel type is {}", panel_type);
+  fdf::info("Fixed panel type is {}", static_cast<uint32_t>(panel_type));
   const PanelConfig* panel_config = GetPanelConfig(panel_type);
   if (panel_config == nullptr) {
-    fdf::error("Failed to get panel config for panel {}", panel_type);
+    fdf::error("Failed to get panel config for panel {}", static_cast<uint32_t>(panel_type));
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -120,10 +122,10 @@ zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVout(fdf::Namespace& incoming, 
   return zx::ok(std::move(vout));
 }
 
-zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(uint32_t panel_type) {
+zx::result<std::unique_ptr<Vout>> Vout::CreateDsiVoutForTesting(display::PanelType panel_type) {
   const PanelConfig* panel_config = GetPanelConfig(panel_type);
   if (panel_config == nullptr) {
-    fdf::error("Failed to get panel config for panel {}", panel_type);
+    fdf::error("Failed to get panel config for panel {}", static_cast<uint32_t>(panel_type));
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 

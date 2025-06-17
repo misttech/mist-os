@@ -148,7 +148,7 @@ constexpr PanelConfig kBoeTv070wsmFitipowerJd9364AstroPanelConfig = {
     .display_timing = kBoeTv070wsmPanelTimings,
 };
 
-// See PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON for model information.
+// See display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson for model information.
 constexpr PanelConfig kBoeTv070wsmFitipowerJd9364NelsonPanelConfig = {
     .name = "BOE_TV070WSM_FITIPOWER_JD9364_NELSON",
     .dsi_on = lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9364_NELSON,
@@ -171,7 +171,7 @@ constexpr PanelConfig kBoeTv070wsmFitipowerJd9364NelsonPanelConfig = {
     .display_timing = kBoeTv070wsmPanelTimings,
 };
 
-// See PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364 for model information.
+// See display::PanelType::kInnoluxP070acbFitipowerJd9364 for model information.
 constexpr PanelConfig kInnoluxP070acbFitipowerJd9364PanelConfig = {
     .name = "INNOLUX_P070ACB_FITIPOWER_JD9364",
     .dsi_on = lcd_init_sequence_INNOLUX_P070ACB_FITIPOWER_JD9364,
@@ -225,7 +225,7 @@ constexpr PanelConfig kInnoluxP070acbFitipowerJd9364PanelConfig = {
         },
 };
 
-// See PANEL_BOE_TV101WXM_FITIPOWER_JD9364 for model information.
+// See display::PanelType::kBoeTv101wxmFitipowerJd9364 for model information.
 constexpr PanelConfig kBoeTv101wxmFitipowerJd9364PanelConfig = {
     .name = "BOE_TV101WXM_FITIPOWER_JD9364",
     .dsi_on = lcd_init_sequence_BOE_TV101WXM_FITIPOWER_JD9364,
@@ -252,7 +252,7 @@ constexpr PanelConfig kBoeTv101wxmFitipowerJd9364PanelConfig = {
     .display_timing = kBoeTv101wxmPanelTimings,
 };
 
-// See PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364 for model information.
+// See display::PanelType::kInnoluxP101dezFitipowerJd9364 for model information.
 constexpr PanelConfig kInnoluxP101dezFitipowerJd9364PanelConfig = {
     .name = "INNOLUX_P101DEZ_FITIPOWER_JD9364",
     .dsi_on = lcd_init_sequence_INNOLUX_P101DEZ_FITIPOWER_JD9364,
@@ -298,7 +298,7 @@ constexpr PanelConfig kInnoluxP101dezFitipowerJd9364PanelConfig = {
         },
 };
 
-// See PANEL_BOE_TV101WXM_FITIPOWER_JD9365 for model information.
+// See display::PanelType::kBoeTv101wxmFitipowerJd9365 for model information.
 constexpr PanelConfig kBoeTv101wxmFitipowerJd9365PanelConfig = {
     .name = "BOE_TV101WXM_FITIPOWER_JD9365",
     .dsi_on = lcd_init_sequence_BOE_TV101WXM_FITIPOWER_JD9365,
@@ -325,7 +325,7 @@ constexpr PanelConfig kBoeTv101wxmFitipowerJd9365PanelConfig = {
     .display_timing = kBoeTv101wxmPanelTimings,
 };
 
-// See PANEL_BOE_TV070WSM_FITIPOWER_JD9365 for model information.
+// See display::PanelType::kBoeTv070wsmFitipowerJd9365 for model information.
 constexpr PanelConfig kBoeTv070wsmFitipowerJd9365PanelConfig = {
     .name = "BOE_TV070WSM_FITIPOWER_JD9365",
     .dsi_on = lcd_init_sequence_BOE_TV070WSM_FITIPOWER_JD9365,
@@ -348,7 +348,7 @@ constexpr PanelConfig kBoeTv070wsmFitipowerJd9365PanelConfig = {
     .display_timing = kBoeTv070wsmPanelTimings,
 };
 
-// See PANEL_KD_KD070D82_FITIPOWER_JD9364 for model information.
+// See display::PanelType::kKdKd070d82FitipowerJd9364 for model information.
 constexpr PanelConfig kKdKd070d82FitipowerJd9364PanelConfig = {
     .name = "KD_KD070D82_FITIPOWER_JD9364",
     .dsi_on = lcd_init_sequence_KD_KD070D82_FITIPOWER_JD9364,
@@ -369,7 +369,7 @@ constexpr PanelConfig kKdKd070d82FitipowerJd9364PanelConfig = {
     .display_timing = kKdKd070d82PanelTimings,
 };
 
-// See PANEL_KD_KD070D82_FITIPOWER_JD9365 for model information.
+// See display::PanelType::kKdKd070d82FitipowerJd9365 for model information.
 constexpr PanelConfig kKdKd070d82FitipowerJd9365PanelConfig = {
     .name = "KD_KD070D82_FITIPOWER_JD9365",
     .dsi_on = lcd_init_sequence_KD_KD070D82_FITIPOWER_JD9365,
@@ -390,7 +390,7 @@ constexpr PanelConfig kKdKd070d82FitipowerJd9365PanelConfig = {
     .display_timing = kKdKd070d82PanelTimings,
 };
 
-// See PANEL_MICROTECH_MTF050FHDI03_NOVATEK_NT35596 for model information.
+// See display::PanelType::kMicrotechMtf050fhdi03NovatekNt35596 for model information.
 constexpr PanelConfig kMicrotechMtf050fhdi03NovatekNt35596PanelConfig = {
     .name = "MICROTECH_MTF050FHDI03_NOVATEK_NT35596",
     .dsi_on = lcd_init_sequence_MICROTECH_MTF050FHDI03_NOVATEK_NT35596,
@@ -440,29 +440,32 @@ constexpr PanelConfig kMicrotechMtf050fhdi03NovatekNt35596PanelConfig = {
 
 }  // namespace
 
-const PanelConfig* GetPanelConfig(uint32_t panel_type) {
+const PanelConfig* GetPanelConfig(display::PanelType panel_type) {
   // LINT.IfChange
   switch (panel_type) {
-    case PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO:
+    case display::PanelType::kBoeTv070wsmFitipowerJd9364Astro:
       return &kBoeTv070wsmFitipowerJd9364AstroPanelConfig;
-    case PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364:
+    case display::PanelType::kInnoluxP070acbFitipowerJd9364:
       return &kInnoluxP070acbFitipowerJd9364PanelConfig;
-    case PANEL_BOE_TV101WXM_FITIPOWER_JD9364:
+    case display::PanelType::kBoeTv101wxmFitipowerJd9364:
       return &kBoeTv101wxmFitipowerJd9364PanelConfig;
-    case PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364:
+    case display::PanelType::kInnoluxP101dezFitipowerJd9364:
       return &kInnoluxP101dezFitipowerJd9364PanelConfig;
-    case PANEL_BOE_TV101WXM_FITIPOWER_JD9365:
+    case display::PanelType::kBoeTv101wxmFitipowerJd9365:
       return &kBoeTv101wxmFitipowerJd9365PanelConfig;
-    case PANEL_BOE_TV070WSM_FITIPOWER_JD9365:
+    case display::PanelType::kBoeTv070wsmFitipowerJd9365:
       return &kBoeTv070wsmFitipowerJd9365PanelConfig;
-    case PANEL_KD_KD070D82_FITIPOWER_JD9364:
+    case display::PanelType::kKdKd070d82FitipowerJd9364:
       return &kKdKd070d82FitipowerJd9364PanelConfig;
-    case PANEL_KD_KD070D82_FITIPOWER_JD9365:
+    case display::PanelType::kKdKd070d82FitipowerJd9365:
       return &kKdKd070d82FitipowerJd9365PanelConfig;
-    case PANEL_MICROTECH_MTF050FHDI03_NOVATEK_NT35596:
+    case display::PanelType::kMicrotechMtf050fhdi03NovatekNt35596:
       return &kMicrotechMtf050fhdi03NovatekNt35596PanelConfig;
-    case PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON:
+    case display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson:
       return &kBoeTv070wsmFitipowerJd9364NelsonPanelConfig;
+    case display::PanelType::kUnknown:
+    default:
+      break;
   }
   // LINT.ThenChange(//src/graphics/display/lib/device-protocol-display/include/lib/device-protocol/display-panel.h)
   return nullptr;

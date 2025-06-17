@@ -43,8 +43,8 @@ TEST(DisplayPanelVisitorTest, TestMetadataAndBindProperty) {
 
   // Controller metadata.
   std::vector<uint8_t> metadata_blob = std::move(*(*metadata)[0].data());
-  auto display_panel_info = reinterpret_cast<display_panel_t*>(metadata_blob.data());
-  EXPECT_EQ(display_panel_info->panel_type, static_cast<uint32_t>(TEST_PANEL_TYPE));
+  display::PanelType* panel_type = reinterpret_cast<display::PanelType*>(metadata_blob.data());
+  EXPECT_EQ(static_cast<uint32_t>(*panel_type), static_cast<uint32_t>(TEST_PANEL_TYPE));
 }
 
 }  // namespace display_panel_visitor_dt

@@ -174,7 +174,7 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
   // submodule for MIPI-DSI displays.
   //
   // `vout_` must not be allocated nor initialized.
-  zx_status_t InitializeMipiDsiVout(display_panel_t panel_info);
+  zx_status_t InitializeMipiDsiVout(display::PanelType panel_type);
 
   // A helper allocating and initializing the video output (Vout) hardware
   // submodule for HDMI displays.

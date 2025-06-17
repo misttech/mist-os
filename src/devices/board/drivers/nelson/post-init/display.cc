@@ -104,16 +104,16 @@ const std::vector<fpbus::Bti> display_btis{
     }},
 };
 
-zx::result<uint32_t> GetDisplayPanelTypeFromGpioPanelPins(uint32_t gpio_panel_type_pins) {
+zx::result<display::PanelType> GetDisplayPanelTypeFromGpioPanelPins(uint32_t gpio_panel_type_pins) {
   switch (gpio_panel_type_pins) {
     case 0b10:
-      return zx::ok(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON);
+      return zx::ok(display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson);
     case 0b11:
-      return zx::ok(PANEL_BOE_TV070WSM_FITIPOWER_JD9365);
+      return zx::ok(display::PanelType::kBoeTv070wsmFitipowerJd9365);
     case 0b01:
-      return zx::ok(PANEL_KD_KD070D82_FITIPOWER_JD9365);
+      return zx::ok(display::PanelType::kKdKd070d82FitipowerJd9365);
     case 0b00:
-      return zx::ok(PANEL_KD_KD070D82_FITIPOWER_JD9364);
+      return zx::ok(display::PanelType::kKdKd070d82FitipowerJd9364);
   }
   FDF_LOG(ERROR, "Invalid GPIO panel type pins value: %d", gpio_panel_type_pins);
   return zx::error(ZX_ERR_INVALID_ARGS);
@@ -122,25 +122,22 @@ zx::result<uint32_t> GetDisplayPanelTypeFromGpioPanelPins(uint32_t gpio_panel_ty
 }  // namespace
 
 zx::result<> PostInit::InitDisplay() {
-  zx::result<uint32_t> panel_type_result = GetDisplayPanelTypeFromGpioPanelPins(display_id_);
+  zx::result<display::PanelType> panel_type_result =
+      GetDisplayPanelTypeFromGpioPanelPins(display_id_);
   if (!panel_type_result.is_ok()) {
     FDF_LOG(ERROR, "Failed to get display type from GPIO inspection (%" PRIu32 "): %s", display_id_,
             panel_type_result.status_string());
     return panel_type_result.take_error();
   }
-  const uint32_t panel_type = panel_type_result.value();
-  FDF_LOG(DEBUG, "Display panel type: %" PRIu32, panel_type);
-
-  display_panel_t display_panel_info = {
-      .panel_type = panel_type,
-  };
+  const display::PanelType panel_type = panel_type_result.value();
+  FDF_LOG(DEBUG, "Display panel type: %" PRIu32, static_cast<uint32_t>(panel_type));
 
   const std::vector<fpbus::Metadata> display_panel_metadata{
       {{
-          .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_CONFIG),
+          .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_TYPE),
           .data = std::vector<uint8_t>(
-              reinterpret_cast<uint8_t*>(&display_panel_info),
-              reinterpret_cast<uint8_t*>(&display_panel_info) + sizeof(display_panel_info)),
+              reinterpret_cast<const uint8_t*>(&panel_type),
+              reinterpret_cast<const uint8_t*>(&panel_type) + sizeof(display::PanelType)),
           // No metadata for this item.
       }},
   };

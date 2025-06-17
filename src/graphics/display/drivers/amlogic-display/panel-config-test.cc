@@ -17,87 +17,88 @@ namespace amlogic_display {
 namespace {
 
 TEST(PanelConfig, BoeTv070wsmFitipowerJd9364Astro) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv070wsmFitipowerJd9364Astro);
   ASSERT_NE(config, nullptr);
   EXPECT_STREQ(config->name, "BOE_TV070WSM_FITIPOWER_JD9364_ASTRO");
 }
 
 TEST(PanelConfig, InnoluxP070acbFitipowerJd9364) {
-  const PanelConfig* config = GetPanelConfig(PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kInnoluxP070acbFitipowerJd9364);
   ASSERT_NE(config, nullptr);
   EXPECT_STREQ(config->name, "INNOLUX_P070ACB_FITIPOWER_JD9364");
 }
 
 TEST(PanelConfig, BoeTv101wxmFitipowerJd9364) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV101WXM_FITIPOWER_JD9364);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv101wxmFitipowerJd9364);
   ASSERT_NE(config, nullptr);
   EXPECT_STREQ(config->name, "BOE_TV101WXM_FITIPOWER_JD9364");
 }
 
 TEST(PanelConfig, InnoluxP101dezFitipowerJd9364) {
-  const PanelConfig* config = GetPanelConfig(PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kInnoluxP101dezFitipowerJd9364);
   ASSERT_NE(config, nullptr);
   EXPECT_STREQ(config->name, "INNOLUX_P101DEZ_FITIPOWER_JD9364");
 }
 
 TEST(PanelConfig, BoeTv101wxmFitipowerJd9365) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV101WXM_FITIPOWER_JD9365);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv101wxmFitipowerJd9365);
   ASSERT_NE(config, nullptr);
   EXPECT_STREQ(config->name, "BOE_TV101WXM_FITIPOWER_JD9365");
 }
 
 TEST(PanelConfig, BoeTv070wsmFitipowerJd9365) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9365);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv070wsmFitipowerJd9365);
   ASSERT_NE(config, nullptr);
   EXPECT_STREQ(config->name, "BOE_TV070WSM_FITIPOWER_JD9365");
 }
 
 TEST(PanelConfig, KdKd070d82FitipowerJd9364) {
-  const PanelConfig* config = GetPanelConfig(PANEL_KD_KD070D82_FITIPOWER_JD9364);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kKdKd070d82FitipowerJd9364);
   ASSERT_NE(config, nullptr);
   EXPECT_STREQ(config->name, "KD_KD070D82_FITIPOWER_JD9364");
 }
 
 TEST(PanelConfig, KdKd070d82FitipowerJd9365) {
-  const PanelConfig* config = GetPanelConfig(PANEL_KD_KD070D82_FITIPOWER_JD9365);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kKdKd070d82FitipowerJd9365);
   ASSERT_NE(config, nullptr);
   EXPECT_STREQ(config->name, "KD_KD070D82_FITIPOWER_JD9365");
 }
 
 TEST(PanelConfig, MicrotechMtf050fhdi03NovatekNt35596) {
-  const PanelConfig* config = GetPanelConfig(PANEL_MICROTECH_MTF050FHDI03_NOVATEK_NT35596);
+  const PanelConfig* config =
+      GetPanelConfig(display::PanelType::kMicrotechMtf050fhdi03NovatekNt35596);
   ASSERT_NE(config, nullptr);
   EXPECT_STREQ(config->name, "MICROTECH_MTF050FHDI03_NOVATEK_NT35596");
 }
 
 TEST(PanelConfig, BoeTv070wsmFitipowerJd9364Nelson) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson);
   ASSERT_NE(config, nullptr);
   EXPECT_STREQ(config->name, "BOE_TV070WSM_FITIPOWER_JD9364_NELSON");
 }
 
 TEST(PanelConfig, InvalidPanels) {
-  const PanelConfig* config_0x04 = GetPanelConfig(0x04);
+  const PanelConfig* config_0x04 = GetPanelConfig(static_cast<display::PanelType>(0x04));
   EXPECT_EQ(config_0x04, nullptr);
 
-  const PanelConfig* config_0x05 = GetPanelConfig(0x05);
+  const PanelConfig* config_0x05 = GetPanelConfig(static_cast<display::PanelType>(0x05));
   EXPECT_EQ(config_0x05, nullptr);
 
-  const PanelConfig* config_0x06 = GetPanelConfig(0x06);
+  const PanelConfig* config_0x06 = GetPanelConfig(static_cast<display::PanelType>(0x06));
   EXPECT_EQ(config_0x06, nullptr);
 
-  const PanelConfig* config_0x0b = GetPanelConfig(0x0b);
+  const PanelConfig* config_0x0b = GetPanelConfig(static_cast<display::PanelType>(0x0b));
   EXPECT_EQ(config_0x0b, nullptr);
 
-  const PanelConfig* config_overly_large = GetPanelConfig(0x0e);
+  const PanelConfig* config_overly_large = GetPanelConfig(static_cast<display::PanelType>(0x0e));
   EXPECT_EQ(config_overly_large, nullptr);
 
-  const PanelConfig* config_unknown = GetPanelConfig(PANEL_UNKNOWN);
+  const PanelConfig* config_unknown = GetPanelConfig(display::PanelType::kUnknown);
   EXPECT_EQ(config_unknown, nullptr);
 }
 
 TEST(PanelConfigTimingIsValid, BoeTv070wsmFitipowerJd9364Astro) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv070wsmFitipowerJd9364Astro);
   ASSERT_NE(config, nullptr);
 
   EXPECT_EQ(display::FieldsPerFrame::kProgressive, config->display_timing.fields_per_frame);
@@ -107,7 +108,7 @@ TEST(PanelConfigTimingIsValid, BoeTv070wsmFitipowerJd9364Astro) {
 }
 
 TEST(PanelConfigTimingIsValid, InnoluxP070acbFitipowerJd9364) {
-  const PanelConfig* config = GetPanelConfig(PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kInnoluxP070acbFitipowerJd9364);
   ASSERT_NE(config, nullptr);
 
   EXPECT_EQ(display::FieldsPerFrame::kProgressive, config->display_timing.fields_per_frame);
@@ -117,7 +118,7 @@ TEST(PanelConfigTimingIsValid, InnoluxP070acbFitipowerJd9364) {
 }
 
 TEST(PanelConfigTimingIsValid, BoeTv101wxmFitipowerJd9364) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV101WXM_FITIPOWER_JD9364);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv101wxmFitipowerJd9364);
   ASSERT_NE(config, nullptr);
 
   EXPECT_EQ(display::FieldsPerFrame::kProgressive, config->display_timing.fields_per_frame);
@@ -127,7 +128,7 @@ TEST(PanelConfigTimingIsValid, BoeTv101wxmFitipowerJd9364) {
 }
 
 TEST(PanelConfigTimingIsValid, InnoluxP101dezFitipowerJd9364) {
-  const PanelConfig* config = GetPanelConfig(PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kInnoluxP101dezFitipowerJd9364);
   ASSERT_NE(config, nullptr);
 
   EXPECT_EQ(display::FieldsPerFrame::kProgressive, config->display_timing.fields_per_frame);
@@ -137,7 +138,7 @@ TEST(PanelConfigTimingIsValid, InnoluxP101dezFitipowerJd9364) {
 }
 
 TEST(PanelConfigTimingIsValid, BoeTv101wxmFitipowerJd9365) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV101WXM_FITIPOWER_JD9365);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv101wxmFitipowerJd9365);
   ASSERT_NE(config, nullptr);
 
   EXPECT_EQ(display::FieldsPerFrame::kProgressive, config->display_timing.fields_per_frame);
@@ -147,7 +148,7 @@ TEST(PanelConfigTimingIsValid, BoeTv101wxmFitipowerJd9365) {
 }
 
 TEST(PanelConfigTimingIsValid, BoeTv070wsmFitipowerJd9365) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9365);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv070wsmFitipowerJd9365);
   ASSERT_NE(config, nullptr);
 
   EXPECT_EQ(display::FieldsPerFrame::kProgressive, config->display_timing.fields_per_frame);
@@ -157,7 +158,7 @@ TEST(PanelConfigTimingIsValid, BoeTv070wsmFitipowerJd9365) {
 }
 
 TEST(PanelConfigTimingIsValid, KdKd070d82FitipowerJd9364) {
-  const PanelConfig* config = GetPanelConfig(PANEL_KD_KD070D82_FITIPOWER_JD9364);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kKdKd070d82FitipowerJd9364);
   ASSERT_NE(config, nullptr);
 
   EXPECT_EQ(display::FieldsPerFrame::kProgressive, config->display_timing.fields_per_frame);
@@ -167,7 +168,7 @@ TEST(PanelConfigTimingIsValid, KdKd070d82FitipowerJd9364) {
 }
 
 TEST(PanelConfigTimingIsValid, KdKd070d82FitipowerJd9365) {
-  const PanelConfig* config = GetPanelConfig(PANEL_KD_KD070D82_FITIPOWER_JD9365);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kKdKd070d82FitipowerJd9365);
   ASSERT_NE(config, nullptr);
 
   EXPECT_EQ(display::FieldsPerFrame::kProgressive, config->display_timing.fields_per_frame);
@@ -177,7 +178,8 @@ TEST(PanelConfigTimingIsValid, KdKd070d82FitipowerJd9365) {
 }
 
 TEST(PanelConfigTimingIsValid, MicrotechMtf050fhdi03NovatekNt35596) {
-  const PanelConfig* config = GetPanelConfig(PANEL_MICROTECH_MTF050FHDI03_NOVATEK_NT35596);
+  const PanelConfig* config =
+      GetPanelConfig(display::PanelType::kMicrotechMtf050fhdi03NovatekNt35596);
   ASSERT_NE(config, nullptr);
 
   EXPECT_EQ(display::FieldsPerFrame::kProgressive, config->display_timing.fields_per_frame);
@@ -187,7 +189,7 @@ TEST(PanelConfigTimingIsValid, MicrotechMtf050fhdi03NovatekNt35596) {
 }
 
 TEST(PanelConfigTimingIsValid, BoeTv070wsmFitipowerJd9364Nelson) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson);
   ASSERT_NE(config, nullptr);
 
   EXPECT_EQ(display::FieldsPerFrame::kProgressive, config->display_timing.fields_per_frame);
@@ -197,55 +199,55 @@ TEST(PanelConfigTimingIsValid, BoeTv070wsmFitipowerJd9364Nelson) {
 }
 
 TEST(PanelConfigRefreshRateMatchesSpec, BoeTv070wsmFitipowerJd9364Astro) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_ASTRO);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv070wsmFitipowerJd9364Astro);
   ASSERT_NE(config, nullptr);
   EXPECT_EQ(config->display_timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
 TEST(PanelConfigRefreshRateMatchesSpec, InnoluxP070acbFitipowerJd9364) {
-  const PanelConfig* config = GetPanelConfig(PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kInnoluxP070acbFitipowerJd9364);
   ASSERT_NE(config, nullptr);
   EXPECT_EQ(config->display_timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
 TEST(PanelConfigRefreshRateMatchesSpec, BoeTv101wxmFitipowerJd9364) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV101WXM_FITIPOWER_JD9364);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv101wxmFitipowerJd9364);
   ASSERT_NE(config, nullptr);
   EXPECT_EQ(config->display_timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
 TEST(PanelConfigRefreshRateMatchesSpec, InnoluxP101dezFitipowerJd9364) {
-  const PanelConfig* config = GetPanelConfig(PANEL_INNOLUX_P101DEZ_FITIPOWER_JD9364);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kInnoluxP101dezFitipowerJd9364);
   ASSERT_NE(config, nullptr);
   EXPECT_EQ(config->display_timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
 TEST(PanelConfigRefreshRateMatchesSpec, BoeTv101wxmFitipowerJd9365) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV101WXM_FITIPOWER_JD9365);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv101wxmFitipowerJd9365);
   ASSERT_NE(config, nullptr);
   EXPECT_EQ(config->display_timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
 TEST(PanelConfigRefreshRateMatchesSpec, BoeTv070wsmFitipowerJd9365) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9365);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv070wsmFitipowerJd9365);
   ASSERT_NE(config, nullptr);
   EXPECT_EQ(config->display_timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
 TEST(PanelConfigRefreshRateMatchesSpec, KdKd070d82FitipowerJd9364) {
-  const PanelConfig* config = GetPanelConfig(PANEL_KD_KD070D82_FITIPOWER_JD9364);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kKdKd070d82FitipowerJd9364);
   ASSERT_NE(config, nullptr);
   EXPECT_EQ(config->display_timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
 TEST(PanelConfigRefreshRateMatchesSpec, KdKd070d82FitipowerJd9365) {
-  const PanelConfig* config = GetPanelConfig(PANEL_KD_KD070D82_FITIPOWER_JD9365);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kKdKd070d82FitipowerJd9365);
   ASSERT_NE(config, nullptr);
   EXPECT_EQ(config->display_timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }
 
 TEST(PanelConfigRefreshRateMatchesSpec, BoeTv070wsmFitipowerJd9364Nelson) {
-  const PanelConfig* config = GetPanelConfig(PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON);
+  const PanelConfig* config = GetPanelConfig(display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson);
   ASSERT_NE(config, nullptr);
   EXPECT_EQ(config->display_timing.vertical_field_refresh_rate_millihertz(), 60'000);
 }

@@ -6,6 +6,7 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_AMLOGIC_DISPLAY_LCD_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/zx/result.h>
 
@@ -33,7 +34,7 @@ class Lcd {
   // therefore safe to use when adopting a device previously initialized by
   // the bootloader or another driver.
   static zx::result<std::unique_ptr<Lcd>> Create(
-      fdf::Namespace& incoming, uint32_t panel_type, const PanelConfig* panel_config,
+      fdf::Namespace& incoming, display::PanelType panel_type, const PanelConfig* panel_config,
       designware_dsi::DsiHostController* designware_dsi_host_controller, bool enabled);
 
   // Production code should prefer using the `Create()` factory method.
@@ -44,7 +45,7 @@ class Lcd {
   // `Lcd` instance.
   //
   // `lcd_reset_gpio` must be a valid GPIO pin.
-  explicit Lcd(uint32_t panel_type, const PanelConfig* panel_config,
+  explicit Lcd(display::PanelType panel_type, const PanelConfig* panel_config,
                designware_dsi::DsiHostController* designware_dsi_host_controller,
                fidl::ClientEnd<fuchsia_hardware_gpio::Gpio> lcd_reset_gpio, bool enabled);
 
@@ -67,7 +68,7 @@ class Lcd {
   // Section 3.2.6 "Init table config", page 19.
   zx::result<> PerformDisplayInitCommandSequence(cpp20::span<const uint8_t> encoded_commands);
 
-  uint32_t panel_type_;
+  display::PanelType panel_type_;
   const PanelConfig& panel_config_;
 
   designware_dsi::DsiHostController& designware_dsi_host_controller_;
