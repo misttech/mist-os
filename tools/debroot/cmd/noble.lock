@@ -1,6 +1,46 @@
-hash: a9c0a17aa375e3ba3ddea9584a2b43067b6bdeb017058f254fcf911a24ddd9e7
-updated: 2025-05-09T14:36:13.675749199-04:00
+hash: 3acf04c3c02a3a6247cd37c38c317abf022d864e75a1f1bf16b181b26d381aef
+updated: 2025-06-17T07:39:00.300153387Z
 packages:
+- package: libasound2-dev
+  version: 1.2.11-1build2
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/a/alsa-lib/libasound2-dev_1.2.11-1build2_amd64.deb
+  hash: 6acdb3db0069cf386ee6b615de8bb11cfc8863bf3a593ca6957f03e017a4b3db
+- package: libasound2-dev
+  version: 1.2.11-1build2
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/a/alsa-lib/libasound2-dev_1.2.11-1build2_i386.deb
+  hash: cf3d9a0d63b786f92e7b8892fb2337c2c40f5d57d739f936c30e0babf58f0e5b
+- package: libasound2-dev
+  version: 1.2.11-1build2
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2-dev_1.2.11-1build2_arm64.deb
+  hash: 302287cf2823d5bd2dd5bce1ca839809cd520b802715ab56e2c9fd13483c17cb
+- package: libasound2-dev
+  version: 1.2.11-1build2
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2-dev_1.2.11-1build2_armhf.deb
+  hash: c2e343c10adde52b39c1b55ad052b4615515cb18a3ff3d6558b8d24bbf600f73
+- package: libasound2-dev
+  version: 1.2.11-1build2
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2-dev_1.2.11-1build2_riscv64.deb
+  hash: 1635d09efca17a0e3800f08f378b21ad427b3fad4b9fac3109324cc96044f269
+- package: libasound2t64
+  version: 1.2.11-1build2
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/a/alsa-lib/libasound2t64_1.2.11-1build2_amd64.deb
+  hash: c2f0caa30869876791ba349bef4907d5cfec47b8cfd1ae9889a05dce0feb7c39
+- package: libasound2t64
+  version: 1.2.11-1build2
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/a/alsa-lib/libasound2t64_1.2.11-1build2_i386.deb
+  hash: 41b1a0a4711672a0c60cf30abffe1ff69ed0aa96eed549d3aa1883bc1249485e
+- package: libasound2t64
+  version: 1.2.11-1build2
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2t64_1.2.11-1build2_arm64.deb
+  hash: 793a0961cad1540bdc6217f14b544eb1b27eda952675f4d7d150f547f0c196d7
+- package: libasound2t64
+  version: 1.2.11-1build2
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2t64_1.2.11-1build2_armhf.deb
+  hash: 9db3c5de74823ed847531fdc643da3af83761b3cf9636069196ab6bfdd42db11
+- package: libasound2t64
+  version: 1.2.11-1build2
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/a/alsa-lib/libasound2t64_1.2.11-1build2_riscv64.deb
+  hash: c67353050b247e59278e928757b4e5b06848c6ab51201ad5e285894603520000
 - package: libc6
   version: 2.39-0ubuntu8.4
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/g/glibc/libc6_2.39-0ubuntu8.4_amd64.deb
@@ -41,6 +81,46 @@ packages:
   version: 2.39-0ubuntu8.4
   url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/g/glibc/libc6-dev_2.39-0ubuntu8.4_riscv64.deb
   hash: 614bc31c4b50f1e6c68e1ee72e7464a63b206512e4aed3671285db722305adaf
+- package: libgl-dev
+  version: 1.7.0-1build1
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libg/libglvnd/libgl-dev_1.7.0-1build1_amd64.deb
+  hash: b7145fd8f8abe20d5cb436d2eae9b3235bd91be6fbddac581620d16763bd9250
+- package: libgl-dev
+  version: 1.7.0-1build1
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libg/libglvnd/libgl-dev_1.7.0-1build1_i386.deb
+  hash: 08e75eef93019cd6853709cb678000e9494bee72189ef507e66747c4f17cfb47
+- package: libgl-dev
+  version: 1.7.0-1build1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglvnd/libgl-dev_1.7.0-1build1_arm64.deb
+  hash: 9bc28c1265bb82ff2498c234893cbb891529e43fa6b100c007ba677c0a77bbc1
+- package: libgl-dev
+  version: 1.7.0-1build1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglvnd/libgl-dev_1.7.0-1build1_armhf.deb
+  hash: 3ac8ba9d3961cbb235192fad4a58170063dcb0e8c49b9acdb3816815a9659b68
+- package: libgl-dev
+  version: 1.7.0-1build1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglvnd/libgl-dev_1.7.0-1build1_riscv64.deb
+  hash: f65f94fb7e99f537b68371da6b429c6f67ed46991f147d8c83666a18af0e35aa
+- package: libgl1
+  version: 1.7.0-1build1
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libg/libglvnd/libgl1_1.7.0-1build1_amd64.deb
+  hash: e2b2fadeb883f073b566ad1d7874f6702397514d258473e96152a89d4d502a09
+- package: libgl1
+  version: 1.7.0-1build1
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/libg/libglvnd/libgl1_1.7.0-1build1_i386.deb
+  hash: 50dde40a681b15732590b1faa896263a7b4f0588a136e5a38ef2c3b534e27e7e
+- package: libgl1
+  version: 1.7.0-1build1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglvnd/libgl1_1.7.0-1build1_arm64.deb
+  hash: 8b2478bdeaf7a13d3c3b993f0238ac74640ab5a623b9d2645ebf6f1336c9881b
+- package: libgl1
+  version: 1.7.0-1build1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglvnd/libgl1_1.7.0-1build1_armhf.deb
+  hash: 8aad5bb7c2fe03a7de556edc9cb9ee90605acb5a71ae74cfa610907e19504b87
+- package: libgl1
+  version: 1.7.0-1build1
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglvnd/libgl1_1.7.0-1build1_riscv64.deb
+  hash: f2deaa81affe5593c8f38478ef20495883efa3f6726d40770d58c0acec8e861e
 - package: libgl1-mesa-dev
   version: 24.2.8-1ubuntu1~24.04.1
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/libgl1-mesa-dev_24.2.8-1ubuntu1~24.04.1_amd64.deb
@@ -121,6 +201,46 @@ packages:
   version: 9.0.2-1.1build1
   url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libg/libglu/libglu1-mesa-dev_9.0.2-1.1build1_riscv64.deb
   hash: bc4288d7184c644978a4a8a30afe824051a2c90619325a5bd076804c8bba74c4
+- package: libpython3.12-dev
+  version: 3.12.3-1ubuntu0.6
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/p/python3.12/libpython3.12-dev_3.12.3-1ubuntu0.6_amd64.deb
+  hash: fc8e37c9f6c782a6c16a135ab39aee01276d28b2c2e65f548d8e91eeec72bdfb
+- package: libpython3.12-dev
+  version: 3.12.3-1ubuntu0.6
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/p/python3.12/libpython3.12-dev_3.12.3-1ubuntu0.6_i386.deb
+  hash: b0d996a9e94751ee6cb7ad7f2276118fc3069853590e252c4c0cb81e444d286f
+- package: libpython3.12-dev
+  version: 3.12.3-1ubuntu0.6
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.12/libpython3.12-dev_3.12.3-1ubuntu0.6_arm64.deb
+  hash: c9a2119f665acc221583b48352891fea655f4f7da3d7ea7bd464052e0347bc94
+- package: libpython3.12-dev
+  version: 3.12.3-1ubuntu0.6
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.12/libpython3.12-dev_3.12.3-1ubuntu0.6_armhf.deb
+  hash: d7335664494d1788f06a936191a1ee851ba8588a6f3783fef5f3d8748aaf730c
+- package: libpython3.12-dev
+  version: 3.12.3-1ubuntu0.6
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.12/libpython3.12-dev_3.12.3-1ubuntu0.6_riscv64.deb
+  hash: 5e27d4d49b5df5eca7c7429cd2c9169c5e6a78972a90ea65258842f3af492172
+- package: libpython3.12t64
+  version: 3.12.3-1ubuntu0.6
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/p/python3.12/libpython3.12t64_3.12.3-1ubuntu0.6_amd64.deb
+  hash: 81faf13d3688a2c1cbc5a92adf17d07f7867a68d05c00998231ca2c8ac18395b
+- package: libpython3.12t64
+  version: 3.12.3-1ubuntu0.6
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/p/python3.12/libpython3.12t64_3.12.3-1ubuntu0.6_i386.deb
+  hash: 137a87631f79997a223e750bb69272c09f459082ce22f8d0cc02f0155663a215
+- package: libpython3.12t64
+  version: 3.12.3-1ubuntu0.6
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.12/libpython3.12t64_3.12.3-1ubuntu0.6_arm64.deb
+  hash: 847c7a2e9c2a2e298df465eb3d81b55760c91bb7ecc7b64976fbd6e6c0474c35
+- package: libpython3.12t64
+  version: 3.12.3-1ubuntu0.6
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.12/libpython3.12t64_3.12.3-1ubuntu0.6_armhf.deb
+  hash: d4f4f253e7e2713188fe1447db414c67026df4147944257bd7fd42187d1dd7af
+- package: libpython3.12t64
+  version: 3.12.3-1ubuntu0.6
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/p/python3.12/libpython3.12t64_3.12.3-1ubuntu0.6_riscv64.deb
+  hash: 74b6033fec5b6b063687f1cb7372128231c22dfd0bc54cbe2725f523dccbcfde
 - package: libx11-6
   version: 2:1.8.7-1build1
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/libx/libx11/libx11-6_1.8.7-1build1_amd64.deb
@@ -722,25 +842,25 @@ packages:
   url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/libx/libxxf86vm/libxxf86vm1_1.1.4-1build4_riscv64.deb
   hash: 4083aa62e9b95e2587a052312afcdaed8cacde3f9d60ba4083fb5d1edcde9e62
 - package: linux-libc-dev
-  version: 6.8.0-59.61
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_6.8.0-59.61_amd64.deb
-  hash: 1dc0b3871d7fd7a43251ab61efddd4a125b26e4265c4bdbc0d8ed959b5cc8b45
+  version: 6.8.0-60.63
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_6.8.0-60.63_amd64.deb
+  hash: 0ad7f5f7dd020fbdd2f35b8a7ff1673db8e8d65e7e257d98a4b4cb56aa75896e
 - package: linux-libc-dev
-  version: 6.8.0-59.61
-  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_6.8.0-59.61_i386.deb
-  hash: 0590afbf633fe70f536d987414195add6876ed8677bae6dcb48a833071d9f1d8
+  version: 6.8.0-60.63
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/l/linux/linux-libc-dev_6.8.0-60.63_i386.deb
+  hash: 7d4dce4856ce818dd12664ad8a5c6d14577ec79ba8840cccf60e82451494872f
 - package: linux-libc-dev
-  version: 6.8.0-59.61
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_6.8.0-59.61_arm64.deb
-  hash: b6d263d5f550d607bdeaa1dad0b9397f9997ebd502ff61b29a38560aae6b50b8
+  version: 6.8.0-60.63
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_6.8.0-60.63_arm64.deb
+  hash: dde9509d5c0b21f774a3cf28e438e1dd9d4edc659c6dbcbcbb0dfe73f09f4890
 - package: linux-libc-dev
-  version: 6.8.0-59.61
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_6.8.0-59.61_armhf.deb
-  hash: 32aa0ac4755572abf7fca1766228ad9ee83f5b4ecc5fbf0e1235cd628102fd15
+  version: 6.8.0-60.63
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_6.8.0-60.63_armhf.deb
+  hash: 633c15b2c2f3ce8bd3fcf44ea39ce400651eacff2bc2d493cb93f82ab981f915
 - package: linux-libc-dev
-  version: 6.8.0-59.61
-  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_6.8.0-59.61_riscv64.deb
-  hash: fe8f258348a72bf82c222c6fbbf9bcdb208db64d7c2e2cc23eb8aa0cc73d5836
+  version: 6.8.0-60.63
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/l/linux/linux-libc-dev_6.8.0-60.63_riscv64.deb
+  hash: 4268e761b3c5ffefd4cac3c0a90739b9e009d6cc0ad250c40022b41ac1475f96
 - package: mesa-common-dev
   version: 24.2.8-1ubuntu1~24.04.1
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/mesa-common-dev_24.2.8-1ubuntu1~24.04.1_amd64.deb
@@ -765,6 +885,10 @@ packages:
   version: 2023.2-1
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-core-dev_2023.2-1_all.deb
   hash: d7c8cbeb485a45ca6e5486b46df7a5ead737440954ae4489866222101ac2f0d7
+- package: x11proto-dev
+  version: 2023.2-1
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-dev_2023.2-1_all.deb
+  hash: 3bf13a2ffb79ecd4014d438936014e5863f79eb59ebf76e8f43356271c90e7ce
 - package: x11proto-gl-dev
   version: 2023.2-1
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/x/xorgproto/x11proto-gl-dev_2023.2-1_all.deb

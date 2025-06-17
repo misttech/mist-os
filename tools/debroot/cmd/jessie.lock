@@ -1,5 +1,5 @@
-hash: 5ddd189b26c3848aa195d41b4ec72e46ed4388b5110a806ef9cd954250c8b732
-updated: 2025-02-24T23:28:15+0000
+hash: 4510fc526e38922880355420af7929d344779b905b7ef6ea6e7d37209ab2778f
+updated: 2025-06-17T07:03:04.599294729Z
 packages:
 - package: libasound2
   version: 1.0.28-1
@@ -81,6 +81,22 @@ packages:
   version: 13.0.6-1~bpo8+1
   url: https://archive.debian.org/debian-archive/debian/pool/main/m/mesa/libgl1-mesa-dev_13.0.6-1~bpo8+1_i386.deb
   hash: f239bdf42ba3d233fd902ac28698e1e9e7488e76b20939a540a1b4075b2210c5
+- package: libgl1-mesa-glx
+  version: 13.0.6-1~bpo8+1
+  url: https://archive.debian.org/debian-archive/debian/pool/main/m/mesa/libgl1-mesa-glx_13.0.6-1~bpo8+1_amd64.deb
+  hash: f1ec471f13d2e0f8647ab70866cba86a793ec4e92196b0c61ff4cdc7b42f31e5
+- package: libgl1-mesa-glx
+  version: 13.0.6-1~bpo8+1
+  url: https://archive.debian.org/debian-archive/debian/pool/main/m/mesa/libgl1-mesa-glx_13.0.6-1~bpo8+1_arm64.deb
+  hash: 941fc1438d37e4658ea9a737de89740d63ec683186dba746067f26b0de3516a3
+- package: libgl1-mesa-glx
+  version: 13.0.6-1~bpo8+1
+  url: https://archive.debian.org/debian-archive/debian/pool/main/m/mesa/libgl1-mesa-glx_13.0.6-1~bpo8+1_armhf.deb
+  hash: fa63bb1098b7e194ce0888f19de3458ed2456e97cea0dfd4f2b914b35e1b257f
+- package: libgl1-mesa-glx
+  version: 13.0.6-1~bpo8+1
+  url: https://archive.debian.org/debian-archive/debian/pool/main/m/mesa/libgl1-mesa-glx_13.0.6-1~bpo8+1_i386.deb
+  hash: 19344459f6a0c6c175737e088791b693dff049b3ef11324199bc10da772cc45e
 - package: libglapi-mesa
   version: 13.0.6-1~bpo8+1
   url: https://archive.debian.org/debian-archive/debian/pool/main/m/mesa/libglapi-mesa_13.0.6-1~bpo8+1_amd64.deb

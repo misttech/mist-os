@@ -1,5 +1,5 @@
-hash: 3c84c0079f8acb0d859d76792368acfc2d3b17c1878d7b90af1af02c4c00d657
-updated: 2023-12-14T00:03:10.954572296Z
+hash: 4ab2fb2a400fef98212f5a99e96ca870fe4436c97ff4543ee59d03ef73cbffd4
+updated: 2025-06-17T07:07:01.597579777Z
 packages:
 - package: libasound2
   version: 1.0.27.2-3ubuntu7
@@ -81,6 +81,22 @@ packages:
   version: 10.1.3-0ubuntu0.6
   url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libgl1-mesa-dev_10.1.3-0ubuntu0.6_armhf.deb
   hash: 84450a14b54c722b2c9b26683db90d77bc9eb29f56676e2e500e01dd02dd3c60
+- package: libgl1-mesa-glx
+  version: 10.1.3-0ubuntu0.6
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/libgl1-mesa-glx_10.1.3-0ubuntu0.6_amd64.deb
+  hash: 976590129bd7b6df94d7948329319e14b17ef1e3e6ea0564a08c2f54cc0d2af6
+- package: libgl1-mesa-glx
+  version: 10.1.3-0ubuntu0.6
+  url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/libgl1-mesa-glx_10.1.3-0ubuntu0.6_i386.deb
+  hash: ff2faa411cdf050da4c7b6ed23496568b77bcbbbe524d73e5e36ac43bf2fd8fe
+- package: libgl1-mesa-glx
+  version: 10.1.3-0ubuntu0.6
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libgl1-mesa-glx_10.1.3-0ubuntu0.6_arm64.deb
+  hash: 47debb31dd76cf45734763965b19ab227d1658ea1026cdd5eabc61377756f19c
+- package: libgl1-mesa-glx
+  version: 10.1.3-0ubuntu0.6
+  url: http://us.ports.ubuntu.com/ubuntu-ports/pool/main/m/mesa/libgl1-mesa-glx_10.1.3-0ubuntu0.6_armhf.deb
+  hash: 41f3d2c91cf924e784fdc7e32212b980c31286e641eb94f0806871d8169205be
 - package: libglapi-mesa
   version: 10.1.3-0ubuntu0.6
   url: http://us.archive.ubuntu.com/ubuntu/pool/main/m/mesa/libglapi-mesa_10.1.3-0ubuntu0.6_amd64.deb
