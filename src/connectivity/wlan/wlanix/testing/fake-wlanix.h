@@ -42,6 +42,7 @@ enum class CommandTag {
   kWifiStaIfaceGetName,
   kWifiStaIfaceUnknownMethod,
   kSupplicantAddStaInterface,
+  kSupplicantRemoveInterface,
   kSupplicantUnknownMethod,
   kSupplicantStaIfaceRegisterCallback,
   kSupplicantStaIfaceAddNetwork,
@@ -128,6 +129,8 @@ class FakeWlanix : public fidl::WireServer<fuchsia_wlan_wlanix::Wlanix>,
   // Supplicant methods
   void AddStaInterface(fuchsia_wlan_wlanix::wire::SupplicantAddStaInterfaceRequest* request,
                        AddStaInterfaceCompleter::Sync& completer) override;
+  void RemoveInterface(fuchsia_wlan_wlanix::wire::SupplicantRemoveInterfaceRequest* request,
+                       RemoveInterfaceCompleter::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_wlan_wlanix::Supplicant> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 

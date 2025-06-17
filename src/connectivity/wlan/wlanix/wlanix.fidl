@@ -135,6 +135,9 @@ open protocol Supplicant {
         1: iface server_end:SupplicantStaIface;
         2: iface_name string:16;
     });
+    flexible RemoveInterface(resource table {
+        1: iface_name string:16;
+    });
 };
 
 open protocol SupplicantStaIface {

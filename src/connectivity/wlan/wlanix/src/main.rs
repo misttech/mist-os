@@ -1027,6 +1027,21 @@ async fn handle_supplicant_request<I: IfaceManager>(
                 }
             }
         }
+        fidl_wlanix::SupplicantRequest::RemoveInterface { payload: _, .. } => {
+            info!("fidl_wlanix::SupplicantRequest::RemoveInterface");
+            let ifaces = iface_manager.list_ifaces();
+            if ifaces.is_empty() {
+                bail!("RemoveInterface but no interfaces exist.");
+            } else {
+                // As a supplicant call, RemoveInterface implies that the interface should no
+                // longer serve connections but does not actually destroy the interface. We
+                // simulate this by tearing down any existing connection.
+                let client_iface = iface_manager.get_client_iface(ifaces[0]).await?;
+                if let Err(e) = client_iface.disconnect().await {
+                    error!("Failed to disconnect on RemoveInterface: {e}");
+                }
+            }
+        }
         fidl_wlanix::SupplicantRequest::_UnknownMethod { ordinal, .. } => {
             warn!("Unknown SupplicantRequest ordinal: {}", ordinal);
         }
@@ -1705,6 +1720,7 @@ mod tests {
     };
 
     const CHIP_ID: u32 = 1;
+    const FAKE_IFACE_NAME: &str = "fake-iface-name";
 
     // This will only work if the message is a parseable nl80211 message. Some
     // attributes are currently write only in our NL80211 implementation. If a
@@ -2375,6 +2391,23 @@ mod tests {
     }
 
     #[test]
+    fn test_supplicant_remove_interface() {
+        let (mut test_helper, mut test_fut) = setup_supplicant_test();
+
+        test_helper
+            .supplicant_proxy
+            .remove_interface(fidl_wlanix::SupplicantRemoveInterfaceRequest {
+                iface_name: Some(FAKE_IFACE_NAME.to_string()),
+                ..Default::default()
+            })
+            .expect("Failed to call RemoveInterface");
+        assert_variant!(test_helper.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+
+        let iface_calls = test_helper.iface_manager.get_iface_call_history();
+        assert_variant!(&iface_calls.lock()[0], ClientIfaceCall::Disconnect);
+    }
+
+    #[test]
     fn test_supplicant_sta_iface_disconnect() {
         let (mut test_helper, mut test_fut) = setup_supplicant_test();
 
@@ -2974,7 +3007,7 @@ mod tests {
 
     struct SupplicantTestHelper {
         _wlanix_proxy: fidl_wlanix::WlanixProxy,
-        _supplicant_proxy: fidl_wlanix::SupplicantProxy,
+        supplicant_proxy: fidl_wlanix::SupplicantProxy,
         supplicant_sta_iface_proxy: fidl_wlanix::SupplicantStaIfaceProxy,
         nl80211_proxy: fidl_wlanix::Nl80211Proxy,
         supplicant_sta_network_proxy: fidl_wlanix::SupplicantStaNetworkProxy,
@@ -3011,7 +3044,7 @@ mod tests {
         let result =
             supplicant_proxy.add_sta_interface(fidl_wlanix::SupplicantAddStaInterfaceRequest {
                 iface: Some(supplicant_sta_iface_server_end),
-                iface_name: Some("fake-iface-name".to_string()),
+                iface_name: Some(FAKE_IFACE_NAME.to_string()),
                 ..Default::default()
             });
         assert_variant!(result, Ok(()));
@@ -3050,7 +3083,7 @@ mod tests {
 
         let test_helper = SupplicantTestHelper {
             _wlanix_proxy: wlanix_proxy,
-            _supplicant_proxy: supplicant_proxy,
+            supplicant_proxy,
             supplicant_sta_iface_proxy,
             nl80211_proxy,
             supplicant_sta_network_proxy,
