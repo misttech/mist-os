@@ -52,9 +52,6 @@ workbench_platform_config = {
         "enabled": True,
         "enable_android_support": True,
     },
-    "storage": {
-        "storage_host_enabled": True,
-    },
     "usb": {
         "peripheral": {
             "functions": [

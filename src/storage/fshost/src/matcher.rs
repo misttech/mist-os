@@ -608,7 +608,7 @@ impl Matcher for FvmOnRecoveryMatcher {
 #[cfg(test)]
 mod tests {
     use super::{Device, DiskFormat, Environment, Matchers};
-    use crate::config::default_config;
+    use crate::config::default_test_config;
     use crate::device::constants::{
         BLOBFS_PARTITION_LABEL, BOOTPART_DRIVER_PATH, DATA_PARTITION_LABEL, GPT_DRIVER_PATH,
         LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
@@ -1029,13 +1029,13 @@ mod tests {
         assert!(!Matchers::new(&fshost_config::Config {
             bootpart: false,
             gpt: false,
-            ..default_config()
+            ..default_test_config()
         },)
         .match_device(Box::new(mock_device.clone()), &mut MockEnv::new())
         .await
         .expect("match_device failed"));
 
-        assert!(Matchers::new(&default_config())
+        assert!(Matchers::new(&default_test_config())
             .match_device(
                 Box::new(mock_device),
                 &mut MockEnv::new().expect_attach_driver(BOOTPART_DRIVER_PATH)
@@ -1050,12 +1050,12 @@ mod tests {
         let mut env = MockEnv::new().expect_attach_driver(NAND_BROKER_DRIVER_PATH);
 
         // Default shouldn't match.
-        assert!(!Matchers::new(&default_config())
+        assert!(!Matchers::new(&default_test_config())
             .match_device(Box::new(device.clone()), &mut env)
             .await
             .expect("match_device failed"));
 
-        assert!(Matchers::new(&fshost_config::Config { nand: true, ..default_config() })
+        assert!(Matchers::new(&fshost_config::Config { nand: true, ..default_test_config() })
             .match_device(Box::new(device), &mut env)
             .await
             .expect("match_device failed"));
@@ -1071,13 +1071,13 @@ mod tests {
             blobfs: false,
             data: false,
             gpt: false,
-            ..default_config()
+            ..default_test_config()
         },)
         .match_device(Box::new(device.clone()), &mut env)
         .await
         .expect("match_device failed"));
 
-        let mut matchers = Matchers::new(&default_config());
+        let mut matchers = Matchers::new(&default_test_config());
         assert!(matchers
             .match_device(Box::new(device.clone()), &mut env)
             .await
@@ -1091,7 +1091,7 @@ mod tests {
 
         // The gpt_all config should allow multiple GPT devices to be matched.
         let mut matchers =
-            Matchers::new(&fshost_config::Config { gpt_all: true, ..default_config() });
+            Matchers::new(&fshost_config::Config { gpt_all: true, ..default_test_config() });
         let mut env = MockEnv::new().expect_attach_driver(GPT_DRIVER_PATH);
         assert!(matchers
             .match_device(Box::new(device.clone()), &mut env)
@@ -1112,7 +1112,7 @@ mod tests {
             ramdisk_image: true,
             data_filesystem_format: "minfs".to_string(),
             gpt: false,
-            ..default_config()
+            ..default_test_config()
         });
         let fvm_device = MockDevice::new()
             .set_content_format(DiskFormat::Fvm)
@@ -1148,7 +1148,7 @@ mod tests {
             ramdisk_image: true,
             data_filesystem_format: "fxfs".to_string(),
             gpt: false,
-            ..default_config()
+            ..default_test_config()
         });
 
         let fvm_device = MockDevice::new()
@@ -1174,7 +1174,7 @@ mod tests {
             ramdisk_image: true,
             data_filesystem_format: "fxfs".to_string(),
             gpt: false,
-            ..default_config()
+            ..default_test_config()
         });
 
         let fvm_device = MockDevice::new()
@@ -1200,7 +1200,7 @@ mod tests {
             .expect_mount_blobfs_on()
             .expect_mount_data_on();
 
-        let mut matchers = Matchers::new(&default_config());
+        let mut matchers = Matchers::new(&default_test_config());
 
         assert!(matchers
             .match_device(Box::new(fvm_device), &mut env)
@@ -1210,7 +1210,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_legacy_data_matcher() {
-        let mut matchers = Matchers::new(&default_config());
+        let mut matchers = Matchers::new(&default_test_config());
 
         assert!(matchers
             .match_device(
@@ -1227,7 +1227,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_matcher_without_data_partition() {
-        let mut matchers = Matchers::new(&default_config());
+        let mut matchers = Matchers::new(&default_test_config());
 
         assert!(matchers
             .match_device(
@@ -1245,7 +1245,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_multiple_fvm_partitions_no_label() {
-        let mut matchers = Matchers::new(&fshost_config::Config { gpt: false, ..default_config() });
+        let mut matchers =
+            Matchers::new(&fshost_config::Config { gpt: false, ..default_test_config() });
 
         assert!(matchers
             .match_device(
@@ -1270,7 +1271,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_netboot_flag_true() {
         let mut matchers =
-            Matchers::new(&fshost_config::Config { netboot: true, ..default_config() });
+            Matchers::new(&fshost_config::Config { netboot: true, ..default_test_config() });
 
         assert!(matchers
             .match_device(
@@ -1287,7 +1288,7 @@ mod tests {
             data_filesystem_format: "fxfs".to_string(),
             netboot: true,
             fxfs_blob: true,
-            ..default_config()
+            ..default_test_config()
         });
 
         assert!(matchers
@@ -1327,7 +1328,7 @@ mod tests {
             fxfs_blob: true,
             data_filesystem_format: "fxfs".to_string(),
             gpt: false,
-            ..default_config()
+            ..default_test_config()
         });
 
         // A device with the wrong label should fail.
@@ -1380,7 +1381,7 @@ mod tests {
                 storage_host: true,
                 data_filesystem_format: "minfs".to_string(),
                 gpt: false,
-                ..default_config()
+                ..default_test_config()
             })
         };
 
@@ -1431,7 +1432,7 @@ mod tests {
             fxfs_blob: true,
             data_filesystem_format: "fxfs".to_string(),
             gpt: false,
-            ..default_config()
+            ..default_test_config()
         });
 
         // A device with the wrong label should fail.
@@ -1490,7 +1491,7 @@ mod tests {
             fxfs_blob: true,
             data_filesystem_format: "fxfs".to_string(),
             gpt: false,
-            ..default_config()
+            ..default_test_config()
         });
 
         assert!(matchers
@@ -1517,7 +1518,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_storage_host_matcher() {
         let mut matchers =
-            Matchers::new(&fshost_config::Config { storage_host: true, ..default_config() });
+            Matchers::new(&fshost_config::Config { storage_host: true, ..default_test_config() });
 
         // Don't match devices with a partition type, since they are likely nested in another GPT.
         assert!(!matchers
@@ -1556,7 +1557,7 @@ mod tests {
             storage_host: true,
             ramdisk_image: true,
             fxfs_blob: true,
-            ..default_config()
+            ..default_test_config()
         });
 
         // The non-ramdisk should match.
@@ -1594,7 +1595,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_fvm_on_recovery_matcher() {
         let mut matchers =
-            Matchers::new(&fshost_config::Config { ramdisk_image: true, ..default_config() });
+            Matchers::new(&fshost_config::Config { ramdisk_image: true, ..default_test_config() });
 
         // The non-ramdisk should match by content format.
         let mut env = MockEnv::new().expect_bind_and_enumerate_fvm();
@@ -1627,8 +1628,10 @@ mod tests {
         // The non-ramdisk FVM should be able to match on label as well.
         for label in ALL_FVM_LABELS {
             let mut env = MockEnv::new().expect_bind_and_enumerate_fvm();
-            matchers =
-                Matchers::new(&fshost_config::Config { ramdisk_image: true, ..default_config() });
+            matchers = Matchers::new(&fshost_config::Config {
+                ramdisk_image: true,
+                ..default_test_config()
+            });
             assert!(matchers
                 .match_device(Box::new(MockDevice::new().set_partition_label(label)), &mut env)
                 .await
@@ -1642,7 +1645,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_publisher_matcher() {
-        let mut matchers = Matchers::new(&default_config());
+        let mut matchers = Matchers::new(&default_test_config());
 
         // First unmanaged device should match and be published as "000". Devices are unmanaged if
         // the come from Dev, instead of Fshost or SystemPartitionTable.
@@ -1682,7 +1685,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_config_matcher() {
         let mut matchers = Matchers::new_with_extra_matchers(
-            &default_config(),
+            &default_test_config(),
             vec![ConfigMatcher::new(
                 String::from("fts-semantic"),
                 String::from("fts-partition"),

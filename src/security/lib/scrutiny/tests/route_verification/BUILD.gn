@@ -62,12 +62,6 @@ if (is_fuchsia) {
     testonly = true
     partitions_config = ":partitions_config"
     version = "fake_version"
-    filesystems = {
-      fvm = {
-        sparse_output = {
-        }
-      }
-    }
   }
 
   product_assembly_configuration("product_assembly_config") {
@@ -77,14 +71,6 @@ if (is_fuchsia) {
       storage = {
         filesystems = {
           image_name = "assembly"
-          volume = {
-            fvm = {
-              data = {
-              }
-              blob = {
-              }
-            }
-          }
         }
       }
 
@@ -123,8 +109,7 @@ if (is_fuchsia) {
 
   assembled_system("assembly") {
     testonly = true
-    generate_fvm = true
-    generate_fvm_fastboot = false
+    generate_fxfs = true
     generate_vbmeta = false
     product_assembly_config_label = ":product_assembly_config"
     board_config_label = ":board_config"

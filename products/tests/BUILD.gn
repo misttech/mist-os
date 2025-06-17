@@ -17,18 +17,6 @@ product_assembly_configuration("minimal_boot_user") {
         "/core/session-manager/session:session",
       ]
     }
-    storage = {
-      filesystems = {
-        volume = {
-          fvm = {
-            data = {
-            }
-            blob = {
-            }
-          }
-        }
-      }
-    }
   }
   product = {
     session = {
