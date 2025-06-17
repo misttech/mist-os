@@ -58,6 +58,11 @@ node "selina-osc-en" {
   fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d3.GPIOH_PIN_ID.PIN_8;
 }
 
+node "touch-interrupt" {
+  fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
+  fuchsia.BIND_GPIO_PIN == fuchsia.amlogic.platform.s905d3.GPIOZ_PIN_ID.PIN_4;
+}
+
 node "gpio-init" {
   fuchsia.BIND_INIT_STEP == fuchsia.gpio.BIND_INIT_STEP.GPIO;
 }

@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.hardware.pin/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <lib/ddk/binding.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/incoming/cpp/namespace.h>
+#include <lib/zx/result.h>
 
 #include <bind/fuchsia/amlogic/platform/s905d3/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
@@ -20,13 +20,35 @@
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 
-#include "nelson-gpios.h"
-#include "nelson.h"
+#include "post-init.h"
 
 namespace nelson {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
 namespace {
+
+zx::result<> SetPull(std::shared_ptr<fdf::Namespace> incoming, std::string_view node_name,
+                     fuchsia_hardware_pin::Pull pull) {
+  zx::result pin = incoming->Connect<fuchsia_hardware_pin::Service::Device>(node_name);
+  if (pin.is_error()) {
+    FDF_LOG(ERROR, "Failed to connect to pin node: %s", pin.status_string());
+    return pin.take_error();
+  }
+
+  fidl::Arena arena;
+  auto config = fuchsia_hardware_pin::wire::Configuration::Builder(arena).pull(pull).Build();
+  fidl::WireResult result = fidl::WireCall(*pin)->Configure(config);
+  if (!result.ok()) {
+    FDF_LOG(ERROR, "Call to Configure failed: %s", result.FormatDescription().c_str());
+    return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    FDF_LOG(ERROR, "Configure failed: %s", result.FormatDescription().c_str());
+    return result->take_error();
+  }
+  return zx::ok();
+}
+
 const std::vector kI2cRules = {
     fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_i2c::SERVICE,
                              bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
@@ -83,8 +105,12 @@ static const std::vector<fpbus::BootMetadata> touch_boot_metadata{
     }},
 };
 
-zx_status_t Nelson::TouchInit() {
-  gpio_init_steps_.push_back(GpioPull(GPIO_TOUCH_SOC_INT_L, fuchsia_hardware_pin::Pull::kNone));
+zx::result<> PostInit::InitTouch() {
+  // The Goodix touch driver expects the interrupt line to be driven by the touch controller.
+  if (auto result = SetPull(incoming(), "touch-interrupt", fuchsia_hardware_pin::Pull::kNone);
+      result.is_error()) {
+    return result;
+  }
 
   fpbus::Node touch_dev;
   touch_dev.name() = "gt6853-touch";
@@ -119,16 +145,16 @@ zx_status_t Nelson::TouchInit() {
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, touch_dev), fidl::ToWire(fidl_arena, composite_node_spec));
   if (!result.ok()) {
-    zxlogf(ERROR, "AddCompositeNodeSpec Touch(touch_dev) request failed: %s",
-           result.FormatDescription().data());
-    return result.status();
+    FDF_LOG(ERROR, "AddCompositeNodeSpec Touch(touch_dev) request failed: %s",
+            result.FormatDescription().data());
+    return zx::error(result.status());
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "AddCompositeNodeSpec Touch(touch_dev) failed: %s",
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+    FDF_LOG(ERROR, "AddCompositeNodeSpec Touch(touch_dev) failed: %s",
+            zx_status_get_string(result->error_value()));
+    return zx::error(result->error_value());
   }
-  return ZX_OK;
+  return zx::ok();
 }
 
 }  // namespace nelson

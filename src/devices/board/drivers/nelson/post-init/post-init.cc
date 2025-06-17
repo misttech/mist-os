@@ -149,6 +149,10 @@ void PostInit::Start(fdf::StartCompleter completer) {
     return completer(result.take_error());
   }
 
+  if (zx::result result = InitTouch(); result.is_error()) {
+    return completer(result.take_error());
+  }
+
   if (zx::result result = SetBoardInfo(); result.is_error()) {
     return completer(result.take_error());
   }

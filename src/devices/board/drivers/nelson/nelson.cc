@@ -94,10 +94,6 @@ int Nelson::Thread() {
   }
   clock_init_steps_.clear();
 
-  if ((status = TouchInit()) != ZX_OK) {
-    zxlogf(ERROR, "TouchInit failed: %d", status);
-  }
-
   if ((status = AddPostInitDevice()) != ZX_OK) {
     zxlogf(ERROR, "%s: AddPostInitDevice() failed: %d", __func__, status);
     return status;
@@ -257,7 +253,7 @@ zx_status_t Nelson::Create(void* ctx, zx_device_t* parent) {
 }
 
 zx_status_t Nelson::AddPostInitDevice() {
-  constexpr std::array<uint32_t, 8> kPostInitGpios{
+  constexpr std::array<uint32_t, 9> kPostInitGpios{
       bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_7,
       bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_8,
       bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_3,
@@ -266,6 +262,7 @@ zx_status_t Nelson::AddPostInitDevice() {
       bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_11,
       bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_12,
       bind_fuchsia_amlogic_platform_s905d3::GPIOH_PIN_ID_PIN_8,
+      bind_fuchsia_amlogic_platform_s905d3::GPIOZ_PIN_ID_PIN_4,
   };
 
   const ddk::BindRule post_init_rules[] = {
