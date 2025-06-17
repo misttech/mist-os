@@ -348,6 +348,19 @@ impl InterfacesHandler for InterfacesHandlerImpl {
             kernel.netstack_devices.remove_device(&kernel, name.into());
         }
     }
+
+    fn handle_idle_event(&mut self) {
+        let Some(kernel) = self.kernel() else {
+            log_error!("kernel went away while netlink is initializing");
+            return;
+        };
+        let (initialized, wq) = &kernel.netstack_devices.initialized_and_wq;
+        if initialized.swap(true, Ordering::SeqCst) {
+            log_error!("netlink initial devices should only be reported once");
+            return;
+        }
+        wq.notify_all()
+    }
 }
 
 impl Kernel {

@@ -64,6 +64,9 @@ pub trait InterfacesHandler: Send + Sync + 'static {
 
     /// Handle a deleted link.
     fn handle_deleted_link(&mut self, name: &str);
+
+    /// Handle the idle event.
+    fn handle_idle_event(&mut self) {}
 }
 
 /// Represents the ways RTM_*LINK messages may specify an individual link.
@@ -496,6 +499,8 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
 
             interfaces_handler.handle_new_link(&properties.name, properties.id);
         }
+
+        interfaces_handler.handle_idle_event();
 
         Ok((
             InterfacesWorkerState {

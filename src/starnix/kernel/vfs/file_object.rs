@@ -1585,9 +1585,13 @@ impl FileObject {
         L: LockEqualOrBefore<FileOpsCore>,
         Op: FnMut(&mut Locked<L>) -> Result<T, Errno>,
     {
+        // Don't return EAGAIN for directories. This can happen because glibc always opens a
+        // directory with O_NONBLOCK.
+        let can_return_eagain = self.flags().contains(OpenFlags::NONBLOCK)
+            && !self.flags().contains(OpenFlags::DIRECTORY);
         // Run the operation a first time without registering a waiter in case no wait is needed.
         match op(locked) {
-            Err(errno) if errno == EAGAIN && !self.flags().contains(OpenFlags::NONBLOCK) => {}
+            Err(errno) if errno == EAGAIN && !can_return_eagain => {}
             result => return result,
         }
 

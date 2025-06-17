@@ -15,10 +15,30 @@
 #include <linux/capability.h>
 #include <linux/if_tun.h>
 
+#include "src/lib/files/directory.h"
 #include "src/lib/files/file.h"
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 class SysctlTest : public ::testing::Test {};
+class SysctlTestWithParam
+    : public SysctlTest,
+      public ::testing::WithParamInterface<std::tuple<std::string, std::string>> {};
+
+TEST_P(SysctlTestWithParam, DirectoryContainsInterfaces) {
+  auto const &[version, conf_or_neigh] = GetParam();
+  std::vector<std::string> files;
+  EXPECT_TRUE(
+      files::ReadDirContents(std::format("/proc/sys/net/{}/{}", version, conf_or_neigh), &files));
+  EXPECT_THAT(files, testing::IsSupersetOf({"default", "lo"}));
+}
+
+INSTANTIATE_TEST_SUITE_P(SysctlTest, SysctlTestWithParam,
+                         ::testing::Combine(::testing::Values("ipv4", "ipv6"),
+                                            ::testing::Values("conf", "neigh")),
+                         [](const ::testing::TestParamInfo<SysctlTestWithParam::ParamType> &info) {
+                           return std::format("{}_{}", std::get<0>(info.param),
+                                              std::get<1>(info.param));
+                         });
 
 TEST_F(SysctlTest, AcceptRaRtTable) {
   if (!test_helper::HasCapability(CAP_NET_ADMIN)) {

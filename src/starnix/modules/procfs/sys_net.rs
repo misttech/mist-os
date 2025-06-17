@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::sync::atomic::Ordering;
+
 use netlink::SysctlInterfaceSelector;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::pseudo::simple_file::{
@@ -19,47 +21,83 @@ use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error};
 
 const FILE_MODE: FileMode = mode!(IFREG, 0o644);
 
 fn netstack_devices_readdir(
-    _locked: &mut Locked<FileOpsCore>,
+    locked: &mut Locked<FileOpsCore>,
     file: &FileObject,
     current_task: &CurrentTask,
     sink: &mut dyn DirentSink,
 ) -> Result<(), Errno> {
-    emit_dotdot(file, sink)?;
+    file.blocking_op(locked, current_task, FdEvents::empty(), None, |_locked| {
+        let (initialized, _) = &current_task.kernel().netstack_devices.initialized_and_wq;
+        if !initialized.load(Ordering::SeqCst) {
+            // Kick off the initialization of the netlink worker if not yet.
+            let _ = current_task.kernel().network_netlink();
+            return error!(EAGAIN);
+        }
+        emit_dotdot(file, sink)?;
 
-    if sink.offset() == 2 {
-        sink.add(
-            file.fs.allocate_ino(),
-            sink.offset() + 1,
-            DirectoryEntryType::from_mode(FILE_MODE),
-            "all".into(),
-        )?;
-    }
+        if sink.offset() == 2 {
+            sink.add(
+                file.fs.allocate_ino(),
+                sink.offset() + 1,
+                DirectoryEntryType::from_mode(FILE_MODE),
+                "all".into(),
+            )?;
+        }
 
-    if sink.offset() == 3 {
-        sink.add(
-            file.fs.allocate_ino(),
-            sink.offset() + 1,
-            DirectoryEntryType::from_mode(FILE_MODE),
-            "default".into(),
-        )?;
-    }
+        if sink.offset() == 3 {
+            sink.add(
+                file.fs.allocate_ino(),
+                sink.offset() + 1,
+                DirectoryEntryType::from_mode(FILE_MODE),
+                "default".into(),
+            )?;
+        }
 
-    let devices = current_task.kernel().netstack_devices.snapshot_devices();
-    for (name, _) in devices.iter().skip(sink.offset() as usize - 4) {
-        let inode_num = file.fs.allocate_ino();
-        sink.add(
-            inode_num,
-            sink.offset() + 1,
-            DirectoryEntryType::from_mode(FILE_MODE),
-            name.as_ref(),
-        )?;
-    }
-    Ok(())
+        let devices = current_task.kernel().netstack_devices.snapshot_devices();
+        for (name, _) in devices.iter().skip(sink.offset() as usize - 4) {
+            let inode_num = file.fs.allocate_ino();
+            sink.add(
+                inode_num,
+                sink.offset() + 1,
+                DirectoryEntryType::from_mode(FILE_MODE),
+                name.as_ref(),
+            )?;
+        }
+        Ok(())
+    })
+}
+
+macro_rules! fileops_impl_netstack_devices {
+    () => {
+        fn readdir(
+            &self,
+            locked: &mut Locked<FileOpsCore>,
+            file: &FileObject,
+            current_task: &CurrentTask,
+            sink: &mut dyn DirentSink,
+        ) -> Result<(), Errno> {
+            netstack_devices_readdir(locked, file, current_task, sink)
+        }
+
+        fn wait_async(
+            &self,
+            _locked: &mut Locked<FileOpsCore>,
+            _file: &FileObject,
+            current_task: &CurrentTask,
+            waiter: &starnix_core::task::Waiter,
+            _events: FdEvents,
+            _handler: starnix_core::task::EventHandler,
+        ) -> Option<starnix_core::task::WaitCanceler> {
+            let (_initialized, wq) = &current_task.kernel().netstack_devices.initialized_and_wq;
+            Some(wq.wait_async(waiter))
+        }
+    };
 }
 
 fn get_netstack_device(
@@ -131,16 +169,7 @@ impl FileOps for ProcSysNetIpv4Conf {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
     fileops_impl_unbounded_seek!();
-
-    fn readdir(
-        &self,
-        locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        sink: &mut dyn DirentSink,
-    ) -> Result<(), Errno> {
-        netstack_devices_readdir(locked, file, current_task, sink)
-    }
+    fileops_impl_netstack_devices!();
 }
 
 #[derive(Clone)]
@@ -211,16 +240,7 @@ impl FileOps for ProcSysNetIpv4Neigh {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
     fileops_impl_unbounded_seek!();
-
-    fn readdir(
-        &self,
-        locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        sink: &mut dyn DirentSink,
-    ) -> Result<(), Errno> {
-        netstack_devices_readdir(locked, file, current_task, sink)
-    }
+    fileops_impl_netstack_devices!();
 }
 
 #[derive(Clone)]
@@ -376,16 +396,7 @@ impl FileOps for ProcSysNetIpv6Conf {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
     fileops_impl_unbounded_seek!();
-
-    fn readdir(
-        &self,
-        locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        sink: &mut dyn DirentSink,
-    ) -> Result<(), Errno> {
-        netstack_devices_readdir(locked, file, current_task, sink)
-    }
+    fileops_impl_netstack_devices!();
 }
 
 #[derive(Clone)]
@@ -456,16 +467,7 @@ impl FileOps for ProcSysNetIpv6Neigh {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
     fileops_impl_unbounded_seek!();
-
-    fn readdir(
-        &self,
-        locked: &mut Locked<FileOpsCore>,
-        file: &FileObject,
-        current_task: &CurrentTask,
-        sink: &mut dyn DirentSink,
-    ) -> Result<(), Errno> {
-        netstack_devices_readdir(locked, file, current_task, sink)
-    }
+    fileops_impl_netstack_devices!();
 }
 
 struct NetworkNetlinkSysctlFile {

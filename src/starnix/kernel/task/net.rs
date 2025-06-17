@@ -4,11 +4,13 @@
 
 use crate::device::kobject::Device;
 use crate::fs::sysfs::DeviceDirectory;
+use crate::task::waiter::WaitQueue;
 use crate::task::Kernel;
 use crate::vfs::{FsStr, FsString};
 use starnix_sync::Mutex;
 use std::collections::BTreeMap;
 use std::num::NonZeroU64;
+use std::sync::atomic::AtomicBool;
 
 #[derive(Clone, Debug)]
 pub struct NetstackDevice {
@@ -21,6 +23,10 @@ pub struct NetstackDevice {
 pub struct NetstackDevices {
     /// The known netstack devices.
     devices: Mutex<BTreeMap<FsString, NetstackDevice>>,
+    /// `NetstackDevices` listens for events from the netlink worker, which
+    /// is initialized lazily and asynchronously. This waits for at least
+    /// the `Idle` event is observed on the interface watcher.
+    pub initialized_and_wq: (AtomicBool, WaitQueue),
 }
 
 impl NetstackDevices {
