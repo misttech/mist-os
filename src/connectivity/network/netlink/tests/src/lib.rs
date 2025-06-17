@@ -6,6 +6,7 @@
 //! netemul realm.
 
 use std::collections::HashSet;
+use std::num::NonZeroU64;
 
 use assert_matches::assert_matches;
 use fidl::endpoints::Proxy as _;
@@ -106,7 +107,7 @@ fn connect_to_netlink_protocols_in_realm(
 struct NoopInterfacesHandler;
 
 impl netlink::interfaces::InterfacesHandler for NoopInterfacesHandler {
-    fn handle_new_link(&mut self, _name: &str) {}
+    fn handle_new_link(&mut self, _name: &str, _interface_id: NonZeroU64) {}
 
     fn handle_deleted_link(&mut self, _name: &str) {}
 }

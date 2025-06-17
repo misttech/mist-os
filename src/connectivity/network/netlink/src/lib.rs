@@ -26,6 +26,8 @@ mod routes;
 mod rules;
 pub(crate) mod util;
 
+use std::num::NonZeroU64;
+
 use fuchsia_component::client::connect_to_protocol;
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
@@ -68,6 +70,20 @@ impl FeatureFlags {
     pub fn test() -> Self {
         FeatureFlags { assume_ifb0_existence: false }
     }
+}
+
+/// Selects the interface for the sysctl.
+#[derive(Debug, Clone, Copy)]
+pub enum SysctlInterfaceSelector {
+    /// "all" interfaces.
+    ///
+    /// This is supposed to change all interfaces' settings, but this is a
+    /// lie for most of the sysctls, they have no effect at all when written.
+    All,
+    /// "default" interface, all interface created after this write will inherit the value.
+    Default,
+    /// The id of the interface to change.
+    Id(NonZeroU64),
 }
 
 /// The implementation of the Netlink protocol suite.
@@ -116,6 +132,35 @@ impl<P: SenderReceiverProvider> Netlink<P> {
         feature_flags: FeatureFlags,
     ) -> (Self, impl Future<Output = ()> + Send) {
         Self::new_inner(interfaces_handler, || protocols, Some(on_initialized), feature_flags)
+    }
+
+    /// Writes the accept_ra_rt_table sysctl for the selected interface.
+    pub fn write_accept_ra_rt_table(
+        &self,
+        interface: SysctlInterfaceSelector,
+        value: i32,
+    ) -> Result<(), SysctlError> {
+        let (responder, receiver) = oneshot_sync::channel();
+        self.async_work_sink
+            .unbounded_send(AsyncWorkItem::SetAcceptRaRtTable {
+                interface,
+                value: value.into(),
+                responder,
+            })
+            .map_err(|_| SysctlError::Disconnected)?;
+        receiver.receive().map_err(|_| SysctlError::Disconnected)?
+    }
+
+    /// Reads the accept_ra_rt_table sysctl for the selected interface.
+    pub fn read_accept_ra_rt_table(
+        &self,
+        interface: SysctlInterfaceSelector,
+    ) -> Result<i32, SysctlError> {
+        let (responder, receiver) = oneshot_sync::channel();
+        self.async_work_sink
+            .unbounded_send(AsyncWorkItem::GetAcceptRaRtTable { interface, responder })
+            .map_err(|_| SysctlError::Disconnected)?;
+        Ok(receiver.receive().map_err(|_| SysctlError::Disconnected)??.into())
     }
 
     fn new_inner<H: interfaces::InterfacesHandler>(
@@ -189,6 +234,15 @@ pub enum NewClientError {
     /// The [`Netlink`] is disconnected from its associated worker, perhaps as a
     /// result of dropping the worker.
     Disconnected,
+}
+
+/// The possible error types when trying to access a sysctl.
+#[derive(Debug)]
+pub enum SysctlError {
+    /// The [`Netlink`] is disconnected from its associated worker.
+    Disconnected,
+    /// The interface went away.
+    NoInterface,
 }
 
 /// Parameters used to start the Netlink asynchronous worker.

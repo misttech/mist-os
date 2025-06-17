@@ -853,7 +853,7 @@ impl<M: Clone + NetlinkSerializable + Send + Sync + 'static> Sender<M>
 }
 
 /// Provide Starnix implementations of `Sender` and `Receiver to [`Netlink`].
-pub(crate) struct NetlinkSenderReceiverProvider;
+pub struct NetlinkSenderReceiverProvider;
 
 impl SenderReceiverProvider for NetlinkSenderReceiverProvider {
     type Sender<M: Clone + NetlinkSerializable + Send + Sync + 'static> = NetlinkToClientSender<M>;

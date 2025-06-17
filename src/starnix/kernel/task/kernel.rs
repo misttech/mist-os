@@ -53,6 +53,7 @@ use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
+use std::num::NonZeroU64;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
@@ -336,9 +337,9 @@ impl InterfacesHandlerImpl {
 }
 
 impl InterfacesHandler for InterfacesHandlerImpl {
-    fn handle_new_link(&mut self, name: &str) {
+    fn handle_new_link(&mut self, name: &str, interface_id: NonZeroU64) {
         if let Some(kernel) = self.kernel() {
-            kernel.netstack_devices.add_device(&kernel, name.into());
+            kernel.netstack_devices.add_device(&kernel, name.into(), interface_id);
         }
     }
 
@@ -642,9 +643,7 @@ impl Kernel {
     ///
     /// This function follows the lazy initialization pattern, where the first
     /// call will instantiate the Netlink implementation.
-    pub(crate) fn network_netlink<'a>(
-        self: &'a Arc<Self>,
-    ) -> &'a Netlink<NetlinkSenderReceiverProvider> {
+    pub fn network_netlink<'a>(self: &'a Arc<Self>) -> &'a Netlink<NetlinkSenderReceiverProvider> {
         self.network_netlink.get_or_init(|| {
             let (network_netlink, network_netlink_async_worker) = Netlink::new(
                 InterfacesHandlerImpl(Arc::downgrade(self)),

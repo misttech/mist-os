@@ -8,34 +8,41 @@ use crate::task::Kernel;
 use crate::vfs::{FsStr, FsString};
 use starnix_sync::Mutex;
 use std::collections::BTreeMap;
+use std::num::NonZeroU64;
+
+#[derive(Clone, Debug)]
+pub struct NetstackDevice {
+    pub device: Device,
+    pub interface_id: NonZeroU64,
+}
 
 /// Keeps track of network devices and their [`Device`].
 #[derive(Default)]
 pub struct NetstackDevices {
     /// The known netstack devices.
-    devices: Mutex<BTreeMap<FsString, Device>>,
+    devices: Mutex<BTreeMap<FsString, NetstackDevice>>,
 }
 
 impl NetstackDevices {
-    pub fn add_device(&self, kernel: &Kernel, name: &FsStr) {
+    pub fn add_device(&self, kernel: &Kernel, name: &FsStr, interface_id: NonZeroU64) {
         let mut devices = self.devices.lock();
         let device = kernel.device_registry.add_net_device(name, DeviceDirectory::new);
-        devices.insert(name.into(), device);
+        devices.insert(name.into(), NetstackDevice { device, interface_id });
     }
 
     pub fn remove_device(&self, kernel: &Kernel, name: &FsStr) {
         let mut devices = self.devices.lock();
-        if let Some(device) = devices.remove(name) {
+        if let Some(NetstackDevice { device, interface_id: _ }) = devices.remove(name) {
             kernel.device_registry.remove_net_device(device);
         }
     }
 
-    pub fn get_device(&self, name: &FsStr) -> Option<Device> {
+    pub fn get_device(&self, name: &FsStr) -> Option<NetstackDevice> {
         let devices = self.devices.lock();
         devices.get(name).cloned()
     }
 
-    pub fn snapshot_devices(&self) -> Vec<(FsString, Device)> {
+    pub fn snapshot_devices(&self) -> Vec<(FsString, NetstackDevice)> {
         let devices = self.devices.lock();
         devices.iter().map(|(name, device)| (name.clone(), device.clone())).collect()
     }
