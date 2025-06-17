@@ -24,10 +24,6 @@ static_assert(DEVICE_METADATA_PARTITION_MAP == ZBI_TYPE_DRV_PARTITION_MAP, "");
 // maximum size of DEVICE_METADATA_PARTITION_MAP data
 #define METADATA_PARTITION_MAP_MAX 4096
 
-// Initial USB mode
-// type: usb_mode_t
-#define DEVICE_METADATA_USB_MODE 0x4D425355  // USBM
-
 // Platform board private data (for board driver)
 // type: ???
 #define DEVICE_METADATA_BOARD_PRIVATE 0x524F426D  // mBOR
