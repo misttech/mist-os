@@ -150,19 +150,12 @@ ArmDevicetreePsciCpuSuspendItem::AppendItems(DataZbi& zbi) {
   if (current_idle_state_ == 0) {
     return fit::ok();
   }
-  auto res = zbi.Append({
-      .type = ZBI_TYPE_KERNEL_DRIVER,
-      .length = static_cast<uint32_t>(size_bytes()),
-      .extra = ZBI_KERNEL_DRIVER_ARM_PSCI_CPU_SUSPEND,
-  });
-  if (res.is_error()) {
-    return res.take_error();
-  }
-  ZX_ASSERT(res->header->length >= size_bytes());
-  auto* states = reinterpret_cast<zbi_dcfg_arm_psci_cpu_suspend_state_t*>(res->payload.data());
-  memcpy(states, idle_states().data(), idle_states().size_bytes());
-
-  return fit::ok();
+  return zbi.Append(
+      {
+          .type = ZBI_TYPE_KERNEL_DRIVER,
+          .extra = ZBI_KERNEL_DRIVER_ARM_PSCI_CPU_SUSPEND,
+      },
+      std::as_bytes(idle_states().subspan(0, current_idle_state_)));
 }
 
 devicetree::ScanState ArmDevicetreePsciCpuSuspendItem::OnSubtree(const devicetree::NodePath& root) {

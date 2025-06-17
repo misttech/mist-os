@@ -68,14 +68,17 @@ using Arm64StandardBootShimItems =
     boot_shim::StandardBootShimItems<boot_shim::UartItem<>,                               //
                                      boot_shim::PoolMemConfigItem,                        //
                                      boot_shim::NvramItem,                                //
+                                     boot_shim::RebootReasonItem,                         //
                                      boot_shim::DevicetreeSerialNumberItem,               //
-                                     boot_shim::ArmDevicetreePsciItem,                    //
                                      boot_shim::ArmDevicetreeGicItem,                     //
                                      boot_shim::DevicetreeDtbItem,                        //
                                      boot_shim::GenericWatchdogItem<WatchdogMmioHelper>,  //
                                      boot_shim::ArmDevicetreeCpuTopologyItem,             //
-                                     boot_shim::RebootReasonItem,                         //
-                                     boot_shim::ArmDevicetreeTimerItem>;
+                                     boot_shim::ArmDevicetreeTimerItem,                   //
+                                     boot_shim::ArmDevicetreeTimerMmioItem,               //
+                                     boot_shim::ArmDevicetreePsciItem,                    //
+                                     boot_shim::ArmDevicetreePsciCpuSuspendItem           //
+                                     >;
 
 // Accessor obtaining the boot hart ID, RISCV only.
 struct BootHartIdGetter {
