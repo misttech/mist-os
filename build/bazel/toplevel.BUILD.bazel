@@ -74,7 +74,10 @@ exports_files(
     ] +
 
     # Used in IDK generation.
-    ["build/sdk/meta"] +
+    [
+        "build/sdk/meta",
+        "fuchsia_build_generated/fuchsia_in_tree_idk.hash",
+    ] +
 
     # end of list.
     [],

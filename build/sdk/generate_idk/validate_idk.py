@@ -188,12 +188,25 @@ def main() -> int:
         help="Path containing the metadata schema files",
         required=True,
     )
+    parser.add_argument(
+        "--stamp-file",
+        type=Path,
+        help="Stamp file to write on success.",
+        required=False,
+    )
+
     args = parser.parse_args()
 
     idk_validator = IdkValidator(
         args.idk_directory, args.schema_directory, args.json_validator_path
     )
-    idk_validator.validate_schema()
+    result = idk_validator.validate_schema()
+    if result != 0:
+        return result
+
+    if args.stamp_file:
+        args.stamp_file.parent.mkdir(parents=True, exist_ok=True)
+        args.stamp_file.write_text("OK")
 
     return 0
 
