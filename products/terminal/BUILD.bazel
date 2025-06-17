@@ -68,7 +68,9 @@ _PRODUCT_CONFIG_BASE_JSON = {
         },
     },
     "product": {
-        "build_info": DEFAULT_PRODUCT_BUILD_INFO,
+        "build_info": DEFAULT_PRODUCT_BUILD_INFO | {
+            "name": "terminal",
+        },
         "session": {
             "url": "fuchsia-pkg://fuchsia.com/tiles-session#meta/tiles-session.cm",
         },

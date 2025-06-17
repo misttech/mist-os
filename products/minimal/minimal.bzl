@@ -39,5 +39,7 @@ MINIMAL_PLATFORM_BASE = {
 }
 
 MINIMAL_PRODUCT_BASE = {
-    "build_info": DEFAULT_PRODUCT_BUILD_INFO,
+    "build_info": DEFAULT_PRODUCT_BUILD_INFO | {
+        "name": "minimal",
+    },
 }
