@@ -496,7 +496,7 @@ bool MsdArmConnection::UpdateCommittedMemory(GpuMapping* mapping) __TA_NO_THREAD
     // TODO(https://fxbug.dev/42107884): Shrink existing PMTs when that's supported.
     std::unique_ptr<magma::PlatformBusMapper::BusMapping> bus_mapping;
     if (committed_region.length() > 0) {
-      bus_mapping = owner_->GetBusMapper()->MapPageRangeBus(
+      bus_mapping = owner_->NdtGetBusMapper()->MapPageRangeBus(
           buffer->platform_buffer(), committed_region.start(), committed_region.length());
       if (!bus_mapping)
         return DRETF(false, "Couldn't allocate new bus mapping");
@@ -523,8 +523,8 @@ bool MsdArmConnection::UpdateCommittedMemory(GpuMapping* mapping) __TA_NO_THREAD
 
   for (auto& region : new_regions) {
     std::unique_ptr<magma::PlatformBusMapper::BusMapping> bus_mapping =
-        owner_->GetBusMapper()->MapPageRangeBus(buffer->platform_buffer(), region.start(),
-                                                region.length());
+        owner_->NdtGetBusMapper()->MapPageRangeBus(buffer->platform_buffer(), region.start(),
+                                                   region.length());
     if (!bus_mapping)
       return DRETF(false, "Couldn't pin region 0x%lx to 0x%lx", region.start(), region.length());
 

@@ -34,7 +34,7 @@ class TestConnectionOwner : public FakeConnectionOwnerBase {
   void NdtPostScheduleAtom(std::shared_ptr<MsdArmAtom> atom) override {}
   void NdtPostCancelAtoms(std::shared_ptr<MsdArmConnection> connection) override {}
   AddressSpaceObserver* NdtGetAddressSpaceObserver() override { return manager_; }
-  magma::PlatformBusMapper* GetBusMapper() override { return &bus_mapper_; }
+  magma::PlatformBusMapper* NdtGetBusMapper() override { return &bus_mapper_; }
 
  private:
   AddressManager* manager_;
@@ -179,8 +179,8 @@ TEST_F(AddressManagerTest, FlushAddressRange) {
 
   buffer = magma::PlatformBuffer::Create(PAGE_SIZE * 3, "test");
 
-  auto bus_mapping =
-      connection_owner.GetBusMapper()->MapPageRangeBus(buffer.get(), 0, buffer->size() / PAGE_SIZE);
+  auto bus_mapping = connection_owner.NdtGetBusMapper()->MapPageRangeBus(
+      buffer.get(), 0, buffer->size() / PAGE_SIZE);
   ASSERT_NE(nullptr, bus_mapping);
 
   EXPECT_TRUE(connection->address_space_for_testing()->Insert(

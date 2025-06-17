@@ -50,8 +50,7 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
     virtual void NdtPostCancelAtoms(std::shared_ptr<MsdArmConnection> connection) = 0;
     virtual AddressSpaceObserver* NdtGetAddressSpaceObserver() = 0;
     virtual ArmMaliCacheCoherencyStatus NdtGetCacheCoherencyStatus() = 0;
-    // TODO(b/417848695): refactor this to NdtMapPageRangeBus
-    virtual magma::PlatformBusMapper* GetBusMapper() = 0;
+    virtual magma::PlatformBusMapper* NdtGetBusMapper() = 0;
     virtual bool NdtIsProtectedModeSupported() = 0;
     // Called after the connection's destructor has been called, so the
     // refcount should be 0.
@@ -199,7 +198,7 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
 
   PerformanceCounters* performance_counters() { return owner_->performance_counters(); }
 
-  magma::PlatformBusMapper* GetBusMapper() override { return owner_->GetBusMapper(); }
+  magma::PlatformBusMapper* GetBusMapper() override { return owner_->NdtGetBusMapper(); }
 
   msd::msd_client_id_t client_id_;
 

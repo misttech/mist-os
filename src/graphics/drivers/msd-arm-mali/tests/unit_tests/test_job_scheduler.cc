@@ -91,7 +91,7 @@ class TestConnectionOwner : public FakeConnectionOwnerBase {
   void NdtPostScheduleAtom(std::shared_ptr<MsdArmAtom> atom) override {}
   void NdtPostCancelAtoms(std::shared_ptr<MsdArmConnection> connection) override {}
   AddressSpaceObserver* NdtGetAddressSpaceObserver() override { return &address_space_observer_; }
-  magma::PlatformBusMapper* GetBusMapper() override { return &bus_mapper_; }
+  magma::PlatformBusMapper* NdtGetBusMapper() override { return &bus_mapper_; }
 
  private:
   TestAddressSpaceObserver address_space_observer_;
