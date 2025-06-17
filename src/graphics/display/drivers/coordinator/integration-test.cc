@@ -40,6 +40,7 @@
 #include "src/graphics/display/drivers/coordinator/testing/mock-coordinator-listener.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/lib/api-types/cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
 #include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
@@ -275,10 +276,12 @@ class TestFidlClient {
   zx::result<> SetDisplayLayers(display::DisplayId display_id,
                                 const std::vector<LayerConfig>& layer_configs);
 
+  zx::result<> SetLayerPrimaryConfig(display::LayerId layer_id,
+                                     const display::ImageMetadata& image_metadata);
   zx::result<> SetLayerImage(display::LayerId layer_id, display::ImageId image_id,
                              display::EventId event_id);
   zx::result<> SetLayerColor(display::LayerId layer_id, const display::Color& fallback_color);
-  zx::result<> CheckConfig();
+  zx::result<display::ConfigCheckResult> CheckConfig();
   zx::result<> ApplyConfig(display::ConfigStamp config_stamp);
   zx::result<> AcknowledgeVsync(display::VsyncAckCookie vsync_ack_cookie);
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb);
@@ -520,6 +523,23 @@ zx::result<> TestFidlClient::SetDisplayLayers(display::DisplayId display_id,
   return zx::ok();
 }
 
+zx::result<> TestFidlClient::SetLayerPrimaryConfig(display::LayerId layer_id,
+                                                   const display::ImageMetadata& image_metadata) {
+  ZX_ASSERT(coordinator_fidl_client_.is_valid());
+
+  const fuchsia_hardware_display::wire::LayerId fidl_layer_id = display::ToFidlLayerId(layer_id);
+  const fuchsia_hardware_display_types::wire::ImageMetadata fidl_image_metadata =
+      image_metadata.ToFidl();
+
+  const fidl::OneWayStatus fidl_status =
+      coordinator_fidl_client_->SetLayerPrimaryConfig(fidl_layer_id, fidl_image_metadata);
+  if (!fidl_status.ok()) {
+    fdf::error("SetLayerPrimaryConfig() failed: {}", fidl_status.status_string());
+    return zx::error(fidl_status.status());
+  }
+  return zx::ok();
+}
+
 zx::result<> TestFidlClient::SetLayerImage(display::LayerId layer_id, display::ImageId image_id,
                                            display::EventId event_id) {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
@@ -553,7 +573,7 @@ zx::result<> TestFidlClient::SetLayerColor(display::LayerId layer_id,
   return zx::ok();
 }
 
-zx::result<> TestFidlClient::CheckConfig() {
+zx::result<display::ConfigCheckResult> TestFidlClient::CheckConfig() {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
   const fidl::WireResult<fuchsia_hardware_display::Coordinator::CheckConfig> fidl_status =
@@ -564,12 +584,14 @@ zx::result<> TestFidlClient::CheckConfig() {
   }
   const fidl::WireResponse<fuchsia_hardware_display::Coordinator::CheckConfig>& fidl_result =
       fidl_status.value();
-  if (fidl_result.res != fuchsia_hardware_display_types::wire::ConfigResult::kOk) {
-    fdf::error("CheckConfig() rejected the config: code {}",
-               static_cast<uint32_t>(fidl_result.res));
-    return zx::error(ZX_ERR_INVALID_ARGS);
+  fuchsia_hardware_display_types::wire::ConfigResult fidl_config_check_result = fidl_result.res;
+  if (!display::ConfigCheckResult::IsValid(fidl_config_check_result)) {
+    fdf::error("CheckConfig() returned unrecognized code: {}",
+               static_cast<uint32_t>(fidl_config_check_result));
+    return zx::error(ZX_ERR_INTERNAL);
   }
-  return zx::ok();
+
+  return zx::ok(display::ConfigCheckResult(fidl_result.res));
 }
 
 zx::result<> TestFidlClient::ApplyConfig(display::ConfigStamp config_stamp) {
@@ -635,14 +657,15 @@ zx::result<display::LayerId> TestFidlClient::CreateFullscreenImageLayer() {
     // CreateLayer() has already logged the error.
     return layer_id_result;
   }
-
-  fidl::OneWayStatus fidl_status = coordinator_fidl_client_->SetLayerPrimaryConfig(
-      display::ToFidlLayerId(layer_id_result.value()), state_.FullscreenImageMetadata().ToFidl());
-  if (!fidl_status.ok()) {
-    fdf::error("SetLayerPrimaryConfig() failed: {}", fidl_status.status_string());
-    return zx::error(fidl_status.status());
+  const display::LayerId layer_id = layer_id_result.value();
+  zx::result<> set_primary_config_result =
+      SetLayerPrimaryConfig(layer_id, state_.FullscreenImageMetadata());
+  if (set_primary_config_result.is_error()) {
+    // SetLayerPrimaryConfig() has already logged the error.
+    return set_primary_config_result.take_error();
   }
-  return layer_id_result;
+
+  return zx::ok(layer_id);
 }
 
 zx::result<display::LayerId> TestFidlClient::CreateFullscreenColorLayer(display::Color color) {
@@ -727,10 +750,15 @@ zx::result<> TestFidlClient::ApplyLayers(display::ConfigStamp config_stamp,
     }
   }
 
-  zx::result<> check_config_result = CheckConfig();
+  zx::result<display::ConfigCheckResult> check_config_result = CheckConfig();
   if (check_config_result.is_error()) {
     // CheckConfig() has already logged the error.
-    return check_config_result;
+    return check_config_result.take_error();
+  }
+  if (check_config_result.value() != display::ConfigCheckResult::kOk) {
+    fdf::error("CheckConfig() rejected the config: code {}",
+               check_config_result.value().ValueForLogging());
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
   zx::result<> apply_config_result = ApplyConfig(config_stamp);
@@ -2565,5 +2593,57 @@ TEST_F(IntegrationTest, ApplyConfigSkipsConfigWithWaitingImage) {
 // primary layer. In order to better test ApplyConfig() / OnVsync() behavior,
 // we should make fake-display driver support multi-layer configurations and
 // then we could add more multi-layer tests.
+
+TEST_F(IntegrationTest, CheckConfigFullscreenImageLayer) {
+  // Create and bind primary client.
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
+
+  zx::result<display::LayerId> create_layer_result = primary_client->CreateLayer();
+  ASSERT_OK(create_layer_result);
+  display::LayerId layer_id = create_layer_result.value();
+  ASSERT_OK(primary_client->SetDisplayLayers(primary_client->state().display_id(),
+                                             {{.layer_id = layer_id}}));
+
+  // TODO(https://fxbug.dev/42068661): This test would be easier to understand
+  // if the fake display resolution was hardcoded into the test.
+  const display::ImageMetadata image_metadata = primary_client->state().FullscreenImageMetadata();
+  ASSERT_OK(primary_client->SetLayerPrimaryConfig(layer_id, image_metadata));
+
+  zx::result<display::ConfigCheckResult> check_config_result = primary_client->CheckConfig();
+  ASSERT_OK(check_config_result);
+  EXPECT_EQ(display::ConfigCheckResult::kOk, check_config_result.value());
+}
+
+TEST_F(IntegrationTest, CheckConfigLargeLayer) {
+  std::unique_ptr<TestFidlClient> primary_client = OpenCoordinatorTestFidlClient(
+      &sysmem_client_, DisplayProviderClient(), ClientPriority::kPrimary);
+  ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client->state().has_display_ownership(); }));
+
+  zx::result<display::LayerId> create_layer_result = primary_client->CreateLayer();
+  ASSERT_OK(create_layer_result);
+  display::LayerId layer_id = create_layer_result.value();
+  ASSERT_OK(primary_client->SetDisplayLayers(primary_client->state().display_id(),
+                                             {{.layer_id = layer_id}}));
+
+  // The ImageMetadata instance below is larger than the display size.
+  // SetLayerPrimaryConfig() uses the metadata to size the layer's destination,
+  // resulting in a layer that cannot possibly fit the display area. So, the
+  // configuration that uses the layer is guaranteed to be invalid.
+  //
+  // TODO(https://fxbug.dev/42068661): This test would be easier to understand
+  // if the fake display resolution was hardcoded into the test.
+  const display::ImageMetadata large_image_metadata({
+      .width = primary_client->state().FullscreenImageMetadata().width() * 2,
+      .height = primary_client->state().FullscreenImageMetadata().height() * 2,
+      .tiling_type = display::ImageTilingType::kLinear,
+  });
+  ASSERT_OK(primary_client->SetLayerPrimaryConfig(layer_id, large_image_metadata));
+
+  zx::result<display::ConfigCheckResult> check_config_result = primary_client->CheckConfig();
+  ASSERT_OK(check_config_result);
+  EXPECT_EQ(display::ConfigCheckResult::kInvalidConfig, check_config_result.value());
+}
 
 }  // namespace display_coordinator
