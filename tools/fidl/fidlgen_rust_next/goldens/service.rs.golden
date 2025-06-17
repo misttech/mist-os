@@ -62,7 +62,7 @@ pub trait FirstProtocolClientSender {
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 }
 
-impl<___T> FirstProtocolClientSender for ::fidl_next::ClientSender<___T, FirstProtocol>
+impl<___T> FirstProtocolClientSender for ::fidl_next::ClientSender<FirstProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -80,14 +80,14 @@ where
 /// See [`FirstProtocol`] for more details.
 pub trait FirstProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for FirstProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for FirstProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: FirstProtocolClientHandler<___T>,
+    ___T: ::fidl_next::Transport,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -104,7 +104,7 @@ pub trait FirstProtocolServerSender {
     type Transport: ::fidl_next::Transport;
 }
 
-impl<___T> FirstProtocolServerSender for ::fidl_next::ServerSender<___T, FirstProtocol>
+impl<___T> FirstProtocolServerSender for ::fidl_next::ServerSender<FirstProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -115,17 +115,17 @@ where
 ///
 /// See [`FirstProtocol`] for more details.
 pub trait FirstProtocolServerHandler<___T: ::fidl_next::Transport> {
-    fn method_on_first(&mut self, sender: &::fidl_next::ServerSender<___T, FirstProtocol>);
+    fn method_on_first(&mut self, sender: &::fidl_next::ServerSender<FirstProtocol, ___T>);
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for FirstProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for FirstProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: FirstProtocolServerHandler<___T>,
+    ___T: ::fidl_next::Transport,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -142,7 +142,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -176,8 +176,8 @@ pub trait MultiHeterogeneousMemberServiceInstance {
     fn connect_to_first_member(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
     ) -> Result<(), Self::Error>;
 
@@ -185,8 +185,8 @@ pub trait MultiHeterogeneousMemberServiceInstance {
     fn connect_to_second_member(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::SecondProtocol, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::SecondProtocol>,
         >,
     ) -> Result<(), Self::Error>;
 }
@@ -202,8 +202,8 @@ where
     fn connect_to_first_member(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("first_member", server_end.into_untyped())
@@ -212,8 +212,8 @@ where
     fn connect_to_second_member(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::SecondProtocol, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::SecondProtocol>,
         >,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("second_member", server_end.into_untyped())
@@ -241,8 +241,8 @@ pub trait MultiHomogeneousMemberServiceInstance {
     fn connect_to_first_member(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
     ) -> Result<(), Self::Error>;
 
@@ -250,8 +250,8 @@ pub trait MultiHomogeneousMemberServiceInstance {
     fn connect_to_second_member(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
     ) -> Result<(), Self::Error>;
 }
@@ -267,8 +267,8 @@ where
     fn connect_to_first_member(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("first_member", server_end.into_untyped())
@@ -277,8 +277,8 @@ where
     fn connect_to_second_member(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("second_member", server_end.into_untyped())
@@ -319,7 +319,7 @@ pub trait SecondProtocolClientSender {
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 }
 
-impl<___T> SecondProtocolClientSender for ::fidl_next::ClientSender<___T, SecondProtocol>
+impl<___T> SecondProtocolClientSender for ::fidl_next::ClientSender<SecondProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -337,14 +337,14 @@ where
 /// See [`SecondProtocol`] for more details.
 pub trait SecondProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for SecondProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for SecondProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: SecondProtocolClientHandler<___T>,
+    ___T: ::fidl_next::Transport,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -361,7 +361,7 @@ pub trait SecondProtocolServerSender {
     type Transport: ::fidl_next::Transport;
 }
 
-impl<___T> SecondProtocolServerSender for ::fidl_next::ServerSender<___T, SecondProtocol>
+impl<___T> SecondProtocolServerSender for ::fidl_next::ServerSender<SecondProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -372,17 +372,17 @@ where
 ///
 /// See [`SecondProtocol`] for more details.
 pub trait SecondProtocolServerHandler<___T: ::fidl_next::Transport> {
-    fn method_on_second(&mut self, sender: &::fidl_next::ServerSender<___T, SecondProtocol>);
+    fn method_on_second(&mut self, sender: &::fidl_next::ServerSender<SecondProtocol, ___T>);
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for SecondProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for SecondProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: SecondProtocolServerHandler<___T>,
+    ___T: ::fidl_next::Transport,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -399,7 +399,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -433,8 +433,8 @@ pub trait SingleMemberServiceInstance {
     fn connect_to_single_member(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
     ) -> Result<(), Self::Error>;
 }
@@ -449,8 +449,8 @@ where
     fn connect_to_single_member(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::FirstProtocol, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::FirstProtocol>,
         >,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("single_member", server_end.into_untyped())

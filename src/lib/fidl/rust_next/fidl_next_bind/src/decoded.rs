@@ -8,7 +8,15 @@ use fidl_next_protocol::Transport;
 use super::Method;
 
 /// A decoded request.
-pub type Request<T, M> = Decoded<<M as Method>::Request, <T as Transport>::RecvBuffer>;
+pub type Request<
+    M,
+    #[cfg(feature = "fuchsia")] T = zx::Channel,
+    #[cfg(not(feature = "fuchsia"))] T,
+> = Decoded<<M as Method>::Request, <T as Transport>::RecvBuffer>;
 
 /// A decoded response.
-pub type Response<T, M> = Decoded<<M as Method>::Response, <T as Transport>::RecvBuffer>;
+pub type Response<
+    M,
+    #[cfg(feature = "fuchsia")] T = zx::Channel,
+    #[cfg(not(feature = "fuchsia"))] T,
+> = Decoded<<M as Method>::Response, <T as Transport>::RecvBuffer>;

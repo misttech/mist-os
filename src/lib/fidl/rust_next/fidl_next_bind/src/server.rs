@@ -10,19 +10,23 @@ use fidl_next_protocol::{self as protocol, ProtocolError, SendFuture, Transport}
 use super::{Method, ServerEnd};
 
 /// A storngly typed server sender.
-pub struct ServerSender<T: Transport, P> {
+pub struct ServerSender<
+    P,
+    #[cfg(feature = "fuchsia")] T: Transport = zx::Channel,
+    #[cfg(not(feature = "fuchsia"))] T: Transport,
+> {
     sender: protocol::ServerSender<T>,
     _protocol: PhantomData<P>,
 }
 
-unsafe impl<T, P> Send for ServerSender<T, P>
+unsafe impl<P, T> Send for ServerSender<P, T>
 where
-    T: Transport,
     protocol::ServerSender<T>: Send,
+    T: Transport,
 {
 }
 
-impl<T: Transport, P> ServerSender<T, P> {
+impl<P, T: Transport> ServerSender<P, T> {
     /// Wraps an untyped sender reference, returning a typed sender reference.
     pub fn wrap_untyped(client: &protocol::ServerSender<T>) -> &Self {
         unsafe { &*(client as *const protocol::ServerSender<T>).cast() }
@@ -39,18 +43,23 @@ impl<T: Transport, P> ServerSender<T, P> {
     }
 }
 
-impl<T: Transport, P> Clone for ServerSender<T, P> {
+impl<P, T: Transport> Clone for ServerSender<P, T> {
     fn clone(&self) -> Self {
         Self { sender: self.sender.clone(), _protocol: PhantomData }
     }
 }
 
 /// A protocol which supports servers.
-pub trait ServerProtocol<T: Transport, H>: Sized {
+pub trait ServerProtocol<
+    H,
+    #[cfg(feature = "fuchsia")] T: Transport = zx::Channel,
+    #[cfg(not(feature = "fuchsia"))] T: Transport,
+>: Sized
+{
     /// Handles a received server one-way message with the given handler.
     fn on_one_way(
         handler: &mut H,
-        server: &ServerSender<T, Self>,
+        server: &ServerSender<Self, T>,
         ordinal: u64,
         buffer: T::RecvBuffer,
     );
@@ -58,7 +67,7 @@ pub trait ServerProtocol<T: Transport, H>: Sized {
     /// Handles a received server two-way message with the given handler.
     fn on_two_way(
         handler: &mut H,
-        server: &ServerSender<T, Self>,
+        server: &ServerSender<Self, T>,
         ordinal: u64,
         buffer: T::RecvBuffer,
         responder: protocol::Responder,
@@ -80,10 +89,10 @@ impl<P, H> ServerAdapter<P, H> {
     }
 }
 
-impl<T, P, H> protocol::ServerHandler<T> for ServerAdapter<P, H>
+impl<P, H, T> protocol::ServerHandler<T> for ServerAdapter<P, H>
 where
+    P: ServerProtocol<H, T>,
     T: Transport,
-    P: ServerProtocol<T, H>,
 {
     fn on_one_way(
         &mut self,
@@ -112,26 +121,30 @@ where
 }
 
 /// A strongly typed server.
-pub struct Server<T: Transport, P> {
+pub struct Server<
+    P,
+    #[cfg(feature = "fuchsia")] T: Transport = zx::Channel,
+    #[cfg(not(feature = "fuchsia"))] T: Transport,
+> {
     server: protocol::Server<T>,
     _protocol: PhantomData<P>,
 }
 
-unsafe impl<T, P> Send for Server<T, P>
+unsafe impl<P, T> Send for Server<P, T>
 where
-    T: Transport,
     protocol::Server<T>: Send,
+    T: Transport,
 {
 }
 
-impl<T: Transport, P> Server<T, P> {
+impl<P, T: Transport> Server<P, T> {
     /// Creates a new server from a server end.
-    pub fn new(server_end: ServerEnd<T, P>) -> Self {
+    pub fn new(server_end: ServerEnd<P, T>) -> Self {
         Self { server: protocol::Server::new(server_end.into_untyped()), _protocol: PhantomData }
     }
 
     /// Returns the sender for the server.
-    pub fn sender(&self) -> &ServerSender<T, P> {
+    pub fn sender(&self) -> &ServerSender<P, T> {
         ServerSender::wrap_untyped(self.server.sender())
     }
 
@@ -143,7 +156,7 @@ impl<T: Transport, P> Server<T, P> {
     /// Runs the server with the provided handler.
     pub async fn run<H>(&mut self, handler: H) -> Result<(), ProtocolError<T::Error>>
     where
-        P: ServerProtocol<T, H>,
+        P: ServerProtocol<H, T>,
     {
         self.server.run(ServerAdapter { handler, _protocol: PhantomData::<P> }).await
     }
@@ -163,9 +176,9 @@ impl<M> Responder<M> {
     }
 
     /// Responds to the client.
-    pub fn respond<'s, T, P, R>(
+    pub fn respond<'s, P, T, R>(
         self,
-        server: &'s ServerSender<T, P>,
+        server: &'s ServerSender<P, T>,
         response: R,
     ) -> Result<SendFuture<'s, T>, EncodeError>
     where

@@ -7987,8 +7987,8 @@ pub trait TestProtocolClientSender {
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            Self::Transport,
             test_protocol::StrictUnionHenceResponseMayBeStackAllocated,
+            Self::Transport,
         >,
         ::fidl_next::EncodeError,
     >;
@@ -7998,14 +7998,14 @@ pub trait TestProtocolClientSender {
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            Self::Transport,
             test_protocol::FlexibleUnionHenceResponseMustBeHeapAllocated,
+            Self::Transport,
         >,
         ::fidl_next::EncodeError,
     >;
 }
 
-impl<___T> TestProtocolClientSender for ::fidl_next::ClientSender<___T, TestProtocol>
+impl<___T> TestProtocolClientSender for ::fidl_next::ClientSender<TestProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -8016,8 +8016,8 @@ where
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            Self::Transport,
             test_protocol::StrictUnionHenceResponseMayBeStackAllocated,
+            Self::Transport,
         >,
         ::fidl_next::EncodeError,
     > {
@@ -8031,8 +8031,8 @@ where
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            Self::Transport,
             test_protocol::FlexibleUnionHenceResponseMustBeHeapAllocated,
+            Self::Transport,
         >,
         ::fidl_next::EncodeError,
     > {
@@ -8047,10 +8047,10 @@ where
 /// See [`TestProtocol`] for more details.
 pub trait TestProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for TestProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for TestProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: TestProtocolClientHandler<___T>,
+    ___T: ::fidl_next::Transport,
 
     <test_protocol::StrictUnionHenceResponseMayBeStackAllocated as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -8060,7 +8060,7 @@ where
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -8077,7 +8077,7 @@ pub trait TestProtocolServerSender {
     type Transport: ::fidl_next::Transport;
 }
 
-impl<___T> TestProtocolServerSender for ::fidl_next::ServerSender<___T, TestProtocol>
+impl<___T> TestProtocolServerSender for ::fidl_next::ServerSender<TestProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -8090,7 +8090,7 @@ where
 pub trait TestProtocolServerHandler<___T: ::fidl_next::Transport> {
     fn strict_union_hence_response_may_be_stack_allocated(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, TestProtocol>,
+        sender: &::fidl_next::ServerSender<TestProtocol, ___T>,
 
         responder: ::fidl_next::Responder<
             test_protocol::StrictUnionHenceResponseMayBeStackAllocated,
@@ -8099,7 +8099,7 @@ pub trait TestProtocolServerHandler<___T: ::fidl_next::Transport> {
 
     fn flexible_union_hence_response_must_be_heap_allocated(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, TestProtocol>,
+        sender: &::fidl_next::ServerSender<TestProtocol, ___T>,
 
         responder: ::fidl_next::Responder<
             test_protocol::FlexibleUnionHenceResponseMustBeHeapAllocated,
@@ -8107,14 +8107,14 @@ pub trait TestProtocolServerHandler<___T: ::fidl_next::Transport> {
     );
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for TestProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for TestProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: TestProtocolServerHandler<___T>,
+    ___T: ::fidl_next::Transport,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -8127,7 +8127,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,

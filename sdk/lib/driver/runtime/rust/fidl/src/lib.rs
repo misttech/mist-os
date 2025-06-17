@@ -399,7 +399,7 @@ mod test {
     impl DeviceServerHandler<DriverChannel> for DeviceServer {
         fn get_hardware_id(
             &mut self,
-            sender: &ServerSender<DriverChannel, Device>,
+            sender: &ServerSender<Device, DriverChannel>,
             responder: Responder<GetHardwareId>,
         ) {
             let sender = sender.clone();
@@ -419,7 +419,7 @@ mod test {
 
         fn get_event(
             &mut self,
-            sender: &ServerSender<DriverChannel, Device>,
+            sender: &ServerSender<Device, DriverChannel>,
             responder: Responder<GetEvent>,
         ) {
             let sender = sender.clone();
@@ -442,7 +442,7 @@ mod test {
         spawn_in_driver("driver fidl server", async {
             let (server_chan, client_chan) = Channel::<[Chunk]>::create();
             let client_end = ClientEnd::from_untyped(DriverChannel::new(client_chan));
-            let server_end: ServerEnd<_, Device> =
+            let server_end: ServerEnd<Device, _> =
                 ServerEnd::from_untyped(DriverChannel::new(server_chan));
             let mut client = Client::new(client_end);
             let mut server = Server::new(server_end);

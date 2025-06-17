@@ -5,15 +5,15 @@
 #[derive(Debug)]
 #[repr(C)]
 pub struct ClientEndWrapper {
-    pub value: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::DriverProtocol>,
+    pub value: ::fidl_next::ClientEnd<crate::DriverProtocol, ::fidl_next::fuchsia::zx::Channel>,
 }
 
 impl ::fidl_next::Encodable for ClientEndWrapper {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireClientEndWrapper> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DriverProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -77,10 +77,10 @@ impl ::fidl_next::FromWire<WireClientEndWrapper> for ClientEndWrapper {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireClientEndWrapper, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ClientEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DriverProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::FromWire<
-                ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::DriverProtocol>,
+                ::fidl_next::ClientEnd<crate::DriverProtocol, ::fidl_next::fuchsia::WireChannel>,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -96,7 +96,7 @@ impl ::fidl_next::FromWire<WireClientEndWrapper> for ClientEndWrapper {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireClientEndWrapper {
-    pub value: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::DriverProtocol>,
+    pub value: ::fidl_next::ClientEnd<crate::DriverProtocol, ::fidl_next::fuchsia::WireChannel>,
 }
 
 unsafe impl ::fidl_next::Wire for WireClientEndWrapper {
@@ -147,7 +147,7 @@ pub trait DriverProtocolClientSender {
     type Transport: ::fidl_next::Transport;
 }
 
-impl<___T> DriverProtocolClientSender for ::fidl_next::ClientSender<___T, DriverProtocol>
+impl<___T> DriverProtocolClientSender for ::fidl_next::ClientSender<DriverProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -159,14 +159,14 @@ where
 /// See [`DriverProtocol`] for more details.
 pub trait DriverProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for DriverProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for DriverProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: DriverProtocolClientHandler<___T>,
+    ___T: ::fidl_next::Transport,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -183,7 +183,7 @@ pub trait DriverProtocolServerSender {
     type Transport: ::fidl_next::Transport;
 }
 
-impl<___T> DriverProtocolServerSender for ::fidl_next::ServerSender<___T, DriverProtocol>
+impl<___T> DriverProtocolServerSender for ::fidl_next::ServerSender<DriverProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -195,14 +195,14 @@ where
 /// See [`DriverProtocol`] for more details.
 pub trait DriverProtocolServerHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for DriverProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for DriverProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: DriverProtocolServerHandler<___T>,
+    ___T: ::fidl_next::Transport,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -215,7 +215,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -233,7 +233,7 @@ pub struct T {
     pub zircon_handle: Option<::fidl_next::fuchsia::zx::Handle>,
 
     pub fdf_handle:
-        Option<::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::DriverProtocol>>,
+        Option<::fidl_next::ClientEnd<crate::DriverProtocol, ::fidl_next::fuchsia::zx::Channel>>,
 }
 
 impl T {
@@ -334,8 +334,8 @@ impl<'de> ::fidl_next::FromWire<WireT<'de>> for T {
             fdf_handle: fdf_handle.map(|envelope| {
                 ::fidl_next::FromWire::from_wire(unsafe {
                     envelope.read_unchecked::<::fidl_next::ClientEnd<
-                        ::fidl_next::fuchsia::WireChannel,
                         crate::DriverProtocol,
+                        ::fidl_next::fuchsia::WireChannel,
                     >>()
                 })
             }),
@@ -355,11 +355,10 @@ impl<'de> Drop for WireT<'de> {
             envelope.read_unchecked::<::fidl_next::fuchsia::WireHandle>()
         });
 
-        let _ = self.table.get(2)
-                .map(|envelope| unsafe {
-                    envelope.read_unchecked::<::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel,crate::DriverProtocol,
-        >>()
-                });
+        let _ = self.table.get(2).map(|envelope| unsafe {
+            envelope.read_unchecked::<::fidl_next::ClientEnd<
+            crate::DriverProtocol,::fidl_next::fuchsia::WireChannel,>>()
+        });
     }
 }
 
@@ -402,8 +401,8 @@ where
                     ::fidl_next::WireEnvelope::decode_as::<
                         ___D,
                         ::fidl_next::ClientEnd<
-                            ::fidl_next::fuchsia::WireChannel,
                             crate::DriverProtocol,
+                            ::fidl_next::fuchsia::WireChannel,
                         >,
                     >(slot.as_mut(), decoder)?;
 
@@ -423,7 +422,7 @@ impl<'de> WireT<'de> {
 
     pub fn fdf_handle(
         &self,
-    ) -> Option<&::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::DriverProtocol>>
+    ) -> Option<&::fidl_next::ClientEnd<crate::DriverProtocol, ::fidl_next::fuchsia::WireChannel>>
     {
         unsafe { Some(self.table.get(2)?.deref_unchecked()) }
     }
@@ -592,7 +591,7 @@ pub trait HandlesInProtocolClientSender {
         >;
 }
 
-impl<___T> HandlesInProtocolClientSender for ::fidl_next::ClientSender<___T, HandlesInProtocol>
+impl<___T> HandlesInProtocolClientSender for ::fidl_next::ClientSender<HandlesInProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -617,14 +616,14 @@ where
 /// See [`HandlesInProtocol`] for more details.
 pub trait HandlesInProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for HandlesInProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for HandlesInProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: HandlesInProtocolClientHandler<___T>,
+    ___T: ::fidl_next::Transport,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -641,7 +640,7 @@ pub trait HandlesInProtocolServerSender {
     type Transport: ::fidl_next::Transport;
 }
 
-impl<___T> HandlesInProtocolServerSender for ::fidl_next::ServerSender<___T, HandlesInProtocol>
+impl<___T> HandlesInProtocolServerSender for ::fidl_next::ServerSender<HandlesInProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -654,23 +653,23 @@ where
 pub trait HandlesInProtocolServerHandler<___T: ::fidl_next::Transport> {
     fn send_handles(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, HandlesInProtocol>,
+        sender: &::fidl_next::ServerSender<HandlesInProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, handles_in_protocol::SendHandles>,
+        request: ::fidl_next::Request<handles_in_protocol::SendHandles, ___T>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for HandlesInProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for HandlesInProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: HandlesInProtocolServerHandler<___T>,
+    ___T: ::fidl_next::Transport,
 
     <handles_in_protocol::SendHandles as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -690,7 +689,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -706,15 +705,15 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ServerEndWrapper {
-    pub value: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::DriverProtocol>,
+    pub value: ::fidl_next::ServerEnd<crate::DriverProtocol, ::fidl_next::fuchsia::zx::Channel>,
 }
 
 impl ::fidl_next::Encodable for ServerEndWrapper {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireServerEndWrapper> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DriverProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -778,10 +777,10 @@ impl ::fidl_next::FromWire<WireServerEndWrapper> for ServerEndWrapper {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireServerEndWrapper, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
             true && <::fidl_next::ServerEnd<
-                ::fidl_next::fuchsia::zx::Channel,
                 crate::DriverProtocol,
+                ::fidl_next::fuchsia::zx::Channel,
             > as ::fidl_next::FromWire<
-                ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::DriverProtocol>,
+                ::fidl_next::ServerEnd<crate::DriverProtocol, ::fidl_next::fuchsia::WireChannel>,
             >>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -797,7 +796,7 @@ impl ::fidl_next::FromWire<WireServerEndWrapper> for ServerEndWrapper {
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireServerEndWrapper {
-    pub value: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::DriverProtocol>,
+    pub value: ::fidl_next::ServerEnd<crate::DriverProtocol, ::fidl_next::fuchsia::WireChannel>,
 }
 
 unsafe impl ::fidl_next::Wire for WireServerEndWrapper {

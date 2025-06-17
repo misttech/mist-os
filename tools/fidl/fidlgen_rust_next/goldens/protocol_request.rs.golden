@@ -20,7 +20,7 @@ pub trait ChildClientSender {
     type Transport: ::fidl_next::Transport;
 }
 
-impl<___T> ChildClientSender for ::fidl_next::ClientSender<___T, Child>
+impl<___T> ChildClientSender for ::fidl_next::ClientSender<Child, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -32,14 +32,14 @@ where
 /// See [`Child`] for more details.
 pub trait ChildClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for Child
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for Child
 where
-    ___T: ::fidl_next::Transport,
     ___H: ChildClientHandler<___T>,
+    ___T: ::fidl_next::Transport,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -56,7 +56,7 @@ pub trait ChildServerSender {
     type Transport: ::fidl_next::Transport;
 }
 
-impl<___T> ChildServerSender for ::fidl_next::ServerSender<___T, Child>
+impl<___T> ChildServerSender for ::fidl_next::ServerSender<Child, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -68,14 +68,14 @@ where
 /// See [`Child`] for more details.
 pub trait ChildServerHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for Child
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for Child
 where
-    ___T: ::fidl_next::Transport,
     ___H: ChildServerHandler<___T>,
+    ___T: ::fidl_next::Transport,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -88,7 +88,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -104,7 +104,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ParentGetChildResponse {
-    pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Child>,
+    pub c: ::fidl_next::ClientEnd<crate::Child, ::fidl_next::fuchsia::zx::Channel>,
 }
 
 impl ::fidl_next::Encodable for ParentGetChildResponse {
@@ -113,8 +113,8 @@ impl ::fidl_next::Encodable for ParentGetChildResponse {
             true
 
                 && <
-                    ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
-        > as ::fidl_next::Encodable
+                    ::fidl_next::ClientEnd<
+            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -180,9 +180,9 @@ impl ::fidl_next::FromWire<WireParentGetChildResponse> for ParentGetChildRespons
             true
 
                 && <
-                    ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
-        > as ::fidl_next::FromWire<::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel,crate::Child,
-        >>
+                    ::fidl_next::ClientEnd<
+            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::FromWire<::fidl_next::ClientEnd<
+            crate::Child,::fidl_next::fuchsia::WireChannel,>>
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -198,7 +198,7 @@ impl ::fidl_next::FromWire<WireParentGetChildResponse> for ParentGetChildRespons
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentGetChildResponse {
-    pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::Child>,
+    pub c: ::fidl_next::ClientEnd<crate::Child, ::fidl_next::fuchsia::WireChannel>,
 }
 
 unsafe impl ::fidl_next::Wire for WireParentGetChildResponse {
@@ -234,7 +234,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ParentGetChildRequestResponse {
-    pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::Child>,
+    pub r: ::fidl_next::ServerEnd<crate::Child, ::fidl_next::fuchsia::zx::Channel>,
 }
 
 impl ::fidl_next::Encodable for ParentGetChildRequestResponse {
@@ -246,8 +246,8 @@ impl ::fidl_next::Encodable for ParentGetChildRequestResponse {
             true
 
                 && <
-                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
-        > as ::fidl_next::Encodable
+                    ::fidl_next::ServerEnd<
+            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -316,9 +316,9 @@ impl ::fidl_next::FromWire<WireParentGetChildRequestResponse> for ParentGetChild
             true
 
                 && <
-                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
-        > as ::fidl_next::FromWire<::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel,crate::Child,
-        >>
+                    ::fidl_next::ServerEnd<
+            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::FromWire<::fidl_next::ServerEnd<
+            crate::Child,::fidl_next::fuchsia::WireChannel,>>
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -334,7 +334,7 @@ impl ::fidl_next::FromWire<WireParentGetChildRequestResponse> for ParentGetChild
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentGetChildRequestResponse {
-    pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::Child>,
+    pub r: ::fidl_next::ServerEnd<crate::Child, ::fidl_next::fuchsia::WireChannel>,
 }
 
 unsafe impl ::fidl_next::Wire for WireParentGetChildRequestResponse {
@@ -370,7 +370,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ParentTakeChildRequest {
-    pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Child>,
+    pub c: ::fidl_next::ClientEnd<crate::Child, ::fidl_next::fuchsia::zx::Channel>,
 }
 
 impl ::fidl_next::Encodable for ParentTakeChildRequest {
@@ -379,8 +379,8 @@ impl ::fidl_next::Encodable for ParentTakeChildRequest {
             true
 
                 && <
-                    ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
-        > as ::fidl_next::Encodable
+                    ::fidl_next::ClientEnd<
+            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -446,9 +446,9 @@ impl ::fidl_next::FromWire<WireParentTakeChildRequest> for ParentTakeChildReques
             true
 
                 && <
-                    ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
-        > as ::fidl_next::FromWire<::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel,crate::Child,
-        >>
+                    ::fidl_next::ClientEnd<
+            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::FromWire<::fidl_next::ClientEnd<
+            crate::Child,::fidl_next::fuchsia::WireChannel,>>
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -464,7 +464,7 @@ impl ::fidl_next::FromWire<WireParentTakeChildRequest> for ParentTakeChildReques
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentTakeChildRequest {
-    pub c: ::fidl_next::ClientEnd<::fidl_next::fuchsia::WireChannel, crate::Child>,
+    pub c: ::fidl_next::ClientEnd<crate::Child, ::fidl_next::fuchsia::WireChannel>,
 }
 
 unsafe impl ::fidl_next::Wire for WireParentTakeChildRequest {
@@ -500,7 +500,7 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct ParentTakeChildRequestRequest {
-    pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel, crate::Child>,
+    pub r: ::fidl_next::ServerEnd<crate::Child, ::fidl_next::fuchsia::zx::Channel>,
 }
 
 impl ::fidl_next::Encodable for ParentTakeChildRequestRequest {
@@ -512,8 +512,8 @@ impl ::fidl_next::Encodable for ParentTakeChildRequestRequest {
             true
 
                 && <
-                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
-        > as ::fidl_next::Encodable
+                    ::fidl_next::ServerEnd<
+            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -582,9 +582,9 @@ impl ::fidl_next::FromWire<WireParentTakeChildRequestRequest> for ParentTakeChil
             true
 
                 && <
-                    ::fidl_next::ServerEnd<::fidl_next::fuchsia::zx::Channel,crate::Child,
-        > as ::fidl_next::FromWire<::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel,crate::Child,
-        >>
+                    ::fidl_next::ServerEnd<
+            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::FromWire<::fidl_next::ServerEnd<
+            crate::Child,::fidl_next::fuchsia::WireChannel,>>
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -600,7 +600,7 @@ impl ::fidl_next::FromWire<WireParentTakeChildRequestRequest> for ParentTakeChil
 #[derive(Debug)]
 #[repr(C)]
 pub struct WireParentTakeChildRequestRequest {
-    pub r: ::fidl_next::ServerEnd<::fidl_next::fuchsia::WireChannel, crate::Child>,
+    pub r: ::fidl_next::ServerEnd<crate::Child, ::fidl_next::fuchsia::WireChannel>,
 }
 
 unsafe impl ::fidl_next::Wire for WireParentTakeChildRequestRequest {
@@ -709,14 +709,14 @@ pub trait ParentClientSender {
     fn get_child(
         &self,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, parent::GetChild>,
+        ::fidl_next::ResponseFuture<'_, parent::GetChild, Self::Transport>,
         ::fidl_next::EncodeError,
     >;
 
     fn get_child_request(
         &self,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, parent::GetChildRequest>,
+        ::fidl_next::ResponseFuture<'_, parent::GetChildRequest, Self::Transport>,
         ::fidl_next::EncodeError,
     >;
 
@@ -741,7 +741,7 @@ pub trait ParentClientSender {
         >;
 }
 
-impl<___T> ParentClientSender for ::fidl_next::ClientSender<___T, Parent>
+impl<___T> ParentClientSender for ::fidl_next::ClientSender<Parent, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -750,7 +750,7 @@ where
     fn get_child(
         &self,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, parent::GetChild>,
+        ::fidl_next::ResponseFuture<'_, parent::GetChild, Self::Transport>,
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
@@ -761,7 +761,7 @@ where
     fn get_child_request(
         &self,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, parent::GetChildRequest>,
+        ::fidl_next::ResponseFuture<'_, parent::GetChildRequest, Self::Transport>,
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
@@ -801,10 +801,10 @@ where
 /// See [`Parent`] for more details.
 pub trait ParentClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for Parent
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for Parent
 where
-    ___T: ::fidl_next::Transport,
     ___H: ParentClientHandler<___T>,
+    ___T: ::fidl_next::Transport,
 
     <parent::GetChild as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -814,7 +814,7 @@ where
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -831,7 +831,7 @@ pub trait ParentServerSender {
     type Transport: ::fidl_next::Transport;
 }
 
-impl<___T> ParentServerSender for ::fidl_next::ServerSender<___T, Parent>
+impl<___T> ParentServerSender for ::fidl_next::ServerSender<Parent, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -844,37 +844,37 @@ where
 pub trait ParentServerHandler<___T: ::fidl_next::Transport> {
     fn get_child(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, Parent>,
+        sender: &::fidl_next::ServerSender<Parent, ___T>,
 
         responder: ::fidl_next::Responder<parent::GetChild>,
     );
 
     fn get_child_request(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, Parent>,
+        sender: &::fidl_next::ServerSender<Parent, ___T>,
 
         responder: ::fidl_next::Responder<parent::GetChildRequest>,
     );
 
     fn take_child(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, Parent>,
+        sender: &::fidl_next::ServerSender<Parent, ___T>,
 
-        request: ::fidl_next::Request<___T, parent::TakeChild>,
+        request: ::fidl_next::Request<parent::TakeChild, ___T>,
     );
 
     fn take_child_request(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, Parent>,
+        sender: &::fidl_next::ServerSender<Parent, ___T>,
 
-        request: ::fidl_next::Request<___T, parent::TakeChildRequest>,
+        request: ::fidl_next::Request<parent::TakeChildRequest, ___T>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for Parent
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for Parent
 where
-    ___T: ::fidl_next::Transport,
     ___H: ParentServerHandler<___T>,
+    ___T: ::fidl_next::Transport,
 
     <parent::TakeChild as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -884,7 +884,7 @@ where
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -911,7 +911,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,

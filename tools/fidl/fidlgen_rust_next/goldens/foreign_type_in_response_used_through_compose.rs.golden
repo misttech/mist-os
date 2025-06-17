@@ -35,12 +35,12 @@ pub trait TopClientSender {
     fn get_foo(
         &self,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, top::GetFoo>,
+        ::fidl_next::ResponseFuture<'_, top::GetFoo, Self::Transport>,
         ::fidl_next::EncodeError,
     >;
 }
 
-impl<___T> TopClientSender for ::fidl_next::ClientSender<___T, Top>
+impl<___T> TopClientSender for ::fidl_next::ClientSender<Top, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -49,7 +49,7 @@ where
     fn get_foo(
         &self,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, top::GetFoo>,
+        ::fidl_next::ResponseFuture<'_, top::GetFoo, Self::Transport>,
         ::fidl_next::EncodeError,
     > {
         self.as_untyped()
@@ -63,17 +63,17 @@ where
 /// See [`Top`] for more details.
 pub trait TopClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for Top
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for Top
 where
-    ___T: ::fidl_next::Transport,
     ___H: TopClientHandler<___T>,
+    ___T: ::fidl_next::Transport,
 
     <top::GetFoo as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -90,7 +90,7 @@ pub trait TopServerSender {
     type Transport: ::fidl_next::Transport;
 }
 
-impl<___T> TopServerSender for ::fidl_next::ServerSender<___T, Top>
+impl<___T> TopServerSender for ::fidl_next::ServerSender<Top, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -103,20 +103,20 @@ where
 pub trait TopServerHandler<___T: ::fidl_next::Transport> {
     fn get_foo(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, Top>,
+        sender: &::fidl_next::ServerSender<Top, ___T>,
 
         responder: ::fidl_next::Responder<top::GetFoo>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for Top
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for Top
 where
-    ___T: ::fidl_next::Transport,
     ___H: TopServerHandler<___T>,
+    ___T: ::fidl_next::Transport,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -129,7 +129,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,

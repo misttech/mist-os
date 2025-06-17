@@ -2344,7 +2344,7 @@ pub trait ComposedProtocolClientSender {
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, composed_protocol::TwoWayAnonComposed>,
+        ::fidl_next::ResponseFuture<'_, composed_protocol::TwoWayAnonComposed, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -2359,8 +2359,8 @@ pub trait ComposedProtocolClientSender {
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            Self::Transport,
             composed_protocol::TwoWayAnonComposedWithError,
+            Self::Transport,
         >,
         ::fidl_next::EncodeError,
     >
@@ -2384,7 +2384,7 @@ pub trait ComposedProtocolClientSender {
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, composed_protocol::TwoWayNamedComposed>,
+        ::fidl_next::ResponseFuture<'_, composed_protocol::TwoWayNamedComposed, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -2399,8 +2399,8 @@ pub trait ComposedProtocolClientSender {
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            Self::Transport,
             composed_protocol::TwoWayNamedComposedWithError,
+            Self::Transport,
         >,
         ::fidl_next::EncodeError,
     >
@@ -2411,7 +2411,7 @@ pub trait ComposedProtocolClientSender {
         >;
 }
 
-impl<___T> ComposedProtocolClientSender for ::fidl_next::ClientSender<___T, ComposedProtocol>
+impl<___T> ComposedProtocolClientSender for ::fidl_next::ClientSender<ComposedProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -2434,7 +2434,7 @@ where
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, composed_protocol::TwoWayAnonComposed>,
+        ::fidl_next::ResponseFuture<'_, composed_protocol::TwoWayAnonComposed, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -2454,8 +2454,8 @@ where
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            Self::Transport,
             composed_protocol::TwoWayAnonComposedWithError,
+            Self::Transport,
         >,
         ::fidl_next::EncodeError,
     >
@@ -2487,7 +2487,7 @@ where
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, composed_protocol::TwoWayNamedComposed>,
+        ::fidl_next::ResponseFuture<'_, composed_protocol::TwoWayNamedComposed, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -2507,8 +2507,8 @@ where
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            Self::Transport,
             composed_protocol::TwoWayNamedComposedWithError,
+            Self::Transport,
         >,
         ::fidl_next::EncodeError,
     >
@@ -2530,23 +2530,23 @@ where
 pub trait ComposedProtocolClientHandler<___T: ::fidl_next::Transport> {
     fn on_anon_composed(
         &mut self,
-        sender: &::fidl_next::ClientSender<___T, ComposedProtocol>,
+        sender: &::fidl_next::ClientSender<ComposedProtocol, ___T>,
 
-        event: ::fidl_next::Response<___T, composed_protocol::OnAnonComposed>,
+        event: ::fidl_next::Response<composed_protocol::OnAnonComposed, ___T>,
     );
 
     fn on_named_composed(
         &mut self,
-        sender: &::fidl_next::ClientSender<___T, ComposedProtocol>,
+        sender: &::fidl_next::ClientSender<ComposedProtocol, ___T>,
 
-        event: ::fidl_next::Response<___T, composed_protocol::OnNamedComposed>,
+        event: ::fidl_next::Response<composed_protocol::OnNamedComposed, ___T>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for ComposedProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for ComposedProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: ComposedProtocolClientHandler<___T>,
+    ___T: ::fidl_next::Transport,
 
     <composed_protocol::TwoWayAnonComposed as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -2568,7 +2568,7 @@ where
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -2619,7 +2619,7 @@ pub trait ComposedProtocolServerSender {
         >;
 }
 
-impl<___T> ComposedProtocolServerSender for ::fidl_next::ServerSender<___T, ComposedProtocol>
+impl<___T> ComposedProtocolServerSender for ::fidl_next::ServerSender<ComposedProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -2658,59 +2658,59 @@ where
 pub trait ComposedProtocolServerHandler<___T: ::fidl_next::Transport> {
     fn one_way_anon_composed(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ComposedProtocol>,
+        sender: &::fidl_next::ServerSender<ComposedProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, composed_protocol::OneWayAnonComposed>,
+        request: ::fidl_next::Request<composed_protocol::OneWayAnonComposed, ___T>,
     );
 
     fn two_way_anon_composed(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ComposedProtocol>,
+        sender: &::fidl_next::ServerSender<ComposedProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, composed_protocol::TwoWayAnonComposed>,
+        request: ::fidl_next::Request<composed_protocol::TwoWayAnonComposed, ___T>,
 
         responder: ::fidl_next::Responder<composed_protocol::TwoWayAnonComposed>,
     );
 
     fn two_way_anon_composed_with_error(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ComposedProtocol>,
+        sender: &::fidl_next::ServerSender<ComposedProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, composed_protocol::TwoWayAnonComposedWithError>,
+        request: ::fidl_next::Request<composed_protocol::TwoWayAnonComposedWithError, ___T>,
 
         responder: ::fidl_next::Responder<composed_protocol::TwoWayAnonComposedWithError>,
     );
 
     fn one_way_named_composed(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ComposedProtocol>,
+        sender: &::fidl_next::ServerSender<ComposedProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, composed_protocol::OneWayNamedComposed>,
+        request: ::fidl_next::Request<composed_protocol::OneWayNamedComposed, ___T>,
     );
 
     fn two_way_named_composed(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ComposedProtocol>,
+        sender: &::fidl_next::ServerSender<ComposedProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, composed_protocol::TwoWayNamedComposed>,
+        request: ::fidl_next::Request<composed_protocol::TwoWayNamedComposed, ___T>,
 
         responder: ::fidl_next::Responder<composed_protocol::TwoWayNamedComposed>,
     );
 
     fn two_way_named_composed_with_error(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, ComposedProtocol>,
+        sender: &::fidl_next::ServerSender<ComposedProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, composed_protocol::TwoWayNamedComposedWithError>,
+        request: ::fidl_next::Request<composed_protocol::TwoWayNamedComposedWithError, ___T>,
 
         responder: ::fidl_next::Responder<composed_protocol::TwoWayNamedComposedWithError>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for ComposedProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for ComposedProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: ComposedProtocolServerHandler<___T>,
+    ___T: ::fidl_next::Transport,
 
     <composed_protocol::OneWayAnonComposed as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -2732,7 +2732,7 @@ where
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -2759,7 +2759,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -4769,7 +4769,7 @@ pub trait MainProtocolClientSender {
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayAnonComposed>,
+        ::fidl_next::ResponseFuture<'_, main_protocol::TwoWayAnonComposed, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4784,8 +4784,8 @@ pub trait MainProtocolClientSender {
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            Self::Transport,
             main_protocol::TwoWayAnonComposedWithError,
+            Self::Transport,
         >,
         ::fidl_next::EncodeError,
     >
@@ -4809,7 +4809,7 @@ pub trait MainProtocolClientSender {
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayNamedComposed>,
+        ::fidl_next::ResponseFuture<'_, main_protocol::TwoWayNamedComposed, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4824,8 +4824,8 @@ pub trait MainProtocolClientSender {
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            Self::Transport,
             main_protocol::TwoWayNamedComposedWithError,
+            Self::Transport,
         >,
         ::fidl_next::EncodeError,
     >
@@ -4849,7 +4849,7 @@ pub trait MainProtocolClientSender {
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayLocal>,
+        ::fidl_next::ResponseFuture<'_, main_protocol::TwoWayLocal, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4862,7 +4862,7 @@ pub trait MainProtocolClientSender {
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayLocalWithError>,
+        ::fidl_next::ResponseFuture<'_, main_protocol::TwoWayLocalWithError, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4885,7 +4885,7 @@ pub trait MainProtocolClientSender {
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayAnon>,
+        ::fidl_next::ResponseFuture<'_, main_protocol::TwoWayAnon, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4898,7 +4898,7 @@ pub trait MainProtocolClientSender {
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayAnonWithError>,
+        ::fidl_next::ResponseFuture<'_, main_protocol::TwoWayAnonWithError, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4908,7 +4908,7 @@ pub trait MainProtocolClientSender {
         >;
 }
 
-impl<___T> MainProtocolClientSender for ::fidl_next::ClientSender<___T, MainProtocol>
+impl<___T> MainProtocolClientSender for ::fidl_next::ClientSender<MainProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -4931,7 +4931,7 @@ where
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayAnonComposed>,
+        ::fidl_next::ResponseFuture<'_, main_protocol::TwoWayAnonComposed, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -4951,8 +4951,8 @@ where
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            Self::Transport,
             main_protocol::TwoWayAnonComposedWithError,
+            Self::Transport,
         >,
         ::fidl_next::EncodeError,
     >
@@ -4984,7 +4984,7 @@ where
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayNamedComposed>,
+        ::fidl_next::ResponseFuture<'_, main_protocol::TwoWayNamedComposed, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -5004,8 +5004,8 @@ where
     ) -> Result<
         ::fidl_next::ResponseFuture<
             '_,
-            Self::Transport,
             main_protocol::TwoWayNamedComposedWithError,
+            Self::Transport,
         >,
         ::fidl_next::EncodeError,
     >
@@ -5037,7 +5037,7 @@ where
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayLocal>,
+        ::fidl_next::ResponseFuture<'_, main_protocol::TwoWayLocal, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -5055,7 +5055,7 @@ where
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayLocalWithError>,
+        ::fidl_next::ResponseFuture<'_, main_protocol::TwoWayLocalWithError, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -5086,7 +5086,7 @@ where
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayAnon>,
+        ::fidl_next::ResponseFuture<'_, main_protocol::TwoWayAnon, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -5104,7 +5104,7 @@ where
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, main_protocol::TwoWayAnonWithError>,
+        ::fidl_next::ResponseFuture<'_, main_protocol::TwoWayAnonWithError, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -5125,37 +5125,37 @@ where
 pub trait MainProtocolClientHandler<___T: ::fidl_next::Transport> {
     fn on_anon_composed(
         &mut self,
-        sender: &::fidl_next::ClientSender<___T, MainProtocol>,
+        sender: &::fidl_next::ClientSender<MainProtocol, ___T>,
 
-        event: ::fidl_next::Response<___T, main_protocol::OnAnonComposed>,
+        event: ::fidl_next::Response<main_protocol::OnAnonComposed, ___T>,
     );
 
     fn on_named_composed(
         &mut self,
-        sender: &::fidl_next::ClientSender<___T, MainProtocol>,
+        sender: &::fidl_next::ClientSender<MainProtocol, ___T>,
 
-        event: ::fidl_next::Response<___T, main_protocol::OnNamedComposed>,
+        event: ::fidl_next::Response<main_protocol::OnNamedComposed, ___T>,
     );
 
     fn on_local(
         &mut self,
-        sender: &::fidl_next::ClientSender<___T, MainProtocol>,
+        sender: &::fidl_next::ClientSender<MainProtocol, ___T>,
 
-        event: ::fidl_next::Response<___T, main_protocol::OnLocal>,
+        event: ::fidl_next::Response<main_protocol::OnLocal, ___T>,
     );
 
     fn on_anon(
         &mut self,
-        sender: &::fidl_next::ClientSender<___T, MainProtocol>,
+        sender: &::fidl_next::ClientSender<MainProtocol, ___T>,
 
-        event: ::fidl_next::Response<___T, main_protocol::OnAnon>,
+        event: ::fidl_next::Response<main_protocol::OnAnon, ___T>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for MainProtocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for MainProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: MainProtocolClientHandler<___T>,
+    ___T: ::fidl_next::Transport,
 
     <main_protocol::TwoWayAnonComposed as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -5195,7 +5195,7 @@ where
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -5280,7 +5280,7 @@ pub trait MainProtocolServerSender {
         >;
 }
 
-impl<___T> MainProtocolServerSender for ::fidl_next::ServerSender<___T, MainProtocol>
+impl<___T> MainProtocolServerSender for ::fidl_next::ServerSender<MainProtocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -5345,109 +5345,109 @@ where
 pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
     fn one_way_anon_composed(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, MainProtocol>,
+        sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, main_protocol::OneWayAnonComposed>,
+        request: ::fidl_next::Request<main_protocol::OneWayAnonComposed, ___T>,
     );
 
     fn two_way_anon_composed(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, MainProtocol>,
+        sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, main_protocol::TwoWayAnonComposed>,
+        request: ::fidl_next::Request<main_protocol::TwoWayAnonComposed, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayAnonComposed>,
     );
 
     fn two_way_anon_composed_with_error(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, MainProtocol>,
+        sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, main_protocol::TwoWayAnonComposedWithError>,
+        request: ::fidl_next::Request<main_protocol::TwoWayAnonComposedWithError, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayAnonComposedWithError>,
     );
 
     fn one_way_named_composed(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, MainProtocol>,
+        sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, main_protocol::OneWayNamedComposed>,
+        request: ::fidl_next::Request<main_protocol::OneWayNamedComposed, ___T>,
     );
 
     fn two_way_named_composed(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, MainProtocol>,
+        sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, main_protocol::TwoWayNamedComposed>,
+        request: ::fidl_next::Request<main_protocol::TwoWayNamedComposed, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayNamedComposed>,
     );
 
     fn two_way_named_composed_with_error(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, MainProtocol>,
+        sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, main_protocol::TwoWayNamedComposedWithError>,
+        request: ::fidl_next::Request<main_protocol::TwoWayNamedComposedWithError, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayNamedComposedWithError>,
     );
 
     fn one_way_local(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, MainProtocol>,
+        sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, main_protocol::OneWayLocal>,
+        request: ::fidl_next::Request<main_protocol::OneWayLocal, ___T>,
     );
 
     fn two_way_local(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, MainProtocol>,
+        sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, main_protocol::TwoWayLocal>,
+        request: ::fidl_next::Request<main_protocol::TwoWayLocal, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayLocal>,
     );
 
     fn two_way_local_with_error(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, MainProtocol>,
+        sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, main_protocol::TwoWayLocalWithError>,
+        request: ::fidl_next::Request<main_protocol::TwoWayLocalWithError, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayLocalWithError>,
     );
 
     fn one_way_anon(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, MainProtocol>,
+        sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, main_protocol::OneWayAnon>,
+        request: ::fidl_next::Request<main_protocol::OneWayAnon, ___T>,
     );
 
     fn two_way_anon(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, MainProtocol>,
+        sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, main_protocol::TwoWayAnon>,
+        request: ::fidl_next::Request<main_protocol::TwoWayAnon, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayAnon>,
     );
 
     fn two_way_anon_with_error(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, MainProtocol>,
+        sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
-        request: ::fidl_next::Request<___T, main_protocol::TwoWayAnonWithError>,
+        request: ::fidl_next::Request<main_protocol::TwoWayAnonWithError, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayAnonWithError>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for MainProtocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for MainProtocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: MainProtocolServerHandler<___T>,
+    ___T: ::fidl_next::Transport,
 
     <main_protocol::OneWayAnonComposed as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -5487,7 +5487,7 @@ where
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -5528,7 +5528,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,

@@ -406,7 +406,7 @@ pub trait InterfaceClientSender {
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 }
 
-impl<___T> InterfaceClientSender for ::fidl_next::ClientSender<___T, Interface>
+impl<___T> InterfaceClientSender for ::fidl_next::ClientSender<Interface, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -425,17 +425,17 @@ where
 /// See [`Interface`] for more details.
 pub trait InterfaceClientHandler<___T: ::fidl_next::Transport> {
     #[doc = " event comment #1\n\n event comment #3\n"]
-    fn on_event(&mut self, sender: &::fidl_next::ClientSender<___T, Interface>);
+    fn on_event(&mut self, sender: &::fidl_next::ClientSender<Interface, ___T>);
 }
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for Interface
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for Interface
 where
-    ___T: ::fidl_next::Transport,
     ___H: InterfaceClientHandler<___T>,
+    ___T: ::fidl_next::Transport,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -461,7 +461,7 @@ pub trait InterfaceServerSender {
     ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
 }
 
-impl<___T> InterfaceServerSender for ::fidl_next::ServerSender<___T, Interface>
+impl<___T> InterfaceServerSender for ::fidl_next::ServerSender<Interface, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -480,17 +480,17 @@ where
 /// See [`Interface`] for more details.
 pub trait InterfaceServerHandler<___T: ::fidl_next::Transport> {
     #[doc = " method comment #1\n\n method comment #3\n"]
-    fn method(&mut self, sender: &::fidl_next::ServerSender<___T, Interface>);
+    fn method(&mut self, sender: &::fidl_next::ServerSender<Interface, ___T>);
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for Interface
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for Interface
 where
-    ___T: ::fidl_next::Transport,
     ___H: InterfaceServerHandler<___T>,
+    ___T: ::fidl_next::Transport,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -507,7 +507,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,
@@ -1028,8 +1028,8 @@ pub trait ServiceInstance {
     fn connect_to_interface(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::Interface, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Interface>,
         >,
     ) -> Result<(), Self::Error>;
 }
@@ -1044,8 +1044,8 @@ where
     fn connect_to_interface(
         &self,
         server_end: ::fidl_next::ServerEnd<
+            ::fidl_next::ClientEnd<crate::Interface, ::fidl_next::fuchsia::zx::Channel>,
             Self::Transport,
-            ::fidl_next::ClientEnd<::fidl_next::fuchsia::zx::Channel, crate::Interface>,
         >,
     ) -> Result<(), Self::Error> {
         self.as_untyped().connect_to("interface", server_end.into_untyped())

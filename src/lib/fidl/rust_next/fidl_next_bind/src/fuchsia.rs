@@ -15,7 +15,7 @@ use crate::{
 };
 
 /// Creates a `ClientEnd` and `ServerEnd` for the given protocol over Zircon channels.
-pub fn create_channel<P>() -> (ClientEnd<zx::Channel, P>, ServerEnd<zx::Channel, P>) {
+pub fn create_channel<P>() -> (ClientEnd<P, zx::Channel>, ServerEnd<P, zx::Channel>) {
     let (client_end, server_end) = Channel::create();
     (ClientEnd::from_untyped(client_end), ServerEnd::from_untyped(server_end))
 }
@@ -26,10 +26,10 @@ pub fn create_channel<P>() -> (ClientEnd<zx::Channel, P>, ServerEnd<zx::Channel,
 /// The spawned client will handle any incoming events with `handler`.
 ///
 /// Returns a `ClientSender` for the spawned client.
-pub fn spawn_client_detached<T, P, H>(client_end: ClientEnd<T, P>, handler: H) -> ClientSender<T, P>
+pub fn spawn_client_detached<P, T, H>(client_end: ClientEnd<P, T>, handler: H) -> ClientSender<P, T>
 where
+    P: ClientProtocol<H, T> + 'static,
     T: Transport + 'static,
-    P: ClientProtocol<T, H> + 'static,
     H: Send + 'static,
 {
     let mut client = Client::new(client_end);
@@ -44,7 +44,7 @@ where
 /// The spawned client will ignore any incoming events.
 ///
 /// Returns a `ClientSender` for the spawned client.
-pub fn spawn_client_sender_detached<T, P>(client_end: ClientEnd<T, P>) -> ClientSender<T, P>
+pub fn spawn_client_sender_detached<P, T>(client_end: ClientEnd<P, T>) -> ClientSender<P, T>
 where
     T: Transport + 'static,
     P: 'static,
@@ -61,10 +61,10 @@ where
 /// The spawned server will handle any incoming requests with the provided handler.
 ///
 /// Returns a `ServerSender` for the spawned server.
-pub fn spawn_server_detached<T, P, H>(server_end: ServerEnd<T, P>, handler: H) -> ServerSender<T, P>
+pub fn spawn_server_detached<P, T, H>(server_end: ServerEnd<P, T>, handler: H) -> ServerSender<P, T>
 where
     T: Transport + 'static,
-    P: ServerProtocol<T, H> + 'static,
+    P: ServerProtocol<H, T> + 'static,
     H: Send + 'static,
 {
     let mut server = Server::new(server_end);

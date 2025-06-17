@@ -27,12 +27,12 @@
                 ::fidl_next::ServerEnd
         {%- endmatch -%}
         <
+            {{ context.natural_id(protocol) }},
             {%- if nullable -%}
                 {{ context.config.resource_bindings.channel.optional_wire_path }},
             {%- else -%}
                 {{ context.config.resource_bindings.channel.wire_path }},
             {%- endif -%}
-            {{ context.natural_id(protocol) }},
         >
     {%- when TypeKind::Primitive with { subtype } -%}
         {{ context.wire_prim(subtype) }}

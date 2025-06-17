@@ -1411,7 +1411,7 @@ pub trait ProtocolClientSender {
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::RequestStrictResponseFlexible>,
+        ::fidl_next::ResponseFuture<'_, protocol::RequestStrictResponseFlexible, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -1424,7 +1424,7 @@ pub trait ProtocolClientSender {
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::RequestFlexibleResponseStrict>,
+        ::fidl_next::ResponseFuture<'_, protocol::RequestFlexibleResponseStrict, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -1434,7 +1434,7 @@ pub trait ProtocolClientSender {
         >;
 }
 
-impl<___T> ProtocolClientSender for ::fidl_next::ClientSender<___T, Protocol>
+impl<___T> ProtocolClientSender for ::fidl_next::ClientSender<Protocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -1444,7 +1444,7 @@ where
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::RequestStrictResponseFlexible>,
+        ::fidl_next::ResponseFuture<'_, protocol::RequestStrictResponseFlexible, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -1462,7 +1462,7 @@ where
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, protocol::RequestFlexibleResponseStrict>,
+        ::fidl_next::ResponseFuture<'_, protocol::RequestFlexibleResponseStrict, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -1482,10 +1482,10 @@ where
 /// See [`Protocol`] for more details.
 pub trait ProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for Protocol
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for Protocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: ProtocolClientHandler<___T>,
+    ___T: ::fidl_next::Transport,
 
     <protocol::RequestStrictResponseFlexible as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -1495,7 +1495,7 @@ where
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -1512,7 +1512,7 @@ pub trait ProtocolServerSender {
     type Transport: ::fidl_next::Transport;
 }
 
-impl<___T> ProtocolServerSender for ::fidl_next::ServerSender<___T, Protocol>
+impl<___T> ProtocolServerSender for ::fidl_next::ServerSender<Protocol, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -1525,27 +1525,27 @@ where
 pub trait ProtocolServerHandler<___T: ::fidl_next::Transport> {
     fn request_strict_response_flexible(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, Protocol>,
+        sender: &::fidl_next::ServerSender<Protocol, ___T>,
 
-        request: ::fidl_next::Request<___T, protocol::RequestStrictResponseFlexible>,
+        request: ::fidl_next::Request<protocol::RequestStrictResponseFlexible, ___T>,
 
         responder: ::fidl_next::Responder<protocol::RequestStrictResponseFlexible>,
     );
 
     fn request_flexible_response_strict(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, Protocol>,
+        sender: &::fidl_next::ServerSender<Protocol, ___T>,
 
-        request: ::fidl_next::Request<___T, protocol::RequestFlexibleResponseStrict>,
+        request: ::fidl_next::Request<protocol::RequestFlexibleResponseStrict, ___T>,
 
         responder: ::fidl_next::Responder<protocol::RequestFlexibleResponseStrict>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for Protocol
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for Protocol
 where
-    ___T: ::fidl_next::Transport,
     ___H: ProtocolServerHandler<___T>,
+    ___T: ::fidl_next::Transport,
 
     <protocol::RequestStrictResponseFlexible as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
@@ -1555,7 +1555,7 @@ where
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -1568,7 +1568,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,

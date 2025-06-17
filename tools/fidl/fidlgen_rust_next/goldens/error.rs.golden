@@ -364,7 +364,7 @@ pub trait ExampleClientSender {
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, example::Foo>,
+        ::fidl_next::ResponseFuture<'_, example::Foo, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -374,7 +374,7 @@ pub trait ExampleClientSender {
         >;
 }
 
-impl<___T> ExampleClientSender for ::fidl_next::ClientSender<___T, Example>
+impl<___T> ExampleClientSender for ::fidl_next::ClientSender<Example, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -384,7 +384,7 @@ where
         &self,
         request: ___R,
     ) -> Result<
-        ::fidl_next::ResponseFuture<'_, Self::Transport, example::Foo>,
+        ::fidl_next::ResponseFuture<'_, example::Foo, Self::Transport>,
         ::fidl_next::EncodeError,
     >
     where
@@ -404,17 +404,17 @@ where
 /// See [`Example`] for more details.
 pub trait ExampleClientHandler<___T: ::fidl_next::Transport> {}
 
-impl<___T, ___H> ::fidl_next::ClientProtocol<___T, ___H> for Example
+impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for Example
 where
-    ___T: ::fidl_next::Transport,
     ___H: ExampleClientHandler<___T>,
+    ___T: ::fidl_next::Transport,
 
     <example::Foo as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_event(
         handler: &mut ___H,
-        sender: &::fidl_next::ClientSender<___T, Self>,
+        sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -431,7 +431,7 @@ pub trait ExampleServerSender {
     type Transport: ::fidl_next::Transport;
 }
 
-impl<___T> ExampleServerSender for ::fidl_next::ServerSender<___T, Example>
+impl<___T> ExampleServerSender for ::fidl_next::ServerSender<Example, ___T>
 where
     ___T: ::fidl_next::Transport,
 {
@@ -444,25 +444,25 @@ where
 pub trait ExampleServerHandler<___T: ::fidl_next::Transport> {
     fn foo(
         &mut self,
-        sender: &::fidl_next::ServerSender<___T, Example>,
+        sender: &::fidl_next::ServerSender<Example, ___T>,
 
-        request: ::fidl_next::Request<___T, example::Foo>,
+        request: ::fidl_next::Request<example::Foo, ___T>,
 
         responder: ::fidl_next::Responder<example::Foo>,
     );
 }
 
-impl<___T, ___H> ::fidl_next::ServerProtocol<___T, ___H> for Example
+impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for Example
 where
-    ___T: ::fidl_next::Transport,
     ___H: ExampleServerHandler<___T>,
+    ___T: ::fidl_next::Transport,
 
     <example::Foo as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
     fn on_one_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
     ) {
@@ -475,7 +475,7 @@ where
 
     fn on_two_way(
         handler: &mut ___H,
-        sender: &::fidl_next::ServerSender<___T, Self>,
+        sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
         buffer: ___T::RecvBuffer,
         responder: ::fidl_next::protocol::Responder,

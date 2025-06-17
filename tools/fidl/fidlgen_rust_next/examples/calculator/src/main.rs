@@ -14,8 +14,8 @@ struct MyCalculatorClient;
 impl<T: Transport> CalculatorClientHandler<T> for MyCalculatorClient {
     fn on_error(
         &mut self,
-        sender: &ClientSender<T, Calculator>,
-        response: Response<T, calculator::OnError>,
+        sender: &ClientSender<Calculator, T>,
+        response: Response<calculator::OnError, T>,
     ) {
         assert_eq!(response.status_code, 100);
 
@@ -31,8 +31,8 @@ struct MyCalculatorServer {
 impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
     fn add(
         &mut self,
-        sender: &ServerSender<T, Calculator>,
-        request: Request<T, calculator::Add>,
+        sender: &ServerSender<Calculator, T>,
+        request: Request<calculator::Add, T>,
         responder: Responder<calculator::Add>,
     ) {
         println!("{} + {} = {}", request.a, request.b, request.a + request.b);
@@ -48,8 +48,8 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
 
     fn divide(
         &mut self,
-        sender: &ServerSender<T, Calculator>,
-        request: Request<T, calculator::Divide>,
+        sender: &ServerSender<Calculator, T>,
+        request: Request<calculator::Divide, T>,
         responder: Responder<calculator::Divide>,
     ) {
         let response = if request.divisor != 0 {
@@ -77,7 +77,7 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
         });
     }
 
-    fn clear(&mut self, sender: &ServerSender<T, Calculator>) {
+    fn clear(&mut self, sender: &ServerSender<Calculator, T>) {
         println!("Cleared, sending an error back to close the connection");
 
         let sender = sender.clone();
@@ -106,11 +106,11 @@ fn make_transport() -> (Endpoint, Endpoint) {
 }
 
 async fn create_endpoints(
-) -> (ClientSender<Endpoint, Calculator>, Task<()>, ServerSender<Endpoint, Calculator>, Task<()>) {
+) -> (ClientSender<Calculator, Endpoint>, Task<()>, ServerSender<Calculator, Endpoint>, Task<()>) {
     let (client_transport, server_transport) = make_transport();
 
-    let client_end = ClientEnd::<_, Calculator>::from_untyped(client_transport);
-    let server_end = ServerEnd::<_, Calculator>::from_untyped(server_transport);
+    let client_end = ClientEnd::<Calculator, _>::from_untyped(client_transport);
+    let server_end = ServerEnd::<Calculator, _>::from_untyped(server_transport);
 
     let mut client = Client::new(client_end);
     let client_sender = client.sender().clone();
@@ -129,7 +129,7 @@ async fn create_endpoints(
     (client_sender, client_task, server_sender, server_task)
 }
 
-async fn add(client_sender: &ClientSender<Endpoint, Calculator>) {
+async fn add(client_sender: &ClientSender<Calculator, Endpoint>) {
     let result = client_sender
         .add(CalculatorAddRequest { a: 16, b: 26 })
         .expect("failed to encode add request")
@@ -140,7 +140,7 @@ async fn add(client_sender: &ClientSender<Endpoint, Calculator>) {
     assert_eq!(response.sum, 42);
 }
 
-async fn divide(client_sender: &ClientSender<Endpoint, Calculator>) {
+async fn divide(client_sender: &ClientSender<Calculator, Endpoint>) {
     // Normal division
     let result = client_sender
         .divide(CalculatorDivideRequest { dividend: 100, divisor: 3 })
@@ -163,7 +163,7 @@ async fn divide(client_sender: &ClientSender<Endpoint, Calculator>) {
     assert_eq!(DivisionError::DivideByZero, (*error).into());
 }
 
-async fn clear(client_sender: &ClientSender<Endpoint, Calculator>) {
+async fn clear(client_sender: &ClientSender<Calculator, Endpoint>) {
     client_sender.clear().unwrap().await.unwrap();
 }
 
