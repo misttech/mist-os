@@ -104,40 +104,15 @@ const std::vector<fpbus::Bti> display_btis{
     }},
 };
 
-zx::result<display::PanelType> GetDisplayPanelTypeFromGpioPanelPins(uint32_t gpio_panel_type_pins) {
-  switch (gpio_panel_type_pins) {
-    case 0b10:
-      return zx::ok(display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson);
-    case 0b11:
-      return zx::ok(display::PanelType::kBoeTv070wsmFitipowerJd9365);
-    case 0b01:
-      return zx::ok(display::PanelType::kKdKd070d82FitipowerJd9365);
-    case 0b00:
-      return zx::ok(display::PanelType::kKdKd070d82FitipowerJd9364);
-  }
-  FDF_LOG(ERROR, "Invalid GPIO panel type pins value: %d", gpio_panel_type_pins);
-  return zx::error(ZX_ERR_INVALID_ARGS);
-}
-
 }  // namespace
 
 zx::result<> PostInit::InitDisplay() {
-  zx::result<display::PanelType> panel_type_result =
-      GetDisplayPanelTypeFromGpioPanelPins(display_id_);
-  if (!panel_type_result.is_ok()) {
-    FDF_LOG(ERROR, "Failed to get display type from GPIO inspection (%" PRIu32 "): %s", display_id_,
-            panel_type_result.status_string());
-    return panel_type_result.take_error();
-  }
-  const display::PanelType panel_type = panel_type_result.value();
-  FDF_LOG(DEBUG, "Display panel type: %" PRIu32, static_cast<uint32_t>(panel_type));
-
   const std::vector<fpbus::Metadata> display_panel_metadata{
       {{
           .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_TYPE),
           .data = std::vector<uint8_t>(
-              reinterpret_cast<const uint8_t*>(&panel_type),
-              reinterpret_cast<const uint8_t*>(&panel_type) + sizeof(display::PanelType)),
+              reinterpret_cast<const uint8_t*>(&panel_type_),
+              reinterpret_cast<const uint8_t*>(&panel_type_) + sizeof(display::PanelType)),
           // No metadata for this item.
       }},
   };
