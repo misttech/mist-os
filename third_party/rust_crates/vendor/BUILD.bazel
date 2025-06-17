@@ -1363,18 +1363,6 @@ alias(
 )
 
 alias(
-    name = "lipsum-0.6.0",
-    actual = "//third_party/rust_crates/vendor/lipsum-0.6.0:lipsum",
-    tags = ["manual"],
-)
-
-alias(
-    name = "lipsum",
-    actual = "//third_party/rust_crates/vendor/lipsum-0.6.0:lipsum",
-    tags = ["manual"],
-)
-
-alias(
     name = "lock_api-0.4.11",
     actual = "//third_party/rust_crates/vendor/lock_api-0.4.11:lock_api",
     tags = ["manual"],

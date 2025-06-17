@@ -493,12 +493,6 @@ group("linked-hash-map") {
   public_deps = [ ":linked-hash-map-v0_5_6" ]
 }
 
-if (current_os == "fuchsia") {
-  group("lipsum") {
-    public_deps = [ ":lipsum-v0_6_0" ]
-  }
-}
-
 group("lock_api") {
   public_deps = [ ":lock_api-v0_4_11" ]
 }
@@ -9181,36 +9175,6 @@ rustc_library("linked-hash-map-v0_5_6") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":linked-hash-map-v0_5_6.license" ]
-}
-
-license("lipsum-v0_6_0.license") {
-  public_package_name = "lipsum"
-  license_files = [ "//third_party/rust_crates/vendor/lipsum-0.6.0/LICENSE" ]
-}
-
-rustc_library("lipsum-v0_6_0") {
-  crate_name = "lipsum"
-  source_root = "//third_party/rust_crates/vendor/lipsum-0.6.0/src/lib.rs"
-  output_name = "lipsum-3f3d810083da13c9"
-  edition = "2015"
-  disable_clippy = true
-  enforce_source_listing = false
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-  deps += [ ":rand-v0_6_5" ]
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "-Cmetadata=3f3d810083da13c9",
-    "-Cextra-filename=-3f3d810083da13c9",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ ":lipsum-v0_6_0.license" ]
 }
 
 license("lock_api-v0_4_11.license") {

@@ -196,7 +196,6 @@ rustc_binary("font_metrics") {
     "//src/lib/ui/carnelian",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:euclid",
-    "//third_party/rust_crates:lipsum",
   ]
 }
 
