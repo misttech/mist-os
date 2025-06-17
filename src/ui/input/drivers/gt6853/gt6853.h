@@ -130,9 +130,6 @@ class Gt6853Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_IN
   // `lib/device-protocol/display-panel.h`.
   zx::result<display::PanelType> GetDisplayPanelType();
 
-  zx::result<display::PanelType> GetDisplayPanelTypeFromPanelConfigMetadata();
-  zx::result<display::PanelType> GetDisplayPanelTypeFromBootloaderMetadata();
-
   // To be implemented in a device-specific file. Should set panel_type_id_ and panel_type_, and
   // config_status_ in cases when the config download is skipped. Returns an invalid VMO if the
   // firmware update and config download should be skipped.

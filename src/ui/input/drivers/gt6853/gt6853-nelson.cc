@@ -12,33 +12,6 @@ namespace touch {
 
 namespace {
 
-// Panel type ID provided by the bootloader to Zircon.
-//
-// Values must be kept in sync with the bootloader implementation.
-enum class BootloaderPanelType : uint32_t {
-  kKdFiti9364 = 1,
-  kBoeFiti9364 = 2,
-  // 3 was for kFiti9364
-  kKdFiti9365 = 4,
-  kBoeFiti9365 = 5,
-  // 6 was for kSit7703.
-};
-
-display::PanelType ToDisplayPanelType(BootloaderPanelType bootloader_panel_type) {
-  switch (bootloader_panel_type) {
-    case BootloaderPanelType::kKdFiti9364:
-      return display::PanelType::kKdKd070d82FitipowerJd9364;
-    case BootloaderPanelType::kBoeFiti9364:
-      return display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson;
-    case BootloaderPanelType::kKdFiti9365:
-      return display::PanelType::kKdKd070d82FitipowerJd9365;
-    case BootloaderPanelType::kBoeFiti9365:
-      return display::PanelType::kBoeTv070wsmFitipowerJd9365;
-  }
-  zxlogf(ERROR, "Unknown panel type %" PRIu32, static_cast<uint32_t>(bootloader_panel_type));
-  return display::PanelType::kUnknown;
-}
-
 // There are three config files, one for each DDIC. A config file may contain multiple configs; the
 // correct one is chosen based on the sensor ID reported by the touch controller.
 inline const char* GetPanelTouchConfigPath(display::PanelType panel_type) {
@@ -71,7 +44,7 @@ inline const char* GetPanelName(display::PanelType panel_type) {
 
 }  // namespace
 
-zx::result<display::PanelType> Gt6853Device::GetDisplayPanelTypeFromPanelConfigMetadata() {
+zx::result<display::PanelType> Gt6853Device::GetDisplayPanelType() {
   size_t actual = 0;
   display::PanelType panel_type;
   zx_status_t status = DdkGetFragmentMetadata("pdev", DEVICE_METADATA_DISPLAY_PANEL_TYPE,
@@ -86,46 +59,6 @@ zx::result<display::PanelType> Gt6853Device::GetDisplayPanelTypeFromPanelConfigM
     return zx::error(ZX_ERR_INTERNAL);
   }
   return zx::ok(panel_type);
-}
-
-zx::result<display::PanelType> Gt6853Device::GetDisplayPanelTypeFromBootloaderMetadata() {
-  size_t actual = 0;
-  BootloaderPanelType bootloader_panel_type;
-  zx_status_t status =
-      DdkGetFragmentMetadata("pdev", DEVICE_METADATA_BOARD_PRIVATE, &bootloader_panel_type,
-                             sizeof(BootloaderPanelType), &actual);
-  if (status != ZX_OK) {
-    zxlogf(WARNING, "Failed to get panel type from bootloader metadata: %d", status);
-    return zx::error(status);
-  }
-  if (actual != sizeof(BootloaderPanelType)) {
-    zxlogf(WARNING, "Expected metadata size %zu, got %zu", sizeof(BootloaderPanelType), actual);
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-
-  display::PanelType panel_type = ToDisplayPanelType(bootloader_panel_type);
-  return zx::ok(panel_type);
-}
-
-zx::result<display::PanelType> Gt6853Device::GetDisplayPanelType() {
-  zx::result<display::PanelType> panel_type_result = [&]() -> zx::result<display::PanelType> {
-    // Prefers using panel config metadata panel type wherever it's available.
-    zx::result<display::PanelType> panel_type_from_panel_config_result =
-        GetDisplayPanelTypeFromPanelConfigMetadata();
-    if (panel_type_from_panel_config_result.is_ok()) {
-      return panel_type_from_panel_config_result;
-    }
-    zxlogf(WARNING,
-           "Panel type from panel config metadata is not available. "
-           "Fall back to bootloader metadata.");
-    return GetDisplayPanelTypeFromBootloaderMetadata();
-  }();
-
-  if (panel_type_result.is_error()) {
-    zxlogf(ERROR, "Failed to get panel type: %s", panel_type_result.status_string());
-    return panel_type_result;
-  }
-  return zx::ok(std::move(panel_type_result).value());
 }
 
 zx::result<fuchsia_mem::wire::Range> Gt6853Device::GetConfigFileVmo() {
