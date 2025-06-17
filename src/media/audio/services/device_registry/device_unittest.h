@@ -34,8 +34,6 @@ static constexpr bool kLogDeviceTestNotifyResponses = false;
 
 // Test class to verify the driver initialization/configuration sequence.
 class DeviceTestBase : public gtest::TestLoopFixture {
-  static inline const std::string_view kClassName = "DeviceTestBase";
-
  public:
   void SetUp() override {
     // Use our production Inspector during device unittests.
@@ -47,6 +45,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
   void TearDown() override { fake_device_presence_watcher_.reset(); }
 
  protected:
+  static inline const std::string kClassName = "DeviceTestBase";
   static fuchsia_audio_device::Info GetDeviceInfo(const std::shared_ptr<Device>& device) {
     return *device->info();
   }
@@ -108,8 +107,6 @@ class DeviceTestBase : public gtest::TestLoopFixture {
   }
 
   class NotifyStub : public std::enable_shared_from_this<NotifyStub>, public ControlNotify {
-    static inline const std::string_view kClassName = "DeviceTestBase::NotifyStub";
-
    public:
     explicit NotifyStub(DeviceTestBase& parent) : parent_(parent) {}
     virtual ~NotifyStub() = default;
@@ -290,6 +287,9 @@ class DeviceTestBase : public gtest::TestLoopFixture {
     std::optional<TopologyId> topology_id() const { return topology_id_; }
     void clear_topology_id() { topology_id_.reset(); }
 
+   protected:
+    static inline const std::string kClassName = "DeviceTestBase::NotifyStub";
+
    private:
     [[maybe_unused]] DeviceTestBase& parent_;
     std::optional<std::pair<fuchsia_audio_device::PlugState, zx::time>> plug_state_;
@@ -380,6 +380,7 @@ class DeviceTestBase : public gtest::TestLoopFixture {
 
 class CodecTest : public DeviceTestBase {
  protected:
+  static inline const std::string kClassName = "CodecTest";
   std::shared_ptr<FakeCodec> MakeFakeCodecInput() { return MakeFakeCodec(true); }
   std::shared_ptr<FakeCodec> MakeFakeCodecOutput() { return MakeFakeCodec(false); }
   std::shared_ptr<FakeCodec> MakeFakeCodecNoDirection() { return MakeFakeCodec(std::nullopt); }
@@ -387,10 +388,10 @@ class CodecTest : public DeviceTestBase {
   std::shared_ptr<Device> InitializeDeviceForFakeCodec(const std::shared_ptr<FakeCodec>& driver) {
     auto codec_client_end = driver->Enable();
     EXPECT_TRUE(codec_client_end.is_valid());
-    auto device =
-        Device::Create(std::weak_ptr<FakeDevicePresenceWatcher>(device_presence_watcher()),
-                       dispatcher(), "Codec device name", fuchsia_audio_device::DeviceType::kCodec,
-                       fuchsia_audio_device::DriverClient::WithCodec(std::move(codec_client_end)));
+    auto device = Device::Create(
+        std::weak_ptr<FakeDevicePresenceWatcher>(device_presence_watcher()), dispatcher(),
+        "Codec device name", fuchsia_audio_device::DeviceType::kCodec,
+        fuchsia_audio_device::DriverClient::WithCodec(std::move(codec_client_end)), kClassName);
 
     RunLoopUntilIdle();
     EXPECT_TRUE(device->is_operational() || device->has_error()) << "device still initializing";
@@ -410,8 +411,7 @@ class CodecTest : public DeviceTestBase {
 
 class CompositeTest : public DeviceTestBase {
  protected:
-  static inline const std::string_view kClassName = "CompositeTest";
-
+  static inline const std::string kClassName = "CompositeTest";
   static const std::vector<
       std::pair<ElementId, std::vector<fuchsia_hardware_audio::SupportedFormats>>>&
   ElementDriverRingBufferFormatSets(const std::shared_ptr<Device>& device) {
@@ -439,7 +439,8 @@ class CompositeTest : public DeviceTestBase {
     auto device = Device::Create(
         std::weak_ptr<FakeDevicePresenceWatcher>(device_presence_watcher()), dispatcher(),
         "Composite device name", fuchsia_audio_device::DeviceType::kComposite,
-        fuchsia_audio_device::DriverClient::WithComposite(std::move(composite_client_end)));
+        fuchsia_audio_device::DriverClient::WithComposite(std::move(composite_client_end)),
+        kClassName);
 
     while (!device->is_operational() && !device->has_error()) {
       RunLoopFor(zx::msec(10));

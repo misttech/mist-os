@@ -47,12 +47,13 @@ class ObserverServerWarningTest : public AudioDeviceRegistryServerTestBase,
 
 class ObserverServerCodecWarningTest : public ObserverServerWarningTest {
  protected:
+  static inline const std::string kClassName = "ObserverServerCodecWarningTest";
   std::shared_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeCodecNoDirection();
 
-    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                            fad::DeviceType::kCodec,
-                                            fad::DriverClient::WithCodec(fake_driver->Enable())));
+    adr_service()->AddDevice(
+        Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                       fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -60,12 +61,13 @@ class ObserverServerCodecWarningTest : public ObserverServerWarningTest {
 
 class ObserverServerCompositeWarningTest : public ObserverServerWarningTest {
  protected:
+  static inline const std::string kClassName = "ObserverServerCompositeWarningTest";
   std::shared_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeComposite();
 
     adr_service()->AddDevice(Device::Create(
         adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
-        fad::DriverClient::WithComposite(fake_driver->Enable())));
+        fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
     RunLoopUntilIdle();
     return fake_driver;
   }

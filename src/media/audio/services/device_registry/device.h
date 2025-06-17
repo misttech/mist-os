@@ -42,7 +42,8 @@ class Device : public std::enable_shared_from_this<Device> {
   static std::shared_ptr<Device> Create(std::weak_ptr<DevicePresenceWatcher> presence_watcher,
                                         async_dispatcher_t* dispatcher, std::string_view name,
                                         fuchsia_audio_device::DeviceType device_type,
-                                        fuchsia_audio_device::DriverClient driver_client);
+                                        fuchsia_audio_device::DriverClient driver_client,
+                                        const std::string& added_by);
   ~Device();
 
   template <typename ProtocolT>
@@ -229,7 +230,7 @@ class Device : public std::enable_shared_from_this<Device> {
 
   Device(std::weak_ptr<DevicePresenceWatcher> presence_watcher, async_dispatcher_t* dispatcher,
          std::string_view name, fuchsia_audio_device::DeviceType device_type,
-         fuchsia_audio_device::DriverClient driver_client);
+         fuchsia_audio_device::DriverClient driver_client, const std::string& added_by);
 
   //
   // Device initialization is essentially a "wait for multiple objects" operation.

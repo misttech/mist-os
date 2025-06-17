@@ -92,7 +92,8 @@ void ProviderServer::AddDevice(AddDeviceRequest& request, AddDeviceCompleter::Sy
 
   // This kicks off device initialization, which notifies the parent when it completes.
   parent_->AddDevice(Device::Create(parent_, thread().dispatcher(), *request.device_name(),
-                                    *request.device_type(), std::move(*request.driver_client())));
+                                    *request.device_type(), std::move(*request.driver_client()),
+                                    "Provider"));
 
   inspect()->RecordAddedDevice(*request.device_name(), *request.device_type(),
                                zx::clock::get_monotonic());

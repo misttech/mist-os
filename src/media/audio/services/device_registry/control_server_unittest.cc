@@ -72,12 +72,13 @@ class ControlServerTest : public AudioDeviceRegistryServerTestBase {
 
 class ControlServerCodecTest : public ControlServerTest {
  protected:
+  static inline const std::string kClassName = "ControlServerCodecTest";
   std::shared_ptr<FakeCodec> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeCodecOutput();
 
-    adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                            fad::DeviceType::kCodec,
-                                            fad::DriverClient::WithCodec(fake_driver->Enable())));
+    adr_service()->AddDevice(
+        Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                       fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
     RunLoopUntilIdle();
     return fake_driver;
   }
@@ -85,12 +86,13 @@ class ControlServerCodecTest : public ControlServerTest {
 
 class ControlServerCompositeTest : public ControlServerTest {
  protected:
+  static inline const std::string kClassName = "ControlServerCompositeTest";
   std::shared_ptr<FakeComposite> CreateAndEnableDriverWithDefaults() {
     auto fake_driver = CreateFakeComposite();
 
     adr_service()->AddDevice(Device::Create(
         adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
-        fad::DriverClient::WithComposite(fake_driver->Enable())));
+        fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
     RunLoopUntilIdle();
     return fake_driver;
   }

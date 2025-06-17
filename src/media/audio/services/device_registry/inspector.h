@@ -26,6 +26,7 @@ static constexpr std::string_view kDetectionUnsupportedDevices =
 
 static constexpr std::string_view kDevices = "Devices";
 static constexpr std::string_view kAddedAt = "added at";
+static constexpr std::string_view kAddedBy = "added by";
 static constexpr std::string_view kFailedAt = "failed at";
 static constexpr std::string_view kRemovedAt = "removed at";
 
@@ -155,7 +156,8 @@ class RingBufferElement {
 class DeviceInspectInstance {
  public:
   DeviceInspectInstance(inspect::Node device_node, std::string device_name,
-                        fuchsia_audio_device::DeviceType device_type, const zx::time& added_at);
+                        fuchsia_audio_device::DeviceType device_type, const zx::time& added_at,
+                        const std::string& added_by);
   ~DeviceInspectInstance();
 
   inspect::Node& inspect_node() { return device_node_; }
@@ -181,6 +183,7 @@ class DeviceInspectInstance {
   inspect::Node device_node_;
   std::string name_;
   inspect::IntProperty added_at_;
+  inspect::StringProperty added_by_;
   inspect::StringProperty type_;
 
   inspect::Node ring_buffers_root_node_;
@@ -263,7 +266,7 @@ class Inspector {
 
   std::shared_ptr<DeviceInspectInstance> RecordDeviceInitializing(
       const std::string& device_name, fuchsia_audio_device::DeviceType device_type,
-      const zx::time& added_at);
+      const zx::time& added_at, const std::string& added_by);
 
   // Create an Inspect node for the instance (e.g. a child of control_servers_root_ if this is a
   // Control instance), wrap it in a FidlServerInspectInstance object, and return a shared_ptr to

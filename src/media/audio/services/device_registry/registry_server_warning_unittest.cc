@@ -17,8 +17,14 @@ namespace {
 namespace fad = fuchsia_audio_device;
 
 class RegistryServerWarningTest : public AudioDeviceRegistryServerTestBase {};
-class RegistryServerCodecWarningTest : public RegistryServerWarningTest {};
-class RegistryServerCompositeWarningTest : public RegistryServerWarningTest {};
+class RegistryServerCodecWarningTest : public RegistryServerWarningTest {
+ protected:
+  static inline const std::string kClassName = "RegistryServerCodecWarningTest";
+};
+class RegistryServerCompositeWarningTest : public RegistryServerWarningTest {
+ protected:
+  static inline const std::string kClassName = "RegistryServerCompositeWarningTest";
+};
 
 /////////////////////
 // Device-less tests
@@ -204,9 +210,9 @@ TEST_F(RegistryServerWarningTest, CreateObserverBadToken) {
 // If required 'observer_server' is not set, CreateObserver should fail with kInvalidObserver.
 TEST_F(RegistryServerCodecWarningTest, CreateObserverMissingObserver) {
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -252,9 +258,9 @@ TEST_F(RegistryServerCodecWarningTest, CreateObserverMissingObserver) {
 // If 'observer_server' is not set to a valid handle, we should fail with ZX_ERR_INVALID_ARGS.
 TEST_F(RegistryServerCodecWarningTest, CreateObserverBadObserver) {
   auto fake_driver = CreateFakeCodecInput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -307,9 +313,9 @@ TEST_F(RegistryServerCodecWarningTest, CreateObserverBadObserver) {
 // If required 'observer_server' is not set, CreateObserver should fail with kInvalidObserver.
 TEST_F(RegistryServerCompositeWarningTest, CreateObserverMissingObserver) {
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -355,9 +361,9 @@ TEST_F(RegistryServerCompositeWarningTest, CreateObserverMissingObserver) {
 // If 'observer_server' is not set to a valid handle, we should fail with ZX_ERR_INVALID_ARGS.
 TEST_F(RegistryServerCompositeWarningTest, CreateObserverBadObserver) {
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);

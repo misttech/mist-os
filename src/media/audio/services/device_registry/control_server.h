@@ -110,7 +110,7 @@ class ControlServer
   template <typename ServerT, template <typename T> typename FidlServerT, typename ProtocolT>
   friend class BaseFidlServer;
 
-  static inline const std::string_view kClassName = "ControlServer";
+  static inline const std::string kClassName = "ControlServer";
   static inline uint64_t count_ = 0;
 
   ControlServer(std::shared_ptr<AudioDeviceRegistry> parent, std::shared_ptr<Device> device);

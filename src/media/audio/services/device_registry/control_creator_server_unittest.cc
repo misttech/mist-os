@@ -16,8 +16,14 @@ namespace {
 namespace fad = fuchsia_audio_device;
 
 class ControlCreatorServerTest : public AudioDeviceRegistryServerTestBase {};
-class ControlCreatorServerCodecTest : public ControlCreatorServerTest {};
-class ControlCreatorServerCompositeTest : public ControlCreatorServerTest {};
+class ControlCreatorServerCodecTest : public ControlCreatorServerTest {
+ protected:
+  static inline const std::string kClassName = "ControlCreatorServerCodecTest";
+};
+class ControlCreatorServerCompositeTest : public ControlCreatorServerTest {
+ protected:
+  static inline const std::string kClassName = "ControlCreatorServerCompositeTest";
+};
 
 /////////////////////
 // Device-less tests
@@ -46,9 +52,9 @@ TEST_F(ControlCreatorServerCodecTest, CreateControl) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   auto fake_driver = CreateFakeCodecOutput();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
-                                          fad::DeviceType::kCodec,
-                                          fad::DriverClient::WithCodec(fake_driver->Enable())));
+  adr_service()->AddDevice(
+      Device::Create(adr_service(), dispatcher(), "Test codec name", fad::DeviceType::kCodec,
+                     fad::DriverClient::WithCodec(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
@@ -82,9 +88,9 @@ TEST_F(ControlCreatorServerCompositeTest, CreateControl) {
   auto control_creator = CreateTestControlCreatorServer();
   ASSERT_EQ(ControlCreatorServer::count(), 1u);
   auto fake_driver = CreateFakeComposite();
-  adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
-                                          fad::DeviceType::kComposite,
-                                          fad::DriverClient::WithComposite(fake_driver->Enable())));
+  adr_service()->AddDevice(Device::Create(
+      adr_service(), dispatcher(), "Test composite name", fad::DeviceType::kComposite,
+      fad::DriverClient::WithComposite(fake_driver->Enable()), kClassName));
 
   RunLoopUntilIdle();
   ASSERT_EQ(adr_service()->devices().size(), 1u);
