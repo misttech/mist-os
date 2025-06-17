@@ -4,45 +4,63 @@
 
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
+#include <lib/device-protocol/display-panel.h>
 
 #include "gt6853.h"
 
 namespace {
 
-enum {
-  // These values are shared with the bootloader, and must be kept in sync.
-  kPanelTypeKdFiti9364 = 1,
-  kPanelTypeBoeFiti9364 = 2,
-  // 3 was for kPanelTypeInxFiti9364
-  kPanelTypeKdFiti9365 = 4,
-  kPanelTypeBoeFiti9365 = 5,
-  // 6 was for kPanelTypeBoeSit7703.
+// Panel type ID provided by the bootloader to Zircon.
+//
+// Values must be kept in sync with the bootloader implementation.
+enum class BootloaderPanelType : uint32_t {
+  kKdFiti9364 = 1,
+  kBoeFiti9364 = 2,
+  // 3 was for kFiti9364
+  kKdFiti9365 = 4,
+  kBoeFiti9365 = 5,
+  // 6 was for kSit7703.
 };
+
+display::PanelType ToDisplayPanelType(BootloaderPanelType bootloader_panel_type) {
+  switch (bootloader_panel_type) {
+    case BootloaderPanelType::kKdFiti9364:
+      return display::PanelType::kKdKd070d82FitipowerJd9364;
+    case BootloaderPanelType::kBoeFiti9364:
+      return display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson;
+    case BootloaderPanelType::kKdFiti9365:
+      return display::PanelType::kKdKd070d82FitipowerJd9365;
+    case BootloaderPanelType::kBoeFiti9365:
+      return display::PanelType::kBoeTv070wsmFitipowerJd9365;
+  }
+  zxlogf(ERROR, "Unknown panel type %" PRIu32, static_cast<uint32_t>(bootloader_panel_type));
+  return display::PanelType::kUnknown;
+}
 
 // There are three config files, one for each DDIC. A config file may contain multiple configs; the
 // correct one is chosen based on the sensor ID reported by the touch controller.
-inline const char* PanelTypeToConfigPath(uint32_t panel_type_id) {
-  switch (panel_type_id) {
-    case kPanelTypeKdFiti9364:
-    case kPanelTypeBoeFiti9364:
+inline const char* GetPanelTouchConfigPath(display::PanelType panel_type) {
+  switch (panel_type) {
+    case display::PanelType::kKdKd070d82FitipowerJd9364:
+    case display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson:
       return GT6853_CONFIG_9364_PATH;
-    case kPanelTypeKdFiti9365:
-    case kPanelTypeBoeFiti9365:
+    case display::PanelType::kKdKd070d82FitipowerJd9365:
+    case display::PanelType::kBoeTv070wsmFitipowerJd9365:
       return GT6853_CONFIG_9365_PATH;
     default:
       return nullptr;
   }
 }
 
-inline const char* PanelTypeToNameString(uint32_t panel_type_id) {
-  switch (panel_type_id) {
-    case kPanelTypeKdFiti9364:
+inline const char* GetPanelName(display::PanelType panel_type) {
+  switch (panel_type) {
+    case display::PanelType::kKdKd070d82FitipowerJd9364:
       return "kd_fiti9364";
-    case kPanelTypeBoeFiti9364:
+    case display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson:
       return "boe_fiti9364";
-    case kPanelTypeKdFiti9365:
+    case display::PanelType::kKdKd070d82FitipowerJd9365:
       return "kd_fiti9365";
-    case kPanelTypeBoeFiti9365:
+    case display::PanelType::kBoeTv070wsmFitipowerJd9365:
       return "boe_fiti9365";
     default:
       return "unknown";
@@ -55,9 +73,11 @@ namespace touch {
 
 zx::result<fuchsia_mem::wire::Range> Gt6853Device::GetConfigFileVmo() {
   size_t actual = 0;
-  uint32_t panel_type_id = 0;
-  zx_status_t status = DdkGetFragmentMetadata("pdev", DEVICE_METADATA_BOARD_PRIVATE, &panel_type_id,
-                                              sizeof(panel_type_id), &actual);
+
+  BootloaderPanelType bootloader_panel_type;
+  zx_status_t status =
+      DdkGetFragmentMetadata("pdev", DEVICE_METADATA_BOARD_PRIVATE, &bootloader_panel_type,
+                             sizeof(BootloaderPanelType), &actual);
   // The only case to let through is when metadata isn't provided, which could happen after
   // netbooting. All other unexpected conditions are fatal, which should help them be discovered
   // more easily.
@@ -69,19 +89,26 @@ zx::result<fuchsia_mem::wire::Range> Gt6853Device::GetConfigFileVmo() {
     zxlogf(ERROR, "Failed to get panel type: %d", status);
     return zx::error(status);
   }
-  if (actual != sizeof(panel_type_id)) {
-    zxlogf(ERROR, "Expected metadata size %zu, got %zu", sizeof(panel_type_id), actual);
+  if (actual != sizeof(BootloaderPanelType)) {
+    zxlogf(ERROR, "Expected metadata size %zu, got %zu", sizeof(BootloaderPanelType), actual);
     return zx::error(ZX_ERR_INTERNAL);
   }
 
-  panel_type_id_ = root_.CreateInt("panel_type_id", panel_type_id);
-  panel_type_ = root_.CreateString("panel_type", PanelTypeToNameString(panel_type_id));
+  // The panel can only be identified correctly by the bootloader for EVT boards
+  // and beyond. This driver won't be used on boards earlier than EVT, so not
+  // finding the panel ID is an error.
+  display::PanelType panel_type = ToDisplayPanelType(bootloader_panel_type);
+  if (panel_type == display::PanelType::kUnknown) {
+    zxlogf(ERROR, "Display panel type unknown");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
 
-  // The panel should be identified correctly by the bootloader for P2 boards and beyond. This
-  // driver isn't be used on boards earlier than P2, so not finding the panel ID is an error.
-  const char* config_path = PanelTypeToConfigPath(panel_type_id);
+  panel_type_id_ = root_.CreateUint("panel_type_id", static_cast<uint32_t>(panel_type));
+  panel_type_ = root_.CreateString("panel_type", GetPanelName(panel_type));
+
+  const char* config_path = GetPanelTouchConfigPath(panel_type);
   if (!config_path) {
-    zxlogf(ERROR, "Failed to find config for panel type %u", panel_type_id);
+    zxlogf(ERROR, "Failed to find config for panel type %u", panel_type);
     return zx::error(ZX_ERR_INTERNAL);
   }
 

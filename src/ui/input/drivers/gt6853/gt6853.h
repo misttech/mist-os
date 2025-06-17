@@ -176,7 +176,7 @@ class Gt6853Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_IN
   inspect::Node root_;
 
   inspect::IntProperty sensor_id_;
-  inspect::IntProperty panel_type_id_;
+  inspect::UintProperty panel_type_id_;
   inspect::StringProperty panel_type_;
   inspect::StringProperty firmware_status_;
   inspect::StringProperty config_status_;
