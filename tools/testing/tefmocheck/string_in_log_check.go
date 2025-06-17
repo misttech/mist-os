@@ -892,5 +892,11 @@ func infraToolLogChecks() []FailureModeCheck {
 			Type:               syslogType,
 			SkipAllPassedTests: true,
 		},
+		// Catch cases where snippet_uiautomator protocol line never arrives.
+		&stringInLogCheck{
+			String:             "Timeout (30s) waiting for protocol line.",
+			Type:               swarmingOutputType,
+			SkipAllPassedTests: true,
+		},
 	}
 }
