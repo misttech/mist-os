@@ -12,6 +12,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/irq.h>
 #include <lib/ddk/debug.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/input_report_reader/reader.h>
@@ -124,6 +125,13 @@ class Gt6853Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_IN
   };
 
   static Gt6853Contact ParseContact(const uint8_t* contact_buffer);
+
+  // Returns the type of the display panel defined in
+  // `lib/device-protocol/display-panel.h`.
+  zx::result<display::PanelType> GetDisplayPanelType();
+
+  zx::result<display::PanelType> GetDisplayPanelTypeFromPanelConfigMetadata();
+  zx::result<display::PanelType> GetDisplayPanelTypeFromBootloaderMetadata();
 
   // To be implemented in a device-specific file. Should set panel_type_id_ and panel_type_, and
   // config_status_ in cases when the config download is skipped. Returns an invalid VMO if the

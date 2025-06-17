@@ -10,6 +10,7 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/fake-i2c/fake-i2c.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
@@ -312,8 +313,13 @@ class Gt6853Test : public zxtest::Test {
   }
 
   // Must be called before `Init()`.
-  void SetBootloaderPanelType(uint32_t bootloader_panel_type) {
+  void SetBootloaderPanelType(std::optional<uint32_t> bootloader_panel_type) {
     bootloader_panel_type_ = bootloader_panel_type;
+  }
+
+  // Must be called before `Init()`.
+  void SetDisplayPanelType(std::optional<display::PanelType> display_panel_type) {
+    display_panel_type_ = display_panel_type;
   }
 
   zx_status_t Init() {
@@ -399,7 +405,15 @@ class Gt6853Test : public zxtest::Test {
 
   zx::interrupt gpio_interrupt_;
   MockDevice* device_ = nullptr;
-  uint32_t bootloader_panel_type_ = 1;  // BootloaderPanelType::kKdFiti9364
+
+  // Panel type provided by the bootloader metadata.
+  // If null, no bootloader metadata will be provided.
+  std::optional<uint32_t> bootloader_panel_type_ = 1;  // BootloaderPanelType::kKdFiti9364
+
+  // Display panel type.
+  // If null, no display panel type metadata will be provided.
+  std::optional<display::PanelType> display_panel_type_;
+
   zx::vmo config_vmo_;
   zx::vmo firmware_vmo_;
 
@@ -455,8 +469,14 @@ class Gt6853Test : public zxtest::Test {
                                  "gpio-int");
 
     fake_parent_->AddProtocol(ZX_PROTOCOL_PDEV, nullptr, nullptr, "pdev");
-    fake_parent_->SetMetadata(DEVICE_METADATA_BOARD_PRIVATE, &bootloader_panel_type_,
-                              sizeof(bootloader_panel_type_));
+    if (bootloader_panel_type_.has_value()) {
+      fake_parent_->SetMetadata(DEVICE_METADATA_BOARD_PRIVATE, &(bootloader_panel_type_.value()),
+                                sizeof(bootloader_panel_type_.value()));
+    }
+    if (display_panel_type_.has_value()) {
+      fake_parent_->SetMetadata(DEVICE_METADATA_DISPLAY_PANEL_TYPE, &(display_panel_type_.value()),
+                                sizeof(display_panel_type_.value()));
+    }
   }
 
   std::shared_ptr<sync_completion_t> i2c_read_completion_ = std::make_shared<sync_completion_t>();
@@ -599,7 +619,7 @@ TEST_F(Gt6853Test, ConfigDownloadPanelType9364) {
   EXPECT_EQ(config_data.size(), 0x0304 - 121);
 }
 
-TEST_F(Gt6853Test, ConfigDownloadPanelType9365) {
+TEST_F(Gt6853Test, ConfigDownloadPanelType9365WithOnlyBootloaderMetadata) {
   config_size = 2338;
   ASSERT_OK(zx::vmo::create(fbl::round_up(config_size, ZX_PAGE_SIZE), 0, &config_vmo_));
 
@@ -621,6 +641,68 @@ TEST_F(Gt6853Test, ConfigDownloadPanelType9365) {
   i2c().SyncCall(&FakeTouchDevice::set_sensor_id, 0);
 
   SetBootloaderPanelType(4);  // BootloaderPanelType::kKdFiti9365
+  ASSERT_OK(Init());
+
+  auto config_data = i2c().SyncCall(&FakeTouchDevice::get_config_data);
+  EXPECT_STREQ(reinterpret_cast<const char*>(config_data.data()), "Config number zero");
+  EXPECT_STREQ(config_path, GT6853_CONFIG_9365_PATH);
+  EXPECT_EQ(config_data.size(), 0x0304 - 121);
+}
+
+TEST_F(Gt6853Test, ConfigDownloadPanelType9365WithOnlyDisplayPanelMetadata) {
+  config_size = 2338;
+  ASSERT_OK(zx::vmo::create(fbl::round_up(config_size, ZX_PAGE_SIZE), 0, &config_vmo_));
+
+  const uint32_t config_size_le = htole32(config_size);
+  ASSERT_OK(config_vmo_.write(&config_size_le, 0, sizeof(config_size_le)));
+  ASSERT_OK(WriteConfigData({0x2b}, 4));
+  ASSERT_OK(WriteConfigData({0x03}, 9));
+  ASSERT_OK(WriteConfigData({0x16, 0x00, 0x1a, 0x03, 0x1e, 0x06}, 16));
+  ASSERT_OK(WriteConfigData({0x04, 0x03, 0x00, 0x00}, 0x0016));
+  ASSERT_OK(WriteConfigData({0x02}, 0x0016 + 20));
+  ASSERT_OK(WriteConfigString("Config number two", 0x0016 + 121));
+  ASSERT_OK(WriteConfigData({0x04, 0x03, 0x00, 0x00}, 0x031a));
+  ASSERT_OK(WriteConfigData({0x00}, 0x031a + 20));
+  ASSERT_OK(WriteConfigString("Config number zero", 0x031a + 121));
+  ASSERT_OK(WriteConfigData({0x04, 0x03, 0x00, 0x00}, 0x061e));
+  ASSERT_OK(WriteConfigData({0x01}, 0x061e + 20));
+  ASSERT_OK(WriteConfigString("Config number one", 0x061e + 121));
+
+  i2c().SyncCall(&FakeTouchDevice::set_sensor_id, 0);
+
+  SetBootloaderPanelType(std::nullopt);
+  SetDisplayPanelType(display::PanelType::kKdKd070d82FitipowerJd9365);
+  ASSERT_OK(Init());
+
+  auto config_data = i2c().SyncCall(&FakeTouchDevice::get_config_data);
+  EXPECT_STREQ(reinterpret_cast<const char*>(config_data.data()), "Config number zero");
+  EXPECT_STREQ(config_path, GT6853_CONFIG_9365_PATH);
+  EXPECT_EQ(config_data.size(), 0x0304 - 121);
+}
+
+TEST_F(Gt6853Test, ConfigDownloadPanelType9365WithBothMetadata) {
+  config_size = 2338;
+  ASSERT_OK(zx::vmo::create(fbl::round_up(config_size, ZX_PAGE_SIZE), 0, &config_vmo_));
+
+  const uint32_t config_size_le = htole32(config_size);
+  ASSERT_OK(config_vmo_.write(&config_size_le, 0, sizeof(config_size_le)));
+  ASSERT_OK(WriteConfigData({0x2b}, 4));
+  ASSERT_OK(WriteConfigData({0x03}, 9));
+  ASSERT_OK(WriteConfigData({0x16, 0x00, 0x1a, 0x03, 0x1e, 0x06}, 16));
+  ASSERT_OK(WriteConfigData({0x04, 0x03, 0x00, 0x00}, 0x0016));
+  ASSERT_OK(WriteConfigData({0x02}, 0x0016 + 20));
+  ASSERT_OK(WriteConfigString("Config number two", 0x0016 + 121));
+  ASSERT_OK(WriteConfigData({0x04, 0x03, 0x00, 0x00}, 0x031a));
+  ASSERT_OK(WriteConfigData({0x00}, 0x031a + 20));
+  ASSERT_OK(WriteConfigString("Config number zero", 0x031a + 121));
+  ASSERT_OK(WriteConfigData({0x04, 0x03, 0x00, 0x00}, 0x061e));
+  ASSERT_OK(WriteConfigData({0x01}, 0x061e + 20));
+  ASSERT_OK(WriteConfigString("Config number one", 0x061e + 121));
+
+  i2c().SyncCall(&FakeTouchDevice::set_sensor_id, 0);
+
+  SetBootloaderPanelType(4);  // BootloaderPanelType::kKdFiti9365
+  SetDisplayPanelType(display::PanelType::kKdKd070d82FitipowerJd9365);
   ASSERT_OK(Init());
 
   auto config_data = i2c().SyncCall(&FakeTouchDevice::get_config_data);

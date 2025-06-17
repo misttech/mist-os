@@ -8,6 +8,8 @@
 
 #include "gt6853.h"
 
+namespace touch {
+
 namespace {
 
 // Panel type ID provided by the bootloader to Zircon.
@@ -69,35 +71,83 @@ inline const char* GetPanelName(display::PanelType panel_type) {
 
 }  // namespace
 
-namespace touch {
-
-zx::result<fuchsia_mem::wire::Range> Gt6853Device::GetConfigFileVmo() {
+zx::result<display::PanelType> Gt6853Device::GetDisplayPanelTypeFromPanelConfigMetadata() {
   size_t actual = 0;
+  display::PanelType panel_type;
+  zx_status_t status = DdkGetFragmentMetadata("pdev", DEVICE_METADATA_DISPLAY_PANEL_TYPE,
+                                              &panel_type, sizeof(display::PanelType), &actual);
+  if (status != ZX_OK) {
+    zxlogf(WARNING, "Failed to get panel type from panel config metadata: %s",
+           zx_status_get_string(status));
+    return zx::error(status);
+  }
+  if (actual != sizeof(display::PanelType)) {
+    zxlogf(WARNING, "Expected metadata size %zu, got %zu", sizeof(display::PanelType), actual);
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  return zx::ok(panel_type);
+}
 
+zx::result<display::PanelType> Gt6853Device::GetDisplayPanelTypeFromBootloaderMetadata() {
+  size_t actual = 0;
   BootloaderPanelType bootloader_panel_type;
   zx_status_t status =
       DdkGetFragmentMetadata("pdev", DEVICE_METADATA_BOARD_PRIVATE, &bootloader_panel_type,
                              sizeof(BootloaderPanelType), &actual);
-  // The only case to let through is when metadata isn't provided, which could happen after
-  // netbooting. All other unexpected conditions are fatal, which should help them be discovered
-  // more easily.
-  if (status == ZX_ERR_NOT_FOUND) {
-    config_status_.Set("skipped, no metadata");
-    return zx::ok(fuchsia_mem::wire::Range{});
-  }
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get panel type: %d", status);
+    zxlogf(WARNING, "Failed to get panel type from bootloader metadata: %d", status);
     return zx::error(status);
   }
   if (actual != sizeof(BootloaderPanelType)) {
-    zxlogf(ERROR, "Expected metadata size %zu, got %zu", sizeof(BootloaderPanelType), actual);
+    zxlogf(WARNING, "Expected metadata size %zu, got %zu", sizeof(BootloaderPanelType), actual);
     return zx::error(ZX_ERR_INTERNAL);
   }
+
+  display::PanelType panel_type = ToDisplayPanelType(bootloader_panel_type);
+  return zx::ok(panel_type);
+}
+
+zx::result<display::PanelType> Gt6853Device::GetDisplayPanelType() {
+  zx::result<display::PanelType> panel_type_result = [&]() -> zx::result<display::PanelType> {
+    // Prefers using panel config metadata panel type wherever it's available.
+    zx::result<display::PanelType> panel_type_from_panel_config_result =
+        GetDisplayPanelTypeFromPanelConfigMetadata();
+    if (panel_type_from_panel_config_result.is_ok()) {
+      return panel_type_from_panel_config_result;
+    }
+    zxlogf(WARNING,
+           "Panel type from panel config metadata is not available. "
+           "Fall back to bootloader metadata.");
+    return GetDisplayPanelTypeFromBootloaderMetadata();
+  }();
+
+  if (panel_type_result.is_error()) {
+    zxlogf(ERROR, "Failed to get panel type: %s", panel_type_result.status_string());
+    return panel_type_result;
+  }
+  return zx::ok(std::move(panel_type_result).value());
+}
+
+zx::result<fuchsia_mem::wire::Range> Gt6853Device::GetConfigFileVmo() {
+  zx::result<display::PanelType> panel_type_result = GetDisplayPanelType();
+
+  if (panel_type_result.is_error()) {
+    // The only case to let through is when metadata isn't provided, which
+    // could happen after netbooting. All other unexpected conditions are
+    // fatal, which should help them be discovered more easily.
+    if (panel_type_result.status_value() == ZX_ERR_NOT_FOUND) {
+      config_status_.Set("skipped, no metadata");
+      return zx::ok(fuchsia_mem::wire::Range{});
+    }
+    zxlogf(ERROR, "Failed to get panel type: %s", panel_type_result.status_string());
+    return panel_type_result.take_error();
+  }
+
+  display::PanelType panel_type = std::move(panel_type_result).value();
 
   // The panel can only be identified correctly by the bootloader for EVT boards
   // and beyond. This driver won't be used on boards earlier than EVT, so not
   // finding the panel ID is an error.
-  display::PanelType panel_type = ToDisplayPanelType(bootloader_panel_type);
   if (panel_type == display::PanelType::kUnknown) {
     zxlogf(ERROR, "Display panel type unknown");
     return zx::error(ZX_ERR_INTERNAL);
@@ -115,7 +165,8 @@ zx::result<fuchsia_mem::wire::Range> Gt6853Device::GetConfigFileVmo() {
   // There's a chance we can proceed without a config, but we should always have one on Nelson, so
   // error out if it can't be loaded.
   fuchsia_mem::wire::Range config = {};
-  status = load_firmware(parent(), config_path, config.vmo.reset_and_get_address(), &config.size);
+  zx_status_t status =
+      load_firmware(parent(), config_path, config.vmo.reset_and_get_address(), &config.size);
   if (status != ZX_OK) {
     zxlogf(ERROR, "Failed to load config binary: %d", status);
     return zx::error(status);
