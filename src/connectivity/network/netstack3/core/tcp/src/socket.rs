@@ -2069,6 +2069,14 @@ where
                 .resolve_addr_with_device(bound_device.clone())
                 .map_err(LocalAddressError::Zone)?;
 
+            // TCP sockets cannot bind to multicast addresses.
+            // TODO(https://fxbug.dev/424874749): Put this check in a witness type.
+            if addr.addr().is_multicast()
+                || I::map_ip_in(addr.addr(), |ip| ip.is_limited_broadcast(), |_| false)
+            {
+                return Err(LocalAddressError::CannotBindToAddress);
+            }
+
             core_ctx.with_devices_with_assigned_addr(addr.clone().into(), |mut assigned_to| {
                 if !assigned_to.any(|d| {
                     required_device
@@ -2333,7 +2341,6 @@ where
             },
         };
 
-        // TODO(https://fxbug.dev/42055442): Check if local_ip is a unicast address.
         let (core_ctx, bindings_ctx) = self.contexts();
         let result = core_ctx.with_socket_mut_transport_demux(id, |core_ctx, socket_state| {
             let TcpSocketState { socket_state, ip_options, socket_options: _ } = socket_state;
@@ -7458,6 +7465,28 @@ mod tests {
                 remote_addr: remote.map_zone(FakeWeakDeviceId),
                 device: None,
             }),
+        );
+    }
+
+    #[test_case(Ipv6::get_multicast_addr(1).into(), PhantomData::<Ipv6>)]
+    #[test_case(Ipv4::get_multicast_addr(1).into(), PhantomData::<Ipv4>)]
+    #[test_case(Ipv4::LIMITED_BROADCAST_ADDRESS, PhantomData::<Ipv4>)]
+    fn non_unicast_ip_bind<I>(local_ip: SpecifiedAddr<I::Addr>, _ip: PhantomData<I>)
+    where
+        I: TcpTestIpExt + Ip,
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
+    {
+        let mut ctx =
+            TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(local_ip, I::TEST_ADDRS.remote_ip));
+        let mut api = ctx.tcp_api::<I>();
+        let local = SocketAddr { ip: ZonedAddr::Unzoned(local_ip), port: PORT_1 };
+        let socket = api.create(Default::default());
+
+        assert_eq!(
+            api.bind(&socket, Some(local.ip), Some(local.port))
+                .expect_err("bind should fail for non-unicast address"),
+            BindError::LocalAddressError(LocalAddressError::CannotBindToAddress)
         );
     }
 

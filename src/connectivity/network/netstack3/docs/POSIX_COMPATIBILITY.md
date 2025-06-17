@@ -129,6 +129,16 @@ destination with a system-selected IPv6 source address. The second case will
 result in the packet being sent to the IPv4-mapped-IPv6 destination *as an IPv6
 address* with the bound IPv6 source address.
 
+### TCP bind to multicast/broadcast IP addresses
+
+On TCP sockets, Netstack3 returns EADDRNOTAVAIL if `bind` is called with a
+multicast or broadcast address as TCP is a unicast-only protocol. On Linux,
+this does not produce an error, though the resulting socket will not receive
+packets; this is because TCP implementations are
+[required][TCP RFC 9293: Source Address Validation] to drop all
+incoming multicast or broadcast SYN packets. Netstack3 opts to provide earlier
+notification to the user that the requested operation is invalid for TCP.
+
 [Fuchsia RFC-0184]: /docs/contribute/governance/rfcs/0184_posix_compatibility_for_the_system_netstack
 [`fuchsia.posix.socket`]: /sdk/fidl/fuchsia.posix.socket/socket.fidl
 [core and bindings]: ./CORE_BINDINGS.md#core-and-bindings
@@ -138,3 +148,4 @@ address* with the bound IPv6 source address.
 [`IP_MULTICAST_IF`]: https://man7.org/linux/man-pages/man7/ip.7.html
 [POSIX buffer sizes]: https://pubs.opengroup.org/onlinepubs/9699919799/functions/V2_chap02.html#tagtcjh_8
 [Linux buffer sizes]: https://man7.org/linux/man-pages/man7/socket.7.html
+[TCP RFC 9293: Source Address Validation]: https://datatracker.ietf.org/doc/html/rfc9293#section-3.9.2.3-2.2
