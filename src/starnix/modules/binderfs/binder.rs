@@ -4247,7 +4247,9 @@ impl BinderDriver {
                         || object.flags.contains(BinderObjectFlags::INHERIT_RT)
                     {
                         // Only supercede the policy from the object if this task's is higher.
-                        if scheduler_policy.map(|p| current_policy > p).unwrap_or(true) {
+                        if scheduler_policy
+                            .is_none_or(|p| p.kind().is_less_than_for_binder(current_policy.kind()))
+                        {
                             scheduler_policy = Some(current_policy);
                         }
                     }
@@ -4418,7 +4420,7 @@ impl BinderDriver {
                         let scheduler_policy = (|| {
                             if let Some(policy) = scheduler_policy {
                                 let old_policy = current_task.read().scheduler_policy;
-                                if old_policy < policy {
+                                if old_policy.kind().is_less_than_for_binder(policy.kind()) {
                                     match current_task.set_scheduler_policy(policy) {
                                         Ok(()) => return SchedulerGuard::from(old_policy),
                                         Err(e) => {

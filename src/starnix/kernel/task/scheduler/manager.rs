@@ -14,7 +14,6 @@ use starnix_uapi::{
     errno, error, sched_param, SCHED_BATCH, SCHED_DEADLINE, SCHED_FIFO, SCHED_IDLE, SCHED_NORMAL,
     SCHED_RESET_ON_FORK, SCHED_RR,
 };
-use std::cmp::Ordering;
 
 pub struct SchedulerManager {
     role_manager: Option<RoleManagerSynchronousProxy>,
@@ -125,7 +124,7 @@ impl SchedulerManager {
 // https://man7.org/linux/man-pages/man2/setpriority.2.html#NOTES
 const DEFAULT_TASK_PRIORITY: u8 = 20;
 
-#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SchedulerPolicy {
     kind: SchedulerPolicyKind,
     reset_on_fork: bool,
@@ -153,12 +152,6 @@ pub enum SchedulerPolicyKind {
         /// 0-99, from sched_setscheduler()
         priority: u8,
     },
-}
-
-impl PartialOrd for SchedulerPolicyKind {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        self.ordering().partial_cmp(&other.ordering())
-    }
 }
 
 impl std::default::Default for SchedulerPolicyKind {
@@ -326,17 +319,6 @@ impl SchedulerPolicyKind {
         matches!(self, Self::Fifo { .. } | Self::RoundRobin { .. })
     }
 
-    /// Returns a tuple allowing to compare 2 policies.
-    fn ordering(&self) -> (u8, u8) {
-        match self {
-            Self::RoundRobin { priority } | Self::Fifo { priority } => (3, *priority),
-            Self::Normal { priority } => (2, *priority),
-            Self::Batch { priority } => (1, *priority),
-            // see "the [...] nice value has no influence for [the SCHED_IDLE] policy" at sched(7).
-            Self::Idle { .. } => (0, 0),
-        }
-    }
-
     /// Returns a number 0-31 (inclusive) mapping Linux scheduler priority to a Zircon priority
     /// level for the fair scheduler.
     ///
@@ -369,6 +351,36 @@ impl SchedulerPolicyKind {
             // specifying an earlier deadline for the higher priority task. We can't specify
             // deadlines at runtime, so we'll treat their priorities all the same.
             Self::Fifo { .. } | Self::RoundRobin { .. } => REALTIME_ROLE_NAME,
+        }
+    }
+
+    // TODO: https://fxbug.dev/425726327 - better understand what are Binder's requirements when
+    // comparing one scheduling with another.
+    pub fn is_less_than_for_binder(&self, other: Self) -> bool {
+        match self {
+            Self::Fifo { priority } | Self::RoundRobin { priority } => match other {
+                Self::Fifo { priority: other_priority }
+                | Self::RoundRobin { priority: other_priority } => *priority < other_priority,
+                Self::Normal { .. } | Self::Batch { .. } | Self::Idle { .. } => false,
+            },
+            Self::Normal { priority } => match other {
+                Self::Fifo { .. } | Self::RoundRobin { .. } => true,
+                Self::Normal { priority: other_priority } => *priority < other_priority,
+                Self::Batch { .. } | Self::Idle { .. } => false,
+            },
+            Self::Batch { priority } => match other {
+                Self::Fifo { .. } | Self::RoundRobin { .. } | Self::Normal { .. } => true,
+                Self::Batch { priority: other_priority } => *priority < other_priority,
+                Self::Idle { .. } => false,
+            },
+            // see "the [...] nice value has no influence for [the SCHED_IDLE] policy" at sched(7).
+            Self::Idle { .. } => match other {
+                Self::Fifo { .. }
+                | Self::RoundRobin { .. }
+                | Self::Normal { .. }
+                | Self::Batch { .. } => true,
+                Self::Idle { .. } => false,
+            },
         }
     }
 }
@@ -538,5 +550,46 @@ mod tests {
         assert_matches!(SchedulerPolicy::from_binder(SCHED_BATCH as u8, 11), Ok(_));
         assert_matches!(SchedulerPolicy::from_binder(42, 0), Err(_));
         assert_matches!(SchedulerPolicy::from_binder(42, 0), Err(_));
+    }
+
+    // NOTE(https://fxbug.dev/425726327): some or all of this test may need to change based
+    // on what is learned in https://fxbug.dev/425726327.
+    #[fuchsia::test]
+    fn is_less_than_for_binder() {
+        let rr_50 = SchedulerPolicyKind::RoundRobin { priority: 50 };
+        let rr_40 = SchedulerPolicyKind::RoundRobin { priority: 40 };
+        let fifo_50 = SchedulerPolicyKind::Fifo { priority: 50 };
+        let fifo_40 = SchedulerPolicyKind::Fifo { priority: 40 };
+        let normal_40 = SchedulerPolicyKind::Normal { priority: 40 };
+        let normal_10 = SchedulerPolicyKind::Normal { priority: 10 };
+        let batch_40 = SchedulerPolicyKind::Batch { priority: 40 };
+        let batch_30 = SchedulerPolicyKind::Batch { priority: 30 };
+        let idle_40 = SchedulerPolicyKind::Idle { priority: 40 };
+        let idle_30 = SchedulerPolicyKind::Idle { priority: 30 };
+        assert!(!fifo_50.is_less_than_for_binder(fifo_50));
+        assert!(!rr_50.is_less_than_for_binder(rr_50));
+        assert!(!fifo_50.is_less_than_for_binder(rr_50));
+        assert!(!rr_50.is_less_than_for_binder(fifo_50));
+        assert!(!fifo_50.is_less_than_for_binder(rr_40));
+        assert!(rr_40.is_less_than_for_binder(fifo_50));
+        assert!(!rr_50.is_less_than_for_binder(fifo_40));
+        assert!(fifo_40.is_less_than_for_binder(rr_50));
+        assert!(!fifo_40.is_less_than_for_binder(normal_40));
+        assert!(normal_40.is_less_than_for_binder(fifo_40));
+        assert!(!rr_40.is_less_than_for_binder(normal_40));
+        assert!(normal_40.is_less_than_for_binder(rr_40));
+        assert!(!normal_40.is_less_than_for_binder(normal_40));
+        assert!(!normal_40.is_less_than_for_binder(normal_10));
+        assert!(normal_10.is_less_than_for_binder(normal_40));
+        assert!(!normal_10.is_less_than_for_binder(batch_40));
+        assert!(batch_40.is_less_than_for_binder(normal_10));
+        assert!(!batch_40.is_less_than_for_binder(batch_40));
+        assert!(!batch_40.is_less_than_for_binder(batch_30));
+        assert!(batch_30.is_less_than_for_binder(batch_40));
+        assert!(!batch_30.is_less_than_for_binder(idle_40));
+        assert!(idle_40.is_less_than_for_binder(batch_30));
+        assert!(!idle_40.is_less_than_for_binder(idle_40));
+        assert!(!idle_40.is_less_than_for_binder(idle_30));
+        assert!(!idle_30.is_less_than_for_binder(idle_40));
     }
 }
