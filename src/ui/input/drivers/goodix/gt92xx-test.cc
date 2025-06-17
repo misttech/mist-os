@@ -9,13 +9,14 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/hid/gt92xx.h>
-#include <lib/mock-i2c/mock-i2c.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 
 #include <ddk/metadata/buttons.h>
-#include <zxtest/zxtest.h>
+#include <gtest/gtest.h>
 
 #include "src/devices/gpio/testing/fake-gpio/fake-gpio.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace goodix {
 
@@ -52,7 +53,7 @@ class Gt92xxTestDevice : public Gt92xxDevice {
   thrd_t test_thread_;
 };
 
-class Gt92xxTest : public zxtest::Test {
+class Gt92xxTest : public ::testing::Test {
  public:
   void SetUp() override {
     ASSERT_OK(fidl_servers_loop_.StartThread("fidl-servers"));
@@ -72,12 +73,12 @@ class Gt92xxTest : public zxtest::Test {
     ASSERT_OK(device_->Init());
 
     std::vector reset_states = reset_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
-    ASSERT_GE(reset_states.size(), 2);
+    ASSERT_GE(reset_states.size(), 2u);
     ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, reset_states[0].sub_state);
     ASSERT_EQ(fake_gpio::WriteSubState{.value = 1}, reset_states[1].sub_state);
 
     std::vector intr_states = intr_gpio_.SyncCall(&fake_gpio::FakeGpio::GetStateLog);
-    ASSERT_GE(intr_states.size(), 2);
+    ASSERT_GE(intr_states.size(), 2u);
     ASSERT_EQ(fake_gpio::WriteSubState{.value = 0}, intr_states[0].sub_state);
     ASSERT_EQ(fake_gpio::ReadSubState{}, intr_states[1].sub_state);
   }
@@ -102,7 +103,7 @@ class Gt92xxTest : public zxtest::Test {
       fidl_servers_loop_.dispatcher(), std::in_place};
   async_patterns::TestDispatcherBound<fake_gpio::FakeGpio> intr_gpio_{
       fidl_servers_loop_.dispatcher(), std::in_place};
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   std::optional<Gt92xxTestDevice> device_;
   std::shared_ptr<MockDevice> fake_parent_;
 
@@ -110,11 +111,12 @@ class Gt92xxTest : public zxtest::Test {
 };
 
 TEST_F(Gt92xxTest, Init) {
+  fbl::Vector<uint8_t> conf_data = Gt92xxDevice::GetConfData();
   mock_i2c_
       .ExpectWrite({static_cast<uint8_t>(GT_REG_CONFIG_DATA >> 8),
                     static_cast<uint8_t>(GT_REG_CONFIG_DATA & 0xff)})
       .ExpectReadStop({0x00})
-      .ExpectWriteStop(Gt92xxDevice::GetConfData())
+      .ExpectWriteStop(std::vector<uint8_t>(conf_data.begin(), conf_data.end()))
       .ExpectWriteStop({static_cast<uint8_t>(GT_REG_TOUCH_STATUS >> 8),
                         static_cast<uint8_t>(GT_REG_TOUCH_STATUS & 0xff), 0x00})
       .ExpectWrite({static_cast<uint8_t>(GT_REG_CONFIG_DATA >> 8),
@@ -136,7 +138,7 @@ TEST_F(Gt92xxTest, InitForceConfig) {
       .ExpectWrite({static_cast<uint8_t>(GT_REG_CONFIG_DATA >> 8),
                     static_cast<uint8_t>(GT_REG_CONFIG_DATA & 0xff)})
       .ExpectReadStop({0x60})
-      .ExpectWriteStop(std::move(conf_data))
+      .ExpectWriteStop(std::vector<uint8_t>(conf_data.begin(), conf_data.end()))
       .ExpectWriteStop({static_cast<uint8_t>(GT_REG_TOUCH_STATUS >> 8),
                         static_cast<uint8_t>(GT_REG_TOUCH_STATUS & 0xff), 0x00})
       .ExpectWrite({static_cast<uint8_t>(GT_REG_CONFIG_DATA >> 8),
@@ -181,11 +183,11 @@ TEST_F(Gt92xxTest, TestGetDescriptor) {
             fuchsia_input_report::wire::TouchType::kTouchscreen);
 
   EXPECT_TRUE(descriptor.touch().input().has_max_contacts());
-  EXPECT_EQ(descriptor.touch().input().max_contacts(), 5);
+  EXPECT_EQ(descriptor.touch().input().max_contacts(), 5u);
 
   EXPECT_FALSE(descriptor.touch().input().has_buttons());
   EXPECT_TRUE(descriptor.touch().input().has_contacts());
-  EXPECT_EQ(descriptor.touch().input().contacts().count(), 5);
+  EXPECT_EQ(descriptor.touch().input().contacts().count(), 5u);
 
   for (const auto& c : descriptor.touch().input().contacts()) {
     EXPECT_TRUE(c.has_position_x());
@@ -228,7 +230,7 @@ TEST_F(Gt92xxTest, TestReport) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.count(), 1u);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -236,24 +238,24 @@ TEST_F(Gt92xxTest, TestReport) {
     auto& touch_report = report.touch();
 
     ASSERT_TRUE(touch_report.has_contacts());
-    ASSERT_EQ(touch_report.contacts().count(), 5);
-    EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
+    ASSERT_EQ(touch_report.contacts().count(), 5u);
+    EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0u);
     EXPECT_EQ(touch_report.contacts()[0].position_x(), 0x110);
     EXPECT_EQ(touch_report.contacts()[0].position_y(), 0x100);
 
-    EXPECT_EQ(touch_report.contacts()[1].contact_id(), 1);
+    EXPECT_EQ(touch_report.contacts()[1].contact_id(), 1u);
     EXPECT_EQ(touch_report.contacts()[1].position_x(), 0x220);
     EXPECT_EQ(touch_report.contacts()[1].position_y(), 0x200);
 
-    EXPECT_EQ(touch_report.contacts()[2].contact_id(), 2);
+    EXPECT_EQ(touch_report.contacts()[2].contact_id(), 2u);
     EXPECT_EQ(touch_report.contacts()[2].position_x(), 0x330);
     EXPECT_EQ(touch_report.contacts()[2].position_y(), 0x300);
 
-    EXPECT_EQ(touch_report.contacts()[3].contact_id(), 3);
+    EXPECT_EQ(touch_report.contacts()[3].contact_id(), 3u);
     EXPECT_EQ(touch_report.contacts()[3].position_x(), 0x440);
     EXPECT_EQ(touch_report.contacts()[3].position_y(), 0x400);
 
-    EXPECT_EQ(touch_report.contacts()[4].contact_id(), 4);
+    EXPECT_EQ(touch_report.contacts()[4].contact_id(), 4u);
     EXPECT_EQ(touch_report.contacts()[4].position_x(), 0x550);
     EXPECT_EQ(touch_report.contacts()[4].position_y(), 0x500);
 
@@ -288,7 +290,7 @@ TEST_F(Gt92xxTest, TestReportMoreContacts) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.count(), 1u);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -296,24 +298,24 @@ TEST_F(Gt92xxTest, TestReportMoreContacts) {
     auto& touch_report = report.touch();
 
     ASSERT_TRUE(touch_report.has_contacts());
-    ASSERT_EQ(touch_report.contacts().count(), 5);
-    EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
+    ASSERT_EQ(touch_report.contacts().count(), 5u);
+    EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0u);
     EXPECT_EQ(touch_report.contacts()[0].position_x(), 0x110);
     EXPECT_EQ(touch_report.contacts()[0].position_y(), 0x100);
 
-    EXPECT_EQ(touch_report.contacts()[1].contact_id(), 1);
+    EXPECT_EQ(touch_report.contacts()[1].contact_id(), 1u);
     EXPECT_EQ(touch_report.contacts()[1].position_x(), 0x220);
     EXPECT_EQ(touch_report.contacts()[1].position_y(), 0x200);
 
-    EXPECT_EQ(touch_report.contacts()[2].contact_id(), 2);
+    EXPECT_EQ(touch_report.contacts()[2].contact_id(), 2u);
     EXPECT_EQ(touch_report.contacts()[2].position_x(), 0x330);
     EXPECT_EQ(touch_report.contacts()[2].position_y(), 0x300);
 
-    EXPECT_EQ(touch_report.contacts()[3].contact_id(), 3);
+    EXPECT_EQ(touch_report.contacts()[3].contact_id(), 3u);
     EXPECT_EQ(touch_report.contacts()[3].position_x(), 0x440);
     EXPECT_EQ(touch_report.contacts()[3].position_y(), 0x400);
 
-    EXPECT_EQ(touch_report.contacts()[4].contact_id(), 4);
+    EXPECT_EQ(touch_report.contacts()[4].contact_id(), 4u);
     EXPECT_EQ(touch_report.contacts()[4].position_x(), 0x550);
     EXPECT_EQ(touch_report.contacts()[4].position_y(), 0x500);
 
@@ -348,7 +350,7 @@ TEST_F(Gt92xxTest, TestReportLessContacts) {
     ASSERT_TRUE(result->is_ok());
     auto& reports = result->value()->reports;
 
-    ASSERT_EQ(reports.count(), 1);
+    ASSERT_EQ(reports.count(), 1u);
     auto& report = reports[0];
 
     ASSERT_TRUE(report.has_event_time());
@@ -356,16 +358,16 @@ TEST_F(Gt92xxTest, TestReportLessContacts) {
     auto& touch_report = report.touch();
 
     ASSERT_TRUE(touch_report.has_contacts());
-    ASSERT_EQ(touch_report.contacts().count(), 3);
-    EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0);
+    ASSERT_EQ(touch_report.contacts().count(), 3u);
+    EXPECT_EQ(touch_report.contacts()[0].contact_id(), 0u);
     EXPECT_EQ(touch_report.contacts()[0].position_x(), 0x110);
     EXPECT_EQ(touch_report.contacts()[0].position_y(), 0x100);
 
-    EXPECT_EQ(touch_report.contacts()[1].contact_id(), 1);
+    EXPECT_EQ(touch_report.contacts()[1].contact_id(), 1u);
     EXPECT_EQ(touch_report.contacts()[1].position_x(), 0x220);
     EXPECT_EQ(touch_report.contacts()[1].position_y(), 0x200);
 
-    EXPECT_EQ(touch_report.contacts()[2].contact_id(), 2);
+    EXPECT_EQ(touch_report.contacts()[2].contact_id(), 2u);
     EXPECT_EQ(touch_report.contacts()[2].position_x(), 0x330);
     EXPECT_EQ(touch_report.contacts()[2].position_y(), 0x300);
 
