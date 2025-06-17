@@ -382,8 +382,6 @@ template("sdk_atom") {
     ]
   }
 
-  meta_target_name = "${target_name}_meta"
-
   # The generated file containing the metadata for the atom that will be
   # included in the final IDK as its `meta.json` at `meta.dest`.
   meta_file_for_idk = "$target_gen_dir/$target_name.meta.json"
@@ -435,7 +433,7 @@ template("sdk_atom") {
       output_conversion = "json"
       deps = gn_deps
     }
-    target_providing_meta_file_for_idk = [ ":$meta_generated_file_target" ]
+    target_providing_meta_file_for_idk = ":$meta_generated_file_target"
   } else {
     meta_copy_target_name = "${target_name}_meta_copy"
     assert(defined(meta.source), "Meta scope needs a source or value")
@@ -457,29 +455,11 @@ template("sdk_atom") {
       deps = gn_deps
     }
 
-    target_providing_meta_file_for_idk = [ ":$meta_copy_target_name" ]
-  }
-
-  # Verify that the metadata complies with the specified schema.
-  validate_json(meta_target_name) {
-    forward_variables_from(invoker, _default_forward_from_invoker)
-    data = meta_file_for_idk
-    schema = "//build/sdk/meta/${type}.json"
-    use_valico = true
-    sources = [
-      # This file is imported by all schemas.
-      "//build/sdk/meta/common.json",
-    ]
-
-    # Add any schema referenced by the main schema for the type.
-    if (type == "ffx_tool") {
-      sources += [ "//build/sdk/meta/host_tool.json" ]
-    }
-
-    public_deps = target_providing_meta_file_for_idk
+    target_providing_meta_file_for_idk = ":$meta_copy_target_name"
   }
 
   # Add the metadata file to the set of files to include in SDKs.
+  # Compliance with the schema will be validated when generating the IDK.
   file_args += [
     "--file",
     meta.dest,
@@ -548,7 +528,7 @@ template("sdk_atom") {
 
     binary_label = "//build/sdk:create_atom_manifest"
 
-    public_deps = gn_deps + [ ":$meta_target_name" ]
+    public_deps = gn_deps + [ target_providing_meta_file_for_idk ]
     if (_verify_api) {
       public_deps += [ ":$verify_api_target_name" ]
     }

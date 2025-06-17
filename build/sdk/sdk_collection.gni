@@ -85,8 +85,6 @@ template("sdk_collection") {
     idk_meta_manifest_json = "${target_name}_idk_meta_manifest_json"
     export_manifest = "${target_name}_export_manifest"
     verify_final_build_manifest = "${target_name}_verify_manifest"
-    verify_idk_meta_manifest_json =
-        "${target_name}_verify_idk_meta_manifest_json"
   }
 
   files = {
@@ -193,24 +191,9 @@ template("sdk_collection") {
     public_deps = [ ":${targets.local_build_manifest}" ]
   }
 
-  # Verifies that the collection manifest (which will later be symlinked at
-  # meta/manifest.json) file is valid.
-  validate_json(targets.verify_idk_meta_manifest_json) {
-    forward_variables_from(invoker, [ "testonly" ])
-
-    data = files.idk_meta_manifest_json
-
-    schema = "//build/sdk/meta/manifest.json"
-    sources = [
-      # This file is imported by all schemas.
-      "//build/sdk/meta/common.json",
-    ]
-
-    public_deps = [ ":${targets.idk_meta_manifest_json}" ]
-  }
-
   additional_export_files = [
     {
+      # Compliance with the schema will be validated when generating the IDK.
       source = files.idk_meta_manifest_json
       dest = files.collection_manifest_relative_path
       deps = [ ":${targets.idk_meta_manifest_json}" ]
@@ -331,10 +314,7 @@ template("sdk_collection") {
                              "visibility",
                            ])
 
-    deps = [
-      ":${targets.prebuild_manifest}",
-      ":${targets.verify_idk_meta_manifest_json}",
-    ]
+    deps = [ ":${targets.prebuild_manifest}" ]
 
     public_deps = [ ":${targets.export}" ]
 
