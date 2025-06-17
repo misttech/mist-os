@@ -550,6 +550,11 @@ fn on_address_removed_inner<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacCon
                 AddressRemovedReason::DadFailed => {
                     // Attempt to regenerate the address.
                 }
+                AddressRemovedReason::Forfeited => {
+                    // There's no Ongoing Address Conflict Detection algorithm
+                    // for IPv6 addresses.
+                    unreachable!("IPv6 addresses should not be forfeited");
+                }
             }
 
             let temp_valid_lifetime = match config.config.temporary_address_configuration {
@@ -608,6 +613,11 @@ fn on_address_removed_inner<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacCon
                 AddressRemovedReason::Manual => return,
                 AddressRemovedReason::DadFailed => {
                     // Attempt to regenerate the address.
+                }
+                AddressRemovedReason::Forfeited => {
+                    // There's no Ongoing Address Conflict Detection algorithm
+                    // for IPv6 addresses.
+                    unreachable!("IPv6 addresses should not be forfeited");
                 }
             }
 
@@ -2772,6 +2782,9 @@ mod tests {
                 return;
             }
             AddressRemovedReason::DadFailed => {}
+            AddressRemovedReason::Forfeited => {
+                unreachable!("forfeited IPv6 addresses are not tested");
+            }
         }
 
         // If the address was removed due to DAD failure, it should be regenerated with

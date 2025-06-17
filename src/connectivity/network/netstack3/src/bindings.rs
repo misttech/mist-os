@@ -705,7 +705,16 @@ impl<I: Ip> EventContext<IpDeviceEvent<DeviceId<BindingsCtx>, I, StackTime>> for
                 );
                 match reason {
                     AddressRemovedReason::Manual => (),
-                    AddressRemovedReason::DadFailed => self.notify_dad_failed(&device, addr.into()),
+                    AddressRemovedReason::DadFailed => self.notify_address_removed(
+                        &device,
+                        addr.into(),
+                        interfaces_admin::AddressStateProviderCancellationReason::DadFailed,
+                    ),
+                    AddressRemovedReason::Forfeited => self.notify_address_removed(
+                        &device,
+                        addr.into(),
+                        interfaces_admin::AddressStateProviderCancellationReason::Forfeited,
+                    ),
                 }
             }
             IpDeviceEvent::AddressStateChanged { device, addr, state } => {
@@ -857,10 +866,11 @@ impl BindingsCtx {
         })
     }
 
-    fn notify_dad_failed(
+    fn notify_address_removed(
         &mut self,
         device: &DeviceId<BindingsCtx>,
         address: SpecifiedAddr<IpAddr>,
+        reason: interfaces_admin::AddressStateProviderCancellationReason,
     ) {
         device.external_state().with_common_info_mut(|i| {
             if let Some(address_info) = i.addresses.get_mut(&address) {
@@ -868,7 +878,7 @@ impl BindingsCtx {
                     &mut address_info.address_state_provider;
                 if let Some(sender) = cancelation_sender.take() {
                     sender
-                        .send(interfaces_admin::AddressStateProviderCancellationReason::DadFailed)
+                        .send(reason)
                         .expect("assignment state receiver unexpectedly disconnected");
                 }
             }

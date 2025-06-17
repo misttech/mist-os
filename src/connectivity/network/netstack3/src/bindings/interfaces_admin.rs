@@ -1567,6 +1567,7 @@ pub(crate) enum AddressStateProviderCancellationReason {
     InvalidProperties,
     UserRemoved,
     DadFailed,
+    Forfeited,
     InterfaceRemoved,
 }
 
@@ -1578,6 +1579,9 @@ impl From<AddressStateProviderCancellationReason> for fnet_interfaces_admin::Add
             }
             AddressStateProviderCancellationReason::DadFailed => {
                 fnet_interfaces_admin::AddressRemovalReason::DadFailed
+            }
+            AddressStateProviderCancellationReason::Forfeited => {
+                fnet_interfaces_admin::AddressRemovalReason::Forfeited
             }
             AddressStateProviderCancellationReason::InterfaceRemoved => {
                 fnet_interfaces_admin::AddressRemovalReason::InterfaceRemoved
@@ -1911,6 +1915,7 @@ async fn address_state_provider_main_loop(
     (
         match cancelation_reason {
             Some(AddressStateProviderCancellationReason::DadFailed)
+            | Some(AddressStateProviderCancellationReason::Forfeited)
             | Some(AddressStateProviderCancellationReason::InterfaceRemoved) => {
                 AddressNeedsExplicitRemovalFromCore::No
             }
