@@ -1053,7 +1053,8 @@ class X86PageTableImpl : public X86PageTableBase {
    * Level must be top_level() when invoked.
    *
    * @param table The top-level paging structure's virtual address.
-   * @param enlarge Whether the caller can tolerate more being unmapped than was requested.
+   * @param unmap_options Enlarge if caller can tolerate more being unmapped than was requested.
+   * Harvest if the caller requested page queues to be updated with accessed information.
    * @param pt_check Whether there might be empty page tables in the range being unmapped that must
    *        be checked for.
    * @param cursor A cursor describing the range of address space to unmap within table.
@@ -1064,9 +1065,9 @@ class X86PageTableImpl : public X86PageTableBase {
    * must be updated by the caller.
    */
   ktl::pair<zx_status_t, uint> RemoveMapping(volatile pt_entry_t* table, PageTableLevel level,
-                                             ArchUnmapOptions enlarge, CheckForEmptyPt pt_check,
-                                             VirtualAddressCursor& cursor, ConsistencyManager* cm)
-      TA_REQ(lock_) {
+                                             ArchUnmapOptions unmap_options,
+                                             CheckForEmptyPt pt_check, VirtualAddressCursor& cursor,
+                                             ConsistencyManager* cm) TA_REQ(lock_) {
     DEBUG_ASSERT(table);
     DEBUG_ASSERT(static_cast<T*>(this)->check_vaddr(cursor.vaddr()));
     // Unified page tables should never be unmapping entries directly; rather, their constituent
@@ -1074,7 +1075,7 @@ class X86PageTableImpl : public X86PageTableBase {
     DEBUG_ASSERT(!IsUnified());
 
     if (level == PageTableLevel::PT_L) {
-      return {ZX_OK, RemoveMappingL0(table, cursor, cm)};
+      return {ZX_OK, RemoveMappingL0(table, unmap_options, cursor, cm)};
     }
 
     uint unmapped = 0;
@@ -1106,7 +1107,7 @@ class X86PageTableImpl : public X86PageTableBase {
         if (status != ZX_OK) {
           // If split fails, just unmap the whole thing, and let a
           // subsequent page fault clean it up.
-          if (!!(enlarge & ArchUnmapOptions::Enlarge)) {
+          if (!!(unmap_options & ArchUnmapOptions::Enlarge)) {
             UnmapEntry(cm, level, cursor.vaddr(), e, /*was_terminal=*/true);
             unmapped++;
 
@@ -1124,7 +1125,7 @@ class X86PageTableImpl : public X86PageTableBase {
       // Remember where we are unmapping from in case we need to do a second pass to remove a PT.
       const vaddr_t unmap_vaddr = cursor.vaddr();
       auto [status, lower_unmapped] =
-          RemoveMapping(next_table, lower_level(level), enlarge, pt_check, cursor, cm);
+          RemoveMapping(next_table, lower_level(level), unmap_options, pt_check, cursor, cm);
       // Regardless of success or failure we must update the mapping count. Since this involves
       // looking up the vm_page_t we take this opportunity to check if it's empty and needs
       // unmapping.
@@ -1172,8 +1173,8 @@ class X86PageTableImpl : public X86PageTableBase {
     return {ZX_OK, unmapped};
   }
   // Base case of RemoveMapping for smallest page size.
-  uint RemoveMappingL0(volatile pt_entry_t* table, VirtualAddressCursor& cursor,
-                       ConsistencyManager* cm) TA_REQ(lock_) {
+  uint RemoveMappingL0(volatile pt_entry_t* table, ArchUnmapOptions unmap_options,
+                       VirtualAddressCursor& cursor, ConsistencyManager* cm) TA_REQ(lock_) {
     DEBUG_ASSERT(IS_PAGE_ALIGNED(cursor.size()));
 
     uint index = vaddr_to_index(PageTableLevel::PT_L, cursor.vaddr());
@@ -1181,6 +1182,16 @@ class X86PageTableImpl : public X86PageTableBase {
     for (; index != NO_OF_PT_ENTRIES && cursor.size() != 0; ++index) {
       volatile pt_entry_t* e = table + index;
       if (IS_PAGE_PRESENT(*e)) {
+        if (!!(unmap_options & ArchUnmapOptions::Harvest)) {
+          // Harvest accessed bit & update page queues.
+          pt_entry_t pt_val = *e;
+          const paddr_t paddr = paddr_from_pte(PageTableLevel::PT_L, pt_val);
+          vm_page_t* page = paddr_to_vm_page(paddr);
+          if (likely(page)) {
+            pmm_page_queues()->MarkAccessed(page);
+          }
+        }
+
         UnmapEntry(cm, PageTableLevel::PT_L, cursor.vaddr(), e, /*was_terminal=*/true);
         unmapped++;
       }
