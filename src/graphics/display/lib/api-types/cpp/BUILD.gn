@@ -77,7 +77,7 @@ test_sources = [
   "driver-image-id-test.cc",
   "driver-layer-id-test.cc",
   "driver-layer-test.cc",
-  "engine-info.cc",
+  "engine-info-test.cc",
   "event-id-test.cc",
   "image-buffer-usage-test.cc",
   "image-id-test.cc",
