@@ -540,8 +540,13 @@ impl Credentials {
         // The setting of the SECBIT_KEEP_CAPS flag is ignored if the
         // SECBIT_NO_SETUID_FIXUP flag is set.  (The latter flag
         // provides a superset of the effect of the former flag.)
+        // SECBIT_NO_SETUID_FIXUP: Setting  this  flag  stops  the  kernel from adjusting
+        // the process's permitted, effective, and ambient capability sets when the thread's
+        // effective and filesystem UIDs are switched between zero and nonzero values.
+        if self.securebits.contains(SecureBits::NO_SETUID_FIXUP) {
+            return;
+        }
         if !self.securebits.contains(SecureBits::KEEP_CAPS)
-            && !self.securebits.contains(SecureBits::NO_SETUID_FIXUP)
             && (prev.uid == 0 || prev.euid == 0 || prev.saved_uid == 0)
             && (self.uid != 0 && self.euid != 0 && self.saved_uid != 0)
         {

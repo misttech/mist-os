@@ -356,6 +356,45 @@ TEST_F(CapsExecTest, ChangingFromRootUidDropsAllCapabilities) {
   });
 }
 
+TEST_F(CapsExecTest, ChangingFromRootUidWithKeepCapsDropsAllEffectiveCapabilities) {
+  test_helper::ForkHelper helper;
+
+  ASSERT_EQ(geteuid(), kRootUid);
+  helper.RunInForkedProcess([&]() {
+    SAFE_SYSCALL(prctl(PR_SET_SECUREBITS, SECBIT_KEEP_CAPS));
+    // With SECBIT_KEEP_CAPS, changing from a root euid to a non-root euid drops all effective
+    // capabilities.
+    SAFE_SYSCALL(setresuid(kUser1Uid, kUser1Uid, kUser1Uid));
+
+    for (int cap = 0; cap <= cap_last_cap_; cap++) {
+      EXPECT_TRUE(test_helper::HasCapabilityBounding(cap));
+      EXPECT_FALSE(test_helper::HasCapabilityAmbient(cap));
+      EXPECT_FALSE(test_helper::HasCapabilityEffective(cap));
+      EXPECT_TRUE(test_helper::HasCapabilityPermitted(cap));
+      EXPECT_FALSE(test_helper::HasCapabilityInheritable(cap));
+    }
+  });
+}
+
+TEST_F(CapsExecTest, ChangingFromRootUidWithNoFixupSetuidKeepsCapabilities) {
+  test_helper::ForkHelper helper;
+
+  ASSERT_EQ(geteuid(), kRootUid);
+  helper.RunInForkedProcess([&]() {
+    SAFE_SYSCALL(prctl(PR_SET_SECUREBITS, SECBIT_NO_SETUID_FIXUP));
+    // With SECBIT_NO_SETUID_FIXUP, capabilities don't change when changing uids.
+    SAFE_SYSCALL(setresuid(kUser1Uid, kUser1Uid, kUser1Uid));
+
+    for (int cap = 0; cap <= cap_last_cap_; cap++) {
+      EXPECT_TRUE(test_helper::HasCapabilityBounding(cap));
+      EXPECT_FALSE(test_helper::HasCapabilityAmbient(cap));
+      EXPECT_TRUE(test_helper::HasCapabilityEffective(cap));
+      EXPECT_TRUE(test_helper::HasCapabilityPermitted(cap));
+      EXPECT_FALSE(test_helper::HasCapabilityInheritable(cap));
+    }
+  });
+}
+
 TEST_F(CapsExecTest, RegularUserExecutingSUIDRootGetsAllCapabilities) {
   /*
      When a process with nonzero UIDs execves a set-user-ID root program
