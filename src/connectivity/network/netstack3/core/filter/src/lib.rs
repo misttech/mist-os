@@ -62,6 +62,7 @@ pub use state::{
 pub mod testutil {
     pub use crate::logic::testutil::NoopImpl;
     pub use crate::packets::testutil::new_filter_egress_ip_packet;
+    use net_types::ip::IpVersion;
     use packet::FragmentedByteSlice;
 
     use crate::{
@@ -98,7 +99,8 @@ pub mod testutil {
 
         fn on_ingress(
             &self,
-            _packet: &FragmentedByteSlice<'_, &[u8]>,
+            _ip_version: IpVersion,
+            _packet: FragmentedByteSlice<'_, &[u8]>,
             _device: &D,
             _cookie: SocketCookie,
             _marks: &Marks,

@@ -13,7 +13,25 @@ struct bpf_map_def ringbuf = {
     .map_flags = 0,
 };
 
-int egress_test_prog(struct __sk_buff* skb) {
+SECTION("maps")
+struct bpf_map_def target_cookie = {
+    .type = BPF_MAP_TYPE_ARRAY,
+    .key_size = 4,
+    .value_size = 8,
+    .max_entries = 1,
+    .map_flags = 0,
+};
+
+int skb_test_prog(struct __sk_buff* skb) {
+  // Check that the packet corresponds to the target socket. It is identified
+  // by the cookie stored in the `target_cookie` map.
+  int index = 0;
+  __u64* cookie = bpf_map_lookup_elem(&target_cookie, &index);
+  if (!cookie || *cookie != bpf_get_socket_cookie(skb)) {
+    return 1;
+  }
+
+  // Push a message to the ringbuf to indicate that the packet was received.
   int* entry = bpf_ringbuf_reserve(&ringbuf, 4, 0);
   if (!entry) {
     return 1;

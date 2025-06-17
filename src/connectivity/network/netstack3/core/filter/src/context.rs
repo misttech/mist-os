@@ -4,7 +4,7 @@
 
 use core::fmt::Debug;
 
-use net_types::ip::{Ipv4, Ipv6};
+use net_types::ip::{IpVersion, Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
 use netstack3_base::socket::SocketCookie;
 use netstack3_base::{
@@ -150,7 +150,8 @@ pub trait SocketOpsFilter<D: StrongDeviceIdentifier> {
     /// Called on every incoming packet handled by a local socket.
     fn on_ingress(
         &self,
-        packet: &FragmentedByteSlice<'_, &[u8]>,
+        ip_version: IpVersion,
+        packet: FragmentedByteSlice<'_, &[u8]>,
         device: &D,
         cookie: SocketCookie,
         marks: &Marks,

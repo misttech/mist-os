@@ -1500,7 +1500,8 @@ fn try_deliver<
             let mut slices = [ip_prefix, ip_options, udp_header, data];
             let data = FragmentedByteSlice::new(&mut slices);
             let filter_result = bindings_ctx.socket_ops_filter().on_ingress(
-                &data,
+                I::VERSION,
+                data,
                 device_id,
                 id.socket_cookie(),
                 state.get_options(core_ctx).marks(),

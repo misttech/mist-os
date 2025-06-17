@@ -6,7 +6,7 @@
 
 #![cfg(any(test, feature = "testutils"))]
 
-pub use netstack3_base::testutil::TestIpExt;
+pub use netstack3_base::testutil::{FakeDeviceId, TestIpExt};
 pub use netstack3_filter::testutil::new_filter_egress_ip_packet;
 
 use alloc::borrow::ToOwned;
