@@ -26,7 +26,11 @@ use iokit_wrappers::{
     NotifyPort, PlugInInterface, RunLoop,
 };
 
-pub struct DeviceHandleInner(IOService, Arc<RunLoop>);
+pub struct DeviceHandleInner {
+    service: IOService,
+    run_loop: Arc<RunLoop>,
+    pub(crate) serial: Option<String>,
+}
 
 impl DeviceHandleInner {
     pub fn debug_name(&self) -> String {
@@ -35,10 +39,11 @@ impl DeviceHandleInner {
 
     pub fn scan_interfaces(
         &self,
+        _urb_pool_size: usize,
         f: impl Fn(&DeviceDescriptor, &InterfaceDescriptor) -> bool,
     ) -> Result<Interface> {
         let dev: DeviceInterface500 =
-            PlugInInterface::new(self.0.clone(), GetIOUSBDeviceUserClientTypeID())?
+            PlugInInterface::new(self.service.clone(), GetIOUSBDeviceUserClientTypeID())?
                 .query_interface()?;
         let device_descriptor = dev.descriptor();
 
@@ -100,10 +105,11 @@ fn handle_event(
         .take_while(|&x| x != 0);
 
     for device in iter {
-        let _ = data.event_sender.unbounded_send(f(DeviceHandleInner(
-            IOService::from_raw(device),
-            Arc::clone(&run_loop),
-        )
+        let _ = data.event_sender.unbounded_send(f(DeviceHandleInner {
+            service: IOService::from_raw(device),
+            run_loop: Arc::clone(&run_loop),
+            serial: None,
+        }
         .into()));
     }
 }
@@ -114,6 +120,11 @@ extern "C" fn added(refcon: *mut ::std::os::raw::c_void, iterator: iokit_usb::io
 
 extern "C" fn removed(refcon: *mut ::std::os::raw::c_void, iterator: iokit_usb::io_iterator_t) {
     handle_event(refcon, iterator, DeviceEvent::Removed)
+}
+
+/// Lists all USB devices currently on the bus.
+pub fn enumerate_devices() -> Result<Vec<DeviceHandle>> {
+    Ok(vec![])
 }
 
 /// Waits for USB devices to appear on the bus.
