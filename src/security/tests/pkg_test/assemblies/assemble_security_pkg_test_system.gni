@@ -241,7 +241,6 @@ template("assemble_security_pkg_test_system") {
             volume = {
               fvm = {
                 data = {
-                  data_filesystem_format = "minfs"
                 }
                 blob = {
                 }

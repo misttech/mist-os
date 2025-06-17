@@ -17,6 +17,28 @@ package(default_visibility = [
 ])
 
 fuchsia_product_configuration(
+    name = "zedboot_with_fvm",
+    product_config_json = {
+        "platform": ZEDBOOT_PLATFORM_BASE | {
+            "storage": {
+                "filesystems": {
+                    "image_name": "zedboot",
+                    "image_mode": "no_image",
+                    "volume": {
+                        "fvm": {
+                            "data": {
+                            },
+                            "blob": {
+                            },
+                        },
+                    },
+                },
+            },
+        },
+    },
+)
+
+fuchsia_product_configuration(
     name = "zedboot",
     product_config_json = {
         "platform": ZEDBOOT_PLATFORM_BASE | {
@@ -51,6 +73,18 @@ fuchsia_product_configuration(
     board_config = "//boards:{}".format(board),
     platform_artifacts = ZEDBOOT_IMAGE_ARGS["platform_artifacts"],
     product_config = "//products/zedboot:zedboot",
+) for board in [
+    "x64",
+    "arm64",
+    "vim3",
+    "riscv64",
+]]
+
+[fuchsia_product(
+    name = "{}_with_fvm".format(board),
+    board_config = "//boards:{}".format(board),
+    platform_artifacts = ZEDBOOT_IMAGE_ARGS["platform_artifacts"],
+    product_config = "//products/zedboot:zedboot_with_fvm",
 ) for board in [
     "x64",
     "arm64",

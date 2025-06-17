@@ -30,6 +30,18 @@ if (is_fuchsia) {
     platform = {
       build_type = "eng"
       feature_set_level = "bootstrap"
+      storage = {
+        filesystems = {
+          volume = {
+            fvm = {
+              data = {
+              }
+              blob = {
+              }
+            }
+          }
+        }
+      }
     }
     product = {
     }

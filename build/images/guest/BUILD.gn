@@ -110,6 +110,12 @@ if (labels.images == "//build/images/bringup") {
     hardware_info = {
       name = "guest-board"
     }
+    filesystems = {
+      fvm = {
+        sparse_output = {
+        }
+      }
+    }
     input_bundles = [
       ":main_bundle",
       "//boards/emulation/virtio",
@@ -123,6 +129,19 @@ if (labels.images == "//build/images/bringup") {
     platform = {
       build_type = "eng"
       feature_set_level = "utility"
+      storage = {
+        filesystems = {
+          no_zxcrypt = true
+          volume = {
+            fvm = {
+              data = {
+              }
+              blob = {
+              }
+            }
+          }
+        }
+      }
     }
     base_packages = [
       {
@@ -141,7 +160,7 @@ if (labels.images == "//build/images/bringup") {
   # The guest image itself.
   assembled_system("guest") {
     testonly = true
-    generate_fxfs = true
+    generate_fvm = true
     namespace = "guest"
     image_name = "fuchsia"
     product_assembly_config_label = ":product_assembly_config"

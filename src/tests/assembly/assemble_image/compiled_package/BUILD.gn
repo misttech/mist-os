@@ -18,6 +18,14 @@ test_assembly_config("compiled_package") {
     storage = {
       filesystems = {
         image_name = "assemble_test"
+        volume = {
+          fvm = {
+            data = {
+            }
+            blob = {
+            }
+          }
+        }
       }
     }
   }

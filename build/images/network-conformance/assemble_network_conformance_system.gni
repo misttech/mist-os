@@ -35,6 +35,11 @@ template("assemble_network_conformance_system") {
       halt_on_panic = true
     }
     filesystems = {
+      fvm = {
+        slice_size = 1048576
+        sparse_output = {
+        }
+      }
     }
     if (target_cpu == "x64") {
       input_bundles = [
@@ -89,7 +94,6 @@ template("assemble_network_conformance_system") {
           volume = {
             fvm = {
               data = {
-                data_filesystem_format = "minfs"
               }
               blob = {
               }

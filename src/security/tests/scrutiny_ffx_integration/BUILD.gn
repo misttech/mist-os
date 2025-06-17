@@ -55,7 +55,6 @@ if (is_fuchsia) {
           volume = {
             fvm = {
               data = {
-                data_filesystem_format = "minfs"
               }
               blob = {
               }
@@ -78,7 +77,6 @@ if (is_fuchsia) {
           volume = {
             fvm = {
               data = {
-                data_filesystem_format = "minfs"
               }
               blob = {
               }

@@ -28,6 +28,18 @@ fuchsia_product_configuration(
         "platform": {
             "build_type": BUILD_TYPES.ENG,
             "feature_set_level": "utility",
+            "storage": {
+                "filesystems": {
+                    "volume": {
+                        "fvm": {
+                            "data": {
+                            },
+                            "blob": {
+                            },
+                        },
+                    },
+                },
+            },
         },
     },
 )

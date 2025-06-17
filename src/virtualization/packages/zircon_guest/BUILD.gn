@@ -27,11 +27,11 @@ guest_package("zircon_guest") {
   cmdline = "console.use_virtio_console=true"
   cmdline += " console.shell=true"
 
-  disk_filename = "filesystem.fxfs"
-  fxfs = guest_image_dir + "/guest_gen/fxfs.blk"
+  disk_filename = "filesystem.fvm"
+  fvm = guest_image_dir + "/guest_gen/fvm.blk"
   resources = [
     {
-      path = rebase_path(fxfs)
+      path = rebase_path(fvm)
       dest = "${disk_filename}"
     },
   ]
