@@ -26,6 +26,8 @@ template("platform_artifacts") {
   assert(defined(invoker.version),
          "platform_artifacts(\"target_name\") must define `version`")
 
+  artifacts_name = "platform_${target_cpu}"
+
   files = {
     aib_list = "$target_out_dir/$target_name/aib_list.json"
     platform_artifacts = "$target_out_dir/$target_name/platform_artifacts"
@@ -72,6 +74,8 @@ template("platform_artifacts") {
     depfile = files.depfile
 
     args = [
+      "--name",
+      artifacts_name,
       "--aib-list",
       rebase_path(files.aib_list, root_build_dir),
       "--repo",
@@ -144,7 +148,7 @@ template("platform_artifacts") {
       package_barrier = []
       platform_artifacts = [
         {
-          name = "platform_${target_cpu}"
+          name = artifacts_name
           path = rebase_path(files.platform_artifacts, root_build_dir)
           label = get_label_info(target_name, "label_no_toolchain")
         },

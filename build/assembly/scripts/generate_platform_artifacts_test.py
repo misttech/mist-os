@@ -24,6 +24,8 @@ class VersionTest(unittest.TestCase):
 
             sys.argv = [
                 "",
+                "--name",
+                "platform_fake_arch",
                 "--aib-list",
                 aib_list_path,
                 "--outdir",
@@ -39,7 +41,7 @@ class VersionTest(unittest.TestCase):
 
             expected = {
                 "release_info": {
-                    "name": "fuchsia_platform_artifacts",
+                    "name": "platform_fake_arch",
                     "repository": "fake_repository",
                     "version": "fake_version_123",
                 },
@@ -66,6 +68,8 @@ class VersionTest(unittest.TestCase):
 
             sys.argv = [
                 "",
+                "--name",
+                "platform_fake_arch",
                 "--aib-list",
                 aib_list_path,
                 "--repo",
@@ -79,7 +83,7 @@ class VersionTest(unittest.TestCase):
 
             expected = {
                 "release_info": {
-                    "name": "fuchsia_platform_artifacts",
+                    "name": "platform_fake_arch",
                     "repository": "fake_repository",
                     "version": "unversioned",
                 },
