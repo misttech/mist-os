@@ -129,6 +129,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.archivist.test/InspectWriter.RecordLazyValues",
+        "strictness": "flexible",
+        "ordinal": "892694546424434787",
+        "direction": "two_way",
+        "request": "fuchsia.archivist.test/InspectWriterRecordLazyValuesRequest",
+        "response": "fuchsia.archivist.test/InspectWriter_RecordLazyValues_Response"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.archivist.test/InspectWriter.RecordString",
         "strictness": "flexible",
         "ordinal": "1827302771529707819",
@@ -168,6 +177,16 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.archivist.test/InspectWriterRecordLazyValuesRequest.key",
+        "ordinal": "1",
+        "type": "string"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.archivist.test/InspectWriterRecordLazyValuesRequest"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.archivist.test/InspectWriterRecordStringRequest.key",
         "ordinal": "1",
         "type": "string"
@@ -181,6 +200,17 @@
     {
         "kind": "struct",
         "name": "fuchsia.archivist.test/InspectWriterRecordStringRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.archivist.test/InspectWriter_RecordLazyValues_Response.client",
+        "ordinal": "1",
+        "type": "client_end:fuchsia.archivist.test/LazyInspectPuppet"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.archivist.test/InspectWriter_RecordLazyValues_Response",
+        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",
@@ -207,6 +237,15 @@
         "direction": "two_way",
         "request": "fuchsia.archivist.test/InspectWriterRecordIntRequest",
         "response": "fuchsia.archivist.test/InspectWriter_RecordInt_Response"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.archivist.test/LazyInspectPuppet.RecordLazyValues",
+        "strictness": "flexible",
+        "ordinal": "892694546424434787",
+        "direction": "two_way",
+        "request": "fuchsia.archivist.test/InspectWriterRecordLazyValuesRequest",
+        "response": "fuchsia.archivist.test/InspectWriter_RecordLazyValues_Response"
     },
     {
         "kind": "protocol/member",
@@ -380,15 +419,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.archivist.test/Puppet.RecordLazyValues",
-        "strictness": "flexible",
-        "ordinal": "3718092810098613629",
-        "direction": "two_way",
-        "request": "fuchsia.archivist.test/PuppetRecordLazyValuesRequest",
-        "response": "fuchsia.archivist.test/Puppet_RecordLazyValues_Response"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.archivist.test/Puppet.WaitForInterestChange",
         "strictness": "flexible",
         "ordinal": "3910764592838198598",
@@ -420,27 +450,6 @@
     {
         "kind": "table",
         "name": "fuchsia.archivist.test/PuppetDecl"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.archivist.test/PuppetRecordLazyValuesRequest.key",
-        "ordinal": "1",
-        "type": "string"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.archivist.test/PuppetRecordLazyValuesRequest"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.archivist.test/Puppet_RecordLazyValues_Response.client",
-        "ordinal": "1",
-        "type": "client_end:fuchsia.archivist.test/LazyInspectPuppet"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.archivist.test/Puppet_RecordLazyValues_Response",
-        "resourceness": "resource"
     },
     {
         "kind": "protocol/member",

@@ -5,6 +5,7 @@
 use crate::{test_topology, utils};
 use anyhow::Error;
 use diagnostics_assertions::{assert_data_tree, assert_json_diff, AnyProperty};
+use diagnostics_data::InspectError;
 use diagnostics_reader::ArchiveReader;
 use difference::assert_diff;
 use realm_proxy_client::RealmProxyClient;
@@ -141,7 +142,8 @@ async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
 
     writer.record_string("child", "value").await?;
 
-    let lazy = puppet.record_lazy_values("lazy-node-always-hangs").await?.into_proxy();
+    let lazy = writer.record_lazy_values("lazy-node-always-hangs").await?.into_proxy();
+    lazy.record_string("should not", "appear in hierarchy").await.unwrap();
     lazy.commit(&ftest::CommitOptions { hang: Some(true), ..Default::default() }).await?;
 
     writer.record_int("int", 3).await?;
@@ -150,11 +152,17 @@ async fn read_component_with_hanging_lazy_node() -> Result<(), Error> {
     let data = ArchiveReader::inspect()
         .with_archive(accessor)
         .with_batch_retrieval_timeout_seconds(10)
-        .add_selector("hanging_data:[name=tree-name]*")
+        .add_selector("hanging_data:[...]*")
         .snapshot()
         .await
         .expect("got inspect data");
 
+    assert_eq!(data.len(), 1);
+    assert_eq!(data[0].metadata.errors.as_ref().unwrap().len(), 1);
+    assert_eq!(
+        data[0].metadata.errors.as_ref().unwrap()[0],
+        InspectError { message: "Lazy value root could not be loaded: Timeout".to_string() }
+    );
     assert_json_diff!(data[0].payload.as_ref().unwrap(), root: {
         child: "value",
         int: 3i64,

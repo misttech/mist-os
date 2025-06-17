@@ -26,6 +26,7 @@ use container::PopulatedInspectDataContainer;
 
 /// Packet containing a node hierarchy and all the metadata needed to
 /// populate a diagnostics schema for that node hierarchy.
+#[derive(Debug)]
 pub struct NodeHierarchyData {
     // Name of the file that created this snapshot.
     name: Option<InspectHandleName>,
@@ -44,13 +45,28 @@ impl From<SnapshotData> for NodeHierarchyData {
     fn from(data: SnapshotData) -> NodeHierarchyData {
         match data.snapshot {
             Some(snapshot) => match convert_snapshot_to_node_hierarchy(snapshot) {
-                Ok(node_hierarchy) => NodeHierarchyData {
-                    name: data.name,
-                    timestamp: data.timestamp,
-                    errors: data.errors,
-                    hierarchy: Some(node_hierarchy),
-                    escrowed: data.escrowed,
-                },
+                Ok(node_hierarchy) => {
+                    let errors = data
+                        .errors
+                        .into_iter()
+                        .chain(node_hierarchy.error_iter().filter_map(|(key, mv)| {
+                            mv.map(|mv| schema::InspectError {
+                                message: format!(
+                                    "Lazy value {} could not be loaded: {:?}",
+                                    key.join("/"),
+                                    mv.reason
+                                ),
+                            })
+                        }))
+                        .collect();
+                    NodeHierarchyData {
+                        name: data.name,
+                        timestamp: data.timestamp,
+                        errors,
+                        hierarchy: Some(node_hierarchy),
+                        escrowed: data.escrowed,
+                    }
+                }
                 Err(e) => NodeHierarchyData {
                     name: data.name,
                     timestamp: data.timestamp,
