@@ -16,6 +16,30 @@ use assembly_release_info::{BoardReleaseInfo, ReleaseInfo};
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 
+/// The architecture of the hardware.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum Architecture {
+    /// x64.
+    X64,
+
+    /// arm64.
+    ARM64,
+
+    /// riscv64.
+    RISCV64,
+}
+
+impl std::fmt::Display for Architecture {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::X64 => write!(f, "x64"),
+            Self::ARM64 => write!(f, "arm64"),
+            Self::RISCV64 => write!(f, "riscv64"),
+        }
+    }
+}
+
 /// This struct provides information about the "board" that a product is being
 /// assembled to run on.
 #[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, WalkPaths)]
@@ -24,6 +48,10 @@ use serde::{Deserialize, Serialize};
 pub struct BoardInformation {
     /// The name of the board.
     pub name: String,
+
+    /// The architecture of the hardware.
+    /// TODO(https://fxbug.dev/425444807): Make this required.
+    pub arch: Option<Architecture>,
 
     /// Metadata about the board that's provided to the 'fuchsia.hwinfo.Board'
     /// protocol and to the Board Driver via the PlatformID and BoardInfo ZBI

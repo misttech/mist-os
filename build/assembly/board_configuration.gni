@@ -203,6 +203,7 @@ template("board_configuration") {
                              "tee_trusted_app_guids",
                            ])
     name = board_name
+    arch = target_cpu
 
     if (defined(invoker.hardware_info)) {
       hardware_info = invoker.hardware_info

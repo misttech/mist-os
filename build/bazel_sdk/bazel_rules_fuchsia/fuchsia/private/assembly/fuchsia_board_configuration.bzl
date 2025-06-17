@@ -36,6 +36,7 @@ def _fuchsia_board_configuration_impl(ctx):
 
     board_config["name"] = ctx.attr.board_name
     board_config["provided_features"] = ctx.attr.provided_features
+    board_config["arch"] = ctx.attr.arch
 
     kernel = json.decode(ctx.attr.kernel)
     check_type(kernel, "dict")
@@ -195,6 +196,11 @@ _fuchsia_board_configuration = rule(
             doc = "Name of this board.",
             mandatory = True,
         ),
+        "arch": attr.string(
+            doc = "Architecture of this board.",
+            values = ["x64", "arm64", "riscv64"],
+            mandatory = True,
+        ),
         "hardware_info": attr.string(
             doc = "Data provided via the 'fuchsia.hwinfo.Board' protocol.",
             default = "{}",
@@ -282,6 +288,11 @@ def fuchsia_board_configuration(
         kernel = json.encode_indent(kernel, indent = "    "),
         hardware_info = json.encode_indent(hardware_info, indent = "    "),
         filesystems_labels = filesystem_labels,
+        arch = select({
+            "@rules_fuchsia//fuchsia/constraints:cpu_x64": "x64",
+            "@rules_fuchsia//fuchsia/constraints:cpu_arm64": "arm64",
+            "@rules_fuchsia//fuchsia/constraints:cpu_riscv64": "riscv64",
+        }),
         **kwargs
     )
 
