@@ -168,25 +168,26 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
       fdf::MakeOffer2<fuchsia_hardware_sdio::DriverService>(arena, sdio_function_name_));
 
   if (sdio_parent_->parent()->config().enable_suspend()) {
-    if (zx::result<> result = ConfigurePowerManagement(); result.is_error()) {
-      return result.status_value();
-    }
+    if (zx::result<> result = ConfigurePowerManagement(); !result.is_error()) {
+      fuchsia_hardware_power::PowerTokenService::InstanceHandler handler({
+          .token_provider = power_token_provider_bindings_.CreateHandler(
+              this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
+      });
+      result = sdio_parent_->parent()
+                   ->driver_outgoing()
+                   ->AddService<fuchsia_hardware_power::PowerTokenService>(std::move(handler),
+                                                                           sdio_function_name_);
+      if (result.is_error()) {
+        FDF_LOGL(ERROR, logger(), "Failed to add power token service: %s", result.status_string());
+        return result.status_value();
+      }
 
-    fuchsia_hardware_power::PowerTokenService::InstanceHandler handler({
-        .token_provider = power_token_provider_bindings_.CreateHandler(
-            this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
-    });
-    zx::result result = sdio_parent_->parent()
-                            ->driver_outgoing()
-                            ->AddService<fuchsia_hardware_power::PowerTokenService>(
-                                std::move(handler), sdio_function_name_);
-    if (result.is_error()) {
-      FDF_LOGL(ERROR, logger(), "Failed to add power token service: %s", result.status_string());
-      return result.status_value();
+      offers.push_back(
+          fdf::MakeOffer2<fuchsia_hardware_power::PowerTokenService>(arena, sdio_function_name_));
+    } else {
+      FDF_LOGL(ERROR, logger(), "Power configuration failed, power management disabled: %s",
+               result.status_string());
     }
-
-    offers.push_back(
-        fdf::MakeOffer2<fuchsia_hardware_power::PowerTokenService>(arena, sdio_function_name_));
   }
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
