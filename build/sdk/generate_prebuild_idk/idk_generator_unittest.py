@@ -9,7 +9,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from generate_prebuild_idk import AtomInfo, IdkGenerator
+from idk_generator import AtomInfo, IdkGenerator
 
 
 class IdkGeneratorTest(unittest.TestCase):

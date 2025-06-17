@@ -3,7 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-"""Unit-test for generate_prebuild_idk.py"""
+"""Unit-test for generate_prebuild_idk"""
 
 import argparse
 import difflib
@@ -89,7 +89,7 @@ def compare_directories(
 
 
 def main() -> int:
-    _generate_idk_script = _SCRIPT_DIR / "generate_prebuild_idk.py"
+    _generate_idk_script = _SCRIPT_DIR / "idk_generator.py"
     _test_data_dir = _SCRIPT_DIR / "validation_data"
     _input_fuchsia_source_dir = _test_data_dir / "input_fuchsia_dir"
     _input_build_dir = _input_fuchsia_source_dir / "out/notdefault"

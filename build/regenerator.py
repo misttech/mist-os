@@ -34,7 +34,7 @@ import compute_content_hash
 import remote_services_utils
 import workspace_utils
 from fuchsia_idk import generate_repository
-from generate_prebuild_idk import generate_prebuild_idk
+from generate_prebuild_idk import IdkGenerator
 
 _DEFAULT_HOST_TAG = "linux-x64"
 
@@ -325,9 +325,7 @@ def main() -> int:
         ).open() as f:
             prebuild_manifest = json.load(f)
 
-        idk_generator = generate_prebuild_idk.IdkGenerator(
-            prebuild_manifest, build_dir, fuchsia_dir
-        )
+        idk_generator = IdkGenerator(prebuild_manifest, build_dir, fuchsia_dir)
 
         result = idk_generator.GenerateMetaFileContents()
         if result != 0:

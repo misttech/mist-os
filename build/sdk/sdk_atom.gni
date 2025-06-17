@@ -14,7 +14,7 @@ _types_supporting_unstable_atoms = [
   "cc_source_library",
   "fidl_library",
 
-  # LINT.ThenChange(//build/sdk/generate_idk/__init__.py:unstable_atom_types, //build/sdk/generate_prebuild_idk/generate_prebuild_idk.py)
+  # LINT.ThenChange(//build/sdk/generate_idk/__init__.py:unstable_atom_types, //build/sdk/generate_prebuild_idk/idk_generator.py)
 ]
 _types_not_requiring_compatibility = [
   "bind_library",

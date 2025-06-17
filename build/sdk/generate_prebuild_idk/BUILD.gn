@@ -7,8 +7,8 @@ import("//build/testing/python_build_time_tests.gni")
 group("tests") {
   testonly = true
 
-  # TODO(https://fxbug.dev/417997995): Add generate_prebuild_idk_unittest.py
-  # when making generate_prebuild_idk.py runnable from GN.
+  # TODO(https://fxbug.dev/417997995): Add idk_generator_unittest.py
+  # when making generate_prebuild_idk runnable from GN.
   deps = [ ":generate_prebuild_idk_integration_test" ]
 }
 
@@ -19,9 +19,9 @@ action("generate_prebuild_idk_integration_test") {
   script =
       "//build/sdk/generate_prebuild_idk/generate_prebuild_idk_validation.py"
   inputs = [
-    "generate_prebuild_idk.py",
+    "idk_generator.py",
 
-    # Accessed by generate_prebuild_idk.py.
+    # Accessed by idk_generator.py.
     "//build/sdk/generate_version_history/__init__.py",
     "//third_party/pyyaml/src/lib/yaml/__init__.py",
     "//third_party/pyyaml/src/lib/yaml/composer.py",
