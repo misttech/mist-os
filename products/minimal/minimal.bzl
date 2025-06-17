@@ -33,9 +33,6 @@ MINIMAL_PLATFORM_BASE = {
     "power": {
         "enable_non_hermetic_testing": True,
     },
-    "storage": {
-        "storage_host_enabled": True,
-    },
 }
 
 MINIMAL_PRODUCT_BASE = {

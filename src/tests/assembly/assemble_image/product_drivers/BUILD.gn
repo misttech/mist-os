@@ -12,14 +12,6 @@ test_assembly_config("product_drivers") {
     storage = {
       filesystems = {
         image_name = "assemble_test"
-        volume = {
-          fvm = {
-            data = {
-            }
-            blob = {
-            }
-          }
-        }
       }
     }
   }

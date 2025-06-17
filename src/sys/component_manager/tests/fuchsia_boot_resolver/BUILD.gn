@@ -52,14 +52,6 @@ if (current_toolchain == default_toolchain) {
         filesystems = {
           image_name = "test_zbi"
           image_mode = "no_image"
-          volume = {
-            fvm = {
-              data = {
-              }
-              blob = {
-              }
-            }
-          }
         }
       }
     }

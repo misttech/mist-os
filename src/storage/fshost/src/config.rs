@@ -5,7 +5,7 @@
 use crate::boot_args::BootArgs;
 
 #[cfg(test)]
-pub fn default_config() -> fshost_config::Config {
+pub fn default_test_config() -> fshost_config::Config {
     fshost_config::Config {
         blobfs: true,
         blobfs_initial_inodes: 0,

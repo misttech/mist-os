@@ -114,12 +114,6 @@ if (is_fuchsia) {
     testonly = true
     version = "fake_version"
     partitions_config = ":partitions"
-    filesystems = {
-      fvm = {
-        sparse_output = {
-        }
-      }
-    }
   }
 
   product_assembly_configuration("assembly_config") {
