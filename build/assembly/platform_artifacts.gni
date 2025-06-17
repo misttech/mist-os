@@ -144,6 +144,7 @@ template("platform_artifacts") {
       package_barrier = []
       platform_artifacts = [
         {
+          name = "platform_${target_cpu}"
           path = rebase_path(files.platform_artifacts, root_build_dir)
           label = get_label_info(target_name, "label_no_toolchain")
         },
