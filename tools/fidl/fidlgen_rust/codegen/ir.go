@@ -87,10 +87,11 @@ type EnumMember struct {
 
 type Union struct {
 	fidlgen.Union
-	Derives derives
-	ECI     EncodedCompoundIdentifier
-	Name    string
-	Members []UnionMember
+	Derives      derives
+	ECI          EncodedCompoundIdentifier
+	Name         string
+	Members      []UnionMember
+	Serializable fidlgen.Serializable
 }
 
 type UnionMember struct {
@@ -113,6 +114,7 @@ type Struct struct {
 	HasPadding                bool
 	// True if the struct should be encoded and decoded by memcpy.
 	UseFidlStructCopy bool
+	Serializable      fidlgen.Serializable
 }
 
 type StructMember struct {
@@ -124,10 +126,11 @@ type StructMember struct {
 
 type Table struct {
 	fidlgen.Table
-	Derives derives
-	ECI     EncodedCompoundIdentifier
-	Name    string
-	Members []TableMember
+	Derives      derives
+	ECI          EncodedCompoundIdentifier
+	Name         string
+	Members      []TableMember
+	Serializable fidlgen.Serializable
 }
 
 func (t *Table) ReversedMembers() []TableMember {
@@ -1593,6 +1596,7 @@ func (c *compiler) compileStruct(val fidlgen.Struct) Struct {
 			FlattenArrays:  true,
 			ResolveStruct:  c.resolveStruct,
 		}),
+		Serializable: val.GetSerializable(),
 	}
 
 	for _, v := range val.Members {
@@ -1608,9 +1612,10 @@ func (c *compiler) compileStruct(val fidlgen.Struct) Struct {
 
 func (c *compiler) compileUnion(val fidlgen.Union) Union {
 	r := Union{
-		Union: val,
-		ECI:   val.Name,
-		Name:  c.compileDeclIdentifier(val.Name),
+		Union:        val,
+		ECI:          val.Name,
+		Name:         c.compileDeclIdentifier(val.Name),
+		Serializable: val.GetSerializable(),
 	}
 	for _, v := range val.Members {
 		r.Members = append(r.Members, UnionMember{
@@ -1625,9 +1630,10 @@ func (c *compiler) compileUnion(val fidlgen.Union) Union {
 
 func (c *compiler) compileTable(table fidlgen.Table) Table {
 	r := Table{
-		Table: table,
-		ECI:   table.Name,
-		Name:  c.compileDeclIdentifier(table.Name),
+		Table:        table,
+		ECI:          table.Name,
+		Name:         c.compileDeclIdentifier(table.Name),
+		Serializable: table.GetSerializable(),
 	}
 	for _, member := range table.Members {
 		r.Members = append(r.Members, TableMember{

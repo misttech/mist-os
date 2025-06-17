@@ -24,6 +24,9 @@ pub use endpoints::MethodType;
 mod persistence;
 pub use persistence::*;
 
+mod serializable;
+pub use serializable::*;
+
 mod error;
 pub use self::error::{Error, Result, TransportError};
 

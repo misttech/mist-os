@@ -35,6 +35,7 @@ fidl_rust_sources = [
   "src/marker.rs",
   "src/persistence.rs",
   "src/prelude.rs",
+  "src/serializable.rs",
   "src/server.rs",
   "src/time.rs",
 ]

@@ -14,6 +14,9 @@ use zx_status;
 pub struct SerializableStruct;
 
 impl fidl::Persistable for SerializableStruct {}
+impl fidl::Serializable for SerializableStruct {
+    const SERIALIZABLE_NAME: &'static str = "test.serializable.SerializableStruct";
+}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SerializableTable {
@@ -22,6 +25,9 @@ pub struct SerializableTable {
 }
 
 impl fidl::Persistable for SerializableTable {}
+impl fidl::Serializable for SerializableTable {
+    const SERIALIZABLE_NAME: &'static str = "test.serializable.SerializableTable";
+}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum SerializableUnion {
@@ -38,6 +44,9 @@ impl SerializableUnion {
 }
 
 impl fidl::Persistable for SerializableUnion {}
+impl fidl::Serializable for SerializableUnion {
+    const SERIALIZABLE_NAME: &'static str = "test.serializable.SerializableUnion";
+}
 
 mod internal {
     use super::*;

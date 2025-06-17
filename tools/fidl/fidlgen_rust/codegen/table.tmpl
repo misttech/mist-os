@@ -22,6 +22,13 @@ pub struct {{ .Name }} {
 }
 
 impl fidl::{{ if .IsValueType }}Persistable{{ else }}Standalone<{{ ResourceDialect }}>{{ end }} for {{ .Name }} {}
+
+{{- if .Serializable.IsSerializable }}
+impl fidl::Serializable for {{ .Name }} {
+      const SERIALIZABLE_NAME: &'static str = "{{ .Serializable.Name }}";
+}
+{{- end }}
+
 {{- end }}
 {{- end }}
 
