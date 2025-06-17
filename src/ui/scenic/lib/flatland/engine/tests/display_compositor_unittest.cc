@@ -939,12 +939,10 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
   DisplayInfo display_info = {resolution, {kPixelFormat}};
 
   EXPECT_CALL(*mock_display_coordinator_, DiscardConfig(_)).Times(1).WillOnce(Return());
-  EXPECT_CALL(*mock_display_coordinator_,
-              CheckConfig(MatchRequestField(CheckConfig, discard, false), _))
+  EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_))
       .Times(2)
       .WillRepeatedly(
-          testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
-                              MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
+          testing::Invoke([&](MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
             completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk);
           }));
 
@@ -1211,11 +1209,9 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
   EXPECT_CALL(*mock_display_coordinator_, DiscardConfig(_)).Times(1);
   EXPECT_CALL(*mock_display_coordinator_, SetDisplayColorConversion(_, _)).Times(1);
 
-  EXPECT_CALL(*mock_display_coordinator_,
-              CheckConfig(MatchRequestField(CheckConfig, discard, false), _))
+  EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_))
       .Times(1)
-      .WillOnce(testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
-                                    MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
+      .WillOnce(testing::Invoke([&](MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
         completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk);
       }));
 
@@ -1412,11 +1408,9 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
 
   EXPECT_CALL(*mock_display_coordinator_, SetDisplayColorConversion(_, _)).Times(1);
 
-  EXPECT_CALL(*mock_display_coordinator_,
-              CheckConfig(MatchRequestField(CheckConfig, discard, false), _))
+  EXPECT_CALL(*mock_display_coordinator_, CheckConfig(_))
       .Times(1)
-      .WillOnce(testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
-                                    MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
+      .WillOnce(testing::Invoke([&](MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
         completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk);
       }));
 

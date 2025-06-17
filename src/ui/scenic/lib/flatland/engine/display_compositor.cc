@@ -720,7 +720,7 @@ bool DisplayCompositor::CheckConfig() {
   FX_DCHECK(display_coordinator_.is_valid());
 
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::CheckConfig");
-  const auto check_config_result = display_coordinator_.sync()->CheckConfig(false);
+  const auto check_config_result = display_coordinator_.sync()->CheckConfig();
   FX_DCHECK(check_config_result.ok())
       << "Failed to call FIDL CheckConfig method: " << check_config_result.status_string();
   return check_config_result->res == fuchsia_hardware_display_types::ConfigResult::kOk;

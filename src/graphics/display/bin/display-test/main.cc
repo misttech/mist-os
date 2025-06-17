@@ -280,7 +280,7 @@ bool update_display_layers(const fbl::Vector<std::unique_ptr<VirtualLayer>>& lay
 }
 
 zx_status_t apply_config(fuchsia_hardware_display::wire::ConfigStamp stamp) {
-  auto check_result = dc->CheckConfig(false);
+  auto check_result = dc->CheckConfig();
   if (!check_result.ok()) {
     printf("Failed to make check call: %s\n", check_result.FormatDescription().c_str());
     return check_result.error().status();

@@ -557,7 +557,7 @@ zx::result<> TestFidlClient::CheckConfig() {
   ZX_ASSERT(coordinator_fidl_client_.is_valid());
 
   const fidl::WireResult<fuchsia_hardware_display::Coordinator::CheckConfig> fidl_status =
-      coordinator_fidl_client_->CheckConfig(/*discard=*/false);
+      coordinator_fidl_client_->CheckConfig();
   if (!fidl_status.ok()) {
     fdf::error("CheckConfig() failed: {}", fidl_status.status_string());
     return zx::error(fidl_status.status());

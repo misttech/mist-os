@@ -259,7 +259,7 @@ impl Coordinator {
             }
         }
 
-        let result = proxy.check_config(false).await?;
+        let result = proxy.check_config().await?;
         if result != display_types::ConfigResult::Ok {
             return Err(ConfigError::invalid(result));
         }

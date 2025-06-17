@@ -354,7 +354,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       << "Failed to call FIDL SetLayerImage2: " << set_layer_image_result.status_string();
 
   // Apply the config.
-  const auto check_config_result = display_coordinator->sync()->CheckConfig(false);
+  const auto check_config_result = display_coordinator->sync()->CheckConfig();
   EXPECT_TRUE(check_config_result.ok())
       << "Failed to call FIDL CheckConfig: " << check_config_result.status_string();
 
@@ -382,7 +382,7 @@ VK_TEST_F(DisplayTest, SetDisplayImageTest) {
       << "Failed to call FIDL SetLayerImage2: " << set_layer_image_result2.status_string();
 
   // Apply the config to display the second image.
-  const auto check_config_result2 = display_coordinator->sync()->CheckConfig(false);
+  const auto check_config_result2 = display_coordinator->sync()->CheckConfig();
   ASSERT_TRUE(check_config_result2.ok())
       << "Failed to call FIDL CheckConfig: " << check_config_result2.status_string();
   EXPECT_EQ(check_config_result2->res, fuchsia_hardware_display_types::ConfigResult::kOk);

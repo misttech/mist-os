@@ -704,13 +704,9 @@ void Client::SetLayerImageImpl(display::LayerId layer_id, display::ImageId image
   // One-way call. No reply required.
 }
 
-void Client::CheckConfig(CheckConfigRequestView request, CheckConfigCompleter::Sync& completer) {
+void Client::CheckConfig(CheckConfigCompleter::Sync& completer) {
   display::ConfigCheckResult config_check_result = CheckConfigImpl();
   draft_display_config_was_validated_ = config_check_result == display::ConfigCheckResult::kOk;
-
-  if (request->discard) {
-    DiscardConfig();
-  }
 
   completer.Reply(config_check_result.ToFidl());
 }

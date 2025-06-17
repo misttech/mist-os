@@ -103,14 +103,12 @@ void MockDisplayCoordinator::SetLayerPrimaryPosition(
   }
 }
 
-void MockDisplayCoordinator::CheckConfig(
-    fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest* request,
-    CheckConfigCompleter::Sync& completer) {
+void MockDisplayCoordinator::CheckConfig(CheckConfigCompleter::Sync& completer) {
   fuchsia_hardware_display_types::ConfigResult result =
       fuchsia_hardware_display_types::ConfigResult::kOk;
   ++check_config_count_;
   if (check_config_fn_) {
-    check_config_fn_(request->discard, &result);
+    check_config_fn_(&result);
   }
 
   completer.Reply(result);

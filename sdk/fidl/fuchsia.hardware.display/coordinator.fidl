@@ -421,13 +421,7 @@ closed protocol Coordinator {
     /// following operations do not require revalidation.
     /// * SetLayerImage2()
     ///
-    strict CheckConfig(struct {
-        /// If is true, the draft changes will be discarded after validation.
-        ///
-        /// TODO(https://fxbug.dev/395488933): Deprecated; always set this to
-        /// false. Call [`Coordinator.DiscardConfig`] instead.
-        discard bool;
-    }) -> (struct {
+    strict CheckConfig() -> (struct {
         res fuchsia.hardware.display.types.ConfigResult;
     });
 
