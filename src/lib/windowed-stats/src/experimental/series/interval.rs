@@ -6,10 +6,10 @@
 
 use itertools::Itertools;
 use num::Integer;
+use std::cmp;
 use std::fmt::{self, Debug, Display, Formatter};
 use std::marker::PhantomData;
 use std::num::NonZeroUsize;
-use std::{cmp, iter};
 
 use crate::experimental::clock::{Duration, DurationExt as _, Quanta, QuantaExt as _, Tick};
 use crate::experimental::series::buffer::Capacity;
@@ -22,10 +22,16 @@ use crate::experimental::Vec1;
 ///
 /// [`Tick`]: crate::experimental::clock::Tick;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub struct ElapsedInterval {
-    /// The number of fill (interpolated) samples required prior to computing the aggregation of
-    /// the interval.
-    fill_sample_count: Option<NonZeroUsize>,
+pub enum ElapsedInterval {
+    Vacant {
+        // When no samples have been observed, contiguous elapsed intervals can
+        // be represented by a count (rather than one or more instances of `ElapsedInterval`).
+        interval_count: NonZeroUsize,
+        fill_sample_count: NonZeroUsize,
+    },
+    Occupied {
+        fill_sample_count: Option<NonZeroUsize>,
+    },
 }
 
 impl ElapsedInterval {
@@ -38,17 +44,27 @@ impl ElapsedInterval {
         self,
         statistic: &mut F,
         interpolation: &mut P,
-    ) -> Result<Option<F::Aggregation>, F::Error>
+    ) -> Result<Option<(NonZeroUsize, F::Aggregation)>, F::Error>
     where
         F: Statistic,
         P: InterpolationState<F::Aggregation, FillSample = F::Sample>,
     {
-        let ElapsedInterval { fill_sample_count } = self;
+        let (interval_count, fill_sample_count) = match self {
+            ElapsedInterval::Vacant { interval_count, fill_sample_count } => {
+                (interval_count, Some(fill_sample_count))
+            }
+            ElapsedInterval::Occupied { fill_sample_count } => {
+                (NonZeroUsize::MIN, fill_sample_count)
+            }
+        };
 
         self::fill_non_zero_with(statistic, fill_sample_count, || interpolation.sample())?;
-        Ok(statistic.get_aggregation_and_reset().inspect(|aggregation| {
-            interpolation.fold_aggregation(aggregation.clone());
-        }))
+        Ok(statistic
+            .get_aggregation_and_reset()
+            .inspect(|aggregation| {
+                interpolation.fold_aggregation(aggregation.clone());
+            })
+            .map(|aggregation| (interval_count, aggregation)))
     }
 }
 
@@ -119,7 +135,7 @@ impl<T> IntervalExpiration<T> {
         self,
         statistic: &mut F,
         interpolation: &mut P,
-    ) -> Result<Option<F::Aggregation>, F::Error>
+    ) -> Result<Option<(NonZeroUsize, F::Aggregation)>, F::Error>
     where
         T: Clone,
         F: Statistic<Sample = T>,
@@ -141,7 +157,7 @@ impl<T> IntervalExpiration<PhantomData<T>> {
         self,
         statistic: &mut F,
         interpolation: &mut P,
-    ) -> Result<Option<F::Aggregation>, F::Error>
+    ) -> Result<Option<(NonZeroUsize, F::Aggregation)>, F::Error>
     where
         T: Clone,
         F: Statistic<Sample = T>,
@@ -282,18 +298,22 @@ impl SamplingInterval {
                 let resumed_interval_fill_sample_count =
                     Integer::div_ceil(&resumed_interval_remaining, &self.max_sampling_period)
                         - if start_has_sample { 1 } else { 0 };
-                IntervalExpiration::Elapsed(ElapsedInterval {
+                IntervalExpiration::Elapsed(ElapsedInterval::Occupied {
                     fill_sample_count: NonZeroUsize::new(
                         usize::try_from(resumed_interval_fill_sample_count).unwrap_or(0),
                     ),
                 })
             }),
-            iter::repeat(IntervalExpiration::Elapsed(ElapsedInterval {
-                fill_sample_count: NonZeroUsize::new(
-                    usize::try_from(self.sampling_period_count).unwrap_or(usize::MAX)
-                ),
-            }))
-            .take(num_skipped_intervals),
+            (num_skipped_intervals > 0).then(|| IntervalExpiration::Elapsed(
+                ElapsedInterval::Vacant {
+                    // Safe to unwrap because we checked that `num_skipped_intervals > 0`
+                    interval_count: NonZeroUsize::new(num_skipped_intervals).unwrap(),
+                    fill_sample_count: NonZeroUsize::new(
+                        usize::try_from(self.sampling_period_count).unwrap_or(usize::MAX)
+                    )
+                    .unwrap_or(NonZeroUsize::MIN),
+                }
+            )),
             // The pending interval falls on the end timestamp and so includes the associated
             // sample.
             Some(IntervalExpiration::Pending(PendingInterval {
@@ -511,7 +531,7 @@ mod tests {
         let expirations: Vec<_> =
             sampling_interval.fold_and_get_expirations(tick, SAMPLE).collect();
         let expected = vec![
-            IntervalExpiration::Elapsed(ElapsedInterval {
+            IntervalExpiration::Elapsed(ElapsedInterval::Occupied {
                 fill_sample_count: NonZeroUsize::new(2),
             }),
             IntervalExpiration::Pending(PendingInterval {
@@ -527,11 +547,12 @@ mod tests {
         let expirations: Vec<_> =
             sampling_interval.fold_and_get_expirations(tick, SAMPLE).collect();
         let expected = vec![
-            IntervalExpiration::Elapsed(ElapsedInterval {
+            IntervalExpiration::Elapsed(ElapsedInterval::Occupied {
                 fill_sample_count: NonZeroUsize::new(5),
             }),
-            IntervalExpiration::Elapsed(ElapsedInterval {
-                fill_sample_count: NonZeroUsize::new(6),
+            IntervalExpiration::Elapsed(ElapsedInterval::Vacant {
+                interval_count: NonZeroUsize::new(1).unwrap(),
+                fill_sample_count: NonZeroUsize::new(6).unwrap(),
             }),
             IntervalExpiration::Pending(PendingInterval {
                 fill_sample_count: None,
@@ -555,7 +576,7 @@ mod tests {
         let expirations: Vec<_> =
             sampling_interval.fold_and_get_expirations(tick, PhantomData::<u64>).collect();
         let expected = vec![
-            IntervalExpiration::Elapsed(ElapsedInterval {
+            IntervalExpiration::Elapsed(ElapsedInterval::Occupied {
                 fill_sample_count: NonZeroUsize::new(1),
             }),
             IntervalExpiration::Pending(PendingInterval {
@@ -649,7 +670,7 @@ mod tests {
 
     #[test]
     fn elapsed_interval_interpolate_and_get_aggregation() {
-        let interval = ElapsedInterval { fill_sample_count: NonZeroUsize::new(6) };
+        let interval = ElapsedInterval::Occupied { fill_sample_count: NonZeroUsize::new(6) };
         let (mut statistic, calls) = MockStatistic::channel();
         let mut interpolation = MockInterpolationState::new();
         let result = interval.interpolate_and_get_aggregation(&mut statistic, &mut interpolation);

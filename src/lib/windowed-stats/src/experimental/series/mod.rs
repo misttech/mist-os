@@ -267,7 +267,7 @@ where
         &'i mut self,
         interpolation: &'i mut P,
         tick: Tick,
-    ) -> impl 'i + Iterator<Item = Result<F::Aggregation, F::Error>>
+    ) -> impl 'i + Iterator<Item = Result<(NonZeroUsize, F::Aggregation), F::Error>>
     where
         P: InterpolationState<F::Aggregation, FillSample = F::Sample>,
     {
@@ -293,7 +293,7 @@ where
         interpolation: &'i mut P,
         tick: Tick,
         sample: F::Sample,
-    ) -> impl 'i + Iterator<Item = Result<F::Aggregation, F::Error>>
+    ) -> impl 'i + Iterator<Item = Result<(NonZeroUsize, F::Aggregation), F::Error>>
     where
         P: InterpolationState<F::Aggregation, FillSample = F::Sample>,
     {
@@ -365,7 +365,12 @@ where
         for aggregation in
             self.series.interpolate_and_get_aggregations(&mut self.interpolation, tick)
         {
-            self.buffer.push(aggregation?);
+            let (count, aggregation) = aggregation?;
+            if count.get() == 1 {
+                self.buffer.push(aggregation);
+            } else {
+                self.buffer.fill(aggregation, count);
+            }
         }
         Ok(())
     }
@@ -382,7 +387,12 @@ where
         for aggregation in
             self.series.fold_and_get_aggregations(&mut self.interpolation, tick, sample)
         {
-            self.buffer.push(aggregation?);
+            let (count, aggregation) = aggregation?;
+            if count.get() == 1 {
+                self.buffer.push(aggregation);
+            } else {
+                self.buffer.fill(aggregation, count);
+            }
         }
         Ok(())
     }

@@ -42,7 +42,7 @@ impl DeltaSimple8bRleRingBuffer {
 
     /// Push |value| onto the ring buffer.
     /// |value| is expected to be equal or greater than the value that was
-    /// passed into the previous call `push` or `push_multiple`. If |value| is less than
+    /// passed into the previous call `push` or `fill`. If |value| is less than
     /// the previous value, return an `Err` and don't commit the value.
     pub fn push(&mut self, value: u64) -> Result<(), anyhow::Error> {
         let (base, last) = match (self.base.as_mut(), self.last.as_mut()) {
@@ -68,15 +68,15 @@ impl DeltaSimple8bRleRingBuffer {
 
     /// Push |count| counts of the new value onto the ring buffer.
     /// |value| is expected to be equal or greater than the value that was
-    /// passed into the previous call `push` or `push_multiple`. If |value| is less than
+    /// passed into the previous call `push` or `fill`. If |value| is less than
     /// the previous value, return an `Err` and don't commit the value.
-    pub fn push_multiple(&mut self, value: u64, count: NonZeroUsize) -> Result<(), anyhow::Error> {
+    pub fn fill(&mut self, value: u64, count: NonZeroUsize) -> Result<(), anyhow::Error> {
         self.push(value)?;
         if let Some(remaining_count) = NonZeroUsize::new(count.get() - 1) {
             // Diff is 0 because the value was already pushed once above, and
             // now we are pushing the same value again.
             const DIFF: u64 = 0;
-            let evicted_blocks = self.buffer.push_multiple(DIFF, remaining_count);
+            let evicted_blocks = self.buffer.fill(DIFF, remaining_count);
             for evicted_block in evicted_blocks {
                 self.base =
                     self.base.map(|base| base.saturating_add(evicted_block.saturating_sum()));
@@ -246,15 +246,13 @@ mod tests {
     }
 
     #[test]
-    fn test_push_multiple() {
+    fn test_fill() {
         let mut ring_buffer = DeltaSimple8bRleRingBuffer::with_min_samples(10);
         let mut counter = 4u64;
         ring_buffer.push(counter).expect("push should succeed");
         for _ in 0..8 {
             counter += 0x80; // 0x80 == 128 and takes 8 bits
-            ring_buffer
-                .push_multiple(counter, NonZeroUsize::new(2).unwrap())
-                .expect("push_multiple should succeed");
+            ring_buffer.fill(counter, NonZeroUsize::new(2).unwrap()).expect("fill should succeed");
         }
 
         let mut buffer = vec![];
@@ -271,9 +269,7 @@ mod tests {
         assert_eq!(&buffer[..], expected_bytes);
 
         counter += 1u64 << 32;
-        ring_buffer
-            .push_multiple(counter, NonZeroUsize::new(9).unwrap())
-            .expect("push should succeed");
+        ring_buffer.fill(counter, NonZeroUsize::new(9).unwrap()).expect("fill should succeed");
 
         let mut buffer = vec![];
         ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
@@ -292,11 +288,11 @@ mod tests {
     }
 
     #[test]
-    fn test_push_multiple_error_on_decreasing_value() {
+    fn test_fill_error_on_decreasing_value() {
         let mut ring_buffer = DeltaSimple8bRleRingBuffer::with_min_samples(10);
         ring_buffer.push(42).expect("push should succeed");
         ring_buffer
-            .push_multiple(41, NonZeroUsize::new(5).unwrap())
-            .expect_err("push_multiple should fail because of decreasing value");
+            .fill(41, NonZeroUsize::new(5).unwrap())
+            .expect_err("fill should fail because of decreasing value");
     }
 }
