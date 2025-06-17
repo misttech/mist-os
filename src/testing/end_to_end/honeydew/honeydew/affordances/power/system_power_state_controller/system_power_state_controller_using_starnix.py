@@ -97,6 +97,7 @@ class SystemPowerStateControllerUsingStarnix(
         ffx: interfaces.transports.FFX implementation.
         device_logger: FuchsiaDeviceLogger implementation.
         inspect: InspectCapableDevice implementation.
+        starnix_affordance: Starnix implementation.
 
     Raises:
         errors.NotSupportedError: If Fuchsia device does not support Starnix.
@@ -108,7 +109,7 @@ class SystemPowerStateControllerUsingStarnix(
         ffx: ffx_transport.FFX,
         device_logger: affordances_capable.FuchsiaDeviceLogger,
         inspect: affordances_capable.InspectCapableDevice,
-        starnix: starnix.Starnix,
+        starnix_affordance: starnix.Starnix,
     ) -> None:
         self._device_name: str = device_name
         self._ffx: ffx_transport.FFX = ffx
@@ -116,7 +117,7 @@ class SystemPowerStateControllerUsingStarnix(
             device_logger
         )
         self._insect: affordances_capable.InspectCapableDevice = inspect
-        self._starnix = starnix
+        self._starnix = starnix_affordance
 
     # List all the public methods
     def verify_supported(self) -> None:

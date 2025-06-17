@@ -467,7 +467,7 @@ class FuchsiaDeviceImpl(
             ffx=self.ffx,
             inspect=self,
             device_logger=self,
-            starnix=self.starnix,
+            starnix_affordance=self.starnix,
         )
 
     @properties.Affordance

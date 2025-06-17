@@ -77,6 +77,7 @@ class VirtualAudioUsingFuchsiaController(audio.VirtualAudio):
 
         Raises:
             VirtualAudioError: On failure
+            ValueError : Failed when input audio file is missing.
         """
 
         if not wav_file or not os.path.exists(wav_file):
@@ -117,9 +118,7 @@ class VirtualAudioUsingFuchsiaController(audio.VirtualAudio):
 
             if size.response.byte_count != len(audio_to_inject):
                 raise errors.VirtualAudioError(
-                    "Expected to have written %d bytes, found %d at audio injection index 0",
-                    size.response.byte_count,
-                    len(audio_to_inject),
+                    f"Expected to have written {size.response.byte_count} bytes, found {len(audio_to_inject)} at audio injection index 0"
                 )
 
             _LOGGER.info("Saying it!")
@@ -128,7 +127,7 @@ class VirtualAudioUsingFuchsiaController(audio.VirtualAudio):
                     await self._injection_client.start_input_injection(index=0)
                 ).err
             ) is not None:
-                raise errors.VirtualAudioError(f"Failed to start audio %s", err)
+                raise errors.VirtualAudioError(f"Failed to start audio {err}")
 
         asyncio.run(_inject())
         return types.AudioInputWaiter(self._injection_client)
@@ -149,7 +148,7 @@ class VirtualAudioUsingFuchsiaController(audio.VirtualAudio):
                 err := (await self._capture_client.start_output_capture()).err
             ) is not None:
                 raise errors.VirtualAudioError(
-                    f"Failed to start output capture audio %s", err
+                    f"Failed to start output capture audio {err}"
                 )
 
         asyncio.run(_capture())
