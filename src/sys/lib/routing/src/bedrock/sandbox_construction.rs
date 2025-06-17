@@ -266,17 +266,19 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
                 };
                 let availability = *use_.availability();
                 let target: WeakInstanceToken = component.as_weak().into();
+                let moniker = component.moniker();
                 let aggregate = (aggregate_router_fn)(
                     component.clone(),
                     vec![AggregateSource::Collection { collection_name: collection_name.clone() }],
                     CapabilitySource::AnonymizedAggregate(AnonymizedAggregateSource {
                         capability: AggregateCapability::Service(use_.source_name().clone()),
-                        moniker: component.moniker().clone(),
+                        moniker: moniker.clone(),
                         members: vec![AggregateMember::try_from(use_).unwrap()],
                         sources: Sources::new(cm_rust::CapabilityTypeName::Service),
                         instances: vec![],
                     }),
                 )
+                .with_availability(moniker.clone(), availability)
                 .with_default(
                     metadata_for_porcelain_type(CapabilityTypeName::Service),
                     availability,
