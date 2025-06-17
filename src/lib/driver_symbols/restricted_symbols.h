@@ -362,7 +362,6 @@ const std::set<std::string> kRestrictedLibcSymbols = {
     "daylight",
     "difftime",
     "dirname",
-    "div",
     "dl_clone_loader_service",
     "_dl_debug_addr",
     "dlinfo",
