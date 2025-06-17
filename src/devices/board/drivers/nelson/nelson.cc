@@ -139,10 +139,6 @@ int Nelson::Thread() {
     zxlogf(ERROR, "SecureMemInit failed: %d", status);
   }
 
-  if ((status = BacklightInit()) != ZX_OK) {
-    zxlogf(ERROR, "BacklightInit failed: %d", status);
-  }
-
   if ((status = PowerInit()) != ZX_OK) {
     zxlogf(ERROR, "PowerInit failed: %d", status);
   }

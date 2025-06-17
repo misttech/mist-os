@@ -36,6 +36,9 @@ class PostInit : public fdf::DriverBase {
   // Must be called after `IdentifyPanel()`.
   zx::result<> InitTouch();
 
+  // Must be called after `IdentifyPanel()`.
+  zx::result<> InitBacklight();
+
   zx::result<> SetBoardInfo();
   zx::result<> AddSelinaCompositeNode();
   zx::result<> EnableSelinaOsc();

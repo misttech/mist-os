@@ -4,9 +4,6 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <lib/ddk/binding.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
@@ -18,7 +15,7 @@
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <soc/aml-s905d3/s905d3-hw.h>
 
-#include "nelson.h"
+#include "post-init.h"
 #include "src/ui/backlight/drivers/ti-lp8556/ti-lp8556Metadata.h"
 
 namespace nelson {
@@ -40,7 +37,7 @@ static const std::vector<fpbus::BootMetadata> backlight_boot_metadata{
 
 constexpr double kMaxBrightnessInNits = 250.0;
 
-zx_status_t Nelson::BacklightInit() {
+zx::result<> PostInit::InitBacklight() {
   TiLp8556Metadata device_metadata = {
       .allow_set_current_scale = false,
       .registers =
@@ -112,16 +109,16 @@ zx_status_t Nelson::BacklightInit() {
       fidl::ToWire(fidl_arena, backlight_dev), fidl::ToWire(fidl_arena, composite_node_spec));
 
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeNodeSpec Backlight(backlight_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
+    FDF_LOG(ERROR, "%s: AddCompositeNodeSpec Backlight(backlight_dev) request failed: %s", __func__,
+            result.FormatDescription().data());
+    return zx::error(result.status());
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeNodeSpec Backlight(backlight_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+    FDF_LOG(ERROR, "%s: AddCompositeNodeSpec Backlight(backlight_dev) failed: %s", __func__,
+            zx_status_get_string(result->error_value()));
+    return zx::error(result->error_value());
   }
-  return ZX_OK;
+  return zx::ok();
 }
 
 }  // namespace nelson
