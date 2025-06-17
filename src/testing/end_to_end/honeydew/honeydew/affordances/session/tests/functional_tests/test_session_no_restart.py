@@ -73,17 +73,26 @@ class SessionAffordanceNoRestartTests(fuchsia_base_test.FuchsiaBaseTest):
         """Test case for session.cleanup()."""
 
         self.device.session.ensure_started()
-        self.device.session.add_component(_TILE_URL)
 
-        before_cleanup = self._elements()
+        before_add = self._elements()
+        self.device.session.add_component(_TILE_URL)
+        after_add = self._elements()
+
+        added_elements = after_add - before_add
+        asserts.assert_equal(len(added_elements), 1)
+        added_element = list(added_elements)[0]
+
+        _LOGGER.info(f"added element: {added_element}")
 
         session = self.device.session
         session._cleanup()
 
         after_cleanup = self._elements()
 
-        # The cleanup should remove at least one component.
-        asserts.assert_greater(len(before_cleanup), len(after_cleanup))
+        _LOGGER.info(f"after cleanup: {after_cleanup}")
+
+        # The cleanup should remove the newly added component.
+        asserts.assert_false(added_element in after_cleanup)
 
 
 if __name__ == "__main__":
