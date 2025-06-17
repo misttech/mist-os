@@ -98,13 +98,6 @@ const std::vector kGpioInitProperties = {
 };
 }  // namespace
 
-static const std::vector<fpbus::BootMetadata> touch_boot_metadata{
-    {{
-        .zbi_type = DEVICE_METADATA_BOARD_PRIVATE,
-        .zbi_extra = 0,
-    }},
-};
-
 zx::result<> PostInit::InitTouch() {
   // The Goodix touch driver expects the interrupt line to be driven by the touch controller.
   if (auto result = SetPull(incoming(), "touch-interrupt", fuchsia_hardware_pin::Pull::kNone);
@@ -112,11 +105,20 @@ zx::result<> PostInit::InitTouch() {
     return result;
   }
 
+  const std::vector<fpbus::Metadata> display_panel_metadata{
+      {{
+          .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_TYPE),
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&panel_type_),
+              reinterpret_cast<const uint8_t*>(&panel_type_) + sizeof(display::PanelType)),
+      }},
+  };
+
   fpbus::Node touch_dev;
   touch_dev.name() = "gt6853-touch";
   touch_dev.vid() = PDEV_VID_GOODIX;
   touch_dev.did() = PDEV_DID_GOODIX_GT6853;
-  touch_dev.boot_metadata() = touch_boot_metadata;
+  touch_dev.metadata() = display_panel_metadata;
 
   auto parents = std::vector{
       fuchsia_driver_framework::ParentSpec2{{
