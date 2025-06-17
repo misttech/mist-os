@@ -66,20 +66,15 @@ fn extract_release_info_v2(pb: &ProductBundleV2) -> (String, Vec<UniqueReleaseIn
     };
 
     let mut add_flat_system_info = |info: SystemReleaseInfo, slot: Slot| {
-        info.platform.as_ref().map(|item| push_or_merge(from_release_info(item, &slot)));
+        push_or_merge(from_release_info(&info.platform, &slot));
 
-        info.product.map(|item| {
-            push_or_merge(from_release_info(&item.info, &slot));
-            for pib in item.pibs.iter() {
-                push_or_merge(from_release_info(pib, &slot));
-            }
-        });
-        info.board.map(|item| {
-            push_or_merge(from_release_info(&item.info, &slot));
-            for bib_set in item.bib_sets.iter() {
-                push_or_merge(from_release_info(bib_set, &slot));
-            }
-        });
+        let product = info.product;
+        push_or_merge(from_release_info(&product.info, &slot));
+        product.pibs.iter().for_each(|pib| push_or_merge(from_release_info(pib, &slot)));
+
+        let board = info.board;
+        push_or_merge(from_release_info(&board.info, &slot));
+        board.bib_sets.iter().for_each(|bib_set| push_or_merge(from_release_info(bib_set, &slot)));
     };
 
     // Push release information for the systems inside the PB.
@@ -127,12 +122,12 @@ mod tests {
                 version: "fake_version".to_string(),
                 sdk_version: "fake_version".to_string(),
                 system_a: Some(SystemReleaseInfo {
-                    platform: Some(ReleaseInfo {
+                    platform: ReleaseInfo {
                         name: "fake_platform".to_string(),
                         repository: "fake_repository_for_platform".to_string(),
                         version: "fake_version_for_platform".to_string(),
-                    }),
-                    product: Some(ProductReleaseInfo {
+                    },
+                    product: ProductReleaseInfo {
                         info: ReleaseInfo {
                             name: "fake_product".to_string(),
                             repository: "fake_repository_for_product".to_string(),
@@ -150,8 +145,8 @@ mod tests {
                                 version: "fake_version_for_product".to_string(),
                             },
                         ],
-                    }),
-                    board: Some(BoardReleaseInfo {
+                    },
+                    board: BoardReleaseInfo {
                         info: ReleaseInfo {
                             name: "fake_board".to_string(),
                             repository: "fake_repository_for_board".to_string(),
@@ -174,37 +169,37 @@ mod tests {
                                 version: "fake_version_for_board".to_string(),
                             },
                         ],
-                    }),
+                    },
                 }),
                 system_b: None,
                 system_r: Some(SystemReleaseInfo {
-                    platform: Some(ReleaseInfo {
+                    platform: ReleaseInfo {
                         name: "fake_platform".to_string(),
                         repository: "fake_repository_for_platform".to_string(),
                         version: "fake_version_for_platform".to_string(),
-                    }),
+                    },
                     // This is the same product as "fake_product" in Slot A (system_a) defined
                     // above. We expect both product entries to be combined into a single
                     // UniqueReleaseInfo entry in the result.
-                    product: Some(ProductReleaseInfo {
+                    product: ProductReleaseInfo {
                         info: ReleaseInfo {
                             name: "fake_product".to_string(),
                             repository: "fake_repository_for_product".to_string(),
                             version: "fake_version_for_product".to_string(),
                         },
                         pibs: vec![],
-                    }),
+                    },
                     // This is the same board as "fake_board" in Slot A (system_a) defined
                     // above. We expect both board entries to be combined into a single
                     // UniqueReleaseInfo entry in the result.
-                    board: Some(BoardReleaseInfo {
+                    board: BoardReleaseInfo {
                         info: ReleaseInfo {
                             name: "fake_board".to_string(),
                             repository: "fake_repository_for_board".to_string(),
                             version: "fake_version_for_board".to_string(),
                         },
                         bib_sets: vec![],
-                    }),
+                    },
                 }),
             }),
         }
@@ -215,49 +210,49 @@ mod tests {
             UniqueReleaseInfo {
                 name: "fake_platform".to_string(),
                 version: "fake_version_for_platform".to_string(),
-                repository: Some("fake_repository_for_platform".to_string()),
+                repository: "fake_repository_for_platform".to_string(),
                 slot: vec![Slot::A, Slot::R],
             },
             UniqueReleaseInfo {
                 name: "fake_product".to_string(),
                 version: "fake_version_for_product".to_string(),
-                repository: Some("fake_repository_for_product".to_string()),
+                repository: "fake_repository_for_product".to_string(),
                 slot: vec![Slot::A, Slot::R],
             },
             UniqueReleaseInfo {
                 name: "fake_example_pib_1".to_string(),
                 version: "fake_version_for_product".to_string(),
-                repository: Some("fake_repository_for_product".to_string()),
+                repository: "fake_repository_for_product".to_string(),
                 slot: vec![Slot::A],
             },
             UniqueReleaseInfo {
                 name: "fake_example_pib_2".to_string(),
                 version: "fake_version_for_product".to_string(),
-                repository: Some("fake_repository_for_product".to_string()),
+                repository: "fake_repository_for_product".to_string(),
                 slot: vec![Slot::A],
             },
             UniqueReleaseInfo {
                 name: "fake_board".to_string(),
                 version: "fake_version_for_board".to_string(),
-                repository: Some("fake_repository_for_board".to_string()),
+                repository: "fake_repository_for_board".to_string(),
                 slot: vec![Slot::A, Slot::R],
             },
             UniqueReleaseInfo {
                 name: "fake_example_bib_set_1".to_string(),
                 version: "fake_version_for_board".to_string(),
-                repository: Some("fake_repository_for_board".to_string()),
+                repository: "fake_repository_for_board".to_string(),
                 slot: vec![Slot::A],
             },
             UniqueReleaseInfo {
                 name: "fake_example_bib_set_2".to_string(),
                 version: "fake_version_for_board".to_string(),
-                repository: Some("fake_repository_for_board".to_string()),
+                repository: "fake_repository_for_board".to_string(),
                 slot: vec![Slot::A],
             },
             UniqueReleaseInfo {
                 name: "fake_example_bib_set_3".to_string(),
                 version: "fake_version_for_board".to_string(),
-                repository: Some("fake_repository_for_board".to_string()),
+                repository: "fake_repository_for_board".to_string(),
                 slot: vec![Slot::A],
             },
         ]

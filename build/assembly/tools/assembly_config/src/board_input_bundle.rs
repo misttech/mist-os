@@ -95,12 +95,11 @@ pub fn new(args: &BoardInputBundleArgs) -> Result<()> {
         packages,
         kernel_boot_args: kernel_boot_args.clone().into_iter().collect(),
         configuration,
-        release_version: None,
-        release_info: Some(ReleaseInfo {
+        release_info: ReleaseInfo {
             name: name.to_string(),
             repository: common::get_release_repository(repo, repo_file)?,
             version: common::get_release_version(version, version_file)?,
-        }),
+        },
     };
     bundle.write_to_dir(output, depfile.as_ref())?;
 

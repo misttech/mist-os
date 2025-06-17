@@ -63,7 +63,7 @@ pub struct AssembledSystem {
     pub partitions_config: Option<DirectoryPathBuf>,
 
     /// Release information for all input artifacts that contributed to this system.
-    pub system_release_info: Option<SystemReleaseInfo>,
+    pub system_release_info: SystemReleaseInfo,
 }
 
 impl AssembledSystem {
@@ -289,6 +289,7 @@ fn has_base_package(image_assembly_config: &ImageAssemblyConfig) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assembly_release_info::SystemReleaseInfo;
 
     #[test]
     fn relativize() {
@@ -311,7 +312,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
         let expected_manifest = AssembledSystem {
             images: vec![
@@ -329,7 +330,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
 
         let manifest = manifest.relativize(Utf8PathBuf::from("path/to")).unwrap();

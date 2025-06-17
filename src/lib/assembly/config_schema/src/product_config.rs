@@ -73,19 +73,8 @@ pub struct ProductConfig {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub bootfs_files_package: Option<Utf8PathBuf>,
 
-    /// Release version that this product config corresponds to.
-    /// TODO(https://fxbug.dev/416239346): Remove once all downstream
-    /// repositories start using release_info below.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_version: Option<String>,
-
     /// Release information about this assembly container artifact.
-    /// TODO(https://fxbug.dev/416239346): Make this a mandatory field
-    /// once these changes have rolled into all downstream repositories.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_info: Option<ProductReleaseInfo>,
+    pub release_info: ProductReleaseInfo,
 }
 
 /// Packages provided by the product, to add to the assembled images.
@@ -719,7 +708,7 @@ mod tests {
     fn product_tee_serialization() {
         let product_config = ProductConfig { tee: Tee::Undefined, ..Default::default() };
         let serialized = serde_json::to_value(product_config).unwrap();
-        let expected = serde_json::json!({});
+        let expected = serde_json::json!({"release_info": ProductReleaseInfo::new_for_testing()});
         assert_eq!(serialized, expected);
 
         let product_config = ProductConfig { tee: Tee::NoTee, ..Default::default() };
@@ -727,6 +716,7 @@ mod tests {
         let expected = serde_json::json!(
             {
                 "tee": "no_tee",
+                "release_info": ProductReleaseInfo::new_for_testing(),
             }
         );
         assert_eq!(serialized, expected);
@@ -743,6 +733,7 @@ mod tests {
                         "clients": []
                     }
                 },
+                "release_info": ProductReleaseInfo::new_for_testing(),
             }
         );
         assert_eq!(serialized, expected);
@@ -757,6 +748,7 @@ mod tests {
                         "tee_manager_url": "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm"
                     }
                 },
+                "release_info": ProductReleaseInfo::new_for_testing(),
             }
         );
         assert_eq!(serialized, expected);
@@ -772,6 +764,14 @@ mod tests {
 
         let json5 = r#"{
             tee: "no_tee",
+            release_info: {
+                info: {
+                    name: "",
+                    repository: "",
+                    version: ""
+                },
+                pibs: []
+            }
         }"#;
         let expected = ProductConfig { tee: Tee::NoTee, ..Default::default() };
         let mut cursor = std::io::Cursor::new(json5);
@@ -784,6 +784,14 @@ mod tests {
                     clients: [],
                 },
             },
+            release_info: {
+                info: {
+                    name: "",
+                    repository: "",
+                    version: ""
+                },
+                pibs: []
+            }
         }"#;
         let expected = ProductConfig {
             tee: Tee::GlobalPlatform(GlobalPlatformTee { clients: vec![] }),
@@ -799,6 +807,14 @@ mod tests {
                     tee_manager_url: "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm",
                 },
             },
+            release_info: {
+                info: {
+                    name: "",
+                    repository: "",
+                    version: ""
+                },
+                pibs: []
+            }
         }"#;
         let expected = ProductConfig { tee: Tee::Proprietary(ProprietaryTee { tee_manager_url: String::from("fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm") }), ..Default::default() };
         let mut cursor = std::io::Cursor::new(json5);

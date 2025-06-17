@@ -7,6 +7,7 @@
 use anyhow::{Context, Result};
 use argh::FromArgs;
 use assembled_system::{AssembledSystem, Image};
+use assembly_release_info::SystemReleaseInfo;
 use camino::Utf8PathBuf;
 use product_bundle::ProductBundle;
 
@@ -205,7 +206,7 @@ impl GenerateBuildArchive {
             images,
             board_name: product_bundle.partitions.hardware_revision.clone(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
         let images_manifest_path = self.out_dir.join("images.json");
         images_manifest.write_old(images_manifest_path).context("Writing images manifest")?;

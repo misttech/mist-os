@@ -1,3 +1,11 @@
 {
-    "name": "x64"
+    "name": "x64",
+    "release_info": {
+        "info": {
+            "name": "board_name",
+            "repository": "board_repository",
+            "version": "board_version"
+        },
+        "bib_sets": []
+    }
 }

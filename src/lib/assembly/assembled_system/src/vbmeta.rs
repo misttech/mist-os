@@ -103,6 +103,7 @@ mod tests {
     use crate::AssembledSystem;
 
     use assembly_images_config::VBMeta;
+    use assembly_release_info::SystemReleaseInfo;
     use camino::Utf8Path;
     use tempfile::tempdir;
     use utf8_path::path_relative_from_current_dir;
@@ -132,7 +133,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
         let vbmeta_path =
             construct_vbmeta(&mut assembled_system, dir, &vbmeta_config, zbi_path).unwrap();

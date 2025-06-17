@@ -466,6 +466,8 @@ impl UpdatePackageBuilder {
 mod tests {
     use super::*;
     use assembly_partitions_config::{BootloaderPartition, Partition, Slot as PartitionSlot};
+    use assembly_release_info::SystemReleaseInfo;
+
     use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
     use assembly_util::write_json_file;
     use fuchsia_archive::Utf8Reader;
@@ -520,7 +522,7 @@ mod tests {
             images: vec![Image::ZBI { path: fake_zbi.to_path_buf(), signed: true }],
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         }));
 
         builder.set_repository(RepositoryUrl::parse_host("test.com".to_string()).unwrap());
@@ -667,7 +669,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         }));
 
         // Add a Recovery ZBI/VBMeta to the update.
@@ -684,7 +686,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         }));
 
         // Build and ensure the output is correct.
@@ -881,7 +883,7 @@ mod tests {
             ],
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         }));
 
         let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));

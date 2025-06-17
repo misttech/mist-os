@@ -190,6 +190,7 @@ mod tests {
     use assembly_constants::BootfsDestination;
     use assembly_file_relative_path::FileRelativePathBuf;
     use assembly_images_config::{PostProcessingScript, Zbi, ZbiCompression};
+    use assembly_release_info::SystemReleaseInfo;
     use assembly_tool::testing::FakeToolProvider;
     use assembly_tool::{ToolCommandLog, ToolProvider};
     use camino::{Utf8Path, Utf8PathBuf};
@@ -253,7 +254,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
         construct_zbi(
             zbi_tool,
@@ -283,7 +284,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
         construct_zbi(
             zbi_tool,
@@ -360,7 +361,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
         let signed_zbi_path =
             vendor_sign_zbi(signing_tool, &mut assembled_system, dir, &zbi, &zbi_path).unwrap();

@@ -6,7 +6,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Release information for a single assembly input.
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, JsonSchema, Serialize)]
+#[derive(Clone, Default, Debug, Deserialize, Eq, Hash, PartialEq, JsonSchema, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ReleaseInfo {
     /// Name of this input artifact.
@@ -19,8 +19,15 @@ pub struct ReleaseInfo {
     pub version: String,
 }
 
+impl ReleaseInfo {
+    /// Helper function for constructing a ReleaseInfo in tests.
+    pub fn new_for_testing() -> Self {
+        Self { name: "".into(), repository: "".into(), version: "".into() }
+    }
+}
+
 /// Release information for boards and their associated BIB sets.
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, JsonSchema, Serialize)]
+#[derive(Clone, Default, Debug, Deserialize, Eq, Hash, PartialEq, JsonSchema, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct BoardReleaseInfo {
     /// Board release information.
@@ -30,8 +37,15 @@ pub struct BoardReleaseInfo {
     pub bib_sets: Vec<ReleaseInfo>,
 }
 
+impl BoardReleaseInfo {
+    /// Helper function for constructing a BoardReleaseInfo in tests.
+    pub fn new_for_testing() -> Self {
+        Self { info: ReleaseInfo::new_for_testing(), bib_sets: vec![] }
+    }
+}
+
 /// Release information for products and their associated product input bundles.
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, JsonSchema, Serialize)]
+#[derive(Clone, Default, Debug, Deserialize, Eq, Hash, PartialEq, JsonSchema, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProductReleaseInfo {
     /// Product release information.
@@ -41,22 +55,40 @@ pub struct ProductReleaseInfo {
     pub pibs: Vec<ReleaseInfo>,
 }
 
+impl ProductReleaseInfo {
+    /// Helper function for constructing a ProductReleaseInfo in tests.
+    pub fn new_for_testing() -> Self {
+        Self { info: ReleaseInfo::new_for_testing(), pibs: vec![] }
+    }
+}
+
 /// Release information for an assembly image.
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, JsonSchema, Serialize)]
+#[derive(Clone, Default, Debug, Deserialize, Eq, Hash, PartialEq, JsonSchema, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct SystemReleaseInfo {
     /// Platform release information.
-    pub platform: Option<ReleaseInfo>,
+    pub platform: ReleaseInfo,
 
     /// Product release information.
-    pub product: Option<ProductReleaseInfo>,
+    pub product: ProductReleaseInfo,
 
     /// Board release information.
-    pub board: Option<BoardReleaseInfo>,
+    pub board: BoardReleaseInfo,
+}
+
+impl SystemReleaseInfo {
+    /// Helper function for constructing a SystemReleaseInfo in tests.
+    pub fn new_for_testing() -> Self {
+        Self {
+            platform: ReleaseInfo::new_for_testing(),
+            product: ProductReleaseInfo::new_for_testing(),
+            board: BoardReleaseInfo::new_for_testing(),
+        }
+    }
 }
 
 /// Release information for all assembly artifacts that contributed to a product bundle.
-#[derive(Clone, Debug, Deserialize, Eq, Hash, PartialEq, JsonSchema, Serialize)]
+#[derive(Clone, Default, Debug, Deserialize, Eq, Hash, PartialEq, JsonSchema, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProductBundleReleaseInfo {
     /// Product Bundle name.

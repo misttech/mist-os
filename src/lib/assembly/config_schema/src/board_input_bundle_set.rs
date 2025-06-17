@@ -35,19 +35,8 @@ pub struct BoardInputBundleSet {
     #[walk_paths]
     pub board_input_bundles: BTreeMap<String, BoardInputBundleEntry>,
 
-    /// Release version that this board input bundle set corresponds to.
-    /// TODO(https://fxbug.dev/416239346): Remove once all downstream
-    /// repositories start using release_info below.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_version: Option<String>,
-
     /// Release information about this assembly container artifact.
-    /// TODO(https://fxbug.dev/416239346): Make this a mandatory field
-    /// once these changes have rolled into all downstream repositories.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_info: Option<ReleaseInfo>,
+    pub release_info: ReleaseInfo,
 }
 
 /// A single BIB in the BIB set.

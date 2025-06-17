@@ -118,6 +118,14 @@ template("test_assembly_config") {
       contents = {
         name = "test board"
         provided_features = []
+        release_info = {
+          info = {
+            name = "test board"
+            repository = "test repository"
+            version = "test version"
+          }
+          bib_sets = []
+        }
       }
     }
 

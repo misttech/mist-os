@@ -44,11 +44,11 @@ impl ProductAssembly {
             board_config.partitions_config.as_ref().map(|p| p.as_utf8_path_buf().clone()),
             image_mode,
             product_config.platform.feature_set_level,
-            Some(SystemReleaseInfo {
-                platform: Some(platform_artifacts.release_info.clone()),
+            SystemReleaseInfo {
+                platform: platform_artifacts.release_info.clone(),
                 product: product_config.product.release_info.clone(),
                 board: board_config.release_info.clone(),
-            }),
+            },
         );
 
         let kernel_aib = platform_artifacts.get_bundle("zircon");

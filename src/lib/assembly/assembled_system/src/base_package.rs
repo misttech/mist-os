@@ -76,6 +76,7 @@ pub fn construct_base_package(
 mod tests {
     use super::*;
 
+    use assembly_release_info::SystemReleaseInfo;
     use fuchsia_archive::Utf8Reader;
     use serde_json::json;
     use std::io::Write;
@@ -100,7 +101,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
         construct_base_package(&mut assembled_system, dir, "system_image", &product_config)
             .unwrap();
@@ -139,7 +140,7 @@ mod tests {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
         construct_base_package(&mut assembled_system, dir, "system_image", &product_config)
             .unwrap();

@@ -146,19 +146,8 @@ pub struct BoardInformation {
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tee_trusted_app_guids: Vec<uuid::Uuid>,
 
-    /// Release version that this board config corresponds to.
-    /// TODO(https://fxbug.dev/416239346): Remove once all downstream
-    /// repositories start using release_info below.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_version: Option<String>,
-
     /// Release information about this assembly container artifact.
-    /// TODO(https://fxbug.dev/416239346): Make this a mandatory field
-    /// once these changes have rolled into all downstream repositories.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_info: Option<BoardReleaseInfo>,
+    pub release_info: BoardReleaseInfo,
 }
 
 /// This struct defines board-provided data for the 'fuchsia.hwinfo.Board' fidl
@@ -231,19 +220,8 @@ pub struct BoardInputBundle {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub configuration: Option<BoardProvidedConfig>,
 
-    /// Release version that this board config corresponds to.
-    /// TODO(https://fxbug.dev/416239346): Remove once all downstream
-    /// repositories start using release_info below.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_version: Option<String>,
-
     /// Release information about this assembly container artifact.
-    /// TODO(https://fxbug.dev/416239346): Make this a mandatory field
-    /// once these changes have rolled into all downstream repositories.
-    #[serde(default)]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub release_info: Option<ReleaseInfo>,
+    pub release_info: ReleaseInfo,
 }
 
 /// This struct defines board-provided configuration for platform services and
@@ -462,6 +440,14 @@ mod test {
     fn test_basic_board_deserialize() {
         let json = serde_json::json!({
             "name": "sample board",
+            "release_info": {
+                "info": {
+                    "name": "",
+                    "repository": "",
+                    "version": "",
+                },
+                "bib_sets": [],
+            }
         });
 
         let parsed: BoardInformation = serde_json::from_value(json).unwrap();
@@ -472,7 +458,7 @@ mod test {
 
     #[test]
     fn test_board_default_serialization() {
-        let value: BoardInformation = serde_json::from_str("{\"name\": \"foo\"}").unwrap();
+        let value: BoardInformation = serde_json::from_str("{\"name\": \"foo\", \"release_info\": {\"info\": { \"name\": \"\", \"repository\": \"\", \"version\": \"\" }, \"bib_sets\": [] }}").unwrap();
         crate::common::tests::value_serialization_helper(value);
     }
 
@@ -526,6 +512,14 @@ mod test {
                     "enable_debug_access_port_for_soc": "amlogic-t931g",
                 }
             },
+            "release_info": {
+                "info": {
+                    "name": "",
+                    "repository": "",
+                    "version": "",
+                },
+                "bib_sets": [],
+            }
         });
         serde_json::to_writer(config_file, &json).unwrap();
         let resolved = BoardInformation::from_dir(&dir_path).unwrap();

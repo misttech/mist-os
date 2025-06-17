@@ -27,6 +27,7 @@ rustc_library("partitions_config") {
     "//third_party/rust_crates:url",
   ]
   test_deps = [
+    "//src/lib/assembly/release_info",
     "//third_party/rust_crates:pretty_assertions",
     "//third_party/rust_crates:tempfile",
   ]

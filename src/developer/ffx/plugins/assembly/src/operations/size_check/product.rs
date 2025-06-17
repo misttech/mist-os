@@ -195,6 +195,7 @@ fn create_gerrit_report(
 mod tests {
     use super::*;
     use assembled_system::{PackageMetadata, PackageSetMetadata, PackagesMetadata};
+    use assembly_release_info::SystemReleaseInfo;
     use serde_json::json;
 
     #[test]
@@ -216,7 +217,7 @@ mod tests {
             images: vec![Image::VBMeta("a/b/c".into()), Image::FVM("x/y/z".into())],
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
         assert_eq!(extract_blob_contents(&assembled_system), None);
         assembled_system

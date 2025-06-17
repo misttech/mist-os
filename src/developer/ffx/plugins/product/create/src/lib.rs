@@ -134,7 +134,7 @@ pub async fn pb_create_with_sdk_version(
 mod test {
     use super::*;
     use assembled_system::Image;
-    use assembly_release_info::ProductBundleReleaseInfo;
+    use assembly_release_info::{ProductBundleReleaseInfo, SystemReleaseInfo};
     use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
     use camino::{Utf8Path, Utf8PathBuf};
     use fuchsia_repo::test_utils;
@@ -229,7 +229,7 @@ mod test {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         }
         .write_to_dir(&system_dir, None::<Utf8PathBuf>)
         .unwrap();
@@ -278,9 +278,9 @@ mod test {
                     name: String::default(),
                     version: String::default(),
                     sdk_version: String::default(),
-                    system_a: None,
+                    system_a: Some(SystemReleaseInfo::new_for_testing()),
                     system_b: None,
-                    system_r: None
+                    system_r: Some(SystemReleaseInfo::new_for_testing()),
                 }),
             })
         );
@@ -304,7 +304,7 @@ mod test {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         };
         manifest.images = vec![
             Image::ZBI { path: tempdir.join("path1"), signed: false },
@@ -359,7 +359,7 @@ mod test {
             images: Default::default(),
             board_name: "my_board".into(),
             partitions_config: None,
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         }
         .write_to_dir(&system_dir, None::<Utf8PathBuf>)
         .unwrap();
@@ -420,9 +420,9 @@ mod test {
                     name: String::default(),
                     version: String::default(),
                     sdk_version: String::default(),
-                    system_a: None,
+                    system_a: Some(SystemReleaseInfo::new_for_testing()),
                     system_b: None,
-                    system_r: None
+                    system_r: Some(SystemReleaseInfo::new_for_testing()),
                 }),
             })
         );

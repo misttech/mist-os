@@ -109,6 +109,15 @@ def _fuchsia_board_configuration_impl(ctx):
     if repo:
         creation_args += ["--repo", repo]
 
+    release_info = {}
+    release_info["info"] = {
+        "name": ctx.attr.board_name,
+        "repository": "intermediate_repository",
+        "version": "intermediate_version",
+    }
+    release_info["bib_sets"] = []
+    board_config["release_info"] = release_info
+
     if ctx.attr.post_processing_script:
         script = ctx.attr.post_processing_script[FuchsiaPostProcessingScriptInfo]
 

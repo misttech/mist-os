@@ -56,23 +56,21 @@ pub fn new(args: &BoardArgs) -> Result<()> {
     let mut bib_sets_info: Vec<ReleaseInfo> = vec![];
     // Add all the BIBs from the BIB sets.
     for (set_name, set) in bib_sets {
-        if let Some(info) = set.release_info {
-            bib_sets_info.push(info.clone());
-        }
+        bib_sets_info.push(set.release_info.clone());
         for (bib_name, bib_entry) in set.board_input_bundles {
             let bib_ref = BibReference::FromBibSet { set: set_name.clone(), name: bib_name };
             config.input_bundles.insert(bib_ref.to_string(), bib_entry.path);
         }
     }
 
-    config.release_info = Some(BoardReleaseInfo {
+    config.release_info = BoardReleaseInfo {
         info: ReleaseInfo {
             name: config.name.clone(),
             repository: common::get_release_repository(&args.repo, &args.repo_file)?,
             version: common::get_release_version(&args.version, &args.version_file)?,
         },
         bib_sets: bib_sets_info,
-    });
+    };
 
     config.write_to_dir(&args.output, args.depfile.as_ref())?;
     Ok(())
@@ -173,6 +171,14 @@ mod tests {
         let config_path = Utf8PathBuf::from_path_buf(config_file.path().to_path_buf()).unwrap();
         let config_value = serde_json::json!({
             "name": "my_board",
+            "release_info": {
+                "info": {
+                    "name": "my_board",
+                    "repository": "my_repository",
+                    "version": "my_version",
+                },
+                "bib_sets": [],
+            }
         });
         serde_json::to_writer(&config_file, &config_value).unwrap();
 
@@ -197,8 +203,7 @@ mod tests {
                 BoardInputBundleEntry { path: DirectoryPathBuf::new(bib_path) },
             )]
             .into(),
-            release_version: None,
-            release_info: None,
+            release_info: ReleaseInfo::new_for_testing(),
         };
         bib_set.write_to_dir(&bib_set_path, None::<Utf8PathBuf>).unwrap();
 
@@ -235,6 +240,14 @@ mod tests {
         let config_path = Utf8PathBuf::from_path_buf(config_file.path().to_path_buf()).unwrap();
         let config_value = serde_json::json!({
             "name": "my_board",
+            "release_info": {
+                "info": {
+                    "name": "my_board",
+                    "repository": "my_repository",
+                    "version": "my_version",
+                },
+                "bib_sets": [],
+            }
         });
         serde_json::to_writer(&config_file, &config_value).unwrap();
 
@@ -256,8 +269,7 @@ mod tests {
                 BoardInputBundleEntry { path: DirectoryPathBuf::new(bib_path) },
             )]
             .into(),
-            release_version: None,
-            release_info: None,
+            release_info: ReleaseInfo::new_for_testing(),
         };
         bib_set.write_to_dir(&bib_set_path, None::<Utf8PathBuf>).unwrap();
 
@@ -288,7 +300,7 @@ mod tests {
         // Ensure the Board config has the correct version string.
         let board = BoardInformation::from_dir(board_path).unwrap();
         let expected = "unversioned".to_string();
-        assert_eq!(expected, board.release_info.unwrap().info.version);
+        assert_eq!(expected, board.release_info.info.version);
     }
 
     #[test]
@@ -306,7 +318,7 @@ mod tests {
         // Ensure the Board config has the correct version string.
         let board = BoardInformation::from_dir(board_path).unwrap();
         let expected = "fake_version".to_string();
-        assert_eq!(expected, board.release_info.unwrap().info.version);
+        assert_eq!(expected, board.release_info.info.version);
     }
 
     #[test]
@@ -324,7 +336,7 @@ mod tests {
         // Ensure the Board config has the correct version string.
         let board = BoardInformation::from_dir(board_path).unwrap();
         let expected = "fake_version".to_string();
-        assert_eq!(expected, board.release_info.unwrap().info.version);
+        assert_eq!(expected, board.release_info.info.version);
     }
 
     #[test]
@@ -337,7 +349,7 @@ mod tests {
         // Ensure the Board config has the correct repository string.
         let board = BoardInformation::from_dir(board_path).unwrap();
         let expected = "unknown".to_string();
-        assert_eq!(expected, board.release_info.unwrap().info.repository);
+        assert_eq!(expected, board.release_info.info.repository);
     }
 
     #[test]
@@ -355,7 +367,7 @@ mod tests {
         // Ensure the Board config has the correct repository string.
         let board = BoardInformation::from_dir(board_path).unwrap();
         let expected = "fake_repository".to_string();
-        assert_eq!(expected, board.release_info.unwrap().info.repository);
+        assert_eq!(expected, board.release_info.info.repository);
     }
 
     #[test]
@@ -373,7 +385,7 @@ mod tests {
         // Ensure the Board config has the correct repository string.
         let board = BoardInformation::from_dir(board_path).unwrap();
         let expected = "fake_repository".to_string();
-        assert_eq!(expected, board.release_info.unwrap().info.repository);
+        assert_eq!(expected, board.release_info.info.repository);
     }
 
     #[test]
@@ -394,8 +406,7 @@ mod tests {
         let board_path = tmp_path.join("my_board");
         let board = BoardInformation {
             name: "my_board".to_string(),
-            release_version: None,
-            release_info: None,
+            release_info: BoardReleaseInfo::new_for_testing(),
             hardware_info: Default::default(),
             provided_features: Default::default(),
             devicetree: Default::default(),
@@ -429,8 +440,7 @@ mod tests {
                 BoardInputBundleEntry { path: DirectoryPathBuf::new(new_bib_path) },
             )]
             .into(),
-            release_version: None,
-            release_info: None,
+            release_info: ReleaseInfo::new_for_testing(),
         };
         bib_set.write_to_dir(&bib_set_path, None::<Utf8PathBuf>).unwrap();
 

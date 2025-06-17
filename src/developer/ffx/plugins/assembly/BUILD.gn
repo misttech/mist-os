@@ -100,6 +100,7 @@ rustc_library("ffx_assembly") {
   ]
   test_deps = [
     "//src/lib/assembly/images_config",
+    "//src/lib/assembly/release_info",
     "//src/lib/utf8_path",
     "//src/storage/blobfs/tools:blobfs",
     "//src/sys/pkg/lib/far/rust:fuchsia-archive",

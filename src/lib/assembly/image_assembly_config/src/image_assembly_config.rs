@@ -83,10 +83,8 @@ pub struct ImageAssemblyConfig {
     pub image_mode: FilesystemImageMode,
 
     /// Release information about the assembly inputs contributing to this image.
-    /// TODO(https://fxbug.dev/416239346): Make this a mandatory field
-    /// once these changes have rolled into all downstream repositories.
     #[serde(default)]
-    pub system_release_info: Option<SystemReleaseInfo>,
+    pub system_release_info: SystemReleaseInfo,
 }
 
 impl ImageAssemblyConfig {
@@ -110,7 +108,7 @@ impl ImageAssemblyConfig {
             devicetree: Some("path/to/devicetree/binary".into()),
             devicetree_overlay: Some("path/to/devicetree/binary/overlay".into()),
             image_mode: Default::default(),
-            system_release_info: None,
+            system_release_info: SystemReleaseInfo::new_for_testing(),
         }
     }
 }

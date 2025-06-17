@@ -24,12 +24,11 @@ pub fn new(args: &BoardInputBundleSetArgs) -> Result<()> {
     let set = BoardInputBundleSet {
         name: name.clone(),
         board_input_bundles,
-        release_version: None,
-        release_info: Some(ReleaseInfo {
+        release_info: ReleaseInfo {
             name,
             version: common::get_release_version(&args.version, &args.version_file)?,
             repository: common::get_release_repository(&args.repo, &args.repo_file)?,
-        }),
+        },
     };
     set.write_to_dir(&args.output, args.depfile.as_ref())?;
     Ok(())
