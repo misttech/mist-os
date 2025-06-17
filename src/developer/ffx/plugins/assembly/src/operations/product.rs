@@ -89,13 +89,13 @@ Resulting product is not supported and may misbehave!
     //
     // Generate the output files.  All builder modifications must be complete by here.
 
-    // Strip the mutability of the builder.
-    let pa = pa;
-
     // Serialize the builder state for forensic use.
     let builder_forensics_file_path = outdir.join("assembly_builder_forensics.json");
     let board_forensics_file_path = outdir.join("board_configuration_forensics.json");
-    pa.write_forensics_files(builder_forensics_file_path, board_forensics_file_path)?;
+    pa.write_forensics_files(builder_forensics_file_path, board_forensics_file_path);
+
+    // Strip the mutability of the builder.
+    let pa = pa;
 
     // Do the actual building and validation of everything for the Image
     // Assembly config.

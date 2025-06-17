@@ -29,6 +29,8 @@ pub struct ProductAssembly {
     kernel_aib: Utf8PathBuf,
     boot_shim_aib: Utf8PathBuf,
     validate: bool,
+    builder_forensics_file_path: Option<Utf8PathBuf>,
+    board_forensics_file_path: Option<Utf8PathBuf>,
 }
 
 impl ProductAssembly {
@@ -68,6 +70,8 @@ impl ProductAssembly {
             kernel_aib,
             boot_shim_aib,
             validate: false,
+            builder_forensics_file_path: None,
+            board_forensics_file_path: None,
         })
     }
 
@@ -135,30 +139,12 @@ impl ProductAssembly {
     }
 
     pub fn write_forensics_files(
-        &self,
+        &mut self,
         builder_forensics_file_path: Utf8PathBuf,
         board_forensics_file_path: Utf8PathBuf,
-    ) -> Result<()> {
-        if let Some(parent_dir) = builder_forensics_file_path.parent() {
-            std::fs::create_dir_all(parent_dir)
-                .with_context(|| format!("unable to create outdir: {parent_dir}"))?;
-        }
-        let builder_forensics_file = std::fs::File::create(&builder_forensics_file_path)
-            .with_context(|| {
-                format!("Failed to create builder forensics files: {builder_forensics_file_path}")
-            })?;
-        serde_json::to_writer_pretty(builder_forensics_file, &self.builder).with_context(|| {
-            format!("Writing builder forensics file to: {builder_forensics_file_path}")
-        })?;
-
-        let board_forensics_file =
-            std::fs::File::create(&board_forensics_file_path).with_context(|| {
-                format!("Failed to create builder forensics files: {builder_forensics_file_path}")
-            })?;
-        serde_json::to_writer_pretty(board_forensics_file, &self.board_config).with_context(
-            || format!("Writing board forensics file to: {board_forensics_file_path}"),
-        )?;
-        Ok(())
+    ) {
+        self.builder_forensics_file_path = Some(builder_forensics_file_path);
+        self.board_forensics_file_path = Some(board_forensics_file_path);
     }
 
     pub fn build(
@@ -350,6 +336,31 @@ impl ProductAssembly {
                 .context("Constructing images config")?,
             )
             .context("Setting images configuration.")?;
+
+        if let Some(builder_forensics_file_path) = &self.builder_forensics_file_path {
+            if let Some(parent_dir) = builder_forensics_file_path.parent() {
+                std::fs::create_dir_all(parent_dir)
+                    .with_context(|| format!("unable to create outdir: {parent_dir}"))?;
+            }
+            let builder_forensics_file = std::fs::File::create(&builder_forensics_file_path)
+                .with_context(|| {
+                    format!(
+                        "Failed to create builder forensics files: {builder_forensics_file_path}"
+                    )
+                })?;
+            serde_json::to_writer_pretty(builder_forensics_file, &builder).with_context(|| {
+                format!("Writing builder forensics file to: {builder_forensics_file_path}")
+            })?;
+        }
+        if let Some(board_forensics_file_path) = &self.board_forensics_file_path {
+            let board_forensics_file = std::fs::File::create(&board_forensics_file_path)
+                .with_context(|| {
+                    format!("Failed to create builder forensics files: {board_forensics_file_path}")
+                })?;
+            serde_json::to_writer_pretty(board_forensics_file, &board_config).with_context(
+                || format!("Writing board forensics file to: {board_forensics_file_path}"),
+            )?;
+        }
 
         let (image_assembly_config, validation_error) =
             builder.build_and_validate(&outdir, tools, self.validate)?;
