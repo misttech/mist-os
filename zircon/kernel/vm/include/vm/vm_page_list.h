@@ -1177,7 +1177,97 @@ class VmPageList final {
   // Takes the content out of this page list and places them in the provided |splice| list, which
   // must have already been initialized but still be empty. The range to be taken is the range
   // specified by the |splice| list, and will be |Finalize|d before returning.
-  void TakePages(VmPageSpliceList* splice);
+  // May return ZX_ERR_OUT_OF_MEMORY, in which case an unspecified number of pages will have been
+  // moved into |splice|.
+  zx_status_t TakePages(VmPageSpliceList* splice);
+
+  // Moves the pages in the specified range in |this| onto the |other| with |offset| in this
+  // mapping to the offset of 0 in |other|.
+  //
+  // |other| is assumed to be empty and so there is no need to deal with the case where content
+  // exists in both |this| and |other|. Where partial nodes need to be moved allocations may need to
+  // be performed, and hence this can fail with ZX_ERR_NO_MEMORY. On failure any partial move is
+  // left as is and the caller must clean up.
+  //
+  // For any offset in |this| that is not empty then the given |on_migrate_fn| is called with a
+  // reference to |this| and has the signature of:
+  // void on_migrate_fn(VmPageOrMarkerRef slot, uint64_t offset);
+  template <typename F>
+  zx_status_t MoveRange(F on_migrate_fn, VmPageList& other, uint64_t offset, uint64_t end_offset) {
+    DEBUG_ASSERT(other.IsEmpty());
+    // The skewed |offset| in |this| must be equal to 0 skewed in |other|. This allows
+    // nodes to moved directly between the lists, without having to worry about allocations.
+    constexpr uint64_t kNodeSize = PAGE_SIZE * VmPageListNode::kPageFanOut;
+    DEBUG_ASSERT((list_skew_ + offset) % kNodeSize == other.list_skew_);
+
+    // Calculate skewed versions of start and end offset to simplify comparisons later.
+    const uint64_t skewed_offset = offset + list_skew_;
+    const uint64_t skewed_end_offset = end_offset + list_skew_;
+
+    // Calculate how much we need to shift nodes so that the node in |this| which contains
+    // |offset| gets mapped to offset 0 in |other|.
+    const uint64_t node_shift =
+        ROUNDDOWN(offset + list_skew_ - other.list_skew_, PAGE_SIZE * VmPageListNode::kPageFanOut);
+
+    // Iterate the range in this we are merging.
+    for (auto iter = list_.lower_bound(ROUNDDOWN(skewed_offset, kNodeSize));
+         iter && iter->offset() < skewed_end_offset;) {
+      const uint64_t target_node_offset = iter->offset() - node_shift;
+      ktl::unique_ptr<VmPageListNode> node;
+      if (iter->offset() < skewed_offset || iter->end_offset() > skewed_end_offset) {
+        fbl::AllocChecker ac;
+        node = ktl::unique_ptr<VmPageListNode>(new (&ac) VmPageListNode(target_node_offset));
+        if (!ac.check()) {
+          return ZX_ERR_NO_MEMORY;
+        }
+
+        bool src_empty = true;
+        bool target_empty = true;
+
+        iter->MergeOnto(
+            [&](VmPageOrMarker* src, VmPageOrMarker* dest, uint64_t off) {
+              DEBUG_ASSERT(!src->IsEmpty());
+              // Convert |off|, which is an offset in |node|, to an offset in |this| to check if
+              // this slot is one that should be moved or not.
+              uint64_t this_off = off + other.list_skew_ + node_shift;
+              if (this_off < skewed_offset || this_off >= skewed_end_offset) {
+                // Not moving this slot, and since it's non-empty then we know that the node will be
+                // non-empty when we are finished.
+                src_empty = false;
+              } else {
+                // Slot is in the desired range and so should be moved. This also tells us that the
+                // target will end up with at least 1 non-empty slot.
+                target_empty = false;
+                on_migrate_fn(VmPageOrMarkerRef(src), this_off);
+                *dest = ktl::move(*src);
+              }
+            },
+            *node, other.list_skew_);
+        auto old = iter++;
+        // If both the old source and new target are empty that would imply that src was originally
+        // empty, which would be an invalid state.
+        DEBUG_ASSERT(!(src_empty && target_empty));
+        if (src_empty) {
+          list_.erase(*old);
+        }
+        if (target_empty) {
+          continue;
+        }
+      } else {
+        node = list_.erase(iter++);
+        node->ForEveryPage<VmPageOrMarkerRef>(
+            [&on_migrate_fn](VmPageOrMarkerRef slot, uint64_t offset) {
+              on_migrate_fn(slot, offset);
+              return ZX_ERR_NEXT;
+            },
+            list_skew_);
+        // Change to the other lists skew.
+        node->set_offset(target_node_offset);
+      }
+      other.list_.insert(ktl::move(node));
+    }
+    return ZX_OK;
+  }
 
   uint64_t HeapAllocationBytes() const { return list_.size() * sizeof(VmPageListNode); }
 
@@ -1763,7 +1853,7 @@ class VmPageSpliceList final {
   bool IsInitialized() const { return state_ == State::Initialized; }
 
   // Returns true if this list is empty.
-  bool IsEmpty() const;
+  bool IsEmpty() const { return page_list_.IsEmpty(); }
 
   // Marks the list as finalized.
   // See the comment at `VmPageSpliceList`'s declaration for more info on what this means and when
@@ -1785,28 +1875,17 @@ class VmPageSpliceList final {
 
  private:
   void FreeAllPages();
-  uint64_t NodeOffset(uint64_t offset) const {
-    return VmPageListNode::NodeOffset(offset, list_skew_);
-  }
-
-  uint64_t NodeIndex(uint64_t offset) const {
-    return VmPageListNode::NodeIndex(offset, list_skew_);
-  }
 
   // Initialize the skew. Must be done after calling Initialize, but before adding any content. Only
   // necessary if directly moving list nodes where the skew has an impact.
   void InitializeSkew(uint64_t skew) {
     DEBUG_ASSERT(IsInitialized() && IsEmpty());
-    // Checking list_skew_ doesn't catch all instances of double-initialization, but
-    // it should catch some of them.
-    DEBUG_ASSERT(list_skew_ == 0);
-    list_skew_ = skew;
+    page_list_.InitializeSkew(skew, offset_);
   }
 
   uint64_t offset_ = 0;
   uint64_t length_ = 0;
   uint64_t pos_ = 0;
-  uint64_t list_skew_ = 0;
 
   // States used to represent the life cycle of the VmPageSpliceList, as per the comment at the
   // declaration.
@@ -1818,9 +1897,7 @@ class VmPageSpliceList final {
   };
   State state_ = State::Constructed;
 
-  VmPageListNode head_ = VmPageListNode(0);
-  fbl::WAVLTree<uint64_t, ktl::unique_ptr<VmPageListNode>> middle_;
-  VmPageListNode tail_ = VmPageListNode(0);
+  VmPageList page_list_;
 
   friend VmPageList;
 };

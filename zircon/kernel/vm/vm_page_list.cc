@@ -1169,43 +1169,16 @@ zx_status_t VmPageList::ClipIntervalEnd(uint64_t interval_end, uint64_t len) {
   return ZX_OK;
 }
 
-void VmPageList::TakePages(VmPageSpliceList* splice) {
+zx_status_t VmPageList::TakePages(VmPageSpliceList* splice) {
   splice->InitializeSkew(list_skew_);
 
   uint64_t offset = splice->offset_;
   const uint64_t end = offset + splice->length_;
 
-  // We should not be starting or ending partway inside an interval. Entire intervals that fall
-  // completely inside the range will be checked for later while we're taking the pages below.
-  DEBUG_ASSERT(!IsOffsetInInterval(offset));
-  DEBUG_ASSERT(!IsOffsetInInterval(end - 1));
-
-  // If we can't take the whole node at the start of the range,
-  // the shove the pages into the splice list head_ node.
-  while (NodeIndex(offset) != 0 && offset < end) {
-    splice->head_.Lookup(NodeIndex(offset)) = RemoveContent(offset);
-    offset += PAGE_SIZE;
-  }
-  DEBUG_ASSERT(splice->head_.HasNoIntervalSentinel());
-
-  // As long as the current and end node offsets are different, we
-  // can just move the whole node into the splice list.
-  while (NodeOffset(offset) != NodeOffset(end)) {
-    ktl::unique_ptr<VmPageListNode> node = list_.erase(NodeOffset(offset));
-    if (node) {
-      DEBUG_ASSERT(node->HasNoIntervalSentinel());
-      splice->middle_.insert(ktl::move(node));
-    }
-    offset += (PAGE_SIZE * VmPageListNode::kPageFanOut);
-  }
-
-  // Move any remaining pages into the splice list tail_ node.
-  while (offset < end) {
-    splice->tail_.Lookup(NodeIndex(offset)) = RemoveContent(offset);
-    offset += PAGE_SIZE;
-  }
-  DEBUG_ASSERT(splice->tail_.HasNoIntervalSentinel());
+  zx_status_t result =
+      MoveRange([](VmPageOrMarkerRef slot, uint64_t offset) {}, splice->page_list_, offset, end);
   splice->Finalize();
+  return result;
 }
 
 VmPageSpliceList::~VmPageSpliceList() {
@@ -1254,54 +1227,27 @@ void VmPageSpliceList::FreeAllPages() {
   }
 }
 
-bool VmPageSpliceList::IsEmpty() const {
-  return head_.IsEmpty() && tail_.IsEmpty() && middle_.is_empty();
-}
-
 zx_status_t VmPageSpliceList::Append(VmPageOrMarker content) {
   ASSERT(pos_ < length_);
   ASSERT(IsInitialized());
   ASSERT(!content.IsInterval());
 
-  const uint64_t cur_offset = offset_ + pos_;
-  const uint64_t node_idx = NodeIndex(cur_offset);
-  const uint64_t head_idx = NodeIndex(offset_);
-  const uint64_t node_offset = NodeOffset(cur_offset);
-  const uint64_t head_offset = NodeOffset(offset_);
-  const uint64_t tail_offset = NodeOffset(offset_ + length_);
-
-  if (head_idx != 0 && node_offset == head_offset) {
-    head_.Lookup(node_idx) = ktl::move(content);
-  } else if (node_offset != tail_offset) {
-    auto middle_node = middle_.find(node_offset);
-    if (middle_node.IsValid()) {
-      middle_node->Lookup(node_idx) = ktl::move(content);
-    } else {
-      // Allocate a node and then insert the content.
-      fbl::AllocChecker ac;
-      ktl::unique_ptr<VmPageListNode> pl =
-          ktl::unique_ptr<VmPageListNode>(new (&ac) VmPageListNode(node_offset));
-      if (!ac.check()) {
-        // If the allocation failed, we need to free content.
-        if (content.IsPage()) {
-          vm_page_t* page = content.ReleasePage();
-          DEBUG_ASSERT(!list_in_list(&page->queue_node));
-          pmm_free_page(page);
-        } else if (content.IsReference()) {
-          VmCompression* compression = Pmm::Node().GetPageCompression();
-          DEBUG_ASSERT(compression);
-          compression->Free(content.ReleaseReference());
-        }
-        return ZX_ERR_NO_MEMORY;
-      }
-      LTRACEF("allocating new inner node for splice list: %p\n", pl.get());
-      pl->Lookup(node_idx) = ktl::move(content);
-      middle_.insert(ktl::move(pl));
+  auto [slot, interval] =
+      page_list_.LookupOrAllocate(pos_, VmPageList::IntervalHandling::NoIntervals);
+  if (!slot) {
+    // If the allocation failed, we need to free content.
+    if (content.IsPage()) {
+      vm_page_t* page = content.ReleasePage();
+      DEBUG_ASSERT(!list_in_list(&page->queue_node));
+      pmm_free_page(page);
+    } else if (content.IsReference()) {
+      VmCompression* compression = Pmm::Node().GetPageCompression();
+      DEBUG_ASSERT(compression);
+      compression->Free(content.ReleaseReference());
     }
-  } else {
-    tail_.Lookup(node_idx) = ktl::move(content);
+    return ZX_ERR_NO_MEMORY;
   }
-
+  *slot = ktl::move(content);
   pos_ += PAGE_SIZE;
   return ZX_OK;
 }
@@ -1312,31 +1258,11 @@ VmPageOrMarkerRef VmPageSpliceList::PeekReference() {
     return VmPageOrMarkerRef(nullptr);
   }
 
-  const uint64_t cur_offset = offset_ + pos_;
-  const auto cur_node_idx = NodeIndex(cur_offset);
-  const auto cur_node_offset = NodeOffset(cur_offset);
-
-  VmPageOrMarker* res = nullptr;
-  if (NodeIndex(offset_) != 0 && NodeOffset(offset_) == cur_node_offset) {
-    // If the original offset means that pages were placed in head_
-    // and the current offset points to the same node, look there.
-    res = &head_.Lookup(cur_node_idx);
-  } else if (cur_node_offset != NodeOffset(offset_ + length_)) {
-    // If the current offset isn't pointing to the tail node,
-    // look in the middle tree.
-    auto middle_node = middle_.find(cur_node_offset);
-    if (middle_node.IsValid()) {
-      res = &middle_node->Lookup(cur_node_idx);
-    }
-  } else {
-    // If none of the other cases, we're in the tail_.
-    res = &tail_.Lookup(cur_node_idx);
+  VmPageOrMarkerRef res = page_list_.LookupMutable(pos_);
+  if (res && res->IsReference()) {
+    return res;
   }
-  // We only want to return non-null if the head of the splice list is a reference.
-  if (res != nullptr && !res->IsReference()) {
-    res = nullptr;
-  }
-  return VmPageOrMarkerRef(res);
+  return VmPageOrMarkerRef(nullptr);
 }
 
 VmPageOrMarker VmPageSpliceList::Pop() {
@@ -1345,28 +1271,7 @@ VmPageOrMarker VmPageSpliceList::Pop() {
     return VmPageOrMarker::Empty();
   }
 
-  VmPageOrMarker res;
-  const uint64_t cur_offset = offset_ + pos_;
-  const auto cur_node_idx = NodeIndex(cur_offset);
-  const auto cur_node_offset = NodeOffset(cur_offset);
-
-  if (NodeIndex(offset_) != 0 && NodeOffset(offset_) == cur_node_offset) {
-    // If the original offset means that pages were placed in head_
-    // and the current offset points to the same node, look there.
-    res = ktl::move(head_.Lookup(cur_node_idx));
-  } else if (cur_node_offset != NodeOffset(offset_ + length_)) {
-    // If the current offset isn't pointing to the tail node,
-    // look in the middle tree.
-    auto middle_node = middle_.find(cur_node_offset);
-    if (middle_node.IsValid()) {
-      res = ktl::move(middle_node->Lookup(cur_node_idx));
-    }
-  } else {
-    // If none of the other cases, we're in the tail_.
-    res = ktl::move(tail_.Lookup(cur_node_idx));
-  }
-  DEBUG_ASSERT(!res.IsInterval());
-
+  VmPageOrMarker res = page_list_.RemoveContent(pos_);
   pos_ += PAGE_SIZE;
   if (pos_ >= length_) {
     state_ = State::Processed;

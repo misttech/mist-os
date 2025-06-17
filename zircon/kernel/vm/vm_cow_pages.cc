@@ -5508,6 +5508,11 @@ zx_status_t VmCowPages::TakePages(VmCowRange range, VmPageSpliceList* pages, uin
     return TakePagesWithParentLocked(range, pages, taken_len, deferred, page_request);
   }
 
+  // On the assumption of success, unamp the entire range we are going to process. This ensures that
+  // in the unlikely event of a failure mid way through the unmap of the portion that was modified
+  // is not lost.
+  RangeChangeUpdateLocked(range, RangeChangeOp::Unmap, &deferred);
+
   VmCompression* compression = Pmm::Node().GetPageCompression();
   bool found_page = false;
   page_list_.ForEveryPageInRangeMutable(
@@ -5547,17 +5552,24 @@ zx_status_t VmCowPages::TakePages(VmCowRange range, VmPageSpliceList* pages, uin
   // VMO whose parent is concurrently closed. In this case, we have to append to the splice list
   // one VmPageOrMarker at a time.
   if (likely(pages->IsEmpty())) {
-    page_list_.TakePages(pages);
+    zx_status_t status = page_list_.TakePages(pages);
+    if (status != ZX_OK) {
+      DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+      return status;
+    }
   } else {
     for (uint64_t position = range.offset; position < range.end(); position += PAGE_SIZE) {
       VmPageOrMarker content = page_list_.RemoveContent(position);
-      pages->Append(ktl::move(content));
+      zx_status_t status = pages->Append(ktl::move(content));
+      if (status != ZX_OK) {
+        DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+        return status;
+      }
     }
     pages->Finalize();
   }
 
   *taken_len = range.len;
-  RangeChangeUpdateLocked(range, RangeChangeOp::Unmap, &deferred);
 
   VMO_VALIDATION_ASSERT(DebugValidateHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
