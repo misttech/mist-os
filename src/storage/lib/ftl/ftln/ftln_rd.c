@@ -18,6 +18,13 @@ typedef struct {
 
 // Local Function Definitions
 
+static void record_worn_if_recently_written(FTLN ftl, ui32 block) {
+  if (GET_RC(ftl->bdata[block]) < ftl->max_rc / 2 &&
+      FtlnCheckBlockBitmap(ftl, ftl->written, block)) {
+    FtlnSetBlockBitmap(ftl, ftl->maybe_bad, block);
+  }
+}
+
 // flush_pending_reads: Read all pages that are pending
 //
 //      Inputs: ftl = pointer to FTL control block
@@ -46,6 +53,7 @@ static int flush_pending_reads(FTLN ftl, StagedRd* staged) {
   if (status) {
     // If block needs to be recycled, set block read count to its max.
     if (status == 1) {
+      record_worn_if_recently_written(ftl, staged->ppn0 / ftl->pgs_per_blk);
       SET_MAX_RC(ftl, b_ptr);
       status = 0;
     }
@@ -206,10 +214,12 @@ int FtlnRdPage(FTLN ftl, ui32 ppn, void* rd_buf) {
   b_ptr = &ftl->bdata[ppn / ftl->pgs_per_blk];
 
   // If recycle requested, set read count to max. Else increment it.
-  if (status)
+  if (status) {
+    record_worn_if_recently_written(ftl, ppn / ftl->pgs_per_blk);
     SET_MAX_RC(ftl, b_ptr);
-  else
+  } else {
     INC_RC(ftl, b_ptr, 1);
+  }
 
   // Return success.
   return 0;

@@ -1285,6 +1285,10 @@ static void free_ftl(void* vol) {
     FsFree(ftl->bdata);
   if (ftl->blk_wc_lag)
     FsFree(ftl->blk_wc_lag);
+  if (ftl->written)
+    FsFree(ftl->written);
+  if (ftl->maybe_bad)
+    FsFree(ftl->maybe_bad);
   if (ftl->mpns)
     FsFree(ftl->mpns);
   if (ftl->main_buf)
@@ -1524,7 +1528,7 @@ void* FtlnAddVol(FtlNdmVol* ftl_cfg, XfsVol* xfs, CircLink* vols) {
   ftl->main_buf = buf;
   ftl->spare_buf = buf + ftl->page_size;
 
-  // Allocate memory for the block data and wear count lag arrays.
+  // Allocate memory for the block data, wear count lag arrays, and block bitmaps.
   ftl->bdata = FsCalloc(ftl->num_blks, sizeof(ui32));
   if (ftl->bdata == NULL) {
     ftl_cfg->logger.error(__FILE__, __LINE__, "Failed to allocated memory for FTL at %s:%d",
@@ -1540,6 +1544,12 @@ void* FtlnAddVol(FtlNdmVol* ftl_cfg, XfsVol* xfs, CircLink* vols) {
     goto FtlnAddV_err;
   }
   ftl->high_wc = 0;
+  if (ftl->written == NULL) {
+    ftl->written = FtlnAllocateBlockBitmap(ftl);
+  }
+  if (ftl->maybe_bad == NULL) {
+    ftl->maybe_bad = FtlnAllocateBlockBitmap(ftl);
+  }
 
   // Allocate memory for map pages array (holds physical page numbers).
   ftl->mpns = FsMalloc(ftl->num_map_pgs * sizeof(ui32));
