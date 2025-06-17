@@ -6207,7 +6207,7 @@ rustc_library("fastrand-v1_4_0") {
 
   deps = []
   if (current_cpu == "wasm32") {
-    deps += [ ":instant-v0_1_9" ]
+    deps += [ ":instant-v0_1_13" ]
   }
 
   rustenv = []
@@ -8625,15 +8625,15 @@ rustc_library("inout-v0_1_3") {
   applicable_licenses = [ ":inout-v0_1_3.license" ]
 }
 
-license("instant-v0_1_9.license") {
+license("instant-v0_1_13.license") {
   public_package_name = "instant"
-  license_files = [ "//third_party/rust_crates/vendor/instant-0.1.9/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/instant-0.1.13/LICENSE" ]
 }
 
-rustc_library("instant-v0_1_9") {
+rustc_library("instant-v0_1_13") {
   crate_name = "instant"
-  source_root = "//third_party/rust_crates/vendor/instant-0.1.9/src/lib.rs"
-  output_name = "instant-83da69adfa026a2e"
+  source_root = "//third_party/rust_crates/vendor/instant-0.1.13/src/lib.rs"
+  output_name = "instant-efc1312b2c92140e"
   edition = "2018"
   disable_clippy = true
   enforce_source_listing = false
@@ -8646,13 +8646,13 @@ rustc_library("instant-v0_1_9") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=83da69adfa026a2e",
-    "-Cextra-filename=-83da69adfa026a2e",
+    "-Cmetadata=efc1312b2c92140e",
+    "-Cextra-filename=-efc1312b2c92140e",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":instant-v0_1_9.license" ]
+  applicable_licenses = [ ":instant-v0_1_13.license" ]
 }
 
 license("iota-v0_2_3.license") {
@@ -11483,7 +11483,7 @@ rustc_library("parking_lot-v0_11_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":instant-v0_1_9" ]
+  deps += [ ":instant-v0_1_13" ]
   deps += [ ":lock_api-v0_4_11" ]
   deps += [ ":parking_lot_core-v0_8_3" ]
 
@@ -11558,7 +11558,7 @@ rustc_library("parking_lot_core-v0_8_3") {
 
   deps = []
   deps += [ ":cfg-if-v1_0_0" ]
-  deps += [ ":instant-v0_1_9" ]
+  deps += [ ":instant-v0_1_13" ]
   deps += [ ":smallvec-v1_14_0" ]
   if (false) {
     deps += [ ":redox_syscall-v0_2_13" ]
