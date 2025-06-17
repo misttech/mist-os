@@ -49,15 +49,16 @@ PACKAGE_DIR_TO_SUBPACKAGE_MANIFESTS_DIR = "../../../subpackage_manifests"
 
 
 def handle_package_manifest(
-    output_dir: Path,
+    output_dir: Path | None,
     input_manifest_path: Path,
-    sdk_file_map: Set[str],
+    sdk_file_map: Dict[str, str],
     sdk_metadata: Dict[str, Any],
-    depfile_collection: Dict[Path, list[Path]],
+    depfile_collection: Dict[Path, list[Path]] | None,
     inputs: Dict[str, str],
-    visited_subpackages: Set[Path],
+    visited_subpackages: Set[Path] = set(),
     is_subpackage: bool = False,
-) -> str:
+    create_intermediate_manifest: bool = False,
+) -> tuple[str, Dict[str, Dict[str, Any]]]:
     """
     For the given `input_manifest_path`, does the following:
     * Re-writes all source paths to be relative to SDK location,
@@ -65,7 +66,7 @@ def handle_package_manifest(
     * Adds files for inclusion to the `sdk_atom`'s `file_list`.
     * Adds files and base package manifest to the `sdk_atom`'s
       `metadata`.
-    * Adds files to `depfile`.
+    * Adds files to `depfile_collection` if specified.
     * Writes re-written package manifest to desired `output_dir` location.
 
     Above is recursed across all subpackages.
@@ -75,21 +76,34 @@ def handle_package_manifest(
                                 manifest filepath to.
         input_manifest_path:    Path to package manifest to convert into
                                 SDK-friendly format.
-        sdk_file_map:           Set containing <dst>=<src> entries, for use in
-                               `sdk_atom`'s `file_list`.
+        sdk_file_map:           Dictionary containing <dst>=<src> entries, for
+                                use in the `sdk_atom`'s `file_list`.
         sdk_metadata:           Object used to build a
                                 `//build/sdk/meta/package.json` entry.
-        depfile_collection:     Object constructed for use as a depfile.
-        inputs:                 Object containing `api_level`, `arch`, and
-                                `distribution_name`. Used for constructing end
-                                paths and other structures.
+        depfile_collection:     Optional depfile map to be updated by this
+                                function, keys are output files, values are
+                                lists of implicit inputs.
+        inputs:                 Input dictionary containing `api_level`, `arch`,
+                                and `distribution_name`. Used for constructing
+                                end paths and other structures.
         visited_subpackages:    Set used for tracking levels of recursion in
                                 subpackages.
         is_subpackage:          Boolean used to track if this iteration is
                                 processing a subpackages. Used to determine if
                                 `sdk_metadata` changes are required, as well as
                                 pathing.
+        create_intermediate_manifest: Whether the package manifest should be
+                                written to an intermediate file in the output
+                                directory.
+    Returns a tuple containing:
+    * The path to the package manifest (not to be confused with the atom's
+      meta.json file).
+    * A dictionary mapping the manifest paths for the package and all its
+      subpackages to their JSON contents. Includes the path above.
     """
+    assert create_intermediate_manifest == (output_dir is not None)
+    assert create_intermediate_manifest == (depfile_collection is not None)
+
     api_level, arch, distribution_name = (
         inputs["api_level"],
         inputs["arch"],
@@ -99,7 +113,7 @@ def handle_package_manifest(
     subtype = f"{arch}-api-{api_level}"
 
     with open(input_manifest_path, "r") as manifest_file:
-        input_manifest = json.load(manifest_file)
+        input_manifest: Dict[str, Any] = json.load(manifest_file)
 
     # Re-wire will be relative to package manifest location.
     input_manifest["blob_sources_relative"] = "file"
@@ -127,10 +141,11 @@ def handle_package_manifest(
         # Re-wire source path to point to SDK blob store.
         blob["source_path"] = relative_blob_path
 
-        sdk_file_map.add(f"{BLOBS_DIR}/{merkle}={source_path}")
+        sdk_file_map[f"{BLOBS_DIR}/{merkle}"] = source_path
         target_files.append(f"{BLOBS_DIR}/{merkle}")
 
     # Handle subpackages.
+    subpackages_manifests_info: Dict[str, Dict[str, Any]] = {}
     subpackage_list = input_manifest.get("subpackages", [])
     for subpackage in subpackage_list:
         subpackage_manifest_path, subpackage_merkle = (
@@ -147,18 +162,19 @@ def handle_package_manifest(
             continue
 
         # Recursively handle subpackages.
-        target_files.append(
-            handle_package_manifest(
-                output_dir,
-                subpackage_manifest_path,
-                sdk_file_map,
-                sdk_metadata,
-                depfile_collection,
-                inputs,
-                visited_subpackages,
-                is_subpackage=True,
-            )
+        sdk_output_manifest_path, manifests_info = handle_package_manifest(
+            output_dir,
+            subpackage_manifest_path,
+            sdk_file_map,
+            sdk_metadata,
+            depfile_collection,
+            inputs,
+            visited_subpackages,
+            is_subpackage=True,
+            create_intermediate_manifest=create_intermediate_manifest,
         )
+        target_files.append(sdk_output_manifest_path)
+        subpackages_manifests_info.update(manifests_info)
 
     if is_subpackage:
         manifest_file_name = f"{meta_far_merkle}.package_manifest.json"
@@ -186,18 +202,27 @@ def handle_package_manifest(
         # Ensure package name matches distribution name.
         input_manifest["package"]["name"] = distribution_name
 
-    build_output_manifest_path = f"{output_dir}/{manifest_file_name}"
+    # TODO(https://fxbug.dev/4070837370): Eliminate
+    # `create_intermediate_manifest`, `output_dir` and `depfile_collection` when
+    # sdk_fuchsia_package() no longer calls this file.
+    if create_intermediate_manifest:
+        assert output_dir is not None and depfile_collection is not None
 
-    sdk_file_map.add(f"{sdk_output_manifest_path}={build_output_manifest_path}")
+        build_output_manifest_path: str = f"{output_dir}/{manifest_file_name}"
 
-    # Write altered manifest to build output location.
-    with open(build_output_manifest_path, "w") as manifest_file:
-        json.dump(input_manifest, manifest_file, sort_keys=True, indent=2)
-        depfile_collection[Path(build_output_manifest_path)] = [
-            input_manifest_path
-        ]
+        sdk_file_map[f"{sdk_output_manifest_path}"] = build_output_manifest_path
 
-    return sdk_output_manifest_path
+        # Write altered manifest to build output location.
+        with open(build_output_manifest_path, "w") as manifest_file:
+            json.dump(input_manifest, manifest_file, sort_keys=True, indent=2)
+            depfile_collection[Path(build_output_manifest_path)] = [
+                input_manifest_path
+            ]
+
+    # Add this package's manifest.
+    subpackages_manifests_info[sdk_output_manifest_path] = input_manifest
+
+    return sdk_output_manifest_path, subpackages_manifests_info
 
 
 def main() -> int:
@@ -230,7 +255,7 @@ def main() -> int:
     # File containing file mappings. Each line in the file should contain a
     # "dest=source" mapping, similarly to file scopes.
     # See `sdk_atom` template definition of `file_list`.
-    sdk_file_map: Set[str] = set()
+    sdk_file_map: Dict[str, str] = {}
 
     # Inputs used for directory naming.
     api_level, arch, distribution_name = (
@@ -252,21 +277,21 @@ def main() -> int:
     }
 
     depfile_collection: Dict[Path, list[Path]] = {}
-    visited_subpackages: Set[Path] = set()
 
-    handle_package_manifest(
+    _, _ = handle_package_manifest(
         args.output,
         args.manifest,
         sdk_file_map,
         sdk_metadata,
         depfile_collection,
         inputs,
-        visited_subpackages,
-        is_subpackage=False,
+        create_intermediate_manifest=True,
     )
 
     # Write out sorted file list.
-    sdk_file_list = sorted(list(sdk_file_map))
+    sdk_file_list = sorted(
+        [f"{dst}={src}" for dst, src in sdk_file_map.items()]
+    )
     sdk_file_list_path = os.path.join(args.output, "file_list.fini")
     with open(sdk_file_list_path, "w") as out_file:
         out_file.write("\n".join(sdk_file_list))

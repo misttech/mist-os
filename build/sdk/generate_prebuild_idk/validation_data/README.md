@@ -25,6 +25,19 @@ This directory contains the following:
   that the processing script is supposed to generate when parsing the
   content of `input_fuchsia_dir`.
 
+Notes about the packages:
+
+- Packages are normally only built in sub-builds. In the test collection,
+  packages for a NEXT x64 sub-build are included alongside other atoms from a
+  base PLATFORM build.
+
+- Not all blobs specified in the package manifests are included. The rest will
+  be broken symlinks. Specifically, only two blobs for fake-build-info are
+  included.
+
+- fake-build-info and intl_property_manager have overlapping blobs, which is an
+  important test case.
+
 # Usage
 
 The `//build/sdk:generate_prebuild_idk_integration_test` target can be built to

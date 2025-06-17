@@ -142,6 +142,25 @@ template("idk_prebuild_manifest") {
   #
   #   LINT.ThenChange(//build/cpp/sdk_shared_library.gni)
   #
+  # ----------------------------------------------------------------------------
+  #
+  #   "package"
+  #
+  #   LINT.IfChange
+  #
+  #     api_level (string)
+  #       API level, can be "PLATFORM" or a decimal string (e.g. "11").
+  #
+  #     arch (string)
+  #       CPU architecture name of the binary (e.g. "x64" or "arm64").
+  #
+  #     distribution_name (string)
+  #       Name of the library in the IDK (e.g. "intl_property_manager").
+  #
+  #     package_manifest (string)
+  #       Path to the manifest for the underlying Fuchsia package.
+  #
+  #   LINT.ThenChange(//build/packages/sdk_fuchsia_package.gni )
   #
   #
   #

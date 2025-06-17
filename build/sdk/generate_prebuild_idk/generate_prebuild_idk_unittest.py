@@ -3,6 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -231,6 +232,96 @@ class IdkGeneratorTest(unittest.TestCase):
             "partner/partner_atom/meta.json",
         )
 
+    def test_generate_meta_file_contents_package_atom(self) -> None:
+        package_manifest_content = {
+            "version": "1",
+            "package": {"name": "test_package_name", "version": "0"},
+            "blobs": [
+                {
+                    "source_path": "path/to/blob1",
+                    "path": "data/blob1.dat",
+                    "merkle": "merkle1",
+                    "size": 10,
+                }
+            ],
+        }
+        package_manifest_path = self._write_build_file(
+            "obj/package/manifest.json", json.dumps(package_manifest_content)
+        )
+
+        self._write_build_file("path/to/blob1", "")
+
+        manifest: list[AtomInfo] = [
+            self._COLLECTION_INFO,
+            {
+                "atom_label": "//sdk/packages:test_package",
+                "atom_type": "package",
+                "category": "partner",
+                "atom_meta": {"dest": "packages/test_package/meta.json"},
+                "prebuild_info": {
+                    "package_manifest": str(
+                        package_manifest_path.relative_to(self.build_dir)
+                    ),
+                    "api_level": "NEXT",
+                    "arch": "arm64",
+                    "distribution_name": "a_package",
+                },
+                "atom_files": [],
+                "is_stable": True,
+            },
+        ]
+
+        generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
+        ret_code = generator.GenerateMetaFileContents()
+
+        self.assertEqual(ret_code, 0)
+
+        self.assertIn("packages/test_package/meta.json", generator._meta_files)
+        pkg_meta = generator._meta_files["packages/test_package/meta.json"]
+        self.assertEqual(pkg_meta["name"], "a_package")
+        self.assertEqual(pkg_meta["type"], "package")
+        self.assertEqual(len(pkg_meta["variants"]), 1)
+        variant = pkg_meta["variants"][0]
+        self.assertEqual(variant["api_level"], "NEXT")
+        self.assertEqual(variant["arch"], "arm64")
+        self.assertEqual(
+            variant["manifest_file"],
+            "packages/a_package/arm64-api-NEXT/release/package_manifest.json",
+        )
+        self.assertEqual(
+            variant["files"],
+            [
+                "packages/a_package/arm64-api-NEXT/release/package_manifest.json",
+                "packages/blobs/merkle1",
+            ],
+        )
+
+        # Check for additional JSON file (the rewritten package manifest)
+        rewritten_manifest_path = variant["manifest_file"]
+        self.assertIn(rewritten_manifest_path, generator._json_files)
+        rewritten_manifest_content = generator._json_files[
+            rewritten_manifest_path
+        ]
+        self.assertEqual(
+            rewritten_manifest_content["package"]["name"], "a_package"
+        )  # Name should be updated
+        self.assertEqual(len(rewritten_manifest_content["blobs"]), 1)
+        self.assertTrue(
+            rewritten_manifest_content["blobs"][0]["source_path"].startswith(
+                "../../../blobs"
+            )
+        )
+
+        # Check for package atom files (blobs)
+        self.assertIn(
+            "packages/blobs/merkle1",
+            generator._package_atom_files,
+        )
+        self.assertEqual(
+            generator._package_atom_files["packages/blobs/merkle1"],
+            "path/to/blob1",
+        )
+
     @mock.patch("os.rename")
     @mock.patch("os.mkdir")
     @mock.patch("io.open", new_callable=mock.mock_open)
@@ -252,7 +343,11 @@ class IdkGeneratorTest(unittest.TestCase):
             "meta/manifest.json": {"id": "1.2.3.4", "parts": []},
             "data/foo/meta.json": {"name": "foo", "type": "data"},
         }
+        generator._json_files = {
+            "packages/bar/manifest.json": {"name": "bar_pkg_manifest"}
+        }
         generator._atom_files = {"data/foo/file1.txt": "src/file1.txt"}
+        generator._package_atom_files = {"packages/blobs/blobA": "pkg/blobA"}
 
         ret_code = generator.WriteIdkContentsToDirectory(self.output_dir)
         self.assertEqual(ret_code, 0)
@@ -266,6 +361,12 @@ class IdkGeneratorTest(unittest.TestCase):
         self.assertIn(
             temp_out_dir / "data/foo", made_dirs
         )  # For data/foo/meta.json
+        self.assertIn(
+            temp_out_dir / "packages/bar", made_dirs
+        )  # For packages/bar/manifest.json and file1.txt
+        self.assertIn(
+            temp_out_dir / "packages/blobs", made_dirs
+        )  # For packages/blobs/blobA (symlink parent)
 
         # Verify that expected files were opened for writing.
         written_file_paths = {
@@ -275,12 +376,19 @@ class IdkGeneratorTest(unittest.TestCase):
         }
         self.assertIn(temp_out_dir / "meta/manifest.json", written_file_paths)
         self.assertIn(temp_out_dir / "data/foo/meta.json", written_file_paths)
+        self.assertIn(
+            temp_out_dir / "packages/bar/manifest.json", written_file_paths
+        )
 
         # Verify symlink calls.
         expected_symlink_calls = [
             mock.call(
                 self.build_dir / "src/file1.txt",
                 temp_out_dir / "data/foo/file1.txt",
+            ),
+            mock.call(
+                self.build_dir / "pkg/blobA",
+                temp_out_dir / "packages/blobs/blobA",
             ),
         ]
         mock_symlink.assert_has_calls(expected_symlink_calls, any_order=True)
