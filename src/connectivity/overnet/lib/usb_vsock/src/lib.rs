@@ -16,11 +16,13 @@ pub use packet::*;
 pub enum ProtocolVersion {
     /// Protocol version 0
     V0,
+    /// Protocol version 1
+    V1,
 }
 
 impl ProtocolVersion {
     /// The latest protocol version.
-    pub const LATEST: ProtocolVersion = ProtocolVersion::V0;
+    pub const LATEST: ProtocolVersion = ProtocolVersion::V1;
 
     /// Magic sent in the sync packet of the USB protocol.
     ///
@@ -35,6 +37,7 @@ impl ProtocolVersion {
     pub fn magic(&self) -> &[u8] {
         match self {
             ProtocolVersion::V0 => b"vsock:0",
+            ProtocolVersion::V1 => b"vsock:1",
         }
     }
 
@@ -42,6 +45,8 @@ impl ProtocolVersion {
     pub fn from_magic(magic: &[u8]) -> Option<ProtocolVersion> {
         if magic == b"vsock:0" {
             Some(ProtocolVersion::V0)
+        } else if magic == b"vsock:1" {
+            Some(ProtocolVersion::V1)
         } else {
             None
         }
@@ -52,8 +57,16 @@ impl ProtocolVersion {
     /// connects, find the protocol version that should be sent in the reply
     /// magic and used for the connection. If `None`, negotiation has broken
     /// down.
-    pub fn negotiate(&self, _host_version: &ProtocolVersion) -> Option<ProtocolVersion> {
-        Some(ProtocolVersion::V0)
+    pub fn negotiate(&self, host_version: &ProtocolVersion) -> Option<ProtocolVersion> {
+        match (self, host_version) {
+            (ProtocolVersion::V1, ProtocolVersion::V1) => Some(ProtocolVersion::V1),
+            (ProtocolVersion::V0, _) | (_, ProtocolVersion::V0) => Some(ProtocolVersion::V0),
+        }
+    }
+
+    /// Whether we support the pause protocol message.
+    pub(crate) fn has_pause_packets(&self) -> bool {
+        matches!(self, ProtocolVersion::V1)
     }
 }
 
@@ -61,6 +74,7 @@ impl std::fmt::Display for ProtocolVersion {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ProtocolVersion::V0 => write!(f, "0"),
+            ProtocolVersion::V1 => write!(f, "1"),
         }
     }
 }

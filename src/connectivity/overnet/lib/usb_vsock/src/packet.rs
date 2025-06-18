@@ -65,6 +65,11 @@ pub enum PacketType {
     /// zero, this is for a special data stream between the host and device that does not require
     /// an established connection.
     Data = b'D',
+    /// Advisory flow control message. Payload indicates flow control state "on"
+    /// or "off". If "on", it is recommended that the receiver not send more data
+    /// for this connection if possible, until the state becomes "off" again.
+    /// State is assumed "off" when no packet has been received.
+    Pause = b'X',
 }
 
 /// The packet header for a vsock packet passed over the usb vsock link. Each usb packet can contain

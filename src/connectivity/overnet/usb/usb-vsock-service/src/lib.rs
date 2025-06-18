@@ -167,19 +167,28 @@ impl UsbConnection {
         let found_magic =
             found_magic.expect("read loop should not terminate until sync packet is read");
 
-        let Some(incoming_version) = ProtocolVersion::from_magic(&found_magic) else {
-            error!("Could not parse device magic '{found_magic:?}'");
-            return None;
-        };
+        let incoming_version = ProtocolVersion::from_magic(&found_magic);
 
         // send echo packets until we get back an expected reply
         // TODO(406262417): this is only here because the host side has trouble with hanging
         // gets and sending some data immediately after will help it clear and re-establish its state.
         self.clear_host_requests(&found_magic).await?;
 
-        let Some(outgoing_version) = ProtocolVersion::LATEST.negotiate(&incoming_version) else {
-            error!("Could not negotiate protocol version: driver has {}, host wants {incoming_version}", ProtocolVersion::LATEST);
-            return None;
+        let outgoing_version = if let Some(incoming_version) = incoming_version {
+            let Some(outgoing_version) = ProtocolVersion::LATEST.negotiate(&incoming_version)
+            else {
+                error!("Could not negotiate protocol version: driver has {}, host wants {incoming_version}", ProtocolVersion::LATEST);
+                return None;
+            };
+
+            outgoing_version
+        } else {
+            warn!(
+                "Did not recognize protocol magic {found_magic:?}. Trying version {}",
+                ProtocolVersion::LATEST
+            );
+
+            ProtocolVersion::LATEST
         };
 
         let outgoing_magic = outgoing_version.magic();
