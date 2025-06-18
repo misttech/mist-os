@@ -11,19 +11,17 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-__BEGIN_CDECLS
+bool hpet_is_present();
 
-bool hpet_is_present(void);
-
-uint64_t hpet_get_value(void);
+uint64_t hpet_get_value();
 zx_status_t hpet_set_value(uint64_t v);
 
-void hpet_enable(void);
-void hpet_disable(void);
+void hpet_enable();
+void hpet_disable();
 
 void hpet_wait_ms(uint16_t ms);
 
-__END_CDECLS
+uint64_t hpet_ticks_per_ms();
 
 // Storage resides in platform/pc/timer.cpp
 extern affine::Ratio hpet_ticks_to_clock_monotonic;

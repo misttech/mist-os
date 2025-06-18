@@ -10,7 +10,6 @@
 #define ZIRCON_KERNEL_PLATFORM_PC_INCLUDE_PLATFORM_PC_H_
 
 #include <arch/x86/interrupts.h>
-#include <platform/pc/iomap.h>
 
 /* NOTE: keep arch/x86/crt0.S in sync with these definitions */
 

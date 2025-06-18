@@ -42,20 +42,17 @@
 #include <ktl/algorithm.h>
 #include <lk/init.h>
 #include <phys/handoff.h>
-#include <platform/console.h>
 #include <platform/crashlog.h>
 #include <platform/efi.h>
 #include <platform/efi_crashlog.h>
-#include <platform/keyboard.h>
 #include <platform/pc.h>
 #include <platform/pc/acpi.h>
+#include <platform/pc/memory.h>
 #include <platform/pc/smbios.h>
 #include <platform/ram_mappable_crashlog.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/vm_aspace.h>
-
-#include "platform_p.h"
 
 #include <ktl/enforce.h>
 

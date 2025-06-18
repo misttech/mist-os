@@ -11,7 +11,6 @@ zx_library("pc") {
   sources = [
     "acpi.cc",
     "cmos_bootbyte.cc",
-    "console.cc",
     "dev-init.cc",
     "efi_expected.cc",
     "hpet.cc",

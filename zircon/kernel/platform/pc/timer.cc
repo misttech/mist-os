@@ -37,13 +37,10 @@
 #include <lk/init.h>
 #include <phys/handoff.h>
 #include <platform/boot_timestamps.h>
-#include <platform/console.h>
 #include <platform/pc.h>
 #include <platform/pc/hpet.h>
 #include <platform/pc/timer.h>
 #include <platform/timer.h>
-
-#include "platform_p.h"
 
 #include <ktl/enforce.h>
 
@@ -55,8 +52,6 @@ arch::EarlyTicks kernel_entry_ticks;
 arch::EarlyTicks kernel_virtual_entry_ticks;
 
 }  // extern "C"
-
-extern uint64_t _hpet_ticks_per_ms;
 
 KCOUNTER(platform_timer_set_counter, "platform.timer.set")
 KCOUNTER(platform_timer_cancel_counter, "platform.timer.cancel")
@@ -281,6 +276,10 @@ zx_instant_mono_t convert_raw_tsc_timestamp_to_clock_monotonic(int64_t ts) {
     return now_mono = rdtsc_ticks_to_clock_monotonic.Scale(time_till_tsc_timestamp);
   }
 }
+
+/* i8253/i8254 programmable interval timer registers */
+static constexpr uint16_t I8253_CONTROL_REG = 0x43;
+static constexpr uint16_t I8253_DATA_REG = 0x40;
 
 // The PIT timer will keep track of wall time if we aren't using the TSC
 static void pit_timer_tick(void* arg) { pit_ticks = pit_ticks + 1; }
@@ -560,8 +559,6 @@ static void calibrate_tsc(bool has_pv_clock) {
 
   LTRACEF("ns_per_tsc: %08x.%08x%08x\n", ns_per_tsc.l0, ns_per_tsc.l32, ns_per_tsc.l64);
 }
-
-static uint64_t hpet_ticks_per_ms(void) { return _hpet_ticks_per_ms; }
 
 static void pc_init_timer(uint level) {
   const struct x86_model_info* cpu_model = x86_get_model();

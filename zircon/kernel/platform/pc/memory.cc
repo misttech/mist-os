@@ -4,6 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include "platform/pc/memory.h"
+
 #include <inttypes.h>
 #include <lib/arch/x86/boot-cpuid.h>
 #include <lib/memalloc/range.h>
@@ -28,8 +30,6 @@
 #include <object/resource_dispatcher.h>
 #include <phys/handoff.h>
 #include <vm/vm.h>
-
-#include "platform_p.h"
 
 #include <ktl/enforce.h>
 
@@ -77,8 +77,10 @@ void pc_mem_init(ktl::span<const memalloc::Range> ranges) {
   }
 }
 
+namespace {
+
 // Initialize the higher level PhysicalAspaceManager after the heap is initialized.
-static void x86_resource_init_hook(unsigned int rl) {
+void x86_resource_init_hook(unsigned int rl) {
   // An error is likely fatal if the bookkeeping is broken and driver
   ResourceDispatcher::InitializeAllocator(
       ZX_RSRC_KIND_MMIO, 0,
@@ -90,3 +92,5 @@ static void x86_resource_init_hook(unsigned int rl) {
 }
 
 LK_INIT_HOOK(x86_resource_init, x86_resource_init_hook, LK_INIT_LEVEL_HEAP)
+
+}  // namespace
