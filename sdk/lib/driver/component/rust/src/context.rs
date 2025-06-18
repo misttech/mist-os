@@ -4,6 +4,7 @@
 
 use crate::{Incoming, Node};
 use fuchsia_component::server::{ServiceFs, ServiceObjTrait};
+use fuchsia_component_config::Config;
 use log::error;
 use namespace::Namespace;
 use zx::Status;
@@ -38,6 +39,16 @@ impl DriverContext {
     pub fn take_node(&mut self) -> Result<Node, Status> {
         let node_client = self.start_args.node.take().ok_or(Status::INVALID_ARGS)?;
         Ok(Node::from(node_client.into_proxy()))
+    }
+
+    /// Returns the component config.
+    ///
+    /// After calling this, [`DriverStartArgs::config`] in [`Self::start_args`] will be `None`.
+    ///
+    /// Returns [`Status::INVALID_ARGS`] if the config is not present in the start arguments.
+    pub fn take_config<C: Config>(&mut self) -> Result<C, Status> {
+        let vmo = self.start_args.config.take().ok_or(Status::INVALID_ARGS)?;
+        Ok(Config::from_vmo(&vmo).expect("Config VMO handle must be valid."))
     }
 
     /// Serves the given [`ServiceFs`] on the node's outgoing directory. This can only be called
