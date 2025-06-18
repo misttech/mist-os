@@ -46,7 +46,7 @@ class PagerProxy : public PageProvider,
   void Free(PortPacket* port_packet) final;
 
   // PageProvider methods.
-  const PageSourceProperties& properties() const final;
+  PageSourceProperties properties() const final;
   void SendAsyncRequest(PageRequest* request) final;
   void ClearAsyncRequest(PageRequest* request) final;
   void SwapAsyncRequest(PageRequest* old, PageRequest* new_req) final;

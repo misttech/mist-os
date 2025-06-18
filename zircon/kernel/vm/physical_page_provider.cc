@@ -20,16 +20,6 @@ KCOUNTER(physical_reclaim_total_requests, "physical.reclaim.total_requests")
 KCOUNTER(physical_reclaim_succeeded_requests, "physical.reclaim.succeeded_requests")
 KCOUNTER(physical_reclaim_failed_requests, "physical.reclaim.failed_requests")
 
-namespace {
-
-const PageSourceProperties kProperties{
-    .is_user_pager = false,
-    .is_preserving_page_content = false,
-    .is_providing_specific_physical_pages = true,
-};
-
-}  // namespace
-
 PhysicalPageProvider::PhysicalPageProvider(uint64_t size) : size_(size) { LTRACEF("\n"); }
 
 PhysicalPageProvider::~PhysicalPageProvider() {
@@ -50,7 +40,13 @@ PhysicalPageProvider::~PhysicalPageProvider() {
   Pmm::Node().FreeList(&free_list_);
 }
 
-const PageSourceProperties& PhysicalPageProvider::properties() const { return kProperties; }
+PageSourceProperties PhysicalPageProvider::properties() const {
+  return PageSourceProperties{
+      .is_user_pager = false,
+      .is_preserving_page_content = false,
+      .is_providing_specific_physical_pages = true,
+  };
+}
 
 void PhysicalPageProvider::Init(VmCowPages* cow_pages, PageSource* page_source, paddr_t phys_base) {
   DEBUG_ASSERT(cow_pages);

@@ -136,8 +136,9 @@ class PageProvider : public fbl::RefCounted<PageProvider> {
   static uint64_t GetRequestVmoId(const PageRequest* request);
 
  private:
-  // The returned properties will last at least as long as PageProvider.
-  virtual const PageSourceProperties& properties() const = 0;
+  // The returned properties can assumed to be const and never change. As such the caller may cache
+  // them.
+  virtual PageSourceProperties properties() const = 0;
 
   // Informs the backing source of a page request. The provider has ownership
   // of |request| until the async request is cancelled.

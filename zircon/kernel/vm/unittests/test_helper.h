@@ -52,7 +52,13 @@ class StubPageProvider : public PageProvider {
       : trap_dirty_(trap_dirty), ignore_requests_(ignore_requests) {}
   ~StubPageProvider() override = default;
 
-  const PageSourceProperties& properties() const override { return properties_; }
+  PageSourceProperties properties() const override {
+    return PageSourceProperties{
+        .is_user_pager = true,
+        .is_preserving_page_content = true,
+        .is_providing_specific_physical_pages = false,
+    };
+  }
 
  private:
   void SendAsyncRequest(PageRequest* request) override { ASSERT(ignore_requests_); }
@@ -75,11 +81,6 @@ class StubPageProvider : public PageProvider {
     return false;
   }
 
-  PageSourceProperties properties_{
-      .is_user_pager = true,
-      .is_preserving_page_content = true,
-      .is_providing_specific_physical_pages = false,
-  };
   const bool trap_dirty_ = false;
   const bool ignore_requests_ = false;
 };

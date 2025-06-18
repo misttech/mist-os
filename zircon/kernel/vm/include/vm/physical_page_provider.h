@@ -37,7 +37,7 @@ class PhysicalPageProvider : public PageProvider {
 
  private:
   // PageProvider methods.
-  const PageSourceProperties& properties() const final;
+  PageSourceProperties properties() const final;
   void SendAsyncRequest(PageRequest* request) final;
   void ClearAsyncRequest(PageRequest* request) final;
   void SwapAsyncRequest(PageRequest* old, PageRequest* new_req) final;
