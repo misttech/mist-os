@@ -28,5 +28,8 @@ group("diagnostics") {
 
 group("tests") {
   testonly = true
-  deps = [ ":lib_test" ]
+  deps = [
+    ":lib_test",
+    "checks:lib_test",
+  ]
 }

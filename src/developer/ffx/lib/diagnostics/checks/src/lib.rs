@@ -7,7 +7,6 @@ use discovery::{DiscoverySources, FastbootConnectionState, TargetHandle, TargetS
 use fdomain_fuchsia_hwinfo::{ProductInfo, ProductProxy};
 use ffx_config::EnvironmentContext;
 use ffx_diagnostics::{Check, CheckExt, CheckFut, Notifier};
-use ffx_fastboot as _;
 use ffx_fastboot_connection_factory::{
     ConnectionFactory, FastbootConnectionFactory, FastbootConnectionKind,
 };
@@ -70,7 +69,8 @@ where
     // Depending on the number of targets resolved and their types,
     // this could go one of several ways. It may also be nice to mention where the devices
     // originated. This does not check VSock devices.
-    let (info, notifier) = ConnectSsh::new(env_context)
+    let conn_provider = DefaultSshConnectorProvider;
+    let (info, notifier) = ConnectSsh::new(env_context, &conn_provider)
         .check_with_notifier(device, notifier)
         .and_then_check(ConnectRemoteControlProxy::new(timeout))
         .await
@@ -83,7 +83,8 @@ async fn check_fastboot_device<N>(notifier: &mut N, device: TargetHandle) -> fho
 where
     N: Notifier + std::marker::Unpin,
 {
-    let (info, notifier) = FastbootDeviceStatus::new()
+    let factory = ConnectionFactory {};
+    let (info, notifier) = FastbootDeviceStatus::new(&factory)
         .check_with_notifier(device, notifier)
         .await
         .map_err(|e| fho::Error::User(e.into()))?;
@@ -220,14 +221,49 @@ where
     }
 }
 
-pub struct ConnectSsh<'a, N> {
+pub trait SshConnectorProvider {
+    fn connector_for_target<N>(
+        &self,
+        ctx: EnvironmentContext,
+        handle: TargetHandle,
+        notifier: &mut N,
+    ) -> anyhow::Result<impl TargetConnector + 'static>
+    where
+        N: Notifier + Sized;
+}
+
+struct DefaultSshConnectorProvider;
+
+impl SshConnectorProvider for DefaultSshConnectorProvider {
+    fn connector_for_target<N>(
+        &self,
+        ctx: EnvironmentContext,
+        handle: TargetHandle,
+        notifier: &mut N,
+    ) -> anyhow::Result<impl TargetConnector + 'static>
+    where
+        N: Notifier + Sized,
+    {
+        let resolution = ffx_target::Resolution::from_target_handle(handle)?;
+        // Probably want to report the address to which we're connecting.
+        let connector = ConnectorHolder(SshConnector::new(
+            netext::ScopedSocketAddr::from_socket_addr(resolution.addr()?)?,
+            &ctx,
+        )?);
+        notifier.info(format!("Executing the command: `{}`", connector.0.fdomain_command()?))?;
+        Ok(connector)
+    }
+}
+
+pub struct ConnectSsh<'a, N, P> {
     ctx: &'a EnvironmentContext,
+    conn_provider: &'a P,
     _w: std::marker::PhantomData<N>,
 }
 
-impl<'a, N> ConnectSsh<'a, N> {
-    pub fn new(ctx: &'a EnvironmentContext) -> Self {
-        Self { ctx, _w: Default::default() }
+impl<'a, N, P> ConnectSsh<'a, N, P> {
+    pub fn new(ctx: &'a EnvironmentContext, conn_provider: &'a P) -> Self {
+        Self { ctx, _w: Default::default(), conn_provider }
     }
 }
 
@@ -242,9 +278,10 @@ impl TargetConnector for ConnectorHolder {
     }
 }
 
-impl<N> Check for ConnectSsh<'_, N>
+impl<N, P> Check for ConnectSsh<'_, N, P>
 where
     N: Notifier + Sized,
+    P: SshConnectorProvider + Sized,
 {
     type Input = TargetHandle;
     type Output = Connection;
@@ -272,14 +309,8 @@ where
         notifier: &'a mut Self::Notifier,
     ) -> CheckFut<'a, Self::Output> {
         Box::pin(async {
-            let resolution = ffx_target::Resolution::from_target_handle(input)?;
-            // Probably want to report the address to which we're connecting.
-            let connector = ConnectorHolder(SshConnector::new(
-                netext::ScopedSocketAddr::from_socket_addr(resolution.addr()?)?,
-                self.ctx,
-            )?);
-            notifier
-                .info(format!("Executing the command: `{}`", connector.0.fdomain_command()?))?;
+            let connector =
+                self.conn_provider.connector_for_target(self.ctx.clone(), input, notifier)?;
             Connection::new(connector).await.map_err(|e| {
                 anyhow::anyhow!(
                     "Unable to connect to device. Underlying error: {}",
@@ -348,17 +379,21 @@ where
     }
 }
 
-pub struct FastbootDeviceStatus<N>(std::marker::PhantomData<N>);
+pub struct FastbootDeviceStatus<'a, F, N> {
+    factory: &'a F,
+    _w: std::marker::PhantomData<N>,
+}
 
-impl<N> FastbootDeviceStatus<N> {
-    pub fn new() -> Self {
-        Self(Default::default())
+impl<'a, F, N> FastbootDeviceStatus<'a, F, N> {
+    pub fn new(factory: &'a F) -> Self {
+        Self { factory, _w: Default::default() }
     }
 }
 
-impl<N> Check for FastbootDeviceStatus<N>
+impl<F, N> Check for FastbootDeviceStatus<'_, F, N>
 where
     N: Notifier + Sized,
+    F: FastbootConnectionFactory,
 {
     type Input = TargetHandle;
     type Output = String;
@@ -384,7 +419,7 @@ where
             // in: FastbootTcp }]
             let fastboot_state = match input.state {
                 TargetState::Fastboot(ref s) => s,
-                _ => panic!("received non-fastboot target handle: {input:?}"),
+                _ => return Err(anyhow::anyhow!("received non-fastboot target handle: {input:?}")),
             };
             let connection_kind = match &fastboot_state.connection_state {
                 FastbootConnectionState::Usb => {
@@ -408,9 +443,207 @@ where
                     v[0].into(),
                 ),
             };
-            let factory = ConnectionFactory {};
-            let mut interface = factory.build_interface(connection_kind).await?;
+            let mut interface = self.factory.build_interface(connection_kind).await?;
             interface.get_var("serialno").await.map_err(Into::into)
         })
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use addr::TargetIpAddr;
+    use ffx_fastboot_connection_factory::test::setup_connection_factory;
+    use ffx_target::FDomainConnection;
+    use std::cell::RefCell;
+    use std::collections::VecDeque;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    #[fuchsia::test]
+    async fn test_fastboot_check_tcp() {
+        let (state, factory) = setup_connection_factory();
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234);
+        let handle = TargetHandle {
+            node_name: Some("test-node".to_string()),
+            state: TargetState::Fastboot(discovery::FastbootTargetState {
+                serial_number: "test-serial".to_string(),
+                connection_state: FastbootConnectionState::Tcp(vec![TargetIpAddr::from(addr)]),
+            }),
+            manual: false,
+        };
+        let mut notifier = ffx_diagnostics::StringNotifier::new();
+        let fake_serial = "fake-serial-number".to_string();
+        state.lock().unwrap().set_var("serialno".to_string(), fake_serial.clone());
+        let mut check = FastbootDeviceStatus::new(&factory);
+        let res = check.check(handle, &mut notifier).await.unwrap();
+        assert_eq!(res, fake_serial);
+    }
+
+    #[fuchsia::test]
+    async fn test_fastboot_check_udp() {
+        let (state, factory) = setup_connection_factory();
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234);
+        let handle = TargetHandle {
+            node_name: Some("test-node".to_string()),
+            state: TargetState::Fastboot(discovery::FastbootTargetState {
+                serial_number: "test-serial".to_string(),
+                connection_state: FastbootConnectionState::Udp(vec![TargetIpAddr::from(addr)]),
+            }),
+            manual: false,
+        };
+        let mut notifier = ffx_diagnostics::StringNotifier::new();
+        let fake_serial = "fake-serial-number".to_string();
+        state.lock().unwrap().set_var("serialno".to_string(), fake_serial.clone());
+        let mut check = FastbootDeviceStatus::new(&factory);
+        let res = check.check(handle, &mut notifier).await.unwrap();
+        assert_eq!(res, fake_serial);
+    }
+
+    #[fuchsia::test]
+    async fn test_fastboot_check_usb() {
+        let (state, factory) = setup_connection_factory();
+        let handle = TargetHandle {
+            node_name: Some("test-node".to_string()),
+            state: TargetState::Fastboot(discovery::FastbootTargetState {
+                serial_number: "test-serial".to_string(),
+                connection_state: FastbootConnectionState::Usb,
+            }),
+            manual: false,
+        };
+        let mut notifier = ffx_diagnostics::StringNotifier::new();
+        let fake_serial = "fake-serial-number".to_string();
+        state.lock().unwrap().set_var("serialno".to_string(), fake_serial.clone());
+        let mut check = FastbootDeviceStatus::new(&factory);
+        let res = check.check(handle, &mut notifier).await.unwrap();
+        assert_eq!(res, fake_serial);
+    }
+
+    #[fuchsia::test]
+    async fn test_fastboot_check_failure() {
+        let (state, factory) = setup_connection_factory();
+        let handle = TargetHandle {
+            node_name: Some("test-node".to_string()),
+            state: TargetState::Unknown,
+            manual: false,
+        };
+        let mut notifier = ffx_diagnostics::StringNotifier::new();
+        let fake_serial = "fake-serial-number".to_string();
+        state.lock().unwrap().set_var("serialno".to_string(), fake_serial);
+        let mut check = FastbootDeviceStatus::new(&factory);
+        let res = check.check(handle, &mut notifier).await;
+        assert!(res.is_err());
+    }
+
+    #[derive(Debug)]
+    struct MockSshConnectorProvider<R> {
+        res: RefCell<Option<anyhow::Result<R>>>,
+    }
+
+    impl<R> MockSshConnectorProvider<R> {
+        fn with_res(res: anyhow::Result<R>) -> Self {
+            Self { res: RefCell::new(Some(res)) }
+        }
+    }
+
+    impl<R> SshConnectorProvider for MockSshConnectorProvider<R>
+    where
+        R: TargetConnector + 'static,
+    {
+        fn connector_for_target<N>(
+            &self,
+            _ctx: EnvironmentContext,
+            _handle: TargetHandle,
+            _notifier: &mut N,
+        ) -> anyhow::Result<impl TargetConnector + 'static>
+        where
+            N: Notifier + Sized,
+        {
+            self.res.borrow_mut().take().expect("called `connector_for_target` once").into()
+        }
+    }
+
+    struct MockConnector {
+        results: RefCell<VecDeque<Result<TargetConnection, TargetConnectionError>>>,
+    }
+
+    impl std::fmt::Debug for MockConnector {
+        fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(fmt, "MockConnector {{}}")
+        }
+    }
+
+    impl MockConnector {
+        /// Delivers the results one at a time in order declared.
+        fn with_results(
+            res: impl Into<Vec<Result<TargetConnection, TargetConnectionError>>>,
+        ) -> Self {
+            Self { results: RefCell::new(res.into().into()) }
+        }
+    }
+
+    impl TargetConnector for MockConnector {
+        const CONNECTION_TYPE: &'static str = "mock";
+
+        async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
+            self.results.borrow_mut().pop_front().expect("should have more mocked results left")
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_connect_ssh() {
+        let env = ffx_config::test_init().await.unwrap();
+        let m = MockSshConnectorProvider::with_res(Ok(MockConnector::with_results([Ok(
+            TargetConnection::FDomain(FDomainConnection::invalid()),
+        )])));
+        let mut notifier = ffx_diagnostics::StringNotifier::new();
+        let mut check = ConnectSsh::new(&env.context, &m);
+        let handle = TargetHandle {
+            node_name: Some("test-node".to_string()),
+            state: TargetState::Unknown,
+            manual: false,
+        };
+        let res = check.check(handle, &mut notifier).await;
+        assert!(res.is_ok());
+    }
+
+    #[fuchsia::test]
+    async fn test_connect_ssh_failures() {
+        let env = ffx_config::test_init().await.unwrap();
+        let m = MockSshConnectorProvider::<MockConnector>::with_res(Err(anyhow::anyhow!(
+            "Couldn't get a connector for some reason"
+        )));
+        let mut notifier = ffx_diagnostics::StringNotifier::new();
+        let mut check = ConnectSsh::new(&env.context, &m);
+        let handle = TargetHandle {
+            node_name: Some("test-node".to_string()),
+            state: TargetState::Unknown,
+            manual: false,
+        };
+        let res = check.check(handle, &mut notifier).await;
+        assert!(res.is_err());
+    }
+
+    #[fuchsia::test]
+    async fn test_connect_ssh_failures_connector_fails() {
+        let env = ffx_config::test_init().await.unwrap();
+        // TODO(b/425474866): This should result in a check where we can see that the connection
+        // failed multiple times albeit non-fatally.
+        let mock_connector = MockConnector::with_results([
+            Err(TargetConnectionError::NonFatal(anyhow::anyhow!("Test non-fatal error"))),
+            Err(TargetConnectionError::NonFatal(anyhow::anyhow!(
+                "Test non-fatal error two: electric boogaloo"
+            ))),
+            Ok(TargetConnection::FDomain(FDomainConnection::invalid())),
+        ]);
+        let m = MockSshConnectorProvider::with_res(Ok(mock_connector));
+        let mut notifier = ffx_diagnostics::StringNotifier::new();
+        let mut check = ConnectSsh::new(&env.context, &m);
+        let handle = TargetHandle {
+            node_name: Some("test-node".to_string()),
+            state: TargetState::Unknown,
+            manual: false,
+        };
+        let res = check.check(handle, &mut notifier).await;
+        assert!(res.is_ok());
     }
 }

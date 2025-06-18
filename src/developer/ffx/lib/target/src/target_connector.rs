@@ -58,6 +58,19 @@ pub struct FDomainConnection {
     pub(crate) main_task: Option<Task<()>>,
 }
 
+impl FDomainConnection {
+    /// Creates a new and unusable FDomainConnection (purely for testing).
+    pub fn invalid() -> Self {
+        let (_, r) = async_channel::unbounded();
+        Self {
+            main_task: None,
+            errors: r,
+            output: Box::new(tokio::io::BufReader::new(tokio::io::empty())),
+            input: Box::new(Vec::new()),
+        }
+    }
+}
+
 pub struct OvernetConnection {
     // Currently because of the implementation of ffx_ssh::parse::parse_ssh_output's
     // implementation, this needs to be a buffered reader.
