@@ -28,7 +28,7 @@ zx::result<> AnonymousPageRequest::Allocate() {
   // end up waiting for a long time then this is probably a sign of a bug in reclamation somewhere,
   // so we want to make some noise here.
   constexpr zx_duration_mono_t kReportWaitTime = ZX_SEC(5);
-  constexpr unsigned int kMaxWaits = ZX_MIN(20) / kReportWaitTime;
+  constexpr unsigned int kMaxWaits = ZX_SEC(30) / kReportWaitTime;
   uint32_t waited = 0;
 
   // Once we return, clear the `active_` flag.
@@ -37,15 +37,16 @@ zx::result<> AnonymousPageRequest::Allocate() {
     zx_status_t wait_result =
         Pmm::Node().WaitTillShouldRetrySingleAlloc(Deadline::after_mono(kReportWaitTime));
     if (wait_result == ZX_ERR_SHOULD_WAIT) {
+      waited++;
       dprintf(INFO, "WARNING: Waited %" PRIi64 " seconds to retry PMM allocations\n",
               (kReportWaitTime * waited) / ZX_SEC(1));
-      waited++;
 
-      // If we've been waiting for more than 20 mins without being able to get more memory and
+      // If we've been waiting for a while without being able to get more memory and
       // without declaring OOM, the memory watchdog is probably wedged and the system is in an
       // unrecoverable state. It would be nice to get some diagnostics here but we don't want to
       // risk trying to acquire any locks; just panic.
-      ZX_ASSERT_MSG(waited < kMaxWaits, "Allocation stalled for 20 min");
+      ZX_ASSERT_MSG(waited < kMaxWaits, "Allocation stalled for %" PRIi64 " seconds",
+                    (kReportWaitTime * waited) / ZX_SEC(1));
       continue;
     }
 
