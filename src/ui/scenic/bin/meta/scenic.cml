@@ -46,6 +46,7 @@
         },
     ],
     use: [
+        { service: "fuchsia.vulkan.loader.TrustedService" },
         {
             directory: "config-data",
             rights: [ "r*" ],
