@@ -168,6 +168,8 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
       fdf::MakeOffer2<fuchsia_hardware_sdio::DriverService>(arena, sdio_function_name_));
 
   if (sdio_parent_->parent()->config().enable_suspend()) {
+    // TODO(b/425459741) Treat errors as fatal again once all products are
+    // wired proerly.
     if (zx::result<> result = ConfigurePowerManagement(); !result.is_error()) {
       fuchsia_hardware_power::PowerTokenService::InstanceHandler handler({
           .token_provider = power_token_provider_bindings_.CreateHandler(
