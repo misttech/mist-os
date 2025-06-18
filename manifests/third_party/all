@@ -436,7 +436,7 @@
     <project name="protobuf-gn"
              path="build/secondary/third_party/protobuf"
              remote="https://fuchsia.googlesource.com/protobuf-gn"
-             revision="017d9a81ad683befce3a4b2c972408d91b208f3e"
+             revision="1d577d70e729f91635fe1b644b0bc8a4391e1751"
              gerrithost="https://fuchsia-review.googlesource.com"/>
     <project name="third_party/github.com/wolever/parameterized"
              path="third_party/parameterized/src"
