@@ -453,11 +453,18 @@ where
 mod test {
     use super::*;
     use addr::TargetIpAddr;
+    use fdomain_client::fidl::DiscoverableProtocolMarker;
+    use fdomain_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use ffx_fastboot_connection_factory::test::setup_connection_factory;
     use ffx_target::FDomainConnection;
+    use fidl_fuchsia_developer_remotecontrol as rcs;
+    use fidl_fuchsia_hwinfo::{ProductInfo, ProductMarker, ProductRequest};
+    use fuchsia_async::Task;
+    use futures_lite::stream::StreamExt;
     use std::cell::RefCell;
     use std::collections::VecDeque;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+    use std::sync::Arc;
 
     #[fuchsia::test]
     async fn test_fastboot_check_tcp() {
@@ -645,5 +652,85 @@ mod test {
         };
         let res = check.check(handle, &mut notifier).await;
         assert!(res.is_ok());
+    }
+
+    fn handle_hwinfo(req: rcs::RemoteControlRequest) {
+        let rcs::RemoteControlRequest::ConnectCapability {
+            server_channel,
+            responder,
+            capability_name,
+            ..
+        } = req
+        else {
+            panic!("unexpected request: {req:?}");
+        };
+        let res = if capability_name.contains("hwinfo") {
+            let server = fidl::endpoints::ServerEnd::<ProductMarker>::new(server_channel);
+            Task::spawn(async move {
+                let mut stream = server.into_stream();
+                while let Ok(Some(req)) = stream.try_next().await {
+                    match req {
+                        ProductRequest::GetInfo { responder } => {
+                            let res = ProductInfo {
+                                name: Some("wubwubwub".to_owned()),
+                                ..Default::default()
+                            };
+                            responder.send(&res).unwrap();
+                        }
+                    }
+                }
+            })
+            .detach();
+            Ok(())
+        } else {
+            Err(rcs::ConnectCapabilityError::NoMatchingCapabilities)
+        };
+        responder.send(res).unwrap();
+    }
+
+    // Creates a local FDomain client with a namespace that only supports the remote control.
+    // This remote control also only supports opening the `hwinfo`
+    fn fdomain_remote_control_server(
+        handler: impl FnOnce(rcs::RemoteControlRequest) + Send + Copy + 'static,
+    ) -> Arc<fdomain_client::Client> {
+        fdomain_local::local_client(move || {
+            let (client, server) =
+                fidl::endpoints::create_endpoints::<fidl_fuchsia_io::DirectoryMarker>();
+            Task::spawn(async move {
+                let mut stream = server.into_stream();
+                while let Ok(Some(req)) = stream.try_next().await {
+                    if let fidl_fuchsia_io::DirectoryRequest::Open { path, object, .. } = req {
+                        assert_eq!(path, RemoteControlMarker::PROTOCOL_NAME);
+                        let server =
+                            fidl::endpoints::ServerEnd::<rcs::RemoteControlMarker>::new(object);
+                        Task::spawn(async move {
+                            let mut stream = server.into_stream();
+                            while let Ok(Some(req)) = stream.try_next().await {
+                                (handler)(req);
+                            }
+                        })
+                        .detach();
+                    } else {
+                        panic!("Unexpected request: {req:?}");
+                    }
+                }
+            })
+            .detach();
+            Ok(client)
+        })
+    }
+
+    #[fuchsia::test]
+    async fn test_connect_remote_control_proxy_success() {
+        let mut notifier = ffx_diagnostics::StringNotifier::new();
+        let conn = Connection::from_fdomain_client(fdomain_remote_control_server(handle_hwinfo));
+        let res = ConnectRemoteControlProxy::new(Duration::from_secs(1))
+            .check_with_notifier(conn, &mut notifier)
+            .await;
+        assert!(res.is_ok(), "Got '{:?}'", res.unwrap_err());
+        let (product_info, _) = res.unwrap();
+        let output: String = notifier.into();
+        assert!(output.contains("SUCCESS"), "Got '{output}'");
+        assert_eq!(product_info.name, Some("wubwubwub".to_owned()));
     }
 }

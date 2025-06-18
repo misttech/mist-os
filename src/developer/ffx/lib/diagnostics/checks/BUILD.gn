@@ -23,8 +23,17 @@ rustc_library("lib") {
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_fdomain",
+    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
+    "//sdk/fidl/fuchsia.hwinfo:fuchsia.hwinfo_rust",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/developer/ffx/lib/addr:lib",
+    "//src/lib/fdomain/client",
+    "//src/lib/fdomain/local",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//third_party/rust_crates:futures-lite",
   ]
   sources = [ "src/lib.rs" ]
 }
