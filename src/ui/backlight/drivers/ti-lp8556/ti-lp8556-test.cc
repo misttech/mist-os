@@ -14,24 +14,27 @@
 #include <lib/device-protocol/display-panel.h>
 #include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/mock-mmio/cpp/region.h>
+#include <lib/inspect/cpp/hierarchy.h>
+#include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/reader.h>
-#include <lib/mock-i2c/mock-i2c.h>
-#include <lib/stdcompat/span.h>
-#include <math.h>
+#include <lib/inspect/testing/cpp/inspect.h>
+#include <lib/mock-i2c/mock-i2c-gtest.h>
 
-#include <map>
+#include <cmath>
 
-#include <zxtest/zxtest.h>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
+#include <mock-mmio-reg/mock-mmio-reg.h>
 
-#include "sdk/lib/inspect/testing/cpp/zxtest/inspect.h"
 #include "src/devices/testing/mock-ddk/mock-device.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace ti {
 
 constexpr uint32_t kMmioRegSize = sizeof(uint32_t);
 constexpr uint32_t kMmioRegCount = (kAOBrightnessStickyReg + kMmioRegSize) / kMmioRegSize;
 
-class Lp8556DeviceTest : public zxtest::Test, public inspect::InspectTestHelper {
+class Lp8556DeviceTest : public ::testing::Test {
  public:
   Lp8556DeviceTest()
       : mock_regs_(mock_mmio::Region(kMmioRegSize, kMmioRegCount)),
@@ -60,11 +63,11 @@ class Lp8556DeviceTest : public zxtest::Test, public inspect::InspectTestHelper 
 
   void TestLifecycle() {
     EXPECT_OK(dev_->DdkAdd("ti-lp8556"));
-    EXPECT_EQ(fake_parent_->child_count(), 1);
+    EXPECT_EQ(fake_parent_->child_count(), 1u);
     dev_->DdkAsyncRemove();
     EXPECT_OK(mock_ddk::ReleaseFlaggedDevices(fake_parent_.get()));  // Calls DdkRelease() on dev_.
     [[maybe_unused]] auto ptr = dev_.release();
-    EXPECT_EQ(fake_parent_->child_count(), 0);
+    EXPECT_EQ(fake_parent_->child_count(), 0u);
   }
 
   void VerifyGetBrightness(bool power, double brightness) {
@@ -112,7 +115,7 @@ class Lp8556DeviceTest : public zxtest::Test, public inspect::InspectTestHelper 
  protected:
   const fidl::ClientEnd<fuchsia_hardware_adhoc_lp8556::Device>& client() const { return client_; }
 
-  mock_i2c::MockI2c mock_i2c_;
+  mock_i2c::MockI2cGtest mock_i2c_;
   std::unique_ptr<Lp8556Device> dev_;
   mock_mmio::Region mock_regs_;
   std::shared_ptr<MockDevice> fake_parent_;
@@ -215,7 +218,7 @@ TEST_F(Lp8556DeviceTest, InitInvalidRegisters) {
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, kInitialRegisterValues,
                             sizeof(kInitialRegisterValues));
 
-  EXPECT_NOT_OK(dev_->Init());
+  EXPECT_NE(dev_->Init(), ZX_OK);
 
   ASSERT_NO_FATAL_FAILURE(mock_regs_[BrightnessStickyReg::Get().addr()].VerifyAndClear());
   ASSERT_NO_FATAL_FAILURE(mock_i2c_.VerifyAndClear());
@@ -228,7 +231,7 @@ TEST_F(Lp8556DeviceTest, InitTooManyRegisters) {
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, kInitialRegisterValues,
                             sizeof(kInitialRegisterValues));
 
-  EXPECT_NOT_OK(dev_->Init());
+  EXPECT_NE(dev_->Init(), ZX_OK);
 
   ASSERT_NO_FATAL_FAILURE(mock_regs_[BrightnessStickyReg::Get().addr()].VerifyAndClear());
   ASSERT_NO_FATAL_FAILURE(mock_i2c_.VerifyAndClear());
@@ -303,16 +306,23 @@ TEST_F(Lp8556DeviceTest, Inspect) {
 
   EXPECT_OK(dev_->Init());
 
-  ReadInspect(dev_->InspectVmo());
-  auto& root_node = hierarchy().GetByPath({"ti-lp8556"})->node();
-  CheckProperty(root_node, "brightness", inspect::DoublePropertyValue(1.0));
+  fpromise::result<inspect::Hierarchy> hierarchy_result = inspect::ReadFromVmo(dev_->InspectVmo());
+  ASSERT_TRUE(hierarchy_result.is_ok());
 
-  EXPECT_FALSE(root_node.get_property<inspect::UintPropertyValue>("persistent_brightness"));
-  CheckProperty(root_node, "scale", inspect::UintPropertyValue(3589u));
-  CheckProperty(root_node, "calibrated_scale", inspect::UintPropertyValue(3589u));
-  CheckProperty(root_node, "power", inspect::BoolPropertyValue(true));
+  inspect::Hierarchy hierarchy = std::move(hierarchy_result.value());
+  const inspect::Hierarchy* root_node = hierarchy.GetByPath({"ti-lp8556"});
+  ASSERT_TRUE(root_node);
+
+  EXPECT_THAT(root_node->node(),
+              inspect::testing::PropertyList(testing::AllOf(
+                  testing::Contains(inspect::testing::DoubleIs("brightness", 1.0)),
+                  testing::Contains(inspect::testing::UintIs("scale", 3589u)),
+                  testing::Contains(inspect::testing::UintIs("calibrated_scale", 3589u)),
+                  testing::Contains(inspect::testing::BoolIs("power", true)))));
+
+  EXPECT_FALSE(root_node->node().get_property<inspect::UintPropertyValue>("persistent_brightness"));
   EXPECT_FALSE(
-      root_node.get_property<inspect::DoublePropertyValue>("max_absolute_brightness_nits"));
+      root_node->node().get_property<inspect::DoublePropertyValue>("max_absolute_brightness_nits"));
 }
 struct IncomingNamespace {
   fdf_fake::FakePDev pdev_server;
