@@ -212,6 +212,10 @@ void plic_shutdown_cpu() {
   ASSERT(arch_curr_cpu_num() != BOOT_CPU_ID);
 }
 
+zx_status_t plic_suspend_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
+zx_status_t plic_resume_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
 bool plic_msi_is_supported() { return false; }
 
 bool plic_msi_supports_masking() { return false; }
@@ -247,6 +251,8 @@ const struct pdev_interrupt_ops plic_ops = {
     .handle_irq = plic_handle_irq,
     .shutdown = plic_shutdown,
     .shutdown_cpu = plic_shutdown_cpu,
+    .suspend_cpu = plic_suspend_cpu,
+    .resume_cpu = plic_resume_cpu,
     .msi_is_supported = plic_msi_is_supported,
     .msi_supports_masking = plic_msi_supports_masking,
     .msi_mask_unmask = plic_msi_mask_unmask,

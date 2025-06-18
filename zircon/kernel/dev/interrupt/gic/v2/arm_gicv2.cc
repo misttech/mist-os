@@ -451,6 +451,10 @@ void gic_shutdown_cpu() {
   arm_gicv2_write32(GICC_CTLR, 0);
 }
 
+zx_status_t gic_suspend_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
+zx_status_t gic_resume_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
 const struct pdev_interrupt_ops gic_ops = {
     .mask = gic_mask_interrupt,
     .unmask = gic_unmask_interrupt,
@@ -468,6 +472,8 @@ const struct pdev_interrupt_ops gic_ops = {
     .handle_irq = gic_handle_irq,
     .shutdown = gic_shutdown,
     .shutdown_cpu = gic_shutdown_cpu,
+    .suspend_cpu = gic_suspend_cpu,
+    .resume_cpu = gic_resume_cpu,
     .msi_is_supported = arm_gicv2m_msi_is_supported,
     .msi_supports_masking = arm_gicv2m_msi_supports_masking,
     .msi_mask_unmask = arm_gicv2m_msi_mask_unmask,
