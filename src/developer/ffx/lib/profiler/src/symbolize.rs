@@ -45,7 +45,7 @@ pub struct SymbolizedRecords {
 #[derive(Clone, Debug)]
 pub struct SymbolizedRecord {
     pub tid: Tid,
-    call_stacks: Vec<Vec<ResolvedAddress>>,
+    pub call_stacks: Vec<Vec<ResolvedAddress>>,
 }
 
 impl SymbolizedRecord {

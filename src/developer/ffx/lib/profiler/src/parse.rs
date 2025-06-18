@@ -4,15 +4,28 @@
 
 use ffx_symbolize::{MappingDetails, MappingFlags};
 use std::collections::HashMap;
+use std::fmt;
 use std::path::PathBuf;
 use std::str::FromStr;
 use thiserror::Error;
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
-pub struct Pid(u64);
+pub struct Pid(pub u64);
+
+impl fmt::Display for Pid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Eq, Hash, PartialEq, Clone, Copy, Debug)]
-pub struct Tid(u64);
+pub struct Tid(pub u64);
+
+impl fmt::Display for Tid {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModuleDetails {
