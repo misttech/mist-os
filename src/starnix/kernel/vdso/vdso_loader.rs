@@ -248,7 +248,16 @@ fn load_time_values_memory() -> Result<Arc<MemoryObject>, Errno> {
     Ok(Arc::new(MemoryObject::from(vmo)))
 }
 
-fn get_sigreturn_offset(vdso_memory: &MemoryObject, sigreturn_name: &str) -> Result<u64, Errno> {
+fn get_string_index(string_table: &[u8], value: &[u8]) -> Option<usize> {
+    for (position, window) in string_table.windows(value.len()).enumerate() {
+        if window == value {
+            return Some(position);
+        }
+    }
+    None
+}
+
+fn get_sigreturn_offset(vdso_memory: &MemoryObject, sigreturn_name: &[u8]) -> Result<u64, Errno> {
     let vdso_vmo = vdso_memory.as_vmo().ok_or_else(|| errno!(EINVAL))?;
     let dyn_section = elf_parse::Elf64DynSection::from_vmo(vdso_vmo).map_err(|_| errno!(EINVAL))?;
     let symtab = dyn_section
@@ -265,10 +274,8 @@ fn get_sigreturn_offset(vdso_memory: &MemoryObject, sigreturn_name: &str) -> Res
     let strtab_bytes = vdso_vmo
         .read_to_vec(strtab.value, strsz.value)
         .map_err(|status| from_status_like_fdio!(status))?;
-    let mut strtab_items = strtab_bytes.split(|c: &u8| *c == 0u8);
-    let strtab_idx = strtab_items
-        .position(|entry: &[u8]| std::str::from_utf8(entry) == Ok(sigreturn_name))
-        .ok_or_else(|| errno!(ENOENT))?;
+    let strtab_idx =
+        get_string_index(&strtab_bytes, sigreturn_name).ok_or_else(|| errno!(ENOENT))?;
 
     const SYM_ENTRY_SIZE: usize = std::mem::size_of::<elf_parse::Elf64Sym>();
 
@@ -285,7 +292,7 @@ fn get_sigreturn_offset(vdso_memory: &MemoryObject, sigreturn_name: &str) -> Res
     }
 }
 
-fn get_sigreturn32_offset(vdso_memory: &MemoryObject, sigreturn_name: &str) -> Result<u64, Errno> {
+fn get_sigreturn32_offset(vdso_memory: &MemoryObject, sigreturn_name: &[u8]) -> Result<u64, Errno> {
     let vdso_vmo = vdso_memory.as_vmo().ok_or_else(|| errno!(EINVAL))?;
     let dyn_section =
         elf_parse::Elf64DynSection::from_vmo_with_arch32(vdso_vmo).map_err(|_| errno!(EINVAL))?;
@@ -303,10 +310,8 @@ fn get_sigreturn32_offset(vdso_memory: &MemoryObject, sigreturn_name: &str) -> R
     let strtab_bytes = vdso_vmo
         .read_to_vec(strtab.value, strsz.value)
         .map_err(|status| from_status_like_fdio!(status))?;
-    let mut strtab_items = strtab_bytes.split(|c: &u8| *c == 0u8);
-    let strtab_idx = strtab_items
-        .position(|entry: &[u8]| std::str::from_utf8(entry) == Ok(sigreturn_name))
-        .ok_or_else(|| errno!(ENOENT))?;
+    let strtab_idx =
+        get_string_index(&strtab_bytes, sigreturn_name).ok_or_else(|| errno!(ENOENT))?;
 
     const SYM_ENTRY_SIZE: usize = std::mem::size_of::<elf_parse::Elf32Sym>();
 
