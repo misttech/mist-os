@@ -2850,7 +2850,8 @@ void VmCowPages::UpdateDirtyStateLocked(vm_page_t* page, uint64_t offset, DirtyS
   // If the page is Dirty or AwaitingClean, it should not be loaned.
   DEBUG_ASSERT(!(is_page_dirty(page) || is_page_awaiting_clean(page)) || !page->is_loaned());
 
-  // Perform state-specific checks and actions. We will finally update the state below.
+  // Perform state-specific checks. We will finally update the state below.
+  bool update_page_queues = false;
   switch (dirty_state) {
     case DirtyState::Clean:
       // If the page is not in the process of being added, we can only see a transition to Clean
@@ -2859,8 +2860,7 @@ void VmCowPages::UpdateDirtyStateLocked(vm_page_t* page, uint64_t offset, DirtyS
 
       // If we are expecting a pending Add[New]PageLocked, we can defer updating the page queue.
       if (!is_pending_add) {
-        // Move to evictable pager backed queue to start tracking age information.
-        pmm_page_queues()->MoveToReclaim(page);
+        update_page_queues = true;
       }
       break;
     case DirtyState::Dirty:
@@ -2874,13 +2874,7 @@ void VmCowPages::UpdateDirtyStateLocked(vm_page_t* page, uint64_t offset, DirtyS
 
       // If we are expecting a pending Add[New]PageLocked, we can defer updating the page queue.
       if (!is_pending_add) {
-        // Move the page to the Dirty queue, which does not track page age. While the page is in the
-        // Dirty queue, age information is not required (yet). It will be required when the page
-        // becomes Clean (and hence evictable) again, at which point it will get moved to the MRU
-        // pager backed queue and will age as normal.
-        // TODO(rashaeqbal): We might want age tracking for the Dirty queue in the future when the
-        // kernel generates writeback pager requests.
-        pmm_page_queues()->MoveToPagerBackedDirty(page);
+        update_page_queues = true;
       }
       break;
     case DirtyState::AwaitingClean:
@@ -2911,6 +2905,22 @@ void VmCowPages::UpdateDirtyStateLocked(vm_page_t* page, uint64_t offset, DirtyS
       ASSERT(false);
   }
   page->object.dirty_state = static_cast<uint8_t>(dirty_state) & VM_PAGE_OBJECT_DIRTY_STATES_MASK;
+  if (update_page_queues && page->object.pin_count == 0) {
+    // Move the page to the appropriate page queue, checking for global state such as high priority
+    // count etc.
+    //
+    // If Clean:
+    // Move to evictable pager backed queue to start tracking age information.
+    //
+    // If Dirty:
+    // Move the page to the Dirty queue, which does not track page age. While the page is in the
+    // Dirty queue, age information is not required (yet). It will be required when the page
+    // becomes Clean (and hence evictable) again, at which point it will get moved to the MRU
+    // pager backed queue and will age as normal.
+    // TODO(rashaeqbal): We might want age tracking for the Dirty queue in the future when the
+    // kernel generates writeback pager requests.
+    MoveToNotPinnedLocked(page, offset);
+  }
 }
 
 zx_status_t VmCowPages::PrepareForWriteLocked(VmCowRange range, LazyPageRequest* page_request,
