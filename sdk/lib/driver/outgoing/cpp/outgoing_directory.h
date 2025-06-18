@@ -14,6 +14,8 @@
 #include <lib/fidl/cpp/wire/service_handler.h>
 #include <lib/fidl_driver/cpp/transport.h>
 
+#include <unordered_set>
+
 namespace fdf {
 
 // The name of the default FIDL Service instance.
@@ -94,9 +96,19 @@ class OutgoingDirectory final {
           return add_result;
         }
       }
+
+      // If one already exists, insert returns the iterator to the existing item instead of
+      // resetting it to an empty set.
+      auto [it, _inserted] = driver_services_.try_emplace(std::string(Service::Name));
+      it->second.insert(std::string(instance));
     } else if constexpr (std::is_same_v<TransportHandler, component::ServiceInstanceHandler>) {
       // If zircon transport is used, just take the user given handler and use that.
       component_handler = std::move(handler);
+
+      // If one already exists, insert returns the iterator to the existing item instead of
+      // resetting it to an empty set.
+      auto [it, _inserted] = zircon_services_.try_emplace(std::string(Service::Name));
+      it->second.insert(std::string(instance));
     } else {
       static_assert(
           always_false<TransportHandler>,
@@ -207,6 +219,14 @@ class OutgoingDirectory final {
     return component_outgoing_dir_.RemoveDirectoryAt(path, directory_name);
   }
 
+  std::unordered_map<std::string, std::unordered_set<std::string>> GetDriverServices() {
+    return driver_services_;
+  }
+
+  std::unordered_map<std::string, std::unordered_set<std::string>> GetZirconServices() {
+    return zircon_services_;
+  }
+
   // Get the underlying component outgoing directory. These APIs will only support
   // FIDL, they do not support DriverTransport.
   component::OutgoingDirectory& component() { return component_outgoing_dir_; }
@@ -222,6 +242,9 @@ class OutgoingDirectory final {
   component::OutgoingDirectory component_outgoing_dir_;
 
   fdf::UnownedSynchronizedDispatcher dispatcher_;
+
+  std::unordered_map<std::string, std::unordered_set<std::string>> driver_services_;
+  std::unordered_map<std::string, std::unordered_set<std::string>> zircon_services_;
 };
 
 }  // namespace fdf
