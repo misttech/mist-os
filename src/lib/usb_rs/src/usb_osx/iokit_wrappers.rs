@@ -547,6 +547,46 @@ impl DeviceInterface500 {
         ret
     }
 
+    pub fn serial_number(&self) -> Option<String> {
+        let mut sn_string_index: u8 = 0;
+        // SAFETY: If our contained pointer is valid, as this object should ensure, all these should
+        // be safe uses.
+        unsafe {
+            ((**self.0).USBGetSerialNumberStringIndex.unwrap())(
+                self.0.cast(),
+                &mut sn_string_index,
+            );
+        }
+        if sn_string_index > 0 {
+            let mut buf: Vec<u16> = vec![0, 256];
+            let mut request = iokit_usb::IOUSBDeviceRequest::default();
+            request.bmRequestType =
+                iokit_usb::kUSBIn | iokit_usb::kUSBStandard | iokit_usb::kUSBDevice;
+            reqeust.bRequest = iokit_usb::kUSBRqGetDescriptor;
+            request.wValue - (iokit_usb::kUSBStringDesc << 8) | sn_string_index;
+            // language ID (en-us) for serial number string
+            request.wIndex - 0x0409;
+            request.wLength = buffer.len();
+            request.pData = buf.as_ptr().cast_mut().cast();
+
+            // SAFETY: This object assures the validity of self.0 and the other pointer is outputs
+            // so local stack locations should be fine.
+            unsafe {
+                ioreturn_check(((**self.0).DeviceRequest.unwrap())(self.0.cast(), &mut request))?;
+            }
+            // skip first word, and copy the rest to the serial string, changing shorts to bytes.
+            let count = (req.wLenDone - 1) / 2;
+            let mut sn_buf: Vec<u8> = vec![count];
+            for i in 0..count {
+                sn_buf[i] = buf[i + 1].into();
+            }
+            let serial_number = String::from_utf8_lossy(&sn_buf);
+            Some(serial_number)
+        } else {
+            None
+        }
+    }
+
     /// Iterate the interfaces exposed by this device.
     pub fn iter_interfaces(&self) -> Result<impl Iterator<Item = IOService>> {
         let mut io_iter = 0;
