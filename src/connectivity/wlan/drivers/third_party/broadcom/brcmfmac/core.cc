@@ -796,6 +796,7 @@ zx_status_t brcmf_reset(brcmf_pub* drvr) {
     BRCMF_ERR("Clear driver status failed -- error: %s", zx_status_get_string(err));
     return err;
   }
+  drvr->config->dongle_up = false;
   return ZX_OK;
 }
 

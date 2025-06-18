@@ -7842,7 +7842,7 @@ static zx_status_t brcmf_config_dongle(struct brcmf_cfg80211_info* cfg) {
 
   BRCMF_DBG(TEMP, "Enter");
   if (cfg->dongle_up) {
-    BRCMF_DBG(TEMP, "Early done");
+    BRCMF_ERR("Dongle is already up");
     return err;
   }
 
