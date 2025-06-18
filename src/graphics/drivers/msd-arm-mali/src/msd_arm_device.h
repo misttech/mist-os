@@ -170,7 +170,7 @@ class MsdArmDevice : public msd::Device,
   bool NdtIsProtectedModeSupported() override;
   void NdtDeregisterConnection() override;
   void NdtSetCurrentThreadToDefaultPriority() override;
-  PerformanceCounters* performance_counters() override { return perf_counters_.get(); }
+  PerformanceCounters* performance_counters() { return perf_counters_.get(); }
   std::shared_ptr<DeviceRequest::Reply> NdtPostTask(FitCallbackTask task) override;
   std::thread::id NdtGetDeviceThreadId() override {
     // Only mutated during device init and shutdown.

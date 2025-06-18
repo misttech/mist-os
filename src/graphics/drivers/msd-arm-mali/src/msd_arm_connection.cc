@@ -345,13 +345,11 @@ MsdArmConnection::MsdArmConnection(msd::msd_client_id_t client_id, Owner* owner)
 
 MsdArmConnection::~MsdArmConnection() {
   if (perf_count_manager_) {
-    auto* perf_count = performance_counters();
-    owner_->NdtPostTask(
-        [perf_count_manager = perf_count_manager_, perf_count](MsdArmDevice* device) {
-          perf_count->RemoveManager(perf_count_manager.get());
-          perf_count->Update();
-          return MAGMA_STATUS_OK;
-        });
+    owner_->NdtPostTask([perf_count_manager = perf_count_manager_](MsdArmDevice* device) {
+      device->performance_counters()->RemoveManager(perf_count_manager.get());
+      device->performance_counters()->Update();
+      return MAGMA_STATUS_OK;
+    });
   }
 
   // Do this before tearing down GpuMappings to ensure it doesn't try to grab a
@@ -1088,22 +1086,21 @@ magma_status_t MsdArmConnection::EnablePerformanceCounters(std::vector<uint64_t>
     perf_count_manager_ = std::make_shared<ConnectionPerfCountManager>();
     start_managing = true;
   }
-  auto* perf_count = performance_counters();
-  auto reply = owner_->NdtPostTask([perf_count_manager = perf_count_manager_, perf_count,
-                                    flags = std::move(flags), client_id = client_id_,
-                                    start_managing](MsdArmDevice* device) {
-    perf_count_manager->enabled_performance_counters_ = std::move(flags);
-    if (start_managing) {
-      if (!perf_count->AddManager(perf_count_manager.get())) {
-        MAGMA_LOG(WARNING,
-                  "Client %" PRIu64 " Attempting to add performance counter manager failed.",
-                  client_id);
-        return MAGMA_STATUS_INTERNAL_ERROR;
-      }
-    }
-    perf_count->Update();
-    return MAGMA_STATUS_OK;
-  });
+  auto reply =
+      owner_->NdtPostTask([perf_count_manager = perf_count_manager_, flags = std::move(flags),
+                           client_id = client_id_, start_managing](MsdArmDevice* device) {
+        perf_count_manager->enabled_performance_counters_ = std::move(flags);
+        if (start_managing) {
+          if (!device->performance_counters()->AddManager(perf_count_manager.get())) {
+            MAGMA_LOG(WARNING,
+                      "Client %" PRIu64 " Attempting to add performance counter manager failed.",
+                      client_id);
+            return MAGMA_STATUS_INTERNAL_ERROR;
+          }
+        }
+        device->performance_counters()->Update();
+        return MAGMA_STATUS_OK;
+      });
 
   if (!start_managing) {
     // The call task can't fail, so return true immediately.
@@ -1115,11 +1112,10 @@ magma_status_t MsdArmConnection::EnablePerformanceCounters(std::vector<uint64_t>
 
 magma_status_t MsdArmConnection::DumpPerformanceCounters(std::shared_ptr<MsdArmPerfCountPool> pool,
                                                          uint32_t trigger_id) {
-  auto* perf_count = performance_counters();
-  owner_->NdtPostTask([pool, perf_count, trigger_id](MsdArmDevice* device) {
-    perf_count->AddClient(pool.get());
+  owner_->NdtPostTask([pool, trigger_id](MsdArmDevice* device) {
+    device->performance_counters()->AddClient(pool.get());
     pool->AddTriggerId(trigger_id);
-    perf_count->TriggerRead();
+    device->performance_counters()->TriggerRead();
     return MAGMA_STATUS_OK;
   });
   return MAGMA_STATUS_OK;
@@ -1127,10 +1123,9 @@ magma_status_t MsdArmConnection::DumpPerformanceCounters(std::shared_ptr<MsdArmP
 
 magma_status_t MsdArmConnection::ReleasePerformanceCounterBufferPool(
     std::shared_ptr<MsdArmPerfCountPool> pool) {
-  auto* perf_count = performance_counters();
-  auto reply = owner_->NdtPostTask([pool, perf_count](MsdArmDevice* device) {
+  auto reply = owner_->NdtPostTask([pool](MsdArmDevice* device) {
     pool->set_valid(false);
-    perf_count->RemoveClient(pool.get());
+    device->performance_counters()->RemoveClient(pool.get());
     return MAGMA_STATUS_OK;
   });
 

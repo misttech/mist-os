@@ -15,7 +15,6 @@ class FakeConnectionOwnerBase : public MsdArmConnection::Owner {
   bool NdtIsProtectedModeSupported() override { return false; }
   void NdtDeregisterConnection() override {}
   void NdtSetCurrentThreadToDefaultPriority() override {}
-  PerformanceCounters* performance_counters() override { return nullptr; }
   std::shared_ptr<DeviceRequest::Reply> NdtPostTask(FitCallbackTask task) override {
     // This implementation runs the callback immediately.
     auto real_task = std::make_unique<DeviceRequest>();

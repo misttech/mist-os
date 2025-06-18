@@ -56,8 +56,6 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
     // refcount should be 0.
     virtual void NdtDeregisterConnection() = 0;
     virtual void NdtSetCurrentThreadToDefaultPriority() = 0;
-    // TODO(b/417848695): refactor this so it's passed into the lambda functions where it's used?
-    virtual PerformanceCounters* performance_counters() = 0;
     virtual std::shared_ptr<DeviceRequest::Reply> NdtPostTask(FitCallbackTask task) = 0;
     virtual std::thread::id NdtGetDeviceThreadId() = 0;
     virtual msd::MagmaMemoryPressureLevel NdtGetCurrentMemoryPressureLevel() = 0;
@@ -195,8 +193,6 @@ class MsdArmConnection : public std::enable_shared_from_this<MsdArmConnection>,
   // Release all unused JIT regions to save memory. Returns the number of bytes freed.
   size_t FreeUnusedJitRegionsIfNeeded() FIT_REQUIRES(address_lock_);
   bool RemoveMappingLocked(uint64_t gpu_va) FIT_REQUIRES(address_lock_);
-
-  PerformanceCounters* performance_counters() { return owner_->performance_counters(); }
 
   magma::PlatformBusMapper* GetBusMapper() override { return owner_->NdtGetBusMapper(); }
 
