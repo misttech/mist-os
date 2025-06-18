@@ -6,6 +6,7 @@
 #define SRC_UI_BACKLIGHT_DRIVERS_TI_LP8556_TI_LP8556_H_
 
 #include <fidl/fuchsia.hardware.adhoc.lp8556/cpp/wire.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/device-protocol/i2c-channel.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
@@ -137,6 +138,8 @@ class Lp8556Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_BA
  private:
   static constexpr char kPowerSensorName[] = "backlight";
 
+  zx::result<display::PanelType> GetDisplayPanelInfo();
+
   zx_status_t SetCurrentScale(uint16_t scale);
   zx_status_t ReadInitialState();
 
@@ -168,7 +171,8 @@ class Lp8556Device : public DeviceType, public ddk::EmptyProtocol<ZX_PROTOCOL_BA
   inspect::UintProperty panel_id_property_;
   inspect::UintProperty panel_type_property_;
   TiLp8556Metadata metadata_ = {.allow_set_current_scale = false};
-  uint32_t panel_type_id_ = 0;
+
+  display::PanelType panel_type_ = display::PanelType::kUnknown;
   uint32_t board_pid_ = 0;
   double backlight_power_ = 0;
   double max_current_ = 0.0;

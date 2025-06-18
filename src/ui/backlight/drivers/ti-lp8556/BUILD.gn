@@ -56,6 +56,7 @@ source_set("common") {
     ":metadata",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/mmio",
+    "//src/graphics/display/lib/device-protocol-display",
     "//src/lib/ddktl",
     "//zircon/system/ulib/hwreg",
   ]

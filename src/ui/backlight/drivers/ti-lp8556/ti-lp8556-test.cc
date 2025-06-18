@@ -11,6 +11,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/device-protocol/display-panel.h>
 #include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/mock-mmio/cpp/region.h>
 #include <lib/inspect/cpp/reader.h>
@@ -325,7 +326,8 @@ TEST_F(Lp8556DeviceTest, GetBackLightPower) {
       .register_count = 0,
   };
 
-  constexpr uint32_t kPanelId = 2;
+  constexpr uint32_t kBootloaderPanelId = 2;  // kBoeFiti9364
+  constexpr display::PanelType kPanelType = display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson;
 
   async::Loop incoming_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming{incoming_loop.dispatcher(),
@@ -350,7 +352,9 @@ TEST_F(Lp8556DeviceTest, GetBackLightPower) {
                                std::move(outgoing_endpoints.client), "pdev");
 
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kDeviceMetadata, sizeof(kDeviceMetadata));
-  fake_parent_->SetMetadata(DEVICE_METADATA_BOARD_PRIVATE, &kPanelId, sizeof(kPanelId));
+  fake_parent_->SetMetadata(DEVICE_METADATA_BOARD_PRIVATE, &kBootloaderPanelId,
+                            sizeof(kBootloaderPanelId));
+  fake_parent_->SetMetadata(DEVICE_METADATA_DISPLAY_PANEL_TYPE, &kPanelType, sizeof(kPanelType));
 
   mock_i2c_.ExpectWrite({kCfg2Reg})
       .ExpectReadStop({kCfg2Default})
@@ -383,7 +387,8 @@ TEST_F(Lp8556DeviceTest, GetPowerWatts) {
       .register_count = 0,
   };
 
-  constexpr uint32_t kPanelId = 2;
+  constexpr uint32_t kBootloaderPanelId = 2;  // kBoeFiti9364
+  constexpr display::PanelType kPanelType = display::PanelType::kBoeTv070wsmFitipowerJd9364Nelson;
 
   async::Loop incoming_loop{&kAsyncLoopConfigNoAttachToCurrentThread};
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming{incoming_loop.dispatcher(),
@@ -408,7 +413,9 @@ TEST_F(Lp8556DeviceTest, GetPowerWatts) {
                                std::move(outgoing_endpoints.client), "pdev");
 
   fake_parent_->SetMetadata(DEVICE_METADATA_PRIVATE, &kDeviceMetadata, sizeof(kDeviceMetadata));
-  fake_parent_->SetMetadata(DEVICE_METADATA_BOARD_PRIVATE, &kPanelId, sizeof(kPanelId));
+  fake_parent_->SetMetadata(DEVICE_METADATA_BOARD_PRIVATE, &kBootloaderPanelId,
+                            sizeof(kBootloaderPanelId));
+  fake_parent_->SetMetadata(DEVICE_METADATA_DISPLAY_PANEL_TYPE, &kPanelType, sizeof(kPanelType));
 
   mock_i2c_.ExpectWrite({kCfg2Reg})
       .ExpectReadStop({kCfg2Default})
