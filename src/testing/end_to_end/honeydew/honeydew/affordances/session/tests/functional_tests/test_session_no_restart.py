@@ -92,7 +92,9 @@ class SessionAffordanceNoRestartTests(fuchsia_base_test.FuchsiaBaseTest):
         _LOGGER.info(f"after cleanup: {after_cleanup}")
 
         # The cleanup should remove the newly added component.
-        asserts.assert_false(added_element in after_cleanup)
+        asserts.assert_false(
+            added_element in after_cleanup, "The added element is not removed."
+        )
 
 
 if __name__ == "__main__":
