@@ -4,14 +4,16 @@
 
 use super::{Container, Filesystem, FilesystemLauncher};
 use crate::device::constants::DATA_TYPE_GUID;
-use anyhow::Error;
+use anyhow::{Context as _, Error};
 use async_trait::async_trait;
 use crypt_policy::get_policy;
 use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
+use fidl_fuchsia_fvm::ResetMarker;
 use fs_management::filesystem::ServingMultiVolumeFilesystem;
 use fs_management::format::constants::{
     BLOBFS_PARTITION_LABEL, DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL,
 };
+use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use zxcrypt_crypt::with_crypt_service;
 
 pub struct FvmContainer(ServingMultiVolumeFilesystem, bool);
@@ -122,7 +124,13 @@ impl Container for FvmContainer {
     }
 
     async fn shred_data(&mut self) -> Result<(), Error> {
-        // TODO(https://fxbug.dev/367171959): Implement this
-        todo!();
+        let reset_proxy = connect_to_protocol_at_dir_root::<ResetMarker>(self.0.exposed_dir())?;
+        reset_proxy
+            .shred_encrypted_volumes()
+            .await
+            .context("shred encrypted volumes fidl failure")?
+            .map_err(zx::Status::from_raw)
+            .context("shred encrypted volumes returned error")?;
+        Ok(())
     }
 }

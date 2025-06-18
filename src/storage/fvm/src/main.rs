@@ -6,6 +6,7 @@ mod device;
 mod mapping;
 mod zxcrypt;
 
+use crate::zxcrypt::Key;
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use block_client::{
     BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId, WriteOptions,
@@ -20,6 +21,7 @@ use fidl_fuchsia_fs_startup::{
     StartupRequestStream, VolumeRequest, VolumeRequestStream, VolumesMarker, VolumesRequest,
     VolumesRequestStream,
 };
+use fidl_fuchsia_fvm::{ResetMarker, ResetRequest, ResetRequestStream};
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fs_management::filesystem::{BlockConnector, Filesystem};
 use fs_management::format::{detect_disk_format, DiskFormat};
@@ -950,6 +952,18 @@ impl Component {
                 }
             }),
         )?;
+        let weak = Arc::downgrade(self);
+        svc_dir.add_entry(
+            ResetMarker::PROTOCOL_NAME,
+            vfs::service::host(move |requests| {
+                let weak = weak.clone();
+                async move {
+                    if let Some(me) = weak.upgrade() {
+                        let _ = me.handle_reset_requests(requests).await;
+                    }
+                }
+            }),
+        )?;
         vfs::directory::serve_on(
             self.export_dir.clone(),
             fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE,
@@ -1397,6 +1411,36 @@ impl Component {
                 Ok(())
             }
         }
+    }
+
+    async fn handle_reset_requests(
+        self: &Arc<Self>,
+        mut stream: ResetRequestStream,
+    ) -> Result<(), Error> {
+        match stream.try_next().await? {
+            None => Ok(()),
+            Some(ResetRequest::ShredEncryptedVolumes { responder }) => {
+                info!("Received reset shred encrypted volumes request");
+                responder
+                    .send(self.handle_shred_encrypted_volumes().await.map_err(|error| {
+                        warn!(error:?; "Failed to shred encrypted volumes");
+                        zx::Status::INTERNAL.into_raw()
+                    }))
+                    .unwrap_or_else(|error| warn!(error:?; "Failed to send shred response"));
+                info!("Shred encrypted volumes complete");
+                Ok(())
+            }
+        }
+    }
+
+    async fn handle_shred_encrypted_volumes(self: &Arc<Self>) -> Result<(), Error> {
+        let fvm = self.fvm();
+        let inner = fvm.inner.read().await;
+        for partition_index in inner.metadata.partitions.keys() {
+            Key::shred_if_zxcrypt_volume(&fvm, *partition_index).await?;
+        }
+
+        Ok(())
     }
 }
 

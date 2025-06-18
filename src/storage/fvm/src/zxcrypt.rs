@@ -104,6 +104,24 @@ impl Key {
             iv: little_endian::U128::from_bytes(unwrapped_key[64..80].try_into().unwrap()).get(),
         })
     }
+
+    pub async fn shred_if_zxcrypt_volume(fvm: &Fvm, partition_index: u16) -> Result<(), Error> {
+        // Read the first block which contains Zxcrypt's header.
+        let block_size = fvm.device.block_size() as usize;
+        let mut data = AlignedMem::<ZxcryptHeaderAndKey>::new(block_size);
+        fvm.do_io(ReadToMem::new(&fvm.device, &mut data), partition_index, 0, 1, 0).await?;
+
+        let (zxcrypt_header, _) = ZxcryptHeaderAndKey::ref_from_prefix(&data).unwrap();
+        if zxcrypt_header.magic != ZXCRYPT_MAGIC {
+            return Ok(());
+        }
+
+        // Fill the block with random data to shred it.  This is what the old driver did.
+        zx::cprng_draw(&mut data);
+        fvm.do_io(WriteFromMem::new(&fvm.device, &data), partition_index, 0, 1, 0).await?;
+
+        Ok(())
+    }
 }
 
 struct Op {

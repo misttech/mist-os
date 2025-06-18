@@ -96,6 +96,10 @@ async fn find_data_partition(ramdisk_prefix: Option<String>) -> Result<Controlle
     zx::ok(fvm_volume_manager_proxy.get_info().await.context("transport error on get_info")?.0)
         .context("get_info failed")?;
 
+    find_data_partition_in(fvm_path).await
+}
+
+async fn find_data_partition_in(fvm_path: String) -> Result<ControllerProxy, Error> {
     let fvm_dir =
         fuchsia_fs::directory::open_in_namespace(&format!("{fvm_path}/fvm"), fio::PERM_READABLE)?;
 
@@ -637,13 +641,12 @@ async fn write_data_file(
 async fn shred_data_volume(
     environment: &Arc<Mutex<dyn Environment>>,
     config: &fshost_config::Config,
-    ramdisk_prefix: Option<String>,
-    launcher: &FilesystemLauncher,
 ) -> Result<(), zx::Status> {
-    if config.data_filesystem_format != "fxfs" {
+    if !(config.data_filesystem_format == "fxfs" || (config.storage_host && !config.no_zxcrypt)) {
         return Err(zx::Status::NOT_SUPPORTED);
     }
-    // If we expect Fxfs to be live, ask `environment` to shred the data volume.
+
+    // If we expect the filesystems to be live, ask `environment` to shred the data volume.
     if (config.data || config.fxfs_blob) && !config.ramdisk_image {
         log::info!("Filesystem is running; shredding online.");
         environment.lock().await.shred_data().await.map_err(|err| {
@@ -651,110 +654,115 @@ async fn shred_data_volume(
             zx::Status::INTERNAL
         })?;
     } else {
-        // Otherwise we need to find the Fxfs partition and shred it.
+        // Otherwise we need to find the system container and shred the encrypted volumes in it.
         log::info!("Filesystem is not running; shredding offline.");
 
-        let filesystem = if config.fxfs_blob {
-            // We find the device via our own matcher.
-            let registered_devices = environment.lock().await.registered_devices().clone();
-            let block_connector = registered_devices
-                .get_block_connector(DeviceTag::SystemContainerOnRecovery)
-                .map_err(|error| {
-                    log::error!(error:?; "shred_data_volume: unable to get block connector");
-                    zx::Status::NOT_FOUND
-                })
-                .on_timeout(FIND_PARTITION_DURATION, || {
-                    log::error!("Failed to find fxfs within timeout");
-                    Err(zx::Status::NOT_FOUND)
-                })
-                .await?;
-
-            // Check to see if the device needs formatting.
-            let format = detect_disk_format(
-                &block_connector
-                    .connect_block()
-                    .map_err(|error| {
-                        log::error!(error:?; "connect_block failed");
-                        zx::Status::INTERNAL
-                    })?
-                    .into_proxy(),
-            )
-            .await;
-            if format != DiskFormat::Fxfs {
-                ServeFilesystemStatus::FormatRequired
-            } else {
-                launcher
-                    .serve_data_from(fs_management::filesystem::Filesystem::from_boxed_config(
-                        block_connector,
-                        Box::new(Fxfs::dynamic_child()),
-                    ))
-                    .await
-                    .map_err(|error| {
-                        log::error!(error:?; "serving fxfs");
-                        zx::Status::INTERNAL
-                    })?
-            }
-        } else {
-            // TODO(https://fxbug.dev/339491886): Support storage-host based systems.
-            let partition_controller = find_data_partition(ramdisk_prefix).await.map_err(|e| {
-                log::error!("shred_data_volume: unable to find partition: {e:?}");
+        let registered_devices = environment.lock().await.registered_devices().clone();
+        // Get the block connector for all filesystem types. This blocks until the matchers find
+        // the system container, so even if we don't use it, we know after this the device exists.
+        let block_connector = registered_devices
+            .get_block_connector(DeviceTag::SystemContainerOnRecovery)
+            .map_err(|error| {
+                log::error!(error:?; "shred_data_volume: unable to get block connector");
                 zx::Status::NOT_FOUND
-            })?;
-            let partition_path = partition_controller
-                .get_topological_path()
-                .await
-                .map_err(|e| {
-                    log::error!("Failed to get topo path (fidl error): {e:?}");
+            })
+            .on_timeout(FIND_PARTITION_DURATION, || {
+                log::error!("Failed to find system container within timeout");
+                Err(zx::Status::NOT_FOUND)
+            })
+            .await?;
+        // Unwrap is fine here, if we got through get_block_connector without an error then the
+        // device with this tag is registered.
+        let device_path =
+            registered_devices.get_topological_path(DeviceTag::SystemContainerOnRecovery).unwrap();
+        let format = detect_disk_format(
+            &block_connector
+                .connect_block()
+                .map_err(|error| {
+                    log::error!(error:?; "connect_block failed");
                     zx::Status::INTERNAL
                 })?
-                .map_err(|e| {
-                    let status = zx::Status::from_raw(e);
-                    log::error!("Failed to get topo path: {}", status.to_string());
-                    status
-                })?;
-            let mut device = Box::new(
-                BlockDevice::from_proxy(partition_controller, &partition_path).await.map_err(
-                    |e| {
-                        log::error!("failed to make new device: {e:?}");
-                        zx::Status::NOT_FOUND
-                    },
-                )?,
-            );
-            launcher.serve_data(device.as_mut(), Fxfs::dynamic_child()).await.map_err(|e| {
-                log::error!("serving fxfs: {e:?}");
-                zx::Status::INTERNAL
-            })?
-        };
+                .into_proxy(),
+        )
+        .await;
 
-        let mut filesystem = match filesystem {
-            // If we already need to format for some reason, we don't need to worry about shredding
-            // the data volume.
-            ServeFilesystemStatus::FormatRequired => return Ok(()),
-            ServeFilesystemStatus::Serving(fs) => fs,
-        };
-        let unencrypted = filesystem.volume(UNENCRYPTED_VOLUME_LABEL).ok_or_else(|| {
-            log::error!("Failed to find unencrypted volume");
-            zx::Status::NOT_FOUND
-        })?;
-        let dir =
-            fuchsia_fs::directory::open_directory(unencrypted.root(), "keys", fio::PERM_WRITABLE)
+        if config.fxfs_blob {
+            if format != DiskFormat::Fxfs {
+                return Ok(());
+            }
+
+            let mut fxfs = fs_management::filesystem::Filesystem::from_boxed_config(
+                block_connector,
+                Box::new(Fxfs::dynamic_child()),
+            );
+            let mut serving_fxfs = fxfs.serve_multi_volume().await.map_err(|error| {
+                log::error!(error:?; "Failed to serve fxfs");
+                zx::Status::INTERNAL
+            })?;
+            let _ = serving_fxfs
+                .open_volume(UNENCRYPTED_VOLUME_LABEL, MountOptions::default())
                 .await
-                .map_err(|e| {
-                    log::error!("Failed to open keys dir: {e:?}");
+                .map_err(|error| {
+                    log::error!(error:?; "Failed to open unencrypted volume in fxfs");
                     zx::Status::INTERNAL
                 })?;
-        dir.unlink("fxfs-data", &fio::UnlinkOptions::default())
-            .await
-            .map_err(|e| {
-                log::error!("Failed to remove keybag (fidl error): {e:?}");
+            let mut fxfs_container = FxfsContainer::new(serving_fxfs);
+            fxfs_container.shred_data().await.map_err(|error| {
+                log::error!(error:?; "Failed to shred fxfs keybag");
                 zx::Status::INTERNAL
-            })?
-            .map_err(|e| {
-                let status = zx::Status::from_raw(e);
-                log::error!("Failed to remove keybag: {}", status.to_string());
-                status
             })?;
-        debug_log("Deleted fxfs-data keybag");
+            debug_log("Deleted fxfs-data keybag");
+        } else if config.storage_host && config.data_filesystem_format == "minfs" {
+            if format != DiskFormat::Fvm {
+                return Ok(());
+            }
+
+            let mut fvm = fs_management::filesystem::Filesystem::from_boxed_config(
+                block_connector,
+                Box::new(Fvm::dynamic_child()),
+            );
+            let serving_fvm = fvm.serve_multi_volume().await.map_err(|error| {
+                log::error!(error:?; "Failed to serve fvm");
+                zx::Status::INTERNAL
+            })?;
+            let mut fvm_container = FvmContainer::new(serving_fvm, false);
+            fvm_container.shred_data().await.map_err(|error| {
+                log::error!(error:?; "Failed to call shred data on fvm component");
+                zx::Status::INTERNAL
+            })?;
+            debug_log("Shredded zxcrypt instances in fvm");
+        } else if !config.storage_host && config.data_filesystem_format == "fxfs" {
+            // fvm+fxfs, fxblob is handled above.
+            if format != DiskFormat::Fvm {
+                return Ok(());
+            }
+
+            let controller_proxy = find_data_partition_in(device_path).await.map_err(|error| {
+                log::error!(error:?; "Failed to find data partition");
+                zx::Status::NOT_FOUND
+            })?;
+            let mut fxfs = fs_management::filesystem::Filesystem::from_boxed_config(
+                Box::new(controller_proxy),
+                Box::new(Fxfs::dynamic_child()),
+            );
+            let mut serving_fxfs = fxfs.serve_multi_volume().await.map_err(|error| {
+                log::error!(error:?; "Failed to serve fxfs");
+                zx::Status::INTERNAL
+            })?;
+            let _ = serving_fxfs
+                .open_volume(UNENCRYPTED_VOLUME_LABEL, MountOptions::default())
+                .await
+                .map_err(|error| {
+                    log::error!(error:?; "Failed to open unencrypted volume in fxfs");
+                    zx::Status::INTERNAL
+                })?;
+            let mut fxfs_container = FxfsContainer::new(serving_fxfs);
+            fxfs_container.shred_data().await.map_err(|error| {
+                log::error!(error:?; "Failed to shred fxfs keybag");
+                zx::Status::INTERNAL
+            })?;
+            debug_log("Deleted fxfs-data keybag");
+        }
     }
     log::info!("Shredded the data volume.  Data will be lost!!");
     Ok(())
@@ -984,14 +992,7 @@ pub fn fshost_admin(
                     }
                     Ok(fshost::AdminRequest::ShredDataVolume { responder }) => {
                         log::info!("admin shred data volume called");
-                        let res = match shred_data_volume(
-                            &env,
-                            &config,
-                            ramdisk_prefix.clone(),
-                            &launcher,
-                        )
-                        .await
-                        {
+                        let res = match shred_data_volume(&env, &config).await {
                             Ok(()) => Ok(()),
                             Err(e) => {
                                 debug_log(&format!(

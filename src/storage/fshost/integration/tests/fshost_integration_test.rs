@@ -755,7 +755,14 @@ async fn ramdisk_image_serves_zbi_ramdisk_contents_with_unformatted_data() {
 }
 
 #[fuchsia::test]
-#[cfg_attr(feature = "fxfs", ignore)]
+#[cfg_attr(
+    not(any(
+        feature = "f2fs",
+        feature = "minfs-no-zxcrypt",
+        all(not(feature = "storage-host"), feature = "minfs"),
+    )),
+    ignore
+)]
 async fn shred_data_volume_not_supported() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec());
@@ -767,17 +774,25 @@ async fn shred_data_volume_not_supported() {
         .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protcol_at_exposed_dir failed");
 
-    admin
+    let status = admin
         .shred_data_volume()
         .await
         .expect("shred_data_volume FIDL failed")
         .expect_err("shred_data_volume should fail");
+    assert_eq!(zx::Status::from_raw(status), zx::Status::NOT_SUPPORTED);
 
     fixture.tear_down().await;
 }
 
 #[fuchsia::test]
-#[cfg_attr(not(feature = "fxfs"), ignore)]
+#[cfg_attr(
+    any(
+        feature = "f2fs",
+        feature = "minfs-no-zxcrypt",
+        all(not(feature = "storage-host"), feature = "minfs"),
+    ),
+    ignore
+)]
 async fn shred_data_volume_when_mounted() {
     let mut builder = new_builder();
     builder.with_disk().format_volumes(volumes_spec());
@@ -965,7 +980,14 @@ async fn vend_a_fresh_starnix_test_volume_on_each_mount() {
 }
 
 #[fuchsia::test]
-#[cfg_attr(not(feature = "fxfs"), ignore)]
+#[cfg_attr(
+    any(
+        feature = "f2fs",
+        feature = "minfs-no-zxcrypt",
+        all(not(feature = "storage-host"), feature = "minfs"),
+    ),
+    ignore
+)]
 async fn shred_data_volume_from_recovery() {
     let mut builder = new_builder();
     builder.with_disk().with_gpt().format_volumes(volumes_spec());
