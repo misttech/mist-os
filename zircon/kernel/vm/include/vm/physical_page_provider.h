@@ -52,8 +52,6 @@ class PhysicalPageProvider : public PageProvider {
 
   void Dump(uint depth, uint32_t max_items) final;
 
-  bool SupportsPageRequestType(page_request_type type) const final;
-
   // If there are no more requests in pending_requests_, returns false and doesn't modify the out
   // parameters.
   //

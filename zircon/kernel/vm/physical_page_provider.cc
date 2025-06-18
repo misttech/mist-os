@@ -45,6 +45,7 @@ PageSourceProperties PhysicalPageProvider::properties() const {
       .is_user_pager = false,
       .is_preserving_page_content = false,
       .is_providing_specific_physical_pages = true,
+      .supports_request_type = {true, false, false},
   };
 }
 
@@ -64,7 +65,7 @@ void PhysicalPageProvider::Init(VmCowPages* cow_pages, PageSource* page_source, 
 // start of WaitOnEvent.
 void PhysicalPageProvider::SendAsyncRequest(PageRequest* request) {
   DEBUG_ASSERT(phys_base_ != kInvalidPhysBase);
-  DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(request)));
+  DEBUG_ASSERT(GetRequestType(request) == page_request_type::READ);
   Guard<Mutex> guard{&mtx_};
   ASSERT(!closed_);
 
@@ -86,14 +87,14 @@ void PhysicalPageProvider::SendAsyncRequest(PageRequest* request) {
 
 void PhysicalPageProvider::QueueRequestLocked(PageRequest* request) {
   DEBUG_ASSERT(phys_base_ != kInvalidPhysBase);
-  DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(request)));
+  DEBUG_ASSERT(GetRequestType(request) == page_request_type::READ);
   ASSERT(!closed_);
   pending_requests_.push_back(request);
 }
 
 void PhysicalPageProvider::ClearAsyncRequest(PageRequest* request) {
   DEBUG_ASSERT(phys_base_ != kInvalidPhysBase);
-  DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(request)));
+  DEBUG_ASSERT(GetRequestType(request) == page_request_type::READ);
   Guard<Mutex> guard{&mtx_};
   ASSERT(!closed_);
 
@@ -108,8 +109,8 @@ void PhysicalPageProvider::ClearAsyncRequest(PageRequest* request) {
 
 void PhysicalPageProvider::SwapAsyncRequest(PageRequest* old, PageRequest* new_req) {
   DEBUG_ASSERT(phys_base_ != kInvalidPhysBase);
-  DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(old)));
-  DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(new_req)));
+  DEBUG_ASSERT(GetRequestType(old) == page_request_type::READ);
+  DEBUG_ASSERT(GetRequestType(new_req) == page_request_type::READ);
   Guard<Mutex> guard{&mtx_};
   ASSERT(!closed_);
 
@@ -191,7 +192,7 @@ bool PhysicalPageProvider::DequeueRequest(uint64_t* request_offset, uint64_t* re
   }
   PageRequest* request = pending_requests_.pop_front();
   DEBUG_ASSERT(request);
-  DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(request)));
+  DEBUG_ASSERT(GetRequestType(request) == page_request_type::READ);
   *request_offset = GetRequestOffset(request);
   *request_length = GetRequestLen(request);
   DEBUG_ASSERT(InRange(*request_offset, *request_length, size_));
@@ -472,12 +473,8 @@ void PhysicalPageProvider::Dump(uint depth, uint32_t max_items) {
                cow_pages_, phys_base_, closed_);
   printer.BeginList(max_items);
   for (auto& req : pending_requests_) {
-    DEBUG_ASSERT(SupportsPageRequestType(GetRequestType(&req)));
+    DEBUG_ASSERT(GetRequestType(&req) == page_request_type::READ);
     printer.Emit("  pending req [0x%lx, 0x%lx)", GetRequestOffset(&req), GetRequestLen(&req));
   }
   printer.EndList();
-}
-
-bool PhysicalPageProvider::SupportsPageRequestType(page_request_type type) const {
-  return type == page_request_type::READ;
 }

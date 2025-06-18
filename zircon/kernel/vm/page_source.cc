@@ -40,8 +40,7 @@ void PageSource::Detach() {
 
   // Cancel all requests except writebacks, which can be completed after detach.
   for (uint8_t type = 0; type < page_request_type::COUNT; type++) {
-    if (type == page_request_type::WRITEBACK ||
-        !page_provider_->SupportsPageRequestType(page_request_type(type))) {
+    if (type == page_request_type::WRITEBACK || !SupportsPageRequestType(page_request_type(type))) {
       continue;
     }
     while (!outstanding_requests_[type].is_empty()) {
@@ -222,7 +221,7 @@ void PageSource::OnPagesFailed(uint64_t offset, uint64_t len, zx_status_t error_
   }
 
   for (uint8_t type = 0; type < page_request_type::COUNT; type++) {
-    if (!page_provider_->SupportsPageRequestType(page_request_type(type))) {
+    if (!SupportsPageRequestType(page_request_type(type))) {
       continue;
     }
     ResolveRequestsLocked(static_cast<page_request_type>(type), offset, len, error_status);
@@ -289,7 +288,7 @@ zx_status_t PageSource::PopulateRequest(PageRequest* request, uint64_t offset, u
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
   DEBUG_ASSERT(IS_PAGE_ALIGNED(len));
 
-  if (!page_provider_->SupportsPageRequestType(type)) {
+  if (!SupportsPageRequestType(type)) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -380,7 +379,7 @@ void PageSource::SendRequestToProviderLocked(PageRequest* request) {
   LTRACEF_LEVEL(2, "%p %p\n", this, request);
   DEBUG_ASSERT(request->type_ < page_request_type::COUNT);
   DEBUG_ASSERT(request->IsInitialized());
-  DEBUG_ASSERT(page_provider_->SupportsPageRequestType(request->type_));
+  DEBUG_ASSERT(SupportsPageRequestType(request->type_));
   // Find the node with the smallest endpoint greater than offset and then
   // check to see if offset falls within that node.
   auto overlap = outstanding_requests_[request->type_].upper_bound(request->offset_);
@@ -404,7 +403,7 @@ void PageSource::CompleteRequestLocked(PageRequest* request) {
                      ("offset", request->offset_), ("length", request->len_),
                      ("type", request->type_ == ZX_PAGER_VMO_READ ? "Read" : "Dirty"));
   DEBUG_ASSERT(request->type_ < page_request_type::COUNT);
-  DEBUG_ASSERT(page_provider_->SupportsPageRequestType(request->type_));
+  DEBUG_ASSERT(SupportsPageRequestType(request->type_));
 
   // Take the request back from the provider before waking up the corresponding thread. Once the
   // request has been taken back we are also free to modify offset_.
@@ -436,7 +435,7 @@ void PageSource::CancelRequestLocked(PageRequest* request) {
     return;
   }
   DEBUG_ASSERT(request->type_ < page_request_type::COUNT);
-  DEBUG_ASSERT(page_provider_->SupportsPageRequestType(request->type_));
+  DEBUG_ASSERT(SupportsPageRequestType(request->type_));
 
   if (fbl::InContainer<PageSourceTag>(*request)) {
     LTRACEF("Overlap node\n");

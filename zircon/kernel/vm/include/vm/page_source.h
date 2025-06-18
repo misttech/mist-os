@@ -121,6 +121,9 @@ struct PageSourceProperties {
   // generic pages from the pmm won't work. These pages must be specifically returned via
   // PageSource::FreePages instead of pmm_free.
   const bool is_providing_specific_physical_pages;
+
+  // For every entry, if true the PageSource supports the given |page_request_type|.
+  const bool supports_request_type[page_request_type::COUNT];
 };
 
 // Interface for providing pages to a VMO through page requests.
@@ -174,10 +177,6 @@ class PageProvider : public fbl::RefCounted<PageProvider> {
   // Dumps relevant state for debugging purposes. The |max_items| parameter should be used to cap
   // the number of elements printed from any kind of variable sized list to prevent spam.
   virtual void Dump(uint depth, uint max_items) = 0;
-
-  // Whether the provider supports the |type| of page request. Controls which requests can be safely
-  // forwarded to the provider.
-  virtual bool SupportsPageRequestType(page_request_type type) const = 0;
 
   friend PageSource;
 };
@@ -300,9 +299,13 @@ class PageSource final : public PageRequestInterface {
   // ZX_PAGER_OP_FAIL for this function to return true.
   static bool IsValidInternalFailureCode(zx_status_t error_status);
 
+  bool SupportsPageRequestType(page_request_type type) const {
+    return properties().supports_request_type[type];
+  }
+
   // Whether transitions from clean to dirty should be trapped.
   bool ShouldTrapDirtyTransitions() const {
-    return page_provider_->SupportsPageRequestType(page_request_type::DIRTY);
+    return SupportsPageRequestType(page_request_type::DIRTY);
   }
 
   // Request the page provider for clean pages in the range [offset, offset + len) to become dirty,

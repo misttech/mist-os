@@ -57,6 +57,7 @@ class StubPageProvider : public PageProvider {
         .is_user_pager = true,
         .is_preserving_page_content = true,
         .is_providing_specific_physical_pages = false,
+        .supports_request_type = {true, trap_dirty_, false},
     };
   }
 
@@ -71,15 +72,6 @@ class StubPageProvider : public PageProvider {
   void OnClose() override {}
   zx_status_t WaitOnEvent(Event* event, bool suspendable) override { panic("Not implemented\n"); }
   void Dump(uint depth, uint32_t max_items) override {}
-  bool SupportsPageRequestType(page_request_type type) const override {
-    if (type == page_request_type::READ) {
-      return true;
-    }
-    if (type == page_request_type::DIRTY) {
-      return trap_dirty_;
-    }
-    return false;
-  }
 
   const bool trap_dirty_ = false;
   const bool ignore_requests_ = false;

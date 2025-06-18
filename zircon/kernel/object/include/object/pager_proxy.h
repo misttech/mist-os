@@ -55,15 +55,6 @@ class PagerProxy : public PageProvider,
   void OnDetach() final;
   zx_status_t WaitOnEvent(Event* event, bool suspendable) final;
   void Dump(uint depth, uint32_t max_items) final;
-  bool SupportsPageRequestType(page_request_type type) const final {
-    if (type == page_request_type::READ) {
-      return true;
-    }
-    if (type == page_request_type::DIRTY) {
-      return options_ & kTrapDirty;
-    }
-    return false;
-  }
 
   // Called by the pager dispatcher when it is about to go away. Handles cleaning up port's
   // reference to any in flight packets.

@@ -47,6 +47,7 @@ PageSourceProperties PagerProxy::properties() const {
       .is_user_pager = true,
       .is_preserving_page_content = true,
       .is_providing_specific_physical_pages = false,
+      .supports_request_type = {true, !!(options_ & kTrapDirty), false},
   };
 }
 
