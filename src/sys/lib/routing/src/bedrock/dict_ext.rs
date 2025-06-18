@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::bedrock::request_metadata::METADATA_KEY_TYPE;
 use crate::error::RoutingError;
 use async_trait::async_trait;
-use cm_types::{IterablePath, RelativePath};
+use cm_rust::CapabilityTypeName;
+use cm_types::{IterablePath, Name, RelativePath};
 use fidl_fuchsia_component_sandbox as fsandbox;
 use moniker::ExtendedMoniker;
 use router_error::RouterError;
@@ -164,8 +166,9 @@ impl DictExt for Dict {
             ) -> Result<RouterResponse<T>, RouterError> {
                 // If `debug` is true, that should only apply to the capability at `path`.
                 // Here we're looking up the containing dictionary, so set `debug = false`, to
-                // obtain the actual Dict and not its debug info.
-                let init_request = request.as_ref().map(|r| r.try_clone()).transpose()?;
+                // obtain the actual Dict and not its debug info. For the same reason, we need
+                // to set the capability type on the first request to Dictionary.
+                let init_request = request_with_dictionary_replacement(request.as_ref())?;
                 match self.router.route(init_request, false).await? {
                     RouterResponse::<Dict>::Capability(dict) => {
                         let moniker: ExtendedMoniker = self.not_found_error.clone().into();
@@ -312,11 +315,11 @@ impl DictExt for Dict {
             } else {
                 debug
             };
-            let request = request.as_ref().map(|r| r.try_clone()).transpose()?;
 
             if next_idx < num_segments - 1 {
                 // Not at the end of the path yet, so there's more nesting. We expect to
                 // have found a [Dict], or a [Dict] router -- traverse into this [Dict].
+                let request = request_with_dictionary_replacement(request.as_ref())?;
                 match capability {
                     Capability::Dictionary(d) => {
                         current_dict = d;
@@ -349,6 +352,7 @@ impl DictExt for Dict {
                 //
                 // There's a bit of repetition here because this function supports multiple router
                 // types.
+                let request = request.as_ref().map(|r| r.try_clone()).transpose()?;
                 let capability: Capability = match capability {
                     Capability::DictionaryRouter(r) => match r.route(request, debug).await? {
                         RouterResponse::<Dict>::Capability(c) => c.into(),
@@ -393,4 +397,21 @@ impl DictExt for Dict {
         }
         unreachable!("get_with_request: All cases are handled in the loop");
     }
+}
+
+/// Creates a clone of `request` that is identical except `"type"` is set to `dictionary`
+/// if it is not already. If `request` is `None`, `None` will be returned.
+///
+/// This is convenient for router lookups of nested paths, since all lookups except the last
+/// segment are dictionary lookups.
+pub(super) fn request_with_dictionary_replacement(
+    request: Option<&Request>,
+) -> Result<Option<Request>, RoutingError> {
+    Ok(request.as_ref().map(|r| r.try_clone()).transpose()?.map(|r| {
+        let _ = r.metadata.insert(
+            Name::new(METADATA_KEY_TYPE).unwrap(),
+            Capability::Data(Data::String(CapabilityTypeName::Dictionary.to_string())),
+        );
+        r
+    }))
 }

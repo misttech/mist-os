@@ -286,6 +286,9 @@ pub enum RoutingError {
     #[error("routed capability was the wrong type at component `{moniker}`. Was: {actual}, expected: {expected}")]
     BedrockWrongCapabilityType { actual: String, expected: String, moniker: ExtendedMoniker },
 
+    #[error("expected type {type_name} for routed capability at component `{moniker}`, but type was missing")]
+    BedrockMissingCapabilityType { type_name: String, moniker: ExtendedMoniker },
+
     #[error("there was an error remoting a capability at component `{moniker}`")]
     BedrockRemoteCapability { moniker: Moniker },
 
@@ -392,6 +395,7 @@ impl Explain for RoutingError {
             | RoutingError::BedrockSourceDictionaryCollision { .. }
             | RoutingError::BedrockFailedToSend { .. }
             | RoutingError::RouteSourceShutdown { .. }
+            | RoutingError::BedrockMissingCapabilityType { .. }
             | RoutingError::BedrockWrongCapabilityType { .. }
             | RoutingError::BedrockRemoteCapability { .. }
             | RoutingError::BedrockNotCloneable { .. }
@@ -453,6 +457,7 @@ impl From<RoutingError> for ExtendedMoniker {
             | RoutingError::BedrockNotCloneable { moniker }
             | RoutingError::BedrockSourceDictionaryCollision { moniker }
             | RoutingError::BedrockFailedToSend { moniker, .. }
+            | RoutingError::BedrockMissingCapabilityType { moniker, .. }
             | RoutingError::BedrockWrongCapabilityType { moniker, .. }
             | RoutingError::NonDebugRoutesUnsupported { moniker }
             | RoutingError::DebugRoutesUnsupported { moniker }
