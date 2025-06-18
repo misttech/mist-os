@@ -275,7 +275,13 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 				return
 			}
 			defer socket.Close()
-			_, err = iomisc.ReadUntilMatchString(ctx, socket, bootedLogSignature)
+			connectionTimeout := t.connectionTimeout
+			if connectionTimeout == 0 {
+				connectionTimeout = 5 * time.Minute
+			}
+			bootCtx, cancel := context.WithTimeout(ctx, connectionTimeout)
+			defer cancel()
+			_, err = iomisc.ReadUntilMatchString(bootCtx, socket, bootedLogSignature)
 			bootedLogChan <- err
 		}()
 	}
