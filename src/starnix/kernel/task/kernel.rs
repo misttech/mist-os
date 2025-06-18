@@ -736,8 +736,8 @@ impl Kernel {
                 let set_properties = |node: &fuchsia_inspect::Node| {
                     node.record_string("command", task.command().to_str().unwrap_or("{err}"));
 
-                    let sched_policy = task.read().scheduler_policy;
-                    if !sched_policy.is_default() {
+                    let scheduler_state = task.read().scheduler_state;
+                    if !scheduler_state.is_default() {
                         node.record_child("sched", |node| {
                             node.record_string(
                                 "role_name",
@@ -746,7 +746,7 @@ impl Kernel {
                                     .map(|n| Cow::Borrowed(n))
                                     .unwrap_or_else(|e| Cow::Owned(e.to_string())),
                             );
-                            node.record_string("policy", format!("{sched_policy:?}"));
+                            node.record_string("state", format!("{scheduler_state:?}"));
                         });
                     }
                 };

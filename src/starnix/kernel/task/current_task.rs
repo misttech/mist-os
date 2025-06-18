@@ -1448,7 +1448,7 @@ impl CurrentTask {
         let pid;
         let command;
         let creds;
-        let scheduler_policy;
+        let scheduler_state;
         let no_new_privs;
         let seccomp_filters;
         let robust_list_head = RobustListHeadPtr::null(self);
@@ -1488,7 +1488,7 @@ impl CurrentTask {
             pid = pids.allocate_pid();
             command = self.command();
             creds = self.creds();
-            scheduler_policy = state.scheduler_policy.fork();
+            scheduler_state = state.scheduler_state.fork();
             timerslack_ns = state.timerslack_ns;
 
             uts_ns = if clone_newuts {
@@ -1561,7 +1561,7 @@ impl CurrentTask {
             child_signal_mask,
             child_kernel_signals,
             vfork_event,
-            scheduler_policy,
+            scheduler_state,
             uts_ns,
             no_new_privs,
             SeccompState::from(&self.seccomp_filter_state),

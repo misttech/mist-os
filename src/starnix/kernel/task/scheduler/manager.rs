@@ -22,13 +22,13 @@ pub struct SchedulerManager {
 
 impl SchedulerManager {
     /// Create a new SchedulerManager which will apply any provided `role_overrides` before
-    /// computing a role name based on a Task's scheduler policy.
+    /// computing a role name based on a Task's scheduler state.
     pub fn new(role_overrides: RoleOverrides) -> SchedulerManager {
         let role_manager = connect_to_protocol_sync::<RoleManagerMarker>().unwrap();
         let role_manager = if let Err(e) = Self::set_thread_role_inner(
             &role_manager,
             &*fuchsia_runtime::thread_self(),
-            SchedulerPolicyKind::default().role_name(),
+            SchedulingPolicy::default().role_name(),
         ) {
             log_debug!("Setting thread role failed ({e:?}), will not set thread priority.");
             None
@@ -48,12 +48,12 @@ impl SchedulerManager {
     /// Return the currently active role name for this task. Requires read access to `task`'s state,
     /// should only be called by code which is not already modifying the provided `task`.
     pub fn role_name(&self, task: &Task) -> Result<&str, Errno> {
-        let policy = task.read().scheduler_policy;
-        self.role_name_inner(task, policy)
+        let scheduler_state = task.read().scheduler_state;
+        self.role_name_inner(task, scheduler_state)
     }
 
-    fn role_name_inner(&self, task: &Task, policy: SchedulerPolicy) -> Result<&str, Errno> {
-        Ok(if policy.kind.is_realtime() {
+    fn role_name_inner(&self, task: &Task, scheduler_state: SchedulerState) -> Result<&str, Errno> {
+        Ok(if scheduler_state.policy.is_realtime() {
             let process_name = task
                 .thread_group()
                 .read()
@@ -66,24 +66,28 @@ impl SchedulerManager {
             {
                 name
             } else {
-                policy.kind.role_name()
+                scheduler_state.policy.role_name()
             }
         } else {
-            policy.kind.role_name()
+            scheduler_state.policy.role_name()
         })
     }
 
     /// Give the provided `task`'s Zircon thread a role.
     ///
-    /// Requires passing the current `policy` so that this can be performed without touching
-    /// `task`'s state lock.
-    pub fn set_thread_role(&self, task: &Task, policy: SchedulerPolicy) -> Result<(), Errno> {
+    /// Requires passing the current `SchedulerState` so that this can be
+    /// performed without touching `task`'s state lock.
+    pub fn set_thread_role(
+        &self,
+        task: &Task,
+        scheduler_state: SchedulerState,
+    ) -> Result<(), Errno> {
         let Some(role_manager) = self.role_manager.as_ref() else {
             log_debug!("no role manager for setting role");
             return Ok(());
         };
 
-        let role_name = self.role_name_inner(task, policy)?;
+        let role_name = self.role_name_inner(task, scheduler_state)?;
         let thread = task.thread.read();
         let Some(thread) = thread.as_ref() else {
             log_debug!("thread role update requested for task without thread, skipping");
@@ -125,13 +129,13 @@ impl SchedulerManager {
 const DEFAULT_TASK_PRIORITY: u8 = 20;
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
-pub struct SchedulerPolicy {
-    kind: SchedulerPolicyKind,
+pub struct SchedulerState {
+    policy: SchedulingPolicy,
     reset_on_fork: bool,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum SchedulerPolicyKind {
+pub enum SchedulingPolicy {
     Normal {
         // 1-40, from setpriority()
         priority: u8,
@@ -154,19 +158,19 @@ pub enum SchedulerPolicyKind {
     },
 }
 
-impl std::default::Default for SchedulerPolicyKind {
+impl std::default::Default for SchedulingPolicy {
     fn default() -> Self {
         Self::Normal { priority: DEFAULT_TASK_PRIORITY }
     }
 }
 
-impl SchedulerPolicy {
+impl SchedulerState {
     pub fn is_default(&self) -> bool {
         self == &Self::default()
     }
 
-    pub fn kind(&self) -> SchedulerPolicyKind {
-        self.kind
+    pub fn policy(&self) -> SchedulingPolicy {
+        self.policy
     }
 
     fn from_raw(mut policy: u32, priority: u8) -> Result<Self, Errno> {
@@ -178,12 +182,12 @@ impl SchedulerPolicy {
             );
             policy -= SCHED_RESET_ON_FORK;
         }
-        let kind = match policy {
-            SCHED_FIFO => SchedulerPolicyKind::Fifo { priority },
-            SCHED_RR => SchedulerPolicyKind::RoundRobin { priority },
-            SCHED_NORMAL => SchedulerPolicyKind::Normal { priority },
-            SCHED_BATCH => SchedulerPolicyKind::Batch { priority },
-            SCHED_IDLE => SchedulerPolicyKind::Idle { priority },
+        let policy = match policy {
+            SCHED_FIFO => SchedulingPolicy::Fifo { priority },
+            SCHED_RR => SchedulingPolicy::RoundRobin { priority },
+            SCHED_NORMAL => SchedulingPolicy::Normal { priority },
+            SCHED_BATCH => SchedulingPolicy::Batch { priority },
+            SCHED_IDLE => SchedulingPolicy::Idle { priority },
             SCHED_DEADLINE => {
                 track_stub!(TODO("https://fxbug.dev/409349496"), "SCHED_DEADLINE");
                 return error!(EINVAL);
@@ -191,7 +195,7 @@ impl SchedulerPolicy {
             _ => return error!(EINVAL),
         };
 
-        Ok(Self { kind, reset_on_fork })
+        Ok(Self { policy, reset_on_fork })
     }
 
     /// Create a policy according to the "sched_policy" and "priority" bits of
@@ -238,23 +242,23 @@ impl SchedulerPolicy {
     pub fn fork(self) -> Self {
         if self.reset_on_fork {
             Self {
-                kind: match self.kind {
+                policy: match self.policy {
                     // If the calling thread has a scheduling policy of SCHED_FIFO or
                     // SCHED_RR, the policy is reset to SCHED_OTHER in child processes.
-                    SchedulerPolicyKind::Fifo { .. } | SchedulerPolicyKind::RoundRobin { .. } => {
-                        SchedulerPolicyKind::default()
+                    SchedulingPolicy::Fifo { .. } | SchedulingPolicy::RoundRobin { .. } => {
+                        SchedulingPolicy::default()
                     }
 
                     // If the calling process has a negative nice value, the nice
                     // value is reset to zero in child processes.
-                    SchedulerPolicyKind::Normal { .. } => {
-                        SchedulerPolicyKind::Normal { priority: DEFAULT_TASK_PRIORITY }
+                    SchedulingPolicy::Normal { .. } => {
+                        SchedulingPolicy::Normal { priority: DEFAULT_TASK_PRIORITY }
                     }
-                    SchedulerPolicyKind::Batch { .. } => {
-                        SchedulerPolicyKind::Batch { priority: DEFAULT_TASK_PRIORITY }
+                    SchedulingPolicy::Batch { .. } => {
+                        SchedulingPolicy::Batch { priority: DEFAULT_TASK_PRIORITY }
                     }
-                    SchedulerPolicyKind::Idle { .. } => {
-                        SchedulerPolicyKind::Idle { priority: DEFAULT_TASK_PRIORITY }
+                    SchedulingPolicy::Idle { .. } => {
+                        SchedulingPolicy::Idle { priority: DEFAULT_TASK_PRIORITY }
                     }
                 },
                 // This flag is disabled in child processes created by fork(2).
@@ -266,12 +270,12 @@ impl SchedulerPolicy {
     }
 
     pub fn raw_policy(&self) -> u32 {
-        let mut base = match self.kind {
-            SchedulerPolicyKind::Normal { .. } => SCHED_NORMAL,
-            SchedulerPolicyKind::Batch { .. } => SCHED_BATCH,
-            SchedulerPolicyKind::Idle { .. } => SCHED_IDLE,
-            SchedulerPolicyKind::Fifo { .. } => SCHED_FIFO,
-            SchedulerPolicyKind::RoundRobin { .. } => SCHED_RR,
+        let mut base = match self.policy {
+            SchedulingPolicy::Normal { .. } => SCHED_NORMAL,
+            SchedulingPolicy::Batch { .. } => SCHED_BATCH,
+            SchedulingPolicy::Idle { .. } => SCHED_IDLE,
+            SchedulingPolicy::Fifo { .. } => SCHED_FIFO,
+            SchedulingPolicy::RoundRobin { .. } => SCHED_RR,
         };
         if self.reset_on_fork {
             base |= SCHED_RESET_ON_FORK;
@@ -282,10 +286,10 @@ impl SchedulerPolicy {
     /// Return the raw "normal priority" for a process, in the range 1-40. This is the value used to
     /// compute nice, and does not apply to real-time scheduler policies.
     pub fn raw_priority(&self) -> u8 {
-        match self.kind {
-            SchedulerPolicyKind::Normal { priority }
-            | SchedulerPolicyKind::Batch { priority }
-            | SchedulerPolicyKind::Idle { priority } => priority,
+        match self.policy {
+            SchedulingPolicy::Normal { priority }
+            | SchedulingPolicy::Batch { priority }
+            | SchedulingPolicy::Idle { priority } => priority,
             _ => DEFAULT_TASK_PRIORITY,
         }
     }
@@ -293,28 +297,27 @@ impl SchedulerPolicy {
     /// Set the "normal priority" for a process, in the range 1-40. This is the value used to
     /// compute nice, and does not apply to real-time scheduler policies.
     pub fn set_raw_nice(&mut self, new_priority: u8) {
-        match &mut self.kind {
-            SchedulerPolicyKind::Normal { priority }
-            | SchedulerPolicyKind::Batch { priority }
-            | SchedulerPolicyKind::Idle { priority } => *priority = new_priority,
+        match &mut self.policy {
+            SchedulingPolicy::Normal { priority }
+            | SchedulingPolicy::Batch { priority }
+            | SchedulingPolicy::Idle { priority } => *priority = new_priority,
             _ => (),
         }
     }
 
     pub fn raw_params(&self) -> sched_param {
-        match self.kind {
-            SchedulerPolicyKind::Normal { .. }
-            | SchedulerPolicyKind::Batch { .. }
-            | SchedulerPolicyKind::Idle { .. } => sched_param { sched_priority: 0 },
-            SchedulerPolicyKind::Fifo { priority }
-            | SchedulerPolicyKind::RoundRobin { priority } => {
+        match self.policy {
+            SchedulingPolicy::Normal { .. }
+            | SchedulingPolicy::Batch { .. }
+            | SchedulingPolicy::Idle { .. } => sched_param { sched_priority: 0 },
+            SchedulingPolicy::Fifo { priority } | SchedulingPolicy::RoundRobin { priority } => {
                 sched_param { sched_priority: priority as i32 }
             }
         }
     }
 }
 
-impl SchedulerPolicyKind {
+impl SchedulingPolicy {
     pub fn is_realtime(&self) -> bool {
         matches!(self, Self::Fifo { .. } | Self::RoundRobin { .. })
     }
@@ -449,58 +452,43 @@ mod tests {
 
     #[fuchsia::test]
     fn default_role_name() {
-        assert_eq!(SchedulerPolicyKind::default().role_name(), "fuchsia.starnix.fair.16");
+        assert_eq!(SchedulingPolicy::default().role_name(), "fuchsia.starnix.fair.16");
     }
 
     #[fuchsia::test]
     fn normal_with_non_default_nice_role_name() {
         assert_eq!(
-            SchedulerPolicyKind::Normal { priority: 10 }.role_name(),
+            SchedulingPolicy::Normal { priority: 10 }.role_name(),
             "fuchsia.starnix.fair.11"
         );
         assert_eq!(
-            SchedulerPolicyKind::Normal { priority: 27 }.role_name(),
+            SchedulingPolicy::Normal { priority: 27 }.role_name(),
             "fuchsia.starnix.fair.19"
         );
     }
 
     #[fuchsia::test]
     fn fifo_role_name() {
-        assert_eq!(
-            SchedulerPolicyKind::Fifo { priority: 1 }.role_name(),
-            "fuchsia.starnix.realtime",
-        );
-        assert_eq!(
-            SchedulerPolicyKind::Fifo { priority: 2 }.role_name(),
-            "fuchsia.starnix.realtime",
-        );
-        assert_eq!(
-            SchedulerPolicyKind::Fifo { priority: 99 }.role_name(),
-            "fuchsia.starnix.realtime",
-        );
+        assert_eq!(SchedulingPolicy::Fifo { priority: 1 }.role_name(), "fuchsia.starnix.realtime",);
+        assert_eq!(SchedulingPolicy::Fifo { priority: 2 }.role_name(), "fuchsia.starnix.realtime",);
+        assert_eq!(SchedulingPolicy::Fifo { priority: 99 }.role_name(), "fuchsia.starnix.realtime",);
     }
 
     #[fuchsia::test]
     fn idle_role_name() {
-        assert_eq!(SchedulerPolicyKind::Idle { priority: 1 }.role_name(), "fuchsia.starnix.fair.0");
-        assert_eq!(
-            SchedulerPolicyKind::Idle { priority: 20 }.role_name(),
-            "fuchsia.starnix.fair.0"
-        );
-        assert_eq!(
-            SchedulerPolicyKind::Idle { priority: 40 }.role_name(),
-            "fuchsia.starnix.fair.0"
-        );
+        assert_eq!(SchedulingPolicy::Idle { priority: 1 }.role_name(), "fuchsia.starnix.fair.0");
+        assert_eq!(SchedulingPolicy::Idle { priority: 20 }.role_name(), "fuchsia.starnix.fair.0");
+        assert_eq!(SchedulingPolicy::Idle { priority: 40 }.role_name(), "fuchsia.starnix.fair.0");
     }
 
     #[fuchsia::test]
     fn build_policy_from_sched_params() {
         assert_matches!(
-            SchedulerPolicy::from_sched_params(SCHED_NORMAL, sched_param { sched_priority: 0 }, 20),
+            SchedulerState::from_sched_params(SCHED_NORMAL, sched_param { sched_priority: 0 }, 20),
             Ok(_)
         );
         assert_matches!(
-            SchedulerPolicy::from_sched_params(
+            SchedulerState::from_sched_params(
                 SCHED_NORMAL | SCHED_RESET_ON_FORK,
                 sched_param { sched_priority: 0 },
                 20
@@ -508,7 +496,7 @@ mod tests {
             Ok(_)
         );
         assert_matches!(
-            SchedulerPolicy::from_sched_params(
+            SchedulerState::from_sched_params(
                 SCHED_NORMAL,
                 sched_param { sched_priority: 1 },
                 20
@@ -516,56 +504,56 @@ mod tests {
             Err(e) if e == EINVAL
         );
         assert_matches!(
-            SchedulerPolicy::from_sched_params(SCHED_FIFO, sched_param { sched_priority: 1 }, 20),
+            SchedulerState::from_sched_params(SCHED_FIFO, sched_param { sched_priority: 1 }, 20),
             Ok(_)
         );
         assert_matches!(
-            SchedulerPolicy::from_sched_params(SCHED_FIFO, sched_param { sched_priority: 0 }, 20),
+            SchedulerState::from_sched_params(SCHED_FIFO, sched_param { sched_priority: 0 }, 20),
             Err(e) if e == EINVAL
         );
     }
 
     #[fuchsia::test]
     fn build_policy_from_binder() {
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL as u8, 0), Ok(_));
+        assert_matches!(SchedulerState::from_binder(SCHED_NORMAL as u8, 0), Ok(_));
         assert_matches!(
-            SchedulerPolicy::from_binder(SCHED_NORMAL as u8, (((-21) as i8) as u8).into()),
+            SchedulerState::from_binder(SCHED_NORMAL as u8, (((-21) as i8) as u8).into()),
             Err(_)
         );
         assert_matches!(
-            SchedulerPolicy::from_binder(SCHED_NORMAL as u8, (((-20) as i8) as u8).into()),
+            SchedulerState::from_binder(SCHED_NORMAL as u8, (((-20) as i8) as u8).into()),
             Ok(_)
         );
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL as u8, 1), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL as u8, 19), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL as u8, 20), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO as u8, 0), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO as u8, 1), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO as u8, 99), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO as u8, 100), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR as u8, 0), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR as u8, 1), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR as u8, 99), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR as u8, 100), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_BATCH as u8, 11), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(42, 0), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(42, 0), Err(_));
+        assert_matches!(SchedulerState::from_binder(SCHED_NORMAL as u8, 1), Ok(_));
+        assert_matches!(SchedulerState::from_binder(SCHED_NORMAL as u8, 19), Ok(_));
+        assert_matches!(SchedulerState::from_binder(SCHED_NORMAL as u8, 20), Err(_));
+        assert_matches!(SchedulerState::from_binder(SCHED_FIFO as u8, 0), Err(_));
+        assert_matches!(SchedulerState::from_binder(SCHED_FIFO as u8, 1), Ok(_));
+        assert_matches!(SchedulerState::from_binder(SCHED_FIFO as u8, 99), Ok(_));
+        assert_matches!(SchedulerState::from_binder(SCHED_FIFO as u8, 100), Err(_));
+        assert_matches!(SchedulerState::from_binder(SCHED_RR as u8, 0), Err(_));
+        assert_matches!(SchedulerState::from_binder(SCHED_RR as u8, 1), Ok(_));
+        assert_matches!(SchedulerState::from_binder(SCHED_RR as u8, 99), Ok(_));
+        assert_matches!(SchedulerState::from_binder(SCHED_RR as u8, 100), Err(_));
+        assert_matches!(SchedulerState::from_binder(SCHED_BATCH as u8, 11), Ok(_));
+        assert_matches!(SchedulerState::from_binder(42, 0), Err(_));
+        assert_matches!(SchedulerState::from_binder(42, 0), Err(_));
     }
 
     // NOTE(https://fxbug.dev/425726327): some or all of this test may need to change based
     // on what is learned in https://fxbug.dev/425726327.
     #[fuchsia::test]
     fn is_less_than_for_binder() {
-        let rr_50 = SchedulerPolicyKind::RoundRobin { priority: 50 };
-        let rr_40 = SchedulerPolicyKind::RoundRobin { priority: 40 };
-        let fifo_50 = SchedulerPolicyKind::Fifo { priority: 50 };
-        let fifo_40 = SchedulerPolicyKind::Fifo { priority: 40 };
-        let normal_40 = SchedulerPolicyKind::Normal { priority: 40 };
-        let normal_10 = SchedulerPolicyKind::Normal { priority: 10 };
-        let batch_40 = SchedulerPolicyKind::Batch { priority: 40 };
-        let batch_30 = SchedulerPolicyKind::Batch { priority: 30 };
-        let idle_40 = SchedulerPolicyKind::Idle { priority: 40 };
-        let idle_30 = SchedulerPolicyKind::Idle { priority: 30 };
+        let rr_50 = SchedulingPolicy::RoundRobin { priority: 50 };
+        let rr_40 = SchedulingPolicy::RoundRobin { priority: 40 };
+        let fifo_50 = SchedulingPolicy::Fifo { priority: 50 };
+        let fifo_40 = SchedulingPolicy::Fifo { priority: 40 };
+        let normal_40 = SchedulingPolicy::Normal { priority: 40 };
+        let normal_10 = SchedulingPolicy::Normal { priority: 10 };
+        let batch_40 = SchedulingPolicy::Batch { priority: 40 };
+        let batch_30 = SchedulingPolicy::Batch { priority: 30 };
+        let idle_40 = SchedulingPolicy::Idle { priority: 40 };
+        let idle_30 = SchedulingPolicy::Idle { priority: 30 };
         assert!(!fifo_50.is_less_than_for_binder(fifo_50));
         assert!(!rr_50.is_less_than_for_binder(rr_50));
         assert!(!fifo_50.is_less_than_for_binder(rr_50));

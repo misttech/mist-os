@@ -10,7 +10,7 @@ use crate::task::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, EventHandler, Kernel,
     PidTable, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData, PtraceState,
-    PtraceStatus, SchedulerPolicy, SeccompFilterContainer, SeccompState, SeccompStateValue,
+    PtraceStatus, SchedulerState, SeccompFilterContainer, SeccompState, SeccompStateValue,
     ThreadGroup, ThreadGroupKey, ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter,
     ZombieProcess,
 };
@@ -392,8 +392,8 @@ pub struct TaskMutableState {
     /// The exit status that this task exited with.
     exit_status: Option<ExitStatus>,
 
-    /// Desired scheduler policy for the task.
-    pub scheduler_policy: SchedulerPolicy,
+    /// Desired scheduler state for the task.
+    pub scheduler_state: SchedulerState,
 
     /// The UTS namespace assigned to this thread.
     ///
@@ -1152,7 +1152,7 @@ impl Task {
         signal_mask: SigSet,
         kernel_signals: VecDeque<KernelSignal>,
         vfork_event: Option<Arc<zx::Event>>,
-        scheduler_policy: SchedulerPolicy,
+        scheduler_state: SchedulerState,
         uts_ns: UtsNamespaceHandle,
         no_new_privs: bool,
         seccomp_filter_state: SeccompState,
@@ -1183,7 +1183,7 @@ impl Task {
                     signals: SignalState::with_mask(signal_mask),
                     kernel_signals,
                     exit_status: None,
-                    scheduler_policy,
+                    scheduler_state,
                     uts_ns,
                     no_new_privs,
                     oom_score_adj: Default::default(),
@@ -1253,36 +1253,40 @@ impl Task {
         *fs = fs.fork();
     }
 
-    /// Overwrite the existing scheduler policy with a new one and update the task's thread's role.
-    pub fn set_scheduler_policy(&self, policy: SchedulerPolicy) -> Result<(), Errno> {
-        self.update_sched_policy_then_role(|sched_policy| *sched_policy = policy)
+    /// Overwrite the existing scheduler state with a new one and update the task's thread's role.
+    pub fn set_scheduler_state(&self, scheduler_state: SchedulerState) -> Result<(), Errno> {
+        self.update_scheduler_state_then_role(|task_scheduler_state| {
+            *task_scheduler_state = scheduler_state
+        })
     }
 
-    /// Update the nice value of the scheduler policy and update the task's thread's role.
+    /// Update the nice value of the scheduler state and update the task's thread's role.
     pub fn update_scheduler_nice(&self, raw_priority: u8) -> Result<(), Errno> {
-        self.update_sched_policy_then_role(|sched_policy| sched_policy.set_raw_nice(raw_priority))
+        self.update_scheduler_state_then_role(|scheduler_state| {
+            scheduler_state.set_raw_nice(raw_priority)
+        })
     }
 
-    /// Update the task's thread's role based on its current scheduler policy without making any
-    /// changes to the policy.
+    /// Update the task's thread's role based on its current scheduler state without making any
+    /// changes to the state.
     ///
     /// This should be called on tasks that have newly created threads, e.g. after cloning.
-    pub fn sync_scheduler_policy_to_role(&self) -> Result<(), Errno> {
-        self.update_sched_policy_then_role(|_| {})
+    pub fn sync_scheduler_state_to_role(&self) -> Result<(), Errno> {
+        self.update_scheduler_state_then_role(|_| {})
     }
 
-    fn update_sched_policy_then_role(
+    fn update_scheduler_state_then_role(
         &self,
-        updater: impl FnOnce(&mut SchedulerPolicy),
+        updater: impl FnOnce(&mut SchedulerState),
     ) -> Result<(), Errno> {
         profile_duration!("UpdateTaskThreadRole");
-        let new_scheduler_policy = {
+        let new_scheduler_state = {
             // Hold the task state lock as briefly as possible, it's not needed to update the role.
             let mut state = self.write();
-            updater(&mut state.scheduler_policy);
-            state.scheduler_policy
+            updater(&mut state.scheduler_state);
+            state.scheduler_state
         };
-        self.thread_group().kernel.scheduler.set_thread_role(self, new_scheduler_policy)?;
+        self.thread_group().kernel.scheduler.set_thread_role(self, new_scheduler_state)?;
         Ok(())
     }
 

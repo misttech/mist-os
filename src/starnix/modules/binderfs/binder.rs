@@ -17,7 +17,7 @@ use starnix_core::mm::{
 };
 use starnix_core::mutable_state::Guard;
 use starnix_core::task::{
-    CurrentTask, EventHandler, Kernel, SchedulerPolicy, SimpleWaiter, Task, ThreadGroupKey,
+    CurrentTask, EventHandler, Kernel, SchedulerState, SimpleWaiter, Task, ThreadGroupKey,
     WaitCanceler, WaitQueue, Waiter,
 };
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer, VecInputBuffer};
@@ -2067,16 +2067,16 @@ impl BinderThreadState {
     > {
         let transaction = self.transactions.pop().ok_or_else(|| errno!(EINVAL))?;
         match transaction {
-            TransactionRole::Receiver(peer, policy) => {
+            TransactionRole::Receiver(peer, scheduler_state) => {
                 log_trace!(
                     "binder transaction popped from thread {} for peer {:?}",
                     self.tid,
                     peer
                 );
-                let (process, thread) = release_on_error!(policy, current_task, {
+                let (process, thread) = release_on_error!(scheduler_state, current_task, {
                     peer.upgrade().ok_or(TransactionError::Dead)
                 });
-                Ok((process, thread, policy))
+                Ok((process, thread, scheduler_state))
             }
             TransactionRole::Sender(_) => {
                 log_warn!("caller got confused, nothing to reply to!");
@@ -2102,14 +2102,14 @@ impl Releasable for BinderThreadState {
         // If there are any transactions that this thread was processing, we need to tell the caller
         // that this thread is now dead and to not expect a reply.
 
-        // The policy need to be restored to the initial one.
-        let mut updated_scheduler_policy = false;
+        // The scheduler state need to be restored to the initial one.
+        let mut updated_scheduler_state = false;
         for transaction in self.transactions {
-            if let TransactionRole::Receiver(peer, policy) = transaction {
-                if !updated_scheduler_policy {
-                    updated_scheduler_policy = policy.release_for_task(context, self.tid);
+            if let TransactionRole::Receiver(peer, scheduler_state) = transaction {
+                if !updated_scheduler_state {
+                    updated_scheduler_state = scheduler_state.release_for_task(context, self.tid);
                 } else {
-                    policy.disarm();
+                    scheduler_state.disarm();
                 }
                 if let Some(peer_thread) = peer.thread.upgrade() {
                     let sender_thread = &mut peer_thread.lock();
@@ -2194,8 +2194,8 @@ enum Command {
         sender: WeakBinderPeer,
         /// The transaction payload.
         data: TransactionData,
-        /// The eventual policy to use when the transaction is running.
-        scheduler_policy: Option<SchedulerPolicy>,
+        /// The eventual scheduler state to use when the transaction is running.
+        scheduler_state: Option<SchedulerState>,
     },
     /// Commands a binder thread to process an incoming reply to its transaction.
     /// Sent from the server to the client.
@@ -2630,21 +2630,20 @@ impl BinderObjectFlags {
         })
     }
 
-    fn get_scheduler_policy(&self) -> Option<SchedulerPolicy> {
+    fn get_scheduler_state(&self) -> Option<SchedulerState> {
         let bits = self.bits();
         let priority = bits & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_PRIORITY_MASK;
-        let sched_policy = (bits
-            & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_SCHED_POLICY_MASK)
+        let policy = (bits & uapi::flat_binder_object_flags_FLAT_BINDER_FLAG_SCHED_POLICY_MASK)
             >> uapi::flat_binder_object_shifts_FLAT_BINDER_FLAG_SCHED_POLICY_SHIFT;
         let priority = u8::try_from(priority).expect("priority should fit in a u8");
-        let sched_policy = u8::try_from(sched_policy).expect("sched_policy should fit in a u8");
-        if priority == 0 && sched_policy == 0 {
+        let policy = u8::try_from(policy).expect("policy should fit in a u8");
+        if priority == 0 && policy == 0 {
             None
         } else {
-            match SchedulerPolicy::from_binder(sched_policy, priority) {
-                Ok(policy) => Some(policy),
+            match SchedulerState::from_binder(policy, priority) {
+                Ok(scheduler_state) => Some(scheduler_state),
                 Err(e) => {
-                    log_warn!("Unable to parse policy {sched_policy}:{priority}: {e:?}");
+                    log_warn!("Unable to parse scheduler state {policy}:{priority}: {e:?}");
                     None
                 }
             }
@@ -3003,7 +3002,7 @@ impl TransactionRole {
 }
 
 #[derive(Debug, Default)]
-struct SchedulerGuard(Option<ReleaseGuard<SchedulerPolicy>>);
+struct SchedulerGuard(Option<ReleaseGuard<SchedulerState>>);
 
 impl SchedulerGuard {
     fn release_for_task(self, kernel: &Kernel, tid: pid_t) -> bool {
@@ -3012,22 +3011,22 @@ impl SchedulerGuard {
             self.release(&task);
             return true;
         } else {
-            // The task has been killed. There is no policy to update.
+            // The task has been killed. There is no scheduler state to update.
             self.disarm();
             return false;
         };
     }
 
     fn disarm(self) {
-        if let Some(policy) = self.0 {
-            ReleaseGuard::take(policy);
+        if let Some(scheduler_state) = self.0 {
+            ReleaseGuard::take(scheduler_state);
         }
     }
 }
 
-impl From<SchedulerPolicy> for SchedulerGuard {
-    fn from(policy: SchedulerPolicy) -> Self {
-        Self(Some(policy.into()))
+impl From<SchedulerState> for SchedulerGuard {
+    fn from(scheduler_state: SchedulerState) -> Self {
+        Self(Some(scheduler_state.into()))
     }
 }
 
@@ -3035,10 +3034,13 @@ impl Releasable for SchedulerGuard {
     type Context<'a: 'b, 'b> = &'a Task;
 
     fn release<'a: 'b, 'b>(self, task: Self::Context<'a, 'b>) {
-        if let Some(policy) = self.0 {
-            let policy = ReleaseGuard::take(policy);
-            if let Err(e) = task.set_scheduler_policy(policy) {
-                log_warn!("Unable to update policy of task {} to {policy:?}: {e:?}", task.tid);
+        if let Some(scheduler_state) = self.0 {
+            let scheduler_state = ReleaseGuard::take(scheduler_state);
+            if let Err(e) = task.set_scheduler_state(scheduler_state) {
+                log_warn!(
+                    "Unable to update scheduler state of task {} to {scheduler_state:?}: {e:?}",
+                    task.tid
+                );
             }
         }
     }
@@ -4232,25 +4234,25 @@ impl BinderDriver {
                         .into(),
                     );
 
-                    // There are 2 ways to declare a scheduler policy for the transaction.
-                    // 1. The object might contain a specific minimal policy to use.
+                    // There are 2 ways to declare a scheduler state for the transaction.
+                    // 1. The object might contain a specific minimal scheduler state to use.
                     // 2. The current task has a non-realtime priority[0] or the object has been
                     //    configured to inherit realtime priorities from callers.
                     //
-                    // The results must always be the best policy according to these rules.
+                    // The results must always be the best scheduler state according to these rules.
                     //
                     // [0]: "The binder driver has always supported nice priority inheritance." from
                     // https://source.android.com/docs/core/architecture/hidl/binder-ipc#rt-priority
-                    let mut scheduler_policy = object.flags.get_scheduler_policy();
-                    let current_policy = current_task.read().scheduler_policy;
-                    if !current_policy.kind().is_realtime()
+                    let mut scheduler_state = object.flags.get_scheduler_state();
+                    let current_scheduler_state = current_task.read().scheduler_state;
+                    if !current_scheduler_state.policy().is_realtime()
                         || object.flags.contains(BinderObjectFlags::INHERIT_RT)
                     {
-                        // Only supercede the policy from the object if this task's is higher.
-                        if scheduler_policy
-                            .is_none_or(|p| p.kind().is_less_than_for_binder(current_policy.kind()))
-                        {
-                            scheduler_policy = Some(current_policy);
+                        // Only supercede the scheduler state from the object if this task's is higher.
+                        if scheduler_state.is_none_or(|p| {
+                            p.policy().is_less_than_for_binder(current_scheduler_state.policy())
+                        }) {
+                            scheduler_state = Some(current_scheduler_state);
                         }
                     }
 
@@ -4259,7 +4261,7 @@ impl BinderDriver {
                         Command::Transaction {
                             sender: WeakBinderPeer::new(binder_proc, binder_thread),
                             data: transaction,
-                            scheduler_policy,
+                            scheduler_state,
                         },
                     )
                 };
@@ -4289,52 +4291,54 @@ impl BinderDriver {
         L: LockBefore<ResourceAccessorAddFile>,
     {
         // Find the process and thread that initiated the transaction. This reply is for them.
-        let (target_proc, target_thread, policy) =
+        let (target_proc, target_thread, scheduler_state) =
             binder_thread.lock().pop_transaction_caller(current_task)?;
-        if let Err(e) = release_after!(policy, current_task, || -> Result<(), TransactionError> {
-            let target_task = target_proc.get_task().ok_or(TransactionError::Dead)?;
+        if let Err(e) =
+            release_after!(scheduler_state, current_task, || -> Result<(), TransactionError> {
+                let target_task = target_proc.get_task().ok_or(TransactionError::Dead)?;
 
-            // Copy the transaction data to the target process.
-            let (buffers, transaction_state) = self.copy_transaction_buffers(
-                locked,
-                current_task,
-                binder_proc.get_resource_accessor(current_task),
-                binder_proc,
-                binder_thread,
-                target_proc.get_resource_accessor(target_task.deref()),
-                &target_proc,
-                &data,
-                None,
-            )?;
+                // Copy the transaction data to the target process.
+                let (buffers, transaction_state) = self.copy_transaction_buffers(
+                    locked,
+                    current_task,
+                    binder_proc.get_resource_accessor(current_task),
+                    binder_proc,
+                    binder_thread,
+                    target_proc.get_resource_accessor(target_task.deref()),
+                    &target_proc,
+                    &data,
+                    None,
+                )?;
 
-            // Register the transaction buffer.
-            target_proc.lock().active_transactions.insert(
-                buffers.data.address,
-                ActiveTransaction {
-                    request_type: RequestType::RequestResponse,
-                    state: transaction_state.into_state(),
-                }
-                .into(),
-            );
+                // Register the transaction buffer.
+                target_proc.lock().active_transactions.insert(
+                    buffers.data.address,
+                    ActiveTransaction {
+                        request_type: RequestType::RequestResponse,
+                        state: transaction_state.into_state(),
+                    }
+                    .into(),
+                );
 
-            // Schedule the transaction on the target process' command queue.
-            target_thread.lock().enqueue_command(Command::Reply(TransactionData {
-                peer_pid: binder_proc.key.pid(),
-                peer_tid: binder_thread.tid,
-                peer_euid: current_task.creds().euid,
+                // Schedule the transaction on the target process' command queue.
+                target_thread.lock().enqueue_command(Command::Reply(TransactionData {
+                    peer_pid: binder_proc.key.pid(),
+                    peer_tid: binder_thread.tid,
+                    peer_euid: current_task.creds().euid,
 
-                object: FlatBinderObject::Remote { handle: Handle::ContextManager },
-                code: data.transaction_data.code,
-                flags: data.transaction_data.flags,
+                    object: FlatBinderObject::Remote { handle: Handle::ContextManager },
+                    code: data.transaction_data.code,
+                    flags: data.transaction_data.flags,
 
-                buffers,
-            }));
+                    buffers,
+                }));
 
-            // Schedule the transaction complete command on the caller's command queue.
-            binder_thread.lock().enqueue_command(Command::TransactionComplete);
+                // Schedule the transaction complete command on the caller's command queue.
+                binder_thread.lock().enqueue_command(Command::TransactionComplete);
 
-            Ok(())
-        }) {
+                Ok(())
+            })
+        {
             // Sending to the target process failed, notify of the transaction failure.
             let _ = e.dispatch(&target_thread);
             return Err(e);
@@ -4411,27 +4415,30 @@ impl BinderDriver {
                 // Attempt to write the command to the thread's buffer.
                 let bytes_written = command.write_to_memory(resource_accessor, read_buffer)?;
                 match command {
-                    Command::Transaction { sender, scheduler_policy, .. } => {
+                    Command::Transaction { sender, scheduler_state, .. } => {
                         // The transaction is synchronous and we're expected to give a reply, so
                         // push the transaction onto the transaction stack.
 
-                        // If the transaction must inherit the sender policy, let update the
-                        // scheduler policy, and keep track of the previous one.
-                        let scheduler_policy = (|| {
-                            if let Some(policy) = scheduler_policy {
-                                let old_policy = current_task.read().scheduler_policy;
-                                if old_policy.kind().is_less_than_for_binder(policy.kind()) {
-                                    match current_task.set_scheduler_policy(policy) {
-                                        Ok(()) => return SchedulerGuard::from(old_policy),
+                        // If the transaction must inherit the sender state, let update the
+                        // scheduler state, and keep track of the previous one.
+                        let scheduler_state = (|| {
+                            if let Some(scheduler_state) = scheduler_state {
+                                let old_scheduler_state = current_task.read().scheduler_state;
+                                if old_scheduler_state
+                                    .policy()
+                                    .is_less_than_for_binder(scheduler_state.policy())
+                                {
+                                    match current_task.set_scheduler_state(scheduler_state) {
+                                        Ok(()) => return SchedulerGuard::from(old_scheduler_state),
                                         Err(e) => {
-                                            log_warn!("Unable to update policy of task {} to {policy:?}: {e:?}", current_task.tid);
+                                            log_warn!("Unable to update scheduler state of task {} to {scheduler_state:?}: {e:?}", current_task.tid);
                                         }
                                     }
                                 }
                             }
                             SchedulerGuard::default()
                         })();
-                        let tx = TransactionRole::Receiver(sender, scheduler_policy);
+                        let tx = TransactionRole::Receiver(sender, scheduler_state);
                         thread_state.transactions.push(tx);
                     }
                     Command::Reply(..) => {

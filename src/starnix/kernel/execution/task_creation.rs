@@ -421,13 +421,13 @@ where
     let mut pids = system_task.kernel().pids.write();
     let pid = pids.allocate_pid();
 
-    let scheduler_policy;
+    let scheduler_state;
     let uts_ns;
     let default_timerslack_ns;
     let security_state;
     {
         let state = system_task.read();
-        scheduler_policy = state.scheduler_policy;
+        scheduler_state = state.scheduler_state;
         uts_ns = state.uts_ns.clone();
         default_timerslack_ns = state.default_timerslack_ns;
         security_state = security::task_alloc_for_kernel();
@@ -447,7 +447,7 @@ where
         Default::default(),
         Default::default(),
         None,
-        scheduler_policy,
+        scheduler_state,
         uts_ns,
         false,
         SeccompState::default(),

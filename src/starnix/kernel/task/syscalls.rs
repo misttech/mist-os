@@ -9,7 +9,7 @@ use crate::signals::syscalls::RUsagePtr;
 use crate::task::{
     max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach, ptrace_dispatch,
     ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers, PtraceAttachType,
-    PtraceOptions, SchedulerPolicy, SeccompAction, SeccompStateValue, SyslogAccess, Task,
+    PtraceOptions, SchedulerState, SeccompAction, SeccompStateValue, SyslogAccess, Task,
     ThreadGroup, PR_SET_PTRACER_ANY,
 };
 use crate::vfs::{
@@ -757,8 +757,8 @@ pub fn sys_sched_getscheduler(
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
     security::check_getsched_access(current_task, target_task.as_ref())?;
-    let current_policy = target_task.read().scheduler_policy;
-    Ok(current_policy.raw_policy())
+    let current_scheduler_state = target_task.read().scheduler_state;
+    Ok(current_scheduler_state.raw_policy())
 }
 
 pub fn sys_sched_setscheduler(
@@ -776,12 +776,12 @@ pub fn sys_sched_setscheduler(
     let target_task = Task::from_weak(&weak)?;
     let rlimit = target_task.thread_group().get_rlimit(Resource::RTPRIO);
     let param = current_task.read_object(param)?;
-    let policy = SchedulerPolicy::from_sched_params(policy, param, rlimit)?;
+    let scheduler_state = SchedulerState::from_sched_params(policy, param, rlimit)?;
     if !current_task.is_euid_friendly_with(&target_task) {
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
     }
     security::check_setsched_access(current_task, &target_task)?;
-    target_task.set_scheduler_policy(policy)?;
+    target_task.set_scheduler_state(scheduler_state)?;
 
     Ok(())
 }
@@ -903,7 +903,7 @@ pub fn sys_sched_getparam(
 
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
-    let param_value = target_task.read().scheduler_policy.raw_params();
+    let param_value = target_task.read().scheduler_state.raw_params();
     current_task.write_object(param, &param_value)?;
     Ok(())
 }
@@ -921,17 +921,20 @@ pub fn sys_sched_setparam(
     let new_params: sched_param = current_task.read_object(param.into())?;
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
-    let current_policy = target_task.read().scheduler_policy;
+    let current_scheduler_state = target_task.read().scheduler_state;
 
     let rlimit = target_task.thread_group().get_rlimit(Resource::RTPRIO);
 
-    let policy =
-        SchedulerPolicy::from_sched_params(current_policy.raw_policy(), new_params, rlimit)?;
+    let scheduler_state = SchedulerState::from_sched_params(
+        current_scheduler_state.raw_policy(),
+        new_params,
+        rlimit,
+    )?;
     if !current_task.is_euid_friendly_with(&target_task) {
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
     }
     security::check_setsched_access(current_task, &target_task)?;
-    target_task.set_scheduler_policy(policy)?;
+    target_task.set_scheduler_state(scheduler_state)?;
 
     Ok(())
 }
@@ -1662,7 +1665,7 @@ pub fn sys_getpriority(
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
     let state = target_task.read();
-    Ok(state.scheduler_policy.raw_priority())
+    Ok(state.scheduler_state.raw_priority())
 }
 
 // Note the asymmetry with sys_getpriority: the `priority` parameter is what Starnix calls a
@@ -1687,7 +1690,7 @@ pub fn sys_setpriority(
     const MAX_RAW_PRIORITY: i32 = 40;
     let new_raw_priority =
         (MID_RAW_PRIORITY).saturating_sub(priority).clamp(MIN_RAW_PRIORITY, MAX_RAW_PRIORITY) as u8;
-    let strengthening = target_task.read().scheduler_policy.raw_priority() < new_raw_priority;
+    let strengthening = target_task.read().scheduler_state.raw_priority() < new_raw_priority;
     let allowed_so_far_as_rlimit_is_concerned = !strengthening
         || new_raw_priority as u64 <= target_task.thread_group().get_rlimit(Resource::NICE);
     if !(current_task.is_euid_friendly_with(&target_task) && allowed_so_far_as_rlimit_is_concerned)
