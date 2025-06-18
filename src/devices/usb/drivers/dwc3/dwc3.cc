@@ -640,7 +640,7 @@ void Dwc3::HandleDisconnectedEvent() {
 }
 
 void Dwc3::Stop() {
-  irq_handler_.Cancel();
+  async::PostTask(irq_dispatcher_.async_dispatcher(), [this]() { irq_handler_.Cancel(); });
   complete_pending_requests_.Post(irq_dispatcher_.async_dispatcher());
 
   ReleaseResources();
@@ -706,7 +706,12 @@ void Dwc3::StopController(StopControllerCompleter::Sync& completer) {
     uep.Reset();
   }
 
-  async::PostTask(irq_dispatcher_.async_dispatcher(), [this]() { irq_handler_.Cancel(); });
+  libsync::Completion wait;
+  async::PostTask(irq_dispatcher_.async_dispatcher(), [this, &wait]() {
+    irq_handler_.Cancel();
+    wait.Signal();
+  });
+  wait.Wait();
   complete_pending_requests_.Post(irq_dispatcher_.async_dispatcher());
 
   zx_status_t status;
