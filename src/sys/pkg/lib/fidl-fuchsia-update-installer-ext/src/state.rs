@@ -726,10 +726,8 @@ impl TryFrom<fidl::State> for State {
             info: Option<fidl::UpdateInfo>,
             progress: Option<fidl::InstallationProgress>,
         ) -> Result<UpdateInfoAndProgress, DecodeStateError> {
-            let info: UpdateInfo = info
-                .ok_or(DecodeStateError::MissingField(RequiredStateField::Info))?
-                .try_into()
-                .map_err(DecodeStateError::DecodeUpdateInfo)?;
+            let info: UpdateInfo =
+                info.ok_or(DecodeStateError::MissingField(RequiredStateField::Info))?.into();
             let progress: Progress = progress
                 .ok_or(DecodeStateError::MissingField(RequiredStateField::Progress))?
                 .try_into()
@@ -816,11 +814,9 @@ impl From<UpdateInfo> for fidl::UpdateInfo {
     }
 }
 
-impl TryFrom<fidl::UpdateInfo> for UpdateInfo {
-    type Error = DecodeUpdateInfoError;
-
-    fn try_from(info: fidl::UpdateInfo) -> Result<Self, Self::Error> {
-        Ok(UpdateInfo { download_size: info.download_size.unwrap_or(0) })
+impl From<fidl::UpdateInfo> for UpdateInfo {
+    fn from(info: fidl::UpdateInfo) -> Self {
+        UpdateInfo { download_size: info.download_size.unwrap_or(0) }
     }
 }
 
@@ -995,7 +991,7 @@ mod tests {
         #[test]
         fn update_info_roundtrips_through_fidl(info: UpdateInfo) {
             let as_fidl: fidl::UpdateInfo = info.into();
-            prop_assert_eq!(as_fidl.try_into(), Ok(info));
+            prop_assert_eq!(UpdateInfo::from(as_fidl), info);
         }
 
         #[test]
