@@ -112,6 +112,24 @@ static WILDCARD_RESTRICTIONS: LazyLock<Vec<WildcardRestriction>> = LazyLock::new
             ],
             must_have_tree_name: true,
         },
+        WildcardRestriction {
+            segments: vec![
+                StringSelector::ExactMatch("bootstrap".into()),
+                StringSelector::ExactMatch("fshost".into()),
+                StringSelector::ExactMatch("fvm2".into()),
+                StringSelector::StringPattern("blobfs-collection:*".into()),
+            ],
+            must_have_tree_name: false,
+        },
+        WildcardRestriction {
+            segments: vec![
+                StringSelector::ExactMatch("bootstrap".into()),
+                StringSelector::ExactMatch("fshost".into()),
+                StringSelector::ExactMatch("fvm2".into()),
+                StringSelector::StringPattern("fs-collection:*".into()),
+            ],
+            must_have_tree_name: false,
+        },
     ]
 });
 
