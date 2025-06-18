@@ -21,6 +21,7 @@ use fxfs::object_store::{
     BLOB_MERKLE_ATTRIBUTE_ID, NO_OWNER,
 };
 use fxfs::round::round_up;
+use std::io::{Read as _, Seek as _, SeekFrom};
 use std::ops::Range;
 use std::sync::{Arc, Weak};
 use storage_device::buffer::MutableBufferRef;
@@ -101,7 +102,6 @@ impl Device for ReadOnlyDevice {
 /// the graveyard upon construction so that it will be cleaned up on next mount if we crash.
 async fn new_temporary_handle(
     owner: &Arc<BlobDirectory>,
-    size: u64,
 ) -> Result<DataObjectHandle<FxVolume>, Error> {
     let parent = owner.directory().clone();
     let store = parent.store();
@@ -124,17 +124,33 @@ async fn new_temporary_handle(
     // Add the object to the graveyard so that it's cleaned up if we crash.
     store.add_to_graveyard(&mut transaction, handle.object_id());
     transaction.commit().await.context("Failed to commit transaction.")?;
+    return Ok(handle);
+}
+
+async fn write_data(
+    handle: &DataObjectHandle<FxVolume>,
+    vmo: zx::Vmo,
+    size: u64,
+) -> Result<(), Error> {
+    let mut reader = sparse::reader::SparseReader::new(VmoReader { vmo, size, offset: 0 })?;
+
     // Pre-allocate enough space for the image.
-    let mut range = 0..round_up(size, handle.block_size()).ok_or(FxfsError::OutOfRange)?;
+    let unsparsed_size = {
+        let size = reader.seek(SeekFrom::End(0))?;
+        reader.seek(SeekFrom::Start(0))?;
+        size
+    };
+    let mut range =
+        0..round_up(unsparsed_size, handle.block_size()).ok_or(FxfsError::OutOfRange)?;
     let mut first_time = true;
     while range.start < range.end {
         let mut transaction =
             handle.new_transaction().await.context("Failed to create transaction.")?;
         if first_time {
             handle
-                .grow(&mut transaction, 0, size)
+                .grow(&mut transaction, 0, unsparsed_size)
                 .await
-                .with_context(|| format!("Failed to grow handle to {} bytes.", size))?;
+                .with_context(|| format!("Failed to grow handle to {} bytes.", unsparsed_size))?;
             first_time = false;
         }
         handle.preallocate_range(&mut transaction, &mut range).await.with_context(|| {
@@ -142,22 +158,23 @@ async fn new_temporary_handle(
         })?;
         transaction.commit().await.context("Failed to commit transaction.")?;
     }
-    return Ok(handle);
-}
 
-async fn write_data(
-    handle: &DataObjectHandle<FxVolume>,
-    src: zx::Vmo,
-    size: u64,
-) -> Result<(), Error> {
-    // Copy as much data out of the source VMO in multiples of the chunk read size.
+    // Copy as much data out of the sparse image in multiples of the chunk read size.
+    // TODO(https://fxbug.dev/397515768): When we generate a sparse fxblob image, there is usually
+    // a trailing chunk of don't-care. The SparseReader correctly expands these to to all zeroes,
+    // but we don't need to copy them nor write them to disk.
+
     let chunk_size_aligned =
         round_up(CHUNK_READ_SIZE, handle.block_size()).ok_or(FxfsError::OutOfRange)? as usize;
     let mut buffer = handle.allocate_buffer(chunk_size_aligned).await;
-    let mut remaining = size;
+    let mut remaining = unsparsed_size;
     while remaining >= CHUNK_READ_SIZE {
-        let offset = size - remaining;
-        src.read(buffer.as_mut_slice(), offset).context("Failed to read from VMO")?;
+        let amount =
+            reader.read(buffer.as_mut_slice()).context("Failed to read from sparse image")?;
+        if amount != buffer.len() {
+            return Err(FxfsError::IntegrityError).context("Short read from sparse image");
+        }
+        let offset = unsparsed_size - remaining;
         handle
             .overwrite(offset, buffer.as_mut(), Default::default())
             .await
@@ -169,10 +186,14 @@ async fn write_data(
         let remaining_aligned =
             round_up(remaining, handle.block_size()).ok_or(FxfsError::OutOfRange)? as usize;
         let mut buffer = buffer.subslice_mut(0..remaining_aligned);
-        let offset = size - remaining;
+        let offset = unsparsed_size - remaining;
         let remaining = remaining as usize;
-        src.read(&mut buffer.as_mut_slice()[..remaining], offset)
-            .context("Failed to read from VMO")?;
+        let amount = reader
+            .read(&mut buffer.as_mut_slice()[..remaining])
+            .context("Failed to read from sparse image")?;
+        if amount != remaining {
+            return Err(FxfsError::IntegrityError).context("Short read from sparse image");
+        }
         buffer.as_mut_slice()[remaining..].fill(0);
         handle
             .overwrite(offset, buffer, Default::default())
@@ -192,7 +213,7 @@ pub(crate) async fn write_new_blob_volume(
     delete_all_blobs(destination).await?;
     // Write the image payload into a new, temporary object.
     log::info!("Streaming image to disk.");
-    let handle = new_temporary_handle(destination, size).await?;
+    let handle = new_temporary_handle(destination).await?;
     // Store the object ID of the handle so we can tombstone it when we're finished.
     let handle_id = handle.object_id();
     write_data(&handle, vmo, size).await?;
@@ -358,6 +379,38 @@ async fn copy_blob(
     Ok(())
 }
 
+struct VmoReader {
+    vmo: zx::Vmo,
+    size: u64,
+    offset: u64,
+}
+
+// TODO(https://fxbug.dev/397515768): Propagate read errors, don't unwrap.
+impl std::io::Read for VmoReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if self.offset >= self.size || buf.len() == 0 {
+            return Ok(0);
+        }
+        let bytes_available = (self.size - self.offset) as usize;
+        let bytes_read = std::cmp::min(buf.len(), bytes_available);
+        self.vmo.read(&mut buf[..bytes_read], self.offset).unwrap();
+        self.offset += bytes_read as u64;
+        Ok(bytes_read)
+    }
+}
+
+// TODO(https://fxbug.dev/397515768): Propagate seek errors, don't unwrap.
+impl std::io::Seek for VmoReader {
+    fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+        self.offset = match pos {
+            SeekFrom::Current(offset) => self.offset.checked_add_signed(offset).unwrap(),
+            SeekFrom::Start(offset) => offset,
+            SeekFrom::End(offset) => self.size.checked_add_signed(offset).unwrap(),
+        };
+        Ok(self.offset)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -388,48 +441,107 @@ mod tests {
     const NUM_BLOCKS: u64 = 8192;
     const DEVICE_SIZE: u64 = BLOCK_SIZE * NUM_BLOCKS;
 
-    async fn create_blob_image_vmo() -> (zx::Vmo, u64) {
-        let vmo = zx::Vmo::create(DEVICE_SIZE).unwrap();
+    struct VmoWriter {
+        vmo: zx::Vmo,
+        size: u64,
+        offset: u64,
+        // TODO(https://fxbug.dev/397515768): SparseImageBuilder should be able to provide how many
+        // bytes are required for the sparse output before it's actually built.
+        max_offset: u64,
+    }
 
-        // TODO(https://fxbug.dev/397515768): It would be preferable if we avoid using a ramdisk
-        // here and instead used vmo_backed_block_server.
-        let ramdisk = RamdiskClientBuilder::new_with_vmo(
-            vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-            Some(BLOCK_SIZE),
-        )
-        .build()
-        .await
-        .unwrap();
-        let device = DeviceHolder::new(
-            BlockDevice::new(
-                Box::new(
-                    crate::component::new_block_client(
-                        ramdisk.open().expect("Unable to open ramdisk"),
-                    )
-                    .await
-                    .expect("Unable to create block client"),
-                ),
-                false,
-            )
-            .await
-            .unwrap(),
-        );
+    impl std::io::Seek for VmoWriter {
+        fn seek(&mut self, pos: SeekFrom) -> std::io::Result<u64> {
+            self.offset = match pos {
+                SeekFrom::Current(offset) => self.offset.checked_add_signed(offset).unwrap(),
+                SeekFrom::Start(offset) => offset,
+                SeekFrom::End(offset) => self.size.checked_add_signed(offset).unwrap(),
+            };
+            self.max_offset = std::cmp::max(self.offset, self.max_offset);
+            Ok(self.offset)
+        }
+    }
 
-        let fxblob = FxBlobBuilder::new(device, /*compression_enabled*/ true).await.unwrap();
-        for (hash, data) in TEST_BLOBS {
-            let blob = fxblob.generate_blob(data.to_vec()).unwrap();
-            assert_eq!(blob.hash(), hash.try_into().unwrap());
-            fxblob.install_blob(&blob).await.unwrap();
+    impl std::io::Write for VmoWriter {
+        fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+            if self.offset >= self.size || buf.len() == 0 {
+                return Ok(0);
+            }
+            let bytes_available = (self.size - self.offset) as usize;
+            let bytes_written = std::cmp::min(buf.len(), bytes_available);
+            self.vmo.write(&buf[..bytes_written], self.offset).unwrap();
+            self.offset += bytes_written as u64;
+            self.max_offset = std::cmp::max(self.offset, self.max_offset);
+            Ok(bytes_written)
         }
 
-        let _image_size = fxblob.finalize().await.unwrap();
-        ramdisk.destroy_and_wait_for_removal().await.unwrap();
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
 
-        // TODO(https://fxbug.dev/397515768): We need to make sure this works using the sparse image
-        // format, and that we only need to pass in the bytes that were used in the image (i.e. that
-        // we only need to send as many bytes as reported by finalize() above).
+    async fn create_sparse_fxblob_image() -> (zx::Vmo, u64) {
+        // TODO(https://fxbug.dev/397515768): It would be preferable if we avoid using a ramdisk
+        // here and instead used vmo_backed_block_server.
+        let (fxblob_vmo, used_space) = {
+            let vmo = zx::Vmo::create(DEVICE_SIZE).unwrap();
+            let ramdisk = RamdiskClientBuilder::new_with_vmo(
+                vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
+                Some(BLOCK_SIZE),
+            )
+            .build()
+            .await
+            .unwrap();
+            let device = DeviceHolder::new(
+                BlockDevice::new(
+                    Box::new(
+                        crate::component::new_block_client(
+                            ramdisk.open().expect("Unable to open ramdisk"),
+                        )
+                        .await
+                        .expect("Unable to create block client"),
+                    ),
+                    false,
+                )
+                .await
+                .unwrap(),
+            );
+            let fxblob = FxBlobBuilder::new(device, /*compression_enabled*/ true).await.unwrap();
+            for (hash, data) in TEST_BLOBS {
+                let blob = fxblob.generate_blob(data.to_vec()).unwrap();
+                assert_eq!(blob.hash(), hash.try_into().unwrap());
+                fxblob.install_blob(&blob).await.unwrap();
+            }
 
-        (vmo, DEVICE_SIZE)
+            let used_space = fxblob.finalize().await.unwrap();
+            ramdisk.destroy_and_wait_for_removal().await.unwrap();
+            (vmo, used_space)
+        };
+
+        let (sparse_vmo, sparse_size) = {
+            // TODO(https://fxbug.dev/397515768): Use the correct size here once we can determine
+            // how many bytes we need for the sparse output ahead of time.
+            let mut sparse_writer = VmoWriter {
+                vmo: zx::Vmo::create(DEVICE_SIZE).unwrap(),
+                size: DEVICE_SIZE,
+                offset: 0,
+                max_offset: 0,
+            };
+            sparse::builder::SparseImageBuilder::new()
+                .set_block_size(BLOCK_SIZE as u32)
+                .add_chunk(sparse::builder::DataSource::Vmo {
+                    vmo: fxblob_vmo,
+                    size: used_space,
+                    offset: 0,
+                })
+                .add_chunk(sparse::builder::DataSource::Skip(DEVICE_SIZE - used_space))
+                .build(&mut sparse_writer)
+                .unwrap();
+            let VmoWriter { vmo, max_offset, .. } = sparse_writer;
+            (vmo, max_offset)
+        };
+
+        (sparse_vmo, sparse_size)
     }
 
     #[fasync::run(10, test)]
@@ -441,7 +553,7 @@ mod tests {
         // Generate a new fxfs filesystem in a VMO containing different blobs, and write it into
         // the existing filesystem using our protocol.
         {
-            let (vmo, size) = create_blob_image_vmo().await;
+            let (vmo, size) = create_sparse_fxblob_image().await;
             let writer =
                 connect_to_protocol_at_dir_svc::<BlobVolumeWriterMarker>(fixture.volume_out_dir())
                     .unwrap();

@@ -62,6 +62,7 @@ platform_deps = [
   "//src/storage/lib/block_client/rust",
   "//src/storage/lib/delivery_blob",
   "//src/storage/lib/fs_inspect",
+  "//src/storage/lib/sparse/rust:lib",
   "//src/storage/lib/storage_device",
   "//src/storage/lib/vfs/rust:vfs_static",
   "//src/sys/pkg/lib/fuchsia-hash",

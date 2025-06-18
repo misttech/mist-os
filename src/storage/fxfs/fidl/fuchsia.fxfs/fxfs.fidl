@@ -322,10 +322,12 @@ closed protocol BlobVolumeWriter {
     ///
     /// *WARNING*: The system may not boot if this process is interrupted.
     ///
-    // TODO(https://fxbug.dev/415300916): Figure out what format we should use in production.
     // TODO(https://fxbug.dev/415300916): Split this method up into separate steps so we can report
     // more detailed logs from fastboot (e.g. first wipe all existing blobs, then stream payload to
     // disk, and finally post-process the blobs).
+    // TODO(https://fxbug.dev/415300916): We need to change this interface so that we can
+    // incrementally stream the sparse image into fxfs. Currently, we assume the whole image has
+    // been buffered in `payload`.
     strict Write(resource struct {
         payload fuchsia.mem.Buffer;
     }) -> () error zx.Status;
