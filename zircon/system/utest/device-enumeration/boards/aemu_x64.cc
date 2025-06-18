@@ -9,14 +9,14 @@ namespace {
 TEST_F(DeviceEnumerationTest, AemuX64Test) {
   static const char* kNodeMonikers[] = {
       "dev.sys.platform.pt.acpi",
-      "dev.sys.platform.pt.PCI0.bus.00_1f.2.00_1f_2.ahci",
+      "dev.sys.platform.pt.PCI0.bus.00_1f_2.00_1f_2.ahci",
       "dev.sys.platform.pt.acpi._SB_.PCI0.ISA_.KBD_.pt.KBD_-composite-spec.i8042.i8042-keyboard",
       "dev.sys.platform.pt.acpi._SB_.PCI0.ISA_.KBD_.pt.KBD_-composite-spec.i8042.i8042-mouse",
   };
   VerifyNodes(kNodeMonikers);
 
   static const char* kAemuNodeMonikers[] = {
-      "dev.sys.platform.pt.PCI0.bus.00_0b.0.00_0b_0.goldfish-address-space",
+      "dev.sys.platform.pt.PCI0.bus.00_0b_0.00_0b_0.goldfish-address-space",
 
       // Verify goldfish pipe root device created.
       "dev.sys.platform.pt.acpi._SB_.GFPP.pt.GFPP-composite-spec.goldfish-pipe",

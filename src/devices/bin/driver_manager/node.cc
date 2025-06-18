@@ -503,6 +503,8 @@ std::string Node::MakeComponentMoniker() const {
   // which is not allowed, so replace those characters.
   // TODO(https://fxbug.dev/42062456): Migrate driver names to only use CF valid characters.
   std::replace(topo_path.begin(), topo_path.end(), ':', '_');
+  // Since we use '.' to denote topology, replace them with '_'.
+  std::replace(topo_path.begin(), topo_path.end(), '.', '_');
   std::replace(topo_path.begin(), topo_path.end(), '/', '.');
   return topo_path;
 }

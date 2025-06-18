@@ -67,12 +67,12 @@ TEST_F(DeviceEnumerationTest, Nuc11TNBv5Test) {
   }
 
   static const char* kNodeMonikers[] = {
-      "dev.sys.platform.pt.PC00.bus.00_02.0.00_02_0.intel-gpu-core",
-      "dev.sys.platform.pt.PC00.bus.00_02.0.00_02_0.intel-display-controller.display-coordinator",
-      "dev.sys.platform.pt.PC00.bus.00_14.0.00_14_0.xhci.usb-bus",
-      "dev.sys.platform.pt.PC00.bus.00_17.0.00_17_0.ahci",
+      "dev.sys.platform.pt.PC00.bus.00_02_0.00_02_0.intel-gpu-core",
+      "dev.sys.platform.pt.PC00.bus.00_02_0.00_02_0.intel-display-controller.display-coordinator",
+      "dev.sys.platform.pt.PC00.bus.00_14_0.00_14_0.xhci.usb-bus",
+      "dev.sys.platform.pt.PC00.bus.00_17_0.00_17_0.ahci",
 #ifdef include_packaged_drivers
-      "dev.sys.platform.pt.PC00.bus.00_14.3.00_14_3.iwlwifi-wlanphyimpl",
+      "dev.sys.platform.pt.PC00.bus.00_14_3.00_14_3.iwlwifi-wlanphyimpl",
 #endif
   };
   VerifyNodes(kNodeMonikers);

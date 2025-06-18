@@ -67,24 +67,24 @@ TEST_F(DeviceEnumerationTest, Nuc7i5DNBTest) {
   }
 
   static const char* kNodeMonikers[] = {
-      "dev.sys.platform.pt.PCI0.bus.00_02.0.00_02_0.intel-gpu-core",
-      "dev.sys.platform.pt.PCI0.bus.00_02.0.00_02_0.intel-display-controller.display-coordinator",
-      "dev.sys.platform.pt.PCI0.bus.00_14.0.00_14_0.xhci.usb-bus",
-      "dev.sys.platform.pt.PCI0.bus.00_17.0.00_17_0.ahci",
+      "dev.sys.platform.pt.PCI0.bus.00_02_0.00_02_0.intel-gpu-core",
+      "dev.sys.platform.pt.PCI0.bus.00_02_0.00_02_0.intel-display-controller.display-coordinator",
+      "dev.sys.platform.pt.PCI0.bus.00_14_0.00_14_0.xhci.usb-bus",
+      "dev.sys.platform.pt.PCI0.bus.00_17_0.00_17_0.ahci",
       // TODO(https://fxbug.dev.42164781): Temporarily removed.
-      // "dev.sys.platform.pt.PCI0.bus.00_1f.3.00_1f_3.intel-hda-000",
-      // "dev.sys.platform.pt.PCI0.bus.00_1f.3.00_1f_3.intel-hda-controller",
-      "dev.sys.platform.pt.PCI0.bus.00_1f.6.00_1f_6.e1000",
+      // "dev.sys.platform.pt.PCI0.bus.00_1f_3.00_1f_3.intel-hda-000",
+      // "dev.sys.platform.pt.PCI0.bus.00_1f_3.00_1f_3.intel-hda-controller",
+      "dev.sys.platform.pt.PCI0.bus.00_1f_6.00_1f_6.e1000",
 #ifdef include_packaged_drivers
-      "dev.sys.platform.pt.PCI0.bus.01_00.0.01_00_0.iwlwifi-wlanphyimpl",
+      "dev.sys.platform.pt.PCI0.bus.01_00_0.01_00_0.iwlwifi-wlanphyimpl",
 #endif
   };
   VerifyNodes(kNodeMonikers);
 
   // TODO(https://fxbug.dev/42075152): Fix the metadata problems in i2c.cm and re-enable this.
   // static const char* kDfv1DevicePaths[] = {
-  //     "dev.sys.platform.pt.PCI0.bus.00_15.0.00_15_0.i2c-bus-9d60",
-  //     "dev.sys.platform.pt.PCI0.bus.00_15.1.00_15_1.i2c-bus-9d61",
+  //     "dev.sys.platform.pt.PCI0.bus.00_15_0.00_15_0.i2c-bus-9d60",
+  //     "dev.sys.platform.pt.PCI0.bus.00_15_1.00_15_1.i2c-bus-9d61",
   // };
   // ASSERT_NO_FATAL_FAILURE(TestRunner(kDfv1DevicePaths, std::size(kDfv1DevicePaths)));
 }

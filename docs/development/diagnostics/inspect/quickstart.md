@@ -565,7 +565,7 @@ This returns:
 
 ```none {:.devsite-disable-click-to-copy}
 Fuzzy matching failed due to too many matches, please re-try with one of these:
-bootstrap/boot-drivers:dev.sys.platform.pt.PCI0.bus.00_04.0.00_04_0.virtio-net
+bootstrap/boot-drivers:dev.sys.platform.pt.PCI0.bus.00_04_0.00_04_0.virtio-net
 core/network
 core/network-tun
 core/network/dhcpd
