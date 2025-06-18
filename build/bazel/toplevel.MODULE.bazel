@@ -124,6 +124,7 @@ fuchsia_sdk_ext = use_extension(
 )
 fuchsia_sdk_ext.local(
     buildifier = "@fuchsia_build_config//:host_prebuilts/buildifier",
+    # The @fuchsia_sdk repository is populated from the same content as @fuchsia_in_tree_idk.
     # LINT.IfChange
     local_sdk_version_file = "//:fuchsia_build_generated/fuchsia_in_tree_idk.hash",
     # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
@@ -152,7 +153,9 @@ fuchsia_sdk_repository(
     name = "internal_sdk",
     local_paths = ["@@+_repo_rules+fuchsia_internal_only_idk"],
     # The @internal_sdk repository is populated from the same content as @fuchsia_internal_only_idk.
+    # LINT.IfChange
     local_sdk_version_file = "//:fuchsia_build_generated/fuchsia_internal_only_idk.hash",
+    # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
     # NOTE: It's unclear why @@rules_fuchsia++fuchsia_sdk_ext+fuchsia_sdk does
     # NOT work here. Leaving it as-is for now since this target is planned to be
     # removed.

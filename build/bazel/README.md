@@ -88,7 +88,7 @@ Now that you've been warned, here's how this is supposed to work:
 
 # IMPLEMENTATION NOTES
 
-The reasons why there are not top-level `WORKSPACE.bazel` or `BUILD.bazel`
+The reasons why there are not top-level `MODULE.bazel` or `BUILD.bazel`
 files provided in `$FUCHSIA_DIR` are that:
 
 - Some top-level Bazel files (e.g. `.bazelrc`) contain values that always

@@ -740,15 +740,6 @@ def record_fuchsia_workspace(
     )
     # LINT.ThenChange(//build/bazel/toplevel.MODULE.bazel)
 
-    generated.record_symlink(
-        # LINT.IfChange
-        "workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash",
-        # LINT.ThenChange(//build/bazel/bazel_sdk/BUILD.bazel, //build/bazel/toplevel.MODULE.bazel)
-        # LINT.IfChange
-        gn_output_dir / "sdk/prebuild/in_tree_collection.json",
-        # LINT.ThenChange(//build/regenerator.py)
-    )
-
     # Used when merging the IDK sub-build directories. For other use cases,
     # prefer a symlink with a narrower scope.
     generated.record_symlink(
@@ -756,6 +747,15 @@ def record_fuchsia_workspace(
         "workspace/fuchsia_build_generated/ninja_root_build_dir",
         # LINT.ThenChange(//build/bazel/bazel_sdk/BUILD.bazel)
         gn_output_dir,
+    )
+
+    generated.record_symlink(
+        # LINT.IfChange
+        "workspace/fuchsia_build_generated/fuchsia_in_tree_idk.hash",
+        # LINT.ThenChange(//build/bazel/bazel_sdk/BUILD.bazel, //build/bazel/toplevel.MODULE.bazel)
+        # LINT.IfChange
+        gn_output_dir / "sdk/prebuild/in_tree_collection.json",
+        # LINT.ThenChange(//build/regenerator.py)
     )
 
     generated.record_symlink(
@@ -769,7 +769,7 @@ def record_fuchsia_workspace(
 
     # The following symlinks are used only by bazel_action.py when processing
     # the list of Bazel source inputs, the actual repository setup in
-    # WORKSPACE.bazel reuses the two symlinks above instead.
+    # MODULE.bazel reuses the two symlinks above instead.
     generated.record_symlink(
         # LINT.IfChange
         "workspace/fuchsia_build_generated/fuchsia_sdk.hash",
