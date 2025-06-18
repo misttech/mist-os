@@ -34,6 +34,7 @@ where
 {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
+    let class = registry.objects.get_or_create_class("kgsl".into(), registry.objects.virtual_bus());
     let builder = KgslDeviceBuilder {};
 
     registry
@@ -41,7 +42,7 @@ where
             locked,
             current_task,
             "kgsl-3d0".into(),
-            registry.objects.graphics_class(),
+            class,
             DeviceDirectory::new,
             builder,
         )
