@@ -8,13 +8,11 @@
 use ffx_config::EnvironmentContext;
 use ffx_product::{CommandStatus, MachineOutput, MachineUi};
 use ffx_product_list::{pb_list_impl, ProductBundle};
+use ffx_product_lookup_args::LookupCommand;
 use ffx_writer::{ToolIO as _, VerifiedMachineWriter};
 use fho::{bug, return_user_error, FfxMain, FfxTool, Result};
 use pbms::AuthFlowChoice;
 use std::io::{stdin, stdout, Write};
-
-mod args;
-pub use args::LookupCommand;
 
 #[derive(FfxTool)]
 pub struct PbLookupTool {
@@ -23,6 +21,8 @@ pub struct PbLookupTool {
 
     context: EnvironmentContext,
 }
+
+fho::embedded_plugin!(PbLookupTool);
 
 #[async_trait::async_trait(?Send)]
 impl FfxMain for PbLookupTool {

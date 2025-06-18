@@ -7,6 +7,7 @@ use assembled_system::Image;
 use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
 use ffx_config::EnvironmentContext;
+use ffx_product_get_image_path_args::{GetImagePathCommand, ImageType, Slot};
 use ffx_writer::VerifiedMachineWriter;
 use fho::{bug, return_user_error, user_error, Error, FfxMain, FfxTool, Result};
 use product_bundle::ProductBundle;
@@ -14,10 +15,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use utf8_path::path_relative_from;
-
-mod args;
-pub use crate::args::GetImagePathCommand;
-use crate::args::{ImageType, Slot};
 
 /// CommandStatus is returned to indicate exit status of
 /// a command. The Ok variant returns the list of artifacts.
@@ -40,6 +37,8 @@ pub struct PbGetImagePathTool {
     pub cmd: GetImagePathCommand,
     env: EnvironmentContext,
 }
+
+fho::embedded_plugin!(PbGetImagePathTool);
 
 #[async_trait(?Send)]
 impl FfxMain for PbGetImagePathTool {

@@ -34,6 +34,7 @@ required_ffx_plugins = [
 
   # TODO(402497848): Remove these once MOS has been updated.
   "//src/developer/ffx/plugins/package:ffx_package",
+  "//src/developer/ffx/plugins/product:ffx_product",
 ]
 
 # The list of ffx plugins that we currently build as part of the 'main' ffx

@@ -6,6 +6,7 @@
 
 use anyhow::Result;
 use camino::Utf8PathBuf;
+use ffx_product_get_repository_args::GetRepositoryCommand;
 use ffx_writer::{MachineWriter, ToolIO as _};
 use fho::{bug, user_error, FfxMain, FfxTool};
 use product_bundle::ProductBundle;
@@ -13,15 +14,14 @@ use serde::{Deserialize, Serialize};
 use std::io::Write;
 use utf8_path::path_relative_from;
 
-mod args;
-pub use args::GetRepositoryCommand;
-
 /// `ffx product show` sub-command.
 #[derive(FfxTool)]
 pub struct ProductGetRepoTool {
     #[command]
     pub cmd: GetRepositoryCommand,
 }
+
+fho::embedded_plugin!(ProductGetRepoTool);
 
 /// This plugin will get the info of repository inside product bundle.
 #[async_trait::async_trait(?Send)]
