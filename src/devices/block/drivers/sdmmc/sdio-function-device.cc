@@ -22,36 +22,7 @@
 namespace {
 
 std::pair<zx::error<zx_status_t>, const char*> MapPowerError(fdf_power::Error error) {
-  switch (error) {
-    case fdf_power::Error::INVALID_ARGS:
-      return {zx::error(ZX_ERR_INVALID_ARGS), "Invalid power configuration"};
-    case fdf_power::Error::IO:
-      return {zx::error(ZX_ERR_IO), "IO error"};
-    case fdf_power::Error::DEPENDENCY_NOT_FOUND:
-      return {zx::error(ZX_ERR_NOT_FOUND), "Could not get dependency tokens"};
-    case fdf_power::Error::TOKEN_SERVICE_CAPABILITY_NOT_FOUND:
-      return {zx::error(ZX_ERR_NOT_FOUND), "No token service capability available"};
-    case fdf_power::Error::READ_INSTANCES:
-      return {zx::error(ZX_ERR_IO), "Failed to list service instances"};
-    case fdf_power::Error::NO_TOKEN_SERVICE_INSTANCES:
-      return {zx::error(ZX_ERR_NOT_FOUND), "No token service instances available"};
-    case fdf_power::Error::TOKEN_REQUEST:
-      return {zx::error(ZX_ERR_IO), "Failed to get token"};
-    case fdf_power::Error::ACTIVITY_GOVERNOR_UNAVAILABLE:
-      return {zx::error(ZX_ERR_UNAVAILABLE), "No SAG token capability available"};
-    case fdf_power::Error::ACTIVITY_GOVERNOR_REQUEST:
-      return {zx::error(ZX_ERR_IO), "SAG request failed"};
-    case fdf_power::Error::TOPOLOGY_UNAVAILABLE:
-      return {zx::error(ZX_ERR_UNAVAILABLE), "Topology service unavailable"};
-    case fdf_power::Error::CONFIGURATION_UNAVAILABLE:
-      return {zx::error(ZX_ERR_UNAVAILABLE), "Failed to get power configuration"};
-    case fdf_power::Error::CPU_ELEMENT_MANAGER_UNAVAILABLE:
-      return {zx::error(ZX_ERR_UNAVAILABLE), "No CpuElementManager capability available"};
-    case fdf_power::Error::CPU_ELEMENT_MANAGER_REQUEST:
-      return {zx::error(ZX_ERR_IO), "CpuElementManager request failed"};
-    default:
-      return {zx::error(ZX_ERR_INTERNAL), "(unknown)"};
-  }
+  return {fdf_power::ErrorToZxError(error), fdf_power::ErrorToString(error)};
 }
 
 std::pair<zx::error<zx_status_t>, const char*> MapLeaseError(

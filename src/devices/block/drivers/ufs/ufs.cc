@@ -1343,8 +1343,8 @@ zx::result<> Ufs::ConfigurePowerManagement() {
 
     auto tokens = fdf_power::GetDependencyTokens(*driver_incoming(), config);
     if (tokens.is_error()) {
-      FDF_LOG(ERROR, "Failed to get power dependency tokens: %u.",
-              static_cast<uint8_t>(tokens.error_value()));
+      FDF_LOG(ERROR, "Failed to get power dependency tokens: %s.",
+              fdf_power::ErrorToString(tokens.error_value()));
       return zx::error(ZX_ERR_INTERNAL);
     }
 
