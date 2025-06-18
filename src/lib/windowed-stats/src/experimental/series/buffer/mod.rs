@@ -118,10 +118,7 @@ impl RingBuffer<f32> for Uncompressed<f32> {
     }
 
     fn fill(&mut self, item: f32, count: NonZeroUsize) {
-        // TODO(https://fxbug.dev/414659622): Call ring buffer's `fill`
-        for _i in 0..count.get() {
-            self.push(item);
-        }
+        self.0.fill(item, count);
     }
 
     fn serialize(&self, mut write: impl Write) -> io::Result<()> {
@@ -149,11 +146,7 @@ where
     }
 
     fn fill(&mut self, item: A, count: NonZeroUsize) {
-        // TODO(https://fxbug.dev/414659622): Call ring buffer's `fill`
-        let item = item.into();
-        for _i in 0..count.get() {
-            self.0.push(item);
-        }
+        self.0.fill(item.into(), count);
     }
 
     fn serialize(&self, mut write: impl Write) -> io::Result<()> {
@@ -184,11 +177,7 @@ where
     }
 
     fn fill(&mut self, item: A, count: NonZeroUsize) {
-        // TODO(https://fxbug.dev/414659622): Call ring buffer's `fill`
-        let item = item.into();
-        for _i in 0..count.get() {
-            self.0.push(item);
-        }
+        self.0.fill(item.into(), count);
     }
 
     fn serialize(&self, mut write: impl Write) -> io::Result<()> {
@@ -221,12 +210,8 @@ where
     }
 
     fn fill(&mut self, item: A, count: NonZeroUsize) {
-        // TODO(https://fxbug.dev/414659622): Call ring buffer's `fill`
-        let item = item.into();
-        for _i in 0..count.get() {
-            if let Err(e) = self.0.push(item.into()) {
-                warn!("DeltaSimple8bRleRingBuffer::push error: {}", e);
-            }
+        if let Err(e) = self.0.fill(item.into(), count) {
+            warn!("DeltaSimple8bRleRingBuffer::fill error: {}", e);
         }
     }
 
@@ -259,10 +244,7 @@ impl RingBuffer<i64> for DeltaZigzagSimple8bRle<i64> {
     }
 
     fn fill(&mut self, item: i64, count: NonZeroUsize) {
-        // TODO(https://fxbug.dev/414659622): Call ring buffer's `fill`
-        for _i in 0..count.get() {
-            self.push(item);
-        }
+        self.0.fill(item, count);
     }
 
     fn serialize(&self, mut write: impl Write) -> io::Result<()> {
@@ -289,10 +271,7 @@ impl RingBuffer<u64> for DeltaZigzagSimple8bRle<u64> {
     }
 
     fn fill(&mut self, item: u64, count: NonZeroUsize) {
-        // TODO(https://fxbug.dev/414659622): Call ring buffer's `fill`
-        for _i in 0..count.get() {
-            self.push(item);
-        }
+        self.0.fill(item, count);
     }
 
     fn serialize(&self, mut write: impl Write) -> io::Result<()> {

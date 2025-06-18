@@ -752,6 +752,30 @@ mod tests {
                 0, 0, // number of elements
             ]
         );
+
+        // Advance several time steps to test ring buffer's `fill`
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(50_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                50, 0, 0, 0, // last timestamp
+                0, 0, // type: uncompressed; subtype: f32
+                24, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                5, 0, // number of elements
+                42, 0, 0, 0, // item 1
+                0, 0, 0, 0, // item 2
+                0, 0, 0, 0, // item 3
+                0, 0, 0, 0, // item 4
+                0, 0, 0, 0, // item 5
+                4, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of elements
+            ]
+        );
     }
 
     #[test]
@@ -783,7 +807,7 @@ mod tests {
             ]
         );
 
-        time_matrix.fold(Timed::now(42)).unwrap();
+        time_matrix.fold(Timed::now(15)).unwrap();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
@@ -799,7 +823,32 @@ mod tests {
                 0, 0,    // head selector index
                 1,    // number of values in last block
                 0x0f, // RLE selector
-                42, 0, 0, 0, 0, 0, 1, 0, // value 42 appears 1 time
+                15, 0, 0, 0, 0, 0, 1, 0, // value 15 appears 1 time
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of selector elements and value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+
+        // Advance several time steps to test ring buffer's `fill`
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(50_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                50, 0, 0, 0, // last timestamp
+                1, 0, // type: simple8b RLE; subtype: unsigned
+                16, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                1, 0, // number of selector elements and value blocks
+                0, 0,    // head selector index
+                5,    // number of values in last block
+                0x03, // 4-bit selector
+                0x0f, 0, 0, 0, 0, 0, 0, 0, // values 15, 0, 0, 0, 0
                 7, 0, // series 2: length in bytes
                 60, 0, // series 2 granularity: 60s
                 0, 0, // number of selector elements and value blocks
@@ -838,7 +887,7 @@ mod tests {
             ]
         );
 
-        time_matrix.fold(Timed::now(-2)).unwrap();
+        time_matrix.fold(Timed::now(-8)).unwrap();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
@@ -854,7 +903,32 @@ mod tests {
                 0, 0,    // head selector index
                 1,    // number of values in last block
                 0x0f, // RLE selector
-                3, 0, 0, 0, 0, 0, 1, 0, // value -2 (encoded as 3) appears 1 time
+                15, 0, 0, 0, 0, 0, 1, 0, // value -8 (encoded as 15) appears 1 time
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of selector elements and value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+
+        // Advance several time steps to test ring buffer's `fill`
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(50_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                50, 0, 0, 0, // last timestamp
+                1, 1, // type: simple8b RLE; subtype: signed (zigzag encoded)
+                16, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                1, 0, // number of selector elements and value blocks
+                0, 0,    // head selector index
+                5,    // number of values in last block
+                0x03, // 4-bit selector
+                0x0f, 0, 0, 0, 0, 0, 0, 0, // values -8 (encoded as 15), 0, 0, 0, 0
                 7, 0, // series 2: length in bytes
                 60, 0, // series 2 granularity: 60s
                 0, 0, // number of selector elements and value blocks
@@ -868,9 +942,9 @@ mod tests {
     fn time_matrix_with_delta_simple8b_rle_buffer() {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3_000_000_000));
-        let mut time_matrix = TimeMatrix::<LatchMax<u64>, LastAggregation>::new(
+        let mut time_matrix = TimeMatrix::<LatchMax<u64>, LastSample>::new(
             SamplingProfile::highly_granular(),
-            LastAggregation::or(0),
+            LastSample::or(0),
         );
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
@@ -917,7 +991,7 @@ mod tests {
             ]
         );
 
-        time_matrix.fold(Timed::now(50)).unwrap();
+        time_matrix.fold(Timed::now(57)).unwrap();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(20_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
@@ -934,7 +1008,33 @@ mod tests {
                 1, // number of values in last block
                 42, 0, 0, 0, 0, 0, 0, 0,    // base value
                 0x0f, // RLE selector
-                8, 0, 0, 0, 0, 0, 1, 0, // value 8 (delta) appears 1 time
+                15, 0, 0, 0, 0, 0, 1, 0, // value 15 (delta) appears 1 time
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+
+        // Advance several time steps to test ring buffer's `fill`
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(50_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                50, 0, 0, 0, // last timestamp
+                2, 0, // type: delta simple8b RLE; subtype: unsigned
+                24, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                2, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                4, // number of values in last block
+                42, 0, 0, 0, 0, 0, 0, 0,    // base value
+                0x03, // 4-bit selector
+                0x0f, 0, 0, 0, 0, 0, 0, 0, // values 15, 0, 0, 0
                 7, 0, // series 2: length in bytes
                 60, 0, // series 2 granularity: 60s
                 0, 0, // number of base value + selector elements or value blocks
@@ -997,7 +1097,7 @@ mod tests {
             ]
         );
 
-        time_matrix.fold(Timed::now(40)).unwrap();
+        time_matrix.fold(Timed::now(34)).unwrap();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(20_000_000_000));
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
         assert_eq!(
@@ -1014,7 +1114,33 @@ mod tests {
                 1, // number of values in last block
                 42, 0, 0, 0, 0, 0, 0, 0,    // base value
                 0x0f, // RLE selector
-                3, 0, 0, 0, 0, 0, 1, 0, // value -2 (delta) encoded as 3, appearing 1 time
+                15, 0, 0, 0, 0, 0, 1, 0, // value -8 (delta) encoded as 15, appearing 1 time
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+
+        // Advance several time steps to test ring buffer's `fill`
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(50_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                50, 0, 0, 0, // last timestamp
+                2, 1, // type: delta simple8b RLE; subtype: signed
+                24, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                2, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                4, // number of values in last block
+                42, 0, 0, 0, 0, 0, 0, 0,    // base value
+                0x03, // 4-bit selector
+                0x0f, 0, 0, 0, 0, 0, 0, 0, // diff values -8 (encoded as 15), 0, 0, 0
                 7, 0, // series 2: length in bytes
                 60, 0, // series 2 granularity: 60s
                 0, 0, // number of base value + selector elements or value blocks
@@ -1095,6 +1221,32 @@ mod tests {
                 1, 0, 0, 0, 0, 0, 0, 0,    // base value
                 0x0f, // RLE selector
                 3, 0, 0, 0, 0, 0, 1, 0, // value -2 (delta) encoded as 3, appearing 1 time
+                7, 0, // series 2: length in bytes
+                60, 0, // series 2 granularity: 60s
+                0, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                0, // number of values in last block
+            ]
+        );
+
+        // Advance several time steps to test ring buffer's `fill`
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(50_000_000_000));
+        let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();
+        assert_eq!(
+            buffer.data,
+            vec![
+                1, // version number
+                3, 0, 0, 0, // created timestamp
+                50, 0, 0, 0, // last timestamp
+                2, 2, // type: delta simple8b RLE; subtype: unsigned with signed diff
+                24, 0, // series 1: length in bytes
+                10, 0, // series 1 granularity: 10s
+                2, 0, // number of base value + selector elements or value blocks
+                0, 0, // head selector index
+                4, // number of values in last block
+                1, 0, 0, 0, 0, 0, 0, 0,    // base value
+                0x01, // 2-bit selector
+                3, 0, 0, 0, 0, 0, 0, 0, // diff values -2 (encoded as 3), 0, 0, 0
                 7, 0, // series 2: length in bytes
                 60, 0, // series 2 granularity: 60s
                 0, 0, // number of base value + selector elements or value blocks
