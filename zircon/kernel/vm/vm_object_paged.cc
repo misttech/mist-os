@@ -1911,23 +1911,21 @@ zx_status_t VmObjectPaged::SetMappingCachePolicy(const uint32_t cache_policy) {
   }
 
   // If transitioning from a cached policy we must clean/invalidate all the pages as the kernel may
-  // have written to them on behalf of the user.
-  if (cache_policy_ == ARCH_MMU_FLAG_CACHED && cache_policy != ARCH_MMU_FLAG_CACHED) {
-    // No need to perform clean/invalidate if size is zero because there can be no pages.
-    if (size_locked() > 0) {
-      VmCowRange range(0, size_locked());
-      zx_status_t status =
-          cow_pages_locked()->LookupLocked(range, [](uint64_t offset, paddr_t pa) mutable {
-            arch_clean_invalidate_cache_range((vaddr_t)paddr_to_physmap(pa), PAGE_SIZE);
-            return ZX_ERR_NEXT;
-          });
-      if (status != ZX_OK) {
-        return status;
-      }
+  // have written to them on behalf of the user. Change the cache_policy_ before doing that as the
+  // VmCowPages might need to look at the policy to infer what actions to take.
+  const bool transition_to_uncached =
+      cache_policy_ == ARCH_MMU_FLAG_CACHED && cache_policy != ARCH_MMU_FLAG_CACHED;
+  if (transition_to_uncached) {
+    // It does not make sense for a pager-backed or discardable VMO to be uncached.
+    if (is_user_pager_backed() || is_discardable()) {
+      return ZX_ERR_BAD_STATE;
     }
   }
-
   cache_policy_ = cache_policy;
+
+  if (transition_to_uncached) {
+    cow_pages_locked()->FinishTransitionToUncachedLocked();
+  }
 
   return ZX_OK;
 }

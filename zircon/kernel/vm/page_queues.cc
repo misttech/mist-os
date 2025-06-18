@@ -1029,11 +1029,13 @@ void PageQueues::MoveToWired(vm_page_t* page) {
   MaybeCheckActiveRatioAging(1);
 }
 
-void PageQueues::SetAnonymous(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
+void PageQueues::SetAnonymous(vm_page_t* page, VmCowPages* object, uint64_t page_offset,
+                              bool skip_reclaim) {
   {
     Guard<SpinLock, IrqSave> guard{&list_lock_};
-    SetQueueBacklinkLockedList(page, object, page_offset,
-                               anonymous_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymous);
+    SetQueueBacklinkLockedList(
+        page, object, page_offset,
+        anonymous_is_reclaimable_ && !skip_reclaim ? mru_gen_to_queue() : PageQueueAnonymous);
 #if DEBUG_ASSERT_IMPLEMENTED
     if (debug_compressor_) {
       debug_compressor_->Add(page, object, page_offset);
@@ -1056,11 +1058,11 @@ void PageQueues::MoveToHighPriority(vm_page_t* page) {
   MaybeCheckActiveRatioAging(1);
 }
 
-void PageQueues::MoveToAnonymous(vm_page_t* page) {
+void PageQueues::MoveToAnonymous(vm_page_t* page, bool skip_reclaim) {
   {
     Guard<SpinLock, IrqSave> guard{&list_lock_};
-    MoveToQueueLockedList(page,
-                          anonymous_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymous);
+    MoveToQueueLockedList(
+        page, anonymous_is_reclaimable_ && !skip_reclaim ? mru_gen_to_queue() : PageQueueAnonymous);
 #if DEBUG_ASSERT_IMPLEMENTED
     if (debug_compressor_) {
       debug_compressor_->Add(page, reinterpret_cast<VmCowPages*>(page->object.get_object()),

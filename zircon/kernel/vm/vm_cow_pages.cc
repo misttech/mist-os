@@ -4554,7 +4554,13 @@ void VmCowPages::MoveToNotPinnedLocked(vm_page_t* page, uint64_t offset) {
       } else if (is_discardable()) {
         pq->MoveToReclaim(page);
       } else {
-        pq->MoveToAnonymous(page);
+        // If the VMO is mapped uncached, it cannot be reclaimed. The reclamation code is tolerant
+        // to this and will skip the page anyway, but uncached memory is typically used by drivers
+        // and tends to back large buffers, so avoid wasted work.
+        pq->MoveToAnonymous(page,
+                            /*skip_reclaim=*/paged_ref_ &&
+                                (paged_backlink_locked(this)->GetMappingCachePolicyLocked() &
+                                 ZX_CACHE_POLICY_MASK) != ZX_CACHE_POLICY_CACHED);
       }
     } else {
       pq->MoveToWired(page);
@@ -4592,7 +4598,13 @@ void VmCowPages::SetNotPinnedLocked(vm_page_t* page, uint64_t offset) {
       } else if (is_discardable()) {
         pq->SetReclaim(page, this, offset);
       } else {
-        pq->SetAnonymous(page, this, offset);
+        // If the VMO is mapped uncached, it cannot be reclaimed. The reclamation code is tolerant
+        // to this and will skip the page anyway, but uncached memory is typically used by drivers
+        // and tends to back large buffers, so avoid wasted work.
+        pq->SetAnonymous(page, this, offset,
+                         /*skip_reclaim=*/paged_ref_ &&
+                             (paged_backlink_locked(this)->GetMappingCachePolicyLocked() &
+                              ZX_CACHE_POLICY_MASK) != ZX_CACHE_POLICY_CACHED);
       }
     } else {
       pq->SetWired(page, this, offset);
@@ -6671,6 +6683,31 @@ void VmCowPages::RangeChangeUpdateCowChildren(LockedPtr self, VmCowRange range, 
       candidate = cursor.NextSibling();
     }
   }
+}
+
+void VmCowPages::FinishTransitionToUncachedLocked() {
+  DEBUG_ASSERT(parent_ == nullptr);
+  DEBUG_ASSERT(children_list_len_ == 0);
+  DEBUG_ASSERT(!is_discardable());
+  DEBUG_ASSERT(!is_root_source_user_pager_backed());
+
+  // No need to perform clean/invalidate if size is zero because there can be no pages.
+  if (size_ == 0) {
+    return;
+  }
+
+  page_list_.ForEveryPage([this](const VmPageOrMarker* p, uint64_t off) {
+    if (!p->IsPage()) {
+      return ZX_ERR_NEXT;
+    }
+    vm_page_t* page = p->Page();
+    DEBUG_ASSERT(page->object.pin_count == 0);
+    // Refreshing the page queue will move the page to an unreclaimable one if applicable.
+    AssertHeld(lock_ref());
+    MoveToNotPinnedLocked(page, off);
+    arch_clean_invalidate_cache_range((vaddr_t)paddr_to_physmap(page->paddr()), PAGE_SIZE);
+    return ZX_ERR_NEXT;
+  });
 }
 
 template <typename T>
