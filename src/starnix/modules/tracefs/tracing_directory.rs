@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use super::event::{TraceEvent, TraceEventQueue};
+use fuchsia_sync::Mutex;
 use fuchsia_trace::{ArgValue, Scope, TraceCategoryContext};
 use starnix_core::fileops_impl_nonseekable;
 use starnix_core::task::CurrentTask;
@@ -13,7 +14,7 @@ use starnix_logging::CATEGORY_ATRACE;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 pub struct TraceMarkerFile {
     event_stacks: Mutex<HashMap<u64, Vec<(String, zx::BootTicks)>>>,
@@ -73,65 +74,64 @@ impl FileOps for TraceMarkerFile {
             // TODO(https://fxbug.dev/357665908): Remove forwarding of atrace events to trace
             // manager when dependencies have been migrated.
             if let Some(context) = TraceCategoryContext::acquire(CATEGORY_ATRACE) {
-                if let Ok(mut event_stacks) = self.event_stacks.lock() {
-                    let now = zx::BootTicks::get();
-                    match atrace_event {
-                        ATraceEvent::Begin { pid, name } => {
-                            event_stacks
-                                .entry(pid)
-                                .or_insert_with(Vec::new)
-                                .push((name.to_string(), now));
-                        }
-                        ATraceEvent::End { pid } => {
-                            let pid = if pid != 0 {
-                                pid
-                            } else {
-                                current_task.get_pid().try_into().unwrap_or(pid)
-                            };
-                            if let Some(stack) = event_stacks.get_mut(&pid) {
-                                if let Some((name, start_time)) = stack.pop() {
-                                    context.write_duration_with_inline_name(&name, start_time, &[]);
-                                }
+                let mut event_stacks = self.event_stacks.lock();
+                let now = zx::BootTicks::get();
+                match atrace_event {
+                    ATraceEvent::Begin { pid, name } => {
+                        event_stacks
+                            .entry(pid)
+                            .or_insert_with(Vec::new)
+                            .push((name.to_string(), now));
+                    }
+                    ATraceEvent::End { pid } => {
+                        let pid = if pid != 0 {
+                            pid
+                        } else {
+                            current_task.get_pid().try_into().unwrap_or(pid)
+                        };
+                        if let Some(stack) = event_stacks.get_mut(&pid) {
+                            if let Some((name, start_time)) = stack.pop() {
+                                context.write_duration_with_inline_name(&name, start_time, &[]);
                             }
                         }
-                        ATraceEvent::Instant { name } => {
-                            context.write_instant_with_inline_name(&name, Scope::Process, &[]);
-                        }
-                        ATraceEvent::AsyncBegin { name, correlation_id } => {
-                            context.write_async_begin_with_inline_name(
-                                correlation_id.into(),
-                                &name,
-                                &[],
-                            );
-                        }
-                        ATraceEvent::AsyncEnd { name, correlation_id } => {
-                            context.write_async_end_with_inline_name(
-                                correlation_id.into(),
-                                &name,
-                                &[],
-                            );
-                        }
-                        ATraceEvent::Counter { name, value } => {
-                            // ATrace only supplies one name in each counter record,
-                            // so it appears that counters are not intended to be grouped.
-                            // As such, we use the name both for the record name and
-                            // the arg name.
-                            let arg = ArgValue::of(name, value);
-                            context.write_counter_with_inline_name(name, 0, &[arg]);
-                        }
-                        ATraceEvent::AsyncTrackBegin { .. /*track_name, _name, _cookie*/ } => {
-                            // TODO("https://fxbug.dev/408054205"): propagate track events.
-                            // Currently, these only appear in tracefs.
+                    }
+                    ATraceEvent::Instant { name } => {
+                        context.write_instant_with_inline_name(&name, Scope::Process, &[]);
+                    }
+                    ATraceEvent::AsyncBegin { name, correlation_id } => {
+                        context.write_async_begin_with_inline_name(
+                            correlation_id.into(),
+                            &name,
+                            &[],
+                        );
+                    }
+                    ATraceEvent::AsyncEnd { name, correlation_id } => {
+                        context.write_async_end_with_inline_name(
+                            correlation_id.into(),
+                            &name,
+                            &[],
+                        );
+                    }
+                    ATraceEvent::Counter { name, value } => {
+                        // ATrace only supplies one name in each counter record,
+                        // so it appears that counters are not intended to be grouped.
+                        // As such, we use the name both for the record name and
+                        // the arg name.
+                        let arg = ArgValue::of(name, value);
+                        context.write_counter_with_inline_name(name, 0, &[arg]);
+                    }
+                    ATraceEvent::AsyncTrackBegin { .. /*track_name, _name, _cookie*/ } => {
+                        // TODO("https://fxbug.dev/408054205"): propagate track events.
+                        // Currently, these only appear in tracefs.
 
-                        }
-                        ATraceEvent::AsyncTrackEnd { ../* track_name, cookie */} => {
-                            // TODO("https://fxbug.dev/408054205"): propagate track events.
-                            // Currently, these only appear in tracefs.
-                        }
-                        ATraceEvent::Track {..} => {
-                            // TODO("https://fxbug.dev/408054205"): propagate track events.
-                            // Currently, these only appear in tracefs.
-                        }
+                    }
+                    ATraceEvent::AsyncTrackEnd { ../* track_name, cookie */} => {
+                        // TODO("https://fxbug.dev/408054205"): propagate track events.
+                        // Currently, these only appear in tracefs.
+                    }
+                    ATraceEvent::Track {..} => {
+                        // TODO("https://fxbug.dev/408054205"): propagate track events.
+                        // Currently, these only appear in tracefs.
                     }
                 }
             }
@@ -151,9 +151,7 @@ impl FileOps for TraceMarkerFile {
             // to stop emitting atrace data before stopping the trace, where
             // a typical use case would want atrace data for the entire duration
             // of the trace.
-            if let Ok(mut event_stacks) = self.event_stacks.lock() {
-                event_stacks.clear();
-            }
+            self.event_stacks.lock().clear();
         }
         return Ok(bytes.len());
     }

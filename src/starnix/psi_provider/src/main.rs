@@ -9,9 +9,10 @@ use fidl_fuchsia_starnix_psi::{
 };
 use fuchsia_component::client::connect_to_protocol_sync;
 use fuchsia_component::server::ServiceFs;
+use fuchsia_sync::Mutex;
 use futures::{StreamExt, TryStreamExt};
 use log::warn;
-use std::sync::{Arc, Mutex, Weak};
+use std::sync::{Arc, Weak};
 use {fidl_fuchsia_kernel as fkernel, fuchsia_async as fasync};
 
 mod history;
@@ -152,7 +153,7 @@ impl PsiProvider {
         let (now, stat) = self.data_source.capture();
 
         // Retrieve the values 10, 60 and 300 seconds ago from the history.
-        let guard = self.history.lock().unwrap();
+        let guard = self.history.lock();
         let (some10, full10) = guard.query_at(now - DURATION_10);
         let (some60, full60) = guard.query_at(now - DURATION_60);
         let (some300, full300) = guard.query_at(now - DURATION_300);
@@ -195,7 +196,7 @@ impl PsiProvider {
     /// Adds a new sample containing the current stall counters to the history.
     fn update_history(&self) {
         let (now, stat) = self.data_source.capture();
-        self.history.lock().unwrap().add_new_sample(
+        self.history.lock().add_new_sample(
             zx::MonotonicDuration::from_nanos(stat.stall_time_some),
             zx::MonotonicDuration::from_nanos(stat.stall_time_full),
             now,
@@ -275,7 +276,7 @@ mod tests {
 
     impl FakeDataSource {
         fn increment(&self, timestamp: zx::MonotonicDuration, some_factor: f64, full_factor: f64) {
-            let mut guard = self.result.lock().unwrap();
+            let mut guard = self.result.lock();
             guard.0 += timestamp;
             guard.1.stall_time_some += (timestamp.into_nanos() as f64 * some_factor) as i64;
             guard.1.stall_time_full += (timestamp.into_nanos() as f64 * full_factor) as i64;
@@ -284,7 +285,7 @@ mod tests {
 
     impl DataSource for Arc<FakeDataSource> {
         fn capture(&self) -> (zx::MonotonicInstant, zx::MemoryStall) {
-            *self.result.lock().unwrap()
+            *self.result.lock()
         }
 
         fn watch(

@@ -17,6 +17,7 @@ use crate::vfs::{
 use anyhow::{anyhow, ensure, Error};
 use ext4_metadata::{Metadata, Node, NodeInfo};
 use fidl_fuchsia_io as fio;
+use fuchsia_sync::Mutex;
 use starnix_logging::{impossible_error, log_warn};
 use starnix_sync::{FileOpsCore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use starnix_types::vfs::default_statfs;
@@ -28,7 +29,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error, from_status_like_fdio, off_t, statfs};
 use std::io::Read;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t};
 use zx::{
     HandleBased, {self as zx},
@@ -179,7 +180,7 @@ impl FsNodeOps for File {
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let memory = self.inner.lock().unwrap().get_memory()?;
+        let memory = self.inner.lock().get_memory()?;
         let size = usize::try_from(memory.get_content_size()).unwrap();
         Ok(Box::new(MemoryFile { memory, size }))
     }
@@ -191,7 +192,7 @@ impl FsNodeOps for File {
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        let memory = self.inner.lock().unwrap().get_memory()?;
+        let memory = self.inner.lock().get_memory()?;
         let content_size = memory.get_content_size();
         let attrs = zxio_node_attributes_t {
             content_size: content_size,

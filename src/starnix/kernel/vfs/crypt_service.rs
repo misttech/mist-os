@@ -10,6 +10,7 @@ use fidl_fuchsia_fxfs::{
     CryptCreateKeyResult, CryptCreateKeyWithIdResult, CryptRequest, CryptRequestStream,
     CryptUnwrapKeyResult, FxfsKey, KeyPurpose, WrappedKey,
 };
+use fuchsia_sync::Mutex;
 use futures::stream::StreamExt;
 use linux_uapi::FSCRYPT_KEY_IDENTIFIER_SIZE;
 use rand::{thread_rng, Rng};
@@ -17,7 +18,6 @@ use starnix_logging::{log_error, log_info};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use std::collections::hash_map::{Entry, HashMap};
-use std::sync::Mutex;
 
 #[derive(Clone)]
 pub struct KeyInfo {
@@ -55,17 +55,17 @@ impl CryptService {
     }
 
     pub fn contains_key(&self, key: EncryptionKeyId) -> bool {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         inner.ciphers.contains_key(&key)
     }
 
     pub fn get_users_for_key(&self, key: EncryptionKeyId) -> Option<Vec<u32>> {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         inner.ciphers.get(&key).map(|x| x.users.clone())
     }
 
     fn create_key(&self, owner: u64, purpose: KeyPurpose) -> CryptCreateKeyResult {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         let wrapping_key_id = match purpose {
             KeyPurpose::Data => {
                 inner.data_key.as_ref().ok_or_else(|| zx::Status::BAD_STATE.into_raw())?
@@ -99,7 +99,7 @@ impl CryptService {
         owner: u64,
         wrapping_key_id: EncryptionKeyId,
     ) -> CryptCreateKeyWithIdResult {
-        let inner = self.inner.lock().unwrap();
+        let inner = self.inner.lock();
         let cipher = inner
             .ciphers
             .get(&wrapping_key_id)
@@ -123,7 +123,7 @@ impl CryptService {
         match key {
             WrappedKey::Fxfs(FxfsKey { wrapping_key_id, wrapped_key }) => {
                 let wrapping_key_id = EncryptionKeyId::from(wrapping_key_id);
-                let inner = self.inner.lock().unwrap();
+                let inner = self.inner.lock();
                 let cipher = inner
                     .ciphers
                     .get(&wrapping_key_id)
@@ -146,7 +146,7 @@ impl CryptService {
         key: Vec<u8>,
         uid: u32,
     ) -> Result<(), Errno> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         match inner.ciphers.entry(EncryptionKeyId::from(wrapping_key_id)) {
             Entry::Occupied(mut e) => {
                 let users = &mut e.get_mut().users;
@@ -172,7 +172,7 @@ impl CryptService {
         uid: u32,
     ) -> Result<(), Errno> {
         log_info!("Removing wrapping key with id: {:?}", &wrapping_key_id);
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         match inner.ciphers.entry(EncryptionKeyId::from(wrapping_key_id)) {
             Entry::Occupied(mut e) => {
                 let user_ids = &mut e.get_mut().users;
@@ -198,7 +198,7 @@ impl CryptService {
         wrapping_key_id: [u8; FSCRYPT_KEY_IDENTIFIER_SIZE as usize],
         purpose: KeyPurpose,
     ) -> Result<(), Errno> {
-        let mut inner = self.inner.lock().unwrap();
+        let mut inner = self.inner.lock();
         let key_id = EncryptionKeyId::from(wrapping_key_id);
         if !inner.ciphers.contains_key(&key_id) {
             return error!(ENOENT);
@@ -306,7 +306,7 @@ mod tests {
             .expect("add wrapping key failed");
 
         {
-            let inner = service.inner.lock().unwrap();
+            let inner = service.inner.lock();
             assert_eq!(
                 inner.ciphers.get(&EncryptionKeyId::from(u128::to_le_bytes(1))).unwrap().users,
                 [0, 1]

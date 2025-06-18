@@ -4,10 +4,11 @@
 
 use crate::execution::create_kernel_thread;
 use crate::task::{with_new_current_task, CurrentTask, Task};
+use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::TryFutureExt;
 use starnix_logging::{log_debug, log_error};
-use starnix_sync::{Locked, Mutex, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_types::ownership::{release_after, WeakRef};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;

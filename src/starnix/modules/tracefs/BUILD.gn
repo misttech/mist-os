@@ -34,6 +34,7 @@ rustc_library("tracefs") {
     "//sdk/rust/zx",
     "//sdk/rust/zx-status",
     "//src/lib/diagnostics/inspect/rust",
+    "//src/lib/fuchsia-sync",
     "//src/lib/trace/rust:trace",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
