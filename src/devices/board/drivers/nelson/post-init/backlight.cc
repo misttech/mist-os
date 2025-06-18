@@ -28,13 +28,6 @@ static const std::vector<fpbus::Mmio> backlight_mmios{
     }},
 };
 
-static const std::vector<fpbus::BootMetadata> backlight_boot_metadata{
-    {{
-        .zbi_type = DEVICE_METADATA_BOARD_PRIVATE,
-        .zbi_extra = 0,
-    }},
-};
-
 constexpr double kMaxBrightnessInNits = 250.0;
 
 zx::result<> PostInit::InitBacklight() {
@@ -68,6 +61,12 @@ zx::result<> PostInit::InitBacklight() {
               reinterpret_cast<const uint8_t*>(&device_metadata),
               reinterpret_cast<const uint8_t*>(&device_metadata) + sizeof(device_metadata)),
       }},
+      {{
+          .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_TYPE),
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&panel_type_),
+              reinterpret_cast<const uint8_t*>(&panel_type_) + sizeof(panel_type_)),
+      }},
   };
 
   fpbus::Node backlight_dev;
@@ -77,7 +76,6 @@ zx::result<> PostInit::InitBacklight() {
   backlight_dev.did() = PDEV_DID_TI_BACKLIGHT;
   backlight_dev.mmio() = backlight_mmios;
   backlight_dev.metadata() = backlight_metadata;
-  backlight_dev.boot_metadata() = backlight_boot_metadata;
 
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('BACK');
