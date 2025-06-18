@@ -1822,7 +1822,7 @@ zx_status_t VmObjectPaged::DirtyPages(uint64_t offset, uint64_t len) {
       return ZX_OK;
     }
     if (status == ZX_ERR_SHOULD_WAIT) {
-      status = page_request.Wait();
+      status = page_request.Allocate().status_value();
     }
     if (status != ZX_OK) {
       return status;

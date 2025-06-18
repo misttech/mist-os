@@ -778,7 +778,10 @@ zx_status_t VmCowPages::AllocateCopyPage(paddr_t parent_paddr, list_node_t* allo
   DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
 
   vm_page_t* p_clone = nullptr;
-  if (alloc_list) {
+
+  if (request->has_page()) {
+    p_clone = request->take_page();
+  } else if (alloc_list) {
     p_clone = list_remove_head_type(alloc_list, vm_page, queue_node);
   }
 
@@ -813,6 +816,12 @@ zx_status_t VmCowPages::AllocateCopyPage(paddr_t parent_paddr, list_node_t* allo
 zx_status_t VmCowPages::AllocUninitializedPage(vm_page_t** page, AnonymousPageRequest* request) {
   paddr_t paddr = 0;
   DEBUG_ASSERT(!is_source_supplying_specific_physical_pages());
+  // Another layer has already allocated a page for us.
+  if (request->has_page()) {
+    *page = request->take_page();
+    return ZX_OK;
+  }
+
   zx_status_t status = CacheAllocPage(pmm_alloc_flags_, page, &paddr);
   if (status == ZX_ERR_SHOULD_WAIT) {
     request->MakeActive();
@@ -4828,7 +4837,8 @@ zx_status_t VmCowPages::DecompressInRange(VmCowRange range) {
       return ZX_OK;
     }
     if (status == ZX_ERR_SHOULD_WAIT) {
-      guard.CallUnlocked([&page_request, &status]() { status = page_request.Wait(); });
+      guard.CallUnlocked(
+          [&page_request, &status]() { status = page_request.Allocate().status_value(); });
     }
   } while (status == ZX_OK);
   return status;
