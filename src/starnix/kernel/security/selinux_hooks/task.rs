@@ -14,13 +14,14 @@ use crate::vfs::{FsNode, FsStr};
 use crate::TODO_DENY;
 use selinux::{
     Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, InitialSid,
-    KernelClass, NullessByteStr,
+    KernelClass, NullessByteStr, SystemPermission,
 };
 use starnix_types::ownership::TempRef;
 use starnix_uapi::auth::CAP_DAC_OVERRIDE;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
+use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::{errno, error, rlimit};
 
 /// Updates the SELinux thread group state on exec, using the security ID associated with the
@@ -434,6 +435,35 @@ pub(in crate::security) fn check_signal_access(
             audit_context,
         ),
     }
+}
+
+pub(in crate::security) fn check_syslog(
+    permission_check: &PermissionCheck<'_>,
+    current_task: &CurrentTask,
+    action: SyslogAction,
+) -> Result<(), Errno> {
+    let sid = current_task.security_state.lock().current_sid;
+    let required_permission = match action {
+        SyslogAction::ReadAll | SyslogAction::SizeBuffer => SystemPermission::SyslogRead,
+        SyslogAction::ConsoleOff | SyslogAction::ConsoleOn | SyslogAction::ConsoleLevel => {
+            SystemPermission::SyslogConsole
+        }
+        SyslogAction::Close
+        | SyslogAction::Open
+        | SyslogAction::Read
+        | SyslogAction::ReadClear
+        | SyslogAction::Clear
+        | SyslogAction::SizeUnread => SystemPermission::SyslogMod,
+    };
+    todo_check_permission(
+        TODO_DENY!("https://fxbug.dev/425873800", "Enforce syslog permissions."),
+        current_task.kernel(),
+        permission_check,
+        sid,
+        sid,
+        required_permission,
+        current_task.into(),
+    )
 }
 
 /// Returns the serialized Security Context associated with the specified task.
