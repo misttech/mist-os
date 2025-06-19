@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::utils::{connect_to_device, connect_to_device_async, ReadWriteBytesFile};
+use super::utils::{connect_to_device, connect_to_device_channel, ReadWriteBytesFile};
 use fidl_fuchsia_hardware_qcom_hvdcpopti as fhvdcpopti;
 use futures_util::StreamExt;
 use starnix_core::device::kobject::KObject;
 use starnix_core::fs::sysfs::KObjectSymlinkDirectory;
 use starnix_core::mm::MemoryAccessorExt;
+use starnix_core::power::{create_proxy_for_wake_events_counter, mark_proxy_message_handled};
 use starnix_core::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
@@ -97,11 +98,16 @@ impl FsNodeOps for QbgClassDirectory {
 struct QbgDeviceState {
     waiters: WaitQueue,
     read_queue: Mutex<VecDeque<VecInputBuffer>>,
+    message_counter: Mutex<Option<zx::Counter>>,
 }
 
 impl QbgDeviceState {
     fn new() -> Self {
-        Self { waiters: WaitQueue::default(), read_queue: Mutex::new(VecDeque::new()) }
+        Self {
+            waiters: WaitQueue::default(),
+            read_queue: Mutex::new(VecDeque::new()),
+            message_counter: Mutex::new(None),
+        }
     }
 
     fn handle_event(&self, event: fhvdcpopti::DeviceEvent) {
@@ -138,8 +144,18 @@ fn spawn_qbg_device_tasks(device_state: Arc<QbgDeviceState>, current_task: &Curr
     current_task.kernel().kthreads.spawn_future(async move {
         // Connect to the device on the main thread. The thread from which the task is being
         // spawned does not yet have an executor, so it cannot make an async FIDL connection.
-        let proxy = connect_to_device_async().expect("Could not connect to hvdcpopti service");
-        run_qbg_device_event_loop(device_state, proxy.take_event_stream()).await;
+        let channel = connect_to_device_channel().expect("Could not connect to hvdcpopti service");
+        // Wake message_counter starts on 1 because set_processed_fifo_data gets called in response
+        // to initial data, which is not passed through this event stream.
+        let (proxy_channel, message_counter) =
+            create_proxy_for_wake_events_counter(channel, "hvdcp_opti".to_string());
+        *device_state.message_counter.lock() = Some(message_counter);
+        run_qbg_device_event_loop(
+            device_state,
+            fhvdcpopti::DeviceProxy::new(fidl::AsyncChannel::from_channel(proxy_channel))
+                .take_event_stream(),
+        )
+        .await;
     });
 }
 
@@ -292,6 +308,7 @@ impl FileOps for QbgDeviceFile {
                 log_error!("SetProcessedFifoData failed: {:?}", e);
                 errno!(EINVAL)
             })?;
+        self.state.message_counter.lock().as_ref().map(mark_proxy_message_handled);
         Ok(data_len)
     }
 
