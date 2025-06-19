@@ -86,6 +86,18 @@ impl MemoryId {
             Some(p) => p.as_ref() == parent,
         }
     }
+
+    /// Returns whether `self` and `other` represent the same type. This is true if both have the
+    /// same if and if they both have parent, parents must also match.
+    fn matches(&self, other: &MemoryId) -> bool {
+        if self.id != other.id {
+            return false;
+        };
+        match (&self.parent, &other.parent) {
+            (Some(p1), Some(p2)) => p1.matches(p2.as_ref()),
+            _ => true,
+        }
+    }
 }
 
 /// The type of a filed in a strcut pointed by `Type::PtrToStruct`.
@@ -626,7 +638,7 @@ impl Type {
                 Type::StructParameter { id: id1 },
                 Type::PtrToMemory { id: id2, offset, .. }
                 | Type::PtrToStruct { id: id2, offset, .. },
-            ) if offset.is_zero() && *id1 == *id2 => Ok(()),
+            ) if offset.is_zero() && id1.matches(id2) => Ok(()),
             (
                 Type::ReleasableParameter { id: id1, inner: inner1 },
                 Type::Releasable { id: id2, inner: inner2 },

@@ -600,7 +600,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                     index: bpf_func_id_BPF_FUNC_sk_fullsock,
                     name: "sk_fullsock",
                     signature: FunctionSignature {
-                        args: vec![Type::StructParameter { id: SK_BUF_ID.clone() }],
+                        args: vec![Type::StructParameter { id: BPF_SOCK_ID.clone() }],
                         return_value: Type::NullOrParameter(Box::new(ptr_to_mem_type::<bpf_sock>(
                             BPF_SOCK_ID.clone(),
                         ))),
@@ -644,6 +644,17 @@ fn array_start_32_field(offset: usize, id: MemoryId) -> FieldDescriptor {
 
 fn array_end_32_field(offset: usize, id: MemoryId) -> FieldDescriptor {
     FieldDescriptor { offset, field_type: FieldType::PtrToEndArray { id, is_32_bit: true } }
+}
+
+fn ptr_to_mem_field<T: IntoBytes>(offset: usize, id: MemoryId) -> FieldDescriptor {
+    FieldDescriptor {
+        offset,
+        field_type: FieldType::PtrToMemory {
+            id,
+            buffer_size: std::mem::size_of::<T>(),
+            is_32_bit: false,
+        },
+    }
 }
 
 fn ptr_to_struct_type(id: MemoryId, fields: Vec<FieldDescriptor>) -> Type {
@@ -707,6 +718,7 @@ pub static SCHED_ARGS: LazyLock<Vec<Type>> = LazyLock::new(|| vec![SCHED_ARG_TYP
 /// Type for the `__sk_buff` passed to `BPF_PROG_TYPE_CGROUP_SKB` programs.
 pub static CGROUP_SKB_SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
     let data_id = MemoryId::new();
+    assert!(offset_of!(__sk_buff, __bindgen_anon_2) == 168);
     ptr_to_struct_type(
         SK_BUF_ID.clone(),
         vec![
@@ -722,7 +734,12 @@ pub static CGROUP_SKB_SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
             array_end_32_field(offset_of!(__sk_buff, data_end), data_id),
             scalar_range(offset_of!(__sk_buff, napi_id), offset_of!(__sk_buff, data_meta)),
             scalar_u64_field(offset_of!(__sk_buff, tstamp)),
-            scalar_range(offset_of!(__sk_buff, gso_segs), offset_of!(__sk_buff, tstamp_type)),
+            scalar_u32_field(offset_of!(__sk_buff, gso_segs)),
+            ptr_to_mem_field::<bpf_sock>(
+                offset_of!(__sk_buff, __bindgen_anon_2),
+                BPF_SOCK_ID.clone(),
+            ),
+            scalar_u32_field(offset_of!(__sk_buff, gso_size)),
             scalar_u64_field(offset_of!(__sk_buff, hwtstamp)),
         ],
     )
@@ -824,24 +841,16 @@ static BPF_FUSE_TYPE: LazyLock<Type> = LazyLock::new(|| {
         BPF_FUSE_ID.clone(),
         vec![
             scalar_field(0, offset_of!(fuse_bpf_args, out_args)),
-            FieldDescriptor {
-                offset: (offset_of!(fuse_bpf_args, out_args) + offset_of!(fuse_bpf_arg, value)),
-                field_type: FieldType::PtrToMemory {
-                    id: MemoryId::new(),
-                    buffer_size: std::mem::size_of::<fuse_entry_out>(),
-                    is_32_bit: false,
-                },
-            },
-            FieldDescriptor {
-                offset: (offset_of!(fuse_bpf_args, out_args)
+            ptr_to_mem_field::<fuse_entry_out>(
+                offset_of!(fuse_bpf_args, out_args) + offset_of!(fuse_bpf_arg, value),
+                MemoryId::new(),
+            ),
+            ptr_to_mem_field::<fuse_entry_bpf_out>(
+                offset_of!(fuse_bpf_args, out_args)
                     + std::mem::size_of::<fuse_bpf_arg>()
-                    + offset_of!(fuse_bpf_arg, value)),
-                field_type: FieldType::PtrToMemory {
-                    id: MemoryId::new(),
-                    buffer_size: std::mem::size_of::<fuse_entry_bpf_out>(),
-                    is_32_bit: false,
-                },
-            },
+                    + offset_of!(fuse_bpf_arg, value),
+                MemoryId::new(),
+            ),
         ],
     )
 });
