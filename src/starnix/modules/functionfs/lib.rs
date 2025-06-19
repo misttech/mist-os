@@ -325,10 +325,14 @@ fn connect_to_device(
         .map_err(|_| errno!(EINVAL))?;
 
     loop {
-        let fadb::UsbAdbImpl_Event::OnStatusChanged { status } = adb_proxy
-            .wait_for_event(zx::MonotonicInstant::INFINITE)
-            .expect("failed to wait for event");
-
+        let fadb::UsbAdbImpl_Event::OnStatusChanged { status } =
+            match adb_proxy.wait_for_event(zx::MonotonicInstant::INFINITE) {
+                Ok(event) => event,
+                Err(e) => {
+                    log_error!(e:?; "adb proxy failed to wait for event");
+                    return error!(EINVAL);
+                }
+            };
         // Don't decrement the counter here, since the first adb read call will decrement the
         // counter for this message, keeping the container alive until the read call can be made.
 
