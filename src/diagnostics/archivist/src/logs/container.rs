@@ -85,7 +85,7 @@ impl Ord for CursorItem {
 
 impl PartialOrd for CursorItem {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.message.timestamp().cmp(&other.message.timestamp()))
+        Some(self.cmp(other))
     }
 }
 
