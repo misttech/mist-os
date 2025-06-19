@@ -11,14 +11,10 @@
 #include <lib/devicetree/matcher.h>
 #include <lib/memalloc/pool.h>
 #include <lib/memalloc/range.h>
-#include <lib/uart/all.h>
-#include <lib/uart/null.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/storage-traits.h>
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <zircon/assert.h>
 
 #include <ktl/array.h>
@@ -31,7 +27,7 @@
 #include <phys/boot-shim/devicetree.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
-#include <phys/uart.h>
+#include <phys/uart-console.h>
 
 #include "test-main.h"
 

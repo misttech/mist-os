@@ -32,9 +32,11 @@ if (is_phys_toolchain) {
     testonly = true
     sources = [ "uart-input-test.cc" ]
     deps = [
+      "//zircon/kernel/lib/ktl",
+      "//zircon/kernel/lib/libc",
       "//zircon/kernel/phys:main",
       "//zircon/kernel/phys:stdio",
-      "//zircon/kernel/phys:uart",
+      "//zircon/kernel/phys:uart-console",
       "//zircon/kernel/phys/test:zbi-test-main",
       "//zircon/system/ulib/uart",
     ]

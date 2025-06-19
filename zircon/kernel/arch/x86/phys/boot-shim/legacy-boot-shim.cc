@@ -22,7 +22,7 @@
 #include <phys/main.h>
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
-#include <phys/uart.h>
+#include <phys/uart-console.h>
 #include <phys/zbi.h>
 
 #include "stdout.h"

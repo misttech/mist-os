@@ -15,6 +15,7 @@
 #include <ktl/array.h>
 #include <ktl/iterator.h>
 #include <ktl/limits.h>
+#include <ktl/ranges.h>
 #include <ktl/span.h>
 #include <ktl/string_view.h>
 #include <phys/acpi.h>
@@ -22,7 +23,7 @@
 #include <phys/allocation.h>
 #include <phys/main.h>
 #include <phys/symbolize.h>
-#include <phys/uart.h>
+#include <phys/uart-console.h>
 #include <pretty/sizes.h>
 
 #include <ktl/enforce.h>
@@ -42,12 +43,6 @@ constexpr uintptr_t kSmbiosSearchBase = 0xf0000;
 constexpr size_t kSmbiosSearchSize = 0x10000;
 constexpr size_t kSmbiosAlign = 16;
 constexpr ktl::array kSmbiosSignatures{"_SM_"sv, "_SM3_"sv};
-
-template <typename T>
-ktl::span<const ktl::byte> AsBytes(const T& obj) {
-  ktl::span span{ktl::data(obj), ktl::size(obj)};
-  return ktl::as_bytes(span);
-}
 
 void InitAcpi(LegacyBoot& boot_info) {
   auto acpi_parser = MakeAcpiParser(boot_info.acpi_rsdp);
@@ -82,6 +77,17 @@ void InitSmbios(LegacyBoot& boot_info) {
   }
 }
 
+constexpr memalloc::Range AsMemrange(  //
+    const ktl::ranges::contiguous_range auto& spanlike,
+    memalloc::Type type = memalloc::Type::kLegacyBootData) {
+  ktl::span bytes = ktl::as_bytes(ktl::span{spanlike});
+  return {
+      .addr = reinterpret_cast<uintptr_t>(bytes.data()),
+      .size = bytes.size(),
+      .type = type,
+  };
+}
+
 }  // namespace
 
 // A default, weak definition that may be overrode to perform other relevant
@@ -97,24 +103,14 @@ void LegacyBootInitMemory(AddressSpace* aspace) {
   InitAcpi(gLegacyBoot);
   InitSmbios(gLegacyBoot);
 
-  constexpr auto as_memrange =
-      [](const auto& obj, memalloc::Type type = memalloc::Type::kLegacyBootData) -> memalloc::Range {
-    auto bytes = AsBytes(obj);
-    return {
-        .addr = reinterpret_cast<uint64_t>(bytes.data()),
-        .size = static_cast<uint64_t>(bytes.size()),
-        .type = type,
-    };
-  };
-
   // TODO(https://fxbug.dev/42159372): See LINUXBOOT_LOAD_ADDRESS comment above.
   uint64_t phys_start = &LINUXBOOT_LOAD_ADDRESS ? reinterpret_cast<uint64_t>(LINUXBOOT_LOAD_ADDRESS)
                                                 : reinterpret_cast<uint64_t>(PHYS_LOAD_ADDRESS);
-  uint64_t phys_end = reinterpret_cast<uint64_t>(_end);
+  uint64_t phys_end = reinterpret_cast<uintptr_t>(_end);
 
   auto in_load_image = [phys_start, phys_end](const auto& obj) -> bool {
-    auto bytes = AsBytes(obj);
-    uint64_t start = reinterpret_cast<uint64_t>(bytes.data());
+    ktl::span bytes = ktl::as_bytes(ktl::span{obj});
+    uint64_t start = reinterpret_cast<uintptr_t>(bytes.data());
     uint64_t end = start + bytes.size();
     return phys_start <= start && end <= phys_end;
   };
@@ -127,20 +123,20 @@ void LegacyBootInitMemory(AddressSpace* aspace) {
           .size = phys_end - phys_start,
           .type = memalloc::Type::kPhysKernel,
       },
-      as_memrange(gLegacyBoot.ramdisk, memalloc::Type::kDataZbi),
+      AsMemrange(gLegacyBoot.ramdisk, memalloc::Type::kDataZbi),
       {},
       {},
       {},
   };
   size_t num_ranges = 2;
   if (!in_load_image(gLegacyBoot.cmdline)) {
-    ranges[num_ranges++] = as_memrange(gLegacyBoot.cmdline);
+    ranges[num_ranges++] = AsMemrange(gLegacyBoot.cmdline);
   }
   if (!in_load_image(gLegacyBoot.bootloader)) {
-    ranges[num_ranges++] = as_memrange(gLegacyBoot.bootloader);
+    ranges[num_ranges++] = AsMemrange(gLegacyBoot.bootloader);
   }
   if (!in_load_image(gLegacyBoot.mem_config)) {
-    ranges[num_ranges++] = as_memrange(gLegacyBoot.mem_config);
+    ranges[num_ranges++] = AsMemrange(gLegacyBoot.mem_config);
   }
 
   Allocation::Init(memalloc::AsRanges(gLegacyBoot.mem_config),

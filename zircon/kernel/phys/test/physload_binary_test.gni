@@ -7,8 +7,8 @@
 import("//build/testing/boot_tests/zbi_test.gni")
 import("//build/zbi/kernel_cmdline.gni")
 import("//zircon/kernel/kernel_package.gni")
-import("//zircon/kernel/phys/kernel_elf_binary.gni")
 import("//zircon/kernel/phys/phys_executable.gni")
+import("//zircon/kernel/phys/physload_module.gni")
 
 # Defines a physload module and a ZBI test that loads it. This provides a
 # streamlined way of running boot test logic in the phys environment, allowing
@@ -22,7 +22,7 @@ import("//zircon/kernel/phys/phys_executable.gni")
 # Subtargets
 #
 #   * $target_name.binary
-#     The underlying kernel_elf_binary() target defining the physload module.
+#     The underlying physload_module() target defining the physload module.
 #
 # Parameters
 #
@@ -47,12 +47,13 @@ template("physload_binary_test") {
   main_target = target_name
 
   if (toolchain_environment == "kernel.phys") {
-    kernel_elf_binary(binary_target) {
+    physload_module(binary_target) {
       output_name = main_target
       visibility = [ ":*" ]
       testonly = true
 
       # Data deps are aggregated separately by the kernel package.
+      deps = []
       forward_variables_from(invoker,
                              "*",
                              [

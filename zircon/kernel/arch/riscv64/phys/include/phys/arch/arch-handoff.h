@@ -12,10 +12,9 @@
 
 #include <lib/arch/riscv64/feature.h>
 #include <lib/zbi-format/driver-config.h>
-#include <stdint.h>
 
+#include <cstdint>
 #include <optional>
-#include <variant>
 
 struct ArchPatchInfo {};
 
@@ -47,8 +46,5 @@ inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffffffff00000000;  // -
 // for the physmap in the kernel.
 inline constexpr uint64_t kArchPhysmapVirtualBase = 0xffff'ffc0'0000'0000;
 inline constexpr uint64_t kArchPhysmapSize = 0x0000'0008'0000'0000;
-
-// Whether a peripheral range for the UART needs to be synthesized.
-inline constexpr bool kArchHandoffGenerateUartPeripheralRanges = false;
 
 #endif  // ZIRCON_KERNEL_ARCH_RISCV64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_

@@ -10,6 +10,7 @@
 #include <lib/zbi-format/zbi.h>
 #include <stdio.h>
 
+#include <bit>
 #include <type_traits>
 #include <utility>
 #include <variant>
@@ -59,10 +60,9 @@ concept MatchableDriver = requires(Args&&... args) {
   } -> std::convertible_to<std::optional<uart::Config<Driver>>>;
 };
 
-
-template<typename Driver, typename ...Args>
-concept SelectableDriver = requires(Args&& ... args) {
-  {Driver::TrySelect(std::forward<Args>(args)...)}-> std::convertible_to<bool>;
+template <typename Driver, typename... Args>
+concept SelectableDriver = requires(Args&&... args) {
+  { Driver::TrySelect(std::forward<Args>(args)...) } -> std::convertible_to<bool>;
 };
 
 }  // namespace internal
@@ -156,9 +156,10 @@ class Config {
     return all_configs;
   }
 
-  // Returns an empty `Config` object if any supported driver provides a `TrySelect` static method that
-  // succeeds when invoked with `args`. Otherwise `std::nullopt` is returned. This allows separating driver
-  // type selection from the actual configuration, or partially filling the configuration.
+  // Returns an empty `Config` object if any supported driver provides a `TrySelect` static method
+  // that succeeds when invoked with `args`. Otherwise `std::nullopt` is returned. This allows
+  // separating driver type selection from the actual configuration, or partially filling the
+  // configuration.
   //
   // Note: The matching order is determined by the position in the list of the driver.
   template <typename... Args>
@@ -174,7 +175,9 @@ class Config {
     // Turns variant size into a parameter pack and invokes extracts the variant arguments of
     // `UartDriver` and attempts to match each.
     auto try_select_supported_driver = [&]<size_t... Is>(std::index_sequence<Is...> is) {
-      static_assert((uart::internal::SelectableDriver<std::variant_alternative_t<Is, UartDriver>, Args...> && ...));
+      static_assert(
+          (uart::internal::SelectableDriver<std::variant_alternative_t<Is, UartDriver>, Args...> &&
+           ...));
       (try_one.template operator()<std::variant_alternative_t<Is, UartDriver>>(all_configs) || ...);
     };
     try_select_supported_driver(std::make_index_sequence<std::variant_size_v<UartDriver>>());
@@ -297,6 +300,12 @@ class KernelDriver {
     return conf;
   }
 
+  std::optional<MmioRange> maybe_mmio_range() const {
+    std::optional<MmioRange> range;
+    Visit([&range](const auto& driver) { range = MaybeMmioRange(driver); });
+    return range;
+  }
+
   // Write out a string that Parse() can read back to recreate the driver
   // state.  This doesn't preserve the driver state, only the configuration.
   void Unparse(FILE* out = stdout) const {
@@ -344,6 +353,12 @@ class KernelDriver {
   struct OneDriverVariant<std::variant<Args...>> {
     using type = Variant<Args...>;
   };
+
+  static constexpr auto MaybeMmioRange(const NonMmioDriver auto& driver) { return std::nullopt; }
+
+  static constexpr auto MaybeMmioRange(const MmioDriver auto& driver) {
+    return driver.mmio_range();
+  }
 
   template <typename... Args>
   bool TryMatch(Args&&... args) {

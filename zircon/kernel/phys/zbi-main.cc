@@ -13,7 +13,7 @@
 #include <phys/early-boot.h>
 #include <phys/main.h>
 #include <phys/stdio.h>
-#include <phys/uart.h>
+#include <phys/uart-console.h>
 
 #include <ktl/enforce.h>
 

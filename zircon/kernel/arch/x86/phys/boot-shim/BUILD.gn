@@ -110,6 +110,7 @@ if (toolchain_environment == "kernel.phys32" ||
       "//zircon/kernel/phys:boot-zbi",
       "//zircon/kernel/phys:main",
       "//zircon/kernel/phys:symbolize",
+      "//zircon/kernel/phys:uart-console",
       "//zircon/kernel/phys:zbi",
       "//zircon/kernel/phys/lib/boot-shim",
       "//zircon/system/ulib/hwreg",
@@ -174,7 +175,7 @@ if (toolchain_environment == "kernel.phys32" ||
         "//sdk/lib/zbi-format",
         "//zircon/kernel/phys:stdio",
         "//zircon/kernel/phys:symbolize",
-        "//zircon/kernel/phys:uart",
+        "//zircon/kernel/phys:uart-console",
         "//zircon/kernel/phys:zbi",
         "//zircon/system/ulib/uart",
       ]

@@ -165,17 +165,6 @@ void HandoffPrep::FinishVmObjects() {
 }
 
 void HandoffPrep::SetMemory() {
-  // TODO(https://fxbug.dev/355731771): Bootloaders and boot shims should be
-  // providing a PERIPHERAL range that already covers UART MMIO, but there is
-  // currently a gap in that coverage.
-  if constexpr (kArchHandoffGenerateUartPeripheralRanges) {
-    GetUartDriver().Visit([&]<typename KernelDriver>(const KernelDriver& driver) {
-      if (auto uart_mmio = GetUartMmioRange(driver, ZX_PAGE_SIZE)) {
-        ZX_ASSERT(Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_ok());
-      }
-    });
-  }
-
   // Normalizes types so that only those that are of interest to the kernel
   // remain.
   auto normed_type = [](memalloc::Type type) -> ktl::optional<memalloc::Type> {

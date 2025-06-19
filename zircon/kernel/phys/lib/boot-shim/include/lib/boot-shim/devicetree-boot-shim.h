@@ -49,6 +49,10 @@ struct DevicetreeMmioRange {
             .size = static_cast<size_t>(reg.size().value_or(0))};
   }
 
+  static DevicetreeMmioRange From(uart::MmioRange range) {
+    return {.address = range.address, .size = static_cast<size_t>(range.size)};
+  }
+
   constexpr bool empty() const { return size == 0; }
   constexpr uint64_t end() const { return address + size; }
 

@@ -79,7 +79,4 @@ inline constexpr uint64_t kArchHandoffVirtualAddress = 0xffff'ffff'1000'0000;
 inline constexpr uint64_t kArchPhysmapVirtualBase = 0xffff'0000'0000'0000;
 inline constexpr uint64_t kArchPhysmapSize = 0x0000'0080'0000'0000;
 
-// Whether a peripheral range for the UART needs to be synthesized.
-inline constexpr bool kArchHandoffGenerateUartPeripheralRanges = true;
-
 #endif  // ZIRCON_KERNEL_ARCH_ARM64_PHYS_INCLUDE_PHYS_ARCH_ARCH_HANDOFF_H_

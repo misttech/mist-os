@@ -249,7 +249,7 @@ if (current_toolchain == default_toolchain) {
       "//zircon/kernel/phys:address-space",
       "//zircon/kernel/phys:allocation-init",
       "//zircon/kernel/phys:symbolize",
-      "//zircon/kernel/phys:uart",
+      "//zircon/kernel/phys:uart-console",
       "//zircon/kernel/phys/lib/boot-shim",
       "//zircon/kernel/phys/lib/memalloc",
       "//zircon/system/ulib/hwreg",
