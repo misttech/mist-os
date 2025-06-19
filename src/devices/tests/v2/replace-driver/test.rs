@@ -229,7 +229,7 @@ async fn test_replace_target() -> Result<()> {
         }
     };
     // And now that we have registered the replacement we call to bind all available nodes.
-    let bind_result = driver_dev.bind_all_unbound_nodes().await;
+    let bind_result = driver_dev.bind_all_unbound_nodes2().await;
     match bind_result {
         Ok(Ok(_)) => {}
         Ok(Err(err)) => {
@@ -325,7 +325,7 @@ async fn test_replace_target() -> Result<()> {
         }
     };
     // And now that we have registered the replacement we call to bind all available nodes.
-    let bind_result = driver_dev.bind_all_unbound_nodes().await;
+    let bind_result = driver_dev.bind_all_unbound_nodes2().await;
     match bind_result {
         Ok(Ok(_)) => {}
         Ok(Err(err)) => {

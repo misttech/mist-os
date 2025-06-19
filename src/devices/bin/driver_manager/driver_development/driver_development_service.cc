@@ -332,6 +332,16 @@ void DriverDevelopmentService::BindAllUnboundNodes(BindAllUnboundNodesCompleter:
   driver_runner_.TryBindAllAvailable(std::move(callback));
 }
 
+void DriverDevelopmentService::BindAllUnboundNodes2(
+    BindAllUnboundNodes2Completer::Sync& completer) {
+  auto callback =
+      [completer = completer.ToAsync()](
+          fidl::VectorView<fuchsia_driver_development::wire::NodeBindingInfo> result) mutable {
+        completer.ReplySuccess(result);
+      };
+  driver_runner_.TryBindAllAvailable(std::move(callback));
+}
+
 void DriverDevelopmentService::AddTestNode(AddTestNodeRequestView request,
                                            AddTestNodeCompleter::Sync& completer) {
   fuchsia_driver_framework::NodeAddArgs args;

@@ -37,6 +37,7 @@ class DriverDevelopmentService : public fidl::WireServer<fuchsia_driver_developm
   void GetDriverHostInfo(GetDriverHostInfoRequestView request,
                          GetDriverHostInfoCompleter::Sync& completer) override;
   void BindAllUnboundNodes(BindAllUnboundNodesCompleter::Sync& completer) override;
+  void BindAllUnboundNodes2(BindAllUnboundNodes2Completer::Sync& completer) override;
   void AddTestNode(AddTestNodeRequestView request, AddTestNodeCompleter::Sync& completer) override;
   void RemoveTestNode(RemoveTestNodeRequestView request,
                       RemoveTestNodeCompleter::Sync& completer) override;

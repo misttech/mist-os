@@ -1,9 +1,9 @@
 [
     {
         "kind": "const",
-        "name": "fuchsia.driver.development/BINDING_RESULT_MAX",
-        "type": "uint8",
-        "value": "10"
+        "name": "fuchsia.driver.development/BINDING_RESULT_MAX_2",
+        "type": "uint32",
+        "value": "256"
     },
     {
         "kind": "union/member",
@@ -214,11 +214,11 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.driver.development/Manager.BindAllUnboundNodes",
+        "name": "fuchsia.driver.development/Manager.BindAllUnboundNodes2",
         "strictness": "flexible",
-        "ordinal": "3117410125757521697",
+        "ordinal": "4504389271868250327",
         "direction": "two_way",
-        "response": "fuchsia.driver.development/Manager_BindAllUnboundNodes_Response",
+        "response": "fuchsia.driver.development/Manager_BindAllUnboundNodes2_Response",
         "error": "int32"
     },
     {
@@ -483,13 +483,13 @@
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.driver.development/Manager_BindAllUnboundNodes_Response.binding_result",
+        "name": "fuchsia.driver.development/Manager_BindAllUnboundNodes2_Response.binding_result",
         "ordinal": "1",
-        "type": "vector<fuchsia.driver.development/NodeBindingInfo>:10"
+        "type": "vector<fuchsia.driver.development/NodeBindingInfo>:256"
     },
     {
         "kind": "struct",
-        "name": "fuchsia.driver.development/Manager_BindAllUnboundNodes_Response"
+        "name": "fuchsia.driver.development/Manager_BindAllUnboundNodes2_Response"
     },
     {
         "kind": "struct/member",
