@@ -96,8 +96,7 @@ class BlockDevice : public BlockDeviceType,
 
   void CreateSession(
       fidl::ServerEnd<fuchsia_hardware_block::Session> session,
-      fidl::ClientEnd<fuchsia_hardware_block::OffsetMap> offset_map = {},
-      std::span<const fuchsia_hardware_block::wire::BlockOffsetMapping> initial_mappings = {});
+      std::optional<fuchsia_hardware_block::wire::BlockOffsetMapping> mapping = std::nullopt);
 
   // Completion callback that expects StatsCookie as |cookie| and calls upper
   // layer completion cookie.

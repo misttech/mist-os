@@ -135,15 +135,13 @@ void BlockDevice::OpenSession(OpenSessionRequestView request,
 
 void BlockDevice::OpenSessionWithOffsetMap(OpenSessionWithOffsetMapRequestView request,
                                            OpenSessionWithOffsetMapCompleter::Sync& completer) {
-  CreateSession(std::move(request->session), std::move(request->offset_map),
-                std::span(request->initial_mappings.cbegin(), request->initial_mappings.cend()));
+  CreateSession(std::move(request->session), request->mapping);
 }
 
 void BlockDevice::CreateSession(
     fidl::ServerEnd<fuchsia_hardware_block::Session> session,
-    fidl::ClientEnd<fuchsia_hardware_block::OffsetMap> offset_map,
-    std::span<const fuchsia_hardware_block::wire::BlockOffsetMapping> initial_mappings) {
-  zx::result server = Server::Create(&self_protocol_, std::move(offset_map), initial_mappings);
+    std::optional<fuchsia_hardware_block::wire::BlockOffsetMapping> mapping) {
+  zx::result server = Server::Create(&self_protocol_, mapping);
   if (server.is_error()) {
     session.Close(server.error_value());
     return;

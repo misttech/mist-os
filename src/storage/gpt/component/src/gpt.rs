@@ -80,14 +80,12 @@ impl GptPartition {
 
     pub fn open_passthrough_session(&self, session: ServerEnd<fblock::SessionMarker>) {
         if let Some(gpt) = self.gpt.upgrade() {
-            let mappings = [fblock::BlockOffsetMapping {
+            let mapping = fblock::BlockOffsetMapping {
                 source_block_offset: 0,
                 target_block_offset: self.block_range.start,
                 length: self.block_count(),
-            }];
-            if let Err(err) =
-                gpt.block_proxy.open_session_with_offset_map(session, None, Some(&mappings[..]))
-            {
+            };
+            if let Err(err) = gpt.block_proxy.open_session_with_offset_map(session, &mapping) {
                 // Client errors normally come back on `session` but that was already consumed.  The
                 // client will get a PEER_CLOSED without an epitaph.
                 log::warn!(err:?; "Failed to open passthrough session");
@@ -1460,12 +1458,11 @@ mod tests {
         part_block
             .open_session_with_offset_map(
                 server_end,
-                None,
-                Some(&[fblock::BlockOffsetMapping {
+                &fblock::BlockOffsetMapping {
                     source_block_offset: 0,
                     target_block_offset: 1,
                     length: 2,
-                }]),
+                },
             )
             .expect("FIDL error");
         session.get_fifo().await.expect_err("Session should be closed");
@@ -1474,12 +1471,11 @@ mod tests {
         part_block
             .open_session_with_offset_map(
                 server_end,
-                None,
-                Some(&[fblock::BlockOffsetMapping {
+                &fblock::BlockOffsetMapping {
                     source_block_offset: 0,
                     target_block_offset: 0,
                     length: 3,
-                }]),
+                },
             )
             .expect("FIDL error");
         session.get_fifo().await.expect_err("Session should be closed");

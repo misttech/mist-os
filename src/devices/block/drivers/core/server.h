@@ -32,14 +32,10 @@
 #include "message.h"
 
 // Remaps the dev_offset of block requests based on an internal map.
-// TODO(https://fxbug.dev/402515764): For now, this just supports a single entry in the map, which
-// is all that is required for GPT partitions.  If we want to support this for FVM, we will need
-// to support multiple entries, which requires changing the block server to support request
-// splitting.
 class OffsetMap {
  public:
   static zx::result<std::unique_ptr<OffsetMap>> Create(
-      fuchsia_hardware_block::wire::BlockOffsetMapping initial_mapping);
+      fuchsia_hardware_block::wire::BlockOffsetMapping mapping);
 
   // Adjusts `request` by applying the map to dev_offset.
   // Returns false if the request would exceed the range known to OffsetMap.
@@ -56,8 +52,7 @@ class Server : public fidl::WireServer<fuchsia_hardware_block::Session> {
   // Creates a new Server.
   static zx::result<std::unique_ptr<Server>> Create(
       ddk::BlockProtocolClient* bp,
-      fidl::ClientEnd<fuchsia_hardware_block::OffsetMap> offset_map = {},
-      std::span<const fuchsia_hardware_block::wire::BlockOffsetMapping> initial_mappings = {});
+      std::optional<fuchsia_hardware_block::wire::BlockOffsetMapping> mapping = std::nullopt);
 
   // This will block until all outstanding messages have been processed.
   ~Server() override;

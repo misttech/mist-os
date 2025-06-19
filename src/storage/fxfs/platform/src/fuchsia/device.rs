@@ -308,12 +308,7 @@ impl BlockServer {
                     })
                     .await?;
             }
-            VolumeRequest::OpenSessionWithOffsetMap {
-                session,
-                offset_map: _,
-                initial_mappings: _,
-                control_handle: _,
-            } => {
+            VolumeRequest::OpenSessionWithOffsetMap { session, mapping: _, control_handle: _ } => {
                 session.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
             }
             // TODO(https://fxbug.dev/293970391)

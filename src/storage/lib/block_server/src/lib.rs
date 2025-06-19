@@ -219,10 +219,6 @@ impl std::convert::TryFrom<fblock::BlockOffsetMapping> for BlockOffsetMapping {
 }
 
 /// Remaps the offset of block requests based on an internal map, and truncates long requests.
-/// TODO(https://fxbug.dev/402515764): For now, this just supports a single entry in the map, which
-/// is all that is required for GPT partitions.  If we want to support this for FVM, we will need
-/// to support multiple entries, which requires changing the block server to support request
-/// splitting.
 pub struct OffsetMap {
     mapping: Option<BlockOffsetMapping>,
     max_transfer_blocks: Option<NonZero<u32>>,
@@ -390,28 +386,17 @@ impl<SM: SessionManager> BlockServer<SM> {
             }
             fvolume::VolumeRequest::OpenSessionWithOffsetMap {
                 session,
-                offset_map,
-                initial_mappings,
+                mapping,
                 control_handle: _,
             } => match self.device_info().await {
                 Ok(info) => {
-                    if offset_map.is_some()
-                        || initial_mappings.as_ref().is_none_or(|m| m.len() != 1)
-                    {
-                        // TODO(https://fxbug.dev/402515764): Support multiple mappings and
-                        // dynamic querying for FVM as needed.  A single static map is
-                        // sufficient for GPT.
-                        session.close_with_epitaph(zx::Status::NOT_SUPPORTED)?;
-                        return Ok(None);
-                    }
-                    let initial_mapping: BlockOffsetMapping =
-                        match initial_mappings.unwrap().pop().unwrap().try_into() {
-                            Ok(m) => m,
-                            Err(status) => {
-                                session.close_with_epitaph(status)?;
-                                return Ok(None);
-                            }
-                        };
+                    let initial_mapping: BlockOffsetMapping = match mapping.try_into() {
+                        Ok(m) => m,
+                        Err(status) => {
+                            session.close_with_epitaph(status)?;
+                            return Ok(None);
+                        }
+                    };
                     if let Some(max) = info.block_count() {
                         if initial_mapping.target_block_offset + initial_mapping.length > max {
                             log::warn!(
@@ -2640,12 +2625,12 @@ mod tests {
             async move {
                 let (session_proxy, server) = fidl::endpoints::create_proxy();
 
-                let mappings = [fblock::BlockOffsetMapping {
+                let mapping = fblock::BlockOffsetMapping {
                     source_block_offset: 0,
                     target_block_offset: 10,
                     length: 20,
-                }];
-                proxy.open_session_with_offset_map(server, None, Some(&mappings[..])).unwrap();
+                };
+                proxy.open_session_with_offset_map(server, &mapping).unwrap();
 
                 let vmo = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
                 let vmo_id = session_proxy
