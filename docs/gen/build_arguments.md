@@ -71,7 +71,7 @@ for all supported CPUs, not just $target_cpu.
 
 **Current value (from the default):** `false`
 
-From //zircon/kernel/phys/BUILD.gn:22
+From //zircon/kernel/phys/BUILD.gn:23
 
 ### all_font_file_paths
 
@@ -1075,7 +1075,7 @@ This should never be set as a build argument.
 }
   lsan = {
   shared = {
-  clang_rt = "../../../../out/not-default/libclang_rt.lsan.so"
+  clang_rt = ""
 }
   static = {
   clang_rt = "lib/clang/21/lib/armv7-unknown-linux-gnueabihf/libclang_rt.lsan.a"
