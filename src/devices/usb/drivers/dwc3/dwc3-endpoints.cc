@@ -9,7 +9,7 @@
 
 namespace dwc3 {
 
-void Dwc3::EpEnable(const Endpoint& ep, bool enable) {
+void Dwc3::EpEnable(Endpoint& ep, bool enable) {
   std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
 
@@ -18,22 +18,25 @@ void Dwc3::EpEnable(const Endpoint& ep, bool enable) {
   } else {
     DALEPENA::Get().ReadFrom(mmio).DisableEp(ep.ep_num).WriteTo(mmio);
   }
+
+  ep.enabled = enable;
 }
 
 void Dwc3::EpSetConfig(Endpoint& ep, bool enable) {
   FDF_LOG(DEBUG, "Dwc3::EpSetConfig %u", ep.ep_num);
 
-  if (enable) {
+  if (!ep.enabled && enable) {
     CmdEpSetConfig(ep, false);
     CmdEpTransferConfig(ep);
     EpEnable(ep, true);
-  } else {
+  } else if (ep.enabled && !enable) {
     EpEnable(ep, false);
   }
 }
 
 zx_status_t Dwc3::EpSetStall(Endpoint& ep, bool stall) {
   if (!ep.enabled) {
+    ep.stalled = stall;
     return ZX_ERR_BAD_STATE;
   }
 
@@ -44,7 +47,6 @@ zx_status_t Dwc3::EpSetStall(Endpoint& ep, bool stall) {
   }
 
   ep.stalled = stall;
-
   return ZX_OK;
 }
 
@@ -63,12 +65,9 @@ void Dwc3::EpStartTransfer(Endpoint& ep, TrbFifo& fifo, uint32_t type, zx_paddr_
 }
 
 void Dwc3::EpServer::CancelAll(zx_status_t reason) {
+  std::lock_guard<std::mutex> _{uep_->ep.lock};
   if (current_req.has_value()) {
-    {
-      std::lock_guard<std::mutex> _(uep_->ep.lock);
-      dwc3_->CmdEpEndTransfer(uep_->ep);
-    }
-
+    dwc3_->CmdEpEndTransfer(uep_->ep);
     RequestComplete(reason, 0, std::move(*current_req));
     current_req.reset();
   }
@@ -78,24 +77,20 @@ void Dwc3::EpServer::CancelAll(zx_status_t reason) {
     queued_reqs.pop();
   }
 
-  std::lock_guard<std::mutex> _(uep_->ep.lock);
   uep_->fifo.Clear();
 }
 
 void Dwc3::UserEpQueueNext(UserEndpoint& uep) {
-  if (!(!uep.server->current_req.has_value() && uep.ep.got_not_ready &&
-        !uep.server->queued_reqs.empty())) {
+  if (uep.server->current_req.has_value() || !uep.ep.got_not_ready ||
+      uep.server->queued_reqs.empty()) {
     return;
   }
 
   uep.server->current_req.emplace(std::move(uep.server->queued_reqs.front()));
   uep.server->queued_reqs.pop();
 
-  zx::result result{uep.server->get_iter(*uep.server->current_req, zx_system_get_page_size())};
-  if (result.is_error()) {
-    FDF_LOG(ERROR, "[BUG] server->phys_iter(): %s", result.status_string());
-  }
-  ZX_ASSERT(result.is_ok());
+  zx::result result = uep.server->get_iter(*uep.server->current_req, zx_system_get_page_size());
+  ZX_ASSERT_MSG(result.is_ok(), "[BUG] server->phys_iter(): %s", result.status_string());
 
   // TODO(voydanoff) scatter/gather support
   zx_paddr_t phys;
@@ -110,32 +105,28 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
     return;
   }
 
-  std::optional<usb::RequestVariant> req;
-  uint32_t actual;
-
   UserEndpoint* const uep = get_user_endpoint(ep_num);
   ZX_DEBUG_ASSERT(uep != nullptr);
-  {
-    std::lock_guard<std::mutex> lock{uep->ep.lock};
-    if (!uep->server->current_req.has_value()) {
-      FDF_LOG(ERROR, "no usb request found to complete!");
-      return;
-    }
-    dwc3_trb_t trb = uep->fifo.Read();
 
-    if (trb.control & TRB_HWO) {
-      FDF_LOG(ERROR, "TRB_HWO still set in dwc3_ep_xfer_complete %d", uep->ep.ep_num);
-      return;
-    }
+  std::lock_guard<std::mutex> lock{uep->ep.lock};
+  if (!uep->server->current_req.has_value()) {
+    FDF_LOG(ERROR, "no usb request found to complete!");
+    return;
+  }
+  dwc3_trb_t trb = uep->fifo.Read();
 
-    req.emplace(std::move(*uep->server->current_req));
-    uep->server->current_req.reset();
-    uep->fifo.AdvanceRead();
-    actual =
-        std::get<usb::FidlRequest>(*req)->data()->at(0).size().value() - TRB_BUFSIZ(trb.status);
+  if (trb.control & TRB_HWO) {
+    FDF_LOG(ERROR, "TRB_HWO still set in dwc3_ep_xfer_complete %d", uep->ep.ep_num);
+    return;
   }
 
-  uep->server->RequestComplete(ZX_OK, actual, std::move(*req));
+  uep->server->RequestComplete(
+      ZX_OK,
+      std::get<usb::FidlRequest>(*uep->server->current_req)->data()->at(0).size().value() -
+          TRB_BUFSIZ(trb.status),
+      std::move(*uep->server->current_req));
+  uep->server->current_req.reset();
+  uep->fifo.AdvanceRead();
 }
 
 void Dwc3::HandleEpTransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
