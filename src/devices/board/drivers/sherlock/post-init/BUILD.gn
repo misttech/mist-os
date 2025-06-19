@@ -21,6 +21,7 @@ driver_bind_rules("sherlock-post-init-bind") {
 fuchsia_cc_driver("post-init-driver") {
   output_name = "sherlock-post-init"
   sources = [
+    "backlight.cc",
     "display.cc",
     "post-init.cc",
     "touch.cc",
@@ -50,6 +51,7 @@ fuchsia_cc_driver("post-init-driver") {
     "//src/graphics/display/lib/device-protocol-display",
     "//src/lib/ddk",
     "//src/lib/ddk:ddk-metadata-headers",
+    "//src/ui/backlight/drivers/ti-lp8556:metadata",
     "//zircon/system/ulib/ddk-platform-defs",
   ]
 }

@@ -4,19 +4,19 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/compiler.h>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
+#include <soc/aml-t931/t931-hw.h>
 
-#include "sherlock.h"
+#include "post-init.h"
 #include "src/ui/backlight/drivers/ti-lp8556/ti-lp8556Metadata.h"
 
 namespace sherlock {
@@ -33,11 +33,9 @@ constexpr double kMaxBrightnessInNits = 350.0;
 
 TiLp8556Metadata kDeviceMetadata = {
     .panel_id = 0,
-#ifdef FACTORY_BUILD
-    .allow_set_current_scale = true,
-#else
+    // `allow_set_current_scale` is true iff the driver is on factory build.
+    // Currently we assume the `post-init` driver is not on factory builds.
     .allow_set_current_scale = false,
-#endif  // FACTORY_BUILD
     .registers =
         {
             // Registers
@@ -79,7 +77,7 @@ static const fpbus::Node backlight_dev = []() {
   return dev;
 }();
 
-zx_status_t Sherlock::BacklightInit() {
+zx::result<> PostInit::InitBacklight() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('BACK');
 
@@ -109,16 +107,16 @@ zx_status_t Sherlock::BacklightInit() {
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, backlight_dev), fidl::ToWire(fidl_arena, composite_node_spec));
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeNodeSpec Backlight(backlight) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
+    FDF_LOG(ERROR, "%s: AddCompositeNodeSpec Backlight(backlight) request failed: %s", __func__,
+            result.FormatDescription().data());
+    return zx::error(result.status());
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeNodeSpec Backlight(backlight) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+    FDF_LOG(ERROR, "%s: AddCompositeNodeSpec Backlight(backlight) failed: %s", __func__,
+            zx_status_get_string(result->error_value()));
+    return result->take_error();
   }
-  return ZX_OK;
+  return zx::ok();
 }
 
 }  // namespace sherlock

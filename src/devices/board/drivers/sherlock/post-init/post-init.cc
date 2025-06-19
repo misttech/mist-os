@@ -74,6 +74,10 @@ void PostInit::Start(fdf::StartCompleter completer) {
     return completer(result.take_error());
   }
 
+  if (zx::result result = InitBacklight(); result.is_error()) {
+    return completer(result.take_error());
+  }
+
   if (zx::result result = SetInspectProperties(); result.is_error()) {
     return completer(result.take_error());
   }

@@ -37,6 +37,7 @@ class PostInit : public fdf::DriverBase {
   zx::result<> SetBoardInfo();
   zx::result<> InitDisplay();
   zx::result<> InitTouch();
+  zx::result<> InitBacklight();
   zx::result<> SetInspectProperties();
 
   // Constructs a number using the value of each GPIO as one bit. The order of elements in
