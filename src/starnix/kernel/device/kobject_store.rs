@@ -108,6 +108,11 @@ impl KObjectStore {
         self.get_or_create_class("tty".into(), self.virtual_bus())
     }
 
+    /// The device class used for virtual dma_heap devices.
+    pub fn dma_heap_class(&self) -> Class {
+        self.get_or_create_class("dma_heap".into(), self.virtual_bus())
+    }
+
     /// An incorrect device class.
     ///
     /// This class exposes the name "starnix" to userspace, which is incorrect. Instead, devices
