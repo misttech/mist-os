@@ -1,0 +1,16 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("//build/bazel/bazel_idk:defs.bzl", "idk_cc_source_library")
+
+# LINT.IfChange
+idk_cc_source_library(
+    name = "magma_common",
+    hdrs = ["include/lib/magma/magma_common_defs.h"],
+    category = "partner",
+    idk_name = "magma_common",
+    stable = True,
+    visibility = ["//visibility:public"],
+)
+# LINT.ThenChange(BUILD.gn)

@@ -54,6 +54,7 @@ idk_molecule(
     testonly = True,
     deps = [
         ":test_submolecule",
+        "//sdk/lib/magma_common:magma_common_idk",
         "//sdk/lib/memory_barriers:memory_barriers_idk",
     ],
 )
