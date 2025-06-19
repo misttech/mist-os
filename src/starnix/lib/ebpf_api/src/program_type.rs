@@ -253,7 +253,7 @@ static BPF_HELPERS_DEFINITIONS: LazyLock<Vec<(BpfTypeFilter, EbpfHelperDefinitio
                 },
             ),
             (
-                vec![ProgramType::Tracepoint].into(),
+                vec![ProgramType::Kprobe, ProgramType::Tracepoint].into(),
                 EbpfHelperDefinition {
                     index: bpf_func_id_BPF_FUNC_get_current_pid_tgid,
                     name: "get_current_pid_tgid",
