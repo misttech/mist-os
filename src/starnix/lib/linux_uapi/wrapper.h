@@ -25,6 +25,8 @@
 #include <linux/capability.h>
 #include <linux/close_range.h>
 #include <linux/dm-ioctl.h>
+#include <linux/dma-buf.h>
+#include <linux/dma-heap.h>
 #include <linux/errno.h>
 #include <linux/eventpoll.h>
 #include <linux/fadvise.h>
@@ -121,6 +123,9 @@
 
 // Android kgsl header
 #include "src/starnix/lib/linux_uapi/stub/kgsl/msm_kgsl.h"
+
+// Custom driver headers
+#include "src/starnix/lib/linux_uapi/stub/drivers/char/adsprpc_shared.h"
 
 // Data shared between Starnix and a vDSO implementation.
 #include "src/starnix/kernel/vdso/vvar_data.h"

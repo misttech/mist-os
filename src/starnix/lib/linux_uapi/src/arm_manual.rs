@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{arch_translate_data, translate_data};
+use crate::{arch_translate_data, check_arch_independent_layout, translate_data};
 
 fn saturating_u64_to_u32(v: u64) -> u32 {
     if v > u32::max_value().into() {
@@ -374,5 +374,57 @@ impl TryFrom<crate::sysinfo> for crate::arch32::sysinfo {
             mem_unit: sysinfo.mem_unit.try_into().map_err(|_| ())?,
             ..Default::default()
         })
+    }
+}
+
+check_arch_independent_layout! {
+    dma_heap_allocation_data {
+        len,
+        fd,
+        fd_flags,
+        heap_flags,
+    }
+}
+
+arch_translate_data! {
+    From32<fastrpc_ioctl_invoke> {
+        handle,
+        sc,
+        pra,
+    }
+
+    From32<fastrpc_ioctl_invoke_fd> {
+        inv,
+        fds,
+    }
+
+    From32<fastrpc_ioctl_invoke2> {
+        req,
+        invparam,
+        size,
+        err,
+    }
+
+    From32<remote_buf> {
+        pv,
+        len,
+    }
+
+    From32<fastrpc_ioctl_init> {
+        flags,
+        file,
+        filelen,
+        filefd,
+        mem,
+        memlen,
+        memfd,
+    }
+}
+
+check_arch_independent_layout! {
+    fastrpc_ioctl_capability {
+        domain,
+        attribute_ID,
+        capability,
     }
 }
