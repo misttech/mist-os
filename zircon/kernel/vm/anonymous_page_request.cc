@@ -36,7 +36,7 @@ zx::result<> AnonymousPageRequest::Allocate() {
   while (true) {
     zx_status_t wait_result =
         Pmm::Node().WaitTillShouldRetrySingleAlloc(Deadline::after_mono(kReportWaitTime));
-    if (wait_result == ZX_ERR_SHOULD_WAIT) {
+    if (wait_result == ZX_ERR_TIMED_OUT) {
       waited++;
       dprintf(INFO, "WARNING: Waited %" PRIi64 " seconds to retry PMM allocations\n",
               (kReportWaitTime * waited) / ZX_SEC(1));
