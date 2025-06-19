@@ -74,7 +74,8 @@ void Dwc3::EpServer::CancelAll(zx_status_t reason) {
   }
 
   while (!queued_reqs.empty()) {
-    RequestComplete(reason, 0, std::move(*queued_reqs.pop()));
+    RequestComplete(reason, 0, std::move(queued_reqs.front()));
+    queued_reqs.pop();
   }
 
   std::lock_guard<std::mutex> _(uep_->ep.lock);
@@ -87,7 +88,8 @@ void Dwc3::UserEpQueueNext(UserEndpoint& uep) {
     return;
   }
 
-  uep.server->current_req.emplace(std::move(*uep.server->queued_reqs.pop()));
+  uep.server->current_req.emplace(std::move(uep.server->queued_reqs.front()));
+  uep.server->queued_reqs.pop();
 
   zx::result result{uep.server->get_iter(*uep.server->current_req, zx_system_get_page_size())};
   if (result.is_error()) {
