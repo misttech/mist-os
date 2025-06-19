@@ -17,6 +17,7 @@ config("bionic") {
     if (current_cpu == "arm") {
       clang_target = "armv7-unknown-linux-gnueabihf"
       bionic_arch = "arm"
+      cflags += [ "-fasynchronous-unwind-tables" ]
     } else {
       clang_arch = "aarch64"
       bionic_arch = "arm64"
