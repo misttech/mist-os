@@ -1019,6 +1019,25 @@ pub fn check_socket_listen_access(
     })
 }
 
+/// Checks if the `current_task` is allowed to accept connections on `listening_socket`. Sets
+/// the security label and SID for the accepted socket to match those of the listening socket.
+/// Corresponds to the `socket_accept()` LSM hook.
+pub fn socket_accept(
+    current_task: &CurrentTask,
+    listening_socket: DowncastedFile<'_, SocketFile>,
+    accepted_socket: DowncastedFile<'_, SocketFile>,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.check_socket_getname_access");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::socket::socket_accept(
+            &security_server,
+            current_task,
+            listening_socket,
+            accepted_socket,
+        )
+    })
+}
+
 /// Checks if the `current_task` is allowed to get socket options on `socket`.
 /// Corresponds to the `socket_getsockopt()` LSM hook.
 pub fn check_socket_getsockopt_access(

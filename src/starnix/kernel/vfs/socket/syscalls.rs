@@ -308,13 +308,13 @@ pub fn sys_accept4(
     flags: u32,
 ) -> Result<FdNumber, Errno> {
     let file = current_task.files.get(fd)?;
-    let socket = Socket::get_from_file(&file)?;
+    let listening_socket = Socket::get_from_file(&file)?;
     let accepted_socket = file.blocking_op(
         locked,
         current_task,
         FdEvents::POLLIN | FdEvents::POLLHUP,
         None,
-        |locked| socket.accept(locked),
+        |locked| listening_socket.accept(locked),
     )?;
 
     if !user_socket_address.is_null() {
@@ -334,6 +334,9 @@ pub fn sys_accept4(
         open_flags,
         /* kernel_private= */ false,
     )?;
+    let listening_socket = SocketFile::get_from_file(&file)?;
+    let accepted_socket = SocketFile::get_from_file(&accepted_socket_file)?;
+    security::socket_accept(current_task, listening_socket, accepted_socket)?;
     let fd_flags = if flags & SOCK_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
     let accepted_fd = current_task.add_file(accepted_socket_file, fd_flags)?;
     Ok(accepted_fd)

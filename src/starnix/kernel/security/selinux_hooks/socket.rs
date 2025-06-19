@@ -303,6 +303,33 @@ pub(in crate::security) fn check_socket_listen_access(
     )
 }
 
+/// Checks that `current_task` has permission to accept a connection on `listening_socket`, and
+/// sets the security state for `accepted_socket` to match the context of `listening_socket`.
+pub(in crate::security) fn socket_accept(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    listening_socket: DowncastedFile<'_, SocketFile>,
+    accepted_socket: DowncastedFile<'_, SocketFile>,
+) -> Result<(), Errno> {
+    let current_sid = task_effective_sid(current_task);
+    let listening_security_state = listening_socket.file().node().security_state.lock().clone();
+    let FsNodeClass::Socket(socket_class) = listening_security_state.class else {
+        panic!("socket_accept called for non-Socket class")
+    };
+
+    todo_has_socket_permission(
+        TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_accept checks."),
+        &security_server.as_permission_check(),
+        current_task.kernel(),
+        current_sid,
+        &listening_socket.file().node(),
+        CommonSocketPermission::Accept.for_class(socket_class),
+        current_task.into(),
+    )?;
+    *accepted_socket.file().node().security_state.lock() = listening_security_state;
+    Ok(())
+}
+
 /// Checks that `current_task` has permission to get socket options on `socket`.
 pub(in crate::security) fn check_socket_getsockopt_access(
     security_server: &SecurityServer,

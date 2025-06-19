@@ -322,10 +322,6 @@ TEST(SocketTest, GetSocknameAndPeername) {
   ASSERT_THAT(connect(client_fd.value().get(), (struct sockaddr*)&sock_addr, sizeof(sock_addr)),
               SyscallSucceeds());
 
-  // TODO: https://fxbug.dev/364569135 - don't set "sockcreate" explicitly, `accepted_fd` should
-  // inherit the `listen_fd` label.
-  auto sockcreate =
-      ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_getname_yes_t:s0");
   fbl::unique_fd accepted_fd;
   ASSERT_TRUE((accepted_fd = fbl::unique_fd(accept(listen_fd.value().get(), nullptr, nullptr))))
       << strerror(errno);
@@ -341,6 +337,59 @@ TEST(SocketTest, GetSocknameAndPeername) {
               SyscallFailsWithErrno(EACCES));
   EXPECT_THAT(getpeername(client_fd.value().get(), (struct sockaddr*)&addr, &addr_len),
               SyscallFailsWithErrno(EACCES));
+}
+
+TEST(SocketTest, AcceptAllowed) {
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_accept_test_t:s0"), fit::ok());
+  auto enforce = ScopedEnforcement::SetEnforcing();
+  fbl::unique_fd listen_fd, client_fd;
+  {
+    auto sockcreate =
+        ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_accept_yes_t:s0");
+    ASSERT_TRUE((listen_fd = fbl::unique_fd(socket(AF_UNIX, SOCK_STREAM, 0)))) << strerror(errno);
+  }
+
+  ASSERT_TRUE((client_fd = fbl::unique_fd(socket(AF_UNIX, SOCK_STREAM, 0)))) << strerror(errno);
+  constexpr char kListenPath[] = "/tmp/accept_test_yes";
+  struct sockaddr_un sock_addr{.sun_family = AF_UNIX};
+  strncpy(sock_addr.sun_path, kListenPath, sizeof(sock_addr.sun_path) - 1);
+  ASSERT_THAT(bind(listen_fd.get(), (struct sockaddr*)&sock_addr, sizeof(sock_addr)),
+              SyscallSucceeds());
+  ASSERT_THAT(listen(listen_fd.get(), kTestBacklog), SyscallSucceeds());
+  ASSERT_THAT(connect(client_fd.get(), (struct sockaddr*)&sock_addr, sizeof(sock_addr)),
+              SyscallSucceeds());
+
+  // Accept the connection in a domain that is only allowed the "accept" permission, to verify that
+  // only the "accept" permission is required and that the "create" permission is not needed to
+  // create `accepted_fd` on `accept()`.
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_accept_only_test_t:s0"), fit::ok());
+  fbl::unique_fd accepted_fd;
+  EXPECT_TRUE((accepted_fd = fbl::unique_fd(accept(listen_fd.get(), nullptr, nullptr))))
+      << strerror(errno);
+}
+
+TEST(SocketTest, AcceptDenied) {
+  ASSERT_EQ(WriteTaskAttr("current", "test_u:test_r:socket_accept_test_t:s0"), fit::ok());
+  auto enforce = ScopedEnforcement::SetEnforcing();
+  fbl::unique_fd listen_fd, client_fd;
+  {
+    auto sockcreate =
+        ScopedTaskAttrResetter::SetTaskAttr("sockcreate", "test_u:test_r:socket_accept_no_t:s0");
+    ASSERT_TRUE((listen_fd = fbl::unique_fd(socket(AF_UNIX, SOCK_STREAM, 0)))) << strerror(errno);
+  }
+
+  ASSERT_TRUE((client_fd = fbl::unique_fd(socket(AF_UNIX, SOCK_STREAM, 0)))) << strerror(errno);
+  constexpr char kListenPath[] = "/tmp/accept_test_no";
+  struct sockaddr_un sock_addr{.sun_family = AF_UNIX};
+  strncpy(sock_addr.sun_path, kListenPath, sizeof(sock_addr.sun_path) - 1);
+  ASSERT_THAT(bind(listen_fd.get(), (struct sockaddr*)&sock_addr, sizeof(sock_addr)),
+              SyscallSucceeds());
+  ASSERT_THAT(listen(listen_fd.get(), kTestBacklog), SyscallSucceeds());
+  ASSERT_THAT(connect(client_fd.get(), (struct sockaddr*)&sock_addr, sizeof(sock_addr)),
+              SyscallSucceeds());
+
+  fbl::unique_fd accepted_fd;
+  EXPECT_THAT(accept(listen_fd.get(), nullptr, nullptr), SyscallFailsWithErrno(EACCES));
 }
 
 fit::result<int, std::string> GetPeerSec(int fd) {
