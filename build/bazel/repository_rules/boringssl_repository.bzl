@@ -39,6 +39,9 @@ def _boringssl_repository_impl(repo_ctx):
         content = repo_ctx.read(
             repo_ctx.path(workspace_dir + "/third_party/boringssl/" + generated_file),
         )
+
+        # See https://fxbug.dev/426143514
+        content = content.replace("\"src/", "\"//src:")
         repo_ctx.file(
             generated_file,
             content = content,
