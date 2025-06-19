@@ -7,7 +7,7 @@ use crate::security::{get_authenticator, Credential};
 use anyhow::{bail, format_err, Context, Error};
 use async_trait::async_trait;
 use fidl::endpoints::create_proxy;
-use fuchsia_async::TimeoutExt;
+use fuchsia_async::{self as fasync, TimeoutExt};
 use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::lock::Mutex as MutexAsync;
@@ -32,12 +32,13 @@ use {
 
 // A long amount of time that a scan should be able to finish within. If a scan takes longer than
 // this is indicates something is wrong.
-const SCAN_TIMEOUT: fuchsia_async::MonotonicDuration =
-    fuchsia_async::MonotonicDuration::from_seconds(60);
-const CONNECT_TIMEOUT: fuchsia_async::MonotonicDuration =
-    fuchsia_async::MonotonicDuration::from_seconds(30);
-const DISCONNECT_TIMEOUT: fuchsia_async::MonotonicDuration =
-    fuchsia_async::MonotonicDuration::from_seconds(10);
+const SCAN_TIMEOUT: fasync::MonotonicDuration = fasync::MonotonicDuration::from_seconds(60);
+const CONNECT_TIMEOUT: fasync::MonotonicDuration = fasync::MonotonicDuration::from_seconds(30);
+const DISCONNECT_TIMEOUT: fasync::MonotonicDuration = fasync::MonotonicDuration::from_seconds(10);
+
+// If the scan results are older than this duration when handling a connect request, refresh
+// the scan results.
+const SCAN_CACHE_AGE_LIMIT: zx::BootDuration = zx::BootDuration::from_seconds(30);
 
 #[async_trait]
 pub(crate) trait IfaceManager: Send + Sync {
@@ -318,13 +319,25 @@ pub(crate) trait ClientIface: Sync + Send {
     async fn set_country(&self, code: [u8; 2]) -> Result<(), Error>;
 }
 
+#[derive(Debug, Clone)]
+struct LastScanResults {
+    timestamp: fasync::BootInstant,
+    results: Vec<fidl_sme::ScanResult>,
+}
+
+impl LastScanResults {
+    fn new(timestamp: fasync::BootInstant, results: Vec<fidl_sme::ScanResult>) -> Self {
+        Self { timestamp, results }
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct SmeClientIface {
     phy_id: u16,
     iface_id: u16,
     monitor_svc: fidl_device_service::DeviceMonitorProxy,
     sme_proxy: fidl_sme::ClientSmeProxy,
-    last_scan_results: Arc<Mutex<Option<Vec<fidl_sme::ScanResult>>>>,
+    last_scan_results: Arc<Mutex<Option<LastScanResults>>>,
     scan_abort_signal: Arc<Mutex<Option<oneshot::Sender<()>>>>,
     connected_network_rssi: Arc<Mutex<Option<i8>>>,
     // TODO(b/298030838): Remove unmanaged iface support when wlanix is the sole config path.
@@ -453,7 +466,10 @@ impl ClientIface for SmeClientIface {
                 let scan_result_vmo = scan_results?
                     .map_err(|e| format_err!("Scan ended with error: {:?}", e))?;
                 info!("Got scan results from SME.");
-                *self.last_scan_results.lock() = Some(wlan_common::scan::read_vmo(scan_result_vmo)?);
+                *self.last_scan_results.lock() = Some(LastScanResults::new(
+                    fasync::BootInstant::now(),
+                    wlan_common::scan::read_vmo(scan_result_vmo)?
+                ));
                 self.scan_abort_signal.lock().take();
                 Ok(ScanEnd::Complete)
             }
@@ -474,7 +490,7 @@ impl ClientIface for SmeClientIface {
     }
 
     fn get_last_scan_results(&self) -> Vec<fidl_sme::ScanResult> {
-        self.last_scan_results.lock().clone().unwrap_or_default()
+        self.last_scan_results.lock().clone().map(|r| r.results).unwrap_or_default()
     }
 
     async fn connect_to_network(
@@ -484,8 +500,12 @@ impl ClientIface for SmeClientIface {
         bssid: Option<Bssid>,
     ) -> Result<ConnectResult, Error> {
         // Sometimes a connect request is sent before the first scan.
-        if self.last_scan_results.lock().is_none() {
-            info!("No scan results available. Starting a connect scan");
+        let refresh_scan = match &*self.last_scan_results.lock() {
+            Some(r) => fasync::BootInstant::now() - r.timestamp > SCAN_CACHE_AGE_LIMIT,
+            None => true,
+        };
+        if refresh_scan {
+            info!("Scan results too old or no results available. Starting a connect scan");
             match self.trigger_scan().await {
                 Ok(ScanEnd::Complete) => info!("Connect scan completed"),
                 Ok(ScanEnd::Cancelled) => bail!("Connect scan was cancelled"),
@@ -494,7 +514,7 @@ impl ClientIface for SmeClientIface {
         }
 
         let last_scan_results = match self.last_scan_results.lock().clone() {
-            Some(results) => results,
+            Some(scan_results) => scan_results.results,
             None => bail!("No scan results available for connect attempt"),
         };
         info!("Checking for network in last scan: {} access points", last_scan_results.len());
@@ -1636,13 +1656,16 @@ mod tests {
             ssid: Ssid::try_from("foo").unwrap(),
             bssid: [1, 2, 3, 4, 5, 6],
         );
-        *iface.last_scan_results.lock() = Some(vec![fidl_sme::ScanResult {
-            bss_description: bss_description.clone(),
-            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
-                mutual_security_protocols,
-            }),
-            timestamp_nanos: 1,
-        }]);
+        *iface.last_scan_results.lock() = Some(LastScanResults::new(
+            fasync::BootInstant::now(),
+            vec![fidl_sme::ScanResult {
+                bss_description: bss_description.clone(),
+                compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
+                    mutual_security_protocols,
+                }),
+                timestamp_nanos: 1,
+            }],
+        ));
 
         let bssid = if bssid_specified { Some(Bssid::from([1, 2, 3, 4, 5, 6])) } else { None };
         let mut connect_fut = iface.connect_to_network(b"foo", passphrase, bssid);
@@ -1673,6 +1696,70 @@ mod tests {
         let (mut exec, _monitor_stream, mut sme_stream, _telemetry_receiver, _manager, iface) =
             setup_test_manager_with_iface();
 
+        let bssid = [1, 2, 3, 4, 5, 6];
+        let bss_description = fake_fidl_bss_description!(protection => FakeProtectionCfg::Open,
+            ssid: Ssid::try_from("foo").unwrap(),
+            bssid: bssid,
+        );
+        let mut connect_fut = iface.connect_to_network(b"foo", None, Some(Bssid::from(bssid)));
+        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+        let (_req, responder) = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => (req, responder));
+        let result = wlan_common::scan::write_vmo(vec![fidl_sme::ScanResult {
+            bss_description: bss_description.clone(),
+            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
+                mutual_security_protocols: vec![fidl_security::Protocol::Open],
+            }),
+            timestamp_nanos: 1,
+        }])
+        .expect("Failed to write scan VMO");
+        responder.send(Ok(result)).expect("Failed to send result");
+        assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
+
+        let (req, connect_txn) = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Connect { req, txn: Some(txn), .. }))) => (req, txn));
+        assert_eq!(req.bss_description, bss_description);
+
+        let connect_txn_handle = connect_txn.into_stream_and_control_handle().1;
+        let result = connect_txn_handle.send_on_connect_result(&fidl_sme::ConnectResult {
+            code: fidl_ieee80211::StatusCode::Success,
+            is_credential_rejected: false,
+            is_reconnect: false,
+        });
+        assert_variant!(result, Ok(()));
+
+        let connect_result =
+            assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(r) => r);
+        let connected_result = assert_variant!(connect_result, Ok(ConnectResult::Success(r)) => r);
+        assert_eq!(connected_result.bss.ssid, Ssid::try_from("foo").unwrap());
+        assert_eq!(connected_result.bss.bssid, Bssid::from(bssid));
+    }
+
+    #[test]
+    fn test_connect_to_network_stale_scan() {
+        let (mut exec, _monitor_stream, mut sme_stream, _telemetry_receiver, _manager, iface) =
+            setup_test_manager_with_iface_and_fake_time();
+
+        let other_bss_description = fake_fidl_bss_description!(protection => FakeProtectionCfg::Open,
+            ssid: Ssid::try_from("bar").unwrap(),
+            bssid: [11, 22, 33, 44, 55, 66],
+        );
+        *iface.last_scan_results.lock() = Some(LastScanResults::new(
+            fasync::BootInstant::from_nanos(1),
+            vec![fidl_sme::ScanResult {
+                bss_description: other_bss_description.clone(),
+                compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
+                    mutual_security_protocols: vec![fidl_security::Protocol::Open],
+                }),
+                timestamp_nanos: 1,
+            }],
+        ));
+
+        // Set current time to 31st second so that a scan would be triggered when handling
+        // connect request.
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(31_000_000_000));
         let bssid = [1, 2, 3, 4, 5, 6];
         let bss_description = fake_fidl_bss_description!(protection => FakeProtectionCfg::Open,
             ssid: Ssid::try_from("foo").unwrap(),
@@ -1762,15 +1849,19 @@ mod tests {
                 ssid: Ssid::try_from("foo").unwrap(),
                 bssid: [1, 2, 3, 4, 5, 6],
             );
-            *iface.last_scan_results.lock() = Some(vec![fidl_sme::ScanResult {
-                bss_description: bss_description.clone(),
-                compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
-                    mutual_security_protocols,
-                }),
-                timestamp_nanos: 1,
-            }]);
+            *iface.last_scan_results.lock() = Some(LastScanResults::new(
+                fasync::BootInstant::now(),
+                vec![fidl_sme::ScanResult {
+                    bss_description: bss_description.clone(),
+                    compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
+                        mutual_security_protocols,
+                    }),
+                    timestamp_nanos: 1,
+                }],
+            ));
         } else {
-            *iface.last_scan_results.lock() = Some(vec![]);
+            *iface.last_scan_results.lock() =
+                Some(LastScanResults::new(fasync::BootInstant::now(), vec![]));
         }
 
         let mut connect_fut = iface.connect_to_network(b"foo", passphrase, bssid);
@@ -1786,13 +1877,16 @@ mod tests {
             ssid: Ssid::try_from("foo").unwrap(),
             bssid: [1, 2, 3, 4, 5, 6],
         );
-        *iface.last_scan_results.lock() = Some(vec![fidl_sme::ScanResult {
-            bss_description: bss_description.clone(),
-            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
-                mutual_security_protocols: vec![fidl_security::Protocol::Open],
-            }),
-            timestamp_nanos: 1,
-        }]);
+        *iface.last_scan_results.lock() = Some(LastScanResults::new(
+            fasync::BootInstant::now(),
+            vec![fidl_sme::ScanResult {
+                bss_description: bss_description.clone(),
+                compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
+                    mutual_security_protocols: vec![fidl_security::Protocol::Open],
+                }),
+                timestamp_nanos: 1,
+            }],
+        ));
 
         let mut connect_fut = iface.connect_to_network(b"foo", None, None);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
@@ -1832,13 +1926,16 @@ mod tests {
             ssid: Ssid::try_from("foo").unwrap(),
             bssid: [1, 2, 3, 4, 5, 6],
         );
-        *iface.last_scan_results.lock() = Some(vec![fidl_sme::ScanResult {
-            bss_description: bss_description.clone(),
-            compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
-                mutual_security_protocols: vec![fidl_security::Protocol::Open],
-            }),
-            timestamp_nanos: 1,
-        }]);
+        *iface.last_scan_results.lock() = Some(LastScanResults::new(
+            fasync::BootInstant::now(),
+            vec![fidl_sme::ScanResult {
+                bss_description: bss_description.clone(),
+                compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
+                    mutual_security_protocols: vec![fidl_security::Protocol::Open],
+                }),
+                timestamp_nanos: 1,
+            }],
+        ));
 
         let mut connect_fut = iface.connect_to_network(b"foo", None, None);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
@@ -1930,13 +2027,16 @@ mod tests {
         if let Some((bss_description, connect_failure)) = recent_connect_failure {
             // Set up a connect failure so that later in the test, there'd be a score penalty
             // for the BSS described by `bss_description`
-            *iface.last_scan_results.lock() = Some(vec![fidl_sme::ScanResult {
-                bss_description,
-                compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
-                    mutual_security_protocols: vec![fidl_security::Protocol::Open],
-                }),
-                timestamp_nanos: 1,
-            }]);
+            *iface.last_scan_results.lock() = Some(LastScanResults::new(
+                fasync::BootInstant::now(),
+                vec![fidl_sme::ScanResult {
+                    bss_description,
+                    compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
+                        mutual_security_protocols: vec![fidl_security::Protocol::Open],
+                    }),
+                    timestamp_nanos: 1,
+                }],
+            ));
 
             let mut connect_fut = iface.connect_to_network(b"foo", None, None);
             assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
@@ -1948,7 +2048,8 @@ mod tests {
             assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(_r)));
         }
 
-        *iface.last_scan_results.lock() = Some(
+        *iface.last_scan_results.lock() = Some(LastScanResults::new(
+            fasync::BootInstant::now(),
             scan_bss_descriptions
                 .into_iter()
                 .map(|bss_description| fidl_sme::ScanResult {
@@ -1959,7 +2060,7 @@ mod tests {
                     timestamp_nanos: 1,
                 })
                 .collect::<Vec<_>>(),
-        );
+        ));
 
         let mut connect_fut = iface.connect_to_network(b"foo", None, None);
         assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Pending);
