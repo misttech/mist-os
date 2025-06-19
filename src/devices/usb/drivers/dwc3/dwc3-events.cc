@@ -176,13 +176,6 @@ void Dwc3::HandleEvent(uint32_t event) {
   }
 }
 
-void Dwc3::CompletePendingRequests() {
-  while (!pending_completions_.empty()) {
-    std::optional<RequestInfo> info{pending_completions_.pop()};
-    info->uep->server->RequestComplete(info->status, info->actual, std::move(info->req));
-  }
-}
-
 void Dwc3::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                      const zx_packet_interrupt_t* interrupt) {
   auto* mmio = get_mmio();
@@ -199,7 +192,6 @@ void Dwc3::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_sta
     GEVNTCOUNT::Get(0).FromValue(0).set_EVNTCOUNT(event_bytes).WriteTo(mmio);
   }
 
-  complete_pending_requests_.Post(dispatcher);
   irq_.ack();
 }
 

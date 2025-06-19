@@ -65,29 +65,15 @@ void Dwc3::EpStartTransfer(Endpoint& ep, TrbFifo& fifo, uint32_t type, zx_paddr_
 void Dwc3::EpEndTransfers(Endpoint& ep, zx_status_t reason) {
   if (ep.current_req.has_value()) {
     CmdEpEndTransfer(ep);
-    ep.current_req->actual = 0;
-    ep.current_req->status = reason;
 
-    pending_completions_.push(std::move(*ep.current_req));
+    ep.current_req->uep->server->RequestComplete(reason, 0, std::move(ep.current_req->req));
     ep.current_req.reset();
   }
   ep.got_not_ready = false;
 
   while (!ep.queued_reqs.empty()) {
     std::optional<RequestInfo> opt_info{ep.queued_reqs.pop()};
-    opt_info->status = reason;
-    opt_info->actual = 0;
-    pending_completions_.push(std::move(*opt_info));
-  }
-
-  // If the reason is ZX_ERR_IO_NOT_PRESENT then the request is either in response to a
-  // port-detach, or a configuration change. In either case the irq thread remains live and we need
-  // to eat all pending completions before continuing.
-  if (reason == ZX_ERR_IO_NOT_PRESENT) {
-    while (!pending_completions_.empty()) {
-      std::optional<RequestInfo> info{pending_completions_.pop()};
-      info->uep->server->RequestComplete(info->status, info->actual, std::move(info->req));
-    }
+    opt_info->uep->server->RequestComplete(reason, 0, std::move(opt_info->req));
   }
 }
 
@@ -161,11 +147,11 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
   }
 
   std::optional<RequestInfo> opt_info;
+  uint32_t actual;
 
+  UserEndpoint* const uep = get_user_endpoint(ep_num);
+  ZX_DEBUG_ASSERT(uep != nullptr);
   {
-    UserEndpoint* const uep = get_user_endpoint(ep_num);
-    ZX_DEBUG_ASSERT(uep != nullptr);
-
     std::lock_guard<std::mutex> lock{uep->ep.lock};
     if (!uep->ep.current_req.has_value()) {
       FDF_LOG(ERROR, "no usb request found to complete!");
@@ -181,12 +167,11 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
     opt_info.emplace(std::move(*uep->ep.current_req));
     uep->ep.current_req.reset();
     uep->fifo.AdvanceRead();
-    opt_info->actual = std::get<usb::FidlRequest>(opt_info->req)->data()->at(0).size().value() -
-                       TRB_BUFSIZ(trb.status);
-    opt_info->status = ZX_OK;
+    actual = std::get<usb::FidlRequest>(opt_info->req)->data()->at(0).size().value() -
+             TRB_BUFSIZ(trb.status);
   }
 
-  pending_completions_.push(std::move(*opt_info));
+  uep->server->RequestComplete(ZX_OK, actual, std::move(opt_info->req));
 }
 
 void Dwc3::HandleEpTransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {

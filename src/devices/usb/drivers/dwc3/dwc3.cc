@@ -641,7 +641,6 @@ void Dwc3::HandleDisconnectedEvent() {
 
 void Dwc3::Stop() {
   async::PostTask(irq_dispatcher_.async_dispatcher(), [this]() { irq_handler_.Cancel(); });
-  complete_pending_requests_.Post(irq_dispatcher_.async_dispatcher());
 
   ReleaseResources();
 }
@@ -712,7 +711,6 @@ void Dwc3::StopController(StopControllerCompleter::Sync& completer) {
     wait.Signal();
   });
   wait.Wait();
-  complete_pending_requests_.Post(irq_dispatcher_.async_dispatcher());
 
   zx_status_t status;
   {
@@ -977,11 +975,10 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
       FDF_LOG(ERROR, "failing request with status %s", zx_status_get_string(status));
       RequestComplete(status, 0, std::move(freq));
 
-      dwc3_->complete_pending_requests_.Post(dwc3_->irq_dispatcher_.async_dispatcher());
       continue;
     }
 
-    uep_->ep.queued_reqs.push(RequestInfo{0, 0, uep_, std::move(freq)});
+    uep_->ep.queued_reqs.push(RequestInfo{uep_, std::move(freq)});
   }
 
   if (dwc3_->configured_) {

@@ -112,8 +112,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
   struct UserEndpoint;
   struct RequestInfo {
-    size_t actual;
-    zx_status_t status;
     UserEndpoint* uep;
     usb::RequestVariant req;
   };
@@ -178,13 +176,13 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
       return q_.empty();
     }
 
-    void CompleteAll(zx_status_t status, size_t size) {
+    void CompleteAll(zx_status_t status, size_t actual) {
       std::lock_guard<std::mutex> _(lock_);
 
       while (!q_.empty()) {
         RequestInfo info{std::move(q_.back())};
         q_.pop_back();
-        info.uep->server->RequestComplete(status, size, std::move(info.req));
+        info.uep->server->RequestComplete(status, actual, std::move(info.req));
       }
     }
 
@@ -450,7 +448,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
   void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                  const zx_packet_interrupt_t* interrupt);
-  void CompletePendingRequests();
 
   std::mutex lock_;
   std::mutex dci_lock_;
@@ -469,12 +466,9 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   EventFifo event_fifo_;
   fdf::SynchronizedDispatcher irq_dispatcher_;
   async::IrqMethod<Dwc3, &Dwc3::HandleIrq> irq_handler_{this};
-  async::TaskClosureMethod<Dwc3, &Dwc3::CompletePendingRequests> complete_pending_requests_{this};
 
   Ep0 ep0_;
   UserEndpointCollection user_endpoints_;
-
-  FidlRequestQueue pending_completions_;
 
   // TODO(johngro): What lock protects this?  Right now, it is effectively
   // endpoints_[0].lock(), but how do we express this?
