@@ -182,7 +182,7 @@ impl Matcher for PublisherMatcher {
         device: &mut dyn Device,
         env: &mut dyn Environment,
     ) -> Result<Option<DeviceTag>, Error> {
-        // TODO(https://fxbug.dev/407072932): we should move the paver to use configuration for
+        // TODO(https://fxbug.dev/417773172): we should move the paver to use configuration for
         // what specific block devices to export instead of exporting everything. Once we do, this
         // will go away. Until then, we use an incrementing index because the name doesn't matter.
         // It's kind of confusing to have it not match the debug directory but it's fine.

@@ -1159,7 +1159,6 @@ async fn reset_volumes_no_existing_data_volume() {
 // Toggle migration mode
 
 #[fuchsia::test]
-// TODO(https://fxbug.dev/397763081): support disk migration on storage-host
 #[cfg_attr(any(feature = "fxblob", feature = "storage-host"), ignore)]
 async fn migration_toggle() {
     let mut builder = new_builder();
@@ -1190,7 +1189,6 @@ async fn migration_toggle() {
 }
 
 #[fuchsia::test]
-// TODO(https://fxbug.dev/397763081): support disk migration on storage-host
 #[cfg_attr(any(feature = "fxblob", feature = "storage-host"), ignore)]
 async fn migration_to_fxfs() {
     let mut builder = new_builder();
@@ -1212,7 +1210,6 @@ async fn migration_to_fxfs() {
 }
 
 #[fuchsia::test]
-// TODO(https://fxbug.dev/397763081): support disk migration on storage-host
 #[cfg_attr(any(feature = "fxblob", feature = "storage-host"), ignore)]
 async fn migration_to_minfs() {
     let mut builder = new_builder();

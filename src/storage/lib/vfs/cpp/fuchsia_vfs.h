@@ -165,7 +165,7 @@ class FuchsiaVfs : public Vfs {
   //
   // *NOTE*: |vnode| must be opened before calling this function, and will be automatically closed
   // on failure. This does not apply to node reference connections, which should not open |vnode|.
-  // TODO(https://fxbug.dev/324111653): Remove this method when we no longer need to support Open1.
+  // TODO(https://fxbug.dev/324080864): Remove this method when we no longer need to support Open1.
   zx_status_t ServeDeprecated(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
                               VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
 
