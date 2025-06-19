@@ -17,7 +17,7 @@ use crate::ConnectionRequest;
 
 /// Implements the fuchsia.hardware.vsock service against a [`Connection`].
 pub struct VsockService<B> {
-    connection: sync::Mutex<Option<Weak<Connection<B>>>>,
+    connection: sync::Mutex<Option<Weak<Connection<B, Socket>>>>,
     callback: CallbacksProxy,
     current_cid: AtomicU32,
     scope: Scope,
@@ -66,7 +66,7 @@ impl<B: PacketBuffer> VsockService<B> {
     /// # Panics
     ///
     /// Panics if the current socket is already set.
-    pub async fn set_connection(&self, conn: Arc<Connection<B>>, cid: u32) {
+    pub async fn set_connection(&self, conn: Arc<Connection<B, Socket>>, cid: u32) {
         self.current_cid.store(cid, Ordering::Relaxed);
         self.callback.transport_reset(cid).await.unwrap_or_else(log_callback_error);
         let mut current = self.connection.lock().unwrap();
@@ -77,7 +77,7 @@ impl<B: PacketBuffer> VsockService<B> {
     }
 
     /// Gets the current connection if one is set.
-    fn get_connection(&self) -> Option<Arc<Connection<B>>> {
+    fn get_connection(&self) -> Option<Arc<Connection<B, Socket>>> {
         self.connection.lock().unwrap().as_ref().and_then(Weak::upgrade)
     }
 

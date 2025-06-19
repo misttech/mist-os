@@ -309,7 +309,7 @@ async fn read_packet_stream<'a>(
 }
 
 async fn usb_socket_writer<const MTU: usize>(
-    connection: &Connection<Vec<u8>>,
+    connection: &Connection<Vec<u8>, Socket>,
     usb_writer: &mut (impl AsyncWrite + Unpin),
 ) -> Result<(), Error> {
     let mut builder = UsbPacketBuilder::new(vec![0; MTU]);
@@ -327,7 +327,7 @@ async fn usb_socket_writer<const MTU: usize>(
 async fn usb_socket_reader<const MTU: usize>(
     found_magic: &mut Option<Vec<u8>>,
     usb_reader: &mut (impl AsyncRead + Unpin),
-    connection: &Connection<Vec<u8>>,
+    connection: &Connection<Vec<u8>, Socket>,
 ) -> Result<(), Error> {
     let mut data = [0; MTU];
     loop {
@@ -471,7 +471,11 @@ mod tests {
 
     async fn end_to_end_test(
         device_side: impl AsyncFn(vsock_api::ConnectorProxy),
-        host_side: impl AsyncFn(Arc<Connection<Vec<u8>>>, u32, mpsc::Receiver<ConnectionRequest>),
+        host_side: impl AsyncFn(
+            Arc<Connection<Vec<u8>, Socket>>,
+            u32,
+            mpsc::Receiver<ConnectionRequest>,
+        ),
     ) {
         let scope = Scope::new();
         let (vsock_impl_client, vsock_impl_server) = create_endpoints::<vsock::DeviceMarker>();

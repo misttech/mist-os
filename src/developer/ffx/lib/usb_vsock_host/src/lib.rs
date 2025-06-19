@@ -444,7 +444,7 @@ impl PortState {
 
 /// Holds a connection to a single USB device.
 struct ConnectionState {
-    connection: Arc<usb_vsock::Connection<Vec<u8>>>,
+    connection: Arc<usb_vsock::Connection<Vec<u8>, fuchsia_async::Socket>>,
     _control_socket: fuchsia_async::Socket,
 }
 
@@ -570,7 +570,7 @@ impl UsbVsockHost {
     /// Add a new test connection to this host.
     pub fn add_connection_for_test(
         self: &Arc<Self>,
-        connection: Arc<usb_vsock::Connection<Vec<u8>>>,
+        connection: Arc<usb_vsock::Connection<Vec<u8>, fuchsia_async::Socket>>,
         control_socket: fuchsia_async::Socket,
         incoming_requests: mpsc::Receiver<usb_vsock::ConnectionRequest>,
     ) -> u32 {
@@ -833,7 +833,7 @@ impl UsbVsockHost {
 pub struct TestConnection {
     pub cid: u32,
     pub host: Arc<UsbVsockHost>,
-    pub connection: Arc<usb_vsock::Connection<Vec<u8>>>,
+    pub connection: Arc<usb_vsock::Connection<Vec<u8>, fuchsia_async::Socket>>,
     pub _control_socket: fasync::Socket,
     pub incoming_requests: mpsc::Receiver<usb_vsock::ConnectionRequest>,
     pub abort_transfer: (AbortHandle, AbortHandle),

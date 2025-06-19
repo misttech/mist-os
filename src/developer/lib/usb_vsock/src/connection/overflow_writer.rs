@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_async::Socket;
 use futures::io::WriteHalf;
 use futures::lock::{Mutex, OwnedMutexLockFuture};
 use futures::{AsyncWrite, FutureExt};
@@ -19,8 +18,8 @@ use std::task::{ready, Context, Poll, Waker};
 /// When the buffer is non-empty, some async process must poll the
 /// [`OverflowWriter::poll_handle_overflow`] function to keep bytes moving from
 /// the buffer into the actual socket.
-pub struct OverflowWriter {
-    inner: WriteHalf<Socket>,
+pub struct OverflowWriter<S> {
+    inner: WriteHalf<S>,
     overflow: VecDeque<u8>,
 }
 
@@ -38,9 +37,9 @@ impl OverflowWriterStatus {
     }
 }
 
-impl OverflowWriter {
+impl<S: AsyncWrite + Send + 'static> OverflowWriter<S> {
     /// Make a new [`OverflowWriter`], wrapping the given socket write half.
-    pub fn new(inner: WriteHalf<Socket>) -> Self {
+    pub fn new(inner: WriteHalf<S>) -> Self {
         OverflowWriter { inner, overflow: VecDeque::new() }
     }
 
@@ -84,19 +83,19 @@ impl OverflowWriter {
 }
 
 /// Future that drains any backlogged data from an OverflowWriter.
-pub struct OverflowHandleFut {
-    writer: Weak<Mutex<OverflowWriter>>,
-    guard_storage: Option<OwnedMutexLockFuture<OverflowWriter>>,
+pub struct OverflowHandleFut<S> {
+    writer: Weak<Mutex<OverflowWriter<S>>>,
+    guard_storage: Option<OwnedMutexLockFuture<OverflowWriter<S>>>,
 }
 
-impl OverflowHandleFut {
+impl<S> OverflowHandleFut<S> {
     /// Create a new future to drain all backlogged data from the given writer.
-    pub fn new(writer: Weak<Mutex<OverflowWriter>>) -> Self {
+    pub fn new(writer: Weak<Mutex<OverflowWriter<S>>>) -> Self {
         OverflowHandleFut { writer, guard_storage: None }
     }
 }
 
-impl Future for OverflowHandleFut {
+impl<S: AsyncWrite + Send + 'static> Future for OverflowHandleFut<S> {
     type Output = Result<(), Error>;
 
     fn poll(mut self: std::pin::Pin<&mut Self>, ctx: &mut Context<'_>) -> Poll<Self::Output> {

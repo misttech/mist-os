@@ -11,9 +11,9 @@ use std::io::{Error, ErrorKind};
 use std::ops::DerefMut;
 use std::sync::Arc;
 
-use fuchsia_async::{Scope, Socket};
+use fuchsia_async::Scope;
 use futures::io::{ReadHalf, WriteHalf};
-use futures::{AsyncReadExt, AsyncWriteExt, SinkExt, StreamExt};
+use futures::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, SinkExt, StreamExt};
 
 use crate::connection::overflow_writer::OverflowHandleFut;
 use crate::{
@@ -57,16 +57,16 @@ impl PausePacket {
 /// connections to the other end.
 /// - Provide buffers to be filled and sent to the other end with [`Connection::fill_usb_packet`].
 /// - Pump usb packets received into it using [`Connection::handle_vsock_packet`].
-pub struct Connection<B> {
-    control_socket_writer: Mutex<WriteHalf<Socket>>,
+pub struct Connection<B, S> {
+    control_socket_writer: Mutex<WriteHalf<S>>,
     packet_filler: Arc<UsbPacketFiller<B>>,
     protocol_version: ProtocolVersion,
-    connections: Arc<std::sync::Mutex<HashMap<Address, VsockConnection>>>,
+    connections: Arc<std::sync::Mutex<HashMap<Address, VsockConnection<S>>>>,
     incoming_requests_tx: mpsc::Sender<ConnectionRequest>,
     task_scope: Scope,
 }
 
-impl<B: PacketBuffer> Connection<B> {
+impl<B: PacketBuffer, S: AsyncRead + AsyncWrite + Send + 'static> Connection<B, S> {
     /// Creates a new connection with:
     /// - a `control_socket`, over which data addressed to and from cid 0, port 0 (a control channel
     /// between host and device) can be read and written from.
@@ -74,7 +74,7 @@ impl<B: PacketBuffer> Connection<B> {
     /// connection requests from the other side.
     pub fn new(
         protocol_version: ProtocolVersion,
-        control_socket: Socket,
+        control_socket: S,
         incoming_requests_tx: mpsc::Sender<ConnectionRequest>,
     ) -> Self {
         let (control_socket_reader, control_socket_writer) = control_socket.split();
@@ -108,7 +108,7 @@ impl<B: PacketBuffer> Connection<B> {
     }
 
     async fn run_socket(
-        mut reader: ReadHalf<Socket>,
+        mut reader: ReadHalf<S>,
         address: Address,
         usb_packet_filler: Arc<UsbPacketFiller<B>>,
         pause_state: Arc<PauseState>,
@@ -139,7 +139,11 @@ impl<B: PacketBuffer> Connection<B> {
         }
     }
 
-    fn set_connection(&self, address: Address, state: VsockConnectionState) -> Result<(), Error> {
+    fn set_connection(
+        &self,
+        address: Address,
+        state: VsockConnectionState<S>,
+    ) -> Result<(), Error> {
         let mut connections = self.connections.lock().unwrap();
         if !connections.contains_key(&address) {
             connections.insert(address.clone(), VsockConnection { _address: address, state });
@@ -164,7 +168,7 @@ impl<B: PacketBuffer> Connection<B> {
     /// to read and write from. The function will complete when the other end has accepted or
     /// rejected the connection, and the returned [`ConnectionState`] handle can be used to wait
     /// for the connection to be closed.
-    pub async fn connect(&self, addr: Address, socket: Socket) -> Result<ConnectionState, Error> {
+    pub async fn connect(&self, addr: Address, socket: S) -> Result<ConnectionState, Error> {
         let (read_socket, write_socket) = socket.split();
         let write_socket = Arc::new(Mutex::new(OverflowWriter::new(write_socket)));
         let (connected_tx, connected_rx) = oneshot::channel();
@@ -196,7 +200,7 @@ impl<B: PacketBuffer> Connection<B> {
     pub async fn accept(
         &self,
         request: ConnectionRequest,
-        socket: Socket,
+        socket: S,
     ) -> Result<ConnectionState, Error> {
         let address = request.address;
         let notify_closed_rx;
@@ -557,9 +561,9 @@ impl<B: PacketBuffer> Connection<B> {
     }
 }
 
-async fn reset<B: PacketBuffer>(
+async fn reset<B: PacketBuffer, S: AsyncRead + AsyncWrite + Send + 'static>(
     address: &Address,
-    connections: &std::sync::Mutex<HashMap<Address, VsockConnection>>,
+    connections: &std::sync::Mutex<HashMap<Address, VsockConnection<S>>>,
     packet_filler: &UsbPacketFiller<B>,
 ) -> Result<(), Error> {
     let mut notify = None;
@@ -586,15 +590,15 @@ async fn reset<B: PacketBuffer>(
     Ok(())
 }
 
-enum VsockConnectionState {
+enum VsockConnectionState<S> {
     ConnectingOutgoing(
-        Arc<Mutex<OverflowWriter>>,
-        ReadHalf<Socket>,
+        Arc<Mutex<OverflowWriter<S>>>,
+        ReadHalf<S>,
         oneshot::Sender<Result<ConnectionState, Error>>,
     ),
     ConnectingIncoming,
     Connected {
-        writer: Arc<Mutex<OverflowWriter>>,
+        writer: Arc<Mutex<OverflowWriter<S>>>,
         notify_closed: mpsc::Sender<Result<(), Error>>,
         pause_state: Arc<PauseState>,
         _reader_scope: Scope,
@@ -602,9 +606,9 @@ enum VsockConnectionState {
     Invalid,
 }
 
-struct VsockConnection {
+struct VsockConnection<S> {
     _address: Address,
-    state: VsockConnectionState,
+    state: VsockConnectionState<S>,
 }
 
 /// A handle for the state of a connection established with either [`Connection::connect`] or
@@ -653,12 +657,12 @@ mod test {
 
     #[cfg(not(target_os = "fuchsia"))]
     use fuchsia_async::emulated_handle::Socket as SyncSocket;
-    use fuchsia_async::Task;
+    use fuchsia_async::{Socket, Task};
     use futures::StreamExt;
     #[cfg(target_os = "fuchsia")]
     use zx::Socket as SyncSocket;
 
-    async fn usb_echo_server(echo_connection: Arc<Connection<Vec<u8>>>) {
+    async fn usb_echo_server(echo_connection: Arc<Connection<Vec<u8>, Socket>>) {
         let mut builder = UsbPacketBuilder::new(vec![0; 128]);
         loop {
             println!("waiting for usb packet");
@@ -780,7 +784,7 @@ mod test {
         echo_task.abort().await;
     }
 
-    async fn copy_connection(from: &Connection<Vec<u8>>, to: &Connection<Vec<u8>>) {
+    async fn copy_connection(from: &Connection<Vec<u8>, Socket>, to: &Connection<Vec<u8>, Socket>) {
         let mut builder = UsbPacketBuilder::new(vec![0; 1024]);
         loop {
             builder = from.fill_usb_packet(builder).await;
@@ -793,11 +797,11 @@ mod test {
     }
 
     pub(crate) trait EndToEndTestFn<R>:
-        AsyncFnOnce(Arc<Connection<Vec<u8>>>, mpsc::Receiver<ConnectionRequest>) -> R
+        AsyncFnOnce(Arc<Connection<Vec<u8>, Socket>>, mpsc::Receiver<ConnectionRequest>) -> R
     {
     }
     impl<T, R> EndToEndTestFn<R> for T where
-        T: AsyncFnOnce(Arc<Connection<Vec<u8>>>, mpsc::Receiver<ConnectionRequest>) -> R
+        T: AsyncFnOnce(Arc<Connection<Vec<u8>, Socket>>, mpsc::Receiver<ConnectionRequest>) -> R
     {
     }
 
@@ -805,7 +809,7 @@ mod test {
         left_side: impl EndToEndTestFn<R1>,
         right_side: impl EndToEndTestFn<R2>,
     ) -> (R1, R2) {
-        type Connection = crate::Connection<Vec<u8>>;
+        type Connection = crate::Connection<Vec<u8>, Socket>;
         let (_control_socket1, other_socket1) = SyncSocket::create_stream();
         let (_control_socket2, other_socket2) = SyncSocket::create_stream();
         let (incoming_requests_tx1, incoming_requests1) = mpsc::channel(5);
