@@ -519,4 +519,31 @@ testing::AssertionResult TestThatAccessSegfaults(void *test_address, AccessType 
   return helper.WaitForChildren();
 }
 
+fit::result<int, ScopedMount> ScopedMount::Mount(const std::string &source,
+                                                 const std::string &target,
+                                                 const std::string &filesystemtype,
+                                                 unsigned long mountflags, const void *data) {
+  if (mount(source.c_str(), target.c_str(), filesystemtype.c_str(), mountflags, data) != 0) {
+    int error = errno;
+    return fit::error(error);
+  }
+  return fit::ok(ScopedMount(target));
+}
+
+ScopedMount::ScopedMount(ScopedMount &&other) noexcept {
+  Unmount();
+  is_mounted_ = other.is_mounted_;
+  target_path_ = other.target_path_;
+  other.is_mounted_ = false;
+}
+
+ScopedMount::~ScopedMount() { Unmount(); }
+
+void ScopedMount::Unmount() {
+  if (is_mounted_) {
+    umount(target_path_.c_str());
+    is_mounted_ = false;
+  }
+}
+
 }  // namespace test_helper
