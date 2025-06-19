@@ -346,7 +346,7 @@
              path="third_party/snippet-uiautomator/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/snippet-uiautomator"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="b64a71f9cdfc6e110c2e26ff5bfe80ecda721992"/>
+             revision="e18186121571e0f79fab8fa948e60391a6f084be"/>
     <project name="third_party/jellyfish"
              path="third_party/jellyfish/jellyfish"
              remote="https://fuchsia.googlesource.com/third_party/github.com/jamesturk/jellyfish"
