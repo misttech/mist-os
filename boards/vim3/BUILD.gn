@@ -123,6 +123,37 @@ board_input_bundle("main_bundle") {
       package_set = "bootfs"
       driver_components = [ "meta/dwc2.cm" ]
     },
+    {
+      package_target = "//src/graphics/display/drivers/aml-canvas:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-canvas.cm" ]
+    },
+    {
+      package_target = "//src/graphics/display/drivers/amlogic-display:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/amlogic-display.cm" ]
+    },
+    {
+      package_target =
+          "//src/graphics/display/drivers/vim3-display-detect:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/vim3-display-detect.cm" ]
+    },
+    {
+      package_target = "//src/graphics/drivers/aml-gpu:aml-gpu-package"
+      package_set = "bootfs"
+      driver_components = [ "meta/aml-gpu.cm" ]
+    },
+    {
+      package_target = "//src/ui/backlight/drivers/vim3-pwm-backlight:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/vim3-pwm-backlight.cm" ]
+    },
+    {
+      package_target = "//src/ui/input/drivers/focaltech:package"
+      package_set = "bootfs"
+      driver_components = [ "meta/focaltech.cm" ]
+    },
 
     # Base drivers
     {
@@ -134,37 +165,6 @@ board_input_bundle("main_bundle") {
       package_target = "//src/graphics/drivers/msd-vsi-vip"
       package_set = "base"
       driver_components = [ "meta/libmsd_vsi.cm" ]
-    },
-    {
-      package_target = "//src/graphics/display/drivers/aml-canvas:package"
-      package_set = "base"
-      driver_components = [ "meta/aml-canvas.cm" ]
-    },
-    {
-      package_target = "//src/graphics/display/drivers/amlogic-display:package"
-      package_set = "base"
-      driver_components = [ "meta/amlogic-display.cm" ]
-    },
-    {
-      package_target =
-          "//src/graphics/display/drivers/vim3-display-detect:package"
-      package_set = "base"
-      driver_components = [ "meta/vim3-display-detect.cm" ]
-    },
-    {
-      package_target = "//src/graphics/drivers/aml-gpu:aml-gpu-package"
-      package_set = "base"
-      driver_components = [ "meta/aml-gpu.cm" ]
-    },
-    {
-      package_target = "//src/ui/backlight/drivers/vim3-pwm-backlight:package"
-      package_set = "base"
-      driver_components = [ "meta/vim3-pwm-backlight.cm" ]
-    },
-    {
-      package_target = "//src/ui/input/drivers/focaltech:package"
-      package_set = "base"
-      driver_components = [ "meta/focaltech.cm" ]
     },
   ]
   version = build_info_version

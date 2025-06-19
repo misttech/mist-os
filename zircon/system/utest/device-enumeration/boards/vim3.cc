@@ -21,6 +21,7 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
       // TODO(b/291154545): Add bluetooth paths when firmware is publicly available.
       // "dev.sys.platform/bt-uart-ffd24000/bt-uart-ffd24000_group/aml-uart/bt-transport-uart/bt-hci-broadcom",
 
+      "dev.sys.platform.canvas-ff638000.aml-canvas",
       "dev.sys.platform.clock-controller-ff63c000.clocks",
       "dev.sys.platform.clock-controller-ff63c000.clocks.clock-init",
       "dev.sys.platform.dsi-display-ff900000",
@@ -92,22 +93,17 @@ TEST_F(DeviceEnumerationTest, Vim3DeviceTreeTest) {
 
       // GPU
       "dev.sys.platform.gpu-ffe40000.gpu-ffe40000_group.aml-gpu",
-
-      // aml-canvas
-      "dev.sys.platform.canvas-ff638000.aml-canvas",
 #endif
 
   };
 
   VerifyNodes(kNodeMonikers);
 
-#ifdef include_packaged_drivers
   static const char* kDisplayNodeMonikers[] = {
       "dev.sys.platform.hdmi-display-ff900000.hdmi-display-ff900000_group.amlogic-display.display-coordinator",
       "dev.sys.platform.dsi-display-ff900000.dsi-display-ff900000_group.amlogic-display.display-coordinator",
   };
   VerifyOneOf(kDisplayNodeMonikers);
-#endif
 }
 
 }  // namespace

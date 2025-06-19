@@ -107,15 +107,6 @@
             // packages to provide fshost's (transitive) dependencies.
             dependency: "weak",
         },
-
-        // `VisualDebuggingLevel` to driver to change display configuration.
-        {
-            config: "fuchsia.ui.VisualDebuggingLevel",
-            from: "parent",
-            as: "fuchsia.display.VisualDebuggingLevel",
-            to: "#base-drivers",
-            availability: "optional",
-        },
     ],
     expose: [
         {
