@@ -431,12 +431,12 @@
     <project name="third_party/protobuf"
              path="third_party/protobuf"
              remote="https://fuchsia.googlesource.com/third_party/protobuf"
-             revision="439c42c735ae1efed57ab7771986f2a3c0b99319"
+             revision="2d4414f384dc499af113b5991ce3eaa9df6dd931"
              gerrithost="https://fuchsia-review.googlesource.com"/>
     <project name="protobuf-gn"
              path="build/secondary/third_party/protobuf"
              remote="https://fuchsia.googlesource.com/protobuf-gn"
-             revision="1d577d70e729f91635fe1b644b0bc8a4391e1751"
+             revision="1024ff0859c0d45d7347f967b7a8be5209dea7d3"
              gerrithost="https://fuchsia-review.googlesource.com"/>
     <project name="third_party/github.com/wolever/parameterized"
              path="third_party/parameterized/src"

@@ -53,6 +53,8 @@ _BAZEL_ROOT_WORKSPACE_NAME = "_main"
 #
 _BAZEL_BUILTIN_REPOSITORIES = (
     "bazel_tools",
+    "bazel_features_globals",
+    "bazel_features_version",
     "local_config_cc",
     "local_config_platform",
     # The two repositories below were added by Bazel 7.2.

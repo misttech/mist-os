@@ -60,6 +60,7 @@ fx-update-bazel-workspace
     --repo='@@rules_go+' \
     --repo='@@rules_java+' \
     --repo='@@rules_license+' \
+    --repo='@@rules_pkg+' \
     --repo='@@rules_proto+' \
     --repo='@@rules_python+' \
     --repo='@@rules_rust+' \
