@@ -201,7 +201,7 @@ class BootShimHelper {
 
       // Mark the UART MMIO range as a peripheral range.
       if (auto uart_mmio = GetUartDriver().maybe_mmio_range()) {
-        MarkAsPeripheral(boot_shim::DevicetreeMmioRange::From(uart_mmio->AlignedTo(ZX_PAGE_SIZE)));
+        MarkAsPeripheral(uart_mmio->AlignedTo(ZX_PAGE_SIZE));
       }
     }
 
@@ -258,7 +258,7 @@ class BootShimHelper {
     }
   }
 
-  static void MarkAsPeripheral(boot_shim::DevicetreeMmioRange mmio_range) {
+  static void MarkAsPeripheral(boot_shim::MmioRange mmio_range) {
     const memalloc::Range peripheral_range = {
         .addr = mmio_range.address,
         .size = mmio_range.size,

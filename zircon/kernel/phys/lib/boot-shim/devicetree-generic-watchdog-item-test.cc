@@ -97,10 +97,9 @@ TEST_F(DevicetreeGenericWatchdogItemTest, QcomMsmWatchdog) {
 
   auto fdt = qcom_msm_watchdog();
   boot_shim::DevicetreeBootShim<boot_shim::GenericWatchdogItem<MmioHelper>> shim("test", fdt);
-  std::vector<boot_shim::DevicetreeMmioRange> ranges;
+  std::vector<boot_shim::MmioRange> ranges;
 
-  shim.set_mmio_observer(
-      [&ranges](boot_shim::DevicetreeMmioRange range) { ranges.push_back(range); });
+  shim.set_mmio_observer([&ranges](boot_shim::MmioRange range) { ranges.push_back(range); });
 
   ASSERT_TRUE(shim.Init());
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
@@ -145,11 +144,10 @@ TEST_F(DevicetreeGenericWatchdogItemTest, QcomMsmWatchdogEnabled) {
 
   auto fdt = qcom_msm_watchdog();
   boot_shim::DevicetreeBootShim<boot_shim::GenericWatchdogItem<MmioHelper>> shim("test", fdt);
-  std::vector<boot_shim::DevicetreeMmioRange> ranges;
+  std::vector<boot_shim::MmioRange> ranges;
 
   MmioHelper::value = 1234567891;
-  shim.set_mmio_observer(
-      [&ranges](boot_shim::DevicetreeMmioRange range) { ranges.push_back(range); });
+  shim.set_mmio_observer([&ranges](boot_shim::MmioRange range) { ranges.push_back(range); });
 
   ASSERT_TRUE(shim.Init());
   ASSERT_TRUE(shim.AppendItems(image).is_ok());
@@ -194,10 +192,9 @@ TEST_F(DevicetreeGenericWatchdogItemTest, QcomMsmWatchdogMultipleRegs) {
 
   auto fdt = qcom_msm_watchdog_multiuple_regs();
   boot_shim::DevicetreeBootShim<boot_shim::GenericWatchdogItem<MmioHelper>> shim("test", fdt);
-  std::vector<boot_shim::DevicetreeMmioRange> ranges;
+  std::vector<boot_shim::MmioRange> ranges;
 
-  shim.set_mmio_observer(
-      [&ranges](boot_shim::DevicetreeMmioRange range) { ranges.push_back(range); });
+  shim.set_mmio_observer([&ranges](boot_shim::MmioRange range) { ranges.push_back(range); });
 
   ASSERT_TRUE(shim.Init());
   ASSERT_TRUE(shim.AppendItems(image).is_ok());

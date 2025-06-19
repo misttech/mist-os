@@ -78,7 +78,7 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicChildNode(
         return;
       }
 
-      (*mmio_observer_)(DevicetreeMmioRange::From((*reg)[0]));
+      (*mmio_observer_)(MmioRangeFrom((*reg)[0]));
       uint64_t base_address = *(*reg)[0].address();
       if (auto root_address = decoder.TranslateAddress(base_address)) {
         dcfg.use_msi = true;
@@ -130,7 +130,7 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV3(
       OnError("GIC v3: GICR address translation failed.");
       return devicetree::ScanState::kDone;
     }
-    (*mmio_observer_)(DevicetreeMmioRange::From(reg[GicV3Regs::kGicd]));
+    (*mmio_observer_)(MmioRangeFrom(reg[GicV3Regs::kGicd]));
     dcfg.mmio_phys = std::min(*gicd, *gicr);
     dcfg.gicr_offset = *gicr - dcfg.mmio_phys;
     dcfg.gicd_offset = *gicd - dcfg.mmio_phys;
@@ -170,11 +170,13 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV3(
   // all the redistributors within its range.  We observe the larger of the
   // definitions for MmioRange purposes.
   if (reg[GicV3Regs::kGicr].size() > dcfg.gicr_stride * regions) {
-    (*mmio_observer_)(DevicetreeMmioRange::From(reg[GicV3Regs::kGicr]));
+    (*mmio_observer_)(MmioRangeFrom(reg[GicV3Regs::kGicr]));
   } else {
     const size_t total_size = static_cast<size_t>(dcfg.gicr_stride * regions);
-    const DevicetreeMmioRange range = {.address = reg[GicV3Regs::kGicr].address().value(),
-                                       .size = total_size};
+    const MmioRange range = {
+        .address = reg[GicV3Regs::kGicr].address().value(),
+        .size = total_size,
+    };
     (*mmio_observer_)(range);
   }
   dcfg.ipi_base = 0;
@@ -219,8 +221,8 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV2(
       OnError("GIC v2: Failed to translate gicc address.");
       return devicetree::ScanState::kDone;
     }
-    (*mmio_observer_)(DevicetreeMmioRange::From(reg[GicV2Regs::kGicd]));
-    (*mmio_observer_)(DevicetreeMmioRange::From(reg[GicV2Regs::kGicc]));
+    (*mmio_observer_)(MmioRangeFrom(reg[GicV2Regs::kGicd]));
+    (*mmio_observer_)(MmioRangeFrom(reg[GicV2Regs::kGicc]));
     dcfg.mmio_phys = std::min(*gicd, *gicc);
     dcfg.gicd_offset = *gicd - dcfg.mmio_phys;
     dcfg.gicc_offset = *gicc - dcfg.mmio_phys;
@@ -255,8 +257,8 @@ devicetree::ScanState ArmDevicetreeGicItem::HandleGicV2(
     uint64_t min_mmio_phys = std::min(dcfg.mmio_phys, std::min(*gicv, *gich));
 
     // Need to recalculate offsets from new minimal address.
-    (*mmio_observer_)(DevicetreeMmioRange::From(reg[GicV2Regs::kGich]));
-    (*mmio_observer_)(DevicetreeMmioRange::From(reg[GicV2Regs::kGicv]));
+    (*mmio_observer_)(MmioRangeFrom(reg[GicV2Regs::kGich]));
+    (*mmio_observer_)(MmioRangeFrom(reg[GicV2Regs::kGicv]));
     if (min_mmio_phys != dcfg.mmio_phys) {
       dcfg.gicd_offset = dcfg.gicd_offset + dcfg.mmio_phys - min_mmio_phys;
       dcfg.gicc_offset = dcfg.gicc_offset + dcfg.mmio_phys - min_mmio_phys;

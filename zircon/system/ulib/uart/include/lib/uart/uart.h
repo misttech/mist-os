@@ -169,8 +169,11 @@ struct MmioRange {
     return {.address = aligned_start, .size = aligned_end - aligned_start};
   }
 
-  uint64_t address;
-  uint64_t size;
+  constexpr bool empty() const { return size == 0; }
+  constexpr uint64_t end() const { return address + size; }
+
+  uint64_t address = 0;
+  uint64_t size = 0;
 };
 
 // This matches either a Driver API object or a KernelDriver wrapper
