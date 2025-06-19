@@ -33,7 +33,7 @@ fuchsia_rust_driver("usb-vsock-service-driver") {
     "//sdk/lib/driver/component/rust",
     "//sdk/lib/driver/runtime/rust",
     "//sdk/rust/zx",
-    "//src/connectivity/overnet/lib/usb_vsock",
+    "//src/developer/lib/usb_vsock",
     "//src/devices/bind/fuchsia.test:fuchsia.test_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

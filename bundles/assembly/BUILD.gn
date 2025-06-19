@@ -1794,7 +1794,7 @@ assembly_input_bundle("mdns_fuchsia_device_wired_service") {
 assembly_input_bundle("core_realm_development_access_rcs_usb") {
   base_driver_packages = [
     {
-      package_target = "//src/connectivity/overnet/usb:usb-vsock-package"
+      package_target = "//src/developer/remote-control/usb:usb-vsock-package"
       driver_components = [
         "meta/usb-vsock-service.cm",
         "meta/overnet-usb.cm",
