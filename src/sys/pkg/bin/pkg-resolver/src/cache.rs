@@ -487,6 +487,16 @@ pub struct FetchBlobContext {
     parent_trace_id: ftrace::Id,
 }
 
+impl FetchBlobContext {
+    pub fn new(
+        opener: pkg::cache::DeferredOpenBlob,
+        mirrors: Arc<[MirrorConfig]>,
+        parent_trace_id: ftrace::Id,
+    ) -> Self {
+        Self { opener, mirrors, parent_trace_id }
+    }
+}
+
 impl work_queue::TryMerge for FetchBlobContext {
     fn try_merge(&mut self, other: Self) -> Result<(), Self> {
         // The NeededBlobs protocol requires pkg-resolver to attempt to open each blob associated

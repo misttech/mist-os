@@ -22,13 +22,13 @@ type BlobInfo = struct {
 /// A fuchsia-pkg:// URL indicating a package.
 /// https://fuchsia.dev/fuchsia-src/concepts/packages/package_url#package_identity
 type PackageUrl = struct {
-    url string:fuchsia.url.MAX_URL_LENGTH;
+    url fuchsia.url.Url;
 };
 
 /// A fuchsia-pkg:// URL indicating a repository.
 /// https://fuchsia.dev/fuchsia-src/concepts/packages/package_url#repository_identity
 type RepositoryUrl = struct {
-    url string:fuchsia.url.MAX_URL_LENGTH;
+    url fuchsia.url.Url;
 };
 
 /// A single entry in the package index.

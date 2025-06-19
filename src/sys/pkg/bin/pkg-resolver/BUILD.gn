@@ -103,6 +103,7 @@ rustc_library("lib") {
     "src/inspect_util.rs",
     "src/main.rs",
     "src/metrics_util.rs",
+    "src/ota_downloader.rs",
     "src/repository.rs",
     "src/repository/filesystem_repository.rs",
     "src/repository/updating_tuf_client.rs",

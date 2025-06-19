@@ -116,6 +116,16 @@ impl Client {
             .map_err(GetSubpackageError::CallingGetSubpackage)??;
         Ok(dir)
     }
+
+    /// Write blobs using the returned [`WriteBlobs`] type.
+    pub fn write_blobs(&self) -> Result<WriteBlobs, fidl::Error> {
+        let (needed_blobs, needed_blobs_server_end) =
+            fidl::endpoints::create_proxy::<fpkg::NeededBlobsMarker>();
+
+        let () = self.proxy.write_blobs(needed_blobs_server_end)?;
+
+        Ok(WriteBlobs { needed_blobs })
+    }
 }
 
 #[derive(thiserror::Error, Debug)]
@@ -378,6 +388,30 @@ impl Get {
         // racing). The finish call will return an error that just tells us that we called
         // abort, so we ignore it.
         let _ = self.get_fut.await;
+    }
+}
+
+/// A pending `fuchsia.pkg/PackageCache.WriteBlob()` request.
+#[derive(Clone, Debug)]
+pub struct WriteBlobs {
+    needed_blobs: fpkg::NeededBlobsProxy,
+}
+
+impl WriteBlobs {
+    /// Returns an independent object that can be used to open the `blob` for write.  See
+    /// [`Self::open_blob`].
+    pub fn make_open_blob(&mut self, blob: BlobId) -> DeferredOpenBlob {
+        DeferredOpenBlob {
+            needed_blobs: self.needed_blobs.clone(),
+            kind: OpenKind::Content,
+            blob_id: blob,
+            pkg_present: None,
+        }
+    }
+
+    /// Opens `blob` for write. The blob's data can be provided using the returned NeededBlob.
+    pub async fn open_blob(&mut self, blob: BlobId) -> Result<Option<NeededBlob>, OpenBlobError> {
+        open_blob(&self.needed_blobs, OpenKind::Content, blob, None).await
     }
 }
 

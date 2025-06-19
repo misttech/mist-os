@@ -45,8 +45,9 @@ use vfs::directory::helper::DirectlyMutable as _;
 use zx::{self as zx, AsHandleRef as _, HandleBased as _};
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
-    fidl_fuchsia_pkg_rewrite as fpkg_rewrite, fidl_fuchsia_space as fspace,
-    fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_update as fupdate, fuchsia_async as fasync,
+    fidl_fuchsia_pkg_internal as fpkg_internal, fidl_fuchsia_pkg_rewrite as fpkg_rewrite,
+    fidl_fuchsia_space as fspace, fidl_fuchsia_sys2 as fsys2, fidl_fuchsia_update as fupdate,
+    fuchsia_async as fasync,
 };
 
 // If the body of an https response is not large enough, hyper will download the body
@@ -741,6 +742,7 @@ where
                     .capability(Capability::protocol::<fpkg::RepositoryManagerMarker>())
                     .capability(Capability::protocol::<fpkg_rewrite::EngineMarker>())
                     .capability(Capability::protocol::<fpkg::CupMarker>())
+                    .capability(Capability::protocol::<fpkg_internal::OtaDownloaderMarker>())
                     .from(&pkg_resolver)
                     .to(Ref::parent()),
             )
@@ -831,6 +833,7 @@ pub struct Proxies {
     pub rewrite_engine: fpkg_rewrite::EngineProxy,
     pub cup: CupProxy,
     pub space_manager: fspace::ManagerProxy,
+    pub ota_downloader: fpkg_internal::OtaDownloaderProxy,
 }
 
 impl Proxies {
@@ -855,6 +858,9 @@ impl Proxies {
             space_manager: realm
                 .connect_to_protocol_at_exposed_dir()
                 .expect("connect to space manager"),
+            ota_downloader: realm
+                .connect_to_protocol_at_exposed_dir()
+                .expect("connect to ota downloader"),
         }
     }
 }
@@ -955,12 +961,8 @@ impl<B: Blobfs> TestEnv<B> {
     pub fn resolve_package(
         &self,
         url: &str,
-    ) -> impl Future<
-        Output = Result<
-            (fio::DirectoryProxy, pkg::ResolutionContext),
-            fidl_fuchsia_pkg::ResolveError,
-        >,
-    > {
+    ) -> impl Future<Output = Result<(fio::DirectoryProxy, pkg::ResolutionContext), fpkg::ResolveError>>
+    {
         resolve_package(&self.proxies.resolver, url)
     }
 
@@ -968,12 +970,8 @@ impl<B: Blobfs> TestEnv<B> {
         &self,
         url: &str,
         context: pkg::ResolutionContext,
-    ) -> impl Future<
-        Output = Result<
-            (fio::DirectoryProxy, pkg::ResolutionContext),
-            fidl_fuchsia_pkg::ResolveError,
-        >,
-    > {
+    ) -> impl Future<Output = Result<(fio::DirectoryProxy, pkg::ResolutionContext), fpkg::ResolveError>>
+    {
         resolve_with_context(&self.proxies.resolver, url, context)
     }
 
@@ -1074,6 +1072,14 @@ impl<B: Blobfs> TestEnv<B> {
     ) -> Result<(String, String), GetInfoError> {
         self.proxies.cup.get_info(&fpkg::PackageUrl { url: url.into() }).await.unwrap()
     }
+
+    pub async fn fetch_blob(
+        &self,
+        hash: pkg::BlobId,
+        base_url: impl AsRef<str>,
+    ) -> Result<(), fpkg::ResolveError> {
+        self.proxies.ota_downloader.fetch_blob(&hash.into(), base_url.as_ref()).await.unwrap()
+    }
 }
 
 pub const EMPTY_REPO_PATH: &str = "/pkg/empty-repo";
@@ -1105,9 +1111,8 @@ pub async fn make_pkg_with_extra_blobs(s: &str, n: u32) -> Package {
 pub fn resolve_package(
     resolver: &PackageResolverProxy,
     url: &str,
-) -> impl Future<
-    Output = Result<(fio::DirectoryProxy, pkg::ResolutionContext), fidl_fuchsia_pkg::ResolveError>,
-> {
+) -> impl Future<Output = Result<(fio::DirectoryProxy, pkg::ResolutionContext), fpkg::ResolveError>>
+{
     let (package, package_server_end) = fidl::endpoints::create_proxy();
     let response_fut = resolver.resolve(url, package_server_end);
     async move {
@@ -1120,9 +1125,8 @@ pub fn resolve_with_context(
     resolver: &PackageResolverProxy,
     url: &str,
     context: pkg::ResolutionContext,
-) -> impl Future<
-    Output = Result<(fio::DirectoryProxy, pkg::ResolutionContext), fidl_fuchsia_pkg::ResolveError>,
-> {
+) -> impl Future<Output = Result<(fio::DirectoryProxy, pkg::ResolutionContext), fpkg::ResolveError>>
+{
     let (package, package_server_end) = fidl::endpoints::create_proxy();
     let response_fut = resolver.resolve_with_context(url, &context.into(), package_server_end);
     async move {

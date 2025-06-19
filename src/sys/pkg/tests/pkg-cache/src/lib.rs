@@ -44,6 +44,7 @@ mod pkgfs;
 mod retained_packages;
 mod space;
 mod sync;
+mod write_blobs;
 
 static SHELL_COMMANDS_BIN_PATH: &str = "shell-commands-bin";
 // Sleep duration while waiting for pkg-cache to update inspect state. Chosen arbitrarily.
@@ -197,21 +198,30 @@ pub async fn write_needed_blobs(
             break;
         }
         for blob_info in chunk {
-            let blob_proxy =
-                needed_blobs.open_blob(&blob_info.blob_id).await.unwrap().unwrap().unwrap();
-            let () = compress_and_write_blob(
-                available_blobs
-                    .remove(&fpkg_ext::BlobId::from(blob_info.blob_id).into())
-                    .unwrap()
-                    .as_slice(),
-                *blob_proxy,
+            let blob_id = fpkg_ext::BlobId::from(blob_info.blob_id).into();
+            write_needed_blob(
+                needed_blobs,
+                blob_id,
+                available_blobs.remove(&blob_id).unwrap().as_slice(),
             )
-            .await
-            .unwrap();
-            let () =
-                blob_written(needed_blobs, fpkg_ext::BlobId::from(blob_info.blob_id).into()).await;
+            .await;
         }
     }
+}
+
+pub async fn write_needed_blob(
+    needed_blobs: &fpkg::NeededBlobsProxy,
+    blob_id: Hash,
+    contents: &[u8],
+) {
+    let blob_proxy = needed_blobs
+        .open_blob(&fpkg_ext::BlobId::from(blob_id).into())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let () = compress_and_write_blob(contents, *blob_proxy).await.unwrap();
+    let () = blob_written(needed_blobs, blob_id).await;
 }
 
 // Calls PackageCache.Get and verifies the package directory for each element of `packages`

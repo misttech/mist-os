@@ -5,7 +5,13 @@
 import("//build/fidl/fidl.gni")
 
 fidl("fuchsia.pkg.internal") {
-  sources = [ "eager_package.fidl" ]
+  sources = [
+    "eager_package.fidl",
+    "ota_downloader.fidl",
+  ]
 
-  public_deps = [ "//sdk/fidl/fuchsia.pkg" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.pkg",
+    "//sdk/fidl/fuchsia.url",
+  ]
 }

@@ -41,6 +41,20 @@ open protocol PackageCache {
         dir server_end:<fuchsia.io.Directory>;
     }) -> () error zx.Status;
 
+    /// Writes blobs to the system.
+    ///
+    /// This method is intended to be used by package resolver components to write individual blobs
+    /// that are missing from the system.
+    ///
+    /// Clients must avoid write collisions of any blobs with `Get()` or another `WriteBlobs()`,
+    /// even across different `PackageCache` connections.
+    ///
+    /// + request `needed_blobs` a protocol can be used to write multiple blobs. This `NeededBlobs`
+    ///   only supports `OpenBlob` and `BlobWritten`.
+    strict WriteBlobs(resource struct {
+        needed_blobs server_end:NeededBlobs;
+    });
+
     /// Gets the package directory for a subpackage.
     /// The connection to the superpackage's package directory must still be open when this is
     /// called.
