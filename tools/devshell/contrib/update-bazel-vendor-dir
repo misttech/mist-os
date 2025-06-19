@@ -7,6 +7,34 @@
 ### Update the Bazel vendor directory to include all necessary Bazel deps.
 
 ## usage: fx update-bazel-vendor-dir
+##
+## Versions of vendored repositories are based on the content of
+## //build/bazel/toplevel.MODULE.bazel. If any of the direct or transitive
+## dependencies there are updated to newer versions, make sure to rerun this
+## script to update content of the Bazel vendor directory, otherwise the build
+## will fail.
+##
+## NOTE: It's possible for transitive dependencies to change when local
+## repositories (e.g. rules_fuchsia) update their dependencies, which will
+## require a rerun of this script.
+##
+## NOTE: When new dependencies are introduced (either added directly with a
+## bazel_dep in toplevel.MODULE.bazel, or picked up by a newer version of an
+## existing dependency), you can add it to the Bazel vendor directory in two
+## ways:
+##
+##   1. Add a `--repo='@@canonical_repo_name'` below, to download this
+##      dependency from upstream (Bazel Central Registry, BCR). Please follow
+##      the OSRB process [0] if it is the first time this repository is added
+##      to fuchsia.git.
+##
+##   2. Or, manually create a stub directory with necessary Bazel targets
+##      stubbed out at `//third_party/canonical_repo_name`, and add
+##      `--stub-repo='@@canonical_repo_name'` below. Contents of stub repos
+##      stay untouched by this script.
+##
+## [0] https://fuchsia.dev/fuchsia-src/contribute/governance/policy/osrb-process
+##
 
 # shellcheck source=/dev/null
 source "${FUCHSIA_DIR}/tools/devshell/lib/vars.sh" || exit $?

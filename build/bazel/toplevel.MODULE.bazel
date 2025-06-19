@@ -3,12 +3,12 @@
 # found in the LICENSE file.
 
 """
-IMPORTANT: This file is only used when BzlMod is enabled when generating
-the Bazel workspace used by the Fuchsia platform build. Keep it in sync
-with toplevel.WORKSPACE.basel whenever possible!
-
 This file will appear as MODULE.bazel in the top-level Bazel workspace
 used by the Fuchsia platform build.
+
+NOTE: If you update any of the dependencies in this file, or introduce new
+dependencies, make sure to run `fx update-bazel-vendor-dir` to update the Bazel
+vendor directory. See `fx help update-bazel-vendor-dir` for details.
 """
 
 module(
