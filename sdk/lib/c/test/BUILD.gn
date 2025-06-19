@@ -22,7 +22,7 @@ group("tests") {
     "sanitizer:tests",
 
     # TODO(https://fxbug.dev/407804528): This should be replaced in
-    # //sdk/lib/dl.
+    # dlfcn/dl/test.
     "dlsym-circular-deps",
   ]
 }

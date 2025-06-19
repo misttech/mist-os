@@ -1,0 +1,18 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("../libc.gni")
+
+llvm_libc_source_set("dlfcn") {
+  # Currently llvm-libc has per-function headers and (stub) implementations but
+  # no corresponding tests.  If llvm-libc adds test/src/dlfcn/*_test.cpp files
+  # then they can be used (by listing the functions here).  But they would all
+  # be classed as os_functions anyway.
+  functions = []
+}
+
+group("tests") {
+  testonly = true
+  deps = [ "dl:tests" ]
+}

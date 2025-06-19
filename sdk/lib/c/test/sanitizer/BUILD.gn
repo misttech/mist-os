@@ -113,7 +113,7 @@ shared_library("sanitizer-memory-snapshot-test-dlopen-dso") {
   sources = [ "sanitizer-memory-snapshot-test-dlopen-dso.cc" ]
 }
 
-# TODO(https://fxbug.dev/408003053): This should be replaced in //sdk/lib/dl.
+# TODO(https://fxbug.dev/408003053): This should be replaced in dlfcn/dl/test.
 sanitizer_tests += [ "hwasan-ctor-order-test" ]
 test("hwasan-ctor-order-test") {
   visibility = [ ":*" ]
