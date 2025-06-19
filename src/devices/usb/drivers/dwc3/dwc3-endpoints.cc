@@ -62,18 +62,23 @@ void Dwc3::EpStartTransfer(Endpoint& ep, TrbFifo& fifo, uint32_t type, zx_paddr_
   CmdEpStartTransfer(ep, trb_phys);
 }
 
-void Dwc3::EpEndTransfers(UserEndpoint& uep, zx_status_t reason) {
-  if (uep.server->current_req.has_value()) {
-    CmdEpEndTransfer(uep.ep);
+void Dwc3::EpServer::CancelAll(zx_status_t reason) {
+  if (current_req.has_value()) {
+    {
+      std::lock_guard<std::mutex> _(uep_->ep.lock);
+      dwc3_->CmdEpEndTransfer(uep_->ep);
+    }
 
-    uep.server->RequestComplete(reason, 0, std::move(*uep.server->current_req));
-    uep.server->current_req.reset();
+    RequestComplete(reason, 0, std::move(*current_req));
+    current_req.reset();
   }
-  uep.ep.got_not_ready = false;
 
-  while (!uep.server->queued_reqs.empty()) {
-    uep.server->RequestComplete(reason, 0, std::move(*uep.server->queued_reqs.pop()));
+  while (!queued_reqs.empty()) {
+    RequestComplete(reason, 0, std::move(*queued_reqs.pop()));
   }
+
+  std::lock_guard<std::mutex> _(uep_->ep.lock);
+  uep_->fifo.Clear();
 }
 
 void Dwc3::UserEpQueueNext(UserEndpoint& uep) {
@@ -95,41 +100,6 @@ void Dwc3::UserEpQueueNext(UserEndpoint& uep) {
   size_t size;
   std::tie(phys, size) = *result->at(0).begin();
   EpStartTransfer(uep.ep, uep.fifo, TRB_TRBCTL_NORMAL, phys, size);
-}
-
-zx_status_t Dwc3::CancelAll(UserEndpoint& uep) {
-  FidlRequestQueue to_complete;
-
-  {
-    std::lock_guard<std::mutex> lock(uep.ep.lock);
-    to_complete = CancelAllLocked(uep);
-  }
-
-  // Now that we have dropped the lock, go ahead and complete all of the
-  // requests we canceled.
-  to_complete.CompleteAll(*uep.server, ZX_ERR_IO_NOT_PRESENT, 0);
-  return ZX_OK;
-}
-
-Dwc3::FidlRequestQueue Dwc3::CancelAllLocked(UserEndpoint& uep) {
-  // Move the endpoint's queue of requests into a local list so we can
-  // complete the requests outside of the endpoint lock.
-  FidlRequestQueue to_complete{std::move(uep.server->queued_reqs)};
-
-  // If there is currently a request in-flight, be sure to cancel its
-  // transfer, and add the in-flight request to the local queue of requests to
-  // complete.  Make sure we add this in-flight request to the _front_ of the
-  // queue so that all requests are completed in the order that they were
-  // queued.
-  if (uep.server->current_req.has_value()) {
-    CmdEpEndTransfer(uep.ep);
-    to_complete.push_next(*std::move(uep.server->current_req));
-    uep.server->current_req.reset();
-  }
-
-  // Return the list of requests back to the caller so they can complete them
-  // once the enpoint's lock has finally been dropped.
-  return to_complete;
 }
 
 void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {

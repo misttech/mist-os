@@ -89,7 +89,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
  private:
   const std::string_view kScheduleProfileRole = "fuchsia.devices.usb.drivers.dwc3.interrupt";
 
-  zx::result<> CommonCancelAll(uint8_t ep_addr);
   void DciIntfSetSpeed(fuchsia_hardware_usb_descriptor::wire::UsbSpeed speed)
       __TA_REQUIRES(dci_lock_);
   void DciIntfSetConnected(bool connected) __TA_REQUIRES(dci_lock_);
@@ -110,7 +109,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   static inline constexpr zx::duration kHwResetTimeout{zx::msec(50)};
   static inline constexpr zx::duration kEndpointDeadline{zx::sec(10)};
 
-  class EpServer;
   // Like a usb::RequestQueue for usb::FidlRequests.
   //
   // TODO(hansens) We should probably implement something like this in usb/request-fidl.h
@@ -165,15 +163,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
       return q_.empty();
     }
 
-    void CompleteAll(EpServer& server, zx_status_t status, size_t actual) {
-      std::lock_guard<std::mutex> _(lock_);
-
-      while (!q_.empty()) {
-        server.RequestComplete(status, actual, std::move(q_.back()));
-        q_.pop_back();
-      }
-    }
-
    private:
     mutable std::mutex lock_;
     std::deque<usb::RequestVariant> q_ __TA_GUARDED(lock_);  // Queued front-to-back.
@@ -205,6 +194,8 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     void CancelAll(CancelAllCompleter::Sync& completer) override;
 
     async_dispatcher_t* dispatcher() { return dispatcher_.async_dispatcher(); }
+
+    void CancelAll(zx_status_t reason);
 
     FidlRequestQueue queued_reqs;                    // requests waiting to be processed
     std::optional<usb::RequestVariant> current_req;  // request currently being processed (if any)
@@ -410,18 +401,9 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   zx_status_t EpSetStall(Endpoint& ep, bool stall) __TA_EXCLUDES(lock_);
   void EpStartTransfer(Endpoint& ep, TrbFifo& fifo, uint32_t type, zx_paddr_t buffer, size_t length)
       __TA_EXCLUDES(lock_);
-  void EpEndTransfers(UserEndpoint& uep, zx_status_t reason) __TA_EXCLUDES(lock_);
 
   // Methods specific to user endpoints
   void UserEpQueueNext(UserEndpoint& uep) __TA_REQUIRES(uep.ep.lock) __TA_EXCLUDES(lock_);
-  zx_status_t CancelAll(UserEndpoint& uep) __TA_EXCLUDES(lock_, uep.ep.lock);
-
-  // Cancel all currently in flight requests, and return a list of requests
-  // which were in-flight.  Note that these requests have not been completed
-  // yet.  It is the responsibility of the caller to (eventually) take care of
-  // this once the lock has been dropped.
-  [[nodiscard]] FidlRequestQueue CancelAllLocked(UserEndpoint& uep) __TA_REQUIRES(uep.ep.lock)
-      __TA_EXCLUDES(lock_);
 
   // Commands
   void CmdStartNewConfig(const Endpoint& ep, uint32_t rsrc_id) __TA_EXCLUDES(lock_);

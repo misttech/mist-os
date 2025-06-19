@@ -528,10 +528,10 @@ void Dwc3::ResetConfiguration() {
   }
 
   for (UserEndpoint& uep : user_endpoints_) {
+    uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
     std::lock_guard<std::mutex> lock(uep.ep.lock);
-    EpEndTransfers(uep, ZX_ERR_IO_NOT_PRESENT);
+    uep.ep.got_not_ready = false;
     EpSetStall(uep.ep, false);
-    uep.fifo.Clear();
   }
 }
 
@@ -541,10 +541,10 @@ void Dwc3::HandleResetEvent() {
   Ep0Reset();
 
   for (UserEndpoint& uep : user_endpoints_) {
+    uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
     std::lock_guard<std::mutex> lock(uep.ep.lock);
-    EpEndTransfers(uep, ZX_ERR_IO_NOT_PRESENT);
+    uep.ep.got_not_ready = false;
     EpSetStall(uep.ep, false);
-    uep.fifo.Clear();
   }
 
   {
@@ -633,8 +633,9 @@ void Dwc3::HandleDisconnectedEvent() {
   }
 
   for (UserEndpoint& uep : user_endpoints_) {
+    uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
     std::lock_guard<std::mutex> lock(uep.ep.lock);
-    EpEndTransfers(uep, ZX_ERR_IO_NOT_PRESENT);
+    uep.ep.got_not_ready = false;
     EpSetStall(uep.ep, false);
   }
 }
@@ -701,7 +702,7 @@ void Dwc3::StopController(StopControllerCompleter::Sync& completer) {
   Ep0Reset();
   ep0_.Reset();
   for (UserEndpoint& uep : user_endpoints_) {
-    CancelAll(uep);
+    uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
     uep.Reset();
   }
 
@@ -784,15 +785,12 @@ void Dwc3::DisableEndpoint(DisableEndpointRequest& request,
     return;
   }
 
-  FidlRequestQueue to_complete;
+  uep->server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
   {
-    std::lock_guard<std::mutex> lock(uep->ep.lock);
-    to_complete = CancelAllLocked(*uep);
-    uep->fifo.Release();
+    std::lock_guard<std::mutex> _{uep->ep.lock};
     uep->ep.enabled = false;
   }
 
-  to_complete.CompleteAll(*uep->server, ZX_ERR_IO_NOT_PRESENT, 0);
   completer.Reply(zx::ok());
 }
 
@@ -832,24 +830,17 @@ void Dwc3::EndpointClearStall(EndpointClearStallRequest& request,
   }
 }
 
-zx::result<> Dwc3::CommonCancelAll(uint8_t ep_addr) {
-  const uint8_t ep_num = UsbAddressToEpNum(ep_addr);
+void Dwc3::CancelAll(CancelAllRequest& request, CancelAllCompleter::Sync& completer) {
+  const uint8_t ep_num = UsbAddressToEpNum(request.ep_address());
   UserEndpoint* const uep = get_user_endpoint(ep_num);
 
   if (uep == nullptr) {
-    return zx::error(ZX_ERR_INVALID_ARGS);
+    completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
+    return;
   }
 
-  if (zx_status_t status = CancelAll(*uep); status != ZX_OK) {
-    return zx::error(status);
-  }
-  std::lock_guard<std::mutex> lock(uep->ep.lock);
-  uep->fifo.Clear();
-  return zx::ok();
-}
-
-void Dwc3::CancelAll(CancelAllRequest& request, CancelAllCompleter::Sync& completer) {
-  completer.Reply(CommonCancelAll(request.ep_address()));
+  uep->server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
+  completer.Reply(zx::ok());
 }
 
 void Dwc3::DciIntfSetSpeed(fdescriptor::wire::UsbSpeed speed) {
@@ -978,7 +969,7 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
       continue;
     }
 
-    uep_->server->queued_reqs.push(std::move(freq));
+    queued_reqs.push(std::move(freq));
   }
 
   if (dwc3_->configured_) {
@@ -987,7 +978,8 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
 }
 
 void Dwc3::EpServer::CancelAll(CancelAllCompleter::Sync& completer) {
-  completer.Reply(dwc3_->CommonCancelAll(uep_->ep.ep_num));
+  CancelAll(ZX_ERR_IO_NOT_PRESENT);
+  completer.Reply(zx::ok());
 }
 
 }  // namespace dwc3
