@@ -235,7 +235,6 @@ class DriverBase {
   }
 
   static std::optional<uart::Config<Driver>> TryMatch(std::string_view string) {
-    printf("TryMatch::BASE\n");
     const auto config_name = Driver::kConfigName;
     if (string.substr(0, config_name.size()) == config_name) {
       string.remove_prefix(config_name.size());
