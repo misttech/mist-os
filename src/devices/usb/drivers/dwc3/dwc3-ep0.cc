@@ -34,8 +34,6 @@ zx_status_t Dwc3::Ep0Init() {
 void Dwc3::Ep0Reset() {
   std::lock_guard<std::mutex> lock(ep0_.lock);
   ep0_.shared_fifo.Clear();
-  CancelAll(ep0_.out);
-  CancelAll(ep0_.in);
   ep0_.state = Ep0::State::None;
 }
 

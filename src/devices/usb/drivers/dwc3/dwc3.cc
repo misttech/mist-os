@@ -529,7 +529,7 @@ void Dwc3::ResetConfiguration() {
 
   for (UserEndpoint& uep : user_endpoints_) {
     std::lock_guard<std::mutex> lock(uep.ep.lock);
-    EpEndTransfers(uep.ep, ZX_ERR_IO_NOT_PRESENT);
+    EpEndTransfers(uep, ZX_ERR_IO_NOT_PRESENT);
     EpSetStall(uep.ep, false);
     uep.fifo.Clear();
   }
@@ -542,7 +542,7 @@ void Dwc3::HandleResetEvent() {
 
   for (UserEndpoint& uep : user_endpoints_) {
     std::lock_guard<std::mutex> lock(uep.ep.lock);
-    EpEndTransfers(uep.ep, ZX_ERR_IO_NOT_PRESENT);
+    EpEndTransfers(uep, ZX_ERR_IO_NOT_PRESENT);
     EpSetStall(uep.ep, false);
     uep.fifo.Clear();
   }
@@ -634,7 +634,7 @@ void Dwc3::HandleDisconnectedEvent() {
 
   for (UserEndpoint& uep : user_endpoints_) {
     std::lock_guard<std::mutex> lock(uep.ep.lock);
-    EpEndTransfers(uep.ep, ZX_ERR_IO_NOT_PRESENT);
+    EpEndTransfers(uep, ZX_ERR_IO_NOT_PRESENT);
     EpSetStall(uep.ep, false);
   }
 }
@@ -701,7 +701,7 @@ void Dwc3::StopController(StopControllerCompleter::Sync& completer) {
   Ep0Reset();
   ep0_.Reset();
   for (UserEndpoint& uep : user_endpoints_) {
-    CancelAll(uep.ep);
+    CancelAll(uep);
     uep.Reset();
   }
 
@@ -787,12 +787,12 @@ void Dwc3::DisableEndpoint(DisableEndpointRequest& request,
   FidlRequestQueue to_complete;
   {
     std::lock_guard<std::mutex> lock(uep->ep.lock);
-    to_complete = CancelAllLocked(uep->ep);
+    to_complete = CancelAllLocked(*uep);
     uep->fifo.Release();
     uep->ep.enabled = false;
   }
 
-  to_complete.CompleteAll(ZX_ERR_IO_NOT_PRESENT, 0);
+  to_complete.CompleteAll(*uep->server, ZX_ERR_IO_NOT_PRESENT, 0);
   completer.Reply(zx::ok());
 }
 
@@ -840,7 +840,7 @@ zx::result<> Dwc3::CommonCancelAll(uint8_t ep_addr) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  if (zx_status_t status = CancelAll(uep->ep); status != ZX_OK) {
+  if (zx_status_t status = CancelAll(*uep); status != ZX_OK) {
     return zx::error(status);
   }
   std::lock_guard<std::mutex> lock(uep->ep.lock);
@@ -978,7 +978,7 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
       continue;
     }
 
-    uep_->ep.queued_reqs.push(RequestInfo{uep_, std::move(freq)});
+    uep_->server->queued_reqs.push(std::move(freq));
   }
 
   if (dwc3_->configured_) {

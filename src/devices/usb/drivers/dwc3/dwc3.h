@@ -110,12 +110,7 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   static inline constexpr zx::duration kHwResetTimeout{zx::msec(50)};
   static inline constexpr zx::duration kEndpointDeadline{zx::sec(10)};
 
-  struct UserEndpoint;
-  struct RequestInfo {
-    UserEndpoint* uep;
-    usb::RequestVariant req;
-  };
-
+  class EpServer;
   // Like a usb::RequestQueue for usb::FidlRequests.
   //
   // TODO(hansens) We should probably implement something like this in usb/request-fidl.h
@@ -141,27 +136,21 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     FidlRequestQueue(const FidlRequestQueue&) = delete;
     FidlRequestQueue& operator=(const FidlRequestQueue&) = delete;
 
-    void push(RequestInfo&& info) {
+    void push(usb::RequestVariant&& req) {
       std::lock_guard<std::mutex> lock(lock_);
-
-      if (info.uep == nullptr) {
-        FDF_LOG(ERROR, "[BUG] Enqueuing usb::FidlRequest with no corresponding uep");
-      }
-      ZX_ASSERT(info.uep != nullptr);  // Halt and catch fire.
-
-      q_.push_front(std::move(info));
+      q_.push_front(std::move(req));
     }
 
     // Pushes to the (semantic) front of the queue, cutting the line.
-    void push_next(RequestInfo&& info) {
+    void push_next(usb::RequestVariant&& req) {
       std::lock_guard<std::mutex> lock(lock_);
-      q_.push_back(std::move(info));
+      q_.push_back(std::move(req));
     }
 
     // Pop the next value from the queue, if any.
-    std::optional<RequestInfo> pop() {
+    std::optional<usb::RequestVariant> pop() {
       std::lock_guard<std::mutex> lock(lock_);
-      std::optional<RequestInfo> opt{std::nullopt};
+      std::optional<usb::RequestVariant> opt{std::nullopt};
 
       if (!q_.empty()) {
         opt.emplace(std::move(q_.back()));
@@ -176,21 +165,21 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
       return q_.empty();
     }
 
-    void CompleteAll(zx_status_t status, size_t actual) {
+    void CompleteAll(EpServer& server, zx_status_t status, size_t actual) {
       std::lock_guard<std::mutex> _(lock_);
 
       while (!q_.empty()) {
-        RequestInfo info{std::move(q_.back())};
+        server.RequestComplete(status, actual, std::move(q_.back()));
         q_.pop_back();
-        info.uep->server->RequestComplete(status, actual, std::move(info.req));
       }
     }
 
    private:
     mutable std::mutex lock_;
-    std::deque<RequestInfo> q_ __TA_GUARDED(lock_);  // Queued front-to-back.
+    std::deque<usb::RequestVariant> q_ __TA_GUARDED(lock_);  // Queued front-to-back.
   };
 
+  struct UserEndpoint;
   class EpServer : public usb::EndpointServer {
    public:
     EpServer(const zx::bti& bti, Dwc3* dwc3, UserEndpoint* uep)
@@ -216,6 +205,9 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     void CancelAll(CancelAllCompleter::Sync& completer) override;
 
     async_dispatcher_t* dispatcher() { return dispatcher_.async_dispatcher(); }
+
+    FidlRequestQueue queued_reqs;                    // requests waiting to be processed
+    std::optional<usb::RequestVariant> current_req;  // request currently being processed (if any)
 
    private:
     Dwc3* dwc3_{nullptr};         // Must outlive this instance.
@@ -244,9 +236,7 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
       stalled = false;
     }
 
-    FidlRequestQueue queued_reqs;            // requests waiting to be processed
-    std::optional<RequestInfo> current_req;  // request currently being processed (if any)
-    uint32_t rsrc_id{0};                     // resource ID for current_req
+    uint32_t rsrc_id{0};  // resource ID for current_req
 
     const uint8_t ep_num{0};
     uint8_t type{0};  // control, bulk, interrupt or isochronous
@@ -420,17 +410,17 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   zx_status_t EpSetStall(Endpoint& ep, bool stall) __TA_EXCLUDES(lock_);
   void EpStartTransfer(Endpoint& ep, TrbFifo& fifo, uint32_t type, zx_paddr_t buffer, size_t length)
       __TA_EXCLUDES(lock_);
-  void EpEndTransfers(Endpoint& ep, zx_status_t reason) __TA_EXCLUDES(lock_);
+  void EpEndTransfers(UserEndpoint& uep, zx_status_t reason) __TA_EXCLUDES(lock_);
 
   // Methods specific to user endpoints
   void UserEpQueueNext(UserEndpoint& uep) __TA_REQUIRES(uep.ep.lock) __TA_EXCLUDES(lock_);
-  zx_status_t CancelAll(Endpoint& ep) __TA_EXCLUDES(lock_, ep.lock);
+  zx_status_t CancelAll(UserEndpoint& uep) __TA_EXCLUDES(lock_, uep.ep.lock);
 
   // Cancel all currently in flight requests, and return a list of requests
   // which were in-flight.  Note that these requests have not been completed
   // yet.  It is the responsibility of the caller to (eventually) take care of
   // this once the lock has been dropped.
-  [[nodiscard]] FidlRequestQueue CancelAllLocked(Endpoint& ep) __TA_REQUIRES(ep.lock)
+  [[nodiscard]] FidlRequestQueue CancelAllLocked(UserEndpoint& uep) __TA_REQUIRES(uep.ep.lock)
       __TA_EXCLUDES(lock_);
 
   // Commands
