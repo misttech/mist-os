@@ -5,9 +5,11 @@
 #include <lib/fidl/cpp/binding.h>
 
 #include "echo_connection.h"
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
 
 // [START test_imports]
+#include <fidl/fidl.examples.routing.echo/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/testing/cpp/inspect.h>
 
@@ -18,7 +20,7 @@ using namespace inspect::testing;
 
 namespace example {
 
-class EchoConnectionTest : public gtest::RealLoopFixture {
+class EchoConnectionTest : public testing::Test {
  public:
   EchoConnectionTest()
       : inspector_(),
@@ -27,23 +29,32 @@ class EchoConnectionTest : public gtest::RealLoopFixture {
             inspector_.GetRoot().CreateUint("total_requests", 0),
         })},
         connection_(stats_),
-        echo_(),
-        binding_(&connection_, echo_.NewRequest().TakeChannel()) {}
+        serverLoop_(async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread)) {}
+
+  void SetUp() override {
+    serverLoop_.StartThread("EchoConnectionServer");
+
+    auto [client_end, server_end] =
+        fidl::CreateEndpoints<fidl_examples_routing_echo::Echo>().value();
+
+    fidl::BindServer(serverLoop_.dispatcher(), std::move(server_end), &connection_);
+
+    echoClient_.emplace(fidl::SyncClient(std::move(client_end)));
+  }
 
  protected:
   inspect::Inspector inspector_;
   std::shared_ptr<EchoConnectionStats> stats_;
   EchoConnection connection_;
-  fidl::examples::routing::echo::EchoPtr echo_;
-  fidl::Binding<EchoConnection> binding_;
+  async::Loop serverLoop_;
+  std::optional<fidl::SyncClient<fidl_examples_routing_echo::Echo>> echoClient_;
 };
 
 TEST_F(EchoConnectionTest, EchoServerWritesStats) {
   // Invoke the echo server
   ::fidl::StringPtr message;
-  echo_->EchoString("Hello World!", [&](::fidl::StringPtr retval) { message = retval; });
-  echo_->EchoString("Hello World!", [&](::fidl::StringPtr retval) { message = retval; });
-  RunLoopUntilIdle();
+  message = echoClient_.value()->EchoString({"Hello World!"}).value().response().value();
+  message = echoClient_.value()->EchoString({"Hello World!"}).value().response().value();
 
   // [START inspect_test]
   // Validate the contents of the tree match
