@@ -68,7 +68,7 @@ func TestAddFFXDeps(t *testing.T) {
 					RuntimeFiles: []string{"host_x64/ffx-emu.json"}},
 				{Name: "ffx-emu", OS: hostOS, CPU: "arm64", Path: "host_arm64/ffx-emu",
 					RuntimeFiles: []string{"host_arm64/ffx-emu.json"}},
-			}, false); err != nil {
+			}); err != nil {
 				t.Errorf("failed to add ffx deps: %s", err)
 			}
 			sort.Strings(tc.want)
