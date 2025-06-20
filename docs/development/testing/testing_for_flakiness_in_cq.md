@@ -76,10 +76,10 @@ Multiply: foo_tests: 100
 ### Internal tests
 
 Multiplying internal tests on public changes is not allowed, to avoid leaking
-confidential information. If you want to multiply an internal test, use `fx
-make-integration-patch` to create an internal CL that patches your CL into the
-integration repository. Then add the necessary `Multiply` line to the
-integration CL instead of the original public CL, and CQ+1 the integration CL.
+confidential information. If you want to multiply an internal test, create a
+no-op internal CL in integration.git or vendor/google with a `Depends-on` footer
+that references your public CL. Then add the necessary `Multiply` line to the
+internal CL instead of the original public CL, and CQ+1 the internal CL.
 
 {% dynamic endif %}
 
