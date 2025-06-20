@@ -52,6 +52,7 @@ rustc_library("blackout-target") {
 
   sources = [
     "src/lib.rs",
+    "src/random_op.rs",
     "src/static_tree.rs",
   ]
 }

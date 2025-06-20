@@ -15,12 +15,10 @@ rustc_binary("blackout-fxfs-allocate-bin") {
   testonly = true
   edition = "2021"
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-fs",
     "//src/storage/blackout/target/lib:blackout-config",
     "//src/storage/blackout/target/lib:blackout-target",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
@@ -44,12 +42,10 @@ rustc_binary("blackout-fxfs-barriers-bin") {
   testonly = true
   edition = "2021"
   deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-fs",
     "//src/storage/blackout/target/lib:blackout-config",
     "//src/storage/blackout/target/lib:blackout-target",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
