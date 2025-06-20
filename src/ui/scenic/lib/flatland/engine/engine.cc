@@ -140,8 +140,8 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
                                      /*num_vmos*/ kNumDisplayFramebuffers, &render_target_info);
   }
 
-  CullRectangles(&scene_state.image_rectangles, &scene_state.images, hw_display->width_in_px(),
-                 hw_display->height_in_px());
+  CullRectanglesInPlace(&scene_state.image_rectangles, &scene_state.images,
+                        hw_display->width_in_px(), hw_display->height_in_px());
 
   {
     TRACE_DURATION("gfx", "flatland::Engine::RenderScheduledFrame[move topology_data]");
@@ -210,8 +210,8 @@ Renderables Engine::GetRenderables(const FlatlandDisplay& display) {
 
   SceneState scene_state(*this, root);
   const auto hw_display = display.display();
-  CullRectangles(&scene_state.image_rectangles, &scene_state.images, hw_display->width_in_px(),
-                 hw_display->height_in_px());
+  CullRectanglesInPlace(&scene_state.image_rectangles, &scene_state.images,
+                        hw_display->width_in_px(), hw_display->height_in_px());
 
   return std::make_pair(std::move(scene_state.image_rectangles), std::move(scene_state.images));
 }

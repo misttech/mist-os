@@ -496,9 +496,10 @@ GlobalRectangleVector ComputeGlobalRectangles(
   return rectangles;
 }
 
-void CullRectangles(GlobalRectangleVector* rectangles_in_out, GlobalImageVector* images_in_out,
-                    uint64_t display_width, uint64_t display_height) {
-  TRACE_DURATION("gfx", "CullRectangles");
+void CullRectanglesInPlace(GlobalRectangleVector* rectangles_in_out,
+                           GlobalImageVector* images_in_out, uint64_t display_width,
+                           uint64_t display_height) {
+  TRACE_DURATION("gfx", "CullRectanglesInPlace");
   FX_DCHECK(rectangles_in_out && images_in_out);
   FX_DCHECK(rectangles_in_out->size() == images_in_out->size());
   auto is_occluder = [display_width, display_height](

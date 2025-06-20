@@ -1304,7 +1304,7 @@ TEST(GlobalCullRectanglesTest, EmptyTest) {
 
   GlobalRectangleVector rects;
   GlobalImageVector images;
-  CullRectangles(&rects, &images, display_width, display_height);
+  CullRectanglesInPlace(&rects, &images, display_width, display_height);
   EXPECT_EQ(rects.size(), 0U);
   EXPECT_EQ(images.size(), 0U);
 }
@@ -1325,7 +1325,7 @@ TEST(GlobalCullRectanglesTest, EmptySizeTest) {
     images[i].identifier = i;
   }
 
-  CullRectangles(&rects, &images, display_width, display_height);
+  CullRectanglesInPlace(&rects, &images, display_width, display_height);
   EXPECT_EQ(rects.size(), 1U);
   EXPECT_EQ(images.size(), 1U);
   EXPECT_EQ(images[0].identifier, 1U);
@@ -1342,7 +1342,7 @@ TEST(GlobalCullRectanglesTest, SingleTest) {
   GlobalImageVector images = {allocation::ImageMetadata()};
   images[0].identifier = 20;
 
-  CullRectangles(&rects, &images, display_width, display_height);
+  CullRectanglesInPlace(&rects, &images, display_width, display_height);
   EXPECT_EQ(rects.size(), 1U);
   EXPECT_EQ(images.size(), 1U);
   EXPECT_EQ(images[0].identifier, 20U);
@@ -1363,7 +1363,7 @@ TEST(GlobalCullRectanglesTest, FullScreenRectIsLast) {
                               allocation::ImageMetadata()};
   images[2].identifier = 2;
 
-  CullRectangles(&rects, &images, display_width, display_height);
+  CullRectanglesInPlace(&rects, &images, display_width, display_height);
   EXPECT_EQ(rects.size(), 1U);
   EXPECT_EQ(images.size(), 1U);
   EXPECT_EQ(images[0].identifier, 2U);
@@ -1388,7 +1388,7 @@ TEST(GlobalCullRectanglesTest, FullScreenRectIsFirst) {
   auto expected_rects = rects;
   auto expeted_images = images;
 
-  CullRectangles(&rects, &images, display_width, display_height);
+  CullRectanglesInPlace(&rects, &images, display_width, display_height);
   EXPECT_EQ(rects.size(), 3U);
   EXPECT_EQ(images.size(), 3U);
   for (uint32_t i = 0; i < 3U; i++) {
@@ -1417,7 +1417,7 @@ TEST(GlobalCullRectanglesTest, FullScreenRectIsMiddle) {
       ImageRect(glm::vec2(60, 100), glm::vec2(300, 200))};
   GlobalImageVector expected_images = {images[1], images[2]};
 
-  CullRectangles(&rects, &images, display_width, display_height);
+  CullRectanglesInPlace(&rects, &images, display_width, display_height);
   EXPECT_EQ(rects.size(), 2U);
   EXPECT_EQ(images.size(), 2U);
 
@@ -1454,7 +1454,7 @@ TEST(GlobalCullRectanglesTest, MultipleFullScreenRects) {
       ImageRect(glm::vec2(80, 110), glm::vec2(900, 350))};
   GlobalImageVector expected_images = {images[6], images[7]};
 
-  CullRectangles(&rects, &images, display_width, display_height);
+  CullRectanglesInPlace(&rects, &images, display_width, display_height);
   EXPECT_EQ(rects.size(), 2U);
   EXPECT_EQ(images.size(), 2U);
 
@@ -1508,7 +1508,7 @@ TEST(GlobalCullRectanglesTest, MultipleFullScreenRectsWithTransparency) {
     expected_images.push_back(images[i + 1]);
   }
 
-  CullRectangles(&rects, &images, display_width, display_height);
+  CullRectanglesInPlace(&rects, &images, display_width, display_height);
   EXPECT_EQ(rects.size(), 7U);
   EXPECT_EQ(images.size(), 7U);
 
