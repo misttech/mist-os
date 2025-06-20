@@ -110,8 +110,7 @@ impl SysFs {
             });
         });
 
-        // TODO(https://fxbug.dev/42072346): Temporary fix of flakeness in tcp_socket_test.
-        // Remove after registry.rs refactor is in place.
+        // TODO(https://fxbug.dev/425942145): Correctly implement system filesystem in sysfs
         registry
             .objects
             .devices

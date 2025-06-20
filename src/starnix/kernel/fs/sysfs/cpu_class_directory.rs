@@ -6,6 +6,7 @@ use crate::device::kobject::{KObject, KObjectHandle};
 use crate::fs::tmpfs::TmpfsDirectory;
 use crate::task::CurrentTask;
 use crate::vfs::pseudo::simple_file::BytesFile;
+use crate::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use crate::vfs::{
     fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
@@ -67,6 +68,11 @@ impl FsNodeOps for CpuClassDirectory {
                 name: "vulnerabilities".into(),
                 inode: None,
             },
+            VecDirectoryEntry {
+                entry_type: DirectoryEntryType::DIR,
+                name: "cpufreq".into(),
+                inode: None,
+            },
         ];
 
         for cpu_name in cpus {
@@ -89,10 +95,6 @@ impl FsNodeOps for CpuClassDirectory {
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
-            name if name.starts_with(b"cpu") => Ok(node.fs().create_node_and_allocate_node_id(
-                TmpfsDirectory::new(),
-                FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
-            )),
             b"online" => Ok(node.fs().create_node_and_allocate_node_id(
                 BytesFile::new_node(format!("0-{}\n", zx::system_get_num_cpus() - 1).into_bytes()),
                 FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
@@ -113,6 +115,24 @@ impl FsNodeOps for CpuClassDirectory {
                     error!(ENOENT)
                 }
             }
+            b"cpufreq" => {
+                let fs = &node.fs();
+                let mut builder = StaticDirectoryBuilder::new(fs);
+                builder.set_mode(mode!(IFDIR, 0o755));
+                builder.subdir("policy0", 0o755, |dir| {
+                    dir.subdir("stats", 0o755, |dir| {
+                        dir.entry("reset", BytesFile::new_node(b"".to_vec()), mode!(IFREG, 0o200));
+                    });
+                });
+
+                Ok(builder.build())
+            }
+            // This "cpu" match mush be ordered after "cpufrq". Since "cpufreq" also starts with
+            // "cpu", it would be incorrectly matched as a generic CPU device if placed before.
+            name if name.starts_with(b"cpu") => Ok(node.fs().create_node_and_allocate_node_id(
+                TmpfsDirectory::new(),
+                FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
+            )),
             _ => error!(ENOENT),
         }
     }
