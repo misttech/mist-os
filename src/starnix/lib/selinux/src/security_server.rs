@@ -1496,10 +1496,14 @@ mod tests {
             PermissionCheckResult { permit: false, audit: true, todo_bug: None }
         );
 
-        // Permissive SID is granted all permissions, so matching exception should be ignored.
+        // Todo-deny exceptions are processed before the permissive bit is handled.
         assert_eq!(
             permission_check.has_permission(permissive_sid, target_sid, FilePermission::Entrypoint),
-            PermissionCheckResult { permit: true, audit: true, todo_bug: None }
+            PermissionCheckResult {
+                permit: true,
+                audit: true,
+                todo_bug: Some(NonZeroU64::new(4).unwrap())
+            }
         );
 
         // Todo-permissive SID is not granted any permissions, so all permissions should be granted,

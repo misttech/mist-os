@@ -171,18 +171,22 @@ fn has_permission<P: ClassPermission + Into<KernelPermission> + Clone + 'static>
     };
 
     if !result.permit {
-        if !is_enforcing {
+        if decision.todo_bug.is_some() {
+            // If the access decision includes a `todo_bug` then permit the access and return the
+            // bug Id to the caller, for audit logging.
+            //
+            // This is checked before the "permissive" settings because exceptions work-around
+            // issues in our implementation, or policy builds, so permissive treatment can lead
+            // to logspam as well as losing bug-tracking information.
+            result.permit = true;
+            result.todo_bug = decision.todo_bug;
+        } else if !is_enforcing {
             // If the security server is not currently enforcing then permit all access.
             result.permit = true;
         } else if decision.flags & SELINUX_AVD_FLAGS_PERMISSIVE != 0 {
             // If the access decision indicates that the source domain is permissive then permit
             // all access.
             result.permit = true;
-        } else if decision.todo_bug.is_some() {
-            // If the access decision includes a `todo_bug` then permit the access and return the
-            // bug Id to the caller, for audit logging.
-            result.permit = true;
-            result.todo_bug = decision.todo_bug;
         }
     }
 
