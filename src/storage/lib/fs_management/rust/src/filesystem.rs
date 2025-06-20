@@ -677,18 +677,14 @@ impl ServingMultiVolumeFilesystem {
         .map_err(|e| anyhow!(zx::Status::from_raw(e)))
     }
 
-    pub async fn check_volume(
-        &mut self,
-        volume: &str,
-        crypt: Option<ClientEnd<fidl_fuchsia_fxfs::CryptMarker>>,
-    ) -> Result<(), Error> {
+    pub async fn check_volume(&mut self, volume: &str, options: CheckOptions) -> Result<(), Error> {
         ensure!(!self.volumes.contains_key(volume), "Already bound");
         let path = format!("volumes/{}", volume);
         connect_to_named_protocol_at_dir_root::<fidl_fuchsia_fs_startup::VolumeMarker>(
             self.exposed_dir.as_ref().unwrap(),
             &path,
         )?
-        .check(fidl_fuchsia_fs_startup::CheckOptions { crypt, ..Default::default() })
+        .check(options)
         .await?
         .map_err(|e| anyhow!(zx::Status::from_raw(e)))?;
         Ok(())

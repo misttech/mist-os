@@ -7,6 +7,7 @@ use crate::crypt;
 use crate::device::constants::{BLOB_VOLUME_LABEL, DATA_VOLUME_LABEL, UNENCRYPTED_VOLUME_LABEL};
 use anyhow::{Context, Error};
 use async_trait::async_trait;
+use fidl_fuchsia_fs_startup::CheckOptions;
 use fs_management::filesystem::ServingMultiVolumeFilesystem;
 use std::collections::HashSet;
 
@@ -34,7 +35,7 @@ impl Container for FxfsContainer {
 
     async fn maybe_check_blob_volume(&mut self) -> Result<(), Error> {
         self.0
-            .check_volume(BLOB_VOLUME_LABEL, None)
+            .check_volume(BLOB_VOLUME_LABEL, CheckOptions::default())
             .await
             .context("Failed to verify the blob volume")
     }

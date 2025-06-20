@@ -11,7 +11,7 @@ use async_trait::async_trait;
 use diagnostics_reader::ArchiveReader;
 use either::Either;
 use fidl_fuchsia_device::ControllerMarker;
-use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
+use fidl_fuchsia_fs_startup::{CheckOptions, CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptManagementProxy, CryptMarker, KeyPurpose};
 use fs_management::filesystem::Filesystem;
 use fs_management::FSConfig;
@@ -354,7 +354,10 @@ impl<FSC: 'static + FSConfig + Clone + Send + Sync> Environment for FsEnvironmen
                         .connect_to_protocol_at_exposed_dir()
                         .unwrap(),
                 );
-                instance.check_volume("default", crypt).await.unwrap();
+                instance
+                    .check_volume("default", CheckOptions { crypt, ..Default::default() })
+                    .await
+                    .unwrap();
                 let crypt = Some(
                     self.crypt_realm
                         .as_ref()

@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context, Error};
 use crypt_policy::{format_sources, get_policy, unseal_sources, KeyConsumer};
 use fidl::endpoints::{ClientEnd, Proxy};
 use fidl_fuchsia_component::{self as fcomponent, RealmMarker};
-use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
+use fidl_fuchsia_fs_startup::{CheckOptions, CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingVolume};
 use fuchsia_component::client::{
@@ -78,7 +78,7 @@ pub async fn unlock_data_volume<'a>(
 ) -> Result<Option<(CryptService, String, &'a mut ServingVolume)>, Error> {
     // Open up the unencrypted volume so that we can access the key-bag for data.
     if config.check_filesystems {
-        fs.check_volume(UNENCRYPTED_VOLUME_LABEL, None)
+        fs.check_volume(UNENCRYPTED_VOLUME_LABEL, CheckOptions::default())
             .await
             .context("Failed to verify unencrypted")?;
     }
@@ -107,9 +107,12 @@ pub async fn unlock_data_volume<'a>(
             .await
             .context("init_crypt_service")?;
     if config.check_filesystems {
-        fs.check_volume(DATA_VOLUME_LABEL, Some(crypt_service.connect()))
-            .await
-            .context("Failed to verify data")?;
+        fs.check_volume(
+            DATA_VOLUME_LABEL,
+            CheckOptions { crypt: Some(crypt_service.connect()), ..Default::default() },
+        )
+        .await
+        .context("Failed to verify data")?;
     }
     let crypt = Some(crypt_service.connect());
 

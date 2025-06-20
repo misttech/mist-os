@@ -7,9 +7,9 @@ use crate::device::constants::DATA_TYPE_GUID;
 use anyhow::{Context as _, Error};
 use async_trait::async_trait;
 use crypt_policy::get_policy;
-use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
+use fidl_fuchsia_fs_startup::{CheckOptions, CreateOptions, MountOptions};
 use fidl_fuchsia_fvm::ResetMarker;
-use fs_management::filesystem::ServingMultiVolumeFilesystem;
+use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingVolume};
 use fs_management::format::constants::{
     BLOBFS_PARTITION_LABEL, DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL,
 };
@@ -39,7 +39,7 @@ impl Container for FvmContainer {
     }
 
     async fn serve_data(&mut self, launcher: &FilesystemLauncher) -> Result<Filesystem, Error> {
-        fn check_volumes(volumes: Vec<String>) -> Option<String> {
+        fn find_data_volume(volumes: Vec<String>) -> Option<String> {
             let mut found_blobfs = false;
             let mut data_label = None;
             for volume in volumes {
@@ -58,24 +58,8 @@ impl Container for FvmContainer {
             }
         }
 
-        if let Some(data_label) = check_volumes(self.get_volumes().await?) {
-            let format = launcher.config.data_filesystem_format.as_str();
-            let uri = format!("#meta/{format}.cm");
-            let open_volume = |crypt| {
-                self.0.open_volume(
-                    &data_label,
-                    MountOptions { uri: Some(uri), crypt, ..MountOptions::default() },
-                )
-            };
-
-            match if launcher
-                .requires_zxcrypt(launcher.config.data_filesystem_format.as_str().into(), self.1)
-            {
-                let policy = get_policy().await?;
-                with_crypt_service(policy, |crypt| open_volume(Some(crypt))).await
-            } else {
-                open_volume(None).await
-            } {
+        if let Some(data_label) = find_data_volume(self.get_volumes().await?) {
+            match self.check_and_mount_data(&data_label, launcher).await {
                 Ok(_) => return Ok(Filesystem::ServingVolumeInMultiVolume(None, data_label)),
                 Err(error) => match error.root_cause().downcast_ref::<zx::Status>() {
                     Some(status) if status == &zx::Status::WRONG_TYPE => {
@@ -84,6 +68,7 @@ impl Container for FvmContainer {
                         log::info!("Data volume unexpected type. Reformatting.");
                     }
                     _ => {
+                        let format = &launcher.config.data_filesystem_format;
                         launcher.report_corruption(format, &error);
                         log::error!(
                             error:?;
@@ -132,5 +117,59 @@ impl Container for FvmContainer {
             .map_err(zx::Status::from_raw)
             .context("shred encrypted volumes returned error")?;
         Ok(())
+    }
+}
+
+impl FvmContainer {
+    async fn check_and_mount_data(
+        &mut self,
+        data_label: &str,
+        launcher: &FilesystemLauncher,
+    ) -> Result<&mut ServingVolume, Error> {
+        let format = launcher.config.data_filesystem_format.as_str();
+        let uri = format!("#meta/{format}.cm");
+        if launcher.requires_zxcrypt(launcher.config.data_filesystem_format.as_str().into(), self.1)
+        {
+            let policy = get_policy().await?;
+            if launcher.config.check_filesystems {
+                with_crypt_service(policy, |crypt| {
+                    self.0.check_volume(
+                        data_label,
+                        CheckOptions {
+                            uri: Some(uri.clone()),
+                            crypt: Some(crypt),
+                            ..Default::default()
+                        },
+                    )
+                })
+                .await?;
+            }
+            with_crypt_service(policy, |crypt| {
+                self.0.open_volume(
+                    data_label,
+                    MountOptions {
+                        uri: Some(uri.clone()),
+                        crypt: Some(crypt),
+                        ..MountOptions::default()
+                    },
+                )
+            })
+            .await
+        } else {
+            if launcher.config.check_filesystems {
+                self.0
+                    .check_volume(
+                        data_label,
+                        CheckOptions { uri: Some(uri.clone()), ..Default::default() },
+                    )
+                    .await?;
+            }
+            self.0
+                .open_volume(
+                    data_label,
+                    MountOptions { uri: Some(uri), crypt: None, ..MountOptions::default() },
+                )
+                .await
+        }
     }
 }

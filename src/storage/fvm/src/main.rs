@@ -17,11 +17,12 @@ use device::Device;
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
 use fidl_fuchsia_fs_startup::{
-    CreateOptions, FormatOptions, MountOptions, StartOptions, StartupMarker, StartupRequest,
-    StartupRequestStream, VolumeRequest, VolumeRequestStream, VolumesMarker, VolumesRequest,
-    VolumesRequestStream,
+    CheckOptions, CreateOptions, FormatOptions, MountOptions, StartOptions, StartupMarker,
+    StartupRequest, StartupRequestStream, VolumeRequest, VolumeRequestStream, VolumesMarker,
+    VolumesRequest, VolumesRequestStream,
 };
 use fidl_fuchsia_fvm::{ResetMarker, ResetRequest, ResetRequestStream};
+use fidl_fuchsia_fxfs::CryptMarker;
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fs_management::filesystem::{BlockConnector, Filesystem};
 use fs_management::format::{detect_disk_format, DiskFormat};
@@ -1086,11 +1087,14 @@ impl Component {
     ) -> Result<(), Error> {
         while let Some(request) = requests.try_next().await? {
             match request {
-                VolumeRequest::Check { responder, .. } => {
-                    responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
-                }
+                VolumeRequest::Check { responder, options } => responder.send(
+                    self.handle_volume_check(partition_index, options).await.map_err(|error| {
+                        warn!(error:?, partition_index; "Failed to check volume");
+                        map_to_status(error).into_raw()
+                    }),
+                )?,
                 VolumeRequest::Mount { responder, outgoing_directory, options } => responder.send(
-                    self.handle_mount(partition_index, outgoing_directory, options, false)
+                    self.handle_volume_mount(partition_index, outgoing_directory, options, false)
                         .await
                         .map_err(|error| {
                             let error = map_to_status(error);
@@ -1125,13 +1129,12 @@ impl Component {
         Ok(())
     }
 
-    async fn handle_mount(
-        self: &Arc<Self>,
+    async fn create_device_for_partition(
+        &self,
         partition_index: u16,
-        server_end: ServerEnd<fio::DirectoryMarker>,
-        options: MountOptions,
-        format: bool,
-    ) -> Result<(), Error> {
+        crypt: Option<ClientEnd<CryptMarker>>,
+        key_for_formatting: bool,
+    ) -> Result<BlockServer<SessionManager<PartitionInterface>>, Error> {
         let fvm = self.fvm();
         let device_info = {
             let inner = fvm.inner.read().await;
@@ -1147,10 +1150,9 @@ impl Component {
                 flags: 0,
             })
         };
-
-        let key = if let Some(crypt) = options.crypt {
+        let key = if let Some(crypt) = crypt {
             let crypt_proxy = crypt.into_proxy();
-            Some(if format {
+            Some(if key_for_formatting {
                 zxcrypt::Key::format(&fvm, partition_index, &crypt_proxy).await.unwrap()
             } else {
                 zxcrypt::Key::unseal(&fvm, partition_index, &crypt_proxy).await?
@@ -1159,52 +1161,91 @@ impl Component {
             None
         };
 
-        let block_server = BlockServer::new(
+        Ok(BlockServer::new(
             fvm.block_size(),
             Arc::new(PartitionInterface { partition_index, device_info, key, fvm: fvm.clone() }),
-        );
+        ))
+    }
 
-        if let Some(uri) = options.uri {
-            // For now we only support URIs of the form: "#meta/<component_name>.cm".
-            let re = Regex::new(r"^#meta/(.*)\.cm$").unwrap();
-            let Some(caps) = re.captures(&uri) else { bail!(zx::Status::INVALID_ARGS) };
+    async fn mount_volume(
+        &self,
+        block_server: BlockServer<SessionManager<PartitionInterface>>,
+        uri: &str,
+        start_options: StartOptions,
+        check_disk_format: bool,
+    ) -> Result<(MountedVolume, Filesystem), Error> {
+        // For now we only support URIs of the form: "#meta/<component_name>.cm".
+        let re = Regex::new(r"^#meta/(.*)\.cm$").unwrap();
+        let Some(caps) = re.captures(uri) else { bail!(zx::Status::INVALID_ARGS) };
 
-            struct ComponentName(String);
-            impl FSConfig for ComponentName {
-                fn options(&self) -> Options<'_> {
-                    Options {
-                        component_name: &self.0,
-                        reuse_component_after_serving: false,
-                        format_options: FormatOptions::default(),
-                        start_options: StartOptions::default(),
-                        component_type: ComponentType::DynamicChild {
-                            // Use a separate collection for blobfs because it needs additional
-                            // capabilities routed to it (e.g. VmexResource) and we don't want
-                            // to route those capabilities to other filesystems.
-                            collection_name: if self.0 == "blobfs" {
-                                "blobfs-collection".to_string()
-                            } else {
-                                fs_management::FS_COLLECTION_NAME.to_string()
-                            },
+        struct ComponentName(String, StartOptions);
+        impl FSConfig for ComponentName {
+            fn options(&self) -> Options<'_> {
+                Options {
+                    component_name: &self.0,
+                    reuse_component_after_serving: false,
+                    format_options: FormatOptions::default(),
+                    start_options: self.1.clone(),
+                    component_type: ComponentType::DynamicChild {
+                        // Use a separate collection for blobfs because it needs additional
+                        // capabilities routed to it (e.g. VmexResource) and we don't want
+                        // to route those capabilities to other filesystems.
+                        collection_name: if self.0 == "blobfs" {
+                            "blobfs-collection".to_string()
+                        } else {
+                            fs_management::FS_COLLECTION_NAME.to_string()
                         },
-                    }
+                    },
                 }
             }
+        }
 
-            let volume = MountedVolume::new(block_server);
+        let volume = MountedVolume::new(block_server);
+        if check_disk_format && caps[1].to_string() == "minfs" {
+            // It's relatively normal to try to mount a filesystem, discover it's not the right
+            // format, and reformat it so it is. If this filesystem is supposed to be minfs,
+            // spot-check that this partition is the right format before we try serving, and
+            // return the proper error without logging scary things if it is not.
+            let block_proxy = volume.connect_block()?.into_proxy();
+            let detected_format = detect_disk_format(block_proxy).await;
+            ensure!(detected_format == DiskFormat::Minfs, zx::Status::WRONG_TYPE);
+        }
+        let fs = Filesystem::new(volume.clone(), ComponentName(caps[1].to_string(), start_options));
+        Ok((volume, fs))
+    }
+
+    async fn handle_volume_check(
+        self: &Arc<Self>,
+        partition_index: u16,
+        options: CheckOptions,
+    ) -> Result<(), Error> {
+        let block_server =
+            self.create_device_for_partition(partition_index, options.crypt, false).await?;
+        let (_, mut fs) = self
+            .mount_volume(
+                block_server,
+                &options.uri.ok_or(zx::Status::INVALID_ARGS).context("No URI specified")?,
+                StartOptions { read_only: Some(true), ..Default::default() },
+                true,
+            )
+            .await?;
+        fs.fsck().await
+    }
+
+    async fn handle_volume_mount(
+        self: &Arc<Self>,
+        partition_index: u16,
+        server_end: ServerEnd<fio::DirectoryMarker>,
+        options: MountOptions,
+        format: bool,
+    ) -> Result<(), Error> {
+        let block_server =
+            self.create_device_for_partition(partition_index, options.crypt, format).await?;
+
+        if let Some(uri) = options.uri {
+            let (volume, mut fs) =
+                self.mount_volume(block_server, &uri, StartOptions::default(), !format).await?;
             let volume_scope = volume.scope.clone();
-
-            if !format && caps[1].to_string() == "minfs" {
-                // It's relatively normal to try to mount a filesystem, discover it's not the right
-                // format, and reformat it so it is. If this filesystem is supposed to be minfs,
-                // spot-check that this partition is the right format before we try serving, and
-                // return the proper error without logging scary things if it is not.
-                let block_proxy = volume.connect_block()?.into_proxy();
-                let detected_format = detect_disk_format(block_proxy).await;
-                ensure!(detected_format == DiskFormat::Minfs, zx::Status::WRONG_TYPE);
-            }
-
-            let mut fs = Filesystem::new(volume.clone(), ComponentName(caps[1].to_string()));
 
             if format {
                 fs.format().await?;
@@ -1340,7 +1381,7 @@ impl Component {
         async move {
             self.add_volume_to_volumes_directory(partition_index, name)?;
 
-            self.handle_mount(partition_index, outgoing_directory, mount_options, true).await
+            self.handle_volume_mount(partition_index, outgoing_directory, mount_options, true).await
         }
         .await
         .map_err(|error| {
@@ -2175,11 +2216,13 @@ mod tests {
             )
             .unwrap();
 
-            // Check we connected by calling the Check method (even though it's unsupported).
-            assert_eq!(
-                volume_proxy.check(CheckOptions::default()).await.unwrap(),
-                Err(zx::sys::ZX_ERR_NOT_SUPPORTED)
-            );
+            // Check we connected by calling the Check method.  It should fail as no URI was
+            // specified
+            volume_proxy
+                .check(CheckOptions::default())
+                .await
+                .expect("FIDL error")
+                .expect_err("Check volume should fail");
 
             fixture.fake_server
         };
@@ -3214,5 +3257,37 @@ mod tests {
         let volume_info = volume_info.unwrap();
         assert_eq!(volume_info.partition_slice_count, 257);
         assert_eq!(volume_info.slice_limit, 0);
+    }
+
+    #[fuchsia::test]
+    async fn test_fsck_golden_fvm() {
+        let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
+        let fake_server = Arc::new(
+            VmoBackedServerOptions {
+                info: DeviceInfo::Block(BlockInfo {
+                    device_flags: fblock::Flag::READONLY,
+                    ..Default::default()
+                }),
+                block_size: BLOCK_SIZE,
+                initial_contents: InitialContents::FromBuffer(&contents),
+                ..Default::default()
+            }
+            .build()
+            .unwrap(),
+        );
+
+        let fixture = Fixture::from_fake_server(fake_server).await;
+
+        let volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+            &fixture.outgoing_dir,
+            "volumes/blobfs",
+        )
+        .unwrap();
+
+        volume_proxy
+            .check(CheckOptions { uri: Some("#meta/blobfs.cm".to_string()), ..Default::default() })
+            .await
+            .expect("check blob failed (FIDL)")
+            .expect("check blob failed");
     }
 }

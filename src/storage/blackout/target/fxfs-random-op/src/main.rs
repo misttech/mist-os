@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use blackout_target::{find_partition, set_up_partition, Test, TestServer};
 use fidl::endpoints::{ClientEnd, Proxy as _};
-use fidl_fuchsia_fs_startup::{CreateOptions, MountOptions};
+use fidl_fuchsia_fs_startup::{CheckOptions, CreateOptions, MountOptions};
 use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fidl_fuchsia_io as fio;
 use fs_management::filesystem::Filesystem;
@@ -377,7 +377,9 @@ impl Test for FxfsRandomOp {
 
         let mut fs = fxfs.serve_multi_volume().await.context("failed to serve")?;
         let crypt = Some(self.setup_crypt_service().await.context("set up crypt service")?);
-        fs.check_volume("default", crypt).await.context("default volume check")?;
+        fs.check_volume("default", CheckOptions { crypt, ..Default::default() })
+            .await
+            .context("default volume check")?;
 
         log::info!("verification complete");
         Ok(())
