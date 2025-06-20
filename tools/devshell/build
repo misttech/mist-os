@@ -44,6 +44,8 @@
 ##   -j <count>               Specify an explicit max job count for both Ninja
 ##                            and Bazel.
 ##
+##   -q, --quiet              Tell Ninja and Bazel to be quiet.
+##
 ##   --skip-auth-check        Bypass pre-flight build service authentication
 ##                            checks.
 ##
@@ -113,6 +115,7 @@ function main {
   local log_file is_logging fint_params_path
   local no_checks
   local verbose
+  local quiet
   local skip_auth_check=0
   local concurrency=0
 
@@ -171,6 +174,10 @@ function main {
         verbose=true
         ;;
 
+      -q|--quiet)
+        quiet=true
+        ;;
+
       # As a special case, recognize `-j<count>` and `-j <count>` as valid
       # options. For now pass them directly to fx-run-ninja, which will eventually
       # pass them to Bazel. See https://fxbug.dev/351623259
@@ -211,6 +218,10 @@ function main {
     esac
     shift
   done
+
+  if [[ -n "${quiet}" ]]; then
+    ninja_switches+=("--quiet")
+  fi
 
   # Set no_checks=true when running a Ninja tool or printing the Ninja help.
   for arg in "${ninja_switches[@]}"; do
@@ -396,6 +407,7 @@ function main {
 checkout_dir: \"${FUCHSIA_DIR}\"
 build_dir: \"${FUCHSIA_BUILD_DIR}\"
 job_count: $concurrency
+quiet: ${quiet:-false}
 ")
   else
     if [[ "${#fuchsia_targets[@]}" -gt 0 ]]; then
