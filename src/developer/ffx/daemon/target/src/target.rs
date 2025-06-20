@@ -289,7 +289,7 @@ impl HostPipeState {
 }
 
 #[cfg(not(target_os = "macos"))]
-static USB_VSOCK_HOST: Mutex<Option<Arc<UsbVsockHost>>> = Mutex::new(None);
+static USB_VSOCK_HOST: Mutex<Option<Arc<UsbVsockHost<fuchsia_async::Socket>>>> = Mutex::new(None);
 
 pub struct Target {
     pub events: events::Queue<TargetEvent>,
@@ -390,7 +390,7 @@ impl Target {
     }
 
     #[cfg(not(target_os = "macos"))]
-    pub fn get_usb_vsock_host() -> Option<Arc<UsbVsockHost>> {
+    pub fn get_usb_vsock_host() -> Option<Arc<UsbVsockHost<fuchsia_async::Socket>>> {
         (*USB_VSOCK_HOST.lock().unwrap()).clone()
     }
 

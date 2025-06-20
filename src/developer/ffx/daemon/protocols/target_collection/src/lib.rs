@@ -680,7 +680,7 @@ async fn handle_usb_target_impl(
     cid: u32,
     tc: &Rc<TargetCollection>,
     overnet_node: &Arc<overnet_core::Router>,
-    host: Arc<usb_vsock_host::UsbVsockHost>,
+    host: Arc<usb_vsock_host::UsbVsockHost<fuchsia_async::Socket>>,
 ) -> Result<()> {
     let (socket, other_end) = fuchsia_async::emulated_handle::Socket::create_stream();
     let other_end = fuchsia_async::Socket::from_socket(other_end);

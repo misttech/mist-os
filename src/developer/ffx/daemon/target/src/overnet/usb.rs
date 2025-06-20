@@ -11,7 +11,11 @@ use usb_vsock_host::UsbVsockHost;
 use super::vsock::OVERNET_VSOCK_PORT;
 
 /// Host-pipe-like task for communicating via vsock.
-pub async fn spawn_usb(host: Arc<UsbVsockHost>, cid: u32, node: Arc<overnet_core::Router>) {
+pub async fn spawn_usb(
+    host: Arc<UsbVsockHost<fasync::Socket>>,
+    cid: u32,
+    node: Arc<overnet_core::Router>,
+) {
     log::debug!(cid; "Spawning USB VSOCK host pipe");
 
     let Ok(cid) = cid.try_into() else {
