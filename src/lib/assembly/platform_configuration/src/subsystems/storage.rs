@@ -152,6 +152,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             }
         } else {
             // TODO(https://fxbug.dev/339491886): Delete the non-storage-host branch.
+            builder.platform_bundle("fshost_non_storage_host");
             match &storage_config.filesystems.volume {
                 VolumeConfig::Fxfs => {
                     ensure!(gpt, "GPT required for Fxfs-based product assemblies");

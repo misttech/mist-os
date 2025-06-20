@@ -271,24 +271,12 @@ assembly_input_bundle("bootstrap") {
       driver_components = [ "meta/block.core.cm" ]
     },
     {
-      package_target = "//src/devices/block/drivers/gpt:package"
-      driver_components = [ "meta/gpt.cm" ]
-    },
-    {
-      package_target = "//src/devices/block/drivers/ramdisk:package"
-      driver_components = [ "meta/ramdisk.cm" ]
-    },
-    {
       package_target = "//src/devices/block/drivers/sdmmc:package"
       driver_components = [ "meta/sdmmc.cm" ]
     },
     {
       package_target = "//src/devices/block/drivers/usb-mass-storage:package"
       driver_components = [ "meta/usb-mass-storage.cm" ]
-    },
-    {
-      package_target = "//src/devices/block/drivers/zxcrypt:package"
-      driver_components = [ "meta/zxcrypt.cm" ]
     },
     {
       package_target = "//src/devices/clock/drivers/clock:package"
@@ -345,10 +333,6 @@ assembly_input_bundle("bootstrap") {
     {
       package_target = "//src/media/audio/drivers/usb-audio:package"
       driver_components = [ "meta/usb-audio.cm" ]
-    },
-    {
-      package_target = "//src/storage/fvm/driver:package"
-      driver_components = [ "meta/fvm.cm" ]
     },
     {
       package_target = "//src/ui/input/drivers/hid:package"
@@ -3160,6 +3144,46 @@ assembly_input_bundle("fshost_storage_host_fvm_minfs") {
   ]
 }
 
+# AIB containing drivers and fshost shards needed for non-storage-host configurations.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_non_storage_host") {
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards =
+              [ "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml" ]
+        },
+      ]
+    },
+  ]
+  boot_driver_packages = [
+    {
+      package_target = "//src/devices/block/drivers/ramdisk:package"
+      driver_components = [ "meta/ramdisk.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/gpt:package"
+      driver_components = [ "meta/gpt.cm" ]
+    },
+    {
+      package_target = "//src/storage/fvm/driver:package"
+      driver_components = [ "meta/fvm.cm" ]
+    },
+    {
+      package_target = "//src/devices/block/drivers/zxcrypt:package"
+      driver_components = [ "meta/zxcrypt.cm" ]
+    },
+  ]
+}
+
 # AIB containing the fshost with fxfs.
 #
 # optional: product must specify its inclusion
@@ -3177,7 +3201,6 @@ assembly_input_bundle("fshost_fxfs") {
           shards = [
             "//src/storage/fshost/meta/fxblob_fshost.cml",
             "//src/storage/fshost/meta/fxblob_fshost_base.shard.cml",
-            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
@@ -3234,7 +3257,6 @@ assembly_input_bundle("fshost_fvm_fxfs") {
           shards = [
             "//src/storage/fshost/meta/fvm_fxfs_fshost.cml",
             "//src/storage/fshost/meta/fvm_fxfs_fshost_base.shard.cml",
-            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
@@ -3264,7 +3286,6 @@ assembly_input_bundle("fshost_fvm_minfs") {
           shards = [
             "//src/storage/fshost/meta/fvm_minfs_fshost.cml",
             "//src/storage/fshost/meta/fvm_minfs_fshost_base.shard.cml",
-            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
@@ -3296,7 +3317,6 @@ assembly_input_bundle("fshost_fvm_minfs_migration") {
             "//src/storage/fshost/meta/fvm_minfs_fshost_base.shard.cml",
             "//src/storage/fshost/meta/fvm_fxfs_fshost.cml",
             "//src/storage/fshost/meta/fvm_fxfs_fshost_base.shard.cml",
-            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
@@ -3330,7 +3350,6 @@ assembly_input_bundle("fshost_fvm_f2fs") {
           shards = [
             "//src/storage/fshost/meta/fvm_f2fs_fshost.cml",
             "//src/storage/fshost/meta/fvm_f2fs_fshost_base.shard.cml",
-            "//src/storage/fshost/meta/non_storage_host_gpt.shard.cml",
           ]
         },
       ]
