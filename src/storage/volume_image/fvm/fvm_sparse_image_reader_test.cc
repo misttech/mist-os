@@ -33,22 +33,6 @@ namespace {
 
 constexpr std::string_view sparse_image_path = "/pkg/data/test_fvm.sparse.blk";
 
-zx::result<std::string> AttachFvm(const std::string& device_path) {
-  std::string controller_path = device_path + "/device_controller";
-  zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
-  if (controller.is_error()) {
-    return controller.take_error();
-  }
-  if (auto status = storage::BindFvm(controller.value()); status.is_error())
-    return status.take_error();
-  std::string fvm_disk_path = device_path + "/fvm";
-  if (zx::result channel = device_watcher::RecursiveWaitForFile(fvm_disk_path.c_str(), zx::sec(3));
-      channel.is_error()) {
-    return channel.take_error();
-  }
-  return zx::ok(fvm_disk_path);
-}
-
 // Create a ram-disk and copy the output directly into the ram-disk, and then see if FVM can read
 // it and minfs Fsck passes.
 TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
@@ -122,22 +106,11 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
 
   client.reset();
 
-  // Now try and attach FVM.
-  auto result = AttachFvm(ram_disk_or.value().path());
-  ASSERT_TRUE(result.is_ok()) << result.status_string();
-
-  fs_management::PartitionMatcher matcher{
-      .type_guids = {GUID_DATA_VALUE},
-  };
-
-  ASSERT_EQ(fs_management::OpenPartition(matcher, true).status_value(), ZX_OK);
-
   // Attempt to fsck minfs.
   {
-    zx::result partition = fs_management::OpenPartition(matcher, true);
-    ASSERT_EQ(ZX_OK, partition.status_value());
-    fidl::WireResult path = fidl::WireCall(partition.value())->GetTopologicalPath();
-    ASSERT_EQ(ZX_OK, path.status());
+    zx::result instance = storage::OpenFvmPartition(ram_disk_or.value().path(), "data");
+    instance.is_error();
+    ASSERT_EQ(instance.status_value(), ZX_OK) << instance.status_string();
 
     // And finally run fsck on the volume.
     fs_management::FsckOptions options{
@@ -147,20 +120,14 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
         .force = true,
     };
     auto component = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatMinfs);
-    EXPECT_EQ(fs_management::Fsck(path->value()->path.get(), component, options), ZX_OK);
+    EXPECT_EQ(fs_management::Fsck(instance->path(), component, options), ZX_OK);
   }
 
   // Attempt to fsck blobfs.
   {
-    fs_management::PartitionMatcher matcher{
-        .type_guids = {GUID_BLOB_VALUE},
-    };
-    zx::result partition = fs_management::OpenPartition(matcher, true);
-    ASSERT_EQ(ZX_OK, partition.status_value());
-    fidl::WireResult path = fidl::WireCall(partition.value())->GetTopologicalPath();
-    ASSERT_EQ(ZX_OK, path.status());
-
-    ASSERT_EQ(fs_management::OpenPartition(matcher, true).status_value(), ZX_OK);
+    zx::result instance = storage::OpenFvmPartition(ram_disk_or.value().path(), "blobfs");
+    instance.is_error();
+    ASSERT_EQ(instance.status_value(), ZX_OK) << instance.status_string();
 
     // And finally run fsck on the volume.
     fs_management::FsckOptions options{
@@ -170,7 +137,7 @@ TEST(FvmSparseImageReaderTest, PartitionsInImagePassFsck) {
         .force = true,
     };
     auto component = fs_management::FsComponent::FromDiskFormat(fs_management::kDiskFormatBlobfs);
-    EXPECT_EQ(fs_management::Fsck(path->value()->path.get(), component, options), ZX_OK);
+    EXPECT_EQ(fs_management::Fsck(instance->path(), component, options), ZX_OK);
   }
 }
 

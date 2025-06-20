@@ -98,12 +98,7 @@ zx::result<std::pair<storage::RamDisk, std::string>> CreateRamDisk(
 
   // Create a ram-disk.  The DFv2 driver doesn't support fail_after,
   // ram_disk_discard_random_after_last_flush or FVM.
-  auto ram_disk_or = storage::RamDisk::CreateWithVmo(
-      std::move(vmo), options.device_block_size,
-      storage::RamDisk::Options{
-          .use_v2 = !options.fail_after && !options.ram_disk_discard_random_after_last_flush &&
-                    !options.use_fvm,
-      });
+  auto ram_disk_or = storage::RamDisk::CreateWithVmo(std::move(vmo), options.device_block_size);
   if (ram_disk_or.is_error()) {
     return ram_disk_or.take_error();
   }
@@ -371,18 +366,12 @@ zx::result<RamDevice> OpenRamDevice(const TestFilesystemOptions& options) {
 
   if (options.use_fvm) {
     // Now bind FVM to it.
-    std::string controller_path = ram_device->path() + "/device_controller";
-    zx::result controller = component::Connect<fuchsia_device::Controller>(controller_path);
-    if (controller.is_error()) {
-      return controller.take_error();
+    zx::result fvm_partition = storage::OpenFvmPartition(ram_device->path());
+    if (fvm_partition.is_error()) {
+      std::cout << "Unable to bind FVM: " << fvm_partition.status_string() << std::endl;
+      return fvm_partition.take_error();
     }
-    auto status = storage::BindFvm(controller.value());
-    if (status.is_error()) {
-      std::cout << "Unable to bind FVM: " << status.status_string() << std::endl;
-      return status.take_error();
-    }
-
-    ram_device->set_path(ram_device->path() + "/fvm/fs-test-partition-p-1/block");
+    ram_device->set_fvm_partition(*std::move(fvm_partition));
   }
 
   if (zx::result channel =
