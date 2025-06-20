@@ -4,7 +4,6 @@
 
 //! Shared code for implementing datagram sockets.
 
-use alloc::collections::{HashMap, HashSet};
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 use core::convert::Infallible as Never;
@@ -39,6 +38,7 @@ use netstack3_base::{
     StrongDeviceIdentifier as _, TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::{FilterIpExt, TransportPacketSerializer};
+use netstack3_hashmap::{HashMap, HashSet};
 use netstack3_ip::socket::{
     DelegatedRouteResolutionOptions, DelegatedSendOptions, IpSock, IpSockCreateAndSendError,
     IpSockCreationError, IpSockSendError, IpSocketHandler, RouteResolutionOptions,

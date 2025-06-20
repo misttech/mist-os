@@ -18,10 +18,7 @@
     clippy::redundant_clone,
     clippy::precedence
 )]
-
-// TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11): remove
-// this module.
-extern crate fakealloc as alloc;
+extern crate alloc;
 
 mod api;
 mod context;

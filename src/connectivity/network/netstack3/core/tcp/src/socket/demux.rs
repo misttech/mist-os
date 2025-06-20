@@ -5,7 +5,6 @@
 //! Defines the entry point of TCP packets, by directing them into the correct
 //! state machine.
 
-use alloc::collections::hash_map;
 use core::fmt::Debug;
 use core::num::NonZeroU16;
 
@@ -25,6 +24,7 @@ use netstack3_base::{
 use netstack3_filter::{
     FilterIpExt, SocketIngressFilterResult, SocketOpsFilter, TransportPacketSerializer,
 };
+use netstack3_hashmap::hash_map;
 use netstack3_ip::socket::{IpSockCreationError, MmsError};
 use netstack3_ip::{
     IpHeaderInfo, IpTransportContext, LocalDeliveryPacketInfo, ReceiveIpPacketMeta,

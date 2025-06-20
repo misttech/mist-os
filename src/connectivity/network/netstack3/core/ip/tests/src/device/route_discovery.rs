@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::collections::HashMap;
 use alloc::vec::Vec;
 use core::convert::TryInto as _;
 use core::time::Duration;
@@ -25,6 +24,7 @@ use netstack3_core::testutil::{
     CtxPairExt as _, DispatchedEvent, FakeBindingsCtx, FakeCtx, DEFAULT_INTERFACE_METRIC,
 };
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+use netstack3_hashmap::HashMap;
 use netstack3_ip::device::{
     IpDeviceBindingsContext, IpDeviceConfigurationUpdate, IpDeviceEvent,
     Ipv6DeviceConfigurationContext, Ipv6DeviceConfigurationUpdate, Ipv6DiscoveredRoute,

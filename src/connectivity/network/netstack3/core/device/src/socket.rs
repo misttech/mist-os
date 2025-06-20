@@ -4,7 +4,6 @@
 
 //! Link-layer sockets (analogous to Linux's AF_PACKET sockets).
 
-use alloc::collections::{HashMap, HashSet};
 use core::fmt::Debug;
 use core::hash::Hash;
 use core::num::NonZeroU16;
@@ -21,6 +20,7 @@ use netstack3_base::{
     RemoveResourceResultWithContext, ResourceCounterContext, SendFrameContext,
     SendFrameErrorReason, StrongDeviceIdentifier, WeakDeviceIdentifier as _,
 };
+use netstack3_hashmap::{HashMap, HashSet};
 use packet::{BufferMut, ParsablePacket as _, Serializer};
 use packet_formats::error::ParseError;
 use packet_formats::ethernet::{EtherType, EthernetFrameLengthCheck};
@@ -1060,7 +1060,6 @@ mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use alloc::collections::HashMap;
     use alloc::vec;
     use alloc::vec::Vec;
     use core::marker::PhantomData;
@@ -1070,6 +1069,7 @@ mod tests {
         FakeReferencyDeviceId, FakeStrongDeviceId, FakeWeakDeviceId, MultipleDevicesId,
     };
     use netstack3_base::{CounterContext, CtxPair, SendFrameError, SendableFrameMeta};
+    use netstack3_hashmap::HashMap;
     use packet::ParsablePacket;
     use test_case::test_case;
 

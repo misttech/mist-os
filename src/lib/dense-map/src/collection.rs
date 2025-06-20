@@ -7,8 +7,7 @@
 //! Defines [`DenseMapCollection`], which is a generic map collection that can be
 //! keyed on [`DenseMapCollectionKey`], which is a two-level key structure.
 
-use alloc::vec::Vec;
-use core::num::NonZeroUsize;
+use std::num::NonZeroUsize;
 
 use crate::{DenseMap, EntryKey};
 
@@ -404,7 +403,7 @@ impl<K: DenseMapCollectionKey, T> Default for DenseMapCollection<K, T> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::collections::HashSet;
+    use std::collections::HashSet;
 
     use super::*;
     use crate::testutil::assert_empty;

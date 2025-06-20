@@ -21,7 +21,6 @@ pub(crate) mod accept_queue;
 pub(crate) mod demux;
 pub(crate) mod isn;
 
-use alloc::collections::{hash_map, HashMap};
 use core::convert::Infallible as Never;
 use core::fmt::{self, Debug};
 use core::marker::PhantomData;
@@ -62,6 +61,7 @@ use netstack3_base::{
     TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::{FilterIpExt, SocketOpsFilterBindingContext, Tuple};
+use netstack3_hashmap::{hash_map, HashMap};
 use netstack3_ip::socket::{
     DeviceIpSocketHandler, IpSock, IpSockCreateAndSendError, IpSockCreationError, IpSocketHandler,
 };

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use alloc::boxed::Box;
-use alloc::collections::HashMap;
 use alloc::vec::Vec;
 use core::convert::Infallible as Never;
 use core::fmt::Debug;
@@ -42,6 +41,7 @@ use netstack3_filter::{
     FilterMarkMetadata, FilterTimerId, ForwardedPacket, IngressVerdict, IpPacket, MarkAction,
     TransportPacketSerializer, Tuple, WeakConnectionError, WeakConntrackConnection,
 };
+use netstack3_hashmap::HashMap;
 use packet::{
     Buf, BufferAlloc, BufferMut, GrowBuffer, PacketBuilder as _, PacketConstraints, ParseBufferMut,
     ParseMetadata, SerializeError, Serializer as _,

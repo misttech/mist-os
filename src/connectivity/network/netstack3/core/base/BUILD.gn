@@ -63,7 +63,7 @@ rustc_library_with_features("netstack3-base") {
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/lib/diagnostics-traits",
     "//src/connectivity/network/lib/explicit",
-    "//src/lib/fakealloc",
+    "//src/connectivity/network/netstack3/core/hashmap",
     "//src/lib/network/packet",
     "//third_party/rust_crates:arrayvec",
     "//third_party/rust_crates:derivative",
@@ -83,7 +83,6 @@ rustc_library_with_features("netstack3-base") {
     "//src/connectivity/network/netstack3/core/teststd",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:criterion",
-    "//third_party/rust_crates:log",
     "//third_party/rust_crates:rand_xorshift",
   ]
 

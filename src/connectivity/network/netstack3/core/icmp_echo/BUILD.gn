@@ -19,7 +19,6 @@ rustc_library_with_features("netstack3-icmp-echo") {
     "//src/connectivity/lib/net-types",
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/netstack3/core/lock-order",
-    "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:either",

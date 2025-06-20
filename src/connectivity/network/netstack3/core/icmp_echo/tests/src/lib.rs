@@ -11,6 +11,6 @@
 // ordering no longer causes overflows.
 #![recursion_limit = "256"]
 
-extern crate fakealloc as alloc;
+extern crate alloc;
 
 mod socket;

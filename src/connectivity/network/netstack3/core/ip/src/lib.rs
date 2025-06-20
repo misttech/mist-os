@@ -15,7 +15,7 @@
     clippy::precedence
 )]
 
-extern crate fakealloc as alloc;
+extern crate alloc;
 
 #[path = "."]
 mod internal {

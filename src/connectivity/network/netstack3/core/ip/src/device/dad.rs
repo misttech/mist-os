@@ -1354,7 +1354,6 @@ const IPV4_ADDRESS_DEFENSE_STRATEGY: AddressDefenseStrategy =
 
 #[cfg(test)]
 mod tests {
-    use alloc::collections::hash_map::{Entry, HashMap};
     use core::ops::RangeBounds;
     use core::time::Duration;
 
@@ -1370,6 +1369,7 @@ mod tests {
         AssignedAddrIpExt, CtxPair, InstantContext as _, Ipv4DeviceAddr, Ipv6DeviceAddr,
         SendFrameContext as _, TimerHandler,
     };
+    use netstack3_hashmap::hash_map::{Entry, HashMap};
     use packet::EmptyBuf;
     use test_case::test_case;
 

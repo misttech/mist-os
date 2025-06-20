@@ -30,7 +30,6 @@
 //! + 40 byte IPv6 header). If a link supports an MTU greater than the maximum
 //! size of a non-jumbogram packet, the packet should not be fragmented.
 
-use alloc::collections::hash_map::{Entry, HashMap};
 use alloc::collections::{BTreeSet, BinaryHeap};
 use alloc::vec::Vec;
 use core::cmp::Ordering;
@@ -45,6 +44,7 @@ use netstack3_base::{
     CoreTimerContext, HandleableTimer, InstantBindingsTypes, IpExt, LocalTimerHeap,
     TimerBindingsTypes, TimerContext,
 };
+use netstack3_hashmap::hash_map::{Entry, HashMap};
 use packet::BufferViewMut;
 use packet_formats::ip::{IpPacket, Ipv4Proto};
 use packet_formats::ipv4::{Ipv4Header, Ipv4Packet};

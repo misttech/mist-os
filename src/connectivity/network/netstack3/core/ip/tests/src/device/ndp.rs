@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::collections::{HashMap, HashSet};
 use alloc::vec;
 use alloc::vec::Vec;
 use core::convert::TryInto as _;
@@ -52,6 +51,7 @@ use netstack3_core::testutil::{
 };
 use netstack3_core::{BindingsTypes, Instant, TimerId};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+use netstack3_hashmap::{HashMap, HashSet};
 use netstack3_ip::device::testutil::{calculate_slaac_addr_sub, with_assigned_ipv6_addr_subnets};
 use netstack3_ip::device::{
     get_ipv6_hop_limit, IidGenerationConfiguration, InnerSlaacTimerId, IpAddressData,

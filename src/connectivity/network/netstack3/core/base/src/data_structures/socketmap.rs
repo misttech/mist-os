@@ -9,13 +9,13 @@
 //! API for setting and getting values while maintaining extra information about
 //! the number of values of certain types present in the map.
 
-use alloc::collections::{hash_map, HashMap};
 use core::fmt::Debug;
 use core::hash::Hash;
 use core::num::NonZeroUsize;
 
 use derivative::Derivative;
 use either::Either;
+use netstack3_hashmap::{hash_map, HashMap};
 
 /// A type whose values can "shadow" other values of the type.
 ///

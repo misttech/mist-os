@@ -7,17 +7,13 @@
 //! Defines the [`DenseMap`] data structure: A generic mapped container keyed by
 //! an internally managed pool of identifiers kept densely packed.
 
-#![no_std]
 #![deny(missing_docs, unreachable_patterns)]
-
-extern crate fakealloc as alloc;
 
 pub mod collection;
 #[cfg(test)]
 mod testutil;
 
-use alloc::vec::Vec;
-use core::fmt::Debug;
+use std::fmt::Debug;
 
 /// [`DenseMap`]s use `usize`s for keys.
 pub type Key = usize;
@@ -553,7 +549,7 @@ impl<'a, T> Iterator for InsertionOrderedIter<'a, T> {
 /// An iterator over the keys and values stored in an [`DenseMap`].
 ///
 /// This iterator returns items in key order.
-pub struct IntoKeyOrderedIter<T>(core::iter::Enumerate<alloc::vec::IntoIter<DenseMapEntry<T>>>);
+pub struct IntoKeyOrderedIter<T>(core::iter::Enumerate<std::vec::IntoIter<DenseMapEntry<T>>>);
 
 impl<T> Iterator for IntoKeyOrderedIter<T> {
     type Item = (Key, T);
@@ -850,8 +846,7 @@ impl<'a, K: EntryKey, T> Entry<'a, K, T> {
 
 #[cfg(test)]
 mod tests {
-    use alloc::collections::HashMap;
-    use alloc::vec;
+    use std::collections::HashMap;
 
     use rand::seq::SliceRandom as _;
 
@@ -1742,7 +1737,7 @@ mod tests {
     proptest::proptest! {
         #![proptest_config(proptest::test_runner::Config {
             // Add all failed seeds here.
-            failure_persistence: proptest_support::failed_seeds_no_std!(),
+            failure_persistence: proptest_support::failed_seeds!(),
             ..proptest::test_runner::Config::default()
         })]
 

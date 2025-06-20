@@ -195,7 +195,6 @@ impl<
 
 #[cfg(test)]
 pub(crate) mod testutil {
-    use alloc::collections::HashMap;
     use alloc::sync::{Arc, Weak};
     use alloc::vec::Vec;
     use core::hash::{Hash, Hasher};
@@ -212,6 +211,7 @@ pub(crate) mod testutil {
         AnyDevice, AssignedAddrIpExt, DeviceIdContext, InspectableValue, InstantContext,
         IntoCoreTimerCtx, IpAddressId, WeakIpAddressId,
     };
+    use netstack3_hashmap::HashMap;
 
     use super::*;
     use crate::conntrack;

@@ -2035,7 +2035,7 @@ fn add_slaac_addr_sub<BC: SlaacBindingsContext<CC::DeviceId>, CC: SlaacContext<B
 pub(crate) mod testutil {
     use super::*;
 
-    use alloc::collections::HashMap;
+    use netstack3_hashmap::HashMap;
 
     use net_types::ip::Ipv6;
 
@@ -2078,7 +2078,6 @@ pub(crate) mod testutil {
 
 #[cfg(test)]
 mod tests {
-    use alloc::collections::HashSet;
     use alloc::vec;
     use core::convert::TryFrom as _;
 
@@ -2088,6 +2087,7 @@ mod tests {
         FakeTimerCtxExt as _, FakeWeakDeviceId,
     };
     use netstack3_base::{CtxPair, IntoCoreTimerCtx};
+    use netstack3_hashmap::HashSet;
     use test_case::test_case;
 
     use super::*;

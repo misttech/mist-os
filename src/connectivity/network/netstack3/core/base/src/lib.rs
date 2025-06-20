@@ -16,7 +16,7 @@
     clippy::precedence
 )]
 
-extern crate fakealloc as alloc;
+extern crate alloc;
 
 mod context;
 mod convert;

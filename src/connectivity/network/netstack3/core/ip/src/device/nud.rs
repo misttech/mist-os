@@ -4,7 +4,6 @@
 
 //! Neighbor unreachability detection.
 
-use alloc::collections::hash_map::{self, Entry, HashMap};
 use alloc::collections::{BinaryHeap, VecDeque};
 use alloc::vec::Vec;
 use core::convert::Infallible as Never;
@@ -26,6 +25,7 @@ use netstack3_base::{
     SendFrameError, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
     TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
+use netstack3_hashmap::hash_map::{self, Entry, HashMap};
 use packet::{
     Buf, BufferMut, GrowBuffer as _, ParsablePacket as _, ParseBufferMut as _, SerializeError,
     Serializer,
@@ -2792,7 +2792,6 @@ where
 
 #[cfg(test)]
 mod tests {
-    use alloc::collections::HashSet;
     use alloc::vec;
 
     use ip_test_macro::ip_test;
@@ -2805,6 +2804,7 @@ mod tests {
     use netstack3_base::{
         CtxPair, InstantContext, IntoCoreTimerCtx, SendFrameContext as _, SendFrameErrorReason,
     };
+    use netstack3_hashmap::HashSet;
     use test_case::test_case;
 
     use super::*;

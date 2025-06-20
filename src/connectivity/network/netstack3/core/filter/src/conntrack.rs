@@ -4,7 +4,6 @@
 
 mod tcp;
 
-use alloc::collections::HashMap;
 use alloc::fmt::Debug;
 use alloc::sync::{Arc, Weak};
 use alloc::vec::Vec;
@@ -16,6 +15,7 @@ use core::time::Duration;
 
 use derivative::Derivative;
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker};
+use netstack3_hashmap::HashMap;
 use packet_formats::ip::{IpExt, IpProto, Ipv4Proto, Ipv6Proto};
 
 use crate::context::{FilterBindingsContext, FilterBindingsTypes};
@@ -84,14 +84,14 @@ impl<I: IpExt, E, BT: FilterBindingsTypes> Table<I, E, BT> {
         tuple: &Tuple<I>,
     ) -> Option<Arc<ConnectionShared<I, E, BT>>> {
         let guard = self.inner.lock();
-        let conn = guard.table.get(&tuple)?;
+        let conn = guard.table.get(tuple)?;
         Some(conn.clone())
     }
 
     /// Returns a [`Connection`] for the flow indexed by `tuple`, if one exists.
     pub fn get_connection(&self, tuple: &Tuple<I>) -> Option<Connection<I, E, BT>> {
         let guard = self.inner.lock();
-        let conn = guard.table.get(&tuple)?;
+        let conn = guard.table.get(tuple)?;
         Some(Connection::Shared(conn.clone()))
     }
 
@@ -111,7 +111,7 @@ impl<I: IpExt, E, BT: FilterBindingsTypes> Table<I, E, BT> {
         let mut guard = self.inner.lock();
 
         // Remove the entry indexed by the tuple.
-        let conn = guard.table.remove(&tuple)?;
+        let conn = guard.table.remove(tuple)?;
         let (original, reply) = (&conn.inner.original_tuple, &conn.inner.reply_tuple);
 
         // If this is not a self-connected flow, we need to remove the other tuple on

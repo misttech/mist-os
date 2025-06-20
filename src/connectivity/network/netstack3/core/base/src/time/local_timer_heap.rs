@@ -4,9 +4,11 @@
 
 //! A local timer heap for use in netstack3 core.
 
-use alloc::collections::{binary_heap, hash_map, BinaryHeap, HashMap};
+use alloc::collections::{binary_heap, BinaryHeap};
 use core::hash::Hash;
 use core::time::Duration;
+
+use netstack3_hashmap::{hash_map, HashMap};
 
 use crate::{CoreTimerContext, Instant, InstantBindingsTypes, TimerBindingsTypes, TimerContext};
 

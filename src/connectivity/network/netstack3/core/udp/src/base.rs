@@ -4,7 +4,6 @@
 
 //! The User Datagram Protocol (UDP).
 
-use alloc::collections::hash_map::DefaultHasher;
 use alloc::vec::Vec;
 use core::borrow::Borrow;
 use core::convert::Infallible as Never;
@@ -51,6 +50,7 @@ use netstack3_datagram::{
     WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
 };
 use netstack3_filter::{SocketIngressFilterResult, SocketOpsFilter, SocketOpsFilterBindingContext};
+use netstack3_hashmap::hash_map::DefaultHasher;
 use netstack3_ip::socket::{
     IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SocketHopLimits,
 };
@@ -2737,7 +2737,6 @@ impl<
 #[cfg(test)]
 mod tests {
     use alloc::borrow::ToOwned;
-    use alloc::collections::{HashMap, HashSet};
     use alloc::vec;
     use core::convert::TryInto as _;
     use core::ops::{Deref, DerefMut};
@@ -2764,6 +2763,7 @@ mod tests {
         UninstantiableWrapper,
     };
     use netstack3_datagram::MulticastInterfaceSelector;
+    use netstack3_hashmap::{HashMap, HashSet};
     use netstack3_ip::device::IpDeviceStateIpExt;
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
     use netstack3_ip::testutil::{DualStackSendIpPacketMeta, FakeIpHeaderInfo};

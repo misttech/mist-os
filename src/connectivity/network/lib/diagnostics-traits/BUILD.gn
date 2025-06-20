@@ -8,10 +8,7 @@ import("//build/rust/rustc_library.gni")
 rustc_library("diagnostics-traits") {
   edition = "2021"
   sources = [ "src/lib.rs" ]
-  deps = [
-    "//src/connectivity/lib/net-types",
-    "//src/lib/fakealloc",
-  ]
+  deps = [ "//src/connectivity/lib/net-types" ]
   if (is_fuchsia) {
     sources += [ "src/fuchsia.rs" ]
     deps += [

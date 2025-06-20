@@ -101,6 +101,7 @@ rustc_library_with_features("netstack3-core") {
     "src/transport/integration.rs",
   ]
   deps = [
+    "hashmap",
     "lock-order",
     "macros:netstack3-macros",
     "//src/connectivity/lib/net-types",
@@ -109,10 +110,6 @@ rustc_library_with_features("netstack3-core") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:derivative",
     "//third_party/rust_crates:log",
-
-    # TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11):
-    # remove this module.
-    "//src/lib/fakealloc",
   ]
   _testutils_deps = [ "//third_party/rust_crates:zerocopy" ]
 

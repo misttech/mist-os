@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::collections::HashMap;
 use alloc::vec::Vec;
 use core::fmt::{Debug, Display};
 use core::num::NonZeroU64;
@@ -17,6 +16,7 @@ use netstack3_base::{
     InstantContext, ReferenceNotifiers, TimerBindingsTypes, TimerHandler, TxMetadataBindingsTypes,
 };
 use netstack3_filter::FilterBindingsTypes;
+use netstack3_hashmap::HashMap;
 use netstack3_ip::device::Ipv6LinkLayerAddr;
 use netstack3_ip::nud::{LinkResolutionContext, NudCounters};
 use packet::Buf;
@@ -42,10 +42,10 @@ use crate::internal::state::DeviceStateSpec;
 /// so it can be an associated type on impls of the [`IpDeviceContext`] trait.
 pub struct DevicesIter<'s, BT: DeviceLayerTypes> {
     pub(super) ethernet:
-        alloc::collections::hash_map::Values<'s, EthernetDeviceId<BT>, EthernetPrimaryDeviceId<BT>>,
+        netstack3_hashmap::hash_map::Values<'s, EthernetDeviceId<BT>, EthernetPrimaryDeviceId<BT>>,
     pub(super) pure_ip:
-        alloc::collections::hash_map::Values<'s, PureIpDeviceId<BT>, PureIpPrimaryDeviceId<BT>>,
-    pub(super) blackhole: alloc::collections::hash_map::Values<
+        netstack3_hashmap::hash_map::Values<'s, PureIpDeviceId<BT>, PureIpPrimaryDeviceId<BT>>,
+    pub(super) blackhole: netstack3_hashmap::hash_map::Values<
         's,
         BlackholeDeviceId<BT>,
         BlackholePrimaryDeviceId<BT>,

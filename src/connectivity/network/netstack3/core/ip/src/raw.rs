@@ -5,7 +5,7 @@
 //! Facilities backing raw IP sockets.
 
 use alloc::collections::btree_map::Entry;
-use alloc::collections::{BTreeMap, HashMap};
+use alloc::collections::BTreeMap;
 use core::fmt::{self, Debug, Display};
 use core::num::NonZeroU8;
 use derivative::Derivative;
@@ -23,6 +23,7 @@ use netstack3_base::{
     TxMetadataBindingsTypes, WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_filter::{FilterIpExt, RawIpBody};
+use netstack3_hashmap::HashMap;
 use packet::{BufferMut, SliceBufViewMut};
 use packet_formats::icmp;
 use packet_formats::ip::{DscpAndEcn, IpPacket};

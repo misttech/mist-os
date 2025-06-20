@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::collections::{HashMap, VecDeque};
+use alloc::collections::VecDeque;
 use alloc::vec;
 use alloc::vec::Vec;
 use core::num::{NonZeroU16, NonZeroUsize};
@@ -41,6 +41,7 @@ use netstack3_core::testutil::{
 };
 use netstack3_core::{CoreTxMetadata, IpExt, UnlockedCoreCtx};
 use netstack3_device::testutil::IPV6_MIN_IMPLIED_MAX_FRAME_SIZE;
+use netstack3_hashmap::HashMap;
 use netstack3_ip::device::{
     IpDeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate, SlaacConfigurationUpdate,
     StableSlaacAddressConfiguration,

@@ -10,7 +10,6 @@ pub use netstack3_base::testutil::{FakeDeviceId, TestIpExt};
 pub use netstack3_filter::testutil::new_filter_egress_ip_packet;
 
 use alloc::borrow::ToOwned;
-use alloc::collections::HashMap;
 use alloc::sync::Arc;
 use alloc::vec;
 use alloc::vec::Vec;
@@ -57,6 +56,7 @@ use netstack3_filter::testutil::NoOpSocketOpsFilter;
 use netstack3_filter::{
     FilterBindingsTypes, FilterTimerId, SocketOpsFilter, SocketOpsFilterBindingContext,
 };
+use netstack3_hashmap::HashMap;
 use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
 use netstack3_ip::device::{
     IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
