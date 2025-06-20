@@ -6696,11 +6696,6 @@ void VmCowPages::RangeChangeUpdateCowChildren(LockedPtr self, VmCowRange range, 
 }
 
 void VmCowPages::FinishTransitionToUncachedLocked() {
-  DEBUG_ASSERT(parent_ == nullptr);
-  DEBUG_ASSERT(children_list_len_ == 0);
-  DEBUG_ASSERT(!is_discardable());
-  DEBUG_ASSERT(!is_root_source_user_pager_backed());
-
   // No need to perform clean/invalidate if size is zero because there can be no pages.
   if (size_ == 0) {
     return;
