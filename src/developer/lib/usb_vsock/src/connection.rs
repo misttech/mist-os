@@ -58,7 +58,7 @@ impl PausePacket {
 /// - Provide buffers to be filled and sent to the other end with [`Connection::fill_usb_packet`].
 /// - Pump usb packets received into it using [`Connection::handle_vsock_packet`].
 pub struct Connection<B, S> {
-    control_socket_writer: Mutex<WriteHalf<S>>,
+    control_socket_writer: Option<Mutex<WriteHalf<S>>>,
     packet_filler: Arc<UsbPacketFiller<B>>,
     protocol_version: ProtocolVersion,
     connections: Arc<std::sync::Mutex<HashMap<Address, VsockConnection<S>>>>,
@@ -69,25 +69,28 @@ pub struct Connection<B, S> {
 impl<B: PacketBuffer, S: AsyncRead + AsyncWrite + Send + 'static> Connection<B, S> {
     /// Creates a new connection with:
     /// - a `control_socket`, over which data addressed to and from cid 0, port 0 (a control channel
-    /// between host and device) can be read and written from.
+    /// between host and device) can be read and written from. If this is `None`
+    /// we will discard control data.
     /// - An `incoming_requests_tx` that is the sender half of a request queue for incoming
     /// connection requests from the other side.
     pub fn new(
         protocol_version: ProtocolVersion,
-        control_socket: S,
+        control_socket: Option<S>,
         incoming_requests_tx: mpsc::Sender<ConnectionRequest>,
     ) -> Self {
-        let (control_socket_reader, control_socket_writer) = control_socket.split();
-        let control_socket_writer = Mutex::new(control_socket_writer);
         let packet_filler = Arc::new(UsbPacketFiller::default());
         let connections = Default::default();
         let task_scope = Scope::new_with_name("vsock_usb");
-        task_scope.spawn(Self::run_socket(
-            control_socket_reader,
-            Address::default(),
-            packet_filler.clone(),
-            PauseState::new(),
-        ));
+        let control_socket_writer = control_socket.map(|control_socket| {
+            let (control_socket_reader, control_socket_writer) = control_socket.split();
+            task_scope.spawn(Self::run_socket(
+                control_socket_reader,
+                Address::default(),
+                packet_filler.clone(),
+                PauseState::new(),
+            ));
+            Mutex::new(control_socket_writer)
+        });
         Self {
             control_socket_writer,
             packet_filler,
@@ -274,7 +277,11 @@ impl<B: PacketBuffer, S: AsyncRead + AsyncWrite + Send + 'static> Connection<B, 
     async fn handle_data_packet(&self, address: Address, payload: &[u8]) -> Result<(), Error> {
         // all zero data packets go to the control channel
         if address.is_zeros() {
-            self.control_socket_writer.lock().await.write_all(payload).await?;
+            if let Some(writer) = self.control_socket_writer.as_ref() {
+                writer.lock().await.write_all(payload).await?;
+            } else {
+                trace!("Discarding {} bytes of data sent to control socket", payload.len());
+            }
             Ok(())
         } else {
             let payload_socket;
@@ -700,7 +707,7 @@ mod test {
         let mut socket = Socket::from_socket(socket);
         let connection = Arc::new(Connection::new(
             ProtocolVersion::LATEST,
-            Socket::from_socket(other_socket),
+            Some(Socket::from_socket(other_socket)),
             incoming_requests_tx,
         ));
 
@@ -722,7 +729,7 @@ mod test {
         let (incoming_requests_tx, _incoming_requests) = mpsc::channel(5);
         let connection = Arc::new(Connection::new(
             ProtocolVersion::LATEST,
-            Socket::from_socket(other_socket),
+            Some(Socket::from_socket(other_socket)),
             incoming_requests_tx,
         ));
 
@@ -754,7 +761,7 @@ mod test {
         let (incoming_requests_tx, mut incoming_requests) = mpsc::channel(5);
         let connection = Arc::new(Connection::new(
             ProtocolVersion::LATEST,
-            Socket::from_socket(other_socket),
+            Some(Socket::from_socket(other_socket)),
             incoming_requests_tx,
         ));
 
@@ -817,12 +824,12 @@ mod test {
 
         let connection1 = Arc::new(Connection::new(
             ProtocolVersion::LATEST,
-            Socket::from_socket(other_socket1),
+            Some(Socket::from_socket(other_socket1)),
             incoming_requests_tx1,
         ));
         let connection2 = Arc::new(Connection::new(
             ProtocolVersion::LATEST,
-            Socket::from_socket(other_socket2),
+            Some(Socket::from_socket(other_socket2)),
             incoming_requests_tx2,
         ));
 

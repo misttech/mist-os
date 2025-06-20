@@ -445,7 +445,6 @@ impl PortState {
 /// Holds a connection to a single USB device.
 struct ConnectionState {
     connection: Arc<usb_vsock::Connection<Vec<u8>, fuchsia_async::Socket>>,
-    _control_socket: fuchsia_async::Socket,
 }
 
 impl ConnectionState {
@@ -454,19 +453,10 @@ impl ConnectionState {
         protocol_version: ProtocolVersion,
     ) -> (Self, mpsc::Receiver<usb_vsock::ConnectionRequest>) {
         let (incoming_requests_tx, incoming_requests) = mpsc::channel(1);
-        let (control_socket, other_end) = fuchsia_async::emulated_handle::Socket::create_stream();
-        let control_socket = fuchsia_async::Socket::from_socket(control_socket);
-        let other_end = fuchsia_async::Socket::from_socket(other_end);
         let connection =
-            Arc::new(usb_vsock::Connection::new(protocol_version, other_end, incoming_requests_tx));
+            Arc::new(usb_vsock::Connection::new(protocol_version, None, incoming_requests_tx));
 
-        (
-            ConnectionState {
-                connection: Arc::clone(&connection),
-                _control_socket: control_socket,
-            },
-            incoming_requests,
-        )
+        (ConnectionState { connection: Arc::clone(&connection) }, incoming_requests)
     }
 }
 
@@ -571,17 +561,11 @@ impl UsbVsockHost {
     pub fn add_connection_for_test(
         self: &Arc<Self>,
         connection: Arc<usb_vsock::Connection<Vec<u8>, fuchsia_async::Socket>>,
-        control_socket: fuchsia_async::Socket,
         incoming_requests: mpsc::Receiver<usb_vsock::ConnectionRequest>,
     ) -> u32 {
         let cid = self.next_cid.fetch_add(1, Ordering::Relaxed);
-        let success = self
-            .inner
-            .lock()
-            .unwrap()
-            .conns
-            .insert(cid, ConnectionState { connection, _control_socket: control_socket })
-            .is_none();
+        let success =
+            self.inner.lock().unwrap().conns.insert(cid, ConnectionState { connection }).is_none();
         assert!(success);
         self.add_incoming_request_handler(cid, incoming_requests);
         let mut sender = self.event_sender.clone();
@@ -834,7 +818,6 @@ pub struct TestConnection {
     pub cid: u32,
     pub host: Arc<UsbVsockHost>,
     pub connection: Arc<usb_vsock::Connection<Vec<u8>, fuchsia_async::Socket>>,
-    pub _control_socket: fasync::Socket,
     pub incoming_requests: mpsc::Receiver<usb_vsock::ConnectionRequest>,
     pub abort_transfer: (AbortHandle, AbortHandle),
     pub event_receiver: mpsc::Receiver<UsbVsockHostEvent>,
@@ -847,22 +830,16 @@ impl TestConnection {
     /// (representing the target perspective).
     pub fn new() -> TestConnection {
         let (a_incoming_requests_tx, a_incoming_requests) = mpsc::channel(1);
-        let (a_control_socket_other_end, a_control_socket) =
-            fasync::emulated_handle::Socket::create_stream();
-        let a_control_socket_other_end = fasync::Socket::from_socket(a_control_socket_other_end);
         let a = Arc::new(usb_vsock::Connection::new(
             ProtocolVersion::LATEST,
-            a_control_socket_other_end,
+            None,
             a_incoming_requests_tx,
         ));
 
         let (b_incoming_requests_tx, b_incoming_requests) = mpsc::channel(1);
-        let (b_control_socket_other_end, b_control_socket) =
-            fasync::emulated_handle::Socket::create_stream();
-        let b_control_socket_other_end = fasync::Socket::from_socket(b_control_socket_other_end);
         let b = Arc::new(usb_vsock::Connection::new(
             ProtocolVersion::LATEST,
-            b_control_socket_other_end,
+            None,
             b_incoming_requests_tx,
         ));
 
@@ -894,17 +871,12 @@ impl TestConnection {
 
         let (event_sender, event_receiver) = mpsc::channel(1);
         let host = UsbVsockHost::new_for_test(event_sender);
-        let cid = host.add_connection_for_test(
-            a,
-            fasync::Socket::from_socket(a_control_socket),
-            a_incoming_requests,
-        );
+        let cid = host.add_connection_for_test(a, a_incoming_requests);
 
         TestConnection {
             cid,
             host,
             connection: b,
-            _control_socket: fasync::Socket::from_socket(b_control_socket),
             incoming_requests: b_incoming_requests,
             abort_transfer: (abort_a, abort_b),
             event_receiver,
@@ -926,7 +898,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             mut incoming_requests,
             abort_transfer: _,
             event_receiver: _,
@@ -981,7 +952,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1031,7 +1001,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1096,7 +1065,6 @@ mod test {
             cid,
             host,
             connection: _c,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1117,7 +1085,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             mut incoming_requests,
             abort_transfer: _,
             event_receiver: _,
@@ -1144,7 +1111,6 @@ mod test {
             cid,
             host: _host,
             connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1174,7 +1140,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1206,7 +1171,6 @@ mod test {
             cid: _,
             host,
             connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1238,7 +1202,6 @@ mod test {
             cid: _,
             host,
             connection: _connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1258,7 +1221,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             mut incoming_requests,
             abort_transfer: _,
             event_receiver: _,
@@ -1293,7 +1255,6 @@ mod test {
             cid,
             host,
             connection: _connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1314,7 +1275,6 @@ mod test {
             cid,
             host,
             connection: _connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1334,7 +1294,6 @@ mod test {
             cid: _,
             host,
             connection: _connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1354,7 +1313,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1382,7 +1340,6 @@ mod test {
             cid,
             host,
             connection,
-            _control_socket,
             mut incoming_requests,
             abort_transfer: (abort_a, abort_b),
             event_receiver: _,
@@ -1456,7 +1413,6 @@ mod test {
             cid: _,
             host,
             connection: _connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             event_receiver: _,
@@ -1474,7 +1430,6 @@ mod test {
             cid,
             host,
             connection: _connection,
-            _control_socket,
             incoming_requests: _,
             abort_transfer: _,
             mut event_receiver,

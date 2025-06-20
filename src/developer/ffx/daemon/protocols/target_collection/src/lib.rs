@@ -1125,7 +1125,6 @@ mod tests {
             cid,
             host,
             connection,
-            _control_socket,
             mut incoming_requests,
             abort_transfer: _,
             event_receiver: _,

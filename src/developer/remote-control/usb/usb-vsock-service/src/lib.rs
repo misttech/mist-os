@@ -257,12 +257,8 @@ impl UsbConnection {
             // we allow `_other_end` to drop because we don't expect any further data on the control
             // socket, as it's currently unused. In the future if we want to have side channel data flow
             // between the host and driver, this is the socket it would go in.
-            let (control_socket, _other_end) = zx::Socket::create_stream();
-            let connection = Arc::new(Connection::new(
-                protocol_version,
-                Socket::from_socket(control_socket),
-                self.connection_tx.clone(),
-            ));
+            let connection =
+                Arc::new(Connection::new(protocol_version, None, self.connection_tx.clone()));
             self.vsock_service.set_connection(connection.clone(), cid).await;
             log::trace!("vsock connection set");
             if let Some(synchronized) = synchronized.take() {
@@ -507,12 +503,7 @@ mod tests {
         usb_callback_client.new_link(usb_packet_server).await.unwrap();
 
         let (incoming_tx, incoming_rx) = mpsc::channel(1);
-        let (_control_socket, other_end) = zx::Socket::create_stream();
-        let host_connection = Arc::new(Connection::new(
-            ProtocolVersion::LATEST,
-            Socket::from_socket(other_end),
-            incoming_tx,
-        ));
+        let host_connection = Arc::new(Connection::new(ProtocolVersion::LATEST, None, incoming_tx));
 
         // send the initial sync packet with
         let header = &mut Header::new(PacketType::Sync);
