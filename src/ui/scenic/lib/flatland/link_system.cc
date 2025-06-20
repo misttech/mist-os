@@ -193,12 +193,11 @@ LinkSystem::LinkToParent LinkSystem::CreateLinkToParent(
                        .view_ref_control = std::move(view_ref_control)});
 }
 
-void LinkSystem::UpdateLinks(const GlobalTopologyData::TopologyVector& global_topology,
-                             const std::unordered_set<TransformHandle>& live_handles,
-                             const GlobalMatrixVector& global_matrices,
-                             const glm::vec2& device_pixel_ratio,
-                             const UberStruct::InstanceMap& uber_structs) {
-  TRACE_DURATION("gfx", "LinkSystem::UpdateLinks");
+void LinkSystem::UpdateLinkWatchers(const GlobalTopologyData::TopologyVector& global_topology,
+                                    const std::unordered_set<TransformHandle>& live_handles,
+                                    const GlobalMatrixVector& global_matrices,
+                                    const UberStruct::InstanceMap& uber_structs) const {
+  TRACE_DURATION("gfx", "LinkSystem::UpdateLinkWatchers");
   std::scoped_lock lock(mutex_);
 
   // Since the global topology may not contain every Flatland instance, manually update the
@@ -207,7 +206,7 @@ void LinkSystem::UpdateLinks(const GlobalTopologyData::TopologyVector& global_to
     // The child Flatland instance is connected to the display if it is present in the global
     // topology.
     child_end.parent_viewport_watcher->UpdateLinkStatus(
-        live_handles.count(child_end.child_transform_handle) > 0
+        live_handles.contains(child_end.child_transform_handle)
             ? ParentViewportStatus::CONNECTED_TO_DISPLAY
             : ParentViewportStatus::DISCONNECTED_FROM_DISPLAY);
   }
@@ -227,8 +226,8 @@ void LinkSystem::UpdateLinks(const GlobalTopologyData::TopologyVector& global_to
     //
     // NOTE: The LinkSystem can technically "miss" updating the ChildViewStatus for a
     //       particular ChildViewWatcher if the child presents two CreateView() calls before
-    //       UpdateLinks() is called, but in that case, the first Link is destroyed, and therefore
-    //       its status does not need to be updated anyway.
+    //       UpdateLinkWatchers() is called, but in that case, the first Link is destroyed,
+    //       and therefore its status does not need to be updated anyway.
     auto uber_struct_kv = uber_structs.find(child_transform_handle.GetInstanceId());
     if (uber_struct_kv != uber_structs.end()) {
       const auto& local_topology = uber_struct_kv->second->local_topology;
@@ -245,15 +244,16 @@ void LinkSystem::UpdateLinks(const GlobalTopologyData::TopologyVector& global_to
     // to any caller of GetViewRef().  For example, this means that by the time the watcher receives
     // it, the child view will already exist in the view tree, and therefore an attempt to focus it
     // will succeed.
-    if (live_handles.count(child_transform_handle) > 0) {
+    if (live_handles.contains(child_transform_handle)) {
       child_view_watcher->UpdateViewRef();
     }
   }
-
-  UpdateDevicePixelRatio({device_pixel_ratio.x, device_pixel_ratio.y});
 }
 
 void LinkSystem::UpdateDevicePixelRatio(const fuchsia::math::VecF& device_pixel_ratio) {
+  TRACE_DURATION("gfx", "LinkSystem::UpdateDevicePixelRatio");
+  std::scoped_lock lock(mutex_);
+
   if (fidl::Equals(device_pixel_ratio_.exchange(device_pixel_ratio), device_pixel_ratio)) {
     // The new value is the same as the old.
     return;
@@ -288,8 +288,7 @@ void LinkSystem::UpdateViewportPropertiesFor(
   // 2. Resolved link -> Layout stored in |parent_to_child_map_|.
   // 3. Dead link -> Layout stored nowhere.
   std::scoped_lock lock(mutex_);
-  FX_DCHECK((initial_layout_infos_.count(handle) == 0 && parent_to_child_map_.count(handle) == 0) ||
-            (initial_layout_infos_.count(handle) != parent_to_child_map_.count(handle)))
+  FX_DCHECK((initial_layout_infos_.count(handle) + parent_to_child_map_.count(handle)) <= 1)
       << "Layout should only exist in at most one map at a time.";
   if (auto initial_layout_it = initial_layout_infos_.find(handle);
       initial_layout_it != initial_layout_infos_.end()) {

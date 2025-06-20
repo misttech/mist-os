@@ -376,10 +376,10 @@ class LinkSystem : public std::enable_shared_from_this<LinkSystem> {
   // single) display. |live_handles| is the set of nodes in that vector. |global_matrices| is the
   // list of global matrices, one per handle in |global_topology|. |uber_structs| is the set of
   // UberStructs used to generate the global topology.
-  void UpdateLinks(const GlobalTopologyData::TopologyVector& global_topology,
-                   const std::unordered_set<TransformHandle>& live_handles,
-                   const GlobalMatrixVector& global_matrices, const glm::vec2& device_pixel_ratio,
-                   const UberStruct::InstanceMap& uber_structs);
+  void UpdateLinkWatchers(const GlobalTopologyData::TopologyVector& global_topology,
+                          const std::unordered_set<TransformHandle>& live_handles,
+                          const GlobalMatrixVector& global_matrices,
+                          const UberStruct::InstanceMap& uber_structs) const;
 
   // Returns the mapping from the child_transform_handle of each LinkToParent to the corresponding
   // parent_transform_handle from each LinkToChild.
@@ -391,16 +391,14 @@ class LinkSystem : public std::enable_shared_from_this<LinkSystem> {
   void UpdateViewportPropertiesFor(TransformHandle handle,
                                    const fuchsia::ui::composition::ViewportProperties& properties);
 
-  void set_device_pixel_ratio(const glm::vec2& initial_device_pixel_ratio) {
-    std::scoped_lock lock(mutex_);
-    UpdateDevicePixelRatio({initial_device_pixel_ratio.x, initial_device_pixel_ratio.y});
+  // Updates |device_pixel_ratio_| and, if the value changed, sends updates to all waiting clients.
+  void UpdateDevicePixelRatio(const fuchsia::math::VecF& device_pixel_raito);
+  void UpdateDevicePixelRatio(const glm::vec2& initial_device_pixel_ratio) {
+    UpdateDevicePixelRatio(
+        fuchsia::math::VecF{.x = initial_device_pixel_ratio.x, .y = initial_device_pixel_ratio.y});
   }
 
  private:
-  // Updates |device_pixel_ratio_| and, if the value changed, sends updates to all waiting clients.
-  void UpdateDevicePixelRatio(const fuchsia::math::VecF& device_pixel_raito)
-      FXL_EXCLUSIVE_LOCKS_REQUIRED(mutex_);
-
   TransformHandle CreateTransformLocked() {
     TransformHandle transform;
     {
@@ -423,10 +421,10 @@ class LinkSystem : public std::enable_shared_from_this<LinkSystem> {
   // |mutex_| guards access to |link_graph_| and |link_topologies_|.
   //
   // TODO(https://fxbug.dev/42120738): These maps are modified at Link creation and destruction time
-  // (within the ObjectLinker closures) as well as within UpdateLinks, which is called by the core
-  // render loop. This produces a possible priority inversion between the Flatland instance threads
-  // and the (possibly deadline scheduled) render thread.
-  std::mutex mutex_;
+  // (within the ObjectLinker closures) as well as within UpdateLinkWatchers(), which is called by
+  // the core render loop. This produces a possible priority inversion between the Flatland instance
+  // threads and the (possibly deadline scheduled) render thread.
+  mutable std::mutex mutex_;
 
   // Structs representing the child and parent ends of a link.
   struct ChildEnd {
@@ -449,7 +447,7 @@ class LinkSystem : public std::enable_shared_from_this<LinkSystem> {
       FXL_GUARDED_BY(mutex_);
 
   // The starting DPR used by the link system. The actual DPR used on subsequent calls to
-  // UpdateLinks() may be different from this value.
+  // UpdateLinkWatchers() may be different from this value.
   // TODO(https://fxbug.dev/42059985): This will need to be updated once we have multidisplay setup.
   std::atomic<fuchsia::math::VecF> device_pixel_ratio_;
 };

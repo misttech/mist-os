@@ -577,7 +577,7 @@ class FlatlandTest : public LoggingEventLoop, public ::testing::Test {
   // Updates all Links reachable from |root_transform|, which must be the root transform of one of
   // the active Flatland instances.
   //
-  // Tests that call this function are testing both Flatland and LinkSystem::UpdateLinks().
+  // Tests that call this function are testing both Flatland and LinkSystem::UpdateLinkWatchers().
   void UpdateLinks(TransformHandle root_transform) {
     // Run the looper in case there are queued commands in, e.g., ObjectLinker.
     RunLoopUntilIdle();
@@ -590,8 +590,8 @@ class FlatlandTest : public LoggingEventLoop, public ::testing::Test {
     const auto matrices =
         flatland::ComputeGlobalMatrices(data.topology_vector, data.parent_indices, snapshot);
 
-    link_system_->UpdateLinks(data.topology_vector, data.live_handles, matrices,
-                              display_pixel_ratio_, snapshot);
+    link_system_->UpdateLinkWatchers(data.topology_vector, data.live_handles, matrices, snapshot);
+    link_system_->UpdateDevicePixelRatio(display_pixel_ratio_);
 
     // Run the looper again to process any queued FIDL events (i.e., Link callbacks).
     RunLoopUntilIdle();
@@ -3670,7 +3670,7 @@ TEST_F(FlatlandTest, LinkSystem_WhenSettingDevicePixelRatio_ItShouldBeTransmitte
   const ContentId kLinkId = {2};
 
   const glm::vec2 initial_dpr = {3.f, 4.f};
-  link_system_->set_device_pixel_ratio(initial_dpr);
+  link_system_->UpdateDevicePixelRatio(initial_dpr);
 
   auto [parent_viewport_watcher_client_end, parent_viewport_watcher_server_end] =
       fidl::Endpoints<ParentViewportWatcher>::Create();
@@ -3703,7 +3703,7 @@ TEST_F(FlatlandTest, LinkSystem_WhenSettingDevicePixelRatio_ItShouldBeTransmitte
 
   // Set a new DPR.
   const glm::vec2 new_dpr = {5.f, 6.f};
-  link_system_->set_device_pixel_ratio(new_dpr);
+  link_system_->UpdateDevicePixelRatio(new_dpr);
 
   {  // Observe the new DPR being delivered.
     std::optional<LayoutInfo> layout;

@@ -124,7 +124,7 @@ TEST_F(LinkSystemTest, ResolvedLinkCreatesLinkTopology) {
   auto child_graph = CreateTransformGraph();
   auto parent_graph = CreateTransformGraph();
 
-  link_system->set_device_pixel_ratio(glm::vec2{2.f, 2.f});
+  link_system->UpdateDevicePixelRatio(glm::vec2{2.f, 2.f});
 
   ViewportCreationToken parent_token;
   ViewCreationToken child_token;
@@ -302,11 +302,11 @@ TEST_F(LinkSystemTest, OverwrittenHangingGetsReturnError) {
   }
 }
 
-// LinkSystem::UpdateLinks() requires substantial setup to unit test:
+// LinkSystem::UpdateLinkWatchers() requires substantial setup to unit test:
 // ParentViewportWatcher/ChildViewWatcher protocols attached to the correct TransformHandles in a
-// correctly constructed global topology. As a result, LinkSystem::UpdateLinks() is effectively
-// tested in the Flatland unit tests in flatland_unittest.cc, since those tests simplify performing
-// the correct setup.
+// correctly constructed global topology.  As a result, LinkSystem::UpdateLinkWatchers() is
+// effectively tested in the Flatland unit tests in flatland_unittest.cc, since those tests simplify
+// performing the correct setup.
 
 }  // namespace test
 }  // namespace flatland

@@ -117,8 +117,8 @@ void FlatlandDisplay::SetContent(ViewportCreationToken token,
   // We can initialize the Link importer immediately, since no state changes actually occur before
   // the feed-forward portion of this method. We also forward the initial ViewportProperties through
   // the LinkSystem immediately, so the child can receive them as soon as possible.
-  // NOTE: clients won't receive CONNECTED_TO_DISPLAY until LinkSystem::UpdateLinks() is called,
-  // typically during rendering.
+  // NOTE: clients won't receive CONNECTED_TO_DISPLAY until LinkSystem::UpdateLinkWatchers() is
+  // called, typically during rendering.
   link_to_child_ = link_system_->CreateLinkToChild(
       dispatcher_holder_, std::move(token), std::move(properties), std::move(child_view_watcher),
       child_transform,

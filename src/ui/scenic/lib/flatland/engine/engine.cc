@@ -120,9 +120,10 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
   FLATLAND_VERBOSE_LOG << str.str();
 #endif
 
-  link_system_->UpdateLinks(scene_state.topology_data.topology_vector,
-                            scene_state.topology_data.live_handles, scene_state.global_matrices,
-                            hw_display->device_pixel_ratio(), scene_state.snapshot);
+  link_system_->UpdateLinkWatchers(scene_state.topology_data.topology_vector,
+                                   scene_state.topology_data.live_handles,
+                                   scene_state.global_matrices, scene_state.snapshot);
+  link_system_->UpdateDevicePixelRatio(hw_display->device_pixel_ratio());
 
   // TODO(https://fxbug.dev/42156567): hack!  need a better place to call AddDisplay().
   if (hack_seen_display_id_values_.find(hw_display->display_id().value) ==
