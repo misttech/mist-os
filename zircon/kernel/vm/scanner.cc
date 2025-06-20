@@ -348,6 +348,7 @@ void scanner_pop_disable_count() {
 }
 
 void scanner_debug_dump_state_before_panic() {
+  VmCowPages::DebugDumpReclaimCounters();
   // Retrieve a reference to any possible eviction related threads.
   Thread* threads[] = {
       GetMemoryWatchdog().DebugGetWorkerThread(),

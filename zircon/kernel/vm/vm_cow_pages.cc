@@ -182,6 +182,21 @@ VmObjectPaged* paged_backlink_locked(VmCowPages* cow) TA_REQ(cow->lock())
 
 }  // namespace
 
+// static
+void VmCowPages::DebugDumpReclaimCounters() {
+  printf("Failed reclaim evict_accessed %ld\n", vm_reclaim_evict_accessed.SumAcrossAllCpus());
+  printf("Failed reclaim compress_accessed %ld\n", vm_reclaim_compress_accessed.SumAcrossAllCpus());
+  printf("Failed reclaim no_strategy %ld\n", vm_reclaim_no_reclamation_strategy.SumAcrossAllCpus());
+  printf("Failed reclaim always_need %ld\n", vm_reclaim_always_need_skipped.SumAcrossAllCpus());
+  printf("Failed reclaim discardable %ld\n", vm_reclaim_discardable_failed.SumAcrossAllCpus());
+  printf("Failed reclaim incorrect_page %ld\n", vm_reclaim_incorrect_page.SumAcrossAllCpus());
+  printf("Failed reclaim high_priority %ld\n", vm_reclaim_high_priority.SumAcrossAllCpus());
+  printf("Failed reclaim pinned %ld\n", vm_reclaim_pinned.SumAcrossAllCpus());
+  printf("Failed reclaim dirty %ld\n", vm_reclaim_dirty.SumAcrossAllCpus());
+  printf("Failed reclaim not_pager_backed %ld\n", vm_reclaim_not_pager_backed.SumAcrossAllCpus());
+  printf("Failed reclaim uncached %ld\n", vm_reclaim_uncached.SumAcrossAllCpus());
+}
+
 // Helper for walking up a VmCowPages hierarchy where the start node is locked, and the immediate
 // parent may or may not be locked.
 class LockedParentWalker {

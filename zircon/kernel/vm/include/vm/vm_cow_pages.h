@@ -890,6 +890,8 @@ class VmCowPages final : public VmHierarchyBase,
     page_source_->FreePages(&list);
   }
 
+  static void DebugDumpReclaimCounters();
+
  private:
   // private constructor (use Create...())
   VmCowPages(VmCowPagesOptions options, uint32_t pmm_alloc_flags, uint64_t size,
