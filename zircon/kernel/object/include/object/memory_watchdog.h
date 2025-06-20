@@ -38,6 +38,10 @@ class MemoryWatchdog {
   uint64_t DebugNumBytesTillPressureLevel(PressureLevel level);
   void Dump();
 
+  // Debug method to retrieve any current worker thread. Only to be used for testing / debugging
+  // purposes. It is up to the caller to know if this objects is alive or not.
+  Thread* DebugGetWorkerThread() { return worker_thread_; }
+
  private:
   // The callback provided to the |eviction_trigger_| timer.
   static void EvictionTriggerCallback(Timer* timer, zx_instant_mono_t now, void* arg);
@@ -118,6 +122,9 @@ class MemoryWatchdog {
   // under memory pressure (i.e. at a memory pressure level that is eligible for eviction).
   enum EvictionStrategy : uint8_t { OneShot, Continuous };
   EvictionStrategy eviction_strategy_ = EvictionStrategy::OneShot;
+
+  // Record of the thread running WorkerThread created during Init.
+  Thread* worker_thread_ = nullptr;
 
   Executor* executor_;
 };

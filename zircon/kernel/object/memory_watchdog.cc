@@ -222,6 +222,7 @@ void MemoryWatchdog::WorkerThread() {
   while (true) {
     // If we've hit OOM level perform some immediate synchronous eviction to attempt to avoid OOM.
     if (mem_event_idx_ == PressureLevel::kOutOfMemory) {
+      printf("memory-pressure: beginning reclamation to avoid OOM. Allocations are now disabled\n");
       CountPressureEvent(mem_event_idx_);
       // Keep trying to perform eviction for as long as we are evicting non-zero pages and we remain
       // in the out of memory state.
@@ -344,6 +345,10 @@ void MemoryWatchdog::WaitForMemChange(const Deadline& deadline) {
   // triggering the evictor, which would cause a deadlock.
   DEBUG_ASSERT(prev != PressureLevel::kOutOfMemory);
   zx_status_t status = ZX_OK;
+  // Count how many times in a row the setting of the free memory signal fails. This should only
+  // fail in the case of an unlikely race, and failing repeatedly could indicate a bug and also
+  // means the free_pages_evt_ in the pmm is not getting signaled.
+  uint set_free_memory_failed_iterations = 0;
   // This loop can iterate many times as it is woken up by both pmm state changes and, if continuous
   // eviction is enabled, page queues state changes.
   do {
@@ -358,12 +363,18 @@ void MemoryWatchdog::WaitForMemChange(const Deadline& deadline) {
       // After having successfully set the event check again for any allocation failures. This is to
       // ensure that if an allocation failure happened while we did not have an event set that it is
       // not missed.
+      set_free_memory_failed_iterations = 0;
       if (gBootOptions->oom_trigger_on_alloc_failure && PmmNode::has_alloc_failed_no_mem()) {
         return;
       }
       status = mem_state_signal_.Wait(deadline);
     } else {
+      set_free_memory_failed_iterations++;
       // Setting failed, must've raced. Fall through and compute the new pressure level.
+      if (set_free_memory_failed_iterations > 5 && ispow2(set_free_memory_failed_iterations)) {
+        printf("memory-pressure: WARNING pmm_set_free_memory_signal has failed %u times in a row\n",
+               set_free_memory_failed_iterations);
+      }
     }
     mem_event_idx_ = CalculatePressureLevel();
     // If continuous eviction is currently active then let the evictor know that it may have some
@@ -550,10 +561,9 @@ void MemoryWatchdog::Init(Executor* executor) {
       MemoryWatchdog* watchdog = reinterpret_cast<MemoryWatchdog*>(arg);
       watchdog->WorkerThread();
     };
-    auto thread =
+    worker_thread_ =
         Thread::Create("memory-pressure-thread", memory_worker_thread, this, HIGHEST_PRIORITY);
-    DEBUG_ASSERT(thread);
-    thread->Detach();
-    thread->Resume();
+    DEBUG_ASSERT(worker_thread_);
+    worker_thread_->Resume();
   }
 }

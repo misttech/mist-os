@@ -336,6 +336,12 @@ class PageQueues {
   // to attempt to register over the top of an existing event.
   void SetAgingEvent(Event* event);
 
+  // Debug methods to retrieve a reference to any lru and mru threads. These are intended for use
+  // during tests / debugging and hence bypass the lock normally needed to read these members. It is
+  // up to the caller to know if these objects are alive or not.
+  Thread* DebugGetLruThread() TA_NO_THREAD_SAFETY_ANALYSIS { return lru_thread_; }
+  Thread* DebugGetMruThread() TA_NO_THREAD_SAFETY_ANALYSIS { return mru_thread_; }
+
  private:
   // Specifies the indices for both the page_queues_ and the page_queue_counts_
   enum PageQueue : uint8_t {

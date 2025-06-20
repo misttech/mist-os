@@ -137,6 +137,10 @@ class Evictor {
   // Return global eviction stats from all instantiations of the Evictor.
   static EvictorStats GetGlobalStats();
 
+  // Debug method to retrieve any current eviction thread. Only to be used for testing / debugging
+  // purposes. It is up to the caller to know if this objects is alive or not.
+  Thread *DebugGetEvictorThread() { return eviction_thread_; }
+
  private:
   // Private constructor for test code to specify custom methods to fake the reclamation.
   using ReclaimFunction = fit::inline_function<ktl::optional<EvictedPageCounts>(

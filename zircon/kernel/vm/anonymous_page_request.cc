@@ -11,6 +11,13 @@
 #include <kernel/lockdep.h>
 #include <kernel/thread.h>
 #include <vm/pmm.h>
+#include <vm/scanner.h>
+
+namespace {
+// Atomic token used to ensure that only one thread performs the informational dump so that in the
+// scenario of many threads all reaching the timeout at the same time there is not a rush of spam.
+ktl::atomic<bool> dump_info_before_panic_token = true;
+}  // namespace
 
 zx::result<> AnonymousPageRequest::Allocate() {
   DEBUG_ASSERT(active_);
@@ -29,6 +36,11 @@ zx::result<> AnonymousPageRequest::Allocate() {
   // so we want to make some noise here.
   constexpr zx_duration_mono_t kReportWaitTime = ZX_SEC(5);
   constexpr unsigned int kMaxWaits = ZX_SEC(30) / kReportWaitTime;
+  static_assert(kMaxWaits >= 1);
+  // Trigger an informational dump 1 wait prior to triggering a panic. In the case of many threads
+  // waiting this gives a chance for the informational dump to happen before a different thread
+  // triggers the panic.
+  constexpr unsigned int kDumpInfoWaits = kMaxWaits - 1;
   uint32_t waited = 0;
 
   // Once we return, clear the `active_` flag.
@@ -40,6 +52,15 @@ zx::result<> AnonymousPageRequest::Allocate() {
       waited++;
       dprintf(INFO, "WARNING: Waited %" PRIi64 " seconds to retry PMM allocations\n",
               (kReportWaitTime * waited) / ZX_SEC(1));
+
+      // If we've reached the threshold to dump information *and* we're the first thread to do so,
+      // i.e. first to get the token, then ask the scanner to do a pre panic dump. The assumption
+      // here is that if we've been blocked this long then we are most likely going to hit kMaxWaits
+      // and so it's worth performing a slightly unsafe informational dump for the purposes of
+      // debugging.
+      if (waited == kDumpInfoWaits && dump_info_before_panic_token.exchange(false)) {
+        scanner_debug_dump_state_before_panic();
+      }
 
       // If we've been waiting for a while without being able to get more memory and
       // without declaring OOM, the memory watchdog is probably wedged and the system is in an
