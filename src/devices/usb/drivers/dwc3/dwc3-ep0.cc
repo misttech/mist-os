@@ -22,12 +22,19 @@ zx_status_t Dwc3::Ep0Init() {
 
   const std::array eps{&ep0_.out, &ep0_.in};
   for (Endpoint* ep : eps) {
+    ep->enabled = false;
     ep->max_packet_size = kEp0MaxPacketSize;
     ep->type = USB_ENDPOINT_CONTROL;
     ep->interval = 0;
   }
 
   return ZX_OK;
+}
+
+void Dwc3::Ep0Reset() {
+  std::lock_guard<std::mutex> lock(ep0_.lock);
+  ep0_.shared_fifo.Clear();
+  ep0_.state = Ep0::State::None;
 }
 
 void Dwc3::Ep0Start() {
@@ -60,6 +67,15 @@ void Dwc3::Ep0StartEndpoints() {
   // 1-102), it will be ignored by the Start New Configuration command we are
   // sending.
   CmdStartNewConfig(ep0_.out, 2);
+
+  for (UserEndpoint& uep : user_endpoints_) {
+    std::lock_guard<std::mutex> lock(uep.ep.lock);
+
+    if (uep.ep.enabled) {
+      EpSetConfig(uep.ep, true);
+      UserEpQueueNext(uep);
+    }
+  }
 }
 
 void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
@@ -72,9 +88,6 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
 
   switch (ep0_.state) {
     case Ep0::State::Setup: {
-      // Control Endpoint stall is cleared upon receiving SETUP.
-      ep0_.out.stalled = false;
-
       void* const vaddr = ep0_.buffer->virt();
       const zx_paddr_t paddr = ep0_.buffer->phys();
       fdescriptor::wire::UsbSetup& setup = ep0_.cur_setup;
@@ -91,7 +104,7 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
         if (status.is_error()) {
           FDF_LOG(DEBUG, "HandleSetup returned %s", zx_status_get_string(status.error_value()));
           ep0_.shared_fifo.Clear();
-          EpSetStall(ep0_.out, true);
+          CmdEpSetStall(ep0_.out);
           Ep0QueueSetupLocked();
           break;
         }
@@ -135,7 +148,7 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
       zx::result<size_t> status = HandleEp0Setup(ep0_.cur_setup, ep0_.buffer->virt(), received);
       if (status.is_error()) {
         ep0_.shared_fifo.Clear();
-        EpSetStall(ep0_.out, true);
+        CmdEpSetStall(ep0_.out);
         Ep0QueueSetupLocked();
         break;
       }
@@ -164,7 +177,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
           (stage == DEPEVT_XFER_NOT_READY_STAGE_STATUS)) {
         // Stall if we receive xfer not ready data/status while waiting for setup to complete
         ep0_.shared_fifo.Clear();
-        EpSetStall(ep0_.out, true);
+        CmdEpSetStall(ep0_.out);
         Ep0QueueSetupLocked();
       }
       break;
@@ -173,7 +186,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
         // end transfer and stall if we receive xfer not ready in the opposite direction
         ep0_.shared_fifo.Clear();
         CmdEpEndTransfer(ep0_.out);
-        EpSetStall(ep0_.out, true);
+        CmdEpSetStall(ep0_.out);
         Ep0QueueSetupLocked();
       }
       break;
@@ -182,7 +195,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
         // end transfer and stall if we receive xfer not ready in the opposite direction
         ep0_.shared_fifo.Clear();
         CmdEpEndTransfer(ep0_.in);
-        EpSetStall(ep0_.out, true);
+        CmdEpSetStall(ep0_.out);
         Ep0QueueSetupLocked();
       }
       break;
@@ -236,10 +249,13 @@ zx::result<size_t> Dwc3::HandleEp0Setup(const fdescriptor::wire::UsbSetup& setup
         return zx::ok(0);
       case USB_REQ_SET_CONFIGURATION: {
         ResetConfiguration();
-        Ep0StartEndpoints();
+        configured_ = false;
+
         zx::result<size_t> status = DoControlCall(setup, nullptr, 0, nullptr, 0);
         if (status.is_ok() && setup.w_value) {
           ZX_DEBUG_ASSERT(status.value() == 0);
+          configured_ = true;
+          Ep0StartEndpoints();
         }
         return status;
       }
