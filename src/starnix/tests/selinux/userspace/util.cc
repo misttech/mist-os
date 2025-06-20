@@ -39,8 +39,9 @@ std::string RemoveTrailingNul(std::string in) {
 }
 
 fit::result<int, std::string> ReadFile(const std::string& path) {
+  fbl::unique_fd fd(open(path.c_str(), O_RDONLY));
   std::string result;
-  if (files::ReadFileToString(path, &result)) {
+  if (fd.is_valid() && files::ReadFileDescriptorToString(fd.get(), &result)) {
     return fit::ok(std::move(result));
   }
   return fit::error(errno);

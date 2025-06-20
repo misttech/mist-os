@@ -41,8 +41,8 @@ extern std::string DoPrePolicyLoadWork() {
   // Create a memfd prior to policy load, to allow the test to validate the post-policy label.
   EXPECT_THAT((g_before_policy_fd = memfd_create("test", 0)), SyscallSucceeds());
 
-  // Until a policy is loaded, returning a file label is not supported.
-  EXPECT_EQ(GetLabel(g_before_policy_fd), fit::error(ENOTSUP));
+  // Until a policy is loaded, no file label is provided.
+  EXPECT_EQ(GetLabel(g_before_policy_fd), fit::error(ENODATA));
 
   return "memfd_transition.pp";
 }

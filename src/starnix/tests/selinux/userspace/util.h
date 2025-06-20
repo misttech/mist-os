@@ -121,13 +121,14 @@ void PrintTo(const fit::result<E, T>& result, std::ostream* os) {
   }
 }
 
-template <typename E, typename T>
-bool operator==(const fit::result<E, T>& result, const fit::error<E>& expected) {
-  return result == fit::result<E, T>(expected);
+template <typename E, typename... Ts>
+constexpr bool operator==(const fit::result<E, Ts...>& result, const fit::error<E>& expected) {
+  // fit::result<...> comparisons do not compare the error values, so hand-roll that here.
+  return result.is_error() && result.error_value() == fit::result<E, Ts...>(expected).error_value();
 }
 
 template <typename E, typename T, typename T2>
-bool operator==(const fit::result<E, T>& result, const fit::success<T2>& expected) {
+constexpr bool operator==(const fit::result<E, T>& result, const fit::success<T2>& expected) {
   return result == fit::result<E, T>(expected);
 }
 
