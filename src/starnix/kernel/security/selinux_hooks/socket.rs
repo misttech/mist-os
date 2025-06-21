@@ -188,17 +188,19 @@ where
         .expect("resolve fs security");
     let effective_sid = task_effective_sid(current_task);
     let new_socket_class = compute_socket_security_class(domain, socket_type, protocol);
-    let new_socket_sid = compute_new_fs_node_sid(
-        security_server,
-        current_task,
-        &sockfs,
-        None,
-        new_socket_class.into(),
-        "".into(),
-    )?
-    .map(|(sid, _)| sid)
-    // TODO: https://fxbug.dev/364569053 - default to socket-related initial SIDs.
-    .unwrap_or_else(|| InitialSid::Unlabeled.into());
+    let new_socket_sid = if let Some(fs_label) = sockfs.security_state.state.label() {
+        compute_new_fs_node_sid(
+            security_server,
+            current_task,
+            fs_label,
+            None,
+            new_socket_class.into(),
+            "".into(),
+        )?
+    } else {
+        // TODO: https://fxbug.dev/364569053 - default to socket-related initial SIDs.
+        InitialSid::Unlabeled.into()
+    };
 
     has_socket_permission_for_sid(
         &security_server.as_permission_check(),

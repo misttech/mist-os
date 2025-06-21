@@ -18,7 +18,7 @@ pub(super) mod testing;
 
 use super::{FsNodeSecurityXattr, PermissionFlags};
 use crate::task::{CurrentTask, Kernel, Task};
-use crate::vfs::{Anon, DirEntry, FileHandle, FileObject, FileSystem, FsNode, FsStr, OutputBuffer};
+use crate::vfs::{Anon, DirEntry, FileHandle, FileObject, FileSystem, FsNode, OutputBuffer};
 use audit::{audit_decision, audit_todo_decision, Auditable};
 use selinux::permission_check::PermissionCheck;
 use selinux::policy::FsUseType;
@@ -679,60 +679,43 @@ pub(super) struct FileObjectState {
 /// Security state for a [`crate::vfs::FileSystem`] instance. This holds the security fields
 /// parsed from the mount options and the selected labeling scheme.
 #[derive(Debug)]
-enum FileSystemLabelState {
-    Unlabeled {
-        name: &'static FsStr,
-        mount_options: FileSystemMountOptions,
-        pending_entries: HashSet<WeakKey<DirEntry>>,
-    },
-    Labeled {
-        label: FileSystemLabel,
-    },
+pub(super) struct FileSystemState {
+    // Fields used prior to policy-load, to hold mount options, etc.
+    mount_options: FileSystemMountOptions,
+    pending_entries: Mutex<HashSet<WeakKey<DirEntry>>>,
+
+    // Set once the initial policy has been loaded, taking into account `mount_options`.
+    label: OnceLock<FileSystemLabel>,
 }
 
-#[derive(Debug)]
-pub(super) struct FileSystemState(Mutex<FileSystemLabelState>);
-
 impl FileSystemState {
-    fn new(name: &'static FsStr, mount_options: FileSystemMountOptions) -> Self {
-        Self(Mutex::new(FileSystemLabelState::Unlabeled {
-            name,
-            mount_options: mount_options,
-            pending_entries: HashSet::new(),
-        }))
+    fn new(mount_options: FileSystemMountOptions) -> Self {
+        Self { mount_options, pending_entries: Mutex::new(HashSet::new()), label: OnceLock::new() }
     }
 
-    /// Returns true if this `FileSystemState` is labeled with `fs_use_xattr` and thus supports
-    /// xattr.
-    pub fn supports_xattr(&self) -> bool {
-        if let FileSystemLabelState::Labeled { label } = &mut *self.0.lock() {
-            if let FileSystemLabelingScheme::FsUse { fs_use_type, .. } = label.scheme {
-                return fs_use_type == FsUseType::Xattr;
-            }
+    /// Returns the resolved `FileSystemLabel`, or `None` if no policy has yet been loaded.
+    pub fn label(&self) -> Option<&FileSystemLabel> {
+        self.label.get()
+    }
+
+    /// Returns trye if this file system supports dynamic re-labeling of file nodes.
+    pub fn supports_relabel(&self) -> bool {
+        // TODO: https://fxbug.dev/357876133 - Fix this to be consistent with observed
+        // behaviour under Linux, which allows relabeling of some `genfscon` labeled file systems.
+        match self.label() {
+            Some(FileSystemLabel { scheme: FileSystemLabelingScheme::FsUse { .. }, .. }) => true,
+            _ => false,
         }
-        return false;
     }
 
-    /// Returns true if the security state of `self` is equivalent to the one derived from
-    /// `other_mount_options` for the filesystem named `fs_name`.
-    fn equivalent_to_options(
-        &self,
-        security_server: &SecurityServer,
-        other_mount_options: &FileSystemMountOptions,
-        fs_name: &'static FsStr,
-    ) -> bool {
-        let guard = self.0.lock();
-        match &*guard {
-            FileSystemLabelState::Unlabeled { name: _, mount_options, pending_entries: _ } => {
-                return *other_mount_options == *mount_options
-            }
-            FileSystemLabelState::Labeled { label } => {
-                return superblock::label_from_mount_options_and_name(
-                    security_server,
-                    other_mount_options,
-                    fs_name.into(),
-                ) == *label
-            }
+    /// Returns true if this file system persists labels in extended attributes.
+    pub fn supports_xattr(&self) -> bool {
+        match self.label() {
+            Some(FileSystemLabel {
+                scheme: FileSystemLabelingScheme::FsUse { fs_use_type, .. },
+                ..
+            }) => *fs_use_type == FsUseType::Xattr,
+            _ => false,
         }
     }
 
@@ -750,32 +733,23 @@ impl FileSystemState {
         security_server: &SecurityServer,
         buf: &mut impl OutputBuffer,
     ) -> Result<(), Errno> {
-        let security_state = self.0.lock();
+        let Some(label) = self.label() else {
+            return Self::write_mount_options_to_buf(buf, &self.mount_options);
+        };
 
-        match *security_state {
-            FileSystemLabelState::Unlabeled { ref mount_options, .. } => {
-                Self::write_mount_options_to_buf(buf, mount_options)
-            }
-            FileSystemLabelState::Labeled { ref label } => {
-                let to_context = |sid| security_server.sid_to_security_context(sid);
-                let mount_options = FileSystemMountOptions {
-                    context: label.mount_sids.context.and_then(to_context),
-                    fs_context: label.mount_sids.fs_context.and_then(to_context),
-                    def_context: label.mount_sids.def_context.and_then(to_context),
-                    root_context: label.mount_sids.root_context.and_then(to_context),
-                };
+        let to_context = |sid| security_server.sid_to_security_context(sid);
+        let mount_options = FileSystemMountOptions {
+            context: label.mount_sids.context.and_then(to_context),
+            fs_context: label.mount_sids.fs_context.and_then(to_context),
+            def_context: label.mount_sids.def_context.and_then(to_context),
+            root_context: label.mount_sids.root_context.and_then(to_context),
+        };
 
-                // TODO: https://fxbug.dev/357876133 - Fix this to be consistent with observed
-                // behaviour under Linux.
-                let has_configurable_labels =
-                    matches!(label.scheme, FileSystemLabelingScheme::FsUse { .. });
-                if has_configurable_labels {
-                    buf.write_all(b",seclabel").map(|_| ())?;
-                }
-
-                Self::write_mount_options_to_buf(buf, &mount_options)
-            }
+        if self.supports_relabel() {
+            buf.write_all(b",seclabel").map(|_| ())?;
         }
+
+        Self::write_mount_options_to_buf(buf, &mount_options)
     }
 
     /// Writes the supplied `mount_options` to the `OutputBuffer`.
@@ -869,12 +843,17 @@ fn fs_node_set_label_with_task(fs_node: &FsNode, task: WeakRef<Task>) {
 /// Ensures that the `fs_node`'s security state has an appropriate security class set.
 /// As per the NSA report description, the security class is chosen based on the `FileMode`, unless
 /// a security class more specific than "file" has already been set on the node.
-fn fs_node_ensure_class(fs_node: &FsNode) -> Result<(), Errno> {
-    if fs_node.security_state.lock().class == FileClass::File.into() {
-        let file_mode = fs_node.info().mode;
-        fs_node.security_state.lock().class = file_class_from_file_mode(file_mode)?.into();
+fn fs_node_ensure_class(fs_node: &FsNode) -> Result<FsNodeClass, Errno> {
+    // TODO: Consider moving the class into a `OnceLock`.
+    let class = fs_node.security_state.lock().class;
+    if class != FileClass::File.into() {
+        return Ok(class);
     }
-    Ok(())
+
+    let file_mode = fs_node.info().mode;
+    let class = file_class_from_file_mode(file_mode)?.into();
+    fs_node.security_state.lock().class = class;
+    Ok(class)
 }
 
 /// Returns the security id currently stored in `fs_node`, if any. This API should only be used

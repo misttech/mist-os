@@ -5,7 +5,7 @@
 use super::fs_node::fs_node_init_with_dentry;
 use super::{
     check_permission, fs_node_effective_sid_and_class, task_effective_sid, todo_check_permission,
-    FileSystemLabel, FileSystemLabelState, FileSystemState, FsNodeSidAndClass,
+    FileSystemLabel, FileSystemState, FsNodeSidAndClass,
 };
 
 use crate::task::CurrentTask;
@@ -27,21 +27,17 @@ use starnix_uapi::unmount_flags::UnmountFlags;
 /// Returns the [`SecurityId`] of `fs`.
 /// If the filesystem is not labeled, returns EPERM.
 fn fs_sid(fs: &FileSystem) -> Result<SecurityId, Errno> {
-    let filesystem_sid = match &*fs.security_state.state.0.lock() {
-        FileSystemLabelState::Labeled { label } => Ok(label.sid),
-        FileSystemLabelState::Unlabeled { .. } => {
-            error!(EPERM)
-        }
-    }?;
-    Ok(filesystem_sid)
+    let Some(fs_label) = fs.security_state.state.label() else {
+        return error!(EPERM);
+    };
+    Ok(fs_label.sid)
 }
 
 /// Returns security state to associate with a filesystem based on the supplied mount options.
 pub(in crate::security) fn file_system_init_security(
-    name: &'static FsStr,
     mount_options: &FileSystemMountOptions,
 ) -> Result<FileSystemState, Errno> {
-    Ok(FileSystemState::new(name, mount_options.clone()))
+    Ok(FileSystemState::new(mount_options.clone()))
 }
 
 /// Resolves the labeling scheme and arguments for the `file_system`, based on the loaded policy.
@@ -56,28 +52,28 @@ where
 {
     // TODO: https://fxbug.dev/334094811 - Determine how failures, e.g. mount options containing
     // Security Context values that are not valid in the loaded policy.
+    let fs_state = &file_system.security_state.state;
+
+    let mut root_node_to_init = Option::default();
+
+    fs_state.label.get_or_init(|| {
+        // This caller is initializing the file system, so note the root node to be initialized.
+        root_node_to_init = file_system.maybe_root();
+
+        label_from_mount_options_and_name(
+            security_server,
+            &fs_state.mount_options,
+            file_system.name(),
+        )
+    });
+
     let pending_entries = {
-        let mut label_state = file_system.security_state.state.0.lock();
-        let (resolved_label_state, pending_entries) = match &mut *label_state {
-            FileSystemLabelState::Labeled { .. } => return Ok(()),
-            FileSystemLabelState::Unlabeled { name, mount_options, pending_entries } => (
-                {
-                    FileSystemLabelState::Labeled {
-                        label: label_from_mount_options_and_name(
-                            security_server,
-                            mount_options,
-                            name,
-                        ),
-                    }
-                },
-                std::mem::take(pending_entries),
-            ),
-        };
-        *label_state = resolved_label_state;
-        pending_entries
+        let pending = &mut *file_system.security_state.state.pending_entries.lock();
+        std::mem::take(pending)
     };
 
-    if let Some(root_dir_entry) = file_system.maybe_root() {
+    // This step will be performed only when the file system label is first resolved.
+    if let Some(root_dir_entry) = root_node_to_init {
         fs_node_init_with_dentry(
             Some(&mut locked.cast_locked()),
             security_server,
@@ -211,16 +207,11 @@ pub(in crate::security) fn sb_mount(
 
 /// Checks that `mount` is getting remounted with the same security state as before.
 pub(in crate::security) fn sb_remount(
-    security_server: &SecurityServer,
+    _security_server: &SecurityServer,
     mount: &Mount,
     new_mount_options: FileSystemMountOptions,
 ) -> Result<(), Errno> {
-    let fs_name = mount.fs_name();
-    if !mount.security_state().state.equivalent_to_options(
-        security_server,
-        &new_mount_options,
-        fs_name,
-    ) {
+    if mount.security_state().state.mount_options != new_mount_options {
         return error!(EACCES);
     }
     Ok(())

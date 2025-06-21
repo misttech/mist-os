@@ -222,12 +222,11 @@ pub fn sb_eat_lsm_opts(
 /// Returns security state to associate with a filesystem based on the supplied mount options.
 /// This sits somewhere between `fs_context_parse_param()` and `sb_set_mnt_opts()` in function.
 pub fn file_system_init_security(
-    name: &'static FsStr,
     mount_options: &FileSystemMountOptions,
 ) -> Result<FileSystemState, Errno> {
     track_hook_duration!(c"security.hooks.file_system_init_security");
     Ok(FileSystemState {
-        state: selinux_hooks::superblock::file_system_init_security(name, mount_options)?,
+        state: selinux_hooks::superblock::file_system_init_security(mount_options)?,
     })
 }
 
