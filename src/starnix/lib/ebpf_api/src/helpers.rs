@@ -6,16 +6,16 @@ use crate::maps::{Map, MapKey, MapValueRef, RingBuffer, RingBufferWakeupPolicy};
 use ebpf::{BpfValue, EbpfHelperImpl, EbpfProgramContext};
 use inspect_stubs::track_stub;
 use linux_uapi::{
-    bpf_func_id_BPF_FUNC_get_smp_processor_id, bpf_func_id_BPF_FUNC_get_socket_cookie,
-    bpf_func_id_BPF_FUNC_get_socket_uid, bpf_func_id_BPF_FUNC_ktime_get_boot_ns,
-    bpf_func_id_BPF_FUNC_ktime_get_coarse_ns, bpf_func_id_BPF_FUNC_ktime_get_ns,
-    bpf_func_id_BPF_FUNC_map_delete_elem, bpf_func_id_BPF_FUNC_map_lookup_elem,
-    bpf_func_id_BPF_FUNC_map_update_elem, bpf_func_id_BPF_FUNC_probe_read_str,
-    bpf_func_id_BPF_FUNC_probe_read_user, bpf_func_id_BPF_FUNC_probe_read_user_str,
-    bpf_func_id_BPF_FUNC_ringbuf_discard, bpf_func_id_BPF_FUNC_ringbuf_reserve,
-    bpf_func_id_BPF_FUNC_ringbuf_submit, bpf_func_id_BPF_FUNC_sk_fullsock,
-    bpf_func_id_BPF_FUNC_sk_storage_get, bpf_func_id_BPF_FUNC_skb_load_bytes_relative,
-    bpf_func_id_BPF_FUNC_trace_printk, uid_t,
+    bpf_func_id_BPF_FUNC_get_current_uid_gid, bpf_func_id_BPF_FUNC_get_smp_processor_id,
+    bpf_func_id_BPF_FUNC_get_socket_cookie, bpf_func_id_BPF_FUNC_get_socket_uid,
+    bpf_func_id_BPF_FUNC_ktime_get_boot_ns, bpf_func_id_BPF_FUNC_ktime_get_coarse_ns,
+    bpf_func_id_BPF_FUNC_ktime_get_ns, bpf_func_id_BPF_FUNC_map_delete_elem,
+    bpf_func_id_BPF_FUNC_map_lookup_elem, bpf_func_id_BPF_FUNC_map_update_elem,
+    bpf_func_id_BPF_FUNC_probe_read_str, bpf_func_id_BPF_FUNC_probe_read_user,
+    bpf_func_id_BPF_FUNC_probe_read_user_str, bpf_func_id_BPF_FUNC_ringbuf_discard,
+    bpf_func_id_BPF_FUNC_ringbuf_reserve, bpf_func_id_BPF_FUNC_ringbuf_submit,
+    bpf_func_id_BPF_FUNC_sk_fullsock, bpf_func_id_BPF_FUNC_sk_storage_get,
+    bpf_func_id_BPF_FUNC_skb_load_bytes_relative, bpf_func_id_BPF_FUNC_trace_printk, uid_t,
 };
 use std::slice;
 
@@ -251,6 +251,18 @@ fn bpf_get_smp_processor_id<C: EbpfProgramContext>(
     0.into()
 }
 
+fn bpf_get_current_uid_gid<C: EbpfProgramContext>(
+    _context: &mut C::RunContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/426601337"), "bpf_get_current_uid_gid");
+    0.into()
+}
+
 pub fn get_common_helpers<C: EbpfProgramContext>() -> Vec<(u32, EbpfHelperImpl<C>)>
 where
     for<'a> C::RunContext<'a>: MapsContext<'a>,
@@ -270,6 +282,7 @@ where
         (bpf_func_id_BPF_FUNC_ringbuf_submit, EbpfHelperImpl(bpf_ringbuf_submit)),
         (bpf_func_id_BPF_FUNC_trace_printk, EbpfHelperImpl(bpf_trace_printk)),
         (bpf_func_id_BPF_FUNC_get_smp_processor_id, EbpfHelperImpl(bpf_get_smp_processor_id)),
+        (bpf_func_id_BPF_FUNC_get_current_uid_gid, EbpfHelperImpl(bpf_get_current_uid_gid)),
     ]
 }
 
@@ -394,5 +407,27 @@ where
         (bpf_func_id_BPF_FUNC_skb_load_bytes_relative, EbpfHelperImpl(bpf_skb_load_bytes_relative)),
         (bpf_func_id_BPF_FUNC_sk_storage_get, EbpfHelperImpl(bpf_sk_storage_get)),
         (bpf_func_id_BPF_FUNC_sk_fullsock, EbpfHelperImpl(bpf_sk_fullsock)),
+    ]
+}
+
+// `bpf_get_socket_cookie()` for `CGROUP_SOCK` programs. Note that unlike
+// the default `bpf_get_socket_cookie()` this one takes bpf_sock as the first argument
+fn bpf_get_socket_cookie_sock<'a, C: EbpfProgramContext>(
+    _context: &mut C::RunContext<'a>,
+    _bpf_sock: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/407809534"), "bpf_get_socket_cookie_sock");
+    0.into()
+}
+
+// Returns helpers for programs of type `BPF_PROG_TYPE_CGROUP_SOCK`.
+pub fn get_cgroup_sock_helpers<C: EbpfProgramContext>() -> Vec<(u32, EbpfHelperImpl<C>)> {
+    vec![
+        (bpf_func_id_BPF_FUNC_get_socket_cookie, EbpfHelperImpl(bpf_get_socket_cookie_sock)),
+        (bpf_func_id_BPF_FUNC_sk_storage_get, EbpfHelperImpl(bpf_sk_storage_get)),
     ]
 }

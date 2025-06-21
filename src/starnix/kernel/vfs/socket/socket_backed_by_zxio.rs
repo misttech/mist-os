@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bpf::attachments::{SockAddrEbpfProgramResult, SockAddrOp};
+use crate::bpf::attachments::{SockAddrOp, SockAddrProgramResult, SockOp, SockProgramResult};
 use crate::fs::fuchsia::zxio::{zxio_query_events, zxio_wait_async};
 use crate::mm::{MemoryAccessorExt, UNIFIED_ASPACES_ENABLED};
 use crate::task::syscalls::SockFProgPtr;
@@ -92,6 +92,7 @@ pub struct ZxioBackedSocket {
 
 impl ZxioBackedSocket {
     pub fn new(
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         domain: SocketDomain,
         socket_type: SocketType,
@@ -102,6 +103,7 @@ impl ZxioBackedSocket {
         } else {
             &mut [][..]
         };
+
         let zxio = Zxio::new_socket::<SocketProviderServiceConnector>(
             domain.as_raw() as c_int,
             socket_type.as_raw() as c_int,
@@ -110,6 +112,19 @@ impl ZxioBackedSocket {
         )
         .map_err(|status| from_status_like_fdio!(status))?
         .map_err(|out_code| errno_from_zxio_code!(out_code))?;
+
+        if matches!(domain, SocketDomain::Inet | SocketDomain::Inet6) {
+            match current_task.kernel().ebpf_attachments.root_cgroup().run_sock_prog(
+                locked,
+                SockOp::Create,
+                domain,
+                socket_type,
+                protocol,
+            ) {
+                SockProgramResult::Allow => (),
+                SockProgramResult::Block => return error!(EPERM),
+            }
+        }
 
         Ok(Self::new_with_zxio(zxio))
     }
@@ -289,8 +304,8 @@ impl ZxioBackedSocket {
             socket_address,
         )?;
         match ebpf_result {
-            SockAddrEbpfProgramResult::Allow => Ok(()),
-            SockAddrEbpfProgramResult::Block => error!(EPERM),
+            SockAddrProgramResult::Allow => Ok(()),
+            SockAddrProgramResult::Block => error!(EPERM),
         }
     }
 }
@@ -492,7 +507,20 @@ impl SocketOps for ZxioBackedSocket {
             .map_err(|out_code| errno_from_zxio_code!(out_code))
     }
 
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {
+    fn close(&self, locked: &mut Locked<FileOpsCore>, current_task: &CurrentTask, socket: &Socket) {
+        if matches!(socket.domain, SocketDomain::Inet | SocketDomain::Inet6) {
+            // Invoke eBPF release program (if any). Result is ignored since we cannot block
+            // socket release.
+            let _: SockProgramResult =
+                current_task.kernel().ebpf_attachments.root_cgroup().run_sock_prog(
+                    locked,
+                    SockOp::Release,
+                    socket.domain,
+                    socket.socket_type,
+                    socket.protocol,
+                );
+        }
+
         let _ = self.zxio.close();
     }
 

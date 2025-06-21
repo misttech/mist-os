@@ -692,7 +692,12 @@ impl SocketOps for UnixSocket {
     /// which changes how read() behaves on that socket. Second, close
     /// transitions the internal state of this socket to Closed, which breaks
     /// the reference cycle that exists in the connected state.
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, socket: &Socket) {
+    fn close(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _current_task: &CurrentTask,
+        socket: &Socket,
+    ) {
         let (maybe_peer, has_unread) = {
             let mut inner = self.lock();
             let maybe_peer = inner.peer().map(Arc::clone);

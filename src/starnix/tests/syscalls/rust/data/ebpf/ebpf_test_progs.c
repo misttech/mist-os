@@ -22,6 +22,15 @@ struct bpf_map_def target_cookie = {
     .map_flags = 0,
 };
 
+SECTION("maps")
+struct bpf_map_def count = {
+    .type = BPF_MAP_TYPE_ARRAY,
+    .key_size = 4,
+    .value_size = sizeof(int),
+    .max_entries = 1,
+    .map_flags = 0,
+};
+
 int skb_test_prog(struct __sk_buff* skb) {
   // Check that the packet corresponds to the target socket. It is identified
   // by the cookie stored in the `target_cookie` map.
@@ -38,5 +47,17 @@ int skb_test_prog(struct __sk_buff* skb) {
   }
   *entry = skb->len;
   bpf_ringbuf_submit(entry, 0);
+  return 1;
+}
+
+int sock_test_prog(struct bpf_sock* sock) {
+  int index = 0;
+  int* counter = bpf_map_lookup_elem(&count, &index);
+  if (!counter) {
+    return 1;
+  }
+
+  __sync_fetch_and_add(counter, 1);
+
   return 1;
 }

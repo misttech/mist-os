@@ -266,7 +266,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// which changes how read() behaves on that socket. Second, close
     /// transitions the internal state of this socket to Closed, which breaks
     /// the reference cycle that exists in the connected state.
-    fn close(&self, locked: &mut Locked<FileOpsCore>, socket: &Socket);
+    fn close(&self, locked: &mut Locked<FileOpsCore>, current_task: &CurrentTask, socket: &Socket);
 
     /// Returns the name of this socket.
     ///
@@ -405,6 +405,7 @@ fn resolve_protocol(
 }
 
 fn create_socket_ops(
+    locked: &mut Locked<FileOpsCore>,
     current_task: &CurrentTask,
     domain: SocketDomain,
     socket_type: SocketType,
@@ -419,7 +420,13 @@ fn create_socket_ops(
             if socket_type == SocketType::Raw {
                 security::check_task_capable(current_task, CAP_NET_RAW)?;
             }
-            Ok(Box::new(ZxioBackedSocket::new(current_task, domain, socket_type, protocol)?))
+            Ok(Box::new(ZxioBackedSocket::new(
+                locked,
+                current_task,
+                domain,
+                socket_type,
+                protocol,
+            )?))
         }
         SocketDomain::Netlink => {
             let netlink_family = NetlinkFamily::from_raw(protocol.as_raw());
@@ -429,7 +436,13 @@ fn create_socket_ops(
             // Follow Linux, and require CAP_NET_RAW to create packet sockets.
             // See https://man7.org/linux/man-pages/man7/packet.7.html.
             security::check_task_capable(current_task, CAP_NET_RAW)?;
-            Ok(Box::new(ZxioBackedSocket::new(current_task, domain, socket_type, protocol)?))
+            Ok(Box::new(ZxioBackedSocket::new(
+                locked,
+                current_task,
+                domain,
+                socket_type,
+                protocol,
+            )?))
         }
         SocketDomain::Key => {
             track_stub!(
@@ -469,7 +482,8 @@ impl Socket {
             protocol,
             kernel_private,
         )?;
-        let ops = create_socket_ops(current_task, domain, socket_type, protocol)?;
+        let ops =
+            create_socket_ops(locked.cast_locked(), current_task, domain, socket_type, protocol)?;
         Ok(Self::new_with_ops_and_info(ops, domain, socket_type, protocol))
     }
 
@@ -1163,11 +1177,11 @@ impl Socket {
         self.ops.shutdown(&mut locked.cast_locked::<FileOpsCore>(), self, how)
     }
 
-    pub fn close<L>(&self, locked: &mut Locked<L>)
+    pub fn close<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask)
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.ops.close(&mut locked.cast_locked::<FileOpsCore>(), self)
+        self.ops.close(&mut locked.cast_locked::<FileOpsCore>(), current_task, self)
     }
 
     pub fn to_handle(
@@ -1496,7 +1510,7 @@ mod tests {
         assert_eq!(source_iter.available(), 0);
         // Previously, this would cause the test to fail,
         // because rec_dgram was shut down.
-        send.close(&mut locked);
+        send.close(&mut locked, &current_task);
 
         let mut rec_buffer = VecOutputBuffer::new(8);
         let read_info = rec_dgram
@@ -1514,6 +1528,6 @@ mod tests {
             }))
         );
 
-        rec_dgram.close(&mut locked);
+        rec_dgram.close(&mut locked, &current_task);
     }
 }

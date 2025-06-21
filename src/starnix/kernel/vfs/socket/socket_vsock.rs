@@ -227,7 +227,12 @@ impl SocketOps for VsockSocket {
         Ok(())
     }
 
-    fn close(&self, locked: &mut Locked<FileOpsCore>, socket: &Socket) {
+    fn close(
+        &self,
+        locked: &mut Locked<FileOpsCore>,
+        _current_task: &CurrentTask,
+        socket: &Socket,
+    ) {
         // Call to shutdown should never fail, so unwrap is OK
         self.shutdown(locked, socket, SocketShutdownFlags::READ | SocketShutdownFlags::WRITE)
             .unwrap();
@@ -404,8 +409,8 @@ mod tests {
         assert_eq!(test_bytes_out.len(), fs1.read(&mut read_back_buf).unwrap());
         assert_eq!(&read_back_buf[..test_bytes_out.len()], &test_bytes_out);
 
-        server_socket.close(&mut locked);
-        listen_socket.close(&mut locked);
+        server_socket.close(&mut locked, &current_task);
+        listen_socket.close(&mut locked, &current_task);
     }
 
     #[::fuchsia::test]

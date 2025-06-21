@@ -526,7 +526,13 @@ impl SocketOps for BaseNetlinkSocket {
         Ok(())
     }
 
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {}
+    fn close(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _current_task: &CurrentTask,
+        _socket: &Socket,
+    ) {
+    }
 
     fn getsockname(
         &self,
@@ -715,7 +721,12 @@ impl SocketOps for UEventNetlinkSocket {
         Ok(())
     }
 
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {
+    fn close(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _current_task: &CurrentTask,
+        _socket: &Socket,
+    ) {
         let id = self.device_listener_key.lock().take();
         if let Some(id) = id {
             self.kernel.device_registry.unregister_listener(&id);
@@ -1050,7 +1061,12 @@ impl SocketOps for RouteNetlinkSocket {
         error!(EOPNOTSUPP)
     }
 
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {
+    fn close(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _current_task: &CurrentTask,
+        _socket: &Socket,
+    ) {
         // Close the underlying channel to the Netlink worker.
         self.message_sender.close_channel();
     }
@@ -1236,7 +1252,13 @@ impl SocketOps for DiagnosticNetlinkSocket {
         error!(EOPNOTSUPP)
     }
 
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {}
+    fn close(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _current_task: &CurrentTask,
+        _socket: &Socket,
+    ) {
+    }
 
     fn getsockname(
         &self,
@@ -1427,7 +1449,13 @@ impl SocketOps for GenericNetlinkSocket {
         Ok(())
     }
 
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {}
+    fn close(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _current_task: &CurrentTask,
+        _socket: &Socket,
+    ) {
+    }
 
     fn getsockname(
         &self,

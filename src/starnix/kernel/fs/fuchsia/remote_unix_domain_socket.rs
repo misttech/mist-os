@@ -253,7 +253,12 @@ impl SocketOps for RemoteUnixDomainSocket {
         Ok(())
     }
 
-    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {
+    fn close(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _current_task: &CurrentTask,
+        _socket: &Socket,
+    ) {
         let _ = self.client.close(zx::MonotonicInstant::ZERO);
     }
 

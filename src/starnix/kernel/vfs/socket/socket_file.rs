@@ -152,9 +152,9 @@ impl FileOps for SocketFile {
         &self,
         locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
     ) {
-        self.socket.close(locked);
+        self.socket.close(locked, current_task);
     }
 
     /// Return a handle that allows access to this file descritor through the zxio protocols.
