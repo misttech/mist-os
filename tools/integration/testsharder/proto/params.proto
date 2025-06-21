@@ -91,10 +91,4 @@ message Params {
   // CPU architecture than the host machine, but should be avoided otherwise
   // because it brings a major performance hit.
   bool use_tcg = 17;
-
-  // The experiments to enable in infra.
-  repeated string experiments = 19;
-
-  // Kernel command-line arguments to pass on boot.
-  repeated string zircon_args = 20;
 }

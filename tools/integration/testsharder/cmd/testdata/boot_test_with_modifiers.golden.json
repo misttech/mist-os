@@ -41,10 +41,7 @@
         },
         "deps": [
             "boot-test_product_bundle/zbi",
-            "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_another-boot-test#meta_another-boot-test.cm_tests.json",
-            "host_x64/botanist",
             "host_x64/ffx",
-            "host_x64/llvm-profdata",
             "images.json",
             "product_bundles.json"
         ],
@@ -74,28 +71,6 @@
             "os": "Debian",
             "pool": ""
         },
-        "tests_json": "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_another-boot-test#meta_another-boot-test.cm_tests.json",
-        "base_command": [
-            "./host_x64/botanist",
-            "-level",
-            "debug",
-            "run",
-            "-llvm-profdata",
-            "host_x64/llvm-profdata=clang",
-            "-images",
-            "images.json",
-            "-timeout",
-            "602s",
-            "-ffx",
-            "./host_x64/ffx",
-            "-product-bundles",
-            "product_bundles.json",
-            "-product-bundle-name",
-            "boot-test_product_bundle",
-            "-boot-test",
-            "-use-serial"
-        ],
-        "relative_cwd": "out/temp",
         "build_metadata": {}
     },
     {
@@ -140,10 +115,7 @@
         },
         "deps": [
             "boot-test_product_bundle/zbi",
-            "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_boot-test#meta_boot-test.cm_tests.json",
-            "host_x64/botanist",
             "host_x64/ffx",
-            "host_x64/llvm-profdata",
             "images.json",
             "product_bundles.json"
         ],
@@ -173,28 +145,6 @@
             "os": "Debian",
             "pool": ""
         },
-        "tests_json": "hermetic:AEMU-fuchsia-pkg:__fuchsia.com_boot-test#meta_boot-test.cm_tests.json",
-        "base_command": [
-            "./host_x64/botanist",
-            "-level",
-            "debug",
-            "run",
-            "-llvm-profdata",
-            "host_x64/llvm-profdata=clang",
-            "-images",
-            "images.json",
-            "-timeout",
-            "602s",
-            "-ffx",
-            "./host_x64/ffx",
-            "-product-bundles",
-            "product_bundles.json",
-            "-product-bundle-name",
-            "boot-test_product_bundle",
-            "-boot-test",
-            "-use-serial"
-        ],
-        "relative_cwd": "out/temp",
         "build_metadata": {}
     }
 ]

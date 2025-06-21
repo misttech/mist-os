@@ -72,10 +72,7 @@
             }
         },
         "deps": [
-            "AEMU-(1)_tests.json",
-            "host_x64/botanist",
             "host_x64/ffx",
-            "host_x64/llvm-profdata",
             "images.json",
             "product_bundle/zbi",
             "product_bundles.json"
@@ -106,27 +103,6 @@
             "os": "Debian",
             "pool": ""
         },
-        "tests_json": "AEMU-(1)_tests.json",
-        "base_command": [
-            "./host_x64/botanist",
-            "-level",
-            "debug",
-            "run",
-            "-llvm-profdata",
-            "host_x64/llvm-profdata=clang",
-            "-images",
-            "images.json",
-            "-timeout",
-            "1814s",
-            "-ffx",
-            "./host_x64/ffx",
-            "-product-bundles",
-            "product_bundles.json",
-            "-product-bundle-name",
-            "core.x64",
-            "-expects-ssh"
-        ],
-        "relative_cwd": "out/temp",
         "build_metadata": {}
     },
     {
@@ -166,10 +142,7 @@
             }
         },
         "deps": [
-            "AEMU-(2)_tests.json",
-            "host_x64/botanist",
             "host_x64/ffx",
-            "host_x64/llvm-profdata",
             "images.json",
             "product_bundle/zbi",
             "product_bundles.json"
@@ -200,27 +173,6 @@
             "os": "Debian",
             "pool": ""
         },
-        "tests_json": "AEMU-(2)_tests.json",
-        "base_command": [
-            "./host_x64/botanist",
-            "-level",
-            "debug",
-            "run",
-            "-llvm-profdata",
-            "host_x64/llvm-profdata=clang",
-            "-images",
-            "images.json",
-            "-timeout",
-            "1502s",
-            "-ffx",
-            "./host_x64/ffx",
-            "-product-bundles",
-            "product_bundles.json",
-            "-product-bundle-name",
-            "core.x64",
-            "-expects-ssh"
-        ],
-        "relative_cwd": "out/temp",
         "build_metadata": {}
     }
 ]

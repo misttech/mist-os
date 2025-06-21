@@ -17,11 +17,6 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
 )
 
-const (
-	imagesManifest         = "images.json"
-	productBundlesManifest = "product_bundles.json"
-)
-
 // for testability
 type FFXInterface interface {
 	Run(context.Context, ...string) error
@@ -41,7 +36,7 @@ func AddImageDeps(ctx context.Context, s *Shard, buildDir string, images []build
 	if s.Env.Dimensions.DeviceType() == "" {
 		return nil
 	}
-	imageDeps := []string{imagesManifest}
+	imageDeps := []string{"images.json"}
 	// GCE test shards do not require any image deps as the build creates a
 	// compute image with all the deps baked in.
 	if s.Env.Dimensions.DeviceType() == "GCE" {
@@ -67,7 +62,7 @@ func AddImageDeps(ctx context.Context, s *Shard, buildDir string, images []build
 	}
 
 	// Add product bundle related artifacts.
-	imageDeps = append(imageDeps, productBundlesManifest)
+	imageDeps = append(imageDeps, "product_bundles.json")
 
 	tmp, err := os.MkdirTemp("", "wt")
 	if err != nil {

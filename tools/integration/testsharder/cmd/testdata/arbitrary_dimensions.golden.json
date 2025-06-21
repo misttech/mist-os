@@ -35,9 +35,7 @@
             }
         },
         "deps": [
-            "Linux-other_dimension:bar_tests.json",
-            "host_x64/bar.sh",
-            "host_x64/botanist"
+            "host_x64/bar.sh"
         ],
         "timeout_secs": 0,
         "summary": {
@@ -52,15 +50,6 @@
             "other_dimension": "bar",
             "pool": "other.pool"
         },
-        "tests_json": "Linux-other_dimension:bar_tests.json",
-        "base_command": [
-            "./host_x64/botanist",
-            "-level",
-            "debug",
-            "run",
-            "-skip-setup"
-        ],
-        "relative_cwd": "out/temp",
         "build_metadata": {}
     },
     {
@@ -99,8 +88,6 @@
             }
         },
         "deps": [
-            "Linux-other_dimension:foo_tests.json",
-            "host_x64/botanist",
             "host_x64/foo.sh"
         ],
         "timeout_secs": 0,
@@ -116,15 +103,6 @@
             "other_dimension": "foo",
             "pool": "other.pool"
         },
-        "tests_json": "Linux-other_dimension:foo_tests.json",
-        "base_command": [
-            "./host_x64/botanist",
-            "-level",
-            "debug",
-            "run",
-            "-skip-setup"
-        ],
-        "relative_cwd": "out/temp",
         "build_metadata": {}
     }
 ]

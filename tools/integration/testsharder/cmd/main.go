@@ -174,8 +174,7 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 	}
 
 	opts := &testsharder.ShardOptions{
-		Tags:   params.EnvironmentTags,
-		UseTCG: params.UseTcg,
+		Tags: params.EnvironmentTags,
 	}
 	// Pass in the test-list to carry over tags to the shards.
 	testListPath := filepath.Join(flags.buildDir, m.TestListLocation()[0])
@@ -381,7 +380,7 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		if err := testsharder.AddEmuVersion(s, prebuiltVersions); err != nil {
 			return err
 		}
-		if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Tools()); err != nil {
+		if err := testsharder.AddFFXDeps(s, flags.buildDir, m.Tools(), params.UseTcg); err != nil {
 			return err
 		}
 		if s.ProductBundle == "" {
@@ -424,30 +423,12 @@ func execute(ctx context.Context, flags testsharderFlags, params *proto.Params, 
 		}
 	}
 
-	var variants []string
-	if err := m.Args().Get("select_variant", &variants); err != nil {
-		// variants may not be set, which is ok.
-		logger.Debugf(ctx, "%s", err)
-	}
-
-	experiments, err := testsharder.GetEnabledExperiments(params.Experiments)
-	if err != nil {
-		return err
-	}
 	for _, s := range shards {
-		s.ExperimentSpecs = params.Experiments
-		s.EnabledExperiments = experiments
-		if err := testsharder.ConstructBaseCommand(s, flags.checkoutDir, flags.buildDir, m.Tools(), params, variants, experiments); err != nil {
-			return err
-		}
-		if err := testsharder.ConstructTestsJSON(s, flags.buildDir); err != nil {
-			return err
-		}
 		testsharder.GetBotDimensions(s, params)
 	}
 
 	if flags.depsFile != "" {
-		if err := testsharder.AddShardDeps(ctx, shards, m.Args(), m.Tools()); err != nil {
+		if err := testsharder.AddShardDeps(ctx, shards, m.Args(), m.Tools(), params); err != nil {
 			return err
 		}
 	}
