@@ -21,10 +21,10 @@ use starnix_core::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     default_seek, emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-    fileops_impl_noop_sync, fileops_impl_unbounded_seek, fs_node_impl_dir_readonly,
-    CallbackSymlinkNode, DirectoryEntryType, DirentSink, FdNumber, FileObject, FileOps,
-    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    ProcMountinfoFile, ProcMountsFile, SeekTarget, SymlinkTarget,
+    fileops_impl_noop_sync, fileops_impl_seekable, fileops_impl_unbounded_seek,
+    fs_node_impl_dir_readonly, CallbackSymlinkNode, DirectoryEntryType, DirentSink, FdNumber,
+    FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
+    FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget, SymlinkTarget,
 };
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
@@ -391,26 +391,53 @@ struct AttrNode {
 
 impl AttrNode {
     fn new(task: WeakRef<Task>, attr: security::ProcAttr) -> impl FsNodeOps {
-        BytesFile::new_node(AttrNode { task, attr })
+        SimpleFileNode::new(move || Ok(AttrNode { attr, task: task.clone() }))
     }
 }
 
-impl BytesFileOps for AttrNode {
-    fn write(&self, current_task: &CurrentTask, data: Vec<u8>) -> Result<(), Errno> {
+impl FileOps for AttrNode {
+    fileops_impl_seekable!();
+    fileops_impl_noop_sync!();
+
+    fn writes_update_seek_offset(&self) -> bool {
+        false
+    }
+
+    fn read(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        let task = Task::from_weak(&self.task)?;
+        let response = security::get_procattr(current_task, &task, self.attr)?;
+        data.write(&response[offset..])
+    }
+
+    fn write(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
         let task = Task::from_weak(&self.task)?;
 
         // If the current task is not the target then writes are not allowed.
         if current_task.temp_task() != task {
             return error!(EPERM);
         }
+        if offset != 0 {
+            return error!(EINVAL);
+        }
 
-        security::set_procattr(current_task, self.attr, data.as_slice())
-    }
-
-    fn read(&self, current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
-        let task = Task::from_weak(&self.task)?;
-
-        security::get_procattr(current_task, &task, self.attr).map(|s| s.into())
+        let data = data.read_all()?;
+        let data_len = data.len();
+        security::set_procattr(current_task, self.attr, data.as_slice())?;
+        Ok(data_len)
     }
 }
 
