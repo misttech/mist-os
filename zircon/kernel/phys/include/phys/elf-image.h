@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ELF_IMAGE_H_
 #define ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_ELF_IMAGE_H_
 
+#include <inttypes.h>
 #include <lib/code-patching/code-patching.h>
 #include <lib/elfldltl/load.h>
 #include <lib/elfldltl/memory.h>
@@ -93,6 +94,24 @@ class ElfImage {
   ktl::optional<ktl::string_view> interp() const { return interp_; }
 
   const ktl::optional<elfldltl::ElfNote>& build_id() const { return build_id_; }
+
+  const ktl::optional<elfldltl::ElfNote>& zircon_info() const { return zircon_info_; }
+
+  template <typename T, uint32_t NoteType = 0>
+  ktl::optional<T> GetZirconInfo() const {
+    if (zircon_info_) {
+      ZX_ASSERT_MSG(zircon_info_->type == NoteType,
+                    "ZirconInfo note has type %" PRIu32 ", expected %" PRIu32, zircon_info_->type,
+                    NoteType);
+      ZX_ASSERT_MSG(zircon_info_->desc.size_bytes() == sizeof(T),
+                    "ZirconInfo note has descsz %zu, expected %zu", zircon_info_->desc.size_bytes(),
+                    sizeof(T));
+      T info;
+      memcpy(&info, zircon_info_->desc.data(), sizeof(info));
+      return info;
+    }
+    return ktl::nullopt;
+  }
 
   bool has_patches() const { return !patches().empty(); }
 
@@ -266,6 +285,7 @@ class ElfImage {
   uint64_t entry_ = 0;
   ktl::span<const Elf::Dyn> dynamic_;
   ktl::optional<elfldltl::ElfNote> build_id_;
+  ktl::optional<elfldltl::ElfNote> zircon_info_;
   ktl::optional<ktl::string_view> interp_;
   code_patching::Patcher patcher_;
   ktl::optional<uintptr_t> load_bias_;

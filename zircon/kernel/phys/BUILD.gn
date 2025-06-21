@@ -649,6 +649,7 @@ if (toolchain_environment == "kernel.phys" ||
     deps = [
       ":allocation",
       ":handoff",
+      ":zircon-info-note",
       "//src/lib/llvm-profdata",
 
       # Indirect dep via circular :symbolize dep.
@@ -703,6 +704,15 @@ source_set("zbi") {
   ]
   public_configs = [ ":includes" ]
   sources = [ "$arch_phys/include/phys/arch/zbi.h" ]
+}
+
+source_set("zircon-info-note") {
+  public = [ "include/phys/zircon-info-note.h" ]
+  public_deps = [
+    "//src/lib/elfldltl",
+    "//zircon/kernel/lib/special-sections",
+  ]
+  public_configs = [ ":includes" ]
 }
 
 config("includes") {

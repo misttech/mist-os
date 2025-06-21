@@ -23,6 +23,7 @@
 #include <ktl/variant.h>
 #include <phys/allocation.h>
 #include <phys/symbolize.h>
+#include <phys/zircon-info-note.h>
 
 #include <ktl/enforce.h>
 
@@ -106,12 +107,25 @@ fit::result<ElfImage::Error> ElfImage::InitFromFile(ElfImage::BootfsDir::iterato
   auto headers = elfldltl::LoadHeadersFromFile<Elf>(diagnostics, image_, phdr_allocator);
   auto [ehdr, phdrs] = *headers;
 
+  auto observe_zircon_info_note =
+      [this](const elfldltl::ElfNote& note) -> fit::result<fit::failed, bool> {
+    if (note.Is(kZirconInfoNoteName)) {
+      ZX_ASSERT_MSG(!zircon_info_,
+                    "second ZirconInfo note (type %#" PRIx32
+                    ", desc %zu bytes after existing type %#" PRIx32
+                    ", desc %zu bytes) in ELF image %.*s",
+                    note.type, note.desc.size_bytes(), zircon_info_->type,
+                    zircon_info_->desc.size_bytes(), static_cast<int>(name_.size()), name_.data());
+      zircon_info_ = note;
+    }
+    return fit::ok(true);
+  };
   ktl::optional<Elf::Phdr> relro, dynamic, interp;
   elfldltl::DecodePhdrs(  //
       diagnostics, phdrs, load_info_.GetPhdrObserver(ZX_PAGE_SIZE),
       elfldltl::PhdrFileNoteObserver(  //
           Elf(), image_, elfldltl::NoArrayFromFile<ktl::byte>(),
-          elfldltl::ObserveBuildIdNote(build_id_)),
+          elfldltl::ObserveBuildIdNote(build_id_), observe_zircon_info_note),
       elfldltl::PhdrRelroObserver<Elf>(relro), elfldltl::PhdrDynamicObserver<Elf>(dynamic),
       elfldltl::PhdrStackObserver<Elf>(stack_size_), elfldltl::PhdrInterpObserver<Elf>(interp));
 
