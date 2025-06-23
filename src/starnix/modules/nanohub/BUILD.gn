@@ -37,6 +37,7 @@ rustc_library("nanohub") {
     "nanohub_comms_directory.rs",
     "nanohub_firmware_file.rs",
     "nanohub_socket_file.rs",
+    "nanohub_sysfs_files.rs",
     "socket_tunnel_file.rs",
   ]
 

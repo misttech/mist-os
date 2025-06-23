@@ -8,6 +8,7 @@ mod nanohub;
 mod nanohub_comms_directory;
 mod nanohub_firmware_file;
 mod nanohub_socket_file;
+mod nanohub_sysfs_files;
 mod socket_tunnel_file;
 
 pub use nanohub::{nanohub_device_init, nanohub_procfs_builder};

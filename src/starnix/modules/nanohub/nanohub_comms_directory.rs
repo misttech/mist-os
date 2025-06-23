@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::nanohub_sysfs_files::{FirmwareNameSysFsOps, NanohubSysFsNode};
 use crate::socket_tunnel_file::{FirmwareFile, SocketTunnelSysfsFile};
 use starnix_core::device::kobject::Device;
 use starnix_core::fs::sysfs::DeviceDirectory;
@@ -126,9 +127,7 @@ impl FsNodeOps for NanohubCommsDirectory {
                 FsNodeInfo::new(mode!(IFREG, 0o220), FsCred::root()),
             )),
             b"firmware_name" => Ok(node.fs().create_node_and_allocate_node_id(
-                SocketTunnelSysfsFile::new(
-                    b"/sys/devices/virtual/nanohub/nanohub_comms/firmware_name".into(),
-                ),
+                NanohubSysFsNode::<FirmwareNameSysFsOps>::new(),
                 FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
             )),
             b"firmware_version" => Ok(node.fs().create_node_and_allocate_node_id(
