@@ -477,6 +477,7 @@ impl FxVolume {
         loop {
             let mut should_terminate = false;
             let mut should_flush = false;
+            let mut low_mem = false;
             let mut should_purge_layer_files = false;
             let mut should_update_cache_limit = false;
 
@@ -487,7 +488,7 @@ impl FxVolume {
                     let new_level = new_level.unwrap();
                     // At critical levels, it's okay to undertake expensive work immediately
                     // to reclaim memory.
-                    should_flush = matches!(new_level, MemoryPressureLevel::Critical);
+                    low_mem = matches!(new_level, MemoryPressureLevel::Critical);
                     should_purge_layer_files = true;
                     if new_level != level {
                         level = new_level;
@@ -519,18 +520,21 @@ impl FxVolume {
             if should_terminate {
                 break;
             }
-
+            // Maybe close extra files *before* iterating them for flush/low mem.
+            if should_update_cache_limit {
+                self.dirent_cache.set_limit(config.for_level(&level).cache_size_limit);
+            }
             if should_flush {
                 self.flush_all_files(false).await;
                 self.dirent_cache.recycle_stale_files();
+            } else if low_mem {
+                // This is a softer version of flushing files, so don't bother if we're flushing.
+                self.minimize_memory().await;
             }
             if should_purge_layer_files {
                 for layer in self.store.tree().immutable_layer_set().layers {
                     layer.purge_cached_data();
                 }
-            }
-            if should_update_cache_limit {
-                self.dirent_cache.set_limit(config.for_level(&level).cache_size_limit);
             }
         }
         debug!(store_id = self.store.store_object_id(); "FxVolume::background_task end");
@@ -580,6 +584,22 @@ impl FxVolume {
             flushed += 1;
         }
         debug!(store_id = self.store.store_object_id(), file_count = flushed; "FxVolume flushed");
+    }
+
+    #[trace]
+    async fn minimize_memory(&self) {
+        for file in self.cache.files() {
+            if let Some(node) = file.into_opened_node() {
+                if let Err(e) = node.handle().minimize_memory().await {
+                    warn!(
+                        store_id = self.store.store_object_id(),
+                        oid = node.object_id(),
+                        error:? = e;
+                        "Failed to flush",
+                    )
+                }
+            }
+        }
     }
 
     /// Spawns a short term task for the volume that includes a guard that will prevent termination.

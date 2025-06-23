@@ -306,6 +306,18 @@ impl PagedObjectHandle {
         Ok(buffer)
     }
 
+    /// Reduce memory footprint of this file if there are outstanding dirty pages.
+    pub async fn minimize_memory(&self) -> Result<(), Error> {
+        // This is a best-effort call. It is allowed to race with things, and if all the outstanding
+        // cached data is metadata we won't save memory anyways, so don't bother. Only looking for
+        // dirty pages, or if there are overwrite pages we'll have to take the slow path since those
+        // dirty pages don't record any information internally.
+        if self.handle.overwrite_ranges().is_empty() && self.inner.lock().reservation() == 0 {
+            return Ok(());
+        }
+        self.flush(false).await
+    }
+
     pub fn mark_dirty<T: PagerBacked>(
         &self,
         page_range: MarkDirtyRange<T>,
