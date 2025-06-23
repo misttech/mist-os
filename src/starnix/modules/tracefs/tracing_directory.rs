@@ -52,6 +52,8 @@ impl FileOps for TraceMarkerFile {
         _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
+        // TODO(wilkinsonclay): Should we have a category for tracing?
+        fuchsia_trace::duration!(CATEGORY_ATRACE, c"Write event");
         let mut bytes = data.read_all()?;
         // The TraceEvent struct appends a new line to the trace data unconditionally, so
         // remove the trailing newline if here to avoid generating empty events when reading.
@@ -74,27 +76,28 @@ impl FileOps for TraceMarkerFile {
             // TODO(https://fxbug.dev/357665908): Remove forwarding of atrace events to trace
             // manager when dependencies have been migrated.
             if let Some(context) = TraceCategoryContext::acquire(CATEGORY_ATRACE) {
-                let mut event_stacks = self.event_stacks.lock();
-                let now = zx::BootTicks::get();
                 match atrace_event {
-                    ATraceEvent::Begin { pid, name } => {
-                        event_stacks
-                            .entry(pid)
-                            .or_insert_with(Vec::new)
-                            .push((name.to_string(), now));
-                    }
-                    ATraceEvent::End { pid } => {
-                        let pid = if pid != 0 {
-                            pid
-                        } else {
-                            current_task.get_pid().try_into().unwrap_or(pid)
-                        };
-                        if let Some(stack) = event_stacks.get_mut(&pid) {
-                            if let Some((name, start_time)) = stack.pop() {
-                                context.write_duration_with_inline_name(&name, start_time, &[]);
+                        ATraceEvent::Begin { pid, name } => {
+                            let now = zx::BootTicks::get();
+                            let mut event_stacks = self.event_stacks.lock();
+                            event_stacks
+                                .entry(pid)
+                                .or_insert_with(Vec::new)
+                                .push((name.to_string(), now));
+                        }
+                        ATraceEvent::End { pid } => {
+                            let pid = if pid != 0 {
+                                pid
+                            } else {
+                                current_task.get_pid().try_into().unwrap_or(pid)
+                            };
+                            let mut event_stacks = self.event_stacks.lock();
+                            if let Some(stack) = event_stacks.get_mut(&pid) {
+                                if let Some((name, start_time)) = stack.pop() {
+                                    context.write_duration_with_inline_name(&name, start_time, &[]);
+                                }
                             }
                         }
-                    }
                     ATraceEvent::Instant { name } => {
                         context.write_instant_with_inline_name(&name, Scope::Process, &[]);
                     }

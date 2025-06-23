@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::vfs::OutputBuffer;
 use starnix_sync::Mutex;
@@ -9,7 +11,7 @@ use starnix_types::PAGE_SIZE;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error, from_status_like_fdio};
 use zerocopy::{Immutable, IntoBytes};
-use zx::BootTimeline;
+use zx::{BootInstant, BootTimeline};
 
 // The default ring buffer size (2MB).
 // TODO(https://fxbug.dev/357665908): This should be based on /sys/kernel/tracing/buffer_size_kb.
@@ -123,7 +125,7 @@ impl<'a> TraceEvent<'a> {
         bytes
     }
 
-    fn set_timestamp(&mut self, timestamp: zx::BootInstant, prev_timestamp: zx::BootInstant) {
+    fn set_timestamp(&mut self, timestamp: BootInstant, prev_timestamp: BootInstant) {
         // Debug assert here so if it happens, we can notice it happened and hopefully fix it.
         // In non-debug, use 0 as the delta. It will be less disruptive to the process and the
         // resulting trace data.
@@ -152,11 +154,7 @@ struct TraceEventQueueMetadata {
 
     /// The timestamp of the last event in the queue. If the queue is empty, then the time the queue
     /// was created.
-    prev_timestamp: zx::BootInstant,
-
-    /// If true, atrace events written to /sys/kernel/tracing/trace_marker will be stored as
-    /// TraceEvents in `ring_buffer`.
-    tracing_enabled: bool,
+    prev_timestamp: BootInstant,
 
     /// If true, the queue doesn't have a full page of events to read.
     ///
@@ -178,8 +176,7 @@ impl TraceEventQueueMetadata {
             commit: PAGE_HEADER_SIZE,
             tail: PAGE_HEADER_SIZE,
             max_event_size: *PAGE_SIZE - PAGE_HEADER_SIZE,
-            prev_timestamp: zx::BootInstant::get(),
-            tracing_enabled: false,
+            prev_timestamp: BootInstant::get(),
             is_readable: false,
             overwrite: true,
             dropped_pages: 0,
@@ -279,6 +276,10 @@ impl TraceEventQueueMetadata {
 
 /// Stores all trace events.
 pub struct TraceEventQueue {
+    /// If true, atrace events written to /sys/kernel/tracing/trace_marker will be stored as
+    /// TraceEvents in `ring_buffer`.
+    tracing_enabled: AtomicBool,
+
     /// Metadata about `ring_buffer`.
     metadata: Mutex<TraceEventQueueMetadata>,
 
@@ -314,29 +315,42 @@ impl<'a> TraceEventQueue {
             .map_err(|_| errno!(ENOMEM))?
             .into();
         let ring_buffer = ring_buffer.with_zx_name(b"starnix:tracefs");
-        Ok(Self { metadata: Mutex::new(metadata), ring_buffer, tracefs_node })
+        Ok(Self {
+            tracing_enabled: AtomicBool::new(false),
+            metadata: Mutex::new(metadata),
+            ring_buffer,
+            tracefs_node,
+        })
     }
 
     pub fn is_enabled(&self) -> bool {
-        self.metadata.lock().tracing_enabled
+        self.tracing_enabled.load(Ordering::Relaxed)
     }
 
     pub fn enable(&self) -> Result<(), Errno> {
+        // Use the metadata mutex to make sure the state of the metadata and the enabled flag
+        // are changed at the same time.
         let mut metadata = self.metadata.lock();
-        metadata.tracing_enabled = true;
-        metadata.prev_timestamp = zx::BootInstant::get();
+        metadata.prev_timestamp = BootInstant::get();
         self.ring_buffer
             .set_size(DEFAULT_RING_BUFFER_SIZE_BYTES)
             .map_err(|e| from_status_like_fdio!(e))?;
         self.initialize_page(0, metadata.prev_timestamp)?;
+        self.tracing_enabled.store(true, Ordering::Relaxed);
         Ok(())
     }
 
+    /// Disables the event queue and resets it to empty.
+    /// The number of dropped pages are recorded for reading via tracefs.
     pub fn disable(&self) -> Result<(), Errno> {
+        // Use the metadata mutex to make sure the state of the metadata and the enabled flag
+        // are changed at the same time.
         let mut metadata = self.metadata.lock();
         self.tracefs_node.record_uint(DROPPED_PAGES, metadata.dropped_pages);
         *metadata = TraceEventQueueMetadata::new();
         self.ring_buffer.set_size(0).map_err(|e| from_status_like_fdio!(e))?;
+        self.tracing_enabled.store(false, Ordering::Relaxed);
+
         Ok(())
     }
 
@@ -345,8 +359,16 @@ impl<'a> TraceEventQueue {
     /// From https://docs.kernel.org/trace/ring-buffer-design.html, when memory is mapped, a reader
     /// page can be swapped with the header page to avoid copying memory.
     pub fn read(&self, buf: &mut dyn OutputBuffer) -> Result<usize, Errno> {
-        let mut metadata = self.metadata.lock();
-        let offset = metadata.read()?;
+        // Read the offset, which also moves the read pointer forward in the metadata, then unlock.
+        let offset = {
+            let mut metadata = self.metadata.lock();
+            metadata.read()?
+        };
+
+        // self.ring_buffer is  vmo backed memory. So reads past the allocated size return in error.
+        // Enabling and disabling the queue can change the size of the ring_buffer, but this is done
+        // using thread safe kernel, so if there is a race between this read and disabling the queue,
+        // the worst that will happen is an error of either EAGAIN or ENOMEM.
         buf.write_all(
             &self.ring_buffer.read_to_vec(offset, *PAGE_SIZE).map_err(|_| errno!(ENOMEM))?,
         )
@@ -372,7 +394,7 @@ impl<'a> TraceEventQueue {
         // the metadata lock. This definitely could be refined, potentially using an atomic to hold
         // the previous timestamp or similar synchronization to make sure the previous timestamp is not
         // updated past this timestamp.
-        let timestamp = zx::BootInstant::get();
+        let timestamp = BootInstant::get();
 
         event.set_timestamp(timestamp, metadata.prev_timestamp);
 
@@ -406,17 +428,17 @@ impl<'a> TraceEventQueue {
 
     #[cfg(test)]
     /// Returns the timestamp of the previous event in `ring_buffer`.
-    fn prev_timestamp(&self) -> zx::BootInstant {
+    fn prev_timestamp(&self) -> BootInstant {
         self.metadata.lock().prev_timestamp
     }
 
     /// Initializes a new page by setting the header's timestamp and clearing the rest of the page
     /// with 0's.
-    fn initialize_page(&self, offset: u64, prev_timestamp: zx::BootInstant) -> Result<(), Errno> {
+    fn initialize_page(&self, offset: u64, prev_timestamp: BootInstant) -> Result<(), Errno> {
         self.ring_buffer
             .write(&prev_timestamp.into_nanos().to_le_bytes(), offset)
             .map_err(|e| from_status_like_fdio!(e))?;
-        let timestamp_size = std::mem::size_of::<zx::BootInstant>() as u64;
+        let timestamp_size = std::mem::size_of::<BootInstant>() as u64;
         self.ring_buffer
             .op_range(zx::VmoOp::ZERO, offset + timestamp_size, *PAGE_SIZE - timestamp_size)
             .map_err(|e| from_status_like_fdio!(e))?;
@@ -598,7 +620,7 @@ mod tests {
 
         // Read a page of data.
         let mut buffer = VecOutputBuffer::new(*PAGE_SIZE as usize);
-        assert!(queue.read(&mut buffer).is_ok());
+        assert_eq!(queue.read(&mut buffer), Ok(*PAGE_SIZE as usize));
         assert_eq!(buffer.bytes_written() as u64, *PAGE_SIZE);
 
         let mut expected_page_header: Vec<u8> = vec![];
