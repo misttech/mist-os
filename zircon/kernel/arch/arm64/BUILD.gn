@@ -62,14 +62,16 @@ if (toolchain_environment == "physmem" ||
   # This is kept consistent between the kernel proper and phys
   # so (pure PIC) code should be callable from the kernel proper.
   config("abi") {
-    # x20 is reserved so we can use it to point at the per-CPU structure.
-    cflags = [ "-ffixed-x20" ]
+    cflags = [
+      # x20 is reserved so we can use it to point at the per-CPU structure.
+      "-ffixed-x20",
+
+      # Use the right thread-pointer ABI for the kernel.
+      "-mtp=el1",
+    ]
 
     if (!is_gcc) {
       cflags += [
-        # Use the right thread-pointer ABI for the kernel.
-        "-mtp=el1",
-
         # Use shadow-call-stack rather than safe-stack for the kernel,
         # regardless of the compiler's default.
         "-fno-sanitize=safe-stack",
