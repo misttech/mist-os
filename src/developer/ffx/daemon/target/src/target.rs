@@ -44,7 +44,8 @@ use std::sync::Arc;
 #[cfg(not(target_os = "macos"))]
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
-use usb_fastboot_discovery::{open_interface_with_serial, Interface};
+use usb_bulk::AsyncInterface as Interface;
+use usb_fastboot_discovery::open_interface_with_serial;
 #[cfg(not(target_os = "macos"))]
 use usb_vsock_host::UsbVsockHost;
 
