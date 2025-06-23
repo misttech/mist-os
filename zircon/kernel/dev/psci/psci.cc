@@ -19,7 +19,29 @@
 
 namespace {
 
-bool psci_cpu_suspend_supported = false;
+// Indicates that PSCI CPU_SUSPEND is supported for this device.
+//
+// When supported, this variable contains the power_state value to be passed in a CPU_SUSPEND call.
+// When not supported, this variable contains ktl::nullopt.
+//
+// Requirements for PSCI CPU_SUSPEND support:
+//
+// * The device has PSCI version 1.0 or better, and
+// * PSCI FEATURES reports that CPU_ CPU_SUSPEND is supported, and
+// * ZBI contains a supported CPU suspend state configuration.
+//
+// The ZBI-supplied CPU suspend state configuration is considered supported if it contains at least
+// one entry where:
+//
+//   * No unknown flags are specified, and
+//   * ZBI_ARM_PSCI_CPU_SUSPEND_STATE_FLAGS_TARGETS_POWER_DOMAIN is not set.
+ktl::optional<uint32_t> cpu_suspend_power_state_target_cpu;
+
+// Optionally contains a PSCI CPU_SUSPEND power_state value that targets a power domain (think
+// cluster or whole system).  Will only contain a value if |cpu_suspend_power_state_target_cpu|
+// contains a value.
+ktl::optional<uint32_t> cpu_suspend_power_state_target_power_domain;
+
 bool psci_set_suspend_mode_supported = false;
 
 uint64_t shutdown_args[3] = {0, 0, 0};
@@ -68,6 +90,44 @@ uint64_t psci_hvc_call(uint32_t function, uint64_t arg0, uint64_t arg1, uint64_t
 using psci_call_proc = uint64_t (*)(uint32_t, uint64_t, uint64_t, uint64_t);
 
 psci_call_proc do_psci_call = psci_smc_call;
+
+// Parse and print |config|, setting the relevant global power state variables.
+//
+// Intended to be called once as part of |PsciInit|.
+void parse_cpu_suspend_power_states(ktl::span<const zbi_dcfg_arm_psci_cpu_suspend_state_t> config) {
+  if (config.empty()) {
+    dprintf(INFO, "PSCI power_states: none\n");
+    return;
+  }
+
+  constexpr uint32_t kKnownFlags = ZBI_ARM_PSCI_CPU_SUSPEND_STATE_FLAGS_LOCAL_TIMER_STOPS |
+                                   ZBI_ARM_PSCI_CPU_SUSPEND_STATE_FLAGS_TARGETS_POWER_DOMAIN;
+
+  dprintf(INFO, "PSCI power_states:\n");
+
+  // Iterate over every element.  The elements are in no particular order.  The last-one-wins
+  // behavior of this loop is somewhat arbitrary.
+  for (const zbi_dcfg_arm_psci_cpu_suspend_state_t& elem : config) {
+    // Ignore any power state that contains flags we don't know about as they may indicate a
+    // requirement that must be met before invoking that power state.
+    const bool skip = elem.flags & ~kKnownFlags;
+
+    dprintf(INFO, "  id=0x%x, power_state=0x%x, flags=0x%x%s\n", elem.id, elem.power_state,
+            elem.flags, skip ? " SKIPPED" : "");
+    dprintf(INFO, "    entry_latency_us=%u, exit_latency_us=%u, min_residency_us=%u\n",
+            elem.entry_latency_us, elem.exit_latency_us, elem.min_residency_us);
+
+    if (skip) {
+      continue;
+    }
+
+    if ((elem.flags & ZBI_ARM_PSCI_CPU_SUSPEND_STATE_FLAGS_TARGETS_POWER_DOMAIN) == 0) {
+      cpu_suspend_power_state_target_cpu = elem.power_state;
+    } else {
+      cpu_suspend_power_state_target_power_domain = elem.power_state;
+    }
+  }
+}
 
 }  // anonymous namespace
 
@@ -130,16 +190,17 @@ zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry, uint64_t context) {
   return psci_status_to_zx_status(do_psci_call(PSCI64_CPU_ON, mpid, entry, context));
 }
 
-PsciCpuSuspendResult psci_cpu_suspend(uint32_t power_state) {
+PsciCpuSuspendResult psci_cpu_suspend() {
   LTRACE_ENTRY;
 
   DEBUG_ASSERT(arch_ints_disabled());
 
-  if (!psci_cpu_suspend_supported) {
+  if (!psci_is_cpu_suspend_supported()) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   const paddr_t entry_pa = KernelPhysicalAddressOf<arm64_secondary_start>();
+  const uint32_t power_state = cpu_suspend_power_state_target_cpu.value();
 
   psci_cpu_resume_context context{};
 
@@ -221,9 +282,10 @@ zx_status_t psci_set_suspend_mode(psci_suspend_mode mode) {
 
 bool psci_is_set_suspend_mode_supported() { return psci_set_suspend_mode_supported; }
 
-bool psci_is_cpu_suspend_supported() { return psci_cpu_suspend_supported; }
+bool psci_is_cpu_suspend_supported() { return cpu_suspend_power_state_target_cpu.has_value(); }
 
-void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
+void PsciInit(const zbi_dcfg_arm_psci_driver_t& config,
+              ktl::span<const zbi_dcfg_arm_psci_cpu_suspend_state_t> psci_cpu_suspend_config) {
   do_psci_call = config.use_hvc ? psci_hvc_call : psci_smc_call;
   memcpy(shutdown_args, config.shutdown_args, sizeof(shutdown_args));
   memcpy(reboot_args, config.reboot_args, sizeof(reboot_args));
@@ -251,7 +313,7 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
       return result;
     };
 
-    psci_cpu_suspend_supported = probe_feature(PSCI64_CPU_SUSPEND, "CPU_SUSPEND").has_value();
+    const bool has_cpu_suspend = probe_feature(PSCI64_CPU_SUSPEND, "CPU_SUSPEND").has_value();
     probe_feature(PSCI64_CPU_OFF, "CPU_OFF");
     probe_feature(PSCI64_CPU_ON, "CPU_ON");
     probe_feature(PSCI64_AFFINITY_INFO, "AFFINITY_INFO");
@@ -277,6 +339,11 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
     probe_feature(PSCI64_MEM_PROTECT_RANGE, "MEM_PROTECT_RANGE");
 
     probe_feature(PSCI64_SMCCC_VERSION, "PSCI64_SMCCC_VERSION");
+
+    // Print the power_states after printing all the supported features.
+    if (has_cpu_suspend) {
+      parse_cpu_suspend_power_states(psci_cpu_suspend_config);
+    }
   }
 
   // Register with the pdev power driver.

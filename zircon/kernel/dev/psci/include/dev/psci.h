@@ -57,6 +57,7 @@
 
 #include <arch/arm64/mp.h>
 #include <dev/power.h>
+#include <ktl/span.h>
 
 /* TODO NOTE: - currently these routines assume cpu topologies that are described only in AFF0 and
    AFF1. If a system is architected such that AFF2 or AFF3 are non-zero then this code will need to
@@ -64,7 +65,8 @@
 */
 
 // Initializes the PSCI driver.
-void PsciInit(const zbi_dcfg_arm_psci_driver_t& config);
+void PsciInit(const zbi_dcfg_arm_psci_driver_t& config,
+              ktl::span<const zbi_dcfg_arm_psci_cpu_suspend_state_t> psci_cpu_suspend_config);
 
 uint32_t psci_get_version();
 uint32_t psci_get_feature(uint32_t psci_call);
@@ -74,11 +76,11 @@ zx_status_t psci_cpu_off();
 zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry, uint64_t context);
 
 // Whether or not the CPU powered down (lost state) during a CPU_SUSPEND
-// operation.
+// operation.  See |psci_cpu_suspend|.
 enum class CpuPoweredDown : bool { No, Yes };
 using PsciCpuSuspendResult = zx::result<CpuPoweredDown>;
 
-// Enters the specified PSCI CPU_SUSPEND |power_state| on the calling CPU.
+// Enters a PSCI CPU_SUSPEND state on the calling CPU.
 //
 // Prior to calling, interrupts must be disabled, preemption must be disabled,
 // and the caller must be pinned to the calling CPU.
@@ -91,20 +93,13 @@ using PsciCpuSuspendResult = zx::result<CpuPoweredDown>;
 // CpuPoweredDown::Yes, depending on whether the CPU actually powered down
 // during the operation.
 //
-// Returns ZX_ERR_NOT_SUPPORTED if CPU is not supported on this platform.
+// Returns ZX_ERR_NOT_SUPPORTED if CPU_SUSPEND is not supported on this platform.
 //
-// Returns ZX_ERR_INVALID_PARAMETERS if the requested power_state is invalid, or
-// a low-power state was requested for a higher-than-core-level topology node
-// (e.g. cluster) and at least one of the children in that node is in a local
-// low-power state that is incompatible with the request.  This is a "normal"
-// error that callers must be prepared to handle.
-//
-// Returns ZX_ERR_ACCESS_DENIED if a low-power state was requested for a
-// higher-than-core-level topology node (e.g. cluster) and all the cores that
-// are in an incompatible state with the request are running, as opposed to
-// being in a low-power state.  This is a "normal" error that callers must be
-// prepared to handle.
-PsciCpuSuspendResult psci_cpu_suspend(uint32_t power_state);
+// TODO(https://fxbug.dev/414456459): Once we add support for higher-than-core-level
+// power states, be sure to update the docs to discuss the possibility of
+// ZX_ERR_INVALID_ARGS and ZX_ERR_ACCESS_DENIED.  And be sure to update callers to
+// handle those cases.
+PsciCpuSuspendResult psci_cpu_suspend();
 
 // Holds register state to be saved/restored across a suspend/resume cycle.
 //
@@ -128,7 +123,8 @@ zx_status_t psci_set_suspend_mode(psci_suspend_mode mode);
 // Returns true iff PSCI version is 1.0 or better and SET_SUSPEND_MODE is supported.
 bool psci_is_set_suspend_mode_supported();
 
-// Returns true iff PSCI version is 1.0 or better and CPU_SUSPEND is supported.
+// Returns true iff PSCI version is 1.0 or better, and CPU_SUSPEND is supported,
+// and we have valid ZBI-supplied power_state configuration.
 bool psci_is_cpu_suspend_supported();
 
 #endif  // !__ASSEMBLER__
