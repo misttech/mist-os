@@ -24,8 +24,7 @@ _python_prebuilt_files = glob(
 exports_files(
     # Export these files for the benefit of the //build/bazel/toolchains/clang package.
     glob(["prebuilt/third_party/clang/**"]) +
-    glob(["prebuilt/third_party/sysroot/linux"]) +
-    glob(["build/bazel/toolchains/**"]) +
+    glob(["prebuilt/third_party/sysroot/linux/**"]) +
 
     # Used by code generators in vendor/google:
     glob(["prebuilt/third_party/gn/*/gn"]) +
@@ -40,7 +39,7 @@ exports_files(
         "third_party/android/platform/external/avb/test/data/atx_metadata.bin",
     ] +
     # Bootloader images used in partition configs for product bundles.
-    glob(["prebuilt/vendor/amlogic/*/firmware/**/*"]) +
+    glob(["prebuilt/vendor/amlogic/*/firmware/**/*"], allow_empty = True) +
 
     # OSPO license verification tool
     glob(["prebuilt/third_party/ospo/licenseclassifier/*/identify_license"]) +
@@ -55,16 +54,16 @@ exports_files(
     glob(["prebuilt/third_party/zoneinfo/**"]) +
 
     # prebuilt drivers
-    glob(["prebuilt/vendor/google/drivers/**/*.far"]) +
+    glob(["prebuilt/vendor/google/drivers/**/*.far"], allow_empty = True) +
 
     # mcu firmwares
-    glob(["prebuilt/mcu/firmware/**/*"]) +
+    glob(["prebuilt/mcu/firmware/**/*"], allow_empty = True) +
 
     # prebuilt firmware
-    glob(["prebuilt/vendor/google_devices/*/prebuilts/firmware/**/*"]) +
+    glob(["prebuilt/vendor/google_devices/*/prebuilts/firmware/**/*"], allow_empty = True) +
 
     # audio config files
-    glob(["prebuilt/vendor/google_devices/*/prebuilts/audio/**/*"]) +
+    glob(["prebuilt/vendor/google_devices/*/prebuilts/audio/**/*"], allow_empty = True) +
 
     # build/info
     [

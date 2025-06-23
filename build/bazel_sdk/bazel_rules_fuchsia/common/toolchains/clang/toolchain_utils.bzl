@@ -338,14 +338,15 @@ def define_clang_runtime_filegroups(clang_constants):
     # statement that resolves to the right location based on the build
     # configuration's target platform.
     #
-    # There are also also multilib specific versions of that file
-    # under include/{clang_target_tuple}/<name>/c++/v1/__config_site.
+    # For some tuples, there are also also multilib specific versions of that
+    # file under include/{clang_target_tuple}/<name>/c++/v1/__config_site.
     #
     __config_site_sources = format_labels_list_to_target_tag_native_glob_select(
         [
             "include/{clang_target_tuple}/c++/v1/__config_site",
             "include/{clang_target_tuple}/*/c++/v1/__config_site",
         ],
+        allow_empty = True,
     )
 
     native.filegroup(
@@ -364,6 +365,15 @@ def define_clang_runtime_filegroups(clang_constants):
             compiler_files_name = "mac-sdk-compiler-files",
             linker_files_name = "mac-sdk-linker-files",
         )
+
+    # NMOTE: allow_empty=True is required in the glob calls below, otherwise
+    # Bazel 8.x will complain with an error like:
+    #
+    # ERROR: ... glob pattern 'lib/x86_64-apple-darwin/**' didn't match anything
+    #
+    # Even on a Linux host machine because format_labels_list_to_target_tag_native_glob_select()
+    # returns a select() that includes a @platforms//os:macos key and glob() statements
+    # within them.
 
     native.filegroup(
         name = "libcxx_runtime_libs",
@@ -396,7 +406,7 @@ def define_clang_runtime_filegroups(clang_constants):
             #
             format_labels_list_to_target_tag_native_glob_select([
                 "lib/{clang_target_tuple}/**",
-            ]) +
+            ], allow_empty = True) +
             # This contains the Clang runtime libraries, including all
             # their variants. Because individual targets can select a different
             # sanitizer mode than the default for the current build operation,
@@ -428,6 +438,7 @@ def define_clang_runtime_filegroups(clang_constants):
                 extra_dict = {
                     "internal_dir": clang_constants.lib_clang_internal_dir,
                 },
+                allow_empty = True,
             ) +
             # As a special case, the libc++ runtime libraries for host MacOS
             # are not under lib/aarch64-apple-darwin/ but directly under lib/

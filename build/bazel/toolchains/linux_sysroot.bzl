@@ -83,6 +83,7 @@ def linux_sysroot_libs(name, sysroot_arch, sysroot_path = _linux_sysroot):
             patterns,
             exclude = exclude,
             exclude_directories = 1,
+            allow_empty = True,
         ),
         visibility = ["//visibility:public"],
     )

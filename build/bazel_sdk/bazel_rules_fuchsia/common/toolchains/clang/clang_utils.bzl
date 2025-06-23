@@ -205,7 +205,7 @@ def format_labels_list_to_target_tag_dict(
         for target_tag in target_tags
     }
 
-def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = None, extra_dict = None, common_package_prefix = "//common"):
+def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = None, extra_dict = None, allow_empty = False, common_package_prefix = "//common"):
     """Format a list of label patterns into a select() statement.
 
     The result is a select() statement whose keys are config_setting() labels
@@ -220,6 +220,7 @@ def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = No
            target tags will be used.
         extra_dict: An optional dictionary containing additional arguments
            for the string expansion.
+        allow_empty: Optional boolean for glob() calls. Default is False.
         common_package_prefix: Package prefix for the repository that contains
             this .bzl file and the BUILD.bazel next to it.
 
@@ -261,7 +262,7 @@ def format_labels_list_to_target_tag_native_glob_select(labels, target_tags = No
 
     return select(target_tag_dict_to_select_keys(
         {
-            target_tag: native.glob(target_labels)
+            target_tag: native.glob(target_labels, allow_empty = allow_empty)
             for target_tag, target_labels in format_labels_list_to_target_tag_dict(
                 labels,
                 target_tags = target_tags,

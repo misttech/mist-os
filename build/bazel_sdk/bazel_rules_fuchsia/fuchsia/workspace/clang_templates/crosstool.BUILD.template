@@ -254,7 +254,7 @@ exports_files([
 
 cc_library(
     name = "sources",
-    srcs = glob(["src/**"]),
+    srcs = glob(["src/**"], allow_empty=True),
     visibility = ["//visibility:public"],
 )
 

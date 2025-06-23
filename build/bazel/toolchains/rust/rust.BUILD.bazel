@@ -128,7 +128,10 @@ toolchain(
 
 rust_stdlib_filegroup(
     name = "rust_std_fuchsia_riscv64",
-    srcs = glob(["lib/rustlib/riscv64-unknown-fuchsia/lib/*"]),
+    # See https://doc.rust-lang.org/rustc/platform-support/riscv64gc-unknown-linux-gnu.html
+    # which this uses a "riscv64gc" prefix, while C++ uses only "riscv64" for the same
+    # ABI.
+    srcs = glob(["lib/rustlib/riscv64gc-unknown-fuchsia/lib/*"]),
 )
 
 rust_toolchain(
