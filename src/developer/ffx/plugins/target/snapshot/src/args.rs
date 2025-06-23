@@ -30,6 +30,11 @@ pub struct SnapshotCommand {
     pub output_file: Option<String>,
 
     #[argh(switch, long = "dump-annotations")]
-    /// print annotations without capturing the snapshot, ignores `dir` flag
+    /// print annotations without capturing the snapshot, ignores `dir` and
+    /// `upload` flags
     pub dump_annotations: bool,
+
+    #[argh(switch, long = "upload")]
+    /// whether to upload the generated snapshot to a predefined GCS bucket
+    pub upload: bool,
 }

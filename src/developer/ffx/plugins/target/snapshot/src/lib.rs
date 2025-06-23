@@ -2,8 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use ::gcs::client::Client;
+use anyhow::Context;
 use async_trait::async_trait;
 use chrono::{Datelike, Local, Timelike};
+use ffx_config::EnvironmentContext;
 use ffx_snapshot_args::SnapshotCommand;
 use ffx_writer::VerifiedMachineWriter;
 use fho::{bug, return_bug, return_user_error, Error, FfxMain, FfxTool, Result};
@@ -12,14 +15,19 @@ use fidl_fuchsia_feedback::{
 };
 use fidl_fuchsia_io as fio;
 use futures::stream::{FuturesOrdered, StreamExt};
+use gcs::error::GcsError;
+use pbms::{handle_new_access_token, AuthFlowChoice};
 use schemars::JsonSchema;
 use serde::Serialize;
 use std::env::temp_dir;
 use std::fs;
-use std::io::Write;
+use std::io::{stderr, stdin, stdout, Write};
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use target_holders::moniker;
+
+const SNAPSHOT_GCS_BUCKET: &'static str = "snapshot.bucket";
+const SNAPSHOT_WEB_VIEWER_BASE: &'static str = "snapshot.web_viewer";
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
@@ -38,8 +46,11 @@ pub enum CommandStatus {
 pub struct SnapshotTool {
     #[command]
     cmd: SnapshotCommand,
+
     #[with(moniker("/core/feedback"))]
     data_provider_proxy: DataProviderProxy,
+
+    context: EnvironmentContext,
 }
 
 fho::embedded_plugin!(SnapshotTool);
@@ -65,7 +76,7 @@ impl FfxMain for SnapshotTool {
                 ),
             }?;
         } else {
-            match snapshot_impl(self.data_provider_proxy, self.cmd).await {
+            match snapshot_impl(self.data_provider_proxy, self.cmd, self.context).await {
                 Ok(filepath) => writer.machine_or(
                     &CommandStatus::Snapshot { output_file: filepath.clone() },
                     format!("Exported {}", filepath.to_string_lossy()),
@@ -210,6 +221,7 @@ pub async fn dump_annotations(data_provider_proxy: DataProviderProxy) -> Result<
 pub async fn snapshot_impl(
     data_provider_proxy: DataProviderProxy,
     cmd: SnapshotCommand,
+    context: EnvironmentContext,
 ) -> Result<PathBuf> {
     let output_dir = match cmd.output_file {
         None => {
@@ -252,7 +264,55 @@ pub async fn snapshot_impl(
     let mut file = fs::File::create(&file_path).map_err(|e| bug!(e))?;
     file.write_all(&data).map_err(|e| bug!(e))?;
 
+    // Optionally upload the snapshot to GCS
+    if cmd.upload {
+        match upload_snapshot(&file_path, context).await {
+            Ok(_) => {}
+            Err(e) => {
+                eprintln!("Failed to upload snapshot: {e}");
+            }
+        }
+    }
+
     Ok(file_path)
+}
+
+async fn upload_snapshot(file_path: &PathBuf, context: EnvironmentContext) -> Result<()> {
+    let bucket: String = context
+                            .get(SNAPSHOT_GCS_BUCKET)
+                            .expect("No GCS bucket configured. Please add the GCS bucket name by running ` ffx config set snapshot.bucket <your gcs bucket>`.");
+    let web_viewer_base: String = context
+                            .get(SNAPSHOT_WEB_VIEWER_BASE)
+                            .expect("No web_viewer_base URL configured. Please set it by running ` ffx config set snapshot.web_viewer_base <your web_viewer_base>`.");
+    let now = Local::now().format("%Y-%m-%d-%H-%M-%S");
+    let object_name = format!("snapshot-{}", now);
+    let client = Client::initial()?;
+    loop {
+        match client.upload(&bucket, &object_name, file_path).await.context("uploading snapshot.") {
+            Ok(result) => {
+                println!(
+                    "Snapshot uploaded. Check it here:\n\t {}/?from={}",
+                    web_viewer_base,
+                    result.as_str()
+                );
+                break;
+            }
+            Err(e) => match e.downcast_ref::<GcsError>() {
+                Some(GcsError::NeedNewAccessToken) => {
+                    let mut input = stdin();
+                    let mut output = stdout();
+                    let mut error_output = stderr();
+                    let ui = structured_ui::TextUi::new(&mut input, &mut output, &mut error_output);
+                    let access_token = handle_new_access_token(&AuthFlowChoice::Pkce, &ui)
+                        .await
+                        .context("Getting new access token.")?;
+                    client.set_access_token(access_token).await;
+                }
+                _ => return Err(Error::User(e)),
+            },
+        }
+    }
+    Ok(())
 }
 
 fn default_output_dir() -> PathBuf {
@@ -367,8 +427,8 @@ mod test {
         let annotations = Annotations::default();
         let data_provider_proxy = setup_fake_data_provider_server(annotations);
 
-        let cmd = SnapshotCommand { output_file: None, dump_annotations: false };
-        let result = snapshot_impl(data_provider_proxy, cmd).await;
+        let cmd = SnapshotCommand { output_file: None, dump_annotations: false, upload: false };
+        let result = snapshot_impl(data_provider_proxy, cmd, EnvironmentContext::default()).await;
         assert!(result.is_ok());
         let output = result.expect("snapshot path");
         assert!(output.ends_with("snapshot.zip"));
@@ -384,8 +444,10 @@ mod test {
             cmd: SnapshotCommand {
                 output_file: Some(tempdir.to_string_lossy().to_string()),
                 dump_annotations: false,
+                upload: false,
             },
             data_provider_proxy,
+            context: EnvironmentContext::default(),
         };
         let buffers = TestBuffers::default();
         let writer = VerifiedMachineWriter::<CommandStatus>::new_test(Some(Format::Json), &buffers);
