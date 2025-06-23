@@ -163,7 +163,7 @@ bool UsbAdbDevice::SendQueuedOnce() {
     }
     auto status = req->CacheFlush(bulk_in_ep_.GetMapped());
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Cache flush failed %d", status);
+      zxlogf(ERROR, "Cache flush failed %s", zx_status_get_string(status));
     }
 
     requests.emplace_back(req->take_request());
@@ -218,7 +218,7 @@ bool UsbAdbDevice::ReceiveQueuedOnce() {
     } else {
       auto status = req.CacheFlushInvalidate(bulk_out_ep_.GetMapped());
       if (status != ZX_OK) {
-        zxlogf(ERROR, "Cache flush and invalidate failed %d", status);
+        zxlogf(ERROR, "Cache flush and invalidate failed %s", zx_status_get_string(status));
       }
       rx_requests_.front().Reply(fit::ok(
           std::vector<uint8_t>(reinterpret_cast<uint8_t*>(*addr),
@@ -490,13 +490,13 @@ zx_status_t UsbAdbDevice::InitEndpoint(
     uint8_t* ep_addrs, usb::EndpointClient<UsbAdbDevice>& ep, uint32_t req_count) {
   auto status = function_.AllocEp(direction, ep_addrs);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "usb_function_alloc_ep failed - %d.", status);
+    zxlogf(ERROR, "usb_function_alloc_ep failed - %s.", zx_status_get_string(status));
     return status;
   }
 
   status = ep.Init(*ep_addrs, client, usb_dispatcher_);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to init UsbEndpoint %d", status);
+    zxlogf(ERROR, "Failed to init UsbEndpoint %s", zx_status_get_string(status));
     return status;
   }
 
@@ -529,20 +529,20 @@ zx::result<> UsbAdbDevice::Start() {
 
   auto status = function_.AllocInterface(&descriptors_.adb_intf.b_interface_number);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "usb_function_alloc_interface failed - %d.", status);
+    zxlogf(ERROR, "usb_function_alloc_interface failed - %s.", zx_status_get_string(status));
     return zx::error(status);
   }
 
   status = InitEndpoint(*client, USB_DIR_OUT, &descriptors_.bulk_out_ep.b_endpoint_address,
                         bulk_out_ep_, kBulkRxCount);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "InitEndpoint failed - %d.", status);
+    zxlogf(ERROR, "InitEndpoint failed - %s.", zx_status_get_string(status));
     return zx::error(status);
   }
   status = InitEndpoint(*client, USB_DIR_IN, &descriptors_.bulk_in_ep.b_endpoint_address,
                         bulk_in_ep_, kBulkTxCount);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "InitEndpoint failed - %d.", status);
+    zxlogf(ERROR, "InitEndpoint failed - %s.", zx_status_get_string(status));
     return zx::error(status);
   }
   auto serve_result = outgoing()->AddService<fadb::Service>(fadb::Service::InstanceHandler({
