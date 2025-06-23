@@ -8,11 +8,14 @@
 use crate::bpf::fs::{get_bpf_object, BpfHandle};
 use crate::bpf::program::Program;
 use crate::task::CurrentTask;
-use crate::vfs::socket::{SocketAddress, SocketDomain, SocketProtocol, SocketType};
+use crate::vfs::socket::{
+    SocketAddress, SocketDomain, SocketProtocol, SocketType, ZxioBackedSocket,
+};
 use crate::vfs::FdNumber;
 use ebpf::{EbpfProgram, EbpfProgramContext, ProgramArgument, Type};
 use ebpf_api::{
-    AttachType, BaseEbpfRunContext, PinnedMap, ProgramType, BPF_SOCK_ADDR_TYPE, BPF_SOCK_TYPE,
+    AttachType, BaseEbpfRunContext, CurrentTaskContext, MapValueRef, MapsContext, PinnedMap,
+    ProgramType, SocketContext, BPF_SOCK_ADDR_TYPE, BPF_SOCK_TYPE,
 };
 use fidl_fuchsia_net_filter as fnet_filter;
 use fuchsia_component::client::connect_to_protocol_sync;
@@ -21,7 +24,8 @@ use starnix_sync::{BpfPrograms, FileOpsCore, Locked, OrderedRwLock, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{
-    bpf_attr__bindgen_ty_6, bpf_sock, bpf_sock_addr, errno, error, CGROUP2_SUPER_MAGIC,
+    bpf_attr__bindgen_ty_6, bpf_sock, bpf_sock_addr, errno, error, gid_t, pid_t, uid_t,
+    CGROUP2_SUPER_MAGIC,
 };
 use std::ops::{Deref, DerefMut};
 use std::sync::{Arc, OnceLock};
@@ -122,6 +126,46 @@ pub fn bpf_prog_detach(
     current_task.kernel().ebpf_attachments.detach_prog(locked, current_task, attach_type, target_fd)
 }
 
+struct EbpfRunContextImpl<'a> {
+    base: BaseEbpfRunContext<'a>,
+    current_task: &'a CurrentTask,
+}
+impl<'a> EbpfRunContextImpl<'a> {
+    fn new(current_task: &'a CurrentTask) -> Self {
+        Self { base: Default::default(), current_task }
+    }
+}
+
+impl<'a> MapsContext<'a> for EbpfRunContextImpl<'a> {
+    fn add_value_ref(&mut self, map_ref: MapValueRef<'a>) {
+        self.base.add_value_ref(map_ref)
+    }
+}
+
+impl<'a> CurrentTaskContext for EbpfRunContextImpl<'a> {
+    fn get_uid_gid(&self) -> (uid_t, gid_t) {
+        let creds = self.current_task.creds();
+        (creds.uid, creds.gid)
+    }
+
+    fn get_tid_tgid(&self) -> (pid_t, pid_t) {
+        let task = &self.current_task.task;
+        (task.get_tid(), task.get_pid())
+    }
+}
+
+impl<'a> SocketContext for EbpfRunContextImpl<'a> {
+    type BpfSock<'b> = BpfSock<'b>;
+
+    fn get_socket_cookie(&self, bpf_sock: &BpfSock<'_>) -> u64 {
+        let v = bpf_sock.socket.get_socket_cookie();
+        v.unwrap_or_else(|errno| {
+            log_error!("Failed to get socket cookie: {:?}", errno);
+            0
+        })
+    }
+}
+
 // Wrapper for `bpf_sock_addr` used to implement `ProgramArgument` trait.
 #[repr(C)]
 #[derive(Default)]
@@ -150,7 +194,7 @@ impl ProgramArgument for &'_ mut BpfSockAddr {
 struct SockAddrProgram(EbpfProgram<SockAddrProgram>);
 
 impl EbpfProgramContext for SockAddrProgram {
-    type RunContext<'a> = BaseEbpfRunContext<'a>;
+    type RunContext<'a> = EbpfRunContextImpl<'a>;
     type Packet<'a> = ();
     type Arg1<'a> = &'a mut BpfSockAddr;
     type Arg2<'a> = ();
@@ -168,8 +212,8 @@ pub enum SockAddrProgramResult {
 }
 
 impl SockAddrProgram {
-    fn run(&self, addr: &mut BpfSockAddr) -> SockAddrProgramResult {
-        let mut run_context = BaseEbpfRunContext::<'_>::default();
+    fn run(&self, current_task: &CurrentTask, addr: &mut BpfSockAddr) -> SockAddrProgramResult {
+        let mut run_context = EbpfRunContextImpl::new(current_task);
         if self.0.run_with_1_argument(&mut run_context, addr) == 0 {
             SockAddrProgramResult::Block
         } else {
@@ -182,23 +226,27 @@ type AttachedSockAddrProgramCell = OrderedRwLock<Option<SockAddrProgram>, BpfPro
 
 // Wrapper for `bpf_sock` used to implement `ProgramArgument` trait.
 #[repr(C)]
-#[derive(Default)]
-pub struct BpfSock(bpf_sock);
+pub struct BpfSock<'a> {
+    // Must be first field.
+    value: bpf_sock,
 
-impl Deref for BpfSock {
+    socket: &'a ZxioBackedSocket,
+}
+
+impl<'a> Deref for BpfSock<'a> {
     type Target = bpf_sock;
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.value
     }
 }
 
-impl DerefMut for BpfSock {
+impl<'a> DerefMut for BpfSock<'a> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
+        &mut self.value
     }
 }
 
-impl ProgramArgument for &'_ mut BpfSock {
+impl<'a> ProgramArgument for &'_ BpfSock<'a> {
     fn get_type() -> &'static Type {
         &*BPF_SOCK_TYPE
     }
@@ -208,9 +256,9 @@ impl ProgramArgument for &'_ mut BpfSock {
 struct SockProgram(EbpfProgram<SockProgram>);
 
 impl EbpfProgramContext for SockProgram {
-    type RunContext<'a> = BaseEbpfRunContext<'a>;
+    type RunContext<'a> = EbpfRunContextImpl<'a>;
     type Packet<'a> = ();
-    type Arg1<'a> = &'a mut BpfSock;
+    type Arg1<'a> = &'a BpfSock<'a>;
     type Arg2<'a> = ();
     type Arg3<'a> = ();
     type Arg4<'a> = ();
@@ -226,8 +274,8 @@ pub enum SockProgramResult {
 }
 
 impl SockProgram {
-    fn run(&self, sock: &mut BpfSock) -> SockProgramResult {
-        let mut run_context = BaseEbpfRunContext::<'_>::default();
+    fn run<'a>(&self, current_task: &'a CurrentTask, sock: &'a BpfSock<'a>) -> SockProgramResult {
+        let mut run_context = EbpfRunContextImpl::new(current_task);
         if self.0.run_with_1_argument(&mut run_context, sock) == 0 {
             SockProgramResult::Block
         } else {
@@ -293,6 +341,7 @@ impl CgroupEbpfProgramSet {
     pub fn run_sock_addr_prog(
         &self,
         locked: &mut Locked<FileOpsCore>,
+        current_task: &CurrentTask,
         op: SockAddrOp,
         domain: SocketDomain,
         socket_type: SocketType,
@@ -337,16 +386,18 @@ impl CgroupEbpfProgramSet {
             _ => (),
         };
 
-        Ok(prog.run(&mut bpf_sockaddr))
+        Ok(prog.run(current_task, &mut bpf_sockaddr))
     }
 
     pub fn run_sock_prog(
         &self,
         locked: &mut Locked<FileOpsCore>,
+        current_task: &CurrentTask,
         op: SockOp,
         domain: SocketDomain,
         socket_type: SocketType,
         protocol: SocketProtocol,
+        socket: &ZxioBackedSocket,
     ) -> SockProgramResult {
         let prog_cell = match op {
             SockOp::Create => &self.sock_create,
@@ -357,12 +408,17 @@ impl CgroupEbpfProgramSet {
             return SockProgramResult::Allow;
         };
 
-        let mut bpf_sock = BpfSock::default();
-        bpf_sock.family = domain.as_raw().into();
-        bpf_sock.type_ = socket_type.as_raw();
-        bpf_sock.protocol = protocol.as_raw();
+        let bpf_sock = BpfSock {
+            value: bpf_sock {
+                family: domain.as_raw().into(),
+                type_: socket_type.as_raw(),
+                protocol: protocol.as_raw(),
+                ..Default::default()
+            },
+            socket,
+        };
 
-        prog.run(&mut bpf_sock)
+        prog.run(current_task, &bpf_sock)
     }
 }
 
@@ -504,8 +560,9 @@ impl EbpfAttachments {
             (AttachLocation::Kernel, ProgramType::CgroupSockAddr) => {
                 check_root_cgroup_fd(locked, current_task, target_fd)?;
 
+                let helpers = ebpf_api::get_current_task_helpers();
                 let linked_program =
-                    SockAddrProgram(program.link(attach_type.get_program_type(), &[], &[])?);
+                    SockAddrProgram(program.link(attach_type.get_program_type(), &[], &helpers)?);
                 *self.root_cgroup.get_sock_addr_program(attach_type)?.write(locked) =
                     Some(linked_program);
 
@@ -515,7 +572,8 @@ impl EbpfAttachments {
             (AttachLocation::Kernel, ProgramType::CgroupSock) => {
                 check_root_cgroup_fd(locked, current_task, target_fd)?;
 
-                let helpers = ebpf_api::get_cgroup_sock_helpers();
+                let mut helpers = ebpf_api::get_current_task_helpers();
+                helpers.extend(ebpf_api::get_cgroup_sock_helpers().into_iter());
                 let linked_program =
                     SockProgram(program.link(attach_type.get_program_type(), &[], &helpers)?);
                 *self.root_cgroup.get_sock_program(attach_type)?.write(locked) =

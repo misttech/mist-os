@@ -41,6 +41,11 @@ mod tests {
             .ok_or(std::io::Error::from_raw_os_error(-result as i32))
     }
 
+    fn gettid() -> linux_uapi::pid_t {
+        // SAFETY: gettid syscall is always safe.
+        unsafe { libc::syscall(linux_uapi::__NR_gettid.into()) as linux_uapi::pid_t }
+    }
+
     fn bpf_map_create(map_def: &ebpf_loader::MapDefinition) -> Result<OwnedFd, std::io::Error> {
         let mut attr = zero_bpf_attr();
 
@@ -214,6 +219,17 @@ mod tests {
     const RINGBUF_MAP_NAME: &str = "ringbuf";
     const TARGET_COOKIE_MAP_NAME: &str = "target_cookie";
     const COUNT_MAP_NAME: &str = "count";
+    const TEST_RESULT_MAP_NAME: &str = "test_result";
+
+    // LINT.IfChange
+    #[repr(C)]
+    #[derive(Immutable, FromBytes)]
+    struct TestResult {
+        uid_gid: u64,
+        pid_tgid: u64,
+        cookie: u64,
+    }
+    // LINT.ThenChange(//src/starnix/tests/syscalls/rust/data/ebpf/ebpf_test_progs.c)
 
     struct MapSet {
         maps: Vec<(MapDefinition, OwnedFd)>,
@@ -242,9 +258,15 @@ mod tests {
         }
 
         fn get_count(&self) -> u32 {
-            let target_cookie_fd =
+            let count_map_fd =
                 self.find(COUNT_MAP_NAME, linux_uapi::bpf_map_type_BPF_MAP_TYPE_ARRAY);
-            bpf_map_lookup_elem(target_cookie_fd, 0u32).expect("Failed to get count")
+            bpf_map_lookup_elem(count_map_fd, 0u32).expect("Failed to get count")
+        }
+
+        fn get_test_result(&self) -> TestResult {
+            let test_result_map_fd =
+                self.find(TEST_RESULT_MAP_NAME, linux_uapi::bpf_map_type_BPF_MAP_TYPE_ARRAY);
+            bpf_map_lookup_elem(test_result_map_fd, 0u32).expect("Failed to test_result")
         }
     }
 
@@ -370,7 +392,7 @@ mod tests {
         root_required!();
 
         let program = LoadedProgram::new(
-            "sock_test_prog",
+            "sock_create_prog",
             linux_uapi::bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK,
             linux_uapi::bpf_attach_type_BPF_CGROUP_INET_SOCK_CREATE,
         );
@@ -384,22 +406,35 @@ mod tests {
     }
 
     #[test]
-    fn ebpf_sock_release() {
+    fn sock_release_prog() {
         root_required!();
 
         let program = LoadedProgram::new(
-            "sock_test_prog",
+            "sock_release_prog",
             linux_uapi::bpf_prog_type_BPF_PROG_TYPE_CGROUP_SOCK,
             linux_uapi::bpf_attach_type_BPF_CGROUP_INET_SOCK_RELEASE,
         );
-        let _attached = program.attach();
 
         let socket = UdpSocket::bind("0.0.0.0:0").expect("Failed to create UDP socket");
+        let cookie = get_socket_cookie(socket.as_fd()).expect("Failed to get SO_COOKIE");
+        program.maps.set_target_cookie(cookie);
+
+        let _attached = program.attach();
 
         // Verify that the counter is incremented when a new socket is released.
         let last_count = program.maps.get_count();
         std::mem::drop(socket);
         let new_count = program.maps.get_count();
-        assert!(new_count - last_count >= 1);
+        assert_eq!(new_count, last_count + 1);
+
+        let test_result = program.maps.get_test_result();
+
+        // SAFETY: These libc functions are safe to call.
+        let (uid, gid) = unsafe { (libc::getuid(), libc::getgid()) };
+        assert_eq!(test_result.uid_gid, (uid as u64) + (gid as u64) << 32);
+
+        let tid = gettid();
+        let tgid = std::process::id();
+        assert_eq!(test_result.pid_tgid, (tid as u64) + (tgid as u64) << 32);
     }
 }

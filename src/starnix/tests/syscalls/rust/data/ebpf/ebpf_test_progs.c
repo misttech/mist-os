@@ -31,11 +31,30 @@ struct bpf_map_def count = {
     .map_flags = 0,
 };
 
+// Struct stored in the `test_result` map in order to pass results to the test.
+// It must match `TestResult` struct in
+// `src/starnix/tests/syscalls/rust/src/ebpf.rs` .
+// LINT.IfChange
+struct test_result {
+  __u64 uid_gid;
+  __u64 pid_tgid;
+};
+// LINT.ThenChange(//src/starnix/tests/syscalls/rust/src/ebpf.rs)
+
+SECTION("maps")
+struct bpf_map_def test_result = {
+    .type = BPF_MAP_TYPE_ARRAY,
+    .key_size = 4,
+    .value_size = sizeof(struct test_result),
+    .max_entries = 1,
+    .map_flags = 0,
+};
+
 int skb_test_prog(struct __sk_buff* skb) {
   // Check that the packet corresponds to the target socket. It is identified
   // by the cookie stored in the `target_cookie` map.
-  int index = 0;
-  __u64* cookie = bpf_map_lookup_elem(&target_cookie, &index);
+  int zero = 0;
+  __u64* cookie = bpf_map_lookup_elem(&target_cookie, &zero);
   if (!cookie || *cookie != bpf_get_socket_cookie(skb)) {
     return 1;
   }
@@ -59,14 +78,39 @@ int skb_test_prog(struct __sk_buff* skb) {
   return 1;
 }
 
-int sock_test_prog(struct bpf_sock* sock) {
-  int index = 0;
-  int* counter = bpf_map_lookup_elem(&count, &index);
+int sock_create_prog(struct bpf_sock* sock) {
+  int zero = 0;
+  int* counter = bpf_map_lookup_elem(&count, &zero);
   if (!counter) {
     return 1;
   }
 
   __sync_fetch_and_add(counter, 1);
+
+  return 1;
+}
+
+int sock_release_prog(struct bpf_sock* sock) {
+  // Check that the packet corresponds to the target socket. It is identified
+  // by the cookie stored in the `target_cookie` map.
+  int zero = 0;
+  __u64* cookie = bpf_map_lookup_elem(&target_cookie, &zero);
+  if (!cookie || *cookie != bpf_get_sk_cookie(sock)) {
+    return 1;
+  }
+
+  int* counter = bpf_map_lookup_elem(&count, &zero);
+  if (!counter) {
+    return 1;
+  }
+
+  __sync_fetch_and_add(counter, 1);
+
+  struct test_result result = {
+      .uid_gid = bpf_get_current_uid_gid(),
+      .pid_tgid = bpf_get_current_pid_tgid(),
+  };
+  bpf_map_update_elem(&test_result, &zero, &result, 0);
 
   return 1;
 }
