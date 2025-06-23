@@ -256,6 +256,7 @@ struct PhysElfImage {
 
 struct MappedMmioRange {
   volatile void* base = nullptr;
+  uintptr_t paddr = 0;
   size_t size = 0;
 };
 
@@ -368,6 +369,9 @@ struct PhysHandoff {
 
   // The UART's mapped MMIO range, if present and MMIO-based.
   MappedMmioRange uart_mmio;
+
+  // Mapped kPeripheral ranges.
+  PhysHandoffTemporarySpan<const MappedMmioRange> periph_ranges;
 };
 static_assert(std::is_default_constructible_v<PhysHandoff>);
 

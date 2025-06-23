@@ -350,6 +350,11 @@ class HandoffPrep {
   // its mapped virtual address.
   void* PublishSingleMappingVmar(PhysMapping mapping);
 
+  // Ditto, but for an MMIO range. The provided address and size may be
+  // non-page-aligned, in which the virtual address of `addr` is returned
+  // directly rather than base address of the mapping.
+  volatile void* PublishSingleMmioMappingVmar(ktl::string_view name, uintptr_t addr, size_t size);
+
   // This constructs a PhysElfImage from an ELF file in the KernelStorage.
   PhysElfImage MakePhysElfImage(KernelStorage::Bootfs::iterator file, ktl::string_view name);
 

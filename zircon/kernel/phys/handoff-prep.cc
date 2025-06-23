@@ -175,7 +175,6 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kKernelPageTables:
       case memalloc::Type::kPhysDebugdata:
       case memalloc::Type::kPermanentPhysHandoff:
-      case memalloc::Type::kPeripheral:
       case memalloc::Type::kPhysLog:
       case memalloc::Type::kReservedLow:
       case memalloc::Type::kTemporaryPhysHandoff:
@@ -203,6 +202,10 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kNvram:
       // Truncations should now go into effect.
       case memalloc::Type::kTruncatedRam:
+      // kPeripheral range content has been distilled in
+      // PhysHandoff::periph_ranges and does not need to be present in this
+      // accounting.
+      case memalloc::Type::kPeripheral:
         return ktl::nullopt;
 
       default:

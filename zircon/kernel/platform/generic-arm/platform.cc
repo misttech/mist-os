@@ -416,14 +416,6 @@ void platform_early_init(void) {
 
   arm64_boot_map_init(reinterpret_cast<uintptr_t>(__executable_start) -
                       reinterpret_cast<uintptr_t>(KernelPhysicalLoadAddress()));
-  for (const memalloc::Range& range : gPhysHandoff->memory.get()) {
-    if (range.type == memalloc::Type::kPeripheral) {
-      dprintf(INFO, "ZBI: peripheral range [%#" PRIx64 ", %#" PRIx64 ")\n", range.addr,
-              range.end());
-      auto status = add_periph_range(range.addr, range.size);
-      ASSERT(status == ZX_OK);
-    }
-  }
 
   ASSERT(pmm_init(gPhysHandoff->memory.get()) == ZX_OK);
 
@@ -455,11 +447,6 @@ void platform_init(void) {
 
   topology_cpu_init();
 }
-
-// after the fact create a region to reserve the peripheral map(s)
-static void platform_init_postvm(uint level) { reserve_periph_ranges(); }
-
-LK_INIT_HOOK(platform_postvm, platform_init_postvm, LK_INIT_LEVEL_VM)
 
 zx_status_t platform_mp_prep_cpu_unplug(cpu_num_t cpu_id) {
   return arch_mp_prep_cpu_unplug(cpu_id);

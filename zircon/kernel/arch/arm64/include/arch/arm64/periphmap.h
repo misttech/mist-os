@@ -11,13 +11,6 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-// adds a new peripheral range
-zx_status_t add_periph_range(paddr_t base_phys, size_t length);
-
-// called after virtual memory is started to reserve peripheral ranges
-// in the kernel's address space
-void reserve_periph_ranges();
-
 // translates peripheral physical address to virtual address in the big kernel map
 vaddr_t periph_paddr_to_vaddr(paddr_t paddr);
 
