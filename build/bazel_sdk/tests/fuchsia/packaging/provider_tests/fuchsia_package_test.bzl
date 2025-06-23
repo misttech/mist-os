@@ -3,10 +3,32 @@
 # found in the LICENSE file.
 
 # buildifier: disable=module-docstring
-load("@bazel_skylib//lib:unittest.bzl", "analysistest", "asserts")
-load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_component", "fuchsia_driver_component", "fuchsia_package", "get_component_manifests", "get_driver_component_manifests")
-load("@rules_fuchsia//fuchsia:private_defs.bzl", "FuchsiaPackageInfo")
-load("//fuchsia/packaging:common_utils.bzl", "failure_test", "no_repo_default_api_level_failure_test", "unknown_override_api_level_failure_test", "unknown_repo_default_api_level_failure_test")
+load(
+    "@bazel_skylib//lib:unittest.bzl",
+    "analysistest",
+    "asserts",
+)
+load(
+    "@rules_fuchsia//fuchsia:defs.bzl",
+    "fuchsia_component",
+    "fuchsia_driver_component",
+    "fuchsia_package",
+    "get_component_manifests",
+    "get_driver_component_manifests",
+)
+load(
+    "@rules_fuchsia//fuchsia:private_defs.bzl",
+    "FUCHSIA_API_LEVEL_TARGET",
+    "FuchsiaPackageInfo",
+    "REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET",
+)
+load(
+    "//fuchsia/packaging:common_utils.bzl",
+    "failure_test",
+    "no_repo_default_api_level_failure_test",
+    "unknown_override_api_level_failure_test",
+    "unknown_repo_default_api_level_failure_test",
+)
 load("//test_utils:make_file.bzl", "make_fake_component_manifest", "make_file")
 
 ## Name Tests
@@ -208,29 +230,29 @@ def _noop_success_test_impl(ctx):
 _no_repo_default_api_level_test = analysistest.make(
     _noop_success_test_impl,
     config_settings = {
-        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "",
+        REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET: "",
     },
 )
 
 _repo_default_unknown_api_level_test = analysistest.make(
     _noop_success_test_impl,
     config_settings = {
-        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "98765",
+        REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET: "98765",
     },
 )
 
 _repo_default_api_level_next_test = analysistest.make(
     _noop_success_test_impl,
     config_settings = {
-        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "NEXT",
+        REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET: "NEXT",
     },
 )
 
 _repo_default_unknown_and_override_next_api_level_test = analysistest.make(
     _noop_success_test_impl,
     config_settings = {
-        "@fuchsia_sdk//flags:repository_default_fuchsia_api_level": "98765",
-        "@fuchsia_sdk//flags:fuchsia_api_level": "NEXT",
+        REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET: "98765",
+        FUCHSIA_API_LEVEL_TARGET: "NEXT",
     },
 )
 

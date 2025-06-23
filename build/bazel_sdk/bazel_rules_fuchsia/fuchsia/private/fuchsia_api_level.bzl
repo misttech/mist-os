@@ -4,10 +4,11 @@
 
 """ Defines utilities for working with fuchsia api levels. """
 
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+
 # NOTE: INTERNAL_ONLY_ALL_KNOWN_API_LEVELS is part of the generated content of @fuchsia_sdk
 # and does not exist in @rules_fuchsia.
 load("@fuchsia_sdk//:api_version.bzl", "INTERNAL_ONLY_SUPPORTED_API_LEVELS")
-load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 
 # We define the provider in this file because it is a private implementation
 # detail in this file. It is only made public so that it can be used in tests.
@@ -19,13 +20,14 @@ FuchsiaAPILevelInfo = provider(
 )
 
 # The name for the API level target.
-FUCHSIA_API_LEVEL_TARGET_NAME = "@fuchsia_sdk//flags:fuchsia_api_level"
+FUCHSIA_API_LEVEL_TARGET = "@fuchsia_sdk//flags:fuchsia_api_level"
+REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET = "@fuchsia_sdk//flags:repository_default_fuchsia_api_level"
 
 # Rules that require the fuchsia api level should depend on this attribute set.
 # They can then use the helper functions in this file to get the flags needed.
 FUCHSIA_API_LEVEL_ATTRS = {
     "_fuchsia_api_level": attr.label(
-        default = FUCHSIA_API_LEVEL_TARGET_NAME,
+        default = FUCHSIA_API_LEVEL_TARGET,
     ),
 }
 
@@ -53,14 +55,14 @@ def get_fuchsia_api_level(ctx):
     When using this function in a rule, add `FUCHSIA_API_LEVEL_ATTRS` to its `attrs`.
 
     Must only be called within the scope of `fuchsia_transition` or some other
-    context where FUCHSIA_API_LEVEL_TARGET_NAME has been set appropriately,
+    context where FUCHSIA_API_LEVEL_TARGET has been set appropriately,
     including considering all ways to set the API level as appropriate.
 
     Args:
         ctx: A rule context object.
 
     Returns:
-        A string containing the valid API level in FUCHSIA_API_LEVEL_TARGET_NAME.
+        A string containing the valid API level in FUCHSIA_API_LEVEL_TARGET.
     """
     return ctx.attr._fuchsia_api_level[FuchsiaAPILevelInfo].level
 
@@ -131,7 +133,7 @@ def _fuchsia_api_level_impl(ctx):
         if raw_level == "":
             # All we know is that this rule is being analyzed with the level set to the empty string,
             # which is the default, and the label of the rule. We do not know why the rule is being
-            # analyzed, though most likely it is FUCHSIA_API_LEVEL_TARGET_NAME being analyzed for a
+            # analyzed, though most likely it is FUCHSIA_API_LEVEL_TARGET being analyzed for a
             # target after `fuchsia_transition`, meaning none of the API level mechanisms were set.
             fail("ERROR: An API level has not been specified for this target or the repository.")
 
@@ -190,7 +192,7 @@ verify_cc_head_api_level = rule(
         "_fuchsia_api_level": attr.label(
             # We have to explicitly depend on the @fuchsia_sdk target because
             # this is used from the internal_sdk as well.
-            default = "@fuchsia_sdk//flags:fuchsia_api_level",
+            default = FUCHSIA_API_LEVEL_TARGET,
         ),
     },
 )

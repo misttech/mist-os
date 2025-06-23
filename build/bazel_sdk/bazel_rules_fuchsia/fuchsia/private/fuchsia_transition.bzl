@@ -5,8 +5,17 @@
 """Utilities for changing the build configuration to fuchsia."""
 
 load("//common:transition_utils.bzl", "set_command_line_option_value")
-load("//fuchsia/constraints/platforms:supported_platforms.bzl", "ALL_SUPPORTED_PLATFORMS", "fuchsia_platforms")
-load(":fuchsia_api_level.bzl", "FUCHSIA_API_LEVEL_TARGET_NAME", "u32_for_fuchsia_api_level_or_none")
+load(
+    "//fuchsia/constraints/platforms:supported_platforms.bzl",
+    "ALL_SUPPORTED_PLATFORMS",
+    "fuchsia_platforms",
+)
+load(
+    ":fuchsia_api_level.bzl",
+    "FUCHSIA_API_LEVEL_TARGET",
+    "REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET",
+    "u32_for_fuchsia_api_level_or_none",
+)
 
 NATIVE_CPU_ALIASES = {
     "darwin": "x86_64",
@@ -39,13 +48,13 @@ def _fuchsia_api_level_in_effect(settings, attr):
     # If the transition is executed multiple times, the previous result will be in (1).
 
     # 1. Check the value that is manually specified via command-line
-    manually_specified_api_level = settings[FUCHSIA_API_LEVEL_TARGET_NAME]
+    manually_specified_api_level = settings[FUCHSIA_API_LEVEL_TARGET]
 
     # 2. Check the value that is set on the fuchsia_package
     target_specified_api_level = getattr(attr, "fuchsia_api_level", None)
 
     # 3. Check the repository_default_fuchsia_api_level flag
-    repo_default_api_level = settings[_REPO_DEFAULT_API_LEVEL_TARGET_NAME]
+    repo_default_api_level = settings[REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET]
 
     return (
         manually_specified_api_level
@@ -110,19 +119,19 @@ def _fuchsia_transition_impl(settings, attr):
         "//command_line_option:copt": copt,
         "//command_line_option:strip": "never",
         "//command_line_option:platforms": fuchsia_platform,
-        FUCHSIA_API_LEVEL_TARGET_NAME: fuchsia_api_level,
+        FUCHSIA_API_LEVEL_TARGET: fuchsia_api_level,
     }
 
 fuchsia_transition = transition(
     implementation = _fuchsia_transition_impl,
     inputs = [
-        FUCHSIA_API_LEVEL_TARGET_NAME,
-        _REPO_DEFAULT_API_LEVEL_TARGET_NAME,
+        FUCHSIA_API_LEVEL_TARGET,
+        REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET,
         "//command_line_option:cpu",
         "//command_line_option:copt",
     ],
     outputs = [
-        FUCHSIA_API_LEVEL_TARGET_NAME,
+        FUCHSIA_API_LEVEL_TARGET,
         "//command_line_option:cpu",
         "//command_line_option:crosstool_top",
         "//command_line_option:host_crosstool_top",
