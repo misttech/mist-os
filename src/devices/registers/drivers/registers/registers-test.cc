@@ -4,13 +4,14 @@
 
 #include "registers.h"
 
-#include <lib/ddk/metadata.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/mock-mmio/cpp/region.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include <gtest/gtest.h>
 
 #include "src/devices/lib/fidl-metadata/registers.h"
+#include "src/lib/testing/predicates/status.h"
 
 namespace registers {
 
@@ -38,7 +39,7 @@ class TestRegistersDevice : public RegistersDevice {
         fdf_internal::DriverServer<TestRegistersDevice>::destroy);
   }
 
-  zx::result<> MapMmio(fuchsia_hardware_registers::wire::Mask::Tag& tag) override {
+  zx::result<> MapMmio(fuchsia_hardware_registers::Mask::Tag& tag) override {
     std::map<uint32_t, std::shared_ptr<MmioInfo>> mmios;
     for (uint32_t i = 0; i < kRegCount; i++) {
       mock_mmio_[i] = std::make_unique<mock_mmio::Region>(SWITCH_BY_TAG(tag, GetSize),
@@ -46,7 +47,7 @@ class TestRegistersDevice : public RegistersDevice {
 
       zx::result<MmioInfo> mmio_info =
           SWITCH_BY_TAG(tag, MmioInfo::Create, mock_mmio_[i]->GetMmioBuffer());
-      EXPECT_TRUE(mmio_info.is_ok());
+      EXPECT_OK(mmio_info);
       mmios_.emplace(i, std::make_shared<MmioInfo>(std::move(*mmio_info)));
     }
 
@@ -59,23 +60,25 @@ class TestRegistersDevice : public RegistersDevice {
 class RegistersDeviceTestEnvironment : fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
-    device_server_.Initialize(component::kDefaultInstance);
-    device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
+    zx::result result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
+        pdev_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()));
+    if (result.is_error()) {
+      return result.take_error();
+    }
 
     return zx::ok();
   }
 
   template <typename T>
-  void Init(std::vector<fidl_metadata::registers::Register<T>>& kRegisters) {
-    auto metadata = fidl_metadata::registers::RegistersMetadataToFidl(kRegisters);
-    ASSERT_TRUE(metadata.is_ok());
-    auto status =
-        device_server_.AddMetadata(DEVICE_METADATA_REGISTERS, metadata->data(), metadata->size());
-    ASSERT_EQ(ZX_OK, status);
+  void Init(std::span<const fidl_metadata::registers::Register<T>> kRegisters) {
+    zx::result metadata = fidl_metadata::registers::RegistersMetadataToFidl(kRegisters);
+    ASSERT_OK(metadata);
+    ASSERT_OK(pdev_.AddFidlMetadata(fuchsia_hardware_registers::Metadata::kSerializableName,
+                                    metadata.value()));
   }
 
  private:
-  compat::DeviceServer device_server_;
+  fdf_fake::FakePDev pdev_;
 };
 
 class RegistersDeviceTestConfig final {
@@ -87,22 +90,19 @@ class RegistersDeviceTestConfig final {
 class RegistersDeviceTest : public ::testing::Test {
  public:
   template <typename T>
-  void Init(std::vector<fidl_metadata::registers::Register<T>>&& kRegisters) {
+  void Init(std::span<const fidl_metadata::registers::Register<T>> registers) {
     driver_test().RunInEnvironmentTypeContext(
-        [&kRegisters](RegistersDeviceTestEnvironment& env) { env.Init(kRegisters); });
-    EXPECT_TRUE(driver_test().StartDriver().is_ok());
+        [registers](RegistersDeviceTestEnvironment& env) { env.Init(registers); });
+    ASSERT_OK(driver_test().StartDriver());
   }
 
-  fidl::ClientEnd<fuchsia_hardware_registers::Device> GetClient(std::string&& name) {
-    auto result = driver_test().Connect<fuchsia_hardware_registers::Service::Device>(name);
-    EXPECT_EQ(ZX_OK, result.status_value());
+  fidl::ClientEnd<fuchsia_hardware_registers::Device> GetRegisterClient(std::string_view reg_id) {
+    zx::result result = driver_test().Connect<fuchsia_hardware_registers::Service::Device>(reg_id);
+    EXPECT_OK(result.status_value());
     return std::move(result.value());
   }
 
-  void TearDown() override {
-    zx::result<> result = driver_test().StopDriver();
-    ASSERT_EQ(ZX_OK, result.status_value());
-  }
+  void TearDown() override { ASSERT_OK(driver_test().StopDriver()); }
 
   fdf_testing::BackgroundDriverTest<RegistersDeviceTestConfig>& driver_test() {
     return driver_test_;
@@ -113,7 +113,7 @@ class RegistersDeviceTest : public ::testing::Test {
 };
 
 TEST_F(RegistersDeviceTest, Read32Test) {
-  Init(std::vector<fidl_metadata::registers::Register<uint32_t>>{
+  Init<uint32_t>(std::vector<fidl_metadata::registers::Register<uint32_t>>{
       {
           .name = "test0",
           .mmio_id = 0,
@@ -143,8 +143,8 @@ TEST_F(RegistersDeviceTest, Read32Test) {
       },
   });
 
-  auto test0 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetClient("test0"));
-  auto test1 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetClient("test1"));
+  auto test0 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetRegisterClient("test0"));
+  auto test1 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetRegisterClient("test1"));
 
   // Invalid Call
   {
@@ -204,7 +204,7 @@ TEST_F(RegistersDeviceTest, Read32Test) {
 }
 
 TEST_F(RegistersDeviceTest, Write32Test) {
-  Init(std::vector<fidl_metadata::registers::Register<uint32_t>>{
+  Init<uint32_t>(std::vector<fidl_metadata::registers::Register<uint32_t>>{
       {
           .name = "test0",
           .mmio_id = 0,
@@ -234,8 +234,8 @@ TEST_F(RegistersDeviceTest, Write32Test) {
       },
   });
 
-  auto test0 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetClient("test0"));
-  auto test1 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetClient("test1"));
+  auto test0 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetRegisterClient("test0"));
+  auto test1 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetRegisterClient("test1"));
 
   // Invalid Call
   {
@@ -304,7 +304,7 @@ TEST_F(RegistersDeviceTest, Write32Test) {
 }
 
 TEST_F(RegistersDeviceTest, Read64Test) {
-  Init(std::vector<fidl_metadata::registers::Register<uint64_t>>{
+  Init<uint64_t>(std::vector<fidl_metadata::registers::Register<uint64_t>>{
       {
           .name = "test0",
           .mmio_id = 0,
@@ -337,8 +337,8 @@ TEST_F(RegistersDeviceTest, Read64Test) {
       },
   });
 
-  auto test0 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetClient("test0"));
-  auto test1 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetClient("test1"));
+  auto test0 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetRegisterClient("test0"));
+  auto test1 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetRegisterClient("test1"));
 
   // Invalid Call
   {
@@ -392,7 +392,7 @@ TEST_F(RegistersDeviceTest, Read64Test) {
 }
 
 TEST_F(RegistersDeviceTest, Write64Test) {
-  Init(std::vector<fidl_metadata::registers::Register<uint64_t>>{
+  Init<uint64_t>(std::vector<fidl_metadata::registers::Register<uint64_t>>{
       {
           .name = "test0",
           .mmio_id = 0,
@@ -425,8 +425,8 @@ TEST_F(RegistersDeviceTest, Write64Test) {
       },
   });
 
-  auto test0 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetClient("test0"));
-  auto test1 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetClient("test1"));
+  auto test0 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetRegisterClient("test0"));
+  auto test1 = fidl::WireSyncClient<fuchsia_hardware_registers::Device>(GetRegisterClient("test1"));
 
   // Invalid Call
   {

@@ -4,73 +4,70 @@
 
 #include "src/devices/lib/fidl-metadata/registers.h"
 
-#include <fidl/fuchsia.hardware.registers/cpp/wire.h>
-
 namespace fidl_metadata::registers {
 
 namespace {
 
 template <typename T>
-zx::result<std::vector<uint8_t>> ToFidl(cpp20::span<const Register<T>> registers) {
-  fidl::Arena allocator;
-  fidl::VectorView<fuchsia_hardware_registers::wire::RegistersMetadataEntry> registers_metadata(
-      allocator, registers.size());
+zx::result<fuchsia_hardware_registers::Metadata> ToFidl(cpp20::span<const Register<T>> registers) {
+  std::vector<fuchsia_hardware_registers::RegistersMetadataEntry> registers_metadata;
+  registers_metadata.reserve(registers.size());
 
-  for (size_t i = 0; i < registers.size(); i++) {
-    auto& src_reg = registers[i];
+  for (const auto& src_reg : registers) {
+    if (src_reg.name.size() > fuchsia_hardware_registers::kMaxNameLength) {
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    }
 
-    fidl::VectorView<fuchsia_hardware_registers::wire::MaskEntry> mask_entries(
-        allocator, src_reg.masks.size());
-    for (size_t j = 0; j < src_reg.masks.size(); j++) {
-      auto& src_mask = src_reg.masks[j];
+    std::vector<fuchsia_hardware_registers::MaskEntry> mask_entries;
+    mask_entries.reserve(src_reg.masks.size());
+    for (const auto& src_mask : src_reg.masks) {
+      fuchsia_hardware_registers::MaskEntry entry{{
+          .mmio_offset{src_mask.mmio_offset},
+          .count{src_mask.count},
+          .overlap_check_on{src_mask.overlap_check_on},
+      }};
 
-      auto builder = fuchsia_hardware_registers::wire::MaskEntry::Builder(allocator)
-                         .mmio_offset(src_mask.mmio_offset)
-                         .count(src_mask.count)
-                         .overlap_check_on(src_mask.overlap_check_on);
       if constexpr (std::is_same_v<T, uint8_t>) {
-        builder.mask(std::move(fuchsia_hardware_registers::wire::Mask::WithR8(src_mask.value)));
+        entry.mask().emplace(fuchsia_hardware_registers::Mask::WithR8(src_mask.value));
       } else if constexpr (std::is_same_v<T, uint16_t>) {
-        builder.mask(std::move(fuchsia_hardware_registers::wire::Mask::WithR16(src_mask.value)));
+        entry.mask().emplace(fuchsia_hardware_registers::Mask::WithR16(src_mask.value));
       } else if constexpr (std::is_same_v<T, uint32_t>) {
-        builder.mask(std::move(fuchsia_hardware_registers::wire::Mask::WithR32(src_mask.value)));
+        entry.mask().emplace(fuchsia_hardware_registers::Mask::WithR32(src_mask.value));
       } else if constexpr (std::is_same_v<T, uint64_t>) {
-        builder.mask(
-            std::move(fuchsia_hardware_registers::wire::Mask::WithR64(allocator, src_mask.value)));
+        entry.mask().emplace(fuchsia_hardware_registers::Mask::WithR64(src_mask.value));
       } else {
         static_assert(false);
       }
 
-      mask_entries[j] = std::move(builder.Build());
+      mask_entries.emplace_back(std::move(entry));
     }
 
-    registers_metadata[i] =
-        std::move(fuchsia_hardware_registers::wire::RegistersMetadataEntry::Builder(allocator)
-                      .name(src_reg.name)
-                      .mmio_id(src_reg.mmio_id)
-                      .masks(std::move(mask_entries))
-                      .Build());
+    registers_metadata.emplace_back(fuchsia_hardware_registers::RegistersMetadataEntry{{
+        .name{src_reg.name},
+        .mmio_id{src_reg.mmio_id},
+        .masks{std::move(mask_entries)},
+    }});
   }
 
-  return zx::result<std::vector<uint8_t>>{
-      fidl::Persist(std::move(fuchsia_hardware_registers::wire::Metadata::Builder(allocator)
-                                  .registers(std::move(registers_metadata))
-                                  .Build()))
-          .map_error(std::mem_fn(&fidl::Error::status))};
+  return zx::ok(fuchsia_hardware_registers::Metadata{{.registers{std::move(registers_metadata)}}});
 }
 
 }  // namespace
 
-zx::result<std::vector<uint8_t>> RegistersMetadataToFidl(cpp20::span<const Register8> registers) {
+zx::result<fuchsia_hardware_registers::Metadata> RegistersMetadataToFidl(
+    cpp20::span<const Register8> registers) {
   return ToFidl(registers);
 }
-zx::result<std::vector<uint8_t>> RegistersMetadataToFidl(cpp20::span<const Register16> registers) {
+zx::result<fuchsia_hardware_registers::Metadata> RegistersMetadataToFidl(
+    cpp20::span<const Register16> registers) {
   return ToFidl(registers);
 }
-zx::result<std::vector<uint8_t>> RegistersMetadataToFidl(cpp20::span<const Register32> registers) {
+zx::result<fuchsia_hardware_registers::Metadata> RegistersMetadataToFidl(
+    cpp20::span<const Register32> registers) {
   return ToFidl(registers);
 }
-zx::result<std::vector<uint8_t>> RegistersMetadataToFidl(cpp20::span<const Register64> registers) {
+zx::result<fuchsia_hardware_registers::Metadata> RegistersMetadataToFidl(
+    cpp20::span<const Register64> registers) {
   return ToFidl(registers);
 }
 

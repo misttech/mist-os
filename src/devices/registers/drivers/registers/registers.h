@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_REGISTERS_DRIVERS_REGISTERS_REGISTERS_H_
 #define SRC_DEVICES_REGISTERS_DRIVERS_REGISTERS_REGISTERS_H_
 
-#include <fidl/fuchsia.hardware.registers/cpp/wire.h>
+#include <fidl/fuchsia.hardware.registers/cpp/fidl.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
@@ -19,18 +19,18 @@
 
 namespace registers {
 
-#define SWITCH_BY_TAG(TAG, FUNC, ARGS...)                     \
-  [&]() {                                                     \
-    switch (TAG) {                                            \
-      case fuchsia_hardware_registers::wire::Mask::Tag::kR8:  \
-        return FUNC<uint8_t>(ARGS);                           \
-      case fuchsia_hardware_registers::wire::Mask::Tag::kR16: \
-        return FUNC<uint16_t>(ARGS);                          \
-      case fuchsia_hardware_registers::wire::Mask::Tag::kR32: \
-        return FUNC<uint32_t>(ARGS);                          \
-      case fuchsia_hardware_registers::wire::Mask::Tag::kR64: \
-        return FUNC<uint64_t>(ARGS);                          \
-    }                                                         \
+#define SWITCH_BY_TAG(TAG, FUNC, ARGS...)               \
+  [&]() {                                               \
+    switch (TAG) {                                      \
+      case fuchsia_hardware_registers::Mask::Tag::kR8:  \
+        return FUNC<uint8_t>(ARGS);                     \
+      case fuchsia_hardware_registers::Mask::Tag::kR16: \
+        return FUNC<uint16_t>(ARGS);                    \
+      case fuchsia_hardware_registers::Mask::Tag::kR32: \
+        return FUNC<uint32_t>(ARGS);                    \
+      case fuchsia_hardware_registers::Mask::Tag::kR64: \
+        return FUNC<uint64_t>(ARGS);                    \
+    }                                                   \
   }()
 
 template <typename T>
@@ -220,10 +220,10 @@ class RegistersDevice : public fdf::DriverBase {
   friend class TestRegistersDevice;
 
   // Virtual for testing.
-  virtual zx::result<> MapMmio(fuchsia_hardware_registers::wire::Mask::Tag& tag);
+  virtual zx::result<> MapMmio(fuchsia_hardware_registers::Mask::Tag& tag);
 
   template <typename T>
-  zx::result<> Create(fuchsia_hardware_registers::wire::RegistersMetadataEntry& reg);
+  zx::result<> Create(const fuchsia_hardware_registers::RegistersMetadataEntry& reg);
 
   template <typename T>
   zx::result<> CreateNode(Register<T>& reg);
