@@ -715,8 +715,13 @@ fn do_duplicate_address_detection<
         |DadStateRef { state, retrans_timer_data, max_dad_transmits: _ }| {
             let DadAddressStateRef { dad_state, core_ctx } = state;
             match dad_state {
-                DadState::Uninitialized | DadState::Assigned { .. } => {
-                    panic!("expected address to be tentative or announcing; addr={addr:?}")
+                DadState::Uninitialized => {
+                    // Note: Starting DAD must have raced with stopping DAD.
+                    // Short circuit DAD execution by returning `None`.
+                    return None;
+                }
+                DadState::Assigned { .. } => {
+                    panic!("cannot do DAD for an already assigned address; addr={addr:?}")
                 }
                 DadState::Tentative {
                     dad_transmits_remaining,
@@ -1617,7 +1622,7 @@ mod tests {
     }
 
     #[ip_test(I)]
-    #[should_panic(expected = "expected address to be tentative")]
+    #[should_panic(expected = "cannot do DAD for an already assigned address")]
     fn panic_non_tentative_address_handle_timer<I: TestDadIpExt>() {
         let FakeCtx::<I> { mut core_ctx, mut bindings_ctx } =
             FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
