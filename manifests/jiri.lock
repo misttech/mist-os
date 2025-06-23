@@ -345,6 +345,21 @@
         "instance_id": "kbo0YXw8vcgPYmo77d_mklY0D5kUpwgysU-6pB0KdUAC"
     },
     {
+        "package": "fuchsia/third_party/3pp/bazel/linux-amd64",
+        "version": "version:2@7.5.0.7",
+        "instance_id": "8nztW57qE5sptYY5jgM1JTSVKS55DiJA6kWQlAKWSa8C"
+    },
+    {
+        "package": "fuchsia/third_party/3pp/bazel/mac-amd64",
+        "version": "version:2@7.5.0.7",
+        "instance_id": "d18SclfdG2chVqHnxs8efWWtEBRtIDwEj6h5g2X87_AC"
+    },
+    {
+        "package": "fuchsia/third_party/3pp/bazel/mac-arm64",
+        "version": "version:2@7.5.0.7",
+        "instance_id": "QzcigXGQf2tvoF-63UgnMw4QyRgIKowSfkxbin44CTgC"
+    },
+    {
         "package": "fuchsia/third_party/3pp/buildozer/linux-amd64",
         "version": "version:2@v8.0.2.1",
         "instance_id": "5nSOpOGhZCcYwcBZwdE-3GLMVC-Qkvkn_e2K7ZPC6UwC"
@@ -423,21 +438,6 @@
         "package": "fuchsia/third_party/android/libsparse/release/linux-amd64",
         "version": "bid:13155864",
         "instance_id": "1XvyD9yGD2oc4DeZP-2I1WfxzNFx9_G3jymXclZok3kC"
-    },
-    {
-        "package": "fuchsia/third_party/bazel/linux-amd64",
-        "version": "version:2@7.4.1.7",
-        "instance_id": "6uGHKlmyx0_lpIZPUQTJREEJwdqheYQJQW6T4mxzhbkC"
-    },
-    {
-        "package": "fuchsia/third_party/bazel/mac-amd64",
-        "version": "version:2@7.4.1.7",
-        "instance_id": "FB_e8qA5F9aUtP6W7gVm5v97jPtjsPc9Un0SCrSx0W4C"
-    },
-    {
-        "package": "fuchsia/third_party/bazel/mac-arm64",
-        "version": "version:2@7.4.1.7",
-        "instance_id": "tH_XgucA0zTnl8mWpVnCTrCY-V6EsWfkz8FR2wZDL3oC"
     },
     {
         "package": "fuchsia/third_party/bazel_workspacelogparser",
