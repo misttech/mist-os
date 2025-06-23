@@ -56,6 +56,7 @@ rustc_binary("bin") {
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:proptest",
     "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:test-case",
   ]
 
   sources = [

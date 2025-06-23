@@ -8,7 +8,7 @@ use crate::inspect::{AppsNode, StateNode};
 use anyhow::{anyhow, Context as _, Error};
 use channel_config::ChannelConfigs;
 use event_queue::{ClosedClient, ControlHandle, Event, EventQueue, Notify};
-use fidl::endpoints::ClientEnd;
+use fidl::endpoints::{ClientEnd, ControlHandle as _};
 use fidl_fuchsia_power::{CollaborativeRebootInitiatorMarker, CollaborativeRebootInitiatorProxy};
 use fidl_fuchsia_power_internal::{
     CollaborativeRebootReason, CollaborativeRebootSchedulerMarker,
@@ -18,9 +18,8 @@ use fidl_fuchsia_update::{
     self as update, AttemptsMonitorMarker, CheckNotStartedReason, CheckingForUpdatesData,
     ErrorCheckingForUpdateData, Initiator, InstallationDeferralReason, InstallationDeferredData,
     InstallationErrorData, InstallationProgress, InstallingData, ListenerRequest,
-    ListenerRequestStream, ListenerWaitForFirstUpdateCheckToCompleteResponder, ManagerRequest,
-    ManagerRequestStream, MonitorMarker, MonitorProxy, MonitorProxyInterface,
-    NoUpdateAvailableData, UpdateInfo,
+    ListenerRequestStream, ManagerRequest, ManagerRequestStream, MonitorMarker, MonitorProxy,
+    MonitorProxyInterface, NoUpdateAvailableData, NotifierProxy, UpdateInfo,
 };
 use fidl_fuchsia_update_channel::{ProviderRequest, ProviderRequestStream};
 use fidl_fuchsia_update_channelcontrol::{ChannelControlRequest, ChannelControlRequestStream};
@@ -479,8 +478,19 @@ where
         request: ListenerRequest,
     ) -> Result<(), Error> {
         match request {
-            ListenerRequest::WaitForFirstUpdateCheckToComplete { responder } => {
-                server.borrow_mut().completion_responder.respond_when_appropriate(responder);
+            ListenerRequest::NotifyOnFirstUpdateCheck { payload, control_handle } => {
+                let notifier = match payload.notifier {
+                    Some(notifier) => notifier,
+                    None => {
+                        // This is a required field.
+                        control_handle.shutdown_with_epitaph(zx::Status::INVALID_ARGS);
+                        return Ok(());
+                    }
+                };
+                server
+                    .borrow_mut()
+                    .completion_responder
+                    .notify_when_appropriate(notifier.into_proxy());
             }
             ListenerRequest::_UnknownMethod { .. } => {}
         }
@@ -727,24 +737,24 @@ where
 }
 
 enum CompletionResponder {
-    Waiting(Vec<ListenerWaitForFirstUpdateCheckToCompleteResponder>),
+    Waiting { notifiers: Vec<NotifierProxy> },
     Satisfied,
 }
 
 impl CompletionResponder {
     fn new() -> Self {
-        CompletionResponder::Waiting(Vec::new())
+        CompletionResponder::Waiting { notifiers: Vec::new() }
     }
 
-    fn respond_when_appropriate(
-        &mut self,
-        responder: ListenerWaitForFirstUpdateCheckToCompleteResponder,
-    ) {
+    fn notify_when_appropriate(&mut self, notifier: NotifierProxy) {
         match self {
-            CompletionResponder::Waiting(ref mut responses) => responses.push(responder),
+            CompletionResponder::Waiting { ref mut notifiers } => notifiers.push(notifier),
             CompletionResponder::Satisfied => {
-                // If the client has closed the connection, that's not our concern.
-                let _ = responder.send();
+                if let Err(e) = notifier.notify() {
+                    warn!(
+                        "Received FIDL error notifying client of software update completion: {e:?}"
+                    );
+                }
             }
         }
     }
@@ -764,9 +774,11 @@ impl CompletionResponder {
         }
         match self {
             CompletionResponder::Satisfied => (),
-            CompletionResponder::Waiting(responders) => {
-                for responder in responders.drain(..) {
-                    let _ = responder.send();
+            CompletionResponder::Waiting { notifiers } => {
+                for notifier in notifiers.drain(..) {
+                    if let Err(e) = notifier.notify() {
+                        warn!("Received FIDL error notifying client of software update completion: {e:?}");
+                    }
                 }
                 *self = CompletionResponder::Satisfied;
             }
@@ -1209,20 +1221,22 @@ mod tests {
     use assert_matches::assert_matches;
     use channel_config::ChannelConfig;
     use diagnostics_assertions::assert_data_tree;
-    use fidl::endpoints::{create_proxy_and_stream, create_request_stream};
+    use fidl::endpoints::{create_endpoints, create_proxy_and_stream, create_request_stream};
     use fidl_fuchsia_update::{
-        self as update, AttemptsMonitorRequest, ListenerMarker, ManagerMarker, MonitorRequest,
-        MonitorRequestStream,
+        self as update, AttemptsMonitorRequest, ListenerMarker,
+        ListenerNotifyOnFirstUpdateCheckRequest, ManagerMarker, MonitorRequest,
+        MonitorRequestStream, NotifierMarker, NotifierRequest,
     };
     use fidl_fuchsia_update_channel::ProviderMarker;
     use fidl_fuchsia_update_channelcontrol::ChannelControlMarker;
     use fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker;
     use fuchsia_async::TestExecutor;
     use fuchsia_inspect::Inspector;
-    use futures::pin_mut;
+    use futures::{pin_mut, TryStreamExt};
     use omaha_client::common::App;
     use omaha_client::protocol::Cohort;
     use std::task::Poll;
+    use test_case::test_case;
 
     fn spawn_fidl_server<M: fidl::endpoints::ProtocolMarker>(
         fidl: Rc<RefCell<stub::StubFidlServer>>,
@@ -1906,47 +1920,68 @@ mod tests {
         assert_eq!(fidl.borrow().state.urgent, None);
     }
 
+    enum TestExpect {
+        /// Listener is waiting for the correct state.
+        Wait,
+        /// Listener has notified clients.
+        Notify,
+    }
+
+    #[test_case(state_machine::State::Idle, TestExpect::Wait)]
+    #[test_case(
+        state_machine::State::CheckingForUpdates(InstallSource::default()),
+        TestExpect::Wait
+    )]
+    #[test_case(state_machine::State::ErrorCheckingForUpdate, TestExpect::Notify)]
+    #[test_case(state_machine::State::NoUpdateAvailable, TestExpect::Notify)]
+    #[test_case(state_machine::State::InstallationDeferredByPolicy, TestExpect::Notify)]
+    #[test_case(state_machine::State::InstallingUpdate, TestExpect::Wait)]
+    #[test_case(state_machine::State::WaitingForReboot, TestExpect::Wait)]
+    #[test_case(state_machine::State::InstallationError, TestExpect::Wait)]
     #[fuchsia::test(allow_stalls = false)]
-    async fn test_whether_state_satisfies() {
-        for state in [
-            state_machine::State::Idle,
-            state_machine::State::CheckingForUpdates(InstallSource::default()),
-            state_machine::State::ErrorCheckingForUpdate,
-            state_machine::State::NoUpdateAvailable,
-            state_machine::State::InstallationDeferredByPolicy,
-            state_machine::State::InstallingUpdate,
-            state_machine::State::WaitingForReboot,
-            state_machine::State::InstallationError,
-        ] {
-            let fidl = FidlServerBuilder::new().build().await;
-            if state == state_machine::State::WaitingForReboot {
-                let (request_stream_receiver, mut cr_provider) =
-                    FakeCollaborativeRebootScheduler::new();
-                let ((), ()) = futures::join!(
-                    FidlServer::on_state_change(Rc::clone(&fidl), state, &mut cr_provider),
-                    expect_system_update_scheduled_once(request_stream_receiver),
+    async fn test_listener_response(state: state_machine::State, expect: TestExpect) {
+        let fidl = FidlServerBuilder::new().build().await;
+        if state == state_machine::State::WaitingForReboot {
+            let (request_stream_receiver, mut cr_provider) =
+                FakeCollaborativeRebootScheduler::new();
+            let ((), ()) = futures::join!(
+                FidlServer::on_state_change(Rc::clone(&fidl), state, &mut cr_provider),
+                expect_system_update_scheduled_once(request_stream_receiver),
+            );
+        } else {
+            FidlServer::on_state_change(Rc::clone(&fidl), state, &mut NoCollaborativeReboot {})
+                .await;
+        }
+        let proxy = spawn_fidl_server::<ListenerMarker>(fidl, IncomingServices::Listener);
+
+        let (notifier_client, notifier_server) = create_endpoints::<NotifierMarker>();
+        assert_matches!(
+            proxy.notify_on_first_update_check(ListenerNotifyOnFirstUpdateCheckRequest {
+                notifier: Some(notifier_client),
+                ..Default::default()
+            }),
+            Ok(())
+        );
+
+        let mut notifier_stream = notifier_server.into_stream();
+        let notify_fut = notifier_stream.try_next();
+        pin_mut!(notify_fut);
+        let notify_result = TestExecutor::poll_until_stalled(&mut notify_fut).await;
+
+        match expect {
+            TestExpect::Notify => {
+                assert_matches!(
+                    notify_result,
+                    Poll::Ready(Ok(Some(NotifierRequest::Notify { .. }))),
+                    "Notifier didn't receive request"
                 );
-            } else {
-                FidlServer::on_state_change(Rc::clone(&fidl), state, &mut NoCollaborativeReboot {})
-                    .await;
             }
-            let proxy = spawn_fidl_server::<ListenerMarker>(fidl, IncomingServices::Listener);
-            let fut = proxy.wait_for_first_update_check_to_complete();
-            pin_mut!(fut);
-            let result = TestExecutor::poll_until_stalled(&mut fut).await;
-            match state {
-                state_machine::State::ErrorCheckingForUpdate
-                | state_machine::State::NoUpdateAvailable
-                | state_machine::State::InstallationDeferredByPolicy => {
-                    assert_matches!(result, Poll::Ready(_), "State {:?} didn't satisfy", state);
-                }
-                state_machine::State::Idle
-                | state_machine::State::CheckingForUpdates(_)
-                | state_machine::State::InstallingUpdate
-                | state_machine::State::WaitingForReboot
-                | state_machine::State::InstallationError => {
-                    assert_matches!(result, Poll::Pending, "State {:?} satisfied", state);
-                }
+            TestExpect::Wait => {
+                assert_matches!(
+                    notify_result,
+                    Poll::Pending,
+                    "Notifier received unexpected request"
+                );
             }
         }
     }
@@ -1958,10 +1993,30 @@ mod tests {
             spawn_fidl_server::<ListenerMarker>(Rc::clone(&fidl), IncomingServices::Listener);
         let proxy2 =
             spawn_fidl_server::<ListenerMarker>(Rc::clone(&fidl), IncomingServices::Listener);
-        let waiter1 = proxy1.wait_for_first_update_check_to_complete();
-        let waiter2 = proxy2.wait_for_first_update_check_to_complete();
-        pin_mut!(waiter1);
-        pin_mut!(waiter2);
+
+        let (notifier_client_1, notifier_server_1) = create_endpoints::<NotifierMarker>();
+        assert_matches!(
+            proxy1.notify_on_first_update_check(ListenerNotifyOnFirstUpdateCheckRequest {
+                notifier: Some(notifier_client_1),
+                ..Default::default()
+            }),
+            Ok(())
+        );
+        let mut notifier_stream_1 = notifier_server_1.into_stream();
+        let notifier1 = notifier_stream_1.try_next();
+        pin_mut!(notifier1);
+
+        let (notifier_client_2, notifier_server_2) = create_endpoints::<NotifierMarker>();
+        assert_matches!(
+            proxy2.notify_on_first_update_check(ListenerNotifyOnFirstUpdateCheckRequest {
+                notifier: Some(notifier_client_2),
+                ..Default::default()
+            }),
+            Ok(())
+        );
+        let mut notifier_stream_2 = notifier_server_2.into_stream();
+        let notifier2 = notifier_stream_2.try_next();
+        pin_mut!(notifier2);
 
         FidlServer::on_state_change(
             Rc::clone(&fidl),
@@ -1969,8 +2024,8 @@ mod tests {
             &mut NoCollaborativeReboot {},
         )
         .await;
-        assert_matches!(TestExecutor::poll_until_stalled(&mut waiter1).await, Poll::Pending);
-        assert_matches!(TestExecutor::poll_until_stalled(&mut waiter2).await, Poll::Pending);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut notifier1).await, Poll::Pending);
+        assert_matches!(TestExecutor::poll_until_stalled(&mut notifier2).await, Poll::Pending);
 
         FidlServer::on_state_change(
             Rc::clone(&fidl),
@@ -1978,10 +2033,29 @@ mod tests {
             &mut NoCollaborativeReboot {},
         )
         .await;
-        let _ = waiter1.await;
-        let _ = waiter2.await;
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut notifier1).await,
+            Poll::Ready(Ok(Some(NotifierRequest::Notify { .. })))
+        );
+        assert_matches!(
+            TestExecutor::poll_until_stalled(&mut notifier2).await,
+            Poll::Ready(Ok(Some(NotifierRequest::Notify { .. })))
+        );
+
         // Clients that start to wait after the happy state is received should return immediately.
         let proxy3 = spawn_fidl_server::<ListenerMarker>(fidl, IncomingServices::Listener);
-        let _ = proxy3.wait_for_first_update_check_to_complete().await;
+        let (notifier_client_3, notifier_server_3) = create_endpoints::<NotifierMarker>();
+        assert_matches!(
+            proxy3.notify_on_first_update_check(ListenerNotifyOnFirstUpdateCheckRequest {
+                notifier: Some(notifier_client_3),
+                ..Default::default()
+            }),
+            Ok(())
+        );
+        let mut notifier_stream_3 = notifier_server_3.into_stream();
+        assert_matches!(
+            notifier_stream_3.try_next().await,
+            Ok(Some(NotifierRequest::Notify { .. }))
+        );
     }
 }
