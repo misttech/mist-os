@@ -80,11 +80,32 @@ type Shard struct {
 	// BotDimensions specifies the swarming bot dimensions to use for this shard.
 	BotDimensions map[string]string `json:"bot_dimensions,omitmepty"`
 
+	// The test manifest passed to botanist containing the tests to run.
+	TestsJSON string `json:"tests_json,omitempty"`
+
+	// The base swarming command to run for this shard.
+	BaseCommand []string `json:"base_command,omitempty"`
+
+	// The experiments from the testsharder params.
+	ExperimentSpecs []string `json:"experiment_specs,omitempty"`
+
+	// The actual experiments enabled for this shard based on the experiment percentage.
+	// The same experiments should be enabled for every shard created from a testsharder
+	// invocation.
+	EnabledExperiments []string `json:"enabled_experiments,omitempty"`
+
+	// The relative cwd for the swarming task. All paths should be relative to this
+	// directory.
+	RelativeCWD string `json:"relative_cwd,omitempty"`
+
 	// BuildMetadata provides the fint set artifacts metadata needed to construct
 	// swarming task requests from the shards. This will only be populated if the
 	// `-deps-file` flag is provided meaning that local artifacts will be used and
 	// thus the builder itself won't have the fint set artifacts available.
 	BuildMetadata fintpb.SetArtifacts_Metadata `json:"build_metadata,omitempty"`
+
+	// Whether to use TCG with this shard if running against an emulator.
+	UseTCG bool `json:"use_tcg,omitempty"`
 }
 
 // CIPDPackage describes the CIPD package, version and subdir to download the package to
@@ -116,8 +137,8 @@ func (s *Shard) TargetCPU() string {
 }
 
 // HostCPU returns the host CPU architecture this shard will run on.
-func (s *Shard) HostCPU(useTCG bool) string {
-	if s.Env.TargetsEmulator() && s.TargetCPU() == "arm64" && !useTCG {
+func (s *Shard) HostCPU() string {
+	if s.Env.TargetsEmulator() && s.TargetCPU() == "arm64" && !s.UseTCG {
 		return "arm64"
 	}
 	return "x64"
@@ -267,6 +288,9 @@ type ShardOptions struct {
 	// Tags is the list of tags that the sharded Environments must match; those
 	// that don't match all tags will be ignored.
 	Tags []string
+
+	// Whether to use TCG with this shard if running against an emulator.
+	UseTCG bool
 }
 
 // MakeShards returns the list of shards associated with a given build.
@@ -318,6 +342,7 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 					BootupTimeoutSecs: spec.BootupTimeoutSecs,
 					ExpectsSSH:        spec.ExpectsSSH,
 					Env:               e,
+					UseTCG:            opts.UseTCG,
 				}
 			}
 			test := Test{Test: spec.Test, Runs: 1}
@@ -339,6 +364,7 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 					BootupTimeoutSecs: spec.BootupTimeoutSecs,
 					ExpectsSSH:        spec.ExpectsSSH,
 					Env:               e,
+					UseTCG:            opts.UseTCG,
 				})
 			} else {
 				shard.Tests = append(shard.Tests, test)
