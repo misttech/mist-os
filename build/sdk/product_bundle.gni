@@ -180,7 +180,7 @@ template("product_bundle") {
       "--config",
       "product.experimental=true",
       "product",
-      "create",
+      "create-old",
       "--product-version",
       product_version,
       "--product-name",

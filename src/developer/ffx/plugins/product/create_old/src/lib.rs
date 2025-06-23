@@ -14,7 +14,7 @@ use assembly_tool::ToolProvider;
 use ffx_config::sdk::{in_tree_sdk_version, SdkVersion};
 use ffx_config::EnvironmentContext;
 use ffx_flash_manifest::FlashManifestVersion;
-use ffx_product_create_args::CreateCommand;
+use ffx_product_create_old_args::CreateCommand;
 use ffx_writer::SimpleWriter;
 use fho::{return_bug, FfxMain, FfxTool};
 use product_bundle::ProductBundleBuilder;
