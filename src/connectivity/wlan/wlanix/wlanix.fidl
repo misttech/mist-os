@@ -222,7 +222,11 @@ type Nl80211MessageType = flexible enum {
 
 type Nl80211Message = table {
     1: message_type Nl80211MessageType;
-    2: payload vector<uint8>:MAX;
+    2: payload vector<uint8>;
+};
+
+type Nl80211MessageArray = struct {
+    messages vector<Nl80211Message>;
 };
 
 open protocol Nl80211 {
@@ -231,10 +235,17 @@ open protocol Nl80211 {
         2: multicast client_end:Nl80211Multicast;
     });
 
+    // This is only used for E2E tests
     flexible Message(resource table {
         1: message Nl80211Message;
     }) -> (resource table {
         1: responses vector<Nl80211Message>:MAX;
+    }) error zx.Status;
+
+    flexible MessageV2(resource struct {
+        message Nl80211Message;
+    }) -> (resource struct {
+        response zx.Handle:<VMO>;
     }) error zx.Status;
 };
 

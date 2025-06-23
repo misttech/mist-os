@@ -4,6 +4,9 @@
 
 use anyhow::{bail, Context, Error};
 use fidl::endpoints::ProtocolMarker;
+use fidl_fuchsia_wlan_wlanix::{
+    Nl80211MessageResponder, Nl80211MessageResponse, Nl80211MessageV2Responder,
+};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
 use futures::future::OptionFuture;
@@ -1077,10 +1080,12 @@ async fn serve_supplicant<I: IfaceManager>(
     .await;
 }
 
-fn nl80211_message_resp(
-    responses: Vec<fidl_wlanix::Nl80211Message>,
-) -> fidl_wlanix::Nl80211MessageResponse {
-    fidl_wlanix::Nl80211MessageResponse { responses: Some(responses), ..Default::default() }
+fn nl80211_message_resp(messages: Vec<fidl_wlanix::Nl80211Message>) -> zx::Vmo {
+    let output = fidl::persist(&fidl_wlanix::Nl80211MessageArray { messages }).unwrap();
+    let vmo = zx::Vmo::create(output.len() as u64).unwrap();
+    vmo.write(&output, 0).unwrap();
+    vmo.set_content_size(&(output.len() as u64)).unwrap();
+    vmo
 }
 
 fn build_nl80211_message(cmd: Nl80211Cmd, attrs: Vec<Nl80211Attr>) -> fidl_wlanix::Nl80211Message {
@@ -1141,9 +1146,38 @@ fn get_supported_frequencies() -> Vec<Vec<Nl80211FrequencyAttr>> {
         .collect()
 }
 
+trait MessageResponder {
+    fn send(self, result: Result<Vec<fidl_wlanix::Nl80211Message>, i32>)
+        -> Result<(), fidl::Error>;
+}
+
+impl MessageResponder for Nl80211MessageV2Responder {
+    fn send(
+        self,
+        result: Result<Vec<fidl_fuchsia_wlan_wlanix::Nl80211Message>, i32>,
+    ) -> Result<(), fidl::Error> {
+        Nl80211MessageV2Responder::send(self, result.map(nl80211_message_resp))
+    }
+}
+
+impl MessageResponder for Nl80211MessageResponder {
+    fn send(
+        self,
+        result: Result<Vec<fidl_fuchsia_wlan_wlanix::Nl80211Message>, i32>,
+    ) -> Result<(), fidl::Error> {
+        Nl80211MessageResponder::send(
+            self,
+            result.map(|responses| Nl80211MessageResponse {
+                responses: Some(responses),
+                ..Default::default()
+            }),
+        )
+    }
+}
+
 async fn handle_nl80211_message<I: IfaceManager>(
     netlink_message: fidl_wlanix::Nl80211Message,
-    responder: WithDefaultDrop<fidl_wlanix::Nl80211MessageResponder>,
+    responder: WithDefaultDrop<impl MessageResponder + DefaultDrop>,
     state: Arc<Mutex<WifiState>>,
     iface_manager: Arc<I>,
     telemetry_sender: TelemetrySender,
@@ -1189,10 +1223,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                     ],
                 ));
             }
-            responder
-                .take()
-                .send(Ok(nl80211_message_resp(resp)))
-                .context("Failed to send NewWiphy")?;
+            responder.take().send(Ok(resp)).context("Failed to send NewWiphy")?;
         }
         Nl80211Cmd::GetInterface => {
             info!("Nl80211Cmd::GetInterface");
@@ -1210,10 +1241,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                 ));
             }
             resp.push(build_nl80211_done());
-            responder
-                .take()
-                .send(Ok(nl80211_message_resp(resp)))
-                .context("Failed to send scan results")?;
+            responder.take().send(Ok(resp)).context("Failed to send scan results")?;
         }
         Nl80211Cmd::GetStation => {
             debug!("Nl80211Cmd::GetStation");
@@ -1226,7 +1254,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                     let rssi = client_iface.get_connected_network_rssi().unwrap_or(INVALID_RSSI);
                     responder
                         .take()
-                        .send(Ok(nl80211_message_resp(vec![build_nl80211_message(
+                        .send(Ok(vec![build_nl80211_message(
                             Nl80211Cmd::NewStation,
                             vec![Nl80211Attr::StaInfo(vec![
                                 // TX packet counters don't seem to be used, so just set
@@ -1238,7 +1266,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                                 // can also be included. We don't have those information, so
                                 // we are not including them here.
                             ])],
-                        )])))
+                        )]))
                         .context("Failed to send GetStation")?;
                 }
                 Err(e) => {
@@ -1251,10 +1279,10 @@ async fn handle_nl80211_message<I: IfaceManager>(
             info!("Nl80211Cmd::GetProtocolFeatures");
             responder
                 .take()
-                .send(Ok(nl80211_message_resp(vec![build_nl80211_message(
+                .send(Ok(vec![build_nl80211_message(
                     Nl80211Cmd::GetProtocolFeatures,
                     vec![Nl80211Attr::ProtocolFeatures(0)],
-                )])))
+                )]))
                 .context("Failed to send GetProtocolFeatures")?;
         }
         Nl80211Cmd::TriggerScan => {
@@ -1263,7 +1291,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                 Ok((client_iface, iface_id)) => {
                     responder
                         .take()
-                        .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
+                        .send(Ok(vec![build_nl80211_ack()]))
                         .context("Failed to ack TriggerScan")?;
                     telemetry_sender.send(TelemetryEvent::ScanStart);
                     match client_iface.trigger_scan().await {
@@ -1342,14 +1370,14 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         });
                         responder
                             .take()
-                            .send(Ok(nl80211_message_resp(vec![build_nl80211_ack()])))
+                            .send(Ok(vec![build_nl80211_ack()]))
                             .context("Failed to ack AbortScan")?;
                     }
                     Err(e) => {
                         error!("Failed to abort scan: {:?}", e);
                         responder
                             .take()
-                            .send(Ok(nl80211_message_resp(vec![build_nl80211_err()])))
+                            .send(Ok(vec![build_nl80211_err()]))
                             .context("Failed to ack AbortScan")?;
                     }
                 },
@@ -1373,10 +1401,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         ));
                     }
                     resp.push(build_nl80211_done());
-                    responder
-                        .take()
-                        .send(Ok(nl80211_message_resp(resp)))
-                        .context("Failed to send scan results")?;
+                    responder.take().send(Ok(resp)).context("Failed to send scan results")?;
                 }
                 Err(e) => {
                     responder.take().send(Err(e)).context("sending error status for GetScan")?;
@@ -1395,7 +1420,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
                         );
                         responder
                             .take()
-                            .send(Ok(nl80211_message_resp(vec![resp])))
+                            .send(Ok(vec![resp]))
                             .context("Failed to respond to GetReg")?;
                     }
                     Err(e) => {
@@ -1417,10 +1442,7 @@ async fn handle_nl80211_message<I: IfaceManager>(
         }
         _ => {
             warn!("Dropping nl80211 message: {:?}", message);
-            responder
-                .take()
-                .send(Ok(nl80211_message_resp(vec![])))
-                .context("Failed to respond to unhandled message")?;
+            responder.take().send(Ok(vec![])).context("Failed to respond to unhandled message")?;
         }
     }
     Ok(())
@@ -1429,6 +1451,15 @@ async fn handle_nl80211_message<I: IfaceManager>(
 impl DefaultDrop for fidl_wlanix::Nl80211MessageResponder {
     fn default_drop(self) {
         error!("Dropped Nl80211MessageResponder without responding.");
+        if let Err(e) = self.send(Err(zx::sys::ZX_ERR_INTERNAL)) {
+            error!("Failed to send internal error response: {}", e);
+        }
+    }
+}
+
+impl DefaultDrop for fidl_wlanix::Nl80211MessageV2Responder {
+    fn default_drop(self) {
+        error!("Dropped Nl80211MessageV2Responder without responding.");
         if let Err(e) = self.send(Err(zx::sys::ZX_ERR_INTERNAL)) {
             error!("Failed to send internal error response: {}", e);
         }
@@ -1506,19 +1537,30 @@ async fn serve_nl80211<I: IfaceManager>(
             return;
         };
         match req {
-            Ok(fidl_wlanix::Nl80211Request::Message { payload, responder, .. }) => {
-                if let Some(message) = payload.message {
-                    if let Err(e) = handle_nl80211_message(
-                        message,
-                        WithDefaultDrop::new(responder),
-                        Arc::clone(&state),
-                        Arc::clone(&iface_manager),
-                        telemetry_sender.clone(),
-                    )
-                    .await
-                    {
-                        error!("Failed to handle Nl80211 message: {}", e);
-                    }
+            Ok(fidl_wlanix::Nl80211Request::MessageV2 { message, responder }) => {
+                if let Err(e) = handle_nl80211_message(
+                    message,
+                    WithDefaultDrop::new(responder),
+                    Arc::clone(&state),
+                    Arc::clone(&iface_manager),
+                    telemetry_sender.clone(),
+                )
+                .await
+                {
+                    error!("Failed to handle Nl80211 message: {}", e);
+                }
+            }
+            Ok(fidl_wlanix::Nl80211Request::Message { payload, responder }) => {
+                if let Err(e) = handle_nl80211_message(
+                    payload.message.unwrap(),
+                    WithDefaultDrop::new(responder),
+                    Arc::clone(&state),
+                    Arc::clone(&iface_manager),
+                    telemetry_sender.clone(),
+                )
+                .await
+                {
+                    error!("Failed to handle Nl80211 message: {}", e);
                 }
             }
             Ok(fidl_wlanix::Nl80211Request::GetMulticast { payload, .. }) => {
@@ -1706,6 +1748,7 @@ mod tests {
     use super::*;
     use anyhow::format_err;
     use fidl::endpoints::{create_proxy, create_proxy_and_stream, create_request_stream, Proxy};
+    use fidl_fuchsia_wlan_wlanix::Nl80211Message;
     use futures::channel::mpsc;
     use futures::task::Poll;
     use futures::Future;
@@ -3222,10 +3265,7 @@ mod tests {
             ..Default::default()
         };
 
-        let query_resp_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(invalid_message),
-            ..Default::default()
-        });
+        let query_resp_fut = proxy.message_v2(&invalid_message);
         let mut query_resp_fut = pin!(query_resp_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         assert_variant!(
@@ -3247,16 +3287,13 @@ mod tests {
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_interface_message = build_nl80211_message(Nl80211Cmd::GetInterface, vec![]);
-        let get_interface_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(get_interface_message),
-            ..Default::default()
-        });
+        let get_interface_fut = proxy.message_v2(&get_interface_message);
         let mut get_interface_fut = pin!(get_interface_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        let responses = assert_variant!(
+        let responses = deserialize(assert_variant!(
             exec.run_until_stalled(&mut get_interface_fut),
-            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
-        );
+            Poll::Ready(Ok(Ok(r))) => r,
+        ));
 
         assert_eq!(responses.len(), 2);
         let message = expect_nl80211_message(&responses[0]);
@@ -3286,17 +3323,14 @@ mod tests {
             Nl80211Cmd::GetStation,
             vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
         );
-        let get_station_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(get_station_message),
-            ..Default::default()
-        });
+        let get_station_fut = proxy.message_v2(&get_station_message);
 
         let mut get_station_fut = pin!(get_station_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        let responses = assert_variant!(
+        let responses = deserialize(assert_variant!(
             exec.run_until_stalled(&mut get_station_fut),
-            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
-        );
+            Poll::Ready(Ok(Ok(r))) => r,
+        ));
         assert_eq!(responses.len(), 1);
         assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Message));
     }
@@ -3324,20 +3358,17 @@ mod tests {
             Nl80211Cmd::TriggerScan,
             vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
         );
-        let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(trigger_scan_message),
-            ..Default::default()
-        });
+        let trigger_scan_fut = proxy.message_v2(&trigger_scan_message);
 
         let mut trigger_scan_fut = pin!(trigger_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
 
         assert_variant!(telemetry_receiver.try_next(), Ok(Some(TelemetryEvent::ScanStart)));
 
-        let responses = assert_variant!(
+        let responses = deserialize(assert_variant!(
             exec.run_until_stalled(&mut trigger_scan_fut),
-            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
-        );
+            Poll::Ready(Ok(Ok(r))) => r,
+        ));
         assert_eq!(responses.len(), 1);
         assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Ack));
 
@@ -3367,10 +3398,7 @@ mod tests {
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let trigger_scan_message = build_nl80211_message(Nl80211Cmd::TriggerScan, vec![]);
-        let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(trigger_scan_message),
-            ..Default::default()
-        });
+        let trigger_scan_fut = proxy.message_v2(&trigger_scan_message);
 
         let mut trigger_scan_fut = pin!(trigger_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
@@ -3394,10 +3422,7 @@ mod tests {
 
         let trigger_scan_message =
             build_nl80211_message(Nl80211Cmd::TriggerScan, vec![Nl80211Attr::IfaceIndex(123)]);
-        let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(trigger_scan_message),
-            ..Default::default()
-        });
+        let trigger_scan_fut = proxy.message_v2(&trigger_scan_message);
 
         let mut trigger_scan_fut = pin!(trigger_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
@@ -3436,10 +3461,7 @@ mod tests {
             Nl80211Cmd::TriggerScan,
             vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
         );
-        let trigger_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(trigger_scan_message),
-            ..Default::default()
-        });
+        let trigger_scan_fut = proxy.message_v2(&trigger_scan_message);
         let mut trigger_scan_fut = pin!(trigger_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
         assert_variant!(exec.run_until_stalled(&mut trigger_scan_fut), Poll::Ready(_));
@@ -3483,10 +3505,7 @@ mod tests {
             Nl80211Cmd::AbortScan,
             vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
         );
-        let abort_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(abort_scan_message),
-            ..Default::default()
-        });
+        let abort_scan_fut = proxy.message_v2(&abort_scan_message);
 
         let mut abort_scan_fut = pin!(abort_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
@@ -3515,17 +3534,14 @@ mod tests {
             Nl80211Cmd::GetScan,
             vec![Nl80211Attr::IfaceIndex(ifaces::test_utils::FAKE_IFACE_RESPONSE.id.into())],
         );
-        let get_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(get_scan_message),
-            ..Default::default()
-        });
+        let get_scan_fut = proxy.message_v2(&get_scan_message);
 
         let mut get_scan_fut = pin!(get_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        let responses = assert_variant!(
+        let responses = deserialize(assert_variant!(
             exec.run_until_stalled(&mut get_scan_fut),
-            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
-        );
+            Poll::Ready(Ok(Ok(r))) => r,
+        ));
         assert_eq!(responses.len(), 2);
         assert_eq!(responses[0].message_type, Some(fidl_wlanix::Nl80211MessageType::Message));
         assert_eq!(responses[1].message_type, Some(fidl_wlanix::Nl80211MessageType::Done));
@@ -3544,10 +3560,7 @@ mod tests {
         let mut nl80211_fut = pin!(nl80211_fut);
 
         let get_scan_message = build_nl80211_message(Nl80211Cmd::GetScan, vec![]);
-        let get_scan_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(get_scan_message),
-            ..Default::default()
-        });
+        let get_scan_fut = proxy.message_v2(&get_scan_message);
 
         let mut get_scan_fut = pin!(get_scan_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
@@ -3555,6 +3568,11 @@ mod tests {
             exec.run_until_stalled(&mut get_scan_fut),
             Poll::Ready(Ok(Err(zx::sys::ZX_ERR_INVALID_ARGS))),
         );
+    }
+
+    fn deserialize(vmo: zx::Vmo) -> Vec<Nl80211Message> {
+        let value = vmo.read_to_vec(0, vmo.get_content_size().unwrap()).unwrap();
+        fidl::unpersist::<fidl_wlanix::Nl80211MessageArray>(&value).unwrap().messages
     }
 
     #[test]
@@ -3571,17 +3589,15 @@ mod tests {
 
         let get_reg_message =
             build_nl80211_message(Nl80211Cmd::GetReg, vec![Nl80211Attr::Wiphy(123)]);
-        let get_reg_fut = proxy.message(fidl_wlanix::Nl80211MessageRequest {
-            message: Some(get_reg_message),
-            ..Default::default()
-        });
+        let get_reg_fut = proxy.message_v2(&get_reg_message);
 
         let mut get_reg_fut = pin!(get_reg_fut);
         assert_variant!(exec.run_until_stalled(&mut nl80211_fut), Poll::Pending);
-        let responses = assert_variant!(
+        let responses = deserialize(assert_variant!(
             exec.run_until_stalled(&mut get_reg_fut),
-            Poll::Ready(Ok(Ok(fidl_wlanix::Nl80211MessageResponse{responses: Some(r), ..}))) => r,
-        );
+            Poll::Ready(Ok(Ok(r))) => r,
+        ));
+
         assert_eq!(responses.len(), 1);
         let message = expect_nl80211_message(&responses[0]);
         assert_eq!(message.payload.cmd, Nl80211Cmd::GetReg);
