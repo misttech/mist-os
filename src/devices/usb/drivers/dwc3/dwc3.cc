@@ -969,7 +969,7 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
       continue;
     }
 
-    queued_reqs.emplace(std::move(freq));
+    queued_reqs.push(std::move(freq));
   }
 
   if (dwc3_->configured_) {
