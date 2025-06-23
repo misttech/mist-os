@@ -112,6 +112,9 @@ pub enum FieldType {
     /// A pointer to the kernel memory. The full buffer is `buffer_size` bytes long.
     PtrToMemory { is_32_bit: bool, id: MemoryId, buffer_size: usize },
 
+    /// A nullable pointer to the kernel memory. The full buffer is `buffer_size` bytes long.
+    NullablePtrToMemory { is_32_bit: bool, id: MemoryId, buffer_size: usize },
+
     /// A pointer to the kernel memory. The full buffer size is determined by an instance of
     /// `PtrToEndArray` with the same `id`.
     PtrToArray { is_32_bit: bool, id: MemoryId },
@@ -137,6 +140,7 @@ impl FieldDescriptor {
         match self.field_type {
             FieldType::Scalar { size } | FieldType::MutableScalar { size } => size,
             FieldType::PtrToMemory { is_32_bit, .. }
+            | FieldType::NullablePtrToMemory { is_32_bit, .. }
             | FieldType::PtrToArray { is_32_bit, .. }
             | FieldType::PtrToEndArray { is_32_bit, .. } => {
                 if is_32_bit {
@@ -194,6 +198,7 @@ impl StructDescriptor {
                 ((offset + field.width.bytes()).max() as usize) <= field_desc.offset + size
             }
             FieldType::PtrToMemory { is_32_bit, .. }
+            | FieldType::NullablePtrToMemory { is_32_bit, .. }
             | FieldType::PtrToArray { is_32_bit, .. }
             | FieldType::PtrToEndArray { is_32_bit, .. } => {
                 let expected_width = if is_32_bit { DataWidth::U32 } else { DataWidth::U64 };
@@ -1467,6 +1472,20 @@ impl ComputationContext {
                         },
                         *is_32_bit,
                     ),
+                    FieldType::NullablePtrToMemory { id: memory_id, buffer_size, is_32_bit } => {
+                        let id = memory_id.prepended(id.clone());
+                        (
+                            Type::NullOr {
+                                id: id.clone(),
+                                inner: Box::new(Type::PtrToMemory {
+                                    id,
+                                    offset: 0.into(),
+                                    buffer_size: *buffer_size as u64,
+                                }),
+                            },
+                            *is_32_bit,
+                        )
+                    }
                 };
 
                 context.register_struct_access(StructAccess {

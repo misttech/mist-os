@@ -657,6 +657,17 @@ fn ptr_to_mem_field<T: IntoBytes>(offset: usize, id: MemoryId) -> FieldDescripto
     }
 }
 
+fn nullable_ptr_to_mem_field<T: IntoBytes>(offset: usize, id: MemoryId) -> FieldDescriptor {
+    FieldDescriptor {
+        offset,
+        field_type: FieldType::NullablePtrToMemory {
+            is_32_bit: false,
+            id,
+            buffer_size: std::mem::size_of::<T>(),
+        },
+    }
+}
+
 fn ptr_to_struct_type(id: MemoryId, fields: Vec<FieldDescriptor>) -> Type {
     Type::PtrToStruct { id, offset: 0.into(), descriptor: Arc::new(StructDescriptor { fields }) }
 }
@@ -735,7 +746,8 @@ pub static CGROUP_SKB_SK_BUF_TYPE: LazyLock<Type> = LazyLock::new(|| {
             scalar_range(offset_of!(__sk_buff, napi_id), offset_of!(__sk_buff, data_meta)),
             scalar_u64_field(offset_of!(__sk_buff, tstamp)),
             scalar_u32_field(offset_of!(__sk_buff, gso_segs)),
-            ptr_to_mem_field::<bpf_sock>(
+            // `sk` field
+            nullable_ptr_to_mem_field::<bpf_sock>(
                 offset_of!(__sk_buff, __bindgen_anon_2),
                 BPF_SOCK_ID.clone(),
             ),

@@ -45,8 +45,17 @@ int skb_test_prog(struct __sk_buff* skb) {
   if (!entry) {
     return 1;
   }
+
   *entry = skb->len;
+
+  // Try calling `bpf_sk_fullsock`.
+  struct bpf_sock* fullsock = skb->sk ? bpf_sk_fullsock(skb->sk) : 0;
+  if (fullsock) {
+    *entry += fullsock->protocol;
+  }
+
   bpf_ringbuf_submit(entry, 0);
+
   return 1;
 }
 
