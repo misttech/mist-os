@@ -129,6 +129,10 @@ impl Index {
     pub fn contains_id(&self, id: &InstanceId) -> bool {
         self.instance_ids.contains(id)
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (&Moniker, &InstanceId)> {
+        self.moniker_to_instance_id.iter()
+    }
 }
 
 impl Default for Index {

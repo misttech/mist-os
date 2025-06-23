@@ -1572,6 +1572,12 @@ impl BuiltinEnvironment {
         ));
         model.root().hooks.install(component_escrow_duration_status.hooks()).await;
 
+        let component_id_index_node = inspector.root().create_child("component_id_index");
+        for (moniker, instance_id) in model.component_id_index().iter() {
+            component_id_index_node.record_string(moniker.to_string(), instance_id.to_string());
+        }
+        inspector.root().record(component_id_index_node);
+
         // Serve stats about inspect in a lazy node.
         inspector.record_lazy_stats();
 

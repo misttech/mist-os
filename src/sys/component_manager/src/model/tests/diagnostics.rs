@@ -7,11 +7,13 @@ mod tests {
     use crate::model::component::testing::wait_until_event_get_timestamp;
     use crate::model::component::{ComponentInstance, StartReason};
     use crate::model::start::Start;
-    use crate::model::testing::routing_test_helpers::RoutingTest;
+    use crate::model::testing::routing_test_helpers::{RoutingTest, RoutingTestBuilder};
     use crate::model::testing::test_helpers::{
         component_decl_with_test_runner, ActionsTest, ComponentInfo,
     };
+    use ::routing_test_helpers::component_id_index::make_index_file;
     use cm_rust_testing::*;
+    use component_id_index::InstanceId;
     use diagnostics::escrow::DurationStats;
     use diagnostics::lifecycle::ComponentLifecycleTimeStats;
     use diagnostics_assertions::{assert_data_tree, AnyProperty, HistogramAssertion};
@@ -25,7 +27,9 @@ mod tests {
     use moniker::Moniker;
     use std::future;
     use std::sync::Arc;
+
     use zx::AsHandleRef;
+
     use {
         fidl_fuchsia_component_runner as fcrunner, fidl_fuchsia_io as fio, fuchsia_async as fasync,
         fuchsia_inspect as inspect, fuchsia_sync as fsync,
@@ -310,5 +314,27 @@ mod tests {
             .expect("failed to bind");
         let state = component.lock_state().await;
         state.get_started_state().unwrap().timestamp
+    }
+
+    #[fuchsia::test]
+    async fn component_id_index_is_populated_with_assigned_ids() {
+        let mut index = component_id_index::Index::default();
+        let instance_id = InstanceId::new_random(&mut rand::thread_rng());
+        index.insert(Moniker::parse_str("/a").unwrap(), instance_id.clone()).unwrap();
+        let component_id_index_path = make_index_file(index).expect("make index file");
+
+        let test = RoutingTestBuilder::new("a", vec![])
+            .set_component_id_index_path(
+                component_id_index_path.path().to_owned().try_into().unwrap(),
+            )
+            .build()
+            .await;
+
+        let inspector = test.builtin_environment.inspector();
+        assert_data_tree!(inspector, root: contains {
+            component_id_index: {
+                "a": format!("{instance_id}"),
+            }
+        });
     }
 }

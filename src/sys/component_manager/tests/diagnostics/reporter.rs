@@ -162,7 +162,8 @@ async fn main() {
             deallocated_blocks: AnyProperty,
             failed_allocations: 0u64,
             utilization_per_ten_k: AnyProperty,
-        }
+        },
+        component_id_index: contains {},
     });
 
     assert_component_data(hierarchy, "root/archivist", archivist_job_koid);
