@@ -460,7 +460,7 @@ pub(in crate::security) fn check_syslog(
         current_task.kernel(),
         permission_check,
         sid,
-        sid,
+        InitialSid::Kernel.into(),
         required_permission,
         current_task.into(),
     )

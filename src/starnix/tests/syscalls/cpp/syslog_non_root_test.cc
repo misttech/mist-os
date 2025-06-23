@@ -31,13 +31,13 @@ TEST_F(SyslogNonRootTest, DevKmsg) {
 
 TEST_F(SyslogNonRootTest, ProcKmsg) {
   EXPECT_LT(open("/proc/kmsg", O_RDONLY), 0);
-  EXPECT_EQ(errno, EPERM);
+  EXPECT_EQ(errno, EACCES);
 
   EXPECT_LT(open("/proc/kmsg", O_WRONLY), 0);
-  EXPECT_EQ(errno, EPERM);
+  EXPECT_EQ(errno, EACCES);
 
   EXPECT_LT(open("/proc/kmsg", O_RDWR), 0);
-  EXPECT_EQ(errno, EPERM);
+  EXPECT_EQ(errno, EACCES);
 }
 
 TEST_F(SyslogNonRootTest, Syslog) {

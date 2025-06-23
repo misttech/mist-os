@@ -91,6 +91,14 @@ _COMPOSITE_POLICY_PATHS = [
     (
         [
             "base_policy.conf",
+            "new_file/test_policy.conf",
+            "new_file/syslog.conf",
+        ],
+        "syslog.pp",
+    ),
+    (
+        [
+            "base_policy.conf",
             "new_file/class_defaults_policy.conf",
         ],
         "class_defaults_policy.pp",

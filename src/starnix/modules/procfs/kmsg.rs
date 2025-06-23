@@ -4,9 +4,9 @@
 
 use starnix_core::task::{CurrentTask, EventHandler, Syslog, SyslogAccess, WaitCanceler, Waiter};
 use starnix_core::vfs::{
-    fileops_impl_noop_sync, fileops_impl_seekless, fs_node_impl_not_dir, CheckAccessReason,
-    FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps,
-    InputBuffer, OutputBuffer,
+    fileops_impl_noop_sync, fileops_impl_seekless, fs_node_impl_not_dir, AppendLockGuard,
+    CheckAccessReason, FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, InputBuffer, OutputBuffer,
 };
 use starnix_sync::{FileOpsCore, Locked, RwLock};
 use starnix_uapi::auth::FsCred;
@@ -20,7 +20,7 @@ use starnix_uapi::{error, mode};
 pub fn kmsg_file(fs: &FileSystemHandle) -> FsNodeHandle {
     fs.create_node_and_allocate_node_id(
         KmsgNode,
-        FsNodeInfo::new(mode!(IFREG, 0o100), FsCred::root()),
+        FsNodeInfo::new(mode!(IFREG, 0o400), FsCred::root()),
     )
 }
 
@@ -32,12 +32,13 @@ impl FsNodeOps for KmsgNode {
     fn check_access(
         &self,
         _locked: &mut Locked<FileOpsCore>,
-        _node: &FsNode,
+        node: &FsNode,
         current_task: &CurrentTask,
-        _access: Access,
-        _info: &RwLock<FsNodeInfo>,
-        _reason: CheckAccessReason,
+        access: Access,
+        info: &RwLock<FsNodeInfo>,
+        reason: CheckAccessReason,
     ) -> Result<(), Errno> {
+        node.default_check_access_impl(current_task, access, reason, info.read())?;
         Syslog::validate_access(current_task, SyslogAccess::ProcKmsg(SyslogAction::Open))
     }
 
@@ -49,6 +50,18 @@ impl FsNodeOps for KmsgNode {
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         Ok(Box::new(KmsgFile))
+    }
+
+    fn truncate(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _guard: &AppendLockGuard<'_>,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        _length: u64,
+    ) -> Result<(), Errno> {
+        // O_TRUNC succeeds on /proc/kmsg but does nothing.
+        Ok(())
     }
 }
 

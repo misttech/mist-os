@@ -55,23 +55,26 @@ impl Syslog {
     /// Validates that syslog access is unrestricted, or that the `current_task` has the relevant
     /// capability, or global admin capability as well as applying the SELinux policy.
     pub fn validate_access(current_task: &CurrentTask, access: SyslogAccess) -> Result<(), Errno> {
-        let action = match access {
+        let (action, check_capabilities) = match access {
             SyslogAccess::DevKmsg(SyslogAction::Open)
-            | SyslogAccess::ProcKmsg(SyslogAction::Open) => SyslogAction::Open,
-            SyslogAccess::Syscall(a) => a,
+            | SyslogAccess::ProcKmsg(SyslogAction::Open) => (SyslogAction::Open, true),
+            SyslogAccess::Syscall(a) => (a, true),
             // If we got here we already validated Open on these files.
-            SyslogAccess::DevKmsg(_) | SyslogAccess::ProcKmsg(_) => return Ok(()),
+            SyslogAccess::DevKmsg(_) => return Ok(()),
+            SyslogAccess::ProcKmsg(a) => (a, false),
         };
 
         // According to syslog(2) man, ReadAll (3) and SizeBuffer (10) are allowed unprivileged
         // access only if restrict_dmsg is 0.
-        let action_is_privileged = matches!(
+        let action_is_privileged = !matches!(
             access,
             SyslogAccess::Syscall(SyslogAction::ReadAll | SyslogAction::SizeBuffer)
         );
         let restrict_dmesg = current_task.kernel().restrict_dmesg.load(Ordering::Relaxed);
-        if !action_is_privileged || restrict_dmesg {
-            Self::check_capabilities(current_task)?;
+        // Access to /proc/kmsg isn't allowed by CAP_SYS_ADMIN.
+        let allow_cap_sys_admin = !matches!(access, SyslogAccess::ProcKmsg(_));
+        if check_capabilities && (action_is_privileged || restrict_dmesg) {
+            Self::check_capabilities(current_task, allow_cap_sys_admin)?;
         }
 
         // We just perform these checks on ProcKmsg and syslog(2) which are equivalent. This check
@@ -82,8 +85,11 @@ impl Syslog {
         Ok(())
     }
 
-    fn check_capabilities(current_task: &CurrentTask) -> Result<(), Errno> {
-        if security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
+    fn check_capabilities(
+        current_task: &CurrentTask,
+        allow_cap_sys_admin: bool,
+    ) -> Result<(), Errno> {
+        if allow_cap_sys_admin && security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
             return Ok(());
         }
         security::check_task_capable(current_task, CAP_SYSLOG)
