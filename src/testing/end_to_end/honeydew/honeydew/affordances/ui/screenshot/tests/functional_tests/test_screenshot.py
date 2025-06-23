@@ -36,6 +36,10 @@ class ScreenshotAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
         super().setup_test()
         self.device.session.ensure_started()
 
+    def teardown_test(self) -> None:
+        self.device.close()
+        super().teardown_test()
+
     def test_take_screenshot(self) -> None:
         # We launch the test app that draws something on the screen.
         # EXAMPLE_URL(flatland-examples) will render colorful background instead

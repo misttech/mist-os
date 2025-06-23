@@ -39,6 +39,10 @@ class InputBenchmark(fuchsia_base_test.FuchsiaBaseTest):
 
         self.dut.session.ensure_started()
 
+    def teardown_test(self) -> None:
+        self.dut.close()
+        super().teardown_test()
+
     def test_logic(self) -> None:
         # Add simplest-input-flatland-session-app to session.
         self.dut.session.add_component(TOUCH_APP)

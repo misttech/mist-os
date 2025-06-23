@@ -44,6 +44,10 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
 
         self.dut.session.ensure_started()
 
+    def teardown_test(self) -> None:
+        self.dut.close()
+        super().teardown_test()
+
     def test_flatland(self) -> None:
         # The tile app only works on vulkan renderer.
         if self.dut.scenic.renderer != "vulkan":

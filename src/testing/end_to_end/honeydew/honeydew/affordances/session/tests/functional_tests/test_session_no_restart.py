@@ -37,6 +37,10 @@ class SessionAffordanceNoRestartTests(fuchsia_base_test.FuchsiaBaseTest):
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
+    def teardown_test(self) -> None:
+        self.device.close()
+        super().teardown_test()
+
     def test_add_component(self) -> None:
         """Test case for session.add_component()"""
 
