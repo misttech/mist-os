@@ -12,7 +12,10 @@ use ffx_fastboot_connection_factory::{
 };
 use ffx_target::connection::ConnectionError;
 use ffx_target::ssh_connector::SshConnector;
-use ffx_target::{Connection, TargetConnection, TargetConnectionError, TargetConnector};
+use ffx_target::{
+    Connection, DefaultTargetResolver, TargetConnection, TargetConnectionError, TargetConnector,
+    TargetResolver,
+};
 use std::time::Duration;
 
 pub async fn run_diagnostics_with_handle<N>(
@@ -50,7 +53,7 @@ where
 {
     let (target, notifier) = GetTargetSpecifier::new(&env)
         .check_with_notifier((), notifier)
-        .and_then_check(ResolveTarget::new(&env))
+        .and_then_check(ResolveTarget::<_, DefaultTargetResolver>::new(&env))
         .await?;
 
     run_diagnostics_with_handle(&env, target, notifier, product_timeout).await?;
@@ -136,14 +139,18 @@ where
     }
 }
 
-pub struct ResolveTarget<'a, N> {
+pub struct ResolveTarget<'a, N, R> {
     ctx: &'a EnvironmentContext,
+    _resolver: std::marker::PhantomData<R>,
     _notifier: std::marker::PhantomData<N>,
 }
 
-impl<'a, N> ResolveTarget<'a, N> {
+impl<'a, N, R> ResolveTarget<'a, N, R>
+where
+    R: TargetResolver,
+{
     pub fn new(ctx: &'a EnvironmentContext) -> Self {
-        Self { ctx, _notifier: Default::default() }
+        Self { ctx, _resolver: Default::default(), _notifier: Default::default() }
     }
 }
 
@@ -164,9 +171,10 @@ fn sources_from_query(query: &TargetInfoQuery) -> DiscoverySources {
     }
 }
 
-impl<N> Check for ResolveTarget<'_, N>
+impl<N, R> Check for ResolveTarget<'_, N, R>
 where
     N: Notifier + Sized,
+    R: TargetResolver,
 {
     type Input = TargetInfoQuery;
     type Output = TargetHandle;
@@ -206,10 +214,9 @@ where
         // example: if the device is an IP address, we should not attempt to resolve the device via
         // mDNS, as we already have the IP address.
         Box::pin(async {
-            let sources = sources_from_query(&input);
             // There should be some kind of error here if the device resolves to an empty array.
-            let mut targets =
-                ffx_target::resolve_target_query_with_sources(input, self.ctx, sources).await?;
+            let resolver = R::with_sources(sources_from_query(&input));
+            let mut targets = resolver.resolve_target_query(input, self.ctx).await?;
             if targets.is_empty() {
                 return Err(anyhow::anyhow!("Unable to find any devices"));
             }
@@ -453,10 +460,11 @@ where
 mod test {
     use super::*;
     use addr::TargetIpAddr;
+    use anyhow::Result;
     use fdomain_client::fidl::DiscoverableProtocolMarker;
     use fdomain_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use ffx_fastboot_connection_factory::test::setup_connection_factory;
-    use ffx_target::FDomainConnection;
+    use ffx_target::{FDomainConnection, Resolution};
     use fidl_fuchsia_developer_remotecontrol as rcs;
     use fidl_fuchsia_hwinfo::{ProductInfo, ProductMarker, ProductRequest};
     use fuchsia_async::Task;
@@ -464,7 +472,89 @@ mod test {
     use std::cell::RefCell;
     use std::collections::VecDeque;
     use std::net::{IpAddr, Ipv4Addr, SocketAddr};
-    use std::sync::Arc;
+    use std::sync::{Arc, Mutex};
+
+    static MOCK_HANDLES_LOCK: Mutex<()> = Mutex::new(());
+    static MOCK_HANDLES: std::sync::LazyLock<Arc<Mutex<Vec<TargetHandle>>>> =
+        std::sync::LazyLock::new(|| Arc::new(Mutex::new(Vec::new())));
+
+    struct MockResolver;
+
+    impl TargetResolver for MockResolver {
+        fn with_sources(_sources: DiscoverySources) -> Self {
+            Self
+        }
+
+        async fn resolve_target_query(
+            &self,
+            _query: TargetInfoQuery,
+            _ctx: &EnvironmentContext,
+        ) -> Result<Vec<TargetHandle>> {
+            Ok(MOCK_HANDLES.lock().unwrap().clone())
+        }
+
+        async fn try_resolve_manual_target(
+            &self,
+            _name: &str,
+            _ctx: &EnvironmentContext,
+        ) -> Result<Option<Resolution>> {
+            unimplemented!()
+        }
+    }
+
+    #[fuchsia::test]
+    async fn test_resolve_target_success() {
+        let _guard = MOCK_HANDLES_LOCK.lock().unwrap();
+        let env = ffx_config::test_init().await.unwrap();
+        let mut notifier = ffx_diagnostics::StringNotifier::new();
+        let handle = TargetHandle {
+            node_name: Some("test-node".to_string()),
+            state: TargetState::Unknown,
+            manual: false,
+        };
+        {
+            *MOCK_HANDLES.lock().unwrap() = vec![handle.clone()];
+        }
+        let mut check = ResolveTarget::<_, MockResolver>::new(&env.context);
+        let res = check.check(TargetInfoQuery::First, &mut notifier).await.unwrap();
+        assert_eq!(res, handle);
+    }
+
+    #[fuchsia::test]
+    async fn test_resolve_target_no_devices_found() {
+        let _guard = MOCK_HANDLES_LOCK.lock().unwrap();
+        {
+            *MOCK_HANDLES.lock().unwrap() = vec![];
+        }
+        let env = ffx_config::test_init().await.unwrap();
+        let mut notifier = ffx_diagnostics::StringNotifier::new();
+        let mut check = ResolveTarget::<_, MockResolver>::new(&env.context);
+        let res = check.check(TargetInfoQuery::First, &mut notifier).await;
+        assert!(res.is_err());
+    }
+
+    #[fuchsia::test]
+    async fn test_resolve_target_too_many_devices_found() {
+        let _guard = MOCK_HANDLES_LOCK.lock().unwrap();
+        let env = ffx_config::test_init().await.unwrap();
+        let mut notifier = ffx_diagnostics::StringNotifier::new();
+        let handle1 = TargetHandle {
+            node_name: Some("test-node-1".to_string()),
+            state: TargetState::Unknown,
+            manual: false,
+        };
+        let handle2 = TargetHandle {
+            node_name: Some("test-node-2".to_string()),
+            state: TargetState::Unknown,
+            manual: false,
+        };
+        {
+            *MOCK_HANDLES.lock().unwrap() = vec![handle1, handle2];
+        }
+        let mut check = ResolveTarget::<_, MockResolver>::new(&env.context);
+        let res = check.check(TargetInfoQuery::First, &mut notifier).await;
+        assert!(res.is_err());
+    }
 
     #[fuchsia::test]
     async fn test_fastboot_check_tcp() {

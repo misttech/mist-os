@@ -51,7 +51,8 @@ pub async fn maybe_locally_resolve_target_spec(
         ffx_config::is_usb_discovery_disabled(env_context),
         ffx_config::is_mdns_discovery_disabled(env_context));
 
-        locally_resolve_target_spec(target_spec, &QueryResolver::default(), env_context).await
+        locally_resolve_target_spec(target_spec, &DefaultTargetResolver::default(), env_context)
+            .await
     }
 }
 
@@ -67,7 +68,7 @@ fn replace_default_port(sa: SocketAddr) -> SocketAddr {
 /// passed to the daemon. If already an address or serial number, just return
 /// it. Otherwise, perform discovery to find the address or serial #. Returns
 /// Some(_) if a target has been found, None otherwise.
-async fn locally_resolve_target_spec<T: QueryResolverT>(
+async fn locally_resolve_target_spec<T: TargetResolver>(
     target_spec: Option<String>,
     resolver: &T,
     env_context: &EnvironmentContext,
@@ -88,7 +89,23 @@ async fn locally_resolve_target_spec<T: QueryResolverT>(
     Ok(Some(explicit_spec))
 }
 
-trait QueryResolverT {
+/// A trait for resolving target queries into concrete target information.
+///
+/// This trait provides an abstraction over the process of finding a target
+/// based on a user-provided specifier, which could be a nodename, a serial
+/// number, an IP address, or other forms of target identification.
+///
+/// Implementors of this trait are responsible for searching for targets,
+/// handling ambiguity, and returning a `Resolution` object that can be used
+/// to connect to the target.
+pub trait TargetResolver {
+    /// Sets the discovery sources of the resolver.
+    fn with_sources(sources: DiscoverySources) -> Self;
+
+    /// Resolves a `TargetInfoQuery` into a list of matching `TargetHandle`s.
+    ///
+    /// This method is expected to perform discovery and return all targets
+    /// that match the given query.
     #[allow(async_fn_in_trait)]
     async fn resolve_target_query(
         &self,
@@ -96,6 +113,10 @@ trait QueryResolverT {
         ctx: &EnvironmentContext,
     ) -> Result<Vec<TargetHandle>>;
 
+    /// Attempts to resolve a target by name from a manually configured list.
+    ///
+    /// This method is used to check for targets that have been explicitly
+    /// defined by the user, outside of the standard discovery mechanisms.
     #[allow(async_fn_in_trait)]
     async fn try_resolve_manual_target(
         &self,
@@ -103,6 +124,11 @@ trait QueryResolverT {
         ctx: &EnvironmentContext,
     ) -> Result<Option<Resolution>>;
 
+    /// Resolves a target specifier into a `Resolution` containing a connectable address.
+    ///
+    /// This is a high-level method that should handle various query types and
+    /// ensure that a single, unambiguous target is found. It is an error if the query
+    /// does not resolve to exactly one target.
     #[allow(async_fn_in_trait)]
     async fn resolve_target_address(
         &self,
@@ -120,6 +146,11 @@ trait QueryResolverT {
         Ok(res)
     }
 
+    /// Resolves a target specifier to a single `Resolution`.
+    ///
+    /// This method orchestrates the discovery process, including checking
+    /// manual targets, and handles cases where no targets or multiple
+    /// ambiguous targets are found.
     #[allow(async_fn_in_trait)]
     async fn resolve_single_target(
         &self,
@@ -179,8 +210,9 @@ trait QueryResolverT {
 
 #[cfg(test)]
 mock! {
-    QueryResolverT{}
-    impl QueryResolverT for QueryResolverT {
+    TargetResolver{}
+    impl TargetResolver for TargetResolver {
+        fn with_sources(sources: DiscoverySources) -> Self;
         async fn resolve_target_query(
             &self,
             query: TargetInfoQuery,
@@ -379,7 +411,7 @@ pub async fn resolve_target_query_with_sources(
 ) -> Result<Vec<TargetHandle>> {
     log::debug!("Resolving query: {:#?} with sources: {:#?}", query, sources);
     // Get nodename, in case we're trying to find an exact match
-    QueryResolver::new(sources).resolve_target_query(query, ctx).await
+    DefaultTargetResolver::with_sources(sources).resolve_target_query(query, ctx).await
 }
 
 /// Attempts to resolve the query into a target's ssh-able address. It is an error
@@ -390,15 +422,15 @@ pub async fn resolve_target_address(
     target_spec: &Option<String>,
     ctx: &EnvironmentContext,
 ) -> Result<Resolution, FfxTargetError> {
-    QueryResolver::default().resolve_target_address(target_spec, ctx).await
+    DefaultTargetResolver::default().resolve_target_address(target_spec, ctx).await
 }
-struct QueryResolver {
+pub struct DefaultTargetResolver {
     sources: DiscoverySources,
 }
 
-impl Default for QueryResolver {
+impl Default for DefaultTargetResolver {
     fn default() -> Self {
-        Self::new(DiscoverySources::all())
+        Self::with_sources(DiscoverySources::all())
     }
 }
 
@@ -423,14 +455,10 @@ pub async fn get_discovery_stream(
         sources = sources | DiscoverySources::MDNS;
     }
     // Get nodename, in case we're trying to find an exact match
-    QueryResolver::new(sources).get_discovery_stream(query, ctx).await
+    DefaultTargetResolver::with_sources(sources).get_discovery_stream(query, ctx).await
 }
 
-impl QueryResolver {
-    fn new(sources: DiscoverySources) -> Self {
-        Self { sources }
-    }
-
+impl DefaultTargetResolver {
     async fn get_discovery_stream(
         &self,
         query: TargetInfoQuery,
@@ -583,7 +611,11 @@ fn handle_to_description(handle: &TargetHandle) -> Description {
     Description { nodename: handle.node_name.clone(), addresses, serial, ..Default::default() }
 }
 
-impl QueryResolverT for QueryResolver {
+impl TargetResolver for DefaultTargetResolver {
+    fn with_sources(sources: DiscoverySources) -> Self {
+        Self { sources }
+    }
+
     async fn resolve_target_query(
         &self,
         query: TargetInfoQuery,
@@ -893,7 +925,7 @@ mod test {
     #[fuchsia::test]
     async fn test_can_resolve_target_locally() {
         let test_env = ffx_config::test_init().await.unwrap();
-        let mut resolver = MockQueryResolverT::new();
+        let mut resolver = MockTargetResolver::new();
         // A network address will resolve to itself
         let addr = "127.0.0.1:123".to_string();
         let addr_spec = Some(addr.clone());
@@ -932,7 +964,7 @@ mod test {
         assert_eq!(target_spec, addr_spec);
 
         // A serial number for an existing target will satisfy the resolution request
-        let mut resolver = MockQueryResolverT::new();
+        let mut resolver = MockTargetResolver::new();
         let th = TargetHandle {
             node_name: None,
             state: TargetState::Fastboot(discovery::FastbootTargetState {
@@ -951,7 +983,7 @@ mod test {
         assert_eq!(target_spec, Some(sn_spec));
 
         // An ambiguous name will result in an error
-        let mut resolver = MockQueryResolverT::new();
+        let mut resolver = MockTargetResolver::new();
         let name_spec = Some("foobar".to_string());
         let sa = addr.parse::<SocketAddr>().unwrap();
         let ts1 = TargetState::Product { addrs: vec![sa.into(), sa.into()], serial: None };
