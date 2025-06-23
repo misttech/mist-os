@@ -178,30 +178,39 @@ int IdlePowerThread::Run(void* arg) {
         Thread::Current::Reschedule();
       }
     } else {
-      ktrace::Scope trace =
-          KTRACE_CPU_BEGIN_SCOPE_ENABLE(kEnableRunloopTracing, "kernel:sched", "idle");
-
       DEBUG_ASSERT(arch_ints_disabled());
       DEBUG_ASSERT(!Thread::Current::Get()->preemption_state().PreemptIsEnabled());
 
       // A preempt could become pending between disabling preemption and disabling interrupts above.
-      // Handle the preemption instead of attempting to enter the processor idle state.
+      // Handle the preemption instead of attempting to suspend or enter the processor idle state.
       if (Thread::Current::Get()->preemption_state().preempts_pending() != 0) {
         continue;
       }
 
-      // WARNING: Be careful not to do anything that could pend a preemption after the check above,
-      // with the exception of the internal implementation of ArchIdlePowerThread::EnterIdleState.
+      // WARNING: Be careful not to do anything that could pend a preemption after the check above.
 
-      const zx_instant_mono_t idle_start_time = current_mono_time();
+      if (state.current == State::Suspend) {
+        ktrace::Scope trace = KTRACE_CPU_BEGIN_SCOPE("kernel:sched", "suspend");
 
-      // TODO(eieio): Use scheduler and timer states to determine latency requirements.
-      const zx_duration_mono_t max_latency = 0;
-      ArchIdlePowerThread::EnterIdleState(max_latency);
+        if (platform_supports_suspend_cpu()) {
+          zx_status_t status = platform_suspend_cpu();
+          DEBUG_ASSERT_MSG(
+              status == ZX_OK || status == ZX_ERR_ACCESS_DENIED || status == ZX_ERR_INVALID_ARGS,
+              "%d", status);
+        } else {
+          ArchIdlePowerThread::EnterIdleState();
+        }
 
-      const zx_instant_mono_t idle_finish_time = current_mono_time();
+      } else {
+        ktrace::Scope trace =
+            KTRACE_CPU_BEGIN_SCOPE_ENABLE(kEnableRunloopTracing, "kernel:sched", "idle");
 
-      this_idle_power_thread.processor_idle_time_ns_ += idle_finish_time - idle_start_time;
+        const zx_instant_mono_t idle_start_time = current_mono_time();
+        ArchIdlePowerThread::EnterIdleState();
+        const zx_instant_mono_t idle_finish_time = current_mono_time();
+
+        this_idle_power_thread.processor_idle_time_ns_ += idle_finish_time - idle_start_time;
+      }
 
       // END WARNING: Pending preemptions is safe again.
     }

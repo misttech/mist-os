@@ -405,7 +405,7 @@ void arch_late_init_percpu(void) {
   }
 }
 
-void ArchIdlePowerThread::EnterIdleState(zx_duration_t max_latency) {
+void ArchIdlePowerThread::EnterIdleState() {
   // section K14.2.3 of the ARM ARM (DDI 0487K.a) says:
   //
   // ```

@@ -101,7 +101,7 @@ class ArchIdlePowerThread {
   // disable IRQs, but *must not* rely on interrupts being disabled for the
   // entire time to preserve any of their invariants.
   //
-  static void EnterIdleState(zx_duration_t max_latency);
+  static void EnterIdleState();
 };
 
 #endif  // !__ASSEMBLER__
