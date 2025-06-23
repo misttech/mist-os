@@ -191,7 +191,6 @@ template("run_fuchsia_bazel_sdk_tests") {
       inputs = [
         "//prebuilt/third_party/bazel/${host_os}-${host_cpu}/bazel",
         "//build/bazel_sdk/tests/MODULE.bazel",
-        "//build/bazel_sdk/tests/WORKSPACE.bzlmod",
       ]
       outputs = [
         "$target_gen_dir/$target_name.stamp",
