@@ -2,6 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+//! A Rust client library for the Fuchsia block protocol.
+//!
+//! This crate provides a low-level client for interacting with block devices over the
+//! `fuchsia.hardware.block` FIDL protocol and the FIFO interface for block I/O.
+//!
+//! See the [`BlockClient`] trait.
+
 use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_hardware_block::{BlockProxy, MAX_TRANSFER_UNBOUNDED};

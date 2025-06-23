@@ -12,11 +12,8 @@ use {
     async_trait::async_trait,
     block_protocol::WriteOptions,
     // Provides read_exact_at and write_all_at.
-    // TODO(jfsulliv): Do we need to support non-UNIX systems?
     std::{ops::Range, os::unix::fs::FileExt},
 };
-
-// TODO(csuter): Consider using an async file interface.
 
 /// FileBackedDevice is an implementation of Device backed by a std::fs::File. It is intended to be
 /// used for host tooling (to create or verify fxfs images), although it could also be used on
@@ -44,9 +41,9 @@ impl FileBackedDevice {
     /// filesystem ends up using within the file.  With a sequential allocator, this makes the file
     /// as big as it needs to be and no more.
     pub fn new_with_block_count(file: std::fs::File, block_size: u32, block_count: u64) -> Self {
-        // TODO(jfsulliv): If file is S_ISBLK, we should use its block size. Rust does not appear to
-        // expose this information in a portable way, so we may need to dip into non-portable code
-        // to do so.
+        // NOTE: If file is S_ISBLK, we could (and probably should) use its block size. Rust does
+        // not appear to expose this information in a portable way, so we may need to dip into
+        // non-portable code to do so.
         let allocator =
             BufferAllocator::new(block_size as usize, BufferSource::new(TRANSFER_HEAP_SIZE));
         Self { allocator, file, block_count, block_size }
