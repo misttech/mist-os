@@ -148,7 +148,11 @@ async fn mount_main_starnix_volume(
             // Ensures that Starnix can remount its storage after an unclean container shutdown.
             if let Some(_) = multi_vol_fs.volume(&starnix_volume_name) {
                 log::warn!("Unmounting the Starnix volume.");
-                multi_vol_fs.shutdown_volume(&starnix_volume_name).await?;
+                if let Err(error) = multi_vol_fs.shutdown_volume(&starnix_volume_name).await {
+                    // TODO(https://fxbug.dev/422152987): Until we've fixed this properly, just log
+                    // a failure but continue to try and mount the volume.
+                    log::warn!(error:?; "Failed to unmount volume, continuing to try and mount.");
+                }
             }
             multi_vol_fs
                 .open_volume(
@@ -184,7 +188,11 @@ async fn create_starnix_volume_impl(
         if multi_vol_fs.has_volume(starnix_volume_name).await? {
             if let Some(_) = multi_vol_fs.volume(starnix_volume_name) {
                 log::warn!("Unmounting the Starnix volume.");
-                multi_vol_fs.shutdown_volume(starnix_volume_name).await?;
+                if let Err(error) = multi_vol_fs.shutdown_volume(&starnix_volume_name).await {
+                    // TODO(https://fxbug.dev/422152987): Until we've fixed this properly, just log
+                    // a failure but continue to try and mount the volume.
+                    log::warn!(error:?; "Failed to unmount volume, continuing to try and create.");
+                }
             }
             multi_vol_fs.remove_volume(starnix_volume_name).await?;
         }
