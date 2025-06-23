@@ -5,7 +5,7 @@
 use crate::device::kobject::{KObject, KObjectHandle};
 use crate::fs::tmpfs::TmpfsDirectory;
 use crate::task::CurrentTask;
-use crate::vfs::pseudo::simple_file::BytesFile;
+use crate::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
 use crate::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use crate::vfs::{
@@ -121,7 +121,7 @@ impl FsNodeOps for CpuClassDirectory {
                 builder.set_mode(mode!(IFDIR, 0o755));
                 builder.subdir("policy0", 0o755, |dir| {
                     dir.subdir("stats", 0o755, |dir| {
-                        dir.entry("reset", BytesFile::new_node(b"".to_vec()), mode!(IFREG, 0o200));
+                        dir.entry("reset", CpuFreqStatsResetFile::new_node(), mode!(IFREG, 0o200));
                     });
                 });
 
@@ -135,5 +135,24 @@ impl FsNodeOps for CpuClassDirectory {
             )),
             _ => error!(ENOENT),
         }
+    }
+}
+
+struct CpuFreqStatsResetFile {}
+
+impl CpuFreqStatsResetFile {
+    pub fn new_node() -> impl FsNodeOps {
+        BytesFile::new_node(Self {})
+    }
+}
+
+impl BytesFileOps for CpuFreqStatsResetFile {
+    // Currently a no-op.
+    //
+    // Note that according to
+    // https://github.com/torvalds/linux/blob/86731a2a651e58953fc949573895f2fa6d456841/drivers/cpufreq/cpufreq_stats.c#L103
+    // the value written to this node does not matter.
+    fn write(&self, _current_task: &CurrentTask, _data: Vec<u8>) -> Result<(), Errno> {
+        Ok(())
     }
 }
