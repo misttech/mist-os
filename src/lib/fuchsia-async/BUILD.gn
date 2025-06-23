@@ -172,7 +172,6 @@ rustc_library("fuchsia-async") {
   deps += [
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:pin-project-lite",
-    "//third_party/rust_crates:thiserror",
   ]
   if (is_fuchsia) {
     deps += [

@@ -2,20 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::Task;
-
-use futures::channel::mpsc;
 use futures::Future;
 
 use super::Scope;
-
-/// Errors that can be returned by this crate.
-#[derive(Debug, thiserror::Error)]
-enum Error {
-    /// Return when a task cannot be added to a [`TaskGroup`] or [`TaskSink`].
-    #[error("Failed to add Task: {0}")]
-    GroupDropped(#[from] mpsc::TrySendError<Task<()>>),
-}
 
 /// Allows the user to spawn multiple Tasks and await them as a unit.
 ///
@@ -78,7 +67,8 @@ impl TaskGroup {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::SendExecutor;
+    use crate::{SendExecutor, Task};
+    use futures::channel::mpsc;
     use futures::StreamExt;
     use std::sync::atomic::{AtomicU64, Ordering};
     use std::sync::Arc;

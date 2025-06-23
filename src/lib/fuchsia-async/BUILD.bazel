@@ -68,7 +68,6 @@ rustc_library(
     deps = [
         "//third_party/rust_crates/vendor:futures",
         "//third_party/rust_crates/vendor:pin-project-lite",
-        "//third_party/rust_crates/vendor:thiserror",
     ] + select({
         "@platforms//os:fuchsia": [
             "//sdk/lib/fdio",
