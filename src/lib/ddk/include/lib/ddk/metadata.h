@@ -63,9 +63,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // type: FIDL fuchsia.hardware.tee/TeeMetadata
 #define DEVICE_METADATA_TEE_THREAD_CONFIG 0x43454554  // TEEC
 
-// Type: FIDL fuchsia.hardware.trippoint/TripDeviceMetadata
-#define DEVICE_METADATA_TRIP 0x50495254  // TRIP
-
 // Metadata types that have least significant byte set to lowercase 'd'
 // signify private driver data.
 // This allows creating metadata types to be defined local to a particular

@@ -8,10 +8,7 @@
 #include <fidl/fuchsia.hardware.clock/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <fidl/fuchsia.hardware.trippoint/cpp/common_types.h>
-#include <fidl/fuchsia.hardware.trippoint/cpp/markers.h>
-#include <fidl/fuchsia.hardware.trippoint/cpp/wire_messaging.h>
-#include <fidl/fuchsia.hardware.trippoint/cpp/wire_types.h>
+#include <fidl/fuchsia.hardware.trippoint/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/driver_export.h>
@@ -40,16 +37,6 @@ namespace temperature {
 zx::result<> AmlTrip::Start() {
   fidl::Arena arena;
   std::optional<TemperatureCelsius> critical_temperature = std::nullopt;
-  zx::result decoded = compat::GetMetadata<fuchsia_hardware_trippoint::wire::TripDeviceMetadata>(
-      incoming(), arena, DEVICE_METADATA_TRIP);
-  if (decoded.is_error()) {
-    if (decoded.status_value() != ZX_ERR_NOT_FOUND) {
-      FDF_LOG(ERROR, "Failed to get trip sensor metadata: %s", decoded.status_string());
-      return zx::error(decoded.status_value());
-    }
-  } else {
-    critical_temperature = decoded->critical_temp_celsius;
-  }
 
   zx::result pdev_client = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
   if (pdev_client.is_error() || !pdev_client->is_valid()) {
@@ -57,6 +44,16 @@ zx::result<> AmlTrip::Start() {
     return pdev_client.take_error();
   }
   fdf::PDev pdev{std::move(pdev_client.value())};
+
+  zx::result metadata = pdev.GetFidlMetadata<fuchsia_hardware_trippoint::TripDeviceMetadata>();
+  if (metadata.is_error()) {
+    if (metadata.status_value() != ZX_ERR_NOT_FOUND) {
+      FDF_LOG(ERROR, "Failed to get trip sensor metadata: %s", metadata.status_string());
+      return zx::error(metadata.status_value());
+    }
+  } else {
+    critical_temperature = metadata->critical_temp_celsius();
+  }
 
   // Stash a name for this device to be returned by `GetSensorName`
   zx::result device_info_result = pdev.GetDeviceInfo();
