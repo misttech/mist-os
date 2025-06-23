@@ -1243,6 +1243,9 @@ TEST_F(MoonflowerPartitionerTests, SupportsPartition) {
   EXPECT_TRUE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kZirconB)));
   EXPECT_TRUE(
       partitioner->SupportsPartition(PartitionSpec(paver::Partition::kFuchsiaVolumeManager)));
+  EXPECT_TRUE(partitioner->SupportsPartition(
+      PartitionSpec(paver::Partition::kFuchsiaVolumeManager, paver::kOpaqueVolumeContentType)));
+
   // Unsupported partition type.
   EXPECT_FALSE(partitioner->SupportsPartition(PartitionSpec(paver::Partition::kUnknown)));
 

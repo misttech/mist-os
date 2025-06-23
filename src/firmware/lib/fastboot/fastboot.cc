@@ -343,14 +343,22 @@ zx::result<> Fastboot::WriteAsset(fuchsia_paver::wire::Configuration config,
 }
 
 zx::result<> Fastboot::Flash(const std::string& command, Transport* transport) {
-  if (IsAndroidSparseImage(download_vmo_mapper_.start(), download_vmo_mapper_.size())) {
-    return SendResponse(ResponseType::kFail, "Android sparse image is not supported.", transport);
-  }
-
   std::vector<std::string_view> args =
       fxl::SplitString(command, ":", fxl::kTrimWhitespace, fxl::kSplitWantNonEmpty);
   if (args.size() < 2) {
     return SendResponse(ResponseType::kFail, "Not enough arguments", transport);
+  }
+  FlashPartitionInfo info = GetPartitionInfo(args[1]);
+  const bool is_sparse =
+      IsAndroidSparseImage(download_vmo_mapper_.start(), download_vmo_mapper_.size());
+
+  if (info.partition == "super") {
+    if (!is_sparse) {
+      return SendResponse(ResponseType::kFail, "super must be in Android sparse format.",
+                          transport);
+    }
+  } else if (is_sparse) {
+    return SendResponse(ResponseType::kFail, "Android sparse image is not supported.", transport);
   }
 
   auto paver_client_res = ConnectToPaver();
@@ -370,7 +378,6 @@ zx::result<> Fastboot::Flash(const std::string& command, Transport* transport) {
   (void)paver_client_res.value()->FindDataSink(std::move(data_sink_remote));
   fidl::WireSyncClient data_sink{std::move(data_sink_local)};
 
-  FlashPartitionInfo info = GetPartitionInfo(args[1]);
   if (info.partition == "bootloader") {
     // If abr suffix is not given, assume that firmware ABR is not supported and just provide a
     // A slot configuration. It will be ignored by the paver.
@@ -456,6 +463,22 @@ zx::result<> Fastboot::Flash(const std::string& command, Transport* transport) {
       return SendResponse(ResponseType::kFail, "Invalid gpt-meta contents", transport,
                           zx::error(ZX_ERR_INVALID_ARGS));
     }
+  } else if (info.partition == "super") {
+    // TODO(https://fxbug.dev/397515768): We don't yet handle the presence or absence of the -w
+    // flag which is used to indicate if we should wipe userdata or not. For now, this will always
+    // overwrite userdata regardless of this flag.
+    auto ret = data_sink->WriteSparseVolume(GetWireBufferFromDownload());
+    if (ret.status() != ZX_OK) {
+      return SendResponse(ResponseType::kFail,
+                          "Failed to invoke fuchsia.paver/DataSink.WriteSparseVolume", transport,
+                          zx::error(ret.status()));
+    }
+    if (ret.value().is_error()) {
+      return SendResponse(ResponseType::kFail, "Failed to flash super", transport,
+                          zx::error(ret.value().error_value()));
+    }
+    return SendResponse(ResponseType::kOkay, "", transport);
+
   } else {
     return SendResponse(ResponseType::kFail, "Unsupported partition", transport);
   }
