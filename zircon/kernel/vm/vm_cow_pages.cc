@@ -7771,14 +7771,14 @@ zx::result<uint64_t> VmCowPages::ReclaimDiscardable(vm_page_t* page, uint64_t of
     first = (p->Page() == page) && off == offset;
     return ZX_ERR_STOP;
   });
-  if (!first) {
+  zx::result<uint64_t> result =
+      first ? DiscardPagesLocked(deferred) : zx::error(ZX_ERR_INVALID_ARGS);
+  if (result.is_error()) {
     // Mark the page accessed so that it's no longer a reclamation candidate. The other error path
     // above already does this inside the CanReclaimPageLocked() helper.
     pmm_page_queues()->MarkAccessed(page);
-    return zx::error(ZX_ERR_INVALID_ARGS);
   }
-
-  return DiscardPagesLocked(deferred);
+  return result;
 }
 
 void VmCowPages::CopyPageContentsForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) {
