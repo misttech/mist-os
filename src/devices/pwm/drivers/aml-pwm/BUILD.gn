@@ -19,16 +19,12 @@ driver_bind_rules("aml-pwm-bind") {
 }
 
 fuchsia_cc_driver("aml-pwm-driver") {
-  legacy = true
   output_name = "aml-pwm"
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
   ]
-  deps = [
-    ":common",
-    "//src/devices/lib/driver",
-  ]
+  deps = [ ":common" ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
@@ -37,7 +33,10 @@ fuchsia_cc_driver("aml-pwm-driver") {
 fuchsia_driver_component("aml-pwm") {
   info = "meta/aml-pwm-info.json"
   component_name = "aml-pwm"
-  deps = [ ":aml-pwm-driver" ]
+  deps = [
+    ":aml-pwm-bind",
+    ":aml-pwm-driver",
+  ]
   manifest = "meta/aml-pwm.cml"
 }
 
@@ -52,10 +51,12 @@ test("aml-pwm-test-bin") {
   sources = [ "aml-pwm-test.cc" ]
   deps = [
     ":common",
-    "//src/devices/testing/mock-mmio-reg:mock-mmio-reg-zxtest",
-    "//src/devices/testing/no_ddk",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
+    "//sdk/lib/driver/fake-platform-device/cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/devices/testing/mock-mmio-reg",
+    "//src/lib/ddk:ddk_metadata",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
@@ -64,18 +65,21 @@ test("aml-pwm-test-bin") {
 
 source_set("common") {
   sources = [
+    "aml-pwm-regs.h",
     "aml-pwm.cc",
     "aml-pwm.h",
   ]
-  deps = [ "//sdk/lib/driver/platform-device/cpp" ]
+  deps = [
+    "//sdk/lib/driver/platform-device/cpp",
+    "//src/lib/ddk:ddk_metadata",
+  ]
   public_deps = [
-    ":aml-pwm-bind",
     "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/component/cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/zircon-internal",
@@ -86,6 +90,9 @@ fuchsia_unittest_package("aml-pwm-test") {
   deps = [ ":aml-pwm-test-bin" ]
   test_specs = {
     environments = basic_envs
+    log_settings = {
+      max_severity = "ERROR"
+    }
   }
 }
 
