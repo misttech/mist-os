@@ -12,6 +12,7 @@
 #include <gtest/gtest.h>
 #include <linux/fs.h>
 
+#include "src/lib/files/file.h"
 #include "src/lib/fxl/strings/string_number_conversions.h"
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/starnix/tests/selinux/userspace/util.h"
@@ -116,6 +117,42 @@ TEST(SeLinuxFsNull, HasPolicyDevnullContext) {
   EXPECT_EQ(GetLabel(kSeLinuxFsNull), fit::ok("system_u:object_r:devnull_t:s0"));
 }
 
+TEST(SeLinuxFsContext, OneRequestPerInstance) {
+  fbl::unique_fd api_fd(open("/sys/fs/selinux/context", O_RDWR));
+  ASSERT_TRUE(api_fd.is_valid()) << strerror(errno);
+
+  constexpr char kMinimumValidContext[] = "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0";
+  ASSERT_EQ(write(api_fd.get(), kMinimumValidContext, sizeof(kMinimumValidContext)),
+            (ssize_t)sizeof(kMinimumValidContext));
+
+  EXPECT_EQ(write(api_fd.get(), kMinimumValidContext, sizeof(kMinimumValidContext)), -1);
+  EXPECT_EQ(errno, EBUSY);
+}
+
+TEST(SeLinuxFsContext, ReadUpdatesSeekPosition) {
+  fbl::unique_fd api_fd(open("/sys/fs/selinux/context", O_RDWR));
+  ASSERT_TRUE(api_fd.is_valid()) << strerror(errno);
+
+  constexpr char kMinimumValidContext[] = "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0";
+  ASSERT_EQ(write(api_fd.get(), kMinimumValidContext, sizeof(kMinimumValidContext)),
+            (ssize_t)sizeof(kMinimumValidContext));
+
+  // Read the result back one byte at a time.
+  std::string result;
+  for (;;) {
+    char buf;
+    auto read_result = read(api_fd.get(), &buf, sizeof(buf));
+    if (read_result == 0) {
+      break;
+    } else if (read_result < 0) {
+      ADD_FAILURE() << "read() failed: " << strerror(errno);
+    }
+    result.push_back(buf);
+  }
+
+  EXPECT_EQ(RemoveTrailingNul(result), kMinimumValidContext);
+}
+
 TEST(SeLinuxFsContext, ValidatesRequiredFieldsPresent) {
   // Contexts that have too few colons to provide user, role, type & sensitivity are rejected.
   EXPECT_EQ(ValidateContext("test_selinuxfs_u"), fit::failed());
@@ -211,6 +248,49 @@ TEST(SeLinuxFsCreate, DefaultComputeCreateForProcess) {
 
   EXPECT_EQ(ComputeCreateContext(kSourceContext, kTargetContext, "process"),
             fit::ok("test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0"));
+}
+
+TEST(SeLinuxFsCreate, OneRequestPerInstance) {
+  fbl::unique_fd api_fd(open("/sys/fs/selinux/create", O_RDWR));
+  ASSERT_TRUE(api_fd.is_valid()) << strerror(errno);
+
+  const uint32_t kTargetClassId = GetClassId("test_selinuxfs_target_class");
+  const auto kValidRequest = fxl::StringPrintf(
+      "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 %u",
+      kTargetClassId);
+  ASSERT_EQ(write(api_fd.get(), kValidRequest.data(), kValidRequest.size()),
+            (ssize_t)kValidRequest.size());
+
+  EXPECT_EQ(write(api_fd.get(), kValidRequest.data(), kValidRequest.size()), -1);
+  EXPECT_EQ(errno, EBUSY);
+}
+
+TEST(SeLinuxFsCreate, ReadUpdatesSeekPosition) {
+  fbl::unique_fd api_fd(open("/sys/fs/selinux/create", O_RDWR));
+  ASSERT_TRUE(api_fd.is_valid()) << strerror(errno);
+
+  const uint32_t kTargetClassId = GetClassId("process");
+  const auto kValidRequest = fxl::StringPrintf(
+      "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 %u",
+      kTargetClassId);
+  ASSERT_EQ(write(api_fd.get(), kValidRequest.data(), kValidRequest.size()),
+            (ssize_t)kValidRequest.size());
+
+  // Read the result back one byte at a time.
+  std::string result;
+  for (;;) {
+    char buf;
+    auto read_result = read(api_fd.get(), &buf, sizeof(buf));
+    if (read_result == 0) {
+      break;
+    } else if (read_result < 0) {
+      ADD_FAILURE() << "read() failed: " << strerror(errno);
+    }
+    result.push_back(buf);
+  }
+
+  constexpr char kExpected[] = "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0";
+  EXPECT_EQ(RemoveTrailingNul(result), kExpected);
 }
 
 // Validate that Security Contexts for new socket-like class instances behave the same as "process".
@@ -344,6 +424,49 @@ TEST(SeLinuxFsCreate, InvalidComputeCreateClassId) {
           "create",
           "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 test_selinuxfs_create_target_u:test_selinuxfs_create_target_r:test_selinuxfs_create_target_t:s0 65535"),
       fit::ok("test_selinuxfs_u:object_r:test_selinuxfs_create_target_t:s0"));
+}
+
+TEST(SeLinuxFsAccess, OneRequestPerInstance) {
+  fbl::unique_fd api_fd(open("/sys/fs/selinux/access", O_RDWR));
+  ASSERT_TRUE(api_fd.is_valid()) << strerror(errno);
+
+  const uint32_t kTargetClassId = GetClassId("test_selinuxfs_target_class");
+  const auto kValidRequest = fxl::StringPrintf(
+      "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 test_selinuxfs_u:object_r:test_selinuxfs_access_myperm1234_target_t:s0 %u",
+      kTargetClassId);
+  ASSERT_EQ(write(api_fd.get(), kValidRequest.data(), kValidRequest.size()),
+            (ssize_t)kValidRequest.size());
+
+  EXPECT_EQ(write(api_fd.get(), kValidRequest.data(), kValidRequest.size()), -1);
+  EXPECT_EQ(errno, EBUSY);
+}
+
+TEST(SeLinuxFsAccess, ReadUpdatesSeekPosition) {
+  fbl::unique_fd api_fd(open("/sys/fs/selinux/access", O_RDWR));
+  ASSERT_TRUE(api_fd.is_valid()) << strerror(errno);
+
+  const uint32_t kTargetClassId = GetClassId("test_selinuxfs_target_class");
+  const auto kValidRequest = fxl::StringPrintf(
+      "test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 test_selinuxfs_u:test_selinuxfs_r:test_selinuxfs_t:s0 %u",
+      kTargetClassId);
+  ASSERT_EQ(write(api_fd.get(), kValidRequest.data(), kValidRequest.size()),
+            (ssize_t)kValidRequest.size());
+
+  // Read the result back one byte at a time.
+  std::string result;
+  for (;;) {
+    char buf;
+    auto read_result = read(api_fd.get(), &buf, sizeof(buf));
+    if (read_result == 0) {
+      break;
+    } else if (read_result < 0) {
+      ADD_FAILURE() << "read() failed: " << strerror(errno);
+    }
+    result.push_back(buf);
+  }
+
+  const std::string_view kExpected = "0 ffffffff 0 ffffffff 1 0";
+  EXPECT_EQ(RemoveTrailingNul(result), kExpected);
 }
 
 // Validate handling of whitespace between request elements.
