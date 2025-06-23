@@ -326,10 +326,10 @@ pub struct GlobalPlatformTee {
 /// protocols.
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]
 pub struct ProprietaryTee {
-    /// Absolute component URL of the product-provided component that consumes TEE driver
+    /// Absolute URL of the product-provided realm of components that consume TEE driver
     /// capabilities and provides TEE-related capabilities, including key management capabilities
     /// that are routed to the storage stack and other capabilities that are routed to the session.
-    pub tee_manager_url: String,
+    pub tee_realm_url: String,
 }
 
 /// A configuration for a component which depends on TEE-based protocols.
@@ -738,14 +738,20 @@ mod tests {
         );
         assert_eq!(serialized, expected);
 
-        let product_config = ProductConfig { tee: Tee::Proprietary(ProprietaryTee { tee_manager_url: String::from("fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm") }),
-            ..Default::default() };
+        let product_config = ProductConfig {
+            tee: Tee::Proprietary(ProprietaryTee {
+                tee_realm_url: String::from(
+                    "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_realm.cm",
+                ),
+            }),
+            ..Default::default()
+        };
         let serialized = serde_json::to_value(product_config).unwrap();
         let expected = serde_json::json!(
             {
                 "tee": {
                     "proprietary": {
-                        "tee_manager_url": "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm"
+                        "tee_realm_url": "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_realm.cm"
                     }
                 },
                 "release_info": ProductReleaseInfo::new_for_testing(),
@@ -804,7 +810,7 @@ mod tests {
         let json5 = r#"{
             tee: {
                 proprietary: {
-                    tee_manager_url: "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm",
+                    tee_realm_url: "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_realm.cm",
                 },
             },
             release_info: {
@@ -816,7 +822,14 @@ mod tests {
                 pibs: []
             }
         }"#;
-        let expected = ProductConfig { tee: Tee::Proprietary(ProprietaryTee { tee_manager_url: String::from("fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_manager.cm") }), ..Default::default() };
+        let expected = ProductConfig {
+            tee: Tee::Proprietary(ProprietaryTee {
+                tee_realm_url: String::from(
+                    "fuchsia-pkg://test.fuchsia.com/proprietary_tee#meta/proprietary_tee_realm.cm",
+                ),
+            }),
+            ..Default::default()
+        };
         let mut cursor = std::io::Cursor::new(json5);
         let product_config: ProductConfig = util::from_reader(&mut cursor).unwrap();
         assert_eq!(product_config, expected);
