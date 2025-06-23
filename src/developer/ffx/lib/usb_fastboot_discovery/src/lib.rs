@@ -2,238 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, bail, Context, Result};
-use fastboot::command::{ClientVariable, Command};
-use fastboot::reply::Reply;
-use fastboot::{send, FastbootContext};
+use anyhow::{anyhow, Result};
 use fuchsia_async::{Task, Timer};
 use std::collections::BTreeSet;
 use std::time::Duration;
-use thiserror::Error;
-use usb_bulk::{AsyncInterface as Interface, InterfaceInfo, Open};
+pub use usb_rs::bulk_interface::BulkInterface as Interface;
+use usb_rs::enumerate_devices;
 
 // USB fastboot interface IDs
-const FASTBOOT_AND_CDC_ETH_USB_DEV_PRODUCT: u16 = 0xa027;
 const FASTBOOT_USB_INTERFACE_CLASS: u8 = 0xff;
 const FASTBOOT_USB_INTERFACE_SUBCLASS: u8 = 0x42;
 const FASTBOOT_USB_INTERFACE_PROTOCOL: u8 = 0x03;
 
-// Valid USB Product Identifiers
-const USB_DEV_PRODUCTS: [u16; 3] = [0x4ee0, 0x0d02, FASTBOOT_AND_CDC_ETH_USB_DEV_PRODUCT];
-
 // Vendor ID
 const USB_DEV_VENDOR: u16 = 0x18d1;
-
-//TODO(https://fxbug.dev/42130068) - serial info will probably get rolled into the target struct
-
-#[derive(Error, Debug, Clone)]
-enum InterfaceCheckError {
-    #[error("Invalid IFC Class. Found {:?}, want {:?}", found_class, FASTBOOT_USB_INTERFACE_CLASS)]
-    InvalidIfcClass { found_class: u8 },
-    #[error(
-        "Invalid IFC Subclass. Found {:?}, want {:?}",
-        found_subclass,
-        FASTBOOT_USB_INTERFACE_SUBCLASS
-    )]
-    InvalidIfcSubclass { found_subclass: u8 },
-    #[error(
-        "Invalid IFC Protocol. Found {:?}, want {:?}",
-        found_protocol,
-        FASTBOOT_USB_INTERFACE_PROTOCOL
-    )]
-    InvalidIfcProtocol { found_protocol: u8 },
-    #[error("Invalid Device Vendor. Found {:?}, want {:?}", found_vendor, USB_DEV_VENDOR)]
-    InvalidDevVendor { found_vendor: u16 },
-    #[error("Invalid Device Product. Found {:?}, want {:?}", found_product, valid_products)]
-    InvalidDevProduct { found_product: u16, valid_products: Vec<u16> },
-}
-
-fn valid_ifc_class(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
-    if info.ifc_class == FASTBOOT_USB_INTERFACE_CLASS {
-        Ok(())
-    } else {
-        Err(InterfaceCheckError::InvalidIfcClass { found_class: info.ifc_class })
-    }
-}
-
-fn valid_ifc_subclass(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
-    if info.ifc_subclass == FASTBOOT_USB_INTERFACE_SUBCLASS {
-        Ok(())
-    } else {
-        Err(InterfaceCheckError::InvalidIfcSubclass { found_subclass: info.ifc_subclass })
-    }
-}
-
-fn valid_ifc_protocol(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
-    if info.ifc_protocol == FASTBOOT_USB_INTERFACE_PROTOCOL {
-        Ok(())
-    } else {
-        Err(InterfaceCheckError::InvalidIfcProtocol { found_protocol: info.ifc_protocol })
-    }
-}
-
-fn valid_dev_vendor(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
-    if info.dev_vendor == USB_DEV_VENDOR {
-        Ok(())
-    } else {
-        Err(InterfaceCheckError::InvalidDevVendor { found_vendor: info.dev_vendor })
-    }
-}
-
-fn valid_dev_product(info: &InterfaceInfo) -> Result<(), InterfaceCheckError> {
-    if USB_DEV_PRODUCTS.contains(&info.dev_product) {
-        Ok(())
-    } else {
-        Err(InterfaceCheckError::InvalidDevProduct {
-            found_product: info.dev_product,
-            valid_products: USB_DEV_PRODUCTS.to_vec(),
-        })
-    }
-}
-
-#[allow(clippy::vec_init_then_push, reason = "mass allow for https://fxbug.dev/381896734")]
-fn is_fastboot_match(info: &InterfaceInfo) -> bool {
-    let mut results = vec![];
-
-    results.push(valid_dev_vendor(info));
-    results.push(valid_ifc_class(info));
-    results.push(valid_ifc_subclass(info));
-    results.push(valid_ifc_protocol(info));
-
-    let errs: Vec<_> = results.into_iter().filter_map(|r| r.err()).collect();
-
-    let serial = extract_debug_serial_number(info);
-    if !errs.is_empty() {
-        log::debug!(
-            "Interface with serial {} is not valid fastboot match. Encountered errors: \n\t{}",
-            serial,
-            errs.into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n\t")
-        );
-        false
-    } else {
-        if let Err(e) = valid_dev_product(info) {
-            log::debug!(
-                "Interface {serial} is a valid Fastboot match, but may not be a Fuchsia Product: {}",
-                e
-            );
-        } else {
-            log::debug!("Found valid device: {serial}");
-        }
-        true
-    }
-}
-
-fn enumerate_interfaces<F>(mut cb: F)
-where
-    F: FnMut(&InterfaceInfo),
-{
-    log::debug!("Enumerating USB fastboot interfaces");
-    let mut cb = |info: &InterfaceInfo| -> bool {
-        if is_fastboot_match(info) {
-            cb(info)
-        }
-        // Do not open anything.
-        false
-    };
-    // Do not open anything. Check does not drain the input queue
-    let _result = Interface::check(&mut cb);
-}
-
-pub fn find_serial_numbers() -> Vec<String> {
-    let mut serials = Vec::new();
-    let cb = |info: &InterfaceInfo| {
-        if let Ok(Some(s)) = extract_serial_number(info) {
-            serials.push(s);
-        }
-    };
-    enumerate_interfaces(cb);
-    serials
-}
-
-fn open_interface<F>(mut cb: F) -> Result<Interface>
-where
-    F: FnMut(&InterfaceInfo) -> bool,
-{
-    log::debug!("Selecting USB fastboot interface to open");
-
-    let mut open_cb = |info: &InterfaceInfo| -> bool {
-        if is_fastboot_match(info) {
-            cb(info)
-        } else {
-            // Do not open.
-            false
-        }
-    };
-    Interface::open(&mut open_cb).map_err(Into::into)
-}
-
-fn extract_serial_number(info: &InterfaceInfo) -> Result<Option<String>> {
-    let null_pos = match info.serial_number.iter().position(|&c| c == 0) {
-        Some(p) => p,
-        None => {
-            bail!("Invalid serial number");
-        }
-    };
-    let serial = (*String::from_utf8_lossy(&info.serial_number[..null_pos])).to_string();
-    if serial.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(serial))
-    }
-}
-
-fn extract_debug_serial_number(info: &InterfaceInfo) -> String {
-    let null_pos = match info.serial_number.iter().position(|&c| c == 0) {
-        Some(p) => p,
-        None => {
-            return "<invalid>".to_string();
-        }
-    };
-    let serial = (*String::from_utf8_lossy(&info.serial_number[..null_pos])).to_string();
-    if serial.is_empty() {
-        "<empty>".to_string()
-    } else {
-        serial
-    }
-}
-
-fn info_matches_serial(info: &InterfaceInfo, serial: &str) -> bool {
-    if let Ok(Some(s)) = extract_serial_number(info) {
-        s == serial
-    } else {
-        false
-    }
-}
-
-pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
-    log::debug!("Opening USB fastboot interface with serial number: {}", serial);
-    let mut interface =
-        open_interface(|info: &InterfaceInfo| -> bool { info_matches_serial(info, serial) })
-            .with_context(|| format!("opening interface with serial number: {}", serial))?;
-    match send(FastbootContext::new(), Command::GetVar(ClientVariable::Version), &mut interface)
-        .await
-    {
-        Ok(Reply::Okay(version)) => {
-            log::debug!("USB serial {serial}: fastboot version: {version}");
-            Ok(interface)
-        }
-        Ok(Reply::Fail(message)) => {
-            log::warn!("Failed to get variable \"version\" with message: \"{message}\". but we communicated over fastboot protocol... continuing");
-            Ok(interface)
-        }
-        Err(e) => bail!(format!(
-            "USB serial {serial}: could not communicate over Fastboot protocol. Error: {e:#?}"
-        )),
-        e => {
-            bail!(format!("USB serial {serial}: got unexpected response getting variable: {e:#?}"))
-        }
-    }
-}
 
 /// Loops continually testing if the usb device with given `serial` is
 /// accepting fastboot connections, returning when it does.
 ///
-/// Sleeeps for `sleep_interval` between tests
+/// Sleeps for `sleep_interval` between tests
 pub async fn wait_for_live(
     serial: &str,
     tester: &mut impl FastbootUsbLiveTester,
@@ -280,9 +67,8 @@ pub trait FastbootUsbTester: Send + 'static {
 pub struct UnversionedFastbootUsbTester;
 
 impl FastbootUsbTester for UnversionedFastbootUsbTester {
-    async fn is_fastboot_usb(&mut self, serial: &str) -> bool {
-        let mut open_cb = |info: &InterfaceInfo| -> bool { info_matches_serial(info, serial) };
-        Interface::check(&mut open_cb)
+    async fn is_fastboot_usb(&mut self, _serial: &str) -> bool {
+        true
     }
 }
 
@@ -314,16 +100,15 @@ where
     }
 }
 
+#[allow(async_fn_in_trait)]
 pub trait SerialNumberFinder: Send + 'static {
-    fn find_serial_numbers(&mut self) -> Vec<String>;
+    async fn find_serial_numbers(&mut self) -> Vec<String>;
 }
 
-impl<F> SerialNumberFinder for F
-where
-    F: FnMut() -> Vec<String> + Send + 'static,
-{
-    fn find_serial_numbers(&mut self) -> Vec<String> {
-        self()
+pub struct DefaultSerialFinder {}
+impl SerialNumberFinder for DefaultSerialFinder {
+    async fn find_serial_numbers(&mut self) -> Vec<String> {
+        find_serial_numbers().await
     }
 }
 
@@ -333,7 +118,7 @@ where
 {
     FastbootUsbWatcher::new(
         event_handler,
-        find_serial_numbers,
+        DefaultSerialFinder {},
         UnversionedFastbootUsbTester {},
         Duration::from_secs(1),
     )
@@ -370,7 +155,7 @@ where
     let mut serials = BTreeSet::<String>::new();
     loop {
         // Enumerate interfaces
-        let new_serials = finder.find_serial_numbers();
+        let new_serials = finder.find_serial_numbers().await;
         let new_serials = BTreeSet::from_iter(new_serials);
         log::debug!("found serials: {:#?}", new_serials);
         // Update Cache
@@ -417,6 +202,87 @@ where
     }
 }
 
+fn device_is_fastboot(
+    device: &usb_rs::DeviceHandle,
+    usb_device: &usb_rs::DeviceDescriptor,
+    interface: &usb_rs::InterfaceDescriptor,
+) -> bool {
+    let subclass_match = u16::from(usb_device.vendor) == USB_DEV_VENDOR
+        && u8::from(interface.class) == FASTBOOT_USB_INTERFACE_CLASS
+        && u8::from(interface.subclass) == FASTBOOT_USB_INTERFACE_SUBCLASS;
+    let protocol_match = u8::from(interface.protocol) == FASTBOOT_USB_INTERFACE_PROTOCOL;
+    log::debug!(
+        "Device: {:?} subclass_match: {}, protocol_match: {}",
+        device,
+        subclass_match,
+        protocol_match
+    );
+    subclass_match && protocol_match
+}
+
+/// How many URBs to allocate for each device we communicate with.
+const URB_POOL_SIZE: usize = 32;
+
+async fn find_serial_numbers() -> Vec<String> {
+    log::debug!("finding serial numbers");
+    let mut serials = Vec::new();
+
+    let Ok(devices) = enumerate_devices() else {
+        return serials;
+    };
+    for device in devices {
+        if let Some(serial) = device.serial() {
+            let valid = match device.scan_interfaces(URB_POOL_SIZE, |usb_device, interface| {
+                device_is_fastboot(&device, usb_device, interface)
+            }) {
+                Ok(_) => true,
+                Err(usb_rs::Error::InterfaceNotFound) => {
+                    log::warn!(device = device.debug_name().as_str(); "Interface not found");
+                    false
+                }
+                Err(e) => {
+                    log::warn!(device = device.debug_name().as_str(), error:? = e;
+                                   "Error scanning USB device");
+                    false
+                }
+            };
+            log::info!("Serial: {:?} valid: {}", device.serial(), valid);
+            if valid {
+                serials.push(serial);
+            }
+        }
+    }
+    log::info!("About to return serials: {:?}", serials);
+    return serials;
+}
+
+pub async fn open_interface_with_serial<P>(serial: P) -> Result<Interface>
+where
+    P: AsRef<str>,
+{
+    let devices = enumerate_devices()?;
+    for device in devices {
+        if device.serial() == Some(serial.as_ref().to_string()) {
+            // Okay we match on serial number lets scan the interfaces
+            let interface = match device.scan_interfaces(URB_POOL_SIZE, |usb_device, interface| {
+                device_is_fastboot(&device, usb_device, interface)
+            }) {
+                Ok(iface) => iface,
+                Err(usb_rs::Error::InterfaceNotFound) => {
+                    return Err(anyhow!("Interface not found"));
+                }
+                Err(e) => {
+                    log::warn!(device = device.debug_name().as_str(), error:? = e;
+                                   "Error scanning USB device");
+                    return Err(e.into());
+                }
+            };
+            return Ok(Interface::new(interface));
+        }
+    }
+    Err(anyhow!("Interface not found"))
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -441,7 +307,7 @@ mod test {
     }
 
     impl SerialNumberFinder for TestSerialNumberFinder {
-        fn find_serial_numbers(&mut self) -> Vec<String> {
+        async fn find_serial_numbers(&mut self) -> Vec<String> {
             if let Some(res) = self.responses.pop() {
                 res
             } else {
