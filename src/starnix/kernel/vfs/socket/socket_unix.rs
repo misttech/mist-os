@@ -209,6 +209,10 @@ impl UnixSocket {
             open_flags,
             /* kernel_private= */ false,
         )?;
+        let left_socket = SocketFile::get_from_file(&left)?;
+        let right_socket = SocketFile::get_from_file(&right)?;
+
+        security::socket_socketpair(current_task, left_socket, right_socket)?;
         Ok((left, right))
     }
 

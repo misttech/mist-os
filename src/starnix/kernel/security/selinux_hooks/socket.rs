@@ -7,7 +7,7 @@ use super::fs_node::compute_new_fs_node_sid;
 use super::{
     check_permission, fs_node_effective_sid_and_class, task_effective_sid, todo_check_permission,
 };
-use crate::security::selinux_hooks::superblock;
+use crate::security::selinux_hooks::{superblock, FsNodeLabel};
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::socket::{
     socket_fs, NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketFile, SocketPeer,
@@ -210,6 +210,24 @@ where
         CommonFsNodePermission::Create.for_class(new_socket_class),
         current_task.into(),
     )
+}
+
+/// Sets the peer security context for each socket in the pair.
+pub(in crate::security) fn socket_socketpair(
+    left: DowncastedFile<'_, SocketFile>,
+    right: DowncastedFile<'_, SocketFile>,
+) -> Result<(), Errno> {
+    let left_label = left.file().node().security_state.lock().label.clone();
+    let FsNodeLabel::SecurityId { sid: left_sid } = left_label else {
+        panic!("SecurityId not set for socketpair")
+    };
+    let right_label = right.file().node().security_state.lock().label.clone();
+    let FsNodeLabel::SecurityId { sid: right_sid } = right_label else {
+        panic!("SecurityId not set for socketpair")
+    };
+    *left.socket().security.state.peer_sid.lock() = Some(right_sid);
+    *right.socket().security.state.peer_sid.lock() = Some(left_sid);
+    Ok(())
 }
 
 /// Computes and sets the security class for `socket`.

@@ -957,6 +957,19 @@ where
     })
 }
 
+/// Sets the peer security context for each socket in the pair.
+/// Corresponds to the `socket_socketpair()` LSM hook.
+pub fn socket_socketpair(
+    current_task: &CurrentTask,
+    left: DowncastedFile<'_, SocketFile>,
+    right: DowncastedFile<'_, SocketFile>,
+) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.socket_socketpair");
+    if_selinux_else_default_ok(current_task, |_| {
+        selinux_hooks::socket::socket_socketpair(left, right)
+    })
+}
+
 /// Computes and updates the socket security class associated with a new socket.
 /// Corresponds to the `socket_post_create()` LSM hook.
 pub fn socket_post_create(socket: &Socket) {

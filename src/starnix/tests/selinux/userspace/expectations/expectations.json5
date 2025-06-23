@@ -33,9 +33,6 @@
                 // TODO: https://fxbug.dev/361552580 - Fix SELinuxFS API validation of fields.
                 "SeLinuxFsAccess.ClassIdMayHaveTrailingNonNumericData",
                 "SeLinuxFsAccess.FourthArgumentIsNotValidated",
-
-                // TODO: https://fxbug.dev/364569703 - Implement correct SO_PEERSEC for socketpair() sockets.
-                "SocketPeerSecTest.SocketPairUnixStream",
             ],
         },
     ],

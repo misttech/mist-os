@@ -79,6 +79,10 @@ impl SocketFile {
     pub fn get_from_file(file: &FileHandle) -> Result<DowncastedFile<'_, Self>, Errno> {
         file.downcast_file::<SocketFile>().ok_or_else(|| errno!(ENOTSOCK))
     }
+
+    pub fn socket(&self) -> &SocketHandle {
+        &self.socket
+    }
 }
 
 impl FileOps for SocketFile {
