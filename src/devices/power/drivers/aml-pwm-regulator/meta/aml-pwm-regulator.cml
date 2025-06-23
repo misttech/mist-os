@@ -19,7 +19,12 @@
         { service: "fuchsia.hardware.vreg.Service" },
     ],
     use: [
-        { service: "fuchsia.hardware.pwm.Service" },
+        {
+            service: [
+                "fuchsia.hardware.platform.device.Service",
+                "fuchsia.hardware.pwm.Service",
+            ],
+        },
     ],
     expose: [
         {

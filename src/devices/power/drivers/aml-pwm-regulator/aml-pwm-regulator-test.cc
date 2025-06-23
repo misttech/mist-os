@@ -6,40 +6,14 @@
 
 #include <fidl/fuchsia.hardware.pwm/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.vreg/cpp/fidl.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/ddk/metadata.h>
-#include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/internal/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
-#include <lib/sync/cpp/completion.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
-#include <list>
+#include <gtest/gtest.h>
 
-#include <zxtest/zxtest.h>
-bool operator==(const fuchsia_hardware_pwm::wire::PwmConfig& lhs,
-                const fuchsia_hardware_pwm::wire::PwmConfig& rhs) {
-  return (lhs.polarity == rhs.polarity) && (lhs.period_ns == rhs.period_ns) &&
-         (lhs.duty_cycle == rhs.duty_cycle) &&
-         (lhs.mode_config.count() == rhs.mode_config.count()) &&
-         (reinterpret_cast<aml_pwm::mode_config*>(lhs.mode_config.data())->mode ==
-          reinterpret_cast<aml_pwm::mode_config*>(rhs.mode_config.data())->mode);
-}
+#include "src/lib/testing/predicates/status.h"
 
 namespace aml_pwm_regulator {
-
-void set_and_expect_voltage_step(fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>& vreg_client,
-                                 uint32_t value) {
-  fidl::WireResult result = vreg_client->SetVoltageStep(value);
-  EXPECT_OK(result.status());
-  EXPECT_TRUE(result->is_ok());
-
-  fidl::WireResult voltage_step = vreg_client->GetVoltageStep();
-  EXPECT_TRUE(voltage_step.ok());
-  EXPECT_TRUE(voltage_step->is_ok());
-  EXPECT_EQ(voltage_step.value()->result, value);
-}
 
 class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_pwm::Pwm> {
  public:
@@ -51,7 +25,13 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
     ASSERT_TRUE(expect_configs_.size() > 0);
     auto expect_config = expect_configs_.front();
 
-    ASSERT_EQ(request->config, expect_config);
+    const auto& actual_config = request->config;
+    ASSERT_EQ(actual_config.polarity, expect_config.polarity);
+    ASSERT_EQ(actual_config.period_ns, expect_config.period_ns);
+    ASSERT_EQ(actual_config.duty_cycle, expect_config.duty_cycle);
+    ASSERT_EQ(actual_config.mode_config.count(), expect_config.mode_config.count());
+    ASSERT_EQ(reinterpret_cast<aml_pwm::mode_config*>(actual_config.mode_config.data())->mode,
+              reinterpret_cast<aml_pwm::mode_config*>(expect_config.mode_config.data())->mode);
 
     expect_configs_.pop_front();
     mode_config_buffers_.pop_front();
@@ -110,8 +90,8 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
   }
 
   void VerifyAndClear() {
-    ASSERT_EQ(expect_configs_.size(), 0);
-    ASSERT_EQ(mode_config_buffers_.size(), 0);
+    ASSERT_EQ(expect_configs_.size(), 0u);
+    ASSERT_EQ(mode_config_buffers_.size(), 0u);
     ASSERT_FALSE(expect_enable_);
   }
 
@@ -135,108 +115,103 @@ class MockPwmServer final : public fidl::testing::WireTestBase<fuchsia_hardware_
   bool expect_enable_ = false;
 };
 
-struct IncomingNamespace {
-  fdf_testing::TestNode test_node{std::string("root")};
-  fdf_testing::internal::TestEnvironment test_env{fdf::Dispatcher::GetCurrent()->get()};
-  compat::DeviceServer compat_server;
-
-  MockPwmServer mock_pwm_server;
-};
-
-// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
-// library.
-class AmlPwmRegulatorTest : public zxtest::Test {
+class AmlPwmRegulatorTestEnvironment : public fdf_testing::Environment {
  public:
-  void SetUp() override {
-    fuchsia_driver_framework::DriverStartArgs start_args;
-    incoming_.SyncCall([&](IncomingNamespace* incoming) {
-      auto start_args_result = incoming->test_node.CreateStartArgsAndServe();
-      ASSERT_TRUE(start_args_result.is_ok());
-      start_args = std::move(start_args_result->start_args);
-      outgoing_directory_client_ = std::move(start_args_result->outgoing_directory_client);
+  void Init(std::string_view pwm_name) {
+    fuchsia_hardware_vreg::VregMetadata metadata{{
+        .name{pwm_name},
+        .min_voltage_uv = 690000,
+        .voltage_step_uv = 1000,
+        .num_steps = 11,
+    }};
+    pdev_.AddFidlMetadata(fuchsia_hardware_vreg::VregMetadata::kSerializableName, metadata);
 
-      auto init_result =
-          incoming->test_env.Initialize(std::move(start_args_result->incoming_directory_server));
-      ASSERT_TRUE(init_result.is_ok());
-
-      incoming->compat_server.Initialize("pdev");
-
-      // Setup metadata.
-      fuchsia_hardware_vreg::VregMetadata metadata_vreg = {};
-      metadata_vreg.name() = "pwm-0-regulator";
-      metadata_vreg.min_voltage_uv() = 690000;
-      metadata_vreg.voltage_step_uv() = 1000;
-      metadata_vreg.num_steps() = 11;
-      auto encoded_vreg = fidl::Persist(metadata_vreg);
-      ASSERT_TRUE(encoded_vreg.is_ok());
-      incoming->compat_server.AddMetadata(DEVICE_METADATA_VREG, encoded_vreg.value().data(),
-                                          encoded_vreg.value().size());
-
-      zx_status_t status =
-          incoming->compat_server.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                        &incoming->test_env.incoming_directory());
-      ASSERT_OK(status);
-
-      // Serve mock pwm server.
-      auto result =
-          incoming->test_env.incoming_directory().AddService<fuchsia_hardware_pwm::Service>(
-              incoming->mock_pwm_server.GetInstanceHandler(), "pwm");
-      ASSERT_TRUE(result.is_ok());
-
-      incoming->mock_pwm_server.ExpectEnable();
-    });
-
-    // Start dut_.
-    auto result = runtime_.RunToCompletion(dut_.SyncCall(
-        &fdf_testing::internal::DriverUnderTest<aml_pwm_regulator::AmlPwmRegulator>::Start,
-        std::move(start_args)));
-    ASSERT_TRUE(result.is_ok());
+    pwm_.ExpectEnable();
   }
 
-  fidl::ClientEnd<fuchsia_hardware_vreg::Vreg> GetClient(std::string_view name) {
-    auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    {
+      zx::result result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
+          pdev_.GetInstanceHandler(fdf::Dispatcher::GetCurrent()->async_dispatcher()), "pdev");
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
 
-    zx_status_t status =
-        fdio_open3_at(outgoing_directory_client_.handle()->get(), "/svc",
-                      static_cast<uint64_t>(fuchsia_io::wire::Flags::kProtocolDirectory),
-                      svc_endpoints.server.TakeChannel().release());
-    EXPECT_EQ(ZX_OK, status);
+    {
+      zx::result result =
+          to_driver_vfs.AddService<fuchsia_hardware_pwm::Service>(pwm_.GetInstanceHandler(), "pwm");
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
 
-    auto connect_result = component::ConnectAtMember<fuchsia_hardware_vreg::Service::Vreg>(
-        svc_endpoints.client, name);
-    EXPECT_TRUE(connect_result.is_ok());
-    return std::move(connect_result.value());
+    return zx::ok();
   }
+
+  MockPwmServer& pwm() { return pwm_; }
 
  private:
-  fdf_testing::DriverRuntime runtime_;
+  MockPwmServer pwm_;
+  fdf_fake::FakePDev pdev_;
+};
 
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
-  fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
-  fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory_client_;
+class FixtureConfig final {
+ public:
+  using DriverType = AmlPwmRegulatorDriver;
+  using EnvironmentType = AmlPwmRegulatorTestEnvironment;
+};
+
+class AmlPwmRegulatorTest : public ::testing::Test {
+ public:
+  void SetUp() override {
+    static constexpr std::string_view kPwmName = "pwm-0-regulator";
+
+    driver_test_.RunInEnvironmentTypeContext([](auto& env) { env.Init(kPwmName); });
+    ASSERT_OK(driver_test_.StartDriver());
+    zx::result result = driver_test_.Connect<fuchsia_hardware_vreg::Service::Vreg>(kPwmName);
+    ASSERT_OK(result);
+    client_.Bind(std::move(result.value()));
+  }
+
+  void TearDown() override { ASSERT_OK(driver_test_.StopDriver()); }
 
  protected:
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_{
-      env_dispatcher_->async_dispatcher(), std::in_place};
-  async_patterns::TestDispatcherBound<
-      fdf_testing::internal::DriverUnderTest<aml_pwm_regulator::AmlPwmRegulator>>
-      dut_{driver_dispatcher_->async_dispatcher(), std::in_place};
+  void WithPwm(fit::callback<void(MockPwmServer&)> callback) {
+    driver_test_.RunInEnvironmentTypeContext(
+        [callback = std::move(callback)](auto& env) mutable { callback(env.pwm()); });
+  }
+
+  void SetAndExpectVoltageStep(uint32_t value) {
+    fidl::WireResult result = client_->SetVoltageStep(value);
+    EXPECT_OK(result.status());
+    EXPECT_TRUE(result->is_ok());
+
+    fidl::WireResult voltage_step = client_->GetVoltageStep();
+    EXPECT_TRUE(voltage_step.ok());
+    EXPECT_TRUE(voltage_step->is_ok());
+    EXPECT_EQ(voltage_step.value()->result, value);
+  }
+
+  fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg>& client() { return client_; }
+
+ private:
+  fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
+  fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg> client_;
 };
 
 TEST_F(AmlPwmRegulatorTest, RegulatorTest) {
-  fidl::WireSyncClient<fuchsia_hardware_vreg::Vreg> vreg_client(GetClient("pwm-0-regulator"));
-
-  fidl::WireResult params = vreg_client->GetRegulatorParams();
+  fidl::WireResult params = client()->GetRegulatorParams();
   EXPECT_TRUE(params.ok());
   EXPECT_TRUE(params->is_ok());
-  EXPECT_EQ(params.value()->min_uv, 690'000);
-  EXPECT_EQ(params.value()->num_steps, 11);
-  EXPECT_EQ(params.value()->step_size_uv, 1'000);
+  EXPECT_EQ(params.value()->min_uv, 690'000u);
+  EXPECT_EQ(params.value()->num_steps, 11u);
+  EXPECT_EQ(params.value()->step_size_uv, 1'000u);
 
-  fidl::WireResult voltage_step = vreg_client->GetVoltageStep();
+  fidl::WireResult voltage_step = client()->GetVoltageStep();
   EXPECT_TRUE(voltage_step.ok());
   EXPECT_TRUE(voltage_step->is_ok());
-  EXPECT_EQ(voltage_step.value()->result, 11);
+  EXPECT_EQ(voltage_step.value()->result, 11u);
 
   aml_pwm::mode_config mode = {
       .mode = aml_pwm::Mode::kOn,
@@ -247,33 +222,28 @@ TEST_F(AmlPwmRegulatorTest, RegulatorTest) {
       .period_ns = 1250,
   };
 
-  incoming_.SyncCall(
-      [&](IncomingNamespace* incoming) { incoming->mock_pwm_server.ExpectGetConfig(cfg); });
+  WithPwm([&](auto& pwm) { pwm.ExpectGetConfig(cfg); });
 
   cfg.duty_cycle = 70;
   cfg.mode_config =
       fidl::VectorView<uint8_t>::FromExternal(reinterpret_cast<uint8_t*>(&mode), sizeof(mode));
 
-  incoming_.SyncCall(
-      [&](IncomingNamespace* incoming) { incoming->mock_pwm_server.ExpectSetConfig(cfg); });
+  WithPwm([&](auto& pwm) { pwm.ExpectSetConfig(cfg); });
 
-  set_and_expect_voltage_step(vreg_client, 3);
+  SetAndExpectVoltageStep(3);
 
-  incoming_.SyncCall(
-      [&](IncomingNamespace* incoming) { incoming->mock_pwm_server.ExpectGetConfig(cfg); });
+  WithPwm([&](auto& pwm) { pwm.ExpectGetConfig(cfg); });
 
   cfg.duty_cycle = 10;
-  incoming_.SyncCall(
-      [&](IncomingNamespace* incoming) { incoming->mock_pwm_server.ExpectSetConfig(cfg); });
-  set_and_expect_voltage_step(vreg_client, 9);
+  WithPwm([&](auto& pwm) { pwm.ExpectSetConfig(cfg); });
+  SetAndExpectVoltageStep(9);
 
-  fidl::WireResult result = vreg_client->SetVoltageStep(14);
+  fidl::WireResult result = client()->SetVoltageStep(14);
   EXPECT_TRUE(result.ok());
   EXPECT_TRUE(result->is_error());
   EXPECT_EQ(result->error_value(), ZX_ERR_INVALID_ARGS);
 
-  incoming_.SyncCall(
-      [&](IncomingNamespace* incoming) { incoming->mock_pwm_server.VerifyAndClear(); });
+  WithPwm([&](auto& pwm) { pwm.VerifyAndClear(); });
 }
 
 }  // namespace aml_pwm_regulator

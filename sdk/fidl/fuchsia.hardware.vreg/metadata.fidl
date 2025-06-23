@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 library fuchsia.hardware.vreg;
 
+@serializable
 type VregMetadata = table {
     /// Voltage regulator name. This will be set as fuchsia.regulator.NAME property on the child
     /// device to which regulator consumers can bind to.

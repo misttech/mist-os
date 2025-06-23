@@ -125,15 +125,15 @@ zx::result<> RegulatorVisitor::AddRegulatorMetadata(fdf_devicetree::Node& node,
     metadata.num_steps() = (voltage_range / *metadata.voltage_step_uv()) + 1;
   }
 
-  const fit::result encoded_metadata = fidl::Persist(metadata);
-  if (!encoded_metadata.is_ok()) {
-    FDF_LOG(ERROR, "Failed to encode Vreg metadata for node %s: %s", node.name().c_str(),
-            encoded_metadata.error_value().FormatDescription().c_str());
-    return zx::error(encoded_metadata.error_value().status());
+  fit::result persisted_metadata = fidl::Persist(metadata);
+  if (!persisted_metadata.is_ok()) {
+    FDF_LOG(ERROR, "Failed to persist vreg metadata for node %s: %s", node.name().c_str(),
+            persisted_metadata.error_value().FormatDescription().c_str());
+    return zx::error(persisted_metadata.error_value().status());
   }
   fuchsia_hardware_platform_bus::Metadata vreg_metadata = {{
-      .id = std::to_string(DEVICE_METADATA_VREG),
-      .data = encoded_metadata.value(),
+      .id = fuchsia_hardware_vreg::VregMetadata::kSerializableName,
+      .data = std::move(persisted_metadata.value()),
   }};
 
   node.AddMetadata(std::move(vreg_metadata));

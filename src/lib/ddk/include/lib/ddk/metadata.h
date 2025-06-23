@@ -60,9 +60,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // type: double
 #define DEVICE_METADATA_BACKLIGHT_MAX_BRIGHTNESS_NITS 0x4C4B4342  // BCKL
 
-// type: FIDL fuchsia.hardware.vreg/Metadata
-#define DEVICE_METADATA_VREG 0x47455256  // VREG
-
 // type: FIDL fuchsia.hardware.tee/TeeMetadata
 #define DEVICE_METADATA_TEE_THREAD_CONFIG 0x43454554  // TEEC
 
