@@ -2274,6 +2274,18 @@ impl MemoryManagerState {
         }
         Some((range.clone(), aio_context.clone()))
     }
+
+    pub fn mrelease(&self) -> Result<(), Errno> {
+        #[cfg(feature = "alternate_anon_allocs")]
+        {
+            self.private_anonymous
+                .zero(UserAddress::from_ptr(self.user_vmar_info.base), self.user_vmar_info.len)?;
+            return Ok(());
+        }
+
+        #[cfg(not(feature = "alternate_anon_allocs"))]
+        return error!(ENOSYS);
+    }
 }
 
 fn create_user_vmar(vmar: &zx::Vmar, vmar_info: &zx::VmarInfo) -> Result<zx::Vmar, zx::Status> {

@@ -400,12 +400,22 @@ pub fn sys_process_vm_writev(
 
 pub fn sys_process_mrelease(
     _locked: &mut Locked<Unlocked>,
-    _current_task: &CurrentTask,
-    _pidfd: FdNumber,
-    _flags: u32,
+    current_task: &CurrentTask,
+    pidfd: FdNumber,
+    flags: u32,
 ) -> Result<(), Errno> {
-    track_stub!(TODO("https://fxbug.dev/323172557"), "process_mrelease()");
-    error!(ENOSYS)
+    if flags != 0 {
+        return error!(EINVAL);
+    }
+    let file = current_task.files.get(pidfd)?;
+    let task = current_task.get_task(file.as_thread_group_key()?.pid());
+    let task = task.upgrade().ok_or_else(|| errno!(ESRCH))?;
+    if !task.load_stopped().is_stopped() {
+        return error!(EINVAL);
+    }
+
+    let mm = task.mm().ok_or_else(|| errno!(EINVAL))?.state.write();
+    mm.mrelease()
 }
 
 pub fn sys_membarrier(
