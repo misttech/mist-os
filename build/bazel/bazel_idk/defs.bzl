@@ -70,28 +70,32 @@ def _get_idk_deps(underlying_deps):
     return [_get_idk_label(dep) for dep in underlying_deps] + idk_deps
 
 def _create_idk_atom_impl(ctx):
+    all_deps_depset = depset(direct = ctx.files.idk_deps + ctx.files.atom_build_deps)
     idk_deps = ctx.attr.idk_deps
 
-    return [FuchsiaIdkAtomInfo(
-        label = ctx.label,
-        idk_name = ctx.attr.idk_name,
-        id = ctx.attr.id,
-        meta_dest = ctx.attr.meta_dest,
-        type = ctx.attr.type,
-        category = ctx.attr.category,
-        is_stable = ctx.attr.stable,
-        api_area = ctx.attr.api_area,
-        api_file_path = ctx.attr.api_file_path,
-        api_contents_map = ctx.attr.api_contents_map,
-        atom_files_map = ctx.attr.files_map,
-        idk_deps = idk_deps,
-        atoms_depset = depset(
-            direct = idk_deps,
-            transitive = [dep[FuchsiaIdkAtomInfo].atoms_depset for dep in idk_deps],
+    return [
+        DefaultInfo(files = all_deps_depset),
+        FuchsiaIdkAtomInfo(
+            label = ctx.label,
+            idk_name = ctx.attr.idk_name,
+            id = ctx.attr.id,
+            meta_dest = ctx.attr.meta_dest,
+            type = ctx.attr.type,
+            category = ctx.attr.category,
+            is_stable = ctx.attr.stable,
+            api_area = ctx.attr.api_area,
+            api_file_path = ctx.attr.api_file_path,
+            api_contents_map = ctx.attr.api_contents_map,
+            atom_files_map = ctx.attr.files_map,
+            idk_deps = idk_deps,
+            atoms_depset = depset(
+                direct = idk_deps,
+                transitive = [dep[FuchsiaIdkAtomInfo].atoms_depset for dep in idk_deps],
+            ),
+            atom_build_deps = ctx.attr.atom_build_deps,
+            additional_prebuild_info = ctx.attr.additional_prebuild_info,
         ),
-        atom_build_deps = ctx.attr.atom_build_deps,
-        additional_prebuild_info = ctx.attr.additional_prebuild_info,
-    )]
+    ]
 
 _create_idk_atom = rule(
     doc = """Define an IDK atom. Do not instantiate directly - use `idk_atom()` instead.""",
@@ -242,6 +246,7 @@ def idk_atom(
     )
 
 def _idk_molecule_impl(ctx):
+    all_deps_depset = depset(direct = ctx.files.deps)
     idk_deps = ctx.attr.deps
 
     # Build the atoms depset, excluding molecules while including their atoms.
@@ -258,11 +263,14 @@ def _idk_molecule_impl(ctx):
 
     atoms_depset = depset(direct = direct_deps, transitive = transitive_depsets)
 
-    return [FuchsiaIdkMoleculeInfo(
-        label = ctx.label,
-        idk_deps = ctx.attr.deps,
-        atoms_depset = atoms_depset,
-    )]
+    return [
+        DefaultInfo(files = all_deps_depset),
+        FuchsiaIdkMoleculeInfo(
+            label = ctx.label,
+            idk_deps = ctx.attr.deps,
+            atoms_depset = atoms_depset,
+        ),
+    ]
 
 idk_molecule = rule(
     doc = "Generate an IDK molecule.",
