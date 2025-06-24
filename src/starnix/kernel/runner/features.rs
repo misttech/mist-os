@@ -14,6 +14,7 @@ use starnix_core::vfs::FsString;
 use starnix_features::Feature;
 use starnix_logging::log_error;
 use starnix_modules_ashmem::ashmem_device_init;
+use starnix_modules_fastrpc::fastrpc_device_init;
 use starnix_modules_framebuffer::{AspectRatio, Framebuffer};
 use starnix_modules_gpu::gpu_device_init;
 use starnix_modules_gralloc::gralloc_device_init;
@@ -106,6 +107,9 @@ pub struct Features {
     /// Whether to enable the nanohub module.
     pub nanohub: bool,
 
+    /// Whether to enable the fastrpc module.
+    pub fastrpc: bool,
+
     pub enable_utc_time_adjustment: bool,
 
     pub thermal: Option<Vec<String>>,
@@ -167,6 +171,7 @@ impl Features {
                 rootfs_rw,
                 network_manager,
                 nanohub,
+                fastrpc,
                 enable_utc_time_adjustment,
                 thermal,
                 android_bootreason,
@@ -215,6 +220,7 @@ impl Features {
                 inspect_node.record_bool("rootfs_rw", *rootfs_rw);
                 inspect_node.record_bool("network_manager", *network_manager);
                 inspect_node.record_bool("nanohub", *nanohub);
+                inspect_node.record_bool("fastrpc", *fastrpc);
                 inspect_node.record_string(
                     "thermal",
                     match thermal {
@@ -325,6 +331,7 @@ pub fn parse_features(
                 return Err(anyhow!("Feature format must be: magma_supported_vendors:0x1234[,0xabcd]"))
             }
             (Feature::Nanohub, _) => features.nanohub = true,
+            (Feature::Fastrpc, _) => features.fastrpc = true,
             (Feature::NetstackMark, _) => features.kernel.netstack_mark = true,
             (Feature::NetworkManager, _) => features.network_manager = true,
             (Feature::Gfxstream, _) => features.gfxstream = true,
@@ -559,6 +566,9 @@ pub fn run_container_features(
     }
     if features.hvdcp_opti {
         hvdcp_opti_init(locked, system_task);
+    }
+    if features.fastrpc {
+        fastrpc_device_init(locked, system_task);
     }
 
     Ok(())

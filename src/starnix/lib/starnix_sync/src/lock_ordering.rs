@@ -51,5 +51,7 @@ lock_ordering! {
     // MemoryPressureMonitor
     UninterruptibleLock => MemoryPressureMonitor,
     FileOpsCore => MemoryPressureMonitor,
-    MemoryPressureMonitor => MemoryPressureMonitorClientState
+    MemoryPressureMonitor => MemoryPressureMonitorClientState,
+    // Fastrpc
+    UninterruptibleLock => FastrpcInnerState
 }

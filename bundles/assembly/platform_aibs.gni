@@ -358,6 +358,7 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "cobalt_userdebug_config",
                          "mdns_fuchsia_device_wired_service",
                          "nanohub_support",
+                         "fastrpc_support",
                          "omaha_client_empty_eager_config",
                          "radar_proxy_with_injector",
                          "sl4f",
@@ -502,6 +503,7 @@ experimental_aib_names = [
 
   "hvdcp_opti_support",
   "nanohub_support",
+  "fastrpc_support",
   "paravirtualization_support_bootstrap",
   "power_framework_broker",
   "power_framework_sag",

@@ -202,6 +202,13 @@
             source_availability: "unknown",
         },
         {
+            protocol: "fuchsia.hardware.qualcomm.fastrpc.SecureFastRpc",
+            from: "#fastrpc",
+            to: "#starnix_runner",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.hardware.sockettunnel.Device",
             from: "#sockettunnel",
             to: "#starnix_runner",

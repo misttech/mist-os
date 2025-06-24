@@ -115,6 +115,7 @@
             protocol: [
                 "fuchsia.feedback.LastRebootInfoProvider",
                 "fuchsia.hardware.google.nanohub.Device",
+                "fuchsia.hardware.qualcomm.fastrpc.SecureFastRpc",
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.net.policy.socketproxy.StarnixNetworks",
                 "fuchsia.net.stack.Stack",
@@ -171,7 +172,10 @@
             to: [ "#kernels" ],
         },
         {
-            service: "fuchsia.hardware.adb.Service",
+            service: [
+                "fuchsia.hardware.adb.Service",
+                "fuchsia.hardware.qualcomm.fastrpc.SecureService",
+            ],
             from: "parent",
             to: [ "#kernels" ],
         },

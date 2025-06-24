@@ -337,6 +337,7 @@
                 "fuchsia.hardware.power.sensor.Service",
                 "fuchsia.hardware.powersource.Service",
                 "fuchsia.hardware.pty.Service",
+                "fuchsia.hardware.qualcomm.fastrpc.SecureService",
                 "fuchsia.hardware.radar.Service",
                 "fuchsia.hardware.ram.metrics.Service",
                 "fuchsia.hardware.registers.Service",

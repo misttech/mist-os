@@ -2672,6 +2672,28 @@ assembly_input_bundle("nanohub_support") {
   ]
 }
 
+# Core FastRPC support. Does not include driver. Driver should be included separately.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: standard
+# valid build-types: all
+#
+assembly_input_bundle("fastrpc_support") {
+  base_packages = [ "//src/starnix/modules/fastrpc:google_fastrpc" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards =
+              [ "//src/starnix/modules/fastrpc/meta/fastrpc.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # hvdcp_opti support. Does not include driver. Driver should be included separately.
 #
 # optional: product must specify its inclusion

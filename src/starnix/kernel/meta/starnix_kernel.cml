@@ -118,6 +118,7 @@
                 "fuchsia.feedback.LastRebootInfoProvider",
                 "fuchsia.hardware.google.nanohub.Device",
                 "fuchsia.hardware.power.statecontrol.Admin",
+                "fuchsia.hardware.qualcomm.fastrpc.SecureFastRpc",
                 "fuchsia.hardware.sockettunnel.Device",
                 "fuchsia.kernel.Stats",
                 "fuchsia.net.filter.Control",
