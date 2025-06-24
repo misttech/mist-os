@@ -145,13 +145,13 @@ impl<Ops: BytesFileOps> FileOps for BytesFile<Ops> {
 
     fn read(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        let content = self.0.read(current_task)?;
+        let content = self.0.read_locked(locked, current_task)?;
         if offset >= content.len() {
             return Ok(0);
         }
@@ -160,7 +160,7 @@ impl<Ops: BytesFileOps> FileOps for BytesFile<Ops> {
 
     fn write(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
@@ -168,7 +168,7 @@ impl<Ops: BytesFileOps> FileOps for BytesFile<Ops> {
     ) -> Result<usize, Errno> {
         let data = data.read_all()?;
         let len = data.len();
-        self.0.write(current_task, data)?;
+        self.0.write_locked(locked, current_task, data)?;
         Ok(len)
     }
 }
@@ -177,8 +177,23 @@ pub trait BytesFileOps: Send + Sync + AsAny + 'static {
     fn write(&self, _current_task: &CurrentTask, _data: Vec<u8>) -> Result<(), Errno> {
         error!(ENOSYS)
     }
+    fn write_locked(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        current_task: &CurrentTask,
+        data: Vec<u8>,
+    ) -> Result<(), Errno> {
+        self.write(current_task, data)
+    }
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         error!(ENOSYS)
+    }
+    fn read_locked(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        current_task: &CurrentTask,
+    ) -> Result<Cow<'_, [u8]>, Errno> {
+        self.read(current_task)
     }
 }
 
