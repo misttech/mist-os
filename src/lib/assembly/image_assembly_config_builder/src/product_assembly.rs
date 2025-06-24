@@ -279,11 +279,12 @@ impl ProductAssembly {
             match platform.feature_set_level {
                 FeatureSetLevel::TestNoPlatform
                 | FeatureSetLevel::Embeddable
-                | FeatureSetLevel::Bootstrap => {
+                | FeatureSetLevel::Bootstrap
+                | FeatureSetLevel::Utility => {
                     // these are the only valid feature set levels for adding these files.
                 }
                 _ => {
-                    bail!("bootfs packages and files can only be added to the 'empty', 'embeddable', or 'bootstrap' feature set levels");
+                    bail!("bootfs packages and files can only be added to the 'empty', 'embeddable', or 'bootstrap', or 'utility' feature set levels");
                 }
             }
         }
