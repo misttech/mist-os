@@ -110,15 +110,15 @@ open protocol TopologyControl {
     }) -> () error OpenStatusChannelError;
 };
 
-/// The protocol used by a client to hold or drop the lease to the System Activity Governor.
+/// Control system activity states by taking leases with the System Activity Governor.
 @discoverable
 open protocol SystemActivityControl {
-    /// Called by a client to hold a lease to the System Activity Governor.
+    /// Take a lease on Application Activity.
     strict StartApplicationActivity() -> () error SystemActivityControlError;
-    /// Called by a client to drop the lease to the System Activity Governor.
+    /// Drop a held lease (if it exists) on Application Activity.
     strict StopApplicationActivity() -> () error SystemActivityControlError;
 
-    /// Called by a client to drop and then reclaim the lease to the System Activity Governor.
+    /// Drop a held lease (if it exists) on Application Activity, wait, and then take it again.
     strict RestartApplicationActivity(struct {
         /// The time to wait after dropping the lease but before reclaiming it.
         wait_time_ns uint64;

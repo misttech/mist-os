@@ -27,8 +27,8 @@ pub struct SystemActivityGovernorController {
 }
 
 impl SystemActivityGovernorController {
-    pub async fn new() -> Result<Rc<Self>> {
-        Ok(Rc::new(Self { application_activity_token: RefCell::new(None) }))
+    pub fn new() -> Rc<Self> {
+        Rc::new(Self { application_activity_token: RefCell::new(None) })
     }
 
     pub async fn run(self: Rc<Self>) -> Result<()> {
@@ -62,14 +62,14 @@ impl SystemActivityGovernorController {
         while let Some(request) = stream.next().await {
             match request {
                 Ok(fpt::SystemActivityControlRequest::StartApplicationActivity { responder }) => {
-                    let result = responder.send(self.clone().start_application_activity().await);
+                    let result = responder.send(self.start_application_activity().await);
 
                     if let Err(error) = result {
                         warn!(error:?; "Error while responding to StartApplicationActivity request");
                     }
                 }
                 Ok(fpt::SystemActivityControlRequest::StopApplicationActivity { responder }) => {
-                    let result = responder.send(self.clone().stop_application_activity());
+                    let result = responder.send(self.stop_application_activity());
 
                     if let Err(error) = result {
                         warn!(error:?; "Error while responding to StopApplicationActivity request");
@@ -79,8 +79,8 @@ impl SystemActivityGovernorController {
                     responder,
                     wait_time_ns,
                 }) => {
-                    let result = responder
-                        .send(self.clone().restart_application_activity(wait_time_ns).await);
+                    let result =
+                        responder.send(self.restart_application_activity(wait_time_ns).await);
 
                     if let Err(error) = result {
                         warn!(error:?; "Error while responding to StopApplicationActivity request");
@@ -97,7 +97,7 @@ impl SystemActivityGovernorController {
     }
 
     async fn start_application_activity(
-        self: Rc<Self>,
+        self: &Self,
     ) -> fpt::SystemActivityControlStartApplicationActivityResult {
         let sag = connect_to_protocol::<fsystem::ActivityGovernorMarker>().map_err(|err| {
             error!(err:%; "Failed to connect to fuchsia.power.system");
@@ -111,23 +111,25 @@ impl SystemActivityGovernorController {
                 error!(err:%; "Failed to take application activity lease");
                 fpt::SystemActivityControlError::Internal
             })?;
+        info!("Took lease on application activity");
 
         self.application_activity_token.borrow_mut().replace(token);
         Ok(())
     }
 
     fn stop_application_activity(
-        self: Rc<Self>,
+        self: &Self,
     ) -> fpt::SystemActivityControlStartApplicationActivityResult {
         drop(self.application_activity_token.borrow_mut().take());
+        info!("Dropped lease on application activity");
         Ok(())
     }
 
     async fn restart_application_activity(
-        self: Rc<Self>,
+        self: &Self,
         wait_time_ns: u64,
     ) -> fpt::SystemActivityControlStartApplicationActivityResult {
-        self.clone().stop_application_activity()?;
+        self.stop_application_activity()?;
         fasync::Timer::new(std::time::Duration::from_nanos(wait_time_ns)).await;
         self.start_application_activity().await?;
         Ok(())

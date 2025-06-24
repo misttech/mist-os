@@ -18,11 +18,11 @@ async fn main() -> Result<()> {
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
     fuchsia_inspect::component::health().set_starting_up();
 
-    let ttd = SystemActivityGovernorController::new().await?;
+    let controller = SystemActivityGovernorController::new();
     fuchsia_inspect::component::health().set_ok();
 
     // This future should never complete.
-    let result = ttd.run().await;
+    let result = controller.run().await;
     log::error!(result:?; "Unexpected exit");
     fuchsia_inspect::component::health().set_unhealthy(&format!("Unexpected exit: {:?}", result));
     result

@@ -10,8 +10,7 @@ use ffx_core::ffx_command;
 #[argh(
     subcommand,
     name = "application-activity",
-    description = "Controls the topology-test-daemon component to manipulate application_activity \
-power element power levels in system_activity_governor.",
+    description = "Takes and drops leases on activity governor elements.",
     example = "\
 To change application_activity power level to 1:
 
@@ -21,7 +20,7 @@ To change application_activity power level to 1:
 
     $ ffx power system-activity application-activity stop",
     note = "\
-If the topology-test-daemon component is not available to the target, then this command will not
+If the system-activity-governor-controller component is not available to the target, then this command will not
 work properly."
 )]
 /// Top-level command for "ffx power system-activity application-activity".
