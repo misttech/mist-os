@@ -24,6 +24,8 @@ per_test_modules = [
   ":precedence-in-dep-resolution",
   ":soname-filename-loaded-dep",
   ":soname-filename-dep",
+  ":one-weak-symbol",
+  ":all-weak-symbols",
 ]
 
 per_test_executables = [
@@ -49,6 +51,8 @@ per_test_suffices = [
   "Basic",
   "Relative",
   "Symbolic",
+  "OneWeakSymbol",
+  "AllWeakSymbols",
   "BasicDep",
   "IndirectDeps",
   "ManyDeps",
@@ -1478,9 +1482,19 @@ foreach(test, [ "" ] + per_test_suffices) {
     sources = [ "foo-v1.cc" ]
   }
 
+  test_shared_library("ld-dep-foo-v1-weak$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "foo-v1-weak.cc" ]
+  }
+
   test_shared_library("ld-dep-foo-v2$suffix") {
     defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     sources = [ "foo-v2.cc" ]
+  }
+
+  test_shared_library("ld-dep-foo-v2-weak$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "foo-v2-weak.cc" ]
   }
 
   test_shared_library("has-foo-v1$suffix") {
@@ -1520,6 +1534,30 @@ foreach(test, [ "" ] + per_test_suffices) {
     deps = [
       ":ld-dep-foo-v1$suffix",
       ":ld-dep-foo-v2$suffix",
+    ]
+  }
+
+  # one-weak-symbol:
+  #  - foo-v1 -> [[gnu::weak]] foo() returns 2
+  #  - foo-v2 -> foo() returns 7
+  test_loadable_module("one-weak-symbol$suffix.module") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "foo.cc" ]
+    deps = [
+      ":ld-dep-foo-v1-weak$suffix",
+      ":ld-dep-foo-v2$suffix",
+    ]
+  }
+
+  # all-weak-symbols:
+  #  - foo-v1 -> [[gnu::weak]] foo() returns 2
+  #  - foo-v2 -> [[gnu::weak]] foo() returns 7
+  test_loadable_module("all-weak-symbols$suffix.module") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "foo.cc" ]
+    deps = [
+      ":ld-dep-foo-v1-weak$suffix",
+      ":ld-dep-foo-v2-weak$suffix",
     ]
   }
 

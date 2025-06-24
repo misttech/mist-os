@@ -46,6 +46,8 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // Musl attempts to fetch the same shlib from the filesystem twice, when its
   // DT_SONAME is matched with another module in a linking session.
   static constexpr bool kSonameLookupInPendingDeps = false;
+  // Musl will look for and prefer a strong symbol over a weak symbol.
+  static constexpr bool kStrictLinkOrderResolution = false;
 #endif
 
   fit::result<Error, void*> DlOpen(const char* file, int mode);

@@ -114,6 +114,70 @@ TYPED_TEST(DlTests, Symbolic) {
   ASSERT_TRUE(this->DlClose(open.value()).is_ok());
 }
 
+// Tests how symbols are resolved when presented with a weak and strong
+// definition.
+// dlopen one-weak-symbol:
+//   - foo-v1 -> [[gnu::weak]] foo() returns 2
+//   - foo-v2 -> foo() returns 7
+// call call_foo from one-weak-symbol and expect it to resolve its foo symbol to
+// 7 from foo-v2 for musl and libc (which uses strong symbols over weak), or 2
+// from from foo-v1 (for glibc which uses the first symbol encountered).
+TYPED_TEST(DlTests, OneWeakSymbol) {
+  const std::string kOneWeakSymbolFile = TestModule("one-weak-symbol");
+  const std::string kFooV1File = TestShlib("libld-dep-foo-v1-weak");
+  const std::string kFooV2File = TestShlib("libld-dep-foo-v2");
+  constexpr int64_t kFooV1ReturnValue = 2;
+  constexpr int64_t kFooV2ReturnValue = 7;
+
+  this->ExpectRootModule(kOneWeakSymbolFile);
+  this->Needed({kFooV1File, kFooV2File});
+
+  auto open = this->DlOpen(kOneWeakSymbolFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  EXPECT_TRUE(open.value());
+
+  auto sym = this->DlSym(open.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(sym.is_ok()) << sym.error_value();
+  ASSERT_TRUE(sym.value());
+
+  if (TestFixture::kStrictLinkOrderResolution) {
+    EXPECT_EQ(RunFunction<int64_t>(sym.value()), kFooV1ReturnValue);
+  } else {
+    EXPECT_EQ(RunFunction<int64_t>(sym.value()), kFooV2ReturnValue);
+  }
+
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+}
+
+// Tests how symbols are resolved when all definitions are weak.
+// dlopen all-weak-symbols:
+//   - foo-v1 -> [[gnu::weak]] foo() returns 2
+//   - foo-v2 -> [[gnu::weak]] foo() returns 7
+// call call_foo from one-weak-symbol and expect it to resolve its foo symbol to
+// from foo-v1. All implementations will use the first weak definition found in
+// absence of any strong definitions.
+TYPED_TEST(DlTests, AllWeakSymbols) {
+  const std::string kOneWeakSymbolFile = TestModule("all-weak-symbols");
+  const std::string kFooV1File = TestShlib("libld-dep-foo-v1-weak");
+  const std::string kFooV2File = TestShlib("libld-dep-foo-v2-weak");
+  constexpr int64_t kFooV1ReturnValue = 2;
+
+  this->ExpectRootModule(kOneWeakSymbolFile);
+  this->Needed({kFooV1File, kFooV2File});
+
+  auto open = this->DlOpen(kOneWeakSymbolFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  EXPECT_TRUE(open.value());
+
+  auto sym = this->DlSym(open.value(), TestSym("call_foo").c_str());
+  ASSERT_TRUE(sym.is_ok()) << sym.error_value();
+  ASSERT_TRUE(sym.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(sym.value()), kFooV1ReturnValue);
+
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+}
+
 // Test loading a module with relro protections.
 TYPED_TEST(DlTests, Relro) {
   const std::string kRelroFile = TestModule("relro");

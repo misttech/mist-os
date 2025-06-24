@@ -65,6 +65,10 @@ class DlTestsBase : public ::testing::Test {
   // that was already loaded in a linking session.
   static constexpr bool kSonameLookupInLoadedDeps = true;
 
+  // Whether the test fixture will resolve to the first symbol it finds, even if
+  // the symbol is marked weak.
+  static constexpr bool kStrictLinkOrderResolution = true;
+
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);
 
