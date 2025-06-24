@@ -31,6 +31,9 @@ lock_ordering! {
     UninterruptibleLock => KernelIpTables,
     // Kernel.swap_files
     UninterruptibleLock => KernelSwapFiles,
+    // ThreadGroup.limits
+    ProcessGroupState => ThreadGroupLimits,
+    MmDumpable => ThreadGroupLimits,
     // MemoryManager.dumpable
     UninterruptibleLock => MmDumpable,
     // ProcessGroup.mutable_state.

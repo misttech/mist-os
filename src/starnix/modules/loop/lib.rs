@@ -818,7 +818,7 @@ mod tests {
         let backing_fd = current_task
             .task
             .files
-            .add_with_flags(&current_task, backing_file, FdFlags::empty())
+            .add_with_flags(locked, &current_task, backing_file, FdFlags::empty())
             .unwrap();
 
         let loop_file = anon_test_file(

@@ -6,7 +6,7 @@ use crate::task::Task;
 use crate::vfs::{FdNumber, FileHandle};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
-use starnix_sync::Mutex;
+use starnix_sync::{LockBefore, Locked, Mutex, ThreadGroupLimits};
 use starnix_syscalls::SyscallResult;
 use starnix_types::ownership::ReleasableByRef;
 use starnix_uapi::errors::Errno;
@@ -229,18 +229,31 @@ impl FdTable {
         self.retain(|_fd, flags| !flags.contains(FdFlags::CLOEXEC));
     }
 
-    pub fn insert(&self, task: &Task, fd: FdNumber, file: FileHandle) -> Result<(), Errno> {
-        self.insert_with_flags(task, fd, file, FdFlags::empty())
+    pub fn insert<L>(
+        &self,
+        locked: &mut Locked<L>,
+        task: &Task,
+        fd: FdNumber,
+        file: FileHandle,
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<ThreadGroupLimits>,
+    {
+        self.insert_with_flags(locked, task, fd, file, FdFlags::empty())
     }
 
-    pub fn insert_with_flags(
+    pub fn insert_with_flags<L>(
         &self,
+        locked: &mut Locked<L>,
         task: &Task,
         fd: FdNumber,
         file: FileHandle,
         flags: FdFlags,
-    ) -> Result<(), Errno> {
-        let rlimit = task.thread_group().get_rlimit(Resource::NOFILE);
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<ThreadGroupLimits>,
+    {
+        let rlimit = task.thread_group().get_rlimit(locked, Resource::NOFILE);
         let id = self.id();
         let inner = self.inner.lock();
         let mut state = inner.store.lock();
@@ -248,14 +261,18 @@ impl FdTable {
         Ok(())
     }
 
-    pub fn add_with_flags(
+    pub fn add_with_flags<L>(
         &self,
+        locked: &mut Locked<L>,
         task: &Task,
         file: FileHandle,
         flags: FdFlags,
-    ) -> Result<FdNumber, Errno> {
+    ) -> Result<FdNumber, Errno>
+    where
+        L: LockBefore<ThreadGroupLimits>,
+    {
         profile_duration!("AddFd");
-        let rlimit = task.thread_group().get_rlimit(Resource::NOFILE);
+        let rlimit = task.thread_group().get_rlimit(locked, Resource::NOFILE);
         let id = self.id();
         let inner = self.inner.lock();
         let mut state = inner.store.lock();
@@ -266,20 +283,24 @@ impl FdTable {
 
     // Duplicates a file handle.
     // If target is  TargetFdNumber::Minimum, a new FdNumber is allocated. Returns the new FdNumber.
-    pub fn duplicate(
+    pub fn duplicate<L>(
         &self,
+        locked: &mut Locked<L>,
         task: &Task,
         oldfd: FdNumber,
         target: TargetFdNumber,
         flags: FdFlags,
-    ) -> Result<FdNumber, Errno> {
+    ) -> Result<FdNumber, Errno>
+    where
+        L: LockBefore<ThreadGroupLimits>,
+    {
         profile_duration!("DuplicateFd");
         // Drop the removed entry only after releasing the writer lock in case
         // the close() function on the FileOps calls back into the FdTable.
         #[allow(clippy::collection_is_never_read)]
         let _removed_entry;
         let result = {
-            let rlimit = task.thread_group().get_rlimit(Resource::NOFILE);
+            let rlimit = task.thread_group().get_rlimit(locked, Resource::NOFILE);
             let id = self.id();
             let inner = self.inner.lock();
             let mut state = inner.store.lock();
@@ -434,28 +455,29 @@ impl Clone for FdTable {
 #[cfg(test)]
 mod test {
     use super::*;
-
     use crate::fs::fuchsia::SyslogFile;
     use crate::task::*;
     use crate::testing::*;
+    use starnix_sync::Unlocked;
 
     fn add(
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         files: &FdTable,
         file: FileHandle,
     ) -> Result<FdNumber, Errno> {
-        files.add_with_flags(current_task, file, FdFlags::empty())
+        files.add_with_flags(locked, current_task, file, FdFlags::empty())
     }
 
     #[::fuchsia::test]
     async fn test_fd_table_install() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let files = FdTable::default();
         let file = SyslogFile::new_file(&current_task);
 
-        let fd0 = add(&current_task, &files, file.clone()).unwrap();
+        let fd0 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
         assert_eq!(fd0.raw(), 0);
-        let fd1 = add(&current_task, &files, file.clone()).unwrap();
+        let fd1 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
         assert_eq!(fd1.raw(), 1);
 
         assert!(Arc::ptr_eq(&files.get(fd0).unwrap(), &file));
@@ -467,12 +489,12 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_fd_table_fork() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let files = FdTable::default();
         let file = SyslogFile::new_file(&current_task);
 
-        let fd0 = add(&current_task, &files, file.clone()).unwrap();
-        let fd1 = add(&current_task, &files, file).unwrap();
+        let fd0 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
+        let fd1 = add(&mut locked, &current_task, &files, file).unwrap();
         let fd2 = FdNumber::from_raw(2);
 
         let forked = files.fork();
@@ -492,12 +514,12 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_fd_table_exec() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let files = FdTable::default();
         let file = SyslogFile::new_file(&current_task);
 
-        let fd0 = add(&current_task, &files, file.clone()).unwrap();
-        let fd1 = add(&current_task, &files, file).unwrap();
+        let fd0 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
+        let fd1 = add(&mut locked, &current_task, &files, file).unwrap();
 
         files.set_fd_flags_allowing_opath(fd0, FdFlags::CLOEXEC).unwrap();
 
@@ -514,13 +536,13 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_fd_table_pack_values() {
-        let (_kernel, current_task) = create_kernel_and_task();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let files = FdTable::default();
         let file = SyslogFile::new_file(&current_task);
 
         // Add two FDs.
-        let fd0 = add(&current_task, &files, file.clone()).unwrap();
-        let fd1 = add(&current_task, &files, file.clone()).unwrap();
+        let fd0 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
+        let fd1 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
         assert_eq!(fd0.raw(), 0);
         assert_eq!(fd1.raw(), 1);
 
@@ -531,7 +553,7 @@ mod test {
         assert!(files.get(fd0).is_err());
 
         // The next FD we insert fills in the hole we created.
-        let another_fd = add(&current_task, &files, file).unwrap();
+        let another_fd = add(&mut locked, &current_task, &files, file).unwrap();
         assert_eq!(another_fd.raw(), 0);
 
         files.release(());

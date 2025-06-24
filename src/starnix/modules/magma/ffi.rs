@@ -42,6 +42,7 @@ use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt};
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{Anon, FdFlags, FsNodeInfo, MemoryRegularFile};
 use starnix_logging::track_stub;
+use starnix_sync::{Locked, Unlocked};
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
@@ -471,6 +472,7 @@ where
 /// SAFETY: Makes an FFI call to populate the fields of `response`, and creates a `zx::Vmo` from
 /// a raw handle provided by magma.
 pub fn export_buffer(
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     _control: virtio_magma_buffer_export_ctrl_t,
     response: &mut virtio_magma_buffer_export_resp_t,
@@ -514,7 +516,7 @@ pub fn export_buffer(
             }
         };
 
-        let fd = current_task.add_file(file, FdFlags::empty())?;
+        let fd = current_task.add_file(locked, file, FdFlags::empty())?;
         response.buffer_handle_out = fd.raw() as u64;
     }
 
@@ -546,6 +548,7 @@ pub fn flush(
 /// SAFETY: Makes an FFI call to fetch a VMO handle. The VMO handle is expected to be valid if the
 /// FFI call succeeds. Either way, creating a `zx::Vmo` with an invalid handle is safe.
 pub fn get_buffer_handle(
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     _control: virtio_magma_buffer_get_handle_ctrl_t,
     response: &mut virtio_magma_buffer_get_handle_resp_t,
@@ -571,7 +574,7 @@ pub fn get_buffer_handle(
             OpenFlags::RDWR,
             "[fuchsia:magma_buffer]",
         );
-        let fd = current_task.add_file(file, FdFlags::empty())?;
+        let fd = current_task.add_file(locked, file, FdFlags::empty())?;
         response.handle_out = fd.raw() as u64;
         response.result_return = MAGMA_STATUS_OK as u64;
     }
@@ -589,6 +592,7 @@ pub fn get_buffer_handle(
 ///
 /// SAFETY: Makes an FFI call to populate the fields of `response`.
 pub fn query(
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     control: virtio_magma_device_query_ctrl_t,
     response: &mut virtio_magma_device_query_resp_t,
@@ -615,7 +619,7 @@ pub fn query(
             "[fuchsia:magma_vmo]",
             info,
         );
-        let fd = current_task.add_file(file, FdFlags::empty())?;
+        let fd = current_task.add_file(locked, file, FdFlags::empty())?;
         response.result_buffer_out = fd.raw() as u64;
     } else {
         response.result_buffer_out = u64::MAX;

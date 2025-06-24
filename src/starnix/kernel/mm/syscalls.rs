@@ -289,11 +289,11 @@ pub fn sys_process_madvise(
 }
 
 pub fn sys_brk(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
 ) -> Result<UserAddress, Errno> {
-    current_task.mm().ok_or_else(|| errno!(EINVAL))?.set_brk(current_task, addr)
+    current_task.mm().ok_or_else(|| errno!(EINVAL))?.set_brk(locked, current_task, addr)
 }
 
 pub fn sys_process_vm_readv(
@@ -425,7 +425,7 @@ pub fn sys_membarrier(
 }
 
 pub fn sys_userfaultfd(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     raw_flags: u32,
 ) -> Result<FdNumber, Errno> {
@@ -450,7 +450,7 @@ pub fn sys_userfaultfd(
 
     let user_mode_only = raw_flags & UFFD_USER_MODE_ONLY == 0;
     let uff_handle = UserFaultFile::new(current_task, open_flags, user_mode_only);
-    current_task.add_file(uff_handle, fd_flags)
+    current_task.add_file(locked, uff_handle, fd_flags)
 }
 
 pub fn sys_futex(
@@ -694,7 +694,7 @@ pub fn sys_mlock(
 }
 
 pub fn sys_mlock2(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -708,7 +708,7 @@ pub fn sys_mlock2(
     let on_fault = flags & MLOCK_ONFAULT as u64 != 0;
 
     let mm = current_task.mm().ok_or_else(|| errno!(EINVAL))?;
-    mm.state.write().mlock(current_task, addr, length, on_fault)
+    mm.state.write().mlock(current_task, locked, addr, length, on_fault)
 }
 
 pub fn sys_munlock(

@@ -111,7 +111,7 @@ impl FileOps for ControlGroupFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
@@ -130,7 +130,7 @@ impl FileOps for ControlGroupFile {
             return error!(EINVAL);
         };
 
-        self.cgroup()?.add_process(&thread_group)?;
+        self.cgroup()?.add_process(locked, &thread_group)?;
 
         Ok(bytes.len())
     }

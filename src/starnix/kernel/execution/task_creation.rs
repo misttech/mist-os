@@ -10,7 +10,9 @@ use crate::task::{
     SeccompState, Task, TaskBuilder, ThreadGroup, ThreadGroupParent, ThreadGroupWriteGuard,
 };
 use crate::vfs::{FdTable, FsContext};
-use starnix_sync::{LockBefore, Locked, ProcessGroupState, RwLockWriteGuard, TaskRelease};
+use starnix_sync::{
+    LockBefore, Locked, ProcessGroupState, RwLockWriteGuard, TaskRelease, Unlocked,
+};
 use starnix_types::arch::ArchWidth;
 use starnix_types::ownership::{OwnedRef, Releasable, ReleaseGuard, Share, TempRef};
 use starnix_types::release_on_error;
@@ -150,7 +152,6 @@ pub fn create_init_child_process<L>(
 ) -> Result<TaskBuilder, Errno>
 where
     L: LockBefore<TaskRelease>,
-    L: LockBefore<ProcessGroupState>,
 {
     let weak_init = kernel.pids.read().get_task(1);
     let init_task = weak_init.upgrade().ok_or_else(|| errno!(EINVAL))?;
@@ -174,7 +175,7 @@ where
         init_task.fs().fork(),
         |locked, pid, process_group| {
             create_zircon_process(
-                locked,
+                &mut locked.cast_locked::<TaskRelease>(),
                 kernel,
                 None,
                 pid,
@@ -194,8 +195,9 @@ where
     }
     // A child process created via fork(2) inherits its parent's
     // resource limits.  Resource limits are preserved across execve(2).
-    let limits = init_task.thread_group().limits.lock().clone();
-    *task.thread_group().limits.lock() = limits;
+    let limits =
+        init_task.thread_group().limits.lock(&mut locked.cast_locked::<TaskRelease>()).clone();
+    *task.thread_group().limits.lock(&mut locked.cast_locked::<TaskRelease>()) = limits;
     Ok(task)
 }
 
@@ -217,18 +219,14 @@ where
 /// The process created by this function should always have pid 1. We require the caller to
 /// pass the `pid` as an argument to clarify that it's the callers responsibility to determine
 /// the pid for the process.
-pub fn create_init_process<L>(
-    locked: &mut Locked<L>,
+pub fn create_init_process(
+    locked: &mut Locked<Unlocked>,
     kernel: &Arc<Kernel>,
     pid: pid_t,
     initial_name: CString,
     fs: Arc<FsContext>,
     rlimits: &[(Resource, u64)],
-) -> Result<TaskBuilder, Errno>
-where
-    L: LockBefore<TaskRelease>,
-    L: LockBefore<ProcessGroupState>,
-{
+) -> Result<TaskBuilder, Errno> {
     let initial_name_bytes = initial_name.as_bytes().to_owned();
     let pids = kernel.pids.write();
     create_task_with_pid(
@@ -276,7 +274,6 @@ pub fn create_system_task<L>(
 ) -> Result<CurrentTask, Errno>
 where
     L: LockBefore<TaskRelease>,
-    L: LockBefore<ProcessGroupState>,
 {
     let builder = create_task(
         locked,
@@ -286,7 +283,7 @@ where
         |locked, pid, process_group| {
             let process = zx::Process::from(zx::Handle::invalid());
             let thread_group = ThreadGroup::new(
-                locked,
+                &mut locked.cast_locked::<TaskRelease>(),
                 kernel.clone(),
                 process,
                 None,
@@ -313,7 +310,6 @@ pub fn create_task<F, L>(
 where
     F: FnOnce(&mut Locked<L>, i32, Arc<ProcessGroup>) -> Result<ReleaseGuard<TaskInfo>, Errno>,
     L: LockBefore<TaskRelease>,
-    L: LockBefore<ProcessGroupState>,
 {
     let mut pids = kernel.pids.write();
     let pid = pids.allocate_pid();
@@ -346,7 +342,6 @@ fn create_task_with_pid<F, L>(
 where
     F: FnOnce(&mut Locked<L>, i32, Arc<ProcessGroup>) -> Result<ReleaseGuard<TaskInfo>, Errno>,
     L: LockBefore<TaskRelease>,
-    L: LockBefore<ProcessGroupState>,
 {
     debug_assert!(pids.get_task(pid).upgrade().is_none());
 
@@ -356,7 +351,7 @@ where
     let TaskInfo { thread, thread_group, memory_manager } =
         ReleaseGuard::take(task_info_factory(locked, pid, process_group.clone())?);
 
-    process_group.insert(locked, &thread_group);
+    process_group.insert(&mut locked.cast_locked::<TaskRelease>(), &thread_group);
 
     // > The timer slack values of init (PID 1), the ancestor of all processes, are 50,000
     // > nanoseconds (50 microseconds).  The timer slack value is inherited by a child created
@@ -396,7 +391,7 @@ where
             builder
                 .thread_group()
                 .limits
-                .lock()
+                .lock(&mut locked.cast_locked::<TaskRelease>())
                 .set(*resource, rlimit { rlim_cur: *limit, rlim_max: *limit });
         }
 

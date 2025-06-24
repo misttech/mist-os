@@ -19,7 +19,7 @@ use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
 use macro_rules_attribute::apply;
 use starnix_logging::{log_warn, set_current_task_info, set_zx_name};
-use starnix_sync::{Locked, Mutex, RwLock, RwLockWriteGuard, TaskRelease};
+use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex, RwLock, RwLockWriteGuard, TaskRelease};
 use starnix_types::ownership::{
     OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef,
 };
@@ -1219,8 +1219,16 @@ impl Task {
 
     state_accessor!(Task, mutable_state);
 
-    pub fn add_file(&self, file: FileHandle, flags: FdFlags) -> Result<FdNumber, Errno> {
-        self.files.add_with_flags(self, file, flags)
+    pub fn add_file<L>(
+        &self,
+        locked: &mut Locked<L>,
+        file: FileHandle,
+        flags: FdFlags,
+    ) -> Result<FdNumber, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
+        self.files.add_with_flags(&mut locked.cast_locked::<FileOpsCore>(), self, file, flags)
     }
 
     pub fn creds(&self) -> Credentials {
@@ -1675,18 +1683,18 @@ mod test {
     #[::fuchsia::test]
     async fn test_clone_rlimit() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let prev_fsize = current_task.thread_group().get_rlimit(Resource::FSIZE);
+        let prev_fsize = current_task.thread_group().get_rlimit(&mut locked, Resource::FSIZE);
         assert_ne!(prev_fsize, 10);
         current_task
             .thread_group()
             .limits
-            .lock()
+            .lock(&mut locked)
             .set(Resource::FSIZE, rlimit { rlim_cur: 10, rlim_max: 100 });
-        let current_fsize = current_task.thread_group().get_rlimit(Resource::FSIZE);
+        let current_fsize = current_task.thread_group().get_rlimit(&mut locked, Resource::FSIZE);
         assert_eq!(current_fsize, 10);
 
         let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        let child_fsize = child_task.thread_group().get_rlimit(Resource::FSIZE);
+        let child_fsize = child_task.thread_group().get_rlimit(&mut locked, Resource::FSIZE);
         assert_eq!(child_fsize, 10)
     }
 }

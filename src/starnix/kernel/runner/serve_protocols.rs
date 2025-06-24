@@ -119,9 +119,9 @@ async fn spawn_console(
                 current_task.exec(locked, executable, binary_path, argv, environ)?;
                 let (pty, pts) = create_main_and_replica(locked, &current_task, window_size)?;
                 let fd_flags = FdFlags::empty();
-                assert_eq!(0, current_task.add_file(pts.clone(), fd_flags)?.raw());
-                assert_eq!(1, current_task.add_file(pts.clone(), fd_flags)?.raw());
-                assert_eq!(2, current_task.add_file(pts, fd_flags)?.raw());
+                assert_eq!(0, current_task.add_file(locked, pts.clone(), fd_flags)?.raw());
+                assert_eq!(1, current_task.add_file(locked, pts.clone(), fd_flags)?.raw());
+                assert_eq!(2, current_task.add_file(locked, pts, fd_flags)?.raw());
                 Ok(pty)
             },
             move |result| {

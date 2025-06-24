@@ -77,6 +77,7 @@ fn read_attr<Attr: FromBytes>(
 }
 
 fn reopen_bpf_fd(
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     node: NamespaceNode,
     obj: impl Into<BpfHandle>,
@@ -87,10 +88,11 @@ fn reopen_bpf_fd(
     // All BPF FDs have the CLOEXEC flag turned on by default.
     let file =
         FileObject::new(current_task, Box::new(handle), node, open_flags | OpenFlags::CLOEXEC)?;
-    Ok(current_task.add_file(file, FdFlags::CLOEXEC)?.into())
+    Ok(current_task.add_file(locked, file, FdFlags::CLOEXEC)?.into())
 }
 
 fn install_bpf_fd(
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     obj: impl Into<BpfHandle>,
 ) -> Result<SyscallResult, Errno> {
@@ -105,7 +107,7 @@ fn install_bpf_fd(
         OpenFlags::RDWR | OpenFlags::CLOEXEC,
         name,
     );
-    Ok(current_task.add_file(file, FdFlags::CLOEXEC)?.into())
+    Ok(current_task.add_file(locked, file, FdFlags::CLOEXEC)?.into())
 }
 
 #[derive(Debug, Clone)]
@@ -180,7 +182,7 @@ pub fn sys_bpf(
                 Map::new(schema, flags).map_err(map_error_to_errno)?,
                 security::bpf_map_alloc(current_task),
             );
-            install_bpf_fd(current_task, map)
+            install_bpf_fd(locked, current_task, map)
         }
 
         bpf_cmd_BPF_MAP_LOOKUP_ELEM => {
@@ -308,7 +310,7 @@ pub fn sys_bpf(
             };
             // Ensures the log buffer ends with a 0.
             log_buffer.write(b"\0")?;
-            install_bpf_fd(current_task, program_or_stub)
+            install_bpf_fd(locked, current_task, program_or_stub)
         }
 
         // Attach an eBPF program to a target_fd at the specified attach_type hook.
@@ -371,7 +373,7 @@ pub fn sys_bpf(
             let object =
                 node.entry.node.downcast_ops::<BpfFsObject>().ok_or_else(|| errno!(EINVAL))?;
             let handle = object.handle.clone();
-            reopen_bpf_fd(current_task, node, handle, open_flags)
+            reopen_bpf_fd(locked, current_task, node, handle, open_flags)
         }
 
         // Obtain information about the eBPF object corresponding to bpf_fd.
@@ -442,7 +444,7 @@ pub fn sys_bpf(
             security::check_bpf_access(current_task, cmd, &btf_attr, attr_size)?;
             let data = current_task
                 .read_memory_to_vec(UserAddress::from(btf_attr.btf), btf_attr.btf_size as usize)?;
-            install_bpf_fd(current_task, BpfTypeFormat { data })
+            install_bpf_fd(locked, current_task, BpfTypeFormat { data })
         }
         bpf_cmd_BPF_PROG_DETACH => {
             let attach_attr: BpfAttachAttr = read_attr(current_task, attr_addr, attr_size)?;

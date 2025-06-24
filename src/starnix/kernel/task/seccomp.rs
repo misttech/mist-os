@@ -292,7 +292,10 @@ impl SeccompFilterContainer {
     }
 
     /// Creates a new listener for use by SECCOMP_RET_USER_NOTIF.  Returns its fd.
-    pub fn create_listener(current_task: &CurrentTask) -> Result<FdNumber, Errno> {
+    pub fn create_listener(
+        locked: &mut Locked<Unlocked>,
+        current_task: &CurrentTask,
+    ) -> Result<FdNumber, Errno> {
         // Create the `Anon` handle file before taking the write lock on the task, because
         // `Anon::new_file()` needs to read the `current_task` SID to label the file object.
         let the_notifier = SeccompNotifier::new();
@@ -309,7 +312,7 @@ impl SeccompFilterContainer {
         if filters.notifier.is_some() {
             return error!(EBUSY);
         }
-        let fd = current_task.add_file(handle, FdFlags::CLOEXEC)?;
+        let fd = current_task.add_file(locked, handle, FdFlags::CLOEXEC)?;
         {
             let mut state = the_notifier.lock();
             state.add_thread();
@@ -381,12 +384,16 @@ impl SeccompState {
 
     /// Check to see if this syscall is allowed in STRICT mode, and, if not,
     /// send the current task a SIGKILL.
-    pub fn do_strict(task: &Task, syscall: &Syscall) -> Option<Result<SyscallResult, Errno>> {
+    pub fn do_strict(
+        locked: &mut Locked<Unlocked>,
+        task: &Task,
+        syscall: &Syscall,
+    ) -> Option<Result<SyscallResult, Errno>> {
         if syscall.decl.number as u32 != __NR_exit
             && syscall.decl.number as u32 != __NR_read
             && syscall.decl.number as u32 != __NR_write
         {
-            send_standard_signal(task, SignalInfo::default(SIGKILL));
+            send_standard_signal(locked, task, SignalInfo::default(SIGKILL));
             return Some(Err(errno_from_code!(0)));
         }
         None
@@ -495,7 +502,7 @@ impl SeccompState {
                     force: true,
                 };
 
-                send_standard_signal(current_task, siginfo);
+                send_standard_signal(locked, current_task, siginfo);
                 Some(Err(errno_from_code!(-(syscall.decl.number as i16))))
             }
             SeccompAction::UserNotif => {

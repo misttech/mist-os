@@ -218,7 +218,7 @@ pub fn sys_execveat(
     // See the Limits sections in https://man7.org/linux/man-pages/man2/execve.2.html
     const PAGE_LIMIT: usize = 32;
     let page_limit_size: usize = PAGE_LIMIT * *PAGE_SIZE as usize;
-    let rlimit = current_task.thread_group().get_rlimit(Resource::STACK);
+    let rlimit = current_task.thread_group().get_rlimit(locked, Resource::STACK);
     let stack_limit = rlimit / 4;
     let argv_env_limit = cmp::max(page_limit_size, stack_limit as usize);
 
@@ -762,7 +762,7 @@ pub fn sys_sched_getscheduler(
 }
 
 pub fn sys_sched_setscheduler(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     policy: u32,
@@ -774,7 +774,7 @@ pub fn sys_sched_setscheduler(
 
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
-    let rlimit = target_task.thread_group().get_rlimit(Resource::RTPRIO);
+    let rlimit = target_task.thread_group().get_rlimit(locked, Resource::RTPRIO);
     let param = current_task.read_object(param)?;
     let scheduler_state = SchedulerState::from_sched_params(policy, param, rlimit)?;
     if !current_task.is_euid_friendly_with(&target_task) {
@@ -909,7 +909,7 @@ pub fn sys_sched_getparam(
 }
 
 pub fn sys_sched_setparam(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     param: UserRef<sched_param>,
@@ -923,7 +923,7 @@ pub fn sys_sched_setparam(
     let target_task = Task::from_weak(&weak)?;
     let current_scheduler_state = target_task.read().scheduler_state;
 
-    let rlimit = target_task.thread_group().get_rlimit(Resource::RTPRIO);
+    let rlimit = target_task.thread_group().get_rlimit(locked, Resource::RTPRIO);
 
     let scheduler_state = SchedulerState::from_sched_params(
         current_scheduler_state.raw_policy(),
@@ -1247,7 +1247,7 @@ pub fn sys_ptrace(
         PTRACE_TRACEME => ptrace_traceme(current_task),
         PTRACE_ATTACH => ptrace_attach(locked, current_task, pid, PtraceAttachType::Attach, data),
         PTRACE_SEIZE => ptrace_attach(locked, current_task, pid, PtraceAttachType::Seize, data),
-        _ => ptrace_dispatch(current_task, request, pid, addr, data),
+        _ => ptrace_dispatch(locked, current_task, request, pid, addr, data),
     }
 }
 
@@ -1325,7 +1325,7 @@ pub fn sys_prlimit64(
 }
 
 pub fn do_prlimit64<T>(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     user_resource: u32,
@@ -1389,7 +1389,7 @@ where
                 }
                 Some(new_limit)
             };
-            ThreadGroup::adjust_rlimits(current_task, &target_task, resource, new_limit)?
+            ThreadGroup::adjust_rlimits(locked, current_task, &target_task, resource, new_limit)?
         }
     };
     if !old_limit_ref.is_null() {
@@ -1537,7 +1537,7 @@ pub fn sys_capset(
 }
 
 pub fn sys_seccomp(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     operation: u32,
     flags: u32,
@@ -1580,7 +1580,7 @@ pub fn sys_seccomp(
                 security::check_task_capable(current_task, CAP_SYS_ADMIN)
                     .map_err(|_| errno!(EACCES))?;
             }
-            current_task.add_seccomp_filter(code, flags)
+            current_task.add_seccomp_filter(locked, code, flags)
         }
         SECCOMP_GET_ACTION_AVAIL => {
             if flags != 0 || args.is_null() {
@@ -1672,7 +1672,7 @@ pub fn sys_getpriority(
 // "user space" priority, which ranges from -20 (strongest) to 19 (weakest) (other values can be
 // passed and are clamped to that range and interpretation).
 pub fn sys_setpriority(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     which: u32,
     who: i32,
@@ -1692,7 +1692,7 @@ pub fn sys_setpriority(
         (MID_RAW_PRIORITY).saturating_sub(priority).clamp(MIN_RAW_PRIORITY, MAX_RAW_PRIORITY) as u8;
     let strengthening = target_task.read().scheduler_state.raw_priority() < new_raw_priority;
     let allowed_so_far_as_rlimit_is_concerned = !strengthening
-        || new_raw_priority as u64 <= target_task.thread_group().get_rlimit(Resource::NICE);
+        || new_raw_priority as u64 <= target_task.thread_group().get_rlimit(locked, Resource::NICE);
     if !(current_task.is_euid_friendly_with(&target_task) && allowed_so_far_as_rlimit_is_concerned)
     {
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
@@ -2349,7 +2349,7 @@ mod tests {
         current_task
             .thread_group()
             .limits
-            .lock()
+            .lock(&mut locked)
             .set(Resource::RTPRIO, rlimit { rlim_cur: 255, rlim_max: 255 });
 
         let scheduler = sys_sched_getscheduler(&mut locked, &current_task, 0).unwrap();

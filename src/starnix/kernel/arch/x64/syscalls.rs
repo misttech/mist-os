@@ -492,7 +492,7 @@ mod tests {
         let file_handle = current_task
             .open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)
             .expect("open_file");
-        let fd = current_task.add_file(file_handle, FdFlags::empty()).expect("add");
+        let fd = current_task.add_file(&mut locked, file_handle, FdFlags::empty()).expect("add");
         assert_eq!(sys_dup2(&mut locked, &current_task, fd, fd), Ok(fd));
     }
 

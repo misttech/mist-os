@@ -128,7 +128,7 @@ impl FileOps for SyncFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<Unlocked>,
+        locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -212,7 +212,7 @@ impl FileOps for SyncFile {
                     "sync_file",
                 );
 
-                let fd = current_task.add_file(file, FdFlags::empty())?;
+                let fd = current_task.add_file(locked, file, FdFlags::empty())?;
                 merge_data.fence = fd.raw();
 
                 current_task.write_object(user_ref, &merge_data)?;

@@ -238,6 +238,7 @@ impl Pipe {
 
     pub fn write(
         &mut self,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
@@ -246,7 +247,7 @@ impl Pipe {
         }
 
         if self.reader_count == 0 {
-            send_standard_signal(current_task, SignalInfo::default(SIGPIPE));
+            send_standard_signal(locked, current_task, SignalInfo::default(SIGPIPE));
             return error!(EPIPE);
         }
 
@@ -501,11 +502,11 @@ impl FileOps for PipeFileObject {
         debug_assert!(offset == 0);
         debug_assert!(data.bytes_read() == 0);
 
-        let result = file.blocking_op(locked, current_task, FdEvents::POLLOUT, None, |_| {
+        let result = file.blocking_op(locked, current_task, FdEvents::POLLOUT, None, |locked| {
             let mut pipe = self.pipe.lock();
             let was_empty = pipe.is_empty();
             let offset_before = data.bytes_read();
-            let bytes_written = pipe.write(current_task, data)?;
+            let bytes_written = pipe.write(locked, current_task, data)?;
             debug_assert!(data.bytes_read() - offset_before == bytes_written);
             if bytes_written > 0 && was_empty {
                 pipe.notify_fd_events(FdEvents::POLLIN);
@@ -958,6 +959,8 @@ impl PipeFileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let locked = &mut locked;
         let available = UserBuffer::cap_buffers_to_max_rw_count(
             current_task.maximum_valid_address().ok_or_else(|| errno!(EINVAL))?,
             &mut iovec,
@@ -969,7 +972,7 @@ impl PipeFileObject {
             self.lock_pipe_for_writing(locked, current_task, self_file, non_blocking, available)?;
 
         if pipe.reader_count == 0 {
-            send_standard_signal(current_task, SignalInfo::default(SIGPIPE));
+            send_standard_signal(locked, current_task, SignalInfo::default(SIGPIPE));
             return error!(EPIPE);
         }
 

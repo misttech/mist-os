@@ -22,7 +22,10 @@ use itertools::Itertools;
 use macro_rules_attribute::apply;
 use starnix_lifecycle::{AtomicU64Counter, DropNotifier};
 use starnix_logging::{log_debug, log_error, log_warn, track_stub};
-use starnix_sync::{LockBefore, Locked, Mutex, MutexGuard, ProcessGroupState, RwLock, Unlocked};
+use starnix_sync::{
+    LockBefore, Locked, Mutex, MutexGuard, OrderedMutex, ProcessGroupState, RwLock,
+    ThreadGroupLimits, Unlocked,
+};
 use starnix_types::ownership::{OwnedRef, Releasable, TempRef, WeakRef, WeakRefKey};
 use starnix_types::stats::TaskTimeStats;
 use starnix_types::time::{itimerspec_from_itimerval, timeval_from_duration};
@@ -263,7 +266,7 @@ pub struct ThreadGroup {
     /// The resource limits for this thread group.  This is outside mutable_state
     /// to avoid deadlocks where the thread_group lock is held when acquiring
     /// the task lock, and vice versa.
-    pub limits: Mutex<ResourceLimits>,
+    pub limits: OrderedMutex<ResourceLimits, ThreadGroupLimits>,
 
     /// The next unique identifier for a seccomp filter.  These are required to be
     /// able to distinguish identical seccomp filters, which are treated differently
@@ -588,10 +591,10 @@ impl ThreadGroup {
                 drop_notifier: Default::default(),
                 // A child process created via fork(2) inherits its parent's
                 // resource limits.  Resource limits are preserved across execve(2).
-                limits: Mutex::new(
+                limits: OrderedMutex::new(
                     parent
                         .as_ref()
-                        .map(|p| p.base.limits.lock().clone())
+                        .map(|p| p.base.limits.lock(&mut locked.cast_locked()).clone())
                         .unwrap_or(Default::default()),
                 ),
                 next_seccomp_filter_id: Default::default(),
@@ -688,17 +691,18 @@ impl ThreadGroup {
                     should_send_sigkill = ptrace.has_option(PtraceOptions::EXITKILL);
                 }
                 if should_send_sigkill {
-                    send_standard_signal(task_ref.as_ref(), SignalInfo::default(SIGKILL));
+                    send_standard_signal(locked, task_ref.as_ref(), SignalInfo::default(SIGKILL));
                     continue;
                 }
 
-                let _ = ptrace_detach(&mut pids, self, task_ref.as_ref(), &UserAddress::NULL);
+                let _ =
+                    ptrace_detach(locked, &mut pids, self, task_ref.as_ref(), &UserAddress::NULL);
             }
         }
 
         for task in tasks {
             task.write().set_exit_status(exit_status.clone());
-            send_standard_signal(&task, SignalInfo::default(SIGKILL));
+            send_standard_signal(locked, &task, SignalInfo::default(SIGKILL));
         }
     }
 
@@ -1314,20 +1318,27 @@ impl ThreadGroup {
         }
     }
 
-    pub fn get_rlimit(&self, resource: Resource) -> u64 {
-        self.limits.lock().get(resource).rlim_cur
+    pub fn get_rlimit<L>(&self, locked: &mut Locked<L>, resource: Resource) -> u64
+    where
+        L: LockBefore<ThreadGroupLimits>,
+    {
+        self.limits.lock(locked).get(resource).rlim_cur
     }
 
     /// Adjusts the rlimits of the ThreadGroup to which `target_task` belongs to.
-    pub fn adjust_rlimits(
+    pub fn adjust_rlimits<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         target_task: &Task,
         resource: Resource,
         maybe_new_limit: Option<rlimit>,
-    ) -> Result<rlimit, Errno> {
+    ) -> Result<rlimit, Errno>
+    where
+        L: LockBefore<ThreadGroupLimits>,
+    {
         let thread_group = target_task.thread_group();
         let can_increase_rlimit = security::is_task_capable_noaudit(current_task, CAP_SYS_RESOURCE);
-        let mut limit_state = thread_group.limits.lock();
+        let mut limit_state = thread_group.limits.lock(locked);
         let old_limit = limit_state.get(resource);
         if let Some(new_limit) = maybe_new_limit {
             if new_limit.rlim_max > old_limit.rlim_max && !can_increase_rlimit {

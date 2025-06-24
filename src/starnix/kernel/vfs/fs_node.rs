@@ -1798,9 +1798,12 @@ impl FsNode {
         if length > MAX_LFS_FILESIZE as u64 {
             return error!(EINVAL);
         }
-        if length > current_task.thread_group().get_rlimit(Resource::FSIZE) {
-            send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
-            return error!(EFBIG);
+        {
+            let mut locked = locked.cast_locked::<M>().cast_locked::<FileOpsCore>();
+            if length > current_task.thread_group().get_rlimit(&mut locked, Resource::FSIZE) {
+                send_standard_signal(&mut locked, current_task, SignalInfo::default(SIGXFSZ));
+                return error!(EFBIG);
+            }
         }
         let mut locked = locked.cast_locked::<M>();
         self.clear_suid_and_sgid_bits(&mut locked, current_task)?;
@@ -1850,9 +1853,13 @@ impl FsNode {
     {
         let allocate_size = checked_add_offset_and_length(offset as usize, length as usize)
             .map_err(|_| errno!(EFBIG))? as u64;
-        if allocate_size > current_task.thread_group().get_rlimit(Resource::FSIZE) {
-            send_standard_signal(current_task, SignalInfo::default(SIGXFSZ));
-            return error!(EFBIG);
+        {
+            let mut locked = locked.cast_locked::<M>().cast_locked::<FileOpsCore>();
+            if allocate_size > current_task.thread_group().get_rlimit(&mut locked, Resource::FSIZE)
+            {
+                send_standard_signal(&mut locked, current_task, SignalInfo::default(SIGXFSZ));
+                return error!(EFBIG);
+            }
         }
 
         let mut locked = locked.cast_locked::<M>();

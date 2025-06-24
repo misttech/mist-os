@@ -100,7 +100,7 @@ pub fn sys_socket(
     )?;
 
     let fd_flags = socket_flags_to_fd_flags(flags);
-    let fd = current_task.add_file(socket_file, fd_flags)?;
+    let fd = current_task.add_file(locked, socket_file, fd_flags)?;
     Ok(fd)
 }
 
@@ -338,7 +338,7 @@ pub fn sys_accept4(
     let accepted_socket = SocketFile::get_from_file(&accepted_socket_file)?;
     security::socket_accept(current_task, listening_socket, accepted_socket)?;
     let fd_flags = if flags & SOCK_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    let accepted_fd = current_task.add_file(accepted_socket_file, fd_flags)?;
+    let accepted_fd = current_task.add_file(locked, accepted_socket_file, fd_flags)?;
     Ok(accepted_fd)
 }
 
@@ -483,8 +483,8 @@ pub fn sys_socketpair(
     // TODO: Eventually this will need to allocate two fd numbers (each of which could
     // potentially fail), and only populate the fd numbers (which can't fail) if both allocations
     // succeed.
-    let left_fd = current_task.add_file(left, fd_flags)?;
-    let right_fd = current_task.add_file(right, fd_flags)?;
+    let left_fd = current_task.add_file(locked, left, fd_flags)?;
+    let right_fd = current_task.add_file(locked, right, fd_flags)?;
 
     let fds = [left_fd, right_fd];
     log_trace!("socketpair -> [{:#x}, {:#x}]", fds[0].raw(), fds[1].raw());
@@ -573,6 +573,7 @@ where
 
         let expected_size = header_size + ancillary_data.total_size(current_task);
         let message_bytes = ancillary_data.into_bytes(
+            locked,
             current_task,
             flags,
             cmsg_buffer_size - cmsg_bytes_written,

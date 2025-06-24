@@ -15,7 +15,7 @@ use crate::task::{
     ThreadGroupLifecycleWaitValue, WaitResult, WaitableChildResult, Waiter,
 };
 use crate::vfs::{FdFlags, FdNumber};
-use starnix_sync::RwLockReadGuard;
+use starnix_sync::{LockBefore, RwLockReadGuard, ThreadGroupLimits};
 use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef};
 use starnix_uapi::{tid_t, uapi};
 
@@ -311,7 +311,7 @@ pub fn sys_rt_sigtimedwait(
 }
 
 pub fn sys_signalfd4(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     mask_addr: UserRef<SigSet>,
@@ -334,17 +334,21 @@ pub fn sys_signalfd4(
     } else {
         let signalfd = SignalFd::new_file(current_task, mask, flags);
         let flags = if flags & SFD_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
-        let fd = current_task.add_file(signalfd, flags)?;
+        let fd = current_task.add_file(locked, signalfd, flags)?;
         Ok(fd)
     }
 }
 
-fn send_unchecked_signal(
+fn send_unchecked_signal<L>(
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     target: &Task,
     unchecked_signal: UncheckedSignal,
     si_code: i32,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockBefore<ThreadGroupLimits>,
+{
     current_task.can_signal(&target, unchecked_signal)?;
 
     // 0 is a sentinel value used to do permission checks.
@@ -356,6 +360,7 @@ fn send_unchecked_signal(
     security::check_signal_access(current_task, &target, signal)?;
 
     send_signal(
+        locked,
         target,
         SignalInfo {
             code: si_code,
@@ -368,12 +373,16 @@ fn send_unchecked_signal(
     )
 }
 
-fn send_unchecked_signal_info(
+fn send_unchecked_signal_info<L>(
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     target: &Task,
     unchecked_signal: UncheckedSignal,
     siginfo_ref: UserAddress,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockBefore<ThreadGroupLimits>,
+{
     current_task.can_signal(&target, unchecked_signal)?;
 
     // 0 is a sentinel value used to do permission checks.
@@ -392,7 +401,7 @@ fn send_unchecked_signal_info(
         return error!(EINVAL);
     }
 
-    send_signal(&target, siginfo)
+    send_signal(locked, &target, siginfo)
 }
 
 pub fn sys_kill(
@@ -489,7 +498,7 @@ fn verify_tgid_for_task(
 }
 
 pub fn sys_tkill(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     tid: tid_t,
     unchecked_signal: UncheckedSignal,
@@ -500,11 +509,11 @@ pub fn sys_tkill(
     }
     let thread_weak = current_task.get_task(tid);
     let thread = Task::from_weak(&thread_weak)?;
-    send_unchecked_signal(current_task, &thread, unchecked_signal, SI_TKILL)
+    send_unchecked_signal(locked, current_task, &thread, unchecked_signal, SI_TKILL)
 }
 
 pub fn sys_tgkill(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     tgid: pid_t,
     tid: tid_t,
@@ -520,7 +529,7 @@ pub fn sys_tgkill(
     let thread = Task::from_weak(&weak_target)?;
     verify_tgid_for_task(&thread, tgid, &pids)?;
 
-    send_unchecked_signal(current_task, &thread, unchecked_signal, SI_TKILL)
+    send_unchecked_signal(locked, current_task, &thread, unchecked_signal, SI_TKILL)
 }
 
 pub fn sys_rt_sigreturn(
@@ -563,7 +572,7 @@ pub fn sys_rt_sigqueueinfo(
 }
 
 pub fn sys_rt_tgsigqueueinfo(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     tgid: pid_t,
     tid: tid_t,
@@ -576,7 +585,7 @@ pub fn sys_rt_tgsigqueueinfo(
     let task = Task::from_weak(&thread_weak)?;
 
     verify_tgid_for_task(&task, tgid, &pids)?;
-    send_unchecked_signal_info(current_task, &task, unchecked_signal, siginfo_ref)
+    send_unchecked_signal_info(locked, current_task, &task, unchecked_signal, siginfo_ref)
 }
 
 pub fn sys_pidfd_send_signal(
@@ -1930,7 +1939,7 @@ mod tests {
 
         // Send a signal to the task. `wait_on_pid` should realize there is a signal pending when
         // entering a wait and return with `EINTR`.
-        send_standard_signal(&task, SignalInfo::default(SIGUSR1));
+        send_standard_signal(&mut locked, &task, SignalInfo::default(SIGUSR1));
 
         let errno = wait_on_pid(
             &mut locked,
@@ -1948,7 +1957,7 @@ mod tests {
         let mut child = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
 
         // Send SIGKILL to the child. As kill is handled immediately, no need to dequeue signals.
-        send_standard_signal(&child, SignalInfo::default(SIGKILL));
+        send_standard_signal(&mut locked, &child, SignalInfo::default(SIGKILL));
         dequeue_signal_for_test(&mut locked, &mut child);
         std::mem::drop(child);
 
@@ -1971,7 +1980,7 @@ mod tests {
         let mut child = current_task.clone_task_for_test(&mut locked, 0, exit_signal);
 
         // Send the signal to the child.
-        send_standard_signal(&child, SignalInfo::default(sig));
+        send_standard_signal(&mut locked, &child, SignalInfo::default(sig));
         dequeue_signal_for_test(&mut locked, &mut child);
         std::mem::drop(child);
 

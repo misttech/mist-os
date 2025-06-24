@@ -29,7 +29,7 @@ use starnix_core::fs::fuchsia::create_remotefs_filesystem;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
 use starnix_core::task::container_namespace::ContainerNamespace;
-use starnix_core::task::{CurrentTask, ExitStatus, Kernel, RoleOverrides, SchedulerManager, Task};
+use starnix_core::task::{CurrentTask, ExitStatus, Kernel, RoleOverrides, SchedulerManager};
 use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, Namespace, WhatToMount};
@@ -45,7 +45,7 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
-use starnix_uapi::{errno, rlimit, tid_t};
+use starnix_uapi::{errno, tid_t};
 use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::ops::DerefMut;
@@ -722,7 +722,7 @@ async fn create_container(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         init_task,
         move |locked, init_task| {
-            parse_numbered_handles(init_task, None, &init_task.files).expect("");
+            parse_numbered_handles(locked, init_task, None, &init_task.files).expect("");
             init_task.exec(locked, executable, argv[0].clone(), argv.clone(), vec![])
         },
         move |result| {
@@ -805,28 +805,6 @@ fn create_fs_context(
         root.fs = OverlayStack::wrap_fs_in_writable_layer(kernel, root.fs)?;
     }
     Ok(FsContext::new(Namespace::new_with_flags(root.fs, root.flags)))
-}
-
-pub fn set_rlimits(task: &Task, rlimits: &[String]) -> Result<(), Error> {
-    let set_rlimit = |resource, value| {
-        task.thread_group()
-            .limits
-            .lock()
-            .set(resource, rlimit { rlim_cur: value, rlim_max: value });
-    };
-
-    for rlimit in rlimits.iter() {
-        let (key, value) =
-            rlimit.split_once('=').ok_or_else(|| anyhow!("Invalid rlimit: {rlimit}"))?;
-        let value = value.parse::<u64>()?;
-        match key {
-            "RLIMIT_NOFILE" => set_rlimit(Resource::NOFILE, value),
-            _ => {
-                bail!("Unknown rlimit: {key}");
-            }
-        }
-    }
-    Ok(())
 }
 
 fn parse_rlimits(rlimits: &[String]) -> Result<Vec<(Resource, u64)>, Error> {

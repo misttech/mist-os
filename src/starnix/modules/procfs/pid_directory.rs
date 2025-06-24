@@ -871,9 +871,13 @@ impl LimitsFile {
     }
 }
 impl DynamicFileSource for LimitsFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+    fn generate_locked(
+        &self,
+        locked: &mut Locked<FileOpsCore>,
+        sink: &mut DynamicFileBuf,
+    ) -> Result<(), Errno> {
         let task = Task::from_weak(&self.0)?;
-        let limits = task.thread_group().limits.lock();
+        let limits = task.thread_group().limits.lock(locked);
 
         let write_limit = |sink: &mut DynamicFileBuf, value| {
             if value == RLIM_INFINITY as u64 {
@@ -1003,7 +1007,11 @@ impl StatFile {
     }
 }
 impl DynamicFileSource for StatFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+    fn generate_locked(
+        &self,
+        locked: &mut Locked<FileOpsCore>,
+        sink: &mut DynamicFileBuf,
+    ) -> Result<(), Errno> {
         let task = Task::from_weak(&self.task)?;
 
         // All fields and their types as specified in the man page. Unimplemented fields are set to
@@ -1107,7 +1115,7 @@ impl DynamicFileSource for StatFile {
             let page_size = *PAGE_SIZE as usize;
             vsize = mem_stats.vm_size;
             rss = mem_stats.vm_rss / page_size;
-            rsslim = task.thread_group().limits.lock().get(Resource::RSS).rlim_max;
+            rsslim = task.thread_group().limits.lock(locked).get(Resource::RSS).rlim_max;
 
             {
                 let mm_state = mm.state.read();

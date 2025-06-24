@@ -23,7 +23,7 @@ use crate::vfs::{
 use fuchsia_inspect_contrib::profile_duration;
 use selinux::{FileSystemMountOptions, SecurityPermission, SecurityServer};
 use starnix_logging::{log_debug, trace_duration, CATEGORY_STARNIX_SECURITY};
-use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
+use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, ThreadGroupLimits};
 use starnix_types::ownership::TempRef;
 use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::auth::CAP_SYS_ADMIN;
@@ -1210,12 +1210,19 @@ pub fn unix_stream_connect(
 
 /// Updates the SELinux thread group state on exec.
 /// Corresponds to the `bprm_committing_creds()` and `bprm_committed_creds()` LSM hooks.
-pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
+pub fn update_state_on_exec<L>(
+    locked: &mut Locked<L>,
+    current_task: &CurrentTask,
+    elf_security_state: &ResolvedElfState,
+) where
+    L: LockBefore<ThreadGroupLimits>,
+{
     track_hook_duration!(c"security.hooks.update_state_on_exec");
     if_selinux_else(
         current_task,
         |security_server| {
             selinux_hooks::task::update_state_on_exec(
+                locked,
                 security_server,
                 current_task,
                 elf_security_state,
@@ -1973,7 +1980,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn no_state_update_for_selinux_disabled() {
-        spawn_kernel_and_run(|_locked, current_task| {
+        spawn_kernel_and_run(|locked, current_task| {
             // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
             // in the system.
             let target_sid = InitialSid::Unlabeled.into();
@@ -1982,7 +1989,7 @@ mod tests {
             assert!(selinux_hooks::task_effective_sid(current_task) != target_sid);
 
             let before_hook_sid = selinux_hooks::task_effective_sid(current_task);
-            update_state_on_exec(current_task, &elf_state);
+            update_state_on_exec(locked, current_task, &elf_state);
             assert_eq!(selinux_hooks::task_effective_sid(current_task), before_hook_sid);
             assert_eq!(current_task.security_state.lock().current_sid, before_hook_sid)
         })
@@ -1990,14 +1997,14 @@ mod tests {
 
     #[fuchsia::test]
     async fn no_state_update_for_selinux_without_policy() {
-        spawn_kernel_with_selinux_and_run(|_locked, current_task, _security_server| {
+        spawn_kernel_with_selinux_and_run(|locked, current_task, _security_server| {
             // Without SELinux enabled and a policy loaded, only `InitialSid` values exist
             // in the system.
             let initial_state = current_task.security_state.lock().clone();
             let elf_sid = InitialSid::Unlabeled.into();
             let elf_state = ResolvedElfState { sid: Some(elf_sid) };
             assert_ne!(elf_sid, selinux_hooks::task_effective_sid(current_task));
-            update_state_on_exec(current_task, &elf_state);
+            update_state_on_exec(locked, current_task, &elf_state);
             assert_eq!(*current_task.security_state.lock(), initial_state);
         })
     }
@@ -2005,7 +2012,7 @@ mod tests {
     #[fuchsia::test]
     async fn state_update_for_permissive_mode() {
         spawn_kernel_with_selinux_hooks_test_policy_and_run(
-            |_locked, current_task, security_server| {
+            |locked, current_task, security_server| {
                 security_server.set_enforcing(false);
                 let initial_state = selinux_hooks::TaskAttrs::for_kernel();
                 *current_task.security_state.lock() = initial_state.clone();
@@ -2014,7 +2021,7 @@ mod tests {
                     .expect("invalid security context");
                 let elf_state = ResolvedElfState { sid: Some(elf_sid) };
                 assert_ne!(elf_sid, selinux_hooks::task_effective_sid(current_task));
-                update_state_on_exec(current_task, &elf_state);
+                update_state_on_exec(locked, current_task, &elf_state);
                 assert_eq!(selinux_hooks::task_effective_sid(current_task), elf_sid);
                 assert_eq!(current_task.security_state.lock().current_sid, elf_sid);
             },

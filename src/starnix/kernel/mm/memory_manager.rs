@@ -24,7 +24,7 @@ use smallvec::SmallVec;
 use starnix_logging::{
     impossible_error, log_warn, trace_duration, track_stub, CATEGORY_STARNIX_MM,
 };
-use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock};
+use starnix_sync::{LockBefore, Locked, MmDumpable, OrderedMutex, RwLock, ThreadGroupLimits};
 use starnix_types::arch::ArchWidth;
 use starnix_types::futex_address::FutexAddress;
 use starnix_types::math::{round_down_to_system_page_size, round_up_to_system_page_size};
@@ -1659,13 +1659,17 @@ impl MemoryManagerState {
         Ok(())
     }
 
-    pub fn mlock(
+    pub fn mlock<L>(
         &mut self,
         current_task: &CurrentTask,
+        locked: &mut Locked<L>,
         desired_addr: UserAddress,
         desired_length: usize,
         on_fault: bool,
-    ) -> Result<(), Errno> {
+    ) -> Result<(), Errno>
+    where
+        L: LockBefore<ThreadGroupLimits>,
+    {
         let desired_end_addr =
             desired_addr.checked_add(desired_length).ok_or_else(|| errno!(EINVAL))?;
         let start_addr = round_down_to_system_page_size(desired_addr)?;
@@ -1738,7 +1742,7 @@ impl MemoryManagerState {
             return error!(ENOMEM);
         }
 
-        let memlock_rlimit = current_task.thread_group().get_rlimit(Resource::MEMLOCK);
+        let memlock_rlimit = current_task.thread_group().get_rlimit(locked, Resource::MEMLOCK);
         if self.total_locked_bytes() + num_new_locked_bytes > memlock_rlimit {
             if crate::security::check_task_capable(current_task, CAP_IPC_LOCK).is_err() {
                 let code = if memlock_rlimit > 0 { errno!(ENOMEM) } else { errno!(EPERM) };
@@ -3232,14 +3236,18 @@ impl MemoryManager {
         }
     }
 
-    pub fn set_brk(
+    pub fn set_brk<L>(
         self: &Arc<Self>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         addr: UserAddress,
-    ) -> Result<UserAddress, Errno> {
+    ) -> Result<UserAddress, Errno>
+    where
+        L: LockBefore<ThreadGroupLimits>,
+    {
         let rlimit_data = std::cmp::min(
             PROGRAM_BREAK_LIMIT,
-            current_task.thread_group().get_rlimit(Resource::DATA),
+            current_task.thread_group().get_rlimit(locked, Resource::DATA),
         );
 
         let mut released_mappings = vec![];
@@ -4642,7 +4650,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_brk() {
-        let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let mm = current_task.mm().unwrap();
 
         // Look up the given addr in the mappings table.
@@ -4653,7 +4661,7 @@ mod tests {
 
         // Initialize the program break.
         let base_addr = mm
-            .set_brk(&current_task, UserAddress::default())
+            .set_brk(&mut locked, &current_task, UserAddress::default())
             .expect("failed to set initial program break");
         assert!(base_addr > UserAddress::default());
 
@@ -4661,24 +4669,27 @@ mod tests {
         assert_eq!(get_range(base_addr), None);
 
         // Growing it by a single byte results in that page becoming mapped.
-        let addr0 =
-            mm.set_brk(&current_task, (base_addr + 1u64).unwrap()).expect("failed to grow brk");
+        let addr0 = mm
+            .set_brk(&mut locked, &current_task, (base_addr + 1u64).unwrap())
+            .expect("failed to grow brk");
         assert!(addr0 > base_addr);
         let (range0, _) = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range0.start, base_addr);
         assert_eq!(range0.end, (base_addr + *PAGE_SIZE).unwrap());
 
         // Grow the program break by another byte, which won't be enough to cause additional pages to be mapped.
-        let addr1 =
-            mm.set_brk(&current_task, (base_addr + 2u64).unwrap()).expect("failed to grow brk");
+        let addr1 = mm
+            .set_brk(&mut locked, &current_task, (base_addr + 2u64).unwrap())
+            .expect("failed to grow brk");
         assert_eq!(addr1, (base_addr + 2u64).unwrap());
         let (range1, _) = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range1.start, range0.start);
         assert_eq!(range1.end, range0.end);
 
         // Grow the program break by a non-trival amount and observe the larger mapping.
-        let addr2 =
-            mm.set_brk(&current_task, (base_addr + 24893u64).unwrap()).expect("failed to grow brk");
+        let addr2 = mm
+            .set_brk(&mut locked, &current_task, (base_addr + 24893u64).unwrap())
+            .expect("failed to grow brk");
         assert_eq!(addr2, (base_addr + 24893u64).unwrap());
         let (range2, _) = get_range(base_addr).expect("base_addr should be mapped");
         assert_eq!(range2.start, base_addr);
@@ -4686,7 +4697,7 @@ mod tests {
 
         // Shrink the program break and observe the smaller mapping.
         let addr3 = mm
-            .set_brk(&current_task, (base_addr + 14832u64).unwrap())
+            .set_brk(&mut locked, &current_task, (base_addr + 14832u64).unwrap())
             .expect("failed to shrink brk");
         assert_eq!(addr3, (base_addr + 14832u64).unwrap());
         let (range3, _) = get_range(base_addr).expect("base_addr should be mapped");
@@ -4695,7 +4706,7 @@ mod tests {
 
         // Shrink the program break close to zero and observe the smaller mapping.
         let addr4 = mm
-            .set_brk(&current_task, (base_addr + 3u64).unwrap())
+            .set_brk(&mut locked, &current_task, (base_addr + 3u64).unwrap())
             .expect("failed to drastically shrink brk");
         assert_eq!(addr4, (base_addr + 3u64).unwrap());
         let (range4, _) = get_range(base_addr).expect("base_addr should be mapped");
@@ -4703,8 +4714,9 @@ mod tests {
         assert_eq!(range4.end, addr4.round_up(*PAGE_SIZE).unwrap());
 
         // Shrink the program break to zero and observe that the mapping is entirely gone.
-        let addr5 =
-            mm.set_brk(&current_task, base_addr).expect("failed to drastically shrink brk to zero");
+        let addr5 = mm
+            .set_brk(&mut locked, &current_task, base_addr)
+            .expect("failed to drastically shrink brk to zero");
         assert_eq!(addr5, base_addr);
         assert_eq!(get_range(base_addr), None);
     }
@@ -4720,13 +4732,13 @@ mod tests {
         };
 
         let brk_addr = mm
-            .set_brk(&current_task, UserAddress::default())
+            .set_brk(&mut locked, &current_task, UserAddress::default())
             .expect("failed to set initial program break");
         assert!(brk_addr > UserAddress::default());
 
         // Allocate a single page of BRK space, so that the break base address is mapped.
         let _ = mm
-            .set_brk(&current_task, (brk_addr + 1u64).unwrap())
+            .set_brk(&mut locked, &current_task, (brk_addr + 1u64).unwrap())
             .expect("failed to grow program break");
         assert!(has(brk_addr));
 

@@ -527,7 +527,13 @@ impl FileOps for MagmaFile {
                 ) = read_control_and_response(current_task, &command)?;
                 let buffer = self.get_buffer(control.buffer)?;
 
-                get_buffer_handle(current_task, control, &mut response, &buffer)?;
+                get_buffer_handle(
+                    locked.cast_locked(),
+                    current_task,
+                    control,
+                    &mut response,
+                    &buffer,
+                )?;
 
                 current_task.write_object(UserRef::new(response_address), &response)
             }
@@ -560,6 +566,7 @@ impl FileOps for MagmaFile {
                 let buffer = self.get_buffer(control.buffer)?;
 
                 export_buffer(
+                    locked,
                     current_task,
                     control,
                     &mut response,
@@ -809,7 +816,7 @@ impl FileOps for MagmaFile {
                         "sync_file",
                     );
 
-                    let fd = current_task.add_file(file, FdFlags::empty())?;
+                    let fd = current_task.add_file(locked, file, FdFlags::empty())?;
                     sync_file_fd = fd.raw();
                 }
 
@@ -1088,7 +1095,7 @@ impl FileOps for MagmaFile {
                     virtio_magma_device_query_resp_t,
                 ) = read_control_and_response(current_task, &command)?;
 
-                query(current_task, control, &mut response)?;
+                query(locked, current_task, control, &mut response)?;
 
                 response.hdr.type_ = virtio_magma_ctrl_type_VIRTIO_MAGMA_RESP_DEVICE_QUERY as u32;
                 current_task.write_object(UserRef::new(response_address), &response)

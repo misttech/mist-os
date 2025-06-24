@@ -19,7 +19,7 @@ use crate::task::{
 use crate::vfs::pseudo::simple_file::parse_unsigned_file;
 use bitflags::bitflags;
 use starnix_logging::track_stub;
-use starnix_sync::{LockBefore, Locked, MmDumpable, Unlocked};
+use starnix_sync::{LockBefore, Locked, MmDumpable, ThreadGroupLimits, Unlocked};
 use starnix_syscalls::decls::SyscallDecl;
 use starnix_syscalls::SyscallResult;
 use starnix_types::ownership::{OwnedRef, Releasable, ReleaseGuard, TempRef, WeakRef};
@@ -658,7 +658,15 @@ pub enum PtraceAllowedPtracers {
 /// |data| is treated as it is in PTRACE_CONT.
 /// |new_status| is the PtraceStatus to set for this trace.
 /// |detach| will cause the tracer to detach from the tracee.
-fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Errno> {
+fn ptrace_cont<L>(
+    locked: &mut Locked<L>,
+    tracee: &Task,
+    data: &UserAddress,
+    detach: bool,
+) -> Result<(), Errno>
+where
+    L: LockBefore<ThreadGroupLimits>,
+{
     let data = data.ptr() as u64;
     let new_state;
     let mut siginfo = if data != 0 {
@@ -706,7 +714,7 @@ fn ptrace_cont(tracee: &Task, data: &UserAddress, detach: bool) -> Result<(), Er
 
     if let Some(siginfo) = siginfo {
         // This will wake up the task for us, and also release state
-        send_signal_first(&tracee, state, siginfo);
+        send_signal_first(locked, &tracee, state, siginfo);
     } else {
         state.set_stopped(StopState::Waking, None, None, None);
         drop(state);
@@ -764,13 +772,17 @@ fn ptrace_listen(tracee: &Task) -> Result<(), Errno> {
     Ok(())
 }
 
-pub fn ptrace_detach(
+pub fn ptrace_detach<L>(
+    locked: &mut Locked<L>,
     pids: &mut PidTable,
     thread_group: &ThreadGroup,
     tracee: &Task,
     data: &UserAddress,
-) -> Result<(), Errno> {
-    if let Err(x) = ptrace_cont(&tracee, &data, true) {
+) -> Result<(), Errno>
+where
+    L: LockBefore<ThreadGroupLimits>,
+{
+    if let Err(x) = ptrace_cont(locked, &tracee, &data, true) {
         return Err(x);
     }
     let tid = tracee.get_tid();
@@ -780,13 +792,17 @@ pub fn ptrace_detach(
 }
 
 /// For all ptrace requests that require an attached tracee
-pub fn ptrace_dispatch(
+pub fn ptrace_dispatch<L>(
+    locked: &mut Locked<L>,
     current_task: &mut CurrentTask,
     request: u32,
     pid: pid_t,
     addr: UserAddress,
     data: UserAddress,
-) -> Result<SyscallResult, Errno> {
+) -> Result<SyscallResult, Errno>
+where
+    L: LockBefore<ThreadGroupLimits>,
+{
     let weak_task = current_task.kernel().pids.read().get_task(pid);
     let tracee = weak_task.upgrade().ok_or_else(|| errno!(ESRCH))?;
 
@@ -802,7 +818,7 @@ pub fn ptrace_dispatch(
         PTRACE_KILL => {
             let mut siginfo = SignalInfo::default(SIGKILL);
             siginfo.code = (linux_uapi::SIGTRAP | PTRACE_KILL << 8) as i32;
-            send_standard_signal(&tracee, siginfo);
+            send_standard_signal(locked, &tracee, siginfo);
             return Ok(starnix_syscalls::SUCCESS);
         }
         PTRACE_INTERRUPT => {
@@ -814,17 +830,17 @@ pub fn ptrace_dispatch(
             return Ok(starnix_syscalls::SUCCESS);
         }
         PTRACE_CONT => {
-            ptrace_cont(&tracee, &data, false)?;
+            ptrace_cont(locked, &tracee, &data, false)?;
             return Ok(starnix_syscalls::SUCCESS);
         }
         PTRACE_SYSCALL => {
             tracee.trace_syscalls.store(true, std::sync::atomic::Ordering::Relaxed);
-            ptrace_cont(&tracee, &data, false)?;
+            ptrace_cont(locked, &tracee, &data, false)?;
             return Ok(starnix_syscalls::SUCCESS);
         }
         PTRACE_DETACH => {
             let mut pids = current_task.kernel().pids.write();
-            ptrace_detach(&mut pids, current_task.thread_group(), tracee.as_ref(), &data)?;
+            ptrace_detach(locked, &mut pids, current_task.thread_group(), tracee.as_ref(), &data)?;
             return Ok(starnix_syscalls::SUCCESS);
         }
         _ => {}
@@ -1079,10 +1095,14 @@ fn check_caps_for_attach(ptrace_scope: u8, current_task: &CurrentTask) -> Result
 /// Uses the given core ptrace state (including tracer, attach type, etc) to
 /// attach to another task, given by `tracee_task`.  Also sends a signal to stop
 /// tracee_task.  Typical for when inheriting ptrace state from another task.
-pub fn ptrace_attach_from_state(
+pub fn ptrace_attach_from_state<L>(
+    locked: &mut Locked<L>,
     tracee_task: &OwnedRef<Task>,
     ptrace_state: PtraceCoreState,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockBefore<ThreadGroupLimits>,
+{
     {
         let weak_tg = tracee_task
             .thread_group()
@@ -1113,7 +1133,7 @@ pub fn ptrace_attach_from_state(
     } else {
         SignalInfo::default(SIGSTOP)
     };
-    send_signal_first(tracee_task, state, signal);
+    send_signal_first(locked, tracee_task, state, signal);
 
     Ok(())
 }
@@ -1198,7 +1218,11 @@ where
     current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &tracee)?;
     do_attach(current_task.thread_group(), weak_task.clone(), attach_type, PtraceOptions::empty())?;
     if attach_type == PtraceAttachType::Attach {
-        send_standard_signal(&tracee, SignalInfo::default(SIGSTOP));
+        send_standard_signal(
+            &mut locked.cast_locked::<MmDumpable>(),
+            &tracee,
+            SignalInfo::default(SIGSTOP),
+        );
     } else if attach_type == PtraceAttachType::Seize {
         // When seizing, |data| should be used as the options bitmask.
         if let Some(task_ref) = weak_task.upgrade() {

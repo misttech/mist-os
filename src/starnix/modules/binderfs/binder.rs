@@ -3454,7 +3454,7 @@ impl ResourceAccessor for CurrentTask {
 
     fn add_files_with_flags(
         &self,
-        _locked: &mut Locked<ResourceAccessorAddFile>,
+        locked: &mut Locked<ResourceAccessorAddFile>,
         _current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3462,7 +3462,7 @@ impl ResourceAccessor for CurrentTask {
         let mut fds = Vec::with_capacity(files.len());
         for (file, flags) in files {
             log_trace!("Adding file {:?} with flags {:?}", file, flags);
-            let fd = self.add_file(file, flags)?;
+            let fd = self.add_file(locked, file, flags)?;
             add_action(fd);
             fds.push(fd);
         }
@@ -3500,7 +3500,7 @@ impl ResourceAccessor for Task {
 
     fn add_files_with_flags(
         &self,
-        _locked: &mut Locked<ResourceAccessorAddFile>,
+        locked: &mut Locked<ResourceAccessorAddFile>,
         _current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3508,7 +3508,7 @@ impl ResourceAccessor for Task {
         let mut fds = Vec::with_capacity(files.len());
         for (file, flags) in files {
             log_trace!("Adding file {:?} with flags {:?}", file, flags);
-            let fd = self.add_file(file, flags)?;
+            let fd = self.add_file(locked, file, flags)?;
             add_action(fd);
             fds.push(fd);
         }
@@ -7400,7 +7400,7 @@ pub mod tests {
             // descriptor so that the translation doesn't happen to use the same FDs for receiver and
             // sender, potentially hiding a bug.
             current_task
-                .add_file(PanickingFile::new_file(&current_task), FdFlags::empty())
+                .add_file(locked, PanickingFile::new_file(&current_task), FdFlags::empty())
                 .unwrap();
 
             // Open two files in the sender process. These will be sent in the transaction.
@@ -7409,7 +7409,7 @@ pub mod tests {
             let sender_fds = files
                 .iter()
                 .map(|file| {
-                    current_task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file")
+                    current_task.add_file(locked, file.clone(), FdFlags::CLOEXEC).expect("add file")
                 })
                 .collect::<Vec<_>>();
 
@@ -7599,7 +7599,7 @@ pub mod tests {
             // descriptor so that the translation doesn't happen to use the same FDs for receiver and
             // sender, potentially hiding a bug.
             current_task
-                .add_file(PanickingFile::new_file(&current_task), FdFlags::empty())
+                .add_file(locked, PanickingFile::new_file(&current_task), FdFlags::empty())
                 .unwrap();
 
             // Open two files in the sender process. These will be sent in the transaction.
@@ -7607,7 +7607,9 @@ pub mod tests {
                 [PanickingFile::new_file(&current_task), PanickingFile::new_file(&current_task)];
             let sender_fds = files
                 .into_iter()
-                .map(|file| current_task.add_file(file, FdFlags::CLOEXEC).expect("add file"))
+                .map(|file| {
+                    current_task.add_file(locked, file, FdFlags::CLOEXEC).expect("add file")
+                })
                 .collect::<Vec<_>>();
 
             // Ensure that the receiver.task() has no file descriptors.
@@ -7721,7 +7723,7 @@ pub mod tests {
             // descriptor so that the translation doesn't happen to use the same FDs for receiver and
             // sender, potentially hiding a bug.
             current_task
-                .add_file(PanickingFile::new_file(&current_task), FdFlags::empty())
+                .add_file(locked, PanickingFile::new_file(&current_task), FdFlags::empty())
                 .unwrap();
 
             // Open two files in the sender process. These will be sent in the transaction.
@@ -7729,7 +7731,9 @@ pub mod tests {
                 [PanickingFile::new_file(&current_task), PanickingFile::new_file(&current_task)];
             let sender_fds = files
                 .into_iter()
-                .map(|file| current_task.add_file(file, FdFlags::CLOEXEC).expect("add file"))
+                .map(|file| {
+                    current_task.add_file(locked, file, FdFlags::CLOEXEC).expect("add file")
+                })
                 .collect::<Vec<_>>();
 
             // Ensure that the receiver.task() has no file descriptors.
@@ -8323,7 +8327,7 @@ pub mod tests {
             // Open a file in the sender process.
             let file = PanickingFile::new_file(&current_task);
             let sender_fd =
-                current_task.add_file(file.clone(), FdFlags::CLOEXEC).expect("add file");
+                current_task.add_file(locked, file.clone(), FdFlags::CLOEXEC).expect("add file");
 
             // Send the fd in a transaction. `flags` and `cookie` are set so that we can ensure binder
             // driver doesn't touch them/passes them through.
@@ -8405,7 +8409,7 @@ pub mod tests {
 
             // Open a file in the sender process.
             let sender_fd = current_task
-                .add_file(PanickingFile::new_file(&current_task), FdFlags::CLOEXEC)
+                .add_file(locked, PanickingFile::new_file(&current_task), FdFlags::CLOEXEC)
                 .expect("add file");
 
             // Send the fd in a transaction.

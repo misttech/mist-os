@@ -262,6 +262,7 @@ pub fn sys_fcntl(
             let fd_number = arg as i32;
             let flags = if cmd == F_DUPFD_CLOEXEC { FdFlags::CLOEXEC } else { FdFlags::empty() };
             let newfd = current_task.files.duplicate(
+                locked,
                 current_task,
                 fd,
                 TargetFdNumber::Minimum(FdNumber::from_raw(fd_number)),
@@ -802,7 +803,7 @@ fn do_openat(
 ) -> Result<FdNumber, Errno> {
     let file = open_file_at(locked, current_task, dir_fd, user_path, flags, mode, resolve_flags)?;
     let fd_flags = get_fd_flags(flags);
-    current_task.add_file(file, fd_flags)
+    current_task.add_file(locked, file, fd_flags)
 }
 
 pub fn sys_openat(
@@ -1637,8 +1638,8 @@ pub fn sys_pipe2(
     write.update_file_flags(file_flags, supported_file_flags);
 
     let fd_flags = get_fd_flags(flags);
-    let fd_read = current_task.add_file(read, fd_flags)?;
-    let fd_write = current_task.add_file(write, fd_flags)?;
+    let fd_read = current_task.add_file(locked, read, fd_flags)?;
+    let fd_write = current_task.add_file(locked, write, fd_flags)?;
     log_trace!("pipe2 -> [{:#x}, {:#x}]", fd_read.raw(), fd_write.raw());
 
     current_task.write_object(user_pipe, &fd_read)?;
@@ -1710,15 +1711,21 @@ pub fn sys_symlinkat(
 }
 
 pub fn sys_dup(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     oldfd: FdNumber,
 ) -> Result<FdNumber, Errno> {
-    current_task.files.duplicate(current_task, oldfd, TargetFdNumber::Default, FdFlags::empty())
+    current_task.files.duplicate(
+        locked,
+        current_task,
+        oldfd,
+        TargetFdNumber::Default,
+        FdFlags::empty(),
+    )
 }
 
 pub fn sys_dup3(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     oldfd: FdNumber,
     newfd: FdNumber,
@@ -1731,7 +1738,13 @@ pub fn sys_dup3(
         return error!(EINVAL);
     }
     let fd_flags = get_fd_flags(flags);
-    current_task.files.duplicate(current_task, oldfd, TargetFdNumber::Specific(newfd), fd_flags)?;
+    current_task.files.duplicate(
+        locked,
+        current_task,
+        oldfd,
+        TargetFdNumber::Specific(newfd),
+        fd_flags,
+    )?;
     Ok(newfd)
 }
 
@@ -1791,7 +1804,7 @@ pub fn sys_memfd_create(
     if flags & MFD_CLOEXEC != 0 {
         fd_flags |= FdFlags::CLOEXEC;
     }
-    let fd = current_task.add_file(file, fd_flags)?;
+    let fd = current_task.add_file(locked, file, fd_flags)?;
     Ok(fd)
 }
 
@@ -1997,7 +2010,7 @@ pub fn sys_umount2(
 }
 
 pub fn sys_eventfd2(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     value: u32,
     flags: u32,
@@ -2010,12 +2023,12 @@ pub fn sys_eventfd2(
         if (flags & EFD_SEMAPHORE) == 0 { EventFdType::Counter } else { EventFdType::Semaphore };
     let file = new_eventfd(current_task, value, eventfd_type, blocking);
     let fd_flags = if flags & EFD_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    let fd = current_task.add_file(file, fd_flags)?;
+    let fd = current_task.add_file(locked, file, fd_flags)?;
     Ok(fd)
 }
 
 pub fn sys_pidfd_open(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     flags: u32,
@@ -2037,7 +2050,7 @@ pub fn sys_pidfd_open(
     let blocking = (flags & PIDFD_NONBLOCK) == 0;
     let open_flags = if blocking { OpenFlags::empty() } else { OpenFlags::NONBLOCK };
     let file = new_pidfd(current_task, task.thread_group(), open_flags);
-    current_task.add_file(file, FdFlags::CLOEXEC)
+    current_task.add_file(locked, file, FdFlags::CLOEXEC)
 }
 
 pub fn sys_pidfd_getfd(
@@ -2059,11 +2072,11 @@ pub fn sys_pidfd_getfd(
     current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &task)?;
 
     let target_file = task.files.get(targetfd)?;
-    current_task.add_file(target_file, FdFlags::CLOEXEC)
+    current_task.add_file(locked, target_file, FdFlags::CLOEXEC)
 }
 
 pub fn sys_timerfd_create(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     clock_id: u32,
     flags: u32,
@@ -2099,7 +2112,7 @@ pub fn sys_timerfd_create(
     };
 
     let timer = TimerFile::new_file(current_task, timer_type, timeline, open_flags)?;
-    let fd = current_task.add_file(timer, fd_flags)?;
+    let fd = current_task.add_file(locked, timer, fd_flags)?;
     Ok(fd)
 }
 
@@ -2374,7 +2387,7 @@ pub fn sys_select(
 }
 
 pub fn sys_epoll_create1(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
@@ -2383,7 +2396,7 @@ pub fn sys_epoll_create1(
     }
     let ep_file = EpollFileObject::new_file(current_task);
     let fd_flags = if flags & EPOLL_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    let fd = current_task.add_file(ep_file, fd_flags)?;
+    let fd = current_task.add_file(locked, ep_file, fd_flags)?;
     Ok(fd)
 }
 
@@ -2596,7 +2609,9 @@ pub fn poll(
     mask: Option<SigSet>,
     deadline: zx::MonotonicInstant,
 ) -> Result<usize, Errno> {
-    if num_fds < 0 || num_fds as u64 > current_task.thread_group().get_rlimit(Resource::NOFILE) {
+    if num_fds < 0
+        || num_fds as u64 > current_task.thread_group().get_rlimit(locked, Resource::NOFILE)
+    {
         return error!(EINVAL);
     }
 
@@ -2858,7 +2873,7 @@ pub fn sys_fallocate(
 }
 
 pub fn sys_inotify_init1(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
@@ -2869,7 +2884,7 @@ pub fn sys_inotify_init1(
     let close_on_exec = flags & IN_CLOEXEC != 0;
     let inotify_file = InotifyFileObject::new_file(current_task, non_blocking);
     let fd_flags = if close_on_exec { FdFlags::CLOEXEC } else { FdFlags::empty() };
-    current_task.add_file(inotify_file, fd_flags)
+    current_task.add_file(locked, inotify_file, fd_flags)
 }
 
 pub fn sys_inotify_add_watch(
@@ -3152,7 +3167,7 @@ pub fn sys_io_destroy(
 }
 
 pub fn sys_io_uring_setup(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_entries: UserValue<u32>,
     user_params: UserRef<io_uring_params>,
@@ -3201,7 +3216,7 @@ pub fn sys_io_uring_setup(
     let file = IoUringFileObject::new_file(current_task, entries, &mut params)?;
 
     // io_uring file descriptors are always created with CLOEXEC.
-    let fd = current_task.add_file(file, FdFlags::CLOEXEC)?;
+    let fd = current_task.add_file(locked, file, FdFlags::CLOEXEC)?;
     current_task.write_object(user_params, &params)?;
     Ok(fd)
 }
@@ -3692,7 +3707,7 @@ mod tests {
         let file_handle =
             current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
         let file_size = file_handle.node().stat(&mut locked, &current_task).unwrap().st_size;
-        current_task.files.insert(&current_task, fd, file_handle).unwrap();
+        current_task.files.insert(&mut locked, &current_task, fd, file_handle).unwrap();
 
         assert_eq!(sys_lseek(&mut locked, &current_task, fd, 0, SEEK_CUR)?, 0);
         assert_eq!(sys_lseek(&mut locked, &current_task, fd, 1, SEEK_CUR)?, 1);
@@ -3718,7 +3733,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
         let file_handle =
             current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
-        let oldfd = current_task.add_file(file_handle, FdFlags::empty())?;
+        let oldfd = current_task.add_file(&mut locked, file_handle, FdFlags::empty())?;
         let newfd = sys_dup(&mut locked, &current_task, oldfd)?;
 
         assert_ne!(oldfd, newfd);
@@ -3735,7 +3750,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
         let file_handle =
             current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
-        let oldfd = current_task.add_file(file_handle, FdFlags::empty())?;
+        let oldfd = current_task.add_file(&mut locked, file_handle, FdFlags::empty())?;
         let newfd = FdNumber::from_raw(2);
         sys_dup3(&mut locked, &current_task, oldfd, newfd, O_CLOEXEC)?;
 
@@ -3758,7 +3773,8 @@ mod tests {
         // to the new file handle.
         let second_file_handle =
             current_task.open_file(&mut locked, "data/testfile.txt".into(), OpenFlags::RDONLY)?;
-        let different_file_fd = current_task.add_file(second_file_handle, FdFlags::empty())?;
+        let different_file_fd =
+            current_task.add_file(&mut locked, second_file_handle, FdFlags::empty())?;
         assert!(!Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(different_file_fd).unwrap()));
         sys_dup3(&mut locked, &current_task, oldfd, different_file_fd, O_CLOEXEC)?;
         assert!(Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(different_file_fd).unwrap()));

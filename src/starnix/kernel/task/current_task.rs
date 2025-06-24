@@ -961,6 +961,7 @@ impl CurrentTask {
             log_warn!("unrecoverable error in exec: {err:?}");
 
             send_standard_signal(
+                locked,
                 self,
                 SignalInfo { code: SI_KERNEL as i32, force: true, ..SignalInfo::default(SIGSEGV) },
             );
@@ -999,7 +1000,11 @@ impl CurrentTask {
 
         // Update the SELinux state, if enabled.
         // TODO: Do we need to update this state after updating the creds for exec?
-        security::update_state_on_exec(self, &resolved_elf.security_state);
+        security::update_state_on_exec(
+            &mut locked.cast_locked::<MmDumpable>(),
+            self,
+            &resolved_elf.security_state,
+        );
 
         {
             let mut state = self.write();
@@ -1100,6 +1105,7 @@ impl CurrentTask {
 
     pub fn add_seccomp_filter(
         &mut self,
+        locked: &mut Locked<Unlocked>,
         code: Vec<sock_filter>,
         flags: u32,
     ) -> Result<SyscallResult, Errno> {
@@ -1112,7 +1118,7 @@ impl CurrentTask {
         let mut maybe_fd: Option<FdNumber> = None;
 
         if flags & SECCOMP_FILTER_FLAG_NEW_LISTENER != 0 {
-            maybe_fd = Some(SeccompFilterContainer::create_listener(self)?);
+            maybe_fd = Some(SeccompFilterContainer::create_listener(locked, self)?);
         }
 
         // We take the process lock here because we can't change any of the threads
@@ -1181,7 +1187,7 @@ impl CurrentTask {
         // Implementation of SECCOMP_FILTER_STRICT, which has slightly different semantics
         // from user-defined seccomp filters.
         if self.seccomp_filter_state.get() == SeccompStateValue::Strict {
-            return SeccompState::do_strict(self, syscall);
+            return SeccompState::do_strict(locked, self, syscall);
         }
 
         // Run user-defined seccomp filters
@@ -1782,7 +1788,7 @@ impl CurrentTask {
                         // turned on, then send a SIGTRAP.
                         if trace_kind == PtraceOptions::TRACEEXEC && !ptrace.is_seized() {
                             // Send a SIGTRAP so that the parent can gain control.
-                            send_signal_first(self, state, SignalInfo::default(SIGTRAP));
+                            send_signal_first(locked, self, state, SignalInfo::default(SIGTRAP));
                         }
 
                         return;
