@@ -198,11 +198,6 @@ class BootShimHelper {
     // Determine at compile time if the item is present, if so initialize them.
     if constexpr (options.generate_peripheral_ranges) {
       shim_.set_mmio_observer(MarkAsPeripheral);
-
-      // Mark the UART MMIO range as a peripheral range.
-      if (auto uart_mmio = GetUartDriver().maybe_mmio_range()) {
-        MarkAsPeripheral(uart_mmio->AlignedTo(ZX_PAGE_SIZE));
-      }
     }
 
     // This will initialize these common set of items if they are present, otherwise they will
