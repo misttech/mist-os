@@ -288,7 +288,9 @@ capabilities for development. The following capabilities are offered to
 components in this collection:
 
 *   [Protocol capabilities][capability-protocol]
-    *   [`fuchsia.logger.LogSink`][fidl-logger]: Record log messages
+    *   [`fuchsia.logger.LogSink`][fidl-logger]: Record log messages. You can
+        use this protocol with `include: [ "syslog/client.shard.cml" ],` in your
+        component's CML file.
     *   [`fuchsia.process.Launcher`][fidl-launcher]: Create new processes
 *   [Storage capabilities][capability-storage]
     *   `tmp`: Temporary storage (non-persistent)
