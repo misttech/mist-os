@@ -117,4 +117,10 @@ open protocol SystemActivityControl {
     strict StartApplicationActivity() -> () error SystemActivityControlError;
     /// Called by a client to drop the lease to the System Activity Governor.
     strict StopApplicationActivity() -> () error SystemActivityControlError;
+
+    /// Called by a client to drop and then reclaim the lease to the System Activity Governor.
+    strict RestartApplicationActivity(struct {
+        /// The time to wait after dropping the lease but before reclaiming it.
+        wait_time_ns uint64;
+    }) -> () error SystemActivityControlError;
 };

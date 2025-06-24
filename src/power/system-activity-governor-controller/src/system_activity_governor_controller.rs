@@ -75,6 +75,17 @@ impl SystemActivityGovernorController {
                         warn!(error:?; "Error while responding to StopApplicationActivity request");
                     }
                 }
+                Ok(fpt::SystemActivityControlRequest::RestartApplicationActivity {
+                    responder,
+                    wait_time_ns,
+                }) => {
+                    let result = responder
+                        .send(self.clone().restart_application_activity(wait_time_ns).await);
+
+                    if let Err(error) = result {
+                        warn!(error:?; "Error while responding to StopApplicationActivity request");
+                    }
+                }
                 Ok(fpt::SystemActivityControlRequest::_UnknownMethod { ordinal, .. }) => {
                     warn!(ordinal:?; "Unknown ActivityGovernorRequest method");
                 }
@@ -109,6 +120,16 @@ impl SystemActivityGovernorController {
         self: Rc<Self>,
     ) -> fpt::SystemActivityControlStartApplicationActivityResult {
         drop(self.application_activity_token.borrow_mut().take());
+        Ok(())
+    }
+
+    async fn restart_application_activity(
+        self: Rc<Self>,
+        wait_time_ns: u64,
+    ) -> fpt::SystemActivityControlStartApplicationActivityResult {
+        self.clone().stop_application_activity()?;
+        fasync::Timer::new(std::time::Duration::from_nanos(wait_time_ns)).await;
+        self.start_application_activity().await?;
         Ok(())
     }
 }
