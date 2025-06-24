@@ -254,16 +254,18 @@ zx::result<std::string> TestLoopBase::GetPowerElementId(diagnostics::reader::Arc
   }
 }
 
-zx::eventpair TestLoopBase::PrepareDriver(std::string_view node_filter, std::string_view driver_url,
+zx::eventpair TestLoopBase::PrepareDriver(std::string_view node_filter,
+                                          std::string_view driver_url_suffix,
                                           bool expect_new_koid) {
   // Find the node running our target driver.
-  std::cout << "Preparing driver '" << driver_url << "' for test..." << std::endl;
+  std::cout << "Preparing driver '" << driver_url_suffix << "' for test..." << std::endl;
   std::optional<std::string> found = std::nullopt;
   uint64_t old_koid;
   while (!found) {
     auto node_vec = GetNodeInfo(node_filter);
     for (auto& node : node_vec) {
-      if (node.bound_driver_url().has_value() && node.bound_driver_url().value() == driver_url) {
+      if (node.bound_driver_url().has_value() &&
+          node.bound_driver_url().value().ends_with(driver_url_suffix)) {
         std::cout << "driver found with moniker '" << node.moniker().value() << "'" << std::endl;
         found.emplace(node.moniker().value());
         old_koid = node.driver_host_koid().value();
@@ -298,7 +300,8 @@ zx::eventpair TestLoopBase::PrepareDriver(std::string_view node_filter, std::str
   while (!found) {
     auto node_vec = GetNodeInfo(node_filter);
     for (auto& node : node_vec) {
-      if (node.bound_driver_url().has_value() && node.bound_driver_url().value() == driver_url) {
+      if (node.bound_driver_url().has_value() &&
+          node.bound_driver_url().value().ends_with(driver_url_suffix)) {
         if (node.driver_host_koid().has_value()) {
           if (!expect_new_koid || old_koid != node.driver_host_koid().value()) {
             found.emplace(node.moniker().value());

@@ -107,8 +107,7 @@ class PowerSystemIntegration : public system_integration_utils::TestLoopBase, pu
 
 TEST_F(PowerSystemIntegration, SuspendResume) {
   // Hold on to fence for the test duration.
-  auto fence =
-      PrepareDriver("gpu-ffe40000_group", "fuchsia-boot:///aml-gpu-package#meta/aml-gpu.cm", true);
+  auto fence = PrepareDriver("gpu-ffe40000_group", "/aml-gpu-package#meta/aml-gpu.cm", true);
 
   // Duration to sleep much be << 1 second, or else the command submission may timeout.
   const auto kPollDuration = zx::msec(50);
@@ -228,8 +227,7 @@ TEST_F(PowerSystemIntegration, SuspendResume) {
 
 TEST_F(PowerSystemIntegration, PowerIdle) {
   // Hold on to fence for the test duration.
-  auto fence =
-      PrepareDriver("gpu-ffe40000_group", "fuchsia-boot:///aml-gpu-package#meta/aml-gpu.cm", true);
+  auto fence = PrepareDriver("gpu-ffe40000_group", "/aml-gpu-package#meta/aml-gpu.cm", true);
 
   auto topology_result = component::Connect<fuchsia_power_broker::Topology>();
   ASSERT_EQ(ZX_OK, topology_result.status_value());
