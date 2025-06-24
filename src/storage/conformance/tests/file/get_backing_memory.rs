@@ -147,17 +147,6 @@ async fn file_get_executable_memory_with_insufficient_rights() {
             zx::Status::ACCESS_DENIED
         );
     }
-    // The fuchsia.io interface additionally specifies that GetBackingMemory should fail if
-    // VmoFlags::EXECUTE is specified but connection lacks read rights.
-    for file_flags in harness.executable_file_rights.combinations_without(fio::Rights::READ_BYTES) {
-        let file = executable_file(TEST_FILE);
-        assert_eq!(
-            create_file_and_get_backing_memory(file, &harness, file_flags, fio::VmoFlags::EXECUTE)
-                .await
-                .expect_err("Error was expected"),
-            zx::Status::ACCESS_DENIED
-        );
-    }
 }
 
 // Ensure that passing VmoFlags::SHARED_BUFFER to GetBackingMemory returns a buffer that's

@@ -86,14 +86,6 @@ pub fn get_backing_memory_validate_flags(
         return Err(Status::ACCESS_DENIED);
     }
 
-    // As documented in the fuchsia.io interface, if VmoFlags::EXECUTE is requested, ensure that the
-    // connection also has OPEN_RIGHT_READABLE.
-    if vmo_flags.contains(fio::VmoFlags::EXECUTE)
-        && !options.rights.intersects(fio::Operations::READ_BYTES)
-    {
-        return Err(Status::ACCESS_DENIED);
-    }
-
     Ok(())
 }
 
@@ -261,23 +253,13 @@ mod tests {
                 let (readable, writable, executable) = options_to_rights(options);
                 let vmo_flags = rights_to_vmo_flags(readable, writable, executable);
 
-                // The io1.fidl protocol specifies that VmoFlags::EXECUTE requires the connection to be
-                // both readable and executable.
-                if executable && !readable {
-                    assert_eq!(
-                        get_backing_memory_validate_flags(vmo_flags, options),
-                        Err(Status::ACCESS_DENIED)
-                    );
-                    continue;
-                }
-
                 // Ensure that we can open the VMO with the same rights as the connection.
                 get_backing_memory_validate_flags(vmo_flags, options)
                     .expect("Failed to validate flags");
 
                 // Ensure that we can also open the VMO with *less* rights than the connection has.
                 if readable {
-                    let vmo_flags = rights_to_vmo_flags(false, writable, false);
+                    let vmo_flags = rights_to_vmo_flags(false, writable, executable);
                     get_backing_memory_validate_flags(vmo_flags, options)
                         .expect("Failed to validate flags");
                 }
@@ -287,7 +269,7 @@ mod tests {
                         .expect("Failed to validate flags");
                 }
                 if executable {
-                    let vmo_flags = rights_to_vmo_flags(true, writable, false);
+                    let vmo_flags = rights_to_vmo_flags(readable, writable, false);
                     get_backing_memory_validate_flags(vmo_flags, options)
                         .expect("Failed to validate flags");
                 }
