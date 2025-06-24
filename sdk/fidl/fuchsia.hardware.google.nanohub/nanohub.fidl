@@ -8,6 +8,14 @@ using zx;
 
 alias FirmwareName = string:64;
 
+type McuVersionInfo = struct {
+    hardware_type uint16;
+    hardware_version uint16;
+    bootloader_version uint16;
+    os_version uint16;
+    variant_version uint32;
+};
+
 /// Client is expected to pass the vmo handle to nanohub when issuing a DownloadFirmware request.
 @discoverable
 open protocol Device {
@@ -22,6 +30,11 @@ open protocol Device {
     /// The name of the firmware binary running on the MCU.
     strict GetFirmwareName() -> (struct {
         firmware_name FirmwareName;
+    });
+
+    /// The version of the firmware binary running on the MCU.
+    strict GetFirmwareVersion() -> (struct {
+        version_info McuVersionInfo;
     });
 };
 
