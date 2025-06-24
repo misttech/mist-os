@@ -100,14 +100,14 @@ impl Matchers {
         }
 
         // Match non-primary partition tables as configured.
-        if config.gpt_all {
+        if config.gpt_all && !config.storage_host {
             matchers.push(Box::new(PartitionMapMatcher::new(
                 DiskFormat::Gpt,
                 GPT_DRIVER_PATH,
                 true,
             )));
         }
-        if config.mbr {
+        if config.mbr && !config.storage_host {
             matchers.push(Box::new(PartitionMapMatcher::new(
                 DiskFormat::Mbr,
                 MBR_DRIVER_PATH,
