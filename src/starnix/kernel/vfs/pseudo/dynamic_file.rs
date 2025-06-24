@@ -14,17 +14,51 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error, off_t};
 use std::collections::VecDeque;
 
+unsafe extern "C" {
+    // Declare a symbol that doesn't exist. If the compiler cannot prove that this is never used,
+    // this will create a compilation error showing an issue with the usage of the traits in this
+    // file.
+    fn undefined_symbol_to_prevent_compilation();
+}
+
 pub trait SequenceFileSource: Send + Sync + 'static {
     type Cursor: Default + Send;
     fn next(
         &self,
+        _cursor: Self::Cursor,
+        _sink: &mut DynamicFileBuf,
+    ) -> Result<Option<Self::Cursor>, Errno> {
+        // SAFETY: This cannot compile and ensure this method is never reached
+        unsafe {
+            undefined_symbol_to_prevent_compilation();
+        }
+        panic!("Either next or next_locked must be implemented");
+    }
+    fn next_locked(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
         cursor: Self::Cursor,
         sink: &mut DynamicFileBuf,
-    ) -> Result<Option<Self::Cursor>, Errno>;
+    ) -> Result<Option<Self::Cursor>, Errno> {
+        self.next(cursor, sink)
+    }
 }
 
 pub trait DynamicFileSource: Send + Sync + 'static {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno>;
+    fn generate(&self, _sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+        // SAFETY: This cannot compile and ensure this method is never reached
+        unsafe {
+            undefined_symbol_to_prevent_compilation();
+        }
+        panic!("Either generate or generate_locked must be implemented");
+    }
+    fn generate_locked(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        sink: &mut DynamicFileBuf,
+    ) -> Result<(), Errno> {
+        self.generate(sink)
+    }
 }
 
 impl<T> SequenceFileSource for T
@@ -32,8 +66,13 @@ where
     T: DynamicFileSource,
 {
     type Cursor = ();
-    fn next(&self, _cursor: (), sink: &mut DynamicFileBuf) -> Result<Option<()>, Errno> {
-        self.generate(sink).map(|_| None)
+    fn next_locked(
+        &self,
+        locked: &mut Locked<FileOpsCore>,
+        _cursor: (),
+        sink: &mut DynamicFileBuf,
+    ) -> Result<Option<()>, Errno> {
+        self.generate_locked(locked, sink).map(|_| None)
     }
 }
 
@@ -136,8 +175,13 @@ impl<Source: SequenceFileSource + Clone> DynamicFile<Source> {
 }
 
 impl<Source: SequenceFileSource> DynamicFile<Source> {
-    fn read_internal(&self, offset: usize, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
-        self.state.lock().read(offset, data)
+    fn read_internal(
+        &self,
+        locked: &mut Locked<FileOpsCore>,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        self.state.lock().read(locked, offset, data)
     }
 }
 
@@ -150,13 +194,13 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
 
     fn read(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
-        self.read_internal(offset, data)
+        self.read_internal(locked, offset, data)
     }
 
     fn write(
@@ -172,7 +216,7 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
 
     fn seek(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
@@ -184,7 +228,7 @@ impl<Source: SequenceFileSource> FileOps for DynamicFile<Source> {
         // seeking to the start of the file).
         if new_offset > 0 {
             let mut dummy_buf = VecOutputBuffer::new(0);
-            self.read_internal(new_offset as usize, &mut dummy_buf)?;
+            self.read_internal(locked, new_offset as usize, &mut dummy_buf)?;
         }
 
         Ok(new_offset)
@@ -231,7 +275,12 @@ impl<Source: SequenceFileSource> DynamicFileState<Source> {
         self.byte_offset = 0;
     }
 
-    fn read(&mut self, offset: usize, data: &mut dyn OutputBuffer) -> Result<usize, Errno> {
+    fn read(
+        &mut self,
+        locked: &mut Locked<FileOpsCore>,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
         if offset != self.byte_offset {
             self.reset();
         }
@@ -245,7 +294,7 @@ impl<Source: SequenceFileSource> DynamicFileState<Source> {
                 break;
             };
             let mut buf = std::mem::take(&mut self.buf);
-            self.cursor = self.source.next(cursor, &mut buf).map_err(|e| {
+            self.cursor = self.source.next_locked(locked, cursor, &mut buf).map_err(|e| {
                 // Reset everything on failure
                 self.reset();
                 e
