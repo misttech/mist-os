@@ -62,9 +62,7 @@ use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, zx_status as 
 pub use bedrock::dict_ext::{DictExt, GenericRouterResponse};
 pub use bedrock::lazy_get::LazyGet;
 pub use bedrock::weak_instance_token_ext::{test_invalid_instance_token, WeakInstanceTokenExt};
-pub use bedrock::with_availability::WithAvailability;
-pub use bedrock::with_default::WithDefault;
-pub use bedrock::with_error_reporter::WithErrorReporter;
+pub use bedrock::with_porcelain::WithPorcelain;
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};

@@ -78,7 +78,6 @@ mod tests {
     use async_trait::async_trait;
     use cm_rust::NativeIntoFidl;
     use cm_rust_testing::new_decl_from_json;
-    use cm_util::TaskGroup;
     use hooks::Hooks;
     use lazy_static::lazy_static;
     use moniker::Moniker;
@@ -212,13 +211,13 @@ mod tests {
 
     async fn new_root_component(
         mut environment: Environment,
-        task_group: &TaskGroup,
+        top_instance: &Arc<ComponentManagerInstance>,
         context: Arc<ModelContext>,
         component_manager_instance: Weak<ComponentManagerInstance>,
         component_url: &str,
     ) -> Arc<ComponentInstance> {
         let mut root_input_builder =
-            RootComponentInputBuilder::new(task_group.as_weak(), context.runtime_config());
+            RootComponentInputBuilder::new(top_instance, context.runtime_config());
         for (resolver_name, resolver) in environment.drain_resolvers() {
             root_input_builder.add_resolver(resolver_name, resolver);
         }
@@ -313,10 +312,10 @@ mod tests {
             }),
         );
 
-        let task_group = TaskGroup::new();
+        let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
         let root = new_root_component(
             Environment::empty(),
-            &task_group,
+            &top_instance,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/root.cm",
@@ -509,10 +508,9 @@ mod tests {
             ResolverRegistry::new(),
             DebugRegistry::default(),
         );
-        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
-            &task_group,
+            &top_instance,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/package#meta/comp.cm",
@@ -555,10 +553,9 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
-            &task_group,
+            &top_instance,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/package#meta/comp.cm",
@@ -620,10 +617,10 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let task_group = TaskGroup::new();
+
         let root = new_root_component(
             environment,
-            &task_group,
+            &top_instance,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///package#meta/comp.cm",
@@ -684,10 +681,9 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
-            &task_group,
+            &top_instance,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "cast:00000000/package#meta/comp.cm",
@@ -747,10 +743,9 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
-            &task_group,
+            &top_instance,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
@@ -813,10 +808,9 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
-            &task_group,
+            &top_instance,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
@@ -888,10 +882,9 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
-            &task_group,
+            &top_instance,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-boot:///#meta/my-root.cm",
@@ -948,10 +941,9 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
-            &task_group,
+            &top_instance,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "cast:00000000#meta/my-root.cm",
@@ -991,10 +983,9 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
-            &task_group,
+            &top_instance,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "#meta/my-root.cm",
@@ -1054,10 +1045,9 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
-            &task_group,
+            &top_instance,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
@@ -1139,10 +1129,9 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
-            &task_group,
+            &top_instance,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",
@@ -1251,11 +1240,9 @@ mod tests {
             resolver,
             DebugRegistry::default(),
         );
-
-        let task_group = TaskGroup::new();
         let root = new_root_component(
             environment,
-            &task_group,
+            &top_instance,
             Arc::new(ModelContext::new_for_test()),
             Weak::new(),
             "fuchsia-pkg://fuchsia.com/my-package#meta/my-root.cm",

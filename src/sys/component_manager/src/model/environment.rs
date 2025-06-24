@@ -142,7 +142,6 @@ mod tests {
         ChildBuilder, CollectionBuilder, ComponentDeclBuilder, EnvironmentBuilder,
     };
     use cm_types::Name;
-    use cm_util::TaskGroup;
     use errors::{ActionError, ModelError, ResolveActionError};
     use fidl_fuchsia_component as fcomponent;
     use maplit::hashmap;
@@ -229,9 +228,9 @@ mod tests {
                     .build(),
             );
 
-            let task_group = TaskGroup::new();
+            let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
             let mut root_input_builder =
-                RootComponentInputBuilder::new(task_group.as_weak(), &runtime_config);
+                RootComponentInputBuilder::new(&top_instance, &runtime_config);
             root_input_builder.add_resolver("test".to_string(), Arc::new(resolver));
 
             let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
@@ -312,12 +311,11 @@ mod tests {
         );
         resolver.add_component("b", ComponentDeclBuilder::new_empty_component().build());
 
-        let task_group = TaskGroup::new();
         let config = Arc::new(RuntimeConfig::default());
-        let mut root_input_builder = RootComponentInputBuilder::new(task_group.as_weak(), &config);
+        let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
+        let mut root_input_builder = RootComponentInputBuilder::new(&top_instance, &config);
         root_input_builder.add_resolver("test".to_string(), Arc::new(resolver));
 
-        let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
         let model = Model::new(
             ModelParams {
                 runtime_config: config,
@@ -418,9 +416,7 @@ mod tests {
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
         let runtime_config =
             make_debug_allowlisting_config("target_name", "env_a", Moniker::root());
-        let task_group = TaskGroup::new();
-        let mut root_input_builder =
-            RootComponentInputBuilder::new(task_group.as_weak(), &runtime_config);
+        let mut root_input_builder = RootComponentInputBuilder::new(&top_instance, &runtime_config);
         root_input_builder.add_resolver("test".to_string(), Arc::new(resolver));
 
         let model = Model::new(
@@ -554,9 +550,7 @@ mod tests {
         let runtime_config =
             make_debug_allowlisting_config("target_name", "env_a", Moniker::root());
 
-        let task_group = TaskGroup::new();
-        let mut root_input_builder =
-            RootComponentInputBuilder::new(task_group.as_weak(), &runtime_config);
+        let mut root_input_builder = RootComponentInputBuilder::new(&top_instance, &runtime_config);
         root_input_builder.add_resolver("test".to_string(), Arc::new(resolver));
 
         let model = Model::new(
@@ -666,9 +660,9 @@ mod tests {
         );
         resolver.add_component("b", ComponentDeclBuilder::new_empty_component().build());
 
-        let task_group = TaskGroup::new();
+        let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));
         let config = Arc::new(RuntimeConfig::default());
-        let mut root_input_builder = RootComponentInputBuilder::new(task_group.as_weak(), &config);
+        let mut root_input_builder = RootComponentInputBuilder::new(&top_instance, &config);
         root_input_builder.add_resolver("test".to_string(), Arc::new(resolver));
 
         let top_instance = Arc::new(ComponentManagerInstance::new(vec![], vec![]));

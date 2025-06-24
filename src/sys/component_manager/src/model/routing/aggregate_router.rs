@@ -7,7 +7,8 @@ use crate::model::routing::service::{
     AnonymizedAggregateCapabilityProvider, AnonymizedAggregateServiceDir, AnonymizedServiceRoute,
 };
 use async_trait::async_trait;
-use cm_types::Name;
+use cm_rust::CapabilityTypeName;
+use cm_types::{Availability, Name};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_fs::directory::readdir;
@@ -16,6 +17,7 @@ use futures::stream::FuturesUnordered;
 use futures::StreamExt;
 use router_error::RouterError;
 use routing::bedrock::aggregate_router::AggregateSource;
+use routing::bedrock::request_metadata::{Metadata, METADATA_KEY_TYPE};
 use routing::capability_source::{
     AggregateInstance, AnonymizedAggregateSource, CapabilitySource,
     FilteredAggregateProviderSource, ServiceInstance,
@@ -52,6 +54,8 @@ impl From<AnonymizedOrFiltered> for CapabilitySource {
 /// A router which will return a directory that aggregates together entries from the `sources`.
 pub struct AggregateRouter {
     component: WeakComponentInstance,
+    porcelain_type: CapabilityTypeName,
+    availability: Availability,
     capability_source: AnonymizedOrFiltered,
     sources: Vec<AggregateSource>,
     // This is set to `Some` when the aggregate router has been started.
@@ -69,6 +73,20 @@ impl sandbox::Routable<DirEntry> for AggregateRouter {
         request: Option<Request>,
         debug: bool,
     ) -> Result<RouterResponse<DirEntry>, RouterError> {
+        let request = if let Some(request) = request {
+            request
+        } else {
+            let metadata = Dict::new();
+            metadata
+                .insert(
+                    Name::new(METADATA_KEY_TYPE).unwrap(),
+                    Capability::Data(Data::String(self.porcelain_type.to_string())),
+                )
+                .expect("failed to build default metadata?");
+            metadata.set_metadata(self.availability);
+            Request { target: self.component.clone().into(), metadata }
+        };
+
         let aggregate_dir = self.get_aggregate_dir(request).await?;
         if debug {
             let data: Data = self
@@ -86,11 +104,12 @@ impl sandbox::Routable<DirEntry> for AggregateRouter {
 impl AggregateRouter {
     /// Creates a new aggregate router. It will either filter/rename entries or it will aggregate
     /// them together, depending on the value of `capability_source`.
-    #[allow(unused)]
     pub fn new(
         component: Arc<ComponentInstance>,
         sources: Vec<AggregateSource>,
         capability_source: CapabilitySource,
+        porcelain_type: CapabilityTypeName,
+        availability: Availability,
     ) -> Router<DirEntry> {
         let capability_source = match capability_source {
             CapabilitySource::AnonymizedAggregate(source) => {
@@ -108,6 +127,8 @@ impl AggregateRouter {
             aggregate_directory: Mutex::new(None),
             anonymized_aggregate_service_dir: Mutex::new(None),
             scope: component.execution_scope.clone(),
+            porcelain_type,
+            availability,
         })
     }
 
@@ -143,7 +164,7 @@ impl AggregateRouter {
     }
 
     /// Returns the directory containing aggregated entries, and initializes it if necessary.
-    async fn get_aggregate_dir(&self, request: Option<Request>) -> Result<DirEntry, RouterError> {
+    async fn get_aggregate_dir(&self, request: Request) -> Result<DirEntry, RouterError> {
         let mut maybe_directory = self.aggregate_directory.lock().await;
         if let Some(aggregate_directory) = &*maybe_directory {
             return Ok(aggregate_directory.clone());
@@ -151,8 +172,6 @@ impl AggregateRouter {
         // We hold the `self.aggregate_directory` lock going forward because we want to ensure that
         // only one task is doing this work. Multiple tasks can't make this go any faster, and once
         // we're done the following tasks can immediately grab a clone of the directory we create.
-
-        let request = request.ok_or_else(|| RouterError::InvalidArgs)?;
 
         let aggregate_directory = match &self.capability_source {
             AnonymizedOrFiltered::AnonymizedAggregate(anonymized_source) => {

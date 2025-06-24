@@ -71,7 +71,7 @@ impl ComponentInstanceForAnalyzer {
         );
         let moniker = Moniker::root();
         let root_component_input =
-            build_root_component_input(&runtime_config, &policy, runner_registry);
+            build_root_component_input(&runtime_config, &top_instance, &policy, runner_registry);
         let parent = WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::AboveRoot(
             top_instance,
         ));
@@ -179,7 +179,7 @@ impl ComponentInstanceForAnalyzer {
                 &self,
                 _: &RouteRequestErrorInfo,
                 _: &RouterError,
-                _: Option<sandbox::WeakInstanceToken>,
+                _: sandbox::WeakInstanceToken,
             ) {
             }
         }

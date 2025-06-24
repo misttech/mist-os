@@ -2,29 +2,29 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::component_instance::ComponentInstanceForAnalyzer;
+use crate::component_instance::{ComponentInstanceForAnalyzer, TopInstanceForAnalyzer};
 use crate::component_model::DynamicDictionaryConfig;
 use ::routing::bedrock::aggregate_router::AggregateSource;
 use ::routing::bedrock::program_output_dict;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::bedrock::with_policy_check::WithPolicyCheck;
-use ::routing::bedrock::with_porcelain_type::WithPorcelainType;
+use ::routing::bedrock::with_porcelain::WithPorcelain;
 use ::routing::capability_source::{
     BuiltinSource, CapabilitySource, CapabilityToCapabilitySource, ComponentCapability,
     ComponentSource, FrameworkSource, InternalCapability, NamespaceSource,
 };
 use ::routing::component_instance::WeakComponentInstanceInterface;
 use ::routing::environment::RunnerRegistry;
-use ::routing::error::RoutingError;
+use ::routing::error::{ErrorReporter, RouteRequestErrorInfo, RoutingError};
 use ::routing::policy::GlobalPolicyChecker;
 use ::routing::DictExt;
 use async_trait::async_trait;
 use cm_config::RuntimeConfig;
 use cm_rust::{CapabilityTypeName, ComponentDecl, DeliveryType, DictionaryDecl, ProtocolDecl};
-use cm_types::Path;
+use cm_types::{Availability, Path};
 use fidl::endpoints::DiscoverableProtocolMarker;
 use futures::{future, FutureExt};
-use moniker::{ChildName, ExtendedMoniker};
+use moniker::ChildName;
 use router_error::RouterError;
 use sandbox::{
     CapabilityBound, Connector, Data, Dict, DirEntry, Request, Routable, Router, RouterResponse,
@@ -56,6 +56,7 @@ where
 
 pub fn build_root_component_input(
     runtime_config: &Arc<RuntimeConfig>,
+    top_instance: &Arc<TopInstanceForAnalyzer>,
     policy: &GlobalPolicyChecker,
     runner_registry: RunnerRegistry,
 ) -> ComponentInput {
@@ -70,6 +71,7 @@ pub fn build_root_component_input(
                     capability: capability_decl.clone().into(),
                 }),
                 CapabilityTypeName::from(capability_decl),
+                RouteRequestErrorInfo::from(capability_decl),
             )),
             _ => None,
         })
@@ -82,12 +84,15 @@ pub fn build_root_component_input(
                             capability: capability_decl.clone().into(),
                         }),
                         CapabilityTypeName::from(capability_decl),
+                        RouteRequestErrorInfo::from(capability_decl),
                     ))
                 }
                 _ => None,
             }
         }));
-    for (name, capability_source, capability_type) in names_and_capability_sources {
+    for (name, capability_source, capability_type, route_request_info) in
+        names_and_capability_sources
+    {
         if capability_type == CapabilityTypeName::Runner
             && runner_registry.get_runner(&name).is_none()
         {
@@ -101,12 +106,20 @@ pub fn build_root_component_input(
             .expect("failed to convert capability source to Data");
         let router = match capability_type {
             CapabilityTypeName::Protocol | CapabilityTypeName::Runner => {
-                Router::<Connector>::new_debug(data)
+                let router = Router::<Connector>::new_debug(data)
                     .with_policy_check::<ComponentInstanceForAnalyzer>(
                         capability_source,
                         policy.clone(),
-                    )
-                    .with_porcelain_type(capability_type, ExtendedMoniker::ComponentManager)
+                    );
+                WithPorcelain::<_, _, ComponentInstanceForAnalyzer>::with_porcelain_no_default(
+                    router,
+                    capability_type,
+                )
+                .availability(Availability::Required)
+                .target_above_root(top_instance)
+                .error_info(route_request_info)
+                .error_reporter(NullErrorReporter {})
+                .build()
             }
             _ => unreachable!("other types were filtered out above"),
         };
@@ -123,6 +136,19 @@ pub fn build_root_component_input(
         }
     }
     root_component_input
+}
+
+#[derive(Clone)]
+struct NullErrorReporter {}
+#[async_trait]
+impl ErrorReporter for NullErrorReporter {
+    async fn report(
+        &self,
+        _: &RouteRequestErrorInfo,
+        _: &RouterError,
+        _: sandbox::WeakInstanceToken,
+    ) {
+    }
 }
 
 pub fn build_framework_dictionary(component: &Arc<ComponentInstanceForAnalyzer>) -> Dict {
@@ -329,9 +355,11 @@ pub(crate) fn static_children_component_output_dictionary_routers(
 }
 
 pub fn new_aggregate_router(
-    _component: Arc<ComponentInstanceForAnalyzer>,
-    _sources: Vec<AggregateSource>,
+    _: Arc<ComponentInstanceForAnalyzer>,
+    _: Vec<AggregateSource>,
     capability_source: CapabilitySource,
+    _: CapabilityTypeName,
+    _: Availability,
 ) -> Router<DirEntry> {
     new_debug_only_specific_router(capability_source)
 }
