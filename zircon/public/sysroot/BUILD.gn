@@ -198,7 +198,8 @@ foreach(entry, sysroot_entries) {
               _relative_path = rebase_path("$dir/$file",
                                            get_path_info(outputs[0], "dir"),
                                            root_build_dir)
-              contents = [ "#include \"${_relative_path}\"" ]
+              contents =
+                  [ "#include \"${_relative_path}\"  // IWYU pragma: export" ]
             }
           }
         }
