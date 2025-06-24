@@ -109,65 +109,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   static inline constexpr zx::duration kHwResetTimeout{zx::msec(50)};
   static inline constexpr zx::duration kEndpointDeadline{zx::sec(10)};
 
-  // Like a usb::RequestQueue for usb::FidlRequests.
-  //
-  // TODO(hansens) We should probably implement something like this in usb/request-fidl.h
-  class FidlRequestQueue {
-   public:
-    FidlRequestQueue() = default;
-
-    // Movable, not copyable.
-    FidlRequestQueue(FidlRequestQueue&& other) {
-      std::lock_guard<std::mutex> lock(lock_);
-      q_ = std::move(other.q_);
-      other.q_.clear();
-    }
-
-    FidlRequestQueue& operator=(FidlRequestQueue&& other) {
-      std::lock_guard<std::mutex> other_lock(other.lock_);
-      std::lock_guard<std::mutex> my_lock(lock_);
-      q_ = std::move(other.q_);
-      other.q_.clear();
-      return *this;
-    }
-
-    FidlRequestQueue(const FidlRequestQueue&) = delete;
-    FidlRequestQueue& operator=(const FidlRequestQueue&) = delete;
-
-    void push(usb::RequestVariant&& req) {
-      std::lock_guard<std::mutex> lock(lock_);
-      q_.push_front(std::move(req));
-    }
-
-    // Pushes to the (semantic) front of the queue, cutting the line.
-    void push_next(usb::RequestVariant&& req) {
-      std::lock_guard<std::mutex> lock(lock_);
-      q_.push_back(std::move(req));
-    }
-
-    // Pop the next value from the queue, if any.
-    std::optional<usb::RequestVariant> pop() {
-      std::lock_guard<std::mutex> lock(lock_);
-      std::optional<usb::RequestVariant> opt{std::nullopt};
-
-      if (!q_.empty()) {
-        opt.emplace(std::move(q_.back()));
-        q_.pop_back();
-      }
-
-      return opt;
-    }
-
-    bool empty() const {
-      std::lock_guard<std::mutex> lock(lock_);
-      return q_.empty();
-    }
-
-   private:
-    mutable std::mutex lock_;
-    std::deque<usb::RequestVariant> q_ __TA_GUARDED(lock_);  // Queued front-to-back.
-  };
-
   struct UserEndpoint;
   class EpServer : public usb::EndpointServer {
    public:
@@ -197,8 +138,10 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
     void CancelAll(zx_status_t reason);
 
-    FidlRequestQueue queued_reqs;                    // requests waiting to be processed
-    std::optional<usb::RequestVariant> current_req;  // request currently being processed (if any)
+    std::queue<usb::RequestVariant> queued_reqs
+        __TA_GUARDED(uep_->ep.lock);  // requests waiting to be processed
+    std::optional<usb::RequestVariant> current_req
+        __TA_GUARDED(uep_->ep.lock);  // request currently being processed (if any)
 
    private:
     Dwc3* dwc3_{nullptr};         // Must outlive this instance.

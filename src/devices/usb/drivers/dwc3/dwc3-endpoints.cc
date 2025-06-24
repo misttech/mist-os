@@ -63,31 +63,33 @@ void Dwc3::EpStartTransfer(Endpoint& ep, TrbFifo& fifo, uint32_t type, zx_paddr_
 }
 
 void Dwc3::EpServer::CancelAll(zx_status_t reason) {
-  if (current_req.has_value()) {
-    {
-      std::lock_guard<std::mutex> _(uep_->ep.lock);
+  std::queue<usb::RequestVariant> to_cancel;
+  {
+    std::lock_guard<std::mutex> _(uep_->ep.lock);
+    to_cancel = std::move(queued_reqs);
+    if (current_req.has_value()) {
       dwc3_->CmdEpEndTransfer(uep_->ep);
+      to_cancel.push(std::move(*current_req));
+      current_req.reset();
     }
-
-    RequestComplete(reason, 0, std::move(*current_req));
-    current_req.reset();
+    uep_->fifo.Clear();
   }
 
-  while (!queued_reqs.empty()) {
-    RequestComplete(reason, 0, std::move(*queued_reqs.pop()));
+  for (; !to_cancel.empty(); to_cancel.pop()) {
+    RequestComplete(reason, 0, std::move(to_cancel.front()));
   }
-
-  std::lock_guard<std::mutex> _(uep_->ep.lock);
-  uep_->fifo.Clear();
 }
 
-void Dwc3::UserEpQueueNext(UserEndpoint& uep) {
-  if (!(!uep.server->current_req.has_value() && uep.ep.got_not_ready &&
-        !uep.server->queued_reqs.empty())) {
+// No thread safety analysis because UserEpQueueNext already holds uep.ep.lock, which is equivalent
+// to uep.server->uep.ep.lock
+void Dwc3::UserEpQueueNext(UserEndpoint& uep) __TA_NO_THREAD_SAFETY_ANALYSIS {
+  if (uep.server->current_req.has_value() || !uep.ep.got_not_ready ||
+      uep.server->queued_reqs.empty()) {
     return;
   }
 
-  uep.server->current_req.emplace(std::move(*uep.server->queued_reqs.pop()));
+  uep.server->current_req.emplace(std::move(uep.server->queued_reqs.front()));
+  uep.server->queued_reqs.pop();
 
   zx::result result{uep.server->get_iter(*uep.server->current_req, zx_system_get_page_size())};
   if (result.is_error()) {
@@ -102,7 +104,7 @@ void Dwc3::UserEpQueueNext(UserEndpoint& uep) {
   EpStartTransfer(uep.ep, uep.fifo, TRB_TRBCTL_NORMAL, phys, size);
 }
 
-void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
+void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) __TA_NO_THREAD_SAFETY_ANALYSIS {
   if (is_ep0_num(ep_num)) {
     HandleEp0TransferCompleteEvent(ep_num);
     return;
@@ -113,6 +115,8 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) {
 
   UserEndpoint* const uep = get_user_endpoint(ep_num);
   ZX_DEBUG_ASSERT(uep != nullptr);
+  // No thread safety analysis because this already holds uep.ep.lock, which is equivalent
+  // to uep.server->uep.ep.lock
   {
     std::lock_guard<std::mutex> lock{uep->ep.lock};
     if (!uep->server->current_req.has_value()) {
