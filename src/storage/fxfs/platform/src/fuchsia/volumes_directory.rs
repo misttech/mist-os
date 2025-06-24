@@ -20,11 +20,11 @@ use fs_inspect::{FsInspectTree, FsInspectVolume};
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
 use fxfs::errors::FxfsError;
+use fxfs::fsck;
 use fxfs::log::*;
 use fxfs::object_store::transaction::{lock_keys, LockKey, LockKeys, Options, Transaction};
 use fxfs::object_store::volume::RootVolume;
 use fxfs::object_store::{Directory, ObjectDescriptor, ObjectStore, StoreOwner};
-use fxfs::{fsck, metrics};
 use fxfs_crypto::Crypt;
 use fxfs_trace::{trace_future_args, TraceFutureExt};
 use rustc_hash::FxHashMap as HashMap;
@@ -141,7 +141,6 @@ impl MountedVolumesGuard<'_> {
         store: Arc<ObjectStore>,
         flush_task_config: MemoryPressureConfig,
     ) -> Result<FxVolumeAndRoot, Error> {
-        metrics::object_stores_tracker().register_store(name, Arc::downgrade(&store));
         let store_id = store.store_object_id();
         let unique_id = zx::Event::create();
         let volume = FxVolumeAndRoot::new::<T>(
@@ -239,7 +238,6 @@ impl MountedVolumesGuard<'_> {
         if let Some(inspect) = self.volumes_directory.inspect_tree.upgrade() {
             inspect.unregister_volume(name.to_string());
         }
-        metrics::object_stores_tracker().unregister_store(name);
         let directory_node = self.volumes_directory.directory_node.clone();
         self.volumes_directory
             .root_volume

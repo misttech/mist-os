@@ -116,7 +116,7 @@ use async_trait::async_trait;
 use either::Either::{Left, Right};
 use event_listener::EventListener;
 use fprint::TypeFingerprint;
-use fuchsia_inspect::{ArrayProperty, HistogramProperty};
+use fuchsia_inspect::HistogramProperty;
 use fuchsia_sync::Mutex;
 use futures::FutureExt;
 use merge::{filter_marked_for_deletion, filter_tombstones, merge};
@@ -450,7 +450,6 @@ pub fn max_extent_size_for_block_size(block_size: u64) -> u64 {
 struct AllocatorCounters {
     num_flushes: u64,
     last_flush_time: Option<std::time::SystemTime>,
-    persistent_layer_file_sizes: Vec<u64>,
 }
 
 pub struct Allocator {
@@ -871,7 +870,6 @@ impl Allocator {
                 .context("Failed to deserialize AllocatorInfo")?;
 
             let mut handles = Vec::new();
-            let mut layer_file_sizes = Vec::new();
             let mut total_size = 0;
             for object_id in &info.layers {
                 let handle = ObjectStore::open_object(
@@ -884,7 +882,6 @@ impl Allocator {
                 .context("Failed to open allocator layer file")?;
 
                 let size = handle.get_size();
-                layer_file_sizes.push(size);
                 total_size += size;
                 handles.push(handle);
             }
@@ -911,7 +908,6 @@ impl Allocator {
                 inner.info = info;
             }
 
-            self.counters.lock().persistent_layer_file_sizes = layer_file_sizes;
             self.tree.append_layers(handles).await.context("Failed to append allocator layers")?;
             self.filesystem.upgrade().unwrap().object_manager().update_reservation(
                 self.object_id,
@@ -1207,14 +1203,6 @@ impl Allocator {
                                 .unwrap_or(0u64),
                         );
                     }
-                    let sizes = root.create_uint_array(
-                        "persistent_layer_file_sizes",
-                        counters.persistent_layer_file_sizes.len(),
-                    );
-                    for i in 0..counters.persistent_layer_file_sizes.len() {
-                        sizes.set(i, counters.persistent_layer_file_sizes[i]);
-                    }
-                    root.record(sizes);
 
                     let data = this.allocation_size_histogram();
                     let alloc_sizes = root.create_uint_linear_histogram(
@@ -2099,7 +2087,6 @@ impl<'a> Flusher<'a> {
         reservation_update = ReservationUpdate::new(tree::reservation_amount_from_layer_size(
             layer_object_handle.get_size(),
         ));
-        let layer_file_sizes = vec![layer_object_handle.get_size()];
 
         // It's important that EndFlush is in the same transaction that we write AllocatorInfo,
         // because we use EndFlush to make the required adjustments to allocated_bytes.
@@ -2138,7 +2125,6 @@ impl<'a> Flusher<'a> {
         let mut counters = self.allocator.counters.lock();
         counters.num_flushes += 1;
         counters.last_flush_time = Some(std::time::SystemTime::now());
-        counters.persistent_layer_file_sizes = layer_file_sizes;
         // Return the earliest version used by a struct in the tree
         Ok(self.allocator.tree.get_earliest_version())
     }

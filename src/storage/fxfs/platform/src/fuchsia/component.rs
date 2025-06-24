@@ -303,7 +303,6 @@ impl Component {
         fs.allocator().track_statistics(&metrics::detail(), "allocator");
         fs.journal().track_statistics(&metrics::detail(), "journal");
         fs.object_manager().track_statistics(&metrics::detail(), "object_manager");
-        metrics::object_stores_tracker().register_store("__root", Arc::downgrade(&fs.root_store()));
 
         let info = fs.get_info();
         info!(

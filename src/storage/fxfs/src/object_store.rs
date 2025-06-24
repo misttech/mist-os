@@ -58,7 +58,6 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64_URL_SAFE_NO_PAD;
 use base64::engine::Engine as _;
 use fidl_fuchsia_io as fio;
 use fprint::TypeFingerprint;
-use fuchsia_inspect::ArrayProperty;
 use fuchsia_sync::Mutex;
 use fxfs_crypto::ff1::Ff1;
 use fxfs_crypto::{
@@ -486,7 +485,6 @@ struct ObjectStoreCounters {
     mutations_dropped: u64,
     num_flushes: u64,
     last_flush_time: Option<std::time::SystemTime>,
-    persistent_layer_file_sizes: Vec<u64>,
 }
 
 impl ObjectStore {
@@ -712,8 +710,6 @@ impl ObjectStore {
         let counters = self.counters.lock();
         if let Some(store_info) = self.store_info() {
             root.record_string("guid", Uuid::from_bytes(store_info.guid).to_string());
-        } else {
-            warn!("Can't access store_info; store is locked.");
         };
         root.record_uint("store_object_id", self.store_object_id);
         root.record_uint("mutations_applied", counters.mutations_applied);
@@ -730,19 +726,10 @@ impl ObjectStore {
                     .unwrap_or(0u64),
             );
         }
-        let sizes = root.create_uint_array(
-            "persistent_layer_file_sizes",
-            counters.persistent_layer_file_sizes.len(),
-        );
-        for i in 0..counters.persistent_layer_file_sizes.len() {
-            sizes.set(i, counters.persistent_layer_file_sizes[i]);
-        }
         root.record_uint("device_read_ops", self.device_read_ops.load(Ordering::Relaxed));
         root.record_uint("device_write_ops", self.device_write_ops.load(Ordering::Relaxed));
         root.record_uint("logical_read_ops", self.logical_read_ops.load(Ordering::Relaxed));
         root.record_uint("logical_write_ops", self.logical_write_ops.load(Ordering::Relaxed));
-
-        root.record(sizes);
 
         let this = self.clone();
         root.record_child("lsm_tree", move |node| this.tree().record_inspect_data(node));
@@ -1615,7 +1602,6 @@ impl ObjectStore {
     ) -> Result<Vec<DataObjectHandle<ObjectStore>>, Error> {
         let parent_store = self.parent_store.as_ref().unwrap();
         let mut handles = Vec::new();
-        let mut sizes = Vec::new();
         for object_id in object_ids {
             let handle = ObjectStore::open_object(
                 &parent_store,
@@ -1625,10 +1611,8 @@ impl ObjectStore {
             )
             .await
             .with_context(|| format!("Failed to open layer file {}", object_id))?;
-            sizes.push(handle.get_size());
             handles.push(handle);
         }
-        self.counters.lock().persistent_layer_file_sizes = sizes;
         Ok(handles)
     }
 
