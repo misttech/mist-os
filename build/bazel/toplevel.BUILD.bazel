@@ -9,10 +9,6 @@ See //build/bazel/README.md for details about this file.
 
 load("@fuchsia_build_config//:defs.bzl", "build_config")
 load(
-    "@rules_fuchsia//fuchsia:defs.bzl",
-    "fuchsia_devicetree_toolchain_info",
-)
-load(
     "//build/bazel/toolchains:linux_sysroot.bzl",
     "linux_sysroot_headers",
     "linux_sysroot_libs",
@@ -43,16 +39,10 @@ exports_files(
         "third_party/android/platform/external/avb/test/data/atx_metadata.bin",
     ] +
     # Bootloader images used in partition configs for product bundles.
-    glob(
-        ["prebuilt/vendor/amlogic/*/firmware/**/*"],
-        allow_empty = True,  # This could be empty on some infra builders.
-    ) +
+    glob(["prebuilt/vendor/amlogic/*/firmware/**/*"], allow_empty = True) +
 
     # OSPO license verification tool
-    glob(
-        ["prebuilt/third_party/ospo/licenseclassifier/*/identify_license"],
-        allow_empty = True,  # This could be empty on some infra builders.
-    ) +
+    glob(["prebuilt/third_party/ospo/licenseclassifier/*/identify_license"]) +
 
     # DTC tool for devicetree compile
     glob(["prebuilt/third_party/dtc/**/*"]) +
@@ -64,28 +54,16 @@ exports_files(
     glob(["prebuilt/third_party/zoneinfo/**"]) +
 
     # prebuilt drivers
-    glob(
-        ["prebuilt/vendor/google/drivers/**/*.far"],
-        allow_empty = True,  # This could be empty on some infra builders.
-    ) +
+    glob(["prebuilt/vendor/google/drivers/**/*.far"], allow_empty = True) +
 
     # mcu firmwares
-    glob(
-        ["prebuilt/mcu/firmware/**/*"],
-        allow_empty = True,  # This could be empty on some infra builders.
-    ) +
+    glob(["prebuilt/mcu/firmware/**/*"], allow_empty = True) +
 
     # prebuilt firmware
-    glob(
-        ["prebuilt/vendor/google_devices/*/prebuilts/firmware/**/*"],
-        allow_empty = True,  # This could be empty on some infra builders.
-    ) +
+    glob(["prebuilt/vendor/google_devices/*/prebuilts/firmware/**/*"], allow_empty = True) +
 
     # audio config files
-    glob(
-        ["prebuilt/vendor/google_devices/*/prebuilts/audio/**/*"],
-        allow_empty = True,  # This could be empty on some infra builders.
-    ) +
+    glob(["prebuilt/vendor/google_devices/*/prebuilts/audio/**/*"], allow_empty = True) +
 
     # build/info
     [
@@ -128,6 +106,11 @@ filegroup(
     name = "rtc_driver_bib_set",
     srcs = glob(["prebuilt/drivers/rtc/pcf8563/board_input_bundle_set/rtc_set/**/*"]),
     visibility = ["//visibility:public"],
+)
+
+load(
+    "@rules_fuchsia//fuchsia:defs.bzl",
+    "fuchsia_devicetree_toolchain_info",
 )
 
 fuchsia_devicetree_toolchain_info(
