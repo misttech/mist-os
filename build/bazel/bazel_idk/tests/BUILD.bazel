@@ -7,7 +7,7 @@
 load("//build/bazel/bazel_idk:defs.bzl", "idk_atom", "idk_cc_source_library", "idk_molecule")
 
 idk_atom(
-    name = "test_atom_idk",
+    name = "test_atom",
     testonly = True,
     category = "partner",
     id = "sdk://pkg/test",
