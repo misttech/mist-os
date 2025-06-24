@@ -69,6 +69,57 @@ def _get_idk_deps(underlying_deps):
     idk_deps = []
     return [_get_idk_label(dep) for dep in underlying_deps] + idk_deps
 
+def _compute_atom_api_impl(ctx):
+    args = ctx.actions.args()
+    args.add("--output", ctx.outputs.generated_api_file.path)
+
+    for dest_path, source_target in ctx.attr.api_contents_map.items():
+        source_label = source_target.label
+        source_path = source_label.package + "/" + source_label.name
+
+        # `add()` supports at most two parameters, so add the third separately.
+        args.add("--file", dest_path)
+        args.add(source_path)
+
+    # `ctx.files.api_contents_map` contains just the source files.
+    inputs_depset = depset(ctx.files.api_contents_map)
+
+    ctx.actions.run(
+        outputs = [ctx.outputs.generated_api_file],
+        inputs = inputs_depset,
+        executable = ctx.executable._script,
+        arguments = [args],
+        mnemonic = "ComputeAtomApi",
+        progress_message = "Computing API for %s" % ctx.outputs.generated_api_file.short_path,
+    )
+
+    return [DefaultInfo(files = depset([ctx.outputs.generated_api_file]))]
+
+_compute_atom_api = rule(
+    doc = "Computes the contents of the .api file for an atom.",
+    implementation = _compute_atom_api_impl,
+    provides = [DefaultInfo],
+    attrs = {
+        "api_contents_map": attr.string_keyed_label_dict(
+            doc = "A dictionary of files that make up the API for this atom, " +
+                  "mapping the destination path of a file relative to the " +
+                  "IDK  root to its source file label.",
+            mandatory = True,
+            default = {},
+            allow_files = True,
+        ),
+        "generated_api_file": attr.output(
+            mandatory = True,
+            doc = "The output API file.",
+        ),
+        "_script": attr.label(
+            default = Label("//build/sdk:compute_atom_api"),
+            executable = True,
+            cfg = "exec",
+        ),
+    },
+)
+
 def _create_idk_atom_impl(ctx):
     all_deps_depset = depset(direct = ctx.files.idk_deps + ctx.files.atom_build_deps)
     idk_deps = ctx.attr.idk_deps
@@ -203,6 +254,7 @@ def idk_atom(
         stable,
         api_file_path = None,
         api_contents_map = None,
+        atom_build_deps = [],
         **kwargs):
     """Generate an IDK atom and ensure proper validation of it.
 
@@ -212,6 +264,7 @@ def idk_atom(
         stable:  See _create_idk_atom().
         api_file_path: See _create_idk_atom().
         api_contents_map:  See _create_idk_atom().
+        atom_build_deps:  See _create_idk_atom().
         **kwargs: Additional arguments for the underlying atom.  See _create_idk_atom().
     """
 
@@ -225,8 +278,27 @@ def idk_atom(
     if stable and not api_file_path and not is_type_not_requiring_compatibility:
         fail("All atoms with types ('%s') requiring compatibility must specify an `api_file_path` unless explicitly unstable." % type)
 
-    # TODO(https://fxbug.dev/417305295): Verify the API with
-    # `api_file_path` and `api_contents_map`.
+    _verify_api = api_file_path != None
+    if _verify_api:
+        if not api_contents_map:
+            fail("`api_contents_map` cannot be empty.")
+
+        generate_api_target_name = "%s_generate_api" % name
+
+        # GN-generated files generally have `_sdk` from the target name.
+        # TODO(https://fxbug.dev/425931839): Change this to `_idk` or drop it
+        # once GN is no longer generating such files.
+        current_api_file = "%s_sdk.api" % name
+
+        _compute_atom_api(
+            name = generate_api_target_name,
+            api_contents_map = api_contents_map,
+            generated_api_file = current_api_file,
+        )
+
+        atom_build_deps.append(":%s" % generate_api_target_name)
+
+        # TODO(https://fxbug.dev/417305295): Verify `generate_api_target_name` against `api_file_path`.
 
     # TODO(https://fxbug.dev/417305295): Generate internal metadata (.sdk) file
     # if necessary. See https://fxbug.dev/407083737.
@@ -242,6 +314,7 @@ def idk_atom(
         stable = stable,
         api_file_path = api_file_path,
         api_contents_map = api_contents_map,
+        atom_build_deps = atom_build_deps,
         **kwargs
     )
 
