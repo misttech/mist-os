@@ -173,6 +173,10 @@ zx::result<> Dwc3::Start() {
     platform_extension_ = std::move(extension);
   }
 
+  if (zx_status_t status = Init(); status != ZX_OK) {
+    return zx::error(status);
+  }
+
   auto handler = bindings_.CreateHandler(this, dispatcher(), fidl::kIgnoreBindingClosure);
 
   auto serve_result =
@@ -183,10 +187,6 @@ zx::result<> Dwc3::Start() {
   if (serve_result.is_error()) {
     FDF_LOG(ERROR, "Failed to add service: %s", serve_result.status_string());
     return serve_result.take_error();
-  }
-
-  if (zx_status_t status = Init(); status != ZX_OK) {
-    return zx::error(status);
   }
 
   auto props = std::vector{
@@ -366,7 +366,6 @@ zx_status_t Dwc3::Init() {
 
   // Things went well.  Cancel our cleanup routine.
   cleanup.cancel();
-  init_done_.Signal();  // Unblock any FIDL clients awaiting Endpoint service.
   return ZX_OK;
 }
 
@@ -648,13 +647,6 @@ void Dwc3::Stop() {
 
 void Dwc3::ConnectToEndpoint(ConnectToEndpointRequest& request,
                              ConnectToEndpointCompleter::Sync& completer) {
-  zx_status_t status{init_done_.Wait(zx::deadline_after(kEndpointDeadline))};
-  if (status == ZX_ERR_TIMED_OUT) {
-    FDF_LOG(ERROR, "Init() runtime exceeds deadline");
-    completer.Reply(fit::as_error(status));
-    return;
-  }
-
   UserEndpoint* uep{get_user_endpoint(UsbAddressToEpNum(request.ep_addr()))};
   if (uep == nullptr || !uep->server.has_value()) {
     completer.Reply(fit::as_error(ZX_ERR_INVALID_ARGS));

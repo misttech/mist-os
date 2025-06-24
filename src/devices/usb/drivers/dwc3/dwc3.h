@@ -303,7 +303,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
   zx_status_t AcquirePDevResources();
   zx_status_t Init();
-  libsync::Completion init_done_;  // Signaled at the end of Init().
   void ReleaseResources();
 
   // IRQ thread's two top level event decoders.
