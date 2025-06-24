@@ -218,7 +218,7 @@ zx::result<display::PanelType> GetPanelType(PanelVendor panel_vendor, PanelDdicM
     case PanelVendor::kInnolux:
       switch (ddic_model) {
         case PanelDdicModel::kFitipowerJd9364:
-          return zx::ok(display::PanelType::kInnoluxP070acbFitipowerJd9364);
+          return zx::ok(display::PanelType::kInnoluxP101dezFitipowerJd9364);
         case PanelDdicModel::kFitipowerJd9365:
           FDF_LOG(ERROR, "Unsupported panel type detected: panel vendor: Innolux, DDIC: JD9365");
           return zx::error(ZX_ERR_NOT_SUPPORTED);
