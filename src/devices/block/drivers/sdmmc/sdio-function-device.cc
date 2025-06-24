@@ -21,10 +21,6 @@
 
 namespace {
 
-std::pair<zx::error<zx_status_t>, const char*> MapPowerError(fdf_power::Error error) {
-  return {fdf_power::ErrorToZxError(error), fdf_power::ErrorToString(error)};
-}
-
 std::pair<zx::error<zx_status_t>, const char*> MapLeaseError(
     fuchsia_power_broker::LeaseError error) {
   switch (error) {
@@ -647,9 +643,9 @@ zx::result<> SdioFunctionDevice::ConfigurePowerManagement() {
       fdf_power::ApplyPowerConfiguration(*sdio_parent_->parent()->driver_incoming(), configs, true);
 
   if (add_result.is_error()) {
-    std::pair error = MapPowerError(add_result.error_value());
-    FDF_LOGL(ERROR, logger(), "Failed to add power element: %s", error.second);
-    return error.first;
+    FDF_LOGL(ERROR, logger(), "Failed to add power element: %s",
+             fdf_power::ErrorToString(add_result.error_value()));
+    return fdf_power::ErrorToZxError(add_result.error_value());
   }
 
   if (add_result.value().size() != 1) {

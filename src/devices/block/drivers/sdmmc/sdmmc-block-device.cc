@@ -301,9 +301,9 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
       fdf_power::ApplyPowerConfiguration(*parent_->driver_incoming(), element_configs);
 
   if (config_result.is_error()) {
-    zx::result<> error = fdf_power::ErrorToZxError(config_result.error_value());
-    FDF_LOGL(INFO, logger(), "Failed to apply power config: %s", error.status_string());
-    return error;
+    FDF_LOGL(INFO, logger(), "Failed to apply power config: %s",
+             fdf_power::ErrorToString(config_result.error_value()));
+    return fdf_power::ErrorToZxError(config_result.error_value());
   }
 
   std::vector<fdf_power::ElementDesc> elements = std::move(config_result.value());

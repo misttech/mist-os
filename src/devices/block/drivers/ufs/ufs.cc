@@ -1352,7 +1352,8 @@ zx::result<> Ufs::ConfigurePowerManagement() {
         fdf_power::ElementDescBuilder(config, std::move(tokens.value())).Build();
     auto result = fdf_power::AddElement(power_broker.value(), description);
     if (result.is_error()) {
-      FDF_LOG(ERROR, "Failed to add power element: %u", static_cast<uint8_t>(result.error_value()));
+      FDF_LOG(ERROR, "Failed to add power element: %s",
+              fdf_power::ErrorToString(result.error_value()));
       return zx::error(ZX_ERR_INTERNAL);
     }
 

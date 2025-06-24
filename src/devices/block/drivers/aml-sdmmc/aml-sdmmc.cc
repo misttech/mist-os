@@ -347,26 +347,9 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(fdf::PDev& pdev) {
       return zx::success();
     }
 
-    FDF_LOGL(ERROR, logger(), "Failure creating power elements: %hhu", result.error_value());
-    switch (result.error_value()) {
-      case fdf_power::Error::INVALID_ARGS:
-        return zx::error(ZX_ERR_INVALID_ARGS);
-      case fdf_power::Error::TOKEN_REQUEST:
-      case fdf_power::Error::IO:
-      case fdf_power::Error::TOPOLOGY_UNAVAILABLE:
-        return zx::error(ZX_ERR_IO);
-      case fdf_power::Error::DEPENDENCY_NOT_FOUND:
-        return zx::error(ZX_ERR_NOT_FOUND);
-      case fdf_power::Error::TOKEN_SERVICE_CAPABILITY_NOT_FOUND:
-      case fdf_power::Error::NO_TOKEN_SERVICE_INSTANCES:
-      case fdf_power::Error::ACTIVITY_GOVERNOR_UNAVAILABLE:
-        return zx::error(ZX_ERR_ACCESS_DENIED);
-      case fdf_power::Error::READ_INSTANCES:
-      case fdf_power::Error::ACTIVITY_GOVERNOR_REQUEST:
-        return zx::error(ZX_ERR_IO_REFUSED);
-      default:
-        return zx::error(ZX_ERR_INTERNAL);
-    }
+    FDF_LOGL(ERROR, logger(), "Failure creating power elements: %s",
+             fdf_power::ErrorToString(result.error_value()));
+    return fdf_power::ErrorToZxError(result.error_value());
   }
 
   if (result.value().empty()) {
