@@ -247,6 +247,14 @@ impl ObjectKey {
     }
 
     /// Creates an ObjectKey for an encrypted child.
+    ///
+    /// The casefold_hash is important here -- especially for fscrypt as it affects the
+    /// name of locked files.
+    ///
+    /// For case-insensitive lookups in large encrypted directories, we lose the ability to binary
+    /// search for an entry of interest because encryption breaks our sort order. In these cases
+    /// we prefix records with a 32-bit hash based on the stable *casefolded* name. Hash collisions
+    /// aside, this lets us jump straight to the entry of interest, if it exists.
     pub fn encrypted_child(object_id: u64, name: Vec<u8>, casefold_hash: u32) -> Self {
         Self { object_id, data: ObjectKeyData::EncryptedChild { casefold_hash, name } }
     }
