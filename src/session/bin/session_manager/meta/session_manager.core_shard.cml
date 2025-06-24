@@ -315,6 +315,12 @@
             availability: "same_as_target",
         },
         {
+            service: [ "google.powerstats.state.residency.Service" ],
+            from: "parent",
+            to: "#session-manager",
+            availability: "same_as_target",
+        },
+        {
             storage: [
                 "cache",
                 "data",

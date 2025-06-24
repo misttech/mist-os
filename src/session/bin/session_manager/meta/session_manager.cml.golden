@@ -563,6 +563,7 @@
                 "fuchsia.hardware.trippoint.TripPointService", // replaces /dev/class/trippoint
                 "fuchsia.input.report.Service", // replaces /dev/class/input-report
                 "fuchsia.power.battery.InfoService", // replaces /dev/class/battery
+                "google.powerstats.state.residency.Service",
             ],
             from: "parent",
             to: "#session",

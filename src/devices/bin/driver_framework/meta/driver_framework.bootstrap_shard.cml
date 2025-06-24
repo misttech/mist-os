@@ -482,6 +482,7 @@
                 "fuchsia.services.test.Device",
                 "fuchsia.tpm.Service",
                 "fuchsia.wlan.device.Service",
+                "google.powerstats.state.residency.Service",
             ],
             from: "#boot-drivers",
         },
