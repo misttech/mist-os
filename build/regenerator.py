@@ -467,7 +467,6 @@ def main() -> int:
             fuchsia_dir=fuchsia_dir,
             build_dir=build_dir,
             log=log2,
-            enable_bzlmod=False,
         )
 
         # Find all imported Python modules and set them as extra inputs

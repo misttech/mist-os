@@ -884,10 +884,8 @@ def main() -> int:
         # *silently* with a Java exception, leaving no traces on the client
         # terminal :-(
         f"--experimental_downloader_config={downloader_config_file}",
-        # TODO: b/318334703 - Enable bzlmod when the Fuchsia build is ready.
         "--enable_bzlmod=true",
         "--incompatible_use_plus_in_repo_names",
-        "--enable_workspace=true",
         f"--vendor_dir={bazel_vendor_dir}",
         f"--registry=file://{bazel_registry}",
     ]
