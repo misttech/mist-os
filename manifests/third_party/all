@@ -604,7 +604,7 @@
              path="third_party/fmtlib/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/fmtlib/fmt"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="b7979d59cc9be9271b372592928edb9d710d3386"/>
+             revision="1f5e7f3856aab685799261f0413d17c5b2f01367"/>
     <project name="third_party/pyjson5"
              path="third_party/pyjson5/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/dpranke/pyjson5"
