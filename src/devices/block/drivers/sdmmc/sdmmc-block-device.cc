@@ -411,16 +411,27 @@ void SdmmcBlockDevice::WatchHardwareRequiredLevel() {
         }
 
         const fuchsia_power_broker::PowerLevel required_level = result->value()->required_level;
-        switch (required_level) {
-          case kPowerLevelOn:
+
+        // TODO(424264756): Remove this case when we're able to get a lease at the time the PE is
+        // created.
+        if (hardware_power_lease_control_client_end_.is_valid()) {
+          // Power Framework will immediately call SetLevel(OFF) followed by SetLevel(BOOT). These
+          // calls can be ignored while we still have a lease on the BOOT level.
+
+          if (required_level == kPowerLevelOn) {
             // If we're rising above the boot power level, it must because an
             // external lease raised our power level. This means we can drop
             // our self-lease and allow the external entity to drive our power
             // state.
-            if (hardware_power_lease_control_client_end_.is_valid()) {
-              hardware_power_lease_control_client_end_.reset();
-            }
-            __FALLTHROUGH;
+            hardware_power_lease_control_client_end_.reset();
+          }
+          UpdatePowerLevel(hardware_power_current_level_client_, required_level);
+          delay_before_next_watch = false;
+          return;
+        }
+
+        switch (required_level) {
+          case kPowerLevelOn:
           case kPowerLevelBoot: {
             const zx::time start = zx::clock::get_monotonic();
 

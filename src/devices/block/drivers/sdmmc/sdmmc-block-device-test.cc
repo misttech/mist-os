@@ -166,11 +166,14 @@ class FakeLessor : public fidl::Server<fuchsia_power_broker::Lessor> {
 class FakeCurrentLevel : public fidl::Server<fuchsia_power_broker::CurrentLevel> {
  public:
   void Update(UpdateRequest& req, UpdateCompleter::Sync& completer) override {
+    current_level_ = req.current_level();
     completer.Reply(fit::success());
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::CurrentLevel> md,
                              fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+  fuchsia_power_broker::PowerLevel current_level_ = UINT32_MAX;
 };
 
 class FakeRequiredLevel : public fidl::Server<fuchsia_power_broker::RequiredLevel> {
@@ -2282,9 +2285,6 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   });
   ASSERT_TRUE(lease_control_server_end.is_valid());
 
-  // Initial power level is kPowerLevelOff.
-  runtime_.PerformBlockingWork([&] { sleep_complete.Wait(); });
-
   inspect::InspectTestHelper inspector;
   inspector.ReadInspect(block_device_->inspect());
 
@@ -2294,16 +2294,7 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   const auto* power_suspended =
       root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
   ASSERT_NOT_NULL(power_suspended);
-  EXPECT_TRUE(power_suspended->value());
-
-  inspector.ReadInspect(block_device_->inspect());
-
-  root = inspector.hierarchy().GetByPath({"sdmmc_core"});
-  ASSERT_NOT_NULL(root);
-
-  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
-  ASSERT_NOT_NULL(power_suspended);
-  EXPECT_TRUE(power_suspended->value());
+  EXPECT_FALSE(power_suspended->value());
 
   // The driver should have obtained a lease on kPowerLevelBoot.
   zx_signals_t observed{};
@@ -2312,13 +2303,47 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
             ZX_ERR_TIMED_OUT);
   EXPECT_FALSE(observed & ZX_CHANNEL_PEER_CLOSED);
 
+  // Trigger power level change to kPowerLevelOff.
+  incoming_.SyncCall([](IncomingNamespace* incoming) {
+    incoming->power_broker.hardware_power_required_level_->required_level_ =
+        SdmmcBlockDevice::kPowerLevelOff;
+  });
+  runtime_.PerformBlockingWork([&] {
+    while (incoming_.SyncCall([](IncomingNamespace* incoming) {
+      return incoming->power_broker.hardware_power_current_level_->current_level_ !=
+             SdmmcBlockDevice::kPowerLevelOff;
+    })) {
+    }
+  });
+
+  // The lease should still be held after moving to kPowerLevelOff.
+  EXPECT_EQ(lease_control_server_end.channel().wait_one(ZX_CHANNEL_PEER_CLOSED,
+                                                        zx::time::infinite_past(), &observed),
+            ZX_ERR_TIMED_OUT);
+  EXPECT_FALSE(observed & ZX_CHANNEL_PEER_CLOSED);
+
+  inspector.ReadInspect(block_device_->inspect());
+
+  root = inspector.hierarchy().GetByPath({"sdmmc_core"});
+  ASSERT_NOT_NULL(root);
+
+  // The transition should be ignored, and the device should be left on.
+  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NOT_NULL(power_suspended);
+  EXPECT_FALSE(power_suspended->value());
+
   // Trigger power level change to kPowerLevelBoot.
-  awake_complete.Reset();
   incoming_.SyncCall([](IncomingNamespace* incoming) {
     incoming->power_broker.hardware_power_required_level_->required_level_ =
         SdmmcBlockDevice::kPowerLevelBoot;
   });
-  runtime_.PerformBlockingWork([&] { awake_complete.Wait(); });
+  runtime_.PerformBlockingWork([&] {
+    while (incoming_.SyncCall([](IncomingNamespace* incoming) {
+      return incoming->power_broker.hardware_power_current_level_->current_level_ !=
+             SdmmcBlockDevice::kPowerLevelBoot;
+    })) {
+    }
+  });
 
   // The lease should still be held after moving to kPowerLevelBoot.
   EXPECT_EQ(lease_control_server_end.channel().wait_one(ZX_CHANNEL_PEER_CLOSED,
@@ -2361,7 +2386,8 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   ASSERT_NOT_NULL(power_suspended);
   EXPECT_FALSE(power_suspended->value());
 
-  // Trigger power level change to kPowerLevelOff.
+  // Trigger power level change to kPowerLevelOff. This time the transition should be respected, and
+  // the device should be put to sleep.
   sleep_complete.Reset();
   incoming_.SyncCall([](IncomingNamespace* incoming) {
     incoming->power_broker.hardware_power_required_level_->required_level_ =
@@ -2377,6 +2403,23 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
   power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
   ASSERT_NOT_NULL(power_suspended);
   EXPECT_TRUE(power_suspended->value());
+
+  // Trigger power level change back to kPowerLevelOn and wait for the device to be woken up.
+  awake_complete.Reset();
+  incoming_.SyncCall([](IncomingNamespace* incoming) {
+    incoming->power_broker.hardware_power_required_level_->required_level_ =
+        SdmmcBlockDevice::kPowerLevelOn;
+  });
+  runtime_.PerformBlockingWork([&] { awake_complete.Wait(); });
+
+  inspector.ReadInspect(block_device_->inspect());
+
+  root = inspector.hierarchy().GetByPath({"sdmmc_core"});
+  ASSERT_NOT_NULL(root);
+
+  power_suspended = root->node().get_property<inspect::BoolPropertyValue>("power_suspended");
+  ASSERT_NOT_NULL(power_suspended);
+  EXPECT_FALSE(power_suspended->value());
 }
 
 TEST_P(SdmmcBlockDeviceTest, BlockServer) {
