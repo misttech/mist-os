@@ -68,6 +68,7 @@ impl TryFromEnv for DaemonProxyHolder {
     }
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Clone)]
 pub struct DaemonProtocol<P: Clone>(P);
 
