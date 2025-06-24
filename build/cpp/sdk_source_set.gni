@@ -402,11 +402,18 @@ template("sdk_source_set") {
 
     # Explicitly add non-public dependencies, in case some of the source files
     # are generated.
+    # There is only one legitimate use case for these in the IDK, so assert that
+    # all others are in the "internal IDK."
     if (defined(invoker.non_sdk_deps)) {
+      assert(is_internal ||
+                 invoker.non_sdk_deps == [ "//sdk/fidl/zbi:zbi.c.checked-in" ],
+             "`non_sdk_deps` should not be used with atoms in the IDK.")
       non_sdk_deps += invoker.non_sdk_deps
     }
 
     if (defined(invoker.non_sdk_public_deps)) {
+      assert(is_internal,
+             "`non_sdk_public_deps` should not be used with atoms in the IDK.")
       non_sdk_deps += invoker.non_sdk_public_deps
     }
 

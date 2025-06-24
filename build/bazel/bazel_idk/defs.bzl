@@ -224,10 +224,11 @@ idk_molecule = rule(
 # (https://bazel.build/reference/be/c-cpp#cc_library) or the results of
 # `fx format-code`, which reorders most non-common arguments alphabetically at
 # call sites.
-# TODO(https://fxbug.dev/417305295): Add the following arguments supported by
+# TODO(https://fxbug.dev/417305295): Add the following argument supported by
 # the GN `sdk_source_set()` template if necessary. Note that
-# `sdk_static_library()` and `sdk_shared_library()` do not support them.
-# * `non_idk_deps` (GN equivalent: `non_sdk_public_deps`)
+# `sdk_static_library()` and `sdk_shared_library()` do not support it.
+# When adding support, assert that it is only used for
+# "//sdk/fidl/zbi:zbi.c.checked-in"
 # * `non_idk_implementation_deps` (GN equivalent: `non_sdk_deps`)
 def idk_cc_source_library(
         name,
@@ -317,8 +318,6 @@ def idk_cc_source_library(
         srcs = srcs,
         data = allowlist_deps,
         hdrs = hdrs,
-        # TODO(https://fxbug.dev/417305295): If we must support `non_idk_deps`,
-        # add it below.
         deps = deps,
         # TODO(https://fxbug.dev/417305295): If we must support
         # `non_idk_implementation_deps`, add it below.
@@ -359,8 +358,8 @@ def idk_cc_source_library(
 
     idk_deps = _get_idk_deps(deps) + _get_idk_deps(implementation_deps)
 
-    # TODO(https://fxbug.dev/417305295): If we must support `non_idk_deps`
-    # and/or `non_idk_implementation_deps`, add them here.
+    # TODO(https://fxbug.dev/417305295): If we must support
+    # `non_idk_implementation_deps`, add it here.
     # TODO(https://fxbug.dev/417307356): When implementing prebuilt
     # libraries, add `[":%s" % name]`. It may also be necessary to return
     # `DefaultInfo` from the underlying library.
