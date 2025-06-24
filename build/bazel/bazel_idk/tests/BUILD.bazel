@@ -14,7 +14,7 @@ idk_atom(
     idk_name = "test_atom",
     meta_dest = "/pkg/test",
     stable = True,
-    type = "prebuilt_library",
+    type = "data",
 )
 
 idk_cc_source_library(

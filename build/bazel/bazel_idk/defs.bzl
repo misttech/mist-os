@@ -7,6 +7,28 @@
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@rules_cc//cc:defs.bzl", "cc_library")
 
+_TYPES_SUPPORTING_UNSTABLE_ATOMS = [
+    # LINT.IfChange(unstable_atom_types)
+    "cc_source_library",
+    "fidl_library",
+
+    # LINT.ThenChange(//build/sdk/sdk_atom.gni:unstable_atom_types, //build/sdk/generate_idk/__init__.py:unstable_atom_types, //build/sdk/generate_prebuild_idk/idk_generator.py)
+]
+_TYPES_NOT_REQUIRING_COMPATIBILITY = [
+    # LINT.IfChange(non_compatibility_types)
+    "bind_library",
+    "companion_host_tool",
+    "dart_library",
+    "data",
+    "documentation",
+    "experimental_python_e2e_test",
+    "ffx_tool",
+    "host_tool",
+    "package",
+    "version_history",
+    # LINT.ThenChange(//build/sdk/sdk_atom.gni:non_compatibility_types)
+]
+
 # TOOD(https://fxbug.dev/417304469): `sdk_area`,  and some other
 # fields of this provider do not belong in prebuild info. `idk_deps` may
 # also be unnecessary, but could be useful for category enforcement.
@@ -173,6 +195,8 @@ Possible values, from most restrictive to least restrictive:
 # and reference those definitions from _create_idk_atom().
 def idk_atom(
         name,
+        type,
+        stable,
         api_file_path = None,
         api_contents_map = None,
         **kwargs):
@@ -180,13 +204,22 @@ def idk_atom(
 
     Args:
         name: The name of the IDK atom target.
+        type: See _create_idk_atom().
+        stable:  See _create_idk_atom().
         api_file_path: See _create_idk_atom().
         api_contents_map:  See _create_idk_atom().
         **kwargs: Additional arguments for the underlying atom.  See _create_idk_atom().
     """
 
+    if type not in _TYPES_SUPPORTING_UNSTABLE_ATOMS and not stable:
+        fail("`stable` must be true unless the type ('%s') is one of %s." % (type, _TYPES_SUPPORTING_UNSTABLE_ATOMS))
+
     if (not api_file_path) != (not api_contents_map):
         fail("`api_file_path` and `api_contents_map` must be specified together.")
+
+    is_type_not_requiring_compatibility = type in _TYPES_NOT_REQUIRING_COMPATIBILITY
+    if stable and not api_file_path and not is_type_not_requiring_compatibility:
+        fail("All atoms with types ('%s') requiring compatibility must specify an `api_file_path` unless explicitly unstable." % type)
 
     # TODO(https://fxbug.dev/417305295): Verify the API with
     # `api_file_path` and `api_contents_map`.
@@ -201,6 +234,8 @@ def idk_atom(
 
     _create_idk_atom(
         name = name + "_idk",
+        type = type,
+        stable = stable,
         api_file_path = api_file_path,
         api_contents_map = api_contents_map,
         **kwargs

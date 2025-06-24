@@ -14,9 +14,10 @@ _types_supporting_unstable_atoms = [
   "cc_source_library",
   "fidl_library",
 
-  # LINT.ThenChange(//build/sdk/generate_idk/__init__.py:unstable_atom_types, //build/sdk/generate_prebuild_idk/idk_generator.py)
+  # LINT.ThenChange(//build/bazel/bazel_idk/defs.bzl:unstable_atom_types, //build/sdk/generate_idk/__init__.py:unstable_atom_types, //build/sdk/generate_prebuild_idk/idk_generator.py)
 ]
 _types_not_requiring_compatibility = [
+  # LINT.IfChange(non_compatibility_types)
   "bind_library",
   "companion_host_tool",
   "dart_library",
@@ -27,6 +28,8 @@ _types_not_requiring_compatibility = [
   "host_tool",
   "package",
   "version_history",
+
+  # LINT.ThenChange(//build/bazel/bazel_idk/defs.bzl:non_compatibility_types)
 ]
 
 # Atoms of type "data" specify the real type in `value.type`. These are the
@@ -337,7 +340,7 @@ template("sdk_atom") {
 
   assert(
       defined(invoker.api) || !is_stable || is_type_not_requiring_compatibility,
-      "All atoms with types ('${type}') and categories ('${category}') requiring compatibility must specify an `api` file unless explicitly unstable.")
+      "All atoms with types ('${type}') requiring compatibility must specify an `api` file unless explicitly unstable.")
   not_needed([
                "is_type_not_requiring_compatibility",
                "target_label",
