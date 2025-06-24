@@ -5,7 +5,8 @@
 #ifndef SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_FIELD_H_
 #define SRC_LIB_ELFLDLTL_INCLUDE_LIB_ELFLDLTL_FIELD_H_
 
-#include <bit>
+#include <lib/stdcompat/bit.h>
+
 #include <cstddef>
 #include <cstdint>
 #include <type_traits>
@@ -83,24 +84,10 @@ class FieldStorage {
 
   static constexpr value_type Convert(value_type val) {
     if constexpr (kSwap) {
-      // These are portable expressions for byte-swapping but the compiler will
-      // recognize the pattern and emit the optimal single instruction or two.
-      if constexpr (sizeof(value_type) == sizeof(uint64_t)) {
-        val = (((val >> 56) & 0xff) << 0) | (((val >> 48) & 0xff) << 8) |
-              (((val >> 40) & 0xff) << 16) | (((val >> 32) & 0xff) << 24) |
-              (((val >> 24) & 0xff) << 32) | (((val >> 16) & 0xff) << 40) |
-              (((val >> 8) & 0xff) << 48) | (((val >> 0) & 0xff) << 56);
-      } else if constexpr (sizeof(value_type) == sizeof(uint32_t)) {
-        val = (((val >> 24) & 0xff) << 0) | (((val >> 16) & 0xff) << 8) |
-              (((val >> 8) & 0xff) << 16) | (((val >> 0) & 0xff) << 24);
-      } else if constexpr (sizeof(value_type) == sizeof(uint16_t)) {
-        val = static_cast<value_type>(((val >> 8) & 0xff) << 0) |
-              static_cast<value_type>(((val >> 0) & 0xff) << 8);
-      } else {
-        static_assert(sizeof(value_type) == sizeof(uint8_t));
-      }
+      return cpp23::byteswap(val);
+    } else {
+      return val;
     }
-    return val;
   }
 
   value_type value_{};

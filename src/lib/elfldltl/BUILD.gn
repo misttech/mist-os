@@ -11,12 +11,12 @@ has_fd = !is_kernel && toolchain_variant.tags + [ "standalone" ] -
 
 library_headers("headers") {
   # These APIs are close to being universally portable.  They depend only on
-  # standard C++20 and <lib/fit/result.h> and rely only on library features
-  # available in all environments.  This may include references to container
-  # and allocation APIs that cannot actually be used in special environments
-  # (without infallible allocation), but using the headers should be compatible
-  # as long as the specific functions and classes relying on those library
-  # features are not used.
+  # standard C++20, <lib/fit/result.h>, <lib/stdcompat/bit.h> and rely only on
+  # library features available in all environments.  This may include
+  # references to container and allocation APIs that cannot actually be used in
+  # special environments (without infallible allocation), but using the headers
+  # should be compatible as long as the specific functions and classes relying
+  # on those library features are not used.
   headers = [
     "lib/elfldltl/abi-ptr.h",
     "lib/elfldltl/abi-span.h",
@@ -62,7 +62,10 @@ library_headers("headers") {
     "lib/elfldltl/symbol.h",
     "lib/elfldltl/tls-layout.h",
   ]
-  public_deps = [ "//sdk/lib/fit" ]
+  public_deps = [
+    "//sdk/lib/fit",
+    "//sdk/lib/stdcompat",
+  ]
 
   # These APIs depend on some POSIX-like file-descriptor-based APIs.
   if (has_fd) {
