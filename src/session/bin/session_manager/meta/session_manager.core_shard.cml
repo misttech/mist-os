@@ -347,6 +347,12 @@
             availability: "optional",
         },
         {
+            directory: "block",
+            from: "parent",
+            to: "#session-manager",
+            availability: "same_as_target",
+        },
+        {
             config: "fuchsia.power.SuspendEnabled",
             from: "parent",
             to: "#session-manager",

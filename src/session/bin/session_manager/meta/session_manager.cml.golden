@@ -193,6 +193,18 @@
             availability: "optional",
         },
         {
+            // This directory provides access to the subset of block devices which the system is
+            // configured to expose to product components.  The configuration is defined in assembly
+            // (storage.filesystems.block_devices).
+            // Specific block devices are exposed as sub-directories by a configurable label;
+            // generally, only sub-directories should be exposed to specific components as needed,
+            // rather than the entire directory.
+            directory: "block",
+            from: "parent",
+            to: "#session",
+            availability: "same_as_target",
+        },
+        {
             // Routed to session-manager via tee-clients.core_shard.cml
             protocol: [
                 "fuchsia.castauth.CastCertificateRetriever",
