@@ -77,10 +77,12 @@
 #include <lib/trace-engine/fields.h>
 #include <lib/trace-engine/handler.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cstdio>
 #include <mutex>
 
+#include "buffer.h"
 #include "context_impl.h"
 
 namespace trace {
@@ -96,8 +98,7 @@ trace_context::trace_context(void* buffer, size_t buffer_num_bytes,
                              trace_buffering_mode_t buffering_mode, trace_handler_t* handler)
     : generation_(trace::g_next_generation.fetch_add(1u, std::memory_order_relaxed) + 1u),
       buffering_mode_(buffering_mode),
-      buffer_start_(reinterpret_cast<uint8_t*>(buffer)),
-      buffer_end_(buffer_start_ + buffer_num_bytes),
+      buffer_(reinterpret_cast<uint8_t*>(buffer), buffer_num_bytes),
       header_(reinterpret_cast<trace_buffer_header*>(buffer)),
       handler_(handler) {
   ZX_DEBUG_ASSERT(buffer_num_bytes >= kMinPhysicalBufferSize);
@@ -217,7 +218,7 @@ bool trace_context::SwitchRollingBuffer(uint32_t wrapped_count, uint64_t buffer_
 
   // If the durable buffer happened to fill while we were waiting for
   // the lock we're done.
-  if (unlikely(tracing_artificially_stopped_)) {
+  if (unlikely(tracing_artificially_stopped_.load(std::memory_order_relaxed))) {
     return false;
   }
 
@@ -225,7 +226,7 @@ bool trace_context::SwitchRollingBuffer(uint32_t wrapped_count, uint64_t buffer_
   // Anything allocated to the durable buffer after this point
   // won't be for this buffer. This is racy, but all we need is
   // some usable value for where the durable pointer is.
-  uint64_t durable_data_end = DurableBytesAllocated();
+  uint64_t durable_data_end = durable_buffer_.BytesAllocated();
 
   ZX_DEBUG_ASSERT(wrapped_count <= current_wrapped_count);
   if (likely(wrapped_count == current_wrapped_count)) {
@@ -273,17 +274,15 @@ bool trace_context::SwitchRollingBuffer(uint32_t wrapped_count, uint64_t buffer_
 
 uint64_t* trace_context::AllocDurableRecord(size_t num_bytes) {
   ZX_DEBUG_ASSERT(UsingDurableBuffer());
-  ZX_DEBUG_ASSERT((num_bytes & 7) == 0);
-
-  uint64_t buffer_offset = durable_buffer_current_.fetch_add(num_bytes, std::memory_order_relaxed);
-  if (likely(buffer_offset + num_bytes <= durable_buffer_size_)) {
-    uint8_t* ptr = durable_buffer_start_ + buffer_offset;
-    return reinterpret_cast<uint64_t*>(ptr);  // success!
+  uint64_t* ptr = durable_buffer_.AllocRecord(num_bytes);
+  if (likely(ptr != nullptr)) {
+    return ptr;
   }
-
-  // Buffer is full!
-  MarkDurableBufferFull(buffer_offset);
-
+  // A record may be written that relies on this durable record. To preserve data integrity, we
+  // disable all further tracing. There is a small window where a non-durable record could get
+  // emitted that depends on this durable record. It's rare enough and inconsequential enough that
+  // we ignore it.
+  MarkTracingArtificiallyStopped();
   return nullptr;
 }
 
@@ -310,7 +309,7 @@ bool trace_context::AllocStringIndex(trace_string_index_t* out_index) {
 }
 
 void trace_context::ComputeBufferSizes() {
-  size_t full_buffer_size = buffer_end_ - buffer_start_;
+  size_t full_buffer_size = buffer_.size();
   ZX_DEBUG_ASSERT(full_buffer_size >= kMinPhysicalBufferSize);
   ZX_DEBUG_ASSERT(full_buffer_size <= kMaxPhysicalBufferSize);
   size_t header_size = sizeof(trace_buffer_header);
@@ -318,24 +317,22 @@ void trace_context::ComputeBufferSizes() {
     case TRACE_BUFFERING_MODE_ONESHOT:
       // Create one big buffer, where durable and non-durable records share
       // the same buffer. There is no separate buffer for durable records.
-      durable_buffer_start_ = nullptr;
-      durable_buffer_size_ = 0;
-      rolling_buffer_start_[0] = buffer_start_ + header_size;
+      durable_buffer_.Set(std::span<uint8_t>{});
+      rolling_buffer_start_[0] = buffer_.data() + header_size;
       rolling_buffer_size_ = full_buffer_size - header_size;
       // The second rolling buffer is not used.
       rolling_buffer_start_[1] = nullptr;
       break;
     case TRACE_BUFFERING_MODE_CIRCULAR:
     case TRACE_BUFFERING_MODE_STREAMING: {
-      // Rather than make things more complex on the user, at least for now,
+      // Rather than make things more complex on the user,
       // we choose the sizes of the durable and rolling buffers.
+      //
       // Note: The durable buffer must have enough space for at least
       // the initialization record.
-      // TODO(dje): The current choices are wip.
       uint64_t avail = full_buffer_size - header_size;
       uint64_t durable_buffer_size = GET_DURABLE_BUFFER_SIZE(avail);
-      if (durable_buffer_size > kMaxDurableBufferSize)
-        durable_buffer_size = kMaxDurableBufferSize;
+      durable_buffer_size = std::min(durable_buffer_size, DurableBuffer::kMaxDurableBufferSize);
       // Further adjust |durable_buffer_size| to ensure all buffers are a
       // multiple of 8. |full_buffer_size| is guaranteed by
       // |trace_start_engine()| to be a multiple of 4096. We only assume
@@ -347,7 +344,7 @@ void trace_context::ComputeBufferSizes() {
       durable_buffer_size += off_by;
       ZX_DEBUG_ASSERT((durable_buffer_size & 7) == 0);
       // The value of |kMinPhysicalBufferSize| ensures this:
-      ZX_DEBUG_ASSERT(durable_buffer_size >= kMinDurableBufferSize);
+      ZX_DEBUG_ASSERT(durable_buffer_size >= DurableBuffer::kMinDurableBufferSize);
       uint64_t rolling_buffer_size = (avail - durable_buffer_size) / 2;
       ZX_DEBUG_ASSERT((rolling_buffer_size & 7) == 0);
       // We need to maintain the invariant that the entire buffer is used.
@@ -355,9 +352,9 @@ void trace_context::ComputeBufferSizes() {
       // sizeof(trace_buffer_header), which is true since the buffer is a
       // vmo (some number of 4K pages).
       ZX_DEBUG_ASSERT(durable_buffer_size + 2 * rolling_buffer_size == avail);
-      durable_buffer_start_ = buffer_start_ + header_size;
-      durable_buffer_size_ = durable_buffer_size;
-      rolling_buffer_start_[0] = durable_buffer_start_ + durable_buffer_size_;
+      std::span durable_data = buffer_.subspan(header_size, durable_buffer_size);
+      durable_buffer_.Set(durable_data);
+      rolling_buffer_start_[0] = durable_data.data() + durable_buffer_.MaxSize();
       rolling_buffer_start_[1] = rolling_buffer_start_[0] + rolling_buffer_size;
       rolling_buffer_size_ = rolling_buffer_size;
       break;
@@ -367,11 +364,6 @@ void trace_context::ComputeBufferSizes() {
   }
 }
 
-void trace_context::ResetDurableBufferPointers() {
-  durable_buffer_current_.store(0);
-  durable_buffer_full_mark_.store(0);
-}
-
 void trace_context::ResetRollingBufferPointers() {
   rolling_buffer_current_.store(0);
   rolling_buffer_full_mark_[0].store(0);
@@ -379,7 +371,7 @@ void trace_context::ResetRollingBufferPointers() {
 }
 
 void trace_context::ResetBufferPointers() {
-  ResetDurableBufferPointers();
+  durable_buffer_.Reset();
   ResetRollingBufferPointers();
 }
 
@@ -389,8 +381,8 @@ void trace_context::InitBufferHeader() {
   header_->magic = TRACE_BUFFER_HEADER_MAGIC;
   header_->version = TRACE_BUFFER_HEADER_V0;
   header_->buffering_mode = static_cast<uint8_t>(buffering_mode_);
-  header_->total_size = buffer_end_ - buffer_start_;
-  header_->durable_buffer_size = durable_buffer_size_;
+  header_->total_size = buffer_.size();
+  header_->durable_buffer_size = durable_buffer_.MaxSize();
   header_->rolling_buffer_size = rolling_buffer_size_;
 }
 
@@ -402,13 +394,7 @@ void trace_context::ClearEntireBuffer() {
 void trace_context::ClearRollingBuffers() { ResetRollingBufferPointers(); }
 
 void trace_context::UpdateBufferHeaderAfterStopped() {
-  // If the buffer filled, then the current pointer is "snapped" to the end.
-  // Therefore in that case we need to use the buffer_full_mark.
-  uint64_t durable_last_offset = durable_buffer_current_.load(std::memory_order_relaxed);
-  uint64_t durable_buffer_full_mark = durable_buffer_full_mark_.load(std::memory_order_relaxed);
-  if (durable_buffer_full_mark != 0)
-    durable_last_offset = durable_buffer_full_mark;
-  header_->durable_data_end = durable_last_offset;
+  header_->durable_data_end = durable_buffer_.BytesAllocated();
 
   uint64_t offset_plus_counter = rolling_buffer_current_.load(std::memory_order_acquire);
   uint64_t last_offset = GetBufferOffset(offset_plus_counter);
@@ -459,41 +445,6 @@ size_t trace_context::RollingBytesAllocated() const {
     }
     default:
       __UNREACHABLE;
-  }
-}
-
-size_t trace_context::DurableBytesAllocated() const {
-  // Note: This will return zero in oneshot mode (as it should).
-  uint64_t offset = durable_buffer_full_mark_.load(std::memory_order_relaxed);
-  if (offset == 0)
-    offset = durable_buffer_current_.load(std::memory_order_relaxed);
-  return offset;
-}
-
-void trace_context::MarkDurableBufferFull(uint64_t last_offset) {
-  // Snap to the endpoint to reduce likelihood of pointer wrap-around.
-  // Otherwise each new attempt fill continually increase the offset.
-  durable_buffer_current_.store(reinterpret_cast<uint64_t>(durable_buffer_size_),
-                                std::memory_order_relaxed);
-
-  // Mark the end point if not already marked.
-  uintptr_t expected_mark = 0u;
-  if (durable_buffer_full_mark_.compare_exchange_strong(
-          expected_mark, last_offset, std::memory_order_relaxed, std::memory_order_relaxed)) {
-    fprintf(stderr, "TraceEngine: durable buffer full @offset %" PRIu64 "\n", last_offset);
-    header_->durable_data_end = last_offset;
-
-    // A record may be written that relies on this durable record.
-    // To preserve data integrity, we disable all further tracing.
-    // There is a small window where a non-durable record could get
-    // emitted that depends on this durable record. It's rare
-    // enough and inconsequential enough that we ignore it.
-    // TODO(dje): Another possibility is we could let tracing
-    // continue and start allocating future durable records in the
-    // rolling buffers, and accept potentially lost durable
-    // records. Another possibility is to remove the durable buffer,
-    // and, say, have separate caches for each rolling buffer.
-    MarkTracingArtificiallyStopped();
   }
 }
 
@@ -553,15 +504,23 @@ void trace_context::SwitchRollingBufferLocked(uint32_t prev_wrapped_count,
 }
 
 void trace_context::MarkTracingArtificiallyStopped() {
-  // Grab the lock in part so that we don't switch buffers between
-  // |CurrentWrappedCount()| and |SnapToEnd()|.
-  std::lock_guard<std::mutex> lock(buffer_switch_mutex_);
+  bool expected = false;
+  const bool desired = true;
+  bool success = tracing_artificially_stopped_.compare_exchange_strong(
+      expected, desired, std::memory_order::relaxed, std::memory_order::relaxed);
 
-  // Disable tracing by making it look like the current rolling
-  // buffer is full. AllocRecord, on seeing the buffer is full, will
-  // then check |tracing_artificially_stopped_|.
-  tracing_artificially_stopped_ = true;
-  SnapToEnd(CurrentWrappedCount(std::memory_order_relaxed));
+  // We only want to stop the trace once.
+  if (success) {
+    // Grab the lock in part so that we don't switch buffers between
+    // |CurrentWrappedCount()| and |SnapToEnd()|.
+    std::lock_guard<std::mutex> lock(buffer_switch_mutex_);
+    header_->durable_data_end = durable_buffer_.BytesAllocated();
+
+    // Disable tracing by making it look like the current rolling
+    // buffer is full. AllocRecord, on seeing the buffer is full, will
+    // then check |tracing_artificially_stopped_|.
+    SnapToEnd(CurrentWrappedCount(std::memory_order_relaxed));
+  }
 }
 
 void trace_context::NotifyRollingBufferFullLocked(uint32_t wrapped_count,

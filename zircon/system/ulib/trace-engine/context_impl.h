@@ -5,15 +5,17 @@
 #ifndef ZIRCON_SYSTEM_ULIB_TRACE_ENGINE_CONTEXT_IMPL_H_
 #define ZIRCON_SYSTEM_ULIB_TRACE_ENGINE_CONTEXT_IMPL_H_
 
-#include <atomic>
-#include <mutex>
-
-#include <zircon/assert.h>
-
 #include <lib/trace-engine/buffer_internal.h>
 #include <lib/trace-engine/context.h>
 #include <lib/trace-engine/handler.h>
 #include <lib/zx/event.h>
+#include <zircon/assert.h>
+
+#include <atomic>
+#include <mutex>
+#include <span>
+
+#include "buffer.h"
 
 // Two preprocessor symbols control what symbols we export in a .so:
 // EXPORT and EXPORT_NO_DDK:
@@ -80,9 +82,6 @@ struct trace_context {
   // Return the number of bytes currently allocated in the rolling buffer(s).
   size_t RollingBytesAllocated() const;
 
-  size_t DurableBytesAllocated() const;
-
-  void ResetDurableBufferPointers();
   void ResetRollingBufferPointers();
   void ResetBufferPointers();
   void InitBufferHeader();
@@ -152,33 +151,6 @@ struct trace_context {
   // To keep things simple we ignore the header.
   static constexpr size_t kMaxPhysicalBufferSize = kMaxRollingBufferSize;
 
-  // The minimum size of the durable buffer.
-  // There must be enough space for at least the initialization record.
-  static constexpr size_t kMinDurableBufferSize = 16;
-
-  // LINT.IfChange
-  //
-  // The maximum size of the durable buffer.
-  // We need enough space for:
-  // - initialization record = 16 bytes
-  // - string table (max TRACE_ENCODED_STRING_REF_MAX_INDEX = 0x7fffu entries)
-  // - thread table (max TRACE_ENCODED_THREAD_REF_MAX_INDEX = 0xff entries)
-  // String entries are 8 bytes + length-round-to-8-bytes.
-  // Strings have a max size of TRACE_ENCODED_STRING_REF_MAX_LENGTH bytes
-  // = 32000. We assume most are < 64 bytes.
-  // Thread entries are 8 bytes + pid + tid = 24 bytes.
-  // If we assume 10000 registered strings, typically 64 bytes, plus max
-  // number registered threads, that works out to:
-  // 16 /*initialization record*/
-  // + 10000 * (8 + 64) /*strings*/
-  // + 255 * 24 /*threads*/
-  // = 726136.
-  // We round this up to 1MB.
-  static constexpr size_t kMaxDurableBufferSize = size_t{1024} * 1024;
-  //
-  // trace_manager uses this constant to properly size its buffers
-  // LINT.ThenChange(//src/performance/trace_manager/tracee.cc)
-
   // Given a buffer of size |SIZE| in bytes, not including the header,
   // return how much to use for the durable buffer. This is further adjusted
   // to be at most |kMaxDurableBufferSize|, and to account for rolling
@@ -188,7 +160,7 @@ struct trace_context {
   // Ensure the smallest buffer is still large enough to hold
   // |kMinDurableBufferSize|.
   static_assert(GET_DURABLE_BUFFER_SIZE(kMinPhysicalBufferSize - sizeof(trace_buffer_header)) >=
-                    kMinDurableBufferSize,
+                    DurableBuffer::kMinDurableBufferSize,
                 "");
 
   static uintptr_t GetBufferOffset(uint64_t offset_plus_counter) {
@@ -204,10 +176,6 @@ struct trace_context {
   }
 
   static int GetBufferNumber(uint32_t wrapped_count) { return wrapped_count & 1; }
-
-  bool IsDurableBufferFull() const {
-    return durable_buffer_full_mark_.load(std::memory_order_relaxed) != 0;
-  }
 
   // Return true if |buffer_number| is ready to be written to.
   bool IsRollingBufferReady(int buffer_number) const {
@@ -225,8 +193,6 @@ struct trace_context {
   }
 
   void ComputeBufferSizes();
-
-  void MarkDurableBufferFull(uint64_t last_offset);
 
   void MarkOneshotBufferFull(uint64_t last_offset);
 
@@ -261,19 +227,17 @@ struct trace_context {
   // The buffering mode.
   trace_buffering_mode_t const buffering_mode_;
 
-  // Buffer start and end pointers.
-  // These encapsulate the entire physical buffer.
-  uint8_t* const buffer_start_;
-  uint8_t* const buffer_end_;
+  // The entire physical buffer.
+  const std::span<uint8_t> buffer_;
 
-  // Same as |buffer_start_|, but as a header pointer.
+  // Aliases with buffer_, but as a trace_buffer_header*
   trace_buffer_header* const header_;
 
-  // Durable-record buffer start.
-  uint8_t* durable_buffer_start_;
-
-  // The size of the durable buffer;
-  size_t durable_buffer_size_;
+  // Durable-record buffer
+  //
+  // This only used in circular and streaming modes: There is no separate
+  // buffer for durable records in oneshot mode.
+  DurableBuffer durable_buffer_;
 
   // Rolling buffer start.
   // To simplify switching between them we don't record the buffer end,
@@ -282,18 +246,6 @@ struct trace_context {
 
   // The size of both rolling buffers.
   size_t rolling_buffer_size_;
-
-  // Current allocation pointer for durable records.
-  // This only used in circular and streaming modes.
-  // Starts at |durable_buffer_start| and grows from there.
-  // May exceed |durable_buffer_end| when the buffer is full.
-  std::atomic<uint64_t> durable_buffer_current_;
-
-  // Offset beyond the last successful allocation, or zero if not full.
-  // This only used in circular and streaming modes: There is no separate
-  // buffer for durable records in oneshot mode.
-  // Only ever set to non-zero once in the lifetime of the trace context.
-  std::atomic<uint64_t> durable_buffer_full_mark_;
 
   // Allocation pointer of the current buffer for non-durable records,
   // plus a wrapped counter. These are combined into one so that they can
@@ -325,7 +277,7 @@ struct trace_context {
   std::atomic<uint64_t> num_records_dropped_after_buffer_switch_{0};
 
   // Set to true if the engine needs to stop tracing for some reason.
-  bool tracing_artificially_stopped_ __TA_GUARDED(buffer_switch_mutex_) = false;
+  std::atomic<bool> tracing_artificially_stopped_{false};
 
   // This is used when switching rolling buffers.
   // It's a relatively rare operation, and this simplifies reasoning about

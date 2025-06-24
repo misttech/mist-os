@@ -31,6 +31,8 @@ template("trace_engine_library") {
     public_deps += trace_engine_header_deps
 
     sources = [
+      "buffer.cc",
+      "buffer.h",
       "context.cc",
       "context_api.cc",
       "context_impl.h",

@@ -29,6 +29,17 @@ test("hash-table-test") {
   ]
 }
 
+test("buffer_test") {
+  visibility = [ ":*" ]
+  output_name = "buffer_test"
+  sources = [
+    "../buffer.cc",
+    "../buffer.h",
+    "buffer_test.cc",
+  ]
+  deps = [ "//src/lib/fxl/test:gtest_main" ]
+}
+
 test("trace_engine_test") {
   visibility = [ ":*" ]
   sources = [ "trace_engine_test.cc" ]
@@ -51,9 +62,15 @@ fuchsia_unittest_package("trace-engine-test-pkg") {
   deps = [ ":trace_engine_test" ]
 }
 
+fuchsia_unittest_package("buffer-test-pkg") {
+  package_name = "buffer-test"
+  deps = [ ":buffer_test" ]
+}
+
 group("tests") {
   testonly = true
   deps = [
+    ":buffer-test-pkg",
     ":hash-table-test-pkg",
     ":trace-engine-test-pkg",
   ]
