@@ -20,6 +20,12 @@ class MoblyTestTimeoutException(Exception):
 class MoblyTestFailureException(Exception):
     """Raised when the underlying Mobly test returns a non-zero return code."""
 
+    def __init__(self, return_code: int):
+        self.return_code = return_code
+
+    def __repr__(self) -> str:
+        return f"Mobly test failed with return code {self.return_code}."
+
 
 def _execute_test(
     driver: base.BaseDriver,
@@ -103,9 +109,7 @@ def _execute_test(
         if return_code != 0:
             # TODO(https://fxbug.dev/42070748) - differentiate between legitimate
             # test failures vs unexpected crashes.
-            raise MoblyTestFailureException(
-                f"Mobly test failed with return code {return_code}."
-            )
+            raise MoblyTestFailureException(return_code)
 
 
 def run(
