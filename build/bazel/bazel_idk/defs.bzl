@@ -22,8 +22,8 @@ FuchsiaIdkAtomInfo = provider(
         "is_stable": "[bool] Whether the atom is stable",
         "api_area": "[string] The API area responsible for maintaining this atom",
         "api_file_path": "Path to the file representing the API canonically exposed by this atom.",
-        "api_contents": "List of scopes for the files making up the atom's API.",
-        "atom_files": "[dict[str,File]] a { dest -> source } map of files for this atom",
+        "api_contents_map": "List of scopes for the files making up the atom's API.",
+        "atom_files_map": "[dict[str,File]] a { dest -> source } map of files for this atom",
         "idk_deps": "[list[label]] Other atoms the atom directly depends on",
         "atoms_depset": "[depset[FuchsiaIdkAtomInfo]] The full set of other atoms the atom depends on",
         "build_deps": "[list[label]] List of dependencies that should not be reflected in IDKs",
@@ -48,11 +48,11 @@ def _get_idk_deps(underlying_deps):
     return [_get_idk_label(dep) for dep in underlying_deps] + idk_deps
 
 def _idk_atom_impl(ctx):
-    if (not ctx.attr.api_file_path) != (not ctx.attr.api_contents):
-        fail("`api_file_path` and `api_contents` must be specified together.")
+    if (not ctx.attr.api_file_path) != (not ctx.attr.api_contents_map):
+        fail("`api_file_path` and `api_contents_map` must be specified together.")
 
     # TODO(https://fxbug.dev/417305295): Verify the API with
-    # `ctx.attr.api_file_path` and `ctx.attr.contents`.
+    # `ctx.attr.api_file_path` and `ctx.attr.api_contents_map`.
 
     # TODO(https://fxbug.dev/417305295): Generate internal metadata (.sdk) file
     # if necessary. See https://fxbug.dev/407083737.
@@ -74,8 +74,8 @@ def _idk_atom_impl(ctx):
         is_stable = ctx.attr.stable,
         api_area = ctx.attr.api_area,
         api_file_path = ctx.attr.api_file_path,
-        api_contents = ctx.attr.api_contents,
-        atom_files = ctx.attr.files,
+        api_contents_map = ctx.attr.api_contents_map,
+        atom_files_map = ctx.attr.files_map,
         idk_deps = idk_deps,
         atoms_depset = depset(
             direct = idk_deps,
@@ -140,11 +140,11 @@ Possible values, from most restrictive to least restrictive:
         "api_file_path": attr.string(
             doc = "Path to the file representing the API canonically exposed by this atom. " +
                   "This file is used to ensure modifications to the API are explicitly acknowledged. " +
-                  "If this attribute is set, `api_contents` must be set as well. If not specified, no such modification checks are performed.",
+                  "If this attribute is set, `api_contents_map` must be set as well. If not specified, no such modification checks are performed.",
             mandatory = False,
             default = "",
         ),
-        "api_contents": attr.string_keyed_label_dict(
+        "api_contents_map": attr.string_keyed_label_dict(
             doc = "A dictionary of files making up the atom's API, mapping the destination path " +
                   "of  a file relative to the IDK root to its source file label. " +
                   "The set of files will be used to verify that the API has not changed locally. " +
@@ -154,7 +154,7 @@ Possible values, from most restrictive to least restrictive:
             default = {},
             allow_files = True,
         ),
-        "files": attr.string_keyed_label_dict(
+        "files_map": attr.string_keyed_label_dict(
             doc = "A dictionary of files for this atom, mapping the destination " +
                   "path of a file relative to the IDK root to its source file label.",
             mandatory = False,
@@ -335,20 +335,20 @@ def idk_cc_source_library(
     # Determine destinations in the IDK for headers and sources.
     idk_metadata_headers = []
     idk_metadata_sources = []
-    idk_header_files = {}
+    idk_header_files_map = {}
 
     for header in hdrs:
         relative_destination = paths.relativize(header, include_base)
         destination = include_dest + "/" + relative_destination
         idk_metadata_headers.append(destination)
-        idk_header_files |= {destination: header}
+        idk_header_files_map |= {destination: header}
 
-    idk_files = dict(idk_header_files)
+    idk_files_map = dict(idk_header_files_map)
 
     for source in srcs:
         source_dest_path = idk_root_path + "/" + source
         idk_metadata_sources.append(source_dest_path)
-        idk_files |= {source_dest_path: source}
+        idk_files_map |= {source_dest_path: source}
 
     # TODO(https://fxbug.dev/417305295): Verify pragma. Add to `build_deps`.
     # TODO(https://fxbug.dev/417305295): Verify public headers. Add to
@@ -372,10 +372,10 @@ def idk_cc_source_library(
                 fail("The specified `api` file (`%s`) matches the default. `api` only needs to be specified when overriding the default." % api_file_path)
             api_path = api_file_path
 
-        api_contents = idk_header_files
+        api_contents_map = idk_header_files_map
     else:
         api_path = None
-        api_contents = None
+        api_contents_map = None
 
     # The atom's visibility should allow IDK contents/definition rules to depend
     # on the atom in addition to the visibility of the underlying library.
@@ -404,8 +404,8 @@ def idk_cc_source_library(
         stable = stable,
         api_area = api_area,
         api_file_path = api_path,
-        api_contents = api_contents,
-        files = idk_files,
+        api_contents_map = api_contents_map,
+        files_map = idk_files_map,
         idk_deps = idk_deps,
         build_deps = build_deps,
         additional_prebuild_info = {

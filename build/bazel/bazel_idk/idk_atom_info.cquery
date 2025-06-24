@@ -21,8 +21,8 @@ Example use:
         "is_stable: " + str(atom_info.is_stable),
         "api_area: " + atom_info.api_area,
         "api_file_path: " + atom_info.api_file_path,
-        "api_contents: " + str(atom_info.api_contents),
-        "atom_files: " + str(atom_info.atom_files),
+        "api_contents_map: " + str(atom_info.api_contents_map),
+        "atom_files_map: " + str(atom_info.atom_files_map),
     ]
 
     if atom_info.idk_deps:
