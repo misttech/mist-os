@@ -8,7 +8,7 @@ use std::pin::Pin;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::task::Poll;
-use std::{fmt, mem};
+use std::fmt;
 
 use crate::runtime::{EHandle, PacketReceiver, ReceiverRegistration};
 use futures::task::{AtomicWaker, Context};
@@ -196,18 +196,6 @@ impl<H: AsHandleRef> AsHandleRef for OnSignals<'_, H> {
 impl<H: AsHandleRef> AsRef<H> for OnSignals<'_, H> {
     fn as_ref(&self) -> &H {
         &self.handle
-    }
-}
-
-pub struct LeakedOnSignals {
-    registration: Result<ReceiverRegistration<OnSignalsReceiver>, zx::Status>,
-}
-
-impl Future for LeakedOnSignals {
-    type Output = Result<zx::Signals, zx::Status>;
-    fn poll(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let reg = self.registration.as_mut().map_err(|e| mem::replace(e, zx::Status::OK))?;
-        reg.receiver().get_signals(cx).map(Ok)
     }
 }
 
