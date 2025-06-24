@@ -45,5 +45,33 @@ TYPED_TEST(LdLoadTests, SymbolicNamespace) {
   this->ExpectLog("");
 }
 
+TYPED_TEST(LdLoadTests, OneWeakSymbol) {
+  constexpr int64_t kFooV1ReturnValue = 2;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Needed({"libld-dep-foo-v1-weak.so", "libld-dep-foo-v2.so"}));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("one-weak-symbol"));
+
+  EXPECT_EQ(this->Run(), kFooV1ReturnValue);
+
+  this->ExpectLog("");
+}
+
+TYPED_TEST(LdLoadTests, AllWeakSymbols) {
+  constexpr int64_t kFooV1ReturnValue = 2;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Needed({"libld-dep-foo-v1-weak.so", "libld-dep-foo-v2-weak.so"}));
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("all-weak-symbols"));
+
+  EXPECT_EQ(this->Run(), kFooV1ReturnValue);
+
+  this->ExpectLog("");
+}
+
 }  // namespace
 }  // namespace ld::testing
