@@ -204,7 +204,7 @@ impl SocketFile {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        debug_assert!(data.bytes_read() == 0);
+        let bytes_read_before = data.bytes_read();
 
         // TODO: Implement more `flags`.
         let mut op = |locked: &mut Locked<L>| {
@@ -236,7 +236,7 @@ impl SocketFile {
             )
         };
 
-        let bytes_written = data.bytes_read();
+        let bytes_written = data.bytes_read() - bytes_read_before;
         if bytes_written == 0 {
             // We can only return an error if no data was actually sent. If partial data was
             // sent, swallow the error and return how much was sent.
