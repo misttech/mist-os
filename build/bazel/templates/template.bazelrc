@@ -112,6 +112,10 @@ build --@rules_rust//rust/settings:clippy_flag=-Wclippy::all
 common --enable_bzlmod=true
 common --incompatible_use_plus_in_repo_names
 
+# TODO(): Remove this flag after Fuchsia is upgraded to Bazel 8, where this behavior becomes the
+# default.
+common --incompatible_disallow_empty_glob=true
+
 # Pass local developer overrides for assembly to Bazel
 # For now, this needs to set the label_flag() in both @rules_fuchsia
 # and @fuchsia_sdk to ensure that all fuchsia_product() definitions
@@ -123,5 +127,3 @@ common --@rules_fuchsia//fuchsia:assembly_developer_overrides_list=@assembly_dev
 # Set the release repository for assembly config artifacts to "fuchsia".
 # This is necessary so MOS knows where a given assembly artifact came from.
 common --@rules_fuchsia//fuchsia/flags:fuchsia_release_repository="fuchsia"
-
-
