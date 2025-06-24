@@ -150,7 +150,7 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
-                "fuchsia.time.alarms.Wake",
+                "fuchsia.time.alarms.WakeAlarms",
                 "fuchsia.tracing.provider.Registry",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",

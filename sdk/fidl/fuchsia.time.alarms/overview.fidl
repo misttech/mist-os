@@ -4,9 +4,11 @@
 
 /// APIs for handling wake alarms.
 ///
-/// NOTE: This is not the final form of the API. There are a number of roughly
-/// equivalent alternatives, and we'll be exploring some of them in this
-/// proposal.
+/// Wake alarms are alarms that can also wake the system in case it is in a low
+/// power state. They are used to ensure that a task is performed regardless if
+/// a suspend intervenes.
+///
+/// Scheduled alarms do not persist across reboots.
 ///
 /// # Summary
 ///

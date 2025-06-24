@@ -166,7 +166,7 @@
                 "fuchsia.ssh.AuthorizedKeys",
                 "fuchsia.starnix.runner.Manager",
                 "fuchsia.thermal.ClientStateConnector",
-                "fuchsia.time.alarms.Wake",
+                "fuchsia.time.alarms.WakeAlarms",
                 "fuchsia.tracing.perfetto.ProducerConnector",
                 "fuchsia.ultrasound.Factory",
                 "fuchsia.update.CommitStatusProvider",

@@ -59,10 +59,10 @@ async fn wait_signaled<H: HandleBased>(handle: &H) -> Result<()> {
 }
 
 // Used to inject a fake proxy in tests.
-fn get_wake_proxy_internal(mut wake_channel: Option<zx::Channel>) -> fta::WakeProxy {
+fn get_wake_proxy_internal(mut wake_channel: Option<zx::Channel>) -> fta::WakeAlarmsProxy {
     wake_channel
         .take()
-        .map(|c| fta::WakeProxy::new(fidl::AsyncChannel::from_channel(c)))
+        .map(|c| fta::WakeAlarmsProxy::new(fidl::AsyncChannel::from_channel(c)))
         .unwrap_or_else(|| {
             connect_to_wake_alarms_async().expect("connection to wake alarms async proxy")
         })
@@ -73,7 +73,7 @@ async fn cancel_by_id(
     _suspend_lock: &SuspendLock,
     timer_state: Option<TimerState>,
     timer_id: &zx::Koid,
-    proxy: &fta::WakeProxy,
+    proxy: &fta::WakeAlarmsProxy,
     interval_timers_pending_reschedule: &mut HashMap<zx::Koid, SuspendLock>,
     alarm_id: &str,
 ) {
@@ -94,21 +94,21 @@ async fn cancel_by_id(
     }
 }
 
-/// Called when the underlying wake alarms manager reports a fta::WakeError
+/// Called when the underlying wake alarms manager reports a fta::WakeAlarmsError
 /// as a result of a call to set_and_wait.
 fn process_alarm_protocol_error(
     pending: &mut HashMap<zx::Koid, TimerState>,
     timer_id: &zx::Koid,
-    error: fta::WakeError,
+    error: fta::WakeAlarmsError,
 ) -> Option<TimerState> {
     match error {
-        fta::WakeError::Unspecified => {
+        fta::WakeAlarmsError::Unspecified => {
             log_warn!(
                 "watch_new_hrtimer_loop: Cmd::AlarmProtocolFail: unspecified error: {error:?}"
             );
             pending.remove(timer_id)
         }
-        fta::WakeError::Dropped => {
+        fta::WakeAlarmsError::Dropped => {
             log_debug!("watch_new_hrtimer_loop: Cmd::AlarmProtocolFail: alarm dropped: {error:?}");
             // Do not remove a Dropped timer here, in contrast to other error states: a Dropped
             // timer is a result of a Stop or a Cancel ahead of a reschedule. In both cases, that
@@ -125,9 +125,9 @@ fn process_alarm_protocol_error(
 }
 
 // This function is swapped out for an injected proxy in tests.
-fn connect_to_wake_alarms_async() -> Result<fta::WakeProxy, Errno> {
+fn connect_to_wake_alarms_async() -> Result<fta::WakeAlarmsProxy, Errno> {
     log_debug!("connecting to wake alarms");
-    fuchsia_component::client::connect_to_protocol::<fta::WakeMarker>().map_err(|err| {
+    fuchsia_component::client::connect_to_protocol::<fta::WakeAlarmsMarker>().map_err(|err| {
         errno!(EINVAL, format!("Failed to connect to fuchsia.time.alarms/Wake: {err}"))
     })
 }
@@ -548,7 +548,7 @@ impl HrTimerManager {
             .map(|e| signal_handle(e, zx::Signals::NONE, zx::Signals::EVENT_SIGNALED));
 
         let device_async_proxy =
-            fta::WakeProxy::new(fidl::AsyncChannel::from_channel(device_channel));
+            fta::WakeAlarmsProxy::new(fidl::AsyncChannel::from_channel(device_channel));
 
         // Contains suspend locks for interval (periodic) timers that expired, but have not been
         // rescheduled yet. This allows us to defer container suspend until all such timers have
@@ -1019,7 +1019,7 @@ mod tests {
 
     // Makes sure that a dropped responder is properly responded to.
     struct ResponderCleanup {
-        responder: Option<fta::WakeSetAndWaitResponder>,
+        responder: Option<fta::WakeAlarmsSetAndWaitResponder>,
     }
 
     impl Drop for ResponderCleanup {
@@ -1027,7 +1027,7 @@ mod tests {
             let responder = self.responder.take();
             log_debug!("dropping responder: {responder:?}");
             responder.map(|r| {
-                r.send(Err(fta::WakeError::Dropped))
+                r.send(Err(fta::WakeAlarmsError::Dropped))
                     .map_err(|err| log_error!("could not respond to a FIDL message: {err:?}"))
                     .expect("should be able to respond to a FIDL message")
             });
@@ -1047,7 +1047,7 @@ mod tests {
     async fn serve_fake_wake_alarms(
         message_counter: zx::Counter,
         response_type: Response,
-        mut stream: fta::WakeRequestStream,
+        mut stream: fta::WakeAlarmsRequestStream,
         once: bool,
     ) {
         log_warn!("serve_fake_wake_alarms: serving loop entry. response_type={:?}", response_type);
@@ -1065,7 +1065,12 @@ mod tests {
                         response_type
                     );
                     match request {
-                        fta::WakeRequest::SetAndWait { mode, responder, alarm_id, deadline } => {
+                        fta::WakeAlarmsRequest::SetAndWait {
+                            mode,
+                            responder,
+                            alarm_id,
+                            deadline,
+                        } => {
                             log_debug!(
                                 "serve_fake_wake_alarms: SetAndWait: alarm_id: {:?}: deadline: {:?}",
                                 alarm_id,
@@ -1124,7 +1129,7 @@ mod tests {
                                 Response::Error => {
                                     message_counter.add(1).unwrap();
                                     responder
-                                        .send(Err(fta::WakeError::Unspecified))
+                                        .send(Err(fta::WakeAlarmsError::Unspecified))
                                         .expect("infallible");
                                     log_debug!(
                                         "serve_fake_wake_alarms: SetAndWait: Responded with error"
@@ -1132,7 +1137,7 @@ mod tests {
                                 }
                             }
                         }
-                        fta::WakeRequest::Cancel { alarm_id, .. } => {
+                        fta::WakeAlarmsRequest::Cancel { alarm_id, .. } => {
                             let r_count_before = responders.len();
                             responders.retain(|k, _| *k != alarm_id);
                             let r_count_after = responders.len();
@@ -1142,7 +1147,7 @@ mod tests {
 
                             log_debug!("serve_fake_wake_alarms: Cancel: {}", alarm_id);
                         }
-                        fta::WakeRequest::_UnknownMethod { .. } => unreachable!(),
+                        fta::WakeAlarmsRequest::_UnknownMethod { .. } => unreachable!(),
                     }
                 }
                 Err(e) => {
@@ -1159,14 +1164,14 @@ mod tests {
     async fn connect_factory(
         message_counter: zx::Counter,
         response_type: Response,
-    ) -> fta::WakeProxy {
-        let (proxy, server_end) = fidl::endpoints::create_proxy::<fta::WakeMarker>();
+    ) -> fta::WakeAlarmsProxy {
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fta::WakeAlarmsMarker>();
         let channel = server_end.into_channel();
 
         // A separate thread is needed to allow independent execution of the server.
         let _detached = thread::spawn(move || {
             let mut executor = fasync::LocalExecutor::new();
-            let server_end: fidl::endpoints::ServerEnd<fta::WakeMarker> =
+            let server_end: fidl::endpoints::ServerEnd<fta::WakeAlarmsMarker> =
                 fidl::endpoints::ServerEnd::new(channel);
             let _ = executor.run_singlethreaded(async move {
                 serve_fake_wake_alarms(

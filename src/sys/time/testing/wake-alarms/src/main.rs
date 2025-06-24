@@ -22,7 +22,7 @@ use std::rc::Rc;
 use alarms;
 
 enum Services {
-    Wake(ffta::WakeRequestStream),
+    Wake(ffta::WakeAlarmsRequestStream),
 }
 
 #[fuchsia::main(

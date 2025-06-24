@@ -58,7 +58,7 @@ pub enum Rpcs {
     TimeTest(fftt::RtcRequestStream),
 
     /// Client request for scheduling alarms.
-    Wake(fta::WakeRequestStream),
+    Wake(fta::WakeAlarmsRequestStream),
 
     /// Client request for adjusting the UTC estimate.
     Adjust(ffte::AdjustRequestStream),

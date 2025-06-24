@@ -445,7 +445,7 @@
             to: "#session-manager",
         },
         {
-            protocol: "fuchsia.time.alarms.Wake",
+            protocol: "fuchsia.time.alarms.WakeAlarms",
             from: "#timekeeper",
             to: "#session-manager",
             source_availability: "unknown",

@@ -105,7 +105,7 @@
                 "fuchsia.sysinfo.SysInfo",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
-                "fuchsia.time.alarms.Wake",
+                "fuchsia.time.alarms.WakeAlarms",
                 "fuchsia.vulkan.loader.Loader",
             ],
             from: "parent",

@@ -276,7 +276,7 @@ enum Cmd {
         /// This is packaged into a Rc... only because both the "happy path"
         /// and the error path must consume the responder.  This allows them
         /// to be consumed, without the responder needing to implement Default.
-        responder: Rc<RefCell<Option<fta::WakeSetAndWaitResponder>>>,
+        responder: Rc<RefCell<Option<fta::WakeAlarmsSetAndWaitResponder>>>,
     },
     StopById {
         done: zx::Event,
@@ -338,17 +338,19 @@ impl std::fmt::Display for Cmd {
 ///
 /// # Returns
 /// - zx::Koid: the KOID you wanted.
-/// - fta::WakeRequestStream: the stream; we had to deconstruct it briefly,
+/// - fta::WakeAlarmsRequestStream: the stream; we had to deconstruct it briefly,
 ///   so this gives it back to you.
-pub fn get_stream_koid(stream: fta::WakeRequestStream) -> (zx::Koid, fta::WakeRequestStream) {
+pub fn get_stream_koid(
+    stream: fta::WakeAlarmsRequestStream,
+) -> (zx::Koid, fta::WakeAlarmsRequestStream) {
     let (inner, is_terminated) = stream.into_inner();
     let koid = inner.channel().as_channel().get_koid().expect("infallible");
-    let stream = fta::WakeRequestStream::from_inner(inner, is_terminated);
+    let stream = fta::WakeAlarmsRequestStream::from_inner(inner, is_terminated);
     (koid, stream)
 }
 
 /// Serves a single Wake API client.
-pub async fn serve(timer_loop: Rc<Loop>, requests: fta::WakeRequestStream) {
+pub async fn serve(timer_loop: Rc<Loop>, requests: fta::WakeAlarmsRequestStream) {
     // Compute the request ID somehow.
     fasync::Task::local(async move {
         let timer_loop = timer_loop.clone();
@@ -407,9 +409,13 @@ async fn handle_cancel(alarm_id: String, cid: zx::Koid, cmd: &mut mpsc::Sender<C
 /// - `cid`: the unique identifier of the connection producing these requests.
 /// - `cmd`: the outbound queue of commands to deliver to the timer manager.
 /// - `request`: a single inbound Wake FIDL API request.
-async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta::WakeRequest) {
+async fn handle_request(
+    cid: zx::Koid,
+    mut cmd: mpsc::Sender<Cmd>,
+    request: fta::WakeAlarmsRequest,
+) {
     match request {
-        fta::WakeRequest::SetAndWait { deadline, mode, alarm_id, responder } => {
+        fta::WakeAlarmsRequest::SetAndWait { deadline, mode, alarm_id, responder } => {
             // Since responder is consumed by the happy path and the error path, but not both,
             // and because the responder does not implement Default, this is a way to
             // send it in two mutually exclusive directions.  Each direction will reverse
@@ -445,16 +451,16 @@ async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta:
                     .borrow_mut()
                     .take()
                     .expect("always present if call fails")
-                    .send(Err(fta::WakeError::Internal))
+                    .send(Err(fta::WakeAlarmsError::Internal))
                     .unwrap();
             }
         }
-        fta::WakeRequest::Cancel { alarm_id, .. } => {
+        fta::WakeAlarmsRequest::Cancel { alarm_id, .. } => {
             // TODO: b/383062441 - make this into an async task so that we wait
             // less to schedule the next alarm.
             handle_cancel(alarm_id, cid, &mut cmd).await;
         }
-        fta::WakeRequest::_UnknownMethod { .. } => {}
+        fta::WakeAlarmsRequest::_UnknownMethod { .. } => {}
     };
 }
 
@@ -512,7 +518,7 @@ struct TimerNode {
     cid: zx::Koid,
     /// The responder that is blocked until the timer expires.  Used to notify
     /// the alarms subsystem client when this alarm expires.
-    responder: Option<fta::WakeSetAndWaitResponder>,
+    responder: Option<fta::WakeAlarmsSetAndWaitResponder>,
 }
 
 impl TimerNode {
@@ -520,7 +526,7 @@ impl TimerNode {
         deadline: fasync::BootInstant,
         alarm_id: String,
         cid: zx::Koid,
-        responder: fta::WakeSetAndWaitResponder,
+        responder: fta::WakeAlarmsSetAndWaitResponder,
     ) -> Self {
         Self { deadline, alarm_id, cid, responder: Some(responder) }
     }
@@ -541,7 +547,7 @@ impl TimerNode {
         &self.deadline
     }
 
-    fn take_responder(&mut self) -> Option<fta::WakeSetAndWaitResponder> {
+    fn take_responder(&mut self) -> Option<fta::WakeAlarmsSetAndWaitResponder> {
         self.responder.take()
     }
 }
@@ -555,7 +561,7 @@ impl Drop for TimerNode {
             // If the TimerNode is dropped, notify the client that may have
             // been waiting. We can not drop a responder, because that kills
             // the FIDL connection.
-            r.send(Err(fta::WakeError::Dropped))
+            r.send(Err(fta::WakeAlarmsError::Dropped))
                 .map_err(|e| error!("could not drop responder: {:?}", e))
         });
     }
@@ -1216,7 +1222,7 @@ async fn wake_timer_loop(
 
                     if let Some(responder) = timer_node.take_responder() {
                         // We must reply to the responder to keep the connection open.
-                        responder.send(Err(fta::WakeError::Dropped)).expect("infallible");
+                        responder.send(Err(fta::WakeAlarmsError::Dropped)).expect("infallible");
                     }
                     if is_deadline_changed(deadline_before, deadline_after) {
                         stop_hrtimer(&timer_proxy, &timer_config).await;
@@ -1608,7 +1614,7 @@ mod tests {
         run_for_duration: zx::MonotonicDuration,
         test_fn_factory: F,
     ) where
-        F: FnOnce(fta::WakeProxy, finspect::Inspector) -> U, // F returns an async closure.
+        F: FnOnce(fta::WakeAlarmsProxy, finspect::Inspector) -> U, // F returns an async closure.
         U: Future<Output = T> + 'static, // the async closure may return an arbitrary type T.
         T: 'static,
     {
@@ -1638,7 +1644,7 @@ mod tests {
         };
 
         let (wake_proxy, wake_stream) =
-            fidl::endpoints::create_proxy_and_stream::<fta::WakeMarker>();
+            fidl::endpoints::create_proxy_and_stream::<fta::WakeAlarmsMarker>();
 
         let serving_task = async move {
             fasync::OnSignals::new(begin_serve, zx::Signals::EVENT_SIGNALED).await.unwrap();
@@ -2243,7 +2249,7 @@ mod tests {
                     let result = wake_fut.await.unwrap();
                     assert_eq!(
                         result,
-                        Err(fta::WakeError::Dropped),
+                        Err(fta::WakeAlarmsError::Dropped),
                         "expected wake alarm to be dropped"
                     );
                     assert_gt!(fasync::BootInstant::now().into_nanos(), SHORT_DEADLINE_NANOS);
