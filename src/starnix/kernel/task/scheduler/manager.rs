@@ -319,7 +319,12 @@ impl SchedulerState {
 
 impl SchedulingPolicy {
     pub fn is_realtime(&self) -> bool {
-        matches!(self, Self::Fifo { .. } | Self::RoundRobin { .. })
+        match self {
+            SchedulingPolicy::Normal { .. }
+            | SchedulingPolicy::Batch { .. }
+            | SchedulingPolicy::Idle { .. } => false,
+            SchedulingPolicy::Fifo { .. } | SchedulingPolicy::RoundRobin { .. } => true,
+        }
     }
 
     /// Returns a number 0-31 (inclusive) mapping Linux scheduler priority to a Zircon priority
