@@ -33,7 +33,6 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"slices"
 	"sort"
@@ -244,6 +243,27 @@ func traceToOutputs(t *chrometrace.Trace) []string {
 	return outputs
 }
 
+// traceToFinalCategory computes the final category of a trace.
+// This gets rid of the "critical_path" category from the input, as it is
+// only meant as a marker indicating the trace event belongs to the critical
+// path. Also if no category is defined, return "unknown" instead of an
+// empty string.
+func traceToFinalCategory(t *chrometrace.Trace) string {
+	var categories []string
+	for _, category := range strings.Split(t.Category, ",") {
+		if category != "critical_path" {
+			// Remove "critical_path" from the action's categories,
+			// as it is only used as a marker for events in the
+			// critical path.
+			categories = append(categories, category)
+		}
+	}
+	if len(categories) == 0 {
+		categories = append(categories, "unknown")
+	}
+	return strings.Join(categories, ",")
+}
+
 func traceToAction(t *chrometrace.Trace) *action {
 	var command string
 	if commandValue, ok := t.Args["command"]; ok {
@@ -254,27 +274,23 @@ func traceToAction(t *chrometrace.Trace) *action {
 	endTime := time.Duration(t.TimestampMicros+t.DurationMicros) * time.Microsecond
 
 	var drag time.Duration
-	eventCategories := strings.Split(t.Category, ",")
-	if slices.Contains(eventCategories, "critical_path") {
-		drag = endTime - startTime
-	}
+	// Ninja doesn't compute a correct drag values, according to their definition
+	// in the critical path method [1]. Exact numbers are costly to compute, but do
+	// not provide actionable metrics for the Fuchsia build, so ignore them here.
+	// They still need to be in the output to avoid breaking a build dashboard that
+	// tried to inspect them, and hasn't been removed yet.
+	// [1] https://en.wikipedia.org/wiki/Critical_path_method#Visualizing_critical_path_schedule
 
 	var totalFloat time.Duration
-	if totalFloatValue, ok := t.Args["total float"]; ok {
-		// The "total float" value is in seconds, followed by "s"
-		totalFloatDuration, err := time.ParseDuration(totalFloatValue.(string))
-		if err != nil {
-			log.Fatalf("Invalid total float value in chrome trace event: %q", totalFloatValue)
-		}
-		totalFloat = totalFloatDuration
-	}
+	// Total float is yet another metric that is not useful but must be kept to avoid
+	// breaking build dashboards for now.
 
 	return &action{
 		Command:    command,
 		Outputs:    traceToOutputs(t),
 		Start:      startTime,
 		End:        endTime,
-		Category:   t.Category,
+		Category:   traceToFinalCategory(t),
 		TotalFloat: totalFloat,
 		Drag:       drag,
 	}
@@ -411,12 +427,7 @@ func readChromeTrace(tracePath string) (result []*chrometrace.Trace, err error) 
 	return
 }
 
-func extractBuildStatsFromTrace(ninjaTracePath string, minActionBuildTime time.Duration) (buildStats, error) {
-	traces, err := readChromeTrace(ninjaTracePath)
-	if err != nil {
-		return buildStats{}, err
-	}
-
+func extractBuildStatsFromTrace(traces []*chrometrace.Trace, minActionBuildTime time.Duration) buildStats {
 	ret := buildStats{}
 	for _, trace := range traces {
 		if strings.Contains(trace.Category, "critical_path") {
@@ -449,7 +460,7 @@ func extractBuildStatsFromTrace(ninjaTracePath string, minActionBuildTime time.D
 		}
 	}
 
-	for _, stat := range statsByTraceType(traces, nil, func(t *chrometrace.Trace) string { return t.Category }) {
+	for _, stat := range statsByTraceType(traces, nil, func(t *chrometrace.Trace) string { return traceToFinalCategory(t) }) {
 		var minBuildTime, maxBuildTime time.Duration
 		for i, t := range stat.Times {
 			if i == 0 {
@@ -471,7 +482,7 @@ func extractBuildStatsFromTrace(ninjaTracePath string, minActionBuildTime time.D
 			MaxBuildTime: maxBuildTime,
 		})
 	}
-	return ret, nil
+	return ret
 }
 
 func serializeBuildStats(s buildStats, w io.Writer) error {
@@ -508,11 +519,11 @@ func main() {
 	var stats buildStats
 
 	if *ninjaTracePath != "" {
-		extractedStats, err := extractBuildStatsFromTrace(*ninjaTracePath, *minActionBuildTime)
+		traces, err := readChromeTrace(*ninjaTracePath)
 		if err != nil {
-			log.Fatalf("Failed to extract build stats from trace %q: %v", *ninjaTracePath, err)
+			log.Fatalf("Failed to read chrome trace from %q: %v", *ninjaTracePath, err)
 		}
-		stats = extractedStats
+		stats = extractBuildStatsFromTrace(traces, *minActionBuildTime)
 	} else {
 		log.Infof("Reading input files and constructing graph.")
 		ninjalog, err := os.Open(*ninjalogPath)

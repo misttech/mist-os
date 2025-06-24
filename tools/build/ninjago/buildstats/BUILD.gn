@@ -14,6 +14,7 @@ if (is_host) {
       "main_test.go",
     ]
     deps = [
+      "//tools/build/ninjago/chrometrace",
       "//tools/build/ninjago/compdb",
       "//tools/build/ninjago/ninjagraph",
       "//tools/build/ninjago/ninjalog",
@@ -34,6 +35,7 @@ if (is_host) {
       "//tools/build/ninjago/test_data/compdb.json.gz",
       "//tools/build/ninjago/test_data/graph.dot.gz",
       "//tools/build/ninjago/test_data/ninja_log.gz",
+      "//tools/build/ninjago/test_data/ninja_trace.json.gz",
     ]
     outputs = [ "${_testdata_path}/{{source_file_part}}" ]
   }
