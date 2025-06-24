@@ -59,7 +59,8 @@ impl MetadataGeometry {
         sha2::Sha256::digest(temp_metadata_geometry.as_bytes()).into()
     }
 
-    // Returns an error if there is an overflow.
+    // Returns the total super metadata size (including the reserved bytes, geometry, and backup
+    // metadata copies). Returns an error if there is an overflow.
     pub fn get_total_metadata_size(&self) -> Result<u64, Error> {
         // Metadata region looks like:
         //     +-----------------------------------+
@@ -473,7 +474,7 @@ impl ValidateTable for MetadataExtent {
 }
 
 impl MetadataExtent {
-    pub fn as_range(&self) -> Result<SuperDeviceRange, Error> {
+    pub fn as_byte_range(&self) -> Result<SuperDeviceRange, Error> {
         let start = self
             .target_data
             .checked_mul(SECTOR_SIZE as u64)
@@ -996,7 +997,7 @@ mod tests {
             target_data: 1,
             target_source: 0,
         };
-        let range = extent.as_range().expect("failed to convert metadata extent to range");
+        let range = extent.as_byte_range().expect("failed to convert metadata extent to range");
         let start = 1 * SECTOR_SIZE as u64;
         let end = start + 3 * SECTOR_SIZE as u64;
         assert_eq!(range, SuperDeviceRange(start..end));
@@ -1010,7 +1011,7 @@ mod tests {
             target_data: 1,
             target_source: 0,
         };
-        extent.as_range().expect_err("converting extent to range should have failed");
+        extent.as_byte_range().expect_err("converting extent to range should have failed");
     }
 
     const VALID_PARTITION_GROUP: MetadataPartitionGroup = MetadataPartitionGroup {

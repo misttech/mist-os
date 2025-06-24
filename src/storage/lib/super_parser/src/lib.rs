@@ -5,7 +5,7 @@
 mod format;
 mod metadata;
 
-use crate::metadata::{Metadata, SuperDeviceRange};
+use crate::metadata::{SuperDeviceRange, SuperMetadata};
 use std::collections::BTreeSet;
 use std::ops::Range;
 use std::sync::Arc;
@@ -20,19 +20,15 @@ pub struct SuperParser {
 }
 
 impl SuperParser {
-    pub async fn load_from_device(device: Arc<dyn Device>) -> Result<Self, Error> {
-        let mut metadatas = Vec::new();
-        metadatas.push(Metadata::load_from_device(device.as_ref(), 0).await?);
-        let slot_count = metadatas[0].get_slot_counts();
-        let mut used_regions = BTreeSet::new();
-        for slot in 1..slot_count {
-            metadatas.push(Metadata::load_from_device(device.as_ref(), slot).await?);
-        }
+    pub async fn new(device: Arc<dyn Device>) -> Result<Self, Error> {
+        let super_metadata = SuperMetadata::load_from_device(device.as_ref()).await?;
+        let super_metadata_size = super_metadata.geometry.get_total_metadata_size()?;
 
-        for slot in 0..slot_count {
-            let total_metadata_size = metadatas[slot as usize].get_total_metadata_size()?;
-            used_regions.insert(SuperDeviceRange(0..total_metadata_size));
-            used_regions.append(&mut metadatas[slot as usize].get_used_extents_as_regions()?);
+        let mut used_regions = BTreeSet::new();
+        used_regions.insert(SuperDeviceRange(0..super_metadata_size));
+
+        for metadata_slot in &super_metadata.metadata_slots {
+            used_regions.append(&mut metadata_slot.get_used_extents_as_byte_range()?);
         }
 
         Ok(Self { used_regions: into_merged_regions(used_regions) })
@@ -42,15 +38,8 @@ impl SuperParser {
     /// the results would be more meaningful for extents with target type `TARGET_TYPE_LINEAR` as
     /// it implies that the extent is a dm-linear target which are made by concatenating linear
     /// regions (extents) of disk together. For `TARGET_TYPE_ZERO`, this would return [Range(0..0)].
-    pub fn used_regions(&self) -> Vec<Range<u64>> {
+    pub fn used_regions_in_bytes(&self) -> Vec<Range<u64>> {
         self.used_regions.clone().into_iter().map(|r| r.into()).collect()
-    }
-
-    // Intended to only be used for test regions are merged and returned as intended. The super
-    // parser will calculate the used regions in the super image and merge any overlapping regions.
-    #[cfg(test)]
-    fn new(unmerged_regions: BTreeSet<SuperDeviceRange>) -> Result<Self, Error> {
-        Ok(Self { used_regions: into_merged_regions(unmerged_regions) })
     }
 
     // TODO(https://fxbug.dev/404952286): Add support to initialise a partition as a device.
@@ -83,7 +72,7 @@ fn into_merged_regions(mut regions: BTreeSet<SuperDeviceRange>) -> BTreeSet<Supe
 
 #[cfg(test)]
 mod tests {
-    use crate::{SuperDeviceRange, SuperParser};
+    use crate::{into_merged_regions, SuperDeviceRange, SuperParser};
     use std::collections::BTreeSet;
     use std::path::Path;
     use std::sync::Arc;
@@ -102,11 +91,10 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_load_super() {
+    async fn test_super_parser() {
         let device = open_image(std::path::Path::new(IMAGE_PATH));
-        let super_partition =
-            SuperParser::load_from_device(device.clone()).await.expect("failed to load super");
-        let used_regions = super_partition.used_regions();
+        let super_parser = SuperParser::new(device.clone()).await.expect("SuperParser::new failed");
+        let used_regions = super_parser.used_regions_in_bytes();
         // This is the expected used region for this test super image. This may need to be updated
         // if the super image changes.
         assert_eq!(used_regions, vec![(0..28672), (1048576..1056768), (2097152..2101248)]);
@@ -130,8 +118,17 @@ mod tests {
         // Case 5: partially overlapping region (only the ends are different).
         unmerged_regions.insert(SuperDeviceRange(25..27));
         unmerged_regions.insert(SuperDeviceRange(25..30));
-        let super_partition =
-            SuperParser::new(unmerged_regions).expect("failed to create new super");
-        assert_eq!(super_partition.used_regions(), vec![(0..2), (5..10), (13..20), (25..30)]);
+
+        let merged_regions: Vec<SuperDeviceRange> =
+            into_merged_regions(unmerged_regions).into_iter().collect();
+        assert_eq!(
+            merged_regions,
+            vec![
+                SuperDeviceRange(0..2),
+                SuperDeviceRange(5..10),
+                SuperDeviceRange(13..20),
+                SuperDeviceRange(25..30)
+            ]
+        );
     }
 }
