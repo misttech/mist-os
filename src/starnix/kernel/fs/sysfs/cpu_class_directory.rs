@@ -147,11 +147,7 @@ impl CpuFreqStatsResetFile {
 }
 
 impl BytesFileOps for CpuFreqStatsResetFile {
-    // Currently a no-op.
-    //
-    // Note that according to
-    // https://github.com/torvalds/linux/blob/86731a2a651e58953fc949573895f2fa6d456841/drivers/cpufreq/cpufreq_stats.c#L103
-    // the value written to this node does not matter.
+    // Currently a no-op. The value written to this node does not matter.
     fn write(&self, _current_task: &CurrentTask, _data: Vec<u8>) -> Result<(), Errno> {
         Ok(())
     }
