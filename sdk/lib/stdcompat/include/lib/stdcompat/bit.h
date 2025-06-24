@@ -180,4 +180,43 @@ enum class endian {
 
 }  // namespace cpp20
 
+namespace cpp23 {
+
+#if defined(__cpp_lib_byteswap) && __cpp_lib_byteswap >= 202110L && \
+    !defined(LIB_STDCOMPAT_USE_POLYFILLS)
+
+using std::byteswap;
+
+#else
+
+template <class T, typename = std::enable_if_t<std::is_integral_v<T>>>
+constexpr T byteswap(T n) noexcept {
+  static_assert(std::has_unique_object_representations_v<T>, "T may not have padding bits");
+
+  if constexpr (std::is_signed_v<T>) {
+    return cpp20::bit_cast<T>(byteswap(cpp20::bit_cast<std::make_unsigned_t<T>>(n)));
+  }
+
+  // These are portable expressions for byte-swapping but the compiler will
+  // recognize the pattern and emit the optimal single instruction or two.
+  if constexpr (sizeof(T) == sizeof(uint64_t)) {
+    n = (((n >> 56) & 0xff) << 0) | (((n >> 48) & 0xff) << 8) | (((n >> 40) & 0xff) << 16) |
+        (((n >> 32) & 0xff) << 24) | (((n >> 24) & 0xff) << 32) | (((n >> 16) & 0xff) << 40) |
+        (((n >> 8) & 0xff) << 48) | (((n >> 0) & 0xff) << 56);
+  } else if constexpr (sizeof(T) == sizeof(uint32_t)) {
+    n = (((n >> 24) & 0xff) << 0) | (((n >> 16) & 0xff) << 8) | (((n >> 8) & 0xff) << 16) |
+        (((n >> 0) & 0xff) << 24);
+  } else if constexpr (sizeof(T) == sizeof(uint16_t)) {
+    n = static_cast<T>(((n >> 8) & 0xff) << 0) | static_cast<T>(((n >> 0) & 0xff) << 8);
+  } else {
+    static_assert(sizeof(T) == sizeof(uint8_t),
+                  "byteswap is unimplemented for integral types of this size");
+  }
+  return n;
+}
+
+#endif
+
+}  // namespace cpp23
+
 #endif  // LIB_STDCOMPAT_BIT_H_

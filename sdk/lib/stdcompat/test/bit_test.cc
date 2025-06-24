@@ -703,4 +703,35 @@ TEST(EndianTest, IsAliasOfStdWhenAvailable) {
 
 #endif
 
+TEST(ByteSwapTests, Unsigned) {
+  EXPECT_EQ(uint64_t{0xefbeaddecefaedfe}, cpp23::byteswap<uint64_t>(0xfeedfacedeadbeef));
+  EXPECT_EQ(uint64_t{0x3412000000000000}, cpp23::byteswap<uint64_t>(0x1234));
+
+  EXPECT_EQ(uint32_t{0xf2dec1ab}, cpp23::byteswap<uint32_t>(0xabc1def2));
+  EXPECT_EQ(uint32_t{0x34120000}, cpp23::byteswap<uint32_t>(0x1234));
+
+  EXPECT_EQ(uint16_t{0xcdab}, cpp23::byteswap<uint16_t>(0xabcd));
+  EXPECT_EQ(uint16_t{0x3412}, cpp23::byteswap<uint16_t>(0x1234));
+
+  EXPECT_EQ(uint8_t{0xab}, cpp23::byteswap<uint8_t>(0xab));
+}
+
+TEST(ByteSwapTests, Signed) {
+  EXPECT_EQ(static_cast<int64_t>(0xefbeaddecefaedfe),
+            cpp23::byteswap(static_cast<int64_t>(0xfeedfacedeadbeef)));
+  EXPECT_EQ(int64_t{0x3412000000000000}, cpp23::byteswap<int64_t>(0x1234));
+  EXPECT_EQ(int64_t{-0x1}, cpp23::byteswap<int64_t>(-0x1));  // 0xffffffffffffffff unsigned
+
+  EXPECT_EQ(static_cast<int32_t>(0xf2dec1ab), cpp23::byteswap(static_cast<int32_t>(0xabc1def2)));
+  EXPECT_EQ(int32_t{0x34120000}, cpp23::byteswap<int32_t>(0x1234));
+  EXPECT_EQ(int32_t{-0x1}, cpp23::byteswap<int32_t>(-0x1));  // 0xffffffff unsigned
+
+  EXPECT_EQ(static_cast<int16_t>(0xcdab), cpp23::byteswap<int16_t>(0xabcd));
+  EXPECT_EQ(int16_t{0x1234}, cpp23::byteswap<int16_t>(0x3412));
+  EXPECT_EQ(int16_t{-0x1}, cpp23::byteswap<int16_t>(-0x1));  // 0xffff unsigned
+
+  EXPECT_EQ(static_cast<int8_t>(0xab), cpp23::byteswap(static_cast<int8_t>(0xab)));
+  EXPECT_EQ(int8_t{-0x1}, cpp23::byteswap<int8_t>(-0x1));  // 0xff unsigned
+}
+
 }  // namespace
