@@ -31,9 +31,9 @@ Example use:
     if atom_info.atoms_depset:
         lines += ["Atom Dependencies (including indirect): "]
         lines += ["\t" + dep.label.name for dep in atom_info.atoms_depset.to_list()]
-    if atom_info.build_deps:
+    if atom_info.atom_build_deps:
         lines += ["Non-IDK Dependencies: "]
-        lines += ["\t" + dep.label.name for dep in atom_info.build_deps]
+        lines += ["\t" + dep.label.name for dep in atom_info.atom_build_deps]
 
     if atom_info.additional_prebuild_info:
         lines += ["additional prebuild info: " + str(atom_info.additional_prebuild_info)]

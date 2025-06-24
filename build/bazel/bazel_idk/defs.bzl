@@ -26,7 +26,7 @@ FuchsiaIdkAtomInfo = provider(
         "atom_files_map": "[dict[str,File]] a { dest -> source } map of files for this atom",
         "idk_deps": "[list[label]] Other atoms the atom directly depends on",
         "atoms_depset": "[depset[FuchsiaIdkAtomInfo]] The full set of other atoms the atom depends on",
-        "build_deps": "[list[label]] List of dependencies that should not be reflected in IDKs",
+        "atom_build_deps": "[list[label]] List of dependencies related to building the atom that should not be reflected in IDKs",
         "additional_prebuild_info": "[dict[str,list[Any]]] A dictionary of type-specific prebuild info for the atom. All values are lists, even if there is only one value",
     },
 )
@@ -81,7 +81,7 @@ def _idk_atom_impl(ctx):
             direct = idk_deps,
             transitive = [dep[FuchsiaIdkAtomInfo].atoms_depset for dep in idk_deps],
         ),
-        build_deps = ctx.attr.build_deps,
+        atom_build_deps = ctx.attr.atom_build_deps,
         additional_prebuild_info = ctx.attr.additional_prebuild_info,
     )]
 
@@ -167,10 +167,10 @@ Possible values, from most restrictive to least restrictive:
                   "These labels must point to `idk_atom` targets.",
             mandatory = False,
         ),
-        "build_deps": attr.label_list(
-            providers = [CcInfo],
-            doc = "List of dependencies that should not be reflected in IDKs. " +
-                  "Mostly useful for code generation.",
+        "atom_build_deps": attr.label_list(
+            providers = [DefaultInfo],
+            doc = "List of dependencies related to building the atom that should not be reflected in IDKs. " +
+                  "Mostly useful for code generation and validation.",
             mandatory = False,
         ),
         "additional_prebuild_info": attr.string_list_dict(
@@ -350,20 +350,21 @@ def idk_cc_source_library(
         idk_metadata_sources.append(source_dest_path)
         idk_files_map |= {source_dest_path: source}
 
-    # TODO(https://fxbug.dev/417305295): Verify pragma. Add to `build_deps`.
+    # TODO(https://fxbug.dev/417305295): Verify pragma. Add to `atom_build_deps`.
     # TODO(https://fxbug.dev/417305295): Verify public headers. Add to
-    # `build_deps`.
+    # `atom_build_deps`.
     # TODO(https://fxbug.dev/417306131): Implement PlaSA support. Add to
-    # `build_deps`.
+    # `atom_build_deps`.
 
     idk_deps = _get_idk_deps(deps) + _get_idk_deps(implementation_deps)
 
+    # Dependencies for generating the actual IDK atom (not the underlying library).
     # TODO(https://fxbug.dev/417305295): If we must support
     # `non_idk_implementation_deps`, add it here.
     # TODO(https://fxbug.dev/417307356): When implementing prebuilt
     # libraries, add `[":%s" % name]`. It may also be necessary to return
     # `DefaultInfo` from the underlying library.
-    build_deps = []
+    atom_build_deps = []
 
     if stable:
         api_path = idk_name + ".api"
@@ -407,7 +408,7 @@ def idk_cc_source_library(
         api_contents_map = api_contents_map,
         files_map = idk_files_map,
         idk_deps = idk_deps,
-        build_deps = build_deps,
+        atom_build_deps = atom_build_deps,
         additional_prebuild_info = {
             "include_dir": [include_dest],
             "sources": idk_metadata_sources,

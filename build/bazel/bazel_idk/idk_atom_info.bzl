@@ -5,7 +5,7 @@
 load(":defs.bzl", "FuchsiaIdkAtomInfo")
 
 def _print_deps_aspect_impl(_target, ctx):
-    print("\n", ctx.rule.attr.name, ":\n\ttype: ", ctx.rule.attr.type, "\n\tIDK deps: ", ctx.rule.attr.idk_deps, "\n\tnon-IDK deps: ", ctx.rule.attr.build_deps)
+    print("\n", ctx.rule.attr.name, ":\n\ttype: ", ctx.rule.attr.type, "\n\tIDK deps: ", ctx.rule.attr.idk_deps, "\n\tnon-IDK build deps: ", ctx.rule.attr.atom_build_deps)
     return []
 
 print_deps_aspect = aspect(
