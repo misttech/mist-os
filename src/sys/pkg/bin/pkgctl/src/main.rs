@@ -26,7 +26,6 @@ use std::process::exit;
 use {fidl_fuchsia_pkg as fpkg, fidl_fuchsia_pkg_ext as pkg, fuchsia_async as fasync};
 
 mod args;
-mod error;
 
 pub fn main() -> Result<(), anyhow::Error> {
     let mut executor = fasync::LocalExecutor::new();

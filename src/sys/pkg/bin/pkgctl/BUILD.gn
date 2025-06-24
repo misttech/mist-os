@@ -30,14 +30,12 @@ rustc_library("lib") {
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:serde_json",
-    "//third_party/rust_crates:thiserror",
   ]
   test_deps = [ "//third_party/rust_crates:assert_matches" ]
 
   source_root = "src/main.rs"
   sources = [
     "src/args.rs",
-    "src/error.rs",
     "src/main.rs",
   ]
 

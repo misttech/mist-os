@@ -18,15 +18,6 @@ pub struct PackageIndex {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum FulfillMetaFarError {
-    #[error("creating RootDir for meta.far")]
-    CreateRootDir(#[from] package_directory::Error),
-
-    #[error("obtaining package path from meta.far")]
-    PackagePath(#[from] package_directory::PathError),
-}
-
-#[derive(thiserror::Error, Debug)]
 pub enum AddBlobsError {
     #[error("adding blobs to the writing index")]
     Writing(#[source] super::writing::AddBlobsError),
