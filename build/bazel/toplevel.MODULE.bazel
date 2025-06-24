@@ -37,7 +37,6 @@ local_path_override(
     path = "third_party/abseil-cpp",
 )
 
-# This is a @pigweed dependency.
 bazel_dep(name = "emboss", version = "", repo_name = "com_google_emboss")
 local_path_override(
     module_name = "emboss",
