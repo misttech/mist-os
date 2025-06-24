@@ -4,13 +4,11 @@
 
 #include "aml-pwm.h"
 
-#include <lib/ddk/metadata.h>
 #include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include <vector>
 
-#include <fbl/array.h>
 #include <gtest/gtest.h>
 #include <mock-mmio-reg/mock-mmio-reg.h>
 #include <soc/aml-common/aml-pwm-regs.h>
@@ -40,12 +38,6 @@ class AmlPwmDriverTestEnvironment : public fdf_testing::Environment {
 
     device_server_.Initialize(component::kDefaultInstance);
 
-    fit::result persisted_metadata = fidl::Persist(kMetadata);
-    ASSERT_TRUE(persisted_metadata.is_ok());
-    ASSERT_OK(device_server_.AddMetadata(DEVICE_METADATA_PWM_CHANNELS,
-                                         persisted_metadata.value().data(),
-                                         persisted_metadata.value().size()));
-
     std::map<uint32_t, fdf_fake::Mmio> mmios;
     for (size_t i = 0; i < kMmioCount; ++i) {
       auto& mmio = *mmios_.emplace_back(
@@ -62,6 +54,7 @@ class AmlPwmDriverTestEnvironment : public fdf_testing::Environment {
     }
 
     pdev_.SetConfig({.mmios = std::move(mmios), .device_info{{.mmio_count = kMmioCount}}});
+    pdev_.AddFidlMetadata(fuchsia_hardware_pwm::PwmChannelsMetadata::kSerializableName, kMetadata);
   }
 
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {

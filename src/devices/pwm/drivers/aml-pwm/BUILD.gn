@@ -52,9 +52,9 @@ test("aml-pwm-test-bin") {
   deps = [
     ":common",
     "//sdk/lib/driver/fake-platform-device/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/testing/mock-mmio-reg",
-    "//src/lib/ddk:ddk_metadata",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
   ]
@@ -69,15 +69,13 @@ source_set("common") {
     "aml-pwm.cc",
     "aml-pwm.h",
   ]
-  deps = [
-    "//sdk/lib/driver/platform-device/cpp",
-    "//src/lib/ddk:ddk_metadata",
-  ]
+  deps = [ "//sdk/lib/driver/platform-device/cpp" ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/mmio",
     "//zircon/system/ulib/fbl",

@@ -9,6 +9,7 @@
 #include <fuchsia/hardware/pwm/cpp/banjo.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/types.h>
 
@@ -114,6 +115,7 @@ class AmlPwmDriver : public fdf::DriverBase, public ddk::PwmImplProtocol<AmlPwmD
   fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_;
   compat::SyncInitializedDeviceServer compat_server_;
   compat::BanjoServer banjo_server_{ZX_PROTOCOL_PWM_IMPL, this, &pwm_impl_protocol_ops_};
+  fdf_metadata::MetadataServer<fuchsia_hardware_pwm::PwmChannelsMetadata> metadata_server_;
 };
 
 }  // namespace pwm

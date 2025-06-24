@@ -4,9 +4,8 @@
 
 #include "pwm.h"
 
-#include <lib/ddk/metadata.h>
-#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/metadata/cpp/metadata.h>
 
 #include <bind/fuchsia/cpp/bind.h>
 
@@ -21,8 +20,8 @@ zx::result<> Pwm::Start() {
     return pwm_impl.take_error();
   }
 
-  zx::result metadata = compat::GetMetadata<fuchsia_hardware_pwm::PwmChannelsMetadata>(
-      incoming(), DEVICE_METADATA_PWM_CHANNELS);
+  zx::result metadata =
+      fdf_metadata::GetMetadata<fuchsia_hardware_pwm::PwmChannelsMetadata>(*incoming());
   if (metadata.is_error()) {
     fdf::error("Failed to get metadata: {}", metadata);
     return metadata.take_error();

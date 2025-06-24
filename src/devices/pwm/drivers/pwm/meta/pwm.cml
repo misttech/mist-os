@@ -18,7 +18,9 @@
     capabilities: [
         { service: "fuchsia.hardware.pwm.Service" },
     ],
-    use: [],
+    use: [
+        { service: "fuchsia.hardware.pwm.PwmChannelsMetadata" },
+    ],
     expose: [
         {
             service: "fuchsia.hardware.pwm.Service",

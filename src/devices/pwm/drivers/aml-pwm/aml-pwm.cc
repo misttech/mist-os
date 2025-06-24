@@ -4,8 +4,6 @@
 
 #include "aml-pwm.h"
 
-#include <lib/ddk/metadata.h>
-#include <lib/driver/compat/cpp/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
@@ -514,9 +512,9 @@ zx::result<> AmlPwmDriver::Start() {
   {
     compat::DeviceServer::BanjoConfig banjo_config{.default_proto_id = ZX_PROTOCOL_PWM_IMPL};
     banjo_config.callbacks[ZX_PROTOCOL_PWM_IMPL] = banjo_server_.callback();
-    zx::result<> result = compat_server_.Initialize(
-        incoming(), outgoing(), node_name(), kChildNodeName,
-        compat::ForwardMetadata::Some({DEVICE_METADATA_PWM_CHANNELS}), std::move(banjo_config));
+    zx::result<> result =
+        compat_server_.Initialize(incoming(), outgoing(), node_name(), kChildNodeName,
+                                  compat::ForwardMetadata::None(), std::move(banjo_config));
     if (result.is_error()) {
       fdf::error("Failed to initialize compat server: {}", result);
       return result.take_error();
@@ -547,13 +545,22 @@ zx::result<> AmlPwmDriver::Start() {
     mmios.push_back(std::move(*mmio));
   }
 
-  zx::result metadata_result = compat::GetMetadata<fuchsia_hardware_pwm::PwmChannelsMetadata>(
-      incoming(), DEVICE_METADATA_PWM_CHANNELS);
+  zx::result metadata_result = pdev.GetFidlMetadata<fuchsia_hardware_pwm::PwmChannelsMetadata>();
   if (!metadata_result.is_ok()) {
     fdf::error("Failed to get metadata: {}", metadata_result.status_string());
     return metadata_result.take_error();
   }
   const auto& metadata = metadata_result.value();
+
+  if (zx::result result = metadata_server_.SetMetadata(metadata); result.is_error()) {
+    fdf::error("Failed to set metadata: {}", result);
+    return result.take_error();
+  }
+
+  if (zx::result result = metadata_server_.Serve(*outgoing(), dispatcher()); result.is_error()) {
+    fdf::error("Failed to serve metadata: {}", result);
+    return result.take_error();
+  }
 
   // PWM IDs are expected to be continuous starting with 0. There will be 2 PWM ID per mmio.
   max_pwm_id_ = (mmios.size() * 2) - 1;
@@ -592,6 +599,7 @@ zx::result<> AmlPwmDriver::Start() {
   }
 
   std::vector offers = compat_server_.CreateOffers2();
+  offers.push_back(metadata_server_.MakeOffer());
 
   std::vector<fuchsia_driver_framework::NodeProperty2> properties = {
       fdf::MakeProperty2(bind_fuchsia::PROTOCOL, static_cast<uint32_t>(ZX_PROTOCOL_PWM_IMPL))};
