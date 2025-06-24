@@ -341,8 +341,14 @@ impl PagerBacked for FxBlob {
                             &mut buf[..len],
                         )
                     })
-                    .map_err(|_| FxfsError::IntegrityError)?;
-                ensure!(decompressed_size == len, FxfsError::IntegrityError);
+                    .map_err(|e| {
+                        anyhow!(FxfsError::IntegrityError)
+                            .context(format!("Decompression error: {e:?}"))
+                    })?;
+                ensure!(
+                    decompressed_size == len,
+                    anyhow!(FxfsError::IntegrityError).context("Decompressed length mismatch")
+                );
                 len
             }
         };
