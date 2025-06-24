@@ -6765,6 +6765,9 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   if (!CanReclaimPageLocked(page, page_or_marker)) {
     return ReclaimCounts{};
   }
+  // Since CanReclaimPageLocked() succeeded, we know that this page is owned by us at the provided
+  // offset. So it should be safe to call MarkAccessed() on the page if reclamation fails, provided
+  // we don't drop the lock.
 
   // Now allowed to reclaim if high priority, unless being required to do so.
   if (high_priority_count_ != 0 && (eviction_action != EvictionAction::Require)) {
@@ -6853,26 +6856,30 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
   {
     __UNINITIALIZED DeferredOps deferred(this);
     Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
-    // Not allowed to reclaim if uncached.
-    if ((paged_ref_ && (paged_backlink_locked(this)->GetMappingCachePolicyLocked() &
-                        ZX_CACHE_POLICY_MASK) != ZX_CACHE_POLICY_CACHED)) {
-      // To avoid this page remaining in the reclamation list we simulate an access.
-      pmm_page_queues()->MarkAccessed(page);
-      vm_reclaim_uncached.Add(1);
-      return ReclaimCounts{};
-    }
-
-    // Not allows to reclaim if high priority.
-    if (high_priority_count_ != 0) {
-      pmm_page_queues()->MarkAccessed(page);
-      vm_reclaim_high_priority.Add(1);
-      return ReclaimCounts{};
-    }
 
     // Use a sub-scope as the page_or_marker will become invalid as we will drop the lock later.
     {
       VmPageOrMarkerRef page_or_marker = page_list_.LookupMutable(offset);
       if (!CanReclaimPageLocked(page, page_or_marker)) {
+        return ReclaimCounts{};
+      }
+      // Since CanReclaimPageLocked() succeeded, we know that this page is owned by us at the
+      // provided offset. So it should be safe to call MarkAccessed() on the page if reclamation
+      // fails, provided we don't drop the lock.
+
+      // Not allowed to reclaim if uncached.
+      if ((paged_ref_ && (paged_backlink_locked(this)->GetMappingCachePolicyLocked() &
+                          ZX_CACHE_POLICY_MASK) != ZX_CACHE_POLICY_CACHED)) {
+        // To avoid this page remaining in the reclamation list we simulate an access.
+        pmm_page_queues()->MarkAccessed(page);
+        vm_reclaim_uncached.Add(1);
+        return ReclaimCounts{};
+      }
+
+      // Not allowed to reclaim if high priority.
+      if (high_priority_count_ != 0) {
+        pmm_page_queues()->MarkAccessed(page);
+        vm_reclaim_high_priority.Add(1);
         return ReclaimCounts{};
       }
 
@@ -7761,6 +7768,9 @@ zx::result<uint64_t> VmCowPages::ReclaimDiscardable(vm_page_t* page, uint64_t of
   if (!CanReclaimPageLocked(page, page_or_marker)) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
+  // Since CanReclaimPageLocked() succeeded, we know that this page is owned by us at the provided
+  // offset. So it should be safe to call MarkAccessed() on the page if reclamation fails, provided
+  // we don't drop the lock.
 
   // Check if this is the first page.
   bool first = false;
