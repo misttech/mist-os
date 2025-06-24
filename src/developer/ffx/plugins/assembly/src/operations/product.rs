@@ -13,7 +13,7 @@ use assembly_util::read_config;
 use camino::Utf8PathBuf;
 use ffx_assembly_args::{PackageValidationHandling, ProductArgs};
 use fuchsia_pkg::PackageManifest;
-use image_assembly_config_builder::ProductAssembly;
+use image_assembly_config_builder::{ProductAssembly, ValidationMode};
 use log::info;
 
 pub fn assemble(args: ProductArgs) -> Result<()> {
@@ -82,7 +82,7 @@ Resulting product is not supported and may misbehave!
         pa.set_boot_shim_aib(path)?;
     }
     if package_validation == PackageValidationHandling::Warning {
-        pa.enable_validation();
+        pa.set_validation_mode(ValidationMode::WarnOnly);
     }
 
     //////////////////////

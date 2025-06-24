@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::image_assembly_config_builder::ImageAssemblyConfigBuilder;
+use crate::image_assembly_config_builder::{ImageAssemblyConfigBuilder, ValidationMode};
 
 use anyhow::{bail, Context, Result};
 use assembly_config_schema::developer_overrides::{DeveloperOnlyOptions, DeveloperOverrides};
@@ -28,7 +28,7 @@ pub struct ProductAssembly {
     developer_only_options: Option<DeveloperOnlyOptions>,
     kernel_aib: Utf8PathBuf,
     boot_shim_aib: Utf8PathBuf,
-    validate: bool,
+    validation_mode: ValidationMode,
     builder_forensics_file_path: Option<Utf8PathBuf>,
     board_forensics_file_path: Option<Utf8PathBuf>,
 }
@@ -69,7 +69,7 @@ impl ProductAssembly {
             developer_only_options: None,
             kernel_aib,
             boot_shim_aib,
-            validate: false,
+            validation_mode: ValidationMode::On,
             builder_forensics_file_path: None,
             board_forensics_file_path: None,
         })
@@ -134,8 +134,8 @@ impl ProductAssembly {
         Ok(())
     }
 
-    pub fn enable_validation(&mut self) {
-        self.validate = true;
+    pub fn set_validation_mode(&mut self, validation_mode: ValidationMode) {
+        self.validation_mode = validation_mode;
     }
 
     pub fn write_forensics_files(
@@ -363,7 +363,7 @@ impl ProductAssembly {
         }
 
         let (image_assembly_config, validation_error) =
-            builder.build_and_validate(&outdir, tools, self.validate)?;
+            builder.build_and_validate(&outdir, tools, self.validation_mode)?;
         if let Some(validation_error) = validation_error {
             return Err(validation_error.into());
         }
