@@ -65,7 +65,10 @@ pub struct KObjectStore {
 impl KObjectStore {
     /// The virtual bus kobject where all virtual and pseudo devices are stored.
     pub fn virtual_bus(&self) -> Bus {
-        Bus::new(self.devices.get_or_create_child("virtual".into(), KObjectDirectory::new), None)
+        Bus::new(
+            self.devices.get_or_create_child_with_ops("virtual".into(), KObjectDirectory::new),
+            None,
+        )
     }
 
     /// The device class used for virtual block devices.
@@ -128,18 +131,27 @@ impl KObjectStore {
     ///
     /// If the bus does not exist, this function will create it.
     pub fn get_or_create_bus(&self, name: &FsStr) -> Bus {
-        let collection =
-            Collection::new(self.bus.get_or_create_child(name, BusCollectionDirectory::new));
-        Bus::new(self.devices.get_or_create_child(name, KObjectDirectory::new), Some(collection))
+        let collection = Collection::new(
+            self.bus.get_or_create_child_with_ops(name, BusCollectionDirectory::new),
+        );
+        Bus::new(
+            self.devices.get_or_create_child_with_ops(name, KObjectDirectory::new),
+            Some(collection),
+        )
     }
 
     /// Get a class by name.
     ///
     /// If the bus does not exist, this function will create it.
     pub fn get_or_create_class(&self, name: &FsStr, bus: Bus) -> Class {
-        let collection =
-            Collection::new(self.class.get_or_create_child(name, KObjectSymlinkDirectory::new));
-        Class::new(bus.kobject().get_or_create_child(name, KObjectDirectory::new), bus, collection)
+        let collection = Collection::new(
+            self.class.get_or_create_child_with_ops(name, KObjectSymlinkDirectory::new),
+        );
+        Class::new(
+            bus.kobject().get_or_create_child_with_ops(name, KObjectDirectory::new),
+            bus,
+            collection,
+        )
     }
 
     /// Get a class by name.
@@ -156,8 +168,12 @@ impl KObjectStore {
         N: FsNodeOps,
     {
         let collection =
-            Collection::new(self.class.get_or_create_child(name, create_class_sysfs_ops));
-        Class::new(bus.kobject().get_or_create_child(name, KObjectDirectory::new), bus, collection)
+            Collection::new(self.class.get_or_create_child_with_ops(name, create_class_sysfs_ops));
+        Class::new(
+            bus.kobject().get_or_create_child_with_ops(name, KObjectDirectory::new),
+            bus,
+            collection,
+        )
     }
 
     /// Create a device and add that device to the store.
@@ -181,7 +197,7 @@ impl KObjectStore {
     {
         let class_cloned = class.clone();
         let metadata_cloned = metadata.clone();
-        let device_kobject = class.kobject().get_or_create_child(name, move |kobject| {
+        let device_kobject = class.kobject().get_or_create_child_with_ops(name, move |kobject| {
             create_device_sysfs_ops(Device::new(
                 kobject.upgrade().unwrap(),
                 class_cloned.clone(),
@@ -248,7 +264,7 @@ impl Default for KObjectStore {
         let node_cache = Arc::new(FsNodeCache::default());
         let devices = KObject::new_root(SYSFS_DEVICES.into(), node_cache.clone());
         let class = KObject::new_root(SYSFS_CLASS.into(), node_cache.clone());
-        let block = KObject::new_root_with_dir(
+        let block = KObject::new_root_with_ops(
             SYSFS_BLOCK.into(),
             node_cache.clone(),
             KObjectSymlinkDirectory::new,
@@ -256,8 +272,10 @@ impl Default for KObjectStore {
         let bus = KObject::new_root(SYSFS_BUS.into(), node_cache.clone());
         let dev = KObject::new_root(SYSFS_DEV.into(), node_cache.clone());
 
-        let dev_block = dev.get_or_create_child("block".into(), KObjectSymlinkDirectory::new);
-        let dev_char = dev.get_or_create_child("char".into(), KObjectSymlinkDirectory::new);
+        let dev_block =
+            dev.get_or_create_child_with_ops("block".into(), KObjectSymlinkDirectory::new);
+        let dev_char =
+            dev.get_or_create_child_with_ops("char".into(), KObjectSymlinkDirectory::new);
 
         Self { node_cache, devices, class, block, bus, dev, dev_block, dev_char }
     }

@@ -114,9 +114,12 @@ impl SysFs {
         registry
             .objects
             .devices
-            .get_or_create_child("system".into(), KObjectDirectory::new)
-            .get_or_create_child("cpu".into(), CpuClassDirectory::new)
-            .get_or_create_child("vulnerabilities".into(), VulnerabilitiesClassDirectory::new);
+            .get_or_create_child_with_ops("system".into(), KObjectDirectory::new)
+            .get_or_create_child_with_ops("cpu".into(), CpuClassDirectory::new)
+            .get_or_create_child_with_ops(
+                "vulnerabilities".into(),
+                VulnerabilitiesClassDirectory::new,
+            );
 
         fs
     }

@@ -7,6 +7,7 @@ use crate::fs::sysfs::KObjectDirectory;
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::fs_node_cache::FsNodeCache;
+use crate::vfs::pseudo::simple_directory::SimpleDirectory;
 use crate::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps,
     FsNode, FsNodeOps, FsStr, FsString, PathBuilder,
@@ -19,6 +20,13 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, ino_t};
 use std::collections::BTreeMap;
 use std::sync::{Arc, Weak};
+
+type CreateFsNodeOps = Box<dyn Fn(Weak<KObject>) -> Box<dyn FsNodeOps> + Send + Sync>;
+
+pub enum KObjectFsNode {
+    Factory(CreateFsNodeOps),
+    Directory(Arc<SimpleDirectory>),
+}
 
 /// A kobject is the fundamental unit of the sysfs /devices subsystem. Each kobject represents a
 /// sysfs object.
@@ -47,19 +55,17 @@ pub struct KObject {
     /// references from child-to-parent. This will avoid reference cycle.
     children: Mutex<BTreeMap<FsString, KObjectHandle>>,
 
-    /// Function to create the associated `FsNodeOps`.
-    create_fs_node_ops: CreateFsNodeOps,
+    /// The FsNode for this KObject.
+    node: KObjectFsNode,
 }
 pub type KObjectHandle = Arc<KObject>;
 
-type CreateFsNodeOps = Box<dyn Fn(Weak<KObject>) -> Box<dyn FsNodeOps> + Send + Sync>;
-
 impl KObject {
     pub fn new_root(name: &FsStr, node_cache: Arc<FsNodeCache>) -> KObjectHandle {
-        Self::new_root_with_dir(name, node_cache, KObjectDirectory::new)
+        Self::new_root_with_ops(name, node_cache, KObjectDirectory::new)
     }
 
-    pub fn new_root_with_dir<F, N>(
+    pub fn new_root_with_ops<F, N>(
         name: &FsStr,
         node_cache: Arc<FsNodeCache>,
         create_fs_node_ops: F,
@@ -68,21 +74,29 @@ impl KObject {
         F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
         N: FsNodeOps,
     {
+        let node =
+            KObjectFsNode::Factory(Box::new(move |kobject| Box::new(create_fs_node_ops(kobject))));
         Arc::new(Self {
             ino: node_cache.allocate_ino().unwrap(),
             name: name.to_owned(),
             parent: None,
             node_cache,
             children: Default::default(),
-            create_fs_node_ops: Box::new(move |kobject| Box::new(create_fs_node_ops(kobject))),
+            node,
         })
     }
 
-    fn new_child<F, N>(name: &FsStr, parent: KObjectHandle, create_fs_node_ops: F) -> KObjectHandle
+    fn new_child_with_ops<F, N>(
+        name: &FsStr,
+        parent: KObjectHandle,
+        create_fs_node_ops: F,
+    ) -> KObjectHandle
     where
         F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
         N: FsNodeOps,
     {
+        let node =
+            KObjectFsNode::Factory(Box::new(move |kobject| Box::new(create_fs_node_ops(kobject))));
         let node_cache = parent.node_cache.clone();
         Arc::new(Self {
             ino: node_cache.allocate_ino().unwrap(),
@@ -90,7 +104,20 @@ impl KObject {
             parent: Some(Arc::downgrade(&parent)),
             node_cache,
             children: Default::default(),
-            create_fs_node_ops: Box::new(move |kobject| Box::new(create_fs_node_ops(kobject))),
+            node,
+        })
+    }
+
+    fn new_child(name: &FsStr, parent: KObjectHandle) -> KObjectHandle {
+        let node = KObjectFsNode::Directory(SimpleDirectory::new());
+        let node_cache = parent.node_cache.clone();
+        Arc::new(Self {
+            ino: node_cache.allocate_ino().unwrap(),
+            name: name.to_owned(),
+            parent: Some(Arc::downgrade(&parent)),
+            node_cache,
+            children: Default::default(),
+            node,
         })
     }
 
@@ -110,7 +137,10 @@ impl KObject {
     ///
     /// The `create_fs_node_ops` function will be called with a weak pointer to kobject itself.
     pub fn ops(self: &KObjectHandle) -> Box<dyn FsNodeOps> {
-        self.create_fs_node_ops.as_ref()(Arc::downgrade(self))
+        match &self.node {
+            KObjectFsNode::Factory(ops) => ops.as_ref()(Arc::downgrade(self)),
+            KObjectFsNode::Directory(dir) => Box::new(dir.clone()),
+        }
     }
 
     /// Get the path to the current kobject, relative to the root.
@@ -148,7 +178,7 @@ impl KObject {
     }
 
     /// Gets the child if exists, creates a new child if not.
-    pub fn get_or_create_child<F, N>(
+    pub fn get_or_create_child_with_ops<F, N>(
         self: &KObjectHandle,
         name: &FsStr,
         create_fs_node_ops: F,
@@ -161,7 +191,19 @@ impl KObject {
         match children.get(name).cloned() {
             Some(child) => child,
             None => {
-                let child = KObject::new_child(name, self.clone(), create_fs_node_ops);
+                let child = KObject::new_child_with_ops(name, self.clone(), create_fs_node_ops);
+                children.insert(name.into(), child.clone());
+                child
+            }
+        }
+    }
+
+    pub fn get_or_create_child(self: &KObjectHandle, name: &FsStr) -> KObjectHandle {
+        let mut children = self.children.lock();
+        match children.get(name).cloned() {
+            Some(child) => child,
+            None => {
+                let child = KObject::new_child(name, self.clone());
                 children.insert(name.into(), child.clone());
                 child
             }
@@ -454,7 +496,7 @@ mod tests {
         assert!(root.parent().is_none());
 
         assert!(!root.has_child("virtual".into()));
-        root.get_or_create_child("virtual".into(), KObjectDirectory::new);
+        root.get_or_create_child_with_ops("virtual".into(), KObjectDirectory::new);
         assert!(root.has_child("virtual".into()));
     }
 
@@ -462,10 +504,10 @@ mod tests {
     fn kobject_path() {
         let node_cache = Arc::new(FsNodeCache::default());
         let root = KObject::new_root("devices".into(), node_cache);
-        let bus = root.get_or_create_child("virtual".into(), KObjectDirectory::new);
+        let bus = root.get_or_create_child_with_ops("virtual".into(), KObjectDirectory::new);
         let device = bus
-            .get_or_create_child("mem".into(), KObjectDirectory::new)
-            .get_or_create_child("null".into(), KObjectDirectory::new);
+            .get_or_create_child_with_ops("mem".into(), KObjectDirectory::new)
+            .get_or_create_child_with_ops("null".into(), KObjectDirectory::new);
         assert_eq!(device.path(), "devices/virtual/mem/null");
     }
 
@@ -473,8 +515,8 @@ mod tests {
     fn kobject_path_to_root() {
         let node_cache = Arc::new(FsNodeCache::default());
         let root = KObject::new_root(Default::default(), node_cache);
-        let bus = root.get_or_create_child("bus".into(), KObjectDirectory::new);
-        let device = bus.get_or_create_child("device".into(), KObjectDirectory::new);
+        let bus = root.get_or_create_child_with_ops("bus".into(), KObjectDirectory::new);
+        let device = bus.get_or_create_child_with_ops("device".into(), KObjectDirectory::new);
         assert_eq!(device.path_to_root(), "../..");
     }
 
@@ -482,9 +524,9 @@ mod tests {
     fn kobject_get_children_names() {
         let node_cache = Arc::new(FsNodeCache::default());
         let root = KObject::new_root(Default::default(), node_cache);
-        root.get_or_create_child("virtual".into(), KObjectDirectory::new);
-        root.get_or_create_child("cpu".into(), KObjectDirectory::new);
-        root.get_or_create_child("power".into(), KObjectDirectory::new);
+        root.get_or_create_child_with_ops("virtual".into(), KObjectDirectory::new);
+        root.get_or_create_child_with_ops("cpu".into(), KObjectDirectory::new);
+        root.get_or_create_child_with_ops("power".into(), KObjectDirectory::new);
 
         let names = root.get_children_names();
         assert!(names.iter().any(|name| *name == "virtual"));
@@ -497,8 +539,8 @@ mod tests {
     fn kobject_remove() {
         let node_cache = Arc::new(FsNodeCache::default());
         let root = KObject::new_root(Default::default(), node_cache);
-        let bus = root.get_or_create_child("virtual".into(), KObjectDirectory::new);
-        let class = bus.get_or_create_child("mem".into(), KObjectDirectory::new);
+        let bus = root.get_or_create_child_with_ops("virtual".into(), KObjectDirectory::new);
+        let class = bus.get_or_create_child_with_ops("mem".into(), KObjectDirectory::new);
         assert!(bus.has_child("mem".into()));
         class.remove();
         assert!(!bus.has_child("mem".into()));

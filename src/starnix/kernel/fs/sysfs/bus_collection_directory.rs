@@ -161,7 +161,7 @@ mod tests {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let node_cache = Arc::new(FsNodeCache::default());
         let root_kobject = KObject::new_root(Default::default(), node_cache);
-        root_kobject.get_or_create_child("0".into(), KObjectDirectory::new);
+        root_kobject.get_or_create_child_with_ops("0".into(), KObjectDirectory::new);
         let test_fs = create_testfs_with_root(
             &kernel,
             BusCollectionDirectory::new(Arc::downgrade(&root_kobject)),
