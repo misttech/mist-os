@@ -32,13 +32,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::structs::MINIMUM_INODE_SIZE;
-
 use crate::readers::Reader;
 use crate::structs::{
-    BlockGroupDesc32, DirEntry2, DirEntryHeader, EntryType, Extent, ExtentHeader, ExtentIndex,
-    ExtentTreeNode, INode, InvalidAddressErrorType, ParseToStruct, ParsingError, SuperBlock,
-    XattrEntryHeader, XattrHeader, FIRST_BG_PADDING, MIN_EXT4_SIZE, ROOT_INODE_NUM,
+    BlockGroupDesc32, BlockGroupDesc64, DirEntry2, DirEntryHeader, EntryType, Extent, ExtentHeader,
+    ExtentIndex, ExtentTreeNode, INode, InvalidAddressErrorType, ParseToStruct, ParsingError,
+    SuperBlock, XattrEntryHeader, XattrHeader, FIRST_BG_PADDING, MINIMUM_INODE_SIZE, MIN_EXT4_SIZE,
+    ROOT_INODE_NUM,
 };
 use once_cell::sync::OnceCell;
 use std::collections::BTreeMap;
@@ -57,6 +56,23 @@ pub struct Parser {
 }
 
 pub type XattrMap = BTreeMap<Vec<u8>, Vec<u8>>;
+
+/// Abstracts over block group descriptors of different size
+enum BlockGroupDescriptor {
+    BGD32(BlockGroupDesc32),
+    BGD64(BlockGroupDesc64),
+}
+
+impl BlockGroupDescriptor {
+    fn inode_table_block(&self) -> u64 {
+        match self {
+            Self::BGD32(bgd) => u64::from(bgd.ext2bgd_i_tables),
+            Self::BGD64(bgd) => {
+                u64::from(bgd.base.ext2bgd_i_tables) + (u64::from(bgd.ext4bgd_i_tables_hi) << 32)
+            }
+        }
+    }
+}
 
 /// EXT4 Parser
 ///
@@ -136,15 +152,24 @@ impl Parser {
         };
 
         let bgd_offset = (inode_number - 1) as u64 / sb.e2fs_ipg.get() as u64
-            * size_of::<BlockGroupDesc32>() as u64;
-        let bgd =
-            BlockGroupDesc32::from_reader_with_offset(&self.reader, bgd_table_offset + bgd_offset)?;
+            * sb.block_group_descriptor_size() as u64;
+        let bgd = if sb.is_64bit() {
+            BlockGroupDescriptor::BGD64(BlockGroupDesc64::from_reader_with_offset(
+                &self.reader,
+                bgd_table_offset + bgd_offset,
+            )?)
+        } else {
+            BlockGroupDescriptor::BGD32(BlockGroupDesc32::from_reader_with_offset(
+                &self.reader,
+                bgd_table_offset + bgd_offset,
+            )?)
+        };
 
         // Offset could really be anywhere, and the Reader will enforce reading within the
         // filesystem size. Not much can be checked here.
         let inode_table_offset =
             (inode_number - 1) as u64 % sb.e2fs_ipg.get() as u64 * sb.e2fs_inode_size.get() as u64;
-        let inode_addr = (bgd.ext2bgd_i_tables.get() as u64 * block_size) + inode_table_offset;
+        let inode_addr = (bgd.inode_table_block() * block_size) + inode_table_offset;
         if inode_addr < MIN_EXT4_SIZE {
             return Err(ParsingError::InvalidAddress(
                 InvalidAddressErrorType::Lower,
@@ -874,6 +899,14 @@ mod tests {
         },
         vec!["inner", "lost+found"];
         "fs with a single directory")]
+    #[test_case(
+        "/pkg/data/nest64.img",
+        hashmap!{
+            "file1".to_string() => "6bc35bfb2ca96c75a1fecde205693c19a827d4b04e90ace330048f3e031487dd".to_string(),
+            "inner/file2".to_string() => "215ca145cbac95c9e2a6f5ff91ca1887c837b18e5f58fd2a7a16e2e5a3901e10".to_string(),
+        },
+        vec!["inner", "lost+found"];
+        "fs with 64bit enabled and a single directory")]
     #[test_case(
         "/pkg/data/longdir.img",
         {
