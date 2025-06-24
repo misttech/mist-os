@@ -92,8 +92,10 @@ class IdkGeneratorTest(unittest.TestCase):
         ]
 
         generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
-        ret_code = generator.GenerateMetaFileContents()
+        ret_code, files_read = generator.GenerateMetaFileContents()
         self.assertEqual(ret_code, 0)
+        self.assertEqual(files_read, set())
+        self.assertEqual(generator.collection_meta_path, "meta/manifest.json")
         self.assertIn("meta/manifest.json", generator._meta_files)
         self.assertEqual(
             generator._meta_files["meta/manifest.json"]["parts"], []
@@ -213,8 +215,9 @@ class IdkGeneratorTest(unittest.TestCase):
         ]
 
         generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
-        ret_code = generator.GenerateMetaFileContents()
+        ret_code, files_read = generator.GenerateMetaFileContents()
         self.assertEqual(ret_code, 0)
+        self.assertEqual(files_read, set())
         self.assertIn("partner/partner_atom/meta.json", generator._meta_files)
         self.assertEqual(
             generator._meta_files["partner/partner_atom/meta.json"],
@@ -225,6 +228,7 @@ class IdkGeneratorTest(unittest.TestCase):
             generator._atom_files["partner/partner_atom/file.txt"],
             "path/to/source.file",
         )
+        self.assertEqual(generator.collection_meta_path, "meta/manifest.json")
         collection_meta = generator._meta_files["meta/manifest.json"]
         self.assertEqual(len(collection_meta["parts"]), 1)
         self.assertEqual(
@@ -272,9 +276,13 @@ class IdkGeneratorTest(unittest.TestCase):
         ]
 
         generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
-        ret_code = generator.GenerateMetaFileContents()
+        ret_code, files_read = generator.GenerateMetaFileContents()
 
         self.assertEqual(ret_code, 0)
+        self.assertEqual(len(files_read), 1)
+        self.assertIn(
+            str(package_manifest_path.relative_to(self.build_dir)), files_read
+        )
 
         self.assertIn("packages/test_package/meta.json", generator._meta_files)
         pkg_meta = generator._meta_files["packages/test_package/meta.json"]
@@ -322,7 +330,6 @@ class IdkGeneratorTest(unittest.TestCase):
             "path/to/blob1",
         )
 
-    @mock.patch("os.rename")
     @mock.patch("os.mkdir")
     @mock.patch("io.open", new_callable=mock.mock_open)
     @mock.patch("os.symlink")
@@ -331,7 +338,6 @@ class IdkGeneratorTest(unittest.TestCase):
         mock_symlink: mock.Mock,
         mock_open: mock.Mock,
         mock_mkdir: mock.Mock,
-        mock_rename: mock.Mock,
     ) -> None:
         # Prepare generator with some data
         self._write_build_file("src/file1.txt", "")
@@ -339,6 +345,7 @@ class IdkGeneratorTest(unittest.TestCase):
         self._write_build_file("pkg/blobA", "")
 
         generator = IdkGenerator([], self.build_dir, self.source_dir)
+        generator.collection_meta_path = "meta/manifest.json"
         generator._meta_files = {
             "meta/manifest.json": {"id": "1.2.3.4", "parts": []},
             "data/foo/meta.json": {"name": "foo", "type": "data"},
@@ -349,23 +356,25 @@ class IdkGeneratorTest(unittest.TestCase):
         generator._atom_files = {"data/foo/file1.txt": "src/file1.txt"}
         generator._package_atom_files = {"packages/blobs/blobA": "pkg/blobA"}
 
-        ret_code = generator.WriteIdkContentsToDirectory(self.output_dir)
+        (
+            ret_code,
+            additional_written_files,
+        ) = generator.WriteIdkContentsToDirectory(self.output_dir)
         self.assertEqual(ret_code, 0)
 
         # Verify that directories were created for expected files.
         made_dirs = {call.args[0] for call in mock_mkdir.call_args_list}
-        temp_out_dir = Path(str(self.output_dir) + ".tmp")
         self.assertIn(
-            temp_out_dir / "meta", made_dirs
+            self.output_dir / "meta", made_dirs
         )  # For meta/manifest.json
         self.assertIn(
-            temp_out_dir / "data/foo", made_dirs
+            self.output_dir / "data/foo", made_dirs
         )  # For data/foo/meta.json
         self.assertIn(
-            temp_out_dir / "packages/bar", made_dirs
+            self.output_dir / "packages/bar", made_dirs
         )  # For packages/bar/manifest.json and file1.txt
         self.assertIn(
-            temp_out_dir / "packages/blobs", made_dirs
+            self.output_dir / "packages/blobs", made_dirs
         )  # For packages/blobs/blobA (symlink parent)
 
         # Verify that expected files were opened for writing.
@@ -374,24 +383,43 @@ class IdkGeneratorTest(unittest.TestCase):
             for call in mock_open.call_args_list
             if call.args[1] == "w"
         }
-        self.assertIn(temp_out_dir / "meta/manifest.json", written_file_paths)
-        self.assertIn(temp_out_dir / "data/foo/meta.json", written_file_paths)
         self.assertIn(
-            temp_out_dir / "packages/bar/manifest.json", written_file_paths
+            self.output_dir / "meta/manifest.json", written_file_paths
+        )
+        self.assertIn(
+            self.output_dir / "data/foo/meta.json", written_file_paths
+        )
+        self.assertIn(
+            self.output_dir / "packages/bar/manifest.json", written_file_paths
         )
 
         # Verify symlink calls.
         expected_symlink_calls = [
             mock.call(
                 self.build_dir / "src/file1.txt",
-                temp_out_dir / "data/foo/file1.txt",
+                self.output_dir / "data/foo/file1.txt",
             ),
             mock.call(
                 self.build_dir / "pkg/blobA",
-                temp_out_dir / "packages/blobs/blobA",
+                self.output_dir / "packages/blobs/blobA",
             ),
         ]
         mock_symlink.assert_has_calls(expected_symlink_calls, any_order=True)
+
+        # Verify additional_written_files
+        assert len(additional_written_files) == 2
+        self.assertIn(
+            str(self.output_dir / "data/foo/meta.json"),
+            additional_written_files,
+        )
+        self.assertIn(
+            str(self.output_dir / "packages/bar/manifest.json"),
+            additional_written_files,
+        )
+        self.assertNotIn(
+            str(self.output_dir / "meta/manifest.json"),
+            additional_written_files,
+        )  # Collection manifest excluded
 
     def test_verify_dependency_relationships_valid(self) -> None:
         manifest: list[AtomInfo] = [
@@ -415,8 +443,9 @@ class IdkGeneratorTest(unittest.TestCase):
             },
         ]
         generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
-        ret_code = generator.GenerateMetaFileContents()
+        ret_code, files_read = generator.GenerateMetaFileContents()
         self.assertEqual(ret_code, 0)
+        self.assertEqual(files_read, set())
 
     def test_verify_dependency_relationships_bind_invalid_deps(self) -> None:
         manifest: list[AtomInfo] = [
@@ -544,8 +573,9 @@ class IdkGeneratorTest(unittest.TestCase):
             },
         ]
         generator = IdkGenerator(manifest, self.build_dir, self.source_dir)
-        ret_code = generator.GenerateMetaFileContents()
+        ret_code, files_read = generator.GenerateMetaFileContents()
         self.assertEqual(ret_code, 0)
+        self.assertEqual(files_read, set())
 
     def test_verify_dependency_relationships_deps_in_unexpected_atom_type(
         self,

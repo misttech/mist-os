@@ -16,7 +16,6 @@ import datetime
 import difflib
 import json
 import os
-import shutil
 import sys
 import typing as T
 from pathlib import Path
@@ -280,17 +279,27 @@ class PrebuildMap(object):
 
         return 0
 
-    def get_meta(
-        self, info: AtomInfo
-    ) -> tuple[T.Optional[MetaJson], dict[str, str], JsonFilesMap,]:
+    class GetMetaResult(T.NamedTuple):
+        """The result of a call to `get_meta()`.
+
+        Attributes:
+            meta_json: The meta.json content or None if an unsupported type.
+            additional_atom_files: A dictionary mapping additional additional
+            atom files in the IDK to their sources.
+            additional_json_files: A dictionary mapping additional JSON files in
+            the IDK to their contents.
+            additional_files_read: A set of additional files read.
+        """
+
+        meta_json: T.Optional[MetaJson]
+        additional_atom_files: dict[str, str]
+        additional_json_files: JsonFilesMap
+        additional_files_read: set[str]
+
+    def get_meta(self, info: AtomInfo) -> GetMetaResult:
         """Generate meta.json content for a given AtomInfo
 
-        Returns a tuple containing:
-        * The meta.json content or None if an unsupported type
-        * A dictionary mapping additional additional atom files in the IDK to
-          their sources.
-        * A dictionary mapping additional JSON files in the IDK to their
-          contents.
+        Returns a `GetMetaResult` object .
         """
         value = info["atom_meta"].get("value")
         if value is not None:
@@ -303,7 +312,7 @@ class PrebuildMap(object):
             #   "host_tool"
             #   "loadable_module"
             #   "sysroot"
-            return (value, {}, {})
+            return self.GetMetaResult(value, {}, {}, set())
 
         generator = {
             "fidl_library": self._meta_for_fidl_library,
@@ -318,15 +327,17 @@ class PrebuildMap(object):
             "none": self._meta_for_noop,
             "collection": self._meta_for_collection,
         }.get(info["atom_type"], None)
-        return generator(info) if generator else (None, {}, {})
+        return (
+            generator(info)
+            if generator
+            else self.GetMetaResult(None, {}, {}, set())
+        )
 
-    def _meta_for_fidl_library(
-        self, info: AtomInfo
-    ) -> tuple[MetaJson, dict[str, str], JsonFilesMap]:
+    def _meta_for_fidl_library(self, info: AtomInfo) -> GetMetaResult:
         prebuild = info["prebuild_info"]
         fidl_sources = [f["dest"] for f in info["atom_files"]]
         fidl_deps = self.resolve_unique_labels(prebuild.get("deps", {}))
-        return (
+        return self.GetMetaResult(
             {
                 "name": prebuild["library_name"],
                 "root": prebuild["file_base"],
@@ -337,15 +348,14 @@ class PrebuildMap(object):
             },
             {},
             {},
+            set(),
         )
 
-    def _meta_for_bind_library(
-        self, info: AtomInfo
-    ) -> tuple[MetaJson, dict[str, str], JsonFilesMap]:
+    def _meta_for_bind_library(self, info: AtomInfo) -> GetMetaResult:
         prebuild = info["prebuild_info"]
         bind_sources = [f["dest"] for f in info["atom_files"]]
         bind_deps = self.resolve_unique_labels(prebuild.get("deps", {}))
-        return (
+        return self.GetMetaResult(
             {
                 "name": prebuild["library_name"],
                 "root": prebuild["file_base"],
@@ -355,11 +365,10 @@ class PrebuildMap(object):
             },
             {},
             {},
+            set(),
         )
 
-    def _meta_for_cc_source_library(
-        self, info: AtomInfo
-    ) -> tuple[MetaJson, dict[str, str], JsonFilesMap]:
+    def _meta_for_cc_source_library(self, info: AtomInfo) -> GetMetaResult:
         prebuild = info["prebuild_info"]
         all_deps = self.resolve_unique_labels(prebuild.get("deps", {}))
 
@@ -381,7 +390,7 @@ class PrebuildMap(object):
                 fidl_layers["hlcpp"].append(name)
                 fidl_deps.append(name)
 
-        return (
+        return self.GetMetaResult(
             {
                 "name": prebuild["library_name"],
                 "root": prebuild["file_base"],
@@ -400,11 +409,10 @@ class PrebuildMap(object):
             },
             {},
             {},
+            set(),
         )
 
-    def _meta_for_cc_prebuilt_library(
-        self, info: AtomInfo
-    ) -> tuple[MetaJson, dict[str, str], JsonFilesMap]:
+    def _meta_for_cc_prebuilt_library(self, info: AtomInfo) -> GetMetaResult:
         prebuild = info["prebuild_info"]
         binaries = {}
         variants = []
@@ -464,27 +472,34 @@ class PrebuildMap(object):
                 result["ifs"] = ifs_file
         if variants:
             result["variants"] = variants
-        return (result, {}, {})
+        return self.GetMetaResult(result, {}, {}, set())
 
-    def _meta_for_version_history(
-        self, info: AtomInfo
-    ) -> tuple[MetaJson, dict[str, str], JsonFilesMap]:
+    def _meta_for_version_history(self, info: AtomInfo) -> GetMetaResult:
         prebuild = info["prebuild_info"]
         # prebuild contains enough information to generate the final version
         # history file  by calling a Python module function.
 
+        additional_files_read: set[str] = set()
+
+        additional_files_read.add(prebuild["source"])
         with (self._build_dir / prebuild["source"]).open() as f:
             version_history = json.load(f)
 
-        with (self._build_dir / prebuild["daily_commit_hash_file"]).open() as f:
+        additional_files_read.add(prebuild["daily_commit_hash_file"])
+        daily_commit_hash_file_path = (
+            self._build_dir / prebuild["daily_commit_hash_file"]
+        )
+        with daily_commit_hash_file_path.open() as f:
             daily_commit_hash = f.read().strip()
-        with (
+
+        additional_files_read.add(prebuild["daily_commit_timestamp_file"])
+        daily_commit_timestamp_file_path = (
             self._build_dir / prebuild["daily_commit_timestamp_file"]
-        ).open() as f:
+        )
+        with daily_commit_timestamp_file_path.open() as f:
             daily_commit_timestamp = datetime.datetime.fromtimestamp(
                 int(f.read().strip()), datetime.UTC
             )
-
         generate_version_history.replace_special_abi_revisions(
             version_history, daily_commit_hash, daily_commit_timestamp
         )
@@ -493,11 +508,11 @@ class PrebuildMap(object):
         # been updated to use "phase" and it is removed from the real instance.
         generate_version_history.add_deprecated_status_field(version_history)
 
-        return (version_history, {}, {})
+        return self.GetMetaResult(
+            version_history, {}, {}, additional_files_read
+        )
 
-    def _meta_for_companion_host_tool(
-        self, info: AtomInfo
-    ) -> tuple[MetaJson, dict[str, str], JsonFilesMap]:
+    def _meta_for_companion_host_tool(self, info: AtomInfo) -> GetMetaResult:
         prebuild = info["prebuild_info"]
         result = {
             "name": prebuild["name"],
@@ -536,11 +551,9 @@ class PrebuildMap(object):
         # Sort all files except the first one, which must be the binary.
         result["files"] = [files[0]] + sorted(files[1:])
 
-        return (result, additional_atom_files, {})
+        return self.GetMetaResult(result, additional_atom_files, {}, set())
 
-    def _meta_for_dart_library(
-        self, info: AtomInfo
-    ) -> tuple[MetaJson, dict[str, str], JsonFilesMap]:
+    def _meta_for_dart_library(self, info: AtomInfo) -> GetMetaResult:
         prebuild = info["prebuild_info"]
 
         # The list of packages that should be pulled from a Flutter SDK instead of pub.
@@ -551,9 +564,11 @@ class PrebuildMap(object):
             "flutter_tools",
         ]
 
+        additional_files_read: set[str] = set()
         third_party_deps: list[object] = []
         for spec_file in prebuild["third_party_specs"]:
             spec_file_path = os.path.normpath(self._build_dir / spec_file)
+            additional_files_read.add(str(spec_file))
             with open(spec_file_path) as spec_f:
                 manifest = yaml.safe_load(spec_f)
                 name = manifest["name"]
@@ -593,11 +608,11 @@ class PrebuildMap(object):
         }
         if prebuild["null_safe"]:
             result["dart_library_null_safe"] = True
-        return (result, {}, {})
+        return self.GetMetaResult(result, {}, {}, additional_files_read)
 
     def _meta_for_experimental_python_e2e_test(
         self, info: AtomInfo
-    ) -> tuple[MetaJson, dict[str, str], JsonFilesMap]:
+    ) -> GetMetaResult:
         prebuild = info["prebuild_info"]
 
         root = prebuild["file_base"]
@@ -620,6 +635,8 @@ class PrebuildMap(object):
         # Process required test sources from file.
         assert self._build_dir
         additional_atom_files: dict[str, str] = {}
+        additional_files_read: set[str] = set()
+        additional_files_read.add(test_sources_list)
         with (self._build_dir / test_sources_list).open() as f:
             test_sources_json = json.load(f)
             for entry in test_sources_json:
@@ -628,7 +645,7 @@ class PrebuildMap(object):
                 files.append(f"{dest_path}={source_path}")
                 additional_atom_files[dest_path] = source_path
 
-        return (
+        return self.GetMetaResult(
             {
                 "name": prebuild["name"],
                 "root": root,
@@ -637,11 +654,10 @@ class PrebuildMap(object):
             },
             additional_atom_files,
             {},
+            additional_files_read,
         )
 
-    def _meta_for_package(
-        self, info: AtomInfo
-    ) -> tuple[MetaJson, dict[str, str], JsonFilesMap]:
+    def _meta_for_package(self, info: AtomInfo) -> GetMetaResult:
         """Generates metadata for Fuchsia package atoms.
 
         Unlike peer functions, the metadata for packages can only be generated
@@ -649,6 +665,7 @@ class PrebuildMap(object):
         """
         prebuild = info["prebuild_info"]
 
+        package_manifest_relative_path = prebuild["package_manifest"]
         api_level = prebuild["api_level"]
         arch = prebuild["arch"]
         distribution_name = prebuild["distribution_name"]
@@ -680,7 +697,7 @@ class PrebuildMap(object):
             additional_meta_files,
         ) = generate_sdk_package_manifest.handle_package_manifest(
             None,
-            self._build_dir / prebuild["package_manifest"],
+            self._build_dir / package_manifest_relative_path,
             sdk_file_map,
             meta,
             None,
@@ -695,27 +712,32 @@ class PrebuildMap(object):
         for dest, source in sdk_file_map.items():
             additional_atom_files[dest] = source
 
-        return meta, additional_atom_files, additional_meta_files
+        additional_files_read: set[str] = set()
+        additional_files_read.add(package_manifest_relative_path)
 
-    def _meta_for_noop(
-        self, info: AtomInfo
-    ) -> tuple[None, dict[str, str], JsonFilesMap]:
-        return (None, {}, {})
+        return self.GetMetaResult(
+            meta,
+            additional_atom_files,
+            additional_meta_files,
+            additional_files_read,
+        )
 
-    def _meta_for_collection(
-        self, info: AtomInfo
-    ) -> tuple[MetaJson, dict[str, str], JsonFilesMap]:
+    def _meta_for_noop(self, info: AtomInfo) -> GetMetaResult:
+        return self.GetMetaResult(None, {}, {}, set())
+
+    def _meta_for_collection(self, info: AtomInfo) -> GetMetaResult:
         prebuild = info["prebuild_info"]
-        return (
+        return self.GetMetaResult(
             {
                 "arch": prebuild["arch"],
-                "id": info["atom_id"],
+                "id": info.get("atom_id", ""),
                 "parts": list[dict[str, T.Any]],
                 "root": prebuild["root"],
                 "schema_version": prebuild["schema_version"],
             },
             {},
             {},
+            set(),
         )
 
 
@@ -755,6 +777,18 @@ def main() -> int:
             "Does not verify whether the file should be in the IDK."
         ),
     )
+    parser.add_argument(
+        "--stamp-file",
+        help="Path to the stamp file. Required if `--depfile` is specified.",
+        type=Path,
+        required=False,
+    )
+    parser.add_argument(
+        "--depfile",
+        help="Path to the depfile.",
+        type=Path,
+        required=False,
+    )
     args = parser.parse_args()
 
     with args.prebuild_manifest.open() as f:
@@ -764,7 +798,10 @@ def main() -> int:
         prebuild_manifest, args.build_dir, args.fuchsia_source_dir
     )
 
-    result = generator.GenerateMetaFileContents()
+    additional_files_read: set[str] = set()
+    additional_written_files: set[str] = set()
+
+    result, additional_files_read = generator.GenerateMetaFileContents()
     if result != 0:
         return result
 
@@ -774,9 +811,29 @@ def main() -> int:
             return result
 
     if args.output_dir:
-        result = generator.WriteIdkContentsToDirectory(args.output_dir)
+        (
+            result,
+            additional_written_files,
+        ) = generator.WriteIdkContentsToDirectory(args.output_dir)
         if result != 0:
             return result
+
+    if args.stamp_file:
+        args.stamp_file.touch()
+
+    if args.depfile:
+        depfile_path: Path = args.depfile
+        depfile_path.parent.mkdir(parents=True, exist_ok=True)
+        with open(args.depfile, "w") as depfile:
+            all_dependencies = additional_files_read
+            all_dependencies.add(str(args.prebuild_manifest))
+            depfile.write(
+                "{} {}: {}\n".format(
+                    args.stamp_file,
+                    " ".join(additional_written_files),
+                    " ".join(all_dependencies),
+                )
+            )
 
     return 0
 
@@ -788,6 +845,8 @@ class IdkGenerator(object):
         build_dir: Path,
         fuchsia_source_dir: T.Optional[Path],
     ):
+        self.collection_meta_path: str | None = None
+
         # Map of meta.json destination paths to their JSON contents.
         self._meta_files: dict[str, MetaJson] = {}
 
@@ -814,7 +873,7 @@ class IdkGenerator(object):
         self._prebuild_map.set_fuchsia_source_dir(fuchsia_source_dir)
         self._prebuild_map.set_build_dir(build_dir)
 
-    def GenerateMetaFileContents(self) -> int:
+    def GenerateMetaFileContents(self) -> tuple[int, set[str]]:
         """Processes the data in `self._prebuild_map`.
 
         Populates `self._meta_files` with the contents of meta files and
@@ -824,7 +883,8 @@ class IdkGenerator(object):
         Must be called before other methods and may only be called one time.
 
         Returns:
-            0 upon success and a positive integer otherwise.
+            A tuple containing the return code (0 upon success and a positive
+            integer otherwise) and a list of additional files read.
         """
         assert (
             not self._meta_files
@@ -834,11 +894,11 @@ class IdkGenerator(object):
 
         result = self._prebuild_map.verify_dependency_relationships()
         if result != 0:
-            return result
+            return result, set()
 
         unhandled_labels = set()
-        collection_meta_path = None
         collection_parts: list[dict[str, T.Any]] = []
+        all_additional_files_read: set[str] = set()
 
         for info in self._prebuild_map.values():
             # Note: Due to the way the prebuild manifest is currently generated,
@@ -854,9 +914,12 @@ class IdkGenerator(object):
                 meta_json,
                 additional_atom_files,
                 additional_json_files,
+                additional_files_read,
             ) = self._prebuild_map.get_meta(info)
             assert meta_json or (
-                not additional_atom_files and not additional_json_files
+                not additional_atom_files
+                and not additional_json_files
+                and not additional_files_read
             )
             if meta_json:
                 meta_path = info["atom_meta"]["dest"]
@@ -864,9 +927,9 @@ class IdkGenerator(object):
 
                 if info["atom_type"] == "collection":
                     assert (
-                        not collection_meta_path
+                        not self.collection_meta_path
                     ), "More than one collection info provided."
-                    collection_meta_path = meta_path
+                    self.collection_meta_path = meta_path
                 else:
                     collection_parts.append(
                         {
@@ -905,6 +968,8 @@ class IdkGenerator(object):
 
                 if additional_json_files:
                     self._json_files.update(additional_json_files)
+                if additional_files_read:
+                    all_additional_files_read |= additional_files_read
             elif info["atom_type"] != "none":
                 unhandled_labels.add(info["atom_label"])
 
@@ -916,11 +981,10 @@ class IdkGenerator(object):
 
         collection_parts.sort(key=lambda a: (a["meta"], a["type"]))
 
-        # Generate the IDK manifest.
-        assert collection_meta_path, "Collection info must be provided."
-        self._meta_files[collection_meta_path]["parts"] = collection_parts
-
-        return 0
+        # Populate the IDK manifest.
+        assert self.collection_meta_path, "Collection info must be provided."
+        self._meta_files[self.collection_meta_path]["parts"] = collection_parts
+        return 0, all_additional_files_read
 
     def VerifyMetaFileContentsAgainstNinjaGeneratedFiles(self) -> int:
         """Verifies the meta file content generated from prebuild data against
@@ -993,7 +1057,9 @@ class IdkGenerator(object):
             )
             return 0
 
-    def WriteIdkContentsToDirectory(self, output_dir: Path) -> int:
+    def WriteIdkContentsToDirectory(
+        self, output_dir: Path
+    ) -> tuple[int, set[str]]:
         """Writes the generated contents to `output_dir`.
 
         Writes the metadata in `self._meta_files` to files, creates symlinks
@@ -1005,19 +1071,38 @@ class IdkGenerator(object):
             A new directory will be created at this location.
             Any existing directory will be deleted.
         Returns:
-            0 upon success and a positive integer otherwise.
+
+            A tuple containing the return code (0 upon success and a positive
+            integer otherwise) and a list of paths written in addition to the
+            collection manifest.
         """
         assert self._meta_files
 
-        temp_out_dir = Path(f"{output_dir}.tmp")
-        if temp_out_dir.exists():
-            shutil.rmtree(temp_out_dir)
+        # Remove any existing outputs. Manually removing all subdirectories and
+        # files instead of using shutil.rmtree, to avoid registering spurious
+        # reads on stale subdirectories.
+        if output_dir.exists():
+            for root, dirs, files in os.walk(output_dir, topdown=False):
+                for file in files:
+                    os.unlink(os.path.join(root, file))
+                for dir in dirs:
+                    os.rmdir(os.path.join(root, dir))
+
+        additional_written_files: set[str] = set()
 
         for meta_path, meta_json in self._meta_files.items():
-            dest_path = temp_out_dir / meta_path
+            dest_path = output_dir / meta_path
+
+            # The collection manifest path is known and does not need to be
+            # provided. Also, Ninja reports a cyclic dependency if the same file
+            # is listed in GN outputs and the depfile.
+            assert self.collection_meta_path
+            if meta_path != self.collection_meta_path:
+                additional_written_files.add(str(dest_path))
+
             dest_path.parent.mkdir(parents=True, exist_ok=True)
-            with dest_path.open("w") as file:
-                json.dump(meta_json, file, sort_keys=True, indent=2)
+            with dest_path.open("w") as f:
+                json.dump(meta_json, f, sort_keys=True, indent=2)
 
         # Create symlinks for all atom files, including those for packages.
         all_atom_files = {**self._atom_files, **self._package_atom_files}
@@ -1025,22 +1110,22 @@ class IdkGenerator(object):
             target_path = self._build_dir / source
             # The target directory must exist even if the file does not.
             target_path.parent.mkdir(parents=True, exist_ok=True)
-            dest_path = temp_out_dir / dest
+            dest_path = output_dir / dest
             dest_path.parent.mkdir(parents=True, exist_ok=True)
 
+            # Symlinks do not count as file writes, so `dest_path` does not need
+            # to be added to `additional_written_files`.`
             os.symlink(target_path, dest_path)
 
         for meta_path, json_contents in self._json_files.items():
-            dest_path = temp_out_dir / meta_path
+            dest_path = output_dir / meta_path
+            additional_written_files.add(str(dest_path))
 
             dest_path.parent.mkdir(parents=True, exist_ok=True)
-            with dest_path.open("w") as file:
-                json.dump(json_contents, file, sort_keys=True, indent=2)
+            with dest_path.open("w") as f:
+                json.dump(json_contents, f, sort_keys=True, indent=2)
 
-        if output_dir.exists():
-            shutil.rmtree(output_dir)
-        os.rename(temp_out_dir, output_dir)
-        return 0
+        return 0, additional_written_files
 
 
 if __name__ == "__main__":

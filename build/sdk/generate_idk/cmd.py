@@ -98,14 +98,15 @@ def main() -> int:
     )
     parser.add_argument(
         "--stamp-file",
-        help="Path to the stamp file",
+        help="Path to the stamp file. Required if `--depfile` is specified.",
         type=pathlib.Path,
         required=False,
     )
     parser.add_argument(
         "--depfile",
-        help="Path to the stamp file",
+        help="Path to the depfile",
         type=pathlib.Path,
+        required=False,
     )
     args = parser.parse_args()
 

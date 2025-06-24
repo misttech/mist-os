@@ -314,6 +314,11 @@ def main() -> int:
         # on the next fx build. This is because build.ninja has been patched
         # and build.ninja.stamp will be deleted upon error.
 
+        # The list of extra inputs to add to the Ninja build plan.
+        extra_ninja_build_inputs: T.Set[Path] = set()
+        extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator")
+        extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator.py")
+
         log(
             "Generating IDK export directory for Bazel in-tree SDK from GN prebuild metadata."
         )
@@ -327,18 +332,21 @@ def main() -> int:
 
         idk_generator = IdkGenerator(prebuild_manifest, build_dir, fuchsia_dir)
 
-        result = idk_generator.GenerateMetaFileContents()
+        result, additional_files_read = idk_generator.GenerateMetaFileContents()
         if result != 0:
             print(
                 "ERROR: Failed to generate in-tree IDK meta file contents from prebuild metadata!",
                 file=sys.stderr,
             )
             return result
+        extra_ninja_build_inputs |= additional_files_read
 
         idk_export_dir_path = Path(
             f"{build_dir}/regenerator_outputs/bazel_in_tree_idk"
         )
-        result = idk_generator.WriteIdkContentsToDirectory(idk_export_dir_path)
+        result, _ = idk_generator.WriteIdkContentsToDirectory(
+            idk_export_dir_path
+        )
         if result != 0:
             print(
                 "ERROR: Failed to generate in-tree IDK export directory from prebuild metadata!",
@@ -375,11 +383,6 @@ def main() -> int:
         ):
             os.remove(ninja_idk_export_dir_symlink_path)
         os.symlink(idk_export_dir_path, ninja_idk_export_dir_symlink_path)
-
-        # The list of extra inputs to add to the Ninja build plan.
-        extra_ninja_build_inputs: T.Set[Path] = set()
-        extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator")
-        extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator.py")
 
         log("Generating product_bundles.json.")
         product_bundles_metadata = build_dir / "product_bundles_metadata.json"
