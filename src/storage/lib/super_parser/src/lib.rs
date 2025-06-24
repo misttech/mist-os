@@ -8,7 +8,8 @@ mod metadata;
 use crate::metadata::{Metadata, SuperDeviceRange};
 use std::collections::BTreeSet;
 use std::ops::Range;
-use storage_device::fake_device::FakeDevice;
+use std::sync::Arc;
+use storage_device::Device;
 
 use anyhow::Error;
 
@@ -19,13 +20,13 @@ pub struct SuperParser {
 }
 
 impl SuperParser {
-    pub async fn load_from_device(device: &FakeDevice) -> Result<Self, Error> {
+    pub async fn load_from_device(device: Arc<dyn Device>) -> Result<Self, Error> {
         let mut metadatas = Vec::new();
-        metadatas.push(Metadata::load_from_device(device, 0).await?);
+        metadatas.push(Metadata::load_from_device(device.as_ref(), 0).await?);
         let slot_count = metadatas[0].get_slot_counts();
         let mut used_regions = BTreeSet::new();
         for slot in 1..slot_count {
-            metadatas.push(Metadata::load_from_device(device, slot).await?);
+            metadatas.push(Metadata::load_from_device(device.as_ref(), slot).await?);
         }
 
         for slot in 0..slot_count {
@@ -85,23 +86,26 @@ mod tests {
     use crate::{SuperDeviceRange, SuperParser};
     use std::collections::BTreeSet;
     use std::path::Path;
+    use std::sync::Arc;
     use storage_device::fake_device::FakeDevice;
     use storage_device::Device;
 
     const BLOCK_SIZE: u32 = 4096;
     const IMAGE_PATH: &str = "/pkg/data/simple_super.img.zstd";
 
-    fn open_image(path: &Path) -> FakeDevice {
+    fn open_image(path: &Path) -> Arc<FakeDevice> {
         let file = std::fs::File::open(path).expect("open file failed");
         let image = zstd::Decoder::new(file).expect("decompress image failed");
-        FakeDevice::from_image(image, BLOCK_SIZE).expect("create fake block device failed")
+        Arc::new(
+            FakeDevice::from_image(image, BLOCK_SIZE).expect("create fake block device failed"),
+        )
     }
 
     #[fuchsia::test]
     async fn test_load_super() {
         let device = open_image(std::path::Path::new(IMAGE_PATH));
         let super_partition =
-            SuperParser::load_from_device(&device).await.expect("failed to load super");
+            SuperParser::load_from_device(device.clone()).await.expect("failed to load super");
         let used_regions = super_partition.used_regions();
         // This is the expected used region for this test super image. This may need to be updated
         // if the super image changes.

@@ -12,7 +12,7 @@ use sha2::Digest;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::ops::{Deref, DerefMut, Range};
-use storage_device::fake_device::FakeDevice;
+use std::sync::Arc;
 use storage_device::Device;
 use zerocopy::{FromBytes, KnownLayout};
 
@@ -84,13 +84,13 @@ impl Metadata {
     /// Deserialize the "super" metadata. Caller should indicate which slot_number to read from. For
     /// example, for an A/B device, there will be two copies of metadata: "slot_a" is stored at slot
     /// 0 and "slot_b" is stored at slot 1.
-    pub async fn load_from_device(device: &FakeDevice, slot_number: u32) -> Result<Self, Error> {
-        let geometry = Self::load_metadata_geometry(&device).await?;
+    pub async fn load_from_device(device: &dyn Device, slot_number: u32) -> Result<Self, Error> {
+        let geometry = Self::load_metadata_geometry(device).await?;
 
         ensure!(slot_number < geometry.metadata_slot_count, "Invalid metadata slot count");
 
         let mut metadata = match Self::load_metadata(
-            &device,
+            device,
             geometry,
             geometry.get_primary_metadata_offset(slot_number)?,
         )
@@ -99,7 +99,7 @@ impl Metadata {
             Ok(metadata) => metadata,
             Err(_) => {
                 Self::load_metadata(
-                    &device,
+                    device,
                     geometry,
                     geometry.get_backup_metadata_offset(slot_number)?,
                 )
@@ -139,14 +139,14 @@ impl Metadata {
     }
 
     // Load and validate geometry information from a block device that holds logical partitions.
-    async fn load_metadata_geometry(device: &FakeDevice) -> Result<MetadataGeometry, Error> {
+    async fn load_metadata_geometry(device: &dyn Device) -> Result<MetadataGeometry, Error> {
         // Read the primary geometry
-        match Self::parse_metadata_geometry(&device, PARTITION_RESERVED_BYTES as u64).await {
+        match Self::parse_metadata_geometry(device, PARTITION_RESERVED_BYTES as u64).await {
             Ok(geometry) => Ok(geometry),
             Err(_) => {
                 // Try the backup geometry
                 Self::parse_metadata_geometry(
-                    &device,
+                    device,
                     PARTITION_RESERVED_BYTES as u64 + METADATA_GEOMETRY_RESERVED_SIZE as u64,
                 )
                 .await
@@ -155,11 +155,11 @@ impl Metadata {
     }
 
     async fn load_metadata(
-        device: &FakeDevice,
+        device: &dyn Device,
         geometry: MetadataGeometry,
         offset: u64,
     ) -> Result<Self, Error> {
-        let header = Self::parse_metadata_header(&device, offset).await?;
+        let header = Self::parse_metadata_header(device, offset).await?;
 
         // Now that we have more information on the tables, validate table-specific fields.
         ensure!(header.tables_size <= geometry.metadata_max_size, "Invalid tables size.");
@@ -249,7 +249,7 @@ impl Metadata {
     // Read and validates the metadata geometry. The offset provided will be rounded up to the
     // nearest block alignment.
     async fn parse_metadata_geometry(
-        device: &FakeDevice,
+        device: &dyn Device,
         offset: u64,
     ) -> Result<MetadataGeometry, Error> {
         let buffer_len = round_up_to_alignment(
@@ -267,7 +267,7 @@ impl Metadata {
     }
 
     async fn parse_metadata_header(
-        device: &FakeDevice,
+        device: &dyn Device,
         offset: u64,
     ) -> Result<MetadataHeader, Error> {
         // Reads must be block aligned.
@@ -344,12 +344,14 @@ mod tests {
     const IMAGE_PATH: &str = "/pkg/data/simple_super.img.zstd";
     const IMAGE_METADATA_MAX_SIZE: u32 = 4096;
 
-    fn open_image(path: &Path) -> FakeDevice {
+    fn open_image(path: &Path) -> Arc<FakeDevice> {
         // If image changes at the file path, need to update the `verify_*` functions below that
         // verifies the parser and the test const `IMAGE_METADATA_MAX_SIZE`.
         let file = std::fs::File::open(path).expect("open file failed");
         let image = zstd::Decoder::new(file).expect("decompress image failed");
-        FakeDevice::from_image(image, BLOCK_SIZE).expect("create fake block device failed")
+        Arc::new(
+            FakeDevice::from_image(image, BLOCK_SIZE).expect("create fake block device failed"),
+        )
     }
 
     // Verify metadata geometry against the image at `IMAGE_PATH`.
@@ -494,8 +496,9 @@ mod tests {
     async fn test_parsing_metadata() {
         let device = open_image(std::path::Path::new(IMAGE_PATH));
 
-        let super_metadata =
-            Metadata::load_from_device(&device, 0).await.expect("failed to load super metatata.");
+        let super_metadata = Metadata::load_from_device(device.as_ref(), 0)
+            .await
+            .expect("failed to load super metatata.");
 
         verify_super_metadata(&super_metadata, 0).expect("incorrect metadata");
         device.close().await.expect("failed to close device");
@@ -520,8 +523,9 @@ mod tests {
             device.write(offset, buf.as_ref()).await.expect("failed to write to device");
         }
 
-        let super_metadata =
-            Metadata::load_from_device(&device, 0).await.expect("failed to load super metatata.");
+        let super_metadata = Metadata::load_from_device(device.as_ref(), 0)
+            .await
+            .expect("failed to load super metatata.");
         verify_super_metadata(&super_metadata, 0).expect("incorrect metadata");
         device.close().await.expect("failed to close device");
     }
@@ -545,7 +549,7 @@ mod tests {
             device.write(offset, buf.as_ref()).await.expect("failed to write to device");
         }
 
-        Metadata::load_from_device(&device, 0)
+        Metadata::load_from_device(device.as_ref(), 0)
             .await
             .expect_err("passed loading super metatata unexpectedly");
         device.close().await.expect("failed to close device");
@@ -556,7 +560,7 @@ mod tests {
         let device = open_image(std::path::Path::new(IMAGE_PATH));
 
         // This image has 2 metadata slots
-        Metadata::load_from_device(&device, 5)
+        Metadata::load_from_device(device.as_ref(), 5)
             .await
             .expect_err("passed loading super metatata unexpectedly");
         device.close().await.expect("failed to close device");
@@ -580,12 +584,14 @@ mod tests {
             device.write(offset, buf.as_ref()).await.expect("failed to write to device");
         }
 
-        let metadata_slot0 =
-            Metadata::load_from_device(&device, 0).await.expect("failed to load super metatata.");
+        let metadata_slot0 = Metadata::load_from_device(device.as_ref(), 0)
+            .await
+            .expect("failed to load super metatata.");
         verify_super_metadata(&metadata_slot0, 0).expect("incorrect metadata");
 
-        let metadata_slot1 =
-            Metadata::load_from_device(&device, 1).await.expect("failed to load super metatata.");
+        let metadata_slot1 = Metadata::load_from_device(device.as_ref(), 1)
+            .await
+            .expect("failed to load super metatata.");
         verify_super_metadata(&metadata_slot1, 1).expect("incorrect metadata");
     }
 
@@ -611,10 +617,10 @@ mod tests {
         }
 
         // Test loading from both slots
-        Metadata::load_from_device(&device, 0)
+        Metadata::load_from_device(device.as_ref(), 0)
             .await
             .expect_err("passed loading super metatata unexpectedly");
-        Metadata::load_from_device(&device, 1)
+        Metadata::load_from_device(device.as_ref(), 1)
             .await
             .expect_err("passed loading super metatata unexpectedly");
         device.close().await.expect("failed to close device");
