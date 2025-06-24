@@ -166,6 +166,7 @@ typedef struct FtlCounters {
   uint32_t wear_count;
   uint32_t initial_bad_blocks;
   uint32_t running_bad_blocks;
+  uint32_t worn_blocks_detected;
 } FtlCounters;
 
 // NDM Partition Information.
@@ -271,6 +272,9 @@ typedef struct {
   // Number of each kind of bad blocks.
   uint32_t initial_bad_blocks;
   uint32_t running_bad_blocks;
+
+  // Number of blocks detected as worn out during this boot.
+  uint32_t worn_blocks_detected;
 
   // Percentage of space that is dirty from the total available. [0, 100).
   // Calculated as 100 x (1 - free_pages / volume_size - used_pages).

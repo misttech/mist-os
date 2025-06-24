@@ -132,6 +132,7 @@ class FakeVolume final : public ftl::Volume {
     stats->wear_count = wear_count_;
     stats->initial_bad_blocks = initial_bad_blocks_;
     stats->running_bad_blocks = running_bad_blocks_;
+    stats->worn_blocks_detected = worn_blocks_detected_;
     return ZX_OK;
   }
 
@@ -139,6 +140,7 @@ class FakeVolume final : public ftl::Volume {
     counters->wear_count = wear_count_;
     counters->initial_bad_blocks = initial_bad_blocks_;
     counters->running_bad_blocks = running_bad_blocks_;
+    counters->worn_blocks_detected = worn_blocks_detected_;
     return ZX_OK;
   }
 
@@ -158,6 +160,10 @@ class FakeVolume final : public ftl::Volume {
     running_bad_blocks_ = running_bad_blocks;
   }
 
+  void UpdateWornBlocksCount(uint32_t worn_blocks_detected) {
+    worn_blocks_detected_ = worn_blocks_detected;
+  }
+
   void SetOnOperation(fit::function<void()> callback) { on_operation_ = std::move(callback); }
 
  private:
@@ -173,6 +179,7 @@ class FakeVolume final : public ftl::Volume {
   uint32_t wear_count_ = kWearCount;
   uint32_t initial_bad_blocks_ = kInitialBadBlocks;
   uint32_t running_bad_blocks_ = kRunningBadBlocks;
+  uint32_t worn_blocks_detected_ = 0;
   fit::function<void()> on_operation_;
   bool written_ = false;
   bool flushed_ = false;
@@ -741,9 +748,13 @@ TEST_F(BlockDeviceTest, InspectBadBlockMetricsPopulation) {
   ReadProperties(device, counters, rates);
   ASSERT_EQ(counters["nand.initial_bad_blocks"], kInitialBadBlocks);
   ASSERT_EQ(counters["nand.running_bad_blocks"], kRunningBadBlocks);
+  ASSERT_EQ(counters["nand.total_bad_blocks"], kInitialBadBlocks + kRunningBadBlocks);
+  ASSERT_EQ(counters["nand.worn_blocks_detected"], 0);
+  ASSERT_EQ(counters["nand.projected_bad_blocks"], kInitialBadBlocks + kRunningBadBlocks);
 
   GetVolume()->UpdateInitialBadBlockCount(7);
   GetVolume()->UpdateRunningBadBlockCount(8);
+  GetVolume()->UpdateWornBlocksCount(2);
 
   // Force a stats update.
   Read();
@@ -751,6 +762,8 @@ TEST_F(BlockDeviceTest, InspectBadBlockMetricsPopulation) {
   ReadProperties(device, counters, rates);
   ASSERT_EQ(counters["nand.initial_bad_blocks"], 7);
   ASSERT_EQ(counters["nand.running_bad_blocks"], 8);
+  ASSERT_EQ(counters["nand.total_bad_blocks"], 15);
+  ASSERT_EQ(counters["nand.projected_bad_blocks"], 17);
 }
 
 TEST_F(BlockDeviceTest, Suspend) {

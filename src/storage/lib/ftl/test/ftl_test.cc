@@ -565,22 +565,27 @@ TEST(FtlTest, FindWornBlockTest) {
   // bit lower so that it doesn't trigger a recycle.
   SET_RC(ftl->bdata[page_one_physical / kPagesPerBlock], ftl->max_rc - 5);
 
-  // TODO(https://fxbug.dev/424838073): Should use metrics to read this result back.
-
+  ftl::Volume::Stats stats;
   // Reading page zero shouldn't change anything as it was not recently written.
   ASSERT_EQ(ZX_OK, volume->Read(0, 1, buffer.get()));
   ASSERT_EQ(0u, FtlnCheckBlockBitmap(ftl, ftl->maybe_bad, page_zero_physical / kPagesPerBlock));
   ASSERT_EQ(0u, FtlnCountBlockBitmap(ftl, ftl->maybe_bad));
+  volume->GetStats(&stats);
+  ASSERT_EQ(0u, stats.worn_blocks_detected);
 
   // Reading page one shouldn't change anything as the failure is just read-disturb.
   ASSERT_EQ(ZX_OK, volume->Read(1, 1, buffer.get()));
   ASSERT_EQ(0u, FtlnCheckBlockBitmap(ftl, ftl->maybe_bad, page_one_physical / kPagesPerBlock));
   ASSERT_EQ(0u, FtlnCountBlockBitmap(ftl, ftl->maybe_bad));
+  volume->GetStats(&stats);
+  ASSERT_EQ(0u, stats.worn_blocks_detected);
 
   // Reading page two should mark it bad.
   ASSERT_EQ(ZX_OK, volume->Read(2, 1, buffer.get()));
   ASSERT_EQ(1u, FtlnCheckBlockBitmap(ftl, ftl->maybe_bad, page_two_physical / kPagesPerBlock));
   ASSERT_EQ(1u, FtlnCountBlockBitmap(ftl, ftl->maybe_bad));
+  volume->GetStats(&stats);
+  ASSERT_EQ(1u, stats.worn_blocks_detected);
 }
 
 }  // namespace

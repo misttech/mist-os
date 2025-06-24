@@ -39,6 +39,7 @@ class __EXPORT Volume {
     uint32_t wear_count;
     uint32_t initial_bad_blocks;
     uint32_t running_bad_blocks;
+    uint32_t worn_blocks_detected;
 
     // Histogram of the wear level distribution. Each bucket represents about 5%
     // of the valid range, with the first bucket storing the number of blocks
@@ -56,6 +57,7 @@ class __EXPORT Volume {
     uint32_t wear_count = 0;
     uint32_t initial_bad_blocks = 0;
     uint32_t running_bad_blocks = 0;
+    uint32_t worn_blocks_detected = 0;
   };
 
   Volume() {}

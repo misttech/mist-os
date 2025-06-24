@@ -314,6 +314,10 @@ bool BlockDevice::InitFtl() {
     metrics_.max_wear().Set(stats.wear_count);
     metrics_.initial_bad_blocks().Set(stats.initial_bad_blocks);
     metrics_.running_bad_blocks().Set(stats.running_bad_blocks);
+    metrics_.total_bad_blocks().Set(stats.initial_bad_blocks + stats.running_bad_blocks);
+    metrics_.worn_blocks_detected().Set(stats.worn_blocks_detected);
+    metrics_.projected_bad_blocks().Set(stats.initial_bad_blocks + stats.running_bad_blocks +
+                                        stats.worn_blocks_detected);
 
     static_assert(std::size(stats.map_block_end_page_failure_reasons) == Metrics::kReasonCount);
     for (int i = 0; i < Metrics::kReasonCount; ++i) {
@@ -428,6 +432,11 @@ int BlockDevice::WorkerThread() {
       metrics_.max_wear().Set(counters.wear_count);
       metrics_.initial_bad_blocks().Set(counters.initial_bad_blocks);
       metrics_.running_bad_blocks().Set(counters.running_bad_blocks);
+      metrics_.total_bad_blocks().Set(counters.initial_bad_blocks + counters.running_bad_blocks);
+      metrics_.worn_blocks_detected().Set(counters.worn_blocks_detected);
+      metrics_.projected_bad_blocks().Set(counters.initial_bad_blocks +
+                                          counters.running_bad_blocks +
+                                          counters.worn_blocks_detected);
     }
 
     // Update all counters and rates for the supported operation type.
