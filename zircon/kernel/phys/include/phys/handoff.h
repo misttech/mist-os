@@ -371,7 +371,7 @@ struct PhysHandoff {
   MappedMmioRange uart_mmio;
 
   // Mapped kPeripheral ranges.
-  PhysHandoffTemporarySpan<const MappedMmioRange> periph_ranges;
+  PhysHandoffPermanentSpan<const MappedMmioRange> periph_ranges;
 };
 static_assert(std::is_default_constructible_v<PhysHandoff>);
 

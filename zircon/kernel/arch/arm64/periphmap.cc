@@ -18,71 +18,51 @@
 
 #include <ktl/enforce.h>
 
-#define PERIPH_RANGE_MAX 4
-
 namespace {
 
-typedef struct {
-  uint64_t base_phys;
-  uint64_t base_virt;
-  uint64_t length;
-} periph_range_t;
-
-periph_range_t periph_ranges[PERIPH_RANGE_MAX] = {};
+// Backed by permanent hand-off memory.
+ktl::span<const MappedMmioRange> gPeriphRanges;
 
 void RecordPeriphRanges(uint level) {
-  // Record up to the first PERIPH_RANGE_MAX-many ranges; any exceess will be
-  // logged below (once the UART is available).
-  ktl::span ranges = gPhysHandoff->periph_ranges.get();
-  for (size_t i = 0; i < ktl::min<size_t>(ranges.size(), PERIPH_RANGE_MAX); ++i) {
-    periph_ranges[i] = periph_range_t{
-        .base_phys = ranges[i].paddr,
-        .base_virt = reinterpret_cast<uint64_t>(ranges[i].base),
-        .length = ranges[i].size,
-    };
+  constexpr size_t kExpectedMax = 4;
+
+  gPeriphRanges = gPhysHandoff->periph_ranges.get();
+  if (gPeriphRanges.size() > kExpectedMax) {
+    dprintf(INFO, "Warning: unexpected large number of PERIPHERAL ranges: %zu",
+            gPeriphRanges.size());
   }
 }
 
 LK_INIT_HOOK(record_periph_ranges, RecordPeriphRanges, LK_INIT_LEVEL_EARLIEST)
 
-void CheckPeriphRangeCount(uint level) {
-  ktl::span ranges = gPhysHandoff->periph_ranges.get();
-  for (size_t i = ktl::min<size_t>(ranges.size(), PERIPH_RANGE_MAX); i < ranges.size(); ++i) {
-    KERNEL_OOPS("dropped peripheral range [%#lx, %#lx): count exceeded", ranges[i].paddr,
-                ranges[i].paddr + ranges[i].size);
-  }
-}
-
-LK_INIT_HOOK(check_periph_range_count, CheckPeriphRangeCount, LK_INIT_LEVEL_PLATFORM_EARLY + 1)
-
 struct Phys2VirtTrait {
-  static uint64_t src(const periph_range_t& r) { return r.base_phys; }
-  static uint64_t dst(const periph_range_t& r) { return r.base_virt; }
+  static uint64_t src(const MappedMmioRange& r) { return r.paddr; }
+  static uint64_t dst(const MappedMmioRange& r) { return reinterpret_cast<uintptr_t>(r.base); }
 };
 
 struct Virt2PhysTrait {
-  static uint64_t src(const periph_range_t& r) { return r.base_virt; }
-  static uint64_t dst(const periph_range_t& r) { return r.base_phys; }
+  static uint64_t src(const MappedMmioRange& r) { return reinterpret_cast<uintptr_t>(r.base); }
+  static uint64_t dst(const MappedMmioRange& r) { return r.paddr; }
 };
 
 template <typename Fetch>
 struct PeriphUtil {
   // Translate (without range checking) the (virt|phys) peripheral provided to
   // its (phys|virt) counterpart using the provided range.
-  static uint64_t Translate(const periph_range_t& range, uint64_t addr) {
+  static uint64_t Translate(const MappedMmioRange& range, uint64_t addr) {
     return addr - Fetch::src(range) + Fetch::dst(range);
   }
 
   // Find the index (if any) of the peripheral range which contains the
   // (virt|phys) address <addr>
   static ktl::optional<uint32_t> LookupNdx(uint64_t addr) {
-    for (uint32_t i = 0; i < ktl::size(periph_ranges); ++i) {
-      const auto& range = periph_ranges[i];
-      if (range.length == 0) {
+    for (uint32_t i = 0; i < ktl::size(gPeriphRanges); ++i) {
+      const auto& range = gPeriphRanges[i];
+      if (range.size == 0) {
         break;
       } else if (addr >= Fetch::src(range)) {
         uint64_t offset = addr - Fetch::src(range);
-        if (offset < range.length) {
+        if (offset < range.size) {
           return {i};
         }
       }
@@ -95,7 +75,7 @@ struct PeriphUtil {
   static ktl::optional<uint64_t> Map(uint64_t addr) {
     auto ndx = LookupNdx(addr);
     if (ndx.has_value()) {
-      return Translate(periph_ranges[ndx.value()], addr);
+      return Translate(gPeriphRanges[ndx.value()], addr);
     }
     return {};
   }
@@ -189,7 +169,7 @@ zx_status_t dump_periph(paddr_t phys, uint64_t count, AccessWidth width) {
   // OK, all of our sanity checks are complete.  Time to start dumping data.
   constexpr uint32_t bytes_per_line = 16;
   const uint64_t count_per_line = bytes_per_line / opt.byte_width;
-  vaddr_t virt = Phys2Virt::Translate(periph_ranges[start_ndx.value()], phys);
+  vaddr_t virt = Phys2Virt::Translate(gPeriphRanges[start_ndx.value()], phys);
   vaddr_t virt_end_addr = virt + byte_amt;
 
   printf("Dumping %lu %s%s starting at phys 0x%016lx\n", count, opt.tag, count == 1 ? "" : "s",
@@ -258,16 +238,13 @@ int cmd_peripheral_map(int argc, const cmd_args* argv, uint32_t flags) {
   }
 
   if (!strcmp(argv[1].str, "dump")) {
-    uint32_t i = 0;
-    for (const auto& range : periph_ranges) {
-      if (range.length) {
-        printf("Phys [%016lx, %016lx] ==> Virt [%016lx, %016lx] (len 0x%08lx)\n", range.base_phys,
-               range.base_phys + range.length - 1, range.base_virt,
-               range.base_virt + range.length - 1, range.length);
-        ++i;
-      }
+    for (const auto& range : gPeriphRanges) {
+      DEBUG_ASSERT(range.size > 0);
+      printf("Phys [%016lx, %016lx) ==> Virt [%16p, %016lx) (len 0x%08lx)\n", range.paddr,
+             range.paddr + range.size, range.base,
+             reinterpret_cast<uintptr_t>(range.base) + range.size, range.size);
     }
-    printf("Dumped %u defined peripheral map ranges\n", i);
+    printf("Dumped %zu defined peripheral map ranges\n", gPeriphRanges.size());
   } else if (!strcmp(argv[1].str, "phys2virt") || !strcmp(argv[1].str, "virt2phys")) {
     if (argc < 3) {
       return usage(true);
