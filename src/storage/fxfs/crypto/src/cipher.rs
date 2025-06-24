@@ -61,12 +61,10 @@ pub trait Cipher: std::fmt::Debug + Send + Sync {
     /// Decrypts the filename contained in `buffer`.
     fn decrypt_filename(&self, object_id: u64, buffer: &mut Vec<u8>) -> Result<(), Error>;
 
-    /// Returns a hash_code to use.
-    /// Note in the case of encrypted filenames, takes the raw encrypted bytes.
-    fn hash_code(&self, _raw_filename: &[u8]) -> u32;
-
-    /// Returns a case-folded hash_code to use for 'filename'.
-    fn hash_code_casefold(&self, _filename: &str) -> u32;
+    /// Returns a hash_code to use for 'filename'.
+    fn hash_code(&self, _filename: &[u8], _casefold: bool) -> u32 {
+        0
+    }
 }
 
 /// Helper function to obtain a Cipher for a key.

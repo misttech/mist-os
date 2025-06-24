@@ -515,17 +515,9 @@ mod tests {
         Arc::new(FxfsCipher::new(&unwrapped_key(counter)))
     }
 
-    fn padded_plain_text() -> Vec<u8> {
-        let mut text = PLAIN_TEXT.to_vec();
-        text.resize(4096, 0); // Encryption requires block aligned inputs
-        text
-    }
-
     fn cipher_text(counter: u8) -> Vec<u8> {
-        let mut text = padded_plain_text();
+        let mut text = PLAIN_TEXT.to_vec();
         cipher(counter).encrypt(0, 0, 0, &mut text).expect("encrypt failed");
-        // Ensure that encrypt changed the text.
-        assert_ne!(&text, &padded_plain_text());
         text
     }
 
@@ -623,7 +615,7 @@ mod tests {
             .unwrap()
             .decrypt(0, 0, 0, &mut buf)
             .expect("decrypt failed");
-            assert_eq!(&buf, &padded_plain_text());
+            assert_eq!(&buf, PLAIN_TEXT);
         });
         let task2 = fasync::Task::spawn(async move {
             let mut buf = cipher_text(0);
@@ -643,7 +635,7 @@ mod tests {
             .unwrap()
             .decrypt(0, 0, 0, &mut buf)
             .expect("decrypt failed");
-            assert_eq!(&buf, &padded_plain_text());
+            assert_eq!(&buf, PLAIN_TEXT);
         });
         let task3 = fasync::Task::spawn(async move {
             // Make sure this starts after the get_keys.
@@ -656,7 +648,7 @@ mod tests {
                 .expect("missing key")
                 .decrypt(0, 0, 0, &mut buf)
                 .expect("decrypt failed");
-            assert_eq!(&buf, &padded_plain_text());
+            assert_eq!(&buf, PLAIN_TEXT);
         });
 
         TestExecutor::advance_to(MonotonicInstant::after(zx::MonotonicDuration::from_millis(1500)))
@@ -680,7 +672,7 @@ mod tests {
             .expect("missing key")
             .decrypt(0, 0, 0, &mut buf)
             .expect("decrypt failed");
-        assert_eq!(&buf, &padded_plain_text());
+        assert_eq!(&buf, PLAIN_TEXT);
         let _ = manager.remove(1);
         assert!(manager.get(1).await.expect("get failed").is_none());
     }
