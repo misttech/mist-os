@@ -16,6 +16,7 @@ use crate::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, SequenceFile
 use crate::vfs::{FileWriteGuardRef, FsNodeOps, FsStr, FsString, NamespaceNode};
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
+use cfg_if::cfg_if;
 use flyweights::FlyByteStr;
 use fuchsia_inspect_contrib::{profile_duration, ProfileDuration};
 use rand::{thread_rng, Rng};
@@ -2276,15 +2277,15 @@ impl MemoryManagerState {
     }
 
     pub fn mrelease(&self) -> Result<(), Errno> {
-        #[cfg(feature = "alternate_anon_allocs")]
-        {
-            self.private_anonymous
-                .zero(UserAddress::from_ptr(self.user_vmar_info.base), self.user_vmar_info.len)?;
-            return Ok(());
+        cfg_if! {
+            if #[cfg(feature = "alternate_anon_allocs")] {
+                    self.private_anonymous
+                        .zero(UserAddress::from_ptr(self.user_vmar_info.base), self.user_vmar_info.len)?;
+                    return Ok(());
+            } else {
+                return error!(ENOSYS);
+            }
         }
-
-        #[cfg(not(feature = "alternate_anon_allocs"))]
-        return error!(ENOSYS);
     }
 }
 
