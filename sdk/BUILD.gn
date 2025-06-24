@@ -501,6 +501,7 @@ sdk_collection("zircon_sysroot") {
   # TODO(https://fxbug.dev/331962496): Find a solution that doesn't depend on
   # sdk_* templates.
   category = "internal"
+  include_internal_atoms = true
 
   deps = [ "//zircon/public/sysroot_sdk" ]
 }
@@ -999,6 +1000,8 @@ if (current_toolchain == default_toolchain) {
     visibility = [ ":bazel_internal_only_idk" ]
 
     category = "internal"
+    include_internal_atoms = true
+
     id = sdk_id
 
     deps = [ ":bazel_internal_only_libs" ]
@@ -1085,6 +1088,7 @@ if (is_host) {
     # TODO(https://fxbug.dev/317385989): Find a solution that doesn't depend on
     # sdk_* templates.
     category = "internal"
+    include_internal_atoms = true
 
     deps = [
       ":emulators($host_toolchain)",

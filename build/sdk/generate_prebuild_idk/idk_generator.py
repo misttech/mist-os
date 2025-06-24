@@ -420,6 +420,7 @@ class PrebuildMap(object):
         binary = prebuild["binaries"]
         arch = binary["arch"]
         api_level = binary["api_level"]
+        assert type(api_level) is str, "API levels are always strings."
         dist_lib = binary.get("dist_lib")
         dist_path = binary.get("dist_path")
         link_lib = binary["link_lib"]
@@ -617,6 +618,7 @@ class PrebuildMap(object):
 
         root = prebuild["file_base"]
         api_level = prebuild["api_level"]
+        assert type(api_level) is str, "API levels are always strings."
         versioned_root = f"{root}/{api_level}"
 
         files: T.List[str] = []
@@ -667,6 +669,7 @@ class PrebuildMap(object):
 
         package_manifest_relative_path = prebuild["package_manifest"]
         api_level = prebuild["api_level"]
+        assert type(api_level) is str, "API levels are always strings."
         arch = prebuild["arch"]
         distribution_name = prebuild["distribution_name"]
 
@@ -789,6 +792,13 @@ def main() -> int:
         type=Path,
         required=False,
     )
+
+    # TODO(https://fxbug.dev/333907192): Remove along with internal only IDK.
+    parser.add_argument(
+        "--include-internal-atoms",
+        action="store_true",
+        help="Include atoms with category 'internal'. By default, they are excluded.",
+    )
     args = parser.parse_args()
 
     with args.prebuild_manifest.open() as f:
@@ -801,7 +811,9 @@ def main() -> int:
     additional_files_read: set[str] = set()
     additional_written_files: set[str] = set()
 
-    result, additional_files_read = generator.GenerateMetaFileContents()
+    result, additional_files_read = generator.GenerateMetaFileContents(
+        include_internal_atoms=args.include_internal_atoms
+    )
     if result != 0:
         return result
 
@@ -873,7 +885,9 @@ class IdkGenerator(object):
         self._prebuild_map.set_fuchsia_source_dir(fuchsia_source_dir)
         self._prebuild_map.set_build_dir(build_dir)
 
-    def GenerateMetaFileContents(self) -> tuple[int, set[str]]:
+    def GenerateMetaFileContents(
+        self, include_internal_atoms: bool = False
+    ) -> tuple[int, set[str]]:
         """Processes the data in `self._prebuild_map`.
 
         Populates `self._meta_files` with the contents of meta files and
@@ -881,6 +895,11 @@ class IdkGenerator(object):
         copied.
 
         Must be called before other methods and may only be called one time.
+
+        Args:
+            include_internal_atoms: Whether to includ atoms with category
+              'internal'.
+              TODO(https://fxbug.dev/333907192): Remove along with internal only IDK.
 
         Returns:
             A tuple containing the return code (0 upon success and a positive
@@ -907,7 +926,11 @@ class IdkGenerator(object):
             # dependency, such as within a prebuilt library.
             # The IDK manifest golden build tests ensure any new IDK atoms that
             # may result from this are caught.
-            if info["category"] != "partner":
+            allowed_categories = ["partner"]
+            if include_internal_atoms:
+                allowed_categories.append("internal")
+
+            if info["category"] not in allowed_categories:
                 continue
 
             (

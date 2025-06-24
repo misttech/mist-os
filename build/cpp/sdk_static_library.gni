@@ -356,7 +356,7 @@ template("sdk_static_library") {
     file_base = sdk_root_path
     headers = sdk_metadata_headers
     binaries = {
-      api_level = current_build_target_api_level
+      api_level = "$current_build_target_api_level"
       arch = target_cpu
       link_lib = link_lib
     }
