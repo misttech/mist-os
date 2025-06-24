@@ -1107,15 +1107,19 @@ class IdkGenerator(object):
         # Create symlinks for all atom files, including those for packages.
         all_atom_files = {**self._atom_files, **self._package_atom_files}
         for dest, source in all_atom_files.items():
-            target_path = self._build_dir / source
-            # The target directory must exist even if the file does not.
-            target_path.parent.mkdir(parents=True, exist_ok=True)
             dest_path = output_dir / dest
             dest_path.parent.mkdir(parents=True, exist_ok=True)
 
+            target_path = self._build_dir / source
+            relative_target_path = os.path.relpath(
+                target_path, os.path.dirname(dest_path)
+            )
+            # The target directory must exist even if the file does not.
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+
             # Symlinks do not count as file writes, so `dest_path` does not need
             # to be added to `additional_written_files`.`
-            os.symlink(target_path, dest_path)
+            os.symlink(relative_target_path, dest_path)
 
         for meta_path, json_contents in self._json_files.items():
             dest_path = output_dir / meta_path

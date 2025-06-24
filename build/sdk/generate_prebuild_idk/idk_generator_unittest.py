@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -396,11 +397,17 @@ class IdkGeneratorTest(unittest.TestCase):
         # Verify symlink calls.
         expected_symlink_calls = [
             mock.call(
-                self.build_dir / "src/file1.txt",
+                os.path.relpath(
+                    self.build_dir / "src/file1.txt",
+                    self.output_dir / "data/foo",
+                ),
                 self.output_dir / "data/foo/file1.txt",
             ),
             mock.call(
-                self.build_dir / "pkg/blobA",
+                os.path.relpath(
+                    self.build_dir / "pkg/blobA",
+                    self.output_dir / "packages/blobs",
+                ),
                 self.output_dir / "packages/blobs/blobA",
             ),
         ]
