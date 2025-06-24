@@ -415,9 +415,6 @@ void platform_early_init(void) {
   // Initialize the PmmChecker now that the cmdline has been parsed.
   pmm_checker_init_from_cmdline();
 
-  arm64_boot_map_init(reinterpret_cast<uintptr_t>(__executable_start) -
-                      reinterpret_cast<uintptr_t>(KernelPhysicalLoadAddress()));
-
   ASSERT(pmm_init(gPhysHandoff->memory.get()) == ZX_OK);
 
   // give the mmu code a chance to do some bookkeeping
