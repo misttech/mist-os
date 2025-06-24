@@ -10,16 +10,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"path"
-	"regexp"
 	"sort"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/google/shlex"
-
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/compdb"
+	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjacommand"
 )
 
 // Step is one step in ninja_log file.
@@ -63,135 +60,12 @@ func (s Step) AllOutputs() []string {
 	return append(s.Outs, s.Out)
 }
 
-var pythonRE = regexp.MustCompile(`^python(\d(\.\d+)?)?$`)
-
-// extractPythonScript returns the first python script in input tokens.
-func extractPythonScript(tokens []string) string {
-	for _, t := range tokens {
-		if c := baseCmd(t); strings.HasSuffix(c, ".py") {
-			return c
-		}
-	}
-	return ""
-}
-
-// pythonWrapperScripts is a list of known python wrappers used in our build
-// system. They should be stripped in order to get the real command of a build
-// action.
-var pythonWrapperScripts = []string{
-	"action_tracer.py",
-	"cxx_link_remote_wrapper.py",
-	"cxx_remote_wrapper.py",
-	"output_cacher.py",
-	"output_leak_scanner.py",
-	"prebuilt_tool_remote_wrapper.py",
-	"restat_cacher.py",
-	"rustc_remote_wrapper.py",
-}
-
-func isWrapperPythonScript(script string) bool {
-	for _, s := range pythonWrapperScripts {
-		if strings.HasSuffix(script, s) {
-			return true
-		}
-	}
-	return false
-}
-
-// extractCommand extracts the actual script/binary being run from a full
-// command. This function includes logic to handle special wrapper scripts used
-// in Fuchsia's build.
-//
-// This function is best-effort, if nothing can be successfully extracted, an
-// empty string is returned.
-func extractCommand(cmd []string) string {
-	for i, token := range cmd {
-		c := baseCmd(token)
-		if c == "env" {
-			continue
-		}
-
-		// gn_run_binary.sh is a script to run an arbitrary binary produced by the
-		// current build.
-		//
-		// First argument to gn_run_binary.sh is the bin directory of the toolchain,
-		// skip it to take the second argument, which is the binary to run.
-		if c == "gn_run_binary.sh" {
-			if i+2 < len(cmd) {
-				return baseCmd(cmd[i+2])
-			}
-			break
-		}
-
-		if c == "reclient_cxx.sh" {
-			// reclient_cxx.sh wraps a normal cxx build command to enable reclient.
-			// The actual command is after the --.
-			for j := i + 1; j < len(cmd); j++ {
-				if cmd[j] == "--" && j+1 < len(cmd) {
-					return extractCommand(cmd[j+1:])
-				}
-			}
-		}
-
-		if pythonRE.MatchString(c) {
-			if script := extractPythonScript(cmd); script != "" {
-				if !isWrapperPythonScript(script) {
-					return script
-				}
-				// The top level command we extracted is one of the wrapper python
-				// scripts, the actual command is after --, so abandon everything before
-				// that.
-				for j := i + 1; j < len(cmd); j++ {
-					if cmd[j] == "--" && j+1 < len(cmd) {
-						return extractCommand(cmd[j+1:])
-					}
-				}
-			}
-			break
-		}
-
-		return c
-	}
-	return ""
-}
-
-func baseCmd(cmd string) string {
-	return strings.Trim(path.Base(cmd), "()")
-}
-
-func ComputeCommandCategories(command string) string {
-	tokens, err := shlex.Split(command)
-	if err != nil {
-		return "invalid command"
-	}
-
-	var commands [][]string
-	start := 0
-	for i, t := range tokens {
-		if t == "||" || t == "&&" {
-			commands = append(commands, tokens[start:i])
-			start = i + 1
-		}
-	}
-	if start < len(tokens) {
-		commands = append(commands, tokens[start:])
-	}
-
-	var categories []string
-	for _, command := range commands {
-		if c := extractCommand(command); c != "" {
-			categories = append(categories, c)
-		}
-	}
-	return strings.Join(categories, ",")
-}
-
 // category returns a comma separated list of executed commands.
 func (s Step) Category() string {
 	if s.Command == nil {
 		return "unknown"
 	}
-	return ComputeCommandCategories(s.Command.Command)
+	return ninjacommand.ComputeCommandCategories(s.Command.Command)
 }
 
 // Steps is a list of Step.

@@ -22,6 +22,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/chrometrace"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/clangtrace"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/compdb"
+	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjacommand"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjagraph"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjalog"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/rbetrace"
@@ -146,7 +147,7 @@ func readNinjaBuildTrace(tracePath string) (traces []chrometrace.Trace, err erro
 		if !ok { // this event doesn't have any command'
 			continue
 		}
-		categories := ninjalog.ComputeCommandCategories(command)
+		categories := ninjacommand.ComputeCommandCategories(command)
 		if categories == "" {
 			continue
 		}

@@ -17,6 +17,7 @@ if (is_host) {
       "//tools/build/ninjago/chrometrace",
       "//tools/build/ninjago/clangtrace",
       "//tools/build/ninjago/compdb",
+      "//tools/build/ninjago/ninjacommand",
       "//tools/build/ninjago/ninjagraph",
       "//tools/build/ninjago/ninjalog",
       "//tools/build/ninjago/rbetrace",
