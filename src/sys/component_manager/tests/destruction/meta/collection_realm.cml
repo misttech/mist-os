@@ -4,9 +4,8 @@
 // Realm for integration test that creates and binds to component instances in a collection.
 {
     include: [
+        "//src/sys/component_manager/meta/passthrough_diagnostics.shard.cml",
         "//src/sys/component_manager/tests/meta/use_elf_runner.shard.cml",
-        "inspect/offer.shard.cml",
-        "syslog/client.shard.cml",
     ],
     program: {
         binary: "bin/destruction_collection_realm",
@@ -22,6 +21,10 @@
         {
             protocol: "fuchsia.component.Realm",
             from: "framework",
+        },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "self/diagnostics",
         },
     ],
 }

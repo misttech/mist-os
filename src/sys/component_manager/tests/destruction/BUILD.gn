@@ -90,12 +90,18 @@ fuchsia_component("collection_realm") {
   testonly = true
   deps = [ ":destruction_collection_realm_bin" ]
   manifest = "meta/collection_realm.cml"
+
+  # We want `diagnostics` from self rather than parent, so we can't use syslog/client.shard.cml.
+  check_includes = false
 }
 
 fuchsia_component("destroy_and_recreate") {
   testonly = true
   deps = [ ":destroy_and_recreate_bin" ]
   manifest = "meta/destroy_and_recreate.cml"
+
+  # We want `diagnostics` from self rather than parent, so we can't use syslog/client.shard.cml.
+  check_includes = false
 }
 
 fuchsia_unittest_package("destruction_integration_test") {

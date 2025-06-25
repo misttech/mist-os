@@ -96,6 +96,11 @@ fuchsia_component("root_offer_dir_rights") {
   manifest = "meta/root_offer_dir_rights.cml"
 }
 
+fuchsia_component("root_route_directories_from_component_manager_namespace") {
+  testonly = true
+  manifest = "meta/root_route_directories_from_component_manager_namespace.cml"
+}
+
 fuchsia_component("root_expose_intermediate_offer_dir_rights") {
   testonly = true
   manifest = "meta/root_expose_intermediate_offer_dir_rights.cml"
@@ -216,6 +221,7 @@ fuchsia_unittest_package("rights_integration_test") {
     ":root_invalid_use_in_offer_dir_rights",
     ":root_offer_dir_rights",
     ":root_offer_intermediate_offer_dir_rights",
+    ":root_route_directories_from_component_manager_namespace",
     ":root_storage_offer_rights",
     ":use_dir_rights",
     ":use_storage",

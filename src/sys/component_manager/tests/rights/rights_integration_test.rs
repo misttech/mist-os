@@ -161,30 +161,16 @@ async fn alias_offer_dir_rights() {
 async fn route_directories_from_component_manager_namespace() {
     // Define the realm inside component manager.
     let builder = RealmBuilder::with_params(
-        RealmBuilderParams::new().from_relative_url("#meta/elf_runner_and_environment.cm"),
+        RealmBuilderParams::new()
+            .from_relative_url("#meta/root_route_directories_from_component_manager_namespace.cm"),
     )
     .await
     .unwrap();
-    let realm = builder
-        .add_child(
-            "realm",
-            "#meta/use_dir_rights.cm",
-            ChildOptions::new().eager().environment("elf-env"),
-        )
-        .await
-        .unwrap();
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .from(Ref::parent())
-                .to(&realm),
-        )
-        .await
-        .unwrap();
 
     let dirs =
         vec!["read_only", "read_write", "read_exec", "read_write_dup", "read_only_after_scoped"];
+
+    let realm = ChildRef::from("realm");
 
     for dir in dirs {
         builder

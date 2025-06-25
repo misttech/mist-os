@@ -6,7 +6,6 @@
 // need to use the ELF runner itself (component without a program) may use this
 // shard to conveniently define an ELF runner component in the root realm.
 {
-    include: [ "syslog/client.shard.cml" ],
     children: [
         {
             name: "elf_runner",

@@ -4,9 +4,8 @@
 // Verifies that rights are passed correctly the "as" keyword is used.
 {
     include: [
+        "//src/sys/component_manager/meta/passthrough_diagnostics.shard.cml",
         "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
-        "inspect/offer.shard.cml",
-        "syslog/offer.shard.cml",
     ],
     children: [
         {

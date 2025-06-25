@@ -3,9 +3,8 @@
 // found in the LICENSE file.
 {
     include: [
+        "//src/sys/component_manager/meta/passthrough_diagnostics.shard.cml",
         "//src/sys/component_manager/tests/meta/use_elf_runner.shard.cml",
-        "inspect/offer.shard.cml",
-        "syslog/client.shard.cml",
     ],
     program: {
         binary: "bin/reboot_on_terminate_success_bin",

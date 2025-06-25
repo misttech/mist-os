@@ -24,6 +24,7 @@
                 "fuchsia.sys2.RealmQuery",
             ],
         },
+        { dictionary: "diagnostics" },
     ],
     use: [
         {
@@ -32,6 +33,16 @@
                 "fuchsia.component.runner.RealmBuilder",
                 "fuchsia.process.Launcher",
             ],
+        },
+    ],
+    offer: [
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "parent/diagnostics",
+            to: "self/diagnostics",
         },
     ],
     expose: [
@@ -44,6 +55,16 @@
                 "fuchsia.sys2.RealmQuery",
             ],
             from: "self",
+        },
+
+        // Dictionaries are not supported for nested component manager passthrough, so we
+        // must expose the individual protocols.
+        {
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
+            from: "self/diagnostics",
         },
     ],
 }

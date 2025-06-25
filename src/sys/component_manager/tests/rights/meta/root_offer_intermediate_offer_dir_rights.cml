@@ -5,9 +5,8 @@
 // intermidate set of offers before passing it down to the use_decl.
 {
     include: [
+        "//src/sys/component_manager/meta/passthrough_diagnostics.shard.cml",
         "//src/sys/component_manager/tests/meta/elf_runner_and_environment.shard.cml",
-        "inspect/offer.shard.cml",
-        "syslog/offer.shard.cml",
     ],
     children: [
         {

@@ -45,7 +45,8 @@ rustc_binary("async_reporter_bin") {
   testonly = true
   deps = [
     "//src/lib/fuchsia",
-    "//src/lib/fuchsia-component-test",
+    "//src/lib/fuchsia-component-test:lib",
+    "//src/lib/fuchsia-component-test/realm_builder_server:realm_builder_server_component",
     "//src/sys/lib/component-events",
   ]
 
