@@ -341,7 +341,7 @@
              path="third_party/mobly/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/mobly"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="cf1fd01dd36b06bc06deb42b2189d3db4c28f70e"/>
+             revision="2c9e064293769edb0e956272ac4393c1cd55de52"/>
     <project name="third_party/github.com/google/snippet-uiautomator"
              path="third_party/snippet-uiautomator/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/snippet-uiautomator"
