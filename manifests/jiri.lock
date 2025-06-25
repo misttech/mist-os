@@ -1040,18 +1040,18 @@
     },
     {
         "package": "fuchsia/tools/ninjatrace/linux-amd64",
-        "version": "git_revision:51303f22c2b22e86a9da71b604a0b41c043a67bc",
-        "instance_id": "k3uFPdtrQWGrPrQydYDm6myJ3eTeOiSu9-hw6QkWe7gC"
+        "version": "git_revision:6ec1713c884c78c221fa54a90cce93185f742502",
+        "instance_id": "MdeUydU-T19YtRjt_ODqSfI4OR34kEo0Y7f83zYldI0C"
     },
     {
         "package": "fuchsia/tools/ninjatrace/mac-amd64",
-        "version": "git_revision:51303f22c2b22e86a9da71b604a0b41c043a67bc",
-        "instance_id": "lyhF_LtIx_9BmO9RyXpQQo4IZGEwU7b51jVPXCpfXzYC"
+        "version": "git_revision:6ec1713c884c78c221fa54a90cce93185f742502",
+        "instance_id": "zQgf0ufjBF0MOpO72AcW4P2h3pF-OR9-FL6l79cL8P4C"
     },
     {
         "package": "fuchsia/tools/ninjatrace/mac-arm64",
-        "version": "git_revision:51303f22c2b22e86a9da71b604a0b41c043a67bc",
-        "instance_id": "HuJ43kgw13sGRBeZulcqo6iWA8UAPpqVQHoFeFTM24sC"
+        "version": "git_revision:6ec1713c884c78c221fa54a90cce93185f742502",
+        "instance_id": "VPTcmqlJaTAoccyk6z2EDnk630kXU69eI-0C6-BGd5gC"
     },
     {
         "package": "fuchsia_internal/firmware/bluetooth/broadcom",
