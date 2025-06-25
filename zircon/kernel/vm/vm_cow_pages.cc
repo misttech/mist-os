@@ -7726,15 +7726,6 @@ VmCowPages::DiscardablePageCounts VmCowPages::DebugGetDiscardablePageCounts() co
   return counts;
 }
 
-uint64_t VmCowPages::DiscardPages() {
-  canary_.Assert();
-
-  __UNINITIALIZED DeferredOps deferred(this);
-  Guard<CriticalMutex> guard{lock()};
-  // Discard any errors and overlap a 0 return value for errors.
-  return DiscardPagesLocked(deferred).value_or(0);
-}
-
 zx::result<uint64_t> VmCowPages::DiscardPagesLocked(DeferredOps& deferred) {
   // Not a discardable VMO.
   if (!discardable_tracker_) {

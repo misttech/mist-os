@@ -2657,7 +2657,11 @@ static bool vmo_discardable_states_test() {
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
 
   // Cannot discard when locked.
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages());
+  vm_page_t* page;
+  ASSERT_OK(vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr));
+  EXPECT_EQ(0u, vmo->DebugGetCowPages()
+                    ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                    .Total());
 
   // Unlock.
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kSize));
@@ -2666,7 +2670,10 @@ static bool vmo_discardable_states_test() {
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
 
   // Should be able to discard now.
-  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages());
+  EXPECT_EQ(kSize / PAGE_SIZE,
+            vmo->DebugGetCowPages()
+                ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                .Total());
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsUnreclaimable());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsReclaimable());
@@ -2712,7 +2719,11 @@ static bool vmo_discardable_states_test() {
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsUnreclaimable());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
 
-  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages());
+  ASSERT_OK(vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr));
+  EXPECT_EQ(kSize / PAGE_SIZE,
+            vmo->DebugGetCowPages()
+                ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                .Total());
   EXPECT_TRUE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsDiscarded());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsUnreclaimable());
   EXPECT_FALSE(vmo->DebugGetCowPages()->DebugGetDiscardableTracker()->DebugIsReclaimable());
@@ -2743,11 +2754,9 @@ static bool vmo_discard_test() {
   EXPECT_TRUE(make_private_attribution_counts(kSize, 0) == vmo->GetAttributedMemory());
 
   // Cannot discard when locked.
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages());
-  EXPECT_EQ(vmo->DebugGetCowPages()
-                ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
-                .Total(),
-            0u);
+  EXPECT_EQ(0u, vmo->DebugGetCowPages()
+                    ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                    .Total());
   EXPECT_TRUE(make_private_attribution_counts(kSize, 0) == vmo->GetAttributedMemory());
 
   // Unlock.
@@ -2795,11 +2804,9 @@ static bool vmo_discard_test() {
   reclamation_count = vmo->ReclamationEventCount();
 
   // Cannot discard a vmo with pinned pages.
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages());
-  EXPECT_EQ(vmo->DebugGetCowPages()
-                ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
-                .Total(),
-            0u);
+  EXPECT_EQ(0u, vmo->DebugGetCowPages()
+                    ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                    .Total());
   EXPECT_EQ(kNewSize, vmo->size());
   EXPECT_TRUE(make_private_attribution_counts(kSize, 0) == vmo->GetAttributedMemory());
   EXPECT_EQ(reclamation_count, vmo->ReclamationEventCount());
@@ -2832,7 +2839,10 @@ static bool vmo_discard_test() {
   vmo.reset();
   status = VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, VmObjectPaged::kResizable, kSize, &vmo);
   ASSERT_EQ(ZX_OK, status);
-  EXPECT_EQ(0u, vmo->DebugGetCowPages()->DiscardPages());
+  ASSERT_OK(vmo->GetPageBlocking(0, VMM_PF_FLAG_SW_FAULT, nullptr, &page, nullptr));
+  EXPECT_EQ(0u, vmo->DebugGetCowPages()
+                    ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                    .Total());
   EXPECT_EQ(0u, vmo->ReclamationEventCount());
 
   END_TEST;
@@ -2892,7 +2902,12 @@ static bool vmo_discard_failure_test() {
 
   // Unlock and discard.
   EXPECT_EQ(ZX_OK, vmo->UnlockRange(0, kSize));
-  EXPECT_EQ(kSize / PAGE_SIZE, vmo->DebugGetCowPages()->DiscardPages());
+  vm_page_t* page;
+  ASSERT_OK(vmo->GetPageBlocking(0, 0, nullptr, &page, nullptr));
+  EXPECT_EQ(kSize / PAGE_SIZE,
+            vmo->DebugGetCowPages()
+                ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                .Total());
   EXPECT_TRUE((vm::AttributionCounts{}) == vmo->GetAttributedMemory());
   EXPECT_EQ(kSize, vmo->size());
 
@@ -2977,7 +2992,13 @@ static bool vmo_discardable_counts_test() {
 
       if (rand() % 2) {
         // Discarded pages won't show up under locked or unlocked counts.
-        EXPECT_EQ(static_cast<uint64_t>(i + 1), vmos[i]->DebugGetCowPages()->DiscardPages());
+        vm_page_t* page;
+        ASSERT_OK(vmos[i]->GetPageBlocking(0, 0, nullptr, &page, nullptr));
+        EXPECT_EQ(static_cast<uint64_t>(i + 1),
+                  vmos[i]
+                      ->DebugGetCowPages()
+                      ->ReclaimPage(page, 0, VmCowPages::EvictionAction::FollowHint, nullptr)
+                      .Total());
       } else {
         // Unlocked but not discarded.
         expected.unlocked += (i + 1);

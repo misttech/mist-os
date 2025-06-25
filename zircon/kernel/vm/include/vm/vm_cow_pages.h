@@ -810,10 +810,6 @@ class VmCowPages final : public VmHierarchyBase,
 
   bool DebugIsHighMemoryPriority() const TA_EXCL(lock());
 
-  // Discard all the pages from a discardable vmo in the |kReclaimable| state. If successful, the
-  // |discardable_state_| is set to |kDiscarded|. Returns the number of pages discarded.
-  uint64_t DiscardPages() TA_EXCL(lock());
-
   // See DiscardableVmoTracker::DebugDiscardablePageCounts().
   struct DiscardablePageCounts {
     uint64_t locked;
