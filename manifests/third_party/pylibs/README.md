@@ -8,11 +8,11 @@ dependency management and setup using requirements.txt.
 1. OSRB Approval: Request Open Source Review Board (OSRB) approval by creating
     an issue using the [OSRB template](https://issuetracker.google.com/issues/new?component=1477857&template=1911599)
     to use the desired Python package and any of its dependencies.
-    See [example bug](b/42084613) for reference.
+    See [example bug](https://fxbug.dev/42084613) for reference.
 
 2. File a Infra bug to request the import of the package and dependencies source
     code from its upstream repository into the Fuchsia source code.
-    See [example bug](b/42084613) for reference
+    See [example bug](https://fxbug.dev/42084613) for reference
 
 3. Add the package to the `requirements.txt` file, including the specific
     version and the path within the Fuchsia repository. Example:
