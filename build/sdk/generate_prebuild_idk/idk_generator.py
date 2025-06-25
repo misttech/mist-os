@@ -482,25 +482,29 @@ class PrebuildMap(object):
 
         additional_files_read: set[str] = set()
 
-        additional_files_read.add(prebuild["source"])
-        with (self._build_dir / prebuild["source"]).open() as f:
-            version_history = json.load(f)
+        def read_file_with(
+            path: Path, reader: T.Callable[[T.IO[str]], T.Any]
+        ) -> T.Any:
+            additional_files_read.add(str(path))
+            with path.open() as f:
+                return reader(f)
 
-        additional_files_read.add(prebuild["daily_commit_hash_file"])
-        daily_commit_hash_file_path = (
-            self._build_dir / prebuild["daily_commit_hash_file"]
+        version_history = read_file_with(
+            self._build_dir / prebuild["source"], lambda f: json.load(f)
         )
-        with daily_commit_hash_file_path.open() as f:
-            daily_commit_hash = f.read().strip()
 
-        additional_files_read.add(prebuild["daily_commit_timestamp_file"])
-        daily_commit_timestamp_file_path = (
-            self._build_dir / prebuild["daily_commit_timestamp_file"]
+        daily_commit_hash = read_file_with(
+            self._build_dir / prebuild["daily_commit_hash_file"],
+            lambda f: f.read().strip(),
         )
-        with daily_commit_timestamp_file_path.open() as f:
-            daily_commit_timestamp = datetime.datetime.fromtimestamp(
+
+        daily_commit_timestamp = read_file_with(
+            self._build_dir / prebuild["daily_commit_timestamp_file"],
+            lambda f: datetime.datetime.fromtimestamp(
                 int(f.read().strip()), datetime.UTC
-            )
+            ),
+        )
+
         generate_version_history.replace_special_abi_revisions(
             version_history, daily_commit_hash, daily_commit_timestamp
         )
@@ -837,8 +841,12 @@ def main() -> int:
         depfile_path: Path = args.depfile
         depfile_path.parent.mkdir(parents=True, exist_ok=True)
         with open(args.depfile, "w") as depfile:
-            all_dependencies = additional_files_read
-            all_dependencies.add(str(args.prebuild_manifest))
+            all_dependencies = [
+                os.path.relpath(path, args.build_dir)
+                for path in sorted(
+                    additional_files_read | {str(args.prebuild_manifest)}
+                )
+            ]
             depfile.write(
                 "{} {}: {}\n".format(
                     args.stamp_file,
@@ -903,7 +911,7 @@ class IdkGenerator(object):
 
         Returns:
             A tuple containing the return code (0 upon success and a positive
-            integer otherwise) and a list of additional files read.
+            integer otherwise) and a set of additional files read.
         """
         assert (
             not self._meta_files

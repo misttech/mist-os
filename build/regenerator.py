@@ -339,7 +339,7 @@ def main() -> int:
                 file=sys.stderr,
             )
             return result
-        extra_ninja_build_inputs |= additional_files_read
+        extra_ninja_build_inputs |= {Path(p) for p in additional_files_read}
 
         idk_export_dir_path = Path(
             f"{build_dir}/regenerator_outputs/bazel_in_tree_idk"
@@ -476,7 +476,7 @@ def main() -> int:
         # for safety. This avoids the need to manually track them, which
         # is error-prone.
         extra_ninja_build_inputs |= {
-            Path(m.__file__)
+            Path(m.__file__)  # type: ignore
             for m in sys.modules.values()
             if hasattr(m, "__file__")
         }
