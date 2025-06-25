@@ -15,6 +15,7 @@
 #include <fbl/enum_bits.h>
 #include <fbl/intrusive_wavl_tree.h>
 #include <ffl/fixed.h>
+#include <ffl/string.h>
 #include <kernel/cpu.h>
 #include <kernel/spinlock.h>
 #include <ktl/limits.h>
@@ -297,12 +298,26 @@ class SchedulerState {
   // Values stored in the SchedulerState of Thread instances which tracks the
   // aggregate profile values inherited from upstream contributors.
   struct InheritedProfileValues {
-    // Inherited from fair threads
+    // Inherited from fair threads.
     SchedWeight total_weight{0};
 
-    // Inherited from deadline threads
+    // Inherited from deadline threads.
     SchedUtilization uncapped_utilization{0};
     SchedDuration min_deadline{SchedDuration::Max()};
+
+    constexpr bool is_consequential() const {
+      return total_weight != SchedWeight{0} || uncapped_utilization != SchedUtilization{0};
+    }
+
+    void AssertConsistency() const {
+      DEBUG_ASSERT_MSG(min_deadline > 0, "min_deadline=%" PRId64, min_deadline.raw_value());
+      DEBUG_ASSERT_MSG(total_weight >= 0, "total_weight=%s", ffl::Format(total_weight).c_str());
+      DEBUG_ASSERT_MSG(uncapped_utilization >= 0, "uncapped_utilization=%s",
+                       ffl::Format(uncapped_utilization).c_str());
+      DEBUG_ASSERT_MSG(uncapped_utilization == 0 || min_deadline < SchedDuration::Max(),
+                       "uncapped_utilization=%s min_deadline=%" PRId64,
+                       ffl::Format(uncapped_utilization).c_str(), min_deadline.raw_value());
+    }
   };
 
   struct WaitQueueInheritedSchedulerState {

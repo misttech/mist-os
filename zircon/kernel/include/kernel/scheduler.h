@@ -63,7 +63,8 @@ constexpr zx_cpu_performance_scale_t ToUserPerformanceScale(SchedPerformanceScal
   const UserScale user_scale{value};
   const uint64_t integral = user_scale.Integral().raw_value() >> UserScale::Format::FractionalBits;
   const uint64_t fractional = user_scale.Fraction().raw_value();
-  return {.integral_part = uint32_t(integral), .fractional_part = uint32_t(fractional)};
+  return {.integral_part = static_cast<uint32_t>(integral),
+          .fractional_part = static_cast<uint32_t>(fractional)};
 }
 
 // Implements fair and deadline scheduling algorithms and manages the associated
@@ -190,18 +191,18 @@ class Scheduler {
       TA_REQ(chainlock_transaction_token, thread->get_lock());
   static void RemoveFirstThread(Thread* thread)
       TA_REQ(chainlock_transaction_token, thread->get_lock());
-  static void Block(Thread* const current_thread)
+  static void Block(Thread* current_thread)
       TA_REQ(chainlock_transaction_token, current_thread->get_lock());
-  static void Yield(Thread* const current_thread)
+  static void Yield(Thread* current_thread)
       TA_REQ(chainlock_transaction_token, current_thread->get_lock());
 
   // Note; no locks should be held when calling preempt.  The thread's lock will be obtained
   // unconditionally in the process.
   static void Preempt() TA_EXCL(chainlock_transaction_token);
 
-  static void Reschedule(Thread* const current_thread)
+  static void Reschedule(Thread* current_thread)
       TA_REQ(chainlock_transaction_token, current_thread->get_lock());
-  static void RescheduleInternal(Thread* const current_thread)
+  static void RescheduleInternal(Thread* current_thread)
       TA_REQ(chainlock_transaction_token, current_thread->get_lock());
 
   // Finish unblocking a thread.  This function expects the thread to be locked
@@ -383,7 +384,7 @@ class Scheduler {
   }
 
   // Accessors for the "idle" state mask; similar to the active state mask.
-  void SetIdle(bool is_idle) {
+  void SetIdle(bool is_idle) const {
     const cpu_mask_t mask = cpu_num_to_mask(this_cpu_);
     if (is_idle) {
       idle_schedulers_.fetch_or(mask, ktl::memory_order_relaxed);
@@ -523,6 +524,9 @@ class Scheduler {
     Association,
   };
 
+  // Returns a tracing string ref for the give placement value.
+  static fxt::StringRef<fxt::RefType::kId> ToStringRef(Placement placement);
+
   // Returns the current system time as a SchedTime value.
   static SchedTime CurrentTime() { return SchedTime{current_mono_time()}; }
 
@@ -547,7 +551,7 @@ class Scheduler {
       Scheduler* const target = Get(target_cpu);
       Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
 
-      if (target->IsLockedSchedulerActive()) {
+      if (target->IsSchedulerActiveLocked()) {
         action(thread, target);
         return target_cpu;
       }
@@ -584,7 +588,7 @@ class Scheduler {
   // actually add a thread to a scheduler's queues, we check the active state of
   // the scheduler's assigned CPU from within the safety of the queue lock using
   // IsLockedSchedulerActive()
-  void SetIsActive(bool is_active) TA_REQ(queue_lock_) {
+  void SetIsActive(bool is_active) const TA_REQ(queue_lock_) {
     const cpu_mask_t mask = cpu_num_to_mask(this_cpu_);
     if (is_active) {
       active_schedulers_.fetch_or(mask, ktl::memory_order_relaxed);
@@ -597,12 +601,12 @@ class Scheduler {
   // Check to see if |this| scheduler is currently active while holding its
   // queue_lock, ensuring that it will stay in its current state until after we
   // drop the lock.
-  bool IsLockedSchedulerActive() TA_REQ(queue_lock_) { return PeekIsActive(this_cpu_); }
+  bool IsSchedulerActiveLocked() const TA_REQ(queue_lock_) { return PeekIsActive(this_cpu_); }
 
   using EndTraceCallback = fit::inline_function<void(), sizeof(void*)>;
 
   // Common logic for reschedule API.
-  void RescheduleCommon(Thread* const current_thread, SchedTime now,
+  void RescheduleCommon(Thread* current_thread, SchedTime now,
                         EndTraceCallback end_outer_trace = nullptr) TA_EXCL(queue_lock_)
       TA_REQ(chainlock_transaction_token, current_thread->get_lock());
 
@@ -963,10 +967,10 @@ class Scheduler {
   //
   // See StealWork for a practical example of where these methods are useful.
   //
-  static inline void MarkHasSchedulerAccess(const Scheduler& s) TA_ASSERT(s.queue_lock_) {}
-  static inline void MarkHasOwnedThreadAccess(const Thread& t)
-      TA_ASSERT(t.get_scheduler_variable_lock()) TA_ASSERT_SHARED(t.get_lock()) {}
-  static inline void MarkInFindActiveSchedulerForThreadCbk(const Thread& t, const Scheduler& s)
+  static void MarkHasSchedulerAccess(const Scheduler& s) TA_ASSERT(s.queue_lock_) {}
+  static void MarkHasOwnedThreadAccess(const Thread& t) TA_ASSERT(t.get_scheduler_variable_lock())
+      TA_ASSERT_SHARED(t.get_lock()) {}
+  static void MarkInFindActiveSchedulerForThreadCbk(const Thread& t, const Scheduler& s)
       TA_ASSERT(t.get_scheduler_variable_lock()) TA_ASSERT(t.get_lock()) TA_ASSERT(s.queue_lock_) {}
 
   // A mask of all of the currently active scheduler's in the system.  An

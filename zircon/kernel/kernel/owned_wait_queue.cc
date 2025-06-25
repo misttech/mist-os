@@ -123,8 +123,7 @@ using RemoveSingleEdgeTag = decltype(OwnedWaitQueue::RemoveSingleEdgeOp);
 using BaseProfileChangedTag = decltype(OwnedWaitQueue::BaseProfileChangedOp);
 
 inline bool IpvsAreConsequential(const SchedulerState::InheritedProfileValues* ipvs) {
-  return (ipvs != nullptr) && ((ipvs->total_weight != SchedWeight{0}) ||
-                               (ipvs->uncapped_utilization != SchedUtilization{0}));
+  return ipvs != nullptr && ipvs->is_consequential();
 }
 
 template <typename UpstreamType, typename DownstreamType>
@@ -301,7 +300,7 @@ SchedulerState::InheritedProfileValues OwnedWaitQueue::SnapshotThreadIpv(Thread&
     if (bp.discipline == SchedDiscipline::Fair) {
       ret.total_weight += bp.fair.weight;
     } else {
-      DEBUG_ASSERT(ret.min_deadline != SchedDuration{0});
+      ret.AssertConsistency();
       ret.uncapped_utilization += bp.deadline.utilization;
       ret.min_deadline = ktl::min(ret.min_deadline, bp.deadline.deadline_ns);
     }
@@ -388,7 +387,7 @@ void OwnedWaitQueue::ApplyIpvDeltaToThread(const SchedulerState::InheritedProfil
     }
   }
 
-  DEBUG_ASSERT(thread_ipv.min_deadline > SchedDuration{0});
+  thread_ipv.AssertConsistency();
 }
 
 void OwnedWaitQueue::ApplyIpvDeltaToOwq(const SchedulerState::InheritedProfileValues* old_ipv,
@@ -410,9 +409,7 @@ void OwnedWaitQueue::ApplyIpvDeltaToOwq(const SchedulerState::InheritedProfileVa
   iss.ipvs.uncapped_utilization += util_delta;
   iss.ipvs.min_deadline = owq.collection_.MinInheritableRelativeDeadline();
 
-  DEBUG_ASSERT(iss.ipvs.total_weight >= SchedWeight{0});
-  DEBUG_ASSERT(iss.ipvs.uncapped_utilization >= SchedUtilization{0});
-  DEBUG_ASSERT(iss.ipvs.min_deadline > SchedDuration{0});
+  iss.ipvs.AssertConsistency();
 }
 
 template <OwnedWaitQueue::PropagateOp OpType>
@@ -462,6 +459,7 @@ void OwnedWaitQueue::BeginPropagate(OwnedWaitQueue& upstream_node, Thread& downs
   DEBUG_ASSERT(upstream_node.inherited_scheduler_state_storage_ != nullptr);
   SchedulerState::InheritedProfileValues& ipvs =
       upstream_node.inherited_scheduler_state_storage_->ipvs;
+  ipvs.AssertConsistency();
 
   if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
     FinishPropagate(upstream_node, downstream_node, nullptr, &ipvs, op);
@@ -608,6 +606,7 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
       //
       SchedulerState::WaitQueueInheritedSchedulerState& owq_iss =
           *owq_iter->inherited_scheduler_state_storage_;
+      owq_iss.ipvs.AssertConsistency();
       const SchedUtilization utilization_before = owq_iss.ipvs.uncapped_utilization;
       ApplyIpvDeltaToOwq(lost_ipv, added_ipv, *owq_iter);
       const SchedUtilization utilization_after = owq_iss.ipvs.uncapped_utilization;

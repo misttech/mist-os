@@ -155,6 +155,8 @@ constexpr T PeakDecayDelta(T value, T sample, Alpha alpha, Beta beta) {
 //
 // Must be called with interrupts disabled.
 void PreemptReset(cpu_num_t current_cpu, zx_instant_mono_t now, zx_instant_mono_t deadline) {
+  ktrace::Scope trace =
+      LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "preempt_reset", ("now", now), ("deadline", deadline));
   // Setting a preemption time that's prior to the point at which the CPU
   // entered the scheduler indicates at worst a bug, or at best a wasted
   // reschedule.
@@ -191,6 +193,24 @@ void PreemptReset(cpu_num_t current_cpu, zx_instant_mono_t now, zx_instant_mono_
 }
 
 }  // anonymous namespace
+
+fxt::StringRef<fxt::RefType::kId> Scheduler::ToStringRef(Placement placement) {
+  using fxt::operator""_intern;
+  switch (placement) {
+    case Placement::Insertion:
+      return "Insertion"_intern;
+    case Placement::Adjustment:
+      return "Adjustment"_intern;
+    case Placement::Preemption:
+      return "Preemption"_intern;
+    case Placement::Migration:
+      return "Migration"_intern;
+    case Placement::Association:
+      return "Association"_intern;
+    default:
+      return "Invalid"_intern;
+  }
+}
 
 // Records details about the threads entering/exiting the run queues for various
 // CPUs, as well as which task on each CPU is currently active. These events are
@@ -457,26 +477,26 @@ void Scheduler::InitializeFirstThread(Thread* thread) {
 
   // Fill out other details about the thread, making sure to assign it to the
   // current CPU with hard affinity.
-  SchedulerState& ss = thread->scheduler_state();
-  ss.state_ = THREAD_RUNNING;
-  ss.curr_cpu_ = current_cpu;
-  ss.last_cpu_ = current_cpu;
-  ss.hard_affinity_ = cpu_num_to_mask(current_cpu);
+  SchedulerState& state = thread->scheduler_state();
+  state.state_ = THREAD_RUNNING;
+  state.curr_cpu_ = current_cpu;
+  state.last_cpu_ = current_cpu;
+  state.hard_affinity_ = cpu_num_to_mask(current_cpu);
 
   // Finally, make sure that the thread is the active thread for the scheduler,
   // and that the weight_total bookkeeping is accurate.
   {
-    Scheduler* sched = Get(current_cpu);
-    Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&sched->queue_lock_, SOURCE_TAG};
-    sched->AssertInScheduler(*thread);
+    Scheduler* scheduler = Get(current_cpu);
+    Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&scheduler->queue_lock_, SOURCE_TAG};
+    scheduler->AssertInScheduler(*thread);
 
     SchedulerQueueState& sqs = thread->scheduler_queue_state();
     sqs.active = true;
-    sched->active_thread_ = thread;
+    scheduler->active_thread_ = thread;
 
-    sched->weight_total_ = ss.effective_profile_.fair.weight;
-    sched->runnable_fair_task_count_++;
-    sched->UpdateTotalExpectedRuntime(ss.expected_runtime_ns_);
+    scheduler->weight_total_ = state.effective_profile_.fair.weight;
+    scheduler->runnable_fair_task_count_++;
+    scheduler->UpdateTotalExpectedRuntime(state.expected_runtime_ns_);
   }
 }
 
@@ -498,41 +518,41 @@ void Scheduler::InitializeFirstThread(Thread* thread) {
 // (secondary CPU).
 void Scheduler::RemoveFirstThread(Thread* thread) {
   cpu_num_t current_cpu = arch_curr_cpu_num();
-  Scheduler* sched = Get(current_cpu);
-  SchedulerState& ss = thread->scheduler_state();
+  Scheduler* scheduler = Get(current_cpu);
+  SchedulerState& state = thread->scheduler_state();
 
   // Since this is becoming an idle thread, it must have been one of the CPU's
   // first threads.  It should already be bound to this core with hard affinity.
   // Assert this.
-  DEBUG_ASSERT(ss.last_cpu_ == current_cpu);
-  DEBUG_ASSERT(ss.curr_cpu_ == current_cpu);
-  DEBUG_ASSERT(ss.hard_affinity_ == cpu_num_to_mask(current_cpu));
+  DEBUG_ASSERT(state.last_cpu_ == current_cpu);
+  DEBUG_ASSERT(state.curr_cpu_ == current_cpu);
+  DEBUG_ASSERT(state.hard_affinity_ == cpu_num_to_mask(current_cpu));
 
   {
-    Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&sched->queue_lock_, SOURCE_TAG};
-    sched->AssertInScheduler(*thread);
-    SchedulerQueueState& sqs = thread->scheduler_queue_state();
+    Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&scheduler->queue_lock_, SOURCE_TAG};
+    scheduler->AssertInScheduler(*thread);
+    SchedulerQueueState& queue_state = thread->scheduler_queue_state();
 
     // We are becoming the idle thread.  We should currently be running with a
     // fair (not deadline) profile, and we should not be holding any locks
     // (therefore, we should not be inheriting any profile pressure).
-    DEBUG_ASSERT(ss.base_profile_.IsFair());
-    DEBUG_ASSERT(ss.inherited_profile_values_.total_weight == SchedWeight{0});
-    DEBUG_ASSERT(ss.inherited_profile_values_.uncapped_utilization == SchedUtilization{0});
+    DEBUG_ASSERT(state.base_profile_.IsFair());
+    DEBUG_ASSERT(state.inherited_profile_values_.total_weight == SchedWeight{0});
+    DEBUG_ASSERT(state.inherited_profile_values_.uncapped_utilization == SchedUtilization{0});
 
     // We should also be the currently active thread on this core, but no
     // longer.  We are about to either exit, or "UnblockIdle".
-    DEBUG_ASSERT(sched->active_thread_ == thread);
-    DEBUG_ASSERT(sched->runnable_fair_task_count_ > 0);
-    sqs.active = false;
-    sched->active_thread_ = nullptr;
-    sched->weight_total_ -= ss.effective_profile_.fair.weight;
-    sched->runnable_fair_task_count_--;
-    sched->UpdateTotalExpectedRuntime(-ss.expected_runtime_ns_);
+    DEBUG_ASSERT(scheduler->active_thread_ == thread);
+    DEBUG_ASSERT(scheduler->runnable_fair_task_count_ > 0);
+    queue_state.active = false;
+    scheduler->active_thread_ = nullptr;
+    scheduler->weight_total_ -= state.effective_profile_.fair.weight;
+    scheduler->runnable_fair_task_count_--;
+    scheduler->UpdateTotalExpectedRuntime(-state.expected_runtime_ns_);
 
-    ss.base_profile_.fair.weight = SchedulerState::ConvertPriorityToWeight(IDLE_PRIORITY);
-    ss.effective_profile_.MarkBaseProfileChanged();
-    ss.RecomputeEffectiveProfile();
+    state.base_profile_.fair.weight = SchedulerState::ConvertPriorityToWeight(IDLE_PRIORITY);
+    state.effective_profile_.MarkBaseProfileChanged();
+    state.RecomputeEffectiveProfile();
   }
 }
 
@@ -849,23 +869,30 @@ Thread* Scheduler::FindEarlierDeadlineThread(SchedTime eligible_time, SchedTime 
   Thread* const eligible_thread = FindEarliestEligibleThread(&deadline_run_queue_, eligible_time);
 
   if (eligible_thread != nullptr) {
-    MarkHasOwnedThreadAccess(*eligible_thread);  // See DequeueFairThread
-    const bool found_earlier_deadline =
-        const_cast<const Thread*>(eligible_thread)->scheduler_state().finish_time_ < finish_time;
-    return found_earlier_deadline ? eligible_thread : nullptr;
-  } else {
-    return nullptr;
+    // Use MarkHasOwnedThreadAccess to satisfy static annotations for shared
+    // access to the thread's COVs and exclusive access to the thread's SOVs.
+    // This is acceptable because the queue lock is required by this method and
+    // the thread is in a queue protectect by the same lock.
+    MarkHasOwnedThreadAccess(*eligible_thread);
+    if (const_cast<const Thread*>(eligible_thread)->scheduler_state().finish_time() < finish_time) {
+      return eligible_thread;
+    }
   }
+
+  return nullptr;
 }
 
 // Returns the time that the next deadline task will become eligible or infinite
-// if there are no ready deadline tasks or there is pending work for the idle
-// thread to perform.
+// if there are no ready deadline tasks.
 SchedTime Scheduler::GetNextEligibleTime() {
   if (deadline_run_queue_.is_empty()) {
     return SchedTime{ZX_TIME_INFINITE};
   }
 
+  // Use MarkHasOwnedThreadAccess to satisfy static annotations for shared
+  // access to the thread's COVs and exclusive access to the thread's SOVs. This
+  // is acceptable because the queue lock is required by this method and the
+  // thread is in a queue protected by the same lock.
   const Thread& front = deadline_run_queue_.front();
   MarkHasOwnedThreadAccess(front);
   return front.scheduler_state().start_time_;
@@ -879,6 +906,10 @@ Thread* Scheduler::DequeueEarlierDeadlineThread(SchedTime eligible_time, SchedTi
   Thread* const eligible_thread = FindEarlierDeadlineThread(eligible_time, finish_time);
 
   if (eligible_thread != nullptr) {
+    // Use MarkHasOwnedThreadAccess to satisfy static annotations for shared
+    // access to the thread's COVs and exclusive access to the thread's SOVs.
+    // This is acceptable because the queue lock is required by this method and
+    // the thread is in a queue protected by the same lock.
     MarkHasOwnedThreadAccess(*eligible_thread);
     deadline_run_queue_.erase(*eligible_thread);
     TraceThreadQueueEvent("tqe_deque_earlier_deadline"_intern, eligible_thread);
@@ -1022,9 +1053,9 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
     const Scheduler* queue{nullptr};
     SchedPerformanceScale scale_up_factor{1};
 
-    static SchedPerformanceScale LatchScaleUpFactor(const Scheduler* s) {
-      return [s]()
-                 TA_NO_THREAD_SAFETY_ANALYSIS { return s->performance_scale_reciprocal_.load(); }();
+    static SchedPerformanceScale LatchScaleUpFactor(const Scheduler* s)
+        TA_NO_THREAD_SAFETY_ANALYSIS {
+      return s->performance_scale_reciprocal_.load();
     }
   };
 
@@ -1155,19 +1186,20 @@ void Scheduler::ProcessSaveStateList(SchedTime now) {
   cpu_mask_t cpus_to_reschedule_mask = 0;
   while (!local_save_state_list.is_empty()) {
     Thread* to_migrate = local_save_state_list.pop_front();
-    // Acquire the thread's lock without backing off using an explicit retry loop because the
-    // current thread's lock is held and ChainLock::Acquire asserts that no chain locks are
-    // currently held to avoid misuse in the general case. We also currently hold the special
-    // "sched token", meaning that we will win arbitration against any other chainlock
-    // transaction.
+    // Acquire the thread's lock without backing off using an explicit retry
+    // loop because the current thread's lock is held and ChainLock::Acquire
+    // asserts that no chain locks are currently held to avoid misuse in the
+    // general case. We also currently hold the special "sched token", meaning
+    // that we will win arbitration against any other chainlock transaction.
     //
-    // This is safe to do here because we can guarantee that no other scheduler holds or is
-    // attempting to acquire the locks of any of the threads in this save_state_list_. The
-    // only context in which schedulers attempt to acquire the locks of threads in other
-    // schedulers is during the `StealWork` routine. However, that routine only looks for
-    // threads in the RunQueues (not save_state_lists) and also does not steal threads that
-    // have migration functions. Therefore, it is impossible for another scheduler to be
-    // fighting over this thread's lock.
+    // This is safe to do here because we can guarantee that no other scheduler
+    // holds or is attempting to acquire the locks of any of the threads in this
+    // save_state_list_. The only context in which schedulers attempt to acquire
+    // the locks of threads in other schedulers is during the `StealWork`
+    // routine. However, that routine only looks for threads in the RunQueues
+    // (not save_state_lists) and also does not steal threads that have
+    // migration functions. Therefore, it is impossible for another scheduler to
+    // be fighting over this thread's lock.
     while (!to_migrate->get_lock().TryAcquire(ChainLock::AllowFinalized::No,
                                               ChainLock::RecordBackoff::No)) {
       arch::Yield();
@@ -1176,10 +1208,11 @@ void Scheduler::ProcessSaveStateList(SchedTime now) {
     // We now have the thread's lock, so run the migrate function.
     to_migrate->CallMigrateFnLocked(Thread::MigrateStage::Save);
 
-    // TODO(rudymathu): Threads placed in the save_state_list_ via an Unblock operation already
-    // performed a `FindTargetCpu` call. In a future optimization, we should be able to reuse
-    // that value here and avoid another CPU search, provided that the CPU is still online and
-    // load balancing constraints still hold.
+    // TODO(rudymathu): Threads placed in the save_state_list_ via an Unblock
+    // operation already performed a `FindTargetCpu` call. In a future
+    // optimization, we should be able to reuse that value here and avoid
+    // another CPU search, provided that the CPU is still online and load
+    // balancing constraints still hold.
     const cpu_num_t target_cpu =
         FindActiveSchedulerForThread(to_migrate, [now](Thread* thread, Scheduler* target) {
           MarkInFindActiveSchedulerForThreadCbk(*thread, *target);
@@ -1763,10 +1796,10 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
             target->FinishTransition(now, thread);
           });
 
-      // Fire off an IPI to the CPU we just moved the thread to.
       mp_reschedule(cpu_num_to_mask(target_cpu), 0);
     }
 
+    // Trace the activation of the next thread before context switching.
     TraceContextSwitch(current_thread, next_thread, current_cpu);
 
     // We invoke the context switch functions before context switching, so that
@@ -2028,7 +2061,8 @@ SchedTime Scheduler::NextThreadTimeslice(Thread* thread, SchedTime now) {
 
 void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
                             SchedDuration total_runtime_ns) {
-  ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "queue_thread");
+  ktrace::Scope trace =
+      LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "queue_thread", ("placement", ToStringRef(placement)));
 
   DEBUG_ASSERT(thread->state() == THREAD_READY);
   DEBUG_ASSERT(!thread->IsIdle());
@@ -2162,8 +2196,7 @@ void Scheduler::Insert(SchedTime now, Thread* thread, Placement placement) {
 
   DEBUG_ASSERT(thread->state() == THREAD_READY);
   DEBUG_ASSERT(!thread->IsIdle());
-  // We should never be inserting a thread into an inactive CPU's queues.
-  DEBUG_ASSERT(IsLockedSchedulerActive());
+  DEBUG_ASSERT(IsSchedulerActiveLocked());
 
   SchedulerQueueState& queue_state = thread->scheduler_queue_state();
   SchedulerState& state = thread->scheduler_state();
@@ -2438,7 +2471,7 @@ void Scheduler::Unblock(Thread* thread) {
     Scheduler* const target = Get(target_cpu);
     Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
 
-    if (target->IsLockedSchedulerActive()) {
+    if (target->IsSchedulerActiveLocked()) {
       TraceWakeup(thread, target_cpu);
       thread->set_ready();
       thread->UpdateRuntimeStats(thread->state());
@@ -2491,7 +2524,7 @@ void Scheduler::Unblock(Thread::UnblockList list) {
       Scheduler* const target = Get(target_cpu);
       Guard<MonitoredSpinLock, NoIrqSave> target_queue_guard{&target->queue_lock_, SOURCE_TAG};
 
-      if (target->IsLockedSchedulerActive()) {
+      if (target->IsSchedulerActiveLocked()) {
         TraceWakeup(thread, target_cpu);
         thread->set_ready();
         thread->UpdateRuntimeStats(thread->state());
@@ -2845,17 +2878,16 @@ void Scheduler::TimerTick(SchedTime now) {
   Thread::Current::preemption_state().PreemptSetPending();
 }
 
-void Scheduler::InitializePerformanceScale(SchedPerformanceScale scale) {
+void Scheduler::InitializePerformanceScale(SchedPerformanceScale scale)
+    TA_NO_THREAD_SAFETY_ANALYSIS {
   // This happens early in boot, before the scheduler is actually running.  We
   // should be able to treat these assignments as if they were done in a
   // constructor and skip obtaining the queue lock.
   DEBUG_ASSERT(scale > 0);
-  [&]() TA_NO_THREAD_SAFETY_ANALYSIS {
-    performance_scale_ = scale;
-    default_performance_scale_ = scale;
-    pending_user_performance_scale_ = scale;
-    performance_scale_reciprocal_ = 1 / scale;
-  }();
+  performance_scale_ = scale;
+  default_performance_scale_ = scale;
+  pending_user_performance_scale_ = scale;
+  performance_scale_reciprocal_ = 1 / scale;
 }
 
 void Scheduler::UpdatePerformanceScales(zx_cpu_performance_info_t* info, size_t count) {

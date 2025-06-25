@@ -15,6 +15,8 @@ void SchedulerState::RecomputeEffectiveProfile() {
   const BaseProfile& bp = base_profile_;
   const InheritedProfileValues& ipv = inherited_profile_values_;
 
+  ipv.AssertConsistency();
+
   if (bp.IsDeadline()) {
     const SchedUtilization total_util = ipv.uncapped_utilization + bp.deadline.utilization;
     const SchedUtilization new_util = ktl::min(total_util, Scheduler::kCpuUtilizationLimit);

@@ -175,6 +175,8 @@ SchedulerState::EffectiveProfile ComputeEffectiveProfile(const OwnedWaitQueue& o
   const SchedulerState::WaitQueueInheritedSchedulerState& iss =
       *owq.inherited_scheduler_state_storage();
 
+  iss.ipvs.AssertConsistency();
+
   if (iss.ipvs.uncapped_utilization > SchedUtilization{0}) {
     DEBUG_ASSERT(iss.ipvs.min_deadline > SchedDuration{0});
     ep.discipline = SchedDiscipline::Deadline;
@@ -201,7 +203,7 @@ class EffectiveProfileHelper<Thread> {
   EffectiveProfileHelper(const Thread& thread) TA_REQ(thread.get_lock())
       : effective_profile_ref_{thread.scheduler_state().effective_profile()} {}
 
-  const SchedulerState::EffectiveProfile& operator()(void) const { return effective_profile_ref_; }
+  const SchedulerState::EffectiveProfile& operator()() const { return effective_profile_ref_; }
 
  private:
   const SchedulerState::EffectiveProfile& effective_profile_ref_;
@@ -213,7 +215,7 @@ class EffectiveProfileHelper<OwnedWaitQueue> {
   EffectiveProfileHelper(const OwnedWaitQueue& owq) TA_REQ(owq.get_lock())
       : effective_profile_{ComputeEffectiveProfile(owq)} {}
 
-  const SchedulerState::EffectiveProfile& operator()(void) const { return effective_profile_; }
+  const SchedulerState::EffectiveProfile& operator()() const { return effective_profile_; }
 
  private:
   const SchedulerState::EffectiveProfile effective_profile_;
