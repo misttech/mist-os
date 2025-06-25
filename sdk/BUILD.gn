@@ -502,7 +502,7 @@ sdk_collection("zircon_sysroot") {
   # sdk_* templates.
   category = "internal"
   include_internal_atoms = true
-
+  visibility += [ "//third_party/vulkan-cts/fuchsia:*" ]
   deps = [ "//zircon/public/sysroot_sdk" ]
 }
 
