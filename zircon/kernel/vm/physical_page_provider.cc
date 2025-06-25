@@ -135,6 +135,13 @@ void PhysicalPageProvider::FreePages(list_node* pages) {
       return;
     }
   }
+  // This should always be called in a way that is serialized with other operations on our
+  // cow_pages_, otherwise there is a race where an operation on the cow_pages_ could observe an
+  // absence of pages, but then be unable to retrieve them because it is not synchronized with this
+  // FreePages call. Both parties using the paged_vmo_lock serves to create a synchronization that
+  // avoids this scenario.
+  ASSERT(page_source_);
+  AssertHeld(*page_source_->paged_vmo_lock());
   // This marks the pages loaned, and makes them FREE_LOANED for potential use by other clients that
   // are ok with getting loaned pages when allocating. Must hold the loaned_state_lock_ as we are
   // manipulating the loaned state of pages that could get inspected by UnloanRange due to
