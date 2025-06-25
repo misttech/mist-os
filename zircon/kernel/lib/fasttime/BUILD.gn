@@ -4,7 +4,19 @@
 
 import("//build/cpp/library_headers.gni")
 
+group("fasttime") {
+  visibility = [
+    "//src/starnix/kernel/*",
+    "//zircon/kernel/*",
+  ]
+  public_deps = [ ":headers" ]
+}
+
 library_headers("headers") {
+  visibility = [
+    "//src/starnix/kernel/*",
+    "//zircon/kernel/*",
+  ]
   headers = [
     "lib/fasttime/time.h",
     "lib/fasttime/internal/abi.h",
