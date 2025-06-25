@@ -115,6 +115,18 @@ alias(
 )
 
 alias(
+    name = "arc-swap-1.7.1",
+    actual = "//third_party/rust_crates/vendor/arc-swap-1.7.1:arc_swap",
+    tags = ["manual"],
+)
+
+alias(
+    name = "arc-swap",
+    actual = "//third_party/rust_crates/vendor/arc-swap-1.7.1:arc_swap",
+    tags = ["manual"],
+)
+
+alias(
     name = "argh-0.1.12",
     actual = "//third_party/rust_crates/vendor/argh-0.1.12:argh",
     tags = ["manual"],
