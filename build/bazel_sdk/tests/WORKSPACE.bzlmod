@@ -6,6 +6,13 @@ workspace(name = "sdk-integration")
 
 load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@fuchsia_build_config//:defs.bzl", "build_config")
+
+# Register an empty C++ host toolchain, because thiss test suite
+# needs to run on CI bots without GCC or Clang installed.
+load(
+    "@rules_fuchsia//common:toolchains/clang/repository_utils.bzl",
+    "empty_host_cpp_toolchain_repository",
+)
 load(
     "@rules_fuchsia//fuchsia:deps.bzl",
     "fuchsia_sdk_repository",
@@ -13,6 +20,33 @@ load(
 
 # Location of Fuchsia source directory, relative to this workspace.
 fuchsia_source_dir = "../../.."
+
+empty_host_cpp_toolchain_repository(
+    name = "host_no_cpp",
+)
+
+register_toolchains("@host_no_cpp//:empty_cpp_toolchain")
+
+fuchsia_sdk_repository(
+    name = "fuchsia_sdk_x64_only",
+    local_paths = [
+        "sdk_generation/goldens/simple_idk_x64",
+    ],
+)
+
+fuchsia_sdk_repository(
+    name = "fuchsia_sdk_arm64_only",
+    local_paths = [
+        "sdk_generation/goldens/simple_idk_arm64",
+    ],
+)
+
+fuchsia_sdk_repository(
+    name = "fuchsia_sdk_both",
+    local_paths = [
+        "sdk_generation/goldens/simple_idk_both",
+    ],
+)
 
 # The @fuchsia_in_tree_idk repository is ignored, except when running the
 # test suite for the Fuchsia platform build. In this case it will

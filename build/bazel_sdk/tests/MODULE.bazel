@@ -58,27 +58,6 @@ fuchsia_sdk_repository = use_repo_rule(
     "fuchsia_sdk_repository",
 )
 
-fuchsia_sdk_repository(
-    name = "fuchsia_sdk_x64_only",
-    local_paths = [
-        "sdk_generation/goldens/simple_idk_x64",
-    ],
-)
-
-fuchsia_sdk_repository(
-    name = "fuchsia_sdk_arm64_only",
-    local_paths = [
-        "sdk_generation/goldens/simple_idk_arm64",
-    ],
-)
-
-fuchsia_sdk_repository(
-    name = "fuchsia_sdk_both",
-    local_paths = [
-        "sdk_generation/goldens/simple_idk_both",
-    ],
-)
-
 register_toolchains("//:fuchsia_sdk_devicetree_toolchain")
 
 fuchsia_build_config_ext = use_extension("@fuchsia_sdk_common//common:fuchsia_platform_build.bzl", "fuchsia_build_config_ext")
@@ -110,19 +89,6 @@ compact_python_runtime_repository(
 )
 
 register_toolchains("@prebuilt_python//:all")
-
-# Register an empty C++ host toolchain, because thiss test suite
-# needs to run on CI bots without GCC or Clang installed.
-empty_host_cpp_toolchain_repository = use_repo_rule(
-    "@rules_fuchsia//common:toolchains/clang/repository_utils.bzl",
-    "empty_host_cpp_toolchain_repository",
-)
-
-empty_host_cpp_toolchain_repository(
-    name = "host_no_cpp",
-)
-
-register_toolchains("@host_no_cpp//:empty_cpp_toolchain")
 
 # The following deps are not needed by the tests. They are here to make sure the
 # tests do NOT try to depend on different versions of common deps transitively
