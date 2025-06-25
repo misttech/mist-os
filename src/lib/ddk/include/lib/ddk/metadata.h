@@ -43,9 +43,6 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // list of buttons_gpio_config_t
 #define DEVICE_METADATA_BUTTONS_GPIOS 0x474E5442  // BTNG
 
-// type: fuchsia_hardware_thermal_ThermalDeviceInfo
-#define DEVICE_METADATA_THERMAL_CONFIG 0x54485243  // THRC
-
 // type: vendor specific Wifi configuration
 #define DEVICE_METADATA_WIFI_CONFIG 0x49464957  // WIFI
 

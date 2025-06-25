@@ -151,16 +151,16 @@ int AmlTSensor::TripPointIrqHandler() {
 }
 
 zx_status_t AmlTSensor::InitTripPoints() {
-  if (thermal_config_.trip_point_info[thermal_config_.num_trip_points].up_temp_celsius !=
+  if (thermal_config_.trip_point_info()[thermal_config_.num_trip_points()].up_temp_celsius() !=
       (-273.15f + 2.0f)) {
     return ZX_ERR_INTERNAL;
   }
 
   auto set_thresholds = [this](auto&& rise_threshold, auto&& fall_threshold, uint32_t i) {
     auto rise_temperature =
-        TempCelsiusToCode(thermal_config_.trip_point_info[i].up_temp_celsius, true);
+        TempCelsiusToCode(thermal_config_.trip_point_info()[i].up_temp_celsius(), true);
     auto fall_temperature =
-        TempCelsiusToCode(thermal_config_.trip_point_info[i].down_temp_celsius, false);
+        TempCelsiusToCode(thermal_config_.trip_point_info()[i].down_temp_celsius(), false);
 
     // Program the 2 rise temperature thresholds.
     if (i % 2) {
@@ -182,7 +182,7 @@ zx_status_t AmlTSensor::InitTripPoints() {
 
   // Set rise and fall trip points for the first 4 trip points, since the HW supports only 4.
   // We skip the 1st entry since it's the default setting for boot up.
-  switch (thermal_config_.num_trip_points) {
+  switch (thermal_config_.num_trip_points()) {
     default:
     case 5:
       set_thresholds(TsCfgReg5::Get(), TsCfgReg7::Get(), 4);
@@ -229,7 +229,7 @@ zx_status_t AmlTSensor::InitTripPoints() {
 
   // Enable all IRQs.
   auto ts_cfg_reg1 = TsCfgReg1::Get().ReadFrom(&*sensor_base_mmio_);
-  switch (thermal_config_.num_trip_points) {
+  switch (thermal_config_.num_trip_points()) {
     default:
     case 5:
       ts_cfg_reg1.set_rise_th3_irq_en(1);
@@ -351,7 +351,7 @@ zx_status_t AmlTSensor::GetStateChangePort(zx_handle_t* port) {
 }
 
 zx_status_t AmlTSensor::Create(zx_device_t* parent,
-                               fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config) {
+                               fuchsia_hardware_thermal::ThermalDeviceInfo thermal_config) {
   zx::result pdev_client_end =
       ddk::Device<void>::DdkConnectFidlProtocol<fuchsia_hardware_platform_device::Service::Device>(
           parent);
@@ -398,12 +398,12 @@ zx_status_t AmlTSensor::Create(zx_device_t* parent,
   }
   tsensor_irq_ = std::move(irq.value());
 
-  return InitSensor(thermal_config, device_info.pid);
+  return InitSensor(std::move(thermal_config), device_info.pid);
 }
 
-zx_status_t AmlTSensor::InitSensor(fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config,
+zx_status_t AmlTSensor::InitSensor(fuchsia_hardware_thermal::ThermalDeviceInfo thermal_config,
                                    uint32_t version) {
-  thermal_config_ = thermal_config;
+  thermal_config_ = std::move(thermal_config);
 
   switch (version) {
     case PDEV_PID_AMLOGIC_S905D2:
@@ -448,8 +448,8 @@ zx_status_t AmlTSensor::InitSensor(fuchsia_hardware_thermal::wire::ThermalDevice
   }
 
   // Configure the SoC reset temperature.
-  if (thermal_config.critical_temp_celsius > 0.0) {
-    SetRebootTemperatureCelsius(thermal_config.critical_temp_celsius);
+  if (thermal_config_.critical_temp_celsius() > 0.0) {
+    SetRebootTemperatureCelsius(thermal_config_.critical_temp_celsius());
   }
 
   // Setup IRQ's and rise/fall thresholds.

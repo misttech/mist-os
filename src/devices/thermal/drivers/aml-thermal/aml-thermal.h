@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_THERMAL_DRIVERS_AML_THERMAL_AML_THERMAL_H_
 #define SRC_DEVICES_THERMAL_DRIVERS_AML_THERMAL_AML_THERMAL_H_
 
-#include <fidl/fuchsia.hardware.thermal/cpp/wire.h>
+#include <fidl/fuchsia.hardware.thermal/cpp/fidl.h>
 #include <fuchsia/hardware/thermal/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
@@ -30,8 +30,7 @@ class AmlThermal : public DeviceType, public ddk::ThermalProtocol<AmlThermal, dd
  public:
   DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(AmlThermal);
   AmlThermal(zx_device_t* device, std::unique_ptr<thermal::AmlTSensor> tsensor,
-             fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config,
-             std::string_view name)
+             fuchsia_hardware_thermal::ThermalDeviceInfo thermal_config, std::string_view name)
       : DeviceType(device),
         tsensor_(std::move(tsensor)),
         thermal_config_(std::move(thermal_config)),
@@ -66,7 +65,7 @@ class AmlThermal : public DeviceType, public ddk::ThermalProtocol<AmlThermal, dd
   zx_status_t StartConnectDispatchThread();
 
   std::unique_ptr<thermal::AmlTSensor> tsensor_;
-  fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config_;
+  fuchsia_hardware_thermal::ThermalDeviceInfo thermal_config_;
   async::Loop loop_;
   const std::string name_;
 };

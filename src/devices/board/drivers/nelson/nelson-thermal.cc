@@ -4,7 +4,7 @@
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.thermal/cpp/wire.h>
+#include <fidl/fuchsia.hardware.thermal/cpp/fidl.h>
 #include <lib/ddk/binding.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/device.h>
@@ -28,6 +28,22 @@
 #include <soc/aml-s905d3/s905d3-pwm.h>
 
 #include "nelson.h"
+
+namespace {
+
+fuchsia_hardware_thermal::ThermalTemperatureInfo TripPoint(float temp_c, float hysteresis_c,
+                                                           uint16_t cpu_opp, uint16_t gpu_opp) {
+  return {{
+      .up_temp_celsius = temp_c + hysteresis_c,
+      .down_temp_celsius = temp_c - hysteresis_c,
+      .fan_level = 0,
+      .big_cluster_dvfs_opp = cpu_opp,
+      .little_cluster_dvfs_opp = 0,
+      .gpu_clk_freq_source = gpu_opp,
+  }};
+}
+
+}  // namespace
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -64,52 +80,6 @@ static const std::vector<fpbus::Smc> thermal_smcs{
         .count = ARM_SMC_SERVICE_CALL_NUM_SIP_SERVICE_LENGTH,
         .exclusive = false,
     }},
-};
-
-constexpr fuchsia_hardware_thermal::wire::ThermalTemperatureInfo TripPoint(float temp_c,
-                                                                           float hysteresis_c,
-                                                                           uint16_t cpu_opp,
-                                                                           uint16_t gpu_opp) {
-  return {
-      .up_temp_celsius = temp_c + hysteresis_c,
-      .down_temp_celsius = temp_c - hysteresis_c,
-      .fan_level = 0,
-      .big_cluster_dvfs_opp = cpu_opp,
-      .little_cluster_dvfs_opp = 0,
-      .gpu_clk_freq_source = gpu_opp,
-  };
-}
-
-/*
- * GPU_CLK_FREQUENCY_SOURCE -
- * 0 - 285.7 MHz
- * 1 - 400 MHz
- * 2 - 500 MHz
- * 3 - 666 MHz
- * 4 - 800 MHz
- * 5 - 846 MHz
- */
-static const fuchsia_hardware_thermal::wire::ThermalDeviceInfo nelson_config = {
-    .active_cooling = false,
-    .passive_cooling = true,
-    .gpu_throttling = true,
-    .num_trip_points = 5,
-    .big_little = false,
-    .critical_temp_celsius = 110.0f,
-    .trip_point_info =
-        {
-            // The first trip point entry is the default state of the machine
-            // and the driver does not use the specified temperature/hysterisis
-            // to set any interrupt trip points.
-            TripPoint(0.0f, 5.0f, 11, 5),
-            TripPoint(60.0f, 5.0f, 9, 4),
-            TripPoint(75.0f, 5.0f, 8, 3),
-            TripPoint(80.0f, 5.0f, 7, 2),
-            TripPoint(110.0f, 1.0f, 0, 0),
-            // 0 Kelvin is impossible, marks end of TripPoints
-            TripPoint(-273.15f, 2.0f, 0, 0),
-        },
-    .opps = {},
 };
 
 static const aml_thermal_info_t aml_thermal_info = {
@@ -225,21 +195,6 @@ static const aml_thermal_info_t aml_thermal_info = {
         },
 };
 
-static const std::vector<fpbus::Metadata> thermal_metadata{
-    {{
-        .id = std::to_string(DEVICE_METADATA_THERMAL_CONFIG),
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&nelson_config),
-            reinterpret_cast<const uint8_t*>(&nelson_config) + sizeof(nelson_config)),
-    }},
-    {{
-        .id = std::to_string(DEVICE_METADATA_PRIVATE),
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&aml_thermal_info),
-            reinterpret_cast<const uint8_t*>(&aml_thermal_info) + sizeof(aml_thermal_info)),
-    }},
-};
-
 const std::vector<fdf::BindRule2> kPwmRules = std::vector{
     fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_pwm::SERVICE,
                              bind_fuchsia_hardware_pwm::SERVICE_ZIRCONTRANSPORT),
@@ -267,20 +222,70 @@ const std::map<uint32_t, std::string> kClockFunctionMap = {
     {sm1_clk::CLK_SYS_CPU_CLK_DIV16, bind_fuchsia_clock::FUNCTION_SYS_CPU_DIV16},
 };
 
-static const fpbus::Node thermal_dev = []() {
-  fpbus::Node dev = {};
-  dev.name() = "aml-thermal-pll";
-  dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;
-  dev.pid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D3;
-  dev.did() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_PLL;
-  dev.mmio() = thermal_mmios;
-  dev.irq() = thermal_irqs;
-  dev.metadata() = thermal_metadata;
-  dev.smc() = thermal_smcs;
-  return dev;
-}();
-
 zx_status_t Nelson::ThermalInit() {
+  /*
+   * GPU_CLK_FREQUENCY_SOURCE -
+   * 0 - 285.7 MHz
+   * 1 - 400 MHz
+   * 2 - 500 MHz
+   * 3 - 666 MHz
+   * 4 - 800 MHz
+   * 5 - 846 MHz
+   */
+  fuchsia_hardware_thermal::ThermalDeviceInfo thermal_config{{
+      .active_cooling = false,
+      .passive_cooling = true,
+      .gpu_throttling = true,
+      .num_trip_points = 5,
+      .big_little = false,
+      .critical_temp_celsius = 110.0f,
+      .trip_point_info =
+          {
+              // The first trip point entry is the default state of the machine
+              // and the driver does not use the specified temperature/hysterisis
+              // to set any interrupt trip points.
+              TripPoint(0.0f, 5.0f, 11, 5),
+              TripPoint(60.0f, 5.0f, 9, 4),
+              TripPoint(75.0f, 5.0f, 8, 3),
+              TripPoint(80.0f, 5.0f, 7, 2),
+              TripPoint(110.0f, 1.0f, 0, 0),
+              // 0 Kelvin is impossible, marks end of TripPoints
+              TripPoint(-273.15f, 2.0f, 0, 0),
+          },
+      .opps = {},
+  }};
+
+  fit::result persisted_metadata = fidl::Persist(thermal_config);
+  if (!persisted_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to persist thermal config: %s",
+           persisted_metadata.error_value().FormatDescription().c_str());
+    return persisted_metadata.error_value().status();
+  }
+
+  std::vector<fpbus::Metadata> metadata{
+      {{
+          .id = fuchsia_hardware_thermal::ThermalDeviceInfo::kSerializableName,
+          .data = std::move(persisted_metadata.value()),
+      }},
+      {{
+          .id = std::to_string(DEVICE_METADATA_PRIVATE),
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&aml_thermal_info),
+              reinterpret_cast<const uint8_t*>(&aml_thermal_info) + sizeof(aml_thermal_info)),
+      }},
+  };
+
+  fpbus::Node node{{
+      .name = "aml-thermal-pll",
+      .vid = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC,
+      .pid = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_PID_S905D3,
+      .did = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_DID_THERMAL_PLL,
+      .mmio = thermal_mmios,
+      .irq = thermal_irqs,
+      .smc = thermal_smcs,
+      .metadata = std::move(metadata),
+  }};
+
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode.
   gpio_init_steps_.push_back(GpioOutput(S905D3_PWM_D_PIN, false));
@@ -308,7 +313,7 @@ zx_status_t Nelson::ThermalInit() {
   }
 
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
-      fidl::ToWire(fidl_arena, thermal_dev),
+      fidl::ToWire(fidl_arena, node),
       fidl::ToWire(fidl_arena, fuchsia_driver_framework::CompositeNodeSpec{
                                    {.name = "aml_thermal_pll", .parents2 = parents}}));
   if (!result.ok()) {

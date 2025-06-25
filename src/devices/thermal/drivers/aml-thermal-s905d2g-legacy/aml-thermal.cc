@@ -112,13 +112,13 @@ zx_status_t AmlThermal::Create(void* ctx, zx_device_t* device) {
   }
 
   // Get the thermal policy metadata.
-  fuchsia_hardware_thermal::wire::ThermalDeviceInfo thermal_config;
-  status = device_get_metadata(device, DEVICE_METADATA_THERMAL_CONFIG, &thermal_config,
-                               sizeof(fuchsia_hardware_thermal::wire::ThermalDeviceInfo), &actual);
-  if (status != ZX_OK || actual != sizeof(fuchsia_hardware_thermal::wire::ThermalDeviceInfo)) {
-    zxlogf(ERROR, "aml-thermal: Could not get thermal config metadata %d", status);
-    return status;
+  zx::result metadata_result = pdev.GetFidlMetadata<fuchsia_hardware_thermal::ThermalDeviceInfo>();
+  if (metadata_result.is_error()) {
+    zxlogf(ERROR, "Failed to get thermal config metadata: %s", metadata_result.status_string());
+    return metadata_result.status_value();
   }
+  fidl::Arena arena;
+  auto thermal_config = fidl::ToWire(arena, metadata_result.value());
 
   zx::resource smc_resource;
   zx::result smc_resource_result = pdev.GetSmc(0);
