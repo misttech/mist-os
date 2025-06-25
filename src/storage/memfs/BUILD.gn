@@ -24,16 +24,22 @@ static_library("lib") {
   ]
 
   public_deps = [
-    # <memfs.h> has #include "src/storage/lib/vfs/*.h"
-    "//sdk/lib/async-loop:async-loop-cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async",
+    "//sdk/lib/fidl/cpp/wire",
     "//src/storage/lib/vfs/cpp",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
   ]
   deps = [
+    "//sdk/fidl/fuchsia.fs:fuchsia.fs_cpp",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/async",
-    "//sdk/lib/async:async-cpp",
+    "//sdk/lib/fidl/cpp/wire",
     "//sdk/lib/syslog/cpp",
+    "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/sync",
+    "//zircon/system/ulib/zx",
     "//zircon/third_party/ulib/safemath",
   ]
 
@@ -53,10 +59,19 @@ source_set("cpp") {
   public = [ "mounted_memfs.h" ]
   sources = [ "mounted_memfs.cc" ]
 
-  deps = [ "//sdk/fidl/fuchsia.io:fuchsia.io_cpp" ]
+  deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+    "//sdk/lib/async",
+    "//sdk/lib/fdio",
+    "//sdk/lib/fidl/cpp/wire",
+    "//src/storage/memfs:lib",
+    "//zircon/system/ulib/zx",
+  ]
 
   public_deps = [
     ":lib",
+    "//sdk/lib/async",
+    "//sdk/lib/fdio",
     "//zircon/system/ulib/zx",
   ]
 
@@ -74,10 +89,15 @@ executable("memfs_bin") {
   sources = [ "component.cc" ]
   deps = [
     ":lib",
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
+    "//sdk/lib/fidl/cpp/wire",
     "//sdk/lib/scheduler/cpp",
     "//sdk/lib/syslog/cpp",
+    "//src/storage/lib/vfs/cpp",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
   ]
 }
 

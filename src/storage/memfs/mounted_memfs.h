@@ -5,10 +5,14 @@
 #ifndef SRC_STORAGE_MEMFS_MOUNTED_MEMFS_H_
 #define SRC_STORAGE_MEMFS_MOUNTED_MEMFS_H_
 
+#include <lib/async/dispatcher.h>
 #include <lib/fdio/namespace.h>
 #include <lib/zx/result.h>
+#include <zircon/types.h>
 
 #include <memory>
+#include <string>
+#include <utility>
 
 #include "src/storage/memfs/memfs.h"
 

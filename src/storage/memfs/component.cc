@@ -2,21 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.io/cpp/markers.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/scheduler/role.h>
 #include <lib/syslog/cpp/macros.h>
-#include <stdlib.h>
+#include <lib/zx/channel.h>
+#include <lib/zx/result.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
-
-#include <memory>
 
 #include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/memfs/memfs.h"
-#include "src/storage/memfs/vnode_dir.h"
+#include "src/storage/memfs/vnode_dir.h"  // IWYU pragma: keep
 
 int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

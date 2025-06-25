@@ -7,11 +7,14 @@
 
 #include <lib/async/dispatcher.h>
 #include <lib/zx/event.h>
+#include <lib/zx/pager.h>
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <memory>
 #include <string_view>
+#include <utility>
 
 #include <fbl/ref_ptr.h>
 

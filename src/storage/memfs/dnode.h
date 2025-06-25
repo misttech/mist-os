@@ -5,18 +5,18 @@
 #ifndef SRC_STORAGE_MEMFS_DNODE_H_
 #define SRC_STORAGE_MEMFS_DNODE_H_
 
-#include <lib/fdio/vfs.h>
 #include <limits.h>
-#include <string.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <string_view>
 
 #include <fbl/intrusive_double_list.h>
-#include <fbl/ref_counted.h>
+#include <fbl/macros.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/storage/lib/vfs/cpp/vfs.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace memfs {

@@ -4,11 +4,23 @@
 
 #include "src/storage/memfs/dnode.h"
 
-#include <stdlib.h>
+#include <dirent.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstdint>
+#include <cstring>
 #include <memory>
+#include <string_view>
+#include <utility>
+
+#include <fbl/alloc_checker.h>
+#include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 #include "src/storage/memfs/vnode.h"
 
 namespace memfs {
@@ -124,13 +136,12 @@ static_assert(sizeof(dircookie_t) <= sizeof(fs::VdirCookie),
 // appear at the beginning of a directory.
 zx_status_t Dnode::ReaddirStart(fs::DirentFiller* df, void* cookie) {
   dircookie_t* c = static_cast<dircookie_t*>(cookie);
-  zx_status_t r;
 
   if (c->order == 0) {
     // TODO(smklein): Return the real ino.
     uint64_t ino = fuchsia_io::wire::kInoUnknown;
-    if ((r = df->Next(".", VTYPE_TO_DTYPE(V_TYPE_DIR), ino)) != ZX_OK) {
-      return r;
+    if (zx_status_t status = df->Next(".", DT_DIR, ino); status != ZX_OK) {
+      return status;
     }
     c->order++;
   }
@@ -139,10 +150,9 @@ zx_status_t Dnode::ReaddirStart(fs::DirentFiller* df, void* cookie) {
 
 void Dnode::Readdir(fs::DirentFiller* df, void* cookie) const {
   dircookie_t* c = static_cast<dircookie_t*>(cookie);
-  zx_status_t r = 0;
 
   if (c->order < 1) {
-    if ((r = Dnode::ReaddirStart(df, cookie)) != ZX_OK) {
+    if (zx_status_t status = Dnode::ReaddirStart(df, cookie); status != ZX_OK) {
       return;
     }
   }
@@ -151,9 +161,10 @@ void Dnode::Readdir(fs::DirentFiller* df, void* cookie) const {
     if (dn.ordering_token_ < c->order) {
       continue;
     }
-    uint32_t vtype = dn.IsDirectory() ? V_TYPE_DIR : V_TYPE_FILE;
-    if ((r = df->Next(std::string_view(dn.name_.get(), dn.NameLen()), VTYPE_TO_DTYPE(vtype),
-                      dn.AcquireVnode()->ino())) != ZX_OK) {
+    uint8_t dtype = dn.IsDirectory() ? DT_DIR : DT_REG;
+    if (zx_status_t status = df->Next(std::string_view(dn.name_.get(), dn.NameLen()), dtype,
+                                      dn.AcquireVnode()->ino());
+        status != ZX_OK) {
       return;
     }
     c->order = dn.ordering_token_ + 1;

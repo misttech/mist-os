@@ -4,8 +4,31 @@
 
 #include "src/storage/memfs/vnode_dir.h"
 
-#include <sys/stat.h>
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <mutex>
+#include <string_view>
+#include <utility>
+
+#include <fbl/alloc_checker.h>
+#include <fbl/ref_ptr.h>
+
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 #include "src/storage/memfs/dnode.h"
 #include "src/storage/memfs/memfs.h"
 #include "src/storage/memfs/vnode_file.h"
@@ -290,7 +313,7 @@ zx_status_t VnodeDir::AttachVnode(const fbl::RefPtr<Vnode>& vn, std::string_view
   }
 
   // Identify that the vnode is a directory (vn->dnode_ != nullptr) so that
-  // addding a child will also increment the parent link_count (after all,
+  // adding a child will also increment the parent link_count (after all,
   // directories contain a ".." entry, which is a link to their parent).
   if (isdir) {
     vn->dnode_ = dn.get();

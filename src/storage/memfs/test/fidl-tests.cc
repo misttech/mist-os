@@ -2,28 +2,26 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <dirent.h>
-#include <errno.h>
 #include <fcntl.h>
-#include <fidl/fuchsia.fs/cpp/wire.h>
+#include <fidl/fuchsia.fs/cpp/common_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
-#include <lib/fdio/fd.h>
-#include <lib/fdio/fdio.h>
-#include <lib/fdio/vfs.h>
-#include <limits.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <threads.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/wire_messaging_declarations.h>
+#include <lib/zx/result.h>
 #include <unistd.h>
-#include <zircon/processargs.h>
-#include <zircon/syscalls.h>
+#include <zircon/errors.h>
+#include <zircon/limits.h>
+#include <zircon/types.h>
 
+#include <cstdint>
+#include <cstring>
 #include <future>
 #include <span>
+#include <string_view>
 #include <utility>
 
 #include <fbl/unique_fd.h>

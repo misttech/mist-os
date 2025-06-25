@@ -4,9 +4,26 @@
 
 #include "src/storage/memfs/vnode_vmo.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
+#include <zircon/errors.h>
+#include <zircon/rights.h>
+#include <zircon/syscalls.h>
+#include <zircon/syscalls/object.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
+
+#include <fbl/algorithm.h>
+
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/memfs/memfs.h"
+#include "src/storage/memfs/vnode.h"
 
 namespace memfs {
 namespace {
