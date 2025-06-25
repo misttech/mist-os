@@ -10,7 +10,17 @@
 #include <stdlib.h>
 #include <zircon/assert.h>
 
+#include <phys/handoff-requirements.h>
 #include <phys/handoff.h>
+#include <phys/zircon-info-note.h>
+
+namespace {
+
+constexpr PhysHandoffRequirements kPhysHandoffRequirements{};
+
+ZIRCON_INFO_NOTE ZirconInfoNote<kPhysHandoffRequirements> kPhysHandoffRequirementsNote;
+
+}  // namespace
 
 PhysHandoff* gPhysHandoff = nullptr;
 

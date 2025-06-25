@@ -25,6 +25,7 @@
 #include <ktl/utility.h>
 #include <phys/elf-image.h>
 #include <phys/handoff-ptr.h>
+#include <phys/handoff-requirements.h>
 #include <phys/handoff.h>
 #include <phys/kernel-package.h>
 #include <phys/new.h>
@@ -372,6 +373,7 @@ class HandoffPrep {
 
   const ElfImage kernel_;
   PhysHandoff* handoff_ = nullptr;
+  PhysHandoffRequirements requirements_{};
   TemporaryDataAllocator temporary_data_allocator_;
   PermanentDataAllocator permanent_data_allocator_;
   VirtualAddressAllocator first_class_mapping_allocator_;

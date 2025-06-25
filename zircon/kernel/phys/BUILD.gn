@@ -585,6 +585,7 @@ if (toolchain_environment == "kernel.phys" ||
     public_deps = [
       ":elf-image",
       ":handoff",
+      ":handoff-requirements",
       ":kernel-package",
       ":new",
       ":uart",
@@ -756,6 +757,11 @@ group("boot_tests") {
 
 group("physboot") {
   public_deps = [ ":physboot.package" ]
+}
+
+source_set("handoff-requirements") {
+  public = [ "include/phys/handoff-requirements.h" ]
+  public_configs = [ ":includes" ]
 }
 
 source_set("handoff") {
