@@ -53,7 +53,7 @@ where
 {
     let (target, notifier) = GetTargetSpecifier::new(&env)
         .check_with_notifier((), notifier)
-        .and_then_check(ResolveTarget::<_, DefaultTargetResolver>::new(&env))
+        .and_then_check(ResolveTarget::<N>::new(&env))
         .await?;
 
     run_diagnostics_with_handle(&env, target, notifier, product_timeout).await?;
@@ -139,7 +139,7 @@ where
     }
 }
 
-pub struct ResolveTarget<'a, N, R> {
+pub struct ResolveTarget<'a, N, R = DefaultTargetResolver> {
     ctx: &'a EnvironmentContext,
     _resolver: std::marker::PhantomData<R>,
     _notifier: std::marker::PhantomData<N>,
