@@ -7,14 +7,14 @@ use crate::device::kobject::{
 };
 use crate::device::DeviceMode;
 use crate::fs::sysfs::{
-    get_sysfs, BusCollectionDirectory, KObjectDirectory, KObjectSymlinkDirectory, SYSFS_BLOCK,
-    SYSFS_BUS, SYSFS_CLASS, SYSFS_DEV, SYSFS_DEVICES,
+    get_sysfs, BusCollectionDirectory, KObjectDirectory, SYSFS_BLOCK, SYSFS_BUS, SYSFS_CLASS,
+    SYSFS_DEV, SYSFS_DEVICES,
 };
 use crate::task::Kernel;
 use crate::vfs::fs_node_cache::FsNodeCache;
 use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::{FileSystemHandle, FsNodeOps, FsStr, FsString};
-use std::sync::{Arc, Weak};
+use std::sync::{Arc, OnceLock};
 
 /// The owner of all the KObjects in sysfs.
 ///
@@ -23,6 +23,9 @@ use std::sync::{Arc, Weak};
 pub struct KObjectStore {
     /// The node cache used to allocate inode numbers for the kobjects in this store.
     pub node_cache: Arc<FsNodeCache>,
+
+    /// The sysfs filesystem in which the KObjects are stored.
+    fs: OnceLock<FileSystemHandle>,
 
     /// All of the devices added to the system.
     ///
@@ -55,6 +58,14 @@ pub struct KObjectStore {
 }
 
 impl KObjectStore {
+    pub fn init(&self, kernel: &Arc<Kernel>) {
+        self.fs.set(get_sysfs(kernel)).unwrap();
+    }
+
+    fn fs(&self) -> &FileSystemHandle {
+        self.fs.get().expect("sysfs should be initialized")
+    }
+
     /// The virtual bus kobject where all virtual and pseudo devices are stored.
     pub fn virtual_bus(&self) -> Bus {
         Bus::new(
@@ -136,9 +147,7 @@ impl KObjectStore {
     ///
     /// If the bus does not exist, this function will create it.
     pub fn get_or_create_class(&self, name: &FsStr, bus: Bus) -> Class {
-        let collection = Collection::new(
-            self.class.get_or_create_child_with_ops(name, KObjectSymlinkDirectory::new),
-        );
+        let collection = self.class.dir().subdir(self.fs(), name, 0o755);
         Class::new(
             bus.kobject().get_or_create_child_with_ops(name, KObjectDirectory::new),
             bus,
@@ -146,42 +155,32 @@ impl KObjectStore {
         )
     }
 
-    /// Get a class by name.
-    ///
-    /// If the bus does not exist, this function will create it.
-    pub fn get_or_create_class_with_ops<F, N>(
+    pub fn class_with_dir(
         &self,
         name: &FsStr,
         bus: Bus,
-        create_class_sysfs_ops: F,
-    ) -> Class
-    where
-        F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
-    {
-        let collection =
-            Collection::new(self.class.get_or_create_child_with_ops(name, create_class_sysfs_ops));
-        Class::new(
-            bus.kobject().get_or_create_child_with_ops(name, KObjectDirectory::new),
-            bus,
-            collection,
-        )
+        build_collection: impl FnOnce(&SimpleDirectoryMutator),
+    ) -> Class {
+        let class = self.get_or_create_class(name, bus);
+        let mutator = SimpleDirectoryMutator::new(self.fs().clone(), class.collection.clone());
+        build_collection(&mutator);
+        class
     }
 
-    fn block(&self, fs: &FileSystemHandle) -> SimpleDirectoryMutator {
-        SimpleDirectoryMutator::new(fs.clone(), self.block.dir())
+    fn block(&self) -> SimpleDirectoryMutator {
+        SimpleDirectoryMutator::new(self.fs().clone(), self.block.dir())
     }
 
-    fn dev(&self, fs: &FileSystemHandle) -> SimpleDirectoryMutator {
-        SimpleDirectoryMutator::new(fs.clone(), self.dev.dir())
+    fn dev(&self) -> SimpleDirectoryMutator {
+        SimpleDirectoryMutator::new(self.fs().clone(), self.dev.dir())
     }
 
-    fn dev_block(&self, fs: &FileSystemHandle, build_subdir: impl FnOnce(&SimpleDirectoryMutator)) {
-        self.dev(fs).subdir("block", 0o755, build_subdir)
+    fn dev_block(&self, build_subdir: impl FnOnce(&SimpleDirectoryMutator)) {
+        self.dev().subdir("block", 0o755, build_subdir)
     }
 
-    fn dev_char(&self, fs: &FileSystemHandle, build_subdir: impl FnOnce(&SimpleDirectoryMutator)) {
-        self.dev(fs).subdir("char", 0o755, build_subdir)
+    fn dev_char(&self, build_subdir: impl FnOnce(&SimpleDirectoryMutator)) {
+        self.dev().subdir("char", 0o755, build_subdir)
     }
 
     /// Create a device and add that device to the store.
@@ -194,7 +193,7 @@ impl KObjectStore {
     /// device because the `DeviceType` will not be registered with the `DeviceRegistry`.
     pub(super) fn create_device<F, N>(
         &self,
-        kernel: &Arc<Kernel>,
+        _kernel: &Arc<Kernel>,
         name: &FsStr,
         metadata: Option<DeviceMetadata>,
         class: Class,
@@ -204,8 +203,6 @@ impl KObjectStore {
         F: Fn(Device) -> N + Send + Sync + 'static,
         N: FsNodeOps,
     {
-        let fs = get_sysfs(kernel);
-
         let class_cloned = class.clone();
         let metadata_cloned = metadata.clone();
         let device_kobject = class.kobject().get_or_create_child_with_ops(name, move |kobject| {
@@ -216,31 +213,28 @@ impl KObjectStore {
             ))
         });
 
+        let path_to_device =
+            format!("devices/{}/{}/{}", class.bus.kobject().name(), class.kobject().name(), name);
+        let up_device = FsString::from(format!("../{}", &path_to_device));
+        let up_up_device = FsString::from(format!("../../{}", &path_to_device));
+
         // Insert the newly created device into various views.
-        class.collection.kobject().insert_child(device_kobject.clone());
+        class.collection.edit(self.fs(), |dir| {
+            dir.symlink(name, up_up_device.as_ref());
+        });
 
         if let Some(metadata) = &metadata {
-            let path_to_device = format!(
-                "devices/{}/{}/{}",
-                class.bus.kobject().name(),
-                class.kobject().name(),
-                name
-            );
             let device_number = FsString::from(metadata.device_type.to_string());
             match metadata.mode {
                 DeviceMode::Block => {
-                    let path_from_block = FsString::from(format!("../{}", &path_to_device));
-                    self.block(&fs).symlink(name, path_from_block.as_ref());
-
-                    let path_from_dev_block = FsString::from(format!("../../{}", &path_to_device));
-                    self.dev_block(&fs, |dir| {
-                        dir.symlink(device_number.as_ref(), path_from_dev_block.as_ref());
+                    self.block().symlink(name, up_device.as_ref());
+                    self.dev_block(|dir| {
+                        dir.symlink(device_number.as_ref(), up_up_device.as_ref());
                     });
                 }
                 DeviceMode::Char => {
-                    let path_from_dev_char = FsString::from(format!("../../{}", &path_to_device));
-                    self.dev_char(&fs, |dir| {
-                        dir.symlink(device_number.as_ref(), path_from_dev_char.as_ref());
+                    self.dev_char(|dir| {
+                        dir.symlink(device_number.as_ref(), up_up_device.as_ref());
                     });
                 }
             }
@@ -280,7 +274,7 @@ impl KObjectStore {
                 }
             }
         }
-        device.class.collection.kobject().remove_child(name);
+        device.class.collection.remove(name);
         // Finally, remove the device from the object store.
         kobject.remove();
     }
@@ -290,11 +284,11 @@ impl Default for KObjectStore {
     fn default() -> Self {
         let node_cache = Arc::new(FsNodeCache::default());
         let devices = KObject::new_root(SYSFS_DEVICES.into(), node_cache.clone());
-        let class = KObject::new_root(SYSFS_CLASS.into(), node_cache.clone());
+        let class = KObject::new_root_with_dir(SYSFS_CLASS.into(), node_cache.clone());
         let block = KObject::new_root_with_dir(SYSFS_BLOCK.into(), node_cache.clone());
         let bus = KObject::new_root(SYSFS_BUS.into(), node_cache.clone());
         let dev = KObject::new_root_with_dir(SYSFS_DEV.into(), node_cache.clone());
 
-        Self { node_cache, devices, class, block, bus, dev }
+        Self { node_cache, fs: OnceLock::new(), devices, class, block, bus, dev }
     }
 }

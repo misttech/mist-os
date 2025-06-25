@@ -5,8 +5,8 @@
 use super::iio_file::{IioDirectory0, IioDirectory1};
 use super::power_supply_file::{BatteryPowerSupply, BmsPowerSupply, UsbPowerSupply};
 use super::qbg_battery_file::create_battery_profile_device;
-use super::qbg_file::{create_qbg_device, QbgClassDirectory};
-use super::utils::connect_to_device;
+use super::qbg_file::create_qbg_device;
+use super::utils::{connect_to_device, ReadWriteBytesFile};
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::DeviceMode;
 use starnix_core::fs::sysfs::DeviceDirectory;
@@ -14,6 +14,7 @@ use starnix_core::task::CurrentTask;
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, LockBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::file_mode::mode;
 
 pub fn hvdcp_opti_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
 where
@@ -31,17 +32,18 @@ where
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
 
+    let qdb_class =
+        registry.objects.class_with_dir("qbg".into(), registry.objects.virtual_bus(), |dir| {
+            dir.entry("qbg_context".into(), ReadWriteBytesFile::new_node(), mode!(IFREG, 0o666));
+        });
+
     // /dev/qbg
     registry.register_device(
         locked,
         current_task,
         "qbg".into(),
         DeviceMetadata::new("qbg".into(), DeviceType::new(484, 0), DeviceMode::Char),
-        registry.objects.get_or_create_class_with_ops(
-            "qbg".into(),
-            registry.objects.virtual_bus(),
-            QbgClassDirectory::new,
-        ),
+        qdb_class,
         DeviceDirectory::new,
         create_qbg_device,
     );

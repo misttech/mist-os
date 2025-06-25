@@ -2,33 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::utils::{connect_to_device, connect_to_device_channel, ReadWriteBytesFile};
+use super::utils::{connect_to_device, connect_to_device_channel};
 use fidl_fuchsia_hardware_qcom_hvdcpopti as fhvdcpopti;
 use futures_util::StreamExt;
-use starnix_core::device::kobject::KObject;
-use starnix_core::fs::sysfs::KObjectSymlinkDirectory;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::power::{create_proxy_for_wake_events_counter, mark_proxy_message_handled};
 use starnix_core::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
-use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
-    DirectoryEntryType, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    InputBuffer, OutputBuffer, VecInputBuffer,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode, InputBuffer,
+    OutputBuffer, VecInputBuffer,
 };
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
-use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error};
 use std::collections::VecDeque;
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 pub const QBGIOCXCFG: u32 = 0x80684201;
 pub const QBGIOCXEPR: u32 = 0x80304202;
@@ -43,56 +37,6 @@ pub fn create_qbg_device(
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(Box::new(QbgDeviceFile::new(current_task)))
-}
-
-pub struct QbgClassDirectory {
-    base_dir: KObjectSymlinkDirectory,
-}
-
-impl QbgClassDirectory {
-    pub fn new(kobject: Weak<KObject>) -> Self {
-        Self { base_dir: KObjectSymlinkDirectory::new(kobject) }
-    }
-
-    fn create_file_ops_entries(&self) -> Vec<VecDirectoryEntry> {
-        let mut entries = self.base_dir.create_file_ops_entries();
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"qbg_context".into(),
-            inode: None,
-        });
-        entries
-    }
-}
-
-impl FsNodeOps for QbgClassDirectory {
-    fs_node_impl_dir_readonly!();
-
-    fn create_file_ops(
-        &self,
-        _locked: &mut Locked<FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(VecDirectory::new_file(self.create_file_ops_entries()))
-    }
-
-    fn lookup(
-        &self,
-        locked: &mut Locked<FileOpsCore>,
-        node: &FsNode,
-        current_task: &CurrentTask,
-        name: &FsStr,
-    ) -> Result<FsNodeHandle, Errno> {
-        match &**name {
-            b"qbg_context" => Ok(node.fs().create_node_and_allocate_node_id(
-                ReadWriteBytesFile::new_node(),
-                FsNodeInfo::new(mode!(IFREG, 0o666), FsCred::root()),
-            )),
-            _ => self.base_dir.lookup(locked, node, current_task, name),
-        }
-    }
 }
 
 struct QbgDeviceState {

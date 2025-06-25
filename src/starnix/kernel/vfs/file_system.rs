@@ -73,6 +73,12 @@ pub struct FileSystem {
     pub security_state: security::FileSystemState,
 }
 
+impl std::fmt::Debug for FileSystem {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "FileSystem")
+    }
+}
+
 #[derive(Clone, Debug, Default)]
 pub struct FileSystemOptions {
     /// The source string passed as the first argument to mount(), e.g. a block device.

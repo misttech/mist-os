@@ -8,7 +8,6 @@ mod device_directory;
 mod fs;
 mod kernel_directory;
 mod kobject_directory;
-mod kobject_symlink_directory;
 mod power_directory;
 mod vulnerabilities_class_directory;
 
@@ -18,6 +17,5 @@ pub use device_directory::*;
 pub use fs::*;
 pub use kernel_directory::*;
 pub use kobject_directory::*;
-pub use kobject_symlink_directory::*;
 pub use power_directory::*;
 pub use vulnerabilities_class_directory::*;

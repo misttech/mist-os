@@ -59,23 +59,8 @@ impl SimpleDirectoryMutator {
     }
 
     pub fn subdir(&self, name: &str, mode: u32, build_subdir: impl FnOnce(&Self)) {
-        let dir = {
-            let mut entries = self.directory.entries.lock();
-            let name: &FsStr = name.into();
-            if let Some(node) = entries.get(name) {
-                assert!(node.info().mode == mode!(IFDIR, mode));
-                let dir = node
-                    .downcast_ops::<Arc<SimpleDirectory>>()
-                    .expect("subdir is a SimpleDirectory");
-                dir.clone()
-            } else {
-                let dir = SimpleDirectory::new();
-                let info = FsNodeInfo::new(mode!(IFDIR, mode), FsCred::root());
-                let node = self.fs.create_node_and_allocate_node_id(dir.clone(), info);
-                entries.insert(name.into(), node);
-                dir
-            }
-        };
+        let name: &FsStr = name.into();
+        let dir = self.directory.subdir(&self.fs, name, mode);
         let mutator = SimpleDirectoryMutator::new(self.fs.clone(), dir);
         build_subdir(&mutator);
     }
@@ -109,7 +94,37 @@ impl SimpleDirectory {
         current.remove(path);
     }
 
-    fn peek_dir(&self, name: &FsStr) -> Option<Arc<SimpleDirectory>> {
+    pub fn edit(
+        self: &Arc<Self>,
+        fs: &FileSystemHandle,
+        callback: impl FnOnce(&SimpleDirectoryMutator),
+    ) {
+        let mutator = SimpleDirectoryMutator::new(fs.clone(), self.clone());
+        callback(&mutator);
+    }
+
+    pub fn subdir(&self, fs: &FileSystemHandle, name: &FsStr, mode: u32) -> Arc<SimpleDirectory> {
+        let mut entries = self.entries.lock();
+        if let Some(node) = entries.get(name) {
+            assert!(node.info().mode == mode!(IFDIR, mode));
+            let dir =
+                node.downcast_ops::<Arc<SimpleDirectory>>().expect("subdir is a SimpleDirectory");
+            dir.clone()
+        } else {
+            let dir = SimpleDirectory::new();
+            let info = FsNodeInfo::new(mode!(IFDIR, mode), FsCred::root());
+            let node = fs.create_node_and_allocate_node_id(dir.clone(), info);
+            entries.insert(name.into(), node);
+            dir
+        }
+    }
+
+    pub fn get_child(&self, name: &FsStr) -> Option<FsNodeHandle> {
+        let entries = self.entries.lock();
+        entries.get(name).cloned()
+    }
+
+    pub fn peek_dir(&self, name: &FsStr) -> Option<Arc<SimpleDirectory>> {
         let entries = self.entries.lock();
         entries
             .get(name)

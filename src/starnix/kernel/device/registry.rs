@@ -846,7 +846,7 @@ mod tests {
             Ok(Box::new(PanickingFile))
         }
 
-        let registry = DeviceRegistry::default();
+        let registry = &kernel.device_registry;
         let device = registry
             .register_dyn_device(
                 &mut locked,
@@ -898,13 +898,9 @@ mod tests {
             DeviceDirectory::new,
         );
 
-        assert!(registry.objects.class.has_child("input".into()));
-        assert!(registry
-            .objects
-            .class
-            .get_child("input".into())
-            .and_then(|collection| collection.get_child("mice".into()))
-            .is_some());
+        let class_dir = registry.objects.class.dir();
+        let input_dir = class_dir.peek_dir("input".into()).expect("get input dir");
+        assert!(input_dir.get_child("mice".into()).is_some());
     }
 
     #[::fuchsia::test]
@@ -971,12 +967,10 @@ mod tests {
             .get_child("pci".into())
             .expect("get pci collection")
             .has_child("mice".into()));
-        assert!(!registry
-            .objects
-            .class
-            .get_child("input".into())
-            .expect("get input collection")
-            .has_child("mice".into()));
+
+        let class_dir = registry.objects.class.dir();
+        let input_dir = class_dir.peek_dir("input".into()).expect("get input dir");
+        assert!(input_dir.get_child("mice".into()).is_none());
     }
 
     #[::fuchsia::test]
@@ -992,20 +986,12 @@ mod tests {
             DeviceDirectory::new,
         );
 
-        assert!(registry
-            .objects
-            .class
-            .get_child("thermal".into())
-            .expect("get thermal class")
-            .has_child("cooling_device0".into()));
+        let class_dir = registry.objects.class.dir();
+        let thermal_dir = class_dir.peek_dir("thermal".into()).expect("get thermal dir");
+        assert!(thermal_dir.get_child("cooling_device0".into()).is_some());
 
         registry.remove_device(&mut locked, &current_task, cooling_device);
 
-        assert!(!registry
-            .objects
-            .class
-            .get_child("thermal".into())
-            .expect("get thermal class")
-            .has_child("cooling_device0".into()));
+        assert!(thermal_dir.get_child("cooling_device0".into()).is_none());
     }
 }

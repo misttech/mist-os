@@ -298,18 +298,28 @@ impl Collection {
 /// A Class is a higher-level view of a device.
 ///
 /// It groups devices based on what they do, rather than how they are connected.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Class {
     kobject: Weak<KObject>,
     /// Physical bus that the devices belong to.
     pub bus: Bus,
-    pub collection: Collection,
+    pub collection: Arc<SimpleDirectory>,
 }
 impl_kobject_based!(Class);
 
 impl Class {
-    pub fn new(kobject: KObjectHandle, bus: Bus, collection: Collection) -> Self {
+    pub fn new(kobject: KObjectHandle, bus: Bus, collection: Arc<SimpleDirectory>) -> Self {
         Self { kobject: Arc::downgrade(&kobject), bus, collection }
+    }
+}
+
+impl std::fmt::Debug for Class {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Class")
+            .field("kobject", &self.kobject)
+            .field("bus", &self.bus)
+            .field("collection", &"<SimpleDirectory>")
+            .finish()
     }
 }
 
