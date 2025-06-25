@@ -85,10 +85,10 @@ pub enum ObjectKeyDataV43 {
     GraveyardAttributeEntry { object_id: u64, attribute_id: u64 },
     /// A child of an encrypted directory.
     /// We store the filename in its encrypted form.
-    /// casefold_hash is the hash of the casefolded human-readable name if a directory is
+    /// hash_code is the hash of the casefolded human-readable name if a directory is
     /// also casefolded, otherwise 0.
-    /// Legacy records may have a casefold_hash of 0 indicating "unknown".
-    EncryptedChild { casefold_hash: u32, name: Vec<u8> },
+    /// Legacy records may have a hash_code of 0 indicating "unknown".
+    EncryptedChild { hash_code: u32, name: Vec<u8> },
     /// A child of a directory that uses the casefold feature.
     /// (i.e. case insensitive, case preserving names)
     CasefoldChild { name: CasefoldString },
@@ -110,7 +110,7 @@ impl From<ObjectKeyDataV40> for ObjectKeyDataV43 {
                 Self::GraveyardAttributeEntry { object_id, attribute_id }
             }
             ObjectKeyDataV40::EncryptedChild { name } => {
-                Self::EncryptedChild { casefold_hash: 0, name }
+                Self::EncryptedChild { hash_code: 0, name }
             }
             ObjectKeyDataV40::CasefoldChild { name } => Self::CasefoldChild { name },
         }
@@ -247,8 +247,16 @@ impl ObjectKey {
     }
 
     /// Creates an ObjectKey for an encrypted child.
-    pub fn encrypted_child(object_id: u64, name: Vec<u8>, casefold_hash: u32) -> Self {
-        Self { object_id, data: ObjectKeyData::EncryptedChild { casefold_hash, name } }
+    ///
+    /// The hash_code is important here -- especially for fscrypt as it affects the
+    /// name of locked files.
+    ///
+    /// For case-insensitive lookups in large encrypted directories, we lose the ability to binary
+    /// search for an entry of interest because encryption breaks our sort order. In these cases
+    /// we prefix records with a 32-bit hash based on the stable *casefolded* name. Hash collisions
+    /// aside, this lets us jump straight to the entry of interest, if it exists.
+    pub fn encrypted_child(object_id: u64, name: Vec<u8>, hash_code: u32) -> Self {
+        Self { object_id, data: ObjectKeyData::EncryptedChild { hash_code, name } }
     }
 
     /// Creates a graveyard entry for an object.
