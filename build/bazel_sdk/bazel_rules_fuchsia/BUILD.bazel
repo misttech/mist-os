@@ -1,10 +1,3 @@
 # Copyright 2022 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-
-# All of the starlark files that are exported for documentation.
-filegroup(
-    name = "bzl_srcs",
-    srcs = glob(["*.bzl"]),
-    visibility = ["//fuchsia:__pkg__"],
-)

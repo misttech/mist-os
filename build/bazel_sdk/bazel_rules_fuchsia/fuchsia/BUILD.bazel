@@ -27,7 +27,6 @@ filegroup(
 
         # These are the fuchsia specific files that are loaded by the top level
         # files.
-        "//:bzl_srcs",
         "//common:bzl_srcs",
         "//fuchsia/constraints:bzl_srcs",
         "//fuchsia/constraints/platforms:bzl_srcs",
