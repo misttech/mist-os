@@ -28,12 +28,10 @@ rustc_library("lib") {
   ]
 
   test_deps = [
-    "//src/connectivity/overnet/lib/core",
     "//src/developer/ffx/config:lib",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:async-channel",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:mockall",
   ]

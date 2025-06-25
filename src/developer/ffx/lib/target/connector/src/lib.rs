@@ -240,7 +240,7 @@ mod tests {
     use super::*;
     use ffx_command_error::{bug, NonFatalError};
     use ffx_config::{EnvironmentContext, TryFromEnvContext};
-    use ffx_target::connection::testing::{FakeOvernet, FakeOvernetBehavior};
+    use ffx_target::connection::testing::FakeOvernet;
     use ffx_target::fho::connector::MockDirectConnector;
     use ffx_target::{TargetConnection, TargetConnectionError, TargetConnector};
     use futures::future::LocalBoxFuture;
@@ -328,31 +328,6 @@ mod tests {
         assert!(connector.connect().await.is_err());
         let err = bug!("foo");
         assert_eq!(err.to_string(), connector.wrap_connection_errors(err).to_string());
-    }
-
-    // This is a bit of a hack, but there needs to be a way to set the behavior that also doesn't
-    // require locking every test sequentially.
-    #[derive(Debug)]
-    pub(crate) struct RegularFakeOvernet(FakeOvernet);
-
-    impl TargetConnector for RegularFakeOvernet {
-        const CONNECTION_TYPE: &'static str = "fake";
-
-        async fn connect(&mut self) -> Result<TargetConnection, TargetConnectionError> {
-            self.0.connect().await
-        }
-    }
-
-    impl TryFromEnvContext for RegularFakeOvernet {
-        fn try_from_env_context<'a>(
-            _env: &'a EnvironmentContext,
-        ) -> LocalBoxFuture<'a, Result<Self>> {
-            let (_sender, receiver) = async_channel::unbounded();
-            let circuit_node = overnet_core::Router::new(None).unwrap();
-            Box::pin(async {
-                Ok(Self(FakeOvernet::new(circuit_node, receiver, FakeOvernetBehavior::KeepRcsOpen)))
-            })
-        }
     }
 
     #[derive(Debug)]
