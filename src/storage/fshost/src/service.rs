@@ -5,8 +5,7 @@
 use crate::crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice};
 use crate::debug_log;
 use crate::device::constants::{
-    self, BLOB_VOLUME_LABEL, DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL,
-    UNENCRYPTED_VOLUME_LABEL, ZXCRYPT_DRIVER_PATH,
+    self, BLOB_VOLUME_LABEL, DATA_PARTITION_LABEL, LEGACY_DATA_PARTITION_LABEL, ZXCRYPT_DRIVER_PATH,
 };
 use crate::device::{BlockDevice, Device, DeviceTag};
 use crate::environment::{
@@ -673,16 +672,13 @@ async fn shred_data_volume(
                 log::error!(error:?; "Failed to serve fxfs");
                 zx::Status::INTERNAL
             })?;
-            let _ = serving_fxfs
-                .open_volume(UNENCRYPTED_VOLUME_LABEL, MountOptions::default())
-                .await
-                .map_err(|error| {
-                    log::error!(error:?; "Failed to open unencrypted volume in fxfs");
-                    zx::Status::INTERNAL
-                })?;
-            let mut fxfs_container = FxfsContainer::new(serving_fxfs);
+            let mut fxfs_container = Box::new(FxfsContainer::new(serving_fxfs));
             fxfs_container.shred_data().await.map_err(|error| {
                 log::error!(error:?; "Failed to shred fxfs keybag");
+                zx::Status::INTERNAL
+            })?;
+            fxfs_container.into_fs().shutdown().await.map_err(|error| {
+                log::error!(error:?; "Failed to unmount fxfs");
                 zx::Status::INTERNAL
             })?;
             debug_log("Deleted fxfs-data keybag");
@@ -723,16 +719,13 @@ async fn shred_data_volume(
                 log::error!(error:?; "Failed to serve fxfs");
                 zx::Status::INTERNAL
             })?;
-            let _ = serving_fxfs
-                .open_volume(UNENCRYPTED_VOLUME_LABEL, MountOptions::default())
-                .await
-                .map_err(|error| {
-                    log::error!(error:?; "Failed to open unencrypted volume in fxfs");
-                    zx::Status::INTERNAL
-                })?;
-            let mut fxfs_container = FxfsContainer::new(serving_fxfs);
+            let mut fxfs_container = Box::new(FxfsContainer::new(serving_fxfs));
             fxfs_container.shred_data().await.map_err(|error| {
                 log::error!(error:?; "Failed to shred fxfs keybag");
+                zx::Status::INTERNAL
+            })?;
+            fxfs_container.into_fs().shutdown().await.map_err(|error| {
+                log::error!(error:?; "Failed to unmount fxfs");
                 zx::Status::INTERNAL
             })?;
             debug_log("Deleted fxfs-data keybag");
