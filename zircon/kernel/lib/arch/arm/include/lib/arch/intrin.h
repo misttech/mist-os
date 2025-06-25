@@ -48,7 +48,7 @@ inline void DeviceMemoryBarrier() { __dsb(ARM_MB_SY); }
 inline void ThreadMemoryBarrier() { __dmb(ARM_MB_SY); }
 
 /// Return the current CPU cycle count.
-inline uint64_t Cycles() { return __arm_rsr64("cp15:0:c11"); }
+inline uint64_t Cycles() { return __arm_mrrc(15, 0, 11); }
 
 }  // namespace arch
 
