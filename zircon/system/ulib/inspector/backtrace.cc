@@ -56,9 +56,6 @@ void print_backtrace_markup(FILE* f, const std::vector<unwinder::Frame>& frames)
       case unwinder::Frame::Trust::kScan:
         source += "scan";
         break;
-      case unwinder::Frame::Trust::kSigReturn:
-        source += "sigreturn";
-        break;
       case unwinder::Frame::Trust::kSCS:
         source += "SCS";
         break;
