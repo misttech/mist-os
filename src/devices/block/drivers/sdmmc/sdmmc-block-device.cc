@@ -334,22 +334,33 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
   zx::result connect_to_cpu_element_manager =
       parent_->driver_incoming()->Connect<fuchsia_power_system::CpuElementManager>();
   if (connect_to_cpu_element_manager.is_error()) {
-    // TODO (https://fxbug.dev/372507953) Return an error instead of just logging
-    FDF_LOGL(INFO, logger(), "Registration skipped, CpuElementManager unavailable: %s",
+    FDF_LOGL(ERROR, logger(), "CpuElementManager unavailable: %s",
              zx_status_get_string(connect_to_cpu_element_manager.error_value()));
-  } else {
-    fidl::SyncClient<fuchsia_power_system::CpuElementManager> cpu_element_manager(
-        std::move(connect_to_cpu_element_manager.value()));
-    zx::event clone;
-    ZX_ASSERT(hardware_power_element_assertive_token_.duplicate(ZX_RIGHT_SAME_RIGHTS, &clone) ==
-              ZX_OK);
-    fidl::Result<fuchsia_power_system::CpuElementManager::AddExecutionStateDependency> result =
-        cpu_element_manager->AddExecutionStateDependency(
-            {{.dependency_token = std::move(clone), .power_level = 1}});
-    if (result.is_error()) {
-      // TODO (https://fxbug.dev/372507953) Return an error instead of just logging
-      FDF_LOGL(ERROR, logger(), "CpuElementManager token registration failed: %s",
-               result.error_value().FormatDescription().c_str());
+    return connect_to_cpu_element_manager.take_error();
+  }
+
+  fidl::SyncClient<fuchsia_power_system::CpuElementManager> cpu_element_manager(
+      std::move(connect_to_cpu_element_manager.value()));
+  zx::event clone;
+  ZX_ASSERT(hardware_power_element_assertive_token_.duplicate(ZX_RIGHT_SAME_RIGHTS, &clone) ==
+            ZX_OK);
+  fidl::Result<fuchsia_power_system::CpuElementManager::AddExecutionStateDependency> result =
+      cpu_element_manager->AddExecutionStateDependency(
+          {{.dependency_token = std::move(clone), .power_level = 1}});
+  if (result.is_error()) {
+    FDF_LOGL(ERROR, logger(), "CpuElementManager token registration failed: %s",
+             result.error_value().FormatDescription().c_str());
+    if (result.error_value().is_framework_error()) {
+      return zx::error(result.error_value().framework_error().status());
+    }
+
+    switch (result.error_value().domain_error()) {
+      case fuchsia_power_system::AddExecutionStateDependencyError::kInvalidArgs:
+        return zx::error(ZX_ERR_INVALID_ARGS);
+      case fuchsia_power_system::AddExecutionStateDependencyError::kBadState:
+        return zx::error(ZX_ERR_BAD_STATE);
+      default:
+        return zx::error(ZX_ERR_INTERNAL);
     }
   }
 
@@ -363,7 +374,8 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
   }
   hardware_power_lease_control_client_end_ = std::move(lease_control_client_end.value());
 
-  // Start continuous monitoring of the required level and adjusting of the hardware's power level.
+  // Start continuous monitoring of the required level and adjusting of the hardware's power
+  // level.
   WatchHardwareRequiredLevel();
 
   return zx::success();

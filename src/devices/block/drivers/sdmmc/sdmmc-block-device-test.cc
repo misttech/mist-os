@@ -103,6 +103,47 @@ bool TestSdmmcRootDevice::use_fidl_;
 bool TestSdmmcRootDevice::is_sd_;
 FakeSdmmcDevice TestSdmmcRootDevice::sdmmc_;
 
+class FakeCpuElementManager
+    : public fidl::testing::TestBase<fuchsia_power_system::CpuElementManager> {
+ public:
+  fidl::ProtocolHandler<fuchsia_power_system::CpuElementManager> CreateHandler() {
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+  bool execution_state_dependency_added() const { return dependency_token_.is_valid(); }
+
+  void AddExecutionStateDependency(AddExecutionStateDependencyRequest& request,
+                                   AddExecutionStateDependencyCompleter::Sync& completer) override {
+    if (!request.power_level() || *request.power_level() != SdmmcBlockDevice::kPowerLevelOn ||
+        !request.dependency_token()) {
+      completer.Reply(
+          fit::error(fuchsia_power_system::AddExecutionStateDependencyError::kInvalidArgs));
+      return;
+    }
+    if (dependency_token_.is_valid()) {
+      completer.Reply(
+          fit::error(fuchsia_power_system::AddExecutionStateDependencyError::kInvalidArgs));
+      return;
+    }
+
+    dependency_token_ = *std::move(request.dependency_token());
+    completer.Reply(fit::success());
+  }
+
+  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
+    ADD_FAILURE("%s is not implemented", name.c_str());
+  }
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_power_system::CpuElementManager> md,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
+
+ private:
+  fidl::ServerBindingGroup<fuchsia_power_system::CpuElementManager> bindings_;
+  zx::event dependency_token_;
+};
+
 class FakeSystemActivityGovernor
     : public fidl::testing::TestBase<fuchsia_power_system::ActivityGovernor> {
  public:
@@ -337,6 +378,7 @@ struct IncomingNamespace {
   std::optional<FakeSystemActivityGovernor> system_activity_governor;
   FakePowerBroker power_broker;
   FakePowerTokenProvider power_token_provider;
+  FakeCpuElementManager cpu_element_manager;
 };
 
 // WARNING: Don't use this test as a template for new tests as it uses the old driver testing
@@ -472,6 +514,15 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
               incoming->env.incoming_directory()
                   .AddService<fuchsia_hardware_power::PowerTokenService>(
                       std::move(incoming->power_token_provider.GetInstanceHandler()), "default");
+          ASSERT_TRUE(result.is_ok());
+        }
+
+        // Serve (fake) cpu_element_manager.
+        {
+          auto result = incoming->env.incoming_directory()
+                            .component()
+                            .AddUnmanagedProtocol<fuchsia_power_system::CpuElementManager>(
+                                incoming->cpu_element_manager.CreateHandler());
           ASSERT_TRUE(result.is_ok());
         }
 
@@ -2279,6 +2330,10 @@ TEST_P(SdmmcBlockDeviceTest, PowerSuspendResume) {
                               });
 
   ASSERT_OK(StartDriverForMmc(/*speed_capabilities=*/{}, /*supply_power_framework=*/true));
+
+  EXPECT_TRUE(incoming_.SyncCall([](IncomingNamespace* incoming) {
+    return incoming->cpu_element_manager.execution_state_dependency_added();
+  }));
 
   fidl::ServerEnd lease_control_server_end = incoming_.SyncCall([](IncomingNamespace* incoming) {
     return incoming->power_broker.hardware_power_lessor_->TakeLeaseControlServerEnd();
