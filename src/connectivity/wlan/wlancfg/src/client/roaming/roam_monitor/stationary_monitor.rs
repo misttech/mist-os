@@ -165,6 +165,7 @@ impl StationaryMonitor {
             scan_type: fidl_common::ScanType::Active,
             network_identifier: self.connection_data.network_identifier.clone(),
             credential: self.connection_data.credential.clone(),
+            current_security: self.connection_data.ap_state.original().protection().into(),
             reasons: roam_reasons,
         }
     }

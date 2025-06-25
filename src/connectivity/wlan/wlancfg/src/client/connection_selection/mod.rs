@@ -74,6 +74,7 @@ impl ConnectionSelectionRequester {
         scan_type: fidl_common::ScanType,
         network_id: types::NetworkIdentifier,
         credential: network_config::Credential,
+        current_security: types::SecurityTypeDetailed,
     ) -> Result<Option<types::ScannedCandidate>, anyhow::Error> {
         let (sender, receiver) = oneshot::channel();
         self.sender
@@ -81,6 +82,7 @@ impl ConnectionSelectionRequester {
                 scan_type,
                 network_id,
                 credential,
+                current_security,
                 responder: sender,
             })
             .map_err(|e| format_err!("Failed to queue connection selection: {}", e))?;
@@ -99,6 +101,7 @@ pub enum ConnectionSelectionRequest {
         scan_type: fidl_common::ScanType,
         network_id: types::NetworkIdentifier,
         credential: network_config::Credential,
+        current_security: types::SecurityTypeDetailed,
         responder: oneshot::Sender<Option<types::ScannedCandidate>>,
     },
 }
@@ -118,6 +121,7 @@ pub trait ConnectionSelectorApi {
         scan_type: fidl_common::ScanType,
         network: types::NetworkIdentifier,
         credential: &network_config::Credential,
+        current_security: types::SecurityTypeDetailed,
     ) -> Option<types::ScannedCandidate>;
 }
 
@@ -136,8 +140,8 @@ pub async fn serve_connection_selection_request_loop(
                         // sender from responding.
                         let _ = responder.send(selected);
                     }
-                    ConnectionSelectionRequest::RoamSelection { scan_type, network_id, credential, responder } => {
-                        let selected = connection_selector.find_and_select_roam_candidate(scan_type, network_id, &credential).await;
+                    ConnectionSelectionRequest::RoamSelection { scan_type, network_id, credential, current_security, responder } => {
+                        let selected = connection_selector.find_and_select_roam_candidate(scan_type, network_id, &credential, current_security).await;
                         // It's acceptable for the receiver to close the channel, preventing this
                         // sender from responding.
                         let _ = responder.send(selected);
@@ -341,6 +345,7 @@ impl ConnectionSelector {
         &self,
         scan_type: fidl_common::ScanType,
         network: types::NetworkIdentifier,
+        current_security: types::SecurityTypeDetailed,
     ) -> Vec<types::ScanResult> {
         let ssids = match scan_type {
             fidl_common::ScanType::Passive => vec![],
@@ -355,10 +360,8 @@ impl ConnectionSelector {
             })
             .into_iter()
             .filter(|s| {
-                s.ssid == network.ssid
-                    && network
-                        .security_type
-                        .is_compatible_with_scanned_type(&s.security_type_detailed)
+                // Roaming is only allowed between APs with identical protection
+                s.ssid == network.ssid && current_security == s.security_type_detailed
             })
             .collect::<Vec<_>>()
     }
@@ -440,13 +443,16 @@ impl ConnectionSelectorApi for ConnectionSelector {
         scan_type: fidl_common::ScanType,
         network: types::NetworkIdentifier,
         credential: &network_config::Credential,
+        current_security: types::SecurityTypeDetailed,
     ) -> Option<types::ScannedCandidate> {
         // Scan for APs in the provided network.
-        let mut matching_scan_results = self.roam_scan(scan_type, network.clone()).await;
+        let mut matching_scan_results =
+            self.roam_scan(scan_type, network.clone(), current_security).await;
         if matching_scan_results.is_empty() && scan_type == fidl_common::ScanType::Passive {
             info!("No scan results seen in passive roam scan. Active scanning.");
-            matching_scan_results =
-                self.roam_scan(fidl_common::ScanType::Active, network.clone()).await;
+            matching_scan_results = self
+                .roam_scan(fidl_common::ScanType::Active, network.clone(), current_security)
+                .await;
         }
 
         let mut candidates = Vec::new();
@@ -756,6 +762,7 @@ mod tests {
     use std::pin::pin;
     use std::rc::Rc;
     use test_case::test_case;
+    use wlan_common::bss::BssDescription;
     use wlan_common::scan::Compatible;
     use wlan_common::security::SecurityDescriptor;
     use wlan_common::{assert_variant, random_fidl_bss_description};
@@ -1734,6 +1741,7 @@ mod tests {
             scan_type,
             test_id.clone(),
             &credential,
+            types::SecurityTypeDetailed::Wpa3Personal,
         );
         let mut roam_selection_fut = pin!(roam_selection_fut);
         let _ = exec.run_singlethreaded(&mut roam_selection_fut);
@@ -1770,6 +1778,7 @@ mod tests {
             fidl_common::ScanType::Passive,
             test_id.clone(),
             &credential,
+            types::SecurityTypeDetailed::Open,
         );
 
         let mut roam_selection_fut = pin!(roam_selection_fut);
@@ -1892,6 +1901,7 @@ mod tests {
             _scan_type: fidl_common::ScanType,
             _network: types::NetworkIdentifier,
             _credential: &network_config::Credential,
+            _scanned_securioty_type: types::SecurityTypeDetailed,
         ) -> Option<types::ScannedCandidate> {
             self.response_to_find_and_select_roam_candidate.clone()
         }
@@ -1952,10 +1962,14 @@ mod tests {
         let mut requester = ConnectionSelectionRequester { sender: request_sender };
 
         // Call request method
+        let bss_desc =
+            BssDescription::try_from(Sequestered::release(candidate.bss.bss_description.clone()))
+                .unwrap();
         let mut roam_selection_fut = pin!(requester.do_roam_selection(
             fidl_common::ScanType::Passive,
             candidate.network.clone(),
-            candidate.credential.clone()
+            candidate.credential.clone(),
+            bss_desc.protection().into()
         ));
         assert_variant!(exec.run_until_stalled(&mut roam_selection_fut), Poll::Pending);
 

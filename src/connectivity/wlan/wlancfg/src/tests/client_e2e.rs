@@ -8,7 +8,9 @@ use crate::client::roaming::lib::{
 use crate::client::roaming::local_roam_manager::{serve_local_roam_manager_requests, RoamManager};
 use crate::client::roaming::roam_monitor::stationary_monitor;
 use crate::client::{connection_selection, scan, serve_provider_requests, types};
-use crate::config_management::{SavedNetworksManager, SavedNetworksManagerApi};
+use crate::config_management::{
+    compatible_policy_securities, SavedNetworksManager, SavedNetworksManagerApi,
+};
 use crate::legacy;
 use crate::mode_management::iface_manager_api::IfaceManagerApi;
 use crate::mode_management::phy_manager::{PhyManager, PhyManagerApi};
@@ -32,6 +34,7 @@ use futures::stream::StreamExt;
 use futures::task::Poll;
 use lazy_static::lazy_static;
 use log::{debug, info};
+use proc_macros::with_roam_protection_permutations;
 use rand::Rng;
 use std::convert::Infallible;
 use std::pin::{pin, Pin};
@@ -2640,27 +2643,7 @@ fn solicit_roam_scan_weak_rssi(
     )
 }
 
-#[test_case(
-    RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam },
-    solicit_roam_scan_weak_rssi,
-    true;
-    "enabled stationary weak rssi should roam scan"
-)]
-#[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary,mode: RoamingMode::MetricsOnly},
-    solicit_roam_scan_weak_rssi,
-    true;
-    "enabled stationary metrics only weak rssi should roam scan"
-)]
-#[test_case(
-    RoamingPolicy::Disabled,
-    solicit_roam_scan_weak_rssi,
-    false;
-    "disabled weak rssi should not roam scan"
-)]
-#[fuchsia::test(add_test_attr = false)]
-// Tests if roaming policies trigger roam scans in different scenarios.
-fn test_roam_policy_triggers_scan<F>(
+fn assert_roam_scan_expectation<F>(
     roaming_policy: RoamingPolicy,
     mut roam_scan_solicit_func: F,
     should_trigger_roam_scan: bool,
@@ -2688,6 +2671,36 @@ fn test_roam_policy_triggers_scan<F>(
     let roam_scan_triggered =
         roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection).is_some();
     assert_eq!(roam_scan_triggered, should_trigger_roam_scan);
+}
+
+#[test_case(
+    RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam },
+    solicit_roam_scan_weak_rssi;
+    "enabled stationary weak rssi"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary,mode: RoamingMode::MetricsOnly},
+    solicit_roam_scan_weak_rssi;
+    "enabled stationary metrics only weak rssi"
+)]
+#[fuchsia::test(add_test_attr = false)]
+// Tests if roaming policies trigger roam scans in different scenarios.
+fn test_roam_policy_triggers_scan<F>(roaming_policy: RoamingPolicy, roam_scan_solicit_func: F)
+where
+    F: RoamScanSolicitFunc,
+{
+    assert_roam_scan_expectation(roaming_policy, roam_scan_solicit_func, true);
+}
+
+#[test_case(RoamingPolicy::Disabled, solicit_roam_scan_weak_rssi; "disabled weak rssi")]
+#[fuchsia::test(add_test_attr = false)]
+fn test_roam_policy_does_not_trigger_roam_scan<F>(
+    roaming_policy: RoamingPolicy,
+    roam_scan_solicit_func: F,
+) where
+    F: RoamScanSolicitFunc,
+{
+    assert_roam_scan_expectation(roaming_policy, roam_scan_solicit_func, false);
 }
 
 #[test_case(RoamingProfile::Stationary, solicit_roam_scan_weak_rssi; "stationary weak rssi")]
@@ -2753,101 +2766,12 @@ fn test_roam_profile_scans_obey_wait_time<F>(
     assert!(roam_scan_solicit_func(&mut exec, &mut test_values, &mut existing_connection).is_some());
 }
 
-#[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
-    solicit_roam_scan_weak_rssi,
-    Saved::None,
-    Scanned::Open,
-    true;
-    "enabled stationary weak rssi should roam"
-)]
-#[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::MetricsOnly},
-    solicit_roam_scan_weak_rssi,
-    Saved::None,
-    Scanned::Open,
-    false;
-    "enabled stationary metrics only weak rssi should not roam"
-)]
-#[test_case(
-    RoamingPolicy::Disabled,
-    solicit_roam_scan_weak_rssi,
-    Saved::None,
-    Scanned::Open,
-    false;
-    "disabled weak rssi should not roam"
-)]
-#[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
-    solicit_roam_scan_weak_rssi,
-    Saved::Wpa,
-    Scanned::Wpa1Wpa2Personal,
-    true;
-    "enabled wpa saved wpa1wpa2 ap should roam"
-)]
-#[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
-    solicit_roam_scan_weak_rssi,
-    Saved::Wpa2,
-    Scanned::Wpa1Wpa2Personal,
-    true;
-    "enabled wpa2 saved wpa1wpa2 ap should roam"
-)]
-#[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
-    solicit_roam_scan_weak_rssi,
-    Saved::Wpa,
-    Scanned::Wpa2Personal,
-    true;
-    "enabled wpa saved wpa2 ap should roam"
-)]
-#[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
-    solicit_roam_scan_weak_rssi,
-    Saved::Wpa2,
-    Scanned::Wpa2Personal,
-    true;
-    "enabled wpa2 saved wpa2 ap should roam"
-)]
-#[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
-    solicit_roam_scan_weak_rssi,
-    Saved::Wpa2,
-    Scanned::Wpa2Wpa3Personal,
-    true;
-    "enabled wpa2 saved wpa2wpa3 ap should roam"
-)]
-#[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
-    solicit_roam_scan_weak_rssi,
-    Saved::Wpa3,
-    Scanned::Wpa2Wpa3Personal,
-    true;
-    "enabled wpa3 saved wpa2wpa3 ap should roam"
-)]
-#[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
-    solicit_roam_scan_weak_rssi,
-    Saved::Wpa2,
-    Scanned::Wpa3Personal,
-    true;
-    "enabled wpa2 saved wpa3 ap should roam"
-)]
-#[test_case(
-    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
-    solicit_roam_scan_weak_rssi,
-    Saved::Wpa3,
-    Scanned::Wpa3Personal,
-    true;
-    "enabled wpa3 saved wpa3 ap should roam"
-)]
-#[fuchsia::test(add_test_attr = false)]
-// Tests if roaming policies trigger roam requests in different scenarios.
-fn test_roam_policy_sends_roam_request<F>(
+fn assert_roam_request_expectation<F>(
     roaming_policy: RoamingPolicy,
     mut roam_scan_solicit_func: F,
     saved_security: Saved,
-    ap_security: Scanned,
+    origin_ap_security: Scanned,
+    target_ap_security: Scanned,
     should_trigger_roam_request: bool,
 ) where
     F: RoamScanSolicitFunc,
@@ -2857,17 +2781,17 @@ fn test_roam_policy_sends_roam_request<F>(
         test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, roaming_policy);
 
     // Choose an appropriate credential for the security type.
-    let credential = if saved_security == Saved::None {
-        TEST_CREDS.none.clone()
-    } else {
-        TEST_CREDS.wpa_pass_min.clone()
+    let credential = match saved_security {
+        Saved::None => TEST_CREDS.none.clone(),
+        Saved::Wep => TEST_CREDS.wep_64_ascii.clone(),
+        _ => TEST_CREDS.wpa_pass_min.clone(),
     };
 
     // Connect to a network.
     let mut existing_connection = save_and_connect(
         TEST_SSID.clone(),
         saved_security,
-        ap_security,
+        origin_ap_security,
         credential,
         &mut exec,
         &mut test_values,
@@ -2876,11 +2800,11 @@ fn test_roam_policy_sends_roam_request<F>(
     // Create a mock scan result roam candidate with a very strong BSS.
     let mock_scan_results = vec![fidl_sme::ScanResult {
         compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
-            mutual_security_protocols: security_protocols_from_protection(ap_security),
+            mutual_security_protocols: security_protocols_from_protection(target_ap_security),
         }),
         timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
         bss_description: random_fidl_bss_description!(
-            protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(ap_security),
+            protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(target_ap_security),
             bssid: [1, 1, 1, 1, 1, 1],
             ssid: TEST_SSID.clone(),
             rssi_dbm: -10,
@@ -2919,6 +2843,60 @@ fn test_roam_policy_sends_roam_request<F>(
             false
         };
     assert_eq!(roam_requested, should_trigger_roam_request);
+}
+
+#[test_case(RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam}, solicit_roam_scan_weak_rssi)]
+#[fuchsia::test(add_test_attr = false)]
+// Verifies that roam requests can be triggered given a roam policy and a scan solicit function.
+fn test_roam_policy_sends_roam_request<F>(roaming_policy: RoamingPolicy, roam_scan_solicit_func: F)
+where
+    F: RoamScanSolicitFunc,
+{
+    assert_roam_request_expectation(
+        roaming_policy,
+        roam_scan_solicit_func,
+        Saved::None,
+        Scanned::Open,
+        Scanned::Open,
+        true,
+    )
+}
+
+#[test_case(RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::MetricsOnly}, solicit_roam_scan_weak_rssi)]
+#[test_case(RoamingPolicy::Disabled, solicit_roam_scan_weak_rssi)]
+#[fuchsia::test(add_test_attr = false)]
+// Verifies that roam requests are not triggered given a roam policy, despite the scan solicit function.
+fn test_roam_policy_does_not_send_roam_request<F>(
+    roaming_policy: RoamingPolicy,
+    roam_scan_solicit_func: F,
+) where
+    F: RoamScanSolicitFunc,
+{
+    assert_roam_request_expectation(
+        roaming_policy,
+        roam_scan_solicit_func,
+        Saved::None,
+        Scanned::Open,
+        Scanned::Open,
+        false,
+    )
+}
+
+#[with_roam_protection_permutations]
+// Verifies that roam requests are only sent when origin and target protections are the same.
+fn test_roam_request_only_with_compatible_protection(
+    origin_protection: Scanned,
+    target_protection: Scanned,
+) {
+    let saved_security = *compatible_policy_securities(&origin_protection).last().unwrap();
+    assert_roam_request_expectation(
+        RoamingPolicy::Enabled { profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam },
+        solicit_roam_scan_weak_rssi,
+        saved_security.into(),
+        origin_protection,
+        target_protection,
+        origin_protection == target_protection,
+    );
 }
 
 #[test_case(RoamingProfile::Stationary, solicit_roam_scan_weak_rssi; "stationary weak rssi")]

@@ -76,7 +76,7 @@ pub async fn serve_roam_monitor(
             // Handle incoming trigger data.
             trigger_data = trigger_data_receiver.next() => if let Some(data) = trigger_data {
                 match roam_monitor.handle_roam_trigger_data(data).await {
-                    Ok(RoamTriggerDataOutcome::RoamSearch { scan_type, network_identifier, credential, reasons}) => {
+                    Ok(RoamTriggerDataOutcome::RoamSearch { scan_type, network_identifier, credential, current_security, reasons}) => {
                         telemetry_sender.send(TelemetryEvent::PolicyRoamScan { reasons: reasons.clone() });
                         info!("Performing scan to find proactive local roaming candidates.");
                         let roam_search_fut = get_roaming_connection_selection_future(
@@ -84,6 +84,7 @@ pub async fn serve_roam_monitor(
                             scan_type,
                             network_identifier,
                             credential,
+                            current_security,
                             reasons
                         );
                         roam_search_result_futs.push(roam_search_fut.boxed());
@@ -141,10 +142,11 @@ async fn get_roaming_connection_selection_future(
     scan_type: fidl_common::ScanType,
     network_identifier: types::NetworkIdentifier,
     credential: Credential,
+    current_security: types::SecurityTypeDetailed,
     reasons: Vec<RoamReason>,
 ) -> Result<PolicyRoamRequest, Error> {
     match connection_selection_requester
-        .do_roam_selection(scan_type, network_identifier, credential)
+        .do_roam_selection(scan_type, network_identifier, credential, current_security)
         .await?
     {
         Some(candidate) => Ok(PolicyRoamRequest { candidate, reasons }),
@@ -222,7 +224,7 @@ mod test {
     }
 
     #[test_case(RoamTriggerDataOutcome::Noop; "should not queue roam search")]
-    #[test_case(RoamTriggerDataOutcome::RoamSearch { scan_type: fidl_common::ScanType::Passive, network_identifier: generate_random_network_identifier(), credential: generate_random_password(), reasons: vec![]}; "should queue roam search")]
+    #[test_case(RoamTriggerDataOutcome::RoamSearch { scan_type: fidl_common::ScanType::Passive, network_identifier: generate_random_network_identifier(), credential: generate_random_password(), current_security: types::SecurityTypeDetailed::Open, reasons: vec![]}; "should queue roam search")]
     #[fuchsia::test(add_test_attr = false)]
     fn test_serve_loop_handles_trigger_data(response_to_should_roam_scan: RoamTriggerDataOutcome) {
         let mut exec = TestExecutor::new();
@@ -306,6 +308,7 @@ mod test {
             scan_type: fidl_common::ScanType::Passive,
             network_identifier: generate_random_network_identifier(),
             credential: generate_random_password(),
+            current_security: types::SecurityTypeDetailed::Open,
             reasons: vec![],
         };
         roam_monitor.response_to_should_send_roam_request = response_to_should_send_roam_request;
@@ -379,6 +382,7 @@ mod test {
             scan_type: fidl_common::ScanType::Passive,
             network_identifier: generate_random_network_identifier(),
             credential: generate_random_password(),
+            current_security: types::SecurityTypeDetailed::Open,
             reasons: vec![],
         };
         roam_monitor.response_to_should_send_roam_request = true;
