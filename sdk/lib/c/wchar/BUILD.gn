@@ -6,6 +6,8 @@ import("../libc.gni")
 
 llvm_libc_source_set("wchar") {
   functions = [
+    "wcpcpy",
+    "wcpncpy",
     "wcscat",
     "wcschr",
     "wcscmp",
