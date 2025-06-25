@@ -4190,7 +4190,7 @@ mod tests {
     // We have seen this happen with FxHasher when we have bumped the version in the past.
     // This test is to catch any future regressions due to unstable hashing.
     #[fuchsia::test]
-    async fn test_casefold_hash_stability() {
+    async fn test_hash_code_casefold() {
         use crate::lsm_tree::types::LayerIterator;
         use crate::object_store::{ItemRef, ObjectKey, ObjectKeyData, Query};
 
@@ -4258,18 +4258,22 @@ mod tests {
         let mut merger = layer_set.merger();
         let key = ObjectKey::encrypted_child(directory.object_id(), vec![], 0);
         let mut iter = merger.query(Query::FullRange(&key)).await.expect("query");
-        let mut object_id_to_casefold_hash = BTreeMap::new();
+        let mut object_id_to_hash_code = BTreeMap::new();
         loop {
             match iter.get() {
                 Some(ItemRef {
-                    key: ObjectKey { data: ObjectKeyData::EncryptedChild { casefold_hash, .. }, .. },
+                    key:
+                        ObjectKey {
+                            data: ObjectKeyData::EncryptedChild { casefold_hash: hash_code, .. },
+                            ..
+                        },
                     value:
                         crate::object_store::ObjectValue::Child(
                             crate::object_store::object_record::ChildValue { object_id, .. },
                         ),
                     ..
                 }) => {
-                    object_id_to_casefold_hash.insert(*object_id, *casefold_hash);
+                    object_id_to_hash_code.insert(*object_id, *hash_code);
                 }
                 _ => {
                     break;
@@ -4279,18 +4283,124 @@ mod tests {
         }
 
         // Walk the directory tree, decrypting names, and compare hashes to known constants.
-        for &(name, casefolded_name, casefold_hash) in &CASEFOLD_NAMES {
+        for &(name, casefolded_name, hash_code) in &CASEFOLD_NAMES {
             if let Some((object_id, _descriptor, _parent_dir_is_locked)) =
                 directory.lookup(casefolded_name).await.expect("lookup")
             {
-                let actual_hash = object_id_to_casefold_hash.get(&object_id);
+                let actual_hash = object_id_to_hash_code.get(&object_id);
                 assert_eq!(
                     actual_hash,
-                    Some(&casefold_hash),
+                    Some(&hash_code),
                     "Hash for {name} is actually {actual_hash:?}"
                 );
             } else {
                 panic!("File not found for {casefolded_name} ({name})");
+            }
+        }
+        fs.close().await.expect("close failed");
+    }
+
+    // FBE uses hash code for non-casefold filenames as well.
+    // We need to ensure that these hashes also don't change unexpectedly.
+    #[fuchsia::test]
+    async fn test_hash_code() {
+        use crate::lsm_tree::types::LayerIterator;
+        use crate::object_store::{ItemRef, ObjectKey, ObjectKeyData, Query};
+
+        const CASEFOLD_NAMES: [(&str, u32); 3] =
+            [("Straße", 433651741), ("FooBar", 3915573179), ("Ǆ", 3078551122)];
+
+        let device = DeviceHolder::new(FakeDevice::new(8192, 4096));
+        let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+        let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+        let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
+        let store = root_volume
+            .new_volume("test", NO_OWNER, Some(crypt.clone() as Arc<dyn Crypt>))
+            .await
+            .expect("new_volume failed");
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        // Create an fscrypt encrypted directory.
+        crypt.add_wrapping_key(2, [1; 32].into());
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(
+                    store.store_object_id(),
+                    store.root_directory_object_id()
+                )],
+                Options::default(),
+            )
+            .await
+            .expect("new transaction failed");
+        let directory = root_directory
+            .create_child_dir(&mut transaction, "foo")
+            .await
+            .expect("create_child_dir failed");
+        directory.set_wrapping_key(&mut transaction, 2).await.expect("set wrapping_key");
+        transaction.commit().await.expect("commit failed");
+
+        // Write some test entries.
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(store.store_object_id(), directory.object_id())],
+                Options::default(),
+            )
+            .await
+            .expect("new transaction failed");
+        let directory = Directory::open(&store, directory.object_id()).await.expect("open failed");
+        for &(name, _) in &CASEFOLD_NAMES {
+            let _ = directory
+                .create_child_dir(&mut transaction, name)
+                .await
+                .expect("create_child_dir failed");
+        }
+        transaction.commit().await.expect("commit failed");
+
+        // Fetch the casefold hashes for these directly
+        let layer_set = directory.store().tree().layer_set();
+        let mut merger = layer_set.merger();
+        let key = ObjectKey::encrypted_child(directory.object_id(), vec![], 0);
+        let mut iter = merger.query(Query::FullRange(&key)).await.expect("query");
+        let mut object_id_to_hash_code = BTreeMap::new();
+        loop {
+            match iter.get() {
+                Some(ItemRef {
+                    key:
+                        ObjectKey {
+                            data: ObjectKeyData::EncryptedChild { casefold_hash: hash_code, .. },
+                            ..
+                        },
+                    value:
+                        crate::object_store::ObjectValue::Child(
+                            crate::object_store::object_record::ChildValue { object_id, .. },
+                        ),
+                    ..
+                }) => {
+                    object_id_to_hash_code.insert(*object_id, *hash_code);
+                }
+                _ => {
+                    break;
+                }
+            };
+            iter.advance().await.expect("advance");
+        }
+
+        // Walk the directory tree, decrypting names, and compare hashes to known constants.
+        for &(name, hash_code) in &CASEFOLD_NAMES {
+            if let Some((object_id, _descriptor, _parent_dir_is_locked)) =
+                directory.lookup(name).await.expect("lookup")
+            {
+                let actual_hash = object_id_to_hash_code.get(&object_id);
+                assert_eq!(
+                    actual_hash,
+                    Some(&hash_code),
+                    "Hash for {name} is actually {actual_hash:?}"
+                );
+            } else {
+                panic!("File not found for {name}");
             }
         }
         fs.close().await.expect("close failed");
