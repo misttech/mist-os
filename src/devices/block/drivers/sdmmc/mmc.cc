@@ -289,14 +289,14 @@ bool SdmmcBlockDevice::MmcSupportsHs400() {
   return (device_type & (1 << 6));
 }
 
-zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
-    const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) {
+// TODO(427683908): We may be able to skip some of these steps during device re-initialization.
+zx_status_t SdmmcBlockDevice::ProbeMmcLocked() {
   sdmmc_->SetRequestRetries(10);
 
   auto reset_retries = fit::defer([this]() { sdmmc_->SetRequestRetries(0); });
 
   // Query OCR
-  bool removable = metadata.removable().value();
+  bool removable = metadata_.removable().value();
   zx::result<uint32_t> ocr = sdmmc_->MmcSendOpCond(/*suppress_error_messages=*/removable);
   if (ocr.is_error()) {
     if (removable) {
@@ -378,7 +378,7 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
 
     // Must perform tuning at HS200 first if HS400 is supported
     fuchsia_hardware_sdmmc::SdmmcHostPrefs speed_capabilities =
-        metadata.speed_capabilities().value();
+        metadata_.speed_capabilities().value();
     if (MmcSupportsHs200() && bus_width_ != SDMMC_BUS_WIDTH_ONE &&
         !(speed_capabilities & fuchsia_hardware_sdmmc::SdmmcHostPrefs::kDisableHs200)) {
       if ((st = MmcSwitchTiming(SDMMC_TIMING_HS200)) != ZX_OK) {
@@ -450,7 +450,7 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
     block_info_.flags |= FLAG_TRIM_SUPPORT;
   }
 
-  if (GetCacheSizeBits(raw_ext_csd_) && metadata.enable_cache().value()) {
+  if (GetCacheSizeBits(raw_ext_csd_) && metadata_.enable_cache().value()) {
     // Enable the cache.
     st = MmcDoSwitch(MMC_EXT_CSD_CACHE_CTRL, MMC_EXT_CSD_CACHE_EN_MASK);
     if (st != ZX_OK) {
@@ -508,9 +508,9 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
         return std::min(max_packed_commands_effective, metadata.max_command_packing().value());
       };
   max_packed_reads_effective_ =
-      get_max_packed_commands_effective(raw_ext_csd_[MMC_EXT_CSD_MAX_PACKED_READS], metadata);
+      get_max_packed_commands_effective(raw_ext_csd_[MMC_EXT_CSD_MAX_PACKED_READS], metadata_);
   max_packed_writes_effective_ =
-      get_max_packed_commands_effective(raw_ext_csd_[MMC_EXT_CSD_MAX_PACKED_WRITES], metadata);
+      get_max_packed_commands_effective(raw_ext_csd_[MMC_EXT_CSD_MAX_PACKED_WRITES], metadata_);
   if (max_packed_reads_effective_ > 1 || max_packed_writes_effective_ > 1) {
     const uint32_t buffer_region_count =
         std::max(max_packed_reads_effective_, max_packed_writes_effective_) +
@@ -523,8 +523,8 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
     }
   }
 
-  if (metadata.vccq_off_with_controller_off()) {
-    vccq_off_with_controller_off_ = *metadata.vccq_off_with_controller_off();
+  if (metadata_.vccq_off_with_controller_off()) {
+    vccq_off_with_controller_off_ = *metadata_.vccq_off_with_controller_off();
   }
 
   return ZX_OK;

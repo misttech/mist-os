@@ -87,8 +87,9 @@ class TestSdmmcRootDevice : public SdmmcRootDevice {
     if (status = SdmmcBlockDevice::Create(this, std::move(sdmmc), &block_device); status != ZX_OK) {
       return status;
     }
-    if (status = is_sd_ ? block_device->ProbeSd(metadata) : block_device->ProbeMmc(metadata);
-        status != ZX_OK) {
+
+    block_device->SetMetadata(metadata);
+    if (status = is_sd_ ? block_device->ProbeSd() : block_device->ProbeMmc(); status != ZX_OK) {
       return status;
     }
     if (status = block_device->AddDevice(); status != ZX_OK) {

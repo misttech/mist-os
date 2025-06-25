@@ -50,6 +50,11 @@ struct ReadWriteMetadata {
 
   // This initialization is only required if packed commands are used.
   zx_status_t InitForPackedCommands(uint32_t buffer_region_count, uint32_t block_size) {
+    // Skip initialization if we already acquired these resources in a previous call to ProbeMmc().
+    if (packed_command_header_vmo.is_valid() && packed_command_header_mapper.start()) {
+      return ZX_OK;
+    }
+
     buffer_regions = std::make_unique<sdmmc_buffer_region_t[]>(buffer_region_count);
     memset(buffer_regions.get(), 0, sizeof(sdmmc_buffer_region_t) * buffer_region_count);
 
@@ -113,17 +118,17 @@ class SdmmcBlockDevice {
 
   // Probe for SD first, then MMC.
   zx_status_t Probe(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) TA_EXCL(worker_lock_) {
+    metadata_ = metadata;
     fbl::AutoLock lock(&worker_lock_);
-    return ProbeSdLocked(metadata) == ZX_OK ? ZX_OK : ProbeMmcLocked(metadata);
+    return ProbeSdLocked() == ZX_OK ? ZX_OK : ProbeMmcLocked();
   }
-  zx_status_t ProbeSd(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) TA_EXCL(worker_lock_) {
+  zx_status_t ProbeSd() TA_EXCL(worker_lock_) {
     fbl::AutoLock lock(&worker_lock_);
-    return ProbeSdLocked(metadata);
+    return ProbeSdLocked();
   }
-  zx_status_t ProbeMmc(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata)
-      TA_EXCL(worker_lock_) {
+  zx_status_t ProbeMmc() TA_EXCL(worker_lock_) {
     fbl::AutoLock lock(&worker_lock_);
-    return ProbeMmcLocked(metadata);
+    return ProbeMmcLocked();
   }
 
   zx_status_t AddDevice() TA_EXCL(queue_lock_);
@@ -144,6 +149,7 @@ class SdmmcBlockDevice {
 
   // Visible for testing.
   void SetBlockInfo(uint32_t block_size, uint64_t block_count);
+  void SetMetadata(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) { metadata_ = metadata; }
   const inspect::Inspector& inspect() const;
   const std::vector<std::unique_ptr<PartitionDevice>>& child_partition_devices() const {
     return child_partition_devices_;
@@ -160,10 +166,8 @@ class SdmmcBlockDevice {
   // until both queues are empty.
   static constexpr size_t kRoundRobinRequestCount = 16;
 
-  zx_status_t ProbeSdLocked(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata)
-      TA_REQ(worker_lock_);
-  zx_status_t ProbeMmcLocked(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata)
-      TA_REQ(worker_lock_);
+  zx_status_t ProbeSdLocked() TA_REQ(worker_lock_);
+  zx_status_t ProbeMmcLocked() TA_REQ(worker_lock_);
 
   template <typename Request>
   zx_status_t ReadWriteWithRetries(std::vector<Request>& requests, EmmcPartition partition)
@@ -314,6 +318,8 @@ class SdmmcBlockDevice {
   // This value comes from metadata. If true, the device must be re-initialized after leaving the
   // OFF state, and we cannot use the MMC sleep state.
   bool vccq_off_with_controller_off_ = false;
+
+  fuchsia_hardware_sdmmc::SdmmcMetadata metadata_;
 };
 
 }  // namespace sdmmc

@@ -1212,7 +1212,28 @@ zx_status_t SdmmcBlockDevice::ResumePower() {
   }
 
   if (vccq_off_with_controller_off_) {
-    // TODO(388815124): Re-initialize the device.
+    // The device was turned off and is now back in the pre-idle state. Change the bus settings to
+    // match the device state so they stay in sync.
+    if (zx_status_t status = sdmmc_->SetBusWidth(SDMMC_BUS_WIDTH_ONE); status != ZX_OK) {
+      return status;
+    }
+    if (zx_status_t status = sdmmc_->SetTiming(SDMMC_TIMING_LEGACY); status != ZX_OK) {
+      return status;
+    }
+    if (zx_status_t status = sdmmc_->SetBusFreq(kInitializationFrequencyHz); status != ZX_OK) {
+      return status;
+    }
+
+    // Probe the device again now that power has been restored.
+    sdmmc_->ClearRca();
+    if (zx_status_t status = sdmmc_->SdmmcGoIdle(); status != ZX_OK) {
+      return status;
+    }
+
+    ZX_DEBUG_ASSERT(!is_sd_);
+    if (zx_status_t status = ProbeMmcLocked(); status != ZX_OK) {
+      return status;
+    }
   } else {
     if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/false); status != ZX_OK) {
       FDF_LOGL(ERROR, logger(), "Failed to awake: %s", zx_status_get_string(status));
