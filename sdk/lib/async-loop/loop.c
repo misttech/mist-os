@@ -16,7 +16,6 @@
 #include <stdatomic.h>
 #include <stdlib.h>
 #include <zircon/assert.h>
-#include <zircon/compiler.h>
 #include <zircon/listnode.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/hypervisor.h>
@@ -84,15 +83,15 @@ typedef struct async_loop {
   atomic_uint active_threads;  // number of active dispatch threads
   atomic_uint worker_threads;  // number of worker threads created with `async_loop_start_thread`
 
-  mtx_t lock;                                   // guards the lists and the dispatching tasks flag
-  bool dispatching_tasks __TA_GUARDED(&lock);   // true while the loop is busy dispatching tasks
-  list_node_t wait_list __TA_GUARDED(&lock);    // most recently added first
-  list_node_t task_list __TA_GUARDED(&lock);    // pending tasks, earliest deadline first
-  list_node_t due_list __TA_GUARDED(&lock);     // due tasks, earliest deadline first
-  list_node_t thread_list __TA_GUARDED(&lock);  // earliest created thread first
-  list_node_t irq_list __TA_GUARDED(&lock);     // list of IRQs
-  list_node_t paged_vmo_list __TA_GUARDED(&lock);  // most recently added first
-  bool timer_armed __TA_GUARDED(&lock);  // true if timer has been set and has not fired yet
+  mtx_t lock;                  // guards the lists and the dispatching tasks flag
+  bool dispatching_tasks;      // true while the loop is busy dispatching tasks
+  list_node_t wait_list;       // most recently added first
+  list_node_t task_list;       // pending tasks, earliest deadline first
+  list_node_t due_list;        // due tasks, earliest deadline first
+  list_node_t thread_list;     // earliest created thread first
+  list_node_t irq_list;        // list of IRQs
+  list_node_t paged_vmo_list;  // most recently added first
+  bool timer_armed;            // true if timer has been set and has not fired yet
 } async_loop_t;
 
 static zx_status_t async_loop_run_once(async_loop_t* loop, zx_time_t deadline);
@@ -147,16 +146,6 @@ static inline async_paged_vmo_t* node_to_paged_vmo(list_node_t* node) {
   return FROM_NODE(async_paged_vmo_t, node);
 }
 
-// This is called during loop construction before other threads have access to the object.
-static inline void initialize_async_loop_lists(async_loop_t* loop) __TA_NO_THREAD_SAFETY_ANALYSIS {
-  list_initialize(&loop->wait_list);
-  list_initialize(&loop->irq_list);
-  list_initialize(&loop->task_list);
-  list_initialize(&loop->due_list);
-  list_initialize(&loop->thread_list);
-  list_initialize(&loop->paged_vmo_list);
-}
-
 zx_status_t async_loop_create(const async_loop_config_t* config, async_loop_t** out_loop) {
   ZX_DEBUG_ASSERT(out_loop);
   ZX_DEBUG_ASSERT(config != NULL);
@@ -174,7 +163,12 @@ zx_status_t async_loop_create(const async_loop_config_t* config, async_loop_t** 
   loop->dispatcher.ops = (const async_ops_t*)&async_loop_ops;
   loop->config = *config;
   mtx_init(&loop->lock, mtx_plain);
-  initialize_async_loop_lists(loop);
+  list_initialize(&loop->wait_list);
+  list_initialize(&loop->irq_list);
+  list_initialize(&loop->task_list);
+  list_initialize(&loop->due_list);
+  list_initialize(&loop->thread_list);
+  list_initialize(&loop->paged_vmo_list);
 
   zx_status_t status =
       zx_port_create(config->irq_support ? ZX_PORT_BIND_TO_INTERRUPT : 0, &loop->port);
@@ -195,8 +189,7 @@ zx_status_t async_loop_create(const async_loop_config_t* config, async_loop_t** 
   return status;
 }
 
-// This is only used during creation or destruction when no other thread has access to the loop.
-void async_loop_destroy(async_loop_t* loop) __TA_NO_THREAD_SAFETY_ANALYSIS {
+void async_loop_destroy(async_loop_t* loop) {
   ZX_DEBUG_ASSERT(loop);
 
   async_loop_shutdown(loop);
@@ -742,8 +735,7 @@ static zx_status_t async_loop_cancel_paged_vmo(async_paged_vmo_t* paged_vmo) {
   return zx_pager_detach_vmo(paged_vmo->pager, paged_vmo->vmo);
 }
 
-static void async_loop_insert_task_locked(async_loop_t* loop, async_task_t* task)
-    __TA_REQUIRES(&loop->lock) {
+static void async_loop_insert_task_locked(async_loop_t* loop, async_task_t* task) {
   // TODO(https://fxbug.dev/42105840): We assume that tasks are inserted in quasi-monotonic order
   // and that insertion into the task queue will typically take no more than a few steps. If this
   // assumption proves false and the cost of insertion becomes a problem, we should consider using a
@@ -756,7 +748,7 @@ static void async_loop_insert_task_locked(async_loop_t* loop, async_task_t* task
   list_add_after(node, task_to_node(task));
 }
 
-static zx_time_t async_loop_next_deadline_locked(async_loop_t* loop) __TA_REQUIRES(&loop->lock) {
+static zx_time_t async_loop_next_deadline_locked(async_loop_t* loop) {
   if (list_is_empty(&loop->due_list)) {
     list_node_t* head = list_peek_head(&loop->task_list);
     if (!head)
@@ -771,7 +763,7 @@ static zx_time_t async_loop_next_deadline_locked(async_loop_t* loop) __TA_REQUIR
   return 0ULL;
 }
 
-static void async_loop_restart_timer_locked(async_loop_t* loop) __TA_REQUIRES(&loop->lock) {
+static void async_loop_restart_timer_locked(async_loop_t* loop) {
   zx_status_t status;
   zx_time_t deadline = async_loop_next_deadline_locked(loop);
 

@@ -15,10 +15,6 @@ zx_library("async-loop") {
     # <lib/async-loop/loop.h> has #include <lib/async/dispatcher.h>.
     "//sdk/lib/async",
   ]
-
-  # Enable thread safety pointer analysis to validate code in loop.c that passes
-  # a pointer to lock-guarded lists to C list manipulation routines.
-  cflags = [ "-Wthread-safety-pointer" ]
   deps = [ "//sdk/lib/async" ]
 }
 
