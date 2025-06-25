@@ -17,6 +17,9 @@
 #define GBL_EFI_FASTBOOT_PROTOCOL_GUID \
   {0xc67e48a0, 0x5eb8, 0x4127, {0xbe, 0x89, 0xdf, 0x2e, 0xd9, 0x3d, 0x8a, 0x9a}}
 
+// Set within `LaunchGbl()`;
+bool g_should_stop_in_fastboot = false;
+
 namespace {
 struct GblEfiFastbootProtocol {
   struct gbl_efi_fastboot_protocol protocol;
@@ -74,8 +77,14 @@ EFIAPI efi_status GetVarAll(struct gbl_efi_fastboot_protocol* self, void* ctx,
   return EFI_SUCCESS;
 }
 
-EFIAPI efi_status RunOemFunction(struct gbl_efi_fastboot_protocol* self, const uint8_t* command,
-                                 size_t command_len, uint8_t* buf, size_t* bufsize) {
+EFIAPI efi_status RunOemFunction(struct gbl_efi_fastboot_protocol* self, const char* cmd,
+                                 size_t len, uint8_t* download_buffer, size_t download_data_size,
+                                 fastboot_message_sender sender, void* ctx) {
+  return EFI_UNSUPPORTED;
+}
+
+EFIAPI efi_status GetStaged(struct gbl_efi_fastboot_protocol* self, uint8_t* out, size_t* out_size,
+                            size_t* out_remain) {
   return EFI_UNSUPPORTED;
 }
 
@@ -113,19 +122,26 @@ EFIAPI efi_status GetPartitionPermissions(struct gbl_efi_fastboot_protocol* self
 
 EFIAPI efi_status WipeUserData(struct gbl_efi_fastboot_protocol* self) { return EFI_UNSUPPORTED; }
 
-GblEfiFastbootProtocol protocol = {
-    .protocol = {.version = 0x01,
-                 .get_var = GetVar,
-                 .get_var_all = GetVarAll,
-                 .run_oem_function = RunOemFunction,
-                 .get_policy = GetPolicy,
-                 .set_lock = SetLock,
-                 .clear_lock = ClearLock,
-                 .start_local_session = StartLocal,
-                 .update_local_session = UpdateLocal,
-                 .close_local_session = CloseLocal,
-                 .get_partition_permissions = GetPartitionPermissions,
-                 .wipe_user_data = WipeUserData}};
+EFIAPI bool ShouldStopInFastboot(struct gbl_efi_fastboot_protocol* self) {
+  return g_should_stop_in_fastboot;
+}
+
+GblEfiFastbootProtocol protocol = {.protocol = {
+                                       .version = 0x01,
+                                       .get_var = GetVar,
+                                       .get_var_all = GetVarAll,
+                                       .run_oem_function = RunOemFunction,
+                                       .get_staged = GetStaged,
+                                       .get_policy = GetPolicy,
+                                       .set_lock = SetLock,
+                                       .clear_lock = ClearLock,
+                                       .start_local_session = StartLocal,
+                                       .update_local_session = UpdateLocal,
+                                       .close_local_session = CloseLocal,
+                                       .get_partition_permissions = GetPartitionPermissions,
+                                       .wipe_user_data = WipeUserData,
+                                       .should_stop_in_fastboot = ShouldStopInFastboot,
+                                   }};
 
 efi_guid guid = GBL_EFI_FASTBOOT_PROTOCOL_GUID;
 

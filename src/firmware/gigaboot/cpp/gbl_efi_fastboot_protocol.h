@@ -1,5 +1,5 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
+// Use of self source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 // The protocol definition is taken from
@@ -29,24 +29,39 @@ typedef struct gbl_efi_fastboot_policy {
   bool can_ram_boot;
 } gbl_efi_fastboot_policy;
 
-enum GBL_EFI_FASTBOOT_PARTITION_PERMISSION_FLAGS {
+// Callback function pointer passed to gbl_efi_fastboot_protocol.get_var_all.
+//
+// context: Caller specific context.
+// args: An array of NULL-terminated strings that contains the variable name
+//       followed by additional arguments if any.
+// val: A NULL-terminated string representing the value.
+typedef void (*get_var_callback)(void* context, const char* const* args, size_t num_args,
+                                 const char* val);
+
+typedef enum EFI_FASTBOOT_MESSAGE_TYPE {
+  OKAY,
+  FAIL,
+  INFO,
+} EfiFastbootMessageType;
+
+typedef efi_status (*fastboot_message_sender)(void* context, EfiFastbootMessageType msg_type,
+                                              const char* msg, size_t msg_len);
+
+typedef enum GBL_EFI_FASTBOOT_PARTITION_PERMISSION_FLAGS {
   // Firmware can read the given partition and send its data to fastboot client.
   GBL_EFI_FASTBOOT_PARTITION_READ = 0x1 << 0,
   // Firmware can overwrite the given partition.
   GBL_EFI_FASTBOOT_PARTITION_WRITE = 0x1 << 1,
   // Firmware can erase the given partition.
   GBL_EFI_FASTBOOT_PARTITION_ERASE = 0x1 << 2,
-};
+} GblEfiFastbootPartitionPermissionFlags;
 
-enum GBL_EFI_FASTBOOT_LOCK_FLAGS {
+typedef enum GBL_EFI_FASTBOOT_LOCK_FLAGS {
   // All device partitions are locked.
   GBL_EFI_FASTBOOT_GBL_EFI_LOCKED = 0x1 << 0,
   // All 'critical' device partitions are locked.
   GBL_EFI_FASTBOOT_GBL_EFI_CRITICAL_LOCKED = 0x1 << 1,
-};
-
-typedef void (*get_var_callback)(void* context, const char* const* args, size_t num_args,
-                                 const char* val);
+} GblEfiFastbootLockFlags;
 
 typedef struct gbl_efi_fastboot_protocol {
   // Revision of the protocol supported.
@@ -57,13 +72,17 @@ typedef struct gbl_efi_fastboot_protocol {
   // Fastboot variable methods
   efi_status (*get_var)(struct gbl_efi_fastboot_protocol* self, const char* const* args,
                         size_t num_args, uint8_t* out, size_t* out_size) EFIAPI;
-
   efi_status (*get_var_all)(struct gbl_efi_fastboot_protocol* self, void* ctx,
                             get_var_callback cb) EFIAPI;
 
   // Fastboot oem function methods
-  efi_status (*run_oem_function)(struct gbl_efi_fastboot_protocol* self, const uint8_t* command,
-                                 size_t command_len, uint8_t* buf, size_t* bufsize) EFIAPI;
+  efi_status (*run_oem_function)(struct gbl_efi_fastboot_protocol* self, const char* cmd,
+                                 size_t len, uint8_t* download_buffer, size_t download_data_size,
+                                 fastboot_message_sender sender, void* ctx) EFIAPI;
+
+  // Fastboot get_staged backend
+  efi_status (*get_staged)(struct gbl_efi_fastboot_protocol* self, uint8_t* out, size_t* out_size,
+                           size_t* out_remain) EFIAPI;
 
   // Device lock methods
   efi_status (*get_policy)(struct gbl_efi_fastboot_protocol* self,
@@ -82,7 +101,10 @@ typedef struct gbl_efi_fastboot_protocol {
                                           const uint8_t* part_name, size_t part_name_len,
                                           uint64_t* permissions) EFIAPI;
   efi_status (*wipe_user_data)(struct gbl_efi_fastboot_protocol* self) EFIAPI;
+  bool (*should_stop_in_fastboot)(struct gbl_efi_fastboot_protocol* self) EFIAPI;
 } gbl_efi_fastboot_protocol;
+
+extern bool g_should_stop_in_fastboot;
 
 __END_CDECLS
 
