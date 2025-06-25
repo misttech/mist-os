@@ -50,6 +50,11 @@ class CfiUnwinder : public UnwinderBase {
 
   Error GetCfiModuleInfoForPc(uint64_t pc, CfiModuleInfo** out);
 
+  // Returns the memory for the binary without attempting to load either .eh_frame or .debug_frame.
+  // This may be used by fallback unwinders to probe memory when debug info is unavailable or
+  // incomplete.
+  Error GetMemoryForPc(uint64_t pc, Memory** out);
+
  private:
   // |is_return_address| indicates whether the current PC is pointing to a return address,
   // in which case it'll be adjusted to find the correct CFI entry.

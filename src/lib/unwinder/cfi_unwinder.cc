@@ -181,4 +181,21 @@ Error CfiUnwinder::GetCfiModuleInfoForPc(uint64_t pc, CfiModuleInfo** out) {
   return Success();
 }
 
+Error CfiUnwinder::GetMemoryForPc(uint64_t pc, Memory** out) {
+  auto module_it = module_map_.upper_bound(pc);
+  if (module_it == module_map_.begin()) {
+    return Error("%#" PRIx64 " is not covered by any module", pc);
+  }
+  module_it--;
+  uint64_t module_address = module_it->first;
+  auto& module_info = module_it->second;
+
+  if (module_info.module.binary_memory) {
+    *out = module_info.module.binary_memory;
+    return Success();
+  }
+
+  return Error("Module at %#" PRIx64 " does not have binary memory", module_address);
+}
+
 }  // namespace unwinder
