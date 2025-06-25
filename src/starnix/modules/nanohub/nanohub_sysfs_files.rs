@@ -191,3 +191,23 @@ impl NanohubSysFsFileOps for FirmwareNameSysFsOps {
         })
     }
 }
+
+#[derive(Default)]
+pub struct FirmwareVersionSysFsOps {}
+
+impl NanohubSysFsFileOps for FirmwareVersionSysFsOps {
+    fn show(&self, service: &fnanohub::DeviceSynchronousProxy) -> Result<String, Errno> {
+        service
+            .get_firmware_version(zx::MonotonicInstant::INFINITE)
+            .map_err(|e| {
+                log_error!("Failed to call Nanohub service method. {e:?}");
+                errno!(EINVAL)
+            })
+            .map(|v| {
+                format!(
+                    "hw type: {:04x} hw ver: {:04x} bl ver: {:04x} os ver: {:04x} variant ver: {:08x}\n",
+                    v.hardware_type, v.hardware_version, v.bootloader_version, v.os_version, v.variant_version
+                )
+            })
+    }
+}
