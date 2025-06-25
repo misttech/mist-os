@@ -32,6 +32,26 @@
 // Provide the standard ARM C Language Extensions API.
 #include <arm_acle.h>
 
+// TODO(https://fxbug.dev/427189167): The compiler treats the intrinsic as a
+// volatile read, so it won't be CSE'd or executed(*) when it shouldn't be
+// semantically.  (*)However, the compiler considers the predicated instruction
+// form `mrrc<cond>` to constitute not executing it if the predicate isn't
+// satisfied.  This isn't quite so for some privileged system registers on some
+// hardware.  So instead of the intrinsic, use inline asm that always emits
+// `mrrc` and never `mrrc<cond>`.
+#undef __arm_mrrc
+#define __arm_mrrc(coproc, opc1, CRm)                                 \
+  ({                                                                  \
+    static_assert((coproc) < 16);                                     \
+    static_assert((opc1) < 8);                                        \
+    static_assert((CRm) < 32);                                        \
+    unsigned long long int _v;                                        \
+    __asm__ volatile("mrrc c%c[p], %o, %Q[v], %R[v], CR%c[c]"         \
+                     : [v] "=r"(_v)                                   \
+                     : [p] "i"(coproc), [o] "i"(opc1), [c] "i"(CRm)); \
+    _v;                                                               \
+  })
+
 // Provide the machine-independent <lib/arch/intrin.h> API.
 
 #ifdef __cplusplus
