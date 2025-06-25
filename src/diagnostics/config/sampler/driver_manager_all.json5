@@ -230,6 +230,15 @@
         },
         {
             event_codes: [
+                3,
+            ],
+            metric_id: 2010,
+            metric_type: "Integer",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:nand.total_bad_blocks",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [
                 0,
             ],
             metric_id: 2011,
@@ -271,6 +280,20 @@
             metric_id: 2011,
             metric_type: "Occurrence",
             selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:nand.map_block_end_page_failure_reason.4",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [],
+            metric_id: 2014,
+            metric_type: "Integer",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:nand.worn_blocks_detected",
+            project_id: 3676913920,
+        },
+        {
+            event_codes: [],
+            metric_id: 2015,
+            metric_type: "Integer",
+            selector: "bootstrap/*-drivers\\:*:[name=ftl]root/ftl:nand.projected_bad_blocks",
             project_id: 3676913920,
         },
 
