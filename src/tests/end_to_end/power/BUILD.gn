@@ -2,24 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/python/python_binary.gni")
-import("//build/python/python_library.gni")
-
-# TODO(b/416339669): This target exists only to enable a soft transition of
-# power_test_utils to src/tests/end_to_end/lib/power. Remove when complete.
-python_library("power_test_utils") {
-  testonly = true
-  library_name = "power_test_utils"
-  sources = [
-    "__init__.py",
-    "power_test_utils.py",
-  ]
-  library_deps = [
-    "//src/performance/lib/trace_processing",
-    "//src/tests/end_to_end/lib/power",
-  ]
-}
-
 source_set("power_utils") {
   testonly = true
   sources = [
