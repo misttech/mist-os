@@ -11,7 +11,6 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <initializer_list>
@@ -40,6 +39,19 @@
 namespace display {
 
 namespace {
+
+// A layer configuration that should pass the adapter's CheckConfig() filters.
+constexpr display::DriverLayer kAcceptableLayer({
+    .display_destination = display::Rectangle({.x = 10, .y = 20, .width = 300, .height = 400}),
+    .image_source = display::Rectangle({.x = 50, .y = 60, .width = 700, .height = 800}),
+    .image_id = display::DriverImageId(4242),
+    .image_metadata = display::ImageMetadata(
+        {.width = 2048, .height = 1024, .tiling_type = display::ImageTilingType::kLinear}),
+    .fallback_color = display::Color({.format = display::PixelFormat::kB8G8R8A8,
+                                      .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43,
+                                                                              0x44, 0, 0, 0, 0}}),
+    .image_source_transformation = display::CoordinateTransformation::kIdentity,
+});
 
 class DisplayEngineBanjoAdapterTest : public ::testing::Test {
  public:
@@ -214,22 +226,11 @@ TEST_F(DisplayEngineBanjoAdapterTest, ReleaseImageSuccess) {
 
 TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSuccess) {
   static constexpr display::DisplayId kDisplayId(42);
-  static constexpr display::DriverLayer kLayer0({
-      .display_destination = display::Rectangle({.x = 10, .y = 20, .width = 300, .height = 400}),
-      .image_source = display::Rectangle({.x = 50, .y = 60, .width = 700, .height = 800}),
-      .image_id = display::DriverImageId(4242),
-      .image_metadata = display::ImageMetadata(
-          {.width = 2048, .height = 1024, .tiling_type = display::ImageTilingType::kLinear}),
-      .fallback_color = display::Color(
-          {.format = display::PixelFormat::kB8G8R8A8,
-           .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}),
-      .image_source_transformation = display::CoordinateTransformation::kIdentity,
-  });
 
-  static constexpr layer_t kBanjoLayer0 = kLayer0.ToBanjo();
+  static constexpr layer_t kBanjoAcceptableLayer = kAcceptableLayer.ToBanjo();
   static constexpr display_config_t kBanjoDisplayConfig = {
       .display_id = display::ToBanjoDisplayId(kDisplayId),
-      .layer_list = &kBanjoLayer0,
+      .layer_list = &kBanjoAcceptableLayer,
       .layer_count = 1,
   };
 
@@ -237,7 +238,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSuccess) {
                                      cpp20::span<const display::DriverLayer> layers) {
     EXPECT_EQ(kDisplayId, display_id);
     EXPECT_EQ(display::ModeId(1), display_mode_id);
-    EXPECT_THAT(layers, ::testing::ElementsAre(kLayer0));
+    EXPECT_THAT(layers, ::testing::ElementsAre(kAcceptableLayer));
     return display::ConfigCheckResult::kOk;
   });
 
@@ -247,22 +248,11 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSuccess) {
 
 TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationError) {
   static constexpr display::DisplayId kDisplayId(42);
-  static constexpr display::DriverLayer kLayer0({
-      .display_destination = display::Rectangle({.x = 10, .y = 20, .width = 300, .height = 400}),
-      .image_source = display::Rectangle({.x = 50, .y = 60, .width = 700, .height = 800}),
-      .image_id = display::DriverImageId(4242),
-      .image_metadata = display::ImageMetadata(
-          {.width = 2048, .height = 1024, .tiling_type = display::ImageTilingType::kLinear}),
-      .fallback_color = display::Color(
-          {.format = display::PixelFormat::kB8G8R8A8,
-           .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}),
-      .image_source_transformation = display::CoordinateTransformation::kIdentity,
-  });
 
-  static constexpr layer_t kBanjoLayer0 = kLayer0.ToBanjo();
+  static constexpr layer_t kBanjoAcceptableLayer = kAcceptableLayer.ToBanjo();
   static constexpr display_config_t kBanjoDisplayConfig = {
       .display_id = display::ToBanjoDisplayId(kDisplayId),
-      .layer_list = &kBanjoLayer0,
+      .layer_list = &kBanjoAcceptableLayer,
       .layer_count = 1,
   };
 
@@ -277,22 +267,11 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationError) {
 
 TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationUnsupportedConfig) {
   static constexpr display::DisplayId kDisplayId(42);
-  static constexpr display::DriverLayer kLayer0({
-      .display_destination = display::Rectangle({.x = 10, .y = 20, .width = 300, .height = 400}),
-      .image_source = display::Rectangle({.x = 50, .y = 60, .width = 700, .height = 800}),
-      .image_id = display::DriverImageId(4242),
-      .image_metadata = display::ImageMetadata(
-          {.width = 2048, .height = 1024, .tiling_type = display::ImageTilingType::kLinear}),
-      .fallback_color = display::Color(
-          {.format = display::PixelFormat::kB8G8R8A8,
-           .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}),
-      .image_source_transformation = display::CoordinateTransformation::kIdentity,
-  });
 
-  static constexpr layer_t kBanjoLayer0 = kLayer0.ToBanjo();
+  static constexpr layer_t kBanjoAcceptableLayer = kAcceptableLayer.ToBanjo();
   static constexpr display_config_t kBanjoDisplayConfig = {
       .display_id = display::ToBanjoDisplayId(kDisplayId),
-      .layer_list = &kBanjoLayer0,
+      .layer_list = &kBanjoAcceptableLayer,
       .layer_count = 1,
   };
 
@@ -307,23 +286,12 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationUnsupportedConfig) {
 
 TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfiguration) {
   static constexpr display::DisplayId kDisplayId(42);
-  static constexpr display::DriverLayer kLayer0({
-      .display_destination = display::Rectangle({.x = 10, .y = 20, .width = 300, .height = 400}),
-      .image_source = display::Rectangle({.x = 50, .y = 60, .width = 700, .height = 800}),
-      .image_id = display::DriverImageId(4242),
-      .image_metadata = display::ImageMetadata(
-          {.width = 2048, .height = 1024, .tiling_type = display::ImageTilingType::kLinear}),
-      .fallback_color = display::Color(
-          {.format = display::PixelFormat::kB8G8R8A8,
-           .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}),
-      .image_source_transformation = display::CoordinateTransformation::kIdentity,
-  });
   static constexpr display::DriverConfigStamp kConfigStamp(4242);
 
-  static constexpr layer_t kBanjoLayer0 = kLayer0.ToBanjo();
+  static constexpr layer_t kBanjoAcceptableLayer = kAcceptableLayer.ToBanjo();
   static constexpr display_config_t kBanjoDisplayConfig = {
       .display_id = display::ToBanjoDisplayId(kDisplayId),
-      .layer_list = &kBanjoLayer0,
+      .layer_list = &kBanjoAcceptableLayer,
       .layer_count = 1,
   };
   static constexpr config_stamp_t kBanjoConfigStamp =
@@ -334,7 +302,7 @@ TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfiguration) {
                                      display::DriverConfigStamp config_stamp) {
     EXPECT_EQ(kDisplayId, display_id);
     EXPECT_EQ(display::ModeId(1), display_mode_id);
-    EXPECT_THAT(layers, ::testing::ElementsAre(kLayer0));
+    EXPECT_THAT(layers, ::testing::ElementsAre(kAcceptableLayer));
     EXPECT_EQ(kConfigStamp, config_stamp);
   });
   engine_banjo_.ApplyConfiguration(&kBanjoDisplayConfig, &kBanjoConfigStamp);
