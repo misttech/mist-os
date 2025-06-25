@@ -4960,7 +4960,7 @@ assembly_resources_directory("resources") {
     "//src/sys/component_manager/configs/bootfs_config.json5",
 
     # Networking resources.
-    "//src/connectivity/policy/netcfg/config/netcfg_default.json",
+    "//src/connectivity/policy/netcfg/config/netcfg_default.json5",
 
     # ICU resources.
     "${icu_tzres_path}/metaZones.res",

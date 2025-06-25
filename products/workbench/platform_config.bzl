@@ -23,7 +23,7 @@ workbench_platform_config = {
     "connectivity": {
         "network": {
             "networking": "standard",
-            "netcfg_config_path": "LABEL(//src/connectivity/policy/netcfg/config:%s.json)" % ("delegated_network_provisioning" if delegated_network_provisioning else "netcfg_default"),
+            "netcfg_config_path": "LABEL(//src/connectivity/policy/netcfg/config:%s.json5)" % ("delegated_network_provisioning" if delegated_network_provisioning else "netcfg_default"),
             "include_tun": True,
         },
     },
