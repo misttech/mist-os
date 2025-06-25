@@ -6,6 +6,7 @@
 #define SRC_UI_LIB_ESCHER_UTIL_BIT_OPS_H_
 
 #include <cmath>
+#include <cstddef>
 #include <cstdint>
 #include <limits>
 #include <type_traits>
