@@ -60,7 +60,9 @@ impl Container for FvmContainer {
 
         if let Some(data_label) = find_data_volume(self.get_volumes().await?) {
             match self.check_and_mount_data(&data_label, launcher).await {
-                Ok(_) => return Ok(Filesystem::ServingVolumeInMultiVolume(None, data_label)),
+                Ok(data_volume) => {
+                    return Ok(Filesystem::ServingVolumeInMultiVolume(None, data_volume))
+                }
                 Err(error) => match error.root_cause().downcast_ref::<zx::Status>() {
                     Some(status) if status == &zx::Status::WRONG_TYPE => {
                         // Assume that it's more likely that this is because of FDR, or after
@@ -94,9 +96,7 @@ impl Container for FvmContainer {
                     MountOptions { crypt, uri: Some(uri), ..Default::default() },
                 )
                 .await
-                .map(|_| {
-                    Filesystem::ServingVolumeInMultiVolume(None, DATA_PARTITION_LABEL.to_string())
-                })
+                .map(|data_volume| Filesystem::ServingVolumeInMultiVolume(None, data_volume))
         };
 
         if launcher.requires_zxcrypt(launcher.config.data_filesystem_format.as_str().into(), self.1)
@@ -125,7 +125,7 @@ impl FvmContainer {
         &mut self,
         data_label: &str,
         launcher: &FilesystemLauncher,
-    ) -> Result<&mut ServingVolume, Error> {
+    ) -> Result<ServingVolume, Error> {
         let format = launcher.config.data_filesystem_format.as_str();
         let uri = format!("#meta/{format}.cm");
         if launcher.requires_zxcrypt(launcher.config.data_filesystem_format.as_str().into(), self.1)

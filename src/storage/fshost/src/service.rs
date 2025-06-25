@@ -145,15 +145,6 @@ async fn mount_main_starnix_volume(
     let mut env = environment.lock().await;
     if let Some(multi_vol_fs) = env.get_container() {
         let mounted_vol = if multi_vol_fs.has_volume(&starnix_volume_name).await? {
-            // Ensures that Starnix can remount its storage after an unclean container shutdown.
-            if let Some(_) = multi_vol_fs.volume(&starnix_volume_name) {
-                log::warn!("Unmounting the Starnix volume.");
-                if let Err(error) = multi_vol_fs.shutdown_volume(&starnix_volume_name).await {
-                    // TODO(https://fxbug.dev/422152987): Until we've fixed this properly, just log
-                    // a failure but continue to try and mount the volume.
-                    log::warn!(error:?; "Failed to unmount volume, continuing to try and mount.");
-                }
-            }
             multi_vol_fs
                 .open_volume(
                     &starnix_volume_name,
@@ -186,14 +177,6 @@ async fn create_starnix_volume_impl(
     if let Some(multi_vol_fs) = env.get_container() {
         // If the starnix volume already exists, unmount if mounted and then remove.
         if multi_vol_fs.has_volume(starnix_volume_name).await? {
-            if let Some(_) = multi_vol_fs.volume(starnix_volume_name) {
-                log::warn!("Unmounting the Starnix volume.");
-                if let Err(error) = multi_vol_fs.shutdown_volume(&starnix_volume_name).await {
-                    // TODO(https://fxbug.dev/422152987): Until we've fixed this properly, just log
-                    // a failure but continue to try and mount the volume.
-                    log::warn!(error:?; "Failed to unmount volume, continuing to try and create.");
-                }
-            }
             multi_vol_fs.remove_volume(starnix_volume_name).await?;
         }
         let mounted_vol = multi_vol_fs
@@ -242,23 +225,6 @@ async fn create_starnix_volume(
     };
 
     create_starnix_volume_impl(environment, volume_name, crypt, exposed_dir).await
-}
-
-async fn unmount_starnix_volume(
-    environment: &Arc<Mutex<dyn Environment>>,
-    config: &fshost_config::Config,
-) -> Result<(), Error> {
-    let starnix_volume_name = if !config.starnix_volume_name.is_empty() {
-        &config.starnix_volume_name
-    } else {
-        STARNIX_TEST_VOLUME_NAME
-    };
-    let mut env = environment.lock().await;
-    let fs = env.get_container().ok_or_else(|| {
-        log::error!("Tried to unmount starnix volume without container set");
-        zx::Status::NOT_FOUND
-    })?;
-    fs.shutdown_volume(starnix_volume_name).await
 }
 
 async fn wipe_storage(
@@ -325,7 +291,7 @@ async fn wipe_storage_fxblob(
         }
     };
 
-    let mut serving_fxfs = fxfs.serve_multi_volume().await.context("serving fxfs")?;
+    let serving_fxfs = fxfs.serve_multi_volume().await.context("serving fxfs")?;
     let blob_volume = serving_fxfs
         .create_volume(
             BLOB_VOLUME_LABEL,
@@ -344,7 +310,7 @@ async fn wipe_storage_fxblob(
     environment.lock().await.register_filesystem(environment::Filesystem::ServingMultiVolume(
         None,
         serving_fxfs,
-        String::new(),
+        None,
     ));
     Ok(())
 }
@@ -506,7 +472,7 @@ async fn write_data_file(
     let content_size =
         usize::try_from(content_size).context("Failed to convert u64 content_size to usize")?;
 
-    let (mut filesystem, mut data) = if config.fxfs_blob || config.storage_host {
+    let (filesystem, mut data) = if config.fxfs_blob || config.storage_host {
         // Find the device via our own matcher.
         let registered_devices = environment.lock().await.registered_devices().clone();
         let block_connector = registered_devices
@@ -612,7 +578,7 @@ async fn write_data_file(
 
         (None, filesystem)
     };
-    let data_root = data.root(filesystem.as_mut()).context("Failed to get data root")?;
+    let data_root = data.root().context("Failed to get data root")?;
     let (directory_proxy, file_path) = match filename.rsplit_once("/") {
         Some((directory_path, relative_file_path)) => {
             let directory_proxy = fuchsia_fs::directory::create_directory_recursive(
@@ -639,7 +605,7 @@ async fn write_data_file(
     payload.read(&mut contents, 0).context("reading payload vmo")?;
     write(&file_proxy, &contents).await.context("writing file contents")?;
 
-    data.shutdown(filesystem.as_mut()).await.context("shutting down data")?;
+    data.shutdown().await.context("shutting down data")?;
     if let Some(fs) = filesystem {
         fs.shutdown().await.context("shutting down filesystem")?;
     }
@@ -703,7 +669,7 @@ async fn shred_data_volume(
                 block_connector,
                 Box::new(Fxfs::dynamic_child()),
             );
-            let mut serving_fxfs = fxfs.serve_multi_volume().await.map_err(|error| {
+            let serving_fxfs = fxfs.serve_multi_volume().await.map_err(|error| {
                 log::error!(error:?; "Failed to serve fxfs");
                 zx::Status::INTERNAL
             })?;
@@ -753,7 +719,7 @@ async fn shred_data_volume(
                 Box::new(controller_proxy),
                 Box::new(Fxfs::dynamic_child()),
             );
-            let mut serving_fxfs = fxfs.serve_multi_volume().await.map_err(|error| {
+            let serving_fxfs = fxfs.serve_multi_volume().await.map_err(|error| {
                 log::error!(error:?; "Failed to serve fxfs");
                 zx::Status::INTERNAL
             })?;
@@ -873,19 +839,6 @@ pub fn fshost_volume_provider(
                             };
                         responder.send(res).unwrap_or_else(|e| {
                             log::error!("failed to send Create response. error: {:?}", e);
-                        });
-                    }
-                    Ok(fshost::StarnixVolumeProviderRequest::Unmount { responder }) => {
-                        log::info!("volume provider unmount called");
-                        let res = match unmount_starnix_volume(&env, &config).await {
-                            Ok(()) => Ok(()),
-                            Err(e) => {
-                                log::error!("volume provider service: unmount failed: {:?}", e);
-                                Err(zx::Status::INTERNAL.into_raw())
-                            }
-                        };
-                        responder.send(res).unwrap_or_else(|e| {
-                            log::error!("failed to send Unmount response. error: {:?}", e);
                         });
                     }
                     Err(e) => {

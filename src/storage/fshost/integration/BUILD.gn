@@ -263,7 +263,10 @@ template("fshost_integration_test_package") {
       deps += invoker.extra_deps
     }
     if (data_filesystem_variant == "fxblob") {
-      deps += [ "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust" ]
+      deps += [
+        "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
+        "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
+      ]
     }
     if (defined(fshost_options.storage_host) && fshost_options.storage_host) {
       deps += [

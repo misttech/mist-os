@@ -21,7 +21,7 @@ mod tests {
         let mut ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).await.unwrap();
         let mut fs = Filesystem::new(ramdisk.take_controller().unwrap(), Fxfs::default());
         fs.format().await.expect("Failed to format the filesystem");
-        let mut serving_filesystem =
+        let serving_filesystem =
             fs.serve_multi_volume().await.expect("Failed to start the filesystem");
         let vol = serving_filesystem
             .create_volume(
@@ -75,7 +75,7 @@ mod tests {
         let mut ramdisk = RamdiskClient::create(BLOCK_SIZE, BLOCK_COUNT).await.unwrap();
         let mut fs = Filesystem::new(ramdisk.take_controller().unwrap(), Fxfs::default());
         fs.format().await.expect("Failed to format the filesystem");
-        let mut serving_filesystem =
+        let serving_filesystem =
             fs.serve_multi_volume().await.expect("Failed to start the filesystem");
         let vol = serving_filesystem
             .create_volume(

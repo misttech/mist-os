@@ -52,7 +52,7 @@ async fn fxfs_static_child() {
 
     fxfs.format().await.unwrap();
     fxfs.fsck().await.unwrap();
-    let mut fs = fxfs.serve_multi_volume().await.unwrap();
+    let fs = fxfs.serve_multi_volume().await.unwrap();
 
     let volume =
         fs.create_volume("test", CreateOptions::default(), MountOptions::default()).await.unwrap();

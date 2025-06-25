@@ -179,8 +179,8 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
             let crypt = Some(
                 crypt_realm.as_ref().unwrap().root.connect_to_protocol_at_exposed_dir().unwrap(),
             );
-            let mut instance = fs.serve_multi_volume().await.unwrap();
-            let vol = instance
+            let instance = fs.serve_multi_volume().await.unwrap();
+            let mut vol = instance
                 .create_volume(
                     "default",
                     CreateOptions::default(),
@@ -189,7 +189,7 @@ impl<FSC: Clone + FSConfig> FsEnvironment<FSC> {
                 .await
                 .unwrap();
             vol.bind_to_path(MOUNT_PATH).unwrap();
-            Either::Right(instance)
+            Either::Right((instance, vol))
         } else {
             let mut instance = fs.serve().await.unwrap();
             instance.bind_to_path(MOUNT_PATH).unwrap();
@@ -345,7 +345,7 @@ impl<FSC: 'static + FSConfig + Clone + Send + Sync> Environment for FsEnvironmen
             let mut fs = Filesystem::new(controller, self.config.clone());
             fs.fsck().await.unwrap();
             let instance = if fs.config().is_multi_volume() {
-                let mut instance = fs.serve_multi_volume().await.unwrap();
+                let instance = fs.serve_multi_volume().await.unwrap();
                 let crypt = Some(
                     self.crypt_realm
                         .as_ref()
@@ -366,12 +366,12 @@ impl<FSC: 'static + FSConfig + Clone + Send + Sync> Environment for FsEnvironmen
                         .connect_to_protocol_at_exposed_dir()
                         .unwrap(),
                 );
-                let vol = instance
+                let mut vol = instance
                     .open_volume("default", MountOptions { crypt, ..MountOptions::default() })
                     .await
                     .unwrap();
                 vol.bind_to_path(MOUNT_PATH).unwrap();
-                Either::Right(instance)
+                Either::Right((instance, vol))
             } else {
                 let mut instance = fs.serve().await.unwrap();
                 instance.bind_to_path(MOUNT_PATH).unwrap();

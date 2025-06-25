@@ -72,56 +72,70 @@ async fn unwrap_or_create_keys(
 /// should be reformatted and re-initialized.  If Ok(None) is returned, it means the keybag was
 /// shredded, so a reformat is required.
 /// Returns the name of the data volume as well as a reference to it.
-pub async fn unlock_data_volume<'a>(
-    fs: &'a mut ServingMultiVolumeFilesystem,
-    config: &'a fshost_config::Config,
-) -> Result<Option<(CryptService, String, &'a mut ServingVolume)>, Error> {
-    // Open up the unencrypted volume so that we can access the key-bag for data.
+pub async fn unlock_data_volume(
+    fs: &mut ServingMultiVolumeFilesystem,
+    config: &fshost_config::Config,
+) -> Result<Option<(CryptService, String, ServingVolume)>, Error> {
     if config.check_filesystems {
         fs.check_volume(UNENCRYPTED_VOLUME_LABEL, CheckOptions::default())
             .await
             .context("Failed to verify unencrypted")?;
     }
-    let root_vol = fs
-        .open_volume(UNENCRYPTED_VOLUME_LABEL, MountOptions::default())
-        .await
-        .context("Failed to open unencrypted")?;
-    let keybag_dir = fuchsia_fs::directory::open_directory(
-        root_vol.root(),
-        "keys",
-        fio::PERM_READABLE | fio::PERM_WRITABLE,
+    with_unencrypted_volume(
+        fs.open_volume(UNENCRYPTED_VOLUME_LABEL, MountOptions::default())
+            .await
+            .context("Failed to open unencrypted")?,
+        async |unencrypted_volume: &mut ServingVolume| {
+            let keybag_dir = fuchsia_fs::directory::open_directory(
+                unencrypted_volume.root(),
+                "keys",
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
+            )
+            .await
+            .context("Failed to open keys dir")?;
+            let keybag_dir_fd =
+                fdio::create_fd(keybag_dir.into_channel().unwrap().into_zx_channel().into())?;
+            let keybag = match KeyBagManager::open(keybag_dir_fd, Path::new("fxfs-data"))? {
+                Some(keybag) => keybag,
+                None => return Ok(None),
+            };
+
+            let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, false).await?;
+
+            let crypt_service =
+                CryptService::new(data_unwrapped, metadata_unwrapped, &config.fxfs_crypt_url)
+                    .await
+                    .context("init_crypt_service")?;
+            if config.check_filesystems {
+                fs.check_volume(
+                    DATA_VOLUME_LABEL,
+                    CheckOptions { crypt: Some(crypt_service.connect()), ..Default::default() },
+                )
+                .await
+                .context("Failed to verify data")?;
+            }
+            let crypt = Some(crypt_service.connect());
+
+            let volume = fs
+                .open_volume(DATA_VOLUME_LABEL, MountOptions { crypt, ..MountOptions::default() })
+                .await
+                .context("Failed to open data")?;
+
+            Ok(Some((crypt_service, DATA_VOLUME_LABEL.to_string(), volume)))
+        },
     )
     .await
-    .context("Failed to open keys dir")?;
-    let keybag_dir_fd =
-        fdio::create_fd(keybag_dir.into_channel().unwrap().into_zx_channel().into())?;
-    let keybag = match KeyBagManager::open(keybag_dir_fd, Path::new("fxfs-data"))? {
-        Some(keybag) => keybag,
-        None => return Ok(None),
-    };
+}
 
-    let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, false).await?;
-
-    let crypt_service =
-        CryptService::new(data_unwrapped, metadata_unwrapped, &config.fxfs_crypt_url)
-            .await
-            .context("init_crypt_service")?;
-    if config.check_filesystems {
-        fs.check_volume(
-            DATA_VOLUME_LABEL,
-            CheckOptions { crypt: Some(crypt_service.connect()), ..Default::default() },
-        )
-        .await
-        .context("Failed to verify data")?;
-    }
-    let crypt = Some(crypt_service.connect());
-
-    let volume = fs
-        .open_volume(DATA_VOLUME_LABEL, MountOptions { crypt, ..MountOptions::default() })
-        .await
-        .context("Failed to open data")?;
-
-    Ok(Some((crypt_service, DATA_VOLUME_LABEL.to_string(), volume)))
+// We must make sure that the unencrypted volume is properly unmounted for all error paths so that
+// it can safely be removed if necessary.
+async fn with_unencrypted_volume<R>(
+    mut unencrypted_volume: ServingVolume,
+    callback: impl AsyncFnOnce(&mut ServingVolume) -> Result<R, Error>,
+) -> Result<R, Error> {
+    let result = callback(&mut unencrypted_volume).await;
+    let _ = unencrypted_volume.shutdown().await;
+    result
 }
 
 /// Initializes the data volume in `fs`, which should be freshly reformatted.
@@ -129,41 +143,49 @@ pub async fn unlock_data_volume<'a>(
 pub async fn init_data_volume<'a>(
     fs: &'a mut ServingMultiVolumeFilesystem,
     config: &'a fshost_config::Config,
-) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
+) -> Result<(CryptService, String, ServingVolume), Error> {
     // Open up the unencrypted volume so that we can access the key-bag for data.
-    let root_vol = fs
-        .create_volume(UNENCRYPTED_VOLUME_LABEL, CreateOptions::default(), MountOptions::default())
-        .await
-        .context("Failed to create unencrypted")?;
-    let keybag_dir = fuchsia_fs::directory::create_directory(
-        root_vol.root(),
-        "keys",
-        fio::PERM_READABLE | fio::PERM_WRITABLE,
-    )
-    .await
-    .context("Failed to create keys dir")?;
-    let keybag_dir_fd =
-        fdio::create_fd(keybag_dir.into_channel().unwrap().into_zx_channel().into())?;
-    let keybag = KeyBagManager::create(keybag_dir_fd, Path::new("fxfs-data"))?;
-
-    let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, true).await?;
-
-    let crypt_service =
-        CryptService::new(data_unwrapped, metadata_unwrapped, &config.fxfs_crypt_url)
-            .await
-            .context("init_crypt_service")?;
-    let crypt = Some(crypt_service.connect());
-
-    let volume = fs
-        .create_volume(
-            DATA_VOLUME_LABEL,
+    with_unencrypted_volume(
+        fs.create_volume(
+            UNENCRYPTED_VOLUME_LABEL,
             CreateOptions::default(),
-            MountOptions { crypt, ..MountOptions::default() },
+            MountOptions::default(),
         )
         .await
-        .context("Failed to create data")?;
+        .context("Failed to create unencrypted")?,
+        async |unencrypted_volume| {
+            let keybag_dir = fuchsia_fs::directory::create_directory(
+                unencrypted_volume.root(),
+                "keys",
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
+            )
+            .await
+            .context("Failed to create keys dir")?;
+            let keybag_dir_fd =
+                fdio::create_fd(keybag_dir.into_channel().unwrap().into_zx_channel().into())?;
+            let keybag = KeyBagManager::create(keybag_dir_fd, Path::new("fxfs-data"))?;
 
-    Ok((crypt_service, DATA_VOLUME_LABEL.to_string(), volume))
+            let (data_unwrapped, metadata_unwrapped) = unwrap_or_create_keys(keybag, true).await?;
+
+            let crypt_service =
+                CryptService::new(data_unwrapped, metadata_unwrapped, &config.fxfs_crypt_url)
+                    .await
+                    .context("init_crypt_service")?;
+            let crypt = Some(crypt_service.connect());
+
+            let volume = fs
+                .create_volume(
+                    DATA_VOLUME_LABEL,
+                    CreateOptions::default(),
+                    MountOptions { crypt, ..MountOptions::default() },
+                )
+                .await
+                .context("Failed to create data")?;
+
+            Ok((crypt_service, DATA_VOLUME_LABEL.to_string(), volume))
+        },
+    )
+    .await
 }
 
 static FXFS_CRYPT_COLLECTION_NAME: &str = "fxfs-crypt";
@@ -253,17 +275,25 @@ impl Drop for CryptService {
     }
 }
 
-pub async fn shred_key_bag(unencrypted_volume: &ServingVolume) -> Result<(), Error> {
-    let dir = fuchsia_fs::directory::open_directory(
-        unencrypted_volume.root(),
-        "keys",
-        fio::PERM_WRITABLE,
+pub async fn shred_key_bag(fs: &ServingMultiVolumeFilesystem) -> Result<(), Error> {
+    with_unencrypted_volume(
+        fs.open_volume(UNENCRYPTED_VOLUME_LABEL, MountOptions::default())
+            .await
+            .context("Failed to open unencrypted")?,
+        async |unencrypted_volume| {
+            let dir = fuchsia_fs::directory::open_directory(
+                unencrypted_volume.root(),
+                "keys",
+                fio::PERM_WRITABLE,
+            )
+            .await
+            .context("Failed to open keys dir")?;
+            dir.unlink("fxfs-data", &fio::UnlinkOptions::default())
+                .await?
+                .map_err(|e| anyhow!(zx::Status::from_raw(e)))
+                .context("Failed to remove keybag")?;
+            Ok(())
+        },
     )
     .await
-    .context("Failed to open keys dir")?;
-    dir.unlink("fxfs-data", &fio::UnlinkOptions::default())
-        .await?
-        .map_err(|e| anyhow!(zx::Status::from_raw(e)))
-        .context("Failed to remove keybag")?;
-    Ok(())
 }

@@ -419,7 +419,7 @@ impl DiskBuilder {
         let mut fxfs = Filesystem::from_boxed_config(connector, Box::new(Fxfs::default()));
         // Wipes the device
         fxfs.format().await.expect("format failed");
-        let mut fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
+        let fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
         let blob_volume = fs
             .create_volume(
                 "blob",
@@ -454,7 +454,7 @@ impl DiskBuilder {
             .await
             .unwrap();
         let mut fvm_fs = Filesystem::from_boxed_config(connector, Box::new(Fvm::dynamic_child()));
-        let mut fvm = fvm_fs.serve_multi_volume().await.unwrap();
+        let fvm = fvm_fs.serve_multi_volume().await.unwrap();
 
         {
             let blob_volume = fvm
@@ -478,8 +478,9 @@ impl DiskBuilder {
                 )
                 .expect("failed to connect to the Blob service");
             self.blob_hash = Some(write_test_blob(blob_creator, &BLOB_CONTENTS).await);
+
+            blob_volume.shutdown().await.unwrap();
         }
-        fvm.shutdown_volume("blobfs").await.unwrap();
 
         if self.volumes_spec.create_data_partition {
             let data_label = if self.legacy_data_label { "minfs" } else { "data" };
@@ -538,7 +539,7 @@ impl DiskBuilder {
                 .await
             } else if self.data_spec.format.is_some() {
                 self.write_test_data(data_volume.root()).await;
-                fvm.shutdown_volume(data_label).await.unwrap();
+                data_volume.shutdown().await.unwrap();
             }
         }
 
@@ -561,7 +562,7 @@ impl DiskBuilder {
 
     async fn init_data_fxfs(&self, fxfs: FxfsType) {
         let mut fxblob = false;
-        let (mut fs, crypt_realm) = match fxfs {
+        let (fs, crypt_realm) = match fxfs {
             FxfsType::Fxfs(connector) => {
                 let crypt_realm = create_hermetic_crypt_service(DATA_KEY, METADATA_KEY).await;
                 let mut fxfs =

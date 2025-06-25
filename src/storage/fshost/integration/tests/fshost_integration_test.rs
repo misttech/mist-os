@@ -375,6 +375,21 @@ async fn set_volume_limit() {
     fixture.tear_down().await;
 }
 
+#[cfg(feature = "fxblob")]
+async fn shutdown_starnix_volume(exposed_dir: fio::DirectoryProxy) {
+    let (proxy, server_end) = create_proxy::<fidl_fuchsia_fs::AdminMarker>();
+    exposed_dir
+        .open(
+            &format!("svc/{}", fidl_fuchsia_fs::AdminMarker::PROTOCOL_NAME),
+            fio::Flags::PROTOCOL_SERVICE,
+            &fio::Options::default(),
+            server_end.into(),
+        )
+        .expect("fidl transport error");
+
+    proxy.shutdown().await.expect("fidl transport error");
+}
+
 #[fuchsia::test]
 #[cfg(feature = "fxblob")]
 async fn create_unmount_and_remount_starnix_volume() {
@@ -418,7 +433,8 @@ async fn create_unmount_and_remount_starnix_volume() {
     .await
     .expect("Failed to create file in starnix volume");
     fuchsia_fs::file::write(&starnix_volume_file, "file contents!").await.unwrap();
-    volume_provider.unmount().await.expect("fidl transport error").expect("unmount failed");
+
+    shutdown_starnix_volume(exposed_dir_proxy).await;
 
     let disk = fixture.tear_down().await.unwrap();
     let mut builder = new_builder().with_disk_from(disk);
@@ -502,6 +518,8 @@ async fn create_mount_and_remount_starnix_volume() {
     .expect("Failed to create file in starnix volume");
     fuchsia_fs::file::write(&starnix_volume_file, "file contents!").await.unwrap();
 
+    shutdown_starnix_volume(exposed_dir_proxy).await;
+
     let crypt = fixture.connect_to_crypt();
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -568,7 +586,8 @@ async fn create_starnix_volume_wipes_previous_volume() {
     .await
     .expect("Failed to create file in starnix volume");
     fuchsia_fs::file::write(&starnix_volume_file, "file contents!").await.unwrap();
-    volume_provider.unmount().await.expect("fidl transport error").expect("unmount failed");
+
+    shutdown_starnix_volume(exposed_dir_proxy).await;
 
     let disk = fixture.tear_down().await.unwrap();
     let mut builder = new_builder().with_disk_from(disk);
@@ -940,7 +959,8 @@ async fn vend_a_fresh_starnix_test_volume_on_each_mount() {
     .await
     .expect("Failed to create file in starnix volume");
     fuchsia_fs::file::write(&starnix_volume_file, "file contents!").await.unwrap();
-    volume_provider.unmount().await.expect("fidl transport error").expect("unmount failed");
+
+    shutdown_starnix_volume(exposed_dir_proxy).await;
 
     let disk = fixture.tear_down().await.unwrap();
     let mut builder = new_builder().with_disk_from(disk);

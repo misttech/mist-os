@@ -62,6 +62,7 @@ rustc_test("remotevol_shutdown_integration_test_bin") {
   sources = [ source_root ]
   deps = test_deps
   deps += [
+    ":remotevol_fuchsia_test_util",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fuchsia-fs",
     "//src/sys/lib/component-events",

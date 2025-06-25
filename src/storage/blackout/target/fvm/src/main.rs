@@ -62,8 +62,8 @@ impl Test for FvmTest {
                 .context("Failed to flash FVM")?;
         }
         let mut fvm = Filesystem::from_boxed_config(block_connector, Box::new(Fvm::default()));
-        let mut fs = fvm.serve_multi_volume().await.context("Failed to serve FVM")?;
-        let _ = with_crypt_service(Policy::Null, |crypt| {
+        let fs = fvm.serve_multi_volume().await.context("Failed to serve FVM")?;
+        let minfs_vol = with_crypt_service(Policy::Null, |crypt| {
             fs.create_volume(
                 "minfs",
                 CreateOptions { type_guid: Some(DATA_TYPE_GUID), ..CreateOptions::default() },
@@ -76,7 +76,7 @@ impl Test for FvmTest {
         })
         .await
         .context("Failed to create minfs volume")?;
-        fs.shutdown_volume("minfs").await.context("Failed to shutdown minfs")?;
+        minfs_vol.shutdown().await.context("Failed to shutdown minfs")?;
         fs.shutdown().await.context("Failed to shutdown")?;
         log::info!("setup complete");
         Ok(())
@@ -92,7 +92,7 @@ impl Test for FvmTest {
         let block_connector = find_partition(device_label, true).await.context("find partition")?;
 
         let mut fvm = Filesystem::from_boxed_config(block_connector, Box::new(Fvm::default()));
-        let mut fs = fvm.serve_multi_volume().await?;
+        let fs = fvm.serve_multi_volume().await?;
         let minfs = with_crypt_service(Policy::Null, |crypt| {
             fs.open_volume(
                 "minfs",
@@ -118,7 +118,7 @@ impl Test for FvmTest {
         let block_connector = find_partition(device_label, true).await?;
 
         let mut fvm = Filesystem::from_boxed_config(block_connector, Box::new(Fvm::default()));
-        let mut fs = fvm.serve_multi_volume().await?;
+        let fs = fvm.serve_multi_volume().await?;
         with_crypt_service(Policy::Null, |crypt| {
             fs.check_volume(
                 "minfs",

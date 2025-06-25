@@ -74,7 +74,7 @@ impl FsTree {
     async fn setup_fxfs(&self, block_connector: Box<dyn BlockConnector>) -> Result<()> {
         let mut fxfs = Filesystem::from_boxed_config(block_connector, Box::new(Fxfs::default()));
         fxfs.format().await?;
-        let mut fs = fxfs.serve_multi_volume().await?;
+        let fs = fxfs.serve_multi_volume().await?;
         let crypt = Some(self.setup_crypt_service().await?);
         fs.create_volume(
             "default",
@@ -93,11 +93,11 @@ impl FsTree {
 
     async fn serve_fxfs(&self, block_connector: Box<dyn BlockConnector>) -> Result<FsInstance> {
         let mut fxfs = Filesystem::from_boxed_config(block_connector, Box::new(Fxfs::default()));
-        let mut fs = fxfs.serve_multi_volume().await?;
+        let fs = fxfs.serve_multi_volume().await?;
         let crypt = Some(self.setup_crypt_service().await?);
-        let _ =
+        let vol =
             fs.open_volume("default", MountOptions { crypt, ..MountOptions::default() }).await?;
-        Ok(FsInstance::Fxfs(fs))
+        Ok(FsInstance::Fxfs(fs, vol))
     }
 
     async fn serve_minfs(&self, block_connector: Box<dyn BlockConnector>) -> Result<FsInstance> {
@@ -111,7 +111,7 @@ impl FsTree {
         fxfs.fsck().await.context("overall fsck")?;
 
         // Also check the volume we created.
-        let mut fs = fxfs.serve_multi_volume().await.context("failed to serve")?;
+        let fs = fxfs.serve_multi_volume().await.context("failed to serve")?;
         let crypt = Some(self.setup_crypt_service().await?);
         fs.check_volume("default", CheckOptions { crypt, ..Default::default() })
             .await
@@ -127,17 +127,15 @@ impl FsTree {
 }
 
 enum FsInstance {
-    Fxfs(ServingMultiVolumeFilesystem),
+    #[allow(dead_code)]
+    Fxfs(ServingMultiVolumeFilesystem, fs_management::filesystem::ServingVolume),
     Minfs(ServingSingleVolumeFilesystem),
 }
 
 impl FsInstance {
     fn root(&self) -> &fio::DirectoryProxy {
         match &self {
-            FsInstance::Fxfs(fs) => {
-                let vol = fs.volume("default").expect("failed to get default volume");
-                vol.root()
-            }
+            FsInstance::Fxfs(_, vol) => vol.root(),
             FsInstance::Minfs(fs) => fs.root(),
         }
     }

@@ -117,8 +117,4 @@ closed protocol StarnixVolumeProvider {
         crypt client_end:fuchsia.fxfs.Crypt;
         exposed_dir server_end:fuchsia.io.Directory;
     }) -> () error zx.Status;
-
-    /// Shuts down the main starnix volume. Fails if the starnix volume was not mounted.
-    // TODO(https://fxbug.dev/392147351): Consider reusing Admin.Shutdown.
-    strict Unmount() -> () error zx.Status;
 };

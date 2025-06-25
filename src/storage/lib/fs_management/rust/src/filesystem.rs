@@ -16,7 +16,6 @@ use fuchsia_component_client::{
     connect_to_named_protocol_at_dir_root, connect_to_protocol, connect_to_protocol_at_dir_root,
     connect_to_protocol_at_dir_svc, open_childs_exposed_directory,
 };
-use std::collections::HashMap;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use zx::{self as zx, AsHandleRef as _, Status};
@@ -330,7 +329,6 @@ impl Filesystem {
         Ok(ServingMultiVolumeFilesystem {
             component: self.component.clone(),
             exposed_dir: Some(exposed_dir),
-            volumes: HashMap::default(),
         })
     }
 }
@@ -503,7 +501,6 @@ pub struct ServingMultiVolumeFilesystem {
     component: Option<Arc<DynamicComponentInstance>>,
     // exposed_dir will always be Some, except in Self::shutdown.
     exposed_dir: Option<fio::DirectoryProxy>,
-    volumes: HashMap<String, ServingVolume>,
 }
 
 /// Represents an opened volume in a [`ServingMultiVolumeFilesystem'] instance.
@@ -514,6 +511,21 @@ pub struct ServingVolume {
 }
 
 impl ServingVolume {
+    fn new(exposed_dir: fio::DirectoryProxy) -> Result<Self, Error> {
+        let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>();
+        exposed_dir.open(
+            "root",
+            fio::PERM_READABLE | fio::Flags::PERM_INHERIT_WRITE | fio::Flags::PERM_INHERIT_EXECUTE,
+            &Default::default(),
+            server_end.into_channel(),
+        )?;
+        Ok(ServingVolume {
+            root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel()).into_proxy(),
+            binding: None,
+            exposed_dir,
+        })
+    }
+
     /// Returns a proxy to the root directory of the serving volume.
     pub fn root(&self) -> &fio::DirectoryProxy {
         &self.root_dir
@@ -558,39 +570,19 @@ impl ServingVolume {
         Status::ok(status).map_err(QueryError::DirectoryQuery)?;
         info.ok_or(QueryError::DirectoryEmptyResult)
     }
-}
-
-impl ServingMultiVolumeFilesystem {
-    /// Gets a reference to the given volume, if it's already open.
-    pub fn volume(&self, volume: &str) -> Option<&ServingVolume> {
-        self.volumes.get(volume)
-    }
-
-    /// Gets a mutable reference to the given volume, if it's already open.
-    pub fn volume_mut(&mut self, volume: &str) -> Option<&mut ServingVolume> {
-        self.volumes.get_mut(volume)
-    }
-
-    pub fn close_volume(&mut self, volume: &str) {
-        self.volumes.remove(volume);
-    }
 
     /// Attempts to shutdown the filesystem using the [`fidl_fuchsia_fs::AdminProxy::shutdown()`]
     /// FIDL method. Fails if the volume is not already open.
-    pub async fn shutdown_volume(&mut self, volume: &str) -> Result<(), Error> {
-        ensure!(self.volumes.contains_key(volume), "Volume not mounted");
-        let serving_vol = self.volume(volume).unwrap();
-        let admin_proxy = connect_to_protocol_at_dir_svc::<AdminMarker>(serving_vol.exposed_dir())?;
+    pub async fn shutdown(self) -> Result<(), Error> {
+        let admin_proxy = connect_to_protocol_at_dir_svc::<AdminMarker>(self.exposed_dir())?;
         admin_proxy.shutdown().await.context("failed to shutdown volume")?;
-        self.close_volume(volume);
         Ok(())
     }
+}
 
+impl ServingMultiVolumeFilesystem {
     /// Returns whether the given volume exists.
     pub async fn has_volume(&mut self, volume: &str) -> Result<bool, Error> {
-        if self.volumes.contains_key(volume) {
-            return Ok(true);
-        }
         let path = format!("volumes/{}", volume);
         fuchsia_fs::directory::open_node(
             self.exposed_dir.as_ref().unwrap(),
@@ -613,12 +605,11 @@ impl ServingMultiVolumeFilesystem {
     /// If `options.crypt` is set, the volume will be encrypted using the provided Crypt instance.
     /// If `options.as_blob` is set, creates a blob volume that is mounted as a blob filesystem.
     pub async fn create_volume(
-        &mut self,
+        &self,
         volume: &str,
         create_options: CreateOptions,
         options: MountOptions,
-    ) -> Result<&mut ServingVolume, Error> {
-        ensure!(!self.volumes.contains_key(volume), "Already bound");
+    ) -> Result<ServingVolume, Error> {
         let (exposed_dir, server) = create_proxy::<fio::DirectoryMarker>();
         connect_to_protocol_at_dir_root::<fidl_fuchsia_fs_startup::VolumesMarker>(
             self.exposed_dir.as_ref().unwrap(),
@@ -626,12 +617,11 @@ impl ServingMultiVolumeFilesystem {
         .create(volume, server, create_options, options)
         .await?
         .map_err(|e| anyhow!(zx::Status::from_raw(e)))?;
-        self.insert_volume(volume.to_string(), exposed_dir).await
+        ServingVolume::new(exposed_dir)
     }
 
     /// Deletes the volume. Fails if the volume is already mounted.
-    pub async fn remove_volume(&mut self, volume: &str) -> Result<(), Error> {
-        ensure!(!self.volumes.contains_key(volume), "Already bound");
+    pub async fn remove_volume(&self, volume: &str) -> Result<(), Error> {
         connect_to_protocol_at_dir_root::<fidl_fuchsia_fs_startup::VolumesMarker>(
             self.exposed_dir.as_ref().unwrap(),
         )?
@@ -643,11 +633,10 @@ impl ServingMultiVolumeFilesystem {
     /// Mounts an existing volume.  Fails if the volume is already mounted or doesn't exist.
     /// If `crypt` is set, the volume will be decrypted using the provided Crypt instance.
     pub async fn open_volume(
-        &mut self,
+        &self,
         volume: &str,
         options: MountOptions,
-    ) -> Result<&mut ServingVolume, Error> {
-        ensure!(!self.volumes.contains_key(volume), "Already bound");
+    ) -> Result<ServingVolume, Error> {
         let (exposed_dir, server) = create_proxy::<fio::DirectoryMarker>();
         let path = format!("volumes/{}", volume);
         connect_to_named_protocol_at_dir_root::<fidl_fuchsia_fs_startup::VolumeMarker>(
@@ -658,12 +647,11 @@ impl ServingMultiVolumeFilesystem {
         .await?
         .map_err(|e| anyhow!(zx::Status::from_raw(e)))?;
 
-        self.insert_volume(volume.to_string(), exposed_dir).await
+        ServingVolume::new(exposed_dir)
     }
 
     /// Sets the max byte limit for a volume. Fails if the volume is not mounted.
     pub async fn set_byte_limit(&self, volume: &str, byte_limit: u64) -> Result<(), Error> {
-        ensure!(self.volumes.contains_key(volume), "Volume not mounted");
         if byte_limit == 0 {
             return Ok(());
         }
@@ -677,8 +665,7 @@ impl ServingMultiVolumeFilesystem {
         .map_err(|e| anyhow!(zx::Status::from_raw(e)))
     }
 
-    pub async fn check_volume(&mut self, volume: &str, options: CheckOptions) -> Result<(), Error> {
-        ensure!(!self.volumes.contains_key(volume), "Already bound");
+    pub async fn check_volume(&self, volume: &str, options: CheckOptions) -> Result<(), Error> {
         let path = format!("volumes/{}", volume);
         connect_to_named_protocol_at_dir_root::<fidl_fuchsia_fs_startup::VolumeMarker>(
             self.exposed_dir.as_ref().unwrap(),
@@ -688,25 +675,6 @@ impl ServingMultiVolumeFilesystem {
         .await?
         .map_err(|e| anyhow!(zx::Status::from_raw(e)))?;
         Ok(())
-    }
-
-    async fn insert_volume(
-        &mut self,
-        volume: String,
-        exposed_dir: fio::DirectoryProxy,
-    ) -> Result<&mut ServingVolume, Error> {
-        let (root_dir, server_end) = create_endpoints::<fio::NodeMarker>();
-        exposed_dir.open(
-            "root",
-            fio::PERM_READABLE | fio::Flags::PERM_INHERIT_WRITE | fio::Flags::PERM_INHERIT_EXECUTE,
-            &Default::default(),
-            server_end.into_channel(),
-        )?;
-        Ok(self.volumes.entry(volume).or_insert(ServingVolume {
-            root_dir: ClientEnd::<fio::DirectoryMarker>::new(root_dir.into_channel()).into_proxy(),
-            binding: None,
-            exposed_dir,
-        }))
     }
 
     /// Provides access to the internal |exposed_dir| for use in testing
@@ -1225,7 +1193,6 @@ mod tests {
             .await
             .expect("Create volume failed");
         vol.query().await.expect("Query volume failed");
-        fs.close_volume("foo");
         // TODO(https://fxbug.dev/42057878) Closing the volume is not synchronous. Immediately reopening the
         // volume will race with the asynchronous close and sometimes fail because the volume is
         // still mounted.
@@ -1244,7 +1211,7 @@ mod tests {
 
         fxfs.format().await.expect("failed to format fxfs");
 
-        let mut fs = fxfs.serve_multi_volume().await.expect("failed to serve fxfs");
+        let fs = fxfs.serve_multi_volume().await.expect("failed to serve fxfs");
         let file = {
             let vol = fs
                 .create_volume("foo", CreateOptions::default(), MountOptions::default())

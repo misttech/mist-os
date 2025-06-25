@@ -100,7 +100,7 @@ impl Test for FxfsRandomOp {
             Box::new(Fxfs { barriers_enabled: self.barriers_enabled, ..Default::default() }),
         );
         fxfs.format().await?;
-        let mut fs = fxfs.serve_multi_volume().await?;
+        let fs = fxfs.serve_multi_volume().await?;
         let crypt = Some(self.setup_crypt_service().await?);
         fs.create_volume(
             "default",
@@ -127,7 +127,7 @@ impl Test for FxfsRandomOp {
             block_connector,
             Box::new(Fxfs { barriers_enabled: self.barriers_enabled, ..Default::default() }),
         );
-        let mut fs = fxfs.serve_multi_volume().await.context("serve multi volume")?;
+        let fs = fxfs.serve_multi_volume().await.context("serve multi volume")?;
         let crypt = Some(self.setup_crypt_service().await.context("set up crypt service")?);
         let volume = fs
             .open_volume("default", MountOptions { crypt, ..MountOptions::default() })
@@ -152,7 +152,7 @@ impl Test for FxfsRandomOp {
         );
         fxfs.fsck().await.context("overall fsck")?;
 
-        let mut fs = fxfs.serve_multi_volume().await.context("failed to serve")?;
+        let fs = fxfs.serve_multi_volume().await.context("failed to serve")?;
         let crypt = Some(self.setup_crypt_service().await.context("set up crypt service")?);
         fs.check_volume("default", CheckOptions { crypt, ..Default::default() })
             .await
