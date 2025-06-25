@@ -21,19 +21,19 @@ async fn main() {
             .unwrap(),
         vec![vec![
             "protocol `fidl.test.components.Trigger`",
-            "not available for target \
-            `root/routing-tests/offers-to-children-unavailable/child-for-offer-from-parent`",
+            "not available for target `child-for-offer-from-parent`",
             "`fidl.test.components.Trigger` was not offered to",
             "`root/routing-tests/offers-to-children-unavailable` by parent",
         ]],
     );
     treasure.insert(
-        "routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-parent".try_into().unwrap(),
+        "routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-parent"
+            .try_into()
+            .unwrap(),
         vec![vec![
             "Optional",
             "protocol `fidl.test.components.Trigger`",
-            "not available for target \
-            `root/routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-parent`",
+            "not available for target `child-for-offer-from-parent`",
             "`fidl.test.components.Trigger` was not offered to",
             "`root/routing-tests/offers-to-children-unavailable-but-optional` by parent",
         ]],
@@ -42,8 +42,7 @@ async fn main() {
         "routing-tests/child".try_into().unwrap(),
         vec![vec![
             "protocol `fidl.test.components.Trigger`",
-            "not available for target \
-            `root/routing-tests/child`",
+            "not available for target `child`",
             "`fidl.test.components.Trigger` was not offered to",
             "`root/routing-tests/child` by parent",
         ]],
@@ -53,8 +52,7 @@ async fn main() {
         vec![vec![
             "Optional",
             "protocol `fidl.test.components.Trigger`",
-            "not available for target \
-            `root/routing-tests/child-with-optional-use`",
+            "not available for target `child-with-optional-use`",
             "`fidl.test.components.Trigger` was not offered to",
             "`root/routing-tests/child-with-optional-use` by parent",
         ]],
@@ -63,8 +61,7 @@ async fn main() {
         "routing-tests/offers-to-children-unavailable/child-for-offer-from-sibling".try_into().unwrap(),
         vec![vec![
             "protocol `fidl.test.components.Trigger`",
-            "not available for target \
-            `root/routing-tests/offers-to-children-unavailable/child-for-offer-from-sibling`",
+            "not available for target `child-for-offer-from-sibling`",
             "`fidl.test.components.Trigger` was not exposed to `root/routing-tests/offers-to-children-unavailable`",
             "from `#child-that-doesnt-expose`"
         ]],
@@ -74,8 +71,7 @@ async fn main() {
         vec![vec![
             "Optional",
             "protocol `fidl.test.components.Trigger`",
-            "not available for target \
-            `root/routing-tests/offers-to-children-unavailable-but-optional/child-for-offer-from-sibling`",
+            "not available for target `child-for-offer-from-sibling`",
             "`fidl.test.components.Trigger` was not exposed to `root/routing-tests/offers-to-children-unavailable-but-optional`",
             "from `#child-that-doesnt-expose`"
         ]],

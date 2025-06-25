@@ -184,6 +184,7 @@ pub async fn report_routing_failure(
 ) {
     let availability = availability.unwrap_or(Availability::Required);
     let moniker = &target.moniker;
+    let child_moniker = moniker.leaf().map(|m| m.as_ref()).unwrap_or("");
     match availability {
         Availability::Required => {
             // TODO(https://fxbug.dev/42060474): consider changing this to `error!()`
@@ -191,8 +192,8 @@ pub async fn report_routing_failure(
                 .log(
                     log::Level::Warn,
                     format!(
-                        "{capability_requested} was not available for target `{moniker}`:\n\t\
-                        {err}\n\tFor more, run `ffx component doctor {moniker}`",
+                        "{capability_requested} was not available for target `{child_moniker}`:\n\t\
+                        {err}\n\tFor more, run `ffx component doctor`",
                     ),
                     &[],
                 )
@@ -213,8 +214,8 @@ pub async fn report_routing_failure(
             target.log(
                 log::Level::Info,
                 format!(
-                    "{availability} {capability_requested} was not available for target `{moniker}`:\n\t\
-                    {err}\n\tFor more, run `ffx component doctor {moniker}`"
+                    "{availability} {capability_requested} was not available for target `{child_moniker}`:\n\t\
+                    {err}\n\tFor more, run `ffx component doctor`"
                 ),
                 &[]
             ).await;
