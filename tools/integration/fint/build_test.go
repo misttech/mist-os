@@ -159,7 +159,7 @@ func TestBuild(t *testing.T) {
 			name:              "empty spec produces no ninja targets",
 			staticSpec:        &fintpb.Static{},
 			expectedArtifacts: &fintpb.BuildArtifacts{},
-			mustRun:           []string{`ninja -C .*out/default$`},
+			mustRun:           []string{`ninja -C .*out/default --chrome_trace ninja_build_trace\.json\.gz$`},
 		},
 		{
 			name:       "artifact dir set",
@@ -171,7 +171,7 @@ func TestBuild(t *testing.T) {
 				BuildstatsJsonFiles: []string{filepath.Join(buildDir, buildstatsJSONName)},
 				NinjatraceJsonFiles: []string{filepath.Join(buildDir, ninjatraceJSONName)},
 			},
-			mustRun: []string{`ninja .*-t graph`, `ninja .*-t compdb`},
+			mustRun: []string{`ninja -C .*out/default --chrome_trace ninja_build_trace\.json\.gz$`},
 		},
 		{
 			name:       "affected tests",
@@ -379,10 +379,6 @@ func TestBuild(t *testing.T) {
 						UploadDest: ninjaDepsPath,
 					},
 					{
-						Path:       filepath.Join(buildDir, ninjaLogPath),
-						UploadDest: ninjaLogPath,
-					},
-					{
 						Path:       filepath.Join(buildDir, ninjatraceJSONName),
 						UploadDest: ninjatraceJSONName,
 					},
@@ -406,36 +402,6 @@ func TestBuild(t *testing.T) {
 			expectedArtifacts: &fintpb.BuildArtifacts{},
 		},
 		{
-			name:       "ninja graph fails",
-			staticSpec: &fintpb.Static{},
-			contextSpec: &fintpb.Context{
-				ArtifactDir: artifactDir,
-			},
-			runnerFunc: func(cmd []string, stdout io.Writer) error {
-				if slices.Contains(cmd, "graph") {
-					return fmt.Errorf("failed to run command: %s", cmd)
-				}
-				return nil
-			},
-			// these errors are now ignored
-			expectedArtifacts: &fintpb.BuildArtifacts{},
-		},
-		{
-			name:       "ninja compdb fails",
-			staticSpec: &fintpb.Static{},
-			contextSpec: &fintpb.Context{
-				ArtifactDir: artifactDir,
-			},
-			runnerFunc: func(cmd []string, stdout io.Writer) error {
-				if slices.Contains(cmd, "compdb") {
-					return fmt.Errorf("failed to run command: %s", cmd)
-				}
-				return nil
-			},
-			// these errors are now ignored
-			expectedArtifacts: &fintpb.BuildArtifacts{},
-		},
-		{
 			name:       "ninjatrace fails",
 			staticSpec: &fintpb.Static{},
 			contextSpec: &fintpb.Context{
@@ -449,42 +415,6 @@ func TestBuild(t *testing.T) {
 			},
 			// these errors are now ignored
 			expectedArtifacts: &fintpb.BuildArtifacts{},
-		},
-		{
-			name:       "ninja graph and compdb fail after failed build",
-			staticSpec: &fintpb.Static{},
-			contextSpec: &fintpb.Context{
-				ArtifactDir: artifactDir,
-			},
-			// This will cause the main ninja build to fail, along with `ninja
-			// compdb` and `ninja graph`.
-			runnerFunc: func(cmd []string, stdout io.Writer) error {
-				if filepath.Base(cmd[0]) == "ninja" {
-					if !slices.Contains(cmd, "-t") {
-						stdout.Write([]byte("[1/1](1) CXX c.o d.o\nFAILED: c.o d.o\nsomeoutput\n"))
-					}
-					return fmt.Errorf("failed to run command: %s", cmd)
-				}
-				// ninjatrace and buildstats succeed
-				return nil
-			},
-			expectErr: true,
-			expectedArtifacts: &fintpb.BuildArtifacts{
-				// Even if post-processing steps like `ninja graph` fail, the
-				// failure summary should still attribute the failure to the
-				// original ninja build error.
-				FailureSummary: "[1/1](1) CXX c.o d.o\nFAILED: c.o d.o\nsomeoutput\n",
-				NinjaActionMetrics: &fintpb.NinjaActionMetrics{
-					InitialActions: 1,
-					FinalActions:   1,
-					ActionsByType: map[string]int32{
-						"CXX": 1,
-					},
-				},
-			},
-			// Trace generation stops on first error, so the last ninja command
-			// run is the graph command.
-			mustRun: []string{`ninja .*-t graph`},
 		},
 		{
 			name: "extra ad-hoc ninja targets",

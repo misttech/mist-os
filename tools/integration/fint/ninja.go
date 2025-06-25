@@ -23,7 +23,6 @@ import (
 
 	"go.fuchsia.dev/fuchsia/tools/build"
 	fintpb "go.fuchsia.dev/fuchsia/tools/integration/fint/proto"
-	"go.fuchsia.dev/fuchsia/tools/lib/osmisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/streams"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
 )
@@ -625,37 +624,12 @@ func buildGnPathForLabel(label string) string {
 	return path.Join(result, "BUILD.gn")
 }
 
-// ninjaGraph runs the ninja graph tool and pipes its stdout to the file at the
-// given path.
-func ninjaGraph(ctx context.Context, r ninjaRunner, targets []string, graphPath string) error {
-	f, err := osmisc.CreateFile(graphPath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	args := append([]string{"-t", "graph"}, targets...)
-	return r.run(ctx, args, f, os.Stderr)
-}
-
-// ninjaCompdb runs the ninja compdb tool and pipes its stdout to the file at
-// the given path.
-func ninjaCompdb(ctx context.Context, r ninjaRunner, compdbPath string) error {
-	f, err := osmisc.CreateFile(compdbPath)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	// Don't specify targets, as we want all build edges to be generated.
-	args := []string{"-t", "compdb"}
-	return r.run(ctx, args, f, os.Stderr)
-}
-
-func runNinjatrace(ctx context.Context, runner subprocessRunner, ninjatraceToolPath string, ninjaLogPath string, compdbPath string, graphPath string, traceJson string) error {
-	cmd := []string{ninjatraceToolPath, "-ninjalog", ninjaLogPath, "-compdb", compdbPath, "-graph", graphPath, "-critical-path", "-trace-json", traceJson}
+func runNinjatrace(ctx context.Context, runner subprocessRunner, ninjatraceToolPath string, ninjaTracePath string, traceJson string) error {
+	cmd := []string{ninjatraceToolPath, "-ninjabuildtrace", ninjaTracePath, "-trace-json", traceJson}
 	return runner.Run(ctx, cmd, subprocess.RunOptions{})
 }
 
-func runBuildstats(ctx context.Context, runner subprocessRunner, buildstatsToolPath string, ninjaLogPath string, compdbPath string, graphPath string, statsOutput string) error {
-	cmd := []string{buildstatsToolPath, "--ninjalog", ninjaLogPath, "--compdb", compdbPath, "--graph", graphPath, "--output", statsOutput}
+func runBuildstats(ctx context.Context, runner subprocessRunner, buildstatsToolPath string, ninjaTracePath string, statsOutput string) error {
+	cmd := []string{buildstatsToolPath, "--ninjatrace", ninjaTracePath, "--output", statsOutput}
 	return runner.Run(ctx, cmd, subprocess.RunOptions{})
 }

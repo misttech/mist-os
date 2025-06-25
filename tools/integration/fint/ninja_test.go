@@ -846,58 +846,6 @@ func TestNinjaDryRun(t *testing.T) {
 	}
 }
 
-func TestNinjaGraph(t *testing.T) {
-	ctx := context.Background()
-	stdout := "ninja\ngraph\nstdout"
-	r := ninjaRunner{
-		runner: &fakeSubprocessRunner{
-			mockStdout: []byte(stdout),
-		},
-		ninjaPath: "ninja",
-		buildDir:  t.TempDir(),
-	}
-	path := filepath.Join(t.TempDir(), "foo.txt")
-	if err := ninjaGraph(ctx, r, []string{"foo", "bar"}, path); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(path)
-	fileContentsBytes, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	fileContents := string(fileContentsBytes)
-	if diff := cmp.Diff(stdout, fileContents); diff != "" {
-		t.Errorf("Unexpected ninja graph file diff (-want +got):\n%s", diff)
-	}
-}
-
-func TestNinjaCompdb(t *testing.T) {
-	ctx := context.Background()
-	stdout := "ninja\ncompdb\nstdout"
-	r := ninjaRunner{
-		runner: &fakeSubprocessRunner{
-			mockStdout: []byte(stdout),
-		},
-		ninjaPath: "ninja",
-		buildDir:  t.TempDir(),
-	}
-	path := filepath.Join(t.TempDir(), "foo.txt")
-	if err := ninjaCompdb(ctx, r, path); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(path)
-	fileContentsBytes, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	fileContents := string(fileContentsBytes)
-	if diff := cmp.Diff(stdout, fileContents); diff != "" {
-		t.Errorf("Unexpected ninja compdb file diff (-want +got):\n%s", diff)
-	}
-}
-
 func TestStripNinjaExplain(t *testing.T) {
 	for _, tc := range []struct {
 		name  string

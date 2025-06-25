@@ -6,28 +6,39 @@
 
 import argparse
 import csv
+import gzip
+import io
 import json
 import pathlib
 import subprocess
 import sys
+import typing as T
 from collections import defaultdict
 
 
-def load_buildstats(gsutil, bid):
+def load_buildstats(gsutil: pathlib.Path, bid: str) -> dict[str, T.Any]:
     gs_paths = [
+        f"gs://fuchsia-artifacts/builds/{bid}/fuchsia-buildstats.json.gz",
         f"gs://fuchsia-artifacts/builds/{bid}/fuchsia-buildstats.json",
+        f"gs://fuchsia-artifacts-internal/builds/{bid}/fuchsia-buildstats.json.gz",
         f"gs://fuchsia-artifacts-internal/builds/{bid}/fuchsia-buildstats.json",
     ]
 
     for p in gs_paths:
         cmd = subprocess.run([gsutil, "cat", p], capture_output=True)
         if cmd.returncode == 0:
-            return json.loads(cmd.stdout)
+            if not p.endswith(".gz"):
+                # This is a regular JSON file.
+                return json.loads(cmd.stdout)
+
+            # This is a gzip-compressed JSON trace file.
+            with gzip.open(io.BytesIO(cmd.stdout), mode="rb") as g:
+                return json.load(g)
 
     raise Exception(f"buildstats.json for {bid} not found, tried: {gs_paths}")
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(
         description="Count and aggregate stats of critical actions through multiple builds specified by build IDs from a file. This script can take a long time to finish because it takes a few seconds to load and process one build.",
     )
@@ -72,9 +83,9 @@ def main():
     if not bids:
         raise Exception(f"No build IDs found in {args.build_ids}")
 
-    counts = defaultdict(int)
-    drags = defaultdict(list)
-    durations = defaultdict(list)
+    counts: T.DefaultDict[str, int] = defaultdict(int)
+    drags: T.DefaultDict[str, list[float]] = defaultdict(list)
+    durations: T.DefaultDict[str, list[float]] = defaultdict(list)
 
     i, tot = 0, len(bids)
 
@@ -123,6 +134,8 @@ def main():
 
     if args.verbose:
         print("DONE")
+
+    return 0
 
 
 if __name__ == "__main__":
