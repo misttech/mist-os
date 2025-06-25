@@ -191,7 +191,7 @@ impl KObjectStore {
     ///
     /// If you create the device yourself, userspace will not be able to instantiate the
     /// device because the `DeviceType` will not be registered with the `DeviceRegistry`.
-    pub(super) fn create_device<F, N>(
+    pub(super) fn create_device_with_ops<F, N>(
         &self,
         _kernel: &Arc<Kernel>,
         name: &FsStr,
@@ -205,13 +205,41 @@ impl KObjectStore {
     {
         let class_cloned = class.clone();
         let metadata_cloned = metadata.clone();
-        let device_kobject = class.kobject().get_or_create_child_with_ops(name, move |kobject| {
+        let kobject = class.kobject().get_or_create_child_with_ops(name, move |kobject| {
             create_device_sysfs_ops(Device::new(
                 kobject.upgrade().unwrap(),
                 class_cloned.clone(),
                 metadata_cloned.clone(),
             ))
         });
+
+        let device = Device::new(kobject, class, metadata);
+        self.add(&device);
+        device
+    }
+
+    pub(super) fn create_device(
+        &self,
+        _kernel: &Arc<Kernel>,
+        name: &FsStr,
+        metadata: Option<DeviceMetadata>,
+        class: Class,
+        build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
+    ) -> Device {
+        let kobject = class.kobject().get_or_create_child(name);
+        let dir = kobject.dir();
+        let device = Device::new(kobject, class, metadata);
+        dir.edit(self.fs(), |dir| {
+            build_directory(&device, dir);
+        });
+        self.add(&device);
+        device
+    }
+
+    fn add(&self, device: &Device) {
+        let class = &device.class;
+        let kobject = device.kobject();
+        let name = kobject.name();
 
         let path_to_device =
             format!("devices/{}/{}/{}", class.bus.kobject().name(), class.kobject().name(), name);
@@ -223,7 +251,7 @@ impl KObjectStore {
             dir.symlink(name, up_up_device.as_ref());
         });
 
-        if let Some(metadata) = &metadata {
+        if let Some(metadata) = &device.metadata {
             let device_number = FsString::from(metadata.device_type.to_string());
             match metadata.mode {
                 DeviceMode::Block => {
@@ -241,10 +269,8 @@ impl KObjectStore {
         }
 
         if let Some(bus_collection) = &class.bus.collection {
-            bus_collection.kobject().insert_child(device_kobject.clone());
+            bus_collection.kobject().insert_child(kobject);
         }
-
-        Device::new(device_kobject, class, metadata)
     }
 
     /// Destroy a device.
@@ -253,7 +279,7 @@ impl KObjectStore {
     ///
     /// Most clients hold weak references to KObjects, which means those references will become
     /// invalid shortly after this function is called.
-    pub(super) fn destroy_device(&self, device: &Device) {
+    pub(super) fn remove(&self, device: &Device) {
         let kobject = device.kobject();
         let name = kobject.name();
         // Remove the device from its views in the reverse order in which it was added.

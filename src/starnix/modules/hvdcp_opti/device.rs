@@ -9,7 +9,6 @@ use super::qbg_file::create_qbg_device;
 use super::utils::{connect_to_device, ReadWriteBytesFile};
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::DeviceMode;
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, LockBefore, Locked};
@@ -44,7 +43,6 @@ where
         "qbg".into(),
         DeviceMetadata::new("qbg".into(), DeviceType::new(484, 0), DeviceMode::Char),
         qdb_class,
-        DeviceDirectory::new,
         create_qbg_device,
     );
 
@@ -55,7 +53,6 @@ where
         "qbg_battery".into(),
         DeviceMetadata::new("qbg_battery".into(), DeviceType::new(485, 0), DeviceMode::Char),
         registry.objects.get_or_create_class("qbg_battery".into(), registry.objects.virtual_bus()),
-        DeviceDirectory::new,
         create_battery_profile_device,
     );
 

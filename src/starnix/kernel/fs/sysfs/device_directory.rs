@@ -6,6 +6,7 @@ use crate::device::kobject::{Device, KObjectBased, KObjectHandle, UEventFsNode};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::InputBuffer;
 use crate::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::pseudo::simple_file::BytesFile;
 use crate::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
@@ -24,6 +25,19 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error};
 use std::sync::Weak;
 
+pub fn init_device_directory(device: &Device, dir: &SimpleDirectoryMutator) {
+    if let Some(metadata) = &device.metadata {
+        dir.entry(
+            "dev",
+            BytesFile::new_node(format!("{}\n", metadata.device_type).into_bytes()),
+            mode!(IFREG, 0o444),
+        );
+    }
+    dir.entry("uevent", UEventFsNode::new(device.clone()), mode!(IFREG, 0o644));
+}
+
+// TODO(https://fxbug.dev/419306849): Remove once we have converted all clients to use SimpleDirectory.
+// For now, we need to keep DeviceDirectory and init_device_directory in sync.
 pub struct DeviceDirectory {
     device: Device,
 }

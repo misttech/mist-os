@@ -10,7 +10,6 @@ use crate::server::{init_viewport_scene, start_presentation_loop, FramebufferSer
 use fuchsia_component::client::connect_to_protocol_sync;
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::{DeviceMode, DeviceOps};
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::{CurrentTask, Kernel};
@@ -89,7 +88,6 @@ impl Framebuffer {
             "fb0".into(),
             DeviceMetadata::new("fb0".into(), DeviceType::FB0, DeviceMode::Char),
             graphics_class,
-            DeviceDirectory::new,
             FramebufferDevice { framebuffer: framebuffer.clone() },
         );
 

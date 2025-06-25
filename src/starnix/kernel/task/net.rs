@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::device::kobject::Device;
-use crate::fs::sysfs::DeviceDirectory;
 use crate::task::waiter::WaitQueue;
 use crate::task::Kernel;
 use crate::vfs::{FsStr, FsString};
@@ -33,7 +32,7 @@ pub struct NetstackDevices {
 impl NetstackDevices {
     pub fn add_device(&self, kernel: &Arc<Kernel>, name: &FsStr, interface_id: NonZeroU64) {
         let mut devices = self.devices.lock();
-        let device = kernel.device_registry.add_net_device(kernel, name, DeviceDirectory::new);
+        let device = kernel.device_registry.add_net_device(kernel, name);
         devices.insert(name.into(), NetstackDevice { device, interface_id });
     }
 

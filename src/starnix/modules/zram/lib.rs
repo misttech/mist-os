@@ -175,7 +175,7 @@ where
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
     let virtual_block_class = registry.objects.virtual_block_class();
-    registry.register_device(
+    registry.register_device_with_sysfs_ops(
         locked,
         system_task,
         "zram0".into(),

@@ -15,7 +15,6 @@ use fidl_fuchsia_ui_test_input::{
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::fileops_impl_seekless;
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
@@ -58,7 +57,6 @@ pub fn register_uinput_device(
         "uinput".into(),
         DeviceMetadata::new("uinput".into(), device_type::DeviceType::UINPUT, DeviceMode::Char),
         misc_class,
-        DeviceDirectory::new,
         device,
     );
 }
@@ -87,7 +85,6 @@ where
             DeviceMode::Char,
         ),
         input_class,
-        DeviceDirectory::new,
         dev_ops,
     )
 }

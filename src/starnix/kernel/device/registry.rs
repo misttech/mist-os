@@ -5,7 +5,7 @@
 use crate::device::kobject::{Class, Device, DeviceMetadata, UEventAction, UEventContext};
 use crate::device::kobject_store::KObjectStore;
 use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node};
-use crate::fs::sysfs::DeviceDirectory;
+use crate::fs::sysfs::init_device_directory;
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{FileOps, FsNode, FsNodeOps, FsStr, FsString};
 use starnix_logging::{log_error, log_warn};
@@ -329,7 +329,35 @@ impl DeviceRegistry {
     ///
     /// Finally, the `dev_ops` parameter is where you provide the callback for instantiating
     /// your device.
-    pub fn register_device<F, N, L>(
+    pub fn register_device<L>(
+        &self,
+        locked: &mut Locked<L>,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        metadata: DeviceMetadata,
+        class: Class,
+        dev_ops: impl DeviceOps,
+    ) -> Device
+    where
+        L: LockBefore<FileOpsCore>,
+    {
+        let entry = DeviceEntry::new(name.into(), dev_ops);
+        self.devices(metadata.mode).register_minor(metadata.device_type, entry);
+        let device = self.objects.create_device(
+            current_task.kernel(),
+            name,
+            Some(metadata),
+            class,
+            init_device_directory,
+        );
+        self.notify_device(locked, current_task, device.clone());
+        device
+    }
+
+    /// Deprecated. Use `register_device` instead.
+    ///
+    /// See `register_device` for an explanation of the parameters.
+    pub fn register_device_with_sysfs_ops<F, N, L>(
         &self,
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
@@ -346,7 +374,7 @@ impl DeviceRegistry {
     {
         let entry = DeviceEntry::new(name.into(), dev_ops);
         self.devices(metadata.mode).register_minor(metadata.device_type, entry);
-        let device = self.objects.create_device(
+        let device = self.objects.create_device_with_ops(
             current_task.kernel(),
             name,
             Some(metadata),
@@ -382,7 +410,6 @@ impl DeviceRegistry {
             name,
             metadata,
             self.objects.misc_class(),
-            DeviceDirectory::new,
             dev_ops,
         ))
     }
@@ -449,7 +476,7 @@ impl DeviceRegistry {
     {
         let device_type = self.state.lock().dyn_chardev_allocator.allocate()?;
         let metadata = DeviceMetadata::new(dev_name.into(), device_type, DeviceMode::Char);
-        Ok(self.register_device(
+        Ok(self.register_device_with_sysfs_ops(
             locked,
             current_task,
             name,
@@ -500,7 +527,7 @@ impl DeviceRegistry {
         L: LockBefore<FileOpsCore>,
     {
         self.devices(metadata.mode).get(metadata.device_type).expect("device is registered");
-        let device = self.objects.create_device(
+        let device = self.objects.create_device_with_ops(
             current_task.kernel(),
             name,
             Some(metadata),
@@ -522,22 +549,13 @@ impl DeviceRegistry {
     /// ```
     ///
     /// Currently, we only register the net devices by name and use an empty `uevent` file.
-    pub fn add_net_device<F, N>(
-        &self,
-        kernel: &Arc<Kernel>,
-        name: &FsStr,
-        create_device_sysfs_ops: F,
-    ) -> Device
-    where
-        F: Fn(Device) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
-    {
+    pub fn add_net_device(&self, kernel: &Arc<Kernel>, name: &FsStr) -> Device {
         self.objects.create_device(
             kernel,
             name,
             None,
             self.objects.net_class(),
-            create_device_sysfs_ops,
+            init_device_directory,
         )
     }
 
@@ -546,7 +564,7 @@ impl DeviceRegistry {
     /// See `add_net_device` for more details.
     pub fn remove_net_device(&self, device: Device) {
         assert!(device.metadata.is_none());
-        self.objects.destroy_device(&device);
+        self.objects.remove(&device);
     }
 
     /// Directly add a device to the KObjectStore that lacks a device number.
@@ -568,7 +586,7 @@ impl DeviceRegistry {
         N: FsNodeOps,
         L: LockBefore<FileOpsCore>,
     {
-        self.objects.create_device(
+        self.objects.create_device_with_ops(
             current_task.kernel(),
             name,
             None,
@@ -598,7 +616,7 @@ impl DeviceRegistry {
             }
         }
 
-        self.objects.destroy_device(&device);
+        self.objects.remove(&device);
     }
 
     /// Returns a list of the registered major device numbers for the given `DeviceMode` and their

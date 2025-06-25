@@ -10,7 +10,7 @@ use starnix_core::fs::devpts::{dev_pts_fs, tty_device_init};
 use starnix_core::fs::devtmpfs::dev_tmp_fs;
 use starnix_core::fs::fuchsia::nmfs::fuchsia_network_monitor_fs;
 use starnix_core::fs::fuchsia::{new_remote_fs, new_remote_vol};
-use starnix_core::fs::sysfs::{sys_fs, DeviceDirectory};
+use starnix_core::fs::sysfs::sys_fs;
 use starnix_core::fs::tmpfs::tmp_fs;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::fs_registry::FsRegistry;
@@ -44,7 +44,6 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         "hw_random".into(),
         DeviceMetadata::new("hwrng".into(), DeviceType::HW_RANDOM, DeviceMode::Char),
         misc_class.clone(),
-        DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
     );
     registry.register_device(
@@ -53,7 +52,6 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         "fuse".into(),
         DeviceMetadata::new("fuse".into(), DeviceType::FUSE, DeviceMode::Char),
         misc_class.clone(),
-        DeviceDirectory::new,
         open_fuse_device,
     );
     registry.register_device(
@@ -62,7 +60,6 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         "device-mapper".into(),
         DeviceMetadata::new("mapper/control".into(), DeviceType::DEVICE_MAPPER, DeviceMode::Char),
         misc_class.clone(),
-        DeviceDirectory::new,
         create_device_mapper,
     );
     registry.register_device(
@@ -71,7 +68,6 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         "loop-control".into(),
         DeviceMetadata::new("loop-control".into(), DeviceType::LOOP_CONTROL, DeviceMode::Char),
         misc_class.clone(),
-        DeviceDirectory::new,
         create_loop_control_device,
     );
     registry.register_device(
@@ -80,7 +76,6 @@ fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
         "tun".into(),
         DeviceMetadata::new("tun".into(), DeviceType::TUN, DeviceMode::Char),
         misc_class,
-        DeviceDirectory::new,
         simple_device_ops::<DevTun>,
     );
 }

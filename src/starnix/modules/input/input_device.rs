@@ -7,7 +7,6 @@ use crate::InputFile;
 use fuchsia_inspect::{NumericProperty, Property};
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::{DeviceMode, DeviceOps};
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode, FsString};
 #[cfg(test)]
@@ -247,7 +246,6 @@ impl InputDevice {
                 DeviceMode::Char,
             ),
             input_class,
-            DeviceDirectory::new,
             self,
         );
     }

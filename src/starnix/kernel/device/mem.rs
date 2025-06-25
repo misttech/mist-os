@@ -4,7 +4,6 @@
 
 use crate::device::kobject::DeviceMetadata;
 use crate::device::{simple_device_ops, DeviceMode};
-use crate::fs::sysfs::DeviceDirectory;
 use crate::mm::{
     create_anonymous_mapping_memory, DesiredAddress, MappingName, MappingOptions,
     MemoryAccessorExt, ProtectionFlags,
@@ -452,7 +451,6 @@ where
         "null".into(),
         DeviceMetadata::new("null".into(), DeviceType::NULL, DeviceMode::Char),
         mem_class.clone(),
-        DeviceDirectory::new,
         simple_device_ops::<DevNull>,
     );
     registry.register_device(
@@ -461,7 +459,6 @@ where
         "zero".into(),
         DeviceMetadata::new("zero".into(), DeviceType::ZERO, DeviceMode::Char),
         mem_class.clone(),
-        DeviceDirectory::new,
         simple_device_ops::<DevZero>,
     );
     registry.register_device(
@@ -470,7 +467,6 @@ where
         "full".into(),
         DeviceMetadata::new("full".into(), DeviceType::FULL, DeviceMode::Char),
         mem_class.clone(),
-        DeviceDirectory::new,
         simple_device_ops::<DevFull>,
     );
     registry.register_device(
@@ -479,7 +475,6 @@ where
         "random".into(),
         DeviceMetadata::new("random".into(), DeviceType::RANDOM, DeviceMode::Char),
         mem_class.clone(),
-        DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
     );
     registry.register_device(
@@ -488,7 +483,6 @@ where
         "urandom".into(),
         DeviceMetadata::new("urandom".into(), DeviceType::URANDOM, DeviceMode::Char),
         mem_class.clone(),
-        DeviceDirectory::new,
         simple_device_ops::<DevRandom>,
     );
     registry.register_device(
@@ -497,7 +491,6 @@ where
         "kmsg".into(),
         DeviceMetadata::new("kmsg".into(), DeviceType::KMSG, DeviceMode::Char),
         mem_class,
-        DeviceDirectory::new,
         open_kmsg,
     );
 }
