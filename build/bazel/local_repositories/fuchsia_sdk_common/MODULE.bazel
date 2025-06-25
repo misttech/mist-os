@@ -6,5 +6,3 @@ module(
     name = "fuchsia_sdk_common",
     version = "",
 )
-
-bazel_dep(name = "platforms", version = "0.0.11")

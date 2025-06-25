@@ -309,29 +309,11 @@ def _fuchsia_build_config_ext_impl(module_ctx):
     if fuchsia_source_dir:
         fuchsia_source_dir += "/../.."
 
-    for mod in module_ctx.modules:
-        if not mod.is_root:
-            continue
-        for d in mod.tags.local:
-            if d.fuchsia_source_dir:
-                fuchsia_source_dir = d.fuchsia_source_dir
-
     fuchsia_build_config_repository(
         name = "fuchsia_build_config",
         fuchsia_source_dir = fuchsia_source_dir,
     )
 
-_local_tag = tag_class(
-    attrs = {
-        "fuchsia_source_dir": attr.string(
-            mandatory = False,
-            doc = "Path to the Fuchsia source directory, relative to the " +
-                  "current workspace.",
-        ),
-    },
-)
-
 fuchsia_build_config_ext = module_extension(
     implementation = _fuchsia_build_config_ext_impl,
-    tag_classes = {"local": _local_tag},
 )

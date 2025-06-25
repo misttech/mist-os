@@ -7,93 +7,26 @@ module(
     version = "1.0",
 )
 
-_FUCHSIA_SOURCE_ROOT = "../../.."
-
-bazel_dep(name = "bazel_skylib", version = "1.7.1")
-bazel_dep(name = "platforms", version = "0.0.11")
-bazel_dep(name = "rules_cc", version = "0.1.1")
-bazel_dep(name = "rules_license", version = "1.0.0")
-bazel_dep(name = "rules_python", version = "1.4.0")
-bazel_dep(name = "protobuf", version = "", repo_name = "com_google_protobuf")
-local_path_override(
-    module_name = "protobuf",
-    path = "{}/third_party/protobuf".format(_FUCHSIA_SOURCE_ROOT),
-)
-
-bazel_dep(name = "abseil-cpp", version = "head")
-local_path_override(
-    module_name = "abseil-cpp",
-    path = "{}/third_party/abseil-cpp".format(_FUCHSIA_SOURCE_ROOT),
-)
-
-bazel_dep(name = "rules_fuchsia", version = "", repo_name = "rules_fuchsia")
+bazel_dep(name = "platforms", version = "0.0.10")
+bazel_dep(name = "bazel_skylib", version = "1.5.0")
+bazel_dep(name = "rules_python", version = "0.22.1")
+bazel_dep(name = "rules_license", version = "0.0.8")
+bazel_dep(name = "googletest", version = "1.12.1", repo_name = "com_google_googletest")
+bazel_dep(name = "rules_fuchsia", version = "")
 local_path_override(
     module_name = "rules_fuchsia",
-    path = "{}/build/bazel_sdk/bazel_rules_fuchsia".format(_FUCHSIA_SOURCE_ROOT),
+    path = "../bazel_rules_fuchsia",
 )
 
-bazel_dep(name = "googletest", version = "1.17.0", repo_name = "com_google_googletest")
-local_path_override(
-    module_name = "googletest",
-    path = "../../../third_party/googletest/src",
-)
-
-bazel_dep(name = "fuchsia_sdk_common", version = "")
-local_path_override(
-    module_name = "fuchsia_sdk_common",
-    path = "{}/build/bazel/local_repositories/fuchsia_sdk_common".format(_FUCHSIA_SOURCE_ROOT),
-)
-
-fuchsia_sdk_ext = use_extension(
-    "@rules_fuchsia//fuchsia/workspace:fuchsia_sdk_repository.bzl",
-    "fuchsia_sdk_ext",
-)
-fuchsia_sdk_ext.local(
-    path = "{}/build/bazel_sdk/bazel_rules_fuchsia".format(_FUCHSIA_SOURCE_ROOT),
-)
-use_repo(fuchsia_sdk_ext, "fuchsia_sdk")
-
-fuchsia_sdk_repository = use_repo_rule(
-    "@rules_fuchsia//fuchsia:deps.bzl",
-    "fuchsia_sdk_repository",
-)
-
-register_toolchains("//:fuchsia_sdk_devicetree_toolchain")
-
-fuchsia_build_config_ext = use_extension("@fuchsia_sdk_common//common:fuchsia_platform_build.bzl", "fuchsia_build_config_ext")
-fuchsia_build_config_ext.local(fuchsia_source_dir = _FUCHSIA_SOURCE_ROOT)
+fuchsia_build_config_ext = use_extension("@rules_fuchsia//common:fuchsia_platform_build.bzl", "fuchsia_build_config_ext")
 use_repo(fuchsia_build_config_ext, "fuchsia_build_config")
 
-fuchsia_clang_ext = use_extension(
-    "@rules_fuchsia//fuchsia/workspace:fuchsia_clang_repository.bzl",
-    "fuchsia_clang_ext",
-)
-fuchsia_clang_ext.local(
-    local_path = "@@fuchsia_sdk_common++fuchsia_build_config_ext+fuchsia_build_config//:host_prebuilts/clang",
-    local_version_file = "//:fuchsia_build_generated/fuchsia_clang.hash",
-)
+fuchsia_sdk_ext = use_extension("@rules_fuchsia//fuchsia:deps.bzl", "fuchsia_sdk_ext")
+use_repo(fuchsia_sdk_ext, "fuchsia_sdk")
+
+fuchsia_clang_ext = use_extension("@rules_fuchsia//fuchsia/workspace:fuchsia_clang_repository.bzl", "fuchsia_clang_ext")
 use_repo(fuchsia_clang_ext, "fuchsia_clang")
 
-register_toolchains("@fuchsia_clang//:all")
-
-compact_python_runtime_repository = use_repo_rule(
-    "@rules_fuchsia//common:toolchains/python/repository_rule.bzl",
-    "compact_python_runtime_repository",
+register_toolchains(
+    "@fuchsia_sdk//:fuchsia_toolchain_sdk",
 )
-
-compact_python_runtime_repository(
-    name = "prebuilt_python",
-    # LINT.IfChange
-    content_hash_file = "fuchsia_build_generated/prebuilt_python.hash",
-    # LINT.ThenChange(scripts/workspace_utils.py)
-)
-
-register_toolchains("@prebuilt_python//:all")
-
-# The following deps are not needed by the tests. They are here to make sure the
-# tests do NOT try to depend on different versions of common deps transitively
-# depended on by them, so it won't fail local Bazel registry lookup. For this
-# reason, they are intentionally kept as the same version as the toplevel
-# module.
-bazel_dep(name = "rules_rust", version = "0.59.1")
-bazel_dep(name = "rules_go", version = "0.54.0", repo_name = "io_bazel_rules_go")

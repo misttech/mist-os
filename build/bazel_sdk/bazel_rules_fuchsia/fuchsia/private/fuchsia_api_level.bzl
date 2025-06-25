@@ -19,13 +19,9 @@ FuchsiaAPILevelInfo = provider(
     },
 )
 
-# Use the canonical repo name for @fuchsia_sdk so it correctly resolves in repos
-# that don't depend on @fuchsia_sdk directly.
-_CANONICAL_FUCHSIA_SDK_REPO_NAME = Label("@fuchsia_sdk").repo_name
-
 # The name for the API level target.
-FUCHSIA_API_LEVEL_TARGET = "@@{}//flags:fuchsia_api_level".format(_CANONICAL_FUCHSIA_SDK_REPO_NAME)
-REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET = "@@{}//flags:repository_default_fuchsia_api_level".format(_CANONICAL_FUCHSIA_SDK_REPO_NAME)
+FUCHSIA_API_LEVEL_TARGET = "@fuchsia_sdk//flags:fuchsia_api_level"
+REPOSITORY_DEFAULT_FUCHSIA_API_LEVEL_TARGET = "@fuchsia_sdk//flags:repository_default_fuchsia_api_level"
 
 # Rules that require the fuchsia api level should depend on this attribute set.
 # They can then use the helper functions in this file to get the flags needed.

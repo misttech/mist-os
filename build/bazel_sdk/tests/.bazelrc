@@ -33,6 +33,9 @@ build --host_crosstool_top=@bazel_tools//tools/cpp:toolchain
 # to improve hermeticity and caching.
 build --incompatible_strict_action_env=true
 
+# Bzlmod is not supported yet.
+common --enable_bzlmod=false
+
 build --flag_alias=override_fuchsia_api_level=@fuchsia_sdk//flags:fuchsia_api_level
 build --flag_alias=default_fuchsia_api_level=@fuchsia_sdk//flags:repository_default_fuchsia_api_level
 

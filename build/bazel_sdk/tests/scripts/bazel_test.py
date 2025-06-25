@@ -53,14 +53,6 @@ _INPUT_MODE_IN_TREE = "in-tree"
 _INPUT_MODE_SDK = "sdk"
 _INPUT_MODE_IDK = "idk"
 
-_CANONICAL_FUCHSIA_SDK_REPO_NAME = "rules_fuchsia++fuchsia_sdk_ext+fuchsia_sdk"
-_CANONICAL_IN_TREE_IDK_REPO_NAME = "+fuchsia_idk+fuchsia_in_tree_idk"
-
-# Maps from apparent repo names to canonical repo names.
-_APPARENT_REPO_NAME_TO_CANONICAL = {
-    "fuchsia_sdk": _CANONICAL_FUCHSIA_SDK_REPO_NAME,
-}
-
 # Type alias for string or Path type.
 # NOTE: With python 3.10+, it is possible to use 'str | Path' directly.
 StrOrPath = T.Union[str, Path]
@@ -316,18 +308,25 @@ class BazelRepositoryMap(object):
         self._output_base = output_base
 
         # These repository overrides are passed to the Bazel invocation.
-        self._overrides: T.Dict[str, Path] = {}
+        self._overrides: T.Dict[str, Path] = {
+            "rules_cc": fuchsia_source_dir / "third_party/bazel_rules_cc",
+            "rules_license": fuchsia_source_dir
+            / "third_party/bazel_rules_license",
+            "remote_coverage_tools": fuchsia_source_dir
+            / "build/bazel/local_repositories/remote_coverage_tools",
+            "rules_fuchsia": fuchsia_source_dir
+            / "build/bazel_sdk/bazel_rules_fuchsia",
+        }
 
         if explicit_fuchsia_sdk:
-            self._overrides[
-                _CANONICAL_FUCHSIA_SDK_REPO_NAME
-            ] = explicit_fuchsia_sdk.resolve()
+            self._overrides["fuchsia_sdk"] = explicit_fuchsia_sdk.resolve()
         if explicit_fuchsia_in_tree_idk:
             self._overrides[
-                _CANONICAL_IN_TREE_IDK_REPO_NAME
+                "fuchsia_in_tree_idk"
             ] = explicit_fuchsia_in_tree_idk.resolve()
-
-        _bazel_vendor_dir = fuchsia_source_dir / "third_party" / "bazel_vendor"
+            self._overrides[
+                "+fuchsia_idk+fuchsia_in_tree_idk"
+            ] = explicit_fuchsia_in_tree_idk.resolve()
 
         # These repository overrides are used when converting Bazel labels to actual paths.
         # NOTE: Mapping labels to repository inputs is considerably simpler than
@@ -337,28 +336,22 @@ class BazelRepositoryMap(object):
         # by the GN build_fuchsia_sdk_repository target which is an input
         # dependency for running this script.
         self._internal_overrides = self._overrides | {
-            "rules_cc": _bazel_vendor_dir / "rules_cc+",
-            "rules_license": _bazel_vendor_dir / "rules_license+",
-            "bazel_tools+remote_coverage_tools_extension+remote_coverage_tools": _bazel_vendor_dir
-            / "bazel_tools+remote_coverage_tools_extension+remote_coverage_tools",
-            "bazel_skylib": _bazel_vendor_dir / "bazel_skylib+",
-            "rules_python": _bazel_vendor_dir / "rules_python+",
-            "platforms": _bazel_vendor_dir / "platforms",
+            "bazel_skylib": fuchsia_source_dir / "third_party/bazel_skylib",
             "com_google_googletest": fuchsia_source_dir
             / "third_party/googletest/src",
-            "rules_fuchsia": fuchsia_source_dir
-            / "build/bazel_sdk/bazel_rules_fuchsia",
+            "rules_python": fuchsia_source_dir
+            / "third_party/bazel_rules_python",
+            "platforms": fuchsia_source_dir / "third_party/bazel_platforms",
             "prebuilt_python": self.IGNORED_REPO,
             "fuchsia_clang": self.IGNORED_REPO,
             "bazel_tools": self.IGNORED_REPO,
-            "bazel_tools+cc_configure_extension+local_config_cc": self.IGNORED_REPO,
-            "platforms+host_platform+host_platform": self.IGNORED_REPO,
-            "rules_python++internal_deps+rules_python_internal": self.IGNORED_REPO,
-            "rules_python++python+pythons_hub": self.IGNORED_REPO,
+            "local_config_cc": self.IGNORED_REPO,
+            "host_platform": self.IGNORED_REPO,
+            "rules_python_internal": self.IGNORED_REPO,
         }
 
         if not explicit_fuchsia_sdk:
-            self._internal_overrides[_CANONICAL_FUCHSIA_SDK_REPO_NAME] = (
+            self._internal_overrides["fuchsia_sdk"] = (
                 self._fuchsia_source_dir / "build/bazel_sdk/bazel_rules_fuchsia"
             )
 
@@ -387,10 +380,7 @@ class BazelRepositoryMap(object):
             assert (
                 sep
             ), f"Build file path has invalid repository root: {bazel_path}"
-            repo_name = repo_name.removeprefix("@@").removeprefix("@")
-            repo_name = _APPARENT_REPO_NAME_TO_CANONICAL.get(
-                repo_name, repo_name
-            )
+            repo_name = repo_name[1:]
             _repo_dir = self._internal_overrides.get(repo_name, None)
             assert _repo_dir, (
                 f"Unknown repository name {repo_name} in build file path: {bazel_path}\n"
@@ -737,11 +727,6 @@ def main() -> int:
     downloader_config_file = (
         fuchsia_source_dir / "build/bazel/config/no_downloads_allowed.config"
     )
-    bazel_vendor_dir = fuchsia_source_dir / "third_party/bazel_vendor"
-    bazel_registry = (
-        fuchsia_source_dir
-        / "third_party/bazel_vendor/_registries/bcr.bazel.build"
-    )
 
     # To ensure that the repository rules for @fuchsia_clang and
     # @prebuilt_python are re-run properly when the content of the prebuilt
@@ -851,7 +836,7 @@ def main() -> int:
             / "bazel"
             / "output_base"
             / "external"
-            / _CANONICAL_FUCHSIA_SDK_REPO_NAME
+            / "rules_fuchsia++fuchsia_sdk_ext+fuchsia_sdk"
         )
         explicit_fuchsia_in_tree_idk = (
             fuchsia_build_dir
@@ -860,7 +845,7 @@ def main() -> int:
             / "bazel"
             / "output_base"
             / "external"
-            / _CANONICAL_IN_TREE_IDK_REPO_NAME
+            / "+fuchsia_idk+fuchsia_in_tree_idk"
         )
     elif input_mode == _INPUT_MODE_SDK:
         # Only override @fuchsia_sdk to point to the full SDK directory.
@@ -884,10 +869,11 @@ def main() -> int:
         # *silently* with a Java exception, leaving no traces on the client
         # terminal :-(
         f"--experimental_downloader_config={downloader_config_file}",
-        "--enable_bzlmod=true",
-        "--incompatible_use_plus_in_repo_names",
-        f"--vendor_dir={bazel_vendor_dir}",
-        f"--registry=file://{bazel_registry}",
+        # TODO: b/318334703 - Enable bzlmod when the Fuchsia build is ready.
+        #
+        # NOTE: Bazel 7 turns on bzlmod by default, so it need to be explicitly
+        # turned off here.
+        "--enable_bzlmod=false",
     ]
 
     # Override repositories since all downloads are forbidden.
