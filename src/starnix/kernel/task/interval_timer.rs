@@ -252,14 +252,18 @@ impl IntervalTimer {
                     new_value.it_value,
                 )?)
         };
-        let interval = duration_from_timespec(new_value.it_interval)?;
 
+        // Stop the current running task.
+        guard.disarm();
+
+        let interval = duration_from_timespec(new_value.it_interval)?;
+        guard.interval = interval;
         if let Some(hr_timer) = &self.hr_timer {
+            // It is important for power management that the hrtimer is marked as interval, as
+            // interval timers may prohibit container suspension.  Note that marking `is_interval`
+            // changes the hrtimer ID, which is only allowed if the hrtimer is not running.
             *hr_timer.is_interval.lock() = guard.interval != zx::SyntheticDuration::default();
         }
-
-        // Stop the current running task;
-        guard.disarm();
 
         if target_time.is_zero() {
             return Ok(());
@@ -267,7 +271,6 @@ impl IntervalTimer {
 
         guard.armed = true;
         guard.target_time = target_time;
-        guard.interval = interval;
         guard.on_setting_changed();
 
         let kernel_ref = current_task.kernel().clone();
