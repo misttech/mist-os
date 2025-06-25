@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::CurrentTask;
+use crate::task::Kernel;
 use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::pseudo::simple_file::create_bytes_file_with_handler;
 use crate::vfs::pseudo::stub_empty_file::StubEmptyFile;
@@ -12,8 +12,7 @@ use std::sync::Arc;
 
 /// This directory contains various files and subdirectories that provide information about
 /// the running kernel.
-pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &SimpleDirectoryMutator) {
-    let kernel = current_task.kernel();
+pub fn sysfs_kernel_directory(kernel: &Arc<Kernel>, dir: &SimpleDirectoryMutator) {
     dir.subdir("kernel", 0o755, |dir| {
         dir.subdir("tracing", 0o755, |_| ());
         dir.subdir("mm", 0o755, |dir| {

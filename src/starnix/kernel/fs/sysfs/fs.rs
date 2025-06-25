@@ -7,7 +7,7 @@ use crate::fs::sysfs::{
     sysfs_kernel_directory, sysfs_power_directory, CpuClassDirectory, KObjectDirectory,
     VulnerabilitiesClassDirectory,
 };
-use crate::task::CurrentTask;
+use crate::task::{CurrentTask, Kernel};
 use crate::vfs::pseudo::simple_directory::{SimpleDirectory, SimpleDirectoryMutator};
 use crate::vfs::pseudo::simple_file::BytesFile;
 use crate::vfs::pseudo::stub_empty_file::StubEmptyFile;
@@ -23,6 +23,7 @@ use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::{statfs, SYSFS_MAGIC};
+use std::sync::Arc;
 
 pub const SYSFS_DEVICES: &str = "devices";
 pub const SYSFS_BUS: &str = "bus";
@@ -46,8 +47,7 @@ impl FileSystemOps for SysFs {
 }
 
 impl SysFs {
-    fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
-        let kernel = current_task.kernel();
+    fn new_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHandle {
         let registry = &kernel.device_registry;
 
         let fs = FileSystem::new_with_node_cache(
@@ -92,8 +92,8 @@ impl SysFs {
         dir.entry(SYSFS_CLASS, registry.objects.class.ops(), dir_mode);
         dir.entry(SYSFS_DEV, registry.objects.dev.ops(), dir_mode);
 
-        sysfs_kernel_directory(current_task, &dir);
-        sysfs_power_directory(current_task, &dir);
+        sysfs_kernel_directory(kernel, &dir);
+        sysfs_power_directory(kernel, &dir);
 
         dir.subdir("module", 0o755, |dir| {
             dir.subdir("dm_verity", 0o755, |dir| {
@@ -130,14 +130,17 @@ struct SysFsHandle(FileSystemHandle);
 pub fn sys_fs(
     _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
-    options: FileSystemOptions,
+    _options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    Ok(current_task
-        .kernel()
+    Ok(get_sysfs(current_task.kernel()))
+}
+
+pub fn get_sysfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
+    kernel
         .expando
-        .get_or_init(|| SysFsHandle(SysFs::new_fs(current_task, options)))
+        .get_or_init(|| SysFsHandle(SysFs::new_fs(kernel, FileSystemOptions::default())))
         .0
-        .clone())
+        .clone()
 }
 
 /// Creates a path to the `to` kobject in the devices tree, relative to the `from` kobject from

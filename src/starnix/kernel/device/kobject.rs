@@ -65,6 +65,17 @@ impl KObject {
         Self::new_root_with_ops(name, node_cache, KObjectDirectory::new)
     }
 
+    pub fn new_root_with_dir(name: &FsStr, node_cache: Arc<FsNodeCache>) -> KObjectHandle {
+        Arc::new(Self {
+            ino: node_cache.allocate_ino().unwrap(),
+            name: name.to_owned(),
+            parent: None,
+            node_cache,
+            children: Default::default(),
+            node: KObjectFsNode::Directory(SimpleDirectory::new()),
+        })
+    }
+
     pub fn new_root_with_ops<F, N>(
         name: &FsStr,
         node_cache: Arc<FsNodeCache>,
@@ -140,6 +151,13 @@ impl KObject {
         match &self.node {
             KObjectFsNode::Factory(ops) => ops.as_ref()(Arc::downgrade(self)),
             KObjectFsNode::Directory(dir) => Box::new(dir.clone()),
+        }
+    }
+
+    pub fn dir(self: &KObjectHandle) -> Arc<SimpleDirectory> {
+        match &self.node {
+            KObjectFsNode::Factory(_) => panic!("KObject does not have a directory"),
+            KObjectFsNode::Directory(dir) => dir.clone(),
         }
     }
 

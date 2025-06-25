@@ -6,7 +6,7 @@ use crate::task::CurrentTask;
 use crate::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_unbounded_seek,
     fs_node_impl_dir_readonly, DirectoryEntryType, DirentSink, FileObject, FileOps,
-    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString, SymlinkNode,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::auth::FsCred;
@@ -52,7 +52,13 @@ impl SimpleDirectoryMutator {
         self.node(name, node);
     }
 
-    pub fn subdir(&self, name: &str, mode: u32, build_subdir: impl Fn(&Self)) {
+    pub fn symlink(&self, name: &FsStr, target: &FsStr) {
+        let (ops, info) = SymlinkNode::new(target, FsCred::root());
+        let node = self.fs.create_node_and_allocate_node_id(ops, info);
+        self.node(name.into(), node);
+    }
+
+    pub fn subdir(&self, name: &str, mode: u32, build_subdir: impl FnOnce(&Self)) {
         let dir = {
             let mut entries = self.directory.entries.lock();
             let name: &FsStr = name.into();
@@ -82,6 +88,33 @@ pub struct SimpleDirectory {
 impl SimpleDirectory {
     pub fn new() -> Arc<Self> {
         Arc::new(SimpleDirectory { entries: Default::default() })
+    }
+
+    pub fn remove(&self, name: &FsStr) {
+        self.entries.lock().remove(name);
+    }
+
+    pub fn remove_path(self: &Arc<Self>, path: &FsStr) {
+        let mut components = path.split(|c| *c == b'/');
+        let mut current = self.clone();
+        while let Some(component) = components.next() {
+            assert!(!component.is_empty());
+            assert_ne!(&component, b".");
+            assert_ne!(&component, b"..");
+            let Some(next) = current.peek_dir(component.into()) else {
+                return;
+            };
+            current = next;
+        }
+        current.remove(path);
+    }
+
+    fn peek_dir(&self, name: &FsStr) -> Option<Arc<SimpleDirectory>> {
+        let entries = self.entries.lock();
+        entries
+            .get(name)
+            .and_then(|node| node.downcast_ops::<Arc<SimpleDirectory>>())
+            .map(Arc::clone)
     }
 }
 

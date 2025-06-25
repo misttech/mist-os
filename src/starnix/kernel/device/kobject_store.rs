@@ -7,11 +7,13 @@ use crate::device::kobject::{
 };
 use crate::device::DeviceMode;
 use crate::fs::sysfs::{
-    BusCollectionDirectory, KObjectDirectory, KObjectSymlinkDirectory, SYSFS_BLOCK, SYSFS_BUS,
-    SYSFS_CLASS, SYSFS_DEV, SYSFS_DEVICES,
+    get_sysfs, BusCollectionDirectory, KObjectDirectory, KObjectSymlinkDirectory, SYSFS_BLOCK,
+    SYSFS_BUS, SYSFS_CLASS, SYSFS_DEV, SYSFS_DEVICES,
 };
+use crate::task::Kernel;
 use crate::vfs::fs_node_cache::FsNodeCache;
-use crate::vfs::{FsNodeOps, FsStr, FsString};
+use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
+use crate::vfs::{FileSystemHandle, FsNodeOps, FsStr, FsString};
 use std::sync::{Arc, Weak};
 
 /// The owner of all the KObjects in sysfs.
@@ -34,7 +36,7 @@ pub struct KObjectStore {
 
     /// All of the block devices known to the system.
     ///
-    /// Used to populate the /ssy/block directory.
+    /// Used to populate the /sys/block directory.
     pub block: KObjectHandle,
 
     /// All of the buses known to the system.
@@ -50,16 +52,6 @@ pub struct KObjectStore {
     /// a different hierarchy. When populated in /sys/dev, they appear as symlinks to the
     /// canonical names in /sys/devices.
     pub dev: KObjectHandle,
-
-    /// The block devices, organized by `DeviceType`.
-    ///
-    /// Used to populate the /sys/dev/block directory.
-    dev_block: KObjectHandle,
-
-    /// The char devices, organized by `DeviceType`.
-    ///
-    /// Used to populate the /sys/dev/char directory.
-    dev_char: KObjectHandle,
 }
 
 impl KObjectStore {
@@ -176,6 +168,22 @@ impl KObjectStore {
         )
     }
 
+    fn block(&self, fs: &FileSystemHandle) -> SimpleDirectoryMutator {
+        SimpleDirectoryMutator::new(fs.clone(), self.block.dir())
+    }
+
+    fn dev(&self, fs: &FileSystemHandle) -> SimpleDirectoryMutator {
+        SimpleDirectoryMutator::new(fs.clone(), self.dev.dir())
+    }
+
+    fn dev_block(&self, fs: &FileSystemHandle, build_subdir: impl FnOnce(&SimpleDirectoryMutator)) {
+        self.dev(fs).subdir("block", 0o755, build_subdir)
+    }
+
+    fn dev_char(&self, fs: &FileSystemHandle, build_subdir: impl FnOnce(&SimpleDirectoryMutator)) {
+        self.dev(fs).subdir("char", 0o755, build_subdir)
+    }
+
     /// Create a device and add that device to the store.
     ///
     /// Rather than use this function directly, you should register your device with the
@@ -186,6 +194,7 @@ impl KObjectStore {
     /// device because the `DeviceType` will not be registered with the `DeviceRegistry`.
     pub(super) fn create_device<F, N>(
         &self,
+        kernel: &Arc<Kernel>,
         name: &FsStr,
         metadata: Option<DeviceMetadata>,
         class: Class,
@@ -195,6 +204,8 @@ impl KObjectStore {
         F: Fn(Device) -> N + Send + Sync + 'static,
         N: FsNodeOps,
     {
+        let fs = get_sysfs(kernel);
+
         let class_cloned = class.clone();
         let metadata_cloned = metadata.clone();
         let device_kobject = class.kobject().get_or_create_child_with_ops(name, move |kobject| {
@@ -209,14 +220,28 @@ impl KObjectStore {
         class.collection.kobject().insert_child(device_kobject.clone());
 
         if let Some(metadata) = &metadata {
-            let device_number = metadata.device_type.to_string().into();
+            let path_to_device = format!(
+                "devices/{}/{}/{}",
+                class.bus.kobject().name(),
+                class.kobject().name(),
+                name
+            );
+            let device_number = FsString::from(metadata.device_type.to_string());
             match metadata.mode {
                 DeviceMode::Block => {
-                    self.block.insert_child(device_kobject.clone());
-                    self.dev_block.insert_child_with_name(device_number, device_kobject.clone())
+                    let path_from_block = FsString::from(format!("../{}", &path_to_device));
+                    self.block(&fs).symlink(name, path_from_block.as_ref());
+
+                    let path_from_dev_block = FsString::from(format!("../../{}", &path_to_device));
+                    self.dev_block(&fs, |dir| {
+                        dir.symlink(device_number.as_ref(), path_from_dev_block.as_ref());
+                    });
                 }
                 DeviceMode::Char => {
-                    self.dev_char.insert_child_with_name(device_number, device_kobject.clone())
+                    let path_from_dev_char = FsString::from(format!("../../{}", &path_to_device));
+                    self.dev_char(&fs, |dir| {
+                        dir.symlink(device_number.as_ref(), path_from_dev_char.as_ref());
+                    });
                 }
             }
         }
@@ -245,11 +270,13 @@ impl KObjectStore {
             let device_number: FsString = metadata.device_type.to_string().into();
             match metadata.mode {
                 DeviceMode::Block => {
-                    self.dev_block.remove_child(device_number.as_ref());
-                    self.block.remove_child(name);
+                    let path = FsString::from(format!("block/{}", device_number));
+                    self.dev.dir().remove_path(path.as_ref());
+                    self.block.dir().remove(name);
                 }
                 DeviceMode::Char => {
-                    self.dev_char.remove_child(device_number.as_ref());
+                    let path = FsString::from(format!("char/{}", device_number));
+                    self.dev.dir().remove_path(path.as_ref());
                 }
             }
         }
@@ -264,19 +291,10 @@ impl Default for KObjectStore {
         let node_cache = Arc::new(FsNodeCache::default());
         let devices = KObject::new_root(SYSFS_DEVICES.into(), node_cache.clone());
         let class = KObject::new_root(SYSFS_CLASS.into(), node_cache.clone());
-        let block = KObject::new_root_with_ops(
-            SYSFS_BLOCK.into(),
-            node_cache.clone(),
-            KObjectSymlinkDirectory::new,
-        );
+        let block = KObject::new_root_with_dir(SYSFS_BLOCK.into(), node_cache.clone());
         let bus = KObject::new_root(SYSFS_BUS.into(), node_cache.clone());
-        let dev = KObject::new_root(SYSFS_DEV.into(), node_cache.clone());
+        let dev = KObject::new_root_with_dir(SYSFS_DEV.into(), node_cache.clone());
 
-        let dev_block =
-            dev.get_or_create_child_with_ops("block".into(), KObjectSymlinkDirectory::new);
-        let dev_char =
-            dev.get_or_create_child_with_ops("char".into(), KObjectSymlinkDirectory::new);
-
-        Self { node_cache, devices, class, block, bus, dev, dev_block, dev_char }
+        Self { node_cache, devices, class, block, bus, dev }
     }
 }

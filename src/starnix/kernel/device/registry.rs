@@ -6,7 +6,7 @@ use crate::device::kobject::{Class, Device, DeviceMetadata, UEventAction, UEvent
 use crate::device::kobject_store::KObjectStore;
 use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node};
 use crate::fs::sysfs::DeviceDirectory;
-use crate::task::CurrentTask;
+use crate::task::{CurrentTask, Kernel};
 use crate::vfs::{FileOps, FsNode, FsNodeOps, FsStr, FsString};
 use starnix_logging::{log_error, log_warn};
 use starnix_uapi::as_any::AsAny;
@@ -346,8 +346,13 @@ impl DeviceRegistry {
     {
         let entry = DeviceEntry::new(name.into(), dev_ops);
         self.devices(metadata.mode).register_minor(metadata.device_type, entry);
-        let device =
-            self.objects.create_device(name, Some(metadata), class, create_device_sysfs_ops);
+        let device = self.objects.create_device(
+            current_task.kernel(),
+            name,
+            Some(metadata),
+            class,
+            create_device_sysfs_ops,
+        );
         self.notify_device(locked, current_task, device.clone());
         device
     }
@@ -495,8 +500,13 @@ impl DeviceRegistry {
         L: LockBefore<FileOpsCore>,
     {
         self.devices(metadata.mode).get(metadata.device_type).expect("device is registered");
-        let device =
-            self.objects.create_device(name, Some(metadata), class, create_device_sysfs_ops);
+        let device = self.objects.create_device(
+            current_task.kernel(),
+            name,
+            Some(metadata),
+            class,
+            create_device_sysfs_ops,
+        );
         self.notify_device(locked, current_task, device.clone());
         device
     }
@@ -512,12 +522,23 @@ impl DeviceRegistry {
     /// ```
     ///
     /// Currently, we only register the net devices by name and use an empty `uevent` file.
-    pub fn add_net_device<F, N>(&self, name: &FsStr, create_device_sysfs_ops: F) -> Device
+    pub fn add_net_device<F, N>(
+        &self,
+        kernel: &Arc<Kernel>,
+        name: &FsStr,
+        create_device_sysfs_ops: F,
+    ) -> Device
     where
         F: Fn(Device) -> N + Send + Sync + 'static,
         N: FsNodeOps,
     {
-        self.objects.create_device(name, None, self.objects.net_class(), create_device_sysfs_ops)
+        self.objects.create_device(
+            kernel,
+            name,
+            None,
+            self.objects.net_class(),
+            create_device_sysfs_ops,
+        )
     }
 
     /// Remove a net device from the device registry.
@@ -537,7 +558,7 @@ impl DeviceRegistry {
     pub fn add_numberless_device<F, N, L>(
         &self,
         _locked: &mut Locked<L>,
-        _current_task: &CurrentTask,
+        current_task: &CurrentTask,
         name: &FsStr,
         class: Class,
         create_device_sysfs_ops: F,
@@ -547,7 +568,13 @@ impl DeviceRegistry {
         N: FsNodeOps,
         L: LockBefore<FileOpsCore>,
     {
-        self.objects.create_device(name, None, class, create_device_sysfs_ops)
+        self.objects.create_device(
+            current_task.kernel(),
+            name,
+            None,
+            class,
+            create_device_sysfs_ops,
+        )
     }
 
     /// Remove a device directly added with `add_device`.
