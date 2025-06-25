@@ -18,14 +18,18 @@
 // NOTE: must be included after the definition of Thread due to the offsetof
 // applied in the following routines.
 
-// Use the cpu local thread context pointer to store current_thread.
-static inline Thread* arch_get_current_thread() {
+static inline ktl::byte* arch_get_current_compiler_thread_pointer() {
   // Clang and GCC with --target=aarch64-unknown-fuchsia -mtp=el1 read
   // TPIDR_EL1 for __builtin_thread_pointer (instead of the usual
   // TPIDR_EL0 for user mode).  Using the intrinsic instead of asm
   // lets the compiler understand what it's doing a little better,
   // which conceivably could let it optimize better.
-  ktl::byte* tp = static_cast<ktl::byte*>(__builtin_thread_pointer());
+  return static_cast<ktl::byte*>(__builtin_thread_pointer());
+}
+
+// Use the cpu local thread context pointer to store current_thread.
+static inline Thread* arch_get_current_thread() {
+  ktl::byte* tp = arch_get_current_compiler_thread_pointer();
 
   // The Thread structure isn't standard layout, but it's "POD enough"
   // for us to rely on computing this member offset via offsetof.
