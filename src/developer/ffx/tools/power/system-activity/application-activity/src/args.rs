@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use arg_parsing::parse_duration;
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 
@@ -51,10 +52,10 @@ pub struct StopCommand {}
 /// Stop application activity on the target and start it again.
 #[argh(subcommand, name = "restart")]
 pub struct RestartCommand {
-    #[argh(option, default = "100000000")]
+    #[argh(option, default = "parse_duration(\"100ms\").unwrap()", from_str_fn(parse_duration))]
     /// the time the system waits before starting application activity again (in nanoseconds).
     /// The system is not guaranteed to start again after this time, but on the next wakeup
     /// this command will take a lease on application activity.
     /// Defaults to 100ms.
-    pub wait_time_ns: u64,
+    pub wait_time: std::time::Duration,
 }

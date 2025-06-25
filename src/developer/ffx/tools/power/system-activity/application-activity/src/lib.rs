@@ -32,7 +32,7 @@ impl FfxMain for ApplicationActivityTool {
             }
             args_mod::SubCommand::Stop(_) => stop(self.system_activity_control).await?,
             args_mod::SubCommand::Restart(command) => {
-                restart(self.system_activity_control, command.wait_time_ns).await?
+                restart(self.system_activity_control, command.wait_time).await?
             }
         };
         Ok(())
@@ -51,8 +51,9 @@ pub async fn stop(system_activity_control: fpt::SystemActivityControlProxy) -> R
 
 pub async fn restart(
     system_activity_control: fpt::SystemActivityControlProxy,
-    wait_time_ns: u64,
+    wait_time: std::time::Duration,
 ) -> Result<()> {
-    let _ = system_activity_control.restart_application_activity(wait_time_ns).await?;
+    let _ =
+        system_activity_control.restart_application_activity(wait_time.as_nanos() as u64).await?;
     Ok(())
 }
