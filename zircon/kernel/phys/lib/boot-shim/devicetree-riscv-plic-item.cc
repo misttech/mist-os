@@ -40,8 +40,8 @@ devicetree::ScanState RiscvDevicetreePlicItem::HandlePlicNode(
     return devicetree::ScanState::kDone;
   }
 
-  bool base_address_ok = false;
   zbi_dcfg_riscv_plic_driver_t dcfg{};
+  bool base_address_ok = false;  // Avoids the assumption that a paddr of 0 is invalid
   if (auto reg_val = reg->AsReg(decoder); reg_val) {
     if (auto address = (*reg_val)[0].address()) {
       if (auto root_address = decoder.TranslateAddress(*address)) {
@@ -49,10 +49,18 @@ devicetree::ScanState RiscvDevicetreePlicItem::HandlePlicNode(
         base_address_ok = true;
       }
     }
+    if (auto size = (*reg_val)[0].size()) {
+      dcfg.size_bytes = static_cast<uint32_t>(*size);
+    }
   }
 
   if (!base_address_ok) {
     OnError("Error parsing PLIC node's reg address.");
+    return devicetree::ScanState::kDone;
+  }
+
+  if (dcfg.size_bytes == 0) {
+    OnError("Error parsing PLIC node's reg length.");
     return devicetree::ScanState::kDone;
   }
 

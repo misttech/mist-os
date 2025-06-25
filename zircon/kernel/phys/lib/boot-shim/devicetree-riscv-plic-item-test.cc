@@ -57,6 +57,7 @@ TEST_F(RiscvDevicetreePlicItemTest, BasicPlic) {
       ASSERT_GE(payload.size(), sizeof(zbi_dcfg_riscv_plic_driver_t));
       auto* plic_dcfg = reinterpret_cast<zbi_dcfg_riscv_plic_driver_t*>(payload.data());
       EXPECT_EQ(plic_dcfg->mmio_phys, 0xc000000);
+      EXPECT_EQ(plic_dcfg->size_bytes, 0x600000);
       EXPECT_EQ(plic_dcfg->num_irqs, 0x60);
       present = true;
     }
@@ -82,6 +83,7 @@ TEST_F(RiscvDevicetreePlicItemTest, Qemu) {
       ASSERT_GE(payload.size(), sizeof(zbi_dcfg_riscv_plic_driver_t));
       auto* plic_dcfg = reinterpret_cast<zbi_dcfg_riscv_plic_driver_t*>(payload.data());
       EXPECT_EQ(plic_dcfg->mmio_phys, 0xc000000);
+      EXPECT_EQ(plic_dcfg->size_bytes, 0x600000);
       EXPECT_EQ(plic_dcfg->num_irqs, 0x60);
       present = true;
     }
@@ -107,6 +109,7 @@ TEST_F(RiscvDevicetreePlicItemTest, VisionFive2) {
       ASSERT_GE(payload.size(), sizeof(zbi_dcfg_riscv_plic_driver_t));
       auto* plic_dcfg = reinterpret_cast<zbi_dcfg_riscv_plic_driver_t*>(payload.data());
       EXPECT_EQ(plic_dcfg->mmio_phys, 0xc000000);
+      EXPECT_EQ(plic_dcfg->size_bytes, 0x4000000);
       EXPECT_EQ(plic_dcfg->num_irqs, 0x88);
       present = true;
     }
@@ -132,6 +135,7 @@ TEST_F(RiscvDevicetreePlicItemTest, HifiveSifiveUnmatched) {
       ASSERT_GE(payload.size(), sizeof(zbi_dcfg_riscv_plic_driver_t));
       auto* plic_dcfg = reinterpret_cast<zbi_dcfg_riscv_plic_driver_t*>(payload.data());
       EXPECT_EQ(plic_dcfg->mmio_phys, 0xc000000);
+      EXPECT_EQ(plic_dcfg->size_bytes, 0x4000000);
       EXPECT_EQ(plic_dcfg->num_irqs, 0x45);
       present = true;
     }
@@ -157,6 +161,7 @@ TEST_F(RiscvDevicetreePlicItemTest, BananaPiF3) {
       ASSERT_GE(payload.size(), sizeof(zbi_dcfg_riscv_plic_driver_t));
       auto* plic_dcfg = reinterpret_cast<zbi_dcfg_riscv_plic_driver_t*>(payload.data());
       EXPECT_EQ(plic_dcfg->mmio_phys, 0xe0000000);
+      EXPECT_EQ(plic_dcfg->size_bytes, 0x4000000);
       EXPECT_EQ(plic_dcfg->num_irqs, 0x9f);
       present = true;
     }

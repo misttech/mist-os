@@ -263,9 +263,12 @@ type DcfgGeneric32Watchdog = struct {
 
 /// for ZBI_KERNEL_DRIVER_RISCV_PLIC
 type DcfgRiscvPlicDriver = struct {
+    /// Physical address of the PLIC MMIO region.
     mmio_phys uint64;
+    /// Size in bytes of the PLIC MMIO region.
+    size_bytes uint32;
+    /// Number of supported IRQs.
     num_irqs uint32;
-    reserved uint32;
 };
 
 /// for ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER
