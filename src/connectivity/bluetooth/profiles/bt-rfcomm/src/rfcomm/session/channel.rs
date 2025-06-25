@@ -278,6 +278,12 @@ impl FlowController for CreditFlowController {
     }
 }
 
+impl Drop for CreditFlowController {
+    fn drop(&mut self) {
+        info!(dlci:% = self.dlci; "CreditFlowController closed. Dropping {} user data frames", self.outgoing_data_pending_credits.len());
+    }
+}
+
 /// The flow control method for the channel.
 #[derive(Debug)]
 pub enum FlowControlMode {
@@ -412,7 +418,7 @@ impl SessionChannel {
                 data_from_client = channel.next() => {
                     match data_from_client {
                         Some(Ok(bytes)) => {
-                            trace!(dlci:%; "Sending user-data packet {:?}", bytes);
+                            trace!(dlci:%; "Sending user-data packet ({} bytes)", bytes.len());
                             let user_data = UserData { information: bytes };
                             flow_controller.send_data_to_peer(user_data).await;
                         }
@@ -437,6 +443,7 @@ impl SessionChannel {
                 complete => break,
             }
         }
+        drop(flow_controller);
         info!(dlci:%; "SessionChannel processing task finished");
         // Client closed the `channel` - notify listener of termination.
         let _ = termination_sender.send(());
