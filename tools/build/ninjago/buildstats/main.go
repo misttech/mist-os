@@ -40,9 +40,6 @@ import (
 	"time"
 
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/chrometrace"
-	"go.fuchsia.dev/fuchsia/tools/build/ninjago/compdb"
-	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjagraph"
-	"go.fuchsia.dev/fuchsia/tools/build/ninjago/ninjalog"
 	"go.fuchsia.dev/fuchsia/tools/build/ninjago/readerwriters"
 	"go.fuchsia.dev/fuchsia/tools/lib/color"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
@@ -50,9 +47,6 @@ import (
 
 var (
 	ninjaTracePath     = flag.String("ninjatrace", "", "path of ninjatrace.json file")
-	ninjalogPath       = flag.String("ninjalog", "", "path of .ninja_log")
-	compdbPath         = flag.String("compdb", "", "path of JSON compilation database")
-	graphPath          = flag.String("graph", "", "path of graphviz dot file for ninja targets")
 	outputPath         = flag.String("output", "", "path to output the serialized build stats")
 	minActionBuildTime = flag.Duration("min_action_build_time", 5*time.Second, "actions that took longer than or equal to this time granularity are included in output")
 
@@ -65,10 +59,6 @@ func init() {
 	level = logger.ErrorLevel
 	flag.Var(&colors, "color", "use color in output, can be never, auto, always")
 	flag.Var(&level, "level", "output verbosity, can be fatal, error, warning, info, debug or trace")
-}
-
-type inputs struct {
-	ninjalog, compdb, graph io.Reader
 }
 
 // action describes a build action.
@@ -121,116 +111,6 @@ type buildStats struct {
 	All []action
 	// All build actions from this build that took longer to finish than granularity.
 	Actions []action
-}
-
-// constructGraph constructs a ninjagraph based on files from input paths, and
-// populates it with information from ninjalog and compdb.
-//
-// Steps used to populate the graph are also returned so they can be used in
-// later steps.
-func constructGraph(ins inputs) (ninjagraph.Graph, error) {
-	njl, err := ninjalog.Parse(*ninjalogPath, ins.ninjalog)
-	if err != nil {
-		return ninjagraph.Graph{}, fmt.Errorf("parsing ninjalog: %v", err)
-	}
-	steps := ninjalog.Dedup(njl.Steps)
-
-	commands, err := compdb.Parse(ins.compdb)
-	if err != nil {
-		return ninjagraph.Graph{}, fmt.Errorf("parsing compdb: %v", err)
-	}
-	steps = ninjalog.Populate(steps, commands)
-
-	graph, err := ninjagraph.FromDOT(ins.graph)
-	if err != nil {
-		return ninjagraph.Graph{}, fmt.Errorf("parsing Ninja graph: %v", err)
-	}
-	if err := graph.PopulateEdges(steps); err != nil {
-		return ninjagraph.Graph{}, fmt.Errorf("populating graph edges with build steps: %v", err)
-	}
-	graph, err = ninjagraph.WithStepsOnly(graph)
-	if err != nil {
-		return ninjagraph.Graph{}, fmt.Errorf("extracting partial graph: %v", err)
-	}
-	return graph, nil
-}
-
-type graph interface {
-	PopulatedSteps() ([]ninjalog.Step, error)
-}
-
-func extractBuildStats(g graph, minActionBuildTime time.Duration) (buildStats, error) {
-	steps, err := g.PopulatedSteps()
-	if err != nil {
-		return buildStats{}, fmt.Errorf("getting steps with float and drag: %w", err)
-	}
-
-	ret := buildStats{}
-	for _, step := range steps {
-		if step.OnCriticalPath {
-			ret.CriticalPath = append(ret.CriticalPath, toAction(step))
-		}
-	}
-	sort.Slice(ret.CriticalPath, func(i, j int) bool { return ret.CriticalPath[i].Start < ret.CriticalPath[j].Start })
-
-	for _, step := range ninjalog.SlowestSteps(steps, 30) {
-		ret.Slowests = append(ret.Slowests, toAction(step))
-	}
-
-	for _, step := range steps {
-		if step.Duration() >= minActionBuildTime {
-			ret.All = append(ret.All, toAction(step))
-			ret.Actions = append(ret.Actions, toAction(step))
-		}
-
-		ret.TotalBuildTime += step.Duration()
-		// The first action always starts at time zero, so build duration equals to
-		// the end time of the last action.
-		if step.End > ret.BuildDuration {
-			ret.BuildDuration = step.End
-		}
-	}
-
-	for _, stat := range ninjalog.StatsByType(steps, nil, func(s ninjalog.Step) string { return s.Category() }) {
-		var minBuildTime, maxBuildTime time.Duration
-		for i, t := range stat.Times {
-			if i == 0 {
-				minBuildTime, maxBuildTime = t, t
-				continue
-			}
-			if t < minBuildTime {
-				minBuildTime = t
-			}
-			if t > maxBuildTime {
-				maxBuildTime = t
-			}
-		}
-		ret.CatBuildTimes = append(ret.CatBuildTimes, catBuildTime{
-			Category:     stat.Type,
-			Count:        stat.Count,
-			BuildTime:    stat.Time,
-			MinBuildTime: minBuildTime,
-			MaxBuildTime: maxBuildTime,
-		})
-	}
-	return ret, nil
-}
-
-func toAction(s ninjalog.Step) action {
-	a := action{
-		Outputs:    append(s.Outs, s.Out),
-		Start:      s.Start,
-		End:        s.End,
-		Category:   s.Category(),
-		TotalFloat: s.TotalFloat,
-		Drag:       s.Drag,
-	}
-	if s.Command != nil {
-		a.Command = s.Command.Command
-	}
-	// TODO(jayzhuang): populate `Rule` when they are made available on step or
-	// command.
-	return a
 }
 
 func traceToOutputs(t *chrometrace.Trace) []string {
@@ -496,67 +376,17 @@ func main() {
 	log := logger.NewLogger(level, painter, os.Stdout, os.Stderr, "")
 
 	if *ninjaTracePath == "" {
-		if *ninjalogPath == "" {
-			log.Fatalf("Either --ninjalog or --ninjatrace is required")
-		}
-		if *compdbPath == "" {
-			log.Fatalf("--compdb is required")
-		}
-		if *graphPath == "" {
-			log.Fatalf("--graph is required")
-		}
-	} else if *ninjalogPath != "" {
-		log.Fatalf("--ninjalog cannot be used with --ninjatrace")
-	} else if *compdbPath != "" {
-		log.Fatalf("--compdb cannot be used with --ninjatrace")
-	} else if *graphPath != "" {
-		log.Fatalf("--graph cannot be used with --ninjatrace")
+		log.Fatalf("--ninjatrace is required")
 	}
 	if *outputPath == "" {
 		log.Fatalf("--output is required")
 	}
 
-	var stats buildStats
-
-	if *ninjaTracePath != "" {
-		traces, err := readChromeTrace(*ninjaTracePath)
-		if err != nil {
-			log.Fatalf("Failed to read chrome trace from %q: %v", *ninjaTracePath, err)
-		}
-		stats = extractBuildStatsFromTrace(traces, *minActionBuildTime)
-	} else {
-		log.Infof("Reading input files and constructing graph.")
-		ninjalog, err := os.Open(*ninjalogPath)
-		if err != nil {
-			log.Fatalf("Failed to read Ninja log %q: %v", *ninjalogPath, err)
-		}
-		defer ninjalog.Close()
-		compdb, err := os.Open(*compdbPath)
-		if err != nil {
-			log.Fatalf("Failed to read compdb %q: %v", *compdbPath, err)
-		}
-		defer compdb.Close()
-		graphFile, err := os.Open(*graphPath)
-		if err != nil {
-			log.Fatalf("Failed to read graph %q: %v", *graphPath, err)
-		}
-		defer graphFile.Close()
-		graph, err := constructGraph(inputs{
-			ninjalog: ninjalog,
-			compdb:   compdb,
-			graph:    graphFile,
-		})
-		if err != nil {
-			log.Fatalf("Failed to construct graph: %v", err)
-		}
-
-		log.Infof("Extracting build stats from graph.")
-		extractedStats, err := extractBuildStats(&graph, *minActionBuildTime)
-		if err != nil {
-			log.Fatalf("Failed to extract build stats from graph: %v", err)
-		}
-		stats = extractedStats
+	traces, err := readChromeTrace(*ninjaTracePath)
+	if err != nil {
+		log.Fatalf("Failed to read chrome trace from %q: %v", *ninjaTracePath, err)
 	}
+	stats := extractBuildStatsFromTrace(traces, *minActionBuildTime)
 
 	log.Infof("Creating %s and serializing the build stats to it.", *outputPath)
 	outputFile, err := readerwriters.Create(*outputPath)
