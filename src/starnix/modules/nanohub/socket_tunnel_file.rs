@@ -132,7 +132,7 @@ pub fn register_socket_tunnel_device<F, N, L>(
         registry.objects.get_or_create_class(dev_class_name, registry.objects.virtual_bus());
 
     registry
-        .register_dyn_device(
+        .register_dyn_device_with_ops(
             locked,
             current_task,
             dev_node_name.into(),

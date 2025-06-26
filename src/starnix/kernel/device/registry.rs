@@ -424,7 +424,22 @@ impl DeviceRegistry {
     /// to be dynamic, we should expand to using the full dynamic range.
     ///
     /// See `register_device` for an explanation of the parameters.
-    pub fn register_dyn_device<F, N, L>(
+    pub fn register_dyn_device<L>(
+        &self,
+        locked: &mut Locked<L>,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        class: Class,
+        dev_ops: impl DeviceOps,
+    ) -> Result<Device, Errno>
+    where
+        L: LockBefore<FileOpsCore>,
+    {
+        self.register_dyn_device_with_devname(locked, current_task, name, name, class, dev_ops)
+    }
+
+    /// Use register_dyn_device instead.
+    pub fn register_dyn_device_with_ops<F, N, L>(
         &self,
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
@@ -438,15 +453,17 @@ impl DeviceRegistry {
         N: FsNodeOps,
         L: LockBefore<FileOpsCore>,
     {
-        self.register_dyn_device_with_devname(
+        let device_type = self.state.lock().dyn_chardev_allocator.allocate()?;
+        let metadata = DeviceMetadata::new(name.into(), device_type, DeviceMode::Char);
+        Ok(self.register_device_with_sysfs_ops(
             locked,
             current_task,
             name,
-            name,
+            metadata,
             class,
             create_device_sysfs_ops,
             dev_ops,
-        )
+        ))
     }
 
     /// Register a dynamic device with major numbers 234..255.
@@ -459,32 +476,21 @@ impl DeviceRegistry {
     /// to be dynamic, we should expand to using the full dynamic range.
     ///
     /// See `register_device` for an explanation of the parameters.
-    pub fn register_dyn_device_with_devname<F, N, L>(
+    pub fn register_dyn_device_with_devname<L>(
         &self,
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
-        dev_name: &FsStr,
+        devname: &FsStr,
         class: Class,
-        create_device_sysfs_ops: F,
         dev_ops: impl DeviceOps,
     ) -> Result<Device, Errno>
     where
-        F: Fn(Device) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
         L: LockBefore<FileOpsCore>,
     {
         let device_type = self.state.lock().dyn_chardev_allocator.allocate()?;
-        let metadata = DeviceMetadata::new(dev_name.into(), device_type, DeviceMode::Char);
-        Ok(self.register_device_with_sysfs_ops(
-            locked,
-            current_task,
-            name,
-            metadata,
-            class,
-            create_device_sysfs_ops,
-            dev_ops,
-        ))
+        let metadata = DeviceMetadata::new(devname.into(), device_type, DeviceMode::Char);
+        Ok(self.register_device(locked, current_task, name, metadata, class, dev_ops))
     }
 
     /// Register a "silent" dynamic device with major numbers 234..255.
@@ -870,7 +876,6 @@ mod tests {
                 &current_task,
                 "test-device".into(),
                 registry.objects.virtual_block_class(),
-                DeviceDirectory::new,
                 create_test_device,
             )
             .unwrap();

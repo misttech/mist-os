@@ -4,7 +4,6 @@
 
 use super::file::GrallocFile;
 use starnix_core::device::DeviceOps;
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
@@ -40,7 +39,6 @@ where
             current_task,
             "virtgralloc0".into(),
             registry.objects.starnix_class(),
-            DeviceDirectory::new,
             GrallocDevice,
         )
         .expect("can register virtgralloc0");

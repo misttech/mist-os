@@ -195,7 +195,6 @@ async fn register_serial_device(kernel: Arc<Kernel>) {
                                 current_task,
                                 "ttyHS1".into(),
                                 registry.objects.tty_class(),
-                                DeviceDirectory::new,
                                 serial_device,
                             )
                             .expect("Can register serial device");

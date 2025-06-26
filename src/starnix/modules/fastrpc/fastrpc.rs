@@ -8,7 +8,6 @@ use bitfield::bitfield;
 use bstr::ByteSlice;
 use fidl_fuchsia_hardware_qualcomm_fastrpc as frpc;
 use starnix_core::device::DeviceOps;
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
 use starnix_core::task::{CurrentTask, ThreadGroupKey};
@@ -954,7 +953,6 @@ pub fn fastrpc_device_init(locked: &mut Locked<Unlocked>, system_task: &CurrentT
             system_task,
             "adsprpc-smd-secure".into(),
             registry.objects.get_or_create_class("fastrpc".into(), registry.objects.virtual_bus()),
-            DeviceDirectory::new,
             device,
         )
         .expect("Can register heap device");

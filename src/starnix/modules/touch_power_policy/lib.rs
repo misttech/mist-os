@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use starnix_core::device::DeviceOps;
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{
@@ -43,7 +42,6 @@ impl TouchPowerPolicyDevice {
                 system_task,
                 "touch_standby".into(),
                 registry.objects.starnix_class(),
-                DeviceDirectory::new,
                 self,
             )
             .expect("can register touch_standby device");

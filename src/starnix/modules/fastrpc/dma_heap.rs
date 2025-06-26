@@ -4,7 +4,6 @@
 
 use linux_uapi::dma_heap_allocation_data;
 use starnix_core::device::DeviceOps;
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{default_ioctl, FdFlags, FdNumber, FileObject, FileOps, FsNode};
@@ -119,7 +118,6 @@ pub fn dma_heap_device_register<A: Alloc>(
             name.into(),
             format!("dma_heap/{}", name).as_str().into(),
             registry.objects.dma_heap_class(),
-            DeviceDirectory::new,
             device,
         )
         .expect("Can register heap device");

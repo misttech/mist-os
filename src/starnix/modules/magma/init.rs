@@ -4,7 +4,6 @@
 
 use crate::MagmaFile;
 use starnix_core::device::DeviceOps;
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
@@ -47,7 +46,6 @@ pub fn magma_device_init<L>(
             current_task,
             "magma0".into(),
             registry.objects.starnix_class(),
-            DeviceDirectory::new,
             builder,
         )
         .expect("can register magma0");

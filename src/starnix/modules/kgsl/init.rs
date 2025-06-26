@@ -4,7 +4,6 @@
 
 use crate::KgslFile;
 use starnix_core::device::DeviceOps;
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
@@ -38,13 +37,6 @@ where
     let builder = KgslDeviceBuilder {};
 
     registry
-        .register_dyn_device(
-            locked,
-            current_task,
-            "kgsl-3d0".into(),
-            class,
-            DeviceDirectory::new,
-            builder,
-        )
+        .register_dyn_device(locked, current_task, "kgsl-3d0".into(), class, builder)
         .expect("can register kgsl-3d0");
 }

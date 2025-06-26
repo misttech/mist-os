@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use rutabaga_gfx::*;
-use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode};
 use starnix_logging::log_error;
@@ -40,7 +39,6 @@ where
             current_task,
             "virtio-gpu".into(),
             registry.objects.starnix_class(),
-            DeviceDirectory::new,
             create_gpu_device,
         )
         .expect("can register virtio-gpu");
