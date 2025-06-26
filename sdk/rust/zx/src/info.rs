@@ -69,6 +69,7 @@ assoc_values!(Topic, [
     IOB = sys::ZX_INFO_IOB;
     IOB_REGIONS = sys::ZX_INFO_IOB_REGIONS;
     MEMORY_STALL = sys::ZX_INFO_MEMORY_STALL;
+    CLOCK_MAPPED_SIZE = sys::ZX_INFO_CLOCK_MAPPED_SIZE;
 ]);
 
 /// Query information about a zircon object. Returns a valid slice and any remaining capacity on

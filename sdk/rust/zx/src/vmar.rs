@@ -8,7 +8,7 @@ use crate::clock::Clock;
 use crate::iob::Iob;
 use crate::{
     object_get_info, object_get_info_single, object_get_info_vec, ok, sys, AsHandleRef, Handle,
-    HandleBased, HandleRef, Koid, Name, ObjectQuery, Status, Topic, Vmo,
+    HandleBased, HandleRef, Koid, Name, ObjectQuery, Status, Timeline, Topic, Vmo,
 };
 use bitflags::bitflags;
 use std::mem::MaybeUninit;
@@ -389,11 +389,11 @@ impl Vmar {
 
     /// Wraps the [zx_vmar_map_clock](https://fuchsia.dev/fuchsia-src/reference/syscalls/zx_vmar_map_clock.md)
     /// syscall.
-    pub fn map_clock(
+    pub fn map_clock<I: Timeline, O: Timeline>(
         &self,
         options: VmarFlags,
         vmar_offset: usize,
-        clock: &Clock,
+        clock: &Clock<I, O>,
         length: usize,
     ) -> Result<usize, Status> {
         let mut addr = 0;

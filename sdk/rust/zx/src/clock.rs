@@ -5,8 +5,8 @@
 //! Type-safe bindings for Zircon clock objects.
 
 use crate::{
-    ok, sys, AsHandleRef, BootTimeline, ClockUpdate, Handle, HandleBased, HandleRef, Instant,
-    MonotonicTimeline, SyntheticTimeline, Timeline,
+    object_get_info_single, ok, sys, AsHandleRef, BootTimeline, ClockUpdate, Handle, HandleBased,
+    HandleRef, Instant, MonotonicTimeline, ObjectQuery, SyntheticTimeline, Timeline, Topic,
 };
 use bitflags::bitflags;
 use std::mem::MaybeUninit;
@@ -158,6 +158,11 @@ impl<Reference: Timeline, Output: Timeline> Clock<Reference, Output> {
         Ok(out_details.into())
     }
 
+    // Returns the memory size for the memory region used to store clock details.
+    pub fn get_mapped_size(clock: &Clock<Reference, Output>) -> Result<usize, Status> {
+        Ok(object_get_info_single::<MappedSizeQuery>(clock.as_handle_ref())?)
+    }
+
     /// Make adjustments to this clock. Wraps the [zx_clock_update] syscall. Requires
     /// `ZX_RIGHT_WRITE`.
     ///
@@ -209,6 +214,12 @@ impl<Reference: Timeline, Output: Timeline> From<Clock<Reference, Output>> for H
 }
 
 impl<Reference: Timeline, Output: Timeline> HandleBased for Clock<Reference, Output> {}
+
+struct MappedSizeQuery;
+unsafe impl ObjectQuery for MappedSizeQuery {
+    const TOPIC: Topic = Topic::CLOCK_MAPPED_SIZE;
+    type InfoTy = usize;
+}
 
 bitflags! {
     #[repr(transparent)]
