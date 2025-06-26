@@ -41,7 +41,10 @@ mod work_queue;
 
 pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
 pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
-pub use counters::{Counter, CounterContext, CounterRepr, ResourceCounterContext};
+pub use counters::{
+    Counter, CounterCollection, CounterCollectionSpec, CounterContext, CounterRepr,
+    ResourceCounterContext,
+};
 pub use data_structures::rcu::SynchronizedWriterRcu;
 pub use data_structures::token_bucket::TokenBucket;
 pub use device::address::{
@@ -82,7 +85,7 @@ pub use tcp::segment::{
     SegmentOptions, VerifiedTcpSegment,
 };
 pub use tcp::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
-pub use test_only::{TestOnlyFrom, TestOnlyPartialEq};
+pub use test_only::TestOnlyPartialEq;
 pub use time::local_timer_heap::LocalTimerHeap;
 pub use time::{
     AtomicInstant, CoreTimerContext, HandleableTimer, Instant, InstantBindingsTypes,

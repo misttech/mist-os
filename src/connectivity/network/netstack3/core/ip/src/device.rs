@@ -27,12 +27,12 @@ use net_types::ip::{
 };
 use net_types::{LinkLocalAddress as _, MulticastAddr, SpecifiedAddr, Witness};
 use netstack3_base::{
-    AnyDevice, AssignedAddrIpExt, Counter, DeferredResourceRemovalContext, DeviceIdContext,
-    EventContext, ExistsError, HandleableTimer, Instant, InstantBindingsTypes, InstantContext,
-    IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Ipv4DeviceAddr, Ipv6DeviceAddr,
-    NotFoundError, RemoveResourceResultWithContext, ResourceCounterContext, RngContext,
-    SendFrameError, StrongDeviceIdentifier, TimerContext, TimerHandler, TxMetadataBindingsTypes,
-    WeakDeviceIdentifier, WeakIpAddressId,
+    AnyDevice, AssignedAddrIpExt, Counter, CounterCollectionSpec, DeferredResourceRemovalContext,
+    DeviceIdContext, EventContext, ExistsError, HandleableTimer, Instant, InstantBindingsTypes,
+    InstantContext, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, IpExt, Ipv4DeviceAddr,
+    Ipv6DeviceAddr, NotFoundError, RemoveResourceResultWithContext, ResourceCounterContext,
+    RngContext, SendFrameError, StrongDeviceIdentifier, TimerContext, TimerHandler,
+    TxMetadataBindingsTypes, WeakDeviceIdentifier, WeakIpAddressId,
 };
 use netstack3_filter::ProofOfEgressCheck;
 use packet::{BufferMut, Serializer};
@@ -936,7 +936,11 @@ impl<
                         self.increment_both(device_id, |c| {
                             #[derive(GenericOverIp)]
                             #[generic_over_ip(I, Ip)]
-                            struct InCounters<'a, I: IpDeviceIpExt>(&'a I::RxCounters<Counter>);
+                            struct InCounters<'a, I: IpDeviceIpExt>(
+                                &'a <I::RxCounters as CounterCollectionSpec>::CounterCollection<
+                                    Counter,
+                                >,
+                            );
                             I::map_ip_in::<_, _>(
                                 InCounters(&c.version_rx),
                                 |_counters| {
@@ -1898,7 +1902,7 @@ where
             IpAddressState::Assigned => {
                 info!("DAD received conflicting ARP packet for assigned addr=({sender_addr})");
             }
-            s @ IpAddressState::Tentative | s @ IpAddressState::Unavailable=> {
+            s @ IpAddressState::Tentative | s @ IpAddressState::Unavailable => {
                 debug!("DAD received conflicting ARP packet for addr=({sender_addr}), state={s:?}");
             }
         }
@@ -1925,7 +1929,7 @@ where
             // Unlike the sender_addr, it's not concerning to receive an ARP
             // packet whose target_addr is assigned to us.
             IpAddressState::Assigned => true,
-            s @ IpAddressState::Tentative | s @ IpAddressState::Unavailable=> {
+            s @ IpAddressState::Tentative | s @ IpAddressState::Unavailable => {
                 debug!("DAD received conflicting ARP packet for addr=({target_addr}), state={s:?}");
                 false
             }

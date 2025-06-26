@@ -82,7 +82,7 @@ pub trait CounterRepr: sealed::Sealed + Default + Debug + TestOnlyPartialEq {
     fn new(value: u64) -> Self;
 
     /// Convert one `CounterRepr` into another `CounterRepr`.
-    fn into_repr<C: CounterRepr>(&self) -> C {
+    fn cast<C: CounterRepr>(&self) -> C {
         C::new(self.get())
     }
 }
@@ -106,5 +106,29 @@ impl CounterRepr for u64 {
 
     fn new(value: u64) -> Self {
         value
+    }
+}
+
+/// The specification of a [`CounterCollection`].
+pub trait CounterCollectionSpec {
+    /// The underlying [`CounterCollection`] for this specification.
+    type CounterCollection<C: CounterRepr>: CounterCollection<Spec = Self>;
+    /// A utility method to transform the underlying counter representation
+    /// within [`Self::CounterCollection`].
+    fn transform<C1: CounterRepr, C2: CounterRepr>(
+        counters: &Self::CounterCollection<C1>,
+    ) -> Self::CounterCollection<C2>;
+}
+
+/// A collection of counters.
+pub trait CounterCollection: Debug + Default + TestOnlyPartialEq {
+    /// The [`CounterCollectionSpec`] associated with this collection.
+    type Spec: CounterCollectionSpec<CounterCollection<Self::Repr> = Self>;
+    /// The counter representation held by this collection.
+    type Repr: CounterRepr;
+    /// A utility method to cast this collection of counters into a different
+    /// underlying counter representation.
+    fn cast<C: CounterRepr>(&self) -> <Self::Spec as CounterCollectionSpec>::CounterCollection<C> {
+        <Self::Spec as CounterCollectionSpec>::transform::<Self::Repr, C>(self)
     }
 }

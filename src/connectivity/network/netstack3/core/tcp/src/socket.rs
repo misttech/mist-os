@@ -5614,9 +5614,9 @@ mod tests {
         WithFakeTimerContext,
     };
     use netstack3_base::{
-        ContextProvider, CounterContext, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, Instant as _,
-        InstantContext, LinkDevice, Mms, ReferenceNotifiers, ResourceCounterContext,
-        StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
+        ContextProvider, CounterCollection, CounterContext, IcmpIpExt, Icmpv4ErrorCode,
+        Icmpv6ErrorCode, Instant as _, InstantContext, LinkDevice, Mms, ReferenceNotifiers,
+        ResourceCounterContext, StrongDeviceIdentifier, Uninstantiable, UninstantiableWrapper,
     };
     use netstack3_filter::testutil::NoOpSocketOpsFilter;
     use netstack3_filter::{SocketOpsFilter, TransportPacketSerializer, Tuple};
@@ -6777,15 +6777,15 @@ mod tests {
                     let counters_without_socket =
                         CounterContext::<TcpCountersWithoutSocket<I>>::counters(&ctx.core_ctx);
                     let counters_per_socket = ctx.core_ctx.per_resource_counters(socket);
-                    assert_eq!(expected, counters.as_ref().into(), "{context_name}");
+                    assert_eq!(expected, counters.as_ref().cast(), "{context_name}");
                     assert_eq!(
                         expected_without_socket,
-                        counters_without_socket.as_ref().into(),
+                        counters_without_socket.as_ref().cast(),
                         "{context_name}"
                     );
                     assert_eq!(
                         expected_per_socket,
-                        counters_per_socket.as_ref().into(),
+                        counters_per_socket.as_ref().cast(),
                         "{context_name}"
                     )
                 })

@@ -40,8 +40,11 @@ pub type UdpCountersWithoutSocket<I> = IpMarked<I, UdpCountersWithoutSocketInner
 /// The IP agnostic version of [`UdpCountersWithoutSocket`].
 ///
 /// The counter type `C` is generic to facilitate testing.
-#[derive(Default)]
-#[cfg_attr(test, derive(Debug, PartialEq))]
+#[derive(Default, Debug)]
+#[cfg_attr(
+    any(test, feature = "testutils"),
+    derive(PartialEq, netstack3_macros::CounterCollection)
+)]
 pub struct UdpCountersWithoutSocketInner<C = Counter> {
     /// Count of ICMP error messages received.
     pub rx_icmp_error: C,
@@ -74,7 +77,10 @@ pub type UdpCountersWithSocket<I> = IpMarked<I, UdpCountersWithSocketInner>;
 ///
 /// The counter type `C` is generic to facilitate testing.
 #[derive(Default, Debug)]
-#[cfg_attr(test, derive(PartialEq))]
+#[cfg_attr(
+    any(test, feature = "testutils"),
+    derive(PartialEq, netstack3_macros::CounterCollection)
+)]
 pub struct UdpCountersWithSocketInner<C = Counter> {
     /// Count of UDP datagrams that were delivered to a socket. Because some
     /// datagrams may be delivered to multiple sockets (e.g. multicast traffic)
@@ -163,35 +169,5 @@ pub(crate) mod testutil {
 
     pub(crate) type CounterExpectationsWithSocket = UdpCountersWithSocketInner<u64>;
 
-    impl From<&UdpCountersWithSocketInner> for CounterExpectationsWithSocket {
-        fn from(counters: &UdpCountersWithSocketInner) -> CounterExpectationsWithSocket {
-            let UdpCountersWithSocketInner { rx_delivered, tx, tx_error } = counters;
-            CounterExpectationsWithSocket {
-                rx_delivered: rx_delivered.get(),
-                tx: tx.get(),
-                tx_error: tx_error.get(),
-            }
-        }
-    }
-
     pub(crate) type CounterExpectationsWithoutSocket = UdpCountersWithoutSocketInner<u64>;
-
-    impl From<&UdpCountersWithoutSocketInner> for CounterExpectationsWithoutSocket {
-        fn from(counters: &UdpCountersWithoutSocketInner) -> CounterExpectationsWithoutSocket {
-            let UdpCountersWithoutSocketInner {
-                rx_icmp_error,
-                rx,
-                rx_mapped_addr,
-                rx_unknown_dest_port,
-                rx_malformed,
-            } = counters;
-            CounterExpectationsWithoutSocket {
-                rx_icmp_error: rx_icmp_error.get(),
-                rx: rx.get(),
-                rx_mapped_addr: rx_mapped_addr.get(),
-                rx_unknown_dest_port: rx_unknown_dest_port.get(),
-                rx_malformed: rx_malformed.get(),
-            }
-        }
-    }
 }

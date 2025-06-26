@@ -930,8 +930,11 @@ impl gmp::v2::ProtocolConfig for IgmpConfig {
 /// Statistics about IGMP.
 ///
 /// The counter type `C` is generic to facilitate testing.
-#[derive(Debug, Default)]
-#[cfg_attr(test, derive(PartialEq))]
+#[derive(Default, Debug)]
+#[cfg_attr(
+    any(test, feature = "testutils"),
+    derive(PartialEq, netstack3_macros::CounterCollection)
+)]
 pub struct IgmpCounters<C = Counter> {
     // Count of IGMPv1 queries received.
     rx_igmpv1_query: C,
@@ -1035,7 +1038,8 @@ mod tests {
         TestIpExt as _,
     };
     use netstack3_base::{
-        CounterContext, CtxPair, Instant as _, IntoCoreTimerCtx, SendFrameContext as _,
+        CounterCollection, CounterContext, CtxPair, Instant as _, IntoCoreTimerCtx,
+        SendFrameContext as _,
     };
     use packet::serialize::Buf;
     use packet::{ParsablePacket as _, ParseBuffer, Serializer};
@@ -1250,57 +1254,12 @@ mod tests {
             &self,
             core_ctx: &mut CC,
         ) {
+            assert_eq!(self, &core_ctx.counters().cast(), "stack-wide counter mismatch");
             assert_eq!(
                 self,
-                &CounterExpectations::from(core_ctx.counters()),
-                "stack-wide counter mismatch"
-            );
-            assert_eq!(
-                self,
-                &CounterExpectations::from(core_ctx.per_resource_counters(&FakeDeviceId)),
+                &core_ctx.per_resource_counters(&FakeDeviceId).cast(),
                 "device-specific counter mismatch"
             );
-        }
-    }
-
-    impl From<&IgmpCounters> for CounterExpectations {
-        fn from(igmp_counters: &IgmpCounters) -> CounterExpectations {
-            let IgmpCounters {
-                rx_igmpv1_query,
-                rx_igmpv2_query,
-                rx_igmpv3_query,
-                rx_igmpv1_report,
-                rx_igmpv2_report,
-                rx_igmpv3_report,
-                rx_leave_group,
-                rx_err_parse,
-                rx_err_missing_router_alert_in_query,
-                rx_err_rejected_general_query,
-                rx_err_bad_ttl,
-                tx_igmpv1_report,
-                tx_igmpv2_report,
-                tx_igmpv3_report,
-                tx_leave_group,
-                tx_err,
-            } = igmp_counters;
-            CounterExpectations {
-                rx_igmpv1_query: rx_igmpv1_query.get(),
-                rx_igmpv2_query: rx_igmpv2_query.get(),
-                rx_igmpv3_query: rx_igmpv3_query.get(),
-                rx_igmpv1_report: rx_igmpv1_report.get(),
-                rx_igmpv2_report: rx_igmpv2_report.get(),
-                rx_igmpv3_report: rx_igmpv3_report.get(),
-                rx_leave_group: rx_leave_group.get(),
-                rx_err_parse: rx_err_parse.get(),
-                rx_err_missing_router_alert_in_query: rx_err_missing_router_alert_in_query.get(),
-                rx_err_rejected_general_query: rx_err_rejected_general_query.get(),
-                rx_err_bad_ttl: rx_err_bad_ttl.get(),
-                tx_igmpv1_report: tx_igmpv1_report.get(),
-                tx_igmpv2_report: tx_igmpv2_report.get(),
-                tx_igmpv3_report: tx_igmpv3_report.get(),
-                tx_leave_group: tx_leave_group.get(),
-                tx_err: tx_err.get(),
-            }
         }
     }
 

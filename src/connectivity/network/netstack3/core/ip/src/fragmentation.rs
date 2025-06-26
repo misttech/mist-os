@@ -585,7 +585,10 @@ fn set_ipv4_fragment(
 
 /// Counters kept by the IP stack pertaining to fragmentation.
 #[derive(Default, Debug)]
-#[cfg_attr(any(test, feature = "testutils"), derive(PartialEq))]
+#[cfg_attr(
+    any(test, feature = "testutils"),
+    derive(PartialEq, netstack3_macros::CounterCollection)
+)]
 pub struct FragmentationCounters<C = Counter> {
     /// The number of IP frames requiring fragmentation on egress.
     pub fragmentation_required: C,
@@ -611,30 +614,6 @@ impl FragmentationCounters {
             FragmentationError::MtuTooSmall => &self.error_mtu_too_small,
             FragmentationError::BodyTooLong => &self.error_body_too_long,
             FragmentationError::SizeLimitExceeded => &self.error_inner_size_limit_exceeded,
-        }
-    }
-}
-
-#[cfg(any(test, feature = "testutils"))]
-impl From<&FragmentationCounters> for FragmentationCounters<u64> {
-    fn from(counters: &FragmentationCounters) -> FragmentationCounters<u64> {
-        let FragmentationCounters {
-            fragmentation_required,
-            fragments,
-            error_not_allowed,
-            error_mtu_too_small,
-            error_body_too_long,
-            error_inner_size_limit_exceeded,
-            error_fragmented_serializer,
-        } = counters;
-        FragmentationCounters {
-            fragmentation_required: fragmentation_required.get(),
-            fragments: fragments.get(),
-            error_not_allowed: error_not_allowed.get(),
-            error_mtu_too_small: error_mtu_too_small.get(),
-            error_body_too_long: error_body_too_long.get(),
-            error_inner_size_limit_exceeded: error_inner_size_limit_exceeded.get(),
-            error_fragmented_serializer: error_fragmented_serializer.get(),
         }
     }
 }

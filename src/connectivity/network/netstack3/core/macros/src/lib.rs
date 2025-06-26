@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use proc_macro::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{quote, quote_spanned, ToTokens};
 use syn::spanned::Spanned;
 
 /// Instantiates an impl block as separate Ipv4 and Ipv6 blocks.
@@ -218,4 +218,207 @@ pub fn context_ip_bounds(attr: TokenStream, input: TokenStream) -> TokenStream {
         Ok(t) => t,
         Err(e) => e.into_compile_error().into(),
     }
+}
+
+// Substitutes the given identifier with an arbitrary replacement.
+fn substitute_ident(
+    input: impl quote::ToTokens,
+    ident: &str,
+    replacement: proc_macro2::TokenStream,
+) -> proc_macro2::TokenStream {
+    input
+        .to_token_stream()
+        .into_iter()
+        .map(|t| {
+            if t.to_string().as_str() == ident {
+                replacement.clone()
+            } else {
+                proc_macro2::TokenStream::from(t)
+            }
+        })
+        .collect()
+}
+
+/// A derive macro for the `netstack3_base::CounterCollection` and
+/// `netstack3_base::CounterCollectionSpec` traits.
+///
+/// For a given input definition:
+///
+/// ```
+///   #[derive(CounterCollection)]
+///   #[counter(C)]
+///   struct Foo<B: Bar, C: netstack3_base::CounterRepr>
+/// ```
+///
+/// it produces the following implementations:
+///
+/// ```
+///   impl<B: Bar, C: netstack3_base::CounterRepr> netstack3_base::CounterCollection for Foo<B, C> {
+///      type Spec = Foo<B, netstack3_base::Counter>;
+///      type Repr = C;
+///   }
+///
+///   impl<B: Bar> netstack3_base::CounterCollectionSpec for Foo<B, netstack3_base::Counter> {
+///       type CounterCollection<C: netstack3_base::CounterRepr> = Foo<B, C>;
+///       fn transform<C1: netstack3_base::CounterRepr, C2: netstack3_base::CounterRepr>(
+///           counters = &Foo<B, C1>
+///       ) -> Foo<B, C2> {
+///           let Foo {
+///               field1,
+///               field2,
+///               <remaining-fields>
+///           } = counters;
+///           Foo {
+///               field1: field1.cast::<C2>(),
+///               field2: field1.cast::<C2>(),
+///               <remaining-fields>
+///           }
+///       }
+///   }
+/// ```
+///
+/// The `#[counter(<TYPE_PARAM>)]` attribute specifies which type parameter is
+/// the counter type parameter. If unset it defaults to `C`.
+///
+/// Every field in `Foo` is expected to implement either
+/// `netstack3_base::CounterRepr` or `netstack3_base::CounterCollection`.
+#[proc_macro_derive(CounterCollection, attributes(counter))]
+pub fn derive_counter_collection_spec(item: TokenStream) -> TokenStream {
+    let ast = syn::parse_macro_input!(item as syn::DeriveInput);
+    let name = ast.ident;
+
+    // Determine which type parameter is the special "counter" type param.
+    const COUNTER_TYPE_PARAM_ATTRIBUTE: &str = "counter";
+    let counter_attribute = ast.attrs.iter().find(|attr| {
+        attr.path().get_ident().map(|ident| ident == COUNTER_TYPE_PARAM_ATTRIBUTE).unwrap_or(false)
+    });
+    let counter_type_param: syn::Ident = match counter_attribute {
+        // Note: If the "counter" attribute is missing, use the default.
+        None => syn::parse_quote!(C),
+        Some(attr) => {
+            let type_param: Result<syn::Ident, _> = attr.parse_args();
+            match type_param {
+                Ok(t) => t,
+                Err(_) => {
+                    return quote_spanned! {
+                        name.span() => std::compile_error!(
+                            "Invalid `counter` attribute. Expected `#[counter(TYPE_PARAM)]`"
+                        );
+                    }
+                    .into();
+                }
+            }
+        }
+    };
+    let counter_type_param_str = counter_type_param.to_string();
+
+    // Verify that the type has the special "counter" type parameter defined.
+    if !ast.generics.type_params().any(|p| p.ident == counter_type_param_str) {
+        return quote_spanned! {
+            name.span() => std::compile_error!(
+                "types deriving `CounterCollection` must have a generic \
+                counter type parameter. By default this is `C` but can be \
+                modified with `counter` attribute."
+            );
+        }
+        .into();
+    }
+
+    // Manipulate the type's generic parameters in various ways. We need to make
+    // adjustments to counter type parameter while leaving all other parameters
+    // (types, lifetimes, etc) untouched.
+    let original_generics = ast.generics.clone();
+    let (_impl_generics, ty_generics, where_clause) = original_generics.split_for_impl();
+    // Note: Substitute the counter type parameter for the concrete `Counter`
+    // type from netstack3 base.
+    let concrete_ty_generics = substitute_ident(
+        ty_generics.clone(),
+        &counter_type_param_str,
+        syn::parse_quote!(netstack3_base::Counter),
+    );
+    // Note: Substitute the counter type parameter for `C1`.
+    let c1_ty_generics =
+        substitute_ident(ty_generics.clone(), &counter_type_param_str, syn::parse_quote!(C1));
+    // Note: Substitute the counter type parameter for `C2`.
+    let c2_ty_generics =
+        substitute_ident(ty_generics.clone(), &counter_type_param_str, syn::parse_quote!(C2));
+    // Note: Remove the counter type parameter from the `impl_generics`.
+    let mut generics_no_counter = ast.generics.clone();
+    generics_no_counter.params = syn::punctuated::Punctuated::from_iter(
+        ast.generics
+            .params
+            .iter()
+            .filter(|param| match param {
+                syn::GenericParam::Type(p) => p.ident != counter_type_param_str,
+                _ => true,
+            })
+            .cloned(),
+    );
+    let (impl_generics_no_counter, _ty_generics, _where_clause) =
+        generics_no_counter.split_for_impl();
+    // Note: Add an extra bound to the counter type parameter:
+    // `netstack3_base::CounterRepr`.
+    let mut generics_extra_bounds = ast.generics.clone();
+    generics_extra_bounds.params.iter_mut().for_each(|param| match param {
+        syn::GenericParam::Type(p) => {
+            if p.ident == counter_type_param_str {
+                // Note: We could check if the type already has the bound before
+                // adding it, however it's not necessary because Rust allows bounds
+                // to be duplicated (e.g. C: CounterRepr + CounterRepr) is valid.
+                p.bounds.push(syn::parse_quote!(netstack3_base::CounterRepr))
+            }
+        }
+        _ => {}
+    });
+    let (impl_generics_extra_bounds, _ty_generics, _where_clause) =
+        generics_extra_bounds.split_for_impl();
+
+    // Extract all the names of the fields defined by the type.
+    let field_names = match ast.data {
+        syn::Data::Struct(data) => data
+            .fields
+            .into_iter()
+            .map(|f| f.ident.expect("field should have identifier"))
+            .collect::<Vec<_>>(),
+        // NB: It would be feasible to provide such an implementation, but we
+        // have no need at the moment.
+        _ => {
+            return quote_spanned! {
+                name.span() => std::compile_error!(
+                    "derive CounterCollectionSpec only supported on structs"
+                );
+            }
+            .into()
+        }
+    };
+
+    quote! {
+        impl #impl_generics_extra_bounds netstack3_base::CounterCollection
+            for #name #ty_generics #where_clause {
+            type Spec = #name #concrete_ty_generics;
+            type Repr = #counter_type_param;
+        }
+
+        impl #impl_generics_no_counter netstack3_base::CounterCollectionSpec
+            for #name #concrete_ty_generics #where_clause {
+            type CounterCollection<#counter_type_param: netstack3_base::CounterRepr> =
+                #name #ty_generics;
+            fn transform<C1: netstack3_base::CounterRepr, C2: netstack3_base::CounterRepr>(
+                counters: &#name #c1_ty_generics
+            ) -> #name #c2_ty_generics {
+                // Destructure `counters` into it's fields.
+                let #name {
+                    #(#field_names,)*
+                } = counters;
+                // Reconstruct `counters`, converting each field with `cast()`.
+                // Import the relevant trait methods so we're certain they're in
+                // scope.
+                use netstack3_base::{CounterCollection as _, CounterRepr as _};
+                #name {
+                    #(#field_names: #field_names.cast::<C2>(),)*
+                }
+            }
+        }
+    }
+    .into()
 }

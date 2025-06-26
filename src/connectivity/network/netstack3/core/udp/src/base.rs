@@ -2759,8 +2759,8 @@ mod tests {
         TestIpExt as _,
     };
     use netstack3_base::{
-        CtxPair, RemoteAddressError, ResourceCounterContext, SendFrameErrorReason,
-        UninstantiableWrapper,
+        CounterCollection, CtxPair, RemoteAddressError, ResourceCounterContext,
+        SendFrameErrorReason, UninstantiableWrapper,
     };
     use netstack3_datagram::MulticastInterfaceSelector;
     use netstack3_hashmap::{HashMap, HashSet};
@@ -3420,22 +3420,15 @@ mod tests {
         >,
     ) {
         assert_eq!(
-            CounterExpectationsWithSocket::from(
-                CounterContext::<UdpCountersWithSocket<I>>::counters(core_ctx).as_ref()
-            ),
+            CounterContext::<UdpCountersWithSocket<I>>::counters(core_ctx).cast(),
             with_socket_expects
         );
         assert_eq!(
-            CounterExpectationsWithoutSocket::from(
-                CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).as_ref()
-            ),
+            CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).cast(),
             without_socket_expects
         );
         for (id, expects) in per_socket_expects.into_iter() {
-            assert_eq!(
-                CounterExpectationsWithSocket::from(core_ctx.per_resource_counters(id).as_ref()),
-                expects
-            );
+            assert_eq!(core_ctx.per_resource_counters(id).cast(), expects);
         }
     }
 

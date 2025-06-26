@@ -7,7 +7,7 @@
 use core::fmt::Debug;
 use net_types::ip::{GenericOverIp, Ip, Ipv4, Ipv6};
 use netstack3_base::{
-    Counter, CounterRepr, Inspectable, Inspector, InspectorExt as _, TestOnlyFrom,
+    Counter, CounterCollectionSpec, CounterRepr, Inspectable, Inspector, InspectorExt as _,
     TestOnlyPartialEq,
 };
 
@@ -16,25 +16,27 @@ use crate::internal::fragmentation::FragmentationCounters;
 /// An IP extension trait supporting counters at the IP layer.
 pub trait IpCountersIpExt: Ip {
     /// Receive counters.
-    type RxCounters<C: CounterRepr>: Default
+    type RxCounters: CounterCollectionSpec<CounterCollection<Counter>: Inspectable>
+        + Default
         + Debug
-        + Inspectable
-        + TestOnlyPartialEq
-        + for<'a> TestOnlyFrom<&'a Self::RxCounters<Counter>>;
+        + TestOnlyPartialEq;
 }
 
 impl IpCountersIpExt for Ipv4 {
-    type RxCounters<C: CounterRepr> = Ipv4RxCounters<C>;
+    type RxCounters = Ipv4RxCounters;
 }
 
 impl IpCountersIpExt for Ipv6 {
-    type RxCounters<C: CounterRepr> = Ipv6RxCounters<C>;
+    type RxCounters = Ipv6RxCounters;
 }
 
 /// Ip layer counters.
 #[derive(Default, Debug, GenericOverIp)]
 #[generic_over_ip(I, Ip)]
-#[cfg_attr(any(test, feature = "testutils"), derive(PartialEq))]
+#[cfg_attr(
+    any(test, feature = "testutils"),
+    derive(PartialEq, netstack3_macros::CounterCollection)
+)]
 pub struct IpCounters<I: IpCountersIpExt, C: CounterRepr = Counter> {
     /// Count of incoming IP unicast packets delivered.
     pub deliver_unicast: C,
@@ -94,7 +96,7 @@ pub struct IpCounters<I: IpCountersIpExt, C: CounterRepr = Counter> {
     /// addresses on the wire.
     pub tx_illegal_loopback_address: C,
     /// Version specific rx counters.
-    pub version_rx: I::RxCounters<C>,
+    pub version_rx: <I::RxCounters as CounterCollectionSpec>::CounterCollection<C>,
     /// Count of incoming IP multicast packets that were dropped because
     /// The stack doesn't have any sockets that belong to the multicast group,
     /// and the stack isn't configured to forward the multicast packet.
@@ -109,7 +111,7 @@ pub struct IpCounters<I: IpCountersIpExt, C: CounterRepr = Counter> {
     pub socket_egress_filter_dropped: C,
 }
 
-impl<I: IpCountersIpExt, C: CounterRepr> Inspectable for IpCounters<I, C> {
+impl<I: IpCountersIpExt> Inspectable for IpCounters<I> {
     fn record<II: Inspector>(&self, inspector: &mut II) {
         let IpCounters {
             deliver_unicast,
@@ -199,9 +201,9 @@ impl<I: IpCountersIpExt, C: CounterRepr> Inspectable for IpCounters<I, C> {
 }
 
 /// IPv4-specific Rx counters.
-#[derive(Default, Debug)]
-#[cfg_attr(any(test, feature = "testutils"), derive(PartialEq))]
-pub struct Ipv4RxCounters<C: CounterRepr = Counter> {
+#[derive(Default, Debug, netstack3_macros::CounterCollection)]
+#[cfg_attr(any(test, feature = "testutils"), derive(PartialEq,))]
+pub struct Ipv4RxCounters<C = Counter> {
     /// Count of incoming broadcast IPv4 packets delivered.
     pub deliver_broadcast: C,
 }
@@ -214,9 +216,9 @@ impl<C: CounterRepr> Inspectable for Ipv4RxCounters<C> {
 }
 
 /// IPv6-specific Rx counters.
-#[derive(Default, Debug)]
-#[cfg_attr(any(test, feature = "testutils"), derive(PartialEq))]
-pub struct Ipv6RxCounters<C: CounterRepr = Counter> {
+#[derive(Default, Debug, netstack3_macros::CounterCollection)]
+#[cfg_attr(any(test, feature = "testutils"), derive(PartialEq,))]
+pub struct Ipv6RxCounters<C = Counter> {
     /// Count of incoming IPv6 packets discarded while processing extension
     /// headers.
     pub extension_header_discard: C,
@@ -237,92 +239,10 @@ impl<C: CounterRepr> Inspectable for Ipv6RxCounters<C> {
 pub mod testutil {
     use super::*;
 
-    use netstack3_base::ResourceCounterContext;
-
-    impl<C: CounterRepr> From<&Ipv4RxCounters> for Ipv4RxCounters<C> {
-        fn from(counters: &Ipv4RxCounters) -> Ipv4RxCounters<C> {
-            let Ipv4RxCounters { deliver_broadcast } = counters;
-            Ipv4RxCounters { deliver_broadcast: deliver_broadcast.into_repr() }
-        }
-    }
-
-    impl<C: CounterRepr> From<&Ipv6RxCounters> for Ipv6RxCounters<C> {
-        fn from(counters: &Ipv6RxCounters) -> Ipv6RxCounters<C> {
-            let Ipv6RxCounters { extension_header_discard, drop_looped_back_dad_probe } = counters;
-            Ipv6RxCounters {
-                extension_header_discard: extension_header_discard.into_repr(),
-                drop_looped_back_dad_probe: drop_looped_back_dad_probe.into_repr(),
-            }
-        }
-    }
+    use netstack3_base::{CounterCollection, ResourceCounterContext};
 
     /// Expected values of [`IpCounters<I>`].
     pub type IpCounterExpectations<I> = IpCounters<I, u64>;
-
-    impl<I: IpCountersIpExt> From<&IpCounters<I>> for IpCounterExpectations<I> {
-        fn from(counters: &IpCounters<I>) -> IpCounterExpectations<I> {
-            let IpCounters {
-                deliver_unicast,
-                deliver_multicast,
-                dispatch_receive_ip_packet,
-                dispatch_receive_ip_packet_other_host,
-                receive_ip_packet,
-                send_ip_packet,
-                forwarding_disabled,
-                forward,
-                no_route_to_host,
-                mtu_exceeded,
-                ttl_expired,
-                receive_icmp_error,
-                fragment_reassembly_error,
-                need_more_fragments,
-                invalid_fragment,
-                fragment_cache_full,
-                parameter_problem,
-                unspecified_destination,
-                unspecified_source,
-                invalid_source,
-                dropped,
-                drop_for_tentative,
-                tx_illegal_loopback_address,
-                version_rx,
-                multicast_no_interest,
-                invalid_cached_conntrack_entry,
-                fragmentation,
-                socket_egress_filter_dropped,
-            } = counters;
-            IpCounterExpectations {
-                deliver_unicast: deliver_unicast.get(),
-                deliver_multicast: deliver_multicast.get(),
-                dispatch_receive_ip_packet: dispatch_receive_ip_packet.get(),
-                dispatch_receive_ip_packet_other_host: dispatch_receive_ip_packet_other_host.get(),
-                receive_ip_packet: receive_ip_packet.get(),
-                send_ip_packet: send_ip_packet.get(),
-                forwarding_disabled: forwarding_disabled.get(),
-                forward: forward.get(),
-                no_route_to_host: no_route_to_host.get(),
-                mtu_exceeded: mtu_exceeded.get(),
-                ttl_expired: ttl_expired.get(),
-                receive_icmp_error: receive_icmp_error.get(),
-                fragment_reassembly_error: fragment_reassembly_error.get(),
-                need_more_fragments: need_more_fragments.get(),
-                invalid_fragment: invalid_fragment.get(),
-                fragment_cache_full: fragment_cache_full.get(),
-                parameter_problem: parameter_problem.get(),
-                unspecified_destination: unspecified_destination.get(),
-                unspecified_source: unspecified_source.get(),
-                invalid_source: invalid_source.get(),
-                dropped: dropped.get(),
-                drop_for_tentative: drop_for_tentative.get(),
-                tx_illegal_loopback_address: tx_illegal_loopback_address.get(),
-                version_rx: version_rx.into(),
-                multicast_no_interest: multicast_no_interest.get(),
-                invalid_cached_conntrack_entry: invalid_cached_conntrack_entry.get(),
-                fragmentation: fragmentation.into(),
-                socket_egress_filter_dropped: socket_egress_filter_dropped.get(),
-            }
-        }
-    }
 
     impl<I: IpCountersIpExt> IpCounterExpectations<I> {
         /// Constructs the expected counter state when the given count of IP
@@ -343,14 +263,10 @@ pub mod testutil {
             core_ctx: &CC,
             device: &D,
         ) {
+            assert_eq!(core_ctx.counters().cast::<u64>(), self, "stack-wide counters");
             assert_eq!(
-                &IpCounterExpectations::from(core_ctx.counters()),
-                &self,
-                "stack-wide counters"
-            );
-            assert_eq!(
-                &IpCounterExpectations::from(core_ctx.per_resource_counters(device)),
-                &self,
+                core_ctx.per_resource_counters(device).cast::<u64>(),
+                self,
                 "per-device counters"
             );
         }

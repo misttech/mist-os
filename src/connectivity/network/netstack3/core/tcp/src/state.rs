@@ -3655,7 +3655,9 @@ mod test {
     use net_types::ip::Ipv4;
     use netstack3_base::sync::ResourceTokenValue;
     use netstack3_base::testutil::{FakeInstant, FakeInstantCtx};
-    use netstack3_base::{FragmentedPayload, InstantContext as _, Options, SackBlock};
+    use netstack3_base::{
+        CounterCollection, FragmentedPayload, InstantContext as _, Options, SackBlock,
+    };
     use test_case::{test_case, test_matrix};
 
     use super::*;
@@ -3964,8 +3966,8 @@ mod test {
     impl CounterExpectations {
         #[track_caller]
         fn assert_counters(&self, FakeTcpCounters { stack_wide, per_socket }: &FakeTcpCounters) {
-            assert_eq!(self, &CounterExpectations::from(stack_wide), "stack-wide counter mismatch");
-            assert_eq!(self, &CounterExpectations::from(per_socket), "per-socket counter mismatch");
+            assert_eq!(self, &stack_wide.cast(), "stack-wide counter mismatch");
+            assert_eq!(self, &per_socket.cast(), "per-socket counter mismatch");
         }
     }
 
