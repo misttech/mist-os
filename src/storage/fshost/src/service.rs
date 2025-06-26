@@ -877,17 +877,6 @@ pub fn fshost_admin(
                             },
                         );
                     }
-                    Ok(fshost::AdminRequest::GetDevicePath { responder, .. }) => {
-                        log::info!("admin get device path called");
-                        responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap_or_else(
-                            |e| {
-                                log::error!(
-                                    "failed to send GetDevicePath response. error: {:?}",
-                                    e
-                                );
-                            },
-                        );
-                    }
                     Ok(fshost::AdminRequest::WriteDataFile { responder, payload, filename }) => {
                         log::info!(filename:?; "admin write data file called");
                         let res = match write_data_file(

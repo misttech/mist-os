@@ -9,16 +9,10 @@ executable("df") {
   configs += [ "//build/config:all_source" ]
   sources = [ "main.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
-    "//sdk/lib/component/outgoing/cpp",
-    "//sdk/lib/fdio",
-    "//src/storage/fshost:admin-client",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fdio-caller",
-    "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/zx",
   ]
 }
 
