@@ -22,7 +22,6 @@
 #include <fbl/intrusive_wavl_tree.h>
 #include <fbl/wavl_tree_augmented_invariant_observer.h>
 #include <ffl/fixed.h>
-#include <kernel/auto_lock.h>
 #include <kernel/dpc.h>
 #include <kernel/mp.h>
 #include <kernel/owned_wait_queue.h>
@@ -30,7 +29,9 @@
 #include <kernel/spinlock.h>
 #include <kernel/thread.h>
 #include <kernel/wait.h>
+#include <ktl/algorithm.h>
 #include <ktl/optional.h>
+#include <ktl/utility.h>
 
 // Forward declarations.
 struct percpu;
@@ -610,11 +611,103 @@ class Scheduler {
                         EndTraceCallback end_outer_trace = nullptr) TA_EXCL(queue_lock_)
       TA_REQ(chainlock_transaction_token, current_thread->get_lock());
 
+  // A utility result type to help avoid missing updates to a thread's
+  // start/finish times when dequeuing from a run queue with a variable
+  // timeline.
+  class DequeueResult {
+   public:
+    // Constructs an empty result.
+    DequeueResult() = default;
+
+    // Constructs a result without a pending update to start/finish times. If
+    // the thread argument is nullptr an empty result is constructed.
+    explicit(false) DequeueResult(Thread* thread) : thread_{thread} {}
+
+    // Constructs a result with a pending update to start/finish times. The
+    // thread argument MUST NOT be nullptr and UpdateThreadTimeline() must be
+    // called with the thread's lock held to apply the pending update to
+    // start/finish times before the result is destroyed or reassigned.
+    DequeueResult(Thread* thread, SchedTime mono_start_time_ns, SchedTime mono_finish_time_ns)
+        : thread_{thread},
+          mono_start_time_ns_{mono_start_time_ns},
+          mono_finish_time_ns_{mono_finish_time_ns} {
+      DEBUG_ASSERT(thread_ != nullptr);
+      DEBUG_ASSERT(mono_start_time_ns != 0 || mono_finish_time_ns != 0);
+    }
+
+    // Destroys the result, asserting that there is no pending update the
+    // thread's start/finish times.
+    ~DequeueResult() {
+      DEBUG_ASSERT_MSG(!is_updated_pending(),
+                       "DequeueResult destroyed with a pending timeline update!");
+    }
+
+    // The result type is move-only.
+    DequeueResult(const DequeueResult&) = delete;
+    DequeueResult& operator=(const DequeueResult&) = delete;
+
+    // Moves the given result into this instance, asserting that the current
+    // instance does not have a pending update to the thread's start/finish
+    // times.
+    DequeueResult(DequeueResult&& other) { *this = ktl::move(other); }
+    DequeueResult& operator=(DequeueResult&& other) {
+      if (this != &other) {
+        DEBUG_ASSERT_MSG(!is_updated_pending(),
+                         "DequeueResult destroyed with a pending timeline update!");
+        thread_ = nullptr;
+        ktl::swap(thread_, other.thread_);
+        ktl::swap(mono_start_time_ns_, other.mono_start_time_ns_);
+        ktl::swap(mono_finish_time_ns_, other.mono_finish_time_ns_);
+      }
+      return *this;
+    }
+
+    // Assigns this instance from a thread without a pending update to the
+    // thread's start/finish times, asserting that the previous thread, if any,
+    // does not have a pending update.
+    DequeueResult& operator=(Thread* thread) {
+      *this = DequeueResult{thread};
+      return *this;
+    }
+
+    // Updates the thread's start/finish times while holding the thread's lock.
+    // May be called unconditionally and more than once, whether or not there
+    // are pending updates.
+    void UpdateThreadTimeline() TA_REQ(thread()->get_lock()) {
+      if (is_updated_pending()) {
+        thread()->scheduler_state().start_time_ = mono_start_time_ns_;
+        thread()->scheduler_state().finish_time_ = mono_finish_time_ns_;
+        mono_start_time_ns_ = mono_finish_time_ns_ = SchedTime{0};
+      }
+    }
+
+    // Returns true if thread's timeline needs to be updated by calling
+    // UpdateThreadTimeline.
+    bool is_updated_pending() const {
+      // TODO(https://fxbug.dev/322207536): This returns false unconditionally
+      // because we do not yet support period expansion with variable timelines.
+      // Once this is supported, this function should return true if either
+      // the mono_start_time_ns_ or mono_finish_time_ns_ are nonzero.
+      return false;
+    }
+
+    // Contextually evaluates to true if the result is not empty.
+    explicit operator bool() const { return thread_ != nullptr; }
+
+    Thread* thread() { return thread_; }
+    const Thread* thread() const { return thread_; }
+
+   private:
+    Thread* thread_{nullptr};
+    SchedTime mono_start_time_ns_{0};
+    SchedTime mono_finish_time_ns_{0};
+  };
+
   // Evaluates the schedule and returns the thread that should execute,
   // updating the run queue as necessary.
-  Thread* EvaluateNextThread(SchedTime now, Thread* current_thread, bool timeslice_expired,
-                             bool current_is_migrating, SchedDuration total_runtime_ns,
-                             Guard<MonitoredSpinLock, NoIrqSave>& queue_guard)
+  DequeueResult EvaluateNextThread(SchedTime now, Thread* current_thread, bool timeslice_expired,
+                                   bool current_is_migrating, SchedDuration total_runtime_ns,
+                                   Guard<MonitoredSpinLock, NoIrqSave>& queue_guard)
       TA_REQ(chainlock_transaction_token, queue_lock_, current_thread->get_lock());
 
   // Adds a thread to the run queue tree. The thread must be active on this
@@ -644,23 +737,23 @@ class Scheduler {
   //    re-inserted into its new scheduler's run queue.
   //
   // Note that these rules apply to *all* the versions of Dequeue listed below.
-  Thread* DequeueThread(SchedTime now, Guard<MonitoredSpinLock, NoIrqSave>& queue_guard)
+  DequeueResult DequeueThread(SchedTime now, Guard<MonitoredSpinLock, NoIrqSave>& queue_guard)
       TA_REQ(chainlock_transaction_token, queue_lock_);
 
   // Removes the thread at the head of the fair run queue and returns it.
-  Thread* DequeueFairThread() TA_REQ(queue_lock_);
+  DequeueResult DequeueFairThread() TA_REQ(queue_lock_);
 
-  // Removes the eligible thread with the earliest deadline in the deadline run
-  // queue and returns it.
-  Thread* DequeueDeadlineThread(SchedTime eligible_time) TA_REQ(queue_lock_);
+  // Removes the eligible deadline thread with the earliest finish time in the
+  // deadline run queue and returns it.
+  DequeueResult DequeueDeadlineThread(SchedTime eligible_time) TA_REQ(queue_lock_);
 
-  // Removes the eligible thread with a deadline earlier than the given deadline
-  // and returns it or nullptr if one does not exist.
-  Thread* DequeueEarlierDeadlineThread(SchedTime eligible_time, SchedTime finish_time)
+  // Removes the eligible deadline thread with a finish time earlier than the
+  // given finish time and returns it or nullptr if one does not exist.
+  DequeueResult DequeueEarlierDeadlineThread(SchedTime eligible_time, SchedTime finish_time)
       TA_REQ(queue_lock_);
 
-  // Returns the eligible thread in the run queue with a deadline earlier than
-  // the given deadline, or nullptr if one does not exist.
+  // Returns the eligible deadline thread in the run queue with a finish time
+  // earlier than the given finish time, or nullptr if one does not exist.
   //
   // See the note in |FindEarliestEligibleThread| for lifecycle rules for the
   // returned pointer (if any)
@@ -668,9 +761,9 @@ class Scheduler {
       TA_REQ(queue_lock_);
 
   // Attempts to steal work from other busy CPUs. Returns nullptr if no work was
-  // stolen, otherwise returns a pointer to the stolen thread that is now
+  // stolen, otherwise returns a pointer to the stolen thread that is partially
   // associated with the local Scheduler instance.
-  Thread* StealWork(SchedTime now, SchedPerformanceScale scale_up_factor)
+  DequeueResult StealWork(SchedTime now, SchedPerformanceScale scale_up_factor)
       TA_REQ(chainlock_transaction_token) TA_EXCL(queue_lock_);
 
   // Returns the time that the next deadline task will become eligible or infinite
@@ -688,7 +781,7 @@ class Scheduler {
 
   // Returns the completion time clamped to the start of the earliest deadline
   // thread that will become eligible in that time frame and also has an earlier
-  // deadline than the given finish time.
+  // finish time than the given finish time.
   SchedTime ClampToEarlierDeadline(SchedTime completion_time, SchedTime finish_time)
       TA_REQ(queue_lock_);
 

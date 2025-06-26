@@ -562,7 +562,8 @@ void Scheduler::RemoveFirstThread(Thread* thread) {
 // an eligible deadline thread, it takes precedence over available fair
 // threads. If there is no eligible work, attempt to steal work from other busy
 // CPUs.
-Thread* Scheduler::DequeueThread(SchedTime now, Guard<MonitoredSpinLock, NoIrqSave>& queue_guard) {
+Scheduler::DequeueResult Scheduler::DequeueThread(
+    SchedTime now, Guard<MonitoredSpinLock, NoIrqSave>& queue_guard) {
   percpu& self = percpu::Get(this_cpu_);
   if (self.idle_power_thread.pending_power_work()) {
     return &self.idle_power_thread.thread();
@@ -578,11 +579,14 @@ Thread* Scheduler::DequeueThread(SchedTime now, Guard<MonitoredSpinLock, NoIrqSa
   // Release the queue lock while attempting to steal work, leaving IRQs
   // disabled.  Latch our scale up factor to use while determining whether or
   // not we can steal a given thread before we drop our lock.
-  Thread* thread;
+  // TODO(eieio): Since the performance scale is CPU-local and not accessed
+  // across processors, it should be unnecessary to latch the value. Change the
+  // annotations to allow this.
+  DequeueResult result;
   SchedPerformanceScale scale_up_factor = performance_scale_reciprocal_.load();
   queue_guard.CallUnlocked([&] {
     ChainLockTransaction::AssertActive();
-    thread = StealWork(now, scale_up_factor);
+    result = StealWork(now, scale_up_factor);
   });
 
   // If we successfully stole a thread, it should now be in the Rescheduling
@@ -608,12 +612,12 @@ Thread* Scheduler::DequeueThread(SchedTime now, Guard<MonitoredSpinLock, NoIrqSa
   // queue, and return a locked thread to RescheduleCommon.  This would mean
   // that we don't have to drop the scheduler's lock later on in order to finish
   // the reschedule (or migration) operation.
-  if (thread != nullptr) {
-    AssertInScheduler(*thread);
-    SchedulerQueueState& sqs = thread->scheduler_queue_state();
+  if (result) {
+    AssertInScheduler(*result.thread());
+    SchedulerQueueState& sqs = result.thread()->scheduler_queue_state();
     DEBUG_ASSERT(sqs.transient_state == SchedulerQueueState::TransientState::Rescheduling);
     sqs.transient_state = SchedulerQueueState::TransientState::None;
-    return thread;
+    return result;
   }
 
   return &self.idle_power_thread.thread();
@@ -622,7 +626,8 @@ Thread* Scheduler::DequeueThread(SchedTime now, Guard<MonitoredSpinLock, NoIrqSa
 // Attempts to steal work from other busy CPUs and move it to the local run
 // queues. Returns a pointer to the stolen thread that is now associated with
 // the local Scheduler instance, or nullptr is no work was stolen.
-Thread* Scheduler::StealWork(SchedTime now, SchedPerformanceScale scale_up_factor) {
+Scheduler::DequeueResult Scheduler::StealWork(SchedTime now,
+                                              SchedPerformanceScale scale_up_factor) {
   using TransientState = SchedulerQueueState::TransientState;
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "StealWork");
 
@@ -803,7 +808,7 @@ Thread* Scheduler::StealWork(SchedTime now, SchedPerformanceScale scale_up_facto
 
 // Dequeues the eligible thread with the earliest virtual finish time. The
 // caller must ensure that there is at least one thread in the queue.
-Thread* Scheduler::DequeueFairThread() {
+Scheduler::DequeueResult Scheduler::DequeueFairThread() {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "dequeue_fair_thread");
 
   // Snap the virtual clock to the earliest start time.
@@ -846,7 +851,7 @@ Thread* Scheduler::DequeueFairThread() {
 
 // Dequeues the eligible thread with the earliest deadline. The caller must
 // ensure that there is at least one eligible thread in the queue.
-Thread* Scheduler::DequeueDeadlineThread(SchedTime eligible_time) {
+Scheduler::DequeueResult Scheduler::DequeueDeadlineThread(SchedTime eligible_time) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "dequeue_deadline_thread");
 
   Thread* const eligible_thread = FindEarliestEligibleThread(&deadline_run_queue_, eligible_time);
@@ -904,7 +909,8 @@ SchedTime Scheduler::GetNextEligibleTime() {
 // Dequeues the eligible thread with the earliest deadline that is also earlier
 // than the given deadline. Returns nullptr if no threads meet the criteria or
 // the run queue is empty.
-Thread* Scheduler::DequeueEarlierDeadlineThread(SchedTime eligible_time, SchedTime finish_time) {
+Scheduler::DequeueResult Scheduler::DequeueEarlierDeadlineThread(SchedTime eligible_time,
+                                                                 SchedTime finish_time) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "dequeue_earlier_deadline_thread");
   Thread* const eligible_thread = FindEarlierDeadlineThread(eligible_time, finish_time);
 
@@ -941,9 +947,9 @@ bool Scheduler::NeedsMigration(Thread* thread) {
 
 // Selects a thread to run. Performs any necessary maintenance if the current
 // thread is changing, depending on the reason for the change.
-Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, bool timeslice_expired,
-                                      bool current_is_migrating, SchedDuration total_runtime_ns,
-                                      Guard<MonitoredSpinLock, NoIrqSave>& queue_guard) {
+Scheduler::DequeueResult Scheduler::EvaluateNextThread(
+    SchedTime now, Thread* current_thread, bool timeslice_expired, bool current_is_migrating,
+    SchedDuration total_runtime_ns, Guard<MonitoredSpinLock, NoIrqSave>& queue_guard) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "find_thread");
 
   const bool is_idle = current_thread->IsIdle();
@@ -951,7 +957,7 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
   const bool is_deadline = IsDeadlineThread(current_thread);
   const bool is_new_deadline_eligible = IsDeadlineThreadEligible(now);
 
-  Thread* next_thread = nullptr;
+  DequeueResult next_thread = nullptr;
   if (!current_is_migrating) {
     if (is_active && likely(!is_idle)) {
       if (timeslice_expired) {
@@ -962,10 +968,9 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
         // eligible deadline thread in the run queue: select the eligible thread
         // with the earliest deadline, which may still be the current thread.
         const SchedTime deadline_ns = current_thread->scheduler_state().finish_time_;
-        if (Thread* const earlier_thread = DequeueEarlierDeadlineThread(now, deadline_ns);
-            earlier_thread != nullptr) {
+        if (DequeueResult earlier_thread_result = DequeueEarlierDeadlineThread(now, deadline_ns)) {
           QueueThread(current_thread, Placement::Preemption, now, total_runtime_ns);
-          next_thread = earlier_thread;
+          next_thread = ktl::move(earlier_thread_result);
         } else {
           // The current thread still has the earliest deadline.
           next_thread = current_thread;
@@ -992,7 +997,7 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
 
   // The current thread is no longer running, has returned to the run queue, or is migrating.
   // Select another thread to run.
-  if (next_thread == nullptr) {
+  if (!next_thread) {
     next_thread = DequeueThread(now, queue_guard);
   }
 
@@ -1463,10 +1468,10 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
   }
 
   // Select the next thread to run.
-  Thread* const next_thread = EvaluateNextThread(
+  DequeueResult next_thread_result = EvaluateNextThread(
       now, current_thread, timeslice_expired, current_is_migrating, total_runtime_ns, queue_guard);
-  DEBUG_ASSERT(next_thread != nullptr);
-  const bool thread_changed{current_thread != next_thread};
+  DEBUG_ASSERT(next_thread_result);
+  const bool thread_changed{current_thread != next_thread_result.thread()};
 
   // Flush pending preemptions.
   mp_reschedule(current_thread->preemption_state().preempts_pending(), 0);
@@ -1520,6 +1525,7 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
   // 4) Therefore, current and next cannot be members of the same graph, and can
   //    both be acquired unconditionally.
   //
+  Thread* const next_thread = next_thread_result.thread();
   if (thread_changed) {
     // Mark the next_thread as "becoming scheduled" while we drop the lock.
     // This will prevent another scheduler from stealing this thread out from
