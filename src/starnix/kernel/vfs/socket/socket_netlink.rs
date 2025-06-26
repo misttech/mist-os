@@ -23,7 +23,7 @@ use std::num::NonZeroU32;
 use std::sync::Arc;
 use zerocopy::{FromBytes, IntoBytes};
 
-use crate::device::kobject::{Device, KObjectBased, UEventAction, UEventContext};
+use crate::device::kobject::{Device, UEventAction, UEventContext};
 use crate::device::{DeviceListener, DeviceListenerKey};
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter};
@@ -779,9 +779,8 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
         let Some(metadata) = &device.metadata else {
             return;
         };
-        let kobject = device.kobject();
-        let subsystem = kobject.parent().unwrap();
-        let subsystem = subsystem.name();
+        let path = device.path_from_depth(0);
+        let subsystem = &device.class.name;
         // TODO(https://fxbug.dev/42078277): Pass the synthetic UUID when available.
         // Otherwise, default as "0".
         let message = format!(
@@ -794,7 +793,7 @@ impl DeviceListener for Arc<Mutex<NetlinkSocketInner>> {
                             MAJOR={major}\0\
                             MINOR={minor}\0\
                             SEQNUM={seqnum}\0",
-            path = kobject.path(),
+            path = path,
             name = metadata.devname,
             subsystem = subsystem,
             major = metadata.device_type.major(),

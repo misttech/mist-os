@@ -20,7 +20,7 @@ use std::sync::Arc;
 
 pub struct SimpleDirectoryMutator {
     fs: FileSystemHandle,
-    directory: Arc<SimpleDirectory>,
+    pub directory: Arc<SimpleDirectory>,
 }
 
 impl SimpleDirectoryMutator {
@@ -33,6 +33,11 @@ impl SimpleDirectoryMutator {
     }
 
     pub fn entry(&self, name: &str, ops: impl Into<Box<dyn FsNodeOps>>, mode: FileMode) {
+        self.entry2(name.into(), ops, mode);
+    }
+
+    // TODO: Figure out a better way to overload this function for &str and &FsStr.
+    pub fn entry2(&self, name: &FsStr, ops: impl Into<Box<dyn FsNodeOps>>, mode: FileMode) {
         let node =
             self.fs.create_node_and_allocate_node_id(ops, FsNodeInfo::new(mode, FsCred::root()));
         self.node(name.into(), node);
@@ -60,9 +65,18 @@ impl SimpleDirectoryMutator {
 
     pub fn subdir(&self, name: &str, mode: u32, build_subdir: impl FnOnce(&Self)) {
         let name: &FsStr = name.into();
+        self.subdir2(name, mode, build_subdir);
+    }
+
+    // TODO: Figure out a better way to overload this function for &str and &FsStr.
+    pub fn subdir2(&self, name: &FsStr, mode: u32, build_subdir: impl FnOnce(&Self)) {
         let dir = self.directory.subdir(&self.fs, name, mode);
         let mutator = SimpleDirectoryMutator::new(self.fs.clone(), dir);
         build_subdir(&mutator);
+    }
+
+    pub fn remove(&self, name: &FsStr) {
+        self.directory.remove(name);
     }
 }
 
@@ -79,19 +93,31 @@ impl SimpleDirectory {
         self.entries.lock().remove(name);
     }
 
-    pub fn remove_path(self: &Arc<Self>, path: &FsStr) {
-        let mut components = path.split(|c| *c == b'/');
-        let mut current = self.clone();
-        while let Some(component) = components.next() {
+    fn walk<'a>(self: &Arc<Self>, path: &'a FsStr) -> Option<(Arc<Self>, &'a FsStr)> {
+        fn check_component(component: &FsStr) {
             assert!(!component.is_empty());
-            assert_ne!(&component, b".");
-            assert_ne!(&component, b"..");
-            let Some(next) = current.peek_dir(component.into()) else {
-                return;
-            };
-            current = next;
+
+            let dot: &FsStr = b".".into();
+            assert_ne!(component, dot);
+
+            let dotdot: &FsStr = b"..".into();
+            assert_ne!(component, dotdot);
         }
-        current.remove(path);
+
+        let mut components = path.split(|c| *c == b'/');
+        let basename = components.next_back()?;
+        let basename: &FsStr = basename.into();
+        check_component(basename);
+        let mut parent = self.clone();
+        while let Some(component) = components.next() {
+            let component: &FsStr = component.into();
+            check_component(component);
+            let Some(next) = parent.get_dir(component) else {
+                return None;
+            };
+            parent = next;
+        }
+        Some((parent, basename))
     }
 
     pub fn edit(
@@ -119,17 +145,22 @@ impl SimpleDirectory {
         }
     }
 
-    pub fn get_child(&self, name: &FsStr) -> Option<FsNodeHandle> {
+    fn get(&self, name: &FsStr) -> Option<FsNodeHandle> {
         let entries = self.entries.lock();
         entries.get(name).cloned()
     }
 
-    pub fn peek_dir(&self, name: &FsStr) -> Option<Arc<SimpleDirectory>> {
+    fn get_dir(&self, name: &FsStr) -> Option<Arc<SimpleDirectory>> {
         let entries = self.entries.lock();
         entries
             .get(name)
             .and_then(|node| node.downcast_ops::<Arc<SimpleDirectory>>())
             .map(Arc::clone)
+    }
+
+    pub fn lookup(self: &Arc<Self>, path: &FsStr) -> Option<FsNodeHandle> {
+        let (parent, basename) = self.walk(path)?;
+        parent.get(basename)
     }
 }
 

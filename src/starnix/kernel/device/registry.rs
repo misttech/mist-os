@@ -780,7 +780,6 @@ impl DeviceTypeAllocator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::device::kobject::KObjectBased;
     use crate::device::mem::DevNull;
     use crate::fs::sysfs::DeviceDirectory;
     use crate::testing::*;
@@ -910,15 +909,13 @@ mod tests {
         registry.add_device(
             &mut locked,
             &current_task,
-            "mice".into(),
-            DeviceMetadata::new("mice".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
+            "mouse".into(),
+            DeviceMetadata::new("mouse".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
             input_class,
             DeviceDirectory::new,
         );
 
-        let class_dir = registry.objects.class.dir();
-        let input_dir = class_dir.peek_dir("input".into()).expect("get input dir");
-        assert!(input_dir.get_child("mice".into()).is_some());
+        assert!(registry.objects.root.lookup("class/input/mouse".into()).is_some());
     }
 
     #[::fuchsia::test]
@@ -934,23 +931,23 @@ mod tests {
             )
             .expect("can register input");
 
-        let bus = registry.objects.get_or_create_bus("bus".into());
-        let class = registry.objects.get_or_create_class("class".into(), bus);
+        let bus = registry.objects.get_or_create_bus("my-bus".into());
+        let class = registry.objects.get_or_create_class("my-class".into(), bus);
         registry.add_device(
             &mut locked,
             &current_task,
-            "device".into(),
-            DeviceMetadata::new("device".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
+            "my-device".into(),
+            DeviceMetadata::new(
+                "my-device".into(),
+                DeviceType::new(INPUT_MAJOR, 0),
+                DeviceMode::Char,
+            ),
             class,
             DeviceDirectory::new,
         );
-        assert!(registry.objects.bus.has_child("bus".into()));
-        assert!(registry
-            .objects
-            .bus
-            .get_child("bus".into())
-            .and_then(|collection| collection.get_child("device".into()))
-            .is_some());
+        assert!(registry.objects.root.lookup("bus/my-bus".into()).is_some());
+        assert!(registry.objects.root.lookup("devices/my-bus/my-class".into()).is_some());
+        assert!(registry.objects.root.lookup("devices/my-bus/my-class/my-device".into()).is_some());
     }
 
     #[::fuchsia::test]
@@ -968,27 +965,24 @@ mod tests {
 
         let pci_bus = registry.objects.get_or_create_bus("pci".into());
         let input_class = registry.objects.get_or_create_class("input".into(), pci_bus);
-        let mice_dev = registry.add_device(
+        let mouse_dev = registry.add_device(
             &mut locked,
             &current_task,
-            "mice".into(),
-            DeviceMetadata::new("mice".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
+            "mouse".into(),
+            DeviceMetadata::new("mouse".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
             input_class.clone(),
             DeviceDirectory::new,
         );
 
-        registry.remove_device(&mut locked, &current_task, mice_dev);
-        assert!(!input_class.kobject().has_child("mice".into()));
-        assert!(!registry
-            .objects
-            .bus
-            .get_child("pci".into())
-            .expect("get pci collection")
-            .has_child("mice".into()));
+        assert!(registry.objects.root.lookup("bus/pci/devices/mouse".into()).is_some());
+        assert!(registry.objects.root.lookup("devices/pci/input/mouse".into()).is_some());
+        assert!(registry.objects.root.lookup("class/input/mouse".into()).is_some());
 
-        let class_dir = registry.objects.class.dir();
-        let input_dir = class_dir.peek_dir("input".into()).expect("get input dir");
-        assert!(input_dir.get_child("mice".into()).is_none());
+        registry.remove_device(&mut locked, &current_task, mouse_dev);
+
+        assert!(registry.objects.root.lookup("bus/pci/devices/mouse".into()).is_none());
+        assert!(registry.objects.root.lookup("devices/pci/input/mouse".into()).is_none());
+        assert!(registry.objects.root.lookup("class/input/mouse".into()).is_none());
     }
 
     #[::fuchsia::test]
@@ -1004,12 +998,20 @@ mod tests {
             DeviceDirectory::new,
         );
 
-        let class_dir = registry.objects.class.dir();
-        let thermal_dir = class_dir.peek_dir("thermal".into()).expect("get thermal dir");
-        assert!(thermal_dir.get_child("cooling_device0".into()).is_some());
+        assert!(registry.objects.root.lookup("class/thermal/cooling_device0".into()).is_some());
+        assert!(registry
+            .objects
+            .root
+            .lookup("devices/virtual/thermal/cooling_device0".into())
+            .is_some());
 
         registry.remove_device(&mut locked, &current_task, cooling_device);
 
-        assert!(thermal_dir.get_child("cooling_device0".into()).is_none());
+        assert!(registry.objects.root.lookup("class/thermal/cooling_device0".into()).is_none());
+        assert!(registry
+            .objects
+            .root
+            .lookup("devices/virtual/thermal/cooling_device0".into())
+            .is_none());
     }
 }

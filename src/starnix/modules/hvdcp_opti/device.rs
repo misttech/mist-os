@@ -33,7 +33,7 @@ where
 
     let qdb_class =
         registry.objects.class_with_dir("qbg".into(), registry.objects.virtual_bus(), |dir| {
-            dir.entry("qbg_context".into(), ReadWriteBytesFile::new_node(), mode!(IFREG, 0o666));
+            dir.entry("qbg_context", ReadWriteBytesFile::new_node(), mode!(IFREG, 0o666));
         });
 
     // /dev/qbg

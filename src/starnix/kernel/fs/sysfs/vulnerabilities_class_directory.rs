@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::kobject::KObject;
 use crate::fs::tmpfs::TmpfsDirectory;
 use crate::task::CurrentTask;
 use crate::vfs::pseudo::simple_file::BytesFile;
@@ -19,7 +18,6 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use std::collections::HashMap;
-use std::sync::Weak;
 
 // Matches file names and creates corresponding files with specified content.
 macro_rules! file_match_and_create {
@@ -40,7 +38,7 @@ pub struct VulnerabilitiesClassDirectory {
 }
 
 impl VulnerabilitiesClassDirectory {
-    pub fn new(_kobject: Weak<KObject>) -> Self {
+    pub fn new_node() -> Box<dyn FsNodeOps> {
         // TODO(b/395160526): Dynamically generate these files based on CPU type.
         let mut files = HashMap::new();
         files.insert("gather_data_sampling", "Not affected\n");
@@ -56,7 +54,7 @@ impl VulnerabilitiesClassDirectory {
         files.insert("spectre_v2", "Not affected\n");
         files.insert("srbds", "Not affected\n");
         files.insert("tsx_async_abort", "Not affected\n");
-        Self { vulnerability_files: files }
+        Box::new(Self { vulnerability_files: files })
     }
 }
 

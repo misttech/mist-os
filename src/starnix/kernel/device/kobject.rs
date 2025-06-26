@@ -3,352 +3,97 @@
 // found in the LICENSE file.
 
 use crate::device::DeviceMode;
-use crate::fs::sysfs::KObjectDirectory;
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::fs_node_cache::FsNodeCache;
 use crate::vfs::pseudo::simple_directory::SimpleDirectory;
 use crate::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekable, fs_node_impl_not_dir, FileObject, FileOps,
-    FsNode, FsNodeOps, FsStr, FsString, PathBuilder,
+    FsNode, FsNodeOps, FsString, PathBuilder,
 };
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::{errno, error, ino_t};
-use std::collections::BTreeMap;
-use std::sync::{Arc, Weak};
-
-type CreateFsNodeOps = Box<dyn Fn(Weak<KObject>) -> Box<dyn FsNodeOps> + Send + Sync>;
-
-pub enum KObjectFsNode {
-    Factory(CreateFsNodeOps),
-    Directory(Arc<SimpleDirectory>),
-}
-
-/// A kobject is the fundamental unit of the sysfs /devices subsystem. Each kobject represents a
-/// sysfs object.
-///
-/// A kobject has a name, a function to create FsNodeOps, pointers to its children, and a pointer
-/// to its parent, which allows it to be organized into hierarchies.
-pub struct KObject {
-    /// The inode number for this kobject.
-    pub ino: ino_t,
-
-    /// The name that will appear in sysfs.
-    ///
-    /// It is also used by the parent to find this child. This name will be reflected in the full
-    /// path from the root.
-    name: FsString,
-
-    /// The weak reference to its parent kobject.
-    parent: Option<Weak<KObject>>,
-
-    /// The node cache used to allocate inode numbers for the children of this kobject.
-    node_cache: Arc<FsNodeCache>,
-
-    /// A collection of the children of this kobject.
-    ///
-    /// The kobject tree has strong references from parent-to-child and weak
-    /// references from child-to-parent. This will avoid reference cycle.
-    children: Mutex<BTreeMap<FsString, KObjectHandle>>,
-
-    /// The FsNode for this KObject.
-    node: KObjectFsNode,
-}
-pub type KObjectHandle = Arc<KObject>;
-
-impl KObject {
-    pub fn new_root(name: &FsStr, node_cache: Arc<FsNodeCache>) -> KObjectHandle {
-        Self::new_root_with_ops(name, node_cache, KObjectDirectory::new)
-    }
-
-    pub fn new_root_with_dir(name: &FsStr, node_cache: Arc<FsNodeCache>) -> KObjectHandle {
-        Arc::new(Self {
-            ino: node_cache.allocate_ino().unwrap(),
-            name: name.to_owned(),
-            parent: None,
-            node_cache,
-            children: Default::default(),
-            node: KObjectFsNode::Directory(SimpleDirectory::new()),
-        })
-    }
-
-    pub fn new_root_with_ops<F, N>(
-        name: &FsStr,
-        node_cache: Arc<FsNodeCache>,
-        create_fs_node_ops: F,
-    ) -> KObjectHandle
-    where
-        F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
-    {
-        let node =
-            KObjectFsNode::Factory(Box::new(move |kobject| Box::new(create_fs_node_ops(kobject))));
-        Arc::new(Self {
-            ino: node_cache.allocate_ino().unwrap(),
-            name: name.to_owned(),
-            parent: None,
-            node_cache,
-            children: Default::default(),
-            node,
-        })
-    }
-
-    fn new_child_with_ops<F, N>(
-        name: &FsStr,
-        parent: KObjectHandle,
-        create_fs_node_ops: F,
-    ) -> KObjectHandle
-    where
-        F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
-    {
-        let node =
-            KObjectFsNode::Factory(Box::new(move |kobject| Box::new(create_fs_node_ops(kobject))));
-        let node_cache = parent.node_cache.clone();
-        Arc::new(Self {
-            ino: node_cache.allocate_ino().unwrap(),
-            name: name.to_owned(),
-            parent: Some(Arc::downgrade(&parent)),
-            node_cache,
-            children: Default::default(),
-            node,
-        })
-    }
-
-    fn new_child(name: &FsStr, parent: KObjectHandle) -> KObjectHandle {
-        let node = KObjectFsNode::Directory(SimpleDirectory::new());
-        let node_cache = parent.node_cache.clone();
-        Arc::new(Self {
-            ino: node_cache.allocate_ino().unwrap(),
-            name: name.to_owned(),
-            parent: Some(Arc::downgrade(&parent)),
-            node_cache,
-            children: Default::default(),
-            node,
-        })
-    }
-
-    /// The name that will appear in sysfs.
-    pub fn name(&self) -> &FsStr {
-        self.name.as_ref()
-    }
-
-    /// The parent kobject.
-    ///
-    /// Returns none if this kobject is the root.
-    pub fn parent(&self) -> Option<KObjectHandle> {
-        self.parent.clone().and_then(|parent| Weak::upgrade(&parent))
-    }
-
-    /// Returns the associated `FsNodeOps`.
-    ///
-    /// The `create_fs_node_ops` function will be called with a weak pointer to kobject itself.
-    pub fn ops(self: &KObjectHandle) -> Box<dyn FsNodeOps> {
-        match &self.node {
-            KObjectFsNode::Factory(ops) => ops.as_ref()(Arc::downgrade(self)),
-            KObjectFsNode::Directory(dir) => Box::new(dir.clone()),
-        }
-    }
-
-    pub fn dir(self: &KObjectHandle) -> Arc<SimpleDirectory> {
-        match &self.node {
-            KObjectFsNode::Factory(_) => panic!("KObject does not have a directory"),
-            KObjectFsNode::Directory(dir) => dir.clone(),
-        }
-    }
-
-    /// Get the path to the current kobject, relative to the root.
-    pub fn path(self: &KObjectHandle) -> FsString {
-        let mut current = Some(self.clone());
-        let mut path = PathBuilder::new();
-        while let Some(n) = current {
-            path.prepend_element(n.name());
-            current = n.parent();
-        }
-
-        path.build_relative()
-    }
-
-    /// Get the path to the root, relative to the current kobject.
-    pub fn path_to_root(self: &KObjectHandle) -> FsString {
-        let mut parent = self.parent();
-        let mut path = PathBuilder::new();
-        while let Some(n) = parent {
-            path.prepend_element("..".into());
-            parent = n.parent();
-        }
-
-        path.build_relative()
-    }
-
-    /// Checks if there is any child holding the `name`.
-    pub fn has_child(self: &KObjectHandle, name: &FsStr) -> bool {
-        self.get_child(name).is_some()
-    }
-
-    /// Get the child based on the name.
-    pub fn get_child(self: &KObjectHandle, name: &FsStr) -> Option<KObjectHandle> {
-        self.children.lock().get(name).cloned()
-    }
-
-    /// Gets the child if exists, creates a new child if not.
-    pub fn get_or_create_child_with_ops<F, N>(
-        self: &KObjectHandle,
-        name: &FsStr,
-        create_fs_node_ops: F,
-    ) -> KObjectHandle
-    where
-        F: Fn(Weak<KObject>) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
-    {
-        let mut children = self.children.lock();
-        match children.get(name).cloned() {
-            Some(child) => child,
-            None => {
-                let child = KObject::new_child_with_ops(name, self.clone(), create_fs_node_ops);
-                children.insert(name.into(), child.clone());
-                child
-            }
-        }
-    }
-
-    pub fn get_or_create_child(self: &KObjectHandle, name: &FsStr) -> KObjectHandle {
-        let mut children = self.children.lock();
-        match children.get(name).cloned() {
-            Some(child) => child,
-            None => {
-                let child = KObject::new_child(name, self.clone());
-                children.insert(name.into(), child.clone());
-                child
-            }
-        }
-    }
-
-    pub fn insert_child(self: &KObjectHandle, child: KObjectHandle) {
-        self.insert_child_with_name(child.name().to_owned(), child);
-    }
-
-    pub fn insert_child_with_name(self: &KObjectHandle, name: FsString, child: KObjectHandle) {
-        self.children.lock().insert(name, child);
-    }
-
-    /// Collects all children names.
-    pub fn get_children_names(&self) -> Vec<FsString> {
-        self.children.lock().keys().cloned().collect()
-    }
-
-    pub fn get_children_kobjects(&self) -> Vec<KObjectHandle> {
-        self.children.lock().values().cloned().collect::<Vec<KObjectHandle>>()
-    }
-
-    /// Removes the child if exists.
-    pub fn remove_child(self: &KObjectHandle, name: &FsStr) -> Option<(FsString, KObjectHandle)> {
-        self.children.lock().remove_entry(name)
-    }
-
-    /// Removes itself from the parent kobject.
-    pub fn remove(&self) {
-        if let Some(parent) = self.parent() {
-            parent.remove_child(&self.name());
-        }
-    }
-}
-
-impl std::fmt::Debug for KObject {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("KObject").field("name", &self.name()).finish()
-    }
-}
-
-/// A trait implemented by all kobject-based types.
-pub trait KObjectBased {
-    fn kobject(&self) -> KObjectHandle;
-}
-
-/// Implements the KObjectBased traits for a KObject new type struct.
-macro_rules! impl_kobject_based {
-    ($type_name:path) => {
-        impl KObjectBased for $type_name {
-            fn kobject(&self) -> KObjectHandle {
-                self.kobject.upgrade().expect("Embedded kobject has been droppped.")
-            }
-        }
-    };
-}
-
-/// A collection of devices whose `parent` kobject is not the embedded kobject.
-///
-/// Used for grouping devices in the sysfs subsystem.
-#[derive(Clone, Debug)]
-pub struct Collection {
-    kobject: Weak<KObject>,
-}
-impl_kobject_based!(Collection);
-
-impl Collection {
-    pub fn new(kobject: KObjectHandle) -> Self {
-        Self { kobject: Arc::downgrade(&kobject) }
-    }
-}
+use starnix_uapi::{errno, error};
+use std::sync::Arc;
 
 /// A Class is a higher-level view of a device.
 ///
 /// It groups devices based on what they do, rather than how they are connected.
 #[derive(Clone)]
 pub struct Class {
-    kobject: Weak<KObject>,
+    pub name: FsString,
+    pub dir: Arc<SimpleDirectory>,
     /// Physical bus that the devices belong to.
     pub bus: Bus,
     pub collection: Arc<SimpleDirectory>,
 }
-impl_kobject_based!(Class);
 
 impl Class {
-    pub fn new(kobject: KObjectHandle, bus: Bus, collection: Arc<SimpleDirectory>) -> Self {
-        Self { kobject: Arc::downgrade(&kobject), bus, collection }
+    pub fn new(
+        name: FsString,
+        dir: Arc<SimpleDirectory>,
+        bus: Bus,
+        collection: Arc<SimpleDirectory>,
+    ) -> Self {
+        Self { name, dir, bus, collection }
     }
 }
 
 impl std::fmt::Debug for Class {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("Class")
-            .field("kobject", &self.kobject)
-            .field("bus", &self.bus)
-            .field("collection", &"<SimpleDirectory>")
-            .finish()
+        f.debug_struct("Class").field("name", &self.name).field("bus", &self.bus).finish()
     }
 }
 
 /// A Bus identifies how the devices are connected to the processor.
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Bus {
-    kobject: Weak<KObject>,
-    pub collection: Option<Collection>,
+    pub name: FsString,
+    pub dir: Arc<SimpleDirectory>,
+    pub collection: Option<Arc<SimpleDirectory>>,
 }
-impl_kobject_based!(Bus);
 
 impl Bus {
-    pub fn new(kobject: KObjectHandle, collection: Option<Collection>) -> Self {
-        Self { kobject: Arc::downgrade(&kobject), collection }
+    pub fn new(
+        name: FsString,
+        dir: Arc<SimpleDirectory>,
+        collection: Option<Arc<SimpleDirectory>>,
+    ) -> Self {
+        Self { name, dir, collection }
+    }
+}
+
+impl std::fmt::Debug for Bus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Bus").field("name", &self.name).finish()
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Device {
-    pub kobject: Weak<KObject>,
-    /// Class kobject that the device belongs to.
+    pub name: FsString,
     pub class: Class,
     pub metadata: Option<DeviceMetadata>,
 }
-impl_kobject_based!(Device);
 
 impl Device {
-    pub fn new(kobject: KObjectHandle, class: Class, metadata: Option<DeviceMetadata>) -> Self {
-        Self { kobject: Arc::downgrade(&kobject), class, metadata }
+    pub fn new(name: FsString, class: Class, metadata: Option<DeviceMetadata>) -> Self {
+        Self { name, class, metadata }
+    }
+
+    /// Returns a path to the device, relative to the sysfs root, going up `depth` directories.
+    pub fn path_from_depth(&self, depth: usize) -> FsString {
+        let mut builder = PathBuilder::new();
+        builder.prepend_element(self.name.as_ref());
+        builder.prepend_element(self.class.name.as_ref());
+        builder.prepend_element(self.class.bus.name.as_ref());
+        builder.prepend_element(b"devices".into());
+        for _ in 0..depth {
+            builder.prepend_element(b"..".into());
+        }
+        builder.build_relative()
     }
 }
 
@@ -511,66 +256,4 @@ impl TryFrom<&[u8]> for UEventAction {
 #[derive(Copy, Clone)]
 pub struct UEventContext {
     pub seqnum: u64,
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[::fuchsia::test]
-    fn kobject_create_child() {
-        let node_cache = Arc::new(FsNodeCache::default());
-        let root = KObject::new_root(Default::default(), node_cache);
-        assert!(root.parent().is_none());
-
-        assert!(!root.has_child("virtual".into()));
-        root.get_or_create_child_with_ops("virtual".into(), KObjectDirectory::new);
-        assert!(root.has_child("virtual".into()));
-    }
-
-    #[::fuchsia::test]
-    fn kobject_path() {
-        let node_cache = Arc::new(FsNodeCache::default());
-        let root = KObject::new_root("devices".into(), node_cache);
-        let bus = root.get_or_create_child_with_ops("virtual".into(), KObjectDirectory::new);
-        let device = bus
-            .get_or_create_child_with_ops("mem".into(), KObjectDirectory::new)
-            .get_or_create_child_with_ops("null".into(), KObjectDirectory::new);
-        assert_eq!(device.path(), "devices/virtual/mem/null");
-    }
-
-    #[::fuchsia::test]
-    fn kobject_path_to_root() {
-        let node_cache = Arc::new(FsNodeCache::default());
-        let root = KObject::new_root(Default::default(), node_cache);
-        let bus = root.get_or_create_child_with_ops("bus".into(), KObjectDirectory::new);
-        let device = bus.get_or_create_child_with_ops("device".into(), KObjectDirectory::new);
-        assert_eq!(device.path_to_root(), "../..");
-    }
-
-    #[::fuchsia::test]
-    fn kobject_get_children_names() {
-        let node_cache = Arc::new(FsNodeCache::default());
-        let root = KObject::new_root(Default::default(), node_cache);
-        root.get_or_create_child_with_ops("virtual".into(), KObjectDirectory::new);
-        root.get_or_create_child_with_ops("cpu".into(), KObjectDirectory::new);
-        root.get_or_create_child_with_ops("power".into(), KObjectDirectory::new);
-
-        let names = root.get_children_names();
-        assert!(names.iter().any(|name| *name == "virtual"));
-        assert!(names.iter().any(|name| *name == "cpu"));
-        assert!(names.iter().any(|name| *name == "power"));
-        assert!(!names.iter().any(|name| *name == "system"));
-    }
-
-    #[::fuchsia::test]
-    fn kobject_remove() {
-        let node_cache = Arc::new(FsNodeCache::default());
-        let root = KObject::new_root(Default::default(), node_cache);
-        let bus = root.get_or_create_child_with_ops("virtual".into(), KObjectDirectory::new);
-        let class = bus.get_or_create_child_with_ops("mem".into(), KObjectDirectory::new);
-        assert!(bus.has_child("mem".into()));
-        class.remove();
-        assert!(!bus.has_child("mem".into()));
-    }
 }

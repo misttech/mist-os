@@ -138,20 +138,10 @@ impl FileSystem {
         kernel: &Arc<Kernel>,
         cache_mode: CacheMode,
         ops: impl FileSystemOps,
-        options: FileSystemOptions,
+        mut options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let uses_external_node_ids = ops.uses_external_node_ids();
         let node_cache = Arc::new(FsNodeCache::new(uses_external_node_ids));
-        Self::new_with_node_cache(kernel, cache_mode, ops, options, node_cache)
-    }
-
-    pub fn new_with_node_cache(
-        kernel: &Arc<Kernel>,
-        cache_mode: CacheMode,
-        ops: impl FileSystemOps,
-        mut options: FileSystemOptions,
-        node_cache: Arc<FsNodeCache>,
-    ) -> Result<FileSystemHandle, Errno> {
         assert_eq!(ops.uses_external_node_ids(), node_cache.uses_external_node_ids());
 
         let mount_options = security::sb_eat_lsm_opts(&kernel, &mut options.params)?;

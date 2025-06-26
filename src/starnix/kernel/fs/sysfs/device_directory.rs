@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::kobject::{Device, KObjectBased, KObjectHandle, UEventFsNode};
+use crate::device::kobject::{Device, UEventFsNode};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::InputBuffer;
 use crate::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
@@ -70,10 +70,6 @@ impl DeviceDirectory {
 
         // TODO(https://fxbug.dev/42072346): Add power and subsystem nodes.
         entries
-    }
-
-    pub fn kobject(&self) -> KObjectHandle {
-        self.device.kobject()
     }
 }
 
@@ -148,10 +144,6 @@ impl BlockDeviceDirectory {
         });
         entries
     }
-
-    fn kobject(&self) -> KObjectHandle {
-        self.base_dir.kobject()
-    }
 }
 
 impl FsNodeOps for BlockDeviceDirectory {
@@ -176,7 +168,7 @@ impl FsNodeOps for BlockDeviceDirectory {
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
             b"queue" => Ok(node.fs().create_node_and_allocate_node_id(
-                BlockDeviceQueueDirectory::new(self.kobject()),
+                BlockDeviceQueueDirectory::new_node(),
                 FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             )),
             b"size" => Ok(node.fs().create_node_and_allocate_node_id(
@@ -188,13 +180,11 @@ impl FsNodeOps for BlockDeviceDirectory {
     }
 }
 
-struct BlockDeviceQueueDirectory {
-    _handle: KObjectHandle,
-}
+struct BlockDeviceQueueDirectory {}
 
 impl BlockDeviceQueueDirectory {
-    fn new(kobject: KObjectHandle) -> Self {
-        Self { _handle: kobject }
+    fn new_node() -> Self {
+        Self {}
     }
 }
 
