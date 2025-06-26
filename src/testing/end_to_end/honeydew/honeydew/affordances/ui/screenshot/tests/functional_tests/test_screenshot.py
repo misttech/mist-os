@@ -16,7 +16,8 @@ from honeydew.typing import custom_types
 _LOGGER = logging.getLogger(__name__)
 
 EXAMPLE_URL = (
-    "fuchsia-pkg://fuchsia.com/flatland-examples#meta/flatland-rainbow.cm"
+    "fuchsia-pkg://fuchsia.com/flatland-examples#meta/"
+    "simplest-app-flatland.cm"
 )
 
 
@@ -78,9 +79,7 @@ class ScreenshotAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
         # Example app render a colorful image with color HSV(?, 75 or 30, 75).
         # Ensure the top left pixel is not black or transparent.
-        # TODO(b/320543407): Re-enable the assertion once we get the example app
-        # to properly render into scenic. See b/320543407 for details.
-        # asserts.assert_not_equal(image.data[0:4], [0x0, 0x0, 0x0, 0xFF])
+        asserts.assert_not_equal(image.data[0:4], [0x0, 0x0, 0x0, 0xFF])
 
 
 if __name__ == "__main__":
