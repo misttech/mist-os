@@ -18,17 +18,6 @@ class SyslogNonRootTest : public ::testing::Test {
   void SetUp() override { ASSERT_NE(getuid(), 0u); }
 };
 
-TEST_F(SyslogNonRootTest, DevKmsg) {
-  EXPECT_LT(open("/dev/kmsg", O_RDONLY), 0);
-  EXPECT_EQ(errno, EPERM);
-
-  EXPECT_LT(open("/dev/kmsg", O_WRONLY), 0);
-  EXPECT_EQ(errno, EPERM);
-
-  EXPECT_LT(open("/dev/kmsg", O_RDWR), 0);
-  EXPECT_EQ(errno, EPERM);
-}
-
 TEST_F(SyslogNonRootTest, ProcKmsg) {
   EXPECT_LT(open("/proc/kmsg", O_RDONLY), 0);
   EXPECT_EQ(errno, EACCES);

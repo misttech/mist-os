@@ -30,7 +30,7 @@ pub struct Syslog {
 
 #[derive(Debug)]
 pub enum SyslogAccess {
-    DevKmsg(SyslogAction),
+    DevKmsgRead,
     ProcKmsg(SyslogAction),
     Syscall(SyslogAction),
 }
@@ -56,11 +56,10 @@ impl Syslog {
     /// capability, or global admin capability as well as applying the SELinux policy.
     pub fn validate_access(current_task: &CurrentTask, access: SyslogAccess) -> Result<(), Errno> {
         let (action, check_capabilities) = match access {
-            SyslogAccess::DevKmsg(SyslogAction::Open)
-            | SyslogAccess::ProcKmsg(SyslogAction::Open) => (SyslogAction::Open, true),
+            SyslogAccess::ProcKmsg(SyslogAction::Open) => (SyslogAction::Open, true),
+            SyslogAccess::DevKmsgRead => (SyslogAction::ReadAll, true),
             SyslogAccess::Syscall(a) => (a, true),
-            // If we got here we already validated Open on these files.
-            SyslogAccess::DevKmsg(_) => return Ok(()),
+            // If we got here we already validated Open on /proc/kmsg.
             SyslogAccess::ProcKmsg(a) => (a, false),
         };
 
@@ -69,19 +68,16 @@ impl Syslog {
         let action_is_privileged = !matches!(
             access,
             SyslogAccess::Syscall(SyslogAction::ReadAll | SyslogAction::SizeBuffer)
+                | SyslogAccess::DevKmsgRead,
         );
         let restrict_dmesg = current_task.kernel().restrict_dmesg.load(Ordering::Relaxed);
-        // Access to /proc/kmsg isn't allowed by CAP_SYS_ADMIN.
-        let allow_cap_sys_admin = !matches!(access, SyslogAccess::ProcKmsg(_));
+        // Access to /proc/kmsg or /dev/kmsg isn't allowed by CAP_SYS_ADMIN.
+        let allow_cap_sys_admin = matches!(access, SyslogAccess::Syscall(_));
         if check_capabilities && (action_is_privileged || restrict_dmesg) {
             Self::check_capabilities(current_task, allow_cap_sys_admin)?;
         }
 
-        // We just perform these checks on ProcKmsg and syslog(2) which are equivalent. This check
-        // doesn't exist for /dev/kmsg which is controlled through restrict_dmesg instead.
-        if !matches!(access, SyslogAccess::DevKmsg(_)) {
-            security::check_syslog_access(current_task, action)?
-        }
+        security::check_syslog_access(current_task, action)?;
         Ok(())
     }
 

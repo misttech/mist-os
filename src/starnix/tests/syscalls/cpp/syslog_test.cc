@@ -403,6 +403,65 @@ TEST_P(SyslogAccessTest, ProcKmsgReadWrite) {
   EXPECT_EQ(expect_writable, fd.is_valid()) << strerror(errno);
 }
 
+TEST_P(SyslogAccessTest, DevKmsgRead) {
+  struct stat sb;
+  ASSERT_THAT(stat("/dev/kmsg", &sb), SyscallSucceeds());
+  EXPECT_EQ(sb.st_uid, 0u);
+  bool permissions_ok =
+      (is_root_ && (sb.st_mode & 0400)) || (!is_root_ && (sb.st_mode & 0004)) || has_dac_override_;
+
+  fbl::unique_fd fd = fbl::unique_fd(open("/dev/kmsg", O_RDONLY | O_NONBLOCK));
+
+  bool expect_readable = permissions_ok && (has_cap_syslog_ || !dmesg_restrict_);
+  if (expect_readable) {
+    ASSERT_TRUE(fd);
+
+    test_helper::UnsetCapabilityEffective(CAP_SYSLOG);
+    char buf[4096];
+    EXPECT_THAT(read(fd.get(), &buf, 4096),
+                AnyOf(SyscallSucceeds(), SyscallFailsWithErrno(EAGAIN)));
+  } else {
+    EXPECT_FALSE(fd);
+  }
+}
+
+TEST_P(SyslogAccessTest, DevKmsgWrite) {
+  struct stat sb;
+  ASSERT_THAT(stat("/dev/kmsg", &sb), SyscallSucceeds());
+  EXPECT_EQ(sb.st_uid, 0u);
+  bool permissions_ok =
+      (is_root_ && (sb.st_mode & 0200)) || (!is_root_ && (sb.st_mode & 0002)) || has_dac_override_;
+
+  fbl::unique_fd fd = fbl::unique_fd(open("/dev/kmsg", O_WRONLY));
+
+  bool expect_writable = permissions_ok;
+  if (expect_writable) {
+    ASSERT_TRUE(fd);
+
+    const char message[] = "hello, world\n";
+    EXPECT_THAT(write(fd.get(), &message, strlen(message)), SyscallSucceeds());
+  } else {
+    EXPECT_FALSE(fd);
+  }
+}
+
+TEST_P(SyslogAccessTest, DevKmsgTrunc) {
+  struct stat sb;
+  ASSERT_THAT(stat("/dev/kmsg", &sb), SyscallSucceeds());
+  EXPECT_EQ(sb.st_uid, 0u);
+  bool permissions_ok =
+      (is_root_ && (sb.st_mode & 0200)) || (!is_root_ && (sb.st_mode & 0002)) || has_dac_override_;
+
+  fbl::unique_fd fd = fbl::unique_fd(open("/dev/kmsg", O_WRONLY | O_TRUNC));
+
+  bool expect_writable = permissions_ok;
+  if (expect_writable) {
+    EXPECT_TRUE(fd);
+  } else {
+    EXPECT_FALSE(fd);
+  }
+}
+
 INSTANTIATE_TEST_SUITE_P(SyslogAccessTestAll, SyslogAccessTest,
                          ::testing::Combine(::testing::Bool(), ::testing::Bool(), ::testing::Bool(),
                                             ::testing::Bool(), ::testing::Bool()),
