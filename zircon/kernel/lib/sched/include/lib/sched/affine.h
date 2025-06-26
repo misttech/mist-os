@@ -6,7 +6,10 @@
 #ifndef ZIRCON_KERNEL_LIB_SCHED_INCLUDE_LIB_SCHED_AFFINE_H_
 #define ZIRCON_KERNEL_LIB_SCHED_INCLUDE_LIB_SCHED_AFFINE_H_
 
+#include <inttypes.h>
 #include <zircon/assert.h>
+
+#include <algorithm>
 
 #include <ffl/fixed.h>
 
@@ -46,6 +49,11 @@ class Affine {
     variable_reference_time_ = MonotonicToVariable(monotonic);
     monotonic_reference_time_ = monotonic;
     slope_ = slope;
+  }
+
+  constexpr void Snap(Time monotonic, Time variable) {
+    monotonic_reference_time_ = std::max(monotonic, monotonic_reference_time_);
+    variable_reference_time_ = std::max(variable, variable_reference_time_);
   }
 
   constexpr Time monotonic_reference_time() const { return monotonic_reference_time_; }
