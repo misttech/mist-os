@@ -216,7 +216,10 @@ _fuchsia_product_assembly = rule(
 def _fuchsia_product_create_system_impl(ctx):
     fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
     out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
-    gen_dir = ctx.actions.declare_directory(ctx.label.name + "_gen")
+    gen_dir_path = "{basedir}/{label_name}_gen".format(
+        basedir = out_dir.dirname,
+        label_name = ctx.label.name,
+    )
 
     # Assembly create-system
     product_assembly_out = ctx.attr.product_assembly[FuchsiaProductAssemblyInfo].product_assembly_out
@@ -233,7 +236,7 @@ def _fuchsia_product_create_system_impl(ctx):
     shell_env = {
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "OUTDIR": out_dir.path,
-        "GENDIR": gen_dir.path,
+        "GENDIR": gen_dir_path,
         "PRODUCT_ASSEMBLY_OUTDIR": product_assembly_out.path,
     }
 
@@ -241,7 +244,6 @@ def _fuchsia_product_create_system_impl(ctx):
         inputs = ffx_inputs + ctx.files.product_assembly,
         outputs = [
             out_dir,
-            gen_dir,
             # Isolate dirs contain useful debug files like logs, so include it
             # in outputs.
             ffx_isolate_dir,
@@ -254,7 +256,7 @@ def _fuchsia_product_create_system_impl(ctx):
     )
     inputs_needed_by_downstream_actions = []
     inputs_needed_by_downstream_actions += ctx.files.product_assembly
-    outputs = [out_dir, gen_dir, ffx_isolate_dir]
+    outputs = [out_dir, ffx_isolate_dir]
     return [
         DefaultInfo(files = depset(outputs + inputs_needed_by_downstream_actions)),
         OutputGroupInfo(
@@ -263,7 +265,6 @@ def _fuchsia_product_create_system_impl(ctx):
         ),
         FuchsiaProductImageInfo(
             images_out = out_dir,
-            images_intermediates = gen_dir,
             platform_aibs = ctx.attr.product_assembly[FuchsiaProductAssemblyInfo].platform_aibs,
             product_assembly_out = product_assembly_out,
             build_type = build_type,
