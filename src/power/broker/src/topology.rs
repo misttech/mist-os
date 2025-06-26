@@ -25,6 +25,7 @@ pub struct IndexedPowerLevel {
 impl IndexedPowerLevel {
     pub const MIN: IndexedPowerLevel = IndexedPowerLevel { level: fpb::PowerLevel::MIN, index: 0 };
 
+    #[allow(dead_code)]
     #[cfg(test)]
     pub const MAX: IndexedPowerLevel = Self { level: fpb::PowerLevel::MAX, index: usize::MAX };
 
