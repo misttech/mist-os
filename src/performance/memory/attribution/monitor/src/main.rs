@@ -191,8 +191,7 @@ async fn provide_snapshot(
         memory_stalls,
         &*bucket_definitions,
     );
-    attribution_snapshot.serve(snapshot).await;
-    Ok(())
+    attribution_snapshot.serve(snapshot).await
 }
 
 /// Looks for a bucket definitions configuration, to perform memory

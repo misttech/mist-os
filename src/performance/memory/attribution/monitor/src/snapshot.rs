@@ -53,7 +53,7 @@ impl AttributionSnapshot {
         })
     }
 
-    pub async fn serve(self, socket: zx::Socket) {
+    pub async fn serve(self, socket: zx::Socket) -> anyhow::Result<()> {
         duration!(CATEGORY_MEMORY_CAPTURE, c"AttributionSnapshot::serve");
         let mut asocket = fidl::AsyncSocket::from_socket(socket);
 
@@ -61,6 +61,25 @@ impl AttributionSnapshot {
             duration!(CATEGORY_MEMORY_CAPTURE, c"AttributionSnapshot::serve persist");
             fidl::persist(&self.0).unwrap()
         };
-        asocket.write_all(&data).await.unwrap();
+        asocket.write_all(&data).await?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    // use super::*;
+    use crate::snapshot::{fplugin, AttributionSnapshot};
+
+    #[fuchsia::test]
+    async fn test_serve_socket_gets_closed() {
+        let (s1, s2) = zx::Socket::create_stream();
+        let serve_task = fuchsia_async::Task::spawn(
+            AttributionSnapshot(fplugin::Snapshot { ..Default::default() }).serve(s1),
+        );
+        // Close the socket without reading it til the, end.
+        s2.half_close().unwrap();
+        // Verify that the process does not panic and returns an error.
+        assert!(serve_task.await.is_err());
     }
 }
