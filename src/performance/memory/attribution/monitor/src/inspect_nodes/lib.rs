@@ -1,6 +1,9 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+#![warn(clippy::unwrap_used)]
+#![cfg_attr(test, allow(clippy::unwrap_used))]
+
 use anyhow::{anyhow, Error, Result};
 use attribution_processing::digest::{BucketDefinition, Digest};
 use attribution_processing::AttributionDataProvider;
@@ -10,7 +13,7 @@ use fuchsia_inspect::{ArrayProperty, Inspector, Node};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use futures::{select, try_join, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
 use inspect_runtime::PublishedInspectController;
-use log::debug;
+use log::{debug, warn};
 use memory_monitor2_config::Config;
 use stalls::StallProvider;
 use std::sync::Arc;
@@ -188,8 +191,9 @@ fn build_inspect_tree(
 
     {
         inspector.root().record_lazy_child("stalls", move || {
-            let stall_info = stall_provider.get_stall_info().unwrap();
+            let stall_provider = stall_provider.clone();
             async move {
+                let stall_info = stall_provider.get_stall_info()?;
                 let inspector = Inspector::default();
                 inspector.root().record_uint(
                     "some_ms",
