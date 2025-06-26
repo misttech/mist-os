@@ -16,6 +16,10 @@
                 // regarding opening binder.
                 "BinderTest.OpenBinderNoTestDomain",
                 "BinderTest.OpenBinderWithTestDomain",
+                "ContextManagerPermission/ContextManagerPermission.BecomeServiceManager/0",
+                "ContextManagerPermission/ContextManagerPermission.BecomeServiceManager/1",
+                "CallPermission/CallPermission.DoCall/0",
+                "CallPermission/CallPermission.DoCall/1",
 
                 // TODO: https://fxbug.dev/322843830 - Make (SE)Starnix match the (SE)Linux behavior
                 // demonstrated in this test.

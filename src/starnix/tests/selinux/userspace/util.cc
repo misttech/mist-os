@@ -15,6 +15,7 @@
 
 #include "src/lib/files/file.h"
 #include "src/lib/files/file_descriptor.h"
+#include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 namespace {
 constexpr char kProcSelfAttrPath[] = "/proc/self/attr/";
@@ -129,6 +130,17 @@ fit::result<int, bool> IsSameInode(int fd_1, int fd_2) {
     return fit::error(errno);
   }
   return fit::ok(fd_1_info.st_dev == fd_2_info.st_dev && fd_1_info.st_ino == fd_2_info.st_ino);
+}
+
+pid_t RunInForkedProcessWithLabel(test_helper::ForkHelper& fork_helper, std::string label,
+                                  fit::function<void()> action) {
+  auto wrapped_action = [&]() {
+    if (WriteTaskAttr("current", label).is_error()) {
+      _exit(1);
+    }
+    action();
+  };
+  return fork_helper.RunInForkedProcess(wrapped_action);
 }
 
 ScopedEnforcement ScopedEnforcement::SetEnforcing() {

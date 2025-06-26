@@ -81,6 +81,8 @@ source_set("userspace_test_main") {
   testonly = true
   sources = [
     "test_main.cc",
+    "tests/binder_helper.cc",
+    "tests/binder_helper.h",
     "util.cc",
     "util.h",
   ]
