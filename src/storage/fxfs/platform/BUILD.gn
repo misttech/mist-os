@@ -40,6 +40,7 @@ platform_sources = [
 ]
 
 platform_deps = [
+  "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
   "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
   "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
   "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",

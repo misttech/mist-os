@@ -43,6 +43,7 @@
     use: [
         {
             protocol: [
+                "fuchsia.feedback.CrashReporter",
                 "fuchsia.memorypressure.Provider",
                 "fuchsia.scheduler.RoleManager",
             ],

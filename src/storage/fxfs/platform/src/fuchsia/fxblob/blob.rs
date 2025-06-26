@@ -12,11 +12,15 @@ use crate::fuchsia::pager::{
     default_page_in, MarkDirtyRange, PageInRange, PagerBacked, PagerPacketReceiverRegistration,
 };
 use crate::fuchsia::volume::{FxVolume, BASE_READ_AHEAD_SIZE};
-use anyhow::{anyhow, ensure, Context, Error};
+use anyhow::{anyhow, bail, ensure, Context, Error};
+use fidl_fuchsia_feedback::{Annotation, Attachment, CrashReport};
+use fidl_fuchsia_mem::Buffer;
+use fuchsia_component_client::connect_to_protocol;
 use fuchsia_hash::Hash;
 use fuchsia_merkle::{hash_block, MerkleTree};
 use futures::try_join;
 use fxfs::errors::FxfsError;
+use fxfs::log::*;
 use fxfs::object_handle::{ObjectHandle, ReadObjectHandle};
 use fxfs::object_store::{DataObjectHandle, ObjectDescriptor};
 use fxfs::round::{round_down, round_up};
@@ -24,7 +28,7 @@ use fxfs::serialized_types::BlobMetadata;
 use fxfs_macros::ToWeakNode;
 use std::num::NonZero;
 use std::ops::Range;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use storage_device::buffer;
 use zx::{self as zx, AsHandleRef, HandleBased, Status};
@@ -305,14 +309,20 @@ impl PagerBacked for FxBlob {
                     ..round_up(compressed_offsets.end, bs).unwrap();
                 let mut compressed_buf =
                     self.handle.allocate_buffer((aligned.end - aligned.start) as usize).await;
-                let (read, _) =
-                    try_join!(self.handle.read(aligned.start, compressed_buf.as_mut()), async {
-                        buffer
-                            .allocator()
-                            .buffer_source()
-                            .commit_range(buffer.range())
-                            .map_err(|e| e.into())
-                    })
+
+                let mut decompression_errors = 0;
+                let len = (std::cmp::min(range.end, self.uncompressed_size) - range.start) as usize;
+                let decompressed_size = loop {
+                    let (read, _) = try_join!(
+                        self.handle.read(aligned.start, compressed_buf.as_mut()),
+                        async {
+                            buffer
+                                .allocator()
+                                .buffer_source()
+                                .commit_range(buffer.range())
+                                .map_err(|e| e.into())
+                        }
+                    )
                     .with_context(|| {
                         format!(
                             "Failed to read compressed range {:?}, len {}",
@@ -320,31 +330,86 @@ impl PagerBacked for FxBlob {
                             self.handle.get_size()
                         )
                     })?;
-                let compressed_buf_range = (compressed_offsets.start - aligned.start) as usize
-                    ..(compressed_offsets.end - aligned.start) as usize;
-                ensure!(
-                    read >= compressed_buf_range.end - compressed_buf_range.start,
-                    anyhow!(FxfsError::Inconsistent).context(format!(
-                        "Unexpected EOF, read {}, but expected {}",
-                        read,
-                        compressed_buf_range.end - compressed_buf_range.start,
-                    ))
-                );
-                let len = (std::cmp::min(range.end, self.uncompressed_size) - range.start) as usize;
-                let buf = buffer.as_mut_slice();
-                let decompressed_size = DECOMPRESSOR
-                    .with(|decompressor| {
+                    let compressed_buf_range = (compressed_offsets.start - aligned.start) as usize
+                        ..(compressed_offsets.end - aligned.start) as usize;
+                    ensure!(
+                        read >= compressed_buf_range.end - compressed_buf_range.start,
+                        anyhow!(FxfsError::Inconsistent).context(format!(
+                            "Unexpected EOF, read {}, but expected {}",
+                            read,
+                            compressed_buf_range.end - compressed_buf_range.start,
+                        ))
+                    );
+
+                    let buf = buffer.as_mut_slice();
+                    match DECOMPRESSOR.with(|decompressor| {
                         fxfs_trace::duration!(c"blob-decompress", "len" => len);
                         let mut decompressor = decompressor.borrow_mut();
                         decompressor.decompress_to_buffer(
                             &compressed_buf.as_slice()[compressed_buf_range],
                             &mut buf[..len],
                         )
-                    })
-                    .map_err(|e| {
-                        anyhow!(FxfsError::IntegrityError)
-                            .context(format!("Decompression error: {e:?}"))
-                    })?;
+                    }) {
+                        Ok(size) => break size,
+                        Err(error) => {
+                            static DONE_ONCE: AtomicBool = AtomicBool::new(false);
+                            if !DONE_ONCE.swap(true, Ordering::Relaxed) {
+                                if let Ok(proxy) = connect_to_protocol::<
+                                    fidl_fuchsia_feedback::CrashReporterMarker,
+                                >() {
+                                    let size = compressed_buf.len() as u64;
+                                    let vmo = zx::Vmo::create(size).unwrap();
+                                    vmo.write(compressed_buf.as_slice(), 0).unwrap();
+                                    if let Err(e) = proxy
+                                        .file_report(CrashReport {
+                                            program_name: Some("fxfs".to_string()),
+                                            crash_signature: Some(
+                                                "fxfs::decompression_error".to_string(),
+                                            ),
+                                            is_fatal: Some(false),
+                                            annotations: Some(vec![
+                                                Annotation {
+                                                    key: "range".to_string(),
+                                                    value: format!("{:?}", range),
+                                                },
+                                                Annotation {
+                                                    key: "compressed_offsets".to_string(),
+                                                    value: format!("{:?}", compressed_offsets),
+                                                },
+                                                Annotation {
+                                                    key: "merkle_root".to_string(),
+                                                    value: format!("{}", self.merkle_root),
+                                                },
+                                            ]),
+                                            attachments: Some(vec![Attachment {
+                                                key: "compressed_data".to_string(),
+                                                value: Buffer { vmo, size },
+                                            }]),
+                                            ..Default::default()
+                                        })
+                                        .await
+                                    {
+                                        error!(e:?; "Failed to file crash report");
+                                    } else {
+                                        warn!("Filed crash report for decompression error");
+                                    }
+                                } else {
+                                    error!("Failed to connect to crash report service");
+                                }
+                            }
+                            decompression_errors += 1;
+                            if decompression_errors == 2 {
+                                bail!(anyhow!(FxfsError::IntegrityError)
+                                    .context(format!("Decompression error: {error:?}")));
+                            } else {
+                                warn!(error:?; "Decompression error; retrying");
+                            }
+                        }
+                    }
+                }; // loop
+                if decompression_errors > 0 {
+                    info!("Read succeeded on second attempt");
+                }
                 ensure!(
                     decompressed_size == len,
                     anyhow!(FxfsError::IntegrityError).context("Decompressed length mismatch")
