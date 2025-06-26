@@ -39,6 +39,7 @@ mod reference_notifier;
 mod resource_removal;
 mod root_fidl_worker;
 mod routes;
+mod settings;
 mod socket;
 mod stack_fidl_worker;
 mod time;
@@ -1197,6 +1198,8 @@ pub(crate) enum Service {
     Socket(fidl_fuchsia_posix_socket::ProviderRequestStream),
     SocketControl(fidl_fuchsia_net_filter::SocketControlRequestStream),
     Stack(fidl_fuchsia_net_stack::StackRequestStream),
+    SettingsControl(fidl_fuchsia_net_settings::ControlRequestStream),
+    SettingsState(fidl_fuchsia_net_settings::StateRequestStream),
 }
 
 impl NetstackSeed {
@@ -1533,6 +1536,10 @@ impl NetstackSeed {
                     .spawn_request_stream_handler(health_check, |rs| {
                         health_check_worker::serve(rs)
                     }),
+                Service::SettingsControl(state) => services_handle
+                    .spawn_request_stream_handler(state, |rs| settings::serve_control(rs)),
+                Service::SettingsState(control) => services_handle
+                    .spawn_request_stream_handler(control, |rs| settings::serve_state(rs)),
             })
             .collect::<()>();
 

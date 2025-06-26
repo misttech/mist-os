@@ -58,16 +58,16 @@ impl<T> SynchronizedWriterRcu<T> {
     ///
     /// *WARNING*: do *NOT* use this method with a value built from a clone of
     /// the data from [`SingleWriterRcu::read`], this is only meant to be used
-    /// when the new value is produced independently of the previous value.
-    /// `replace` does *not* provide synchronization between the read and write
-    /// operation, possibly causing writers to race. Use
-    /// [`SingleWriterRcu::write`] to ensure writer synchronization is applied.
+    /// when the new value is produced independently of the previous value. The
+    /// value may be changed by another thread between `read` and `replace` -
+    /// these changes would be lost. Use [`SingleWriterRcu::write`] to ensure
+    /// writer synchronization is applied.
     pub fn replace(&self, value: T) {
         let Self { lock, data } = self;
         let guard = lock.lock();
         data.store(Arc::new(value));
         // Only drop the guard after we've stored the new value in the ArcSwap.
-        drop(guard);
+        core::mem::drop(guard);
     }
 }
 
@@ -138,7 +138,7 @@ impl<'a, T> Drop for WriteGuard<'a, T> {
         let WriteGuardInner { copy, data, lock_guard } = unsafe { ManuallyDrop::take(inner) };
         data.store(Arc::new(copy));
         // Only drop the lock once we're done.
-        drop(lock_guard);
+        core::mem::drop(lock_guard);
     }
 }
 
@@ -220,7 +220,7 @@ mod tests {
         let mut write = rcu.write();
         *write = 1;
         // Drop to commit.
-        drop(write);
+        core::mem::drop(write);
         let read2 = rcu.read();
         assert_eq!(*read1, 0);
         assert_eq!(*read2, 1);

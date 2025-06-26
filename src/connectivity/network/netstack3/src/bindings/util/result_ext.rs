@@ -35,6 +35,12 @@ pub trait ResultExt {
     fn unwrap_or_log(self, msg: impl Display)
     where
         Self: ResultExt<Ok = ()>;
+
+    fn log_if_err(&self, msg: impl Display);
+
+    fn borrowed_ok(&self) -> Result<&'_ Self::Ok, Self::Error>
+    where
+        Self::Error: Clone;
 }
 
 impl<O, E: ErrorLogExt> ResultExt for Result<O, E> {
@@ -56,6 +62,21 @@ impl<O, E: ErrorLogExt> ResultExt for Result<O, E> {
                 e.log(msg);
             }
         }
+    }
+
+    #[track_caller]
+    fn log_if_err(&self, msg: impl Display) {
+        match self {
+            Ok(_) => {}
+            Err(e) => e.log(msg),
+        }
+    }
+
+    fn borrowed_ok(&self) -> Result<&O, E>
+    where
+        Self::Error: Clone,
+    {
+        self.as_ref().map_err(Clone::clone)
     }
 }
 
