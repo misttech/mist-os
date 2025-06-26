@@ -9,7 +9,8 @@ To run a build, run `fx build -q`. Make sure to use the `-q` option to
 make the output smaller.
 
 To run a test, run `fx test <name of test>`. You can list available tests with
-`fx test list`. Run `fx test --help` for more information.
+`fx test --dry`. You can get JSON output by adding the arguments `--logpath -`.
+Run `fx test --help` for more information.
 
 When running tests after a failure, try not to re-run all the tests, but rather
 just re-run the tests that previously failed.
