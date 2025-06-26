@@ -203,6 +203,15 @@ pub fn binder_set_context_mgr(current_task: &CurrentTask) -> Result<(), Errno> {
     })
 }
 
+/// Checks whether the given `current_task` can perform a transaction to `target_task`.
+/// Corresponds to the `binder_transaction` hook.
+pub fn binder_transaction(current_task: &CurrentTask, target_task: &Task) -> Result<(), Errno> {
+    track_hook_duration!(c"security.hooks.binder_transaction");
+    if_selinux_else_default_ok(current_task, |security_server| {
+        selinux_hooks::binder::binder_transaction(security_server, current_task, target_task)
+    })
+}
+
 /// Consumes the mount options from the supplied `MountParams` and returns the security mount
 /// options for the given `MountParams`.
 /// Corresponds to the `sb_eat_lsm_opts` hook.

@@ -1135,6 +1135,8 @@ class_permission_enum! {
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     BinderPermission {
         // keep-sorted start
+        /// Permission to perform a binder IPC to a given target process.
+        Call("call"),
         /// Permission to set oneself as a context manager.
         SetContextMgr("set_context_mgr"),
         // keep-sorted end

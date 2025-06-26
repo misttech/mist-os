@@ -4117,6 +4117,11 @@ impl BinderDriver {
                     return Err(TransactionError::Frozen);
                 }
                 let target_task = target_proc.get_task().ok_or(TransactionError::Dead)?;
+
+                if security::binder_transaction(current_task, &target_task).is_err() {
+                    return Err(TransactionError::Failure);
+                }
+
                 let security_context: Option<FsString> =
                     if object.flags.contains(BinderObjectFlags::TXN_SECURITY_CTX) {
                         let mut security_context = FsString::from(
