@@ -8,9 +8,9 @@ use crate::security;
 use crate::signals::syscalls::RUsagePtr;
 use crate::task::{
     max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach, ptrace_dispatch,
-    ptrace_traceme, CurrentTask, ExitStatus, PtraceAllowedPtracers, PtraceAttachType,
-    PtraceOptions, SchedulerState, SeccompAction, SeccompStateValue, SyslogAccess, Task,
-    ThreadGroup, PR_SET_PTRACER_ANY,
+    ptrace_traceme, CurrentTask, ExitStatus, NormalPriority, PtraceAllowedPtracers,
+    PtraceAttachType, PtraceOptions, SchedulerState, SeccompAction, SeccompStateValue,
+    SyslogAccess, Task, ThreadGroup, PR_SET_PTRACER_ANY,
 };
 use crate::vfs::{
     FdNumber, FileHandle, MountNamespaceFile, PidFdFileObject, UserBuffersOutputBuffer,
@@ -758,7 +758,7 @@ pub fn sys_sched_getscheduler(
     let target_task = Task::from_weak(&weak)?;
     security::check_getsched_access(current_task, target_task.as_ref())?;
     let current_scheduler_state = target_task.read().scheduler_state;
-    Ok(current_scheduler_state.raw_policy())
+    Ok(current_scheduler_state.policy_for_sched_getscheduler())
 }
 
 pub fn sys_sched_setscheduler(
@@ -903,7 +903,7 @@ pub fn sys_sched_getparam(
 
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
-    let param_value = target_task.read().scheduler_state.raw_params();
+    let param_value = target_task.read().scheduler_state.get_sched_param();
     current_task.write_object(param, &param_value)?;
     Ok(())
 }
@@ -917,7 +917,6 @@ pub fn sys_sched_setparam(
     if pid < 0 || param.is_null() {
         return error!(EINVAL);
     }
-
     let new_params: sched_param = current_task.read_object(param.into())?;
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
@@ -926,7 +925,7 @@ pub fn sys_sched_setparam(
     let rlimit = target_task.thread_group().get_rlimit(locked, Resource::RTPRIO);
 
     let scheduler_state = SchedulerState::from_sched_params(
-        current_scheduler_state.raw_policy(),
+        current_scheduler_state.policy_for_sched_getscheduler(),
         new_params,
         rlimit,
     )?;
@@ -934,7 +933,7 @@ pub fn sys_sched_setparam(
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
     }
     security::check_setsched_access(current_task, &target_task)?;
-    target_task.set_scheduler_state(scheduler_state)?;
+    target_task.set_scheduler_priority(scheduler_state.realtime_priority)?;
 
     Ok(())
 }
@@ -1649,8 +1648,9 @@ pub fn sys_setsid(
     Ok(current_task.get_pid())
 }
 
-// Note the asymmetry with sys_setpriority: this returns what Starnix calls a "raw" priority, which
-// ranges from 1 (weakest) to 40 (strongest).
+// Note the asymmetry with sys_setpriority: this returns "kernel nice" which ranges
+// from 1 (weakest) to 40 (strongest). (It is part of Linux history that this syscall
+// deals with niceness but has "priority" in its name.)
 pub fn sys_getpriority(
     _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
@@ -1659,18 +1659,20 @@ pub fn sys_getpriority(
 ) -> Result<u8, Errno> {
     match which {
         PRIO_PROCESS => {}
+        // TODO: https://fxbug.dev/287121196 - support PRIO_PGRP and PRIO_USER?
         _ => return error!(EINVAL),
     }
     track_stub!(TODO("https://fxbug.dev/322893809"), "getpriority permissions");
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
     let state = target_task.read();
-    Ok(state.scheduler_state.raw_priority())
+    Ok(state.scheduler_state.normal_priority.raw_priority())
 }
 
-// Note the asymmetry with sys_getpriority: the `priority` parameter is what Starnix calls a
-// "user space" priority, which ranges from -20 (strongest) to 19 (weakest) (other values can be
-// passed and are clamped to that range and interpretation).
+// Note the asymmetry with sys_getpriority: this call's `priority` parameter is a
+// "user nice" which ranges from -20 (strongest) to 19 (weakest) (other values can be
+// passed and are clamped to that range and interpretation). (It is part of Linux
+// history that this syscall deals with niceness but has "priority" in its name.)
 pub fn sys_setpriority(
     locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
@@ -1680,26 +1682,23 @@ pub fn sys_setpriority(
 ) -> Result<(), Errno> {
     match which {
         PRIO_PROCESS => {}
+        // TODO: https://fxbug.dev/287121196 - support PRIO_PGRP and PRIO_USER?
         _ => return error!(EINVAL),
     }
 
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
-    const MIN_RAW_PRIORITY: i32 = 1;
-    const MID_RAW_PRIORITY: i32 = 20;
-    const MAX_RAW_PRIORITY: i32 = 40;
-    let new_raw_priority =
-        (MID_RAW_PRIORITY).saturating_sub(priority).clamp(MIN_RAW_PRIORITY, MAX_RAW_PRIORITY) as u8;
-    let strengthening = target_task.read().scheduler_state.raw_priority() < new_raw_priority;
+    let normal_priority = NormalPriority::from_setpriority_syscall(priority);
+    let strengthening = target_task.read().scheduler_state.normal_priority < normal_priority;
     let allowed_so_far_as_rlimit_is_concerned = !strengthening
-        || new_raw_priority as u64 <= target_task.thread_group().get_rlimit(locked, Resource::NICE);
+        || !normal_priority.exceeds(target_task.thread_group().get_rlimit(locked, Resource::NICE));
     if !(current_task.is_euid_friendly_with(&target_task) && allowed_so_far_as_rlimit_is_concerned)
     {
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
     }
     security::check_setsched_access(current_task, &target_task)?;
 
-    target_task.update_scheduler_nice(new_raw_priority)?;
+    target_task.set_scheduler_nice(normal_priority)?;
     Ok(())
 }
 

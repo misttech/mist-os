@@ -4245,13 +4245,13 @@ impl BinderDriver {
                     // https://source.android.com/docs/core/architecture/hidl/binder-ipc#rt-priority
                     let mut scheduler_state = object.flags.get_scheduler_state();
                     let current_scheduler_state = current_task.read().scheduler_state;
-                    if !current_scheduler_state.policy().is_realtime()
+                    if !current_scheduler_state.is_realtime()
                         || object.flags.contains(BinderObjectFlags::INHERIT_RT)
                     {
                         // Only supercede the scheduler state from the object if this task's is higher.
-                        if scheduler_state.is_none_or(|p| {
-                            p.policy().is_less_than_for_binder(current_scheduler_state.policy())
-                        }) {
+                        if scheduler_state
+                            .is_none_or(|p| p.is_less_than_for_binder(current_scheduler_state))
+                        {
                             scheduler_state = Some(current_scheduler_state);
                         }
                     }
@@ -4419,15 +4419,12 @@ impl BinderDriver {
                         // The transaction is synchronous and we're expected to give a reply, so
                         // push the transaction onto the transaction stack.
 
-                        // If the transaction must inherit the sender state, let update the
+                        // If the transaction must inherit the sender scheduler state, let update the
                         // scheduler state, and keep track of the previous one.
                         let scheduler_state = (|| {
                             if let Some(scheduler_state) = scheduler_state {
                                 let old_scheduler_state = current_task.read().scheduler_state;
-                                if old_scheduler_state
-                                    .policy()
-                                    .is_less_than_for_binder(scheduler_state.policy())
-                                {
+                                if old_scheduler_state.is_less_than_for_binder(scheduler_state) {
                                     match current_task.set_scheduler_state(scheduler_state) {
                                         Ok(()) => return SchedulerGuard::from(old_scheduler_state),
                                         Err(e) => {

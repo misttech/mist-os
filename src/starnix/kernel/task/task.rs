@@ -9,10 +9,10 @@ use crate::signals::{KernelSignal, RunState, SignalInfo, SignalState};
 use crate::task::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, EventHandler, Kernel,
-    PidTable, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData, PtraceState,
-    PtraceStatus, SchedulerState, SeccompFilterContainer, SeccompState, SeccompStateValue,
-    ThreadGroup, ThreadGroupKey, ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter,
-    ZombieProcess,
+    NormalPriority, PidTable, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData,
+    PtraceState, PtraceStatus, RealtimePriority, SchedulerState, SeccompFilterContainer,
+    SeccompState, SeccompStateValue, ThreadGroup, ThreadGroupKey, ThreadState, UtsNamespaceHandle,
+    WaitCanceler, Waiter, ZombieProcess,
 };
 use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString};
 use bitflags::bitflags;
@@ -1261,17 +1261,24 @@ impl Task {
         *fs = fs.fork();
     }
 
+    /// Modify the scheduler state's priority and update the task's thread's role.
+    pub(crate) fn set_scheduler_priority(&self, priority: RealtimePriority) -> Result<(), Errno> {
+        self.update_scheduler_state_then_role(|scheduler_state| {
+            scheduler_state.realtime_priority = priority
+        })
+    }
+
+    /// Modify the scheduler state's nice and update the task's thread's role.
+    pub(crate) fn set_scheduler_nice(&self, nice: NormalPriority) -> Result<(), Errno> {
+        self.update_scheduler_state_then_role(|scheduler_state| {
+            scheduler_state.normal_priority = nice
+        })
+    }
+
     /// Overwrite the existing scheduler state with a new one and update the task's thread's role.
     pub fn set_scheduler_state(&self, scheduler_state: SchedulerState) -> Result<(), Errno> {
         self.update_scheduler_state_then_role(|task_scheduler_state| {
             *task_scheduler_state = scheduler_state
-        })
-    }
-
-    /// Update the nice value of the scheduler state and update the task's thread's role.
-    pub fn update_scheduler_nice(&self, raw_priority: u8) -> Result<(), Errno> {
-        self.update_scheduler_state_then_role(|scheduler_state| {
-            scheduler_state.set_raw_nice(raw_priority)
         })
     }
 
