@@ -14,9 +14,11 @@
 #include <arch/mp.h>
 #include <fbl/algorithm.h>
 #include <fbl/enum_bits.h>
+#include <ffl/string.h>
 #include <kernel/auto_preempt_disabler.h>
 #include <kernel/preempt_disabled_token.h>
 #include <kernel/scheduler.h>
+#include <kernel/scheduler_state.h>
 #include <kernel/wait_queue_internal.h>
 #include <ktl/algorithm.h>
 #include <ktl/bit.h>
@@ -484,6 +486,26 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
 
   constexpr bool kStartingFromThread = ktl::is_same_v<UpstreamNodeType, Thread>;
 
+  if constexpr (OpType == PropagateOp::AddSingleEdge) {
+    DEBUG_ASSERT(added_ipv != nullptr);
+    DEBUG_ASSERT(lost_ipv == nullptr);
+  } else if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
+    DEBUG_ASSERT(added_ipv == nullptr);
+    DEBUG_ASSERT(lost_ipv != nullptr);
+  } else if constexpr (OpType == PropagateOp::BaseProfileChanged) {
+    static_assert(
+        kStartingFromThread,
+        "Base profile propagation changes may only start from Threads, not OwnedWaitQueues");
+    DEBUG_ASSERT(added_ipv != nullptr);
+    DEBUG_ASSERT(lost_ipv != nullptr);
+  } else {
+    // This has to be something template-dependent so it only fails when
+    // instantiated and not ignored by the `if constexpr` logic, and nontrivial
+    // enough to avoid tautological test sorts of warnings that are generated
+    // for e.g. `OpType != OpType`.
+    static_assert(ktl::is_void_v<PropagateOpTag<OpType>>, "Unrecognized propagation operation");
+  }
+
   // If neither the IPVs we are adding, nor the IPVs we are removing, are
   // "consequential" (meaning, the have either some fair weight, or some
   // deadline capacity, or both), then we can just get out now.  There are no
@@ -491,6 +513,10 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
   if (!IpvsAreConsequential(added_ipv) && !IpvsAreConsequential(lost_ipv)) {
     return;
   }
+
+  // When we have finally finished updating everything, make sure to update
+  // our max traversal statistic.
+  ChainLengthTracker len_tracker;
 
   // Set up the pointers we will use as iterators for traversing the inheritance
   // graph.  Snapshot the starting node's current inherited profile values which
@@ -514,6 +540,25 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
           "blocking wait queue %p owq_iter %p",
           thread_iter->wait_queue_state().blocking_wait_queue_, static_cast<WaitQueue*>(owq_iter));
     }
+
+    // OK - we are finally ready to get to work.  Use a slightly-evil(tm) goto in
+    // order to start our propagate loop with the proper phase (either
+    // thread-to-OWQ first, or OWQ-to-thread first)
+    if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
+      // Are we starting from a thread during an edge remove operation?  If so,
+      // and if we were the last thread to leave our wait queue, then we don't
+      // need to bother to update its IPVs anymore (it cannot have any IPVs if it
+      // has no waiters), so we can just skip it an move on to its owner thread.
+      //
+      // Additionally, we know that it must have an owner thread at this point in
+      // time.  If if didn't, BeginPropagate would have already bailed out.
+      owq_iter->get_lock().AssertHeld();
+      if (owq_iter->IsEmpty()) {
+        thread_iter = owq_iter->owner_;
+        DEBUG_ASSERT(thread_iter != nullptr);
+        goto start_from_owq;
+      }
+    }
   } else {
     // Base profile changes should never start from OWQs.
     static_assert(OpType != PropagateOp::BaseProfileChanged);
@@ -521,51 +566,7 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
     thread_iter = &downstream_node;
     owq_iter->get_lock().AssertHeld();
     DEBUG_ASSERT(!owq_iter->IsEmpty());
-  }
-
-  if constexpr (OpType == PropagateOp::AddSingleEdge) {
-    DEBUG_ASSERT(added_ipv != nullptr);
-    DEBUG_ASSERT(lost_ipv == nullptr);
-  } else if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
-    DEBUG_ASSERT(added_ipv == nullptr);
-    DEBUG_ASSERT(lost_ipv != nullptr);
-  } else if constexpr (OpType == PropagateOp::BaseProfileChanged) {
-    static_assert(
-        kStartingFromThread,
-        "Base profile propagation changes may only start from Threads, not OwnedWaitQueues");
-    DEBUG_ASSERT(added_ipv != nullptr);
-    DEBUG_ASSERT(lost_ipv != nullptr);
-  } else {
-    // This has to be something template-dependent so it only fails when
-    // instantiated and not ignored by the `if constexpr` logic, and nontrivial
-    // enough to avoid tautological test sorts of warnings that are generated
-    // for e.g. `OpType != OpType`.
-    static_assert(ktl::is_void_v<PropagateOpTag<OpType>>, "Unrecognized propagation operation");
-  }
-
-  // When we have finally finished updating everything, make sure to update
-  // our max traversal statistic.
-  ChainLengthTracker len_tracker;
-
-  // OK - we are finally ready to get to work.  Use a slightly-evil(tm) goto in
-  // order to start our propagate loop with the proper phase (either
-  // thread-to-OWQ first, or OWQ-to-thread first)
-  if constexpr (kStartingFromThread == false) {
     goto start_from_owq;
-  } else if constexpr (OpType == PropagateOp::RemoveSingleEdge) {
-    // Are we starting from a thread during an edge remove operation?  If so,
-    // and if we were the last thread to leave our wait queue, then we don't
-    // need to bother to update its IPVs anymore (it cannot have any IPVs if it
-    // has no waiters), so we can just skip it an move on to its owner thread.
-    //
-    // Additionally, we know that it must have an owner thread at this point in
-    // time.  If if didn't, BeginPropagate would have already bailed out.
-    owq_iter->get_lock().AssertHeld();
-    if (owq_iter->IsEmpty()) {
-      thread_iter = owq_iter->owner_;
-      DEBUG_ASSERT(thread_iter != nullptr);
-      goto start_from_owq;
-    }
   }
 
   while (true) {
