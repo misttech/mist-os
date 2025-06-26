@@ -96,24 +96,6 @@
 
                 // TODO(https://fxbug.dev/333132302)
                 "Madvise.MadvRemoveZeroesMemory",
-
-                // TODO(https://fxbug.dev/397371605)
-                "SchedSetParamTest.NonRootCannotExceedRLimits",
-                "SuccessivePoliciesTest.UnusedNicenessIsStillSubjectToRLimit",
-                "SuccessivePoliciesTest.NicenessIsPreservedByPoliciesThatDoNotUseNiceness",
-                "SuccessivePoliciesTest.UnusedNicenessCanBeAccessed",
-                "SuccessivePoliciesTest.UnusedPositiveNicenessIsZeroedDuringResetOnFork",
-                "SuccessivePoliciesTest.UnusedNegativeNicenessIsStillZeroedByResetOnFork",
-                "SuccessivePoliciesTest.UnusedNicenessCanBeChanged",
-                "SuccessivePoliciesTest.ChangingPolicyWhenExceedingNicenessRLimitAllowedExceptOutOfIdle",
-                "SetPriorityTest.MaintainingAndIncreasingNicenessAllowedDespiteExceededRLimits",
-                "SetPriorityTest.NonRootCannotExceedRLimits",
-                "SchedSetSchedulerTest.NonRootCannotExceedRLimits",
-                "SchedSetSchedulerTest.RootCanExceedRLimits",
-                "SchedSetSchedulerTest.NonRootCannotClearResetOnFork",
-                "SchedSetSchedulerTest.ResetOnForkPreservesPositiveNiceness",
-                "SchedSetSchedulerTest.MaintainingAndDecreasingPriorityAllowedDespiteExceededRLimits",
-                "SchedSetParamTest.RootCanExceedRLimits",
             ],
         },
         {

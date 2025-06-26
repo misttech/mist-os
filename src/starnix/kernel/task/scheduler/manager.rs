@@ -202,6 +202,10 @@ impl RealtimePriority {
     const MAX_VALUE: u8 = 99;
 
     const NON_REAL_TIME: RealtimePriority = RealtimePriority { value: Self::NON_REAL_TIME_VALUE };
+
+    pub(crate) fn exceeds(&self, limit: u64) -> bool {
+        limit < (self.value as u64)
+    }
 }
 
 /// The scheduling policies described in "Scheduling policies" at sched(7).
@@ -273,36 +277,6 @@ impl SchedulerState {
         self == &Self::default()
     }
 
-    fn from_raw(mut policy: u32, priority: u8) -> Result<Self, Errno> {
-        let reset_on_fork = (policy & SCHED_RESET_ON_FORK) != 0;
-        if reset_on_fork {
-            track_stub!(
-                TODO("https://fxbug.dev/297961833"),
-                "SCHED_RESET_ON_FORK check CAP_SYS_NICE"
-            );
-            policy -= SCHED_RESET_ON_FORK;
-        }
-        let policy = match policy {
-            SCHED_FIFO => SchedulingPolicy::Fifo,
-            SCHED_RR => SchedulingPolicy::RoundRobin,
-            SCHED_NORMAL => SchedulingPolicy::Normal,
-            SCHED_BATCH => SchedulingPolicy::Batch,
-            SCHED_IDLE => SchedulingPolicy::Idle,
-            SCHED_DEADLINE => {
-                track_stub!(TODO("https://fxbug.dev/409349496"), "SCHED_DEADLINE");
-                return error!(EINVAL);
-            }
-            _ => return error!(EINVAL),
-        };
-
-        Ok(Self {
-            policy,
-            normal_priority: NormalPriority { value: priority },
-            realtime_priority: RealtimePriority { value: priority },
-            reset_on_fork,
-        })
-    }
-
     /// Create a policy according to the "sched_policy" and "priority" bits of
     /// a flat_binder_object_flags bitmask (see uapi/linux/android/binder.h).
     ///
@@ -335,18 +309,6 @@ impl SchedulerState {
         Ok(Self { policy, normal_priority, realtime_priority, reset_on_fork: false })
     }
 
-    pub fn from_sched_params(policy: u32, params: sched_param, rlimit: u64) -> Result<Self, Errno> {
-        let mut priority = u8::try_from(params.sched_priority).map_err(|_| errno!(EINVAL))?;
-        let raw_policy = policy & !SCHED_RESET_ON_FORK;
-        let valid_priorities =
-            min_priority_for_sched_policy(raw_policy)?..=max_priority_for_sched_policy(raw_policy)?;
-        if !valid_priorities.contains(&priority) {
-            return error!(EINVAL);
-        }
-        priority = std::cmp::min(priority as u64, rlimit) as u8;
-        Self::from_raw(policy, priority)
-    }
-
     pub fn fork(self) -> Self {
         if self.reset_on_fork {
             let (policy, normal_priority, realtime_priority) = if self.is_realtime() {
@@ -361,9 +323,15 @@ impl SchedulerState {
                     RealtimePriority::NON_REAL_TIME,
                 )
             } else {
-                // If the calling process has a negative nice value, the nice
-                // value is reset to zero in child processes.
-                (self.policy, NormalPriority::default(), RealtimePriority::NON_REAL_TIME)
+                // If the calling task has a non-real-time scheduling policy, the
+                // state given to child processes is the same as that of the
+                // caller except with the caller's nice clamped to
+                // NormalPriority::default() at the strongest.
+                (
+                    self.policy,
+                    std::cmp::min(self.normal_priority, NormalPriority::default()),
+                    RealtimePriority::NON_REAL_TIME,
+                )
             };
             Self {
                 policy,

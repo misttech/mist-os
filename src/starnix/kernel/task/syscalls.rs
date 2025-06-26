@@ -9,7 +9,7 @@ use crate::signals::syscalls::RUsagePtr;
 use crate::task::{
     max_priority_for_sched_policy, min_priority_for_sched_policy, ptrace_attach, ptrace_dispatch,
     ptrace_traceme, CurrentTask, ExitStatus, NormalPriority, PtraceAllowedPtracers,
-    PtraceAttachType, PtraceOptions, SchedulerState, SeccompAction, SeccompStateValue,
+    PtraceAttachType, PtraceOptions, SchedulingPolicy, SeccompAction, SeccompStateValue,
     SyslogAccess, Task, ThreadGroup, PR_SET_PTRACER_ANY,
 };
 use crate::vfs::{
@@ -49,11 +49,11 @@ use starnix_uapi::{
     PR_SET_DUMPABLE, PR_SET_KEEPCAPS, PR_SET_NAME, PR_SET_NO_NEW_PRIVS, PR_SET_PDEATHSIG,
     PR_SET_PTRACER, PR_SET_SECCOMP, PR_SET_SECUREBITS, PR_SET_TIMERSLACK, PR_SET_VMA,
     PR_SET_VMA_ANON_NAME, PTRACE_ATTACH, PTRACE_SEIZE, PTRACE_TRACEME, RUSAGE_CHILDREN,
-    SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER, SECCOMP_FILTER_FLAG_SPEC_ALLOW,
-    SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH, SECCOMP_GET_ACTION_AVAIL,
-    SECCOMP_GET_NOTIF_SIZES, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT, SECCOMP_SET_MODE_FILTER,
-    SECCOMP_SET_MODE_STRICT, _LINUX_CAPABILITY_VERSION_1, _LINUX_CAPABILITY_VERSION_2,
-    _LINUX_CAPABILITY_VERSION_3,
+    SCHED_RESET_ON_FORK, SECCOMP_FILTER_FLAG_LOG, SECCOMP_FILTER_FLAG_NEW_LISTENER,
+    SECCOMP_FILTER_FLAG_SPEC_ALLOW, SECCOMP_FILTER_FLAG_TSYNC, SECCOMP_FILTER_FLAG_TSYNC_ESRCH,
+    SECCOMP_GET_ACTION_AVAIL, SECCOMP_GET_NOTIF_SIZES, SECCOMP_MODE_FILTER, SECCOMP_MODE_STRICT,
+    SECCOMP_SET_MODE_FILTER, SECCOMP_SET_MODE_STRICT, _LINUX_CAPABILITY_VERSION_1,
+    _LINUX_CAPABILITY_VERSION_2, _LINUX_CAPABILITY_VERSION_3,
 };
 use static_assertions::const_assert;
 use std::cmp;
@@ -768,20 +768,47 @@ pub fn sys_sched_setscheduler(
     policy: u32,
     param: UserRef<sched_param>,
 ) -> Result<(), Errno> {
+    // Parse & validate the arguments.
     if pid < 0 || param.is_null() {
         return error!(EINVAL);
     }
 
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
-    let rlimit = target_task.thread_group().get_rlimit(locked, Resource::RTPRIO);
-    let param = current_task.read_object(param)?;
-    let scheduler_state = SchedulerState::from_sched_params(policy, param, rlimit)?;
-    if !current_task.is_euid_friendly_with(&target_task) {
+
+    let reset_on_fork = policy & SCHED_RESET_ON_FORK != 0;
+
+    let policy = SchedulingPolicy::try_from(policy & !SCHED_RESET_ON_FORK)?;
+    let realtime_priority =
+        policy.realtime_priority_from(current_task.read_object(param)?.sched_priority)?;
+
+    // TODO: https://fxbug.dev/425143440 - we probably want to improve the locking here.
+    let current_state = target_task.read().scheduler_state;
+
+    // Check capabilities and permissions, if required, for the operation.
+    let euid_friendly = current_task.is_euid_friendly_with(&target_task);
+    let strengthening = current_state.realtime_priority < realtime_priority;
+    let rlimited = strengthening
+        && realtime_priority
+            .exceeds(target_task.thread_group().get_rlimit(locked, Resource::RTPRIO));
+    let clearing_reset_on_fork = current_state.reset_on_fork && !reset_on_fork;
+    let caught_in_idle_trap = current_state.policy == SchedulingPolicy::Idle
+        && policy != SchedulingPolicy::Idle
+        && current_state
+            .normal_priority
+            .exceeds(target_task.thread_group().get_rlimit(locked, Resource::NICE));
+    if !euid_friendly || rlimited || clearing_reset_on_fork || caught_in_idle_trap {
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
     }
+
     security::check_setsched_access(current_task, &target_task)?;
-    target_task.set_scheduler_state(scheduler_state)?;
+
+    // Apply the new scheduler configuration to the task.
+    target_task.set_scheduler_policy_priority_and_reset_on_fork(
+        policy,
+        realtime_priority,
+        reset_on_fork,
+    )?;
 
     Ok(())
 }
@@ -914,26 +941,34 @@ pub fn sys_sched_setparam(
     pid: pid_t,
     param: UserRef<sched_param>,
 ) -> Result<(), Errno> {
+    // Parse & validate the arguments.
     if pid < 0 || param.is_null() {
         return error!(EINVAL);
     }
-    let new_params: sched_param = current_task.read_object(param.into())?;
     let weak = get_task_or_current(current_task, pid);
     let target_task = Task::from_weak(&weak)?;
-    let current_scheduler_state = target_task.read().scheduler_state;
 
-    let rlimit = target_task.thread_group().get_rlimit(locked, Resource::RTPRIO);
+    // TODO: https://fxbug.dev/425143440 - we probably want to improve the locking here.
+    let current_state = target_task.read().scheduler_state;
 
-    let scheduler_state = SchedulerState::from_sched_params(
-        current_scheduler_state.policy_for_sched_getscheduler(),
-        new_params,
-        rlimit,
-    )?;
-    if !current_task.is_euid_friendly_with(&target_task) {
+    let realtime_priority = current_state
+        .policy
+        .realtime_priority_from(current_task.read_object(param)?.sched_priority)?;
+
+    // Check capabilities and permissions, if required, for the operation.
+    let euid_friendly = current_task.is_euid_friendly_with(&target_task);
+    let strengthening = current_state.realtime_priority < realtime_priority;
+    let rlimited = strengthening
+        && realtime_priority
+            .exceeds(target_task.thread_group().get_rlimit(locked, Resource::RTPRIO));
+    if !euid_friendly || rlimited {
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
     }
+
     security::check_setsched_access(current_task, &target_task)?;
-    target_task.set_scheduler_priority(scheduler_state.realtime_priority)?;
+
+    // Apply the new scheduler configuration to the task.
+    target_task.set_scheduler_priority(realtime_priority)?;
 
     Ok(())
 }
@@ -1680,6 +1715,7 @@ pub fn sys_setpriority(
     who: i32,
     priority: i32,
 ) -> Result<(), Errno> {
+    // Parse & validate the arguments.
     match which {
         PRIO_PROCESS => {}
         // TODO: https://fxbug.dev/287121196 - support PRIO_PGRP and PRIO_USER?
@@ -1688,17 +1724,28 @@ pub fn sys_setpriority(
 
     let weak = get_task_or_current(current_task, who);
     let target_task = Task::from_weak(&weak)?;
+
     let normal_priority = NormalPriority::from_setpriority_syscall(priority);
-    let strengthening = target_task.read().scheduler_state.normal_priority < normal_priority;
-    let allowed_so_far_as_rlimit_is_concerned = !strengthening
-        || !normal_priority.exceeds(target_task.thread_group().get_rlimit(locked, Resource::NICE));
-    if !(current_task.is_euid_friendly_with(&target_task) && allowed_so_far_as_rlimit_is_concerned)
-    {
+
+    // TODO: https://fxbug.dev/425143440 - we probably want to improve the locking here.
+    let current_state = target_task.read().scheduler_state;
+
+    // Check capabilities and permissions, if required, for the operation.
+    let euid_friendly = current_task.is_euid_friendly_with(&target_task);
+    let strengthening = current_state.normal_priority < normal_priority;
+    let rlimited = strengthening
+        && normal_priority.exceeds(target_task.thread_group().get_rlimit(locked, Resource::NICE));
+    if !euid_friendly {
         security::check_task_capable(current_task, CAP_SYS_NICE)?;
+    } else if rlimited {
+        security::check_task_capable(current_task, CAP_SYS_NICE).map_err(|_| errno!(EACCES))?;
     }
+
     security::check_setsched_access(current_task, &target_task)?;
 
+    // Apply the new scheduler configuration to the task.
     target_task.set_scheduler_nice(normal_priority)?;
+
     Ok(())
 }
 

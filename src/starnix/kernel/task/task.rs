@@ -10,9 +10,9 @@ use crate::task::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, EventHandler, Kernel,
     NormalPriority, PidTable, ProcessEntryRef, ProcessExitInfo, PtraceEvent, PtraceEventData,
-    PtraceState, PtraceStatus, RealtimePriority, SchedulerState, SeccompFilterContainer,
-    SeccompState, SeccompStateValue, ThreadGroup, ThreadGroupKey, ThreadState, UtsNamespaceHandle,
-    WaitCanceler, Waiter, ZombieProcess,
+    PtraceState, PtraceStatus, RealtimePriority, SchedulerState, SchedulingPolicy,
+    SeccompFilterContainer, SeccompState, SeccompStateValue, ThreadGroup, ThreadGroupKey,
+    ThreadState, UtsNamespaceHandle, WaitCanceler, Waiter, ZombieProcess,
 };
 use crate::vfs::{FdFlags, FdNumber, FdTable, FileHandle, FsContext, FsNodeHandle, FsString};
 use bitflags::bitflags;
@@ -1259,6 +1259,21 @@ impl Task {
     pub fn unshare_fs(&self) {
         let mut fs = self.fs.as_ref().expect("fs must be set").write();
         *fs = fs.fork();
+    }
+
+    /// Modify the given elements of the scheduler state with new values and update the
+    /// task's thread's role.
+    pub(crate) fn set_scheduler_policy_priority_and_reset_on_fork(
+        &self,
+        policy: SchedulingPolicy,
+        priority: RealtimePriority,
+        reset_on_fork: bool,
+    ) -> Result<(), Errno> {
+        self.update_scheduler_state_then_role(|scheduler_state| {
+            scheduler_state.policy = policy;
+            scheduler_state.realtime_priority = priority;
+            scheduler_state.reset_on_fork = reset_on_fork;
+        })
     }
 
     /// Modify the scheduler state's priority and update the task's thread's role.
