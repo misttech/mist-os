@@ -5,3 +5,7 @@
 //! Re-export specific items from `std` for use in tests by netstack3.
 
 pub use ::std::println;
+
+pub mod thread {
+    pub use ::std::thread::spawn;
+}

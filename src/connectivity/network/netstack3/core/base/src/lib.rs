@@ -42,6 +42,7 @@ mod work_queue;
 pub use context::{BuildableCoreContext, ContextPair, ContextProvider, CtxPair};
 pub use convert::{BidirectionalConverter, OwnedOrRefsBidirectionalConverter};
 pub use counters::{Counter, CounterContext, CounterRepr, ResourceCounterContext};
+pub use data_structures::rcu::SynchronizedWriterRcu;
 pub use data_structures::token_bucket::TokenBucket;
 pub use device::address::{
     AssignedAddrIpExt, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, Ipv4DeviceAddr,
