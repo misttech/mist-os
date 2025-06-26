@@ -8,164 +8,75 @@ use crate::nanohub_sysfs_files::{
 };
 use crate::socket_tunnel_file::{FirmwareFile, SocketTunnelSysfsFile};
 use starnix_core::device::kobject::Device;
-use starnix_core::fs::sysfs::DeviceDirectory;
-use starnix_core::task::CurrentTask;
-use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
-use starnix_core::vfs::{
-    fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr,
-};
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_core::fs::sysfs::build_device_directory;
+use starnix_core::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use starnix_uapi::auth::FsCred;
-use starnix_uapi::errors::Errno;
+use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::file_mode::mode;
-use starnix_uapi::open_flags::OpenFlags;
 
-pub struct NanohubCommsDirectory {
-    base_dir: DeviceDirectory,
-}
-
-impl NanohubCommsDirectory {
-    pub fn new(device: Device) -> Self {
-        Self { base_dir: DeviceDirectory::new(device) }
-    }
-
-    fn create_file_ops_entries(&self) -> Vec<VecDirectoryEntry> {
-        let mut entries = self.base_dir.create_file_ops_entries();
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"display_panel_name".into(),
-            inode: None,
-        });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"display_select".into(),
-            inode: None,
-        });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"display_state".into(),
-            inode: None,
-        });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"download_firmware".into(),
-            inode: None,
-        });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"firmware_name".into(),
-            inode: None,
-        });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"firmware_version".into(),
-            inode: None,
-        });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"hw_reset".into(),
-            inode: None,
-        });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"time_sync".into(),
-            inode: None,
-        });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"wakeup_event_msec".into(),
-            inode: None,
-        });
-        entries.push(VecDirectoryEntry {
-            entry_type: DirectoryEntryType::REG,
-            name: b"wake_lock".into(),
-            inode: None,
-        });
-        entries
-    }
-}
-
-impl FsNodeOps for NanohubCommsDirectory {
-    fs_node_impl_dir_readonly!();
-
-    fn create_file_ops(
-        &self,
-        _locked: &mut Locked<FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(VecDirectory::new_file(self.create_file_ops_entries()))
-    }
-
-    fn lookup(
-        &self,
-        locked: &mut Locked<FileOpsCore>,
-        node: &FsNode,
-        current_task: &CurrentTask,
-        name: &FsStr,
-    ) -> Result<FsNodeHandle, Errno> {
-        match &**name {
-            b"display_panel_name" => Ok(node.fs().create_node_and_allocate_node_id(
-                SocketTunnelSysfsFile::new(
-                    b"/sys/devices/virtual/nanohub/nanohub_comms/display_panel_name".into(),
-                ),
-                // TODO(https://fxbug.dev/419041879): These are currently set to "system", but they
-                // should be set to FsCred::root().
-                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred { uid: 1000, gid: 1000 }),
-            )),
-            b"display_select" => Ok(node.fs().create_node_and_allocate_node_id(
-                SocketTunnelSysfsFile::new(
-                    b"/sys/devices/virtual/nanohub/nanohub_comms/display_select".into(),
-                ),
-                // TODO(https://fxbug.dev/419041879): These are currently set to "system", but they
-                // should be set to FsCred::root().
-                FsNodeInfo::new(mode!(IFREG, 0o660), FsCred { uid: 1000, gid: 1000 }),
-            )),
-            b"display_state" => Ok(node.fs().create_node_and_allocate_node_id(
-                SocketTunnelSysfsFile::new(
-                    b"/sys/devices/virtual/nanohub/nanohub_comms/display_state".into(),
-                ),
-                // TODO(https://fxbug.dev/419041879): These are currently set to "system", but they
-                // should be set to FsCred::root().
-                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred { uid: 1000, gid: 1000 }),
-            )),
-            b"download_firmware" => Ok(node.fs().create_node_and_allocate_node_id(
-                FirmwareFile::new(),
-                FsNodeInfo::new(mode!(IFREG, 0o220), FsCred::root()),
-            )),
-            b"firmware_name" => Ok(node.fs().create_node_and_allocate_node_id(
-                NanohubSysFsNode::<FirmwareNameSysFsOps>::new(),
-                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
-            )),
-            b"firmware_version" => Ok(node.fs().create_node_and_allocate_node_id(
-                NanohubSysFsNode::<FirmwareVersionSysFsOps>::new(),
-                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
-            )),
-            b"hw_reset" => Ok(node.fs().create_node_and_allocate_node_id(
-                SocketTunnelSysfsFile::new(
-                    b"/sys/devices/virtual/nanohub/nanohub_comms/hw_reset".into(),
-                ),
-                FsNodeInfo::new(mode!(IFREG, 0o220), FsCred::root()),
-            )),
-            b"time_sync" => Ok(node.fs().create_node_and_allocate_node_id(
-                NanohubSysFsNode::<TimeSyncSysFsOps>::new(),
-                // TODO(https://fxbug.dev/419041879): These are currently set to "system", but they
-                // should be set to FsCred::root().
-                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred { uid: 1000, gid: 1000 }),
-            )),
-            b"wakeup_event_msec" => Ok(node.fs().create_node_and_allocate_node_id(
-                NanohubSysFsNode::<WakeUpEventDuration>::new(),
-                FsNodeInfo::new(mode!(IFREG, 0o660), FsCred::root()),
-            )),
-            b"wake_lock" => Ok(node.fs().create_node_and_allocate_node_id(
-                SocketTunnelSysfsFile::new(
-                    b"/sys/devices/virtual/nanohub/nanohub_comms/wake_lock".into(),
-                ),
-                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
-            )),
-            _ => self.base_dir.lookup(locked, node, current_task, name),
-        }
-    }
+pub fn build_nanohub_comms_directory(device: &Device, dir: &SimpleDirectoryMutator) {
+    build_device_directory(device, dir);
+    // TODO(https://fxbug.dev/419041879): These are currently set to "system", but they
+    // should be set to FsCred::root().
+    let system_creds = FsCred::root();
+    dir.entry_etc(
+        "display_panel_name".into(),
+        SocketTunnelSysfsFile::new(
+            b"/sys/devices/virtual/nanohub/nanohub_comms/display_panel_name".into(),
+        ),
+        mode!(IFREG, 0o440),
+        DeviceType::NONE,
+        system_creds,
+    );
+    dir.entry_etc(
+        "display_select".into(),
+        SocketTunnelSysfsFile::new(
+            b"/sys/devices/virtual/nanohub/nanohub_comms/display_select".into(),
+        ),
+        mode!(IFREG, 0o660),
+        DeviceType::NONE,
+        system_creds,
+    );
+    dir.entry_etc(
+        "display_state".into(),
+        SocketTunnelSysfsFile::new(
+            b"/sys/devices/virtual/nanohub/nanohub_comms/display_state".into(),
+        ),
+        mode!(IFREG, 0o440),
+        DeviceType::NONE,
+        system_creds,
+    );
+    dir.entry("download_firmware", FirmwareFile::new(), mode!(IFREG, 0o220));
+    dir.entry(
+        "firmware_name",
+        NanohubSysFsNode::<FirmwareNameSysFsOps>::new(),
+        mode!(IFREG, 0o440),
+    );
+    dir.entry(
+        "firmware_version",
+        NanohubSysFsNode::<FirmwareVersionSysFsOps>::new(),
+        mode!(IFREG, 0o440),
+    );
+    dir.entry(
+        "hw_reset",
+        SocketTunnelSysfsFile::new(b"/sys/devices/virtual/nanohub/nanohub_comms/hw_reset".into()),
+        mode!(IFREG, 0o220),
+    );
+    dir.entry_etc(
+        "time_sync".into(),
+        NanohubSysFsNode::<TimeSyncSysFsOps>::new(),
+        mode!(IFREG, 0o440),
+        DeviceType::NONE,
+        system_creds,
+    );
+    dir.entry(
+        "wakeup_event_msec",
+        NanohubSysFsNode::<WakeUpEventDuration>::new(),
+        mode!(IFREG, 0o660),
+    );
+    dir.entry(
+        "wake_lock",
+        SocketTunnelSysfsFile::new(b"/sys/devices/virtual/nanohub/nanohub_comms/wake_lock".into()),
+        mode!(IFREG, 0o440),
+    );
 }

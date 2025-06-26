@@ -25,7 +25,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error};
 use std::sync::Weak;
 
-pub fn init_device_directory(device: &Device, dir: &SimpleDirectoryMutator) {
+pub fn build_device_directory(device: &Device, dir: &SimpleDirectoryMutator) {
     if let Some(metadata) = &device.metadata {
         dir.entry(
             "dev",

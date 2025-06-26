@@ -5,8 +5,9 @@
 use crate::device::kobject::{Class, Device, DeviceMetadata, UEventAction, UEventContext};
 use crate::device::kobject_store::KObjectStore;
 use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node};
-use crate::fs::sysfs::init_device_directory;
+use crate::fs::sysfs::build_device_directory;
 use crate::task::{CurrentTask, Kernel};
+use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::{FileOps, FsNode, FsNodeOps, FsStr, FsString};
 use starnix_logging::{log_error, log_warn};
 use starnix_uapi::as_any::AsAny;
@@ -341,6 +342,33 @@ impl DeviceRegistry {
     where
         L: LockBefore<FileOpsCore>,
     {
+        self.register_device_with_dir(
+            locked,
+            current_task,
+            name,
+            metadata,
+            class,
+            build_device_directory,
+            dev_ops,
+        )
+    }
+
+    /// Register a device with a custom directory.
+    ///
+    /// See `register_device` for an explanation of the parameters.
+    pub fn register_device_with_dir<L>(
+        &self,
+        locked: &mut Locked<L>,
+        current_task: &CurrentTask,
+        name: &FsStr,
+        metadata: DeviceMetadata,
+        class: Class,
+        build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
+        dev_ops: impl DeviceOps,
+    ) -> Device
+    where
+        L: LockBefore<FileOpsCore>,
+    {
         let entry = DeviceEntry::new(name.into(), dev_ops);
         self.devices(metadata.mode).register_minor(metadata.device_type, entry);
         let device = self.objects.create_device(
@@ -348,7 +376,7 @@ impl DeviceRegistry {
             name,
             Some(metadata),
             class,
-            init_device_directory,
+            build_directory,
         );
         self.notify_device(locked, current_task, device.clone());
         device
@@ -435,35 +463,40 @@ impl DeviceRegistry {
     where
         L: LockBefore<FileOpsCore>,
     {
-        self.register_dyn_device_with_devname(locked, current_task, name, name, class, dev_ops)
+        self.register_dyn_device_with_dir(
+            locked,
+            current_task,
+            name,
+            class,
+            build_device_directory,
+            dev_ops,
+        )
     }
 
-    /// Use register_dyn_device instead.
-    pub fn register_dyn_device_with_ops<F, N, L>(
+    /// Register a dynamic device with a custom directory.
+    ///
+    /// See `register_device` for an explanation of the parameters.
+    pub fn register_dyn_device_with_dir<L>(
         &self,
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         class: Class,
-        create_device_sysfs_ops: F,
+        build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
         dev_ops: impl DeviceOps,
     ) -> Result<Device, Errno>
     where
-        F: Fn(Device) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
         L: LockBefore<FileOpsCore>,
     {
-        let device_type = self.state.lock().dyn_chardev_allocator.allocate()?;
-        let metadata = DeviceMetadata::new(name.into(), device_type, DeviceMode::Char);
-        Ok(self.register_device_with_sysfs_ops(
+        self.register_dyn_device_with_devname(
             locked,
             current_task,
             name,
-            metadata,
+            name,
             class,
-            create_device_sysfs_ops,
+            build_directory,
             dev_ops,
-        ))
+        )
     }
 
     /// Register a dynamic device with major numbers 234..255.
@@ -483,6 +516,7 @@ impl DeviceRegistry {
         name: &FsStr,
         devname: &FsStr,
         class: Class,
+        build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
         dev_ops: impl DeviceOps,
     ) -> Result<Device, Errno>
     where
@@ -490,7 +524,15 @@ impl DeviceRegistry {
     {
         let device_type = self.state.lock().dyn_chardev_allocator.allocate()?;
         let metadata = DeviceMetadata::new(devname.into(), device_type, DeviceMode::Char);
-        Ok(self.register_device(locked, current_task, name, metadata, class, dev_ops))
+        Ok(self.register_device_with_dir(
+            locked,
+            current_task,
+            name,
+            metadata,
+            class,
+            build_directory,
+            dev_ops,
+        ))
     }
 
     /// Register a "silent" dynamic device with major numbers 234..255.
@@ -561,7 +603,7 @@ impl DeviceRegistry {
             name,
             None,
             self.objects.net_class(),
-            init_device_directory,
+            build_device_directory,
         )
     }
 

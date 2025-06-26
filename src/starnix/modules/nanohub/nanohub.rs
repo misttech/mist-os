@@ -5,12 +5,12 @@
 use std::ops::DerefMut;
 use std::sync::Arc;
 
-use crate::nanohub_comms_directory::NanohubCommsDirectory;
+use crate::nanohub_comms_directory::build_nanohub_comms_directory;
 use crate::socket_tunnel_file::register_socket_tunnel_device;
 use fidl_fuchsia_hardware_serial as fserial;
 use futures::TryStreamExt;
 use starnix_core::device::serial::SerialDevice;
-use starnix_core::fs::sysfs::DeviceDirectory;
+use starnix_core::fs::sysfs::build_device_directory;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::pseudo::simple_file::BytesFile;
 use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
@@ -97,19 +97,19 @@ pub fn nanohub_device_init(locked: &mut Locked<Unlocked>, current_task: &Current
             descriptor.socket_label.as_ref(),
             descriptor.dev_node_name.as_ref(),
             b"nanohub".into(),
-            DeviceDirectory::new,
+            build_device_directory,
         );
     }
 
     // /dev/nanohub_comms requires a set of additional sysfs nodes, so create this route
-    // with a specialized NanohubCommsDirectory implementation.
+    // with a specialized directory.
     register_socket_tunnel_device(
         locked,
         current_task,
         "/dev/nanohub_comms".into(),
         "nanohub_comms".into(),
         "nanohub".into(),
-        NanohubCommsDirectory::new,
+        build_nanohub_comms_directory,
     );
 
     // Spawn future to bind and configure serial device
