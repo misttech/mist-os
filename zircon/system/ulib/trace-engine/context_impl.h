@@ -16,6 +16,7 @@
 #include <span>
 
 #include "buffer.h"
+#include "rolling_buffer.h"
 
 // Two preprocessor symbols control what symbols we export in a .so:
 // EXPORT and EXPORT_NO_DDK:
@@ -54,15 +55,15 @@ struct trace_context {
 
   ~trace_context();
 
-  const trace_buffer_header* buffer_header() const { return header_; }
+  // Copy the current header state into dest
+  void get_header(trace_buffer_header* dest) const {
+    std::lock_guard<std::mutex> lock(header_mutex_);
+    memcpy(dest, header_, sizeof(trace_buffer_header));
+  }
 
   static size_t min_buffer_size() { return kMinPhysicalBufferSize; }
 
   static size_t max_buffer_size() { return kMaxPhysicalBufferSize; }
-
-  static size_t MaxUsableBufferOffset() {
-    return (1ull << kUsableBufferOffsetBits) - sizeof(uint64_t);
-  }
 
   uint32_t generation() const { return generation_; }
 
@@ -79,15 +80,14 @@ struct trace_context {
   // Return true if at least one record was dropped.
   bool WasRecordDropped() const { return num_records_dropped() != 0u; }
 
-  // Return the number of bytes currently allocated in the rolling buffer(s).
-  size_t RollingBytesAllocated() const;
-
   void ResetRollingBufferPointers();
   void ResetBufferPointers();
   void InitBufferHeader();
   void ClearEntireBuffer();
   void ClearRollingBuffers();
   void UpdateBufferHeaderAfterStopped();
+
+  void ServiceBuffers();
 
   uint64_t* AllocRecord(size_t num_bytes);
   uint64_t* AllocDurableRecord(size_t num_bytes);
@@ -104,44 +104,6 @@ struct trace_context {
   void HandleSaveRollingBufferRequest(uint32_t wrapped_count, uint64_t durable_data_end);
 
  private:
-  // The maximum rolling buffer size in bits.
-  static constexpr size_t kRollingBufferSizeBits = 32;
-
-  // Maximum size, in bytes, of a rolling buffer.
-  static constexpr size_t kMaxRollingBufferSize = 1ull << kRollingBufferSizeBits;
-
-  // The number of usable bits in the buffer pointer.
-  // This is several bits more than the maximum buffer size to allow a
-  // buffer pointer to grow without overflow while TraceManager is saving a
-  // buffer in streaming mode.
-  // In this case we don't snap the offset to the end as doing so requires
-  // modifying state and thus obtaining the lock (streaming mode is not
-  // lock-free). Instead the offset keeps growing.
-  // kUsableBufferOffsetBits = 40 bits = 1TB.
-  // Max rolling buffer size = 32 bits = 4GB.
-  // Thus we assume TraceManager can save 4GB of trace before the client
-  // writes 1TB of trace data (lest the offset part of
-  // |rolling_buffer_current_| overflows). But, just in case, if
-  // TraceManager still can't keep up we stop tracing when the offset
-  // approaches overflowing. See AllocRecord().
-  static constexpr int kUsableBufferOffsetBits = kRollingBufferSizeBits + 8;
-
-  // The number of bits used to record the buffer pointer.
-  // This includes one more bit to support overflow in offset calcs.
-  static constexpr int kBufferOffsetBits = kUsableBufferOffsetBits + 1;
-
-  // The number of bits in the wrapped counter.
-  // It important that this counter not wrap (well, technically it can,
-  // the lost information isn't that important, but if it wraps too
-  // quickly the transition from one buffer to the other can break.
-  // The current values allow for a 20 bit counter which is plenty.
-  // A value of 20 also has the benefit that when the entire
-  // offset_plus_counter value is printed in hex the counter is easily read.
-  static constexpr int kWrappedCounterBits = 20;
-  static constexpr int kWrappedCounterShift = 64 - kWrappedCounterBits;
-
-  static_assert(kBufferOffsetBits + kWrappedCounterBits <= 64, "");
-
   // The physical buffer must be at least this big.
   // Mostly this is here to simplify buffer size calculations.
   // It's as small as it is to simplify some testcases.
@@ -149,7 +111,7 @@ struct trace_context {
 
   // The physical buffer can be at most this big.
   // To keep things simple we ignore the header.
-  static constexpr size_t kMaxPhysicalBufferSize = kMaxRollingBufferSize;
+  static constexpr size_t kMaxPhysicalBufferSize = RollingBuffer::kMaxRollingBufferSize;
 
   // Given a buffer of size |SIZE| in bytes, not including the header,
   // return how much to use for the durable buffer. This is further adjusted
@@ -160,65 +122,15 @@ struct trace_context {
   // Ensure the smallest buffer is still large enough to hold
   // |kMinDurableBufferSize|.
   static_assert(GET_DURABLE_BUFFER_SIZE(kMinPhysicalBufferSize - sizeof(trace_buffer_header)) >=
-                    DurableBuffer::kMinDurableBufferSize,
-                "");
-
-  static uintptr_t GetBufferOffset(uint64_t offset_plus_counter) {
-    return offset_plus_counter & ((1ul << kBufferOffsetBits) - 1);
-  }
-
-  static uint32_t GetWrappedCount(uint64_t offset_plus_counter) {
-    return static_cast<uint32_t>(offset_plus_counter >> kWrappedCounterShift);
-  }
-
-  static uint64_t MakeOffsetPlusCounter(uintptr_t offset, uint32_t counter) {
-    return offset | (static_cast<uint64_t>(counter) << kWrappedCounterShift);
-  }
-
-  static int GetBufferNumber(uint32_t wrapped_count) { return wrapped_count & 1; }
-
-  // Return true if |buffer_number| is ready to be written to.
-  bool IsRollingBufferReady(int buffer_number) const {
-    return rolling_buffer_full_mark_[buffer_number].load(std::memory_order_relaxed) == 0;
-  }
-
-  // Return true if the other rolling buffer is ready to be written to.
-  bool IsOtherRollingBufferReady(int buffer_number) const {
-    return IsRollingBufferReady(!buffer_number);
-  }
-
-  uint32_t CurrentWrappedCount(std::memory_order memory_order) const {
-    auto current = rolling_buffer_current_.load(memory_order);
-    return GetWrappedCount(current);
-  }
+                DurableBuffer::kMinDurableBufferSize);
 
   void ComputeBufferSizes();
 
-  void MarkOneshotBufferFull(uint64_t last_offset);
-
-  void MarkRollingBufferFull(uint32_t wrapped_count, uint64_t last_offset);
-
-  bool SwitchRollingBuffer(uint32_t wrapped_count, uint64_t buffer_offset);
-
-  void SwitchRollingBufferLocked(uint32_t prev_wrapped_count, uint64_t prev_last_offset)
-      __TA_REQUIRES(buffer_switch_mutex_);
-
-  void StreamingBufferFullCheck(uint32_t wrapped_count, uint64_t buffer_offset);
+  void SetPendingBufferService(RollingBufferState prev_state);
 
   void MarkTracingArtificiallyStopped();
 
-  void SnapToEnd(uint32_t wrapped_count) {
-    // Snap to the endpoint for simplicity.
-    // Several threads could all hit buffer-full with each one
-    // continually incrementing the offset.
-    uint64_t full_offset_plus_counter = MakeOffsetPlusCounter(rolling_buffer_size_, wrapped_count);
-    rolling_buffer_current_.store(full_offset_plus_counter, std::memory_order_relaxed);
-  }
-
   void MarkRecordDropped() { num_records_dropped_.fetch_add(1, std::memory_order_relaxed); }
-
-  void NotifyRollingBufferFullLocked(uint32_t wrapped_count, uint64_t durable_data_end)
-      __TA_REQUIRES(buffer_switch_mutex_);
 
   // The generation counter associated with this context to distinguish
   // it from previously created contexts.
@@ -231,7 +143,12 @@ struct trace_context {
   const std::span<uint8_t> buffer_;
 
   // Aliases with buffer_, but as a trace_buffer_header*
-  trace_buffer_header* const header_;
+  //
+  // We don't write the header as atomics and we can write to the header in both trace writing
+  // threads in the case of a buffer switch as well as on the trace-engine async loop.
+  // Coordinating writing them locklessly would be difficult, we grab a mutex.
+  mutable std::mutex header_mutex_;
+  trace_buffer_header* const header_ __TA_GUARDED(header_mutex_);
 
   // Durable-record buffer
   //
@@ -239,50 +156,16 @@ struct trace_context {
   // buffer for durable records in oneshot mode.
   DurableBuffer durable_buffer_;
 
-  // Rolling buffer start.
-  // To simplify switching between them we don't record the buffer end,
-  // and instead record their size (which is identical).
-  uint8_t* rolling_buffer_start_[2];
+  // General record buffer.
+  RollingBuffer rolling_buffer_;
 
-  // The size of both rolling buffers.
-  size_t rolling_buffer_size_;
-
-  // Allocation pointer of the current buffer for non-durable records,
-  // plus a wrapped counter. These are combined into one so that they can
-  // be atomically fetched together.
-  // The lower |kBufferOffsetBits| bits comprise the offset into the buffer
-  // of the next record to write. The upper |kWrappedCountBits| comprise
-  // the wrapped counter. Bit zero of this counter is the number of the
-  // buffer currently being written to. The counter is used in part for
-  // record keeping purposes, and to support transition from one buffer to
-  // the next.
-  //
-  // To construct: make_offset_plus_counter
-  // To get buffer offset: get_buffer_offset
-  // To get wrapped count: get_wrapped_count
-  //
-  // This value is also used for durable records in oneshot mode: in
-  // oneshot mode durable and non-durable records share the same buffer.
-  std::atomic<uint64_t> rolling_buffer_current_;
-
-  // Offset beyond the last successful allocation, or zero if not full.
-  // Only ever set to non-zero once when the buffer fills.
-  // This will only be set in oneshot and streaming modes.
-  std::atomic<uint64_t> rolling_buffer_full_mark_[2];
+  std::atomic<RollingBufferState> pending_service_{RollingBufferState()};
 
   // A count of the number of records that have been dropped.
   std::atomic<uint64_t> num_records_dropped_{0};
 
-  // A count of the number of records that have been dropped.
-  std::atomic<uint64_t> num_records_dropped_after_buffer_switch_{0};
-
   // Set to true if the engine needs to stop tracing for some reason.
   std::atomic<bool> tracing_artificially_stopped_{false};
-
-  // This is used when switching rolling buffers.
-  // It's a relatively rare operation, and this simplifies reasoning about
-  // correctness.
-  mutable std::mutex buffer_switch_mutex_;  // TODO(dje): more guards?
 
   // Handler associated with the trace session.
   trace_handler_t* const handler_;

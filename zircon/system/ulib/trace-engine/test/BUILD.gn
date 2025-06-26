@@ -42,19 +42,23 @@ test("buffer_test") {
   ]
   deps = [
     "//src/lib/fxl/test:gtest_main",
-    "//zircon/system/ulib/trace-engine:trace-engine-headers-for-reader",
+    "//zircon/system/ulib/trace-reader",
   ]
 }
 
 test("trace_engine_test") {
   visibility = [ ":*" ]
-  sources = [ "trace_engine_test.cc" ]
+  sources = [
+    "trace_engine_test.cc",
+    "trace_engine_writing_test.cc",
+  ]
   deps = [
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/fit",
     "//src/lib/fxl/test:gtest_main",
     "//zircon/system/ulib/trace-engine",
+    "//zircon/system/ulib/trace-reader",
   ]
 }
 

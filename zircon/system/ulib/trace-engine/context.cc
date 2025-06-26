@@ -84,6 +84,7 @@
 
 #include "buffer.h"
 #include "context_impl.h"
+#include "zircon/system/ulib/trace-engine/rolling_buffer.h"
 
 namespace trace {
 namespace {
@@ -111,165 +112,43 @@ trace_context::trace_context(void* buffer, size_t buffer_num_bytes,
 trace_context::~trace_context() = default;
 
 uint64_t* trace_context::AllocRecord(size_t num_bytes) {
-  ZX_DEBUG_ASSERT((num_bytes & 7) == 0);
-  if (unlikely(num_bytes > TRACE_ENCODED_INLINE_LARGE_RECORD_MAX_SIZE))
-    return nullptr;
-  static_assert(TRACE_ENCODED_INLINE_LARGE_RECORD_MAX_SIZE < kMaxRollingBufferSize, "");
-
-  // For the circular and streaming cases, try at most once for each buffer.
-  // Note: Keep the normal case of one successful pass the fast path.
-  // E.g., We don't do a mode comparison unless we have to.
-
-  for (int iter = 0; iter < 2; ++iter) {
-    // TODO(dje): This can be optimized a bit. Later.
-    uint64_t offset_plus_counter =
-        rolling_buffer_current_.fetch_add(num_bytes, std::memory_order_acquire);
-    uint32_t wrapped_count = GetWrappedCount(offset_plus_counter);
-    int buffer_number = GetBufferNumber(wrapped_count);
-    uint64_t buffer_offset = GetBufferOffset(offset_plus_counter);
-    // Note: There's no worry of an overflow in the calcs here.
-    if (likely(buffer_offset + num_bytes <= rolling_buffer_size_)) {
-      uint8_t* ptr = rolling_buffer_start_[buffer_number] + buffer_offset;
-      return reinterpret_cast<uint64_t*>(ptr);  // success!
-    }
-
-    // Buffer is full!
-
-    switch (buffering_mode_) {
-      case TRACE_BUFFERING_MODE_ONESHOT:
-        ZX_DEBUG_ASSERT(iter == 0);
-        ZX_DEBUG_ASSERT(wrapped_count == 0);
-        ZX_DEBUG_ASSERT(buffer_number == 0);
-        MarkOneshotBufferFull(buffer_offset);
+  const AllocationResult alloc = rolling_buffer_.AllocRecord(num_bytes);
+  const AllocationVisitor visitor{
+      [](Allocation alloc) { return alloc.ptr; },
+      [this](BufferFull) -> uint64_t* {
+        MarkRecordDropped();
+        if (buffering_mode_ == TRACE_BUFFERING_MODE_ONESHOT) {
+          // In oneshot mode, if we fill the buffer, there's definitely no more buffer space.
+          // If we were the one to fill the buffer, we need to finalize the header.
+          std::lock_guard<std::mutex> lock(header_mutex_);
+          header_->rolling_data_end[0] = rolling_buffer_.State().GetBufferOffset();
+        }
         return nullptr;
-      case TRACE_BUFFERING_MODE_STREAMING: {
-        MarkRollingBufferFull(wrapped_count, buffer_offset);
-        // If the TraceManager is slow in saving buffers we could get
-        // here a lot. Do a quick check and early exit for this case.
-        if (unlikely(!IsOtherRollingBufferReady(buffer_number))) {
-          MarkRecordDropped();
-          StreamingBufferFullCheck(wrapped_count, buffer_offset);
+      },
+      [this](SwitchingAllocation alloc) -> uint64_t* {
+        // If the durable buffer is full, it will
+        if (unlikely(tracing_artificially_stopped_.load(std::memory_order_relaxed))) {
           return nullptr;
         }
-        break;
-      }
-      case TRACE_BUFFERING_MODE_CIRCULAR:
-        MarkRollingBufferFull(wrapped_count, buffer_offset);
-        break;
-      default:
-        __UNREACHABLE;
-    }
-
-    if (iter == 1) {
-      // Second time through. We tried one buffer, it was full.
-      // We then switched to the other buffer, which was empty at
-      // the time, and now it is full too. This is technically
-      // possible in either circular or streaming modes, but rare.
-      // There are two possibilities here:
-      // 1) Keep trying (gated by some means).
-      // 2) Drop the record.
-      // In order to not introduce excessive latency into the app
-      // we choose (2). To assist the developer we at least provide
-      // a record that this happened, but since it's rare we keep
-      // it simple and maintain just a global count and no time
-      // information.
-      num_records_dropped_after_buffer_switch_.fetch_add(1, std::memory_order_relaxed);
-      return nullptr;
-    }
-
-    if (!SwitchRollingBuffer(wrapped_count, buffer_offset)) {
-      MarkRecordDropped();
-      return nullptr;
-    }
-
-    // Loop and try again.
-  }
-
-  __UNREACHABLE;
-}
-
-void trace_context::StreamingBufferFullCheck(uint32_t wrapped_count, uint64_t buffer_offset) {
-  // We allow the current offset to grow and grow as each
-  // new tracing request is made: It's a trade-off to not penalize
-  // performance in this case. The number of counter bits is enough
-  // to not make this a concern: See the comments for
-  // |kUsableBufferOffsetBits|.
-  //
-  // As an absolute paranoia check, if the current buffer offset
-  // approaches overflow, grab the lock and snap the offset back
-  // to the end of the buffer. We grab the lock so that the
-  // buffer can't change while we're doing this.
-  if (unlikely(buffer_offset > MaxUsableBufferOffset())) {
-    std::lock_guard<std::mutex> lock(buffer_switch_mutex_);
-    uint32_t current_wrapped_count = CurrentWrappedCount(std::memory_order_relaxed);
-    if (GetBufferNumber(current_wrapped_count) == GetBufferNumber(wrapped_count)) {
-      SnapToEnd(wrapped_count);
-    }
-  }
+        // If we filled the buffer, we are responsible for switching to the next buffer.
+        SetPendingBufferService(alloc.prev_state);
+        return alloc.ptr;
+      },
+  };
+  return std::visit(visitor, alloc);
 }
 
 // Returns false if there's some reason to not record this record.
-
-bool trace_context::SwitchRollingBuffer(uint32_t wrapped_count, uint64_t buffer_offset) {
-  // While atomic variables are used to track things, we switch
-  // buffers under the lock due to multiple pieces of state being
-  // changed.
-  std::lock_guard<std::mutex> lock(buffer_switch_mutex_);
-
-  // If the durable buffer happened to fill while we were waiting for
-  // the lock we're done.
-  if (unlikely(tracing_artificially_stopped_.load(std::memory_order_relaxed))) {
-    return false;
+void trace_context::SetPendingBufferService(RollingBufferState prev_state) {
+  const BufferNumber next_buffer = prev_state.WithNextWrappedCount().GetBufferNumber();
+  {
+    std::lock_guard<std::mutex> lock(header_mutex_);
+    header_->rolling_data_end[static_cast<uint8_t>(prev_state.GetBufferNumber())] =
+        prev_state.GetBufferOffset();
+    header_->rolling_data_end[static_cast<uint8_t>(next_buffer)] = 0;
+    header_->num_records_dropped = num_records_dropped();
+    pending_service_.store(prev_state, std::memory_order_relaxed);
   }
-
-  uint32_t current_wrapped_count = CurrentWrappedCount(std::memory_order_relaxed);
-  // Anything allocated to the durable buffer after this point
-  // won't be for this buffer. This is racy, but all we need is
-  // some usable value for where the durable pointer is.
-  uint64_t durable_data_end = durable_buffer_.BytesAllocated();
-
-  ZX_DEBUG_ASSERT(wrapped_count <= current_wrapped_count);
-  if (likely(wrapped_count == current_wrapped_count)) {
-    // Haven't switched buffers yet.
-    if (buffering_mode_ == TRACE_BUFFERING_MODE_STREAMING) {
-      // Is the other buffer ready?
-      if (!IsOtherRollingBufferReady(GetBufferNumber(wrapped_count))) {
-        // Nope. There are two possibilities here:
-        // 1) Wait for the other buffer to be saved.
-        // 2) Start dropping records until the other buffer is
-        //    saved.
-        // In order to not introduce excessive latency into the
-        // app we choose (2). To assist the developer we at
-        // least provide a record that indicates the window
-        // during which we dropped records.
-        // TODO(dje): Maybe have a future mode where we block
-        // until there's space. This is useful during some
-        // kinds of debugging: Something is going wrong and we
-        // care less about performance and more about keeping
-        // data, and the dropped data may be the clue to find
-        // the bug.
-        return false;
-      }
-
-      SwitchRollingBufferLocked(wrapped_count, buffer_offset);
-
-      // Notify the handler so it starts saving the buffer if
-      // we're in streaming mode.
-      // Note: The actual notification must be done *after*
-      // updating the buffer header: we need trace_manager to
-      // see the updates. The handler will get notified on the
-      // engine's async loop (and thus can't call back into us
-      // while we still have the lock).
-      NotifyRollingBufferFullLocked(wrapped_count, durable_data_end);
-    } else {
-      SwitchRollingBufferLocked(wrapped_count, buffer_offset);
-    }
-  } else {
-    // Someone else switched buffers while we were trying to obtain
-    // the lock. Nothing to do here.
-  }
-
-  return true;
 }
 
 uint64_t* trace_context::AllocDurableRecord(size_t num_bytes) {
@@ -318,10 +197,8 @@ void trace_context::ComputeBufferSizes() {
       // Create one big buffer, where durable and non-durable records share
       // the same buffer. There is no separate buffer for durable records.
       durable_buffer_.Set(std::span<uint8_t>{});
-      rolling_buffer_start_[0] = buffer_.data() + header_size;
-      rolling_buffer_size_ = full_buffer_size - header_size;
-      // The second rolling buffer is not used.
-      rolling_buffer_start_[1] = nullptr;
+      rolling_buffer_.SetOneshotBuffer(
+          std::span<uint8_t>{buffer_.data() + header_size, full_buffer_size - header_size});
       break;
     case TRACE_BUFFERING_MODE_CIRCULAR:
     case TRACE_BUFFERING_MODE_STREAMING: {
@@ -354,9 +231,10 @@ void trace_context::ComputeBufferSizes() {
       ZX_DEBUG_ASSERT(durable_buffer_size + 2 * rolling_buffer_size == avail);
       std::span durable_data = buffer_.subspan(header_size, durable_buffer_size);
       durable_buffer_.Set(durable_data);
-      rolling_buffer_start_[0] = durable_data.data() + durable_buffer_.MaxSize();
-      rolling_buffer_start_[1] = rolling_buffer_start_[0] + rolling_buffer_size;
-      rolling_buffer_size_ = rolling_buffer_size;
+      std::span rolling1 =
+          std::span{durable_data.data() + durable_buffer_.MaxSize(), rolling_buffer_size};
+      std::span rolling2 = std::span{rolling1.data() + rolling_buffer_size, rolling_buffer_size};
+      rolling_buffer_.SetDoubleBuffers(rolling1, rolling2);
       break;
     }
     default:
@@ -364,18 +242,13 @@ void trace_context::ComputeBufferSizes() {
   }
 }
 
-void trace_context::ResetRollingBufferPointers() {
-  rolling_buffer_current_.store(0);
-  rolling_buffer_full_mark_[0].store(0);
-  rolling_buffer_full_mark_[1].store(0);
-}
-
 void trace_context::ResetBufferPointers() {
   durable_buffer_.Reset();
-  ResetRollingBufferPointers();
+  rolling_buffer_.Reset();
 }
 
 void trace_context::InitBufferHeader() {
+  std::lock_guard<std::mutex> lock(header_mutex_);
   memset(header_, 0, sizeof(*header_));
 
   header_->magic = TRACE_BUFFER_HEADER_MAGIC;
@@ -383,7 +256,8 @@ void trace_context::InitBufferHeader() {
   header_->buffering_mode = static_cast<uint8_t>(buffering_mode_);
   header_->total_size = buffer_.size();
   header_->durable_buffer_size = durable_buffer_.MaxSize();
-  header_->rolling_buffer_size = rolling_buffer_size_;
+  // The buffers are equal sized.
+  header_->rolling_buffer_size = rolling_buffer_.BufferSize(BufferNumber::kZero);
 }
 
 void trace_context::ClearEntireBuffer() {
@@ -391,116 +265,49 @@ void trace_context::ClearEntireBuffer() {
   InitBufferHeader();
 }
 
-void trace_context::ClearRollingBuffers() { ResetRollingBufferPointers(); }
+void trace_context::ClearRollingBuffers() { rolling_buffer_.Reset(); }
 
 void trace_context::UpdateBufferHeaderAfterStopped() {
+  std::lock_guard<std::mutex> lock(header_mutex_);
   header_->durable_data_end = durable_buffer_.BytesAllocated();
 
-  uint64_t offset_plus_counter = rolling_buffer_current_.load(std::memory_order_acquire);
-  uint64_t last_offset = GetBufferOffset(offset_plus_counter);
-  uint32_t wrapped_count = GetWrappedCount(offset_plus_counter);
-  header_->wrapped_count = wrapped_count;
-  int buffer_number = GetBufferNumber(wrapped_count);
-  uint64_t buffer_full_mark =
-      rolling_buffer_full_mark_[buffer_number].load(std::memory_order_relaxed);
-  if (buffer_full_mark != 0)
-    last_offset = buffer_full_mark;
-  header_->rolling_data_end[buffer_number] = last_offset;
-
+  RollingBufferState state = rolling_buffer_.State();
+  header_->rolling_data_end[static_cast<uint8_t>(state.GetBufferNumber())] =
+      state.GetBufferOffset();
   header_->num_records_dropped = num_records_dropped();
+  header_->wrapped_count = state.GetWrappedCount();
 }
 
-size_t trace_context::RollingBytesAllocated() const {
-  switch (buffering_mode_) {
-    case TRACE_BUFFERING_MODE_ONESHOT: {
-      // There is a window during the processing of buffer-full where
-      // |rolling_buffer_current_| may point beyond the end of the buffer.
-      // This is ok, we don't promise anything better.
-      uint64_t full_bytes = rolling_buffer_full_mark_[0].load(std::memory_order_relaxed);
-      if (full_bytes != 0)
-        return full_bytes;
-      return rolling_buffer_current_.load(std::memory_order_acquire);
+void trace_context::ServiceBuffers() {
+  RollingBufferState expected_service = pending_service_.load(std::memory_order_relaxed);
+  if (expected_service == RollingBufferState()) {
+    // No service required
+    return;
+  }
+  //  There's a pending service, attempt to claim it.
+  if (pending_service_.compare_exchange_weak(expected_service, RollingBufferState(),
+                                             std::memory_order_relaxed,
+                                             std::memory_order_relaxed)) {
+    if (buffering_mode_ == TRACE_BUFFERING_MODE_STREAMING) {
+      {
+        std::lock_guard<std::mutex> lock(header_mutex_);
+        RollingBufferState state = rolling_buffer_.State();
+        header_->rolling_data_end[static_cast<uint8_t>(state.GetBufferNumber())] =
+            state.GetBufferOffset();
+        header_->num_records_dropped = num_records_dropped();
+        header_->wrapped_count = state.GetWrappedCount();
+      }
+      // Notify the handler so it starts saving the buffer if we're in streaming mode.
+      //
+      // Once we receive the notification that the buffer has been saved, we can finish servicing
+      // it.
+      trace_engine_request_save_buffer(expected_service.GetWrappedCount(),
+                                       durable_buffer_.BytesAllocated());
+    } else if (buffering_mode_ == TRACE_BUFFERING_MODE_CIRCULAR) {
+      // In circular mode, we can immediately mark the buffer has serviced, freeing it for reuse.
+      rolling_buffer_.SetBufferServiced(expected_service.GetWrappedCount());
     }
-    case TRACE_BUFFERING_MODE_CIRCULAR:
-    case TRACE_BUFFERING_MODE_STREAMING: {
-      // Obtain the lock so that the buffers aren't switched on us while
-      // we're trying to compute the total.
-      std::lock_guard<std::mutex> lock(buffer_switch_mutex_);
-      uint64_t offset_plus_counter = rolling_buffer_current_.load(std::memory_order_relaxed);
-      uint32_t wrapped_count = GetWrappedCount(offset_plus_counter);
-      int buffer_number = GetBufferNumber(wrapped_count);
-      // Note: If we catch things at the point where the buffer has
-      // filled, but before we swap buffers, then |buffer_offset| can point
-      // beyond the end. This is ok, we don't promise anything better.
-      uint64_t buffer_offset = GetBufferOffset(offset_plus_counter);
-      if (wrapped_count == 0)
-        return buffer_offset;
-      // We've wrapped at least once, so the other buffer's "full mark"
-      // must be set. However, it may be zero if streaming and we happened
-      // to stop at a point where the buffer was saved, and hasn't
-      // subsequently been written to.
-      uint64_t full_mark_other_buffer =
-          rolling_buffer_full_mark_[!buffer_number].load(std::memory_order_relaxed);
-      return full_mark_other_buffer + buffer_offset;
-    }
-    default:
-      __UNREACHABLE;
   }
-}
-
-void trace_context::MarkOneshotBufferFull(uint64_t last_offset) {
-  SnapToEnd(0);
-
-  // Mark the end point if not already marked.
-  uintptr_t expected_mark = 0u;
-  if (rolling_buffer_full_mark_[0].compare_exchange_strong(
-          expected_mark, last_offset, std::memory_order_relaxed, std::memory_order_relaxed)) {
-    header_->rolling_data_end[0] = last_offset;
-  }
-
-  MarkRecordDropped();
-}
-
-void trace_context::MarkRollingBufferFull(uint32_t wrapped_count, uint64_t last_offset) {
-  // Mark the end point if not already marked.
-  int buffer_number = GetBufferNumber(wrapped_count);
-  uint64_t expected_mark = 0u;
-  if (rolling_buffer_full_mark_[buffer_number].compare_exchange_strong(
-          expected_mark, last_offset, std::memory_order_relaxed, std::memory_order_relaxed)) {
-    header_->rolling_data_end[buffer_number] = last_offset;
-  }
-}
-
-void trace_context::SwitchRollingBufferLocked(uint32_t prev_wrapped_count,
-                                              uint64_t prev_last_offset) {
-  // This has already done in streaming mode when the buffer was marked as
-  // saved, but hasn't been done yet for circular mode. KISS and just do it
-  // again. It's ok to do again as we don't resume allocating trace records
-  // until we update |rolling_buffer_current_|.
-  uint32_t new_wrapped_count = prev_wrapped_count + 1;
-  int next_buffer = GetBufferNumber(new_wrapped_count);
-  rolling_buffer_full_mark_[next_buffer].store(0, std::memory_order_relaxed);
-  header_->rolling_data_end[next_buffer] = 0;
-
-  // Update the number of records dropped at each switch, so that trace_manager
-  // can react to dropped records as they happen.
-  header_->num_records_dropped = num_records_dropped();
-
-  // Do this last: After this tracing resumes in the new buffer.
-  uint64_t new_offset_plus_counter = MakeOffsetPlusCounter(0, new_wrapped_count);
-  // This store is marked memory_order_release to ensure that a thread observing
-  // the buffer swap will also be guaranteed to observe the resets of
-  // rolling_buffer_full_mark[next_buffer] and header_->rolling_data_end[next_buffer]
-  // that were performed above. Otherwise, another thread could observe that we
-  // swapped to the new buffer but believe that it was immediately full,
-  // triggering a transfer of duplicate data.
-  //
-  // Reads of rolling_buffer_current_ will generally use
-  // std::memory_order_acquire, but as this section is done under
-  // buffer_switch_mutex_ any reads that are done while holding
-  // buffer_switch_mutex_ already have a sync point that guarantees a consistent
-  // view of these writes and as such can use memory_order_relaxed.
-  rolling_buffer_current_.store(new_offset_plus_counter, std::memory_order_release);
 }
 
 void trace_context::MarkTracingArtificiallyStopped() {
@@ -511,57 +318,34 @@ void trace_context::MarkTracingArtificiallyStopped() {
 
   // We only want to stop the trace once.
   if (success) {
-    // Grab the lock in part so that we don't switch buffers between
-    // |CurrentWrappedCount()| and |SnapToEnd()|.
-    std::lock_guard<std::mutex> lock(buffer_switch_mutex_);
-    header_->durable_data_end = durable_buffer_.BytesAllocated();
+    {
+      std::lock_guard<std::mutex> lock(header_mutex_);
+      header_->durable_data_end = durable_buffer_.BytesAllocated();
+    }
 
     // Disable tracing by making it look like the current rolling
     // buffer is full. AllocRecord, on seeing the buffer is full, will
     // then check |tracing_artificially_stopped_|.
-    SnapToEnd(CurrentWrappedCount(std::memory_order_relaxed));
+    rolling_buffer_.SetBufferFull();
   }
-}
-
-void trace_context::NotifyRollingBufferFullLocked(uint32_t wrapped_count,
-                                                  uint64_t durable_data_end) {
-  // The notification is handled on the engine's event loop as we need this done outside of the
-  // lock: Certain handlers just want to immediately call |trace_engine_mark_buffer_saved()| which
-  // wants to reacquire the lock. Secondly, if we choose to wait until the buffer context is
-  // released before notifying the handler then we can't do so now as we still have a reference to
-  // the buffer context.
-
-  trace_engine_request_save_buffer(wrapped_count, durable_data_end);
 }
 
 void trace_context::HandleSaveRollingBufferRequest(uint32_t wrapped_count,
                                                    uint64_t durable_data_end) {
-  // TODO(dje): An open issue is solving the problem of TraceManager
-  // prematurely reading the buffer: We know the buffer is full, but
-  // the only way we know existing writers have completed is when
-  // they release their trace context. Fortunately we know when all
-  // context acquisitions for the purpose of writing to the buffer
-  // have been released. The question is how to use this info.
-  // For now we punt the problem to the handler. Ultimately we could
-  // provide callers with a way to wait, and have trace_release_context()
-  // check for waiters and if any are present send a signal like it does
-  // for SIGNAL_CONTEXT_RELEASED.
+  // SAFETY: This must only be called after we have observed that there are no additional writers on
+  // the buffer we are notifying as full.
+  //
+  // We achieve this by only calling trace_context::ServiceBuffers after:
+  // 1) We have been notified that the buffer is full.
+  // 2) We are releasing the trace_context and we observer that we are the only one holding a
+  //    context.
   handler_->ops->notify_buffer_full(handler_, wrapped_count, durable_data_end);
 }
 
 void trace_context::MarkRollingBufferSaved(uint32_t wrapped_count, uint64_t durable_data_end) {
-  std::lock_guard<std::mutex> lock(buffer_switch_mutex_);
-
-  int buffer_number = GetBufferNumber(wrapped_count);
-  {
-    // TODO(dje): Manage bad responses from TraceManager.
-    int current_buffer_number =
-        GetBufferNumber(GetWrappedCount(rolling_buffer_current_.load(std::memory_order_relaxed)));
-    ZX_DEBUG_ASSERT(buffer_number != current_buffer_number);
-  }
-  rolling_buffer_full_mark_[buffer_number].store(0, std::memory_order_relaxed);
-  header_->rolling_data_end[buffer_number] = 0;
-  // Don't update |rolling_buffer_current_| here, that is done when we
-  // successfully allocate the next record. Until then we want to keep
-  // dropping records.
+  std::lock_guard<std::mutex> lock(header_mutex_);
+  header_
+      ->rolling_data_end[static_cast<uint8_t>(RollingBufferState::ToBufferNumber(wrapped_count))] =
+      0;
+  rolling_buffer_.SetBufferServiced(wrapped_count);
 }
