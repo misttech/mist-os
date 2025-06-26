@@ -44,6 +44,16 @@ open protocol Device {
 
     /// The time since boot recorded by the AP and the MCU.
     strict GetTimeSync() -> (McuTimeSyncInfo) error zx.Status;
+
+    /// Get the current duration of time the MCU will remain awake.
+    strict GetWakeUpEventDuration() -> (struct {
+        duration zx.Duration;
+    }) error zx.Status;
+
+    /// Set a duration of time for the MCU to remain awake.
+    strict SetWakeUpEventDuration(struct {
+        duration zx.Duration;
+    }) -> () error zx.Status;
 };
 
 service Service {
