@@ -391,6 +391,17 @@ where
         )
     }
 
+    /// A shortcut for [`DeviceAnyApi::new_configuration_update`] followed by
+    /// [`DeviceAnyApi::apply_configuration`].
+    pub fn update_configuration(
+        &mut self,
+        device: &DeviceId<C::BindingsContext>,
+        config: DeviceConfigurationUpdate,
+    ) -> Result<DeviceConfigurationUpdate, DeviceConfigurationUpdateError> {
+        let pending = self.new_configuration_update(device, config)?;
+        Ok(self.apply_configuration(pending))
+    }
+
     /// Like [`DeviceApi::get_configuration`] but for any device types.
     pub fn get_configuration(
         &mut self,

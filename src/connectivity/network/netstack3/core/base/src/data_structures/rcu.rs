@@ -12,6 +12,7 @@ use netstack3_sync::{LockGuard, Mutex};
 
 /// An RCU (Read-Copy-Update) data structure that uses a `Mutex` to synchronize
 /// writers.
+#[derive(Default)]
 pub struct SynchronizedWriterRcu<T> {
     lock: Mutex<()>,
     data: ArcSwap<T>,

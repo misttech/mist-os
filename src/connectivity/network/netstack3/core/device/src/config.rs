@@ -37,7 +37,7 @@ pub struct DeviceConfiguration {
 /// An update to apply to ARP configurations.
 ///
 /// Only fields with variant `Some` are requested to be updated.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct ArpConfigurationUpdate {
     /// NUD over ARP configuration update.
     pub nud: Option<NudUserConfigUpdate>,
@@ -46,7 +46,7 @@ pub struct ArpConfigurationUpdate {
 /// An update to apply to NDP configurations.
 ///
 /// Only fields with variant `Some` are requested to be updated.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct NdpConfigurationUpdate {
     /// NUD over NDP configuration update.
     pub nud: Option<NudUserConfigUpdate>,
@@ -55,7 +55,7 @@ pub struct NdpConfigurationUpdate {
 /// An update to apply to device configurations.
 ///
 /// Only fields with variant `Some` are requested to be updated.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub struct DeviceConfigurationUpdate {
     /// ARP configuration update.
     pub arp: Option<ArpConfigurationUpdate>,

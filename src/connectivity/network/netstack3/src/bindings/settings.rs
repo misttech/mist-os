@@ -6,11 +6,15 @@
 
 use futures::TryStreamExt as _;
 use log::error;
+use netstack3_core::types::SynchronizedWriterRcu;
 use {
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_settings as fnet_settings,
 };
 
+use crate::bindings::interface_config::{
+    DeviceNeighborConfig, InterfaceConfig, InterfaceConfigDefaults,
+};
 use crate::bindings::util::{ErrorLogExt, ResultExt as _};
 
 pub(crate) async fn serve_control(
@@ -202,5 +206,15 @@ fn get_device() -> fnet_settings::Device {
     fnet_settings::Device {
         packet_buffer_sizes: Some(packet_buffer_sizes),
         __source_breaking: fidl::marker::SourceBreaking,
+    }
+}
+
+pub(crate) struct Settings {
+    pub(crate) interface_defaults: SynchronizedWriterRcu<InterfaceConfig<DeviceNeighborConfig>>,
+}
+
+impl Settings {
+    pub(crate) fn new(interface: &InterfaceConfigDefaults) -> Self {
+        Self { interface_defaults: SynchronizedWriterRcu::new(InterfaceConfig::new(interface)) }
     }
 }

@@ -231,7 +231,7 @@ pub mod trace {
 
 /// Miscellaneous and common types.
 pub mod types {
-    pub use netstack3_base::{Counter, WorkQueueReport};
+    pub use netstack3_base::{Counter, SynchronizedWriterRcu, WorkQueueReport};
 }
 
 /// Methods for dealing with UDP sockets.

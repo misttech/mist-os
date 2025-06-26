@@ -17,7 +17,7 @@ use futures::{Future, StreamExt as _};
 use log::{error, info};
 use {fidl_fuchsia_process_lifecycle as fprocess_lifecycle, fuchsia_async as fasync};
 
-use bindings::{GlobalConfig, InspectPublisher, NetstackSeed, Service};
+use bindings::{GlobalConfig, InspectPublisher, InterfaceConfigDefaults, NetstackSeed, Service};
 
 /// Runs Netstack3.
 pub fn main() {
@@ -93,10 +93,10 @@ pub fn main() {
         .add_fidl_service(Service::SocketControl)
         .add_fidl_service(Service::Stack);
 
-    let seed = NetstackSeed::new(GlobalConfig {
-        suspend_enabled: *suspend_enabled,
-        default_opaque_iids: *opaque_iids,
-    });
+    let seed = NetstackSeed::new(
+        GlobalConfig { suspend_enabled: *suspend_enabled },
+        &InterfaceConfigDefaults { opaque_iids: *opaque_iids },
+    );
 
     let inspect_publisher = InspectPublisher::new();
     inspect_publisher

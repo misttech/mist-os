@@ -128,6 +128,7 @@ common_sources = [
   "src/bindings/health_check_worker.rs",
   "src/bindings/inspect.rs",
   "src/bindings/integration_tests.rs",
+  "src/bindings/interface_config.rs",
   "src/bindings/interfaces_admin.rs",
   "src/bindings/interfaces_watcher.rs",
   "src/bindings/multicast_admin.rs",
