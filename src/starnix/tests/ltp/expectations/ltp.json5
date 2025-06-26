@@ -163,7 +163,6 @@
                 "sched_rr_get_interval02",
                 "sched_rr_get_interval03",
                 "sched_setattr01",
-                "sched_setscheduler02",
                 "seccomp01",
                 "send02",
                 "setitimer01",

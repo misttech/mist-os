@@ -127,7 +127,7 @@ const NPROC_LIMIT: u64 = 0x1FFFFFFF;
 // real-time signals. Set it to `max_threads / 2` (same as `NPROC_LIMIT`).
 const SIGPENDING_LIMIT: u64 = 0x1FFFFFFF;
 
-const DEFAULT_LIMITS: [(Resource, rlimit); 8] = [
+const DEFAULT_LIMITS: [(Resource, rlimit); 9] = [
     (Resource::STACK, rlimit { rlim_cur: uapi::_STK_LIM as u64, rlim_max: RLIM_INFINITY as u64 }),
     (Resource::CORE, rlimit { rlim_cur: 0, rlim_max: uapi::RLIM_INFINITY as u64 }),
     (Resource::NPROC, rlimit { rlim_cur: NPROC_LIMIT, rlim_max: NPROC_LIMIT }),
@@ -145,10 +145,7 @@ const DEFAULT_LIMITS: [(Resource, rlimit); 8] = [
         rlimit { rlim_cur: uapi::MQ_BYTES_MAX as u64, rlim_max: uapi::MQ_BYTES_MAX as u64 },
     ),
     (Resource::NICE, rlimit { rlim_cur: 0, rlim_max: 0 }),
-    // TODO: https://fxbug.dev/397371605 - figure out what's going on with Resource::RTPRIO.
-    // The gVisor code makes it seem like we should use this default, but that causes
-    // some LTP tests to fail.
-    // (Resource::RTPRIO, rlimit { rlim_cur: 0, rlim_max: 0 }),
+    (Resource::RTPRIO, rlimit { rlim_cur: 0, rlim_max: 0 }),
 ];
 
 impl Default for ResourceLimits {
