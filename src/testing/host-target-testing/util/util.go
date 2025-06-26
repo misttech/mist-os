@@ -481,16 +481,20 @@ func ParseProductBundle(path string) (ProductBundle, error) {
 	productBundlePath := filepath.Join(path, "product_bundle.json")
 	f, err := os.Open(productBundlePath)
 	if err != nil {
-		return ProductBundle{}, fmt.Errorf("failed to open %s: %w", productBundlePath, err)
+		return ProductBundle{}, fmt.Errorf("failed to open product bundle %s: %w", productBundlePath, err)
 	}
 	defer f.Close()
 
 	var productBundle ProductBundle
 
 	decoder := json.NewDecoder(f)
-	decoder.DisallowUnknownFields()
+
+	// TODO(https://fxbug.dev/428006070): Re-enable once all relevant tests
+	// are using the updated PB manifest format.
+	//decoder.DisallowUnknownFields()
+
 	if err := decoder.Decode(&productBundle); err != nil {
-		return ProductBundle{}, fmt.Errorf("failed to parse %s: %w", productBundlePath, err)
+		return ProductBundle{}, fmt.Errorf("failed to parse product bundle %s: %w", productBundlePath, err)
 	}
 
 	if productBundle.Version != "2" {
