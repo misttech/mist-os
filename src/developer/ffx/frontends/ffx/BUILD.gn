@@ -126,7 +126,6 @@ host_test("ffx-e2e-with-target") {
 host_test_data("ffx-e2e-test-data") {
   sources = [
     "$root_out_dir/ffx",
-    "$root_out_dir/gen/src/developer/debug/zxdb/zxdb_sdk.meta.json",
     "$root_out_dir/zxdb",
   ]
 }
