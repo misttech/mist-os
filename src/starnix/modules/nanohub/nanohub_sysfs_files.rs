@@ -4,7 +4,6 @@
 
 use std::marker::PhantomData;
 
-use fidl_fuchsia_hardware_google_nanohub as fnanohub;
 use fuchsia_component::client::connect_to_protocol_sync;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
@@ -16,14 +15,64 @@ use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error};
+use {fidl_fuchsia_hardware_google_nanohub as fnanohub, zx};
+
+/// A wrapper around `starnix_uapi::errors::Errno`.
+pub struct NanohubSysfsError(Errno);
+
+/// An equivalent to `starnix_uapi::errno!`, but for `NanohubSysfsError`.
+macro_rules! nanohub_sysfs_errno {
+    ($error_code:ident) => {
+        NanohubSysfsError(errno!($error_code))
+    };
+}
+
+/// An equivalent to `starnix_uapi::error!`, but for `NanohubSysfsError`.
+macro_rules! nanohub_sysfs_error {
+    ($error_code:ident) => {
+        Err(NanohubSysfsError(errno!($error_code)))
+    };
+}
+
+impl From<fidl::Error> for NanohubSysfsError {
+    /// Generate the sysfs error response for a FIDL transport error.
+    ///
+    /// This allows you to handle the error case simply by using the ? operator.
+    fn from(value: fidl::Error) -> Self {
+        log_error!(" FIDL error while calling Nanohub service method: {value:?}");
+        nanohub_sysfs_errno!(EINVAL)
+    }
+}
+
+impl From<i32> for NanohubSysfsError {
+    /// Generate the sysfs error response for a zx.Status error result from a FIDL method.
+    ///
+    /// This allows you to handle the error case simply by using the ? operator.
+    fn from(value: i32) -> Self {
+        let status = zx::Status::from_raw(value);
+        log_error!("Nanohub service method responded with an error: {status:?}");
+        nanohub_sysfs_errno!(EINVAL)
+    }
+}
+
+/// Convert an `Option<T>` (usually from a FIDL table) to a `Result<T, NanohubSysfsError>`.
+fn try_get<T>(o: Option<T>) -> Result<T, NanohubSysfsError> {
+    o.ok_or_else(|| {
+        log_error!("Missing expected value from Nanohub service method response.");
+        nanohub_sysfs_errno!(EINVAL)
+    })
+}
 
 /// Operations supported by sysfs files.
 ///
 /// These are analogous to (but not identical to) the operations exposed by Linux sysfs attributes.
 pub trait NanohubSysFsFileOps: Default + Send + Sync + 'static {
     /// Get the value of the attribute.
-    fn show(&self, _service: &fnanohub::DeviceSynchronousProxy) -> Result<String, Errno> {
-        error!(EINVAL)
+    fn show(
+        &self,
+        _service: &fnanohub::DeviceSynchronousProxy,
+    ) -> Result<String, NanohubSysfsError> {
+        nanohub_sysfs_error!(EINVAL)
     }
 
     /// Store a new value for the attribute.
@@ -31,8 +80,8 @@ pub trait NanohubSysFsFileOps: Default + Send + Sync + 'static {
         &self,
         _service: &fnanohub::DeviceSynchronousProxy,
         _value: String,
-    ) -> Result<(), Errno> {
-        error!(EINVAL)
+    ) -> Result<(), NanohubSysfsError> {
+        nanohub_sysfs_error!(EINVAL)
     }
 }
 
@@ -86,7 +135,7 @@ impl<T: NanohubSysFsFileOps> NanohubSysFsFile<T> {
         let mut contents_guard = self.contents.lock();
         *contents_guard = match op_result {
             Ok(value) => NanohubSysFsContentsState::Armed(value),
-            Err(error) => NanohubSysFsContentsState::Err(error),
+            Err(error) => NanohubSysFsContentsState::Err(error.0),
         }
     }
 }
@@ -150,7 +199,7 @@ impl<T: NanohubSysFsFileOps> FileOps for NanohubSysFsFile<T> {
                     .map(|v| (v.len(), v))
             })
             .and_then(|(num_bytes, value)| {
-                self.sysfs_ops.store(&self.service, value).map(|_| num_bytes)
+                self.sysfs_ops.store(&self.service, value).map(|_| num_bytes).map_err(|e| e.0)
             })
     }
 }
@@ -184,11 +233,11 @@ impl<T: NanohubSysFsFileOps> FsNodeOps for NanohubSysFsNode<T> {
 pub struct FirmwareNameSysFsOps {}
 
 impl NanohubSysFsFileOps for FirmwareNameSysFsOps {
-    fn show(&self, service: &fnanohub::DeviceSynchronousProxy) -> Result<String, Errno> {
-        service.get_firmware_name(zx::MonotonicInstant::INFINITE).map_err(|e| {
-            log_error!("Failed to call Nanohub service method. {e:?}");
-            errno!(EINVAL)
-        })
+    fn show(
+        &self,
+        service: &fnanohub::DeviceSynchronousProxy,
+    ) -> Result<String, NanohubSysfsError> {
+        Ok(service.get_firmware_name(zx::MonotonicInstant::INFINITE)?)
     }
 }
 
@@ -196,18 +245,33 @@ impl NanohubSysFsFileOps for FirmwareNameSysFsOps {
 pub struct FirmwareVersionSysFsOps {}
 
 impl NanohubSysFsFileOps for FirmwareVersionSysFsOps {
-    fn show(&self, service: &fnanohub::DeviceSynchronousProxy) -> Result<String, Errno> {
-        service
-            .get_firmware_version(zx::MonotonicInstant::INFINITE)
-            .map_err(|e| {
-                log_error!("Failed to call Nanohub service method. {e:?}");
-                errno!(EINVAL)
-            })
-            .map(|v| {
-                format!(
-                    "hw type: {:04x} hw ver: {:04x} bl ver: {:04x} os ver: {:04x} variant ver: {:08x}\n",
-                    v.hardware_type, v.hardware_version, v.bootloader_version, v.os_version, v.variant_version
-                )
-            })
+    fn show(
+        &self,
+        service: &fnanohub::DeviceSynchronousProxy,
+    ) -> Result<String, NanohubSysfsError> {
+        let v = service.get_firmware_version(zx::MonotonicInstant::INFINITE)?;
+        Ok(format!(
+            "hw type: {:04x} hw ver: {:04x} bl ver: {:04x} os ver: {:04x} variant ver: {:08x}\n",
+            v.hardware_type,
+            v.hardware_version,
+            v.bootloader_version,
+            v.os_version,
+            v.variant_version
+        ))
+    }
+}
+
+#[derive(Default)]
+pub struct TimeSyncSysFsOps {}
+
+impl NanohubSysFsFileOps for TimeSyncSysFsOps {
+    fn show(
+        &self,
+        service: &fidl_fuchsia_hardware_google_nanohub::DeviceSynchronousProxy,
+    ) -> Result<String, NanohubSysfsError> {
+        let response = service.get_time_sync(zx::MonotonicInstant::INFINITE)??;
+        let ap = try_get(response.ap_boot_time)?;
+        let mcu = try_get(response.mcu_boot_time)?;
+        Ok(format!("ap time: {} mcu time: {}\n", ap, mcu))
     }
 }
