@@ -19,6 +19,7 @@
 
 #include <fidl/fuchsia.wlan.common/cpp/wire.h>
 #include <fidl/fuchsia.wlan.fullmac/cpp/driver/wire.h>
+#include <fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h>
 #include <lib/sync/completion.h>
 #include <threads.h>
 #include <zircon/listnode.h>
@@ -676,7 +677,8 @@ zx_status_t brcmf_if_sae_frame_tx(net_device* ndev,
                                   const fuchsia_wlan_fullmac_wire::SaeFrame* frame);
 void brcmf_if_wmm_status_req(net_device* ndev);
 
-void brcmf_return_assoc_result(struct net_device* ndev, status_code_t status_code);
+void brcmf_return_assoc_result(struct net_device* ndev,
+                               fuchsia_wlan_ieee80211::wire::StatusCode status_code);
 
 // Given IE, return a vector with the SSID bytes if the SSID is present.
 // This function does not distinguish between whether the SSID IE is not present and the SSID

@@ -24,6 +24,7 @@
 #include <optional>
 #include <vector>
 
+#include "fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-env.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bits.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/debug.h"
@@ -55,13 +56,14 @@ class SimErrorInjector {
 
   // Iovar int command specific
   void AddErrEventInjCmd(uint32_t cmd, brcmf_fweh_event_code event_code,
-                         brcmf_fweh_event_status_t ret_status, status_code_t ret_reason,
-                         uint16_t flags, std::optional<uint16_t> ifidx = {});
+                         brcmf_fweh_event_status_t ret_status,
+                         fuchsia_wlan_ieee80211::wire::StatusCode ret_reason, uint16_t flags,
+                         std::optional<uint16_t> ifidx = {});
   void DelErrEventInjCmd(uint32_t cmd);
   bool CheckIfErrEventInjCmdEnabled(uint32_t cmd, brcmf_fweh_event_code& event_code,
                                     brcmf_fweh_event_status_t& ret_status,
-                                    status_code_t& ret_reason, uint16_t& flags,
-                                    std::optional<uint16_t> ifidx);
+                                    fuchsia_wlan_ieee80211::wire::StatusCode& ret_reason,
+                                    uint16_t& flags, std::optional<uint16_t> ifidx);
 
   // Configure the mac address as reported by the (simulated) bootloader
   void SetBootloaderMacAddr(const wlan::common::MacAddr& mac_addr) {
@@ -112,11 +114,12 @@ class SimErrorInjector {
     std::optional<uint16_t> ifidx;
     brcmf_fweh_event_code event_code;
     brcmf_fweh_event_status_t ret_status;
-    status_code_t ret_reason;
+    fuchsia_wlan_ieee80211::wire::StatusCode ret_reason;
     uint16_t flags;
 
     ErrEventInjCmd(uint32_t cmd, brcmf_fweh_event_code event_code,
-                   brcmf_fweh_event_status_t ret_status, status_code_t ret_reason, uint16_t flags,
+                   brcmf_fweh_event_status_t ret_status,
+                   fuchsia_wlan_ieee80211::wire::StatusCode ret_reason, uint16_t flags,
                    std::optional<uint16_t> ifidx)
         : cmd(cmd),
           ifidx(ifidx),

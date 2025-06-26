@@ -18,7 +18,6 @@
 
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/cfg80211.h"
 
-#include <lib/ddk/metadata.h>
 #include <lib/fdf/dispatcher.h>
 #include <lib/zx/clock.h>
 #include <netinet/if_ether.h>
@@ -4539,13 +4538,13 @@ static void brcmf_get_bwcap(struct brcmf_if* ifp, uint32_t bw_cap[]) {
   uint32_t val = WLC_BAND_2G;
   zx_status_t status = brcmf_fil_iovar_int_get(ifp, "bw_cap", &val, nullptr);
   if (status == ZX_OK) {
-    bw_cap[WLAN_BAND_TWO_GHZ] = val;
+    bw_cap[static_cast<uint8_t>(fuchsia_wlan_common_wire::WlanBand::kTwoGhz)] = val;
 
     // 5 GHz
     val = WLC_BAND_5G;
     status = brcmf_fil_iovar_int_get(ifp, "bw_cap", &val, nullptr);
     if (status == ZX_OK) {
-      bw_cap[WLAN_BAND_FIVE_GHZ] = val;
+      bw_cap[static_cast<uint8_t>(fuchsia_wlan_common_wire::WlanBand::kFiveGhz)] = val;
       return;
     }
     BRCMF_WARN(
@@ -4565,14 +4564,16 @@ static void brcmf_get_bwcap(struct brcmf_if* ifp, uint32_t bw_cap[]) {
 
   switch (mimo_bwcap) {
     case WLC_N_BW_40ALL:
-      bw_cap[WLAN_BAND_TWO_GHZ] |= WLC_BW_40MHZ_BIT;
+      bw_cap[static_cast<uint8_t>(fuchsia_wlan_common_wire::WlanBand::kTwoGhz)] |= WLC_BW_40MHZ_BIT;
       __FALLTHROUGH;
     case WLC_N_BW_20IN2G_40IN5G:
-      bw_cap[WLAN_BAND_FIVE_GHZ] |= WLC_BW_40MHZ_BIT;
+      bw_cap[static_cast<uint8_t>(fuchsia_wlan_common_wire::WlanBand::kFiveGhz)] |=
+          WLC_BW_40MHZ_BIT;
       __FALLTHROUGH;
     case WLC_N_BW_20ALL:
-      bw_cap[WLAN_BAND_TWO_GHZ] |= WLC_BW_20MHZ_BIT;
-      bw_cap[WLAN_BAND_FIVE_GHZ] |= WLC_BW_20MHZ_BIT;
+      bw_cap[static_cast<uint8_t>(fuchsia_wlan_common_wire::WlanBand::kTwoGhz)] |= WLC_BW_20MHZ_BIT;
+      bw_cap[static_cast<uint8_t>(fuchsia_wlan_common_wire::WlanBand::kFiveGhz)] |=
+          WLC_BW_20MHZ_BIT;
       break;
     default:
       BRCMF_ERR("invalid mimo_bw_cap value");
@@ -4771,7 +4772,7 @@ static void brcmf_dump_if_band_cap(fuchsia_wlan_fullmac::BandCapability* band_ca
   }
   BRCMF_DBG_UNFILTERED("   band: %s", band_str);
 
-  char rates_str[fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES * 6 + 1];
+  char rates_str[fuchsia::wlan::ieee80211::MAX_SUPPORTED_BASIC_RATES * 6 + 1];
   char* str = rates_str;
   for (unsigned i = 0; i < band_cap->basic_rates()->size(); i++) {
     str += sprintf(str, "%s%d", i > 0 ? " " : "", band_cap->basic_rates()->at(i));
@@ -4779,13 +4780,13 @@ static void brcmf_dump_if_band_cap(fuchsia_wlan_fullmac::BandCapability* band_ca
   BRCMF_DBG_UNFILTERED("     basic_rates: %s", rates_str);
 
   size_t num_operating_channels = band_cap->operating_channels()->size();
-  if (num_operating_channels > fuchsia_wlan_ieee80211_MAX_UNIQUE_CHANNEL_NUMBERS) {
+  if (num_operating_channels > fuchsia::wlan::ieee80211::MAX_UNIQUE_CHANNEL_NUMBERS) {
     BRCMF_DBG_UNFILTERED("Number of channels reported (%u) exceeds limit (%du), truncating",
                          band_cap->operating_channels()->size(),
-                         fuchsia_wlan_ieee80211_MAX_UNIQUE_CHANNEL_NUMBERS);
-    num_operating_channels = fuchsia_wlan_ieee80211_MAX_UNIQUE_CHANNEL_NUMBERS;
+                         fuchsia::wlan::ieee80211::MAX_UNIQUE_CHANNEL_NUMBERS);
+    num_operating_channels = fuchsia::wlan::ieee80211::MAX_UNIQUE_CHANNEL_NUMBERS;
   }
-  char channels_str[fuchsia_wlan_ieee80211_MAX_UNIQUE_CHANNEL_NUMBERS * 4 + 1];
+  char channels_str[fuchsia::wlan::ieee80211::MAX_UNIQUE_CHANNEL_NUMBERS * 4 + 1];
   str = channels_str;
   for (unsigned i = 0; i < num_operating_channels; i++) {
     str += sprintf(str, "%s%d", i > 0 ? " " : "", band_cap->operating_channels()->at(i));
@@ -4884,7 +4885,7 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac::WlanFullmacImplQuery
       band_cap->band(fuchsia_wlan_ieee80211::WlanBand::kTwoGhz);
 
       constexpr uint8_t kNumSupported2GRates =
-          std::min<size_t>(fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES, wl_g_rates_size);
+          std::min<size_t>(fuchsia::wlan::ieee80211::MAX_SUPPORTED_BASIC_RATES, wl_g_rates_size);
       band_cap->basic_rates()->resize(kNumSupported2GRates);
 
       // Ensure that element sizes are identical because we will memcpy them.
@@ -4897,7 +4898,7 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac::WlanFullmacImplQuery
       band_cap->band(fuchsia_wlan_ieee80211::WlanBand::kFiveGhz);
 
       constexpr uint8_t kNumSupported5GRates =
-          std::min<size_t>(fuchsia_wlan_ieee80211_MAX_SUPPORTED_BASIC_RATES, wl_a_rates_size);
+          std::min<size_t>(fuchsia::wlan::ieee80211::MAX_SUPPORTED_BASIC_RATES, wl_a_rates_size);
       band_cap->basic_rates()->resize(kNumSupported5GRates);
 
       // Ensure that element sizes are identical because we will memcpy them.
@@ -4969,7 +4970,8 @@ void brcmf_if_query(net_device* ndev, fuchsia_wlan_fullmac::WlanFullmacImplQuery
     brcmf_get_bwcap(ifp, bw_cap);
   }
   BRCMF_DBG(QUERY, "nmode=%d, vhtmode=%d, bw_cap=(%d, %d)", nmode, vhtmode,
-            bw_cap[WLAN_BAND_TWO_GHZ], bw_cap[WLAN_BAND_FIVE_GHZ]);
+            bw_cap[static_cast<uint8_t>(fuchsia_wlan_common::wire::WlanBand::kTwoGhz)],
+            bw_cap[static_cast<uint8_t>(fuchsia_wlan_common::wire::WlanBand::kFiveGhz)]);
 
   // LDPC support, applies to both HT and VHT
   ldpc_cap = 0;

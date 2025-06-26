@@ -7,7 +7,6 @@
 #include <fuchsia/wlan/common/cpp/fidl.h>
 #include <lib/ddk/debug.h>
 
-#include <wlan/common/band.h>
 #include <wlan/common/channel.h>
 #include <wlan/common/element.h>
 
@@ -62,7 +61,7 @@ void ConvertTapPhyConfig(wlan_softmac::WlanSoftmacQueryResponse* resp,
 
     auto operating_channel_count =
         std::min<size_t>(tap_band_caps.operating_channels.count(),
-                         fuchsia_wlan_ieee80211_MAX_UNIQUE_CHANNEL_NUMBERS);
+                         fuchsia::wlan::ieee80211::MAX_UNIQUE_CHANNEL_NUMBERS);
     std::vector<uint8_t> operating_channels(operating_channel_count);
     std::copy(tap_band_caps.operating_channels.begin(),
               tap_band_caps.operating_channels.begin() + operating_channel_count,

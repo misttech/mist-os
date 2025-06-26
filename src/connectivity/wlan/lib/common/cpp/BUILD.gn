@@ -11,12 +11,10 @@ config("wlan_common_config") {
 
 source_set("common") {
   sources = [
-    "band.cc",
     "channel.cc",
     "energy.cc",
     "ieee80211_codes.cc",
     "include/wlan/common/action_frame.h",
-    "include/wlan/common/band.h",
     "include/wlan/common/bitfield.h",
     "include/wlan/common/buffer_reader.h",
     "include/wlan/common/buffer_writer.h",
@@ -41,9 +39,7 @@ source_set("common") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_cpp",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_cpp",
-    "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_banjo_cpp",
     "//sdk/fidl/fuchsia.wlan.ieee80211:fuchsia.wlan.ieee80211_hlcpp",
     "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme_hlcpp",
     "//sdk/fidl/fuchsia.wlan.phyimpl:fuchsia.wlan.phyimpl_cpp",
@@ -68,7 +64,6 @@ cc_test_executable("mcs_rate_lookup_test") {
   sources = [ "mcs_rate_lookup_test.cc" ]
   deps = [
     ":common",
-    "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_banjo_c",
     "//sdk/fidl/fuchsia.wlan.common:fuchsia.wlan.common_hlcpp",
     "//src/lib/fxl/test:gtest_main",
   ]

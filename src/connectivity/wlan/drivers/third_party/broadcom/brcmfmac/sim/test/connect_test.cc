@@ -692,9 +692,8 @@ void ConnectTest::ConnectErrorEventInject(brcmf_fweh_event_status_t ret_status,
                                           wlan_ieee80211::StatusCode ret_reason) {
   WithSimDevice([&](brcmfmac::SimDevice* device) {
     brcmf_simdev* sim = device->GetSim();
-    sim->sim_fw->err_inj_.AddErrEventInjCmd(BRCMF_C_SET_SSID, BRCMF_E_ASSOC, ret_status,
-                                            static_cast<status_code_t>(ret_reason), 0,
-                                            client_ifc_.iface_id_);
+    sim->sim_fw->err_inj_.AddErrEventInjCmd(BRCMF_C_SET_SSID, BRCMF_E_ASSOC, ret_status, ret_reason,
+                                            0, client_ifc_.iface_id_);
   });
 }
 

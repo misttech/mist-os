@@ -20,7 +20,6 @@
 #include <fuchsia/hardware/sdio/cpp/banjo.h>
 #include <inttypes.h>
 #include <lib/ddk/device.h>
-#include <lib/ddk/metadata.h>
 #include <lib/ddk/trace/event.h>
 #include <lib/sync/completion.h>
 #include <lib/zircon-internal/align.h>

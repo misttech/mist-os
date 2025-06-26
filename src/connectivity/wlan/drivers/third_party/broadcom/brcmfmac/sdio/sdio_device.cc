@@ -20,7 +20,6 @@
 #include <fuchsia/hardware/sdio/cpp/banjo.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
-#include <lib/ddk/binding_driver.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/compat/cpp/metadata.h>

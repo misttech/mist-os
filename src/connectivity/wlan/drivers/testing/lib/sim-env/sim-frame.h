@@ -8,8 +8,6 @@
 #include <fidl/fuchsia.wlan.common/cpp/wire.h>
 #include <fidl/fuchsia.wlan.ieee80211/cpp/common_types.h>
 #include <fidl/fuchsia.wlan.ieee80211/cpp/natural_types.h>
-#include <fuchsia/wlan/common/c/banjo.h>
-#include <fuchsia/wlan/ieee80211/c/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/types.h>
 

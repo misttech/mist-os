@@ -30,6 +30,7 @@
 #include <third_party/bcmdhd/crossdriver/wlioctl.h>
 #include <wlan/common/mac_frame.h>
 
+#include "fidl/fuchsia.wlan.ieee80211/cpp/wire_types.h"
 #include "src/connectivity/wlan/drivers/testing/lib/sim-env/sim-frame.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/bits.h"
 #include "src/connectivity/wlan/drivers/third_party/broadcom/brcmfmac/brcm_hw_ids.h"
@@ -437,11 +438,11 @@ zx_status_t SimFirmware::BusTxCtl(unsigned char* msg, unsigned int len) {
   // If an err event has been injected for this command, then send event to driver and return.
   brcmf_fweh_event_code ecode;
   brcmf_fweh_event_status_t estatus;
-  status_code_t reason;
+  fuchsia_wlan_ieee80211::wire::StatusCode reason;
   uint16_t flags;
   if (err_inj_.CheckIfErrEventInjCmdEnabled(dcmd->cmd, ecode, estatus, reason, flags, ifidx)) {
-    SendEventToDriver(0, nullptr, ecode, estatus, ifidx, nullptr, flags, reason, kZeroMac,
-                      kAssocEventDelay);
+    SendEventToDriver(0, nullptr, ecode, estatus, ifidx, nullptr, flags,
+                      static_cast<uint16_t>(reason), kZeroMac, kAssocEventDelay);
     return ZX_OK;
   }
 
@@ -830,7 +831,7 @@ zx_status_t SimFirmware::BusTxFrameSingle(const wlan::drivers::components::Frame
 
   // IEEE Std 802.11-2016, 9.4.1.4
   switch (assoc_state_.opts->bss_type) {
-    case BSS_TYPE_INDEPENDENT:
+    case fuchsia_wlan_common::wire::BssType::kIndependent:
       // We don't support INDEPENDENT
       ZX_ASSERT_MSG(false, "Non-infrastructure types not currently supported by sim-fw\n");
       dataFrame.toDS_ = 0;
@@ -839,7 +840,7 @@ zx_status_t SimFirmware::BusTxFrameSingle(const wlan::drivers::components::Frame
       dataFrame.addr2_ = common::MacAddr(ethFrame->h_source);
       dataFrame.addr3_ = assoc_state_.opts->bssid;
       break;
-    case BSS_TYPE_INFRASTRUCTURE:
+    case fuchsia_wlan_common::wire::BssType::kInfrastructure:
       dataFrame.toDS_ = 1;
       dataFrame.fromDS_ = 0;
       dataFrame.addr1_ = assoc_state_.opts->bssid;
@@ -1768,7 +1769,7 @@ void SimFirmware::RxDisassocReq(std::shared_ptr<const simulation::SimDisassocReq
 
 // AssocResp and ReassocResp frame types contain capability info, which indicates BSS type.
 static zx_status_t GetBssType(std::shared_ptr<const simulation::SimManagementFrame> frame,
-                              bss_type_t* bss_type) {
+                              fuchsia_wlan_common::wire::BssType* bss_type) {
   // IEEE Std 802.11-2016, 9.4.1.4 to determine bss type
   bool capIbss;
   bool capEss;
@@ -1791,13 +1792,13 @@ static zx_status_t GetBssType(std::shared_ptr<const simulation::SimManagementFra
 
   if (capIbss && !capEss) {
     BRCMF_WARN("Non-infrastructure types not currently supported by sim-fw\n");
-    *bss_type = BSS_TYPE_INDEPENDENT;
+    *bss_type = fuchsia_wlan_common::wire::BssType::kIndependent;
     return ZX_ERR_NOT_SUPPORTED;
   } else if (!capIbss && capEss) {
-    *bss_type = BSS_TYPE_INFRASTRUCTURE;
+    *bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure;
   } else if (capIbss && capEss) {
     BRCMF_WARN("Non-infrastructure types not currently supported by sim-fw\n");
-    *bss_type = BSS_TYPE_MESH;
+    *bss_type = fuchsia_wlan_common::wire::BssType::kMesh;
     return ZX_ERR_NOT_SUPPORTED;
   } else {
     BRCMF_WARN("Station with impossible capability not being an ess or ibss found\n");
@@ -1824,7 +1825,7 @@ void SimFirmware::RxAssocResp(std::shared_ptr<const simulation::SimAssocRespFram
   // Response received, cancel timer
   hw_.CancelCallback(assoc_state_.assoc_timer_id);
   if (frame->status_ == wlan_ieee80211_wire::StatusCode::kSuccess) {
-    bss_type_t bss_type;
+    fuchsia_wlan_common::wire::BssType bss_type;
     if (GetBssType(frame, &bss_type) != ZX_OK) {
       ZX_ASSERT_MSG(false, "Sim firmware does not support BSS type\n");
     }
@@ -1875,7 +1876,7 @@ zx_status_t SimFirmware::ReassocToDifferentAp(
     return ZX_ERR_CONNECTION_ABORTED;
   }
   BRCMF_INFO("Reassociation to different AP");
-  bss_type_t bss_type;
+  fuchsia_wlan_common::wire::BssType bss_type;
   if (GetBssType(frame, &bss_type) != ZX_OK) {
     ZX_ASSERT_MSG(false, "Sim firmware does not support BSS type\n");
     return ZX_ERR_NOT_SUPPORTED;

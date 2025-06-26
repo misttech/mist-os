@@ -6,7 +6,6 @@
 #define SRC_CONNECTIVITY_WLAN_LIB_COMMON_CPP_INCLUDE_WLAN_COMMON_ELEMENT_H_
 
 #include <endian.h>
-#include <fuchsia/wlan/ieee80211/c/banjo.h>
 #include <fuchsia/wlan/mlme/cpp/fidl.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
@@ -396,29 +395,9 @@ struct HtCapabilities {
   TxBfCapability txbf_cap;
   AselCapability asel_cap;
 
-  static HtCapabilities* View(ht_capabilities_t* ddk) {
-    static_assert(sizeof(HtCapabilities) == sizeof(ht_capabilities_t));
-    return reinterpret_cast<HtCapabilities*>(ddk);
-  }
-
   static HtCapabilities* ViewFromRawBytes(uint8_t bytes[fuchsia::wlan::ieee80211::HT_CAP_LEN]) {
     static_assert(sizeof(HtCapabilities) == fuchsia::wlan::ieee80211::HT_CAP_LEN);
     return reinterpret_cast<HtCapabilities*>(bytes);
-  }
-
-  static HtCapabilities FromDdk(const ht_capabilities_t& ddk) {
-    HtCapabilities dst{};
-
-    static_assert(sizeof(dst) == sizeof(ddk.bytes));
-    memcpy(&dst, &ddk.bytes, sizeof(ddk.bytes));
-    return dst;
-  }
-
-  ht_capabilities_t ToDdk() const {
-    ht_capabilities_t ddk{};
-    static_assert(sizeof(ddk.bytes) == sizeof(*this));
-    memcpy(&ddk.bytes, this, sizeof(ddk.bytes));
-    return ddk;
   }
 
 } __PACKED;
@@ -562,28 +541,9 @@ struct VhtCapabilities {
   VhtCapabilitiesInfo vht_cap_info;
   VhtMcsNss vht_mcs_nss;
 
-  static VhtCapabilities* View(vht_capabilities_t* ddk) {
-    static_assert(sizeof(VhtCapabilities) == sizeof(vht_capabilities_t));
-    return reinterpret_cast<VhtCapabilities*>(ddk);
-  }
-
   static VhtCapabilities* ViewFromRawBytes(uint8_t bytes[fuchsia::wlan::ieee80211::VHT_CAP_LEN]) {
     static_assert(sizeof(VhtCapabilities) == fuchsia::wlan::ieee80211::VHT_CAP_LEN);
     return reinterpret_cast<VhtCapabilities*>(bytes);
-  }
-
-  static VhtCapabilities FromDdk(const vht_capabilities_t& ddk) {
-    VhtCapabilities dst{};
-    static_assert(sizeof(dst) == sizeof(ddk.bytes));
-    memcpy(&dst, &ddk.bytes, sizeof(ddk.bytes));
-    return dst;
-  }
-
-  vht_capabilities_t ToDdk() const {
-    vht_capabilities_t ddk{};
-    static_assert(sizeof(ddk.bytes) == sizeof(*this));
-    memcpy(&ddk.bytes, this, sizeof(ddk.bytes));
-    return ddk;
   }
 
 } __PACKED;

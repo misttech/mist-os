@@ -8,8 +8,6 @@
 #include <fuchsia/wlan/common/cpp/fidl.h>
 #include <fuchsia/wlan/internal/cpp/fidl.h>
 #include <inttypes.h>
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/driver.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/fidl/cpp/wire/arena.h>
@@ -19,7 +17,6 @@
 #include <iterator>
 
 #include <sdk/lib/driver/logging/cpp/logger.h>
-#include <wlan/common/band.h>
 #include <wlan/common/channel.h>
 #include <wlan/common/element.h>
 #include <wlan/common/phy.h>
@@ -28,9 +25,6 @@
 #include "wlan/drivers/log_instance.h"
 
 namespace wlanphy {
-
-namespace wlan_common = ::fuchsia::wlan::common;
-namespace wlan_internal = ::fuchsia::wlan::internal;
 
 Device::Device(fdf::DriverStartArgs start_args,
                fdf::UnownedSynchronizedDispatcher driver_dispatcher)
@@ -156,7 +150,7 @@ void Device::GetSupportedMacRoles(GetSupportedMacRolesCompleter::Sync& completer
           completer.ReplyError(ZX_ERR_UNAVAILABLE);
         }
         if (result->value()->supported_mac_roles().count() >
-            fuchsia_wlan_common_MAX_SUPPORTED_MAC_ROLES) {
+            fuchsia::wlan::common::MAX_SUPPORTED_MAC_ROLES) {
           completer.ReplyError(ZX_ERR_OUT_OF_RANGE);
           return;
         }
