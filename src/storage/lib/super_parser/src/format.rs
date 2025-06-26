@@ -383,6 +383,15 @@ pub struct MetadataPartition {
     pub group_index: u32,
 }
 
+impl MetadataPartition {
+    pub fn trimmed_name(&self) -> Result<String, Error> {
+        Ok(String::from_utf8(self.name.to_vec())
+            .map_err(|e| anyhow!("failed to convert partition UTF8 name to string: {e}"))?
+            .trim_end_matches(|c| c == '\0')
+            .to_string())
+    }
+}
+
 impl ValidateTable for MetadataPartition {
     fn validate(&self, header: &MetadataHeader) -> Result<(), Error> {
         if header.minor_version < METADATA_VERSION_FOR_UPDATED_ATTRIBUTES_MIN {
@@ -403,6 +412,9 @@ impl ValidateTable for MetadataPartition {
             "Logical partition has invalid group index."
         );
         ensure!(self.name.is_ascii(), "Logical parition name is not ASCII.");
+        let _ = self
+            .trimmed_name()
+            .map_err(|e| anyhow!("Logical partition name canot be converted to String {e}."))?;
 
         let attributes = self.attributes;
         if attributes.contains(PartitionAttributes::SLOT_SUFFIXED) {
@@ -938,6 +950,17 @@ mod tests {
                 .validate(&header)
                 .expect_err("metadata partition passed validation unexpectedly");
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_partition_trimmed_name() {
+        let partition = VALID_PARTITION_TABLE_ENTRY;
+        partition
+            .validate(&VALID_METADATA_HEADER_BEFORE_COMPUTING_CHECKSUM)
+            .expect("metadata partition failed validation");
+        let partition_name =
+            partition.trimmed_name().expect("MetadataPartition::trimmed_name failed");
+        assert_eq!(partition_name, "system");
     }
 
     const VALID_EXTENT: MetadataExtent = MetadataExtent {

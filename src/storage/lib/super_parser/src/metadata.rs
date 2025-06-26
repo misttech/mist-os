@@ -10,7 +10,7 @@ use crate::format::{
 use anyhow::{anyhow, ensure, Error};
 use sha2::Digest;
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::ops::{Deref, DerefMut, Range};
 use std::sync::Arc;
 use storage_device::Device;
@@ -60,7 +60,7 @@ impl PartialOrd for SuperDeviceRange {
     }
 }
 
-fn round_up_to_alignment(x: u64, alignment: u64) -> Result<u64, Error> {
+pub(crate) fn round_up_to_alignment(x: u64, alignment: u64) -> Result<u64, Error> {
     ensure!(alignment.count_ones() == 1, "alignment should be a power of 2");
     alignment
         .checked_mul(x.div_ceil(alignment))
@@ -111,6 +111,10 @@ impl SuperMetadata {
         Ok(Self { geometry, metadata_slots: metadata_slots })
     }
 
+    pub fn block_size(&self) -> u32 {
+        self.geometry.logical_block_size
+    }
+
     // Load and validate geometry information from a block device that holds logical partitions.
     async fn load_metadata_geometry_from_device(
         device: &dyn Device,
@@ -154,7 +158,7 @@ impl SuperMetadata {
 #[derive(Debug)]
 pub struct Metadata {
     header: MetadataHeader,
-    partitions: Vec<MetadataPartition>,
+    partitions: HashMap<String, MetadataPartition>,
     extents: Vec<MetadataExtent>,
     partition_groups: Vec<MetadataPartitionGroup>,
     block_devices: Vec<MetadataBlockDevice>,
@@ -190,22 +194,42 @@ impl Metadata {
         // Need to update names for slot suffix before returning metadata.
         metadata.adjust_for_slot_suffix(slot_number)?;
 
+        // TODO(https://fxbug.dev/404952286): Check for unique partition name
+
         Ok(metadata)
     }
 
     // Returns the locations of extents used by partitions.
-    pub fn get_used_extents_as_byte_range(&self) -> Result<BTreeSet<SuperDeviceRange>, Error> {
+    pub fn get_all_used_extents_as_byte_range(&self) -> Result<BTreeSet<SuperDeviceRange>, Error> {
         let mut used_regions = BTreeSet::new();
-        for partition in &self.partitions {
-            let first_extent_index = partition.first_extent_index;
-            for extent_index in 0..partition.num_extents {
-                let i = (first_extent_index as usize)
-                    .checked_add(extent_index as usize)
-                    .ok_or_else(|| anyhow!("failed to get extent index"))?;
-                used_regions.insert(self.extents[i].as_byte_range()?);
+        for (partition, _partition_metadata) in &self.partitions {
+            let used_extents = self.extent_locations_for_partition(&partition)?;
+            for extent in used_extents {
+                used_regions.insert(extent);
             }
         }
         Ok(used_regions)
+    }
+
+    // Returns the list of extent locations as a byte range for a given partition.
+    pub fn extent_locations_for_partition(
+        &self,
+        partition_name: &str,
+    ) -> Result<Vec<SuperDeviceRange>, Error> {
+        let partition_metadata = self
+            .partitions
+            .get(partition_name)
+            .ok_or(anyhow!("Could not find partition with name {partition_name}"))?;
+
+        let mut extent_locations = Vec::new();
+        let first_extent_index = partition_metadata.first_extent_index;
+        for extent_offset in 0..partition_metadata.num_extents {
+            let extent_index = (first_extent_index as usize)
+                .checked_add(extent_offset as usize)
+                .ok_or_else(|| anyhow!("failed to get extent index"))?;
+            extent_locations.push(self.extents[extent_index].as_byte_range()?);
+        }
+        Ok(extent_locations)
     }
 
     async fn load_metadata_from_device(
@@ -240,13 +264,20 @@ impl Metadata {
 
         // Parse partition table entries.
         let read_cursor = 0;
-        let partitions = Self::parse_table::<MetadataPartition>(
-            tables_bytes,
-            read_cursor,
-            &header,
-            &header.partitions,
-        )
-        .await?;
+        let partitions: HashMap<String, MetadataPartition> =
+            Self::parse_table::<MetadataPartition>(
+                tables_bytes,
+                read_cursor,
+                &header,
+                &header.partitions,
+            )
+            .await?
+            .iter()
+            // Calling `unwrap` on `trimmed_name` should be fine as the partition metadata has
+            // already been validated and checked that calling `trimmed_name` will not return an
+            // error.
+            .map(|p| (p.trimmed_name().unwrap(), *p))
+            .collect();
 
         // Parse extent table entries.
         let read_cursor =
@@ -349,8 +380,15 @@ impl Metadata {
     }
 
     fn adjust_for_slot_suffix(&mut self, slot_number: u32) -> Result<(), Error> {
-        for partition in &mut self.partitions {
-            partition.adjust_for_slot_suffix(slot_number)?;
+        let old_partition_names: Vec<String> =
+            self.partitions.iter().map(|(k, _v)| k.clone()).collect();
+        for old_partition_name in old_partition_names {
+            // Unwrapping here should be fine as we know that the map contains this key.
+            let mut partition_metadata = self.partitions.remove(&old_partition_name).unwrap();
+            partition_metadata.adjust_for_slot_suffix(slot_number)?;
+            partition_metadata.validate(&self.header)?;
+            self.partitions
+                .insert(partition_metadata.trimmed_name().unwrap(), partition_metadata.clone());
         }
 
         for block_device in &mut self.block_devices {
@@ -411,43 +449,34 @@ mod tests {
 
     // Verify metadata partitions table against the image at `IMAGE_PATH`.
     fn verify_partitions_table(metadata: &Metadata, slot_number: usize) -> Result<(), Error> {
-        let partitions = &metadata.partitions;
-        // The first entry in the partitions table is "system".
-        let partition_name = String::from_utf8(partitions[0].name.to_vec())
-            .expect("failed to convert partition entry name to string");
-        let expected_name = match slot_number {
-            0 => "system_a".to_string(),
-            1 => "system_b".to_string(),
+        let mut partitions = metadata.partitions.clone();
+        let expected_partitions = match slot_number {
+            0 => ["system_a".to_string(), "system_ext_a".to_string()],
+            1 => ["system_b".to_string(), "system_ext_b".to_string()],
             _ => return Err(anyhow!("unexpected slot number: should be 0 or 1")),
         };
-        assert_eq!(partition_name.trim_end_matches(|c| c == '\0'), expected_name);
-        let partition_attributes = partitions[0].attributes;
-        assert_eq!(partition_attributes, PartitionAttributes::READONLY);
-        let system_partition_extent_index = partitions[0].first_extent_index;
-        let system_partition_num_extents = partitions[0].num_extents;
-        assert_eq!(system_partition_extent_index, 0);
-        assert_eq!(system_partition_num_extents, 1);
-        // The slot suffix flag should be removed after parsing Metadata.
-        let attributes = partitions[0].attributes;
-        assert!(!attributes.contains(PartitionAttributes::SLOT_SUFFIXED));
-
-        // The next entry in the partitions table is "system_ext".
-        let partition_name = String::from_utf8(partitions[1].name.to_vec())
-            .expect("failed to convert partition entry name to string");
-        let expected_name = match slot_number {
-            0 => "system_ext_a".to_string(),
-            1 => "system_ext_b".to_string(),
-            _ => return Err(anyhow!("unexpected slot number: should be 0 or 1")),
-        };
-        assert_eq!(partition_name.trim_end_matches(|c| c == '\0'), expected_name);
-        let partition_attributes = partitions[1].attributes;
-        assert_eq!(partition_attributes, PartitionAttributes::READONLY);
-        let system_partition_extent_index = partitions[1].first_extent_index;
-        let system_partition_num_extents = partitions[1].num_extents;
-        assert_eq!(system_partition_extent_index, 1);
-        assert_eq!(system_partition_num_extents, 1);
-        let attributes = partitions[1].attributes;
-        assert!(!attributes.contains(PartitionAttributes::SLOT_SUFFIXED));
+        for expected_partition in expected_partitions {
+            let (name, partition_metadata) = partitions
+                .remove_entry(&expected_partition)
+                .ok_or(anyhow!("could not find {expected_partition}"))?;
+            let attributes = partition_metadata.attributes;
+            assert_eq!(attributes, PartitionAttributes::READONLY);
+            // The slot suffix flag should be removed after parsing Metadata.
+            let attributes = partition_metadata.attributes;
+            assert!(!attributes.contains(PartitionAttributes::SLOT_SUFFIXED));
+            // Check partition extent information
+            let system_partition_extent_index = partition_metadata.first_extent_index;
+            let extent_locations = metadata.extent_locations_for_partition(&name)?;
+            if !name.contains("ext") {
+                assert_eq!(system_partition_extent_index, 0);
+                assert_eq!(extent_locations, [SuperDeviceRange(1048576..1056768)]);
+            } else {
+                assert_eq!(system_partition_extent_index, 1);
+                assert_eq!(extent_locations, [SuperDeviceRange(2097152..2101248)]);
+            }
+            let system_partition_num_extents = partition_metadata.num_extents;
+            assert_eq!(system_partition_num_extents, 1);
+        }
         Ok(())
     }
 
@@ -511,6 +540,7 @@ mod tests {
         assert_eq!(device_size, 4194304);
         let flag = block_devices[0].flags;
         assert!(!flag.contains(BlockDeviceFlags::SLOT_SUFFIXED));
+        assert_eq!(block_devices[0].get_first_logical_sector_in_bytes()?, 1048576);
         Ok(())
     }
 
