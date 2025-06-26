@@ -16,6 +16,11 @@ type McuVersionInfo = struct {
     variant_version uint32;
 };
 
+type McuTimeSyncInfo = table {
+    1: ap_boot_time zx.Time;
+    2: mcu_boot_time zx.Time;
+};
+
 /// Client is expected to pass the vmo handle to nanohub when issuing a DownloadFirmware request.
 @discoverable
 open protocol Device {
@@ -36,6 +41,9 @@ open protocol Device {
     strict GetFirmwareVersion() -> (struct {
         version_info McuVersionInfo;
     });
+
+    /// The time since boot recorded by the AP and the MCU.
+    strict GetTimeSync() -> (McuTimeSyncInfo) error zx.Status;
 };
 
 service Service {
