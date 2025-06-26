@@ -110,19 +110,25 @@ impl FsNodeOps for NanohubCommsDirectory {
                 SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/display_panel_name".into(),
                 ),
-                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
+                // TODO(https://fxbug.dev/419041879): These are currently set to "system", but they
+                // should be set to FsCred::root().
+                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred { uid: 1000, gid: 1000 }),
             )),
             b"display_select" => Ok(node.fs().create_node_and_allocate_node_id(
                 SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/display_select".into(),
                 ),
-                FsNodeInfo::new(mode!(IFREG, 0o660), FsCred::root()),
+                // TODO(https://fxbug.dev/419041879): These are currently set to "system", but they
+                // should be set to FsCred::root().
+                FsNodeInfo::new(mode!(IFREG, 0o660), FsCred { uid: 1000, gid: 1000 }),
             )),
             b"display_state" => Ok(node.fs().create_node_and_allocate_node_id(
                 SocketTunnelSysfsFile::new(
                     b"/sys/devices/virtual/nanohub/nanohub_comms/display_state".into(),
                 ),
-                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
+                // TODO(https://fxbug.dev/419041879): These are currently set to "system", but they
+                // should be set to FsCred::root().
+                FsNodeInfo::new(mode!(IFREG, 0o440), FsCred { uid: 1000, gid: 1000 }),
             )),
             b"download_firmware" => Ok(node.fs().create_node_and_allocate_node_id(
                 FirmwareFile::new(),
