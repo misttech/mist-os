@@ -71,6 +71,9 @@ struct MountedVolume {
     sequence: u64,
     name: String,
     volume: FxVolumeAndRoot,
+
+    // True if the volume was forcibly locked.
+    locked: bool,
 }
 
 impl MountedVolumesGuard<'_> {
@@ -141,22 +144,33 @@ impl MountedVolumesGuard<'_> {
         store: Arc<ObjectStore>,
         flush_task_config: MemoryPressureConfig,
     ) -> Result<FxVolumeAndRoot, Error> {
-        let store_id = store.store_object_id();
         let unique_id = zx::Event::create();
         let volume = FxVolumeAndRoot::new::<T>(
             Arc::downgrade(&self.volumes_directory),
-            store.clone(),
+            store,
             unique_id.get_koid().unwrap().raw_koid(),
         )
         .await?;
         volume
             .volume()
             .start_background_task(flush_task_config, self.volumes_directory.mem_monitor.as_ref());
+        self.add_mount(name, &volume);
+        Ok(volume)
+    }
+
+    /// Adds a volume (`FxVolumeAndRoot`) into the mount list.
+    pub fn add_mount(&mut self, name: &str, volume: &FxVolumeAndRoot) {
         static SEQUENCE: AtomicU64 = AtomicU64::new(0);
         let sequence = SEQUENCE.fetch_add(1, Ordering::Relaxed);
+        let store = volume.volume().store();
         self.mounted_volumes.insert(
-            store_id,
-            MountedVolume { sequence, name: name.to_string(), volume: volume.clone() },
+            store.store_object_id(),
+            MountedVolume {
+                sequence,
+                name: name.to_string(),
+                volume: volume.clone(),
+                locked: false,
+            },
         );
         if let Some(inspect) = self.volumes_directory.inspect_tree.upgrade() {
             inspect.register_volume(
@@ -165,9 +179,8 @@ impl MountedVolumesGuard<'_> {
             )
         }
         if let Some(callback) = self.volumes_directory.on_volume_added.get() {
-            callback(name, Some(store));
+            callback(name, Some(Arc::clone(store)));
         }
-        Ok(volume)
     }
 
     /// Acquires a transaction with appropriate locks to remove volume |name|.
@@ -251,23 +264,53 @@ impl MountedVolumesGuard<'_> {
 
     async fn terminate(&mut self) {
         let volumes = std::mem::take(&mut *self.mounted_volumes);
-        for (_, MountedVolume { name, volume, .. }) in volumes {
+        for (_, MountedVolume { name, volume, locked, .. }) in volumes {
             if let Some(callback) = self.volumes_directory.on_volume_added.get() {
                 callback(&name, None);
             }
-            volume.volume().terminate().await;
+            let admin_scope = volume.admin_scope();
+            admin_scope.shutdown();
+            admin_scope.wait().await;
+
+            if !locked {
+                volume.volume().terminate().await;
+            }
         }
     }
 
     // Unmounts the volume identified by `store_id`.  The caller should take locks to avoid races if
     // necessary.
-    pub async fn unmount(&mut self, store_id: u64) -> Result<(), Error> {
-        let MountedVolume { name, volume, .. } =
+    //
+    // NOTE: This will not terminate any connections on the admin scope.
+    pub async fn unmount(&mut self, store_id: u64) -> Result<FxVolumeAndRoot, Error> {
+        let MountedVolume { name, volume, locked, .. } =
             self.mounted_volumes.remove(&store_id).ok_or(FxfsError::NotFound)?;
         if let Some(callback) = self.volumes_directory.on_volume_added.get() {
             callback(&name, None);
         }
-        volume.volume().terminate().await;
+
+        if !locked {
+            // As we are not terminating the admin scope, we must make sure to remove the root entry
+            // which holds strong references to the volume since otherwise `Volume::try_unwrap`
+            // might fail.
+            let _ = volume.outgoing_dir().remove_entry("root", true);
+            volume.volume().terminate().await;
+        }
+
+        Ok(volume)
+    }
+
+    async fn force_lock(&mut self, store_id: u64) -> Result<(), Error> {
+        let MountedVolume { volume, locked, .. } =
+            self.mounted_volumes.get_mut(&store_id).ok_or(FxfsError::NotFound)?;
+
+        if !*locked {
+            // Remove the "root" entry so that no more connections can be made.
+            let _ = volume.outgoing_dir().remove_entry("root", true);
+            volume.volume().terminate().await;
+            *locked = true;
+        }
+
         Ok(())
     }
 
@@ -276,8 +319,12 @@ impl MountedVolumesGuard<'_> {
         let volumes_directory = self.volumes_directory.clone();
         let mounted_volume = self.mounted_volumes.get(&store_id).unwrap();
         let sequence = mounted_volume.sequence;
+        let admin_scope = mounted_volume.volume.admin_scope().clone();
         let scope = mounted_volume.volume.volume().scope().clone();
         fasync::Task::spawn(async move {
+            // Check the admin_scope first because once that has finished, there can never be any
+            // more connections to it.
+            admin_scope.wait().await;
             scope.wait().await;
 
             // Check that the same volume is still mounted i.e. there wasn't an explicit
@@ -518,8 +565,19 @@ impl VolumesDirectory {
         outgoing_dir_server_end: ServerEnd<fio::DirectoryMarker>,
         as_blob: bool,
     ) -> Result<(), Error> {
-        let outgoing_dir = vfs::directory::immutable::simple();
+        // A note regarding strong references to `FxVolume`: connections to services here are all on
+        // the admin scope.  When we force lock a volume, we want to keep the admin scope running
+        // but terminate the volume.  When a volume is terminated in this way, we want to ensure
+        // that there are no outstanding strong references to the volume.  With that in mind, the
+        // services here should not hold strong references.  They can hold a strong reference to
+        // VolumesDirectory and find the volume via the mount list, or they can hold a weak
+        // reference to the FxVolume.  Before upgrading the weak reference, an active guard must be
+        // acquired on the volume's scope first.  This ensures that no new strong references are
+        // taken once the volume has commenced termination.  The "root" entry just below is an
+        // exception that does hold a strong reference.  We handle that by making sure we remove
+        // that entry before we call `FxVolume::terminate`.
 
+        let outgoing_dir = volume.outgoing_dir();
         outgoing_dir.add_entry("root", volume.root().clone().as_directory_entry())?;
         let svc_dir = vfs::directory::immutable::simple();
         outgoing_dir.add_entry("svc", svc_dir.clone())?;
@@ -535,38 +593,44 @@ impl VolumesDirectory {
                 }
             }),
         )?;
-        let project_handler = volume.clone();
-        svc_dir.add_entry(
-            ProjectIdMarker::PROTOCOL_NAME,
-            vfs::service::host(move |requests| {
-                let project_handler = project_handler.clone();
-                async move {
-                    let _ = project_handler.handle_project_id_requests(requests).await;
-                }
-            }),
-        )?;
-        let vol = volume.clone();
+        let vol_scope = volume.volume().scope().clone();
+        let weak_vol = Arc::downgrade(volume.volume());
+        {
+            let vol_scope = vol_scope.clone();
+            let weak_vol = weak_vol.clone();
+            svc_dir.add_entry(
+                ProjectIdMarker::PROTOCOL_NAME,
+                vfs::service::host(move |requests| {
+                    let weak_vol = weak_vol.clone();
+                    let scope = vol_scope.clone();
+                    async move {
+                        let _ =
+                            FxVolume::handle_project_id_requests(weak_vol, scope, requests).await;
+                    }
+                }),
+            )?;
+        }
         svc_dir.add_entry(
             FileBackedVolumeProviderMarker::PROTOCOL_NAME,
             vfs::service::host(move |requests| {
-                let vol = vol.clone();
+                let weak_vol = weak_vol.clone();
+                let scope = vol_scope.clone();
                 async move {
-                    let _ = vol.handle_file_backed_volume_provider_requests(requests).await;
+                    let _ = FxVolume::handle_file_backed_volume_provider_requests(
+                        weak_vol, scope, requests,
+                    )
+                    .await;
                 }
             }),
         )?;
         volume.root().clone().register_additional_volume_services(&svc_dir)?;
 
-        // Use the volume's scope here which should be OK for now.  In theory the scope represents a
-        // filesystem instance and the pseudo filesystem we are using is arguably a different
-        // filesystem to the volume we are exporting.  The reality is that it only matters for
-        // GetToken and mutable methods which are not supported by the immutable version of Simple.
-        let scope = volume.volume().scope().clone();
+        let scope = volume.admin_scope().clone();
         let mut flags = fio::PERM_READABLE | fio::PERM_WRITABLE;
         if as_blob {
             flags |= fio::PERM_EXECUTABLE;
         }
-        vfs::directory::serve_on(outgoing_dir, flags, scope, outgoing_dir_server_end);
+        vfs::directory::serve_on(Arc::clone(outgoing_dir), flags, scope, outgoing_dir_server_end);
 
         info!(
             store_id;
@@ -580,7 +644,7 @@ impl VolumesDirectory {
     pub async fn create_and_serve_volume(
         self: &Arc<Self>,
         name: &str,
-        outgoing_directory: ServerEnd<fio::DirectoryMarker>,
+        outgoing_directory_server_end: ServerEnd<fio::DirectoryMarker>,
         mount_options: MountOptions,
     ) -> Result<(), Error> {
         let mut guard = self.lock().await;
@@ -588,7 +652,7 @@ impl VolumesDirectory {
             mount_options.crypt.map(|crypt| (Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>));
         let as_blob = mount_options.as_blob.unwrap_or(false);
         let volume = guard.create_or_mount_volume(&name, crypt, true, as_blob).await?;
-        self.serve_volume(&volume, outgoing_directory, as_blob)
+        self.serve_volume(&volume, outgoing_directory_server_end, as_blob)
             .context("failed to serve volume")?;
         guard.auto_unmount(volume.volume().store().store_object_id());
         Ok(())
@@ -741,7 +805,7 @@ impl VolumesDirectory {
         self: &Arc<Self>,
         name: &str,
         store_id: u64,
-        outgoing_directory: ServerEnd<fio::DirectoryMarker>,
+        outgoing_directory_server_end: ServerEnd<fio::DirectoryMarker>,
         options: MountOptions,
     ) -> Result<(), Error> {
         info!(name:%, store_id:%, options:?; "Received mount request");
@@ -753,7 +817,7 @@ impl VolumesDirectory {
             .create_or_mount_volume(name, crypt, false, as_blob)
             .await
             .context("failed to mount volume")?;
-        self.serve_volume(&volume, outgoing_directory, as_blob)
+        self.serve_volume(&volume, outgoing_directory_server_end, as_blob)
             .context("failed to serve volume")?;
         guard.auto_unmount(volume.volume().store().store_object_id());
         Ok(())
@@ -772,28 +836,26 @@ impl VolumesDirectory {
 
                     let root_store = self.root_volume.volume_directory().store();
                     let fs = root_store.filesystem();
-                    let guard = fs
+                    let _guard = fs
                         .lock_manager()
                         .txn_lock(lock_keys![LockKey::object(
                             root_store.store_object_id(),
                             self.root_volume.volume_directory().object_id(),
                         )])
                         .await;
-                    let me = self.clone();
 
-                    // unmount will indirectly call scope.shutdown which will drop the task that we
-                    // are running on, so we spawn onto a new task that won't get dropped.  An
-                    // alternative would be to separate the execution-scopes for the volume and
-                    // pseudo-filesystem.
-                    fasync::Task::spawn(async move {
-                        let _ = stream;
-                        let _ = guard;
-                        let _ = me.lock().await.unmount(store_id).await;
-                        responder
-                            .send()
-                            .unwrap_or_else(|e| warn!("Failed to send shutdown response: {}", e));
-                    })
-                    .detach();
+                    let maybe_volume = self.lock().await.unmount(store_id).await;
+                    responder
+                        .send()
+                        .unwrap_or_else(|e| warn!("Failed to send shutdown response: {}", e));
+
+                    if let Ok(volume) = maybe_volume {
+                        // NOTE: After calling this, this task might be dropped at the next await
+                        // point.
+                        volume.admin_scope().shutdown();
+                    }
+
+                    return Ok(());
                 }
             }
         }
@@ -814,7 +876,7 @@ impl VolumesDirectory {
 #[async_trait]
 impl StoreOwner for VolumesDirectory {
     async fn force_lock(self: Arc<Self>, store: &ObjectStore) -> Result<(), Error> {
-        self.lock().await.unmount(store.store_object_id()).await
+        self.lock().await.force_lock(store.store_object_id()).await
     }
 }
 
@@ -822,7 +884,7 @@ impl StoreOwner for VolumesDirectory {
 mod tests {
     use crate::fuchsia::testing::open_file_checked;
     use crate::fuchsia::volumes_directory::VolumesDirectory;
-    use fidl::endpoints::{create_proxy, create_request_stream};
+    use fidl::endpoints::{create_proxy, create_request_stream, DiscoverableProtocolMarker};
     use fidl_fuchsia_fs::AdminMarker;
     use fidl_fuchsia_fs_startup::{MountOptions, VolumeMarker, VolumeProxy};
     use fidl_fuchsia_fxfs::KeyPurpose;
@@ -2174,6 +2236,20 @@ mod tests {
                     crypt.shutdown();
                 },
             );
+
+            // Make sure we can still ask the volume to shutdown.
+            let (admin_proxy, server_end) =
+                fidl::endpoints::create_proxy::<fidl_fuchsia_fs::AdminMarker>();
+            volume_dir_proxy
+                .open(
+                    &format!("svc/{}", fidl_fuchsia_fs::AdminMarker::PROTOCOL_NAME),
+                    fio::Flags::PROTOCOL_SERVICE,
+                    &Default::default(),
+                    server_end.into(),
+                )
+                .expect("Failed to open Admin connection");
+            admin_proxy.shutdown().await.expect("shutdown failed");
+
             volumes_directory.terminate().await;
         }
         filesystem.close().await.expect("Filesystem close");

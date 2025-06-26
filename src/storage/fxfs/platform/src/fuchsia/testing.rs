@@ -147,6 +147,7 @@ impl TestFixture {
         volume.root().clone().serve(fio::PERM_READABLE | fio::PERM_WRITABLE, server_end);
 
         let (volume_out_dir, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
+        volumes_directory.lock().await.add_mount("vol", &volume);
         volumes_directory
             .serve_volume(&volume, server_end, options.as_blob)
             .expect("serve_volume failed");
@@ -181,14 +182,14 @@ impl TestFixture {
             .expect("FIDL call failed")
             .map_err(Status::from_raw)
             .expect("close root failed");
-        volumes_directory.terminate().await;
-        std::mem::drop(volumes_directory);
-        let store_id = volume.volume().store().store_object_id();
 
-        // Wait for the volume to terminate. If we don't do this, it's possible that we haven't
-        // yet noticed that a connection has closed, and so tasks can still be running and they can
-        // hold references to the volume which we want to unwrap.
-        volume.volume().terminate().await;
+        // This should terminate all volumes.  This should ensure that there are no other references
+        // to the volume (which can be associated with connections that we have not yet noticed are
+        // closed).  This will then allow `FxVolume::try_unwrap()` to work below.
+        volumes_directory.terminate().await;
+        drop(volumes_directory);
+
+        let store_id = volume.volume().store().store_object_id();
 
         if volume.into_volume().try_unwrap().is_none() {
             log::error!("References to volume still exist; hanging");

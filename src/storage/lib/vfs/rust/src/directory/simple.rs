@@ -119,7 +119,7 @@ impl Simple {
 
     fn open_impl<'a, P: ProtocolsExt + ToRequestFlags>(
         self: Arc<Self>,
-        scope: ExecutionScope,
+        mut scope: ExecutionScope,
         mut path: Path,
         protocols: P,
         object_request: ObjectRequestRef<'_>,
@@ -141,7 +141,23 @@ impl Simple {
         };
 
         // Don't hold the inner lock while opening the entry in case the directory contains itself.
-        let entry = self.inner.lock().entries.get(name).cloned();
+        let _guard;
+        let entry = match self.inner.lock().entries.get(name) {
+            Some(entry) => {
+                // Whilst we are holding the lock, see if an alternative scope should be used.
+                if let Some(s) = entry.scope() {
+                    // Make sure we can get an active guard.
+                    let Some(g) = s.try_active_guard() else {
+                        return Err(Status::PEER_CLOSED);
+                    };
+                    scope = s;
+                    _guard = g;
+                }
+                Some(entry.clone())
+            }
+            None => None,
+        };
+
         match (entry, path_ref.is_empty(), protocols.creation_mode()) {
             (None, false, _) | (None, true, CreationMode::Never) => {
                 // Either:
@@ -398,6 +414,7 @@ mod tests {
     use crate::directory::immutable::Simple;
     use crate::file;
     use crate::object_request::ObjectRequest;
+    use fidl::endpoints::create_endpoints;
 
     #[test]
     fn add_entry_success() {
@@ -478,5 +495,37 @@ mod tests {
             dir.get_entry("file").err().expect("file should no longer exist"),
             Status::NOT_FOUND
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_alternate_scope() {
+        struct MockEntry(ExecutionScope);
+
+        impl DirectoryEntry for MockEntry {
+            fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+                assert_eq!(request.scope(), &self.0);
+                Ok(())
+            }
+
+            fn scope(&self) -> Option<ExecutionScope> {
+                Some(self.0.clone())
+            }
+        }
+
+        impl GetEntryInfo for MockEntry {
+            fn entry_info(&self) -> EntryInfo {
+                EntryInfo::new(1, fio::DirentType::Directory)
+            }
+        }
+
+        let dir = Simple::new();
+
+        dir.add_entry("foo", Arc::new(MockEntry(ExecutionScope::new()))).expect("add_entry failed");
+
+        let (_client, server) = create_endpoints::<fio::DirectoryMarker>();
+        let mut request =
+            ObjectRequest::new(fio::Flags::empty(), &fio::Options::default(), server.into());
+        dir.open(ExecutionScope::new(), Path::dot(), fio::Flags::empty(), &mut request)
+            .expect("open succeeded");
     }
 }

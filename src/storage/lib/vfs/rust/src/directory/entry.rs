@@ -73,6 +73,15 @@ pub trait GetEntryInfo {
 pub trait DirectoryEntry: GetEntryInfo + IntoAny + Sync + Send + 'static {
     /// Opens this entry.
     fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status>;
+
+    /// The scope that should own connections to this directory entry, or None if parent scope
+    /// should be used (the default).
+    ///
+    /// NOTE: This method will be called by `Simple` (the VFS implementation of a pseudo directory),
+    /// but might not be respected by other implementors that call `open_entry`.
+    fn scope(&self) -> Option<ExecutionScope> {
+        None
+    }
 }
 
 /// Trait that can be implemented to process open requests asynchronously.
