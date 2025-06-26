@@ -15,6 +15,7 @@ ffx_plugin("ffx_profile_memory") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
     "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin_rust",
     "//sdk/fidl/fuchsia.memory.inspection:fuchsia.memory.inspection_rust",
     "//src/developer/ffx/lib/errors:lib",
@@ -25,6 +26,7 @@ ffx_plugin("ffx_profile_memory") {
     "//src/developer/ffx/plugins/profile/memory/components:ffx_profile_memory_components_args",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
+    "//src/performance/memory/attribution/processing",
     "//src/performance/memory/attribution/processing",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",

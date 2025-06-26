@@ -209,6 +209,7 @@ mod tests {
             vmos: vec![],
             buckets: None,
             total_undigested: None,
+            kmem_stats_compression: Default::default(),
         })
     }
 
@@ -233,6 +234,7 @@ mod tests {
                 Bucket { name: "Bucket1".to_string(), size: 43, vmos: HashSet::new() },
             ]),
             total_undigested: None,
+            kmem_stats_compression: Default::default(),
         })
     }
 

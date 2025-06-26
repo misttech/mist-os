@@ -440,6 +440,7 @@ mod tests {
                 zram_uncompressed: Some(0),
                 zram_fragmentation: Some(0),
             },
+            kmem_stats_compression: Default::default(),
             processes: vec![processed::Process {
                 koid: processed::ProcessKoid::new(1),
                 name: "process1".to_owned(),
