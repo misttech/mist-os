@@ -35,9 +35,15 @@ test("buffer_test") {
   sources = [
     "../buffer.cc",
     "../buffer.h",
+    "../rolling_buffer.cc",
+    "../rolling_buffer.h",
     "buffer_test.cc",
+    "rolling_buffer_test.cc",
   ]
-  deps = [ "//src/lib/fxl/test:gtest_main" ]
+  deps = [
+    "//src/lib/fxl/test:gtest_main",
+    "//zircon/system/ulib/trace-engine:trace-engine-headers-for-reader",
+  ]
 }
 
 test("trace_engine_test") {
