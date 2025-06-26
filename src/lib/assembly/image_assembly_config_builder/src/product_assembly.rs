@@ -170,7 +170,9 @@ impl ProductAssembly {
         for bundle_path in board_config.input_bundles.values() {
             let bundle = BoardInputBundle::from_dir(&bundle_path)
                 .with_context(|| format!("Reading board input bundle: {bundle_path}"))?;
-            board_input_bundles.push((bundle_path.clone(), bundle));
+            if bundle.should_be_included(platform.build_type) {
+                board_input_bundles.push((bundle_path.clone(), bundle));
+            }
         }
         let board_input_bundles = board_input_bundles;
 

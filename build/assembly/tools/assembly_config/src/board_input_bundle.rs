@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 pub fn new(args: &BoardInputBundleArgs) -> Result<()> {
     let BoardInputBundleArgs {
         name,
+        include_in,
         output,
         drivers,
         base_packages,
@@ -91,6 +92,7 @@ pub fn new(args: &BoardInputBundleArgs) -> Result<()> {
     // Create the BoardInputBundle.
     let bundle = BoardInputBundle {
         name: name.to_string(),
+        include_in: include_in.clone(),
         drivers: collected_drivers,
         packages,
         kernel_boot_args: kernel_boot_args.clone().into_iter().collect(),

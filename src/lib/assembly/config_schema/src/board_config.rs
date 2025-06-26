@@ -8,13 +8,15 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::common::{PackageDetails, PackagedDriverDetails};
 use crate::platform_config::sysmem_config::BoardSysmemConfig;
-use anyhow::Result;
+use crate::BuildType;
+use anyhow::{anyhow, Result};
 use assembly_constants::Arm64DebugDapSoc;
 use assembly_container::{assembly_container, AssemblyContainer, DirectoryPathBuf, WalkPaths};
 use assembly_images_config::BoardFilesystemConfig;
 use assembly_release_info::{BoardReleaseInfo, ReleaseInfo};
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /// The architecture of the hardware.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
@@ -198,6 +200,10 @@ pub struct BoardInputBundle {
     /// The name of the board input bundle.
     pub name: String,
 
+    /// Which builds types to include this BIB.
+    #[serde(skip_serializing_if = "crate::common::is_default")]
+    pub include_in: IncludeInBuildType,
+
     /// These are the drivers that are included by this bundle.
     #[walk_paths]
     #[serde(skip_serializing_if = "Vec::is_empty")]
@@ -222,6 +228,47 @@ pub struct BoardInputBundle {
 
     /// Release information about this assembly container artifact.
     pub release_info: ReleaseInfo,
+}
+
+/// Which build type to include a particular BIB.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum IncludeInBuildType {
+    /// Include in all build types.
+    #[default]
+    All,
+
+    /// Only include in eng build types.
+    Eng,
+
+    /// Only include in user and userdebug build types.
+    UserAndUserdebug,
+}
+
+impl FromStr for IncludeInBuildType {
+    type Err = anyhow::Error;
+    fn from_str(s: &str) -> Result<Self> {
+        match s {
+            "all" => Ok(Self::All),
+            "eng" => Ok(Self::Eng),
+            "user_and_userdebug" => Ok(Self::UserAndUserdebug),
+            _ => Err(anyhow!("Cannot parse --include-in from string: {}", &s)),
+        }
+    }
+}
+
+impl BoardInputBundle {
+    /// Return whether this BIB should be included in a product with the given
+    /// build type.
+    pub fn should_be_included(&self, build_type: BuildType) -> bool {
+        match (&self.include_in, build_type) {
+            (&IncludeInBuildType::All, _) => true,
+            (&IncludeInBuildType::Eng, BuildType::Eng) => true,
+            (&IncludeInBuildType::Eng, BuildType::User | BuildType::UserDebug) => false,
+            (&IncludeInBuildType::UserAndUserdebug, BuildType::User | BuildType::UserDebug) => true,
+            (&IncludeInBuildType::UserAndUserdebug, BuildType::Eng) => false,
+        }
+    }
 }
 
 /// This struct defines board-provided configuration for platform services and
