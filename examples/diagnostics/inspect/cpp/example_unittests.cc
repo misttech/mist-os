@@ -14,13 +14,14 @@
 #include <lib/inspect/testing/cpp/inspect.h>
 
 #include <gtest/gtest.h>
+#include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
 using namespace inspect::testing;
 // [END test_imports]
 
 namespace example {
 
-class EchoConnectionTest : public testing::Test {
+class EchoConnectionTest : public gtest::RealLoopFixture {
  public:
   EchoConnectionTest()
       : inspector_(),
@@ -28,33 +29,35 @@ class EchoConnectionTest : public testing::Test {
             inspector_.GetRoot().CreateUint("bytes_processed", 0),
             inspector_.GetRoot().CreateUint("total_requests", 0),
         })},
-        connection_(stats_),
-        serverLoop_(async::Loop(&kAsyncLoopConfigNoAttachToCurrentThread)) {}
+        connection_(stats_) {}
 
   void SetUp() override {
-    serverLoop_.StartThread("EchoConnectionServer");
-
     auto [client_end, server_end] =
         fidl::CreateEndpoints<fidl_examples_routing_echo::Echo>().value();
 
-    fidl::BindServer(serverLoop_.dispatcher(), std::move(server_end), &connection_);
+    fidl::BindServer(dispatcher(), std::move(server_end), &connection_);
 
-    echoClient_.emplace(fidl::SyncClient(std::move(client_end)));
+    echo_client_.emplace(
+        fidl::Client<fidl_examples_routing_echo::Echo>(std::move(client_end), dispatcher()));
   }
 
  protected:
   inspect::Inspector inspector_;
   std::shared_ptr<EchoConnectionStats> stats_;
   EchoConnection connection_;
-  async::Loop serverLoop_;
-  std::optional<fidl::SyncClient<fidl_examples_routing_echo::Echo>> echoClient_;
+  std::optional<fidl::Client<fidl_examples_routing_echo::Echo>> echo_client_;
 };
 
 TEST_F(EchoConnectionTest, EchoServerWritesStats) {
+  auto on_response = [&](fidl::Result<fidl_examples_routing_echo::Echo::EchoString>& result) {
+    ASSERT_TRUE(result.is_ok());
+  };
+
   // Invoke the echo server
-  ::fidl::StringPtr message;
-  message = echoClient_.value()->EchoString({"Hello World!"}).value().response().value();
-  message = echoClient_.value()->EchoString({"Hello World!"}).value().response().value();
+  echo_client_.value()->EchoString({"Hello World!"}).ThenExactlyOnce(on_response);
+  echo_client_.value()->EchoString({"Hello World!"}).ThenExactlyOnce(on_response);
+
+  RunLoopUntilIdle();
 
   // [START inspect_test]
   // Validate the contents of the tree match
