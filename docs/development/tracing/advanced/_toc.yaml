@@ -14,3 +14,5 @@ toc:
   path: /docs/development/tracing/advanced/recording-a-kernel-trace.md
 - title: "Recording a CPU performance trace"
   path: /docs/development/tracing/advanced/recording-a-cpu-performance-trace.md
+- title: "Recording thermal counters in a trace"
+  path: /docs/development/tracing/advanced/recording-thermals.md
