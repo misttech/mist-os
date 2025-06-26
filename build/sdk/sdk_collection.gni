@@ -84,7 +84,6 @@ template("sdk_collection") {
     main = target_name
     collection_prebuild_info = "${target_name}_prebuild_info"
     prebuild_manifest = "${target_name}_prebuild_manifest"
-    old_idk_meta_manifest_json = "${target_name}_idk_meta_manifest_json"
     generate_meta_files = "${target_name}_generate_meta_files"
     verify_final_build_manifest = "${target_name}_verify_manifest"
   }
@@ -98,11 +97,6 @@ template("sdk_collection") {
     # clidoc no longer depends on a manifest at that location.
     final_build_manifest = "${root_out_dir}/sdk/manifest/${collection_name}"
     local_build_manifest = "${target_gen_dir}/${targets.main}.sdk"
-
-    # The IDK manifest generated from the manifest above.
-    # TODO(https://fxbug.dev/417997995): Remove this obsolete file.
-    old_idk_meta_manifest_json =
-        "${target_gen_dir}/${collection_name}.idk_meta_manifest_json.json"
 
     # The main manifest in the IDK that references all atoms.
     collection_manifest_relative_path = "meta/manifest.json"
@@ -157,45 +151,10 @@ template("sdk_collection") {
     deps = [ ":${targets.final_build_manifest}" ]
   }
 
-  # Generates the top-level metadata file (which will later be symlinked at
-  # meta/manifest.json) describing the various parts of the SDK collection.
-  # TODO(https://fxbug.dev/417997995): Remove this obsolete target.
-  python_action(targets.old_idk_meta_manifest_json) {
-    forward_variables_from(invoker, [ "testonly" ])
-
-    binary_label = "//build/sdk:generate_idk_meta_manifest_json"
-
-    inputs = [ files.local_build_manifest ]
-
-    outputs = [ files.old_idk_meta_manifest_json ]
-
-    args = [
-      "--manifest",
-      rebase_path(files.local_build_manifest, root_build_dir),
-      "--meta",
-      rebase_path(files.old_idk_meta_manifest_json, root_build_dir),
-      "--target-arch",
-      target_triple,
-      "--host-arch",
-      host_triple,
-      "--schema-version",
-      sdk_metadata_schema_version,
-    ]
-
-    if (defined(invoker.id) && invoker.id != "") {
-      args += [
-        "--id",
-        invoker.id,
-      ]
-    }
-
-    public_deps = [ ":${targets.local_build_manifest}" ]
-  }
-
   # Adds prebuild metadata that is used to generate the collection manifest. The
   # main target cannot do this because it depends on the
   # `idk_prebuild_manifest()` instance, which must depend on the target with
-  # this metadata..
+  # this metadata.
   group(targets.collection_prebuild_info) {
     metadata = {
       idk_atom_prebuild_info = [
@@ -208,8 +167,6 @@ template("sdk_collection") {
           atom_meta = {
             dest = files.collection_manifest_relative_path
           }
-          atom_meta_json_file =
-              rebase_path(files.old_idk_meta_manifest_json, root_build_dir)
           prebuild_info = {
             arch = {
               host = host_triple
@@ -279,10 +236,7 @@ template("sdk_collection") {
       visibility = invoker.visibility
     }
 
-    deps = [
-      ":${targets.generate_meta_files}",
-      ":${targets.old_idk_meta_manifest_json}",
-    ]
+    deps = [ ":${targets.generate_meta_files}" ]
 
     public_deps = []
 

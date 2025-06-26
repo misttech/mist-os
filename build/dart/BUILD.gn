@@ -56,11 +56,6 @@ python_binary("gen_dart_package_config") {
   deps = [ "//third_party/pyyaml:yaml" ]
 }
 
-python_binary("gen_meta_file") {
-  main_source = "sdk/gen_meta_file.py"
-  deps = [ "//third_party/pyyaml:yaml" ]
-}
-
 # A toolchain dedicated to processing and analyzing Dart packages.
 # The only targets in this toolchain are action() targets, so it
 # has no real tools.  But every toolchain needs stamp and copy.

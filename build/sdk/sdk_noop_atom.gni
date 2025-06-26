@@ -52,7 +52,6 @@ template("sdk_noop_atom") {
     atom_meta = {
       dest = ""
     }
-    atom_meta_json_file = rebase_path(meta_file, root_build_dir)
     atom_files = []
     is_stable = false
     category = invoker.category

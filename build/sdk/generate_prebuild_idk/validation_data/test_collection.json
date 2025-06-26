@@ -137,7 +137,6 @@
       "schema": "cc_source_library",
       "stable": true
     },
-    "atom_meta_json_file": "gen/sdk/lib/stdcompat/stdcompat_sdk.meta.json",
     "is_stable": true,
     "atom_type": "cc_source_library",
     "category": "partner",
@@ -253,7 +252,6 @@
       "schema": "cc_source_library",
       "stable": true
     },
-    "atom_meta_json_file": "gen/sdk/lib/fit/fit_sdk.meta.json",
     "is_stable": true,
     "atom_type": "cc_source_library",
     "category": "partner",
@@ -335,7 +333,6 @@
       "stable": true,
       "type": "cc_source_library"
     },
-    "atom_meta_json_file": "gen/sdk/lib/async/async_sdk.meta.json",
     "atom_type": "cc_source_library",
     "category": "partner",
     "is_stable": true,
@@ -373,7 +370,6 @@
     "atom_meta": {
       "dest": ""
     },
-    "atom_meta_json_file": "gen/src/zircon/lib/zircon/zircon_sdk.meta.json",
     "is_stable": true,
     "atom_type": "none",
     "category": "partner"
@@ -443,7 +439,6 @@
       "dest": "pkg/fdio/meta.json",
       "schema": "cc_prebuilt_library"
     },
-    "atom_meta_json_file": "gen/sdk/lib/fdio/fdio_sdk_manifest.meta.json",
     "is_stable": true,
     "atom_type": "cc_prebuilt_library",
     "category": "partner",
@@ -511,7 +506,6 @@
       "stable": true,
       "type": "cc_source_library"
     },
-    "atom_meta_json_file": "gen/sdk/lib/driver/fake-object/cpp/cpp_sdk.meta.json",
     "atom_type": "cc_source_library",
     "category": "partner",
     "is_stable": true,
@@ -561,7 +555,6 @@
       "dest": "pkg/svc/meta.json",
       "type": "cc_prebuilt_library"
     },
-    "atom_meta_json_file": "gen/sdk/lib/svc/svc_sdk_manifest.meta.json",
     "atom_type": "cc_prebuilt_library",
     "category": "partner",
     "is_stable": true,
@@ -611,7 +604,6 @@
       "schema": "fidl_library",
       "stable": true
     },
-    "atom_meta_json_file": "fidling/gen/zircon/vdso/zx/zx_sdk.meta.json",
     "is_stable": true,
     "atom_type": "fidl_library",
     "category": "partner",
@@ -637,7 +629,6 @@
       "schema": "fidl_library",
       "stable": true
     },
-    "atom_meta_json_file": "fidling/gen/sdk/fidl/fuchsia.unknown/fuchsia.unknown_sdk.meta.json",
     "is_stable": true,
     "atom_type": "fidl_library",
     "category": "partner",
@@ -691,7 +682,6 @@
       "schema": "fidl_library",
       "stable": true
     },
-    "atom_meta_json_file": "fidling/gen/sdk/fidl/fuchsia.io/fuchsia.io_sdk.meta.json",
     "is_stable": true,
     "atom_type": "fidl_library",
     "category": "partner",
@@ -718,7 +708,6 @@
       "stable": true,
       "type": "fidl_library"
     },
-    "atom_meta_json_file": "fidling/gen/sdk/fidl/fuchsia.hardware.pty/fuchsia.hardware.pty_sdk.meta.json",
     "atom_type": "fidl_library",
     "category": "prebuilt",
     "is_stable": true,
@@ -752,7 +741,6 @@
         "type": "host_tool"
       }
     },
-    "atom_meta_json_file": "host_x64/gen/zircon/tools/zbi/zbi_sdk.meta.json",
     "is_stable": true,
     "atom_type": "host_tool",
     "category": "partner"
@@ -791,7 +779,6 @@
         "type": "ffx_tool"
       }
     },
-    "atom_meta_json_file": "host_x64/gen/src/developer/ffx/plugins/emulator/sdk.meta.json",
     "is_stable": true,
     "atom_type": "ffx_tool",
     "category": "partner"
@@ -806,7 +793,6 @@
       "dest": "tools/x64/aemu_internal-meta.json",
       "schema": "companion_host_tool"
     },
-    "atom_meta_json_file": "host_x64/gen/src/developer/ffx/plugins/emulator/aemu_internal.meta.json",
     "is_stable": true,
     "atom_type": "companion_host_tool",
     "category": "partner",
@@ -830,7 +816,6 @@
       "dest": "bind/fuchsia.serial/meta.json",
       "schema": "bind_library"
     },
-    "atom_meta_json_file": "gen/src/devices/bind/fuchsia.serial/fuchsia.serial_sdk.meta.json",
     "is_stable": true,
     "atom_type": "bind_library",
     "category": "partner",
@@ -872,7 +857,6 @@
         "type": "component_manifest"
       }
     },
-    "atom_meta_json_file": "gen/sdk/lib/syslog/shards/syslog_sdk.meta.json",
     "is_stable": true,
     "atom_type": "data",
     "category": "partner"
@@ -888,7 +872,6 @@
       "schema": "version_history",
       "type": "version_history"
     },
-    "atom_meta_json_file": "gen/sdk/version_history_sdk.meta.json",
     "is_stable": true,
     "atom_type": "version_history",
     "category": "partner",
@@ -1087,7 +1070,6 @@
       "dest": "dart/sl4f/meta.json",
       "schema": "dart_library"
     },
-    "atom_meta_json_file": "dartlang/gen/sdk/testing/sl4f/client/client_sdk.meta.json",
     "is_stable": true,
     "atom_type": "dart_library",
     "category": "partner",
@@ -1179,7 +1161,6 @@
         "type": "documentation"
       }
     },
-    "atom_meta_json_file": "gen/sdk/sdk_notice.meta.json",
     "is_stable": true,
     "atom_type": "documentation",
     "category": "partner"
@@ -1194,7 +1175,6 @@
       "dest": "python/rtc_conformance_test/meta.json",
       "schema": "experimental_python_e2e_test"
     },
-    "atom_meta_json_file": "host_x64/gen/src/tests/end_to_end/rtc/rtc_conformance_test_sdk.meta.json",
     "is_stable": true,
     "atom_type": "experimental_python_e2e_test",
     "category": "partner",
@@ -2325,7 +2305,6 @@
         }
       }
     },
-    "atom_meta_json_file": "gen/zircon/public/sysroot_sdk/sysroot_sdk.meta.json",
     "is_stable": true,
     "atom_type": "sysroot",
     "category": "partner"
@@ -2370,7 +2349,6 @@
         "type": "loadable_module"
       }
     },
-    "atom_meta_json_file": "gen/src/lib/vulkan/vulkan_layers.meta.json",
     "is_stable": true,
     "atom_type": "loadable_module",
     "category": "partner"
@@ -2385,7 +2363,6 @@
       "dest": "packages/fake-build-info/meta.json",
       "type": "package"
     },
-    "atom_meta_json_file": "gen/src/developer/build_info/testing/fake-build-info-sdk.meta.json",
     "atom_type": "package",
     "category": "partner",
     "is_stable": true,
@@ -2406,7 +2383,6 @@
       "dest": "packages/intl_property_manager/meta.json",
       "type": "package"
     },
-    "atom_meta_json_file": "gen/src/testing/fidl/intl_property_manager/intl_property_manager_sdk.meta.json",
     "atom_type": "package",
     "category": "partner",
     "is_stable": true,
@@ -2423,7 +2399,6 @@
     "atom_meta": {
       "dest": "meta/manifest.json"
     },
-    "atom_meta_json_file": "sdk/exported/fuchsia_collection/meta/manifest.json",
     "atom_type": "collection",
     "category": "partner",
     "prebuild_info": {

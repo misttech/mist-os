@@ -181,7 +181,6 @@ template("sdk_shared_library") {
   no_headers = defined(invoker.no_headers) && invoker.no_headers
 
   main_target_name = target_name
-  metadata_target_name = "${main_target_name}_sdk_metadata"
   manifest_target_name = "${main_target_name}_sdk_manifest"
   verify_pragma_target_name = "${main_target_name}_sdk_pragma"
   sdk_target_name = "${main_target_name}_sdk"
@@ -252,9 +251,8 @@ template("sdk_shared_library") {
     deps += [ "//build/sdk:partner_idk_shared_libraries_allowlist" ]
   }
 
-  # Identify dependencies and their metadata files.
+  # Identify dependencies.
   sdk_deps = []
-  sdk_metas = []
   all_deps = []
   if (defined(invoker.deps)) {
     all_deps += invoker.deps
@@ -277,12 +275,6 @@ template("sdk_shared_library") {
   # Runtime deps are already SDK targets.
   if (defined(invoker.runtime_deps)) {
     sdk_deps += invoker.runtime_deps
-  }
-
-  foreach(sdk_dep, sdk_deps) {
-    gen_dir = get_label_info(sdk_dep, "target_gen_dir")
-    name = get_label_info(sdk_dep, "name")
-    sdk_metas += [ "${gen_dir}/${name}.meta.json" ]
   }
 
   # Process headers.
@@ -437,51 +429,6 @@ template("sdk_shared_library") {
                ])
   }
 
-  metadata_file = "${target_gen_dir}/${metadata_target_name}.sdk_meta.json"
-
-  action(metadata_target_name) {
-    forward_variables_from(invoker, [ "testonly" ])
-    script = "//build/cpp/gen_sdk_prebuilt_meta_file.py"
-
-    inputs = sdk_metas
-
-    outputs = [ metadata_file ]
-
-    args = [
-      "--out",
-      rebase_path(metadata_file, root_build_dir),
-      "--name",
-      atom_name,
-      "--format",
-      "shared",
-      "--root",
-      sdk_root_path,
-      "--include-dir",
-      include_dest,
-      "--dist-path",
-      "lib/${lib_name}",
-      "--arch",
-      target_cpu,
-      "--lib-link",
-      link_lib,
-      "--lib-dist",
-      dist_lib,
-      "--lib-debug",
-      debug_lib,
-    ]
-    args += [ "--deps" ] + rebase_path(sdk_metas, root_build_dir)
-    args += [ "--headers" ] + sdk_metadata_headers
-    args += [ "--ifs" ] + [ packaged_ifs_file ]
-    if (current_build_target_api_level != "PLATFORM") {
-      args += [
-        "--api-level",
-        "${current_build_target_api_level}",
-      ]
-    }
-
-    deps = sdk_deps + [ shared_lib_target ]
-  }
-
   # LINT.IfChange
   _prebuild_info = {
     format = "shared"
@@ -553,7 +500,6 @@ template("sdk_shared_library") {
     }
 
     meta = {
-      source = metadata_file
       source_prebuild_info = _prebuild_info
       dest = "${sdk_root_path}/meta.json"
       type = "cc_prebuilt_library"
@@ -564,7 +510,6 @@ template("sdk_shared_library") {
     deps = sdk_deps
 
     non_sdk_deps = [
-      ":${metadata_target_name}",
       ":${verify_pragma_target_name}",
       shared_lib_target,
     ]

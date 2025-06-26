@@ -350,9 +350,6 @@ if (current_toolchain == dart_toolchain) {
       # target.
       sdk_deps = []
 
-      # Path to SDK metadata files for first-party dependencies.
-      sdk_metas = []
-
       # Path to Dart manifest files for third-party dependencies.
       third_party_pubspecs = []
 
@@ -361,10 +358,6 @@ if (current_toolchain == dart_toolchain) {
       foreach(dep, local_deps) {
         sdk_dep = "${dep}_sdk"
         sdk_deps += [ sdk_dep ]
-
-        gen_dir = get_label_info(sdk_dep, "target_gen_dir")
-        name = get_label_info(sdk_dep, "name")
-        sdk_metas += [ "$gen_dir/$name.meta.json" ]
       }
       foreach(dep, third_party_deps) {
         path = get_label_info(dep, "dir")
@@ -387,42 +380,6 @@ if (current_toolchain == dart_toolchain) {
         ]
       }
 
-      metadata_target_name = "${target_name}_sdk_metadata"
-      metadata_file = "$target_gen_dir/$target_name.sdk_meta.json"
-      action(metadata_target_name) {
-        # This script is built by "//build/dart:gen_meta_file". However, because
-        # that target is not defined in this file we can't use
-        # `get_target_outputs`, which only supports targets previously defined
-        # in the current file. We don't want to include that target as part of
-        # the template, to avoid repeatedly building it for every dart_library.
-        script = "${root_out_dir}/obj/build/dart/gen_meta_file.pyz"
-
-        inputs = sdk_metas + third_party_pubspecs
-
-        outputs = [ metadata_file ]
-
-        args = [
-          "--out",
-          rebase_path(metadata_file, root_build_dir),
-          "--name",
-          package_name,
-          "--root",
-          file_base,
-        ]
-        args += [ "--specs" ] + rebase_path(sdk_metas, root_build_dir)
-        args += [ "--sources" ] + sdk_sources
-        args += [ "--third-party-specs" ] +
-                rebase_path(third_party_pubspecs, root_build_dir)
-
-        if (defined(invoker.null_safe) && invoker.null_safe) {
-          args += [ "--dart-library-null-safe" ]
-        }
-
-        deps = sdk_deps + [ "//build/dart:gen_meta_file" ]
-
-        forward_variables_from(invoker, [ "testonly" ])
-      }
-
       sdk_atom("${target_name}_sdk") {
         forward_variables_from(invoker, [ "sdk_area" ])
 
@@ -431,7 +388,6 @@ if (current_toolchain == dart_toolchain) {
         category = invoker.sdk_category
 
         meta = {
-          source = metadata_file
           source_prebuild_info = {
             library_name = package_name
             file_base = file_base
@@ -446,8 +402,6 @@ if (current_toolchain == dart_toolchain) {
         }
 
         deps = sdk_deps
-
-        non_sdk_deps = [ ":$metadata_target_name" ]
 
         if (defined(invoker.non_dart_deps)) {
           non_sdk_deps += invoker.non_dart_deps

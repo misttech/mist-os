@@ -73,7 +73,6 @@ template("sdk_version_history") {
                            ])
     meta = {
       dest = "version_history.json"
-      source = _files.compiled
       type = "version_history"
       source_prebuild_info = {
         source = rebase_path(invoker.source, root_build_dir)

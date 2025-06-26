@@ -223,53 +223,6 @@ template("sdk_fuchsia_package") {
         }
       }
 
-      _sdk_package_file_list = "${_sdk_package_dir}/file_list.fini"
-      _sdk_package_metadata = "${_sdk_package_dir}/metadata"
-      _sdk_manifest_target = "${target_name}.sdk_manifest"
-      _sdk_package_depfile = "${target_gen_dir}/${_sdk_manifest_target}.d"
-
-      # Generates SDK primitives, including `file_list`, `metadata`, and
-      # package manifests (both target package and subpackages) with
-      # files structured relative to SDK directories. See
-      # `//build/packages/generate_sdk_package_manifest.py` for more.
-      action(_sdk_manifest_target) {
-        forward_variables_from(invoker, [ "testonly" ])
-
-        script =
-            "//build/sdk/generate_prebuild_idk/generate_sdk_package_manifest.py"
-
-        inputs = [ package_manifest_file ]
-        outputs = [
-          _sdk_package_file_list,
-          _sdk_package_metadata,
-        ]
-        deps = [ _full_package_label ]
-        depfile = _sdk_package_depfile
-
-        # Ensure the manifest is rebuilt in the odd case that the package is
-        # newly `package_in_target_api_level` at this target level but the Fuchsia
-        # package (`_full_package_label`) is not dirty. Without this dependency,
-        # manifest verification can fail in such cases because the manifest does
-        # already exists and does not get regenerated because
-        # `_full_package_label` is not dirty.
-        deps += [ ":${_content_checklist_target}" ]
-
-        args = [
-          "--manifest",
-          rebase_path(package_manifest_file, root_build_dir),
-          "--output",
-          rebase_path(_sdk_package_dir, root_build_dir),
-          "--api-level",
-          "${current_build_target_api_level}",
-          "--target-cpu",
-          "${target_cpu}",
-          "--depfile",
-          rebase_path(depfile, root_build_dir),
-          "--distribution-name",
-          _distribution_name,
-        ]
-      }
-
       sdk_atom(target_name) {
         forward_variables_from(invoker,
                                [
@@ -283,7 +236,6 @@ template("sdk_fuchsia_package") {
         meta = {
           type = "package"
           dest = "packages/${_distribution_name}/meta.json"
-          source = "${_sdk_package_metadata}"
           source_prebuild_info = {
             api_level = "$current_build_target_api_level"
             arch = target_cpu
@@ -293,12 +245,7 @@ template("sdk_fuchsia_package") {
           }
         }
 
-        file_list = _sdk_package_file_list
-
-        non_sdk_deps = [
-          ":${_content_checklist_target}",
-          ":${_sdk_manifest_target}",
-        ]
+        non_sdk_deps = [ ":${_content_checklist_target}" ]
 
         # Barrier enforced to prevent assembly from adding to `base` set,
         # keeping this target as an SDK-only addition.
