@@ -282,10 +282,12 @@ void FtlnBlkStats(CFTLN ftl);
 void FtlnStats(FTLN ftl);
 void FtlnShowBlks(void);
 void FtlnCheckBlank(FTLN ftl, ui32 b);
+void FtlnOnBadBlock(void* ftl, ui32 b);
 
 // Managing bitmaps for blocks
 ui32* FtlnAllocateBlockBitmap(CFTLN ftl);
 void FtlnSetBlockBitmap(CFTLN ftl, ui32* bitmap, ui32 block);
+void FtlnUnsetBlockBitmap(CFTLN ftl, ui32* bitmap, ui32 block);
 ui8 FtlnCheckBlockBitmap(CFTLN ftl, const ui32* bitmap, ui32 block);
 ui32 FtlnCountBlockBitmap(CFTLN ftl, const ui32* bitmap);
 

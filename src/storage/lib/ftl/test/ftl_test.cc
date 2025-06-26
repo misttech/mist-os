@@ -6,6 +6,7 @@
 #include <zircon/errors.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -509,6 +510,16 @@ TEST(FtlTest, BitMapTest) {
   ASSERT_EQ(FtlnCheckBlockBitmap(ftl, ftl->maybe_bad, ftl->num_blks - 1), 1u);
   ASSERT_EQ(FtlnCountBlockBitmap(ftl, ftl->maybe_bad), 2u);
 
+  // Unset zero now.
+  FtlnUnsetBlockBitmap(ftl, ftl->maybe_bad, 0);
+  ASSERT_EQ(FtlnCheckBlockBitmap(ftl, ftl->maybe_bad, 0), 0u);
+  ASSERT_EQ(FtlnCountBlockBitmap(ftl, ftl->maybe_bad), 1u);
+
+  // Repeating it should do nothing.
+  FtlnUnsetBlockBitmap(ftl, ftl->maybe_bad, 0);
+  ASSERT_EQ(FtlnCheckBlockBitmap(ftl, ftl->maybe_bad, 0), 0u);
+  ASSERT_EQ(FtlnCountBlockBitmap(ftl, ftl->maybe_bad), 1u);
+
   // Do a bunch in a row to see that things are being set properly at the u32 member boundary.
   uint32_t previous = FtlnCountBlockBitmap(ftl, ftl->maybe_bad);
   for (int i = 25; i < 35; ++i) {
@@ -518,11 +529,29 @@ TEST(FtlTest, BitMapTest) {
     ASSERT_EQ(previous + 1, next);
     previous = next;
   }
+
+  // Same range, but unsetting.
+  for (int i = 25; i < 35; ++i) {
+    FtlnUnsetBlockBitmap(ftl, ftl->maybe_bad, i);
+    ASSERT_EQ(FtlnCheckBlockBitmap(ftl, ftl->maybe_bad, i), 0u);
+    uint32_t next = FtlnCountBlockBitmap(ftl, ftl->maybe_bad);
+    ASSERT_EQ(previous - 1, next);
+    previous = next;
+  }
 }
 
 TEST(FtlTest, FindWornBlockTest) {
+  std::atomic<bool> fail_next_erase = false;
+
   FtlShell ftl_shell;
   auto driver = std::make_unique<NdmRamDriver>(kDefaultOptions, kBoringTestOptions);
+  driver->set_operation_callback([&fail_next_erase](NdmRamDriver::Op op, uint32_t page) {
+    if (op == NdmRamDriver::Op::Erase &&
+        fail_next_erase.exchange(false, std::memory_order_relaxed)) {
+      return ftl::kNdmError;
+    }
+    return ftl::kNdmOk;
+  });
   NdmRamDriver* driver_unowned = driver.get();
   ASSERT_EQ(nullptr, driver->Init());
   ASSERT_TRUE(ftl_shell.InitWithDriver(std::move(driver)));
@@ -580,12 +609,35 @@ TEST(FtlTest, FindWornBlockTest) {
   volume->GetStats(&stats);
   ASSERT_EQ(0u, stats.worn_blocks_detected);
 
-  // Reading page two should mark it bad.
+  // Reading page two should mark it worn.
   ASSERT_EQ(ZX_OK, volume->Read(2, 1, buffer.get()));
   ASSERT_EQ(1u, FtlnCheckBlockBitmap(ftl, ftl->maybe_bad, page_two_physical / kPagesPerBlock));
   ASSERT_EQ(1u, FtlnCountBlockBitmap(ftl, ftl->maybe_bad));
   volume->GetStats(&stats);
   ASSERT_EQ(1u, stats.worn_blocks_detected);
+
+  // Performing an operation will recycle the data to a new block, but nothing will be marked bad.
+  ASSERT_EQ(ZX_OK, volume->Write(3, 1, buffer.get()));
+  uint32_t page_three_physical;
+  uint32_t new_page_two_physical;
+  ASSERT_EQ(0, FtlnMapGetPpn(ftl, 2, &new_page_two_physical));
+  ASSERT_EQ(0, FtlnMapGetPpn(ftl, 3, &page_three_physical));
+  ASSERT_NE(page_two_physical, new_page_two_physical);
+  ASSERT_EQ(new_page_two_physical / kPagesPerBlock, page_three_physical / kPagesPerBlock);
+  ASSERT_EQ(1u, FtlnCheckBlockBitmap(ftl, ftl->maybe_bad, page_two_physical / kPagesPerBlock));
+  ASSERT_EQ(1u, FtlnCountBlockBitmap(ftl, ftl->maybe_bad));
+
+  // Get block marked bad to remove it from the worn list, but not the written list.
+  ftl::VolumeImpl::Counters counters;
+  ASSERT_EQ(ZX_OK, volume->GetCounters(&counters));
+  ASSERT_EQ(0u, counters.running_bad_blocks);
+  fail_next_erase.store(true, std::memory_order_relaxed);
+  ASSERT_EQ(0, FtlnEraseBlk(ftl, page_two_physical / kPagesPerBlock));
+  ASSERT_EQ(ZX_OK, volume->GetCounters(&counters));
+  ASSERT_EQ(1u, counters.running_bad_blocks);
+  ASSERT_EQ(0u, FtlnCountBlockBitmap(ftl, ftl->maybe_bad));
+  ASSERT_EQ(0u, FtlnCheckBlockBitmap(ftl, ftl->maybe_bad, page_two_physical / kPagesPerBlock));
+  ASSERT_EQ(1u, FtlnCheckBlockBitmap(ftl, ftl->written, page_two_physical / kPagesPerBlock));
 }
 
 }  // namespace

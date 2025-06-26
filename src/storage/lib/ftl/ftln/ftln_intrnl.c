@@ -1457,6 +1457,16 @@ int FtlnGetWearHistogram(CFTLN ftl, int count, ui32* histogram) {
 
 #define BITMAP_BLOCKS_PER_MEMBER (sizeof(ui32) * 8)
 
+// FtlnOnBadBlock: Called when the ndm marks a block bad, clears worn status.
+//
+//       Input: ftl = Pointer to FTL control block.
+//                b = The block number marked bad.
+//
+void FtlnOnBadBlock(void* ftl, unsigned int b) {
+  FTLN ftl_ptr = (FTLN)ftl;
+  FtlnUnsetBlockBitmap(ftl_ptr, ftl_ptr->maybe_bad, b);
+}
+
 // FtlnAllocateBlockBitmap: Allocate a bitmap to cover the blocks of the FTL.
 //
 //       Input: ftl = Pointer to FTL control block.
@@ -1479,6 +1489,18 @@ void FtlnSetBlockBitmap(CFTLN ftl, ui32* bitmap, ui32 block) {
   PfAssert(block < ftl->num_blks);
   div_t dv = div(block, BITMAP_BLOCKS_PER_MEMBER);
   bitmap[dv.quot] |= 1u << dv.rem;
+}
+
+// FtlnUnsetBlockBitmap: Clear the bit for the given block number.
+//
+//       Input: ftl = Pointer to FTL control block.
+//           bitmap = Pointer to the target bitmap.
+//            block = The block number to clear.
+//
+void FtlnUnsetBlockBitmap(CFTLN ftl, ui32* bitmap, ui32 block) {
+  PfAssert(block < ftl->num_blks);
+  div_t dv = div(block, BITMAP_BLOCKS_PER_MEMBER);
+  bitmap[dv.quot] &= ~(1u << dv.rem);
 }
 
 // FtlnSetBlockBitmap: Check the bit for the given block number.

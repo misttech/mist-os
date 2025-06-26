@@ -1280,6 +1280,10 @@ static void free_ftl(void* vol) {
     FtlnStats(ftl);
   }
 
+  // Unhook the bad block callback.
+  if (ftl->ndm)
+    ndmSetBadBlockCallback(NULL, NULL, ftl->ndm);
+
   // Free FTL memory allocations.
   if (ftl->bdata)
     FsFree(ftl->bdata);
@@ -1550,6 +1554,7 @@ void* FtlnAddVol(FtlNdmVol* ftl_cfg, XfsVol* xfs, CircLink* vols) {
   if (ftl->maybe_bad == NULL) {
     ftl->maybe_bad = FtlnAllocateBlockBitmap(ftl);
   }
+  ndmSetBadBlockCallback(FtlnOnBadBlock, ftl, ftl->ndm);
 
   // Allocate memory for map pages array (holds physical page numbers).
   ftl->mpns = FsMalloc(ftl->num_map_pgs * sizeof(ui32));
