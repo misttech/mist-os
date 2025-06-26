@@ -23,7 +23,6 @@ const TransformClipRegion kUnclippedRegion = {
 
 namespace {
 
-using fuchsia::ui::composition::ImageFlip;
 using fuchsia::ui::composition::Orientation;
 
 bool Overlap(const TransformClipRegion& clip, const glm::vec2& origin, const glm::vec2& extent) {
@@ -184,7 +183,8 @@ ImageRect CreateImageRect(const glm::mat3& matrix, const TransformClipRegion& cl
   if (origin == clipped_origin && extent == clipped_extent) {
     // If no clipping happened, we can leave the UVs as is and return.
     return ImageRect(clipped_origin, clipped_extent, texel_uvs, orientation);
-  } else if (clipped_origin == glm::vec2(0) && clipped_extent == glm::vec2(0)) {
+  }
+  if (clipped_origin == glm::vec2(0) && clipped_extent == glm::vec2(0)) {
     // The entire rectangle is outside of the clip region.
     return ImageRect(clipped_origin, clipped_extent,
                      {glm::vec2(0), glm::vec2(0), glm::vec2(0), glm::vec2(0)}, orientation);
@@ -269,7 +269,7 @@ ImageRect CreateImageRect(const glm::mat3& matrix, const TransformClipRegion& cl
   }
 
   // This construction will CHECK if the extent is negative.
-  return ImageRect(clipped_origin, clipped_extent, std::move(uvs), orientation);
+  return ImageRect(clipped_origin, clipped_extent, uvs, orientation);
 }
 
 }  // namespace

@@ -5,8 +5,6 @@
 #ifndef SRC_UI_SCENIC_LIB_FLATLAND_UBER_STRUCT_H_
 #define SRC_UI_SCENIC_LIB_FLATLAND_UBER_STRUCT_H_
 
-#include <fuchsia/ui/composition/cpp/fidl.h>
-
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -20,12 +18,6 @@
 #include <glm/mat3x3.hpp>
 
 namespace flatland {
-
-// The sample region to use for an image when texturing a rectangle.
-using ImageSampleRegion = fuchsia::math::RectF;
-
-// The clip region for a transform to bound its children.
-using TransformClipRegion = fuchsia::math::Rect;
 
 // TODO(https://fxbug.dev/42122511): find the appropriate name for this struct.
 //

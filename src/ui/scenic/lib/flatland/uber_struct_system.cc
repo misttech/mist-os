@@ -26,7 +26,7 @@ TransformHandle::InstanceId UberStructSystem::GetNextInstanceId() {
 
 std::shared_ptr<UberStructSystem::UberStructQueue> UberStructSystem::AllocateQueueForSession(
     scheduling::SessionId session_id) {
-  FX_DCHECK(!pending_structs_queues_.count(session_id));
+  FX_DCHECK(!pending_structs_queues_.contains(session_id));
 
   auto [queue_kv, success] =
       pending_structs_queues_.emplace(session_id, std::make_shared<UberStructQueue>());
@@ -36,7 +36,7 @@ std::shared_ptr<UberStructSystem::UberStructQueue> UberStructSystem::AllocateQue
 }
 
 void UberStructSystem::RemoveSession(scheduling::SessionId session_id) {
-  FX_DCHECK(pending_structs_queues_.count(session_id));
+  FX_DCHECK(pending_structs_queues_.contains(session_id));
 
   pending_structs_queues_.erase(session_id);
   uber_struct_map_.erase(session_id);
@@ -190,13 +190,13 @@ inline ostream& operator<<(ostream& out, const fuchsia_ui_composition::BlendMode
 
 ostream& operator<<(ostream& out, const flatland::UberStruct& us) {
   if (us.view_ref) {
-    out << *us.view_ref << std::endl;
+    out << *us.view_ref << "\n";
   }
 
   auto& topology = us.local_topology;
 
   size_t index = 0;
-  ::std::stack<uint64_t> children_remaining;
+  std::stack<uint64_t> children_remaining;
   children_remaining.push(1);  // The root of the topology.
 
   while (index < topology.size()) {
@@ -233,7 +233,7 @@ ostream& operator<<(ostream& out, const flatland::UberStruct& us) {
       }
     }
 
-    out << std::endl;
+    out << "\n";
 
     FX_DCHECK(!children_remaining.empty() && children_remaining.top() > 0);
     --children_remaining.top();

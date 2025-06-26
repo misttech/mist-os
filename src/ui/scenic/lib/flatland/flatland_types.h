@@ -15,6 +15,12 @@
 
 namespace flatland {
 
+// The sample region to use for an image when texturing a rectangle.
+using ImageSampleRegion = fuchsia::math::RectF;
+
+// The clip region for a transform to bound its children.
+using TransformClipRegion = fuchsia::math::Rect;
+
 // Represents an image rectangle, parameterized by an origin point, an extent representing the width
 // and height. The texel UV coordinates specify, in clockwise order, the unnormalized clockwise
 // texel coordinates beginning at the top-left coordinate (in texture-space). The orientation

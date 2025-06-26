@@ -54,17 +54,18 @@ namespace flatland::test {
 #define CHECK_GLOBAL_TOPOLOGY_DATA(data, link_id)    \
   {                                                  \
     std::unordered_set<TransformHandle> all_handles; \
-    for (auto handle : data.topology_vector) {       \
+    for (auto handle : (data).topology_vector) {     \
       all_handles.insert(handle);                    \
       EXPECT_NE(handle.GetInstanceId(), link_id);    \
     }                                                \
-    EXPECT_EQ(all_handles, data.live_handles);       \
+    EXPECT_EQ(all_handles, (data).live_handles);     \
   }
 
 view_tree::SubtreeSnapshot GenerateSnapshot(
     const UberStruct::InstanceMap& uber_structs, const GlobalTopologyData::LinkTopologyMap& links,
     TransformHandle::InstanceId link_instance_id, TransformHandle root,
-    const std::unordered_map<TransformHandle, TransformHandle> link_child_to_parent_transform_map) {
+    const std::unordered_map<TransformHandle, TransformHandle>&
+        link_child_to_parent_transform_map) {
   const auto gtd =
       GlobalTopologyData::ComputeGlobalTopologyData(uber_structs, links, kLinkInstanceId, {1, 0});
   CHECK_GLOBAL_TOPOLOGY_DATA(gtd, 0u);
@@ -83,7 +84,8 @@ view_tree::SubtreeSnapshot GenerateSnapshot(
 view_tree::SubtreeHitTester GenerateHitTester(
     const UberStruct::InstanceMap& uber_structs, const GlobalTopologyData::LinkTopologyMap& links,
     TransformHandle::InstanceId link_instance_id, TransformHandle root,
-    const std::unordered_map<TransformHandle, TransformHandle> link_child_to_parent_transform_map) {
+    const std::unordered_map<TransformHandle, TransformHandle>&
+        link_child_to_parent_transform_map) {
   auto snapshot = GenerateSnapshot(uber_structs, links, link_instance_id, root,
                                    link_child_to_parent_transform_map);
   return std::move(snapshot.hit_tester);

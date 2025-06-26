@@ -171,7 +171,7 @@ view_tree::SubtreeHitTestResult HitTest(const HitTestingData& data, zx_koid_t st
 
   for (size_t i = start; i < end; ++i) {
     const auto& transform = transforms[i];
-    FX_DCHECK(root_transforms.find(transform) != root_transforms.end());
+    FX_DCHECK(root_transforms.contains(transform));
     const auto& root_transform = root_transforms.at(transform);
 
     const auto clip_region = utils::ConvertRectToRectF(global_clip_regions[i]);
@@ -367,7 +367,7 @@ GlobalTopologyData GlobalTopologyData::ComputeGlobalTopologyData(
     TransformHandle::InstanceId link_instance_id, TransformHandle root) {
   TRACE_DURATION("gfx", "flatland::ComputeGlobalTopologyData");
   // There should never be an UberStruct for the |link_instance_id|.
-  FX_DCHECK(uber_structs.find(link_instance_id) == uber_structs.end());
+  FX_DCHECK(!uber_structs.contains(link_instance_id));
 
 #ifdef USE_FLATLAND_VERBOSE_LOGGING
   {
