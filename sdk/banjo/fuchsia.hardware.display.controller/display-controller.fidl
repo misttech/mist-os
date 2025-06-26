@@ -268,10 +268,11 @@ type DisplayConfig = struct {
 /// Equivalent to the [`fuchsia.hardware.display.types/ConfigResult`] FIDL type.
 type ConfigCheckResult = strict enum : uint32 {
     OK = 0;
-    INVALID_CONFIG = 1;
-    UNSUPPORTED_CONFIG = 2;
-    TOO_MANY = 3;
-    UNSUPPORTED_MODES = 4;
+    EMPTY_CONFIG = 1;
+    INVALID_CONFIG = 2;
+    UNSUPPORTED_CONFIG = 3;
+    TOO_MANY = 4;
+    UNSUPPORTED_MODES = 5;
 };
 
 /// Equivalent to the [`fuchsia.hardware.display.engine/EngineInfo`] FIDL type.

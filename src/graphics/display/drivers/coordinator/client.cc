@@ -985,6 +985,12 @@ void Client::SetDisplayPower(SetDisplayPowerRequestView request,
 display::ConfigCheckResult Client::CheckConfigImpl() {
   TRACE_DURATION("gfx", "Display::Client::CheckConfig");
 
+  if (display_configs_.is_empty()) {
+    // The client needs to process display changes and prepare a configuration
+    // that accounts for the added / removed displays.
+    return display::ConfigCheckResult::kEmptyConfig;
+  }
+
   // The total number of registered layers is an upper bound on the number of
   // layers assigned to display configurations.
   const size_t max_layer_count = std::max(size_t{1}, layers_.size());
@@ -1070,15 +1076,11 @@ display::ConfigCheckResult Client::CheckConfigImpl() {
   }
 
   if (banjo_display_config.layer_count == 0) {
-    // `SetDisplayLayers()` prevents the client from directly specifying an empty layer list
-    // for a display. However, we can still end up here if the client specified a non-empty
-    // configuration for a display that was removed before the client called `CheckConfig()`.
-    //
-    // It is OK to pass the check, because `ApplyConfig()` will skip the configuration for the
-    // missing display. Conversely, we don't want to fail the check, because the client may be
-    // using `CheckConfig()` to probe the display engine's capabilities, and would likely be
-    // confused by a transient failure they have no control over.
-    return display::ConfigCheckResult::kOk;
+    // `SetDisplayLayers()` prevents the client from directly specifying an
+    // empty layer list for a display. However, we can still end up here if the
+    // client specified a non-empty configuration for a display that was removed
+    // before the client called `CheckConfig()`.
+    return display::ConfigCheckResult::kEmptyConfig;
   }
 
   {
