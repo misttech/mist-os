@@ -58,7 +58,11 @@ impl Display for TargetState {
         let res = match self {
             TargetState::Unknown => "Unknown".to_string(),
             TargetState::Product { addrs: addr, serial } => {
-                format!("Product(addrs: {:?} serial:{:?})", addr, serial)
+                format!(
+                    "Product(addrs: [{}] serial: {:?})",
+                    addr.iter().map(|a| format!("{}", a)).collect::<Vec<_>>().join(", "),
+                    serial.as_ref().map_or("", |s| s.as_str())
+                )
             }
             TargetState::Fastboot(state) => format!("Fastboot({:?})", state),
             TargetState::Zedboot => "Zedboot".to_string(),
@@ -77,10 +81,10 @@ pub struct TargetHandle {
 
 impl Display for TargetHandle {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let name = self.node_name.clone().unwrap_or_else(|| "".to_string());
+        let name = self.node_name.as_ref().map_or("", |n| n.as_str());
         write!(
             f,
-            "Node: \"{}\" in state: {}{}",
+            "node: {:?} in state: {}{}",
             name,
             self.state,
             if self.manual { "(manual)" } else { "" }

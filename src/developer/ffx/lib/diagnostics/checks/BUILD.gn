@@ -20,6 +20,7 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/target:lib",
     "//src/developer/ffx/lib/target/holders:lib",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:termion",
   ]
 
   test_deps = [

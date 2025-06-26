@@ -17,6 +17,7 @@ use ffx_target::{
     TargetResolver,
 };
 use std::time::Duration;
+use termion::{color, style};
 
 pub async fn run_diagnostics_with_handle<N>(
     env_context: &EnvironmentContext,
@@ -78,7 +79,12 @@ where
         .and_then_check(ConnectRemoteControlProxy::new(timeout))
         .await
         .map_err(|e| fho::Error::User(e.into()))?;
-    notifier.on_success(format!("Got device info: {:?}", info))?;
+    notifier.on_success(format!(
+        "Got device info: {}{:?}{}",
+        color::Fg(color::Green),
+        info,
+        style::Reset
+    ))?;
     Ok(())
 }
 
@@ -91,7 +97,12 @@ where
         .check_with_notifier(device, notifier)
         .await
         .map_err(|e| fho::Error::User(e.into()))?;
-    notifier.on_success(format!("Got device info: {:?}", info))?;
+    notifier.on_success(format!(
+        "Got device info: {}{:?}{}",
+        color::Fg(color::Green),
+        info,
+        style::Reset
+    ))?;
     Ok(())
 }
 
@@ -196,7 +207,12 @@ where
         output: &Self::Output,
         notifier: &mut Self::Notifier,
     ) -> anyhow::Result<()> {
-        notifier.on_success(format!("Target resolved to {:?}", output))
+        notifier.on_success(format!(
+            "Device resolved to {}{}{}",
+            color::Fg(color::Green),
+            output,
+            style::Reset
+        ))
     }
 
     fn check<'a>(
@@ -299,7 +315,7 @@ where
         input: &Self::Input,
         notifier: &mut Self::Notifier,
     ) -> anyhow::Result<()> {
-        notifier.info(format!("Attempting to connect ssh to device {:?}", input))
+        notifier.info(format!("Attempting to connect ssh to device {}", input))
     }
 
     fn on_success(
