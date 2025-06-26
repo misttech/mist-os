@@ -211,7 +211,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
   // back off to avoid contention with access faults.
   RelaxedAtomic<uint64_t> pending_access_faults_{0};
 
-  // Private RAII type to manage scoped inc/dec of pending_access_faults_.
+  // Private RAII type to manage scoped inc/dec of pending_access_faults_ and preemption disabling.
   class AutoPendingAccessFault {
    public:
     explicit AutoPendingAccessFault(ArmArchVmAspace* aspace);
@@ -221,6 +221,9 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
     AutoPendingAccessFault& operator=(const AutoPendingAccessFault&) = delete;
 
    private:
+    // Include a preempt disable block so that during the state where we do not have the lock, but
+    // have incremented the pending_access_faults_, we cannot be preempted.
+    AutoPreemptDisabler preempt_disable_;
     ArmArchVmAspace* aspace_;
   };
 
