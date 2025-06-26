@@ -643,29 +643,42 @@ TEST_F(BpfMapTest, RingBufferWrapAround) {
   ASSERT_EQ(0u, consumer_pos->load(std::memory_order_acquire));
   ASSERT_EQ(0u, producer_pos->load(std::memory_order_acquire));
 
-  // Write first message that's 3016 bytes long.
-  size_t msg_size = 3016;
-  uint32_t value = 0x6143abcd;
-  WriteToRingBufferLarge(value, msg_size);
-  ASSERT_EQ(3024u, producer_pos->load(std::memory_order_acquire));
-  uint32_t* msg_ptr = reinterpret_cast<uint32_t*>(data + 8);
-  for (size_t i = 0; i < msg_size / 4; ++i) {
-    ASSERT_EQ(msg_ptr[i], value);
-  }
+  struct TestMessage {
+    size_t size;
+    uint32_t value;
+  } messages[] = {
+      {
+          .size = 3016,
+          .value = 0x6143abcd,
+      },
+      // Wrap-around in the middle of the message blob.
+      {
+          .size = 2072,
+          .value = 0xc23414f2,
+      },
+      {
+          .size = 3072,
+          .value = 0x12345678,
+      },
+      // Wrap-around at the edge between message header and the message itself
+      // (8 + 3016 + 8 + 2072 + 8 + 3072 + 8 = 8192).
+      {
+          .size = 128,
+          .value = 0xdeadbeef,
+      },
+  };
 
-  // Consume the message.
-  uint32_t pos = producer_pos->load(std::memory_order_acquire);
-  consumer_pos->store(pos, std::memory_order_release);
-
-  // Write a second message that wraps around to the head of the buffer.
-  uint32_t value2 = 0xc23414f2;
-  size_t msg_size2 = 2072;
-  WriteToRingBufferLarge(value2, msg_size2);
-
-  EXPECT_GT(producer_pos->load(std::memory_order_acquire), static_cast<uint32_t>(getpagesize()));
-  msg_ptr = reinterpret_cast<uint32_t*>(data + pos + 8);
-  for (size_t i = 0; i < msg_size2 / 4; ++i) {
-    ASSERT_EQ(msg_ptr[i], value2);
+  for (const auto& message : messages) {
+    // Queue a message.
+    WriteToRingBufferLarge(message.value, message.size);
+    uint32_t* msg_ptr =
+        reinterpret_cast<uint32_t*>(data + (consumer_pos->load() + 8) % getpagesize());
+    for (size_t i = 0; i < message.size / 4; ++i) {
+      ASSERT_EQ(msg_ptr[i], message.value);
+    }
+    // Consume the message.
+    uint32_t pos = producer_pos->load(std::memory_order_acquire);
+    consumer_pos->store(pos, std::memory_order_release);
   }
 }
 

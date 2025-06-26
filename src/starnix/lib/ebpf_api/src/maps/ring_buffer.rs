@@ -380,7 +380,7 @@ impl MapImpl for RingBuffer {
         if total_size > available_size {
             return Err(MapError::SizeLimit);
         }
-        let data_position = state.data_position(producer_position + BPF_RINGBUF_HDR_SZ);
+        let data_position = state.data_position(producer_position) + BPF_RINGBUF_HDR_SZ as usize;
         let data_length = size | BPF_RINGBUF_BUSY_BIT;
         let page_count = ((data_position - state.data_addr()) / *MapBuffer::PAGE_SIZE + 3)
             .try_into()
