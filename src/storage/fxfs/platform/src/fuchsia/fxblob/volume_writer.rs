@@ -419,8 +419,8 @@ mod tests {
     use fidl_fuchsia_fxfs::BlobVolumeWriterMarker;
     use fuchsia_component_client::connect_to_protocol_at_dir_svc;
     use fxfs_make_blob_image::FxBlobBuilder;
-    use ramdevice_client::RamdiskClientBuilder;
     use storage_device::block_device::BlockDevice;
+    use vmo_backed_block_server::{VmoBackedServer, VmoBackedServerTestingExt};
     use zx::HandleBased as _;
     use {fidl_fuchsia_mem as fmem, fuchsia_async as fasync};
 
@@ -437,9 +437,9 @@ mod tests {
         ),
         ("1194c76d2d3b61f29df97a85ede7b2fd2b293b452f53072356e3c5c939c8131d", &['a' as u8; 65_537]),
     ];
-    const BLOCK_SIZE: u64 = 512;
+    const BLOCK_SIZE: u32 = 512;
     const NUM_BLOCKS: u64 = 8192;
-    const DEVICE_SIZE: u64 = BLOCK_SIZE * NUM_BLOCKS;
+    const DEVICE_SIZE: u64 = BLOCK_SIZE as u64 * NUM_BLOCKS;
 
     struct VmoWriter {
         vmo: zx::Vmo,
@@ -481,25 +481,20 @@ mod tests {
     }
 
     async fn create_sparse_fxblob_image() -> (zx::Vmo, u64) {
-        // TODO(https://fxbug.dev/397515768): It would be preferable if we avoid using a ramdisk
-        // here and instead used vmo_backed_block_server.
         let (fxblob_vmo, used_space) = {
             let vmo = zx::Vmo::create(DEVICE_SIZE).unwrap();
-            let ramdisk = RamdiskClientBuilder::new_with_vmo(
+
+            let block_server = Arc::new(VmoBackedServer::from_vmo(
+                BLOCK_SIZE,
                 vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
-                Some(BLOCK_SIZE),
-            )
-            .build()
-            .await
-            .unwrap();
+            ));
+
             let device = DeviceHolder::new(
                 BlockDevice::new(
                     Box::new(
-                        crate::component::new_block_client(
-                            ramdisk.open().expect("Unable to open ramdisk"),
-                        )
-                        .await
-                        .expect("Unable to create block client"),
+                        crate::component::new_block_client(block_server.connect())
+                            .await
+                            .expect("Unable to create block client"),
                     ),
                     false,
                 )
@@ -514,7 +509,6 @@ mod tests {
             }
 
             let used_space = fxblob.finalize().await.unwrap();
-            ramdisk.destroy_and_wait_for_removal().await.unwrap();
             (vmo, used_space)
         };
 
@@ -528,7 +522,7 @@ mod tests {
                 max_offset: 0,
             };
             sparse::builder::SparseImageBuilder::new()
-                .set_block_size(BLOCK_SIZE as u32)
+                .set_block_size(BLOCK_SIZE)
                 .add_chunk(sparse::builder::DataSource::Vmo {
                     vmo: fxblob_vmo,
                     size: used_space,

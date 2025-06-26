@@ -5,7 +5,7 @@
 use anyhow::{anyhow, Error};
 use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockInfo, BlockServer, DeviceInfo, WriteOptions};
-use fidl::endpoints::ServerEnd;
+use fidl::endpoints::{create_endpoints, ClientEnd, FromClient, RequestStream, ServerEnd};
 use fs_management::filesystem::BlockConnector;
 use std::borrow::Cow;
 use std::num::NonZero;
@@ -181,10 +181,18 @@ impl BlockConnector for VmoBackedServerConnector {
 pub trait VmoBackedServerTestingExt {
     fn new(block_count: u64, block_size: u32, initial_content: &[u8]) -> Self;
     fn from_vmo(block_size: u32, vmo: zx::Vmo) -> Self;
-    fn volume_proxy(self: &Arc<Self>) -> fvolume::VolumeProxy;
-    fn connect(self: &Arc<Self>, server: ServerEnd<fvolume::VolumeMarker>);
-    fn block_proxy(self: &Arc<Self>) -> fblock::BlockProxy;
+    fn connect_server(self: &Arc<Self>, server: ServerEnd<fvolume::VolumeMarker>);
+    fn connect<R: BlockClient>(self: &Arc<Self>) -> R;
 }
+
+pub trait BlockClient: FromClient {}
+
+impl BlockClient for fblock::BlockProxy {}
+impl BlockClient for fvolume::VolumeProxy {}
+impl BlockClient for fblock::BlockSynchronousProxy {}
+impl BlockClient for fvolume::VolumeSynchronousProxy {}
+impl BlockClient for ClientEnd<fblock::BlockMarker> {}
+impl BlockClient for ClientEnd<fvolume::VolumeMarker> {}
 
 impl VmoBackedServerTestingExt for VmoBackedServer {
     fn new(block_count: u64, block_size: u32, initial_content: &[u8]) -> Self {
@@ -206,23 +214,22 @@ impl VmoBackedServerTestingExt for VmoBackedServer {
         .unwrap()
     }
 
-    fn volume_proxy(self: &Arc<Self>) -> fvolume::VolumeProxy {
-        let (client, server) = fidl::endpoints::create_endpoints();
-        self.connect(server);
-        client.into_proxy()
+    fn connect<R: BlockClient>(self: &Arc<Self>) -> R {
+        let (client, server) = create_endpoints::<R::Protocol>();
+        let this = self.clone();
+        fuchsia_async::Task::spawn(async move {
+            let _ = this.serve(server.into_stream().cast_stream()).await;
+        })
+        .detach();
+        R::from_client(client)
     }
 
-    fn connect(self: &Arc<Self>, server: ServerEnd<fvolume::VolumeMarker>) {
+    fn connect_server(self: &Arc<Self>, server: ServerEnd<fvolume::VolumeMarker>) {
         let this = self.clone();
         fuchsia_async::Task::spawn(async move {
             let _ = this.serve(server.into_stream()).await;
         })
         .detach();
-    }
-
-    fn block_proxy(self: &Arc<Self>) -> fblock::BlockProxy {
-        use fidl::endpoints::Proxy as _;
-        fblock::BlockProxy::from_channel(self.volume_proxy().into_channel().unwrap())
     }
 }
 

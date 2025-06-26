@@ -26,7 +26,10 @@ use uuid::Uuid;
 use vmo_backed_block_server::{VmoBackedServer, VmoBackedServerTestingExt as _};
 use zerocopy::{Immutable, IntoBytes};
 use zx::{self as zx, HandleBased};
-use {fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
+    fidl_fuchsia_logger as flogger, fuchsia_async as fasync,
+};
 
 pub const TEST_DISK_BLOCK_SIZE: u32 = 512;
 pub const FVM_SLICE_SIZE: u64 = 32 * 1024;
@@ -354,7 +357,9 @@ impl DiskBuilder {
 
         if self.gpt {
             // Format the disk with gpt, with a single empty partition named "fvm".
-            let client = Arc::new(RemoteBlockClient::new(server.block_proxy()).await.unwrap());
+            let client = Arc::new(
+                RemoteBlockClient::new(server.connect::<fvolume::VolumeProxy>()).await.unwrap(),
+            );
             assert!(self.extra_gpt_partitions.len() < 10);
             let fvm_num_blocks = self.size / TEST_DISK_BLOCK_SIZE as u64 - 138;
             let mut partitions = Vec::new();
@@ -389,8 +394,7 @@ impl DiskBuilder {
         let connector: Box<dyn BlockConnector> = if self.gpt {
             // Format the volume manager in the gpt partition named "fvm".
             let partitions_dir = vfs::directory::immutable::simple();
-            let manager =
-                GptManager::new(server.block_proxy(), partitions_dir.clone()).await.unwrap();
+            let manager = GptManager::new(server.connect(), partitions_dir.clone()).await.unwrap();
             let dir =
                 vfs::directory::serve(partitions_dir, fio::PERM_READABLE | fio::PERM_WRITABLE);
             gpt = Some(manager);
@@ -400,7 +404,7 @@ impl DiskBuilder {
             ))
         } else {
             // Format the volume manager onto the disk directly.
-            Box::new(move |server_end| Ok(server.connect(server_end)))
+            Box::new(move |server_end| Ok(server.connect_server(server_end)))
         };
 
         if self.volumes_spec.fxfs_blob {

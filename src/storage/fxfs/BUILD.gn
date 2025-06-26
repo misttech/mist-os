@@ -184,7 +184,7 @@ fuchsia_unittest_component("fxfs-make-blob-image-test") {
   ]
 }
 
-storage_driver_test_realm_v2_component("fxfs-platform-test") {
+fuchsia_unittest_component("fxfs-platform-test") {
   deps = [ "platform:platform_test" ]
   manifest = "platform/meta/fxfs-platform-test.cml"
 }

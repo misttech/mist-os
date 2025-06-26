@@ -499,26 +499,34 @@ mod tests {
     use fxfs::filesystem::FxFilesystem;
     use fxfs::object_store::volume::root_volume;
     use fxfs::object_store::NO_OWNER;
-    use ramdevice_client::RamdiskClientBuilder;
     use std::pin::Pin;
+    use std::sync::Arc;
     use storage_device::block_device::BlockDevice;
     use storage_device::DeviceHolder;
+    use vmo_backed_block_server::{
+        InitialContents, VmoBackedServerOptions, VmoBackedServerTestingExt,
+    };
     use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
     async fn run_test(
         callback: impl Fn(&fio::DirectoryProxy, LifecycleProxy) -> BoxFuture<'static, ()>,
     ) -> Pin<Box<impl FusedFuture>> {
-        let ramdisk = RamdiskClientBuilder::new(512, 16384)
-            .use_v2()
+        const BLOCK_SIZE: u32 = 512;
+        let block_server = Arc::new(
+            VmoBackedServerOptions {
+                block_size: BLOCK_SIZE,
+                initial_contents: InitialContents::FromCapacity(BLOCK_SIZE as u64 * 16384),
+                ..Default::default()
+            }
             .build()
-            .await
-            .expect("Failed to build ramdisk");
+            .expect("build failed"),
+        );
 
         {
             let fs = FxFilesystem::new_empty(DeviceHolder::new(
                 BlockDevice::new(
                     Box::new(
-                        new_block_client(ramdisk.open().expect("Unable to open ramdisk"))
+                        new_block_client(block_server.connect())
                             .await
                             .expect("Unable to create block client"),
                     ),
@@ -558,10 +566,7 @@ mod tests {
             .expect("Unable to connect to Startup protocol");
         let task = async {
             startup_proxy
-                .start(
-                    ramdisk.open().expect("Unable to open ramdisk").into(),
-                    &StartOptions::default(),
-                )
+                .start(block_server.connect(), &StartOptions::default())
                 .await
                 .expect("Start failed (FIDL)")
                 .expect("Start failed");
