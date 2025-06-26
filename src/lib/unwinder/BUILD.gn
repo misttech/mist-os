@@ -34,6 +34,8 @@ static_library("unwinder") {
     "registers.cc",
     "scs_unwinder.cc",
     "scs_unwinder.h",
+    "sigreturn_unwinder.cc",
+    "sigreturn_unwinder.h",
     "unwind.cc",
     "unwinder_base.h",
   ]
