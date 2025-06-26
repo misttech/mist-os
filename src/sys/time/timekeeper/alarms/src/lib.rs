@@ -266,7 +266,7 @@ enum Cmd {
         /// A timestamp (presumably in the future), at which to expire the timer.
         deadline: fasync::BootInstant,
         // The API supports several modes. See fuchsia.time.alarms/Wake.fidl.
-        mode: fta::SetAndWaitMode,
+        mode: fta::SetMode,
         /// An alarm identifier, chosen by the caller.
         alarm_id: String,
         /// A responder that will be called when the timer expires. The
@@ -1142,7 +1142,7 @@ async fn wake_timer_loop(
                 );
 
                 // This is the only option that requires further action.
-                if let fta::SetAndWaitMode::NotifySetupDone(setup_done) = mode {
+                if let fta::SetMode::NotifySetupDone(setup_done) = mode {
                     defer! {
                         // Must signal once the setup is completed.
                         signal(&setup_done);
@@ -2048,7 +2048,7 @@ mod tests {
             wake_proxy
                 .set_and_wait(
                     deadline.into(),
-                    fta::SetAndWaitMode::NotifySetupDone(setup_done),
+                    fta::SetMode::NotifySetupDone(setup_done),
                     "Hello".into(),
                 )
                 .await
@@ -2095,10 +2095,10 @@ mod tests {
         duration: zx::MonotonicDuration,
     ) {
         run_in_fake_time_and_test_context(duration, |wake_proxy, _| async move {
-            let lease1 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
+            let lease1 = fta::SetMode::KeepAlive(create_fake_wake_lease());
             let fut1 = wake_proxy.set_and_wait(first_deadline.into(), lease1, "Hello1".into());
 
-            let lease2 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
+            let lease2 = fta::SetMode::KeepAlive(create_fake_wake_lease());
             let fut2 = wake_proxy.set_and_wait(second_deadline.into(), lease2, "Hello2".into());
 
             let (result1, result2) = futures::join!(fut1, fut2);
@@ -2141,14 +2141,14 @@ mod tests {
         duration: zx::MonotonicDuration,
     ) {
         run_in_fake_time_and_test_context(duration, |wake_proxy, _| async move {
-            let lease1 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
+            let lease1 = fta::SetMode::KeepAlive(create_fake_wake_lease());
 
             wake_proxy
                 .set_and_wait(first_deadline.into(), lease1, "Hello".into())
                 .await
                 .unwrap()
                 .unwrap();
-            let lease2 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
+            let lease2 = fta::SetMode::KeepAlive(create_fake_wake_lease());
             wake_proxy
                 .set_and_wait(second_deadline.into(), lease2, "Hello2".into())
                 .await
@@ -2169,7 +2169,7 @@ mod tests {
             |wake_proxy, _| async move {
                 let wake_proxy = Rc::new(RefCell::new(wake_proxy));
 
-                let keep_alive = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
+                let keep_alive = fta::SetMode::KeepAlive(create_fake_wake_lease());
 
                 let (mut sync_send, mut sync_recv) = mpsc::channel(1);
 
@@ -2196,7 +2196,7 @@ mod tests {
                     // Wait until we know that the long deadline timer has been scheduled.
                     let _ = sync_recv.next().await;
 
-                    let keep_alive2 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
+                    let keep_alive2 = fta::SetMode::KeepAlive(create_fake_wake_lease());
                     let _ = wake_proxy
                         .borrow()
                         .set_and_wait(
@@ -2229,7 +2229,7 @@ mod tests {
             |wake_proxy, inspector| async move {
                 let wake_proxy = Rc::new(RefCell::new(wake_proxy));
 
-                let keep_alive = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
+                let keep_alive = fta::SetMode::KeepAlive(create_fake_wake_lease());
 
                 let (mut sync_send, mut sync_recv) = mpsc::channel(1);
 
@@ -2262,7 +2262,7 @@ mod tests {
                     // Wait until we know that the other deadline timer has been scheduled.
                     let _ = sync_recv.next().await;
 
-                    let keep_alive2 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
+                    let keep_alive2 = fta::SetMode::KeepAlive(create_fake_wake_lease());
                     let _ = wake_proxy
                         .borrow()
                         .set_and_wait(

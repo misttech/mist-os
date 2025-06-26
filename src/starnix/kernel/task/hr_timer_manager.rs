@@ -611,7 +611,7 @@ impl HrTimerManager {
                     // schedule a wake alarm based on this timer will be sent.
                     let request_fut = device_async_proxy.set_and_wait(
                         new_timer_node.deadline,
-                        fta::SetAndWaitMode::NotifySetupDone(duplicate_handle(&setup_event)?),
+                        fta::SetMode::NotifySetupDone(duplicate_handle(&setup_event)?),
                         &wake_alarm_id,
                     );
                     let mut done_sender = self.get_sender();
@@ -1077,7 +1077,7 @@ mod tests {
                                 deadline
                             );
                             defer! {
-                                if let fta::SetAndWaitMode::NotifySetupDone(setup_done) = mode {
+                                if let fta::SetMode::NotifySetupDone(setup_done) = mode {
                                     // Caller blocks until this event is signaled.
                                     signal_handle(&setup_done, zx::Signals::NONE, zx::Signals::EVENT_SIGNALED).map_err(|e| to_errno_with_log(e)).unwrap();
                                 }

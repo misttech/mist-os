@@ -234,7 +234,7 @@ void escher::EscherFlatland::RenderLoopWithWakingDelay(RenderFrameFn render_fram
 
   FX_CHECK(wake_lease.is_valid());
   fidl::Result<fuchsia_time_alarms::WakeAlarms::SetAndWait> result = wake_alarms_->SetAndWait(
-      {next_render_time_, fuchsia_time_alarms::SetAndWaitMode::WithKeepAlive(std::move(wake_lease)),
+      {next_render_time_, fuchsia_time_alarms::SetMode::WithKeepAlive(std::move(wake_lease)),
        name_});
   if (result.is_ok()) {
     // We do not need to check `enable_wake_alarms_` before the recursive call

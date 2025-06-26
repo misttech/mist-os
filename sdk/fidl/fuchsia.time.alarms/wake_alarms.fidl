@@ -65,7 +65,7 @@ open protocol WakeAlarms {
         deadline zx.InstantBoot;
 
         /// Optional mode that allows the API to support a number of use cases.
-        mode @generated_name("SetAndWaitMode") flexible resource union {
+        mode @generated_name("SetMode") flexible resource union {
             /// This lease is dropped as immediately after the alarm is scheduled
             /// (or an error occurs during scheduling), thus guaranteeing that the
             /// alarm is scheduled before the system is suspended.
