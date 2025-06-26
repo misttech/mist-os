@@ -605,7 +605,7 @@ impl MemoryManagerState {
         length: usize,
         flags: MappingFlags,
     ) -> Result<SelectedAddress, Errno> {
-        let adjusted_length = round_up_to_system_page_size(length)?;
+        let adjusted_length = round_up_to_system_page_size(length).or_else(|_| error!(ENOMEM))?;
 
         let find_address = || -> Result<SelectedAddress, Errno> {
             profile_duration!("FindAddressForMmap");
@@ -731,6 +731,7 @@ impl MemoryManagerState {
         length: usize,
         prot_flags: ProtectionFlags,
         options: MappingOptions,
+        populate: bool,
         name: MappingName,
         released_mappings: &mut Vec<Mapping>,
     ) -> Result<UserAddress, Errno> {
@@ -746,7 +747,7 @@ impl MemoryManagerState {
             backing_memory_offset as u64,
             length,
             flags,
-            false,
+            populate,
         )?;
 
         let end = (mapped_addr + length)?.round_up(*PAGE_SIZE)?;
@@ -779,6 +780,7 @@ impl MemoryManagerState {
                 length,
                 prot_flags,
                 options,
+                options.contains(MappingOptions::POPULATE),
                 name,
                 released_mappings,
             );
@@ -1112,6 +1114,7 @@ impl MemoryManagerState {
                         growth_length,
                         src_mapping.flags().access_flags(),
                         src_mapping.flags().options(),
+                        false,
                         src_mapping.name(),
                         released_mappings,
                     )?;
@@ -1122,7 +1125,7 @@ impl MemoryManagerState {
                     Mapping::new_private_anonymous(src_mapping.flags(), src_mapping.name()),
                 );
 
-                if dst_addr != src_addr && src_length != 0 {
+                if dst_addr != src_addr && src_length != 0 && !keep_source {
                     self.unmap(mm, src_addr, src_length, released_mappings)?;
                 }
 
@@ -3533,6 +3536,8 @@ impl MemoryManager {
             if mapping.flags().contains(MappingFlags::DONTFORK) {
                 continue;
             }
+            // Locking is not inherited when forking.
+            let target_mapping_flags = mapping.flags().difference(MappingFlags::LOCKED);
             match mapping.backing() {
                 MappingBacking::Memory(backing) => {
                     let memory_offset = backing.address_to_offset(range.start);
@@ -3564,8 +3569,7 @@ impl MemoryManager {
                         target_memory,
                         memory_offset,
                         length,
-                        // Locking is not inherited when forking.
-                        mapping.flags().difference(MappingFlags::LOCKED),
+                        target_mapping_flags,
                         mapping.max_access(),
                         false,
                         mapping.name().clone(),
@@ -3590,12 +3594,15 @@ impl MemoryManager {
                         &target_state.private_anonymous.backing,
                         target_memory_offset,
                         length,
-                        mapping.flags(),
+                        target_mapping_flags,
                         false,
                     )?;
                     target_state.mappings.insert(
                         range.clone(),
-                        Mapping::new_private_anonymous(mapping.flags(), mapping.name().clone()),
+                        Mapping::new_private_anonymous(
+                            target_mapping_flags,
+                            mapping.name().clone(),
+                        ),
                     );
                 }
             };
@@ -3626,6 +3633,12 @@ impl MemoryManager {
             state.user_vmar_info = state.user_vmar.info()?;
             state.brk = None;
             state.executable_node = Some(exe_node);
+
+            // All private-anonymous memory is zeroed
+            #[cfg(feature = "alternate_anon_allocs")]
+            state
+                .private_anonymous
+                .zero(UserAddress::from_ptr(state.user_vmar_info.base), state.user_vmar_info.len)?;
 
             std::mem::replace(&mut state.mappings, Default::default())
         };
@@ -5541,13 +5554,17 @@ mod tests {
         // reserve memory for both pages
         let addr_reserve =
             map_memory(&mut locked, &current_task, UserAddress::default(), *PAGE_SIZE * 2);
-        let addr1 = map_memory_with_flags(
+        let addr1 = do_mmap(
             &mut locked,
             &current_task,
             addr_reserve,
-            *PAGE_SIZE,
+            *PAGE_SIZE as usize,
+            PROT_READ, // Map read-only to avoid merging of the two mappings
             MAP_ANONYMOUS | MAP_PRIVATE | MAP_FIXED,
-        );
+            FdNumber::from_raw(-1),
+            0,
+        )
+        .expect("failed to mmap");
         let addr2 = map_memory_with_flags(
             &mut locked,
             &current_task,

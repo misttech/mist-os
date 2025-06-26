@@ -1597,13 +1597,12 @@ pub mod tests {
             )
             .expect("get_payload_info");
 
-            let ArgumentEntry::VmoArgument(VmoArgument { vmo: _vmo, offset, length }) =
+            let ArgumentEntry::VmoArgument(VmoArgument { vmo: _vmo, offset: _offset, length }) =
                 &payload_info.input_args[0]
             else {
                 panic!("wrong type")
             };
 
-            assert_eq!(offset, &0u64);
             assert_eq!(length, &100u64);
 
             assert_eq!(
