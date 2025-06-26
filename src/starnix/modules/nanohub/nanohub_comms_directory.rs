@@ -4,6 +4,7 @@
 
 use crate::nanohub_sysfs_files::{
     FirmwareNameSysFsOps, FirmwareVersionSysFsOps, NanohubSysFsNode, TimeSyncSysFsOps,
+    WakeUpEventDuration,
 };
 use crate::socket_tunnel_file::{FirmwareFile, SocketTunnelSysfsFile};
 use starnix_core::device::kobject::Device;
@@ -155,9 +156,7 @@ impl FsNodeOps for NanohubCommsDirectory {
                 FsNodeInfo::new(mode!(IFREG, 0o440), FsCred { uid: 1000, gid: 1000 }),
             )),
             b"wakeup_event_msec" => Ok(node.fs().create_node_and_allocate_node_id(
-                SocketTunnelSysfsFile::new(
-                    b"/sys/devices/virtual/nanohub/nanohub_comms/wakeup_event_msec".into(),
-                ),
+                NanohubSysFsNode::<WakeUpEventDuration>::new(),
                 FsNodeInfo::new(mode!(IFREG, 0o660), FsCred::root()),
             )),
             b"wake_lock" => Ok(node.fs().create_node_and_allocate_node_id(

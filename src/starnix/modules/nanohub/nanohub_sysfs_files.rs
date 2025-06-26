@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use std::marker::PhantomData;
+use std::time::Duration;
 
 use fuchsia_component::client::connect_to_protocol_sync;
 use starnix_core::task::CurrentTask;
@@ -18,6 +19,7 @@ use starnix_uapi::{errno, error};
 use {fidl_fuchsia_hardware_google_nanohub as fnanohub, zx};
 
 /// A wrapper around `starnix_uapi::errors::Errno`.
+#[derive(Debug)]
 pub struct NanohubSysfsError(Errno);
 
 /// An equivalent to `starnix_uapi::errno!`, but for `NanohubSysfsError`.
@@ -273,5 +275,97 @@ impl NanohubSysFsFileOps for TimeSyncSysFsOps {
         let ap = try_get(response.ap_boot_time)?;
         let mcu = try_get(response.mcu_boot_time)?;
         Ok(format!("ap time: {} mcu time: {}\n", ap, mcu))
+    }
+}
+
+#[derive(Default)]
+pub struct WakeUpEventDuration {}
+
+impl WakeUpEventDuration {
+    fn string_to_duration(value: String) -> Result<i64, NanohubSysfsError> {
+        // At the driver level, the value is expected to be within the range of u32.
+        let duration_msec = value.trim().parse::<u32>().map_err(|e| {
+            log_error!("Failed to parse wake up event duration: {e:?}");
+            nanohub_sysfs_errno!(EINVAL)
+        })?;
+
+        // The duration conversion produces a u128, but we need an i64 to provide as a zx.Duration.
+        // In practice, this conversion should never fail because the driver represents this value
+        // as a u32.
+        let duration_ns: i64 =
+            Duration::from_millis(duration_msec.into()).as_nanos().try_into().map_err(|e| {
+                log_error!("Received out-of-bounds wake up event duration: {e:?}");
+                nanohub_sysfs_errno!(EINVAL)
+            })?;
+
+        Ok(duration_ns)
+    }
+
+    fn duration_to_string(duration: i64) -> Result<String, NanohubSysfsError> {
+        // zx.Duration is an alias of i64 but we need a u64 to work the std::time::Duration.
+        // In practice, this conversion should never fail because the driver represents this
+        // value as a u32.
+        let duration_ns: u64 = duration.try_into().map_err(|e| {
+            log_error!("Received out-of-bounds wake up event duration: {e:?}");
+            nanohub_sysfs_errno!(EINVAL)
+        })?;
+
+        let duration_msec = Duration::from_nanos(duration_ns).as_millis();
+        Ok(format!("{}\n", duration_msec))
+    }
+}
+
+impl NanohubSysFsFileOps for WakeUpEventDuration {
+    fn show(
+        &self,
+        service: &fidl_fuchsia_hardware_google_nanohub::DeviceSynchronousProxy,
+    ) -> Result<String, NanohubSysfsError> {
+        let response = service.get_wake_up_event_duration(zx::MonotonicInstant::INFINITE)??;
+        WakeUpEventDuration::duration_to_string(response)
+    }
+
+    fn store(
+        &self,
+        service: &fidl_fuchsia_hardware_google_nanohub::DeviceSynchronousProxy,
+        value: String,
+    ) -> Result<(), NanohubSysfsError> {
+        let duration_ns = WakeUpEventDuration::string_to_duration(value)?;
+        Ok(service.set_wake_up_event_duration(duration_ns, zx::MonotonicInstant::INFINITE)??)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[::fuchsia::test]
+    fn test_wakeup_event_duration_string_to_duration_valid() {
+        let msec: i64 = 123_456;
+        let cases = [format!("{}", msec), format!("{}\n", msec)];
+
+        for case in cases {
+            let duration = WakeUpEventDuration::string_to_duration(case);
+            assert_eq!(duration.is_ok(), true);
+            assert_eq!(duration.unwrap(), msec * 1_000_000);
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_wakeup_event_duration_string_to_duration_invalid() {
+        let ns = "foobar";
+        let cases = [format!("{}", ns), format!("{}\n", ns)];
+
+        for case in cases {
+            let duration = WakeUpEventDuration::string_to_duration(case);
+            assert_eq!(duration.is_err(), true);
+        }
+    }
+
+    #[::fuchsia::test]
+    fn test_wakeup_event_duration_duration_to_string_valid() {
+        let ns: i64 = 123_456_000_000;
+        let value = WakeUpEventDuration::duration_to_string(ns);
+        assert_eq!(value.is_ok(), true);
+        assert_eq!(value.unwrap(), format!("123456\n"));
     }
 }
