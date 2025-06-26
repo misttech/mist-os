@@ -6,11 +6,15 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_SCHEDULER_STATE_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_SCHEDULER_STATE_H_
 
+#include <lib/fxt/argument.h>
+#include <lib/sched/time.h>
 #include <lib/zircon-internal/macros.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <zircon/syscalls/scheduler.h>
 #include <zircon/types.h>
+
+#include <cstdint>
 
 #include <fbl/enum_bits.h>
 #include <fbl/intrusive_wavl_tree.h>
@@ -19,7 +23,9 @@
 #include <kernel/cpu.h>
 #include <kernel/spinlock.h>
 #include <ktl/limits.h>
+#include <ktl/type_traits.h>
 #include <ktl/utility.h>
+#include <ktl/variant.h>
 
 // Forward declarations.
 struct Thread;
@@ -79,6 +85,33 @@ using SchedUtilization = ffl::Fixed<int64_t, 20>;
 using SchedDuration = ffl::Fixed<zx_duration_mono_t, 0>;
 using SchedTime = ffl::Fixed<zx_instant_mono_t, 0>;
 
+// Ensure these types stay in sync with lib/sched.
+static_assert(ktl::is_same_v<SchedDuration, sched::Duration>);
+static_assert(ktl::is_same_v<SchedTime, sched::Time>);
+
+// Simplify trace event arguments by automatically converting fixed point values with zero
+// fractional bits to the corresponding integral records.
+namespace fxt {
+
+constexpr Argument<ArgumentType::kInt64, RefType::kId> MakeArgument(StringRef<RefType::kId> name,
+                                                                    ffl::Fixed<int64_t, 0> value) {
+  return {name, value.raw_value()};
+}
+constexpr Argument<ArgumentType::kUint64, RefType::kId> MakeArgument(
+    StringRef<RefType::kId> name, ffl::Fixed<uint64_t, 0> value) {
+  return {name, value.raw_value()};
+}
+constexpr Argument<ArgumentType::kInt32, RefType::kId> MakeArgument(StringRef<RefType::kId> name,
+                                                                    ffl::Fixed<int32_t, 0> value) {
+  return {name, value.raw_value()};
+}
+constexpr Argument<ArgumentType::kUint32, RefType::kId> MakeArgument(
+    StringRef<RefType::kId> name, ffl::Fixed<uint32_t, 0> value) {
+  return {name, value.raw_value()};
+}
+
+}  // namespace fxt
+
 namespace internal {
 // Conversion table entry. Scales the integer argument to a fixed-point weight
 // in the interval (0.0, 1.0].
@@ -92,9 +125,9 @@ struct WeightTableEntry {
 // Table of fixed-point constants converting from kernel priority to fair
 // scheduler weight.
 inline constexpr WeightTableEntry kPriorityToWeightTable[] = {
-    121,   149,   182,   223,   273,   335,   410,   503,   616,   754,  924,
-    1132,  1386,  1698,  2080,  2549,  3122,  3825,  4685,  5739,  7030, 8612,
-    10550, 12924, 15832, 19394, 23757, 29103, 35651, 43672, 53499, 65536};
+    53,  58,  64,  71,  78,  85,  94,  103, 114, 125, 138, 152, 167, 184, 202, 222,
+    245, 269, 296, 326, 358, 394, 434, 477, 525, 578, 635, 699, 769, 846, 930, 1024,
+};
 }  // namespace internal
 
 // Represents the key deadline scheduler parameters using fixed-point types.
@@ -159,7 +192,7 @@ enum class SchedDiscipline {
 class SchedulerState {
  public:
   // The key type of this node operated on by WAVLTree.
-  using KeyType = ktl::pair<SchedTime, uint64_t>;
+  using KeyType = ktl::pair<SchedTime, uintptr_t>;
 
   struct BaseProfile {
     constexpr BaseProfile() : fair{} {}
@@ -349,6 +382,7 @@ class SchedulerState {
         start_time = SchedTime{0};
         finish_time = SchedTime{0};
         time_slice_ns = SchedDuration{0};
+        time_slice_used_ns = SchedDuration{0};
       }
     }
 
@@ -359,6 +393,7 @@ class SchedulerState {
         ASSERT(start_time == SchedTime{0});
         ASSERT(finish_time == SchedTime{0});
         ASSERT(time_slice_ns == SchedDuration{0});
+        ASSERT(time_slice_used_ns == SchedDuration{0});
       }
     }
 
@@ -373,6 +408,7 @@ class SchedulerState {
     SchedTime start_time{0};  // TODO(johngro): Do we need this?
     SchedTime finish_time{0};
     SchedDuration time_slice_ns{0};
+    SchedDuration time_slice_used_ns{0};
   };
 
   // Converts from kernel priority value in the interval [0, 31] to weight in
@@ -412,20 +448,22 @@ class SchedulerState {
   SchedDiscipline discipline() const { return effective_profile_.discipline; }
 
   // Returns the key used to order the run queue.
-  KeyType key() const { return {start_time_, generation_}; }
+  KeyType key() const { return {start_time_, reinterpret_cast<uintptr_t>(this)}; }
 
-  // Returns the generation count from the last time the thread was enqueued
-  // in the runnable tree.
-  uint64_t generation() const { return generation_; }
   uint64_t flow_id() const { return flow_id_; }
 
   zx_instant_mono_t last_started_running() const { return last_started_running_.raw_value(); }
-  zx_duration_mono_t time_slice_ns() const { return time_slice_ns_.raw_value(); }
   zx_duration_mono_t runtime_ns() const { return runtime_ns_.raw_value(); }
-  zx_duration_mono_t expected_runtime_ns() const { return expected_runtime_ns_.raw_value(); }
 
-  const SchedTime start_time() const { return start_time_; }
-  const SchedTime finish_time() const { return finish_time_; }
+  SchedDuration expected_runtime_ns() const { return expected_runtime_ns_; }
+  SchedDuration time_slice_ns() const { return time_slice_ns_; }
+  SchedDuration time_slice_used_ns() const { return time_slice_used_ns_; }
+  SchedDuration remaining_time_slice_ns() const { return time_slice_ns_ - time_slice_used_ns_; }
+
+  SchedTime start_time() const { return start_time_; }
+  SchedTime finish_time() const { return finish_time_; }
+  SchedDuration effective_period() const { return finish_time() - start_time(); }
+
   cpu_mask_t hard_affinity() const { return hard_affinity_; }
   cpu_mask_t soft_affinity() const { return soft_affinity_; }
 
@@ -472,11 +510,23 @@ class SchedulerState {
   // tasks.
   SchedTime finish_time_{0};
 
-  // Minimum finish time of all the descendants of this node in the run queue.
-  // This value is automatically maintained by the WAVLTree observer hooks. The
-  // value is used to perform a partition search in O(log n) time, to find the
-  // thread with the earliest finish time that also has an eligible start time.
-  SchedTime min_finish_time_{0};
+  struct SubtreeInvariants {
+    // Minimum finish time of all the descendants of this node in the run queue.
+    // Used to perform a partition search in O(log n) time, to find the thread
+    // with the earliest finish time that also has an eligible start time.
+    SchedTime min_finish_time{0};
+
+    // Minimum weight of all the descendants of this node in the run queue. Used
+    // to determine when period expansion is required to ensure that time slices
+    // are not too small.
+    SchedWeight min_weight{0};
+  };
+
+  // Subtree invariants for the augmented binary search tree implemented by the
+  // run queue WAVLTrees. The WAVLTree observer hooks maintain these per-node
+  // values that describe properties of the node's subtree when the node is in
+  // the tree.
+  SubtreeInvariants subtree_invariants_;
 
   // The scheduling state of the thread.
   thread_state state_{THREAD_INITIAL};
@@ -487,6 +537,9 @@ class SchedulerState {
 
   // The current timeslice allocated to the thread.
   SchedDuration time_slice_ns_{0};
+
+  // The runtime used in the current period.
+  SchedDuration time_slice_used_ns_{0};
 
   // The total time in THREAD_RUNNING state. If the thread is currently in
   // THREAD_RUNNING state, this excludes the time accrued since it last left the
@@ -513,10 +566,6 @@ class SchedulerState {
   //   * THREAD_READY: The time the thread entered the run queue.
   //   * Otherwise: The time the thread last ran.
   SchedTime last_started_running_{0};
-
-  // Takes the value of Scheduler::generation_count_ + 1 at the time this node
-  // is added to the run queue.
-  uint64_t generation_{0};
 
   // The current sched_latency flow id for this thread.
   uint64_t flow_id_{0};

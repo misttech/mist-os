@@ -20,7 +20,7 @@
 
 #include <fbl/intrusive_pointer_traits.h>
 #include <fbl/intrusive_wavl_tree.h>
-#include <fbl/wavl_tree_best_node_observer.h>
+#include <fbl/wavl_tree_augmented_invariant_observer.h>
 #include <ffl/fixed.h>
 #include <kernel/auto_lock.h>
 #include <kernel/dpc.h>
@@ -811,31 +811,42 @@ class Scheduler {
     }
   };
 
-  // Observer that maintains the subtree invariant min_finish_time as nodes are
-  // added to and removed from the run queue.
-  struct SubtreeMinTraits {
-    static SchedTime GetValue(const Thread& node) TA_NO_THREAD_SAFETY_ANALYSIS {
-      return node.scheduler_state().finish_time_;
+  // Observer that maintains the subtree invariant min_finish_time and
+  // min_weight as nodes are added to and removed from the run queue.
+  struct SubtreeInvariantTraits {
+    using SubtreeInvariants = SchedulerState::SubtreeInvariants;
+
+    static SubtreeInvariants GetNodeValue(const Thread& node) TA_NO_THREAD_SAFETY_ANALYSIS {
+      const SchedulerState& scheduler_state = node.scheduler_state();
+      const EffectiveProfile& effective_profile = scheduler_state.effective_profile();
+      const SchedWeight min_weight =
+          effective_profile.IsFair() ? effective_profile.fair.weight : SchedWeight::Max();
+
+      return {.min_finish_time = scheduler_state.finish_time_, .min_weight = min_weight};
     }
 
-    static SchedTime GetSubtreeBest(const Thread& node) TA_NO_THREAD_SAFETY_ANALYSIS {
-      return node.scheduler_state().min_finish_time_;
+    static SubtreeInvariants GetSubtreeValue(const Thread& node) TA_NO_THREAD_SAFETY_ANALYSIS {
+      return node.scheduler_state().subtree_invariants_;
     }
 
-    static bool Compare(SchedTime a, SchedTime b) { return a < b; }
-
-    static void AssignBest(Thread& node, SchedTime val) TA_NO_THREAD_SAFETY_ANALYSIS {
-      node.scheduler_state().min_finish_time_ = val;
+    static SubtreeInvariants CombineValues(SubtreeInvariants subtree, SubtreeInvariants node) {
+      return {.min_finish_time = ktl::min(subtree.min_finish_time, node.min_finish_time),
+              .min_weight = ktl::min(subtree.min_weight, node.min_weight)};
     }
 
-    static void ResetBest(Thread& target) {}
+    static void SetSubtreeValue(Thread& node,
+                                SubtreeInvariants value) TA_NO_THREAD_SAFETY_ANALYSIS {
+      node.scheduler_state().subtree_invariants_ = value;
+    }
+
+    static void ResetSubtreeValue(Thread& target) {}
   };
 
-  using SubtreeMinObserver = fbl::WAVLTreeBestNodeObserver<SubtreeMinTraits>;
+  using SubtreeObserver = fbl::WAVLTreeAugmentedInvariantObserver<SubtreeInvariantTraits>;
 
   // Alias of the WAVLTree type for the run queue.
   using RunQueue = fbl::WAVLTree<TaskTraits::KeyType, Thread*, TaskTraits, fbl::DefaultObjectTag,
-                                 TaskTraits, SubtreeMinObserver>;
+                                 TaskTraits, SubtreeObserver>;
 
   // Finds the next eligible thread in the given run queue.
   //

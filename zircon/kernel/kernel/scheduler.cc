@@ -382,14 +382,19 @@ Thread* Scheduler::FindEarliestEligibleThread(RunQueue* run_queue, SchedTime eli
 template <typename Predicate>
 Thread* Scheduler::FindEarliestEligibleThread(RunQueue* run_queue, SchedTime eligible_time,
                                               Predicate&& predicate) {
-  auto GetSchedulerState = [this](const Thread& t)
-                               TA_REQ(this->queue_lock_) -> const SchedulerState& {
+  const auto scheduler_state = [this](const Thread& t)
+                                   TA_REQ(this->queue_lock_) -> const SchedulerState& {
     AssertInScheduler(t);
     return t.scheduler_state();
   };
+  const auto subtree_state = [this](const Thread& t) TA_REQ(
+                                 this->queue_lock_) -> const SchedulerState::SubtreeInvariants& {
+    AssertInScheduler(t);
+    return t.scheduler_state().subtree_invariants_;
+  };
 
   // Early out if there is no eligible thread.
-  if (run_queue->is_empty() || GetSchedulerState(run_queue->front()).start_time_ > eligible_time) {
+  if (run_queue->is_empty() || scheduler_state(run_queue->front()).start_time_ > eligible_time) {
     return nullptr;
   }
 
@@ -407,16 +412,15 @@ Thread* Scheduler::FindEarliestEligibleThread(RunQueue* run_queue, SchedTime eli
   // that are not eligible. Eligible tasks are both in the left partition and
   // along the search path, tracked by |path|.
   while (node) {
-    const SchedulerState& node_state = GetSchedulerState(*node);
+    const SchedulerState& node_state = scheduler_state(*node);
 
     if (node_state.start_time_ <= eligible_time) {
-      if (!path || GetSchedulerState(*path).finish_time_ > node_state.finish_time_) {
+      if (!path || scheduler_state(*path).finish_time_ > node_state.finish_time_) {
         path = node;
       }
 
-      if (auto left = node.left();
-          !subtree || (left && (GetSchedulerState(*subtree).min_finish_time_ >
-                                GetSchedulerState(*left).min_finish_time_))) {
+      if (auto left = node.left(); !subtree || (left && (subtree_state(*subtree).min_finish_time >
+                                                         subtree_state(*left).min_finish_time))) {
         subtree = left;
       }
 
@@ -430,8 +434,8 @@ Thread* Scheduler::FindEarliestEligibleThread(RunQueue* run_queue, SchedTime eli
     return path && accept(path) ? path.CopyPointer() : nullptr;
   }
 
-  const SchedulerState& subtree_state = GetSchedulerState(*subtree);
-  if ((subtree_state.min_finish_time_ >= GetSchedulerState(*path).finish_time_) && accept(path)) {
+  const SchedTime subtree_min_finish_time = subtree_state(*subtree).min_finish_time;
+  if ((subtree_min_finish_time >= scheduler_state(*path).finish_time_) && accept(path)) {
     return path.CopyPointer();
   }
 
@@ -439,14 +443,12 @@ Thread* Scheduler::FindEarliestEligibleThread(RunQueue* run_queue, SchedTime eli
   // subtree with the smallest minimum finish time.
   node = subtree;
   do {
-    const SchedulerState& node_state = GetSchedulerState(*node);
-
-    if ((subtree_state.min_finish_time_ == node_state.finish_time_) && accept(node)) {
+    if ((subtree_min_finish_time == scheduler_state(*node).finish_time_) && accept(node)) {
       return node.CopyPointer();
     }
 
     if (auto left = node.left();
-        left && (node_state.min_finish_time_ == GetSchedulerState(*left).min_finish_time_)) {
+        left && (subtree_state(*node).min_finish_time == subtree_state(*left).min_finish_time)) {
       node = left;
     } else {
       node = node.right();
@@ -824,13 +826,14 @@ Thread* Scheduler::DequeueFairThread() {
   // different template instantiations of fbl::WAVLTree to support the fair and
   // deadline disciplines.
   Thread* const eligible_thread = FindEarliestEligibleThread(&fair_run_queue_, eligible_time);
-  DEBUG_ASSERT_MSG(eligible_thread != nullptr,
-                   "virtual_time=%" PRId64 ", eligible_time=%" PRId64 " , start_time=%" PRId64
-                   ", finish_time=%" PRId64 ", min_finish_time=%" PRId64 "!",
-                   virtual_time_.raw_value(), eligible_time.raw_value(),
-                   earliest_thread.scheduler_state().start_time_.raw_value(),
-                   earliest_thread.scheduler_state().finish_time_.raw_value(),
-                   earliest_thread.scheduler_state().min_finish_time_.raw_value());
+  DEBUG_ASSERT_MSG(
+      eligible_thread != nullptr,
+      "virtual_time=%" PRId64 ", eligible_time=%" PRId64 " , start_time=%" PRId64
+      ", finish_time=%" PRId64 ", min_finish_time=%" PRId64 "!",
+      virtual_time_.raw_value(), eligible_time.raw_value(),
+      earliest_thread.scheduler_state().start_time_.raw_value(),
+      earliest_thread.scheduler_state().finish_time_.raw_value(),
+      earliest_thread.scheduler_state().subtree_invariants_.min_finish_time.raw_value());
 
   // Same argument as before for the use of the no-op assert.  We are holding
   // the queue lock, and we just found this thread in the scheduler.
@@ -2169,10 +2172,6 @@ void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
       state->flow_id_ = NextFlowId();
       LOCAL_KTRACE_FLOW_BEGIN(FLOW, "sched_latency", state->flow_id(), ("tid", thread->tid()));
     }
-
-    // The generation count must always be updated when changing between CPUs,
-    // as each CPU has its own generation count.
-    state->generation_ = ++generation_count_;
   }
 
   // Insert the thread into the appropriate run queue after the generation count
