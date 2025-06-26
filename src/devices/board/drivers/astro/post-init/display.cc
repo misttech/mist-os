@@ -94,13 +94,6 @@ static const std::vector<fpbus::Irq> display_irqs{
     }},
 };
 
-static std::vector<fpbus::Metadata> display_panel_metadata{
-    {{
-        .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_TYPE),
-        // No metadata for this item.
-    }},
-};
-
 static const std::vector<fpbus::Bti> display_btis{
     {{
         .iommu_index = 0,
@@ -109,14 +102,15 @@ static const std::vector<fpbus::Bti> display_btis{
 };
 
 zx::result<> PostInit::InitDisplay() {
-  const display::PanelType panel_type = display_id_
-                                            ? display::PanelType::kInnoluxP070acbFitipowerJd9364
-                                            : display::PanelType::kBoeTv070wsmFitipowerJd9364Astro;
-  display_panel_metadata[0].data() =
-      std::vector(reinterpret_cast<const uint8_t*>(&panel_type),
-                  reinterpret_cast<const uint8_t*>(&panel_type) + sizeof(display::PanelType));
+  const std::vector<fpbus::Metadata> display_panel_metadata{
+      {{
+          .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_TYPE),
+          .data = std::vector(reinterpret_cast<uint8_t*>(&panel_type_),
+                              reinterpret_cast<uint8_t*>(&panel_type_) + sizeof(panel_type_)),
+      }},
+  };
 
-  const fpbus::Node display_dev = []() {
+  const fpbus::Node display_dev = [&]() {
     fpbus::Node dev = {};
     dev.name() = "display";
     dev.vid() = bind_fuchsia_amlogic_platform::BIND_PLATFORM_DEV_VID_AMLOGIC;

@@ -7,6 +7,8 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
 #include <lib/driver/component/cpp/driver_export.h>
 
+namespace astro {
+
 namespace {
 
 constexpr std::array<const char*, 3> kBoardBuildNodeNames = {
@@ -15,13 +17,16 @@ constexpr std::array<const char*, 3> kBoardBuildNodeNames = {
     "hw-id-2",
 };
 
-constexpr std::array<const char*, 1> kDisplayIdNodeNames = {
+constexpr std::array<const char*, 1> kDisplayPanelVendorNodeNames = {
     "disp-soc-vid",
 };
 
-}  // namespace
+enum class PanelVendor : uint8_t {
+  kBoe = 0,
+  kInnolux = 1,
+};
 
-namespace astro {
+}  // namespace
 
 void PostInit::Start(fdf::StartCompleter completer) {
   parent_.Bind(std::move(node()));
@@ -62,6 +67,10 @@ void PostInit::Start(fdf::StartCompleter completer) {
     return completer(result.take_error());
   }
 
+  if (zx::result result = IdentifyPanel(); result.is_error()) {
+    return completer(result.take_error());
+  }
+
   if (zx::result result = InitDisplay(); result.is_error()) {
     return completer(result.take_error());
   }
@@ -98,14 +107,27 @@ zx::result<> PostInit::InitBoardInfo() {
   } else {
     FDF_LOG(INFO, "Detected board rev 0x%x", board_build_);
   }
+  return zx::ok();
+}
 
-  if (zx::result<uint8_t> display_id = ReadGpios(kDisplayIdNodeNames); display_id.is_ok()) {
-    display_id_ = *display_id;
-  } else {
-    return display_id.take_error();
+zx::result<> PostInit::IdentifyPanel() {
+  zx::result<uint8_t> panel_vendor_result = ReadGpios(kDisplayPanelVendorNodeNames);
+  if (panel_vendor_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to read display panel vendor: %s", panel_vendor_result.status_string());
+    return panel_vendor_result.take_error();
   }
 
-  return zx::ok();
+  PanelVendor panel_vendor = static_cast<PanelVendor>(std::move(panel_vendor_result).value());
+  switch (panel_vendor) {
+    case PanelVendor::kBoe:
+      panel_type_ = display::PanelType::kBoeTv070wsmFitipowerJd9364Astro;
+      return zx::ok();
+    case PanelVendor::kInnolux:
+      panel_type_ = display::PanelType::kInnoluxP070acbFitipowerJd9364;
+      return zx::ok();
+  }
+  FDF_LOG(ERROR, "Invalid panel vendor: %" PRIu8, static_cast<uint8_t>(panel_vendor));
+  return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
 zx::result<> PostInit::SetBoardInfo() {
