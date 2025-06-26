@@ -635,7 +635,7 @@ template("starnix_syscalls_cpp_tests_package") {
 }
 
 starnix_syscalls_cpp_tests_package("starnix_syscalls_cpp_tests") {
-  test_names = syscall_tests
+  test_names = all_test_names
   log_settings = {
     max_severity = "ERROR"
   }
