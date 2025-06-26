@@ -285,11 +285,14 @@ def fuchsia_prebuilt_product_configuration(
         name,
         product_config_dir,
         build_type,
+        # TODO(https://fxbug.dev/427811316): Flip this to False when all
+        # products set it to True when necessary.
+        allow_empty = True,
         **kwargs):
     _all_files_target = "{}_all_files".format(name)
     native.filegroup(
         name = _all_files_target,
-        srcs = native.glob(["{}/**/*".format(product_config_dir)]),
+        srcs = native.glob(["{}/**/*".format(product_config_dir)], allow_empty = allow_empty),
     )
 
     _fuchsia_prebuilt_product_configuration(
