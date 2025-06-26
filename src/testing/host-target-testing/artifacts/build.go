@@ -260,7 +260,7 @@ func (b *ArtifactsBuild) GetProductBundleDir(ctx context.Context) (string, error
 		pbArtifacts,
 	); err != nil {
 		logger.Errorf(ctx, "failed to download product bundle for build %s: %v", b.id, err)
-		return "", fmt.Errorf("failed to download build info for build %s: %w", b.id, err)
+		return "", fmt.Errorf("failed to download product bundle for build %s: %w", b.id, err)
 	}
 
 	b.productBundleDir = productBundleDir
@@ -514,7 +514,7 @@ func (b *ArtifactsBuild) GetBuildImages(ctx context.Context) (string, error) {
 
 	var items []build.Image
 	if err := json.NewDecoder(f).Decode(&items); err != nil {
-		return "", fmt.Errorf("failed to parse %q: %w", imagesJSON, err)
+		return "", fmt.Errorf("failed to parse build image %q: %w", imagesJSON, err)
 	}
 
 	// Get list of all available images to download and only download
@@ -628,7 +628,7 @@ func (b *ArtifactsBuild) getVbmetaPathFromImages(ctx context.Context) (string, e
 		Type string `json:"type"`
 	}
 	if err := json.NewDecoder(f).Decode(&items); err != nil {
-		return "", fmt.Errorf("failed to parse %q: %w", imagesJSON, err)
+		return "", fmt.Errorf("failed to parse vbmeta image %q: %w", imagesJSON, err)
 	}
 
 	for _, item := range items {
@@ -681,10 +681,6 @@ func (b *FuchsiaDirBuild) GetFlashManifest(ctx context.Context) (string, error) 
 }
 
 func (b *FuchsiaDirBuild) GetProductBundleDir(ctx context.Context) (string, error) {
-	type productBundle struct {
-		Path string `json:"path"`
-	}
-
 	productBundlesPath := filepath.Join(b.dir, "product_bundles.json")
 	f, err := os.Open(productBundlesPath)
 	if err != nil {
@@ -697,7 +693,7 @@ func (b *FuchsiaDirBuild) GetProductBundleDir(ctx context.Context) (string, erro
 	}
 
 	if err := json.NewDecoder(f).Decode(&productBundles); err != nil {
-		return "", fmt.Errorf("failed to parse %s: %w", productBundlesPath, err)
+		return "", fmt.Errorf("failed to parse product bundles path %s: %w", productBundlesPath, err)
 	}
 
 	// The first entry is the product bundle for the build.
@@ -748,7 +744,7 @@ func (b *FuchsiaDirBuild) GetVbmetaPath(ctx context.Context) (string, error) {
 
 	var items []build.Image
 	if err := json.NewDecoder(f).Decode(&items); err != nil {
-		return "", fmt.Errorf("failed to parse %q: %w", imagesJSON, err)
+		return "", fmt.Errorf("failed to parse vbmeta imagesJSON %q: %w", imagesJSON, err)
 	}
 
 	for _, item := range items {
