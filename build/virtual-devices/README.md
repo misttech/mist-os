@@ -6,5 +6,5 @@ These device configurations are included in product bundles. Product owners may
 choose to include some or all of the standard definitions, and also to include
 addition configurations.
 
-See //build/sdk/product_bundle.gni to see how and which standard virtual devices
+See //build/assembly/product_bundle.gni to see how and which standard virtual devices
 are added if no virtual devices are passed into the product_bundle template.

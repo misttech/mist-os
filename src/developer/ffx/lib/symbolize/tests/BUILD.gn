@@ -4,9 +4,9 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/product_assembly_configuration.gni")
+import("//build/assembly/product_bundle.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//build/sdk/product_bundle.gni")
 import("//build/testing/symbols_dir_test_data.gni")
 import("//src/developer/ffx/lib/e2e_emu/ffx_e2e_test.gni")
 

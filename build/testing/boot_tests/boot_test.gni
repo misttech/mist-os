@@ -4,7 +4,7 @@
 
 import("//build/assembly/assembled_system.gni")
 import("//build/assembly/hybrid_board_configuration.gni")
-import("//build/sdk/product_bundle.gni")
+import("//build/assembly/product_bundle.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/test_spec.gni")
 import("//zircon/kernel/phys/qemu.gni")
