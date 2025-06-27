@@ -8,11 +8,10 @@
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/single_threaded_executor.h>
 #include <zircon/compiler.h>
-#include <zircon/types.h>
 
-#include <memory>
 #include <mutex>
 #include <thread>
+#include <utility>
 
 namespace fs {
 

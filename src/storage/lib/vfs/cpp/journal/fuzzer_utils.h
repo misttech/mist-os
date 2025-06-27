@@ -8,10 +8,11 @@
 #include <lib/zx/vmo.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <string.h>
-#include <zircon/assert.h>
+#include <zircon/types.h>
 
 #include <map>
+#include <memory>
+#include <vector>
 
 #include <fuzzer/FuzzedDataProvider.h>
 #include <storage/buffer/blocking_ring_buffer.h>
@@ -20,7 +21,6 @@
 #include <storage/operation/operation.h>
 #include <storage/operation/unbuffered_operation.h>
 
-#include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/lib/vfs/cpp/journal/superblock.h"
 #include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
@@ -43,7 +43,7 @@ class FuzzedVmoidRegistry final : public storage::VmoidRegistry {
   FuzzedVmoidRegistry() = default;
   ~FuzzedVmoidRegistry() = default;
 
-  bool HasVmo(vmoid_t vmoid) const { return vmos_.find(vmoid) != vmos_.end(); }
+  bool HasVmo(vmoid_t vmoid) const { return vmos_.contains(vmoid); }
   bool HasVmo(ReservedVmoid vmoid) const { return HasVmo(static_cast<vmoid_t>(vmoid)); }
 
   const zx::vmo& GetVmo(vmoid_t vmoid) const { return *(vmos_.at(vmoid)); }

@@ -4,9 +4,11 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <zircon/errors.h>
 
-#include "fuzzer_utils.h"
+#include "src/storage/lib/vfs/cpp/journal/fuzzer_utils.h"
 #include "src/storage/lib/vfs/cpp/journal/replay.h"
+#include "src/storage/lib/vfs/cpp/journal/superblock.h"
 
 namespace fs {
 namespace {

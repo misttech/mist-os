@@ -5,6 +5,11 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_JOURNAL_REPLAY_TREE_H_
 #define SRC_STORAGE_LIB_VFS_CPP_JOURNAL_REPLAY_TREE_H_
 
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
+
 #include <range/interval-tree.h>
 #include <range/range.h>
 #include <storage/operation/operation.h>
@@ -17,7 +22,7 @@ namespace internal {
 // The "dev_offset" is used as a key for determining overlap.
 class RangeContainer {
  public:
-  explicit RangeContainer(storage::BufferedOperation op) : operation(std::move(op)) {}
+  explicit RangeContainer(storage::BufferedOperation op) : operation(op) {}
   uint64_t Start() const { return operation.op.dev_offset; }
   uint64_t End() const { return operation.op.dev_offset + operation.op.length; }
   void Update(uint64_t start, uint64_t end) {
@@ -47,7 +52,7 @@ using BufferedOperationTree = range::IntervalTree<BufferedOperationRange>;
 }  // namespace internal
 
 // A tree which enables a caller to collect BufferedOperation objects used during journal replay. On
-// insertion, the tree is updated to use the "latest" operation targetting a particular block.
+// insertion, the tree is updated to use the "latest" operation targeting a particular block.
 class ReplayTree {
  public:
   using IterType = typename internal::BufferedOperationTree::IterType;
@@ -59,7 +64,7 @@ class ReplayTree {
   //
   // First, removes all overlapping prior operations which target the same device offset, and then
   // inserts |operation|. This ensures that the "latest operation touching block B" will be the only
-  // operation from replay targetting that block.
+  // operation from replay targeting that block.
   void insert(storage::BufferedOperation operation);
 
   void clear() { tree_.clear(); }

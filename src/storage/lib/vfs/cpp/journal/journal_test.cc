@@ -4,31 +4,57 @@
 
 #include "src/storage/lib/vfs/cpp/journal/journal.h"
 
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/cksum.h>
+#include <lib/fit/function.h>
+#include <lib/fpromise/promise.h>
+#include <lib/fpromise/result.h>
+#include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/time.h>
 #include <lib/zx/vmo.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/rights.h>
+#include <zircon/time.h>
+#include <zircon/types.h>
 
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <iomanip>
+#include <ios>
+#include <iostream>
+#include <limits>
 #include <memory>
-#include <optional>
 #include <span>
 #include <thread>
+#include <utility>
 #include <vector>
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <safemath/checked_math.h>
-#include <storage/buffer/owned_vmoid.h>
+#include <storage/buffer/blocking_ring_buffer.h>
+#include <storage/buffer/vmo_buffer.h>
+#include <storage/buffer/vmoid_registry.h>
+#include <storage/operation/operation.h>
+#include <storage/operation/unbuffered_operation.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
 #include "src/storage/lib/vfs/cpp/journal/format.h"
-#include "src/storage/lib/vfs/cpp/journal/header_view.h"
 #include "src/storage/lib/vfs/cpp/journal/initializer.h"
+#include "src/storage/lib/vfs/cpp/journal/journal_writer.h"
 #include "src/storage/lib/vfs/cpp/journal/replay.h"
+#include "src/storage/lib/vfs/cpp/journal/superblock.h"
 #include "src/storage/lib/vfs/cpp/transaction/device_transaction_handler.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
 namespace fs {
 namespace {
@@ -43,7 +69,7 @@ const size_t kJournalLength = 10;
 const size_t kWritebackLength = 10;
 const uint32_t kBlockSize = 8192;
 
-enum class EscapedBlocks {
+enum class EscapedBlocks : uint8_t {
   kVerified,
   kIgnored,
 };
@@ -94,12 +120,12 @@ struct JournalBuffers {
 // Identifies if the buffer is the in-memory version of the buffer (accessed directly by the journal
 // code) or the on-disk representation (used by the test to represent all operations which have been
 // transacted to disk).
-enum class BufferType {
+enum class BufferType : uint8_t {
   kDiskBuffer,
   kMemoryBuffer,
 };
 
-// A mock VMO reigstry, which acts as the holder for all VMOs used by the journaling codebase to
+// A mock VMO registry, which acts as the holder for all VMOs used by the journaling codebase to
 // interact with the underlying device.
 //
 // In addition to the storage::VmoidRegistry interface, provides some additional utilities for
@@ -328,7 +354,7 @@ zx_status_t FlushCallback(const std::vector<storage::BufferedOperation>& request
 // A test fixture which initializes structures that are necessary for journal initialization.
 //
 // This initialization is repeated between all tests, so it is deduplicated here. However, journal
-// construction itself is still left to each individaul test, but the prerequisite structures can be
+// construction itself is still left to each individual test, but the prerequisite structures can be
 // "taken" from this fixture using the "take_*" methods below.
 class JournalTest : public testing::Test {
  public:
@@ -1061,7 +1087,7 @@ TEST_F(JournalTest, WriteExactlyFullJournalDoesNotUpdateInfoBlock) {
 //
 // Operation 0: [ H, 1, 2, 3, 4, 5, 6, 7, 8, C ]
 // Operation 1: [ H, 1, C, _, _, _, _, _, _, _ ]
-//            : Info block update promted by operation 1.
+//            : Info block update prompted by operation 1.
 TEST_F(JournalTest, WriteExactlyFullJournalDoesNotUpdateInfoBlockUntilNewOperationArrives) {
   storage::VmoBuffer metadata = registry()->InitializeBuffer(kJournalLength);
 
@@ -1215,7 +1241,7 @@ TEST_F(JournalTest, WriteToOverfilledJournalUpdatesInfoBlock) {
         // Before we update the info block, check that a power failure would result in only the
         // second metadata operation being replayed.
         //
-        // The first operation has already completed and peristed thanks to the earlier info block
+        // The first operation has already completed and persisted thanks to the earlier info block
         // update.
         uint64_t sequence_number = 2;
         registry()->VerifyReplay({operations[1]}, sequence_number);
@@ -1308,7 +1334,7 @@ TEST_F(JournalTest, JournalWritesCausingCommitBlockWraparound) {
         // Before we update the info block, check that a power failure would result in only the
         // second metadata operation being replayed.
         //
-        // The first operation has already completed and peristed thanks to the earlier info block
+        // The first operation has already completed and persisted thanks to the earlier info block
         // update.
         uint64_t sequence_number = 2;
         registry()->VerifyReplay({operations[1]}, sequence_number);
@@ -1401,7 +1427,7 @@ TEST_F(JournalTest, JournalWritesCausingCommitAndEntryWraparound) {
         // Before we update the info block, check that a power failure would result in only the
         // second metadata operation being replayed.
         //
-        // The first operation has already completed and peristed thanks to the earlier info block
+        // The first operation has already completed and persisted thanks to the earlier info block
         // update.
         uint64_t sequence_number = 2;
         registry()->VerifyReplay({operations[1]}, sequence_number);
@@ -1425,7 +1451,7 @@ TEST_F(JournalTest, JournalWritesCausingCommitAndEntryWraparound) {
                     kJournalStartBlock);
     EXPECT_EQ(journal.CommitTransaction({.metadata_operations = {operations[0]}}), ZX_OK);
     journal.schedule_task(journal.Sync());
-    // This write will block until the prevoius operation completes.
+    // This write will block until the previous operation completes.
     EXPECT_EQ(journal.CommitTransaction({.metadata_operations = {operations[1]}}), ZX_OK);
   }
 }
@@ -1509,7 +1535,7 @@ TEST_F(JournalTest, MetadataOnDiskOrderNotMatchingInMemoryOrder) {
   // Actually write operations[0] before operations[1].
   std::vector<storage::BufferedOperation> buffered_operations0;
   ASSERT_TRUE(reservation0
-                  .CopyRequests(std::span(&operations[0], 1), kJournalEntryHeaderBlocks,
+                  .CopyRequests(std::span(operations.data(), 1), kJournalEntryHeaderBlocks,
                                 &buffered_operations0)
                   .is_ok());
   auto result = writer.WriteMetadata(
@@ -1638,7 +1664,7 @@ TEST_F(JournalTest, MetadataOnDiskOrderNotMatchingInMemoryOrderWraparound) {
   uint64_t block_count = operations[0].op.length + kEntryMetadataBlocks;
   ASSERT_EQ(journal_buffer->Reserve(block_count, &reservation), ZX_OK);
   ASSERT_TRUE(reservation
-                  .CopyRequests(std::span(&operations[0], 1), kJournalEntryHeaderBlocks,
+                  .CopyRequests(std::span(operations.data(), 1), kJournalEntryHeaderBlocks,
                                 &buffered_operations)
                   .is_ok());
   auto result = writer.WriteMetadata(
@@ -1759,7 +1785,7 @@ TEST_F(JournalTest, MetadataOnDiskAndInMemoryWraparoundAtDifferentOffsets) {
   uint64_t block_count = operations[0].op.length + kEntryMetadataBlocks;
   ASSERT_EQ(journal_buffer->Reserve(block_count, &reservation), ZX_OK);
   ASSERT_TRUE(reservation
-                  .CopyRequests(std::span(&operations[0], 1), kJournalEntryHeaderBlocks,
+                  .CopyRequests(std::span(operations.data(), 1), kJournalEntryHeaderBlocks,
                                 &buffered_operations)
                   .is_ok());
   auto result = writer.WriteMetadata(
@@ -2042,7 +2068,7 @@ TEST_F(JournalTest, JournalWritesCausingEntireEntryWraparound) {
         // Before we update the info block, check that a power failure would result in only the
         // second metadata operation being replayed.
         //
-        // The first operation has already completed and peristed thanks to the earlier info block
+        // The first operation has already completed and persisted thanks to the earlier info block
         // update.
         uint64_t sequence_number = 2;
         registry()->VerifyReplay({operations[1]}, sequence_number);
@@ -2833,7 +2859,7 @@ TEST_F(JournalTest, InfoBlockWriteFailureFailsSubsequentRequests) {
 //
 //      [ _, H, x, C, _, _, _, _, _, _ ]
 //
-// Resulting in replaying one operaton.
+// Resulting in replaying one operation.
 //
 // However, if "[1, 2, 3]" actually sets block "1" to a valid header block, and block "3" to a valid
 // commit block, the journal would look like the following:
@@ -2977,7 +3003,7 @@ TEST_F(JournalTestWithLargeBuffer, MoreThanMaxBlockDescriptorsFails) {
 
 class TestTransactionHandler : public DeviceTransactionHandler {
  public:
-  TestTransactionHandler(block_client::BlockDevice& device) : device_(device) {}
+  explicit TestTransactionHandler(block_client::BlockDevice& device) : device_(device) {}
 
   block_client::BlockDevice* GetDevice() override { return &device_; }
   uint64_t BlockNumberToDevice(uint64_t block_num) const override {
@@ -3128,7 +3154,7 @@ TEST(JournalCallbackTest, CommitCallbackTriggeredAtCorrectTime) {
       const int data = *static_cast<char*>(test_buffer.Data(0)) << 16 |
                        *static_cast<char*>(test_buffer.Data(1)) << 8 |
                        *static_cast<char*>(test_buffer.Data(2));
-      std::cout << "Found " << std::setfill('0') << std::setw(6) << std::hex << data << std::endl;
+      std::cout << "Found " << std::setfill('0') << std::setw(6) << std::hex << data << '\n';
       switch (data) {
         case 0x000000:
         case 0x010200:

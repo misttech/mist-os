@@ -2,7 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "replay_tree.h"
+#include "src/storage/lib/vfs/cpp/journal/replay_tree.h"
+
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <cstdint>
+
+#include <storage/operation/operation.h>
 
 namespace fs {
 namespace internal {

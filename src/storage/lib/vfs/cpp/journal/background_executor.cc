@@ -4,10 +4,15 @@
 
 #include "src/storage/lib/vfs/cpp/journal/background_executor.h"
 
+#include <lib/fpromise/promise.h>
+#include <lib/fpromise/result.h>
 #include <lib/zx/thread.h>
-#include <threads.h>
-#include <zircon/assert.h>
-#include <zircon/threads.h>
+#include <zircon/syscalls/object.h>
+
+#include <mutex>
+#include <string_view>
+#include <thread>
+#include <utility>
 
 namespace fs {
 

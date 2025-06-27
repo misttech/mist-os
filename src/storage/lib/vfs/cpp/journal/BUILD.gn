@@ -27,15 +27,15 @@ static_library("journal") {
   ]
 
   public_deps = [
+    "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
-    "//src/storage/lib/vfs/cpp",
     "//src/storage/lib/vfs/cpp/transaction",
+    "//zircon/system/ulib/storage/buffer",
+    "//zircon/system/ulib/storage/operation",
+    "//zircon/system/ulib/zx",
   ]
 
-  deps = [
-    "//zircon/system/ulib/fbl",
-    "//zircon/third_party/ulib/cksum",
-  ]
+  deps = [ "//zircon/third_party/ulib/cksum" ]
 
   configs += [ "//build/config:all_source" ]
 
@@ -53,19 +53,10 @@ static_library("journal") {
       "replay_tree.h",
       "superblock.cc",
     ]
-    public_deps += [
-      "//zircon/system/ulib/range",
-      "//zircon/system/ulib/storage/buffer",
-      "//zircon/system/ulib/storage/operation",
-      "//zircon/system/ulib/trace",
-    ]
+    public_deps += [ "//zircon/system/ulib/range" ]
     deps += [
-      "//sdk/lib/fdio",
       "//sdk/lib/syslog/cpp",
-      "//zircon/system/ulib/fbl",
-      "//zircon/system/ulib/range",
-      "//zircon/system/ulib/storage/buffer",
-      "//zircon/system/ulib/storage/operation",
+      "//zircon/system/public",
       "//zircon/system/ulib/sync",
       "//zircon/system/ulib/zx",
       "//zircon/third_party/ulib/safemath",
@@ -100,12 +91,18 @@ test("journal-unit") {
   ]
   deps = [
     ":journal",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_c",
+    "//sdk/lib/fit",
     "//sdk/lib/fit-promise",
     "//src/lib/fxl/test:gtest_main",
     "//src/storage/lib/block_client/cpp:fake_device",
+    "//src/storage/lib/block_client/cpp:interface",
+    "//src/storage/lib/vfs/cpp/transaction",
     "//third_party/googletest:gmock",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/storage/buffer",
+    "//zircon/system/ulib/storage/operation",
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zx",
     "//zircon/third_party/ulib/cksum",
@@ -118,9 +115,11 @@ source_set("fuzz-utils") {
   sources = [ "fuzzer_utils.cc" ]
   public_deps = [
     ":journal",
-    "//zircon/system/ulib/sync",
+    "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_c",
+    "//src/storage/lib/vfs/cpp/transaction",
+    "//zircon/system/ulib/storage/buffer",
+    "//zircon/system/ulib/storage/operation",
     "//zircon/system/ulib/zx",
-    "//zircon/third_party/ulib/cksum",
   ]
 }
 

@@ -6,15 +6,15 @@
 #define SRC_STORAGE_LIB_VFS_CPP_JOURNAL_ENTRY_VIEW_H_
 
 #include <lib/zx/result.h>
-#include <zircon/types.h>
 
-#include <fbl/macros.h>
+#include <cstdint>
+#include <vector>
+
 #include <storage/buffer/block_buffer_view.h>
 #include <storage/operation/operation.h>
 
 #include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/lib/vfs/cpp/journal/header_view.h"
-#include "src/storage/lib/vfs/cpp/journal/superblock.h"
 
 namespace fs {
 

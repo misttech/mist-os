@@ -7,13 +7,16 @@
 
 #include <lib/fit/function.h>
 #include <lib/fpromise/result.h>
-#include <zircon/status.h>
 #include <zircon/types.h>
 
-#include <algorithm>
+#include <cstdint>
+#include <optional>
+#include <utility>
+#include <vector>
 
-#include <fbl/vector.h>
 #include <range/interval-tree.h>
+#include <range/range.h>
+#include <storage/buffer/block_buffer_view.h>
 #include <storage/buffer/blocking_ring_buffer.h>
 #include <storage/operation/operation.h>
 
@@ -21,8 +24,7 @@
 #include "src/storage/lib/vfs/cpp/journal/superblock.h"
 #include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
-namespace fs {
-namespace internal {
+namespace fs::internal {
 
 // A small container encapsulating a buffered request, along with the reservation that makes the
 // buffered request valid. These two pieces of data are coupled together because lifetime of the
@@ -162,7 +164,6 @@ class JournalWriter {
   bool pending_flush_ = false;
 };
 
-}  // namespace internal
-}  // namespace fs
+}  // namespace fs::internal
 
 #endif  // SRC_STORAGE_LIB_VFS_CPP_JOURNAL_JOURNAL_WRITER_H_

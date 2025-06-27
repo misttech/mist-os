@@ -7,7 +7,9 @@
 
 #include <lib/fpromise/result.h>
 #include <zircon/assert.h>
+#include <zircon/types.h>
 
+#include <cstdint>
 #include <span>
 
 #include "src/storage/lib/vfs/cpp/journal/format.h"

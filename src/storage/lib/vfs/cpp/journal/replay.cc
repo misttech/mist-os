@@ -5,21 +5,32 @@
 #include "src/storage/lib/vfs/cpp/journal/replay.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/compiler.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 
+#include <cstdint>
+#include <memory>
 #include <optional>
 #include <span>
+#include <utility>
+#include <vector>
 
-#include <fbl/vector.h>
+#include <storage/buffer/block_buffer_view.h>
+#include <storage/buffer/vmo_buffer.h>
+#include <storage/buffer/vmoid_registry.h>
 #include <storage/operation/operation.h>
 
-#include "entry_view.h"
-#include "lib/zx/result.h"
-#include "replay_tree.h"
+#include "src/storage/lib/vfs/cpp/journal/entry_view.h"
 #include "src/storage/lib/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/journal/header_view.h"
+#include "src/storage/lib/vfs/cpp/journal/replay_tree.h"
 #include "src/storage/lib/vfs/cpp/journal/superblock.h"
 #include "src/storage/lib/vfs/cpp/transaction/buffered_operations_builder.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
 namespace fs {
 namespace {

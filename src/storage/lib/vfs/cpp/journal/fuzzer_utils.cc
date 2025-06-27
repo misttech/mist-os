@@ -1,27 +1,36 @@
 // Copyright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be found in the LICENSE file.
 
-#include "fuzzer_utils.h"
+#include "src/storage/lib/vfs/cpp/journal/fuzzer_utils.h"
 
 #include <fuchsia/hardware/block/driver/c/banjo.h>
-#include <lib/cksum.h>
 #include <lib/zx/vmo.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <memory>
+#include <utility>
+#include <vector>
 
 #include <fuzzer/FuzzedDataProvider.h>
+#include <storage/buffer/block_buffer.h>
 #include <storage/buffer/blocking_ring_buffer.h>
+#include <storage/buffer/vmo_buffer.h>
+#include <storage/buffer/vmoid_registry.h>
 #include <storage/operation/operation.h>
+#include <storage/operation/unbuffered_operation.h>
 #include <storage/operation/unbuffered_operations_builder.h>
 
 #include "src/storage/lib/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/journal/superblock.h"
 
 namespace fs {
 
 using storage::BlockBuffer;
 using storage::BlockingRingBuffer;
-using storage::Operation;
 using storage::OperationType;
 using storage::UnbufferedOperation;
 using storage::UnbufferedOperationsBuilder;
@@ -35,7 +44,7 @@ using storage::VmoBuffer;
 // FuzzedVmoidRegistry
 
 zx_status_t FuzzedVmoidRegistry::BlockAttachVmo(const zx::vmo& vmo, storage::Vmoid* out) {
-  vmos_.emplace(std::make_pair(next_vmoid_, zx::unowned_vmo(vmo.get())));
+  vmos_.emplace(next_vmoid_, zx::unowned_vmo(vmo.get()));
   *out = storage::Vmoid(next_vmoid_);
   next_vmoid_ =
       static_cast<vmoid_t>(ReservedVmoid::kMaxReserved) + static_cast<vmoid_t>(vmos_.size());
@@ -67,11 +76,11 @@ zx_status_t FuzzedTransactionHandler::RunRequests(
         request.op.dev_offset == journal_start_ && request.op.length == kJournalMetadataBlocks) {
       size_t info_len = sizeof(JournalInfo) * 2;
       auto info_bytes = fuzz_utils_->data_provider()->ConsumeBytes<uint8_t>(info_len);
-      vmo.write(&info_bytes[0], 0, info_bytes.size());
+      vmo.write(info_bytes.data(), 0, info_bytes.size());
     } else {
       size_t data_len = request.op.length * block_size_;
       auto data_bytes = fuzz_utils_->data_provider()->ConsumeBytes<uint8_t>(data_len);
-      vmo.write(&data_bytes[0], request.op.vmo_offset, data_bytes.size());
+      vmo.write(data_bytes.data(), request.op.vmo_offset, data_bytes.size());
     }
   }
   return ZX_OK;

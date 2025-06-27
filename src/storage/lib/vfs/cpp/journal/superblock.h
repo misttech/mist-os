@@ -7,7 +7,9 @@
 
 #include <zircon/types.h>
 
-#include <fbl/macros.h>
+#include <cstdint>
+#include <memory>
+
 #include <storage/buffer/block_buffer.h>
 
 #include "src/storage/lib/vfs/cpp/journal/format.h"

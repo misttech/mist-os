@@ -4,9 +4,16 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <zircon/errors.h>
 
-#include "fuzzer_utils.h"
+#include <vector>
+
+#include <storage/buffer/vmo_buffer.h>
+#include <storage/operation/operation.h>
+
+#include "src/storage/lib/vfs/cpp/journal/fuzzer_utils.h"
 #include "src/storage/lib/vfs/cpp/journal/replay.h"
+#include "src/storage/lib/vfs/cpp/journal/superblock.h"
 
 namespace fs {
 namespace {

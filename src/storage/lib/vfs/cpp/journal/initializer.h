@@ -5,9 +5,9 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_JOURNAL_INITIALIZER_H_
 #define SRC_STORAGE_LIB_VFS_CPP_JOURNAL_INITIALIZER_H_
 
-#include <inttypes.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <functional>
 #include <span>
 

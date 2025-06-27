@@ -2,9 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "replay_tree.h"
+#include "src/storage/lib/vfs/cpp/journal/replay_tree.h"
+
+#include <fuchsia/hardware/block/driver/c/banjo.h>
+
+#include <cstdint>
 
 #include <gtest/gtest.h>
+#include <storage/operation/operation.h>
 
 namespace fs {
 namespace {

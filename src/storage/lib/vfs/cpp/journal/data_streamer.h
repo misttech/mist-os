@@ -6,8 +6,10 @@
 #define SRC_STORAGE_LIB_VFS_CPP_JOURNAL_DATA_STREAMER_H_
 
 #include <lib/fpromise/promise.h>
+#include <zircon/types.h>
 
-#include <utility>
+#include <cstddef>
+#include <vector>
 
 #include <storage/operation/unbuffered_operation.h>
 #include <storage/operation/unbuffered_operations_builder.h>

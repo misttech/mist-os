@@ -4,10 +4,16 @@
 
 #include "src/storage/lib/vfs/cpp/journal/header_view.h"
 
-#include <lib/cksum.h>
+#include <lib/fpromise/result.h>
 #include <string.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstdint>
 #include <span>
+
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 
 namespace fs {
 
