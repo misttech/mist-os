@@ -4,7 +4,7 @@
 
 use crate::nanohub_sysfs_files::{
     FirmwareNameSysFsOps, FirmwareVersionSysFsOps, NanohubSysFsNode, TimeSyncSysFsOps,
-    WakeUpEventDuration,
+    WakeLockSysFsOps, WakeUpEventDuration,
 };
 use crate::socket_tunnel_file::{FirmwareFile, SocketTunnelSysfsFile};
 use starnix_core::device::kobject::Device;
@@ -74,9 +74,5 @@ pub fn build_nanohub_comms_directory(device: &Device, dir: &SimpleDirectoryMutat
         NanohubSysFsNode::<WakeUpEventDuration>::new(),
         mode!(IFREG, 0o660),
     );
-    dir.entry(
-        "wake_lock",
-        SocketTunnelSysfsFile::new(b"/sys/devices/virtual/nanohub/nanohub_comms/wake_lock".into()),
-        mode!(IFREG, 0o440),
-    );
+    dir.entry("wake_lock", NanohubSysFsNode::<WakeLockSysFsOps>::new(), mode!(IFREG, 0o440));
 }

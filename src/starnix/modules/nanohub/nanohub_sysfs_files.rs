@@ -279,6 +279,35 @@ impl NanohubSysFsFileOps for TimeSyncSysFsOps {
 }
 
 #[derive(Default)]
+pub struct WakeLockSysFsOps {}
+
+impl NanohubSysFsFileOps for WakeLockSysFsOps {
+    fn store(
+        &self,
+        service: &fidl_fuchsia_hardware_google_nanohub::DeviceSynchronousProxy,
+        value: String,
+    ) -> Result<(), NanohubSysfsError> {
+        let lock = value
+            .chars()
+            .next()
+            .ok_or_else(|| {
+                log_error!("Invalid wake lock value. String was empty.");
+                nanohub_sysfs_errno!(EINVAL)
+            })
+            .and_then(|c| match c {
+                '0' => Ok(fnanohub::McuWakeLockValue::Release),
+                '1' => Ok(fnanohub::McuWakeLockValue::Acquire),
+                e => {
+                    log_error!("Invalid wake lock value. {e:?}");
+                    nanohub_sysfs_error!(EINVAL)
+                }
+            })?;
+
+        Ok(service.set_wake_lock(lock, zx::MonotonicInstant::INFINITE)??)
+    }
+}
+
+#[derive(Default)]
 pub struct WakeUpEventDuration {}
 
 impl WakeUpEventDuration {
