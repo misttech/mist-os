@@ -4,13 +4,22 @@
 
 #include <fcntl.h>
 #include <poll.h>
-#include <string.h>
 #include <sys/klog.h>
 #include <unistd.h>
 
-#include <string>
-
 #include <gtest/gtest.h>
+
+namespace {
+
+// See "The symbolic names are defined in the kernel source, but are
+// not exported to user space; you will either need to use the numbers,
+// or define the names yourself" at syslog(2).
+constexpr int SYSLOG_ACTION_READ = 2;
+constexpr int SYSLOG_ACTION_READ_ALL = 3;
+constexpr int SYSLOG_ACTION_CLEAR = 5;
+constexpr int SYSLOG_ACTION_READ_CLEAR = 6;
+constexpr int SYSLOG_ACTION_SIZE_UNREAD = 9;
+constexpr int SYSLOG_ACTION_SIZE_BUFFER = 10;
 
 class SyslogNonRootTest : public ::testing::Test {
  public:
@@ -30,21 +39,23 @@ TEST_F(SyslogNonRootTest, ProcKmsg) {
 }
 
 TEST_F(SyslogNonRootTest, Syslog) {
-  EXPECT_LT(klogctl(2 /* SYSLOG_ACTION_READ */, NULL, 0), 0);
+  EXPECT_LT(klogctl(SYSLOG_ACTION_READ, nullptr, 0), 0);
   EXPECT_EQ(errno, EPERM);
 
-  EXPECT_LT(klogctl(3 /* SYSLOG_ACTION_READ_ALL */, NULL, 0), 0);
+  EXPECT_LT(klogctl(SYSLOG_ACTION_READ_ALL, nullptr, 0), 0);
   EXPECT_EQ(errno, EPERM);
 
-  EXPECT_LT(klogctl(4 /* SYSLOG_ACTION_READ_CLEAR */, NULL, 0), 0);
+  EXPECT_LT(klogctl(SYSLOG_ACTION_READ_CLEAR, nullptr, 0), 0);
   EXPECT_EQ(errno, EPERM);
 
-  EXPECT_LT(klogctl(5 /* SYSLOG_ACTION_CLEAR */, NULL, 0), 0);
+  EXPECT_LT(klogctl(SYSLOG_ACTION_CLEAR, nullptr, 0), 0);
   EXPECT_EQ(errno, EPERM);
 
-  EXPECT_LT(klogctl(9 /* SYSLOG_ACTION_SIZE_UNREAD */, NULL, 0), 0);
+  EXPECT_LT(klogctl(SYSLOG_ACTION_SIZE_UNREAD, nullptr, 0), 0);
   EXPECT_EQ(errno, EPERM);
 
-  EXPECT_LT(klogctl(10 /* SYSLOG_ACTION_SIZE_BUFFER */, NULL, 0), 0);
+  EXPECT_LT(klogctl(SYSLOG_ACTION_SIZE_BUFFER, nullptr, 0), 0);
   EXPECT_EQ(errno, EPERM);
 }
+
+}  // namespace

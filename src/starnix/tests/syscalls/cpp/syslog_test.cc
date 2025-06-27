@@ -12,6 +12,7 @@
 
 #include <string>
 
+#include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
 #include <linux/capability.h>
 #include <linux/prctl.h>
@@ -19,7 +20,17 @@
 
 #include "src/lib/files/file.h"
 #include "src/starnix/tests/syscalls/cpp/capabilities_helper.h"
-#include "src/starnix/tests/syscalls/cpp/test_helper.h"
+#include "src/starnix/tests/syscalls/cpp/syscall_matchers.h"
+
+namespace {
+
+// See "The symbolic names are defined in the kernel source, but are
+// not exported to user space; you will either need to use the numbers,
+// or define the names yourself" at syslog(2).
+constexpr int SYSLOG_ACTION_READ = 2;
+constexpr int SYSLOG_ACTION_READ_ALL = 3;
+constexpr int SYSLOG_ACTION_SIZE_UNREAD = 9;
+constexpr int SYSLOG_ACTION_SIZE_BUFFER = 10;
 
 class SyslogTest : public ::testing::Test {
  public:
@@ -59,14 +70,13 @@ TEST_F(SyslogTest, SyslogReadAll) {
   write(kmsg_fd, message, strlen(message));
   close(kmsg_fd);
 
-  int size = klogctl(10 /* SYSLOG_ACTION_SIZE_BUFFER */, NULL, 0);
+  int size = klogctl(SYSLOG_ACTION_SIZE_BUFFER, nullptr, 0);
   std::string buf;
   buf.resize(size);
 
   // Logging is an asynchronous process, so we must loop.
   do {
-    int size_read =
-        klogctl(3 /* SYSLOG_ACTION_READ_ALL */, buf.data(), static_cast<int>(buf.size()));
+    int size_read = klogctl(SYSLOG_ACTION_READ_ALL, buf.data(), static_cast<int>(buf.size()));
     if (size_read <= 0) {
       fprintf(stderr, "Failed to read: %s\n", strerror(errno));
       FAIL();
@@ -88,7 +98,7 @@ TEST_F(SyslogTest, Read) {
   //// Read that first log we wrote.
   char buf[4096];
   do {
-    int size_read = klogctl(2 /* SYSLOG_ACTION_READ */, buf, sizeof(buf));
+    int size_read = klogctl(SYSLOG_ACTION_READ, buf, sizeof(buf));
     ASSERT_GT(size_read, 0);
   } while (strstr(buf, "SyslogRead -- first") == nullptr);
 
@@ -99,7 +109,7 @@ TEST_F(SyslogTest, Read) {
   // Check that the first log we syslog(READ) from isn't present anymore.
   do {
     std::fill_n(buf, 4096, 0);
-    int size_read = klogctl(2 /* SYSLOG_ACTION_READ */, buf, sizeof(buf));
+    int size_read = klogctl(SYSLOG_ACTION_READ, buf, sizeof(buf));
     ASSERT_GT(size_read, 0);
     EXPECT_EQ(strstr(buf, "SyslogRead -- first"), nullptr);
   } while (strstr(buf, "SyslogRead -- second") == nullptr);
@@ -117,11 +127,10 @@ TEST_F(SyslogTest, Read) {
   }
 
   // Check that all logs are present when reading using SYSLOG_ACTION_READ_ALL
-  int size = klogctl(10 /* SYSLOG_ACTION_SIZE_BUFFER */, NULL, 0);
+  int size = klogctl(SYSLOG_ACTION_SIZE_BUFFER, nullptr, 0);
   std::string buf_all;
   buf_all.resize(size);
-  int size_read =
-      klogctl(3 /* SYSLOG_ACTION_READ_ALL */, buf_all.data(), static_cast<int>(buf_all.size()));
+  int size_read = klogctl(SYSLOG_ACTION_READ_ALL, buf_all.data(), static_cast<int>(buf_all.size()));
   if (size_read <= 0) {
     fprintf(stderr, "Failed to read: %s\n", strerror(errno));
     FAIL();
@@ -210,7 +219,7 @@ TEST_F(SyslogTest, ProcKmsgPoll) {
   EXPECT_EQ(0, poll(fds, 1, 0));
 
   // Ensure syslog returns that the unread size is 0.
-  EXPECT_EQ(0, klogctl(9 /* SYSLOG_ACTION_SIZE_UNREAD */, NULL, 0));
+  EXPECT_EQ(0, klogctl(SYSLOG_ACTION_SIZE_UNREAD, nullptr, 0));
 
   // Write a log.
   const char *second_message = "ProcKmsgPoll -- log two\n";
@@ -221,7 +230,7 @@ TEST_F(SyslogTest, ProcKmsgPoll) {
   EXPECT_EQ(POLLIN, fds[0].revents);
 
   // Syslog isn't empty anymore.
-  EXPECT_GT(klogctl(9 /* SYSLOG_ACTION_SIZE_UNREAD */, NULL, 0), 0);
+  EXPECT_GT(klogctl(SYSLOG_ACTION_SIZE_UNREAD, nullptr, 0), 0);
 
   close(kmsg_fd);
   close(proc_kmsg_fd);
@@ -474,3 +483,5 @@ INSTANTIATE_TEST_SUITE_P(SyslogAccessTestAll, SyslogAccessTest,
                                   (has_dac_override ? "DacOverride_" : "") +
                                   (dmesg_restrict ? "Restrict" : "NoRestrict");
                          }));
+
+}  // namespace

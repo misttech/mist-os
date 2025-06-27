@@ -5,6 +5,9 @@
 use crate::error;
 use crate::errors::Errno;
 
+// See "The symbolic names are defined in the kernel source, but are
+// not exported to user space; you will either need to use the numbers,
+// or define the names yourself" at syslog(2).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SyslogAction {
     Close = 0,
