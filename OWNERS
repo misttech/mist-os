@@ -58,4 +58,4 @@ per-file **.cml = aaronwood@google.com
 
 per-file .ignore = *
 
-per-file GEMINI.md = wittrock@google.com, abarth@google.com, nickvander@google.com, kyol@google.com
+per-file GEMINI.md = file:.gemini/OWNERS

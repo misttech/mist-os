@@ -81,7 +81,6 @@ tables_generator_tests_*.txt
 ### Directories to be ignored across the tree
 .cipd/
 .idea/
-.gemini/
 
 ### Top-level directories
 /.jiri/
@@ -255,3 +254,6 @@ lcov.info
 # Nix shell
 /shell.nix
 /default.nix
+
+# gemini-cli logs
+.gemini/logs.json
