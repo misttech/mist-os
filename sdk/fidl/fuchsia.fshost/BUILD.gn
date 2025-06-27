@@ -13,5 +13,4 @@ fidl("fuchsia.fshost") {
     "//src/storage/fxfs/fidl/fuchsia.fxfs",
     "//zircon/vdso/zx",
   ]
-  enable_hlcpp = true
 }

@@ -6,7 +6,6 @@ library fuchsia.fshost;
 
 using zx;
 using fuchsia.fxfs;
-using fuchsia.hardware.block;
 using fuchsia.io;
 using fuchsia.storage.partitions;
 
@@ -22,20 +21,6 @@ type MountOptions = resource table {
 /// Manages fshost lifecycle
 @discoverable
 closed protocol Admin {
-    /// Mounts the filesystem on the block device. The filesystem will be mounted in /fs/mnt/<name>
-    /// (in fshost's outgoing directory). This may or may not be supported depending on fshost
-    /// configuration.
-    strict Mount(resource struct {
-        device client_end:fuchsia.hardware.block.Block;
-        name fuchsia.io.Name;
-        options MountOptions;
-    }) -> () error zx.Status;
-
-    /// Unmounts a previously mounted filesystem.
-    strict Unmount(struct {
-        name fuchsia.io.Name;
-    }) -> () error zx.Status;
-
     /// Writes `filename` into the data partition with contents from `payload`, formatting the data
     /// partition if it isn't already formatted.  Overwrites file if it already exists.
     ///

@@ -861,22 +861,6 @@ pub fn fshost_admin(
         async move {
             while let Some(request) = stream.next().await {
                 match request {
-                    Ok(fshost::AdminRequest::Mount { responder, .. }) => {
-                        log::info!("admin mount called");
-                        responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap_or_else(
-                            |e| {
-                                log::error!("failed to send Mount response. error: {:?}", e);
-                            },
-                        );
-                    }
-                    Ok(fshost::AdminRequest::Unmount { responder, .. }) => {
-                        log::info!("admin unmount called");
-                        responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw())).unwrap_or_else(
-                            |e| {
-                                log::error!("failed to send Unmount response. error: {:?}", e);
-                            },
-                        );
-                    }
                     Ok(fshost::AdminRequest::WriteDataFile { responder, payload, filename }) => {
                         log::info!(filename:?; "admin write data file called");
                         let res = match write_data_file(
