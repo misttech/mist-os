@@ -20,4 +20,4 @@ if [[ $err != 0 ]]; then
     exit $err
 fi
 
-fx-command-run shell update force-install "${repo_url}/update"
+fx-command-run ffx target update force-install "${repo_url}/update"
