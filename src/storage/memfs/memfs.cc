@@ -17,6 +17,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -63,10 +64,13 @@ zx::result<std::pair<std::unique_ptr<Memfs>, fbl::RefPtr<VnodeDir>>> Memfs::Crea
   std::unique_ptr<Memfs> fs(new Memfs(dispatcher));
 
   fbl::RefPtr<VnodeDir> root = fbl::MakeRefCounted<VnodeDir>(*fs);
-  std::unique_ptr<Dnode> dn = Dnode::Create(fs_name, root);
-  root->dnode_ = dn.get();
+  zx::result<std::unique_ptr<Dnode>> dn = Dnode::Create(std::string(fs_name), root);
+  if (dn.is_error()) {
+    return dn.take_error();
+  }
+  root->dnode_ = dn.value().get();
   root->dnode_parent_ = dn->GetParent();
-  fs->root_ = std::move(dn);
+  fs->root_ = std::move(dn).value();
 
   if (zx::result<> result = fs->Init(); result.is_error()) {
     return result.take_error();

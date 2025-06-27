@@ -5,12 +5,13 @@
 #ifndef SRC_STORAGE_MEMFS_DNODE_H_
 #define SRC_STORAGE_MEMFS_DNODE_H_
 
+#include <lib/zx/result.h>
 #include <limits.h>
 #include <zircon/types.h>
 
 #include <cstddef>
-#include <cstdint>
 #include <memory>
+#include <string>
 #include <string_view>
 
 #include <fbl/intrusive_double_list.h>
@@ -26,10 +27,6 @@ class Vnode;
 constexpr size_t kDnodeNameMax = NAME_MAX;
 static_assert(NAME_MAX == 255, "NAME_MAX must be 255");
 
-// Assert that kDnodeNameMax can be used as a bitmask
-static_assert(((kDnodeNameMax + 1) & kDnodeNameMax) == 0,
-              "Expected kDnodeNameMax to be one less than a power of two");
-
 // The named portion of a node, representing the named hierarchy.
 //
 // Dnodes always have one corresponding Vnode (a name represents one vnode).
@@ -41,7 +38,7 @@ class Dnode : public fbl::DoublyLinkedListable<std::unique_ptr<Dnode>> {
   DISALLOW_COPY_ASSIGN_AND_MOVE(Dnode);
 
   // Allocates a dnode, attached to a vnode
-  static std::unique_ptr<Dnode> Create(std::string_view name, fbl::RefPtr<Vnode> vn);
+  static zx::result<std::unique_ptr<Dnode>> Create(std::string name, fbl::RefPtr<Vnode> vn);
 
   // Takes a parent-less node and makes it a child of the parent node.
   //
@@ -65,13 +62,8 @@ class Dnode : public fbl::DoublyLinkedListable<std::unique_ptr<Dnode>> {
   bool HasChildren() const { return !children_.is_empty(); }
 
   // Look up the child dnode (within a parent directory) by name.
-  // Returns ZX_OK if the child is found.
-  //
-  // If the looked up child is the current node, "out" is nullptr, and
-  // ZX_OK is still returned.
-  // If "out" is provided as "nullptr", the returned status appears the
-  // same, but the "out" argument is not touched.
-  zx_status_t Lookup(std::string_view name, Dnode** out);
+  // Returns nullptr if the child is not found.
+  Dnode* Lookup(std::string_view name);
 
   // Acquire a pointer to the vnode underneath this dnode.
   // Acquires a reference to the underlying vnode.
@@ -83,29 +75,22 @@ class Dnode : public fbl::DoublyLinkedListable<std::unique_ptr<Dnode>> {
   // Returns ZX_OK if the dnode may be unlinked
   zx_status_t CanUnlink() const;
 
-  // Read dirents (up to len bytes worth) into data.
-  // ReaddirStart reads the canned "." and ".." entries that should appear
-  // at the beginning of a directory.
-  // On success, return the number of bytes read.
-  static zx_status_t ReaddirStart(fs::DirentFiller* df, void* cookie);
-  void Readdir(fs::DirentFiller* df, void* cookie) const;
+  // Populates df with this directory's entries.
+  void Readdir(fs::DirentFiller& df, void* cookie) const;
 
   // Answers the question: "Is dn a subdirectory of this?"
   bool IsSubdirectory(const Dnode* dn) const;
 
   // Functions to take / steal the allocated dnode name.
-  std::unique_ptr<char[]> TakeName();
-  void PutName(std::unique_ptr<char[]> name, size_t len);
+  std::string TakeName();
+  void PutName(std::string name);
 
   bool IsDirectory() const;
 
  private:
   friend struct TypeChildTraits;
 
-  Dnode(fbl::RefPtr<Vnode> vn, std::unique_ptr<char[]> name, uint32_t flags);
-
-  size_t NameLen() const;
-  bool NameMatch(std::string_view name) const;
+  Dnode(fbl::RefPtr<Vnode> vn, std::string name);
 
   fbl::RefPtr<Vnode> vnode_;
   // Refers to the parent named node in the directory hierarchy.
@@ -115,8 +100,7 @@ class Dnode : public fbl::DoublyLinkedListable<std::unique_ptr<Dnode>> {
   // Used to impose an absolute order on dnodes within a directory.
   size_t ordering_token_;
   fbl::DoublyLinkedList<std::unique_ptr<Dnode>> children_;
-  uint32_t flags_;
-  std::unique_ptr<char[]> name_;
+  std::string name_;
 };
 
 }  // namespace memfs
