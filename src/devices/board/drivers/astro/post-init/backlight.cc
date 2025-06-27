@@ -49,33 +49,36 @@ TiLp8556Metadata kDeviceMetadata = {
     .register_count = 14,
 };
 
-static const std::vector<fpbus::Metadata> backlight_metadata{
-    {{
-        .id = std::to_string(DEVICE_METADATA_BACKLIGHT_MAX_BRIGHTNESS_NITS),
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&kMaxBrightnessInNits),
-            reinterpret_cast<const uint8_t*>(&kMaxBrightnessInNits) + sizeof(kMaxBrightnessInNits)),
-    }},
-    {{
-        .id = std::to_string(DEVICE_METADATA_PRIVATE),
-        .data = std::vector<uint8_t>(
-            reinterpret_cast<const uint8_t*>(&kDeviceMetadata),
-            reinterpret_cast<const uint8_t*>(&kDeviceMetadata) + sizeof(kDeviceMetadata)),
-    }},
-};
-
-static const fpbus::Node backlight_dev = []() {
-  fpbus::Node dev = {};
-  dev.name() = "backlight";
-  dev.vid() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI;
-  dev.pid() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_PID_LP8556;
-  dev.did() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_BACKLIGHT;
-  dev.metadata() = backlight_metadata;
-  dev.mmio() = backlight_mmios;
-  return dev;
-}();
-
 zx::result<> PostInit::InitBacklight() {
+  const std::vector<fpbus::Metadata> backlight_metadata{
+      {{
+          .id = std::to_string(DEVICE_METADATA_BACKLIGHT_MAX_BRIGHTNESS_NITS),
+          .data = std::vector<uint8_t>(reinterpret_cast<const uint8_t*>(&kMaxBrightnessInNits),
+                                       reinterpret_cast<const uint8_t*>(&kMaxBrightnessInNits) +
+                                           sizeof(kMaxBrightnessInNits)),
+      }},
+      {{
+          .id = std::to_string(DEVICE_METADATA_PRIVATE),
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&kDeviceMetadata),
+              reinterpret_cast<const uint8_t*>(&kDeviceMetadata) + sizeof(kDeviceMetadata)),
+      }},
+      {{
+          .id = std::to_string(DEVICE_METADATA_DISPLAY_PANEL_TYPE),
+          .data = std::vector<uint8_t>(
+              reinterpret_cast<const uint8_t*>(&panel_type_),
+              reinterpret_cast<const uint8_t*>(&panel_type_) + sizeof(panel_type_)),
+      }},
+  };
+
+  fpbus::Node backlight_dev = {};
+  backlight_dev.name() = "backlight";
+  backlight_dev.vid() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_VID_TI;
+  backlight_dev.pid() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_PID_LP8556;
+  backlight_dev.did() = bind_fuchsia_ti_platform::BIND_PLATFORM_DEV_DID_BACKLIGHT;
+  backlight_dev.metadata() = backlight_metadata;
+  backlight_dev.mmio() = backlight_mmios;
+
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('BACK');
 
