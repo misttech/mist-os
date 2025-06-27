@@ -40,7 +40,7 @@ ffx trace start --categories "#default,metrics_logger"
 ## Device specific information
 
 As thermal measurements are hardware dependent, Googlers can find additional
-device specific information at go/fuchsia-tracing-internal-docs.
+device specific information at [go/fuchsia-tracing-internal-docs](http://goto.google.com/fuchsia-tracing-internal-docs).
 {% dynamic endif %}
 
 [fuchsia-tracing]: /docs/development/tracing/README.md
