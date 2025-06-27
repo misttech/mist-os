@@ -9,7 +9,7 @@ use starnix_core::vfs::{FileSystemHandle, FsNodeHandle};
 pub fn device_tree_directory(kernel: &Kernel, fs: &FileSystemHandle) -> FsNodeHandle {
     let mut directory = StaticDirectoryBuilder::new(fs);
     for setup_function in &kernel.procfs_device_tree_setup {
-        setup_function(&mut directory, kernel);
+        setup_function(&mut directory);
     }
     directory.build()
 }

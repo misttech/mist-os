@@ -62,50 +62,25 @@ where
     let iio = registry
         .objects
         .get_or_create_class("iio".into(), registry.objects.get_or_create_bus("iio".into()));
-    registry.add_numberless_device(
-        locked,
-        current_task,
-        "iio:device0".into(),
-        iio.clone(),
-        IioDirectory0::new,
-    );
+    registry.add_numberless_device(locked, "iio:device0".into(), iio.clone(), IioDirectory0::new);
 
-    registry.add_numberless_device(
-        locked,
-        current_task,
-        "iio:device1".into(),
-        iio,
-        IioDirectory1::new,
-    );
+    registry.add_numberless_device(locked, "iio:device1".into(), iio, IioDirectory1::new);
 
     // power_supply devices don't show up under any bus. This makes it show up under virtual_bus,
     // but it's OK.
     let power_supply =
         registry.objects.get_or_create_class("power_supply".into(), registry.objects.virtual_bus());
     // /sys/class/power_supply/usb
-    registry.add_numberless_device(
-        locked,
-        current_task,
-        "usb".into(),
-        power_supply.clone(),
-        UsbPowerSupply::new,
-    );
+    registry.add_numberless_device(locked, "usb".into(), power_supply.clone(), UsbPowerSupply::new);
 
     // /sys/class/power_supply/battery
     registry.add_numberless_device(
         locked,
-        current_task,
         "battery".into(),
         power_supply.clone(),
         BatteryPowerSupply::new,
     );
 
     // /sys/class/power_supply/bms
-    registry.add_numberless_device(
-        locked,
-        current_task,
-        "bms".into(),
-        power_supply,
-        BmsPowerSupply::new,
-    );
+    registry.add_numberless_device(locked, "bms".into(), power_supply, BmsPowerSupply::new);
 }

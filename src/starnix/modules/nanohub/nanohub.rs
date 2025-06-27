@@ -22,7 +22,7 @@ use starnix_uapi::mode;
 const SERIAL_DIRECTORY: &str = "/dev/class/serial";
 
 /// Function to be invoked by ProcDirectory while constructing /proc/device-tree
-pub fn nanohub_procfs_builder(builder: &'_ mut StaticDirectoryBuilder<'_>, _kernel: &Kernel) {
+pub fn nanohub_procfs_builder(builder: &'_ mut StaticDirectoryBuilder<'_>) {
     builder.subdir("mcu", 0o555, |dir| {
         dir.entry("board_type", BytesFile::new_node(b"starnix".to_vec()), mode!(IFREG, 0o444));
     });

@@ -543,8 +543,7 @@ async fn create_container(
     }
 
     // Collect a vector of functions to be invoked while constructing /proc/device-tree
-    let mut procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &Kernel)> =
-        Vec::new();
+    let mut procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>)> = Vec::new();
     if features.nanohub {
         procfs_device_tree_setup.push(starnix_modules_nanohub::nanohub_procfs_builder);
     }

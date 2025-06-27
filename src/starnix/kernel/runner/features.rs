@@ -561,7 +561,7 @@ pub fn run_container_features(
         nanohub_device_init(locked, system_task);
     }
     if let Some(devices) = &features.thermal {
-        thermal_device_init(locked, system_task, devices.clone());
+        thermal_device_init(locked, kernel, devices.clone());
     }
     if features.hvdcp_opti {
         hvdcp_opti_init(locked, system_task);

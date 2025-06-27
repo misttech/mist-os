@@ -31,7 +31,7 @@ pub struct NetstackDevices {
 impl NetstackDevices {
     pub fn add_device(&self, kernel: &Kernel, name: &FsStr, interface_id: NonZeroU64) {
         let mut devices = self.devices.lock();
-        let device = kernel.device_registry.add_net_device(kernel, name);
+        let device = kernel.device_registry.add_net_device(name);
         devices.insert(name.into(), NetstackDevice { device, interface_id });
     }
 

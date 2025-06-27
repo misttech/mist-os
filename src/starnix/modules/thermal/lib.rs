@@ -12,7 +12,7 @@ use futures::TryStreamExt;
 use once_cell::sync::OnceCell;
 use starnix_core::device::kobject::Device;
 use starnix_core::fs::sysfs::DeviceDirectory;
-use starnix_core::task::CurrentTask;
+use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
 use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
@@ -139,12 +139,7 @@ impl BytesFileOps for TemperatureFile {
     }
 }
 
-pub fn thermal_device_init(
-    locked: &mut Locked<Unlocked>,
-    system_task: &CurrentTask,
-    devices: Vec<String>,
-) {
-    let kernel = system_task.kernel();
+pub fn thermal_device_init(locked: &mut Locked<Unlocked>, kernel: &Kernel, devices: Vec<String>) {
     let registry = &kernel.device_registry;
     let virtual_thermal_class = registry.objects.virtual_thermal_class();
 
@@ -158,7 +153,6 @@ pub fn thermal_device_init(
 
         registry.add_numberless_device(
             locked,
-            system_task,
             thermal_zone.clone().as_str().into(),
             virtual_thermal_class.clone(),
             move |dev| ThermalZoneDirectory::new(dev, proxy.clone(), sensor_name.clone().into()),
