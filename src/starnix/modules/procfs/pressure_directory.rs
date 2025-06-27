@@ -34,11 +34,8 @@ use std::sync::Arc;
 use zx::{AsHandleRef, HandleBased};
 
 /// Creates the /proc/pressure directory. https://docs.kernel.org/accounting/psi.html
-pub fn pressure_directory(
-    current_task: &CurrentTask,
-    fs: &FileSystemHandle,
-) -> Option<FsNodeHandle> {
-    let psi_provider = current_task.kernel().expando.get::<PsiProvider>();
+pub fn pressure_directory(kernel: &Kernel, fs: &FileSystemHandle) -> Option<FsNodeHandle> {
+    let psi_provider = kernel.expando.get::<PsiProvider>();
     if psi_provider.proxy.is_none() {
         return None;
     };

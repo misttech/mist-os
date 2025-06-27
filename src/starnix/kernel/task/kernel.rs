@@ -293,7 +293,7 @@ pub struct Kernel {
 
     /// Vector of functions to be run when procfs is constructed. This is to allow
     /// modules to expose directories into /proc/device-tree.
-    pub procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)>,
+    pub procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &Kernel)>,
 
     /// Whether this kernel is shutting down. When shutting down, new processes may not be spawned.
     shutting_down: AtomicBool,
@@ -372,7 +372,7 @@ impl Kernel {
         crash_reporter_proxy: Option<CrashReporterProxy>,
         inspect_node: fuchsia_inspect::Node,
         security_state: security::KernelState,
-        procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &CurrentTask)>,
+        procfs_device_tree_setup: Vec<fn(&mut StaticDirectoryBuilder<'_>, &Kernel)>,
         time_adjustment_proxy: Option<AdjustSynchronousProxy>,
     ) -> Result<Arc<Kernel>, zx::Status> {
         let unix_address_maker =

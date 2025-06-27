@@ -27,7 +27,7 @@ use crate::uptime::UptimeFile;
 use crate::vmstat::VmStatFile;
 use crate::zoneinfo::ZoneInfoFile;
 use maplit::btreemap;
-use starnix_core::task::CurrentTask;
+use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::pseudo::simple_file::{BytesFile, SimpleFileNode};
 use starnix_core::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use starnix_core::vfs::{
@@ -71,21 +71,20 @@ impl Deref for ProcDirectoryNode {
 
 impl ProcDirectory {
     /// Returns a new `ProcDirectory` exposing information about `kernel`.
-    pub fn new(current_task: &CurrentTask, fs: &FileSystemHandle) -> ProcDirectoryNode {
-        let kernel = current_task.kernel();
+    pub fn new(kernel: &Arc<Kernel>, fs: &FileSystemHandle) -> ProcDirectoryNode {
         // First add all the nodes that are always present in the top-level proc directory.
         let mut nodes = btreemap! {
             "asound".into() => stub_file(fs, "/proc/asound", bug_ref!("https://fxbug.dev/322893329")),
             "cgroups".into() => cgroups_file(fs),
             "cmdline".into() => {
-                let mut cmdline = Vec::from(current_task.kernel().cmdline.clone());
+                let mut cmdline = Vec::from(kernel.cmdline.clone());
                 cmdline.push(b'\n');
                 read_only_file(fs, BytesFile::new_node(cmdline))
             },
             "config.gz".into() => read_only_file(fs, ConfigFile::new_node()),
             "cpuinfo".into() => read_only_file(fs, CpuinfoFile::new_node()),
             "devices".into() => read_only_file(fs, DevicesFile::new_node()),
-            "device-tree".into() => device_tree_directory(current_task, fs),
+            "device-tree".into() => device_tree_directory(kernel, fs),
             "diskstats".into() => stub_file(fs, "/proc/diskstats", bug_ref!("https://fxbug.dev/322893370")),
             "filesystems".into() => bytes_file(fs, b"fxfs".to_vec()),
             "kallsyms".into() => read_only_file(fs, SimpleFileNode::new(|| {
@@ -129,7 +128,7 @@ impl ProcDirectory {
         };
 
         // Then optionally add the nodes that are only present in some configurations.
-        if let Some(pressure_directory) = pressure_directory(current_task, fs) {
+        if let Some(pressure_directory) = pressure_directory(kernel, fs) {
             nodes.insert("pressure".into(), pressure_directory);
         }
 

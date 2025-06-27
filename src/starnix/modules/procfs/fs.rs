@@ -53,7 +53,7 @@ impl ProcFs {
         let fs = FileSystem::new(kernel, CacheMode::Uncached, ProcFs, options)
             .expect("procfs constructed with valid options");
         let root_ino = fs.allocate_ino();
-        fs.create_root(root_ino, ProcDirectory::new(current_task, &fs));
+        fs.create_root(root_ino, ProcDirectory::new(kernel, &fs));
         fs
     }
 }
