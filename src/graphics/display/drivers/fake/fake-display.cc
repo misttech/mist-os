@@ -87,6 +87,9 @@ constexpr display::ModeId kDisplayModeId(1);
 
 constexpr int32_t kRefreshRateHz = 60;
 
+// TODO(https://fxbug.dev/412450577): Remove the single-layer assumption.
+constexpr size_t kMaxLayerCount = 1;
+
 }  // namespace
 
 FakeDisplay::FakeDisplay(display::DisplayEngineEventsInterface* engine_events,
@@ -167,7 +170,7 @@ display::EngineInfo FakeDisplay::CompleteCoordinatorConnection() {
   engine_events_.OnDisplayAdded(kDisplayId, preferred_modes, kSupportedPixelFormats);
 
   return display::EngineInfo({
-      .max_layer_count = 1,
+      .max_layer_count = kMaxLayerCount,
       .max_connected_display_count = 1,
       .is_capture_supported = IsCaptureSupported(),
   });
@@ -319,13 +322,19 @@ display::ConfigCheckResult FakeDisplay::CheckConfiguration(
     cpp20::span<const display::DriverLayer> layers) {
   ZX_DEBUG_ASSERT(display_id == kDisplayId);
 
-  // TODO(https://fxbug.dev/412450577): Remove the single-layer assumption.
-  ZX_DEBUG_ASSERT(layers.size() == 1);
+  if (layers.size() > kMaxLayerCount) {
+    fdf::error(
+        "CheckConfiguration: Number of requested layers ({}) is greater "
+        " than maximum supported layer count ({}).",
+        kMaxLayerCount, layers.size());
+    return display::ConfigCheckResult::kUnsupportedConfig;
+  }
 
   if (display_mode_id != kDisplayModeId) {
     return display::ConfigCheckResult::kUnsupportedDisplayModes;
   }
 
+  // TODO(https://fxbug.dev/412450577): Remove the single-layer assumption.
   const display::DriverLayer& layer = layers[0];
   const display::Rectangle display_area({
       .x = 0,
@@ -370,9 +379,10 @@ void FakeDisplay::ApplyConfiguration(display::DisplayId display_id, display::Mod
   ZX_DEBUG_ASSERT(display_mode_id == kDisplayModeId);
   ZX_DEBUG_ASSERT(config_stamp != display::kInvalidDriverConfigStamp);
 
-  ZX_DEBUG_ASSERT(layers.size() == 1);
+  ZX_DEBUG_ASSERT(layers.size() <= kMaxLayerCount);
   std::lock_guard lock(mutex_);
 
+  // TODO(https://fxbug.dev/412450577): Remove the single-layer assumption.
   if (layers[0].image_id() != display::kInvalidDriverImageId) {
     ZX_DEBUG_ASSERT_MSG(imported_images_.find(layers[0].image_id()) != imported_images_.end(),
                         "Configuration contains invalid image ID: %" PRIu64,

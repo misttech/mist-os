@@ -64,6 +64,11 @@ namespace fake_display {
 
 namespace {
 
+// Must match kDisplayId and kModeId in fake-display.cc.
+// TODO(https://fxbug.dev/42078942): Do not hardcode the display and mode IDs.
+constexpr display::DisplayId kDisplayId(1);
+constexpr display::ModeId kModeId(1);
+
 class TestDisplayEngineListener : public display::DisplayEngineEventsInterface {
  public:
   // display::DisplayEngineEventsInterface:
@@ -172,6 +177,34 @@ TEST_F(FakeDisplayTest, Inspect) {
       config->node().get_property<inspect::BoolPropertyValue>("no_buffer_access");
   ASSERT_NE(no_buffer_access, nullptr);
   EXPECT_EQ(no_buffer_access->value(), false);
+}
+
+// A layer configuration that should pass all the layer tests in FakeDisplay::CheckConfiguration.
+constexpr display::DriverLayer kAcceptableLayer({
+    .display_destination = display::Rectangle({.x = 0, .y = 0, .width = 1280, .height = 800}),
+    .image_source = display::Rectangle({.x = 0, .y = 0, .width = 1280, .height = 800}),
+    .image_id = display::DriverImageId(4242),
+    .image_metadata = display::ImageMetadata(
+        {.width = 1280, .height = 800, .tiling_type = display::ImageTilingType::kLinear}),
+    .fallback_color = display::Color({.format = display::PixelFormat::kB8G8R8A8,
+                                      .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43,
+                                                                              0x44, 0, 0, 0, 0}}),
+    .image_source_transformation = display::CoordinateTransformation::kIdentity,
+});
+
+TEST_F(FakeDisplayTest, CheckConfigMultipleLayers) {
+  display::DriverLayer layers[2] = {kAcceptableLayer, kAcceptableLayer};
+  cpp20::span<const display::DriverLayer> one_layer(layers, 1);
+  // Check the display configuration, to make sure the layer configuration succeeds.
+  display::ConfigCheckResult config_check_result =
+      fake_display_->CheckConfiguration(kDisplayId, kModeId, one_layer);
+  ASSERT_EQ(display::ConfigCheckResult::kOk, config_check_result)
+      << "This test uses a DriverLayer that does not pass FakeDisplay::CheckConfiguration().";
+
+  // Two layers should fail, as FakeDisplay only supports one layer.
+  cpp20::span<const display::DriverLayer> two_layers(layers, 2);
+  config_check_result = fake_display_->CheckConfiguration(kDisplayId, kModeId, two_layers);
+  EXPECT_EQ(display::ConfigCheckResult::kUnsupportedConfig, config_check_result);
 }
 
 class FakeDisplayRealSysmemTest : public FakeDisplayTest {
@@ -681,11 +714,6 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
       CreateImageLayerConfig(framebuffer_import_result.value(), kBlackBgra,
                              kFramebufferImageMetadata),
   };
-
-  // Must match kDisplayId and kModeId in fake-display.cc.
-  // TODO(https://fxbug.dev/42078942): Do not hardcode the display and mode IDs.
-  static constexpr display::DisplayId kDisplayId(1);
-  static constexpr display::ModeId kModeId(1);
 
   // Check and apply the display configuration.
   display::ConfigCheckResult config_check_result =
