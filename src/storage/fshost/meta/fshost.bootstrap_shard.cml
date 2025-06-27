@@ -130,13 +130,13 @@
             protocol: [
                 "fuchsia.fs.startup.Volumes",
                 "fuchsia.fshost.Admin",
-                "fuchsia.fshost.Recovery",
                 "fuchsia.update.verify.ComponentOtaHealthCheck",
             ],
             from: "#fshost",
         },
         {
             protocol: [
+                "fuchsia.fshost.Recovery",
                 "fuchsia.fshost.StarnixVolumeProvider",
                 "fuchsia.fxfs.FileBackedVolumeProvider",
                 "fuchsia.storage.partitions.PartitionsManager",

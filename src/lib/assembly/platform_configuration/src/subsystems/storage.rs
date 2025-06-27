@@ -5,6 +5,8 @@
 use crate::subsystems::prelude::*;
 use anyhow::{bail, ensure, Context};
 use assembly_config_capabilities::{Config, ConfigValueType};
+use assembly_config_schema::platform_config::development_support_config::DevelopmentSupportConfig;
+use assembly_config_schema::platform_config::recovery_config::RecoveryConfig;
 use assembly_config_schema::platform_config::storage_config::StorageConfig;
 use assembly_constants::{BootfsDestination, FileEntry};
 use assembly_images_config::{
@@ -12,12 +14,15 @@ use assembly_images_config::{
 };
 
 pub(crate) struct StorageSubsystemConfig;
-impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
+impl DefineSubsystemConfiguration<(&StorageConfig, &RecoveryConfig, &DevelopmentSupportConfig)>
+    for StorageSubsystemConfig
+{
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        storage_config: &StorageConfig,
+        configs: &(&StorageConfig, &RecoveryConfig, &DevelopmentSupportConfig),
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
+        let (storage_config, recovery_config, development_config) = *configs;
         if matches!(
             context.feature_set_level,
             FeatureSetLevel::Bootstrap | FeatureSetLevel::Embeddable
@@ -34,6 +39,14 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             && !context.board_info.provides_feature("fuchsia::paver")
         {
             builder.platform_bundle("paver_legacy");
+        }
+
+        // Include fuchsia.fshost/Recovery capabilities if this configuration supports recovery
+        // (flash super via userspace fastboot) or netboot (reprovision partition tables) workflows.
+        if recovery_config.system_recovery.is_some() || development_config.enable_netsvc_netboot {
+            builder.platform_bundle("fshost_recovery");
+        } else {
+            builder.platform_bundle("fshost_non_recovery");
         }
 
         // Fetch a custom gen directory for placing temporary files. We get this

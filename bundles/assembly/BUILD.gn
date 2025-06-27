@@ -3046,6 +3046,48 @@ assembly_input_bundle("fshost_non_eng") {
   ]
 }
 
+# AIB adding recovery capabilities to fshost.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_recovery") {
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards = [ "//src/storage/fshost/meta/recovery_fshost.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+# AIB that stubs out recovery capabilities for builds that don't require recovery capabilities.
+#
+# optional: product must specify its inclusion
+# valid feature_set_levels: all
+# valid build-types: all
+#
+assembly_input_bundle("fshost_non_recovery") {
+  compiled_packages = [
+    {
+      bootfs_package = true
+      name = "fshost"
+      components = [
+        {
+          component_name = "fshost"
+          shards = [ "//src/storage/fshost/meta/non_recovery_fshost.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # AIB adding support for storage, needed by all fshost variants that use anything more than bootfs
 #
 # optional: product must specify its inclusion
