@@ -3,6 +3,7 @@
         {
             name: "tee_manager",
             url: "{{COMPONENT_URL}}",
+	    environment: "#core-env",
         },
     ],
     expose: [
