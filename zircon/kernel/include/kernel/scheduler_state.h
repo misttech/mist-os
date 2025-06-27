@@ -585,70 +585,250 @@ class SchedulerState {
   cpu_mask_t soft_affinity_{CPU_MASK_ALL};
 };
 
-struct SchedulerQueueState {
-  // Occasionally, a thread needs to be removed from a scheduler and reassigned
-  // to a different one, but without holding the thread's lock (which protects
-  // the thread's curr_cpu_ member in its scheduler_state_ structure).
-  //
-  // In order to complete the transition, the thread's lock must (eventually) be
-  // obtained exclusively, which cannot be done while holding either the
-  // source's or destination's queue_lock.  To work around the lock-ordering
-  // issues, we:
-  //
-  // 1) Remove the thread from the source scheduler's queue (requires access to
-  //    the thread's SchedulerQueueState which is owned by the scheduler, not the
-  //    thread).
-  // 2) Remove the thread's bookkeeping from the source scheduler (requires
-  //    read-only access to the thread's scheduler state).
-  // 3) Record that the thread is transitioning to a new scheduler (and the
-  //    reason why) in the transient state member of SchedulerQueueState.
-  // 4a) Drop the source scheduler lock.
-  // 4b) Obtain the thread's lock.
-  // 4c) Obtain the destination scheduler lock.
-  // 5) Finish the transition by adding the thread to the new scheduler and
-  //    clearing the transient state back to None.
-  //
-  // So, if something like a PI propagation event encounters a thread whose
-  // transient_state is anything but None, it knows that the thread is
-  // (temporarily) not a member of any scheduler, even though its current state
-  // must be READY and its curr_cpu_ identifies the source scheduler it just
-  // left.  When the propagation event modifies the scheduler's effective
-  // profile, it can skip updating the thread's position in its scheduler's run
-  // queue (it is not in one) and it can skip updating its scheduler's overall
-  // bookkeeping (that was already done in step #2 above).
-  enum class TransientState : uint32_t {
-    None = 0,
-    Rescheduling,
-    Stolen,
-    Migrating,
-  };
-
+// SchedulerQueueState tracks the association with a scheduler and run queue. To
+// accommodate the different ways a thread can be accessed (i.e. starting from a
+// thread vs. starting from a run queue), specific locking rules apply to this
+// member of Thread (i.e. Thread::scheduler_queue_state_).
+//
+// There are two locks that apply to interactions with the queue state:
+//
+//  1. Thread::lock_ (or the thread's lock): Protects most of a thread's data
+//     members, including the scheduling state (i.e. Thread::scheduling_state_).
+//     Thread::scheduling_state_::curr_cpu_ indicates which CPU and scheduler
+//     the thread is currently associated with.
+//
+//  2. Scheduler::queue_lock_ (or the queue lock): Protects a scheduler's data
+//     members, including the run queue and associated bookkeeping. This lock
+//     also protects the thread's scheduler queue state member while the thread
+//     is associated with a particular scheduler.
+//
+//  When both a thread's lock and a scheduler's queue lock must be held at
+//  the same time, commonly needed during rescheduling and PI operations,
+//  the defined lock order is to acquire the thread's lock before the queue
+//  lock. Fortunately, most operations start from a thread and proceed to
+//  interact with a scheduler (e.g. blocking, unblocking, PI operations),
+//  naturally conforming to the required lock order. However, several
+//  operations start from a scheduler (e.g. finding the next thread to run,
+//  stealing a thread from another CPU), and require some lock juggling to
+//  complete their operations.
+//
+//  Operations that start from a scheduler typically dequeue a thread from a
+//  run queue while holding the queue lock protecting that run queue.
+//  Locking the thread to complete the operation involves releasing the
+//  currently held queue lock, acquiring the thread's lock, and then
+//  acquiring either the same queue lock or a different queue lock.
+//
+//  For example, selecting the next thread to run during a reschedule
+//  involves the following lock juggling sequence:
+//  1. With the local queue lock held, dequeue the next thread to run.
+//  2. Release the queue lock.
+//  3. Acquire the next thread's lock.
+//  4. Re-acquire the local queue lock and continue the reschedule.
+//
+//  Stealing a thread from another CPU involves a similar lock juggling
+//  sequence:
+//  1. With the source queue lock held, dequeue the thread to steal and
+//     (mostly) disassociate it with the source scheduler.
+//  2. Release the source queue lock.
+//  3. Acquire the stolen thread's lock.
+//  4. Acquire the local queue lock, associate the thread with the local
+//     scheduler, and continue the reschedule.
+//
+//  In both cases, since the thread is no longer in a queue after step 1,
+//  it cannot be selected or stolen by another CPU after the queue lock is
+//  released. However, because the thread is not yet locked between steps 2 and
+//  3, an operation starting at the thread and holding the thread's lock could
+//  interleave with the locking sequence. If such an interleaved operation
+//  involves updating the thread's run queue position and/or the associated
+//  scheduler's bookkeeping, care must be taken to avoid double-dequeuing the
+//  thread, updating the wrong scheduler's bookkeeping, or rescheduling the
+//  wrong CPU.
+//
+// SchedulerQueueState::Disposition is an enumeration of the valid combinations
+// of a thread's scheduler queue states that may be used in conjunction with the
+// thread state (i.e. Thread::state()) to determine how the thread and the
+// associated scheduler can be updated.
+//
+// The following state combinations may be observed by operations that start at
+// a thread and hold both the thread's lock and the queue lock:
+//
+// 1. state=RUNNING, disposition=Associated:
+//
+//    Observable when a thread is running. Because the currently running
+//    thread's lock is held over a reschedule, there are no observable
+//    transitional states to deal with in PI and affinity change operations.
+//
+//    Holding the thread lock delays rescheduling and transitioning from RUNNING
+//    to any other state. The thread's scheduling state and scheduler
+//    bookkeeping may be updated by a PI operation or affinity change. The CPU
+//    performing the update is obligated to reschedule the CPU the thread is
+//    running on when the update is complete.
+//
+// 2. state=READY, disposition=Enqueued:
+//
+//    Observable when a thread is waiting in the run queue and is not in the
+//    process of rescheduling.
+//
+//    Holding the queue lock delays the thread from transitioning to RUNNING,
+//    being stolen, or migrated by another CPU. The thread's scheduling state,
+//    scheduler bookkeeping, and scheduler queue state may be updated by a PI
+//    operation or affinity change. The CPU performing the update is obligated
+//    to reschedule the CPU the thread is associated with if the change might
+//    affect the currently running thread.
+//
+// 3. state=READY, disposition=Associated:
+//
+//    Observable when a thread is rescheduling and transitioning from READY to
+//    RUNNING and the lock juggling of the rescheduling CPU races with an
+//    update.
+//
+//    During the reschedule, when the next thread has been dequeued it is
+//    expected to be the next thread to run on the CPU. To complete the
+//    transition, the scheduler releases the queue lock (allowing this
+//    observation from another CPU), acquires the thread lock, and re-acquires
+//    the queue lock.
+//
+//    Holding the thread lock on another CPU delays the completion of the
+//    transition, allowing the effective profile, dynamic parameters, and
+//    scheduler bookkeeping or affinity to be updated.
+//
+//    Note: An update of the thread's effective profile and dynamic parameters
+//    can invalidate the thread as the correct/best choice to run. The CPU
+//    performing the update is obligated to reschedule the CPU the thread is
+//    running on, either unconditionally (current behavior) or conditionally if
+//    another thread should run instead (future optimization).
+//
+//    Likewise, a change to the thread's affinity mask may invalidate the CPU
+//    the thread is about to run on as a viable option. The CPU performing the
+//    update is obligated to reschedule the CPU to cause it to migrate the
+//    thread to viable target.
+//
+// 4. state=READY, disposition=Stolen:
+//
+//    Observable when a thread is being stolen and the lock juggling of
+//    the stealing CPU races with an update from another CPU.
+//
+//    When the thread is being stolen, it is dequeued and removed from the
+//    previous scheduler's bookkeeping. To complete the steal, the source
+//    queue lock is released (allowing this observation from another CPU),
+//    the thread lock is acquired, and the destination queue lock is
+//    acquired. Since the stolen thread will become the currently running
+//    thread on the stealing CPU, rescheduling is unnecessary and can be
+//    omitted in a future optimization.
+//
+//    Holding the thread lock on another CPU delays the steal, allowing the
+//    effective profile and dynamic parameters or affinity mask to be updated.
+//    In this state, the thread is not associated with any scheduler
+//    bookkeeping, but the current CPU of thread is stale. However, holding the
+//    queue lock of the stale CPU allows the CPU performing the update to make a
+//    coherent observation of the stolen_by member, which can be used to
+//    determine if an affinity mask change has invalidated the stealing CPU as a
+//    viable option. The updating CPU is obligated to reschedule the stealing
+//    CPU if it became an invalid option due to the update.
+//
+// 5. state=INITIAL,BLOCKED*,SLEEPING,SUSPENDED,DEATH,
+//    disposition=Unassociated
+//
+//    Observable only by the CPU performing a reschedule that transitions the
+//    current thread from RUNNING to one of the non-runnable states. Since a
+//    reschedule of the current thread occurs with the thread lock held, and
+//    transitioning to a non-runnable state clears the current CPU for the
+//    thread, no other CPU can observe this state while holding the thread's
+//    lock and a queue lock.
+//
+class SchedulerQueueState {
+ public:
   SchedulerQueueState() = default;
   ~SchedulerQueueState() = default;
 
-  // Returns true of the task state is currently enqueued in the run queue.
-  bool InQueue() const { return run_queue_node.InContainer(); }
+  SchedulerQueueState(const SchedulerQueueState&) = delete;
+  SchedulerQueueState& operator=(const SchedulerQueueState&) = delete;
+  SchedulerQueueState(SchedulerQueueState&&) = delete;
+  SchedulerQueueState& operator=(SchedulerQueueState&&) = delete;
 
-  // Sets the task state to active (on a run queue). Returns true if the task
-  // was not previously active.
+  // The disposition is a concise representation of the valid combinations of
+  // states of the members of this class. It is used in conjunction with the
+  // thread state to determine which operations are valid on a thread and its
+  // associated scheduler, if any.
+  enum class Disposition : uint8_t {
+    // Corresponds to active=false, in_queue=false, stolen_by=INVALID_CPU.
+    Unassociated,
+
+    // Corresponds to active=true, in_queue=false, stolen_by=INVALID_CPU.
+    Associated,
+
+    // Corresponds to active=true, in_queue=true, stolen_by=INVALID_CPU.
+    Enqueued,
+
+    // Corresponds to active=false, in_queue=false, stolen_by=<CPU num>.
+    Stolen,
+  };
+
+  // Sets the thread state to active (i.e. associated with a specific CPU's
+  // scheduler and bookkeeping).
+  //
+  // Returns true if the thread was not previously active.
   bool OnInsert() {
-    const bool was_active = active;
-    active = true;
+    const bool was_active = active_;
+    active_ = true;
+    stolen_by_ = INVALID_CPU;
     return !was_active;
   }
 
-  // Sets the task state to inactive (not on a run queue). Returns true if the
-  // task was previously active.
-  bool OnRemove() {
-    const bool was_active = active;
-    active = false;
+  // Sets the thread state to inactive (i.e. not associated with a CPU's
+  // scheduler or bookkeeping). If the thread is being stolen from another CPU's
+  // run queue, stolen_by must be the CPU id of the stealing CPU, otherwise it
+  // must be INVALID_CPU.
+  //
+  // Returns true if the task was previously active.
+  bool OnRemove(cpu_num_t stolen_by) {
+    const bool was_active = active_;
+    active_ = false;
+    stolen_by_ = stolen_by;
     return was_active;
   }
 
-  // WAVLTree node state.
-  fbl::WAVLTreeNodeState<Thread*> run_queue_node{};
-  TransientState transient_state{TransientState::None};
-  bool active{false};  // Flag indicating whether this thread is associated with a run queue.
+  // Returns the run queue node.
+  fbl::WAVLTreeNodeState<Thread*>& run_queue_node() { return run_queue_node_; }
+  const fbl::WAVLTreeNodeState<Thread*>& run_queue_node() const { return run_queue_node_; }
+
+  // Returns true if the thread is currently enqueued in a run queue.
+  bool in_queue() const { return run_queue_node_.InContainer(); }
+
+  // Returns the CPU id of the CPU currently stealing the thread.
+  cpu_num_t stolen_by() const { return stolen_by_; }
+
+  // Returns true if the thread is currently associated with a scheduler.
+  bool active() const { return active_; }
+
+  // Returns the disposition of this scheduler queue state. Asserts on invalid
+  // combinations.
+  Disposition disposition() const {
+    if (active_) {
+      DEBUG_ASSERT(stolen_by_ == INVALID_CPU);
+      if (in_queue()) {
+        return Disposition::Enqueued;
+      }
+      return Disposition::Associated;
+    }
+    DEBUG_ASSERT(!in_queue());
+    if (stolen_by_ == INVALID_CPU) {
+      return Disposition::Unassociated;
+    }
+    return Disposition::Stolen;
+  }
+
+ private:
+  // The WAVLTree node for enqueuing the thread in a run queue.
+  fbl::WAVLTreeNodeState<Thread*> run_queue_node_;
+
+  // The id of the CPU currently in the process of stealing the thread, or
+  // INVALID_CPU if the thread is not being stolen.
+  cpu_num_t stolen_by_{INVALID_CPU};
+
+  // Flag indicating whether this thread is associated with a specific CPU's
+  // scheduler and bookkeeping.
+  bool active_{false};
 };
 
 FBL_ENABLE_ENUM_BITS(SchedulerState::ProfileDirtyFlag)

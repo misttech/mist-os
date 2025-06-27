@@ -229,11 +229,7 @@ class Scheduler {
   static void UnblockIdle(Thread* idle_thread)
       TA_REQ(chainlock_transaction_token, idle_thread->get_lock());
 
-  // Called when something has changed about a thread which may result in it
-  // needing to be migrated to a different CPU.  In particular, a change to
-  // either its soft or hard affinity mask.
-  static void Migrate(Thread* thread) TA_REQ(chainlock_transaction_token)
-      TA_REL(thread->get_lock());
+  // Migrates any threads that can run on other CPUs off of the current CPU.
   static void MigrateUnpinnedThreads();
 
   // TimerTick is called when the preemption timer for a CPU has fired.
@@ -318,8 +314,7 @@ class Scheduler {
 
   // Get the mask of valid CPUs that thread may run on. If a new mask
   // is set, the thread will be migrated to satisfy the new constraint.
-  template <Affinity AffinityType>
-  static cpu_mask_t SetCpuAffinity(Thread& thread, cpu_mask_t affinity)
+  static cpu_mask_t SetCpuAffinity(Thread& thread, cpu_mask_t affinity, AffinityType affinity_type)
       TA_EXCL(chainlock_transaction_token, thread.get_lock());
 
   // Run the passed callable while holding the specified scheduler's lock.
@@ -458,6 +453,8 @@ class Scheduler {
   // SchedulerState::(Effective|Base)Profile in all of the Scheduler methods.
   using EffectiveProfile = SchedulerState::EffectiveProfile;
   using BaseProfile = SchedulerState::BaseProfile;
+
+  using Disposition = SchedulerQueueState::Disposition;
 
   using SavedState = concurrent::ChainLockTransactionCommon::SavedState;
 
@@ -806,55 +803,34 @@ class Scheduler {
   void Insert(SchedTime now, Thread* thread, Placement placement = Placement::Insertion)
       TA_REQ(queue_lock_, thread->get_lock(), thread->get_scheduler_variable_lock());
 
-  // Removes the thread from this CPU's scheduler as it transitions to another
-  // CPU (either because it is being stolen, or migrated). The thread's lock
-  // cannot be held exclusively at this point, so some of the thread's state
-  // will remain in a transient state until the thread can be re-inserted in its
-  // new home.  Specifically, this includes:
-  //
-  // 1) The thread's current CPU id.
-  // 2) The thread's start time (if it is a fair thread).
-  // 3) The thread's finish time (if it is a fair thread).
-  //
-  // This state will be cleaned up by FinishTransition once the thread has been
-  // locked exclusively.
-  void RemoveForTransition(Thread* thread, SchedulerQueueState::TransientState target_state)
+  // Removes the thread from this CPU's scheduler to move it to another CPU
+  // (i.e. stealing or migration). This method does not require the thread to be
+  // locked exclusively, and consequently leaves a stale value for the thread's
+  // current CPU id. The stale value is later corrected when the thread is
+  // locked exclusively and added to the new target CPU by calling Insert.
+  void Remove(SchedTime now, Thread* thread, cpu_num_t stolen_by = INVALID_CPU)
       TA_REQ(queue_lock_, thread->get_scheduler_variable_lock()) TA_REQ_SHARED(thread->get_lock());
 
-  void FinishTransition(SchedTime now, Thread* thread)
+  // Removes the thread from this CPU's scheduler and updates the current CPU
+  // id. The thread must not be in the run queue.
+  void RemoveThreadLocked(SchedTime now, Thread* thread)
       TA_REQ(queue_lock_, thread->get_lock(), thread->get_scheduler_variable_lock());
-
-  // Removes the thread from this CPU's scheduler. The thread must not be in
-  // the run queue tree.  This is the same operation as RemoveForTransition, but it
-  // requires that the thread's lock is held exclusively, which allows the CPU
-  // id, start time, and finish time to be updated.
-  void Remove(Thread* thread, SchedulerQueueState::TransientState reason =
-                                  SchedulerQueueState::TransientState::None)
-      TA_REQ(queue_lock_, thread->get_lock(), thread->get_scheduler_variable_lock()) {
-    SchedulerState& state = thread->scheduler_state();
-
-    RemoveForTransition(thread, reason);
-    state.curr_cpu_ = INVALID_CPU;
-    if (IsFairThread(thread)) {
-      state.start_time_ = SchedNs(0);
-      state.finish_time_ = SchedNs(0);
-    }
-  }
 
   // Removes a specific thread from its current RunQueue.  Note that the thread
   // must currently exist in its queue, it is an error otherwise.
   void EraseFromQueue(Thread* thread) TA_REQ(queue_lock_, thread->get_scheduler_variable_lock())
-      TA_REQ_SHARED(thread->get_lock()) {
-    DEBUG_ASSERT(thread->scheduler_queue_state().InQueue());
-    const SchedulerState& state = const_cast<const Thread*>(thread)->scheduler_state();
-    RunQueue& queue =
-        state.discipline() == SchedDiscipline::Fair ? fair_run_queue_ : deadline_run_queue_;
+      TA_REQ(thread->get_lock()) {
+    DEBUG_ASSERT(thread->scheduler_queue_state().in_queue());
+    SchedulerState& state = thread->scheduler_state();
+
+    const bool is_fair = state.discipline() == SchedDiscipline::Fair;
+    RunQueue& queue = is_fair ? fair_run_queue_ : deadline_run_queue_;
     queue.erase(*thread);
   }
 
   // Returns true if there is at least one eligible deadline thread in the
   // run queue.
-  inline bool IsDeadlineThreadEligible(SchedTime eligible_time) TA_REQ(queue_lock_) {
+  bool IsDeadlineThreadEligible(SchedTime eligible_time) TA_REQ(queue_lock_) {
     if (deadline_run_queue_.is_empty()) {
       return false;
     }
@@ -900,7 +876,7 @@ class Scheduler {
     static bool LessThan(KeyType a, KeyType b) { return a < b; }
     static bool EqualTo(KeyType a, KeyType b) { return a == b; }
     static auto& node_state(Thread& thread) TA_NO_THREAD_SAFETY_ANALYSIS {
-      return thread.scheduler_queue_state().run_queue_node;
+      return thread.scheduler_queue_state().run_queue_node();
     }
   };
 
@@ -981,6 +957,11 @@ class Scheduler {
     return !thread->IsIdle() && IsFairThread(thread) && thread->state() == THREAD_READY;
   }
 
+  // Called by code paths that encounter a thread in the READY state with a
+  // disposition other than Enqueued. Updates a kcounter to track the rate of
+  // updates that race with lock juggling.
+  static void CountUpdateInTransition();
+
   // Protects run queues and associated metadata for this Scheduler instance.
   // The queue lock is the bottom most lock in the system for the CPU it is
   // associated with: no other locks may be nested within a queue lock. A queue
@@ -1016,16 +997,17 @@ class Scheduler {
   // Asserts that a given thread belongs to |this| Scheduler instance.
   // Requires holding the scheduler's queue_lock_.
   //
-  void AssertInScheduler(const Thread& t) const TA_REQ(queue_lock_) TA_ASSERT_SHARED(t.get_lock())
-      TA_ASSERT(t.get_scheduler_variable_lock()) {
-    [&]() TA_NO_THREAD_SAFETY_ANALYSIS {
-      // TODO(johngro): Come back here and remove the `&t == active_thread_`
-      // clause once other system-wide invariants have been cleaned up.  See
-      // https://fxbug.dev/340551498 for details.
-      DEBUG_ASSERT_MSG((t.scheduler_state().curr_cpu() == this_cpu_) || (&t == active_thread_),
-                       "Thread %lu expected to be a member of scheduler %u, but curr_cpu says %u",
-                       t.tid(), this_cpu_, t.scheduler_state().curr_cpu());
-    }();
+  void AssertInScheduler(const Thread& thread) const TA_REQ(queue_lock_)
+      TA_ASSERT_SHARED(thread.get_lock())
+          TA_ASSERT(thread.get_scheduler_variable_lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
+    // TODO(johngro): Come back here and remove the `&t == active_thread_`
+    // clause once other system-wide invariants have been cleaned up.  See
+    // https://fxbug.dev/340551498 for details.
+    DEBUG_ASSERT_MSG(thread.scheduler_state().curr_cpu() == this_cpu() ||
+                         thread.scheduler_queue_state().stolen_by() == this_cpu() ||
+                         &thread == active_thread_,
+                     "Thread %lu expected to be a member of scheduler %u, but curr_cpu says %u",
+                     thread.tid(), this_cpu_, thread.scheduler_state().curr_cpu());
   }
 
   // It would be nice to be able to make a stronger assertion here (that the
@@ -1036,12 +1018,10 @@ class Scheduler {
   // it is pretty obvious from the context that the assertion is true.  It might
   // be reasonably to (someday) consider removing even this weak runtime check,
   // and just leaving this as a static analysis workaround, and nothing more.
-  inline void AssertInRunQueue(const Thread& t) const TA_REQ(queue_lock_)
-      TA_ASSERT_SHARED(t.get_lock()) TA_ASSERT(t.get_scheduler_variable_lock()) {
-    [&]() TA_NO_THREAD_SAFETY_ANALYSIS {
-      DEBUG_ASSERT((t.scheduler_state().curr_cpu_ == this_cpu_) &&
-                   (t.scheduler_queue_state().InQueue()));
-    }();
+  void AssertInRunQueue(const Thread& t) const TA_REQ(queue_lock_) TA_ASSERT_SHARED(t.get_lock())
+      TA_ASSERT(t.get_scheduler_variable_lock()) TA_NO_THREAD_SAFETY_ANALYSIS {
+    DEBUG_ASSERT((t.scheduler_state().curr_cpu_ == this_cpu_) &&
+                 (t.scheduler_queue_state().in_queue()));
   }
 
   // Add a couple of small no-op helpers which inform the static analyzer of

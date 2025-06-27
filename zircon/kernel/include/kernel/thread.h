@@ -81,7 +81,7 @@ enum class ResourceOwnership {
 };
 
 // The types of affinity the scheduler understands.
-enum class Affinity { Hard, Soft };
+enum class AffinityType : bool { Hard, Soft };
 
 static inline fbl::NullLock is_current_thread_token;
 
@@ -1516,6 +1516,9 @@ struct Thread : public ChainLockable {
   // Thread API.
 
   thread_state state() const TA_REQ_SHARED(get_lock()) { return scheduler_state_.state(); }
+  SchedulerQueueState::Disposition disposition() const TA_REQ(get_scheduler_variable_lock()) {
+    return scheduler_queue_state().disposition();
+  }
 
   // The scheduler can set threads to be running, or to be ready to run.
   void set_running() TA_REQ(get_lock()) { scheduler_state_.set_state(THREAD_RUNNING); }
@@ -1818,7 +1821,6 @@ struct Thread : public ChainLockable {
 
   // These fields are among the most active in the thread. They are grouped
   // together near the front to improve cache locality.
-  // mutable ChainLock lock_;
   __NO_UNIQUE_ADDRESS mutable fbl::NullLock scheduler_variable_lock_;
   unsigned int flags_{};
   // TODO(https://fxbug.dev/42077109): Write down memory order requirements for accessing signals_.

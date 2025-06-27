@@ -1037,7 +1037,7 @@ void Thread::Current::Kill() {
 
 cpu_mask_t Thread::SetCpuAffinity(cpu_mask_t affinity) {
   canary_.Assert();
-  return Scheduler::SetCpuAffinity<Affinity::Hard>(*this, affinity);
+  return Scheduler::SetCpuAffinity(*this, affinity, AffinityType::Hard);
 }
 
 cpu_mask_t Thread::GetCpuAffinity() const {
@@ -1048,7 +1048,7 @@ cpu_mask_t Thread::GetCpuAffinity() const {
 
 cpu_mask_t Thread::SetSoftCpuAffinity(cpu_mask_t affinity) {
   canary_.Assert();
-  return Scheduler::SetCpuAffinity<Affinity::Soft>(*this, affinity);
+  return Scheduler::SetCpuAffinity(*this, affinity, AffinityType::Soft);
 }
 
 cpu_mask_t Thread::GetSoftCpuAffinity() const {
@@ -1933,6 +1933,7 @@ void Thread::Current::BecomeIdle() {
     // Now that we are the idle thread, make sure that we drop out of the
     // scheduler's bookkeeping altogether.
     Scheduler::RemoveFirstThread(t);
+    Scheduler::UnblockIdle(t);
     t->set_running();
 
     // Cpu must be marked active by now, indicate that it is idle as well.

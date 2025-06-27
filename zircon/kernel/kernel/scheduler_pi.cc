@@ -7,11 +7,11 @@
 #include <lib/fit/defer.h>
 
 #include <kernel/owned_wait_queue.h>
+#include <kernel/scheduler.h>
 #include <kernel/scheduler_internal.h>
+#include <kernel/scheduler_state.h>
 #include <ktl/algorithm.h>
 #include <ktl/type_traits.h>
-
-#include "kernel/scheduler.h"
 
 // PiOperation is an inner class of Scheduler and the base class of each of the
 // various PI operations we need to implement.  Its primary jobs are:
@@ -49,6 +49,10 @@ class Scheduler::PiOperation {
     return thread.scheduler_state().time_slice_ns_;
   }
 
+  static SchedDuration& GetTimeSliceUsedNs(Thread& thread) TA_REQ(thread.get_lock()) {
+    return thread.scheduler_state().time_slice_used_ns_;
+  }
+
   static SchedTime GetStartTime(const Thread& thread) TA_REQ(thread.get_lock()) {
     return thread.scheduler_state().start_time_;
   }
@@ -59,6 +63,14 @@ class Scheduler::PiOperation {
 
   static SchedDuration GetTimeSliceNs(const Thread& thread) TA_REQ(thread.get_lock()) {
     return thread.scheduler_state().time_slice_ns_;
+  }
+
+  static SchedDuration GetTimeSliceUsedNs(const Thread& thread) TA_REQ(thread.get_lock()) {
+    return thread.scheduler_state().time_slice_used_ns_;
+  }
+
+  static SchedDuration GetRemainingTimeSliceNs(const Thread& thread) TA_REQ(thread.get_lock()) {
+    return thread.scheduler_state().remaining_time_slice_ns();
   }
 
   // OwnedWaitQueues do not need to bother to track the dirty or clean state of
@@ -89,6 +101,10 @@ class Scheduler::PiOperation {
     return owq.inherited_scheduler_state_storage()->time_slice_ns;
   }
 
+  static SchedDuration& GetTimeSliceUsedNs(OwnedWaitQueue& owq) TA_REQ(owq.get_lock()) {
+    return owq.inherited_scheduler_state_storage()->time_slice_used_ns;
+  }
+
   static SchedTime GetStartTime(const OwnedWaitQueue& owq) TA_REQ(owq.get_lock()) {
     return owq.inherited_scheduler_state_storage()->start_time;
   }
@@ -99,6 +115,15 @@ class Scheduler::PiOperation {
 
   static SchedDuration GetTimeSliceNs(const OwnedWaitQueue& owq) TA_REQ(owq.get_lock()) {
     return owq.inherited_scheduler_state_storage()->time_slice_ns;
+  }
+
+  static SchedDuration GetTimeSliceUsedNs(const OwnedWaitQueue& owq) TA_REQ(owq.get_lock()) {
+    return owq.inherited_scheduler_state_storage()->time_slice_used_ns;
+  }
+
+  static SchedDuration GetRemainingTimeSliceNs(const OwnedWaitQueue& owq) TA_REQ(owq.get_lock()) {
+    return owq.inherited_scheduler_state_storage()->time_slice_ns -
+           owq.inherited_scheduler_state_storage()->time_slice_used_ns;
   }
 
   inline void HandlePiInteractionCommon() TA_REQ(chainlock_transaction_token, target_.get_lock());
@@ -352,8 +377,10 @@ class UpstreamThreadBaseProfileChangedOp
   using Base = Scheduler::PiOperation<UpstreamThreadBaseProfileChangedOp<TargetType>, TargetType>;
   using Base::AssertEpDirtyState;
   using Base::GetFinishTime;
+  using Base::GetRemainingTimeSliceNs;
   using Base::GetStartTime;
   using Base::GetTimeSliceNs;
+  using Base::GetTimeSliceUsedNs;
   using Base::target_;
   const Thread& upstream_;
 };
@@ -452,8 +479,10 @@ class JoinNodeToPiGraphOp
   using Base = Scheduler::PiOperation<JoinNodeToPiGraphOp<UpstreamType, TargetType>, TargetType>;
   using Base::AssertEpDirtyState;
   using Base::GetFinishTime;
+  using Base::GetRemainingTimeSliceNs;
   using Base::GetStartTime;
   using Base::GetTimeSliceNs;
+  using Base::GetTimeSliceUsedNs;
   using Base::mono_now_;
   using Base::target_;
 
@@ -605,8 +634,10 @@ class SplitNodeFromPiGraphOp
   using Base = Scheduler::PiOperation<SplitNodeFromPiGraphOp<UpstreamType, TargetType>, TargetType>;
   using Base::AssertEpDirtyState;
   using Base::GetFinishTime;
+  using Base::GetRemainingTimeSliceNs;
   using Base::GetStartTime;
   using Base::GetTimeSliceNs;
+  using Base::GetTimeSliceUsedNs;
   using Base::mono_now_;
   using Base::target_;
 
@@ -639,9 +670,9 @@ class SplitNodeFromPiGraphOp
 template <typename Op, typename TargetType>
 inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() {
   if constexpr (ktl::is_same_v<TargetType, Thread>) {
-    SchedulerState& ss = target_.scheduler_state();
+    SchedulerState& state = target_.scheduler_state();
 
-    if (const cpu_num_t curr_cpu = ss.curr_cpu_; curr_cpu != INVALID_CPU) {
+    if (const cpu_num_t curr_cpu = state.curr_cpu_; curr_cpu != INVALID_CPU) {
       DEBUG_ASSERT_MSG((target_.state() == THREAD_RUNNING) || (target_.state() == THREAD_READY),
                        "Unexpected target_ state %u for tid %" PRIu64 "\n", target_.state(),
                        target_.tid());
@@ -650,78 +681,54 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
       Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&scheduler.queue_lock_, SOURCE_TAG};
       scheduler.ValidateInvariants();
       scheduler.AssertInScheduler(target_);
-      const SchedulerQueueState& sqs = target_.scheduler_queue_state();
 
-      // Notes about transient states and bookkeeping.
-      //
-      // RUNNING threads are always expected to have an assigned CPU, to be
-      // "active" (contributing to a scheduler's total weight/utilization), and
-      // to not have any transient state.
-      //
-      // READY threads may have an assigned CPU, but some other combination of
-      // the other factors.
-      //
-      // Typically, a READY thread will be active and have no transient state.
-      // This means that it is waiting in a queue to be scheduled, and will be
-      // accounted for in its scheduler's bookkeeping.  It needs to:
-      //
-      // 1) Be removed from its queue (because its position is about to change)
-      // 2) have its old effective profile be removed from bookkeeping.
-      // 3) Update its EP.
-      // 4) have its new effective profile be added to bookkeeping.
-      // 5) Be re-inserted into the proper run queue.
-      //
-      // If a READY thread's transient state is "rescheduling", however, then it
-      // has been removed from its scheduler's run queue (it is about to become
-      // scheduled), but it has not had its EP removed from bookkeeping.  We do
-      // not want to remove or re-insert the thread into any queue, but we do
-      // need to maintain its scheduler's bookkeeping.
-      //
-      // Finally, the thread could have a transient state of "migrating" or
-      // "stolen".  In this case, it has both been removed from its old
-      // scheduler bookkeeping and its run queues.  We just need to update its
-      // effective profile, which will be properly accounted for in its new
-      // scheduler when it finally arrives there.
+      // Keep track of the original disposition. See SchedulerQueueState for
+      // more details on how the disposition and thread state indicate which
+      // operations are permitted on the thread and its associated scheduler
+      // bookkeeping.
+      const Disposition disposition = target_.disposition();
+      DEBUG_ASSERT_MSG(disposition != Disposition::Unassociated,
+                       "Found unassociated thread %s with tid %lu in state %d, curr_cpu is: %u\n",
+                       target_.name(), target_.tid(), target_.state(),
+                       target_.scheduler_state().curr_cpu());
+
       if (target_.state() == THREAD_READY) {
-        if (sqs.transient_state == SchedulerQueueState::TransientState::None) {
-          DEBUG_ASSERT(sqs.active);
+        if (disposition == Disposition::Enqueued) {
           scheduler.EraseFromQueue(&target_);
         } else {
-          DEBUG_ASSERT(!sqs.run_queue_node.InContainer());
+          CountUpdateInTransition();
         }
       } else {
-        // The target_ thread's state is RUNNING.  Make sure to update its TSR
-        // before we update either the dynamic parameters, or the scheduler's
+        DEBUG_ASSERT(disposition == Disposition::Associated);
 
-        // Running threads should always be "active", and have no transient state.
-        DEBUG_ASSERT(sqs.active &&
-                     (sqs.transient_state == SchedulerQueueState::TransientState::None));
-        const SchedDuration actual_runtime_ns = mono_now_ - ss.last_started_running_;
-        const SchedDuration scaled_actual_runtime_ns = ss.effective_profile().IsDeadline()
+        // Update the time slice before updating other bookkeeping.
+        const SchedDuration actual_runtime_ns = mono_now_ - state.last_started_running_;
+        const SchedDuration scaled_actual_runtime_ns = state.effective_profile().IsDeadline()
                                                            ? scheduler.ScaleDown(actual_runtime_ns)
                                                            : actual_runtime_ns;
 
-        ss.runtime_ns_ += actual_runtime_ns;
-        const SchedDuration new_tsr = (ss.time_slice_ns_ <= scaled_actual_runtime_ns)
+        state.runtime_ns_ += actual_runtime_ns;
+        const SchedDuration new_tsr = (state.time_slice_ns_ <= scaled_actual_runtime_ns)
                                           ? SchedDuration{0}
-                                          : (ss.time_slice_ns_ - scaled_actual_runtime_ns);
-        ss.time_slice_ns_ = new_tsr;
-        if (EffectiveProfile& cur_ep = ss.effective_profile_; cur_ep.IsFair()) {
+                                          : (state.time_slice_ns_ - scaled_actual_runtime_ns);
+        state.time_slice_ns_ = new_tsr;
+        if (EffectiveProfile& cur_ep = state.effective_profile_; cur_ep.IsFair()) {
           cur_ep.fair.normalized_timeslice_remainder =
               new_tsr / ktl::max(cur_ep.fair.initial_time_slice_ns, SchedDuration{1});
         };
 
-        ss.last_started_running_ = mono_now_;
+        state.last_started_running_ = mono_now_;
         scheduler.start_of_current_time_slice_ns_ = mono_now_;
       }
 
-      // Go ahead and update the effective profile.
-      const EffectiveProfile old_ep = ss.effective_profile();
+      // Copy the original effective profile before updating it to compute the
+      // changes to the scheduler bookkeeping.
+      const EffectiveProfile old_ep = state.effective_profile();
       target_.RecomputeEffectiveProfile();
-      const EffectiveProfile& new_ep = ss.effective_profile();
+      const EffectiveProfile& new_ep = state.effective_profile();
 
-      // If the thread is active, deal with its scheduler's bookkeeping.
-      if (sqs.active) {
+      // Update the scheduler bookkeeping, if necessary.
+      if (disposition == Disposition::Associated || disposition == Disposition::Enqueued) {
         if (old_ep.IsFair()) {
           scheduler.weight_total_ -= old_ep.fair.weight;
           --scheduler.runnable_fair_task_count_;
@@ -742,7 +749,6 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
       DEBUG_ASSERT(scheduler.weight_total_ >= SchedWeight{0});
       DEBUG_ASSERT(scheduler.total_deadline_utilization_ >= SchedUtilization{0});
 
-      // static_cast<Op*>(this)->UpdateDynamicParams(old_ep, new_ep, scheduler.virtual_time_);
       static_cast<Op*>(this)->UpdateDynamicParams(old_ep, new_ep, scheduler.virtual_time_);
 
       // OK, we are done updating this thread's state, as well as most of its
@@ -751,18 +757,21 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
       // adjust the preemption time for the scheduler (if this thread is
       // actively running)
       if (target_.state() == THREAD_READY) {
-        if (sqs.transient_state == SchedulerQueueState::TransientState::None) {
+        if (disposition == Disposition::Enqueued) {
           scheduler.QueueThread(&target_, Placement::Adjustment);
         }
       } else {
         DEBUG_ASSERT(target_.state() == THREAD_RUNNING);
         scheduler.target_preemption_time_ns_ =
-            scheduler.start_of_current_time_slice_ns_ + scheduler.ScaleUp(ss.time_slice_ns_);
+            scheduler.start_of_current_time_slice_ns_ + scheduler.ScaleUp(state.time_slice_ns_);
       }
+
+      // Check that target is left in the same disposition.
+      DEBUG_ASSERT(disposition == target_.disposition());
 
       // We have made a change to this scheduler's state, we need to trigger a
       // reschedule operation as soon as we can.
-      RescheduleMask(cpu_num_to_mask(ss.curr_cpu_));
+      RescheduleMask(cpu_num_to_mask(state.curr_cpu_));
       scheduler.ValidateInvariants();
     } else {
       // We are dealing with a target_ which is a non-active thread (it has no
@@ -771,7 +780,7 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
       // profile.  Otherwise, simply update its effective profile.  Once that is
       // all done, update the dynamic parameters of the target_ using the
       // callback provided by the specific operation.
-      SchedulerState::EffectiveProfile old_ep = ss.effective_profile_;
+      SchedulerState::EffectiveProfile old_ep = state.effective_profile_;
       if (WaitQueue* wq = target_.wait_queue_state().blocking_wait_queue_; wq != nullptr) {
         // Note that to update our position in the WaitQueue this thread is
         // blocked in, we need to holding that wait queue's lock.  (It has to be
@@ -792,7 +801,7 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
       } else {
         target_.RecomputeEffectiveProfile();
       }
-      static_cast<Op*>(this)->UpdateDynamicParams(old_ep, ss.effective_profile_, SchedTime{0});
+      static_cast<Op*>(this)->UpdateDynamicParams(old_ep, state.effective_profile_, SchedTime{0});
     }
   } else {
     static_assert(ktl::is_same_v<TargetType, OwnedWaitQueue>,
@@ -814,18 +823,21 @@ void Scheduler::ThreadBaseProfileChanged(Thread& thread) {
 
 template <typename TargetType>
 void Scheduler::UpstreamThreadBaseProfileChanged(const Thread& upstream, TargetType& target) {
+  ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_pi: base profile changed");
   UpstreamThreadBaseProfileChangedOp op{upstream, target};
   op.DoOperation();
 }
 
 template <typename UpstreamType, typename TargetType>
 void Scheduler::JoinNodeToPiGraph(const UpstreamType& upstream, TargetType& target) {
+  ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_pi: join");
   JoinNodeToPiGraphOp op{upstream, target};
   op.DoOperation();
 }
 
 template <typename UpstreamType, typename TargetType>
 void Scheduler::SplitNodeFromPiGraph(const UpstreamType& upstream, TargetType& target) {
+  ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(COMMON, "sched_pi: split");
   SplitNodeFromPiGraphOp op{upstream, target};
   op.DoOperation();
 }
