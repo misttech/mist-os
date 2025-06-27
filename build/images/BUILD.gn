@@ -12,7 +12,6 @@ import("//build/drivers/driver_manifest.gni")
 import("//build/images/args.gni")
 import("//build/images/custom_signing.gni")
 import("//build/images/paths.gni")
-import("//build/images/size_checker/size_checker_input.gni")
 import("//build/images/vbmeta.gni")
 import("//build/images/vboot/vboot.gni")
 import("//build/info/info.gni")
@@ -289,16 +288,8 @@ group("default-images") {
     if (bazel_product_bundle_target != "") {
       deps += [ "${bazel_product_bundle_target}_size_targets" ]
     }
-  } else {
-    if (size_checker_input != {
-        }) {
-      # Size checks only make sense when use_bringup_assembly is false, since
-      # they require system images in addition to the ZBI.
-      deps += [
-        "size_checker:run_product_size_checker",
-        "size_checker:size_report.json",
-      ]
-    }
+  } else if (!bootfs_only) {
+    deps += [ "size_checker:size_report.json" ]
   }
 
   if (!bootfs_only) {

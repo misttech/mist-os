@@ -79,6 +79,7 @@ template("product_bundle") {
     vd_dir = "${outdir}/virtual_devices"
     transfer_manifest = "$target_out_dir/${product_name}.transfer.json"
     tuf_keys = "//src/sys/pkg/repositories/devhost/keys"
+    image_size_report = "$target_out_dir/$target_name.size_report.json"
   }
 
   bundle_deps = []
@@ -189,6 +190,8 @@ template("product_bundle") {
       rebase_path(files.outdir, root_build_dir),
       "--tuf-keys",
       rebase_path(files.tuf_keys, root_build_dir),
+      "--gerrit-size-report",
+      rebase_path(files.image_size_report, root_build_dir),
     ]
 
     outputs += [ files.product_bundle_manifest ]
@@ -203,6 +206,7 @@ template("product_bundle") {
       "${files.outdir}/keys/targets.json",
       "${files.outdir}/keys/snapshot.json",
       "${files.outdir}/keys/timestamp.json",
+      files.image_size_report,
     ]
 
     # Used by create-update for size checks. Needed because product bundle
