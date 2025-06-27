@@ -117,6 +117,7 @@ template("test_assembly_config") {
       output_conversion = "json"
       contents = {
         name = "test board"
+        arch = "x64"
         provided_features = []
         release_info = {
           info = {

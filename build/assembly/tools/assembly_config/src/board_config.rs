@@ -170,6 +170,7 @@ mod tests {
         let config_file = NamedTempFile::new().unwrap();
         let config_path = Utf8PathBuf::from_path_buf(config_file.path().to_path_buf()).unwrap();
         let config_value = serde_json::json!({
+            "arch": "x64",
             "name": "my_board",
             "release_info": {
                 "info": {
@@ -239,6 +240,7 @@ mod tests {
         let config_file = NamedTempFile::new().unwrap();
         let config_path = Utf8PathBuf::from_path_buf(config_file.path().to_path_buf()).unwrap();
         let config_value = serde_json::json!({
+            "arch": "x64",
             "name": "my_board",
             "release_info": {
                 "info": {

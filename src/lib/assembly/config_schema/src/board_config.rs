@@ -19,10 +19,11 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// The architecture of the hardware.
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum Architecture {
     /// x64.
+    #[default]
     X64,
 
     /// arm64.
@@ -52,8 +53,7 @@ pub struct BoardInformation {
     pub name: String,
 
     /// The architecture of the hardware.
-    /// TODO(https://fxbug.dev/425444807): Make this required.
-    pub arch: Option<Architecture>,
+    pub arch: Architecture,
 
     /// Metadata about the board that's provided to the 'fuchsia.hwinfo.Board'
     /// protocol and to the Board Driver via the PlatformID and BoardInfo ZBI
@@ -487,6 +487,7 @@ mod test {
     fn test_basic_board_deserialize() {
         let json = serde_json::json!({
             "name": "sample board",
+            "arch": "x64",
             "release_info": {
                 "info": {
                     "name": "",
@@ -505,7 +506,7 @@ mod test {
 
     #[test]
     fn test_board_default_serialization() {
-        let value: BoardInformation = serde_json::from_str("{\"name\": \"foo\", \"release_info\": {\"info\": { \"name\": \"\", \"repository\": \"\", \"version\": \"\" }, \"bib_sets\": [] }}").unwrap();
+        let value: BoardInformation = serde_json::from_str("{\"name\": \"foo\", \"arch\": \"x64\", \"release_info\": {\"info\": { \"name\": \"\", \"repository\": \"\", \"version\": \"\" }, \"bib_sets\": [] }}").unwrap();
         crate::common::tests::value_serialization_helper(value);
     }
 
@@ -537,6 +538,7 @@ mod test {
 
         let json = serde_json::json!({
             "name": "sample board",
+            "arch": "x64",
             "hardware_info": {
                 "name": "hwinfo_name",
                 "vendor_id": 1,
