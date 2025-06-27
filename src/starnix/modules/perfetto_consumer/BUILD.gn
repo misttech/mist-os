@@ -14,6 +14,7 @@ rustc_library("perfetto_consumer") {
   sources = [ "lib.rs" ]
 
   deps = [
+    "//sdk/rust/zx",
     "//src/lib/fuchsia-async",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-observer",
@@ -22,6 +23,7 @@ rustc_library("perfetto_consumer") {
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/lib/perfetto",
     "//src/starnix/lib/perfetto:perfetto_protos",
+    "//src/starnix/lib/perfetto:perfetto_trace_protos",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_uapi",
     "//third_party/rust_crates:anyhow",

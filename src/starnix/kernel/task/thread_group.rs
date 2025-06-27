@@ -45,7 +45,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use zx::AsHandleRef;
+use zx::{AsHandleRef, Koid, Status};
 
 /// A weak reference to a thread group that can be used in set and maps.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -1709,6 +1709,15 @@ impl ThreadGroup {
         // a return code and dropped the sender end of the channel.
         on_exited.await.ok();
         log_debug!(tg:% = tg_name; "thread group shutdown complete");
+    }
+
+    /// Returns the KOID of the process for this thread group.
+    /// This method should be used to when mapping 32 bit linux process ids to KOIDs
+    /// to avoid breaking the encapsulation of the zx::process within the ThreadGroup.
+    /// This encapsulation is important since the relationship between the ThreadGroup
+    /// and the Process may change over time. See [ThreadGroup::process] for more details.
+    pub fn get_process_koid(&self) -> Result<Koid, Status> {
+        self.process.get_koid()
     }
 }
 

@@ -3,9 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::bail;
+use fuchsia_async as fasync;
 use fuchsia_trace::{
     category_enabled, trace_string_ref_t, BufferingMode, ProlongedContext, TraceState,
 };
+use fuchsia_trace_observer::TraceObserver;
 use fxt::blob::{BlobHeader, BlobType};
 use perfetto_protos::perfetto::protos::trace_config::buffer_config::FillPolicy;
 use perfetto_protos::perfetto::protos::trace_config::{BufferConfig, DataSource};
@@ -13,15 +15,21 @@ use perfetto_protos::perfetto::protos::{
     ipc_frame, DataSourceConfig, DisableTracingRequest, EnableTracingRequest, FreeBuffersRequest,
     FtraceConfig, ReadBuffersRequest, ReadBuffersResponse, TraceConfig,
 };
+use perfetto_trace_protos::perfetto::protos::frame_timeline_event::{
+    ActualDisplayFrameStart, ActualSurfaceFrameStart, Event, ExpectedDisplayFrameStart,
+    ExpectedSurfaceFrameStart,
+};
+use perfetto_trace_protos::perfetto::protos::{trace_packet, Trace};
 use prost::Message;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::FsString;
-use starnix_logging::{log_error, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
+use starnix_logging::{log_error, log_info, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::Errno;
-
-use fuchsia_async as fasync;
-use fuchsia_trace_observer::TraceObserver;
+use starnix_uapi::pid_t;
+use std::collections::HashMap;
+use std::sync::Arc;
+use zx::Koid;
 
 const PERFETTO_BUFFER_SIZE_KB: u32 = 63488;
 
@@ -39,6 +47,11 @@ struct CallbackState {
     prolonged_context: Option<ProlongedContext>,
     /// Partial trace packet returned from Perfetto but not yet written to Fuchsia.
     packet_data: Vec<u8>,
+
+    /// A mapping of Linux pids to Fuchsia koid. This is used
+    /// to patch up the perfetto data so it aligns with the Fuchsia processes
+    /// in the trace.
+    pid_map: HashMap<pid_t, Koid>,
 }
 
 impl CallbackState {
@@ -179,6 +192,10 @@ impl CallbackState {
                         let frame = connection.next_frame_blocking(locked, current_task)?;
                         if frame.request_id == Some(disable_request) {
                             break;
+                        } else {
+                            log_error!(
+                                "Ignoring frame while looking for DisableTracingRequest: {frame:?}"
+                            );
                         }
                     }
 
@@ -202,6 +219,10 @@ impl CallbackState {
                             .next_frame_blocking(locked, current_task)?;
                         if frame.request_id != Some(read_buffers_request) {
                             continue;
+                        } else {
+                            log_info!(
+                                "perfetto_consumer ignoring frame while looking for ReadBuffersRequest {read_buffers_request}: {frame:?}"
+                            );
                         }
                         if let Some(ipc_frame::Msg::MsgInvokeMethodReply(reply)) = &frame.msg {
                             if let Ok(response) = ReadBuffersResponse::decode(
@@ -230,16 +251,30 @@ impl CallbackState {
                                         // s.packet_data will be empty after this call.
                                         blob_data.append(&mut self.packet_data);
 
+                                        // At this point blob_data is a full Perfetto Trace protobuf.
+                                        // Parse the data and replace the linux pids with their
+                                        // corresponding koid.
+                                        let rewritten =
+                                            self.rewrite_pids(&blob_data).unwrap_or(blob_data);
+
                                         // Ignore a failure to write the packet here. We don't
                                         // return immediately because we want to allow the
                                         // remaining records to be recorded as dropped.
-                                        let _ = self.forward_packet(blob_name_ref, blob_data);
+                                        if self.forward_packet(blob_name_ref, rewritten).is_none() {
+                                            log_error!("perfetto_consumer packet was not forwarded successfully");
+                                        }
                                     }
                                 }
+                            } else {
+                                log_error!(
+                                    "perfetto_consumer cannot decode protobuf from {reply:?}"
+                                );
                             }
                             if reply.has_more != Some(true) {
                                 break;
                             }
+                        } else {
+                            log_error!("perfetto_consumer ignoring non-MsgInvokeMethodReply message: {frame:?}");
                         }
                     }
                     // The response to a free buffers request does not have anything meaningful,
@@ -257,6 +292,7 @@ impl CallbackState {
                     // and ensure we're stopped so we re-synchronize.
                     self.prolonged_context = None;
                     self.packet_data.clear();
+                    self.pid_map.clear();
                 }
             }
         }
@@ -328,6 +364,78 @@ impl CallbackState {
         }
         None
     }
+
+    fn rewrite_pids(&self, protobuf_blob: &Vec<u8>) -> anyhow::Result<Vec<u8>> {
+        let mut proto = Trace::decode(protobuf_blob.as_slice())?;
+        for ref mut p in &mut proto.packet {
+            if let Some(ref mut data) = p.data {
+                match data {
+                    trace_packet::Data::FrameTimelineEvent(ref mut frame_timeline_event) => {
+                        if let Some(ref mut evt) = &mut frame_timeline_event.event {
+                            // Update the linux pid to the Fuchsia pid. Each event has its own
+                            // match arm since the variant data is of a different type for each event.
+                            match evt {
+                                Event::ExpectedDisplayFrameStart(ExpectedDisplayFrameStart {
+                                    ref mut pid,
+                                    ..
+                                })
+                                | Event::ActualDisplayFrameStart(ActualDisplayFrameStart {
+                                    ref mut pid,
+                                    ..
+                                })
+                                | Event::ExpectedSurfaceFrameStart(ExpectedSurfaceFrameStart {
+                                    ref mut pid,
+                                    ..
+                                })
+                                | Event::ActualSurfaceFrameStart(ActualSurfaceFrameStart {
+                                    ref mut pid,
+                                    ..
+                                }) => {
+                                    pid.as_mut().map(|pid| {
+                                        *pid = self.map_to_koid_val(*pid);
+                                    });
+                                }
+                                Event::FrameEnd(_frame_end) => {}
+                            }
+                        }
+                    }
+                    // No need to process other data; we only fixup data that references the pid.
+                    _ => (),
+                }
+            }
+        }
+        Ok(proto.encode_to_vec())
+    }
+
+    fn map_to_koid_val(&self, pid: i32) -> i32 {
+        // Truncate the koid down to 32 bits in order to match the perfetto data schema. This is
+        // usually not an issue except for artificial koids which have the 2^63 bit set, such as
+        // virtual threads.This is consistent with the perfetto data importer code:
+        // https://github.com/google/perfetto/blob/main/src/trace_processor/importers/fuchsia/fuchsia_trace_tokenizer.cc#L488
+        self.pid_map.get(&pid).map(|k| k.raw_koid() as i32).unwrap_or(pid)
+    }
+
+    // Use the kernel pid table to make a mapping from linux pid to koid.
+    fn generate_pid_mapping(&mut self, kernel: Arc<Kernel>) {
+        let pid_table = kernel.pids.read();
+
+        // The map is cleared when the tracing state is STOPPED. Only generate the map once per
+        // session.
+        if !self.pid_map.is_empty() {
+            log_info!("perfetto_consumer already generated {} pid mappings", self.pid_map.len());
+            return;
+        }
+
+        let ids = pid_table.process_ids();
+        for pid in &ids {
+            if let Some(tg) = pid_table.get_thread_group(*pid) {
+                if let Ok(koid) = tg.get_process_koid() {
+                    self.pid_map.insert(*pid, koid);
+                }
+            }
+        }
+        log_info!("perfetto_consumer recorded {} pid mappings", ids.len());
+    }
 }
 
 pub fn start_perfetto_consumer_thread(kernel: &Kernel, socket_path: FsString) -> Result<(), Errno> {
@@ -352,8 +460,19 @@ pub fn start_perfetto_consumer_thread(kernel: &Kernel, socket_path: FsString) ->
                 connection: None,
                 prolonged_context: None,
                 packet_data: Vec::new(),
+                pid_map: HashMap::new(),
             };
             while let Ok(state) = observer.on_state_changed().await {
+                if state == TraceState::Stopping {
+                    // Generate the pid to koid mapping table before we read the perfetto data.
+                    // This is a best-effort to map the linux pids to Fuchsia koids. It is possible
+                    // for a linux process to emit trace data and then exit during the trace. This
+                    // would result in the kernel pid table not having a mapping. This is assumed to
+                    // be a rare occurrence for processes that are of interest in the trace. If it does
+                    // happen, one possible fix would be to capture the pid-koid mapping when starting
+                    // the trace as well.
+                    callback_state.generate_pid_mapping(current_task.kernel.clone());
+                }
                 callback_state.on_state_change(locked, state, &current_task).unwrap_or_else(|e| {
                     log_error!("perfetto_consumer callback error: {:?}", e);
                 })
