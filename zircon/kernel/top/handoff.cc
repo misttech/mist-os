@@ -20,8 +20,8 @@
 #include <lk/init.h>
 #include <object/handle.h>
 #include <object/vm_object_dispatcher.h>
-#include <phys/handoff-requirements.h>
 #include <phys/handoff.h>
+#include <phys/zircon-abi-spec.h>
 #include <phys/zircon-info-note.h>
 #include <platform/boot_timestamps.h>
 #include <platform/timer.h>
@@ -34,15 +34,15 @@
 
 PhysHandoff* gPhysHandoff;
 
+namespace {
+
 // TODO(https://fxbug.dev/42164859): Populate with sizes and alignments
 // relating to C++ ABI set-up (e.g., stack sizes).
-constexpr PhysHandoffRequirements kPhysHandoffRequirements{};
+constexpr ZirconAbiSpec kZirconAbiSpec{};
 
-// The mechanism to actually actually convey the requirements: we encode it as
+// The mechanism to convey the ABI specification to physboot: we encode it as
 // an ELF note, to be parsed by physboot at hand-off prep time.
-ZIRCON_INFO_NOTE ZirconInfoNote<kPhysHandoffRequirements> kPhysHandoffRequirementsNote;
-
-namespace {
+ZIRCON_INFO_NOTE ZirconInfoNote<kZirconAbiSpec> kZirconAbiSpecNote;
 
 paddr_t gKernelPhysicalLoadAddress;
 

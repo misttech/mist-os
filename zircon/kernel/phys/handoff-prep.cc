@@ -99,9 +99,9 @@ HandoffPrep::HandoffPrep(ElfImage kernel)
   handoff_ = New(handoff, ac);
   ZX_ASSERT_MSG(ac.check(), "Failed to allocate PhysHandoff!");
 
-  ktl::optional requirements = kernel_.GetZirconInfo<PhysHandoffRequirements>();
-  ZX_ASSERT_MSG(requirements, "no Zircon ELF note containing the PhysHandoffRequirements!");
-  requirements_ = *requirements;
+  ktl::optional spec = kernel_.GetZirconInfo<ZirconAbiSpec>();
+  ZX_ASSERT_MSG(spec, "no Zircon ELF note containing the ZirconAbiSpec!");
+  abi_spec_ = *spec;
 }
 
 PhysVmo HandoffPrep::MakePhysVmo(ktl::span<const ktl::byte> data, ktl::string_view name,

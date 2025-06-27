@@ -10,15 +10,15 @@
 #include <stdlib.h>
 #include <zircon/assert.h>
 
-#include <phys/handoff-requirements.h>
 #include <phys/handoff.h>
+#include <phys/zircon-abi-spec.h>
 #include <phys/zircon-info-note.h>
 
 namespace {
 
-constexpr PhysHandoffRequirements kPhysHandoffRequirements{};
+constexpr ZirconAbiSpec kZirconAbiSpec{};
 
-ZIRCON_INFO_NOTE ZirconInfoNote<kPhysHandoffRequirements> kPhysHandoffRequirementsNote;
+ZIRCON_INFO_NOTE ZirconInfoNote<kZirconAbiSpec> kZirconAbiSpecNote;
 
 }  // namespace
 

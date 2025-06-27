@@ -25,12 +25,12 @@
 #include <ktl/utility.h>
 #include <phys/elf-image.h>
 #include <phys/handoff-ptr.h>
-#include <phys/handoff-requirements.h>
 #include <phys/handoff.h>
 #include <phys/kernel-package.h>
 #include <phys/new.h>
 #include <phys/uart.h>
 #include <phys/zbitl-allocation.h>
+#include <phys/zircon-abi-spec.h>
 
 struct ArchPatchInfo;
 struct BootOptions;
@@ -373,7 +373,7 @@ class HandoffPrep {
 
   const ElfImage kernel_;
   PhysHandoff* handoff_ = nullptr;
-  PhysHandoffRequirements requirements_{};
+  ZirconAbiSpec abi_spec_{};
   TemporaryDataAllocator temporary_data_allocator_;
   PermanentDataAllocator permanent_data_allocator_;
   VirtualAddressAllocator first_class_mapping_allocator_;

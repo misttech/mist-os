@@ -538,8 +538,8 @@ kernel_elf_binary("physboot-hello-world-test") {
   ]
 
   deps = [
-    "..:handoff-requirements",
     "..:physboot.kernel",
+    "..:zircon-abi-spec",
     "..:zircon-info-note",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/code-patching:self-test",

@@ -585,11 +585,11 @@ if (toolchain_environment == "kernel.phys" ||
     public_deps = [
       ":elf-image",
       ":handoff",
-      ":handoff-requirements",
       ":kernel-package",
       ":new",
       ":uart",
       ":zbitl-allocation",
+      ":zircon-abi-spec",
       "//sdk/lib/fit",
       "//sdk/lib/zbi-format",
       "//src/lib/trivial-allocator",
@@ -759,8 +759,8 @@ group("physboot") {
   public_deps = [ ":physboot.package" ]
 }
 
-source_set("handoff-requirements") {
-  public = [ "include/phys/handoff-requirements.h" ]
+source_set("zircon-abi-spec") {
+  public = [ "include/phys/zircon-abi-spec.h" ]
   public_configs = [ ":includes" ]
 }
 
