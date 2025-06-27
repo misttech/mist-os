@@ -184,7 +184,7 @@ def main():
             {
                 file
                 for file in goldens
-                if not Path(golden).is_relative_to(args.golden_dir)
+                if not Path(file).is_relative_to(args.golden_dir)
             }
         )
         if outside_goldens:
