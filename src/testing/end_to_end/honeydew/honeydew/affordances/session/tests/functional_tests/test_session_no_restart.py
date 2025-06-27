@@ -9,9 +9,11 @@ from typing import Set
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
+from honeydew import errors
 from honeydew.affordances.session import errors as session_errors
 from honeydew.affordances.session import session_using_ffx
 from honeydew.fuchsia_device import fuchsia_device
+from honeydew.utils import common
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -91,14 +93,19 @@ class SessionAffordanceNoRestartTests(fuchsia_base_test.FuchsiaBaseTest):
         session = self.device.session
         session._cleanup()
 
-        after_cleanup = self._elements()
+        def element_removed() -> bool:
+            elements = self._elements()
+            _LOGGER.info(f"current elements: {elements}")
+            return added_element not in self._elements()
 
-        _LOGGER.info(f"after cleanup: {after_cleanup}")
-
-        # The cleanup should remove the newly added component.
-        asserts.assert_false(
-            added_element in after_cleanup, "The added element is not removed."
-        )
+        try:
+            common.wait_for_state(
+                state_fn=element_removed,
+                expected_state=True,
+                wait_time=2,  # Time to wait between retries in seconds
+            )
+        except errors.HoneydewTimeoutError:
+            self.fail("The added element is not removed.")
 
 
 if __name__ == "__main__":
