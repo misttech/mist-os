@@ -364,25 +364,25 @@ impl PagerBacked for FxBlob {
                                         .file_report(CrashReport {
                                             program_name: Some("fxfs".to_string()),
                                             crash_signature: Some(
-                                                "fxfs::decompression_error".to_string(),
+                                                "fuchsia-fxfs-decompression_error".to_string(),
                                             ),
                                             is_fatal: Some(false),
                                             annotations: Some(vec![
                                                 Annotation {
-                                                    key: "range".to_string(),
+                                                    key: "fxfs.range".to_string(),
                                                     value: format!("{:?}", range),
                                                 },
                                                 Annotation {
-                                                    key: "compressed_offsets".to_string(),
+                                                    key: "fxfs.compressed_offsets".to_string(),
                                                     value: format!("{:?}", compressed_offsets),
                                                 },
                                                 Annotation {
-                                                    key: "merkle_root".to_string(),
+                                                    key: "fxfs.merkle_root".to_string(),
                                                     value: format!("{}", self.merkle_root),
                                                 },
                                             ]),
                                             attachments: Some(vec![Attachment {
-                                                key: "compressed_data".to_string(),
+                                                key: "fxfs_compressed_data".to_string(),
                                                 value: Buffer { vmo, size },
                                             }]),
                                             ..Default::default()
