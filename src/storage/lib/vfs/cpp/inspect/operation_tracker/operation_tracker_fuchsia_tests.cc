@@ -4,24 +4,34 @@
 
 #include <lib/fit/function.h>
 #include <lib/fpromise/single_threaded_executor.h>
+#include <lib/inspect/cpp/hierarchy.h>
+#include <lib/inspect/cpp/inspector.h>
 #include <lib/inspect/cpp/reader.h>
 #include <lib/inspect/testing/cpp/inspect.h>
-#include <lib/zx/result.h>
+#include <lib/zx/time.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/status.h>
 
+#include <algorithm>
 #include <condition_variable>
 #include <mutex>
 #include <thread>
+#include <utility>
 
+#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
 #include "src/storage/lib/vfs/cpp/inspect/operation_tracker.h"
 
-using namespace ::testing;
-using namespace inspect::testing;
-
 namespace fs_inspect {
 
 namespace {
+
+using inspect::testing::NodeMatches;
+using inspect::testing::PropertyList;
+using inspect::testing::UintIs;
+using testing::IsSupersetOf;
 
 constexpr char kOperationName[] = "my_operation";
 

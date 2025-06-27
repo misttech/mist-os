@@ -7,7 +7,7 @@
 
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
-#include <zircon/status.h>
+#include <zircon/types.h>
 
 #include <optional>
 #include <type_traits>
