@@ -23,8 +23,7 @@ If you're confused about why a command failed, try taking a look at the logs
 from the device before trying the next command. Device logs often reveal
 information not contained in host-side stdout/stderr.
 
-Always ask for confirmation before running `fx set` or otherwise changing the
-user's build settings.
+Always ask for confirmation before running `fx set` or otherwise changing the users build settings and before running destructive commands like `ffx target flash`.
 
 Documentation for Fuchsia is in the `docs/` subdirectory and the
 `vendor/google/docs/` subdirectory. You should read the documentation if you're
