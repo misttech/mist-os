@@ -2,20 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DL_TEST_DL_TESTS_BASE_H_
-#define LIB_DL_TEST_DL_TESTS_BASE_H_
-
-// Avoid symbol conflict between <ld/abi/abi.h> and <link.h>
-#pragma push_macro("_r_debug")
-#undef _r_debug
-#define _r_debug not_using_system_r_debug
-#include <link.h>
-#pragma pop_macro("_r_debug")
+#ifndef LIB_C_DLFCN_DL_TEST_DL_TESTS_BASE_H_
+#define LIB_C_DLFCN_DL_TEST_DL_TESTS_BASE_H_
 
 #include <lib/fit/result.h>
 
 #include <gtest/gtest.h>
 
+#include "../../dl_phdr_info.h"
 #include "../error.h"
 
 namespace dl::testing {
@@ -79,4 +73,4 @@ class DlTestsBase : public ::testing::Test {
 
 }  // namespace dl::testing
 
-#endif  // LIB_DL_TEST_DL_TESTS_BASE_H_
+#endif  // LIB_C_DLFCN_DL_TEST_DL_TESTS_BASE_H_

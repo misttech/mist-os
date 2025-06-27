@@ -280,7 +280,7 @@ TYPED_TEST(DlTests, SonameFilenameMatch) {
   const std::string kSoname = TestShlib("libbar-soname");
   const std::string kParentFile = TestShlib("libsoname-filename-match");
 
-  const size_t initial_loaded_count = GetGlobalCounters(this).loaded;
+  const size_t initial_loaded_count = GetGlobalCounters(this).adds;
 
   this->Needed({kFilename});
 
@@ -305,7 +305,7 @@ TYPED_TEST(DlTests, SonameFilenameMatch) {
   ASSERT_TRUE(open_parent.is_ok()) << open_parent.error_value();
   ASSERT_TRUE(open_parent.value());
 
-  const size_t updated_loaded_count = GetGlobalCounters(this).loaded;
+  const size_t updated_loaded_count = GetGlobalCounters(this).adds;
   if constexpr (TestFixture::kInaccurateLoadCountAfterSonameMatch) {
     EXPECT_EQ(updated_loaded_count, initial_loaded_count + 3);
   } else {
@@ -343,7 +343,7 @@ TYPED_TEST(DlTests, SonameFilenameDep) {
         << "Fixture should be able to look up DT_SONAME in pending deps in a linking session";
   }
 
-  const size_t initial_loaded_count = GetGlobalCounters(this).loaded;
+  const size_t initial_loaded_count = GetGlobalCounters(this).adds;
 
   this->ExpectRootModule(kHasDepsFile);
   this->Needed({kHasLibBarFile, kLibFooFile});
@@ -352,7 +352,7 @@ TYPED_TEST(DlTests, SonameFilenameDep) {
   ASSERT_TRUE(open_has_deps.is_ok()) << open_has_deps.error_value();
   ASSERT_TRUE(open_has_deps.value());
 
-  const size_t updated_loaded_count = GetGlobalCounters(this).loaded;
+  const size_t updated_loaded_count = GetGlobalCounters(this).adds;
   EXPECT_EQ(updated_loaded_count, initial_loaded_count + 3);
 
   // Expect a file named libar-soname to be absent from loaded modules.
@@ -388,7 +388,7 @@ TYPED_TEST(DlTests, SonameFilenameLoadedDep) {
         << "Fixture should be able to look up DT_SONAME in loaded deps in a linking session.";
   }
 
-  const size_t initial_loaded_count = GetGlobalCounters(this).loaded;
+  const size_t initial_loaded_count = GetGlobalCounters(this).adds;
 
   this->ExpectRootModule(kHasDepsFile);
   this->Needed({kLibFooFile, kHasLibBarFile});
@@ -397,7 +397,7 @@ TYPED_TEST(DlTests, SonameFilenameLoadedDep) {
   ASSERT_TRUE(open_has_deps.is_ok()) << open_has_deps.error_value();
   ASSERT_TRUE(open_has_deps.value());
 
-  const size_t updated_loaded_count = GetGlobalCounters(this).loaded;
+  const size_t updated_loaded_count = GetGlobalCounters(this).adds;
 
   if constexpr (TestFixture::kInaccurateLoadCountAfterSonameMatch) {
     // For some reason, Musl only counts one additional module.

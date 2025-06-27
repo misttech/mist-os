@@ -71,6 +71,7 @@ static_library("ld-testing") {
 # This is implicit in :headers and :ld-testing, but it's separate for use in
 # contexts that don't want all the rest of the deps :ld-testing brings in.
 library_headers("abi-headers") {
+  testonly = true
   headers = [ "lib/ld/testing/startup-ld-abi.h" ]
   public_deps = [ "..:abi-headers" ]
 }

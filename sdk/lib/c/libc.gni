@@ -163,6 +163,12 @@ libc_test_namespace = "fuchsia_libc_unittest"
 #     - Type: list(label)
 #     - Default: []
 #
+#   * testonly_public_deps
+#     - Optional: Extra public_deps to append for the testonly target
+#     but not the main target.
+#     - Type: list(label)
+#     - Default: []
+#
 #   * dir
 #     - Optional: Directory prefix for $sources file names.
 #     - Type: dir
@@ -215,6 +221,7 @@ template("libc_source_set") {
                              "remove_configs",
                              "sources",
                              "testonly_deps",
+                             "testonly_public_deps",
                              "undefined_symbols",
                              "visibility",
                            ])
@@ -382,6 +389,9 @@ template("libc_source_set") {
         public_deps += [ "$label.testonly" ]
       }
     }
+    if (defined(invoker.testonly_public_deps)) {
+      public_deps += invoker.testonly_public_deps
+    }
     if (defined(invoker.testonly_deps)) {
       deps += invoker.testonly_deps
     }
@@ -416,6 +426,11 @@ template("libc_source_set") {
 #     - Type: dir
 #     - Default: "."
 #
+#   * gtest
+#     - Optional: Use gtest instead of zxtest.
+#     - Type: boolean
+#     - Default: false
+#
 #   * public
 #     - Optional: As for source_set(), but $dir is prefixed if set.
 #     - Type: list(file)
@@ -430,12 +445,14 @@ template("libc_test") {
   source_set(target_name) {
     testonly = true
 
+    assert_no_deps = []
     deps = []
     forward_variables_from(invoker,
                            "*",
                            [
                              "configs",
                              "dir",
+                             "gtest",
                              "public",
                              "remove_configs",
                              "sources",
@@ -468,6 +485,13 @@ template("libc_test") {
     }
 
     deps += [ "$libc:libc_test.deps" ]
+    if (defined(invoker.gtest) && invoker.gtest) {
+      deps += [ "$libc:gtest" ]
+      assert_no_deps += [ "//zircon/system/ulib/zxtest/*" ]
+    } else {
+      deps += [ "$libc:zxtest" ]
+      assert_no_deps += [ "//third_party/googletest/*" ]
+    }
   }
 }
 
@@ -488,6 +512,11 @@ variant_replaces_allocator = toolchain_variant.tags + [ "replaces-allocator" ] -
 #     - Optional: Subdirectory of $llvm_libc where source is found.
 #     - Type: relative dir
 #     - Default: get_path_info(target_out_dir, "name")
+#
+#   * test_dir
+#     - Optional: Directory where test sources are found.
+#     - Type: dir
+#     - Default: "$llvm_libc/test/$dir"
 #
 #   * asm_functions
 #     - Optional: A subset of $functions implemented in "$function.S" files.
@@ -540,7 +569,7 @@ variant_replaces_allocator = toolchain_variant.tags + [ "replaces-allocator" ] -
 #     the code requires but that aren't also llvm_libc_source_set() targets.
 #     - Type: list(label)
 #
-#   * allow_fini, allow_init, basic_abi, configs, global_symbols, non_test_deps, testonly_deps, undefined_symbols
+#   * allow_fini, allow_init, basic_abi, configs, global_symbols, non_test_deps, testonly_deps, testonly_public_deps, undefined_symbols
 #     - Optional: See libc_source_set().  If $global_symbols is omitted
 #     and $basic_abi is true, then it defaults to $functions.
 #
@@ -623,6 +652,7 @@ template("llvm_libc_source_set") {
                              "public_deps",
                              "sources",
                              "testonly_deps",
+                             "testonly_public_deps",
                              "undefined_symbols",
                              "visibility",
                            ])
@@ -708,17 +738,29 @@ template("llvm_libc_source_set") {
   }
 
   libc_test(test_target) {
-    dir = "$llvm_libc/test/src/$source_dir"
+    if (defined(invoker.test_dir)) {
+      dir = invoker.test_dir
+    } else {
+      dir = "$llvm_libc/test/src/$source_dir"
+    }
 
     deps = [ ":$main_target.testonly" ]
     sources = []
 
     foreach(function, invoker.functions - no_test_functions) {
-      sources += [ "${function}_test.cpp" ]
+      if (defined(invoker.test_dir)) {
+        sources += [ "${function}_test.cc" ]
+      } else {
+        sources += [ "${function}_test.cpp" ]
+      }
     }
 
     if (defined(invoker.test_sources)) {
       sources += invoker.test_sources
+    }
+
+    if (defined(invoker.local_deps)) {
+      deps += invoker.local_deps
     }
 
     if (defined(invoker.test_deps)) {

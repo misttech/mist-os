@@ -17,22 +17,12 @@ using dl::testing::TestSym;
 using dl::testing::CollectModulePhdrInfo;
 using dl::testing::GetGlobalCounters;
 using dl::testing::GetPhdrInfoForModule;
+using dl::testing::gStartupPhdrInfo;
 using dl::testing::ModuleInfoList;
 using dl::testing::ModulePhdrInfo;
 
 using dl::testing::DlTests;
 TYPED_TEST_SUITE(DlTests, dl::testing::TestTypes);
-
-// Call the system dl_iterate_phdr to collect the phdr info for startup modules
-// loaded with this unittest: this serves as the source of truth of what is
-// loaded when the test is run.
-ModuleInfoList GetStartupPhdrInfo() {
-  ModuleInfoList phdr_info;
-  dl_iterate_phdr(CollectModulePhdrInfo, &phdr_info);
-  return phdr_info;
-}
-
-const ModuleInfoList gStartupPhdrInfo = GetStartupPhdrInfo();
 
 // Test that `dl_iterate_phdr` includes startup modules.
 TYPED_TEST(DlTests, DlIteratePhdrStartupModules) {
@@ -73,7 +63,7 @@ TYPED_TEST(DlTests, DlIteratePhdrBasic) {
   ModulePhdrInfo ret17_phdr_info = GetPhdrInfoForModule(*this, kRet17File);
 
   // Check that the `.dlpi_adds` counter is adjusted.
-  const size_t loaded_after_open = GetGlobalCounters(this).loaded;
+  const size_t loaded_after_open = GetGlobalCounters(this).adds;
   EXPECT_EQ(loaded_after_open, initial_loaded + 1);
 
   // Look up a symbol from the module and expect that its pointer value should
@@ -94,7 +84,7 @@ TYPED_TEST(DlTests, DlIteratePhdrBasic) {
   // The last entry should be the same as at the beginning of the test.
   const ModulePhdrInfo test_last_phdr_info = close_info_list.back();
 
-  const size_t unloaded_after_close = GetGlobalCounters(this).unloaded;
+  const size_t unloaded_after_close = GetGlobalCounters(this).subs;
 
   if (TestFixture::kDlCloseUnloadsModules) {
     EXPECT_EQ(unloaded_after_close, initial_unloaded + 1);

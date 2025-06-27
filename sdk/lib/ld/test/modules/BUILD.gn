@@ -2205,3 +2205,20 @@ config("ldsvc-config.libprefix") {
   visibility = [ ":*" ]
   ldflags = [ "-Wl,-dynamic-linker=test-libprefix/ld.so.1" ]
 }
+
+source_set("startup-symbols") {
+  visibility = [
+    ":*",
+    "//sdk/lib/c/*",
+  ]
+  public = [ "startup-symbols.h" ]
+  public_configs = [ ":headers.config" ]
+}
+
+# This lets test code outside this directory that's reusing these test modules
+# use plain `#include "foo.h"` like the test code here does for the local test
+# headers.
+config("headers.config") {
+  visibility = [ ":*" ]
+  include_dirs = [ "." ]
+}

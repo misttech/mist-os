@@ -20,6 +20,8 @@ namespace ld {
 // previous runs to tell if any modules have newly been loaded or unloaded, so
 // as to decide to short-circuit a dl_iterate_phdr() run when nothing changed.
 struct DlPhdrInfoCounts {
+  constexpr auto operator<=>(const DlPhdrInfoCounts&) const = default;
+
   uint64_t adds = 0;
   uint64_t subs = 0;
 };
@@ -58,6 +60,10 @@ inline dl_phdr_info MakeDlPhdrInfo(const abi::Abi<>::Module& module, void* tls_d
       .dlpi_tls_modid = module.tls_modid,
       .dlpi_tls_data = tls_data,
   };
+}
+
+decltype(auto) operator<<(auto& os, DlPhdrInfoCounts counts) {
+  return os << "{adds=" << counts.adds << ", subs=" << counts.subs << "}";
 }
 
 }  // namespace ld

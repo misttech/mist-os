@@ -12,6 +12,17 @@ libc_source_set("ld") {
   sources = []
 }
 
+libc_source_set("ld-abi") {
+  public = [ "ld-abi.h" ]
+  public_deps = [ "//sdk/lib/ld:abi-headers" ]
+  testonly_public_deps = [ "//sdk/lib/ld/testing:ld-abi-testing" ]
+  sources = []
+}
+
+libc_test("ld-abi.unittests") {
+  sources = []
+}
+
 libc_test("unittests") {
   sources = []
   deps = [ ":log-tests" ]

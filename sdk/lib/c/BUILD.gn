@@ -39,6 +39,7 @@ libc_components = [
 libc_testonly_components = [
   "dlfcn",
   "ld",
+  "link",
   "threads",
 ]
 
@@ -188,10 +189,36 @@ group("libc_source_set.deps") {
 group("libc_test.deps") {
   visibility = [ "./*" ]
   testonly = true
+  public_deps = [ "include:headers" ]
+}
+
+# Every libc_test() implicitly depends on one of these two.
+group("zxtest") {
+  visibility = [ "./*" ]
+  testonly = true
+  public_deps = [ "//zircon/system/ulib/zxtest:zxtest-streams" ]
+}
+
+# libc_test() targets with gtest=true use gtest rather than zxtest.  This is
+# only appropriate for code that's not going into "unittests" targets in a
+# subdirectory (which get linked into the zxtest-based libc-unittests), but
+# instead go into separate test() targets that are purely gtest.
+group("gtest") {
+  visibility = [ "./*" ]
+  testonly = true
+  public_configs = [ ":gtest.config" ]
   public_deps = [
-    "include:headers",
-    "//zircon/system/ulib/zxtest:zxtest-streams",
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gmock",
   ]
+}
+
+# When a libc_test() depends on :gtest, this will come after :testonly.config
+# so it can override it (defines come before cflags on compiler command lines).
+config("gtest.config") {
+  visibility = [ ":gtest" ]
+  defines = [ "LIBC_COPT_TEST_USE_GTEST" ]
+  cflags = [ "-ULIBC_COPT_TEST_USE_ZXTEST" ]
 }
 
 if (current_toolchain == default_toolchain) {

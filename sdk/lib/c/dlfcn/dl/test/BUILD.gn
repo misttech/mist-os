@@ -32,12 +32,6 @@ test("dl-unittests") {
   ]
   if (is_elf) {
     sources += [
-      "dl-impl-tests.cc",
-      "dl-impl-tests.h",
-      "dl-iterate-phdr-tests.cc",
-      "dl-iterate-phdr-tests.h",
-      "dl-load-tests-base.cc",
-      "dl-load-tests-base.h",
       "dl-load-tests-basic.cc",
       "dl-load-tests-deps.cc",
       "dl-load-tests-fail.cc",
@@ -45,28 +39,20 @@ test("dl-unittests") {
       "dl-load-tests-initfini.cc",
       "dl-load-tests-open-flags.cc",
       "dl-load-tests-tls.cc",
-      "dl-load-tests.h",
-      "dl-system-tests.cc",
-      "dl-system-tests.h",
-      "dl-tests-base.h",
     ]
     deps += [
       ":dl-unittest.deps",
+      ":iterate-phdr-tests",
+      ":test-fixtures",
       ":tls-desc-resolver-tests",
       ":tlsdesc-runtime-dynamic-tests",
       "..:runtime",
-      "..:tlsdesc-runtime-dynamic",
       "//sdk/lib/fit",
+      "//sdk/lib/ld/test/modules:startup-symbols",
       "//sdk/lib/ld/testing",
       "//src/lib/elfldltl/testing",
     ]
-    include_dirs = [ "//sdk/lib/ld/test/modules" ]
-    if (is_fuchsia) {
-      sources += [
-        "dl-load-zircon-tests-base.cc",
-        "dl-load-zircon-tests-base.h",
-      ]
-    } else {
+    if (!is_fuchsia) {
       # For the host test, this sets a DT_RUNPATH using $ORIGIN to find where
       # the modules are copied into a subdirectory of $host_out_dir (where the
       # test executable will be).
@@ -74,6 +60,68 @@ test("dl-unittests") {
     }
     data_deps = [ ":test-data" ]
   }
+}
+
+source_set("test-fixtures") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  public = [ "dl-load-tests.h" ]
+  public_deps = [
+    "..:runtime",
+    "..:tlsdesc-runtime-dynamic",
+    "../..:dl_phdr_info",
+    "//sdk/lib/ld/testing",
+    "//third_party/googletest:gmock",
+    "//third_party/googletest:gtest",
+  ]
+  sources = [
+    "dl-impl-tests.cc",
+    "dl-impl-tests.h",
+    "dl-load-tests-base.cc",
+    "dl-load-tests-base.h",
+    "dl-system-tests.cc",
+    "dl-system-tests.h",
+    "dl-tests-base.h",
+  ]
+  include_dirs = [ "//sdk/lib/ld/test/modules" ]
+  deps = [
+    "//sdk/lib/ld/test/modules:startup-symbols",
+    "//src/lib/elfldltl/testing",
+  ]
+  if (is_fuchsia) {
+    sources += [
+      "dl-load-zircon-tests-base.cc",
+      "dl-load-zircon-tests-base.h",
+    ]
+    deps += [ "//src/lib/elfldltl" ]
+  }
+}
+
+source_set("iterate-phdr-tests") {
+  visibility = [ ":*" ]
+  testonly = true
+
+  sources = [
+    "dl-iterate-phdr-tests.cc",
+    "dl-iterate-phdr-tests.h",
+  ]
+  deps = [
+    ":module-phdr-info",
+    ":test-fixtures",
+    "//sdk/lib/ld:headers",
+    "//sdk/lib/ld/test/modules:startup-symbols",
+  ]
+}
+
+source_set("module-phdr-info") {
+  testonly = true
+  public = [ "module-phdr-info.h" ]
+  public_deps = [
+    "../..:dl_phdr_info",
+    "//src/lib/elfldltl",
+  ]
+  sources = [ "module-phdr-info.cc" ]
 }
 
 source_set("tlsdesc-runtime-dynamic-tests") {
