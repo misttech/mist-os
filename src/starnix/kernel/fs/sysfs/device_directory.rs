@@ -36,8 +36,18 @@ pub fn build_device_directory(device: &Device, dir: &SimpleDirectoryMutator) {
     dir.entry("uevent", UEventFsNode::new(device.clone()), mode!(IFREG, 0o644));
 }
 
+pub fn build_block_device_directory(
+    device: &Device,
+    block_info: Weak<dyn BlockDeviceInfo>,
+    dir: &SimpleDirectoryMutator,
+) {
+    build_device_directory(device, dir);
+    dir.entry("queue", BlockDeviceQueueDirectory::new_node(), mode!(IFDIR, 0o755));
+    dir.entry("size", BlockDeviceSizeFile::new_node(block_info), mode!(IFREG, 0o444));
+}
+
 // TODO(https://fxbug.dev/419306849): Remove once we have converted all clients to use SimpleDirectory.
-// For now, we need to keep DeviceDirectory and init_device_directory in sync.
+// For now, we need to keep DeviceDirectory and build_device_directory in sync.
 pub struct DeviceDirectory {
     device: Device,
 }
@@ -117,6 +127,8 @@ pub trait BlockDeviceInfo: Send + Sync {
     fn size(&self) -> Result<usize, Errno>;
 }
 
+// TODO(https://fxbug.dev/419306849): Remove once we have converted all clients to use SimpleDirectory.
+// For now, we need to keep BlockDeviceDirectory and build_block_device_directory in sync.
 pub struct BlockDeviceDirectory {
     base_dir: DeviceDirectory,
     block_info: Weak<dyn BlockDeviceInfo>,

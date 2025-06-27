@@ -382,37 +382,6 @@ impl DeviceRegistry {
         device
     }
 
-    /// Deprecated. Use `register_device` instead.
-    ///
-    /// See `register_device` for an explanation of the parameters.
-    pub fn register_device_with_sysfs_ops<F, N, L>(
-        &self,
-        locked: &mut Locked<L>,
-        current_task: &CurrentTask,
-        name: &FsStr,
-        metadata: DeviceMetadata,
-        class: Class,
-        create_device_sysfs_ops: F,
-        dev_ops: impl DeviceOps,
-    ) -> Device
-    where
-        F: Fn(Device) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
-        L: LockBefore<FileOpsCore>,
-    {
-        let entry = DeviceEntry::new(name.into(), dev_ops);
-        self.devices(metadata.mode).register_minor(metadata.device_type, entry);
-        let device = self.objects.create_device_with_ops(
-            current_task.kernel(),
-            name,
-            Some(metadata),
-            class,
-            create_device_sysfs_ops,
-        );
-        self.notify_device(locked, current_task, device.clone());
-        device
-    }
-
     /// Register a dynamic device in the `MISC_MAJOR` major device number.
     ///
     /// MISC devices (major number 10) with minor numbers in the range 52..128 are dynamically
