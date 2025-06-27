@@ -4,6 +4,16 @@
 
 #include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
 
+#include <lib/fpromise/promise.h>
+#include <lib/inspect/cpp/inspector.h>
+#include <lib/inspect/cpp/vmo/types.h>
+#include <zircon/assert.h>
+
+#include <functional>
+#include <utility>
+
+#include "src/storage/lib/vfs/cpp/inspect/inspect_data.h"
+
 namespace fs_inspect {
 
 namespace {

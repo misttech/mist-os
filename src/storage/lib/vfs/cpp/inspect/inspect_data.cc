@@ -4,7 +4,18 @@
 
 #include "src/storage/lib/vfs/cpp/inspect/inspect_data.h"
 
-#include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire_types.h>
+#include <lib/inspect/cpp/inspector.h>
+#include <lib/inspect/cpp/vmo/types.h>
+#include <lib/zx/result.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <algorithm>
+#include <cstdint>
+#include <string>
+
+#include "src/storage/lib/block_client/cpp/block_device.h"
 
 namespace fs_inspect {
 
