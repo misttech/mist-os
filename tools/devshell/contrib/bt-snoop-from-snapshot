@@ -18,6 +18,7 @@ import json
 import struct
 import sys
 from zipfile import BadZipFile, ZipFile
+import io
 
 # Format described in https://wiki.wireshark.org/Development/LibpcapFileFormat#Global_Header
 PCAP_HEADER = struct.pack(
@@ -74,17 +75,29 @@ def find_snoop_root(inspect):
   raise ConversionError(
       "Input does not contain the inspect data for bt-snoop.")
 
-
 def get_inspect_from_snapshot(filename):
   """ Extract and parse inspect json data from a snapshot zip file """
   inspect_file = "inspect.json"
+  dumpstate_file = "dumpstate_board.bin"
   try:
     with ZipFile(filename) as snapshot:
-      # find the full path to the inspect file and parse it as json data
-      inspect_path = next(name for name in snapshot.namelist() if name.endswith(inspect_file))
-      data = snapshot.read(inspect_path)
-      data = json.loads(data)
-      return data
+      files = snapshot.namelist()
+      if inspect_file in files:
+        data = snapshot.read(inspect_file)
+        data = json.loads(data)
+        return data
+      # In Android bugreports, the inspect file can be at dumpstate_board.bin/inspect.json.
+      # dumpstate_board.bin is another zip file.
+      if dumpstate_file in files:
+        # Load dumpstate into memory so we can unzip it.
+        snapshot_bytes = snapshot.read(dumpstate_file)
+        with ZipFile(io.BytesIO(snapshot_bytes)) as dumpstate:
+          if inspect_file in dumpstate.namelist():
+            data = dumpstate.read(inspect_file)
+            data = json.loads(data)
+            return data
+      raise ConversionError(
+          f'Could not find "{inspect_file}" in snapshot zip file. {BUG_MSG}')
   except (IOError, BadZipFile) as e:
     raise ConversionError('Failed to open snapshot zip file "' + filename +
                           '":\n' + str(e))
