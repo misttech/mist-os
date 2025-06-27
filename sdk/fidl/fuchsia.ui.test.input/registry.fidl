@@ -35,7 +35,7 @@ type CoordinateUnit = flexible enum {
 ///
 /// Enables clients to register fake input devices, which can be used to
 /// inject input events directly into Input Pipeline.
-@discoverable(server="platform")
+@discoverable(client="platform", server="platform")
 closed protocol Registry {
 
     /// Enables the client to inject touch events using the corresponding

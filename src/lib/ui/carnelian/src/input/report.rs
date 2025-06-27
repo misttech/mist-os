@@ -328,15 +328,13 @@ impl<'a> InputReportHandler<'a> {
             return Vec::new();
         }
 
-        let pressed_buttons: HashSet<u8> = if let Some(ref pressed_buttons) = touch.pressed_buttons
-        {
-            let pressed_buttons_set = pressed_buttons.iter().cloned().collect();
-            pressed_buttons_set
-        } else {
-            HashSet::new()
-        };
-
-        let button_set = ButtonSet::new(&pressed_buttons);
+        let pressed_buttons: HashSet<hid_input_report::TouchButton> =
+            if let Some(ref pressed_buttons) = touch.pressed_buttons {
+                let pressed_buttons_set = pressed_buttons.iter().cloned().collect();
+                pressed_buttons_set
+            } else {
+                HashSet::new()
+            };
 
         let raw_contacts: HashSet<touch::RawContact> = if let Some(ref contacts) = touch.contacts {
             let id_iter = contacts.iter().filter_map(|contact| {
@@ -402,7 +400,7 @@ impl<'a> InputReportHandler<'a> {
 
         self.raw_contacts = raw_contacts;
 
-        let touch_event = touch::Event { contacts: contacts, buttons: button_set };
+        let touch_event = touch::Event { contacts: contacts, buttons: pressed_buttons };
         let event = Event {
             event_time,
             device_id: device_id.clone(),

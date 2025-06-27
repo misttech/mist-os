@@ -585,7 +585,7 @@ pub fn create_mouse_pointer_sample_event_phase_add(
 /// - `event_time`: The time of event.
 pub fn create_touch_input_report(
     contacts: Vec<fidl_input_report::ContactInputReport>,
-    pressed_buttons: Option<Vec<u8>>,
+    pressed_buttons: Option<Vec<fidl_input_report::TouchButton>>,
     event_time: i64,
 ) -> fidl_input_report::InputReport {
     fidl_input_report::InputReport {
@@ -697,15 +697,21 @@ pub fn create_touch_screen_event(
 /// - `handled`: Whether the event has been consumed.
 pub fn create_touchpad_event_with_handled(
     injector_contacts: Vec<touch_binding::TouchContact>,
-    pressed_buttons: HashSet<mouse_binding::MouseButton>,
+    pressed_buttons: HashSet<fidl_input_report::TouchButton>,
     event_time: zx::MonotonicInstant,
     device_descriptor: &input_device::InputDeviceDescriptor,
     handled: input_device::Handled,
 ) -> input_device::InputEvent {
+    let buttons: HashSet<mouse_binding::MouseButton> =
+        HashSet::from_iter(pressed_buttons.iter().filter_map(|button| match button {
+            fidl_fuchsia_input_report::TouchButton::Palm => Some(1),
+            _ => None,
+        }));
+
     input_device::InputEvent {
         device_event: input_device::InputDeviceEvent::Touchpad(touch_binding::TouchpadEvent {
             injector_contacts,
-            pressed_buttons,
+            pressed_buttons: buttons,
         }),
         device_descriptor: device_descriptor.clone(),
         event_time,
@@ -723,7 +729,7 @@ pub fn create_touchpad_event_with_handled(
 /// - `device_descriptor`: The device descriptor to add to the event.
 pub fn create_touchpad_event(
     contacts: Vec<touch_binding::TouchContact>,
-    pressed_buttons: HashSet<mouse_binding::MouseButton>,
+    pressed_buttons: HashSet<fidl_input_report::TouchButton>,
     event_time: zx::MonotonicInstant,
     device_descriptor: &input_device::InputDeviceDescriptor,
 ) -> input_device::InputEvent {

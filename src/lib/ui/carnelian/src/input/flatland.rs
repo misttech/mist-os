@@ -135,7 +135,7 @@ impl FlatlandTouchInputHandler {
             let phase = Self::flatland_phase_to_phase(flatland_phase, location);
             let contact =
                 touch::Contact { contact_id: touch::ContactId(interaction_id.pointer_id), phase };
-            let buttons = ButtonSet::default();
+            let buttons = HashSet::new();
             let touch_event = touch::Event { buttons, contacts: vec![contact] };
             let new_event = Event {
                 event_type: EventType::Touch(touch_event),
@@ -147,8 +147,7 @@ impl FlatlandTouchInputHandler {
                     contact_id: touch::ContactId(interaction_id.pointer_id),
                     phase: touch::Phase::Up,
                 };
-                let touch_event =
-                    touch::Event { buttons: ButtonSet::default(), contacts: vec![contact] };
+                let touch_event = touch::Event { buttons: HashSet::new(), contacts: vec![contact] };
                 let up_event = Event {
                     event_type: EventType::Touch(touch_event),
                     device_id: device_id,

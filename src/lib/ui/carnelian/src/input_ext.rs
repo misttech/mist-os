@@ -5,7 +5,8 @@
 #![allow(unused)]
 use crate::geometry::{IntPoint, IntSize};
 use crate::input::*;
-use std::collections::{BTreeMap, VecDeque};
+use fidl_fuchsia_input_report as hid_input_report;
+use std::collections::{BTreeMap, HashSet, VecDeque};
 use zx::MonotonicInstant;
 
 #[derive(Clone, Copy)]
@@ -22,7 +23,7 @@ struct DownContact {
 
 struct TouchDevice {
     down_contacts: BTreeMap<touch::ContactId, DownContact>,
-    buttons: ButtonSet,
+    buttons: HashSet<hid_input_report::TouchButton>,
 }
 
 pub(crate) struct TouchEventResampler {
@@ -211,7 +212,7 @@ mod touch_event_resampling_tests {
     fn create_test_event(phase: touch::Phase, event_time: u64) -> Event {
         let touch_event = touch::Event {
             contacts: vec![touch::Contact { contact_id: touch::ContactId(100), phase }],
-            buttons: ButtonSet::new(&HashSet::new()),
+            buttons: HashSet::new(),
         };
         Event {
             event_time: event_time,

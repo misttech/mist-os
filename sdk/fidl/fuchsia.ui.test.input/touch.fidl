@@ -102,7 +102,7 @@ closed protocol TouchScreen {
 
 /// A tool for applications to report touch input to interested parties (e.g. a test
 /// fixture).
-@discoverable
+@discoverable(client="platform", server="platform")
 closed protocol TouchInputListener {
     /// Report that component under test has received expected input.
     strict ReportTouchInput(table {

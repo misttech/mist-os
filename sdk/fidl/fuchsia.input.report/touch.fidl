@@ -47,7 +47,10 @@ type TouchInputDescriptor = table {
     3: touch_type TouchType;
 
     /// Identifiers for the physical buttons on a touch device.
+    @available(replaced=NEXT)
     4: buttons vector<uint8>:TOUCH_MAX_NUM_BUTTONS;
+    @available(added=NEXT)
+    4: buttons vector<TouchButton>:TOUCH_MAX_NUM_BUTTONS;
 };
 
 /// Input mode indicating which top-level collection should be used for input reporting.
@@ -114,13 +117,22 @@ type ContactInputReport = table {
     7: confidence bool;
 };
 
+@available(added=NEXT)
+type TouchButton = flexible enum : uint8 {
+    /// Represents palm on touchscreen.
+    PALM = 1;
+};
+
 /// `TouchInputReport` describes the current contacts recorded by the touchscreen.
 type TouchInputReport = table {
     /// The contacts currently being reported by the device.
     1: contacts vector<ContactInputReport>:TOUCH_MAX_CONTACTS;
 
     /// Identifiers for currently pressed buttons.
+    @available(replaced=NEXT)
     2: pressed_buttons vector<uint8>:TOUCH_MAX_NUM_BUTTONS;
+    @available(added=NEXT)
+    2: pressed_buttons vector<TouchButton>:TOUCH_MAX_NUM_BUTTONS;
 };
 
 /// Selective Reporting Feature Report indicating which types of input are reported.
