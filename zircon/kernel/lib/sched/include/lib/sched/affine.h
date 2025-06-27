@@ -85,4 +85,4 @@ class Affine {
 
 }  // namespace sched
 
-#endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_SCHEDULER_AFFINE_H_
+#endif  // ZIRCON_KERNEL_LIB_SCHED_INCLUDE_LIB_SCHED_AFFINE_H_
