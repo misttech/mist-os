@@ -152,7 +152,7 @@ group("bazel_action_allowlist") {
     "//examples/drivers/template:bazel_package.bazel_build",
     "//examples/drivers/transport/driver/v2:child_bazel_package.bazel_build",
     "//examples/drivers/transport/driver/v2:parent_bazel_package.bazel_build",
-    "//sdk:bazel_built_fuchsia_idk",
+    "//sdk:final_fuchsia_idk.exported",
     "//sdk/lib/driver/devicetree/examples/example-board:bazel_package.bazel_build",
     "//src:bazel_tests.bazel_build",
     "//src/devices/block/drivers/aml-sdmmc:aml-sdmmc-no-banjo-bazel-package.bazel_build",
