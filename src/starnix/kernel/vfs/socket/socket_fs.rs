@@ -10,7 +10,6 @@ use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{statfs, SOCKFS_MAGIC};
-use std::sync::Arc;
 
 /// `SocketFs` is the file system where anonymous socket nodes are created, for example in
 /// `sys_socket`.
@@ -30,7 +29,7 @@ impl FileSystemOps for SocketFs {
 }
 
 /// Returns a handle to the `SocketFs` instance in `kernel`, initializing it if needed.
-pub fn socket_fs(kernel: &Arc<Kernel>) -> FileSystemHandle {
+pub fn socket_fs(kernel: &Kernel) -> FileSystemHandle {
     struct SocketFsHandle(FileSystemHandle);
 
     kernel

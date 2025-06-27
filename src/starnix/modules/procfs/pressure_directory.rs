@@ -30,7 +30,7 @@ use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{errno, error};
 use std::ops::DerefMut;
 use std::pin::pin;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use zx::{AsHandleRef, HandleBased};
 
 /// Creates the /proc/pressure directory. https://docs.kernel.org/accounting/psi.html
@@ -321,7 +321,7 @@ enum PressureMonitorClientState {
 
 impl PressureMonitorThread {
     fn new(
-        kernel: &Arc<Kernel>,
+        kernel: &Kernel,
         zircon_stall_event: zx::Event,
         rate_limiting_window: zx::MonotonicDuration,
     ) -> Arc<PressureMonitorThread> {
@@ -332,7 +332,7 @@ impl PressureMonitorThread {
 
         // Start the monitor kthread.
         kernel.kthreads.spawn_future(Arc::clone(&result).worker(
-            kernel.clone(),
+            kernel.weak_self.clone(),
             zircon_stall_event,
             rate_limiting_window,
         ));
@@ -346,7 +346,7 @@ impl PressureMonitorThread {
 
     async fn worker(
         self: Arc<Self>,
-        kernel: Arc<Kernel>,
+        kernel: Weak<Kernel>,
         zircon_stall_event: zx::Event,
         rate_limiting_window: zx::MonotonicDuration,
     ) {
@@ -372,6 +372,9 @@ impl PressureMonitorThread {
             let mut rate_limiting_timer = pin!(rate_limiting_window.into_timer());
 
             // Notify.
+            let Some(kernel) = kernel.upgrade() else {
+                return;
+            };
             self.client_state
                 .lock(kernel.kthreads.unlocked_for_async().deref_mut())
                 .mutate_in_place(|old_value| match old_value {

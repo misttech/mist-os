@@ -24,7 +24,7 @@ pub struct KObjectStore {
 }
 
 impl KObjectStore {
-    pub fn init(&self, kernel: &Arc<Kernel>) {
+    pub fn init(&self, kernel: &Kernel) {
         self.fs.set(get_sysfs(kernel)).unwrap();
     }
 
@@ -164,7 +164,7 @@ impl KObjectStore {
     /// device because the `DeviceType` will not be registered with the `DeviceRegistry`.
     pub(super) fn create_device_with_ops<F, N>(
         &self,
-        _kernel: &Arc<Kernel>,
+        _kernel: &Kernel,
         name: &FsStr,
         metadata: Option<DeviceMetadata>,
         class: Class,
@@ -185,7 +185,7 @@ impl KObjectStore {
 
     pub(super) fn create_device(
         &self,
-        _kernel: &Arc<Kernel>,
+        _kernel: &Kernel,
         name: &FsStr,
         metadata: Option<DeviceMetadata>,
         class: Class,

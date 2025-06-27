@@ -301,7 +301,7 @@ where
 
 pub fn create_task<F, L>(
     locked: &mut Locked<L>,
-    kernel: &Arc<Kernel>,
+    kernel: &Kernel,
     initial_name: CString,
     root_fs: Arc<FsContext>,
     task_info_factory: F,
@@ -329,7 +329,7 @@ where
 
 fn create_task_with_pid<F, L>(
     locked: &mut Locked<L>,
-    kernel: &Arc<Kernel>,
+    kernel: &Kernel,
     mut pids: RwLockWriteGuard<'_, PidTable>,
     pid: pid_t,
     initial_name: CString,

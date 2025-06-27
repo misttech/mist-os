@@ -24,7 +24,6 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, statfs};
 use std::borrow::Cow;
 use std::net::{Ipv4Addr, Ipv6Addr};
-use std::sync::Arc;
 
 use {fidl_fuchsia_net as fnet, fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy};
 
@@ -53,10 +52,7 @@ pub(crate) enum VersionedProperties {
 
 pub struct FuchsiaNetworkMonitorFs;
 impl FuchsiaNetworkMonitorFs {
-    pub fn new_fs(
-        kernel: &Arc<Kernel>,
-        options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno> {
+    pub fn new_fs(kernel: &Kernel, options: FileSystemOptions) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, FuchsiaNetworkMonitorFs, options)?;
         let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, NetworkDirectoryNode::new());

@@ -13,7 +13,6 @@ use starnix_core::vfs::fs_args::MountParams;
 use starnix_core::vfs::{FileSystemHandle, FileSystemOptions, FsString};
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::mount_flags::MountFlags;
-use std::sync::Arc;
 
 pub struct MountAction {
     pub path: FsString,
@@ -24,7 +23,7 @@ pub struct MountAction {
 impl MountAction {
     pub fn new_for_root(
         _locked: &mut Locked<Unlocked>,
-        kernel: &Arc<Kernel>,
+        kernel: &Kernel,
         pkg: &fio::DirectorySynchronousProxy,
         spec: &str,
     ) -> Result<MountAction, Error> {

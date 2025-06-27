@@ -1304,7 +1304,7 @@ pub fn ptrace_getregset(
     }
 }
 
-pub fn ptrace_set_scope(kernel: &Arc<Kernel>, data: &[u8]) -> Result<(), Errno> {
+pub fn ptrace_set_scope(kernel: &Kernel, data: &[u8]) -> Result<(), Errno> {
     loop {
         let ptrace_scope = kernel.ptrace_scope.load(Ordering::Relaxed);
         if let Ok(val) = parse_unsigned_file::<u8>(data) {
@@ -1329,7 +1329,7 @@ pub fn ptrace_set_scope(kernel: &Arc<Kernel>, data: &[u8]) -> Result<(), Errno> 
     }
 }
 
-pub fn ptrace_get_scope(kernel: &Arc<Kernel>) -> Vec<u8> {
+pub fn ptrace_get_scope(kernel: &Kernel) -> Vec<u8> {
     let mut scope = kernel.ptrace_scope.load(Ordering::Relaxed).to_string();
     scope.push('\n');
     scope.into_bytes()

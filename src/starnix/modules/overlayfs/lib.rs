@@ -1184,7 +1184,7 @@ impl OverlayStack {
 
     /// Given a filesystem, wraps it in a tmpfs-backed writable overlayfs.
     pub fn wrap_fs_in_writable_layer(
-        kernel: &Arc<Kernel>,
+        kernel: &Kernel,
         rootfs: FileSystemHandle,
     ) -> Result<FileSystemHandle, Errno> {
         let lower = ActiveEntry { entry: rootfs.root().clone(), mount: MountInfo::detached() };

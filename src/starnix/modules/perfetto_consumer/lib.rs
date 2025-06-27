@@ -19,7 +19,6 @@ use starnix_core::vfs::FsString;
 use starnix_logging::{log_error, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::Errno;
-use std::sync::Arc;
 
 use fuchsia_async as fasync;
 use fuchsia_trace_observer::TraceObserver;
@@ -331,10 +330,7 @@ impl CallbackState {
     }
 }
 
-pub fn start_perfetto_consumer_thread(
-    kernel: &Arc<Kernel>,
-    socket_path: FsString,
-) -> Result<(), Errno> {
+pub fn start_perfetto_consumer_thread(kernel: &Kernel, socket_path: FsString) -> Result<(), Errno> {
     // We unfortunately need to spawn a dedicated thread to run our async task.
     //
     // While the TraceObserver waits asynchronously, the interactions we do with Perfetto over the

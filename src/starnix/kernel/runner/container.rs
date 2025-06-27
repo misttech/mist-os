@@ -751,7 +751,7 @@ async fn create_container(
 
 fn create_fs_context(
     locked: &mut Locked<Unlocked>,
-    kernel: &Arc<Kernel>,
+    kernel: &Kernel,
     features: &Features,
     start_info: &ContainerStartInfo,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,

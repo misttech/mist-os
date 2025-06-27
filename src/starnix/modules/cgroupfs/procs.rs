@@ -90,11 +90,11 @@ pub struct ControlGroupFile {
 }
 
 impl ControlGroupFile {
-    fn new(kernel: &Arc<Kernel>, cgroup: Weak<dyn CgroupOps>) -> Self {
+    fn new(kernel: &Kernel, cgroup: Weak<dyn CgroupOps>) -> Self {
         Self {
             cgroup: cgroup.clone(),
             dynamic_file: DynamicFile::new(ControlGroupFileSource {
-                kernel: Arc::downgrade(kernel),
+                kernel: kernel.weak_self.clone(),
                 cgroup: cgroup.clone(),
             }),
         }

@@ -566,7 +566,7 @@ impl DeviceRegistry {
     /// ```
     ///
     /// Currently, we only register the net devices by name and use an empty `uevent` file.
-    pub fn add_net_device(&self, kernel: &Arc<Kernel>, name: &FsStr) -> Device {
+    pub fn add_net_device(&self, kernel: &Kernel, name: &FsStr) -> Device {
         self.objects.create_device(
             kernel,
             name,

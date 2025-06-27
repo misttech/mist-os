@@ -35,7 +35,6 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use std::sync::mpsc::channel;
-use std::sync::Arc;
 use {
     fidl_fuchsia_sysinfo as fsysinfo, fidl_fuchsia_ui_composition as fuicomposition,
     fidl_fuchsia_ui_input3 as fuiinput, fidl_fuchsia_ui_policy as fuipolicy,
@@ -576,7 +575,7 @@ pub fn run_container_features(
 
 /// Runs features requested by individual components inside the container.
 pub fn run_component_features(
-    kernel: &Arc<Kernel>,
+    kernel: &Kernel,
     entries: &Vec<String>,
     mut incoming_dir: Option<fidl_fuchsia_io::DirectoryProxy>,
 ) -> Result<(), Errno> {

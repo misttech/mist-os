@@ -8,11 +8,10 @@ use crate::vfs::pseudo::simple_file::create_bytes_file_with_handler;
 use crate::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use starnix_logging::bug_ref;
 use starnix_uapi::file_mode::mode;
-use std::sync::Arc;
 
 /// This directory contains various files and subdirectories that provide information about
 /// the running kernel.
-pub fn sysfs_kernel_directory(kernel: &Arc<Kernel>, dir: &SimpleDirectoryMutator) {
+pub fn sysfs_kernel_directory(kernel: &Kernel, dir: &SimpleDirectoryMutator) {
     dir.subdir("kernel", 0o755, |dir| {
         dir.subdir("tracing", 0o755, |_| ());
         dir.subdir("mm", 0o755, |dir| {
@@ -31,7 +30,7 @@ pub fn sysfs_kernel_directory(kernel: &Arc<Kernel>, dir: &SimpleDirectoryMutator
             let read_only_file_mode = mode!(IFREG, 0o444);
             dir.entry(
                 "last_resume_reason",
-                create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
+                create_bytes_file_with_handler(kernel.weak_self.clone(), |kernel| {
                     kernel
                         .suspend_resume_manager
                         .suspend_stats()
@@ -42,7 +41,7 @@ pub fn sysfs_kernel_directory(kernel: &Arc<Kernel>, dir: &SimpleDirectoryMutator
             );
             dir.entry(
                 "last_suspend_time",
-                create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
+                create_bytes_file_with_handler(kernel.weak_self.clone(), |kernel| {
                     let suspend_stats = kernel.suspend_resume_manager.suspend_stats();
                     // First number is the time spent in suspend and resume processes.
                     // Second number is the time spent in sleep state.

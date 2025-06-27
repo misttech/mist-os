@@ -41,7 +41,7 @@ use zerocopy::{Immutable, IntoBytes};
 /// Create a FileSystemHandle for use in testing.
 ///
 /// Open "/pkg" and returns an FsContext rooted in that directory.
-fn create_pkgfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
+fn create_pkgfs(kernel: &Kernel) -> FileSystemHandle {
     let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
     let (server, client) = zx::Channel::create();
     fdio::open("/pkg", rights, server).expect("failed to open /pkg");
@@ -180,22 +180,22 @@ fn create_test_kernel(
 
 fn create_test_fs_context(
     _locked: &mut Locked<Unlocked>,
-    kernel: &Arc<Kernel>,
-    create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
+    kernel: &Kernel,
+    create_fs: impl FnOnce(&Kernel) -> FileSystemHandle,
 ) -> Arc<FsContext> {
     FsContext::new(Namespace::new(create_fs(kernel)))
 }
 
 fn create_test_init_task(
     locked: &mut Locked<Unlocked>,
-    kernel: &Arc<Kernel>,
+    kernel: &Kernel,
     fs: Arc<FsContext>,
 ) -> TaskBuilder {
     let init_pid = kernel.pids.write().allocate_pid();
     assert_eq!(init_pid, 1);
     let init_task = create_init_process(
         locked,
-        kernel,
+        &kernel.weak_self.upgrade().unwrap(),
         init_pid,
         CString::new("test-task").unwrap(),
         fs.clone(),
@@ -204,7 +204,8 @@ fn create_test_init_task(
     .expect("failed to create first task");
     init_task.mm().unwrap().initialize_mmap_layout_for_test(ArchWidth::Arch64);
 
-    let system_task = create_system_task(locked, kernel, fs).expect("create system task");
+    let system_task = create_system_task(locked, &kernel.weak_self.upgrade().unwrap(), fs)
+        .expect("create system task");
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
 
     let system_task = kernel.kthreads.system_task();
@@ -220,7 +221,7 @@ fn create_test_init_task(
 }
 
 fn create_kernel_task_and_unlocked_with_fs<'l>(
-    create_fs: impl FnOnce(&Arc<Kernel>) -> FileSystemHandle,
+    create_fs: impl FnOnce(&Kernel) -> FileSystemHandle,
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>) {
     let mut locked = unsafe { Unlocked::new() };
     let kernel = create_test_kernel(&mut locked, None);
@@ -241,12 +242,12 @@ fn create_kernel_task_and_unlocked_with_fs<'l>(
 /// the test on the spawned task.
 pub fn create_task(
     locked: &mut Locked<Unlocked>,
-    kernel: &Arc<Kernel>,
+    kernel: &Kernel,
     task_name: &str,
 ) -> AutoReleasableTask {
     let task = create_init_child_process(
         locked,
-        kernel,
+        &kernel.weak_self.upgrade().unwrap(),
         &CString::new(task_name).unwrap(),
         Some(&CString::new("#kernel").unwrap()),
     )
@@ -647,12 +648,12 @@ impl FileSystemOps for TestFs {
     }
 }
 
-pub fn create_testfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
+pub fn create_testfs(kernel: &Kernel) -> FileSystemHandle {
     FileSystem::new(&kernel, CacheMode::Uncached, TestFs, Default::default())
         .expect("testfs constructed with valid options")
 }
 
-pub fn create_testfs_with_root(kernel: &Arc<Kernel>, ops: impl FsNodeOps) -> FileSystemHandle {
+pub fn create_testfs_with_root(kernel: &Kernel, ops: impl FsNodeOps) -> FileSystemHandle {
     let test_fs = create_testfs(kernel);
     let root_ino = test_fs.allocate_ino();
     test_fs.create_root(root_ino, ops);

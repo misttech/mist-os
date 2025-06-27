@@ -14,7 +14,6 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{error, statfs, ANON_INODE_FS_MAGIC};
-use std::sync::Arc;
 
 pub struct Anon {
     /// If this instance represents an `anon_inode` then `name` holds the type-name of the node,
@@ -138,7 +137,7 @@ impl FileSystemOps for AnonFs {
         "anon_inodefs".into()
     }
 }
-pub fn anon_fs(kernel: &Arc<Kernel>) -> FileSystemHandle {
+pub fn anon_fs(kernel: &Kernel) -> FileSystemHandle {
     struct AnonFsHandle(FileSystemHandle);
 
     kernel

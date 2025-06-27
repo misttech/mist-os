@@ -678,7 +678,7 @@ impl<F: RemoteControllerConnector> RemoteBinderHandle<F> {
         server_end: ServerEnd<fbinder::LutexControllerMarker>,
     ) -> Result<(), Error> {
         async fn handle_request(
-            kernel: &Arc<Kernel>,
+            kernel: &Kernel,
             event: fbinder::LutexControllerRequest,
         ) -> Result<(), Error> {
             match event {

@@ -17,7 +17,6 @@ use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::{statfs, SYSFS_MAGIC};
-use std::sync::Arc;
 
 struct SysFs;
 impl FileSystemOps for SysFs {
@@ -35,7 +34,7 @@ impl FileSystemOps for SysFs {
 }
 
 impl SysFs {
-    fn new_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHandle {
+    fn new_fs(kernel: &Kernel, options: FileSystemOptions) -> FileSystemHandle {
         let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), SysFs, options)
             .expect("sysfs constructed with valid options");
 
@@ -117,7 +116,7 @@ pub fn sys_fs(
     Ok(get_sysfs(current_task.kernel()))
 }
 
-pub fn get_sysfs(kernel: &Arc<Kernel>) -> FileSystemHandle {
+pub fn get_sysfs(kernel: &Kernel) -> FileSystemHandle {
     kernel
         .expando
         .get_or_init(|| SysFsHandle(SysFs::new_fs(kernel, FileSystemOptions::default())))

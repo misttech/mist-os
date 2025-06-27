@@ -146,6 +146,9 @@ impl EncryptionKeyId {
 /// The structure of this object will likely need to evolve as we implement more namespacing and
 /// isolation mechanisms, such as `namespaces(7)` and `pid_namespaces(7)`.
 pub struct Kernel {
+    /// Weak reference to self. Allows to not have to pass &Arc<Kernel> in apis.
+    pub weak_self: Weak<Kernel>,
+
     /// The kernel threads running on behalf of this kernel.
     pub kthreads: KernelThreads,
 
@@ -386,6 +389,7 @@ impl Kernel {
         let iptables = OrderedRwLock::new(IpTables::new(features.netstack_mark));
 
         let this = Arc::new_cyclic(|kernel| Kernel {
+            weak_self: kernel.clone(),
             kthreads: KernelThreads::new(kernel.clone()),
             features,
             pids: RwLock::new(PidTable::new()),
@@ -661,10 +665,10 @@ impl Kernel {
     ///
     /// This function follows the lazy initialization pattern, where the first
     /// call will instantiate the Netlink implementation.
-    pub fn network_netlink<'a>(self: &'a Arc<Self>) -> &'a Netlink<NetlinkSenderReceiverProvider> {
+    pub fn network_netlink(&self) -> &Netlink<NetlinkSenderReceiverProvider> {
         self.network_netlink.get_or_init(|| {
             let (network_netlink, network_netlink_async_worker) = Netlink::new(
-                InterfacesHandlerImpl(Arc::downgrade(self)),
+                InterfacesHandlerImpl(self.weak_self.clone()),
                 netlink::FeatureFlags {
                     assume_ifb0_existence: self.features.rtnetlink_assume_ifb0_existence,
                 },

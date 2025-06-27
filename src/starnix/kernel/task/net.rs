@@ -10,7 +10,6 @@ use starnix_sync::Mutex;
 use std::collections::BTreeMap;
 use std::num::NonZeroU64;
 use std::sync::atomic::AtomicBool;
-use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct NetstackDevice {
@@ -30,13 +29,13 @@ pub struct NetstackDevices {
 }
 
 impl NetstackDevices {
-    pub fn add_device(&self, kernel: &Arc<Kernel>, name: &FsStr, interface_id: NonZeroU64) {
+    pub fn add_device(&self, kernel: &Kernel, name: &FsStr, interface_id: NonZeroU64) {
         let mut devices = self.devices.lock();
         let device = kernel.device_registry.add_net_device(kernel, name);
         devices.insert(name.into(), NetstackDevice { device, interface_id });
     }
 
-    pub fn remove_device(&self, kernel: &Arc<Kernel>, name: &FsStr) {
+    pub fn remove_device(&self, kernel: &Kernel, name: &FsStr) {
         let mut devices = self.devices.lock();
         if let Some(NetstackDevice { device, interface_id: _ }) = devices.remove(name) {
             kernel.device_registry.remove_net_device(device);

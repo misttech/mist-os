@@ -85,7 +85,7 @@ pub fn new_remote_fs(
 /// Create a filesystem to access the content of the fuchsia directory available at `fs_src` inside
 /// `pkg`.
 pub fn create_remotefs_filesystem(
-    kernel: &Arc<Kernel>,
+    kernel: &Kernel,
     root: &fio::DirectorySynchronousProxy,
     options: FileSystemOptions,
     rights: fio::Flags,
@@ -263,7 +263,7 @@ impl RemoteFs {
     }
 
     pub fn new_fs(
-        kernel: &Arc<Kernel>,
+        kernel: &Kernel,
         root: zx::Channel,
         mut options: FileSystemOptions,
         rights: fio::Flags,

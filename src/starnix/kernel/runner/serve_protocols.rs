@@ -27,7 +27,6 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::uapi;
 use std::ffi::CString;
 use std::ops::DerefMut;
-use std::sync::Arc;
 use {
     fidl_fuchsia_component_runner as frunner, fidl_fuchsia_element as felement,
     fidl_fuchsia_io as fio, fidl_fuchsia_memory_attribution as fattribution,
@@ -80,7 +79,7 @@ fn to_winsize(window_size: Option<fstarcontainer::ConsoleWindowSize>) -> uapi::w
 }
 
 async fn spawn_console(
-    kernel: &Arc<Kernel>,
+    kernel: &Kernel,
     payload: fstarcontainer::ControllerSpawnConsoleRequest,
 ) -> Result<Result<u8, fstarcontainer::SpawnConsoleError>, Error> {
     if let (Some(console_in), Some(console_out), Some(binary_path)) =
@@ -102,7 +101,7 @@ async fn spawn_console(
         let window_size = to_winsize(payload.window_size);
         let current_task = create_init_child_process(
             kernel.kthreads.unlocked_for_async().deref_mut(),
-            kernel,
+            &kernel.weak_self.upgrade().expect("Kernel must still be alive"),
             &binary_path,
             None,
         )?;

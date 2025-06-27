@@ -695,7 +695,7 @@ impl SeccompAction {
         *dst |= 1 << self.logged_bit_offset();
     }
 
-    pub fn is_logged(&self, kernel: &Arc<Kernel>, filter_flag: bool) -> bool {
+    pub fn is_logged(&self, kernel: &Kernel, filter_flag: bool) -> bool {
         if kernel.actions_logged.load(Ordering::Relaxed) & (1 << self.logged_bit_offset()) != 0 {
             match self {
                 // Per the documentation on audit logging of seccomp actions in
@@ -714,7 +714,7 @@ impl SeccompAction {
         }
     }
 
-    pub fn set_actions_logged(kernel: &Arc<Kernel>, data: &[u8]) -> Result<(), Errno> {
+    pub fn set_actions_logged(kernel: &Kernel, data: &[u8]) -> Result<(), Errno> {
         let mut new_actions_logged: u16 = 0;
         for action_res in data.fields_with(|c| c.is_ascii_whitespace()) {
             if let Ok(action) = action_res.to_str() {
@@ -737,7 +737,7 @@ impl SeccompAction {
         Ok(())
     }
 
-    pub fn get_actions_logged(kernel: &Arc<Kernel>) -> Vec<u8> {
+    pub fn get_actions_logged(kernel: &Kernel) -> Vec<u8> {
         let al = kernel.actions_logged.load(Ordering::Relaxed);
         let mut result: String = "".to_string();
         for action in Self::all_actions() {

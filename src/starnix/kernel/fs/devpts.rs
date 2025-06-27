@@ -66,10 +66,7 @@ pub fn dev_pts_fs(
     ensure_devpts(current_task.kernel(), options)
 }
 
-fn ensure_devpts(
-    kernel: &Arc<Kernel>,
-    options: FileSystemOptions,
-) -> Result<FileSystemHandle, Errno> {
+fn ensure_devpts(kernel: &Kernel, options: FileSystemOptions) -> Result<FileSystemHandle, Errno> {
     struct DevPtsFsHandle(FileSystemHandle);
 
     Ok(kernel
@@ -105,10 +102,7 @@ pub fn create_main_and_replica(
     Ok((pty_file, pts_file))
 }
 
-fn init_devpts(
-    kernel: &Arc<Kernel>,
-    options: FileSystemOptions,
-) -> Result<FileSystemHandle, Errno> {
+fn init_devpts(kernel: &Kernel, options: FileSystemOptions) -> Result<FileSystemHandle, Errno> {
     let state = kernel.expando.get::<TtyState>();
 
     let uid =

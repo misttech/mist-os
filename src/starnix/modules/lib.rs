@@ -31,7 +31,6 @@ use starnix_modules_tun::DevTun;
 use starnix_modules_zram::zram_device_init;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
-use std::sync::Arc;
 
 fn misc_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
     let kernel = current_task.kernel();
@@ -94,7 +93,7 @@ pub fn init_common_devices(locked: &mut Locked<Unlocked>, system_task: &CurrentT
     zram_device_init(locked, system_task);
 }
 
-pub fn register_common_file_systems(_locked: &mut Locked<Unlocked>, kernel: &Arc<Kernel>) {
+pub fn register_common_file_systems(_locked: &mut Locked<Unlocked>, kernel: &Kernel) {
     let registry = kernel.expando.get::<FsRegistry>();
     registry.register(b"binder".into(), BinderFs::new_fs);
     registry.register(b"bpf".into(), BpfFs::new_fs);

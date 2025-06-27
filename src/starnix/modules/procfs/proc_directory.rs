@@ -71,7 +71,7 @@ impl Deref for ProcDirectoryNode {
 
 impl ProcDirectory {
     /// Returns a new `ProcDirectory` exposing information about `kernel`.
-    pub fn new(kernel: &Arc<Kernel>, fs: &FileSystemHandle) -> ProcDirectoryNode {
+    pub fn new(kernel: &Kernel, fs: &FileSystemHandle) -> ProcDirectoryNode {
         // First add all the nodes that are always present in the top-level proc directory.
         let mut nodes = btreemap! {
             "asound".into() => stub_file(fs, "/proc/asound", bug_ref!("https://fxbug.dev/322893329")),

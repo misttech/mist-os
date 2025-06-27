@@ -136,24 +136,24 @@ pub fn tmp_fs(
 }
 
 impl TmpFs {
-    pub fn new_fs(kernel: &Arc<Kernel>) -> FileSystemHandle {
+    pub fn new_fs(kernel: &Kernel) -> FileSystemHandle {
         Self::new_fs_with_options(kernel, Default::default()).expect("empty options cannot fail")
     }
 
-    pub fn new_fs_with_name(kernel: &Arc<Kernel>, name: &'static FsStr) -> FileSystemHandle {
+    pub fn new_fs_with_name(kernel: &Kernel, name: &'static FsStr) -> FileSystemHandle {
         Self::new_fs_with_options_and_name(kernel, Default::default(), name)
             .expect("empty options cannot fail")
     }
 
     pub fn new_fs_with_options(
-        kernel: &Arc<Kernel>,
+        kernel: &Kernel,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         Self::new_fs_with_options_and_name(kernel, options, "tmpfs".into())
     }
 
     fn new_fs_with_options_and_name(
-        kernel: &Arc<Kernel>,
+        kernel: &Kernel,
         options: FileSystemOptions,
         name: &'static FsStr,
     ) -> Result<FileSystemHandle, Errno> {

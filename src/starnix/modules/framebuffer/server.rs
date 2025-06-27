@@ -273,7 +273,7 @@ pub fn init_viewport_scene(
 }
 
 pub fn start_presentation_loop(
-    kernel: &Arc<Kernel>,
+    kernel: &Kernel,
     server: Arc<FramebufferServer>,
     view_bound_protocols: fuicomposition::ViewBoundProtocols,
     view_identity: fuiviews::ViewIdentityOnCreation,
@@ -284,8 +284,8 @@ pub fn start_presentation_loop(
     let server_clone = server.clone();
     let mut presentation_receiver = server_clone.presentation_receiver.lock();
     let mut presentation_receiver = presentation_receiver.deref_mut().take().unwrap();
-    let kernel_clone = kernel.clone();
-    kernel.kthreads.spawner().spawn(|_, _| {
+    kernel.kthreads.spawner().spawn(|_, current_task| {
+        let kernel = current_task.kernel();
         let mut executor = fasync::LocalExecutor::new();
         let scheduler = ThroughputScheduler::new();
         let mut view_bound_protocols = Some(view_bound_protocols);
@@ -337,19 +337,14 @@ pub fn start_presentation_loop(
             };
 
             let graphical_presenter = if let Some(incoming_dir) = incoming_dir {
-                connect_to_protocol_at_dir_root::<
-                felement::GraphicalPresenterMarker,
-            >(&incoming_dir)
-            .map_err(|_| errno!(ENOENT))
-            .expect("Failed to connect to GraphicalPresenter")
+                connect_to_protocol_at_dir_root::<felement::GraphicalPresenterMarker>(&incoming_dir)
+                .map_err(|_| errno!(ENOENT))
+                .expect("Failed to connect to GraphicalPresenter")
             } else {
-            kernel_clone.connect_to_protocol_at_container_svc::<
-                felement::GraphicalPresenterMarker,
-            >()
-            .map_err(|_| errno!(ENOENT))
-            .expect("Failed to connect to GraphicalPresenter").into_proxy()
+                kernel.connect_to_protocol_at_container_svc::<felement::GraphicalPresenterMarker>()
+                .map_err(|_| errno!(ENOENT))
+                .expect("Failed to connect to GraphicalPresenter").into_proxy()
             };
-
 
             let (view_controller_proxy, view_controller_server_end) =
                 fidl::endpoints::create_proxy::<felement::ViewControllerMarker>();

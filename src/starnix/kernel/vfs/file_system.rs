@@ -135,7 +135,7 @@ pub enum CacheMode {
 impl FileSystem {
     /// Create a new filesystem.
     pub fn new(
-        kernel: &Arc<Kernel>,
+        kernel: &Kernel,
         cache_mode: CacheMode,
         ops: impl FileSystemOps,
         mut options: FileSystemOptions,
@@ -148,7 +148,7 @@ impl FileSystem {
         let security_state = security::file_system_init_security(&mount_options)?;
 
         let file_system = Arc::new(FileSystem {
-            kernel: Arc::downgrade(kernel),
+            kernel: kernel.weak_self.clone(),
             root: OnceLock::new(),
             ops: Box::new(ops),
             options,

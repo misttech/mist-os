@@ -249,7 +249,7 @@ pub fn new_fuse_fs(
     Ok(fs)
 }
 
-fn fuse_connections(kernel: &Arc<Kernel>) -> Arc<FuseConnections> {
+fn fuse_connections(kernel: &Kernel) -> Arc<FuseConnections> {
     kernel.expando.get::<FuseConnections>()
 }
 

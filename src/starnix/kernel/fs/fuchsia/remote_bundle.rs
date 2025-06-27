@@ -50,7 +50,7 @@ pub struct RemoteBundle {
 impl RemoteBundle {
     /// Returns a new RemoteBundle filesystem that can be found at `path` relative to `base`.
     pub fn new_fs(
-        kernel: &Arc<Kernel>,
+        kernel: &Kernel,
         base: &fio::DirectorySynchronousProxy,
         mut options: FileSystemOptions,
         rights: fio::Flags,

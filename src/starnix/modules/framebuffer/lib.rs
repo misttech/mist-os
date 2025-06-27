@@ -165,7 +165,7 @@ impl Framebuffer {
     /// # Parameters
     /// * `incoming_dir`: the incoming service directory under which the
     ///   `fuchsia.element.GraphicalPresenter` protocol can be retrieved.
-    pub fn start_server(&self, kernel: &Arc<Kernel>, incoming_dir: Option<fio::DirectoryProxy>) {
+    pub fn start_server(&self, kernel: &Kernel, incoming_dir: Option<fio::DirectoryProxy>) {
         if let Some(server) = &self.server {
             let view_bound_protocols = self.view_bound_protocols.lock().take().unwrap();
             let view_identity = self.view_identity.lock().take().unwrap();

@@ -18,7 +18,6 @@ use starnix_core::vfs::FsString;
 use starnix_logging::{log_error, log_info, track_stub};
 use starnix_sync::{FileOpsCore, LockBefore, Locked};
 use starnix_uapi::open_flags::OpenFlags;
-use std::sync::Arc;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -218,7 +217,7 @@ where
     }
 }
 
-pub fn start_perfetto_producer_thread(kernel: &Arc<Kernel>, socket_path: FsString) -> () {
+pub fn start_perfetto_producer_thread(kernel: &Kernel, socket_path: FsString) -> () {
     kernel.kthreads.spawner().spawn(move |locked, current_task| {
         let conn = wait_for_perfetto_ready(locked, current_task, socket_path);
         // Register as a datasource with the perfetto daemon and begin servicing requests from
