@@ -78,7 +78,6 @@ class Astro : public AstroType {
 
   zx::result<> AdcInit();
   zx_status_t AudioInit();
-  zx_status_t BacklightInit();
   zx_status_t BluetoothInit();
   zx_status_t ButtonsInit();
   zx_status_t CanvasInit();

@@ -79,6 +79,10 @@ void PostInit::Start(fdf::StartCompleter completer) {
     return completer(result.take_error());
   }
 
+  if (zx::result result = InitBacklight(); result.is_error()) {
+    return completer(result.take_error());
+  }
+
   auto result = parent_->AddChild({std::move(args), std::move(controller_endpoints->server), {}});
   if (result.is_error()) {
     if (result.error_value().is_framework_error()) {

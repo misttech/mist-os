@@ -1,14 +1,13 @@
-// Copyright 2019 The Fuchsia Authors. All rights reserved.
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/device.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/compiler.h>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -17,7 +16,7 @@
 #include <bind/fuchsia/ti/platform/cpp/bind.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
-#include "astro.h"
+#include "src/devices/board/drivers/astro/post-init/post-init.h"
 #include "src/ui/backlight/drivers/ti-lp8556/ti-lp8556Metadata.h"
 
 namespace astro {
@@ -76,11 +75,11 @@ static const fpbus::Node backlight_dev = []() {
   return dev;
 }();
 
-zx_status_t Astro::BacklightInit() {
+zx::result<> PostInit::InitBacklight() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('BACK');
 
-  auto bind_rules = std::vector{
+  const auto bind_rules = std::vector{
       fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_i2c::SERVICE,
                                bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
       fdf::MakeAcceptBindRule2(bind_fuchsia::I2C_BUS_ID, bind_fuchsia_i2c::BIND_I2C_BUS_ID_I2C_3),
@@ -88,36 +87,36 @@ zx_status_t Astro::BacklightInit() {
                                bind_fuchsia_i2c::BIND_I2C_ADDRESS_BACKLIGHT),
   };
 
-  auto properties = std::vector{
+  const auto properties = std::vector{
       fdf::MakeProperty2(bind_fuchsia_hardware_i2c::SERVICE,
                          bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
   };
 
-  auto parents = std::vector{
+  const auto parents = std::vector{
       fuchsia_driver_framework::ParentSpec2{{
           .bind_rules = bind_rules,
           .properties = properties,
       }},
   };
 
-  auto composite_node_spec =
+  const auto composite_node_spec =
       fuchsia_driver_framework::CompositeNodeSpec{{.name = "backlight", .parents2 = parents}};
 
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(
       fidl::ToWire(fidl_arena, backlight_dev), fidl::ToWire(fidl_arena, composite_node_spec));
 
   if (!result.ok()) {
-    zxlogf(ERROR, "%s: AddCompositeNodeSpec Backlight(backlight_dev) request failed: %s", __func__,
-           result.FormatDescription().data());
-    return result.status();
+    FDF_LOG(ERROR, "AddCompositeNodeSpec Backlight(backlight_dev) request failed: %s",
+            result.FormatDescription().data());
+    return zx::error(result.status());
   }
   if (result->is_error()) {
-    zxlogf(ERROR, "%s: AddCompositeNodeSpec Backlight(backlight_dev) failed: %s", __func__,
-           zx_status_get_string(result->error_value()));
-    return result->error_value();
+    FDF_LOG(ERROR, "AddCompositeNodeSpec Backlight(backlight_dev) failed: %s",
+            zx_status_get_string(result->error_value()));
+    return result->take_error();
   }
 
-  return ZX_OK;
+  return zx::ok();
 }
 
 }  // namespace astro

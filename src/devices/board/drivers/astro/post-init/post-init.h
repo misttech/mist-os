@@ -46,6 +46,9 @@ class PostInit : public fdf::DriverBase {
   // Must be called after `IdentifyPanel()`.
   zx::result<> InitTouch();
 
+  // Must be called after `IdentifyPanel()`.
+  zx::result<> InitBacklight();
+
   zx::result<> InitFocaltechTouch();
   zx::result<> InitGoodixTouch();
 
