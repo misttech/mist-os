@@ -21,6 +21,11 @@ type McuTimeSyncInfo = table {
     2: mcu_boot_time zx.Time;
 };
 
+type McuWakeLockValue = strict enum : uint8 {
+    RELEASE = 0;
+    ACQUIRE = 1;
+};
+
 /// Client is expected to pass the vmo handle to nanohub when issuing a DownloadFirmware request.
 @discoverable
 open protocol Device {
@@ -44,6 +49,11 @@ open protocol Device {
 
     /// The time since boot recorded by the AP and the MCU.
     strict GetTimeSync() -> (McuTimeSyncInfo) error zx.Status;
+
+    /// Set an MCU wake lock request to prevent the MCU from entering a low-power state.
+    strict SetWakeLock(struct {
+        value McuWakeLockValue;
+    }) -> () error zx.Status;
 
     /// Get the current duration of time the MCU will remain awake.
     strict GetWakeUpEventDuration() -> (struct {
