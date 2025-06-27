@@ -208,6 +208,7 @@
                 "fuchsia.services.test.Device",
                 "fuchsia.tpm.Service",
                 "fuchsia.wlan.device.Service",
+                "google.powerstats.Service",
             ],
             from: "#base-drivers",
         },
