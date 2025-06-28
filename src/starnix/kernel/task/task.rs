@@ -1517,10 +1517,9 @@ impl Task {
 }
 
 impl Releasable for Task {
-    type Context<'a: 'b, 'b> =
-        (ThreadState, &'a mut Locked<TaskRelease>, RwLockWriteGuard<'a, PidTable>);
+    type Context<'a> = (ThreadState, &'a mut Locked<TaskRelease>, RwLockWriteGuard<'a, PidTable>);
 
-    fn release<'a: 'b, 'b>(mut self, context: Self::Context<'a, 'b>) {
+    fn release<'a>(mut self, context: Self::Context<'a>) {
         let (thread_state, locked, mut pids) = context;
 
         *self.proc_pid_directory_cache.get_mut() = None;

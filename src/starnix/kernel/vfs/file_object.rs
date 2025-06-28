@@ -2164,9 +2164,9 @@ impl FileObject {
 }
 
 impl Releasable for FileObject {
-    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a>;
+    type Context<'a> = CurrentTaskAndLocked<'a>;
 
-    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
+    fn release<'a>(self, context: CurrentTaskAndLocked<'a>) {
         let (locked, current_task) = context;
         // Release all wake leases associated with this file in the corresponding `WaitObject`
         // of each registered epfd.

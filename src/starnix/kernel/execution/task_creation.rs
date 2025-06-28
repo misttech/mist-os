@@ -38,9 +38,9 @@ pub struct TaskInfo {
 }
 
 impl Releasable for TaskInfo {
-    type Context<'a: 'b, 'b> = &'b mut PidTable;
+    type Context<'a> = &'a mut PidTable;
 
-    fn release<'a: 'b, 'b>(self, pids: Self::Context<'a, 'b>) {
+    fn release<'a>(self, pids: &'a mut PidTable) {
         self.thread_group.release(pids);
     }
 }

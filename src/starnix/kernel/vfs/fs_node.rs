@@ -2654,9 +2654,9 @@ impl std::fmt::Debug for FsNode {
 }
 
 impl Releasable for FsNode {
-    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a>;
+    type Context<'a> = CurrentTaskAndLocked<'a>;
 
-    fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
+    fn release<'a>(self, context: CurrentTaskAndLocked<'a>) {
         let (locked, current_task) = context;
         if let Some(fs) = self.fs.upgrade() {
             fs.remove_node(&self);

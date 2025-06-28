@@ -463,9 +463,9 @@ struct TracedZombie {
 }
 
 impl Releasable for TracedZombie {
-    type Context<'a: 'b, 'b> = &'a mut PidTable;
+    type Context<'a> = &'a mut PidTable;
 
-    fn release<'a: 'b, 'b>(self, pids: &mut PidTable) {
+    fn release<'a>(self, pids: &'a mut PidTable) {
         self.artificial_zombie.release(pids);
         if let Some((_, z)) = self.delegate {
             z.release(pids);

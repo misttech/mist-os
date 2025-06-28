@@ -439,9 +439,9 @@ impl FdTable {
 }
 
 impl ReleasableByRef for FdTable {
-    type Context<'a: 'b, 'b> = ();
+    type Context<'a> = ();
     /// Drop the fd table, closing any files opened exclusively by this table.
-    fn release<'a: 'b, 'b>(&self, _context: Self::Context<'a, 'b>) {
+    fn release<'a>(&self, _context: ()) {
         *self.inner.lock() = Default::default();
     }
 }

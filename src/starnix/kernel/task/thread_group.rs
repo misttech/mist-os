@@ -302,9 +302,9 @@ impl PartialEq for ThreadGroup {
 }
 
 impl Releasable for ThreadGroup {
-    type Context<'a: 'b, 'b> = &'b mut PidTable;
+    type Context<'a> = &'a mut PidTable;
 
-    fn release<'a: 'b, 'b>(mut self, pids: Self::Context<'a, 'b>) {
+    fn release<'a>(mut self, pids: &'a mut PidTable) {
         let state = self.mutable_state.get_mut();
 
         for zombie in state.zombie_children.drain(..) {
@@ -557,9 +557,9 @@ impl ZombieProcess {
 }
 
 impl Releasable for ZombieProcess {
-    type Context<'a: 'b, 'b> = &'a mut PidTable;
+    type Context<'a> = &'a mut PidTable;
 
-    fn release<'a: 'b, 'b>(self, pids: &mut PidTable) {
+    fn release<'a>(self, pids: &'a mut PidTable) {
         if self.is_canonical {
             pids.remove_zombie(self.pid());
         }
