@@ -26,6 +26,17 @@ type McuWakeLockValue = strict enum : uint8 {
     ACQUIRE = 1;
 };
 
+type PinState = strict enum {
+    LOW = 0;
+    HIGH = 1;
+};
+
+type HardwareResetPinStates = struct {
+    isp_pin_0 PinState;
+    isp_pin_1 PinState;
+    isp_pin_2 PinState;
+};
+
 /// Client is expected to pass the vmo handle to nanohub when issuing a DownloadFirmware request.
 @discoverable
 open protocol Device {
@@ -64,6 +75,9 @@ open protocol Device {
     strict SetWakeUpEventDuration(struct {
         duration zx.Duration;
     }) -> () error zx.Status;
+
+    /// Initiates a hardware reset.
+    strict HardwareReset(HardwareResetPinStates) -> () error zx.Status;
 };
 
 service Service {
