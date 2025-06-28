@@ -144,7 +144,11 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   EngineDriverClient* engine_driver_client() { return engine_driver_client_.get(); }
 
+  // May only be called after the display engine driver is connected.
   bool supports_capture() { return engine_info_->is_capture_supported(); }
+
+  // May only be called after the display engine driver is connected.
+  const display::EngineInfo& engine_info() const { return *engine_info_; }
 
   fdf::UnownedSynchronizedDispatcher client_dispatcher() const {
     return client_dispatcher_->borrow();

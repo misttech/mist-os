@@ -25,7 +25,11 @@ class ClientProxy;
 // Almost-POD used by Client to manage display configuration. Public state is used by Controller.
 class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display::DisplayId> {
  public:
-  explicit DisplayConfig(display::DisplayId display_id);
+  // `engine_max_layer_count` must be positive, and must not exceed
+  // `display::EngineInfo::kMaxAllowedMaxLayerCount`.
+  explicit DisplayConfig(display::DisplayId display_id,
+                         fbl::Vector<display::PixelFormat> pixel_formats,
+                         int engine_max_layer_count);
 
   DisplayConfig(const DisplayConfig&) = delete;
   DisplayConfig& operator=(const DisplayConfig&) = delete;
@@ -50,6 +54,16 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display:
   // `DiscardNonLayerDraftConfig()` is called.
   void DiscardNonLayerDraftConfig();
 
+  // Maximum number of layers that can be composited on this display.
+  //
+  // This is a hard upper bound placed by the display engine hardware. The
+  // maximum may not be reachable due to other factors, such as memory bandwidth
+  // limitations.
+  //
+  // Guaranteed to be positive and at most
+  // `display::EngineInfo::kMaxAllowedMaxLayerCount`.
+  int engine_max_layer_count() const { return engine_max_layer_count_; }
+
   int applied_layer_count() const { return static_cast<int>(applied_.layer_count); }
   const display_config_t* applied_config() const { return &applied_; }
   const fbl::DoublyLinkedList<LayerNode*>& get_applied_layers() const { return applied_layers_; }
@@ -69,7 +83,8 @@ class DisplayConfig : public IdMappable<std::unique_ptr<DisplayConfig>, display:
   fbl::DoublyLinkedList<LayerNode*> draft_layers_;
   fbl::DoublyLinkedList<LayerNode*> applied_layers_;
 
-  fbl::Vector<display::PixelFormat> pixel_formats_;
+  const fbl::Vector<display::PixelFormat> pixel_formats_;
+  const int engine_max_layer_count_;
 
   bool has_draft_nonlayer_config_change_ = false;
 

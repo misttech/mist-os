@@ -1010,14 +1010,17 @@ display::ConfigCheckResult Client::CheckConfigImpl() {
 display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& display_config) {
   ZX_DEBUG_ASSERT(!display_config.draft_layers_.is_empty());
 
-  // The total number of registered layers is an upper bound on the number of
-  // layers assigned to display configurations.
-  const size_t max_layer_count = std::max(size_t{1}, layers_.size());
+  // The cast will not result in UB because the maximum layer count is
+  // guaranteed to be positive.
+  const size_t max_layer_count = display_config.engine_max_layer_count();
+  ZX_DEBUG_ASSERT_MSG(max_layer_count > 0,
+                      "DisplayConfig contract broken: engine_max_layer_count() must be positive");
 
-  // VLA is guaranteed  be non-empty (causing UB) thanks to the clamping above.
+  // VLA is guaranteed  be non-empty (causing UB) thanks to the contract
+  // mentioned above.
   //
-  // TODO(https://fxbug.dev/42080896): Do not use VLA. We should introduce a limit on
-  // totally supported layers instead.
+  // TODO(https://fxbug.dev/42080896): Do not use VLA. Store this buffer in the
+  // display configuration instead.
   layer_t banjo_layers[max_layer_count];
   size_t banjo_layers_index = 0;
 
@@ -1034,6 +1037,10 @@ display::ConfigCheckResult Client::CheckConfigForDisplay(const DisplayConfig& di
   // checks. The engine drivers API contract does not allow passing
   // configurations that fail these checks.
   for (const LayerNode& draft_layer_node : display_config.draft_layers_) {
+    if (banjo_layers_index >= max_layer_count) {
+      return display::ConfigCheckResult::kUnsupportedConfig;
+    }
+
     layer_t& banjo_layer = banjo_layers[banjo_layers_index];
     ++banjo_layers_index;
 
@@ -1242,21 +1249,22 @@ void Client::OnDisplaysChanged(std::span<const display::DisplayId> added_display
 
   controller_.AssertMtxAliasHeld(*controller_.mtx());
   for (display::DisplayId added_display_id : added_display_ids) {
-    fbl::AllocChecker alloc_checker;
-    auto display_config = fbl::make_unique_checked<DisplayConfig>(&alloc_checker, added_display_id);
-    if (!alloc_checker.check()) {
-      fdf::warn("Out of memory when processing hotplug");
-      continue;
-    }
-
     zx::result get_supported_pixel_formats_result =
-        controller_.GetSupportedPixelFormats(display_config->id());
+        controller_.GetSupportedPixelFormats(added_display_id);
     if (get_supported_pixel_formats_result.is_error()) {
       fdf::warn("Failed to get pixel formats when processing hotplug: {}",
                 get_supported_pixel_formats_result);
       continue;
     }
-    display_config->pixel_formats_ = std::move(get_supported_pixel_formats_result.value());
+
+    fbl::AllocChecker alloc_checker;
+    auto display_config = fbl::make_unique_checked<DisplayConfig>(
+        &alloc_checker, added_display_id, std::move(get_supported_pixel_formats_result).value(),
+        controller_.engine_info().max_layer_count());
+    if (!alloc_checker.check()) {
+      fdf::warn("Out of memory when processing hotplug");
+      continue;
+    }
 
     zx::result<std::span<const display::DisplayTiming>> display_timings_result =
         controller_.GetDisplayTimings(display_config->id());
