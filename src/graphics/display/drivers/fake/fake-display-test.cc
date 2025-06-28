@@ -51,6 +51,7 @@
 #include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
@@ -64,10 +65,12 @@ namespace fake_display {
 
 namespace {
 
-// Must match kDisplayId and kModeId in fake-display.cc.
-// TODO(https://fxbug.dev/42078942): Do not hardcode the display and mode IDs.
+// Used to populate FakeDisplayDeviceConfig.
 constexpr display::DisplayId kDisplayId(1);
 constexpr display::ModeId kModeId(1);
+constexpr int32_t kDisplayWidth = 1280;
+constexpr int32_t kDisplayHeight = 800;
+constexpr int kRefreshRateHz = 60;
 
 class TestDisplayEngineListener : public display::DisplayEngineEventsInterface {
  public:
@@ -119,8 +122,19 @@ class FakeDisplayTest : public testing::Test {
 
   virtual FakeDisplayDeviceConfig GetFakeDisplayDeviceConfig() const {
     return FakeDisplayDeviceConfig{
+        .display_id = kDisplayId,
+        .display_mode_id = kModeId,
+        .display_mode = display::Mode({
+            .active_width = kDisplayWidth,
+            .active_height = kDisplayHeight,
+            .refresh_rate_millihertz = kRefreshRateHz * 1'000,
+        }),
+        .engine_info = display::EngineInfo({
+            .max_layer_count = 1,
+            .max_connected_display_count = 1,
+            .is_capture_supported = true,
+        }),
         .periodic_vsync = false,
-        .no_buffer_access = false,
     };
   }
 
@@ -144,48 +158,42 @@ TEST_F(FakeDisplayTest, Inspect) {
   const inspect::Hierarchy* config = hierarchy.GetByPath({"device_config"});
   ASSERT_NE(config, nullptr);
 
-  // Must be the same as `kWidth` defined in fake-display.cc.
-  // TODO(https://fxbug.dev/42065258): Use configurable values instead.
-  constexpr int kWidth = 1280;
   const inspect::IntPropertyValue* width_px =
       config->node().get_property<inspect::IntPropertyValue>("width_px");
   ASSERT_NE(width_px, nullptr);
-  EXPECT_EQ(width_px->value(), kWidth);
+  EXPECT_EQ(width_px->value(), kDisplayWidth);
 
-  // Must be the same as `kHeight` defined in fake-display.cc.
-  // TODO(https://fxbug.dev/42065258): Use configurable values instead.
-  constexpr int kHeight = 800;
   const inspect::IntPropertyValue* height_px =
       config->node().get_property<inspect::IntPropertyValue>("height_px");
   ASSERT_NE(height_px, nullptr);
-  EXPECT_EQ(height_px->value(), kHeight);
+  EXPECT_EQ(height_px->value(), kDisplayHeight);
 
-  // Must be the same as `kRefreshRateFps` defined in fake-display.cc.
-  // TODO(https://fxbug.dev/42065258): Use configurable values instead.
-  constexpr double kRefreshRateHz = 60.0;
   const inspect::DoublePropertyValue* refresh_rate_hz =
       config->node().get_property<inspect::DoublePropertyValue>("refresh_rate_hz");
   ASSERT_NE(refresh_rate_hz, nullptr);
-  EXPECT_DOUBLE_EQ(refresh_rate_hz->value(), kRefreshRateHz);
+  EXPECT_DOUBLE_EQ(refresh_rate_hz->value(), double{kRefreshRateHz});
 
   const inspect::BoolPropertyValue* periodic_vsync =
       config->node().get_property<inspect::BoolPropertyValue>("periodic_vsync");
   ASSERT_NE(periodic_vsync, nullptr);
   EXPECT_EQ(periodic_vsync->value(), false);
 
-  const inspect::BoolPropertyValue* no_buffer_access =
-      config->node().get_property<inspect::BoolPropertyValue>("no_buffer_access");
-  ASSERT_NE(no_buffer_access, nullptr);
-  EXPECT_EQ(no_buffer_access->value(), false);
+  const inspect::BoolPropertyValue* is_capture_supported =
+      config->node().get_property<inspect::BoolPropertyValue>("is_capture_supported");
+  ASSERT_NE(is_capture_supported, nullptr);
+  EXPECT_EQ(is_capture_supported->value(), true);
 }
 
 // A layer configuration that should pass all the layer tests in FakeDisplay::CheckConfiguration.
 constexpr display::DriverLayer kAcceptableLayer({
-    .display_destination = display::Rectangle({.x = 0, .y = 0, .width = 1280, .height = 800}),
-    .image_source = display::Rectangle({.x = 0, .y = 0, .width = 1280, .height = 800}),
+    .display_destination =
+        display::Rectangle({.x = 0, .y = 0, .width = kDisplayWidth, .height = kDisplayHeight}),
+    .image_source =
+        display::Rectangle({.x = 0, .y = 0, .width = kDisplayWidth, .height = kDisplayHeight}),
     .image_id = display::DriverImageId(4242),
-    .image_metadata = display::ImageMetadata(
-        {.width = 1280, .height = 800, .tiling_type = display::ImageTilingType::kLinear}),
+    .image_metadata = display::ImageMetadata({.width = kDisplayWidth,
+                                              .height = kDisplayHeight,
+                                              .tiling_type = display::ImageTilingType::kLinear}),
     .fallback_color = display::Color({.format = display::PixelFormat::kB8G8R8A8,
                                       .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43,
                                                                               0x44, 0, 0, 0, 0}}),
@@ -545,9 +553,6 @@ TEST_F(FakeDisplayRealSysmemTest, ImportImageForCapture) {
   const PixelFormatAndModifier kPixelFormat(fuchsia_images2::PixelFormat::kB8G8R8A8,
                                             fuchsia_images2::PixelFormatModifier::kLinear);
 
-  constexpr uint32_t kDisplayWidth = 1280;
-  constexpr uint32_t kDisplayHeight = 800;
-
   static constexpr display::ImageBufferUsage kCaptureUsage = {
       .tiling_type = display::ImageTilingType::kCapture,
   };
@@ -623,11 +628,6 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureImage) {
 
   const auto kPixelFormat = PixelFormatAndModifier(fuchsia_images2::PixelFormat::kB8G8R8A8,
                                                    fuchsia_images2::PixelFormatModifier::kLinear);
-
-  // Must match kWidth and kHeight defined in fake-display.cc.
-  // TODO(https://fxbug.dev/42078942): Do not hardcode the display width and height.
-  constexpr int kDisplayWidth = 1280;
-  constexpr int kDisplayHeight = 800;
 
   // Set BufferCollection buffer memory constraints from the display driver's
   // end.
@@ -796,10 +796,6 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   const auto kPixelFormat = PixelFormatAndModifier(fuchsia_images2::PixelFormat::kB8G8R8A8,
                                                    fuchsia_images2::PixelFormatModifier::kLinear);
 
-  // Must match kWidth and kHeight defined in fake-display.cc.
-  // TODO(https://fxbug.dev/42078942): Do not hardcode the display width and height.
-  constexpr int kDisplayWidth = 1280;
-  constexpr int kDisplayHeight = 800;
   constexpr display::Dimensions kDisplayDimensions(
       {.width = kDisplayWidth, .height = kDisplayHeight});
 
@@ -846,11 +842,6 @@ TEST_F(FakeDisplayRealSysmemTest, CaptureSolidColorFill) {
   std::array<const display::DriverLayer, kLayerCount> kLayers = {
       CreateColorFillLayerConfig(kBlueBgra, kDisplayDimensions),
   };
-
-  // Must match kDisplayId and kModeId in fake-display.cc.
-  // TODO(https://fxbug.dev/42078942): Do not hardcode the display and mode IDs.
-  static constexpr display::DisplayId kDisplayId(1);
-  static constexpr display::ModeId kModeId(1);
 
   // Check and apply the display configuration.
   display::ConfigCheckResult config_check_result =
@@ -908,8 +899,19 @@ class FakeDisplayWithoutCaptureRealSysmemTest : public FakeDisplayRealSysmemTest
  public:
   FakeDisplayDeviceConfig GetFakeDisplayDeviceConfig() const override {
     return {
+        .display_id = kDisplayId,
+        .display_mode_id = kModeId,
+        .display_mode = display::Mode({
+            .active_width = kDisplayWidth,
+            .active_height = kDisplayHeight,
+            .refresh_rate_millihertz = kRefreshRateHz * 1'000,
+        }),
+        .engine_info = display::EngineInfo({
+            .max_layer_count = 1,
+            .max_connected_display_count = 1,
+            .is_capture_supported = false,
+        }),
         .periodic_vsync = false,
-        .no_buffer_access = true,
     };
   }
 };

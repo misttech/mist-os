@@ -5,9 +5,31 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_DEVICE_CONFIG_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_DISPLAY_DEVICE_CONFIG_H_
 
+#include "src/graphics/display/lib/api-types/cpp/display-id.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
+#include "src/graphics/display/lib/api-types/cpp/mode-id.h"
+#include "src/graphics/display/lib/api-types/cpp/mode.h"
+
 namespace fake_display {
 
 struct FakeDisplayDeviceConfig {
+  // The driver reports one display with the ID below.
+  display::DisplayId display_id = display::DisplayId(1);
+
+  // The driver reports one display mode with the ID below.
+  display::ModeId display_mode_id = display::ModeId(1);
+
+  // The emulated display's mode.
+  display::Mode display_mode = display::Mode(
+      {.active_width = 1280, .active_height = 800, .refresh_rate_millihertz = 60'000});
+
+  // The driver reports the capabilities below.
+  //
+  // If `supports_capture` is true, the driver emulates display capture via
+  // software compositing.  To make this work, the driver adds BufferCollection
+  // constraints requesting CPU access to image data during Sysmem negotiation.
+  display::EngineInfo engine_info;
+
   // Enables periodically-generated VSync events.
   //
   // By default, this member is false. Tests must call `FakeDisplay::TriggerVsync()`
@@ -18,20 +40,6 @@ struct FakeDisplayDeviceConfig {
   // non-determinism. They can lead to flaky tests, when coupled with overly
   // strict assertions around event timing.
   bool periodic_vsync = false;
-
-  // If true, the fake display device will never access imported image buffers,
-  // and it will not add extra image format constraints to the imported buffer
-  // collection.
-  // Otherwise, it may add extra BufferCollection constraints to ensure that the
-  // allocated image buffers support CPU access, and may access the imported
-  // image buffers for capturing.
-  // Display capture is supported iff this field is false.
-  //
-  // TODO(https://fxbug.dev/42079320): This is a temporary workaround to support fake
-  // display device for GPU devices that cannot render into CPU-accessible
-  // formats directly. Remove this option when we have a fake Vulkan
-  // implementation.
-  bool no_buffer_access = false;
 };
 
 }  // namespace fake_display

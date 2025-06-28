@@ -55,7 +55,6 @@
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
-#include "src/graphics/display/lib/api-types/cpp/mode.h"
 #include "src/graphics/display/lib/api-types/cpp/pixel-format.h"
 #include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -78,18 +77,6 @@ constexpr fuchsia_images2::wire::ColorSpace kSupportedColorSpaces[] = {
     fuchsia_images2::wire::ColorSpace::kSrgb,
 };
 
-// Arbitrary dimensions - the same as sherlock.
-constexpr int32_t kWidth = 1280;
-constexpr int32_t kHeight = 800;
-
-constexpr display::DisplayId kDisplayId(1);
-constexpr display::ModeId kDisplayModeId(1);
-
-constexpr int32_t kRefreshRateHz = 60;
-
-// TODO(https://fxbug.dev/412450577): Remove the single-layer assumption.
-constexpr size_t kMaxLayerCount = 1;
-
 }  // namespace
 
 FakeDisplay::FakeDisplay(display::DisplayEngineEventsInterface* engine_events,
@@ -105,6 +92,9 @@ FakeDisplay::FakeDisplay(display::DisplayEngineEventsInterface* engine_events,
       inspector_(std::move(inspector)) {
   ZX_DEBUG_ASSERT(engine_events != nullptr);
   ZX_DEBUG_ASSERT(sysmem_client_.is_valid());
+  ZX_DEBUG_ASSERT_MSG(!device_config.engine_info.is_capture_supported() ||
+                          device_config.engine_info.max_layer_count() == 1,
+                      "Capture emulation does not support multiple layers yet");
   InitializeSysmemClient();
 
   if (device_config_.periodic_vsync) {
@@ -158,22 +148,13 @@ void FakeDisplay::InitializeSysmemClient() {
 
 display::EngineInfo FakeDisplay::CompleteCoordinatorConnection() {
   const display::ModeAndId mode_and_id({
-      .id = kDisplayModeId,
-      .mode = display::Mode({
-          .active_width = kWidth,
-          .active_height = kHeight,
-          .refresh_rate_millihertz = kRefreshRateHz * 1'000,
-      }),
+      .id = device_config_.display_mode_id,
+      .mode = device_config_.display_mode,
   });
 
   const cpp20::span<const display::ModeAndId> preferred_modes(&mode_and_id, 1);
-  engine_events_.OnDisplayAdded(kDisplayId, preferred_modes, kSupportedPixelFormats);
-
-  return display::EngineInfo({
-      .max_layer_count = kMaxLayerCount,
-      .max_connected_display_count = 1,
-      .is_capture_supported = IsCaptureSupported(),
-  });
+  engine_events_.OnDisplayAdded(device_config_.display_id, preferred_modes, kSupportedPixelFormats);
+  return device_config_.engine_info;
 }
 
 zx::result<display::DriverImageId> FakeDisplay::ImportVmoImageForTesting(zx::vmo vmo,
@@ -320,18 +301,21 @@ void FakeDisplay::ReleaseImage(display::DriverImageId image_id) {
 display::ConfigCheckResult FakeDisplay::CheckConfiguration(
     display::DisplayId display_id, display::ModeId display_mode_id,
     cpp20::span<const display::DriverLayer> layers) {
-  ZX_DEBUG_ASSERT(display_id == kDisplayId);
+  ZX_DEBUG_ASSERT(display_id == device_config_.display_id);
 
-  if (layers.size() > kMaxLayerCount) {
+  if (display_mode_id != device_config_.display_mode_id) {
+    return display::ConfigCheckResult::kUnsupportedDisplayModes;
+  }
+
+  // The cast does not result in UB because the maximum layer count is
+  // guaranteed to be positive.
+  const size_t max_layer_count = static_cast<size_t>(device_config_.engine_info.max_layer_count());
+  if (layers.size() > max_layer_count) {
     fdf::error(
         "CheckConfiguration: Number of requested layers ({}) is greater "
         " than maximum supported layer count ({}).",
-        kMaxLayerCount, layers.size());
+        layers.size(), max_layer_count);
     return display::ConfigCheckResult::kUnsupportedConfig;
-  }
-
-  if (display_mode_id != kDisplayModeId) {
-    return display::ConfigCheckResult::kUnsupportedDisplayModes;
   }
 
   // TODO(https://fxbug.dev/412450577): Remove the single-layer assumption.
@@ -339,8 +323,8 @@ display::ConfigCheckResult FakeDisplay::CheckConfiguration(
   const display::Rectangle display_area({
       .x = 0,
       .y = 0,
-      .width = kWidth,
-      .height = kHeight,
+      .width = device_config_.display_mode.active_area().width(),
+      .height = device_config_.display_mode.active_area().height(),
   });
 
   if (layer.display_destination() != display_area) {
@@ -375,11 +359,12 @@ display::ConfigCheckResult FakeDisplay::CheckConfiguration(
 void FakeDisplay::ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                                      cpp20::span<const display::DriverLayer> layers,
                                      display::DriverConfigStamp config_stamp) {
-  ZX_DEBUG_ASSERT(display_id == kDisplayId);
-  ZX_DEBUG_ASSERT(display_mode_id == kDisplayModeId);
+  ZX_DEBUG_ASSERT(display_id == device_config_.display_id);
+  ZX_DEBUG_ASSERT(display_mode_id == device_config_.display_mode_id);
   ZX_DEBUG_ASSERT(config_stamp != display::kInvalidDriverConfigStamp);
+  ZX_DEBUG_ASSERT(layers.size() <=
+                  static_cast<size_t>(device_config_.engine_info.max_layer_count()));
 
-  ZX_DEBUG_ASSERT(layers.size() <= kMaxLayerCount);
   std::lock_guard lock(mutex_);
 
   // TODO(https://fxbug.dev/412450577): Remove the single-layer assumption.
@@ -428,11 +413,12 @@ void SetLayerImageFormatConstraints(
 
 void FakeDisplay::SetCaptureImageFormatConstraints(
     fidl::WireTableBuilder<fuchsia_sysmem2::wire::ImageFormatConstraints>& constraints_builder) {
-  constraints_builder.min_size(fuchsia_math::wire::SizeU{.width = kWidth, .height = kHeight})
-      .max_size(fuchsia_math::wire::SizeU{.width = kWidth, .height = kHeight})
-      .min_bytes_per_row(kWidth * 4)
-      .max_bytes_per_row(kWidth * 4)
-      .max_width_times_height(kWidth * kHeight);
+  constraints_builder.min_size(device_config_.display_mode.active_area().ToFidl())
+      .max_size(device_config_.display_mode.active_area().ToFidl())
+      .min_bytes_per_row(device_config_.display_mode.active_area().width() * 4)
+      .max_bytes_per_row(device_config_.display_mode.active_area().width() * 4)
+      .max_width_times_height(device_config_.display_mode.active_area().width() *
+                              device_config_.display_mode.active_area().height());
 }
 
 fuchsia_sysmem2::wire::BufferCollectionConstraints FakeDisplay::CreateBufferCollectionConstraints(
@@ -607,7 +593,9 @@ zx::result<> FakeDisplay::ReleaseCapture(display::DriverCaptureImageId capture_i
   return zx::ok();
 }
 
-bool FakeDisplay::IsCaptureSupported() const { return !device_config_.no_buffer_access; }
+bool FakeDisplay::IsCaptureSupported() const {
+  return device_config_.engine_info.is_capture_supported();
+}
 
 void FakeDisplay::CaptureThread() {
   ZX_DEBUG_ASSERT(IsCaptureSupported());
@@ -616,7 +604,8 @@ void FakeDisplay::CaptureThread() {
     [[maybe_unused]] zx::result<> capture_result = ServiceAnyCaptureRequest();
     // ServiceAnyCaptureRequest() has already logged the error.
 
-    zx::nanosleep(zx::deadline_after(zx::sec(1) / kRefreshRateHz));
+    zx::nanosleep(
+        zx::deadline_after(zx::sec(1'000) / device_config_.display_mode.refresh_rate_millihertz()));
   }
 }
 
@@ -815,7 +804,8 @@ void FakeDisplay::TriggerVsync() {
 void FakeDisplay::VSyncThread() {
   while (!vsync_thread_shutdown_requested_.load(std::memory_order_relaxed)) {
     SendVsync();
-    zx::nanosleep(zx::deadline_after(zx::sec(1) / kRefreshRateHz));
+    zx::nanosleep(
+        zx::deadline_after(zx::sec(1'000) / device_config_.display_mode.refresh_rate_millihertz()));
   }
 }
 
@@ -832,18 +822,20 @@ void FakeDisplay::SendVsync() {
     return;
   }
 
-  engine_events_.OnDisplayVsync(kDisplayId, vsync_timestamp, vsync_config_stamp);
+  engine_events_.OnDisplayVsync(device_config_.display_id, vsync_timestamp, vsync_config_stamp);
 }
 
 void FakeDisplay::RecordDisplayConfigToInspectRootNode() {
   inspect::Node& root_node = inspector_.GetRoot();
   ZX_ASSERT(root_node);
   root_node.RecordChild("device_config", [&](inspect::Node& config_node) {
-    config_node.RecordInt("width_px", kWidth);
-    config_node.RecordInt("height_px", kHeight);
-    config_node.RecordDouble("refresh_rate_hz", kRefreshRateHz);
+    config_node.RecordInt("width_px", device_config_.display_mode.active_area().width());
+    config_node.RecordInt("height_px", device_config_.display_mode.active_area().height());
+    config_node.RecordDouble("refresh_rate_hz",
+                             device_config_.display_mode.refresh_rate_millihertz() / 1'000.0);
     config_node.RecordBool("periodic_vsync", device_config_.periodic_vsync);
-    config_node.RecordBool("no_buffer_access", device_config_.no_buffer_access);
+    config_node.RecordBool("is_capture_supported",
+                           device_config_.engine_info.is_capture_supported());
   });
 }
 

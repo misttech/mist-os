@@ -8,7 +8,9 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
 
-#include "src/graphics/display/drivers/fake/fake-display.h"
+#include "src/graphics/display/drivers/fake/fake-display-device-config.h"
+#include "src/graphics/display/lib/api-types/cpp/engine-info.h"
+#include "src/graphics/display/lib/api-types/cpp/mode.h"
 #include "src/graphics/display/testing/fake-coordinator-connector/service.h"
 
 int main(int argc, const char** argv) {
@@ -26,8 +28,18 @@ int main(int argc, const char** argv) {
   FX_LOGS(INFO) << "Starting fake fuchsia.hardware.display.Provider service.";
 
   static constexpr fake_display::FakeDisplayDeviceConfig kFakeDisplayDeviceConfig = {
+      // TODO(https://fxbug.dev/42079786): Populate from structured configuration.
+      .display_mode = display::Mode({
+          .active_width = 1280,
+          .active_height = 800,
+          .refresh_rate_millihertz = 60'000,
+      }),
+      .engine_info = display::EngineInfo({
+          .max_layer_count = 1,
+          .max_connected_display_count = 1,
+          .is_capture_supported = true,
+      }),
       .periodic_vsync = true,
-      .no_buffer_access = false,
   };
 
   display::FakeDisplayCoordinatorConnector connector(loop.dispatcher(), kFakeDisplayDeviceConfig);
