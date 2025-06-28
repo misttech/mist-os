@@ -33,14 +33,10 @@ impl SimpleDirectoryMutator {
     }
 
     pub fn entry(&self, name: &str, ops: impl Into<Box<dyn FsNodeOps>>, mode: FileMode) {
-        self.entry2(name.into(), ops, mode);
-    }
-
-    // TODO: Figure out a better way to overload this function for &str and &FsStr.
-    pub fn entry2(&self, name: &FsStr, ops: impl Into<Box<dyn FsNodeOps>>, mode: FileMode) {
+        let name: FsString = name.into();
         let node =
             self.fs.create_node_and_allocate_node_id(ops, FsNodeInfo::new(mode, FsCred::root()));
-        self.node(name.into(), node);
+        self.node(name, node);
     }
 
     pub fn entry_etc(

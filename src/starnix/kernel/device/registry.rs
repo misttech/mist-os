@@ -8,7 +8,7 @@ use crate::fs::devtmpfs::{devtmpfs_create_device, devtmpfs_remove_node};
 use crate::fs::sysfs::build_device_directory;
 use crate::task::CurrentTask;
 use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
-use crate::vfs::{FileOps, FsNode, FsNodeOps, FsStr, FsString};
+use crate::vfs::{FileOps, FsNode, FsStr, FsString};
 use starnix_logging::{log_error, log_warn};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::device_type::{
@@ -523,27 +523,20 @@ impl DeviceRegistry {
     /// instead.
     ///
     /// See `register_device` for an explanation of the parameters.
-    pub fn add_device<F, N, L>(
+    pub fn add_device<L>(
         &self,
         locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         metadata: DeviceMetadata,
         class: Class,
-        create_device_sysfs_ops: F,
+        build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
     ) -> Device
     where
-        F: Fn(Device) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
         L: LockBefore<FileOpsCore>,
     {
         self.devices(metadata.mode).get(metadata.device_type).expect("device is registered");
-        let device = self.objects.create_device_with_ops(
-            name,
-            Some(metadata),
-            class,
-            create_device_sysfs_ops,
-        );
+        let device = self.objects.create_device(name, Some(metadata), class, build_directory);
         self.notify_device(locked, current_task, device.clone());
         device
     }
@@ -776,7 +769,6 @@ impl DeviceTypeAllocator {
 mod tests {
     use super::*;
     use crate::device::mem::DevNull;
-    use crate::fs::sysfs::DeviceDirectory;
     use crate::testing::*;
     use crate::vfs::*;
     use starnix_uapi::device_type::{INPUT_MAJOR, MEM_MAJOR};
@@ -906,7 +898,7 @@ mod tests {
             "mouse".into(),
             DeviceMetadata::new("mouse".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
             input_class,
-            DeviceDirectory::new,
+            build_device_directory,
         );
 
         assert!(registry.objects.root.lookup("class/input/mouse".into()).is_some());
@@ -937,7 +929,7 @@ mod tests {
                 DeviceMode::Char,
             ),
             class,
-            DeviceDirectory::new,
+            build_device_directory,
         );
         assert!(registry.objects.root.lookup("bus/my-bus".into()).is_some());
         assert!(registry.objects.root.lookup("devices/my-bus/my-class".into()).is_some());
@@ -965,7 +957,7 @@ mod tests {
             "mouse".into(),
             DeviceMetadata::new("mouse".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
             input_class.clone(),
-            DeviceDirectory::new,
+            build_device_directory,
         );
 
         assert!(registry.objects.root.lookup("bus/pci/devices/mouse".into()).is_some());

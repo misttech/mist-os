@@ -6,6 +6,7 @@ use crate::device::kobject::DeviceMetadata;
 use crate::device::terminal::{Terminal, TtyState};
 use crate::device::{DeviceMode, DeviceOps};
 use crate::fs::devtmpfs::{devtmpfs_create_symlink, devtmpfs_mkdir, devtmpfs_remove_node};
+use crate::fs::sysfs::build_device_directory;
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
@@ -40,8 +41,6 @@ use starnix_uapi::{
     TIOCSSOFTCAR, TIOCSTI, TIOCSWINSZ, TIOCVHANGUP,
 };
 use std::sync::{Arc, Weak};
-
-use super::sysfs::DeviceDirectory;
 
 // See https://www.kernel.org/doc/Documentation/admin-guide/devices.txt
 const DEVPTS_FIRST_MAJOR: u32 = 136;
@@ -146,7 +145,7 @@ where
         "tty".into(),
         DeviceMetadata::new("tty".into(), DeviceType::TTY, DeviceMode::Char),
         tty_class.clone(),
-        DeviceDirectory::new,
+        build_device_directory,
     );
     registry.add_device(
         locked,
@@ -154,7 +153,7 @@ where
         "ptmx".into(),
         DeviceMetadata::new("ptmx".into(), DeviceType::PTMX, DeviceMode::Char),
         tty_class,
-        DeviceDirectory::new,
+        build_device_directory,
     );
 
     devtmpfs_mkdir(locked, current_task, "pts".into()).unwrap();

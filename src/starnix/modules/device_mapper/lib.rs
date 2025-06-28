@@ -10,7 +10,7 @@ use linux_uapi::DM_UUID_LEN;
 use mundane::hash::{Digest, Hasher, Sha256, Sha512};
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::DeviceMode;
-use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use starnix_core::fs::sysfs::{build_block_device_directory, BlockDeviceInfo};
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt, ProtectionFlags};
 use starnix_core::task::CurrentTask;
@@ -238,7 +238,7 @@ impl DmDevice {
                 DeviceMode::Block,
             ),
             virtual_block_class,
-            move |dev| BlockDeviceDirectory::new(dev, device_weak.clone()),
+            |device, dir| build_block_device_directory(device, device_weak, dir),
         );
         {
             let mut state = device.state.lock();

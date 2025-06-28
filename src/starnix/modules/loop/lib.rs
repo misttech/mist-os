@@ -7,7 +7,7 @@
 use bitflags::bitflags;
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::DeviceMode;
-use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use starnix_core::fs::sysfs::{build_block_device_directory, BlockDeviceInfo};
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE};
 use starnix_core::task::CurrentTask;
@@ -159,7 +159,7 @@ impl LoopDevice {
                 DeviceMode::Block,
             ),
             virtual_block_class,
-            move |dev| BlockDeviceDirectory::new(dev, device_weak.clone()),
+            |device, dir| build_block_device_directory(device, device_weak, dir),
         );
         {
             let mut state = device.state.lock();

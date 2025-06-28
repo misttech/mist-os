@@ -4,14 +4,13 @@
 
 use crate::device::kobject::DeviceMetadata;
 use crate::device::DeviceMode;
-use crate::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use crate::fs::sysfs::{build_block_device_directory, BlockDeviceInfo};
 use crate::mm::memory::MemoryObject;
 use crate::mm::{MemoryAccessorExt, ProtectionFlags};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{default_ioctl, default_seek, FileObject, FileOps, FsNode, FsString, SeekTarget};
 use anyhow::Error;
-
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::{DeviceType, REMOTE_BLOCK_MAJOR};
@@ -72,7 +71,7 @@ impl RemoteBlockDevice {
                 DeviceMode::Block,
             ),
             virtual_block_class,
-            move |dev| BlockDeviceDirectory::new(dev, device_weak.clone()),
+            |device, dir| build_block_device_directory(device, device_weak, dir),
         );
         device
     }

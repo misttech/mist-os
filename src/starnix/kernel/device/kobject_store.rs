@@ -7,8 +7,7 @@ use crate::device::DeviceMode;
 use crate::fs::sysfs::get_sysfs;
 use crate::task::Kernel;
 use crate::vfs::pseudo::simple_directory::{SimpleDirectory, SimpleDirectoryMutator};
-use crate::vfs::{FileSystemHandle, FsNodeOps, FsStr, FsString};
-use starnix_uapi::file_mode::mode;
+use crate::vfs::{FileSystemHandle, FsStr, FsString};
 use std::sync::{Arc, OnceLock};
 
 /// The owner of all the KObjects in sysfs.
@@ -162,26 +161,6 @@ impl KObjectStore {
     ///
     /// If you create the device yourself, userspace will not be able to instantiate the
     /// device because the `DeviceType` will not be registered with the `DeviceRegistry`.
-    pub(super) fn create_device_with_ops<F, N>(
-        &self,
-        name: &FsStr,
-        metadata: Option<DeviceMetadata>,
-        class: Class,
-        create_device_sysfs_ops: F,
-    ) -> Device
-    where
-        F: Fn(Device) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
-    {
-        let device = Device::new(name.to_owned(), class, metadata);
-        let ops = create_device_sysfs_ops(device.clone());
-        device.class.dir.edit(self.fs(), |dir| {
-            dir.entry2(name, ops, mode!(IFDIR, 0o755));
-        });
-        self.add(&device);
-        device
-    }
-
     pub(super) fn create_device(
         &self,
         name: &FsStr,
