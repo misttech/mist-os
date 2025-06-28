@@ -13,17 +13,19 @@ use {
 };
 
 use crate::bindings::interface_config::{
-    DeviceNeighborConfig, InterfaceConfig, InterfaceConfigDefaults,
+    DeviceNeighborConfig, FidlInterfaceConfig, InterfaceConfig, InterfaceConfigDefaults,
 };
 use crate::bindings::util::{ErrorLogExt, ResultExt as _};
+use crate::bindings::Ctx;
 
 pub(crate) async fn serve_control(
+    ctx: Ctx,
     mut rs: fnet_settings::ControlRequestStream,
 ) -> Result<(), fidl::Error> {
     while let Some(req) = rs.try_next().await? {
         match req {
             fnet_settings::ControlRequest::UpdateInterfaceDefaults { payload, responder } => {
-                let r = update_interface_defaults(payload);
+                let r = update_interface_defaults(&ctx.bindings_ctx().settings, payload);
                 r.log_if_err("settings::UpdateInterfaceDefaults");
                 responder.send(r.borrowed_ok())?;
             }
@@ -64,10 +66,12 @@ impl ErrorLogExt for fnet_settings::UpdateError {
 }
 
 fn update_interface_defaults(
-    _interfaces: fnet_interfaces_admin::Configuration,
+    settings: &Settings,
+    interfaces: fnet_interfaces_admin::Configuration,
 ) -> Result<fnet_interfaces_admin::Configuration, fnet_settings::UpdateError> {
-    error!("TODO(https://fxbug.dev/425936078): UpdateInterfaceDefaults not supported");
-    Ok(Default::default())
+    let update = FidlInterfaceConfig::from(interfaces).try_into_update()?;
+    let changed = settings.interface_defaults.write().update(update);
+    Ok(FidlInterfaceConfig::new_update(changed).into())
 }
 
 fn update_tcp(tcp: fnet_settings::Tcp) -> Result<fnet_settings::Tcp, fnet_settings::UpdateError> {
@@ -124,12 +128,13 @@ fn update_device(
 }
 
 pub(crate) async fn serve_state(
+    ctx: Ctx,
     mut rs: fnet_settings::StateRequestStream,
 ) -> Result<(), fidl::Error> {
     while let Some(req) = rs.try_next().await? {
         match req {
             fnet_settings::StateRequest::GetInterfaceDefaults { responder } => {
-                responder.send(&get_interface_defaults())?;
+                responder.send(&get_interface_defaults(&ctx.bindings_ctx().settings))?;
             }
             fnet_settings::StateRequest::GetTcp { responder } => {
                 responder.send(&get_tcp())?;
@@ -151,9 +156,8 @@ pub(crate) async fn serve_state(
     Ok(())
 }
 
-fn get_interface_defaults() -> fnet_interfaces_admin::Configuration {
-    error!("TODO(https://fxbug.dev/425936078): implement GetInterfaceDefaults");
-    Default::default()
+fn get_interface_defaults(settings: &Settings) -> fnet_interfaces_admin::Configuration {
+    FidlInterfaceConfig::new_complete(settings.interface_defaults.read().clone()).into()
 }
 
 fn get_tcp() -> fnet_settings::Tcp {

@@ -20,6 +20,8 @@ type UpdateError = flexible enum {
     ILLEGAL_NEGATIVE_VALUE = 2;
     /// Indicates that a configured value is out of the allowed range.
     OUT_OF_RANGE = 3;
+    /// Requested setting is not supported.
+    NOT_SUPPORTED = 4;
 };
 
 /// Provides control over the network stack namespace-wide configuration.

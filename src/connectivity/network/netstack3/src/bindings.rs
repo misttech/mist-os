@@ -1538,9 +1538,13 @@ impl NetstackSeed {
                         health_check_worker::serve(rs)
                     }),
                 Service::SettingsControl(state) => services_handle
-                    .spawn_request_stream_handler(state, |rs| settings::serve_control(rs)),
+                    .spawn_request_stream_handler(state, |rs| {
+                        settings::serve_control(netstack.ctx.clone(), rs)
+                    }),
                 Service::SettingsState(control) => services_handle
-                    .spawn_request_stream_handler(control, |rs| settings::serve_state(rs)),
+                    .spawn_request_stream_handler(control, |rs| {
+                        settings::serve_state(netstack.ctx.clone(), rs)
+                    }),
             })
             .collect::<()>();
 
