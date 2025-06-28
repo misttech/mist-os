@@ -167,6 +167,11 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   display::ConfigCheckResult CheckConfigImpl();
   void ApplyConfigImpl();
 
+  // CheckConfig() implementation for a single display configuration.
+  //
+  // `display_config`'s draft configuration must have a non-empty layer list.
+  display::ConfigCheckResult CheckConfigForDisplay(const DisplayConfig& display_config);
+
   // Cleans up states of all current Images.
   // Returns true if any current layer has been modified.
   bool CleanUpAllImages();
