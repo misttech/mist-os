@@ -255,7 +255,7 @@ inline void Scheduler::TraceThreadQueueEvent(const fxt::InternedString& name,
   }
 }
 
-void Scheduler::Dump(FILE* output_target) {
+void Scheduler::Dump(FILE* output_target, bool queue_state_only) {
   // We're about to acquire the |queue_lock_| and fprintf some things.
   // Depending on the FILE, calling fprintf may end up calling |DLog::Write|,
   // which may call |Event::Signal|, which may re-enter the Scheduler.  If that
@@ -277,6 +277,10 @@ void Scheduler::Dump(FILE* output_target) {
             Format(weight_total_).c_str(), runnable_fair_task_count_, runnable_deadline_task_count_,
             virtual_time_.raw_value(), scheduling_period_grans_.raw_value(),
             total_expected_runtime_ns_.raw_value(), Format(total_deadline_utilization_).c_str());
+
+    if (queue_state_only) {
+      return ChainLockTransaction::Done;
+    }
 
     if (active_thread_ != nullptr) {
       AssertInScheduler(*active_thread_);
@@ -802,7 +806,7 @@ Scheduler::DequeueResult Scheduler::DequeueDeadlineThread(SchedTime eligible_tim
   // access to the thread's COVs and exclusive access to the thread's SOVs. This
   // is acceptable because the queue lock is required by this method and the
   // thread is in a queue protectect by the same lock.
-  MarkHasOwnedThreadAccess(*eligible_thread);  // See DequeueFairThread
+  MarkHasOwnedThreadAccess(*eligible_thread);
   deadline_run_queue_.erase(*eligible_thread);
   TraceThreadQueueEvent("tqe_deque_deadline"_intern, eligible_thread);
   DEBUG_ASSERT(eligible_thread->disposition() == Disposition::Associated);
@@ -1600,8 +1604,8 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
   } else if (timeslice_expired || current_thread != next_thread) {
     ktrace::Scope trace_start_preemption = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "next_slice");
 
-    // Re-compute the time slice and deadline for the new thread based on the
-    // latest state.
+    // Re-compute the time slice and ideal preemption time for the new thread
+    // based on the latest state.
     target_preemption_time_ns_ = NextThreadTimeslice(next_thread, now);
 
     // Update the thread's runtime stats to record the amount of time that it spent in the run
@@ -1663,9 +1667,8 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
     DEBUG_ASSERT(preemption_time_ns <= target_preemption_time_ns_);
 
     PreemptReset(current_cpu, now.raw_value(), preemption_time_ns.raw_value());
-    trace_continue =
-        KTRACE_END_SCOPE(("preemption_time", Round<uint64_t>(preemption_time_ns)),
-                         ("target preemption time", Round<uint64_t>(target_preemption_time_ns_)));
+    trace_continue = KTRACE_END_SCOPE(("preemption_time", preemption_time_ns),
+                                      ("target preemption time", target_preemption_time_ns_));
   }
 
   // Assert that there is no path beside running the idle thread can leave the
@@ -1677,12 +1680,11 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
 
   // Almost done, we need to handle the actual context switch (if any).
   if (current_thread != next_thread) {
-    LOCAL_KTRACE(
-        DETAILED, "switch_threads",
-        ("total threads", runnable_fair_task_count_ + runnable_deadline_task_count_),
-        ("total weight", weight_total_.raw_value()),
-        ("current thread time slice", current_thread->scheduler_state().time_slice_ns_),
-        ("next thread time slice", Round<uint64_t>(next_thread->scheduler_state().time_slice_ns_)));
+    LOCAL_KTRACE(DETAILED, "switch_threads",
+                 ("total threads", runnable_fair_task_count_ + runnable_deadline_task_count_),
+                 ("total weight", weight_total_.raw_value()),
+                 ("current thread time slice", current_thread->scheduler_state().time_slice_ns_),
+                 ("next thread time slice", next_thread->scheduler_state().time_slice_ns_));
 
     TraceThreadQueueEvent("tqe_astart"_intern, next_thread);
 
@@ -1691,8 +1693,6 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
 
     // Finish the migration of the current thread, if pending.
     if (current_is_migrating) {
-      // Call the Save stage of the thread's migration function as it leaves
-      // this CPU.
       current_thread->CallMigrateFnLocked(Thread::MigrateStage::Save);
 
       const cpu_num_t target_cpu = FindActiveSchedulerForThread(
@@ -1790,7 +1790,7 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
     Scheduler::LockHandoffInternal(saved_transaction_state, current_thread);
     next_thread->get_lock().MarkReleased();
   } else {
-    // Restore our reschedule context and drop our queue guard before unwinding.
+    // Restore the transaction state and drop the queue guard before unwinding.
     ChainLockTransaction::RestoreState(saved_transaction_state);
     current_thread->get_lock().SyncToken();
     queue_guard.Release();
@@ -2075,8 +2075,8 @@ void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
     TraceThreadQueueEvent("tqe_enque"_intern, thread);
   }
 
-  trace = KTRACE_END_SCOPE(("start time", Round<uint64_t>(state->start_time_)),
-                           ("finish time", Round<uint64_t>(state->finish_time_)));
+  trace =
+      KTRACE_END_SCOPE(("start time", state->start_time_), ("finish time", state->finish_time_));
 }
 
 void Scheduler::Insert(SchedTime now, Thread* thread, Placement placement) {
@@ -2129,7 +2129,7 @@ void Scheduler::Remove(SchedTime now, Thread* thread, cpu_num_t stolen_by) {
 
   SchedulerQueueState& queue_state = thread->scheduler_queue_state();
   const SchedulerState& state = const_cast<const Thread*>(thread)->scheduler_state();
-  const EffectiveProfile& ep = state.effective_profile_;
+  const EffectiveProfile& effective_profile = state.effective_profile_;
 
   DEBUG_ASSERT(!queue_state.in_queue());
 
@@ -2143,10 +2143,10 @@ void Scheduler::Remove(SchedTime now, Thread* thread, cpu_num_t stolen_by) {
 
       UpdatePeriod();
 
-      weight_total_ -= ep.fair.weight;
+      weight_total_ -= effective_profile.fair.weight;
       DEBUG_ASSERT(weight_total_ >= 0);
     } else {
-      UpdateTotalDeadlineUtilization(-ep.deadline.utilization);
+      UpdateTotalDeadlineUtilization(-effective_profile.deadline.utilization);
       DEBUG_ASSERT(runnable_deadline_task_count_ > 0);
       runnable_deadline_task_count_--;
     }

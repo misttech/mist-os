@@ -131,7 +131,7 @@ class Scheduler {
 
   // Dumps the state of the run queue to the specified output target.  Note that
   // interrupts must be disabled in order to call this method.
-  void Dump(FILE* output_target = stdout) TA_EXCL(queue_lock_);
+  void Dump(FILE* output_target = stdout, bool queue_state_only = false) TA_EXCL(queue_lock_);
 
   // Dumps info about the currently active thread (if any).  Note that
   // interrupts must be disabled in order to call this method.
@@ -700,8 +700,7 @@ class Scheduler {
     SchedTime mono_finish_time_ns_{0};
   };
 
-  // Evaluates the schedule and returns the thread that should execute,
-  // updating the run queue as necessary.
+  // Evaluates the schedule and returns the thread that should execute.
   DequeueResult EvaluateNextThread(SchedTime now, Thread* current_thread, bool timeslice_expired,
                                    bool current_is_migrating, SchedDuration total_runtime_ns,
                                    Guard<MonitoredSpinLock, NoIrqSave>& queue_guard)
@@ -1105,13 +1104,6 @@ class Scheduler {
   // Pointer to the thread actively running on this CPU.
   TA_GUARDED(queue_lock_)
   Thread* active_thread_{nullptr};
-
-  // Monotonically increasing counter to break ties when queuing tasks with
-  // the same key. This has the effect of placing newly queued tasks behind
-  // already queued tasks with the same key. This is also necessary to
-  // guarantee uniqueness of the key as required by the WAVLTree container.
-  TA_GUARDED(queue_lock_)
-  uint64_t generation_count_{0};
 
   // Count of the fair threads running on this CPU, including threads in the run
   // queue and the currently running thread. Does not include the idle thread.

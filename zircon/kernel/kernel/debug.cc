@@ -249,7 +249,7 @@ RecurringCallback g_threadq_stats_callback([]() {
   for (cpu_num_t i = 0; i < percpu::processor_count(); i++) {
     if (Scheduler::PeekIsActive(i)) {
       printf("thread queue cpu %2u:\n", i);
-      percpu::Get(i).scheduler.Dump(stdout);
+      percpu::Get(i).scheduler.Dump(stdout, /*queue_state_only=*/true);
     }
   }
   printf("\n");

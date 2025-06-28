@@ -518,7 +518,7 @@ class SplitNodeFromPiGraphOp
 
     DEBUG_ASSERT(target_old_ep.IsDeadline());
     if (target_new_ep.IsFair()) {
-      // If target_ node is mono_now_ a fair node, then the upstream_ node must have been
+      // If target_ node is now a fair node, then the upstream_ node must have been
       // a deadline node.  This split operation is what caused the target_ node to
       // change from deadline to fair, all of the deadline pressure must have been
       // coming from the upstream_ node.  Assert all of this.
@@ -557,7 +557,7 @@ class SplitNodeFromPiGraphOp
         // _would_ have been based on the utilizations of the target_ and
         // upstream_ nodes after the split.  It is important when scaling
         // timeslices to be sure that we divide by a utilization value which
-        // is the sum of the two (mono_now_ separated) utilization values.
+        // is the sum of the two (now separated) utilization values.
         const SchedUtilization combined_uncapped_utilization =
             target_new_ep.deadline.utilization + upstream_ep().deadline.utilization;
 
