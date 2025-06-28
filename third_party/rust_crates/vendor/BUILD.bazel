@@ -487,14 +487,14 @@ alias(
 )
 
 alias(
-    name = "chrono-0.4.34",
-    actual = "//third_party/rust_crates/vendor/chrono-0.4.34:chrono",
+    name = "chrono-0.4.41",
+    actual = "//third_party/rust_crates/vendor/chrono-0.4.41:chrono",
     tags = ["manual"],
 )
 
 alias(
     name = "chrono",
-    actual = "//third_party/rust_crates/vendor/chrono-0.4.34:chrono",
+    actual = "//third_party/rust_crates/vendor/chrono-0.4.41:chrono",
     tags = ["manual"],
 )
 

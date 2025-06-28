@@ -81,7 +81,7 @@ rust_library(
     deps = [
         "//third_party/rust_crates/ask2patch/byteorder",
         "//third_party/rust_crates/vendor/bitflags-1.3.2:bitflags",
-        "//third_party/rust_crates/vendor/chrono-0.4.34:chrono",
+        "//third_party/rust_crates/vendor/chrono-0.4.41:chrono",
         "//third_party/rust_crates/vendor/log-0.4.22:log",
     ],
 )

@@ -75,7 +75,7 @@ chacha20 = "0.9.1"
 # https://github.com/rust-lang/cargo/issues/4463. Until there's an escape
 # hatch, all we can do is document and shed a silent tear while we wait for the
 # ecosystem to migrate away from time 0.1.
-chrono = { version = "0.4.34", default-features = false }
+chrono = { version = "0.4.41", default-features = false }
 chrono-english = "0.1.7"
 ciborium = { version = "0.2.2", features = ["std"] }
 cipher = "0.4.4"
@@ -397,6 +397,7 @@ winapi = { path = "empty/winapi" }
 winapi-util = { path = "empty/winapi-util" }
 windows = { path = "empty/windows" }
 windows-core = { path = "empty/windows-core" }
+windows-link-0_1_2 = { package = "windows-link", path = "empty/windows-link-0.1.2" }
 windows-sys-0_45_0 = { package = "windows-sys", path = "empty/windows-sys-0.45.0" }
 windows-sys-0_48_0 = { package = "windows-sys", path = "empty/windows-sys-0.48.0" }
 windows-sys-0_52_0 = { package = "windows-sys", path = "empty/windows-sys-0.52.0" }

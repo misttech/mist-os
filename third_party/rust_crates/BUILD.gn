@@ -170,7 +170,7 @@ group("chacha20") {
 }
 
 group("chrono") {
-  public_deps = [ ":chrono-v0_4_34" ]
+  public_deps = [ ":chrono-v0_4_41" ]
 }
 
 group("chrono-english") {
@@ -3639,16 +3639,16 @@ rustc_library("chacha20-v0_9_1") {
   applicable_licenses = [ ":chacha20-v0_9_1.license" ]
 }
 
-license("chrono-v0_4_34.license") {
+license("chrono-v0_4_41.license") {
   public_package_name = "chrono"
   license_files =
-      [ "//third_party/rust_crates/vendor/chrono-0.4.34/LICENSE.txt" ]
+      [ "//third_party/rust_crates/vendor/chrono-0.4.41/LICENSE.txt" ]
 }
 
-rustc_library("chrono-v0_4_34") {
+rustc_library("chrono-v0_4_41") {
   crate_name = "chrono"
-  source_root = "//third_party/rust_crates/vendor/chrono-0.4.34/src/lib.rs"
-  output_name = "chrono-6cd08b71ee20ad6f"
+  source_root = "//third_party/rust_crates/vendor/chrono-0.4.41/src/lib.rs"
+  output_name = "chrono-7c74aecc16d22af4"
   edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
@@ -3668,15 +3668,15 @@ rustc_library("chrono-v0_4_34") {
     deps += [ ":iana-time-zone-v0_1_60" ]
   }
   if (false) {
-    deps += [ ":windows-targets-v0_52_0" ]
+    deps += [ ":windows-link-v0_1_2" ]
   }
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=6cd08b71ee20ad6f",
-    "-Cextra-filename=-6cd08b71ee20ad6f",
+    "-Cmetadata=7c74aecc16d22af4",
+    "-Cextra-filename=-7c74aecc16d22af4",
     "--cfg=feature=\"alloc\"",
     "--cfg=feature=\"android-tzdata\"",
     "--cfg=feature=\"clock\"",
@@ -3690,12 +3690,12 @@ rustc_library("chrono-v0_4_34") {
     "--cfg=feature=\"wasm-bindgen\"",
     "--cfg=feature=\"wasmbind\"",
     "--cfg=feature=\"winapi\"",
-    "--cfg=feature=\"windows-targets\"",
+    "--cfg=feature=\"windows-link\"",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":chrono-v0_4_34.license" ]
+  applicable_licenses = [ ":chrono-v0_4_41.license" ]
 }
 
 license("chrono-english-v0_1_7.license") {
@@ -3715,7 +3715,7 @@ rustc_library("chrono-english-v0_1_7") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":chrono-v0_4_34" ]
+  deps += [ ":chrono-v0_4_41" ]
   deps += [ ":scanlex-v0_1_4" ]
 
   rustenv = []
@@ -6270,7 +6270,7 @@ rustc_library("fatfs-v0_3_6") {
   deps = []
   deps += [ ":byteorder-v1_5_0" ]
   deps += [ ":bitflags-v1_3_2" ]
-  deps += [ ":chrono-v0_4_34" ]
+  deps += [ ":chrono-v0_4_41" ]
   deps += [ ":log-v0_4_22" ]
 
   rustenv = []
@@ -11041,7 +11041,7 @@ rustc_library("omaha_client-v0_2_2") {
 
   deps = []
   deps += [ ":anyhow-v1_0_97" ]
-  deps += [ ":chrono-v0_4_34" ]
+  deps += [ ":chrono-v0_4_41" ]
   deps += [ ":ecdsa-v0_14_8" ]
   deps += [ ":elliptic-curve-v0_12_3" ]
   deps += [ ":futures-v0_3_30" ]
@@ -15369,7 +15369,7 @@ rustc_library("schemars-v0_8_10") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":chrono-v0_4_34" ]
+  deps += [ ":chrono-v0_4_41" ]
   deps += [ ":dyn-clone-v1_0_19" ]
   deps += [ ":indexmap-v1_9_2" ]
   deps += [ ":schemars_derive-v0_8_10($host_toolchain)" ]
@@ -16456,7 +16456,7 @@ rustc_library("simplelog-v0_10_2") {
 
   deps = []
   deps += [ ":termcolor-v1_1_2" ]
-  deps += [ ":chrono-v0_4_34" ]
+  deps += [ ":chrono-v0_4_41" ]
   deps += [ ":log-v0_4_22" ]
 
   rustenv = []
@@ -18290,7 +18290,7 @@ rustc_library("toml_edit-v0_2_1") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":chrono-v0_4_34" ]
+  deps += [ ":chrono-v0_4_41" ]
   deps += [ ":combine-v4_6_2" ]
   deps += [ ":linked-hash-map-v0_5_6" ]
 
@@ -18786,7 +18786,7 @@ rustc_library("tuf-v0_3_0-beta13") {
 
   deps = []
   deps += [ ":ring-v0_17_8" ]
-  deps += [ ":chrono-v0_4_34" ]
+  deps += [ ":chrono-v0_4_41" ]
   deps += [ ":data-encoding-v2_3_2" ]
   deps += [ ":futures-io-v0_3_30" ]
   deps += [ ":futures-util-v0_3_30" ]
@@ -19815,7 +19815,7 @@ rustc_library("valico-v2_4_2") {
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":chrono-v0_4_34" ]
+  deps += [ ":chrono-v0_4_41" ]
   deps += [ ":jsonway-v2_0_0" ]
   deps += [ ":phf-v0_7_24" ]
   deps += [ ":publicsuffix-v1_5_4" ]
@@ -20377,6 +20377,30 @@ rustc_library("windows-core-v0_52_0") {
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
 }
 
+rustc_library("windows-link-v0_1_2") {
+  crate_name = "windows_link"
+  source_root = "//third_party/rust_crates/empty/windows-link-0.1.2/src/lib.rs"
+  output_name = "windows_link-e3703681a803bbbb"
+  edition = "2015"
+  disable_clippy = true
+  enforce_source_listing = false
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "-Cmetadata=e3703681a803bbbb",
+    "-Cextra-filename=-e3703681a803bbbb",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
 rustc_library("windows-sys-v0_45_0") {
   crate_name = "windows_sys"
   source_root = "//third_party/rust_crates/empty/windows-sys-0.45.0/src/lib.rs"
@@ -20513,31 +20537,6 @@ rustc_library("windows-targets-v0_48_5") {
     "--cap-lints=allow",
     "-Cmetadata=b310ace0c4c0e58e",
     "-Cextra-filename=-b310ace0c4c0e58e",
-  ]
-
-  visibility = [ ":*" ]
-
-  applicable_licenses = [ "//build/licenses:fuchsia_license" ]
-}
-
-rustc_library("windows-targets-v0_52_0") {
-  crate_name = "windows_targets"
-  source_root =
-      "//third_party/rust_crates/empty/windows-targets-0.52.0/src/lib.rs"
-  output_name = "windows_targets-2ab0b8a168fc804"
-  edition = "2015"
-  disable_clippy = true
-  enforce_source_listing = false
-  configs -= [ "//build/config/rust:2018_idioms" ]
-
-  deps = []
-
-  rustenv = []
-
-  rustflags = [
-    "--cap-lints=allow",
-    "-Cmetadata=2ab0b8a168fc804",
-    "-Cextra-filename=-2ab0b8a168fc804",
   ]
 
   visibility = [ ":*" ]

@@ -79,7 +79,7 @@ rust_library(
     version = "0.10.2",
     deps = [
         "//third_party/rust_crates/ask2patch/termcolor",
-        "//third_party/rust_crates/vendor/chrono-0.4.34:chrono",
+        "//third_party/rust_crates/vendor/chrono-0.4.41:chrono",
         "//third_party/rust_crates/vendor/log-0.4.22:log",
     ],
 )
