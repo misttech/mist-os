@@ -613,6 +613,21 @@ struct TimerId {
     cid: zx::Koid,
 }
 
+// Compute a trace ID for a given alarm ID. This identifier is used across
+// processes for tracking the alarm's lifetime.
+fn as_trace_id(alarm_id: &str) -> trace::Id {
+    if let Some(rest) = alarm_id.strip_prefix("starnix:Koid(") {
+        if let Some((koid_str, _)) = rest.split_once(')') {
+            if let Ok(trace_id) = koid_str.parse::<u64>() {
+                return trace_id.into();
+            }
+        }
+    }
+
+    // For now, other components don't have a specific way to get the trace id.
+    0.into()
+}
+
 impl std::fmt::Display for TimerId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "TimerId[alarm_id:{},cid:{:?}]", self.alarm_id, self.cid)
@@ -1131,6 +1146,7 @@ async fn wake_timer_loop(
         match cmd {
             Cmd::Start { cid, deadline, mode, alarm_id, responder } => {
                 trace::duration!(c"alarms", c"Cmd::Start");
+                fuchsia_trace::flow_step!(c"alarms", c"hrtimer_lifecycle", as_trace_id(&alarm_id));
                 let responder = responder.borrow_mut().take().expect("responder is always present");
                 // NOTE: hold keep_alive until all work is done.
                 debug!(
@@ -1152,6 +1168,11 @@ async fn wake_timer_loop(
                 deadline_histogram_prop.insert((deadline - now).into_nanos());
                 if Timers::expired(now, deadline) {
                     trace::duration!(c"alarms", c"Cmd::Start:immediate");
+                    fuchsia_trace::flow_step!(
+                        c"alarms",
+                        c"hrtimer_lifecycle",
+                        as_trace_id(&alarm_id)
+                    );
                     // A timer set into now or the past expires right away.
                     let (_lease, keep_alive) = zx::EventPair::create();
                     debug!(
@@ -1181,6 +1202,11 @@ async fn wake_timer_loop(
                         .unwrap_or(());
                 } else {
                     trace::duration!(c"alarms", c"Cmd::Start:regular");
+                    fuchsia_trace::flow_step!(
+                        c"alarms",
+                        c"hrtimer_lifecycle",
+                        as_trace_id(&alarm_id)
+                    );
                     // A timer scheduled for the future gets inserted into the timer heap.
                     let was_empty = timers.is_empty();
 
@@ -1214,6 +1240,11 @@ async fn wake_timer_loop(
             }
             Cmd::StopById { timer_id, done } => {
                 trace::duration!(c"alarms", c"Cmd::StopById", "alarm_id" => &timer_id.alarm_id[..]);
+                fuchsia_trace::flow_step!(
+                    c"alarms",
+                    c"hrtimer_lifecycle",
+                    as_trace_id(&timer_id.alarm_id)
+                );
                 debug!("wake_timer_loop: STOP timer: {}", timer_id);
                 let deadline_before = timers.peek_deadline();
 
@@ -1528,6 +1559,8 @@ fn notify_all(
         // How much later than requested did the notification happen.
         let deadline = *timer_node.get_deadline();
         let alarm_id = timer_node.get_alarm_id().to_string();
+        trace::duration!(c"alarms", c"notify_all:notified", "alarm_id" => &*alarm_id);
+        fuchsia_trace::flow_step!(c"alarms", c"hrtimer_lifecycle", as_trace_id(&alarm_id));
         let cid = timer_node.get_cid().clone();
         let slack: zx::BootDuration = deadline - now;
         if slack < zx::BootDuration::from_nanos(-LONG_DELAY_NANOS) {
