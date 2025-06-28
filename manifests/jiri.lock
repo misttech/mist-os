@@ -725,28 +725,28 @@
     },
     {
         "package": "fuchsia/third_party/ninja/linux-amd64",
-        "version": "git_revision:536e7f56efcc4842fdb1459c3eceb9e57214a20c",
-        "instance_id": "7wG0YVQSwqlwk3y0_ltGCrYuwb38MjVL5KZhNWoDkBIC"
+        "version": "git_revision:0c8d06385fa1a5a6280cd3088b2d33f361d79956",
+        "instance_id": "Yrk-YKmeBPoQK6UGGnoksiOSz3mZ7H5wCySlcPwQ6i4C"
     },
     {
         "package": "fuchsia/third_party/ninja/linux-arm64",
-        "version": "git_revision:536e7f56efcc4842fdb1459c3eceb9e57214a20c",
-        "instance_id": "VWf0aZWuYjLXChVyTSUUFL0G-IwZE39x2sY0LIz3tR4C"
+        "version": "git_revision:0c8d06385fa1a5a6280cd3088b2d33f361d79956",
+        "instance_id": "FUfG37YrjO1_X2ig5m2Kz_-nNAh6tuu-ah7kZmKR8ewC"
     },
     {
         "package": "fuchsia/third_party/ninja/mac-amd64",
-        "version": "git_revision:536e7f56efcc4842fdb1459c3eceb9e57214a20c",
-        "instance_id": "jCASEc-bZyWrZgu5LDRiQ4FPklSKcJgWL7MOHK2-jLMC"
+        "version": "git_revision:0c8d06385fa1a5a6280cd3088b2d33f361d79956",
+        "instance_id": "lA0xK2WQeSa3dBjY4Eosgcyif1i_cmLYYPH52D4Pn3IC"
     },
     {
         "package": "fuchsia/third_party/ninja/mac-arm64",
-        "version": "git_revision:536e7f56efcc4842fdb1459c3eceb9e57214a20c",
-        "instance_id": "EQYrL0I0-2WTfVwU3BfCazcwWAg-B0GZsa0iYiH3hicC"
+        "version": "git_revision:0c8d06385fa1a5a6280cd3088b2d33f361d79956",
+        "instance_id": "HYyuwxzuug0MvEKxHD9h7RDvEBg3skSvxiZXAfhB1swC"
     },
     {
         "package": "fuchsia/third_party/ninja/windows-amd64",
-        "version": "git_revision:536e7f56efcc4842fdb1459c3eceb9e57214a20c",
-        "instance_id": "btYtnnQyDwletrQNBu5qh-GvCDXpXpfEvSNFvg4hTywC"
+        "version": "git_revision:0c8d06385fa1a5a6280cd3088b2d33f361d79956",
+        "instance_id": "XyWlYGzha-N9Sb2TzgppnB_zJKDjxekqT7qBp-1nxbkC"
     },
     {
         "package": "fuchsia/third_party/openssh-portable/linux-amd64",
