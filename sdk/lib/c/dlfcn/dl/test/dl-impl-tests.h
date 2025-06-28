@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DL_TEST_DL_IMPL_TESTS_H_
-#define LIB_DL_TEST_DL_IMPL_TESTS_H_
+#ifndef LIB_C_DLFCN_DL_TEST_DL_IMPL_TESTS_H_
+#define LIB_C_DLFCN_DL_TEST_DL_IMPL_TESTS_H_
 
 #include <lib/fit/defer.h>
 #include <lib/ld/testing/startup-ld-abi.h>
@@ -69,6 +69,8 @@ class DlImplTests : public Base {
   // modules waiting to be loaded in a LinkingSession. See
   // DlTests.SonameFilenameLoadedDep for current vs expected behavior.
   static constexpr bool kSonameLookupInPendingDeps = false;
+
+  static constexpr elfldltl::ResolverPolicy kResolverPolicy = ld::kResolverPolicy;
 
 #ifndef __Fuchsia__
   // TODO(https://fxbug.dev/419872720): Disable a DT_SONAME lookup test on host
@@ -179,4 +181,4 @@ using DlImplLoadZirconTests = DlImplTests<DlLoadZirconTestsBase>;
 
 }  // namespace dl::testing
 
-#endif  // LIB_DL_TEST_DL_IMPL_TESTS_H_
+#endif  // LIB_C_DLFCN_DL_TEST_DL_IMPL_TESTS_H_
