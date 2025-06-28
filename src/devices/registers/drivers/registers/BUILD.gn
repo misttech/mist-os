@@ -71,6 +71,13 @@ source_set("common") {
 fuchsia_unittest_package("registers-test-package") {
   package_name = "registers-test"
   deps = [ ":registers-test" ]
+  test_specs = {
+    log_settings = {
+      # Metadata validation produces ERROR messages.
+      # Avoid failing these to allow testing expected failures.
+      max_severity = "ERROR"
+    }
+  }
 }
 
 group("tests") {

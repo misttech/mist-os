@@ -72,18 +72,22 @@ zx::result<> CheckOverlappingBits(const fuchsia_hardware_registers::Metadata& me
       if (overlap.find(mmio_id) == overlap.end()) {
         overlap[mmio_id] = {};
       }
-      if (overlap[mmio_id].find(mmio_offset / sizeof(T)) == overlap[mmio_id].end()) {
-        overlap[mmio_id][mmio_offset / sizeof(T)] = 0;
-      }
 
-      auto& bits = overlap[mmio_id][mmio_offset / sizeof(T)];
-      auto mask = GetMask<T>(m.mask().value());
-      if (bits & mask) {
-        FDF_LOG(ERROR, "Overlapping bits in MMIO ID %u, Register No. %lu, Bit mask 0x%lx", mmio_id,
-                mmio_offset / sizeof(T), static_cast<uint64_t>(bits & mask));
-        return zx::error(ZX_ERR_INTERNAL);
+      for (int i = 0; i < m.count(); i++) {
+        auto idx = mmio_offset / sizeof(T) + i;
+        if (overlap[mmio_id].find(idx) == overlap[mmio_id].end()) {
+          overlap[mmio_id][idx] = 0;
+        }
+
+        auto& bits = overlap[mmio_id][idx];
+        auto mask = GetMask<T>(m.mask().value());
+        if (bits & mask) {
+          FDF_LOG(ERROR, "Overlapping bits in MMIO ID %u, Register No. %lu, Bit mask 0x%lx",
+                  mmio_id, idx, static_cast<uint64_t>(bits & mask));
+          return zx::error(ZX_ERR_INTERNAL);
+        }
+        bits |= mask;
       }
-      bits |= mask;
     }
   }
 

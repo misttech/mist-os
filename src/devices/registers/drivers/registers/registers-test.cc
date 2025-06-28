@@ -90,10 +90,15 @@ class RegistersDeviceTestConfig final {
 class RegistersDeviceTest : public ::testing::Test {
  public:
   template <typename T>
-  void Init(std::span<const fidl_metadata::registers::Register<T>> registers) {
+  zx::result<> TryInit(std::span<const fidl_metadata::registers::Register<T>> registers) {
     driver_test().RunInEnvironmentTypeContext(
         [registers](RegistersDeviceTestEnvironment& env) { env.Init(registers); });
-    ASSERT_OK(driver_test().StartDriver());
+    return driver_test().StartDriver();
+  }
+
+  template <typename T>
+  void Init(std::span<const fidl_metadata::registers::Register<T>> registers) {
+    ASSERT_OK(TryInit(registers));
   }
 
   fidl::ClientEnd<fuchsia_hardware_registers::Device> GetRegisterClient(std::string_view reg_id) {
@@ -111,6 +116,49 @@ class RegistersDeviceTest : public ::testing::Test {
  private:
   fdf_testing::BackgroundDriverTest<RegistersDeviceTestConfig> driver_test_;
 };
+
+TEST_F(RegistersDeviceTest, OverlappingBitsTestFailure) {
+  ASSERT_TRUE(TryInit<uint32_t>(std::vector<fidl_metadata::registers::Register<uint32_t>>{
+                                    {
+                                        .name = "test0",
+                                        .mmio_id = 0,
+                                        .masks =
+                                            {
+                                                {
+                                                    .value = 0xFFFFFFFF,
+                                                    .mmio_offset = 0,
+                                                },
+                                                {
+                                                    .value = 0xFFFFFFFF,
+                                                    .mmio_offset = 0,
+                                                },
+                                            },
+                                    },
+                                })
+                  .is_error());
+}
+
+TEST_F(RegistersDeviceTest, OverlappingBitsInTailFailure) {
+  ASSERT_TRUE(TryInit<uint32_t>(std::vector<fidl_metadata::registers::Register<uint32_t>>{
+                                    {
+                                        .name = "test0",
+                                        .mmio_id = 0,
+                                        .masks =
+                                            {
+                                                {
+                                                    .value = 0xFFFFFFFF,
+                                                    .mmio_offset = 0,
+                                                    .count = 2,
+                                                },
+                                                {
+                                                    .value = 0xFFFFFFFF,
+                                                    .mmio_offset = 4,
+                                                },
+                                            },
+                                    },
+                                })
+                  .is_error());
+}
 
 TEST_F(RegistersDeviceTest, Read32Test) {
   Init<uint32_t>(std::vector<fidl_metadata::registers::Register<uint32_t>>{
