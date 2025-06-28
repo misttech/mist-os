@@ -48,15 +48,6 @@ pub(crate) enum CoreReceiveBuffer {
 pub(super) type ReceiveBufferReader = async_ringbuf::AsyncHeapCons<u8>;
 
 impl CoreReceiveBuffer {
-    /// The minimum receive buffer size, in bytes.
-    ///
-    /// Borrowed from Linux: https://man7.org/linux/man-pages/man7/socket.7.html
-    const MIN_CAPACITY: usize = 256;
-    /// The maximum receive buffer size, in bytes.
-    ///
-    /// Borrowed from netstack2.
-    const MAX_CAPACITY: usize = 4 << 20;
-
     pub(super) fn new_ready(
         rx_task_sender: mpsc::UnboundedSender<ReceiveBufferReader>,
         capacity: usize,
@@ -108,10 +99,6 @@ impl Debug for CoreReceiveBuffer {
 }
 
 impl Buffer for CoreReceiveBuffer {
-    fn capacity_range() -> (usize, usize) {
-        (Self::MIN_CAPACITY, Self::MAX_CAPACITY)
-    }
-
     fn limits(&self) -> BufferLimits {
         match self {
             Self::Zero => BufferLimits { capacity: 0, len: 0 },
@@ -386,15 +373,6 @@ impl Debug for CoreSendBuffer {
 }
 
 impl CoreSendBuffer {
-    /// The minimum send buffer size, in bytes.
-    ///
-    /// Borrowed from Linux: https://man7.org/linux/man-pages/man7/socket.7.html
-    const MIN_CAPACITY: usize = 2048;
-    /// The maximum send buffer size, in bytes.
-    ///
-    /// Borrowed from netstack2.
-    const MAX_CAPACITY: usize = 4 << 20;
-
     pub(super) fn new_ready(capacity: usize) -> (Self, SendBufferWriter) {
         let ring_buffer = async_ringbuf::AsyncHeapRb::new(capacity);
         let (producer, cons) = ring_buffer.split();
@@ -436,10 +414,6 @@ impl CoreSendBuffer {
 }
 
 impl Buffer for CoreSendBuffer {
-    fn capacity_range() -> (usize, usize) {
-        (Self::MIN_CAPACITY, Self::MAX_CAPACITY)
-    }
-
     fn limits(&self) -> BufferLimits {
         match self {
             Self::Zero => BufferLimits { capacity: 0, len: 0 },

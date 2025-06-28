@@ -37,6 +37,7 @@ rustc_library_with_features("netstack3-base") {
     "src/port_alloc.rs",
     "src/resource_references.rs",
     "src/rng.rs",
+    "src/settings.rs",
     "src/socket/address.rs",
     "src/socket/base.rs",
     "src/socket/cookie.rs",

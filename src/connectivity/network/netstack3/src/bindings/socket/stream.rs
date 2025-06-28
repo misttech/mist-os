@@ -26,7 +26,6 @@ use netstack3_core::tcp::{
     TcpBindingsTypes, UnboundInfo,
 };
 use netstack3_core::IpExt;
-use once_cell::sync::Lazy;
 use packet_formats::utils::NonZeroDuration;
 use zx::{self as zx, Peered as _};
 use {
@@ -142,14 +141,6 @@ impl TcpBindingsTypes for BindingsCtx {
             spawn_data: TaskSpawnData { socket, tx_task_receiver, rx_task_receiver },
         };
         (receive_buffer, send_buffer, returned_buffers)
-    }
-
-    fn default_buffer_sizes() -> BufferSizes {
-        static ZIRCON_SOCKET_BUFFER_SIZE: Lazy<usize> = Lazy::new(|| {
-            let (local, _peer) = zx::Socket::create_stream();
-            local.info().unwrap().tx_buf_max
-        });
-        BufferSizes { receive: *ZIRCON_SOCKET_BUFFER_SIZE, send: *ZIRCON_SOCKET_BUFFER_SIZE }
     }
 }
 

@@ -26,6 +26,7 @@ mod internal {
     pub(super) mod rtt;
     pub(super) mod sack_scoreboard;
     pub(super) mod seq_ranges;
+    pub(super) mod settings;
     pub(super) mod socket;
     pub(super) mod state;
     #[cfg(test)]
@@ -41,6 +42,7 @@ pub use internal::buffer::{Buffer, BufferLimits, IntoBuffers, ReceiveBuffer, Sen
 pub use internal::counters::{
     CombinedTcpCounters, TcpCountersWithSocket, TcpCountersWithoutSocket,
 };
+pub use internal::settings::TcpSettings;
 pub use internal::socket::accept_queue::ListenerNotifier;
 pub use internal::socket::isn::IsnGenerator;
 pub use internal::socket::{

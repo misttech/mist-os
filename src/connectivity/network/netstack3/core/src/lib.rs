@@ -218,8 +218,8 @@ pub mod tcp {
         AcceptError, BindError, BoundInfo, Buffer, BufferLimits, BufferSizes, ConnectError,
         ConnectionError, ConnectionInfo, IntoBuffers, ListenError, ListenerNotifier, NoConnection,
         OriginalDestinationError, ReceiveBuffer, SendBuffer, SetDeviceError, SetReuseAddrError,
-        SocketAddr, SocketInfo, SocketOptions, TcpBindingsTypes, TcpSocketId, UnboundInfo,
-        DEFAULT_FIN_WAIT2_TIMEOUT,
+        SocketAddr, SocketInfo, SocketOptions, TcpBindingsTypes, TcpSettings, TcpSocketId,
+        UnboundInfo, DEFAULT_FIN_WAIT2_TIMEOUT,
     };
 }
 
@@ -231,7 +231,7 @@ pub mod trace {
 
 /// Miscellaneous and common types.
 pub mod types {
-    pub use netstack3_base::{Counter, SynchronizedWriterRcu, WorkQueueReport};
+    pub use netstack3_base::{BufferSizeSettings, Counter, SynchronizedWriterRcu, WorkQueueReport};
 }
 
 /// Methods for dealing with UDP sockets.
@@ -248,7 +248,7 @@ pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};
 pub use netstack3_base::{
     CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TxMetadata,
+    ReferenceNotifiers, RngContext, SettingsContext, TimerBindingsTypes, TimerContext, TxMetadata,
     TxMetadataBindingsTypes,
 };
 pub use state::{StackState, StackStateBuilder};

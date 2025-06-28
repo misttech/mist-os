@@ -4,9 +4,15 @@
 
 //! Provides workers and data structures for netstack-wide settings.
 
+use std::num::NonZeroUsize;
+use std::ops::Deref;
+
 use futures::TryStreamExt as _;
 use log::error;
-use netstack3_core::types::SynchronizedWriterRcu;
+use netstack3_core::tcp::TcpSettings;
+use netstack3_core::types::{BufferSizeSettings, SynchronizedWriterRcu};
+use netstack3_core::SettingsContext;
+use once_cell::sync::Lazy;
 use {
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_settings as fnet_settings,
@@ -16,7 +22,7 @@ use crate::bindings::interface_config::{
     DeviceNeighborConfig, FidlInterfaceConfig, InterfaceConfig, InterfaceConfigDefaults,
 };
 use crate::bindings::util::{ErrorLogExt, ResultExt as _};
-use crate::bindings::Ctx;
+use crate::bindings::{BindingsCtx, Ctx};
 
 pub(crate) async fn serve_control(
     ctx: Ctx,
@@ -215,10 +221,41 @@ fn get_device() -> fnet_settings::Device {
 
 pub(crate) struct Settings {
     pub(crate) interface_defaults: SynchronizedWriterRcu<InterfaceConfig<DeviceNeighborConfig>>,
+    pub(crate) tcp: SynchronizedWriterRcu<TcpSettings>,
 }
 
 impl Settings {
     pub(crate) fn new(interface: &InterfaceConfigDefaults) -> Self {
-        Self { interface_defaults: SynchronizedWriterRcu::new(InterfaceConfig::new(interface)) }
+        Self {
+            interface_defaults: SynchronizedWriterRcu::new(InterfaceConfig::new(interface)),
+            tcp: SynchronizedWriterRcu::new(default_tcp_settings()),
+        }
+    }
+}
+
+fn default_tcp_settings() -> TcpSettings {
+    static ZIRCON_SOCKET_BUFFER_SIZE: Lazy<NonZeroUsize> = Lazy::new(|| {
+        let (local, _peer) = zx::Socket::create_stream();
+        NonZeroUsize::new(local.info().unwrap().tx_buf_max).unwrap()
+    });
+    // Borrowed from netstack2.
+    const MAX_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(4 << 20).unwrap();
+
+    // Borrowed from Linux: https://man7.org/linux/man-pages/man7/socket.7.html
+    const RCVBUF_MIN: NonZeroUsize = NonZeroUsize::new(256).unwrap();
+    let receive_buffer =
+        BufferSizeSettings::new(RCVBUF_MIN, *ZIRCON_SOCKET_BUFFER_SIZE, MAX_BUFFER_SIZE).unwrap();
+
+    // Borrowed from Linux: https://man7.org/linux/man-pages/man7/socket.7.html
+    const SNDBUF_MIN: NonZeroUsize = NonZeroUsize::new(2048).unwrap();
+    let send_buffer =
+        BufferSizeSettings::new(SNDBUF_MIN, *ZIRCON_SOCKET_BUFFER_SIZE, MAX_BUFFER_SIZE).unwrap();
+
+    TcpSettings { receive_buffer, send_buffer }
+}
+
+impl SettingsContext<TcpSettings> for BindingsCtx {
+    fn settings(&self) -> impl Deref<Target = TcpSettings> + '_ {
+        self.settings.tcp.read()
     }
 }

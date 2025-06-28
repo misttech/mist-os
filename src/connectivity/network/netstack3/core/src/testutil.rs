@@ -29,9 +29,10 @@ use net_types::ip::{
 use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _};
 use netstack3_base::sync::{DynDebugReferences, Mutex};
 use netstack3_base::testutil::{
-    FakeAtomicInstant, FakeCryptoRng, FakeFrameCtx, FakeInstant, FakeNetwork, FakeNetworkLinks,
-    FakeNetworkSpec, FakeSocketWritableListener, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId,
-    MonotonicIdentifier, TestAddrs, WithFakeFrameContext, WithFakeTimerContext,
+    AlwaysDefaultsSettingsContext, FakeAtomicInstant, FakeCryptoRng, FakeFrameCtx, FakeInstant,
+    FakeNetwork, FakeNetworkLinks, FakeNetworkSpec, FakeSocketWritableListener, FakeTimerCtx,
+    FakeTimerCtxExt, FakeTimerId, MonotonicIdentifier, TestAddrs, WithFakeFrameContext,
+    WithFakeTimerContext,
 };
 use netstack3_base::{
     AddressResolutionFailed, CtxPair, DeferredResourceRemovalContext, EventContext,
@@ -883,11 +884,6 @@ impl TcpBindingsTypes for FakeBindingsCtx {
             client,
         )
     }
-
-    fn default_buffer_sizes() -> BufferSizes {
-        // Use the test-only default impl.
-        BufferSizes::default()
-    }
 }
 
 #[cfg(not(loom))]
@@ -1423,6 +1419,8 @@ impl DeviceLayerEventDispatcher for FakeBindingsCtx {
         Ok(())
     }
 }
+
+impl AlwaysDefaultsSettingsContext for FakeBindingsCtx {}
 
 /// Wraps all events emitted by Core into a single enum type.
 #[derive(Debug, Eq, PartialEq, Hash, GenericOverIp)]

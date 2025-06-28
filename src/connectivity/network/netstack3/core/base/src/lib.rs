@@ -33,6 +33,7 @@ mod num;
 mod port_alloc;
 mod resource_references;
 mod rng;
+mod settings;
 mod tcp;
 mod test_only;
 mod time;
@@ -79,6 +80,7 @@ pub use resource_references::{
     RemoveResourceResult, RemoveResourceResultWithContext,
 };
 pub use rng::RngContext;
+pub use settings::{BufferSizeSettings, SettingsContext};
 pub use tcp::base::{Control, FragmentedPayload, Mss};
 pub use tcp::segment::{
     HandshakeOptions, Options, Payload, PayloadLen, SackBlock, SackBlocks, Segment, SegmentHeader,
@@ -171,6 +173,7 @@ pub mod testutil {
     pub use crate::event::testutil::FakeEventCtx;
     pub use crate::frame::testutil::{FakeFrameCtx, FakeTxMetadata, WithFakeFrameContext};
     pub use crate::rng::testutil::{new_rng, run_with_many_seeds, FakeCryptoRng};
+    pub use crate::settings::testutil::AlwaysDefaultsSettingsContext;
     pub use crate::socket::sndbuf::testutil::FakeSocketWritableListener;
     pub use crate::time::testutil::{
         FakeAtomicInstant, FakeInstant, FakeInstantCtx, FakeTimerCtx, FakeTimerCtxExt, FakeTimerId,
