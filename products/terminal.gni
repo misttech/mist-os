@@ -28,4 +28,4 @@ fuchsia_product_assembly_config_label = "//products/terminal"
 zedboot_product_assembly_config_label = "//products/zedboot"
 
 use_bazel_images_only = true
-bazel_product_bundle_prefix = "//products/terminal:product_bundle"
+bazel_product_bundle_prefix = "//products/terminal:terminal"

@@ -46,27 +46,27 @@ group("terminal") {
   testonly = true
   if (current_cpu == "x64") {
     deps = [
-      ":product_bundle.x64",
-      ":product_bundle.x64_reduced_perf_variation",
-      ":product_bundle_with_netstack2.x64",
-      ":product_bundle_with_netstack2.x64_reduced_perf_variation",
+      ":terminal.x64",
+      ":terminal.x64_reduced_perf_variation",
+      ":terminal_with_netstack2.x64",
+      ":terminal_with_netstack2.x64_reduced_perf_variation",
     ]
   } else if (current_cpu == "arm64") {
     deps = [
-      ":product_bundle.arm64",
-      ":product_bundle.qemu-arm64",
-      ":product_bundle.vim3",
-      ":product_bundle.vim3_reduced_perf_variation",
-      ":product_bundle_with_netstack2.arm64",
-      ":product_bundle_with_netstack2.qemu-arm64",
-      ":product_bundle_with_netstack2.vim3",
-      ":product_bundle_with_netstack2.vim3_reduced_perf_variation",
+      ":terminal.arm64",
+      ":terminal.qemu-arm64",
+      ":terminal.vim3",
+      ":terminal.vim3_reduced_perf_variation",
+      ":terminal_with_netstack2.arm64",
+      ":terminal_with_netstack2.qemu-arm64",
+      ":terminal_with_netstack2.vim3",
+      ":terminal_with_netstack2.vim3_reduced_perf_variation",
     ]
   }
 }
 
 if (target_cpu == "x64") {
-  bazel_product_bundle("product_bundle.x64") {
+  bazel_product_bundle("terminal.x64") {
     testonly = true
     product_bundle_name = "terminal.x64"
     allow_eng_platform_bundle_use = true
@@ -78,7 +78,7 @@ if (target_cpu == "x64") {
         common_bazel_inputs + [ "//boards/x64:x64.bazel_input" ]
   }
 
-  bazel_product_bundle("product_bundle.x64_reduced_perf_variation") {
+  bazel_product_bundle("terminal.x64_reduced_perf_variation") {
     testonly = true
     product_bundle_name = "terminal.x64-reduced-perf-variation"
     allow_eng_platform_bundle_use = true
@@ -91,7 +91,7 @@ if (target_cpu == "x64") {
                            [ "//boards/x64:reduced_perf_variation.bazel_input" ]
   }
 
-  bazel_product_bundle("product_bundle_with_netstack2.x64") {
+  bazel_product_bundle("terminal_with_netstack2.x64") {
     testonly = true
     product_bundle_name = "terminal_with_netstack2.x64"
     allow_eng_platform_bundle_use = true
@@ -103,8 +103,7 @@ if (target_cpu == "x64") {
         common_bazel_inputs + [ "//boards/x64:x64.bazel_input" ]
   }
 
-  bazel_product_bundle(
-      "product_bundle_with_netstack2.x64_reduced_perf_variation") {
+  bazel_product_bundle("terminal_with_netstack2.x64_reduced_perf_variation") {
     testonly = true
     product_bundle_name = "terminal_with_netstack2.x64-reduced-perf-variation"
     allow_eng_platform_bundle_use = true
@@ -122,7 +121,7 @@ if (target_cpu == "x64") {
 }
 
 if (target_cpu == "arm64") {
-  bazel_product_bundle("product_bundle.arm64") {
+  bazel_product_bundle("terminal.arm64") {
     testonly = true
     product_bundle_name = "terminal.arm64"
     allow_eng_platform_bundle_use = true
@@ -134,7 +133,7 @@ if (target_cpu == "arm64") {
         common_bazel_inputs + [ "//boards/arm64:arm64.bazel_input" ]
   }
 
-  bazel_product_bundle("product_bundle.qemu-arm64") {
+  bazel_product_bundle("terminal.qemu-arm64") {
     testonly = true
     image_use_vbmeta = false
     product_bundle_name = "terminal.qemu-arm64"
@@ -148,7 +147,7 @@ if (target_cpu == "arm64") {
         common_bazel_inputs + [ "//boards/qemu-arm64:qemu-arm64.bazel_input" ]
   }
 
-  bazel_product_bundle("product_bundle.vim3") {
+  bazel_product_bundle("terminal.vim3") {
     testonly = true
     product_bundle_name = "terminal.vim3"
     allow_eng_platform_bundle_use = true
@@ -160,7 +159,7 @@ if (target_cpu == "arm64") {
         common_bazel_inputs + [ "//boards/vim3:bazel_inputs" ]
   }
 
-  bazel_product_bundle("product_bundle.vim3_reduced_perf_variation") {
+  bazel_product_bundle("terminal.vim3_reduced_perf_variation") {
     testonly = true
     product_bundle_name = "terminal.vim3-reduced-perf-variation"
     allow_eng_platform_bundle_use = true
@@ -173,7 +172,7 @@ if (target_cpu == "arm64") {
         common_bazel_inputs + [ "//boards/vim3:bazel_inputs" ]
   }
 
-  bazel_product_bundle("product_bundle_with_netstack2.arm64") {
+  bazel_product_bundle("terminal_with_netstack2.arm64") {
     testonly = true
     product_bundle_name = "terminal_with_netstack2.arm64"
     allow_eng_platform_bundle_use = true
@@ -185,7 +184,7 @@ if (target_cpu == "arm64") {
         common_bazel_inputs + [ "//boards/arm64:arm64.bazel_input" ]
   }
 
-  bazel_product_bundle("product_bundle_with_netstack2.qemu-arm64") {
+  bazel_product_bundle("terminal_with_netstack2.qemu-arm64") {
     testonly = true
     image_use_vbmeta = false
     product_bundle_name = "terminal_with_netstack2.qemu-arm64"
@@ -199,7 +198,7 @@ if (target_cpu == "arm64") {
         common_bazel_inputs + [ "//boards/qemu-arm64:qemu-arm64.bazel_input" ]
   }
 
-  bazel_product_bundle("product_bundle_with_netstack2.vim3") {
+  bazel_product_bundle("terminal_with_netstack2.vim3") {
     testonly = true
     product_bundle_name = "terminal_with_netstack2.vim3"
     allow_eng_platform_bundle_use = true
@@ -211,8 +210,7 @@ if (target_cpu == "arm64") {
         common_bazel_inputs + [ "//boards/vim3:bazel_inputs" ]
   }
 
-  bazel_product_bundle(
-      "product_bundle_with_netstack2.vim3_reduced_perf_variation") {
+  bazel_product_bundle("terminal_with_netstack2.vim3_reduced_perf_variation") {
     testonly = true
     product_bundle_name = "terminal_with_netstack2.vim3-reduced-perf-variation"
     allow_eng_platform_bundle_use = true
