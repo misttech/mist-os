@@ -430,10 +430,6 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
   // TODO(mcgrathr): Rename to physboot.log with some prefix.
   PublishLog("i/logs/physboot", ktl::move(*ktl::exchange(gLog, nullptr)));
 
-  // Now that all time samples have been collected, copy gBootTimes into the
-  // hand-off.
-  handoff()->times = gBootTimes;
-
   handoff()->kernel_physical_load_address = kernel_.physical_load_address();
   ConstructKernelAddressSpace(uart);
 
@@ -445,11 +441,18 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
   // to the kernel, which is affected by other set-up routines.
   SetMemory();
 
+  // One last log before the next line where we effectively disable logging
+  // altogether.
+  debugf("%s: Handing off at physical load address %#" PRIxPTR ", entry %#" PRIx64 "...\n",
+         gSymbolize->name(), kernel_.physical_load_address(), kernel_.entry());
+
   // Hand-off the serial driver. There may be no more logging beyond this point.
   handoff()->uart = ktl::move(uart).TakeUart();
 
-  debugf("%s: Handing off at physical load address %#" PRIxPTR ", entry %#" PRIx64 "...\n",
-         gSymbolize->name(), kernel_.physical_load_address(), kernel_.entry());
+  // Now that all time samples have been collected, copy gBootTimes into the
+  // hand-off.
+  handoff()->times = gBootTimes;
+
   kernel_.Handoff<void(PhysHandoff*)>(handoff());
   ZX_PANIC("ElfImage::Handoff returned!");
 }
