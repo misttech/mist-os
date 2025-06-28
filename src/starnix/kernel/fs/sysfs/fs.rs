@@ -77,8 +77,12 @@ impl SysFs {
             dir.subdir("block", dir_mode, empty_dir);
         });
 
-        build_kernel_directory(kernel, &dir);
-        build_power_directory(kernel, &dir);
+        dir.subdir("kernel", 0o755, |dir| {
+            build_kernel_directory(kernel, dir);
+        });
+        dir.subdir("power", 0o755, |dir| {
+            build_power_directory(kernel, dir);
+        });
 
         dir.subdir("module", dir_mode, |dir| {
             dir.subdir("dm_verity", dir_mode, |dir| {
