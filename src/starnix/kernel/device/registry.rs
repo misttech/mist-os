@@ -577,19 +577,17 @@ impl DeviceRegistry {
     /// identify these devices because they appear in sysfs and have an empty `uevent` file.
     ///
     /// See `register_device` for an explanation of the parameters.
-    pub fn add_numberless_device<F, N, L>(
+    pub fn add_numberless_device<L>(
         &self,
         _locked: &mut Locked<L>,
         name: &FsStr,
         class: Class,
-        create_device_sysfs_ops: F,
+        build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
     ) -> Device
     where
-        F: Fn(Device) -> N + Send + Sync + 'static,
-        N: FsNodeOps,
         L: LockBefore<FileOpsCore>,
     {
-        self.objects.create_device_with_ops(name, None, class, create_device_sysfs_ops)
+        self.objects.create_device(name, None, class, build_directory)
     }
 
     /// Remove a device directly added with `add_device`.
@@ -990,7 +988,7 @@ mod tests {
             &mut locked,
             "cooling_device0".into(),
             registry.objects.virtual_thermal_class(),
-            DeviceDirectory::new,
+            build_device_directory,
         );
 
         assert!(registry.objects.root.lookup("class/thermal/cooling_device0".into()).is_some());

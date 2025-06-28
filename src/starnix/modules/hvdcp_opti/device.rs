@@ -2,31 +2,38 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::iio_file::{IioDirectory0, IioDirectory1};
-use super::power_supply_file::{BatteryPowerSupply, BmsPowerSupply, UsbPowerSupply};
+use super::iio_file::{
+    build_battery_power_supply_directory, build_iio0_directory, build_iio1_directory,
+    build_usb_power_supply_directory,
+};
 use super::qbg_battery_file::create_battery_profile_device;
 use super::qbg_file::create_qbg_device;
 use super::utils::{connect_to_device, ReadWriteBytesFile};
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::DeviceMode;
+use starnix_core::fs::sysfs::build_device_directory;
 use starnix_core::task::CurrentTask;
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, LockBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::file_mode::mode;
+use std::sync::Arc;
 
 pub fn hvdcp_opti_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
 where
     L: LockBefore<FileOpsCore>,
 {
-    if let Err(e) = connect_to_device() {
-        // hvdcp_opti only supported on Sorrel. Let it fail.
-        log_warn!(
+    let proxy = match connect_to_device() {
+        Ok(proxy) => Arc::new(proxy),
+        Err(e) => {
+            // hvdcp_opti only supported on Sorrel. Let it fail.
+            log_warn!(
             "Could not connect to hvdcp_opti server {}. This is expected on everything but Sorrel.",
             e
         );
-        return;
-    }
+            return;
+        }
+    };
 
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
@@ -62,25 +69,31 @@ where
     let iio = registry
         .objects
         .get_or_create_class("iio".into(), registry.objects.get_or_create_bus("iio".into()));
-    registry.add_numberless_device(locked, "iio:device0".into(), iio.clone(), IioDirectory0::new);
+    registry.add_numberless_device(locked, "iio:device0".into(), iio.clone(), |device, dir| {
+        build_iio0_directory(device, &proxy, dir)
+    });
 
-    registry.add_numberless_device(locked, "iio:device1".into(), iio, IioDirectory1::new);
+    registry.add_numberless_device(locked, "iio:device1".into(), iio, |device, dir| {
+        build_iio1_directory(device, &proxy, dir)
+    });
 
     // power_supply devices don't show up under any bus. This makes it show up under virtual_bus,
     // but it's OK.
     let power_supply =
         registry.objects.get_or_create_class("power_supply".into(), registry.objects.virtual_bus());
     // /sys/class/power_supply/usb
-    registry.add_numberless_device(locked, "usb".into(), power_supply.clone(), UsbPowerSupply::new);
+    registry.add_numberless_device(locked, "usb".into(), power_supply.clone(), |device, dir| {
+        build_usb_power_supply_directory(device, &proxy, dir)
+    });
 
     // /sys/class/power_supply/battery
     registry.add_numberless_device(
         locked,
         "battery".into(),
         power_supply.clone(),
-        BatteryPowerSupply::new,
+        |device, dir| build_battery_power_supply_directory(device, &proxy, dir),
     );
 
     // /sys/class/power_supply/bms
-    registry.add_numberless_device(locked, "bms".into(), power_supply, BmsPowerSupply::new);
+    registry.add_numberless_device(locked, "bms".into(), power_supply, build_device_directory);
 }
