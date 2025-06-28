@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::sysfs::{build_cpu_class_directory, sysfs_kernel_directory, sysfs_power_directory};
+use crate::fs::sysfs::{build_cpu_class_directory, build_kernel_directory, build_power_directory};
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::pseudo::simple_file::BytesFile;
@@ -77,8 +77,8 @@ impl SysFs {
             dir.subdir("block", dir_mode, empty_dir);
         });
 
-        sysfs_kernel_directory(kernel, &dir);
-        sysfs_power_directory(kernel, &dir);
+        build_kernel_directory(kernel, &dir);
+        build_power_directory(kernel, &dir);
 
         dir.subdir("module", dir_mode, |dir| {
             dir.subdir("dm_verity", dir_mode, |dir| {

@@ -147,7 +147,6 @@ rustc_library("starnix_core") {
     "fs/sysfs/kernel_directory.rs",
     "fs/sysfs/mod.rs",
     "fs/sysfs/power_directory.rs",
-    "fs/sysfs/vulnerabilities_class_directory.rs",
     "fs/tmpfs.rs",
     "lib.rs",
     "mm/debugger.rs",

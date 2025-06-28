@@ -11,7 +11,7 @@ use starnix_uapi::file_mode::mode;
 
 /// This directory contains various files and subdirectories that provide information about
 /// the running kernel.
-pub fn sysfs_kernel_directory(kernel: &Kernel, dir: &SimpleDirectoryMutator) {
+pub fn build_kernel_directory(kernel: &Kernel, dir: &SimpleDirectoryMutator) {
     dir.subdir("kernel", 0o755, |dir| {
         dir.subdir("tracing", 0o755, |_| ());
         dir.subdir("mm", 0o755, |dir| {

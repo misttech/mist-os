@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::sysfs::VulnerabilitiesClassDirectory;
 use crate::task::CurrentTask;
 use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
@@ -23,7 +22,12 @@ pub fn build_cpu_class_directory(dir: &SimpleDirectoryMutator) {
         BytesFile::new_node(format!("0-{}\n", cpu_count - 1).into_bytes()),
         mode!(IFREG, 0o444),
     );
-    dir.entry("vulnerabilities", VulnerabilitiesClassDirectory::new_node(), mode!(IFDIR, 0o755));
+    dir.subdir("vulnerabilities", 0o755, |dir| {
+        for (name, contents) in VULNERABILITIES {
+            let contents = contents.to_string();
+            dir.entry(name, BytesFile::new_node(contents.into_bytes()), mode!(IFREG, 0o444));
+        }
+    });
     dir.subdir("cpufreq", 0o755, |dir| {
         dir.subdir("policy0", 0o755, |dir| {
             dir.subdir("stats", 0o755, |dir| {
@@ -36,6 +40,22 @@ pub fn build_cpu_class_directory(dir: &SimpleDirectoryMutator) {
         dir.subdir(&name, 0o755, |_| {});
     }
 }
+
+const VULNERABILITIES: &[(&str, &str)] = &[
+    ("gather_data_sampling", "Not affected\n"),
+    ("itlb_multihit", "Not affected\n"),
+    ("l1tf", "Not affected\n"),
+    ("mds", "Not affected\n"),
+    ("meltdown", "Not affected\n"),
+    ("mmio_stale_data", "Not affected\n"),
+    ("retbleed", "Not affected\n"),
+    ("spec_rstack_overflow", "Not affected\n"),
+    ("spec_store_bypass", "Not affected\n"),
+    ("spectre_v1", "Not affected\n"),
+    ("spectre_v2", "Not affected\n"),
+    ("srbds", "Not affected\n"),
+    ("tsx_async_abort", "Not affected\n"),
+];
 
 struct CpuFreqStatsResetFile {}
 
