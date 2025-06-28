@@ -114,7 +114,7 @@ uintptr_t HandoffPrep::VirtualAddressAllocator::AllocatePages(size_t size) {
   __UNREACHABLE;
 }
 
-void* HandoffPrep::CreateMapping(const PhysMapping& mapping) {
+MappedMemoryRange HandoffPrep::CreateMapping(const PhysMapping& mapping) {
   // TODO(https://fxbug.dev/42164859): Debug assert that mapping.vaddr is >= to
   // the base of the high kernel address space.
   AddressSpace::MapSettings settings;
@@ -134,30 +134,36 @@ void* HandoffPrep::CreateMapping(const PhysMapping& mapping) {
   AddressSpace::PanicIfError(
       gAddressSpace->Map(mapping.vaddr, mapping.size, mapping.paddr, settings));
 
-  return reinterpret_cast<void*>(mapping.vaddr);
+  return {{reinterpret_cast<ktl::byte*>(mapping.vaddr), mapping.size}, mapping.paddr};
 }
 
-void* HandoffPrep::PublishSingleMappingVmar(PhysMapping mapping) {
+MappedMemoryRange HandoffPrep::PublishSingleMappingVmar(PhysMapping mapping) {
   PhysVmarPrep prep =
       PrepareVmarAt(ktl::string_view{mapping.name.data()}, mapping.vaddr, mapping.size);
-  void* addr = prep.PublishMapping(ktl::move(mapping));
+  MappedMemoryRange mapped = prep.PublishMapping(ktl::move(mapping));
   ktl::move(prep).Publish();
-  return addr;
+  return mapped;
 }
 
-volatile void* HandoffPrep::PublishSingleMmioMappingVmar(ktl::string_view name, uintptr_t addr,
-                                                         size_t size) {
+MappedMemoryRange HandoffPrep::PublishSingleMappingVmar(ktl::string_view name,
+                                                        PhysMapping::Type type, uintptr_t addr,
+                                                        size_t size,
+                                                        PhysMapping::Permissions perms) {
   uint64_t aligned_paddr = PageAlignDown(addr);
   uint64_t aligned_size = PageAlignUp(size + (addr - aligned_paddr));
-  PhysMapping mapping{name,
-                      PhysMapping::Type::kMmio,
-                      first_class_mapping_allocator_.AllocatePages(aligned_size),
-                      aligned_size,
-                      aligned_paddr,
-                      PhysMapping::Permissions::Rw()};
-  void* aligned_vaddr = PublishSingleMappingVmar(ktl::move(mapping));
-  return reinterpret_cast<volatile void*>(reinterpret_cast<uintptr_t>(aligned_vaddr) +
-                                          (addr - aligned_paddr));
+
+  // TODO(https://fxbug.dev/379891035): Revisit if kasan_shadow = true is the
+  // right default for the mappings created with this utility.
+  PhysMapping mapping{
+      name,                                                        //
+      type,                                                        //
+      first_class_mapping_allocator_.AllocatePages(aligned_size),  //
+      aligned_size,                                                //
+      aligned_paddr,                                               //
+      perms,                                                       //
+  };
+  ktl::span aligned = PublishSingleMappingVmar(ktl::move(mapping));
+  return {aligned.subspan(addr - aligned_paddr, size), addr};
 }
 
 void HandoffPrep::ConstructKernelAddressSpace(const UartDriver& uart) {
@@ -220,11 +226,7 @@ void HandoffPrep::ConstructKernelAddressSpace(const UartDriver& uart) {
 
     auto map = [this, &periph_ranges](const memalloc::Range& range) {
       ZX_DEBUG_ASSERT(range.type == memalloc::Type::kPeripheral);
-      periph_ranges.front() = {
-          .base = PublishSingleMmioMappingVmar("periphmap"sv, range.addr, range.size),
-          .paddr = range.addr,
-          .size = range.size,
-      };
+      periph_ranges.front() = PublishSingleMmioMappingVmar("periphmap"sv, range.addr, range.size);
       periph_ranges = periph_ranges.last(periph_ranges.size() - 1);
       return true;
     };
@@ -235,11 +237,7 @@ void HandoffPrep::ConstructKernelAddressSpace(const UartDriver& uart) {
   uart.Visit([&]<typename KernelDriver>(const KernelDriver& driver) {
     if constexpr (uart::MmioDriver<typename KernelDriver::uart_type>) {
       uart::MmioRange mmio = driver.mmio_range();
-      handoff_->uart_mmio = {
-          .base = PublishSingleMmioMappingVmar("UART"sv, mmio.address, mmio.size),
-          .paddr = mmio.address,
-          .size = mmio.size,
-      };
+      handoff_->uart_mmio = PublishSingleMmioMappingVmar("UART"sv, mmio.address, mmio.size);
     }
   });
 }

@@ -205,7 +205,7 @@ class HandoffPrep {
       uintptr_t paddr = reinterpret_cast<uintptr_t>(pages.get());
       PhysMapping mapping(mapping_name, PhysMapping::Type::kNormal, vaddr, size, paddr,
                           PhysMapping::Permissions::Rw());
-      void* ptr = CreateMapping(mapping);
+      void* ptr = static_cast<void*>(CreateMapping(mapping).data());
       mappings_.push_front(HandoffMapping::New(ktl::move(mapping)));
 
       return {ptr, Capability{ktl::move(pages), ptr}};
@@ -247,12 +247,12 @@ class HandoffPrep {
 
     // Creates the provided mapping and publishes it within the associated VMAR
     // being built up.
-    void* PublishMapping(PhysMapping mapping) {
+    MappedMemoryRange PublishMapping(PhysMapping mapping) {
       ZX_DEBUG_ASSERT(vmar_.base <= mapping.vaddr);
       ZX_DEBUG_ASSERT(mapping.vaddr_end() <= vmar_.end());
-      void* addr = CreateMapping(mapping);
+      ktl::span mapped = CreateMapping(mapping);
       mappings_.push_front(HandoffMapping::New(ktl::move(mapping)));
-      return addr;
+      return {mapped, mapping.paddr};
     }
 
     // Publishes the PhysVmar in the hand-off.
@@ -286,7 +286,7 @@ class HandoffPrep {
   static PhysVmo MakePhysVmo(ktl::span<const ktl::byte> data, ktl::string_view name,
                              size_t content_size);
 
-  static void* CreateMapping(const PhysMapping& mapping);
+  static MappedMemoryRange CreateMapping(const PhysMapping& mapping);
 
   // Packs a list of pending VM objects into a single hand-off span in sorted
   // order.
@@ -348,13 +348,22 @@ class HandoffPrep {
   }
 
   // Publishes a PhysVmar with a single mapping covering its extent, returning
-  // its mapped virtual address.
-  void* PublishSingleMappingVmar(PhysMapping mapping);
+  // its mapped virtual address range.
+  MappedMemoryRange PublishSingleMappingVmar(PhysMapping mapping);
 
-  // Ditto, but for an MMIO range. The provided address and size may be
-  // non-page-aligned, in which the virtual address of `addr` is returned
-  // directly rather than base address of the mapping.
-  volatile void* PublishSingleMmioMappingVmar(ktl::string_view name, uintptr_t addr, size_t size);
+  // A variation that assumes a first-class mapping and allocates and the
+  // virtual addresses itself. The provided address range may be
+  // non-page-aligned, in which the virtual mapping of [addr, addr + size) is
+  // returned directly rather than with page alignment.
+  MappedMemoryRange PublishSingleMappingVmar(ktl::string_view name, PhysMapping::Type type,
+                                             uintptr_t addr, size_t size,
+                                             PhysMapping::Permissions perms);
+
+  // A specialization for an MMIO range.
+  MappedMmioRange PublishSingleMmioMappingVmar(ktl::string_view name, uintptr_t addr, size_t size) {
+    return PublishSingleMappingVmar(name, PhysMapping::Type::kMmio, addr, size,
+                                    PhysMapping::Permissions::Rw());
+  }
 
   // This constructs a PhysElfImage from an ELF file in the KernelStorage.
   PhysElfImage MakePhysElfImage(KernelStorage::Bootfs::iterator file, ktl::string_view name);

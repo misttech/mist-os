@@ -37,11 +37,11 @@ LK_INIT_HOOK(record_periph_ranges, RecordPeriphRanges, LK_INIT_LEVEL_EARLIEST)
 
 struct Phys2VirtTrait {
   static uint64_t src(const MappedMmioRange& r) { return r.paddr; }
-  static uint64_t dst(const MappedMmioRange& r) { return reinterpret_cast<uintptr_t>(r.base); }
+  static uint64_t dst(const MappedMmioRange& r) { return reinterpret_cast<uintptr_t>(r.data()); }
 };
 
 struct Virt2PhysTrait {
-  static uint64_t src(const MappedMmioRange& r) { return reinterpret_cast<uintptr_t>(r.base); }
+  static uint64_t src(const MappedMmioRange& r) { return reinterpret_cast<uintptr_t>(r.data()); }
   static uint64_t dst(const MappedMmioRange& r) { return r.paddr; }
 };
 
@@ -58,11 +58,11 @@ struct PeriphUtil {
   static ktl::optional<uint32_t> LookupNdx(uint64_t addr) {
     for (uint32_t i = 0; i < ktl::size(gPeriphRanges); ++i) {
       const auto& range = gPeriphRanges[i];
-      if (range.size == 0) {
+      if (range.size_bytes() == 0) {
         break;
       } else if (addr >= Fetch::src(range)) {
         uint64_t offset = addr - Fetch::src(range);
-        if (offset < range.size) {
+        if (offset < range.size_bytes()) {
           return {i};
         }
       }
@@ -239,10 +239,10 @@ int cmd_peripheral_map(int argc, const cmd_args* argv, uint32_t flags) {
 
   if (!strcmp(argv[1].str, "dump")) {
     for (const auto& range : gPeriphRanges) {
-      DEBUG_ASSERT(range.size > 0);
+      DEBUG_ASSERT(range.size_bytes() > 0);
       printf("Phys [%016lx, %016lx) ==> Virt [%16p, %016lx) (len 0x%08lx)\n", range.paddr,
-             range.paddr + range.size, range.base,
-             reinterpret_cast<uintptr_t>(range.base) + range.size, range.size);
+             range.paddr + range.size_bytes(), range.data(),
+             reinterpret_cast<uintptr_t>(range.data()) + range.size_bytes(), range.size_bytes());
     }
     printf("Dumped %zu defined peripheral map ranges\n", gPeriphRanges.size());
   } else if (!strcmp(argv[1].str, "phys2virt") || !strcmp(argv[1].str, "virt2phys")) {
