@@ -46,8 +46,25 @@ fn duplicate_handle<H: HandleBased>(h: &H) -> Result<H, Errno> {
 }
 
 /// Waits forever synchronously for EVENT_SIGNALED.
+///
+/// For us there is no useful scenario where this wait times out and we can continue operating.
 fn wait_signaled_sync<H: HandleBased>(handle: &H) -> zx::WaitResult {
-    handle.wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::INFINITE)
+    for retries_count in 0..2 {
+        let timeout = zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(30));
+        let result = handle.wait_handle(zx::Signals::EVENT_SIGNALED, timeout);
+        if let zx::WaitResult::Ok(_) = result {
+            return result;
+        }
+        fuchsia_trace::instant!(c"alarms", c"starnix:hrtimer:wait_timeout", fuchsia_trace::Scope::Process, "retries_count" => retries_count);
+        log_error!("wait_signaled_sync: not signaled yet: {result:?}");
+    }
+    // This is bad and should never happen. If it does, it's a bug that has to be
+    // found and fixed. There is no good way to proceed if these signals are not
+    // being signaled properly.
+    // TODO: b/428223204 - this should be fixed such that we never reach the panic.
+    panic!(
+        "wait_signaled_sync: HrTimer bug: exhausted wait timeout allowance count. See: b/428223204"
+    );
 }
 
 /// Waits forever asynchronously for EVENT_SIGNALED.
@@ -524,6 +541,11 @@ impl HrTimerManager {
         message_counter_for_test: Option<zx::Counter>,
         setup_done: Option<zx::Event>,
     ) -> Result<()> {
+        fuchsia_trace::instant!(
+            c"alarms",
+            c"watch_new_hrtimer_loop:init",
+            fuchsia_trace::Scope::Process
+        );
         defer! {
             log_warn!("watch_new_hrtimer_loop: exiting. This should only happen in tests.");
         }
@@ -557,6 +579,11 @@ impl HrTimerManager {
         // once it is available.
         let mut interval_timers_pending_reschedule: HashMap<zx::Koid, SuspendLock> = HashMap::new();
 
+        fuchsia_trace::instant!(
+            c"alarms",
+            c"watch_new_hrtimer_loop:init_done",
+            fuchsia_trace::Scope::Process
+        );
         while let Some(cmd) = start_next_receiver.next().await {
             fuchsia_trace::duration!(c"alarms", c"start_next_receiver:loop");
 
