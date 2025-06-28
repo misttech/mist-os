@@ -4,21 +4,15 @@
 
 use crate::device::kobject::{Device, UEventFsNode};
 use crate::task::CurrentTask;
-use crate::vfs::buffers::InputBuffer;
-use crate::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
 use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
-use crate::vfs::pseudo::simple_file::BytesFile;
+use crate::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
 use crate::vfs::pseudo::stub_empty_file::StubEmptyFile;
-use crate::vfs::{
-    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, fs_node_impl_not_dir, FileObject,
-    FileOps, FsNode, FsNodeOps, DEFAULT_BYTES_PER_BLOCK,
-};
+use crate::vfs::{FsNodeOps, DEFAULT_BYTES_PER_BLOCK};
 use starnix_logging::{bug_ref, track_stub};
-use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
-use starnix_uapi::open_flags::OpenFlags;
+use std::borrow::Cow;
 use std::sync::Weak;
 
 pub fn build_device_directory(device: &Device, dir: &SimpleDirectoryMutator) {
@@ -47,7 +41,7 @@ pub fn build_block_device_directory(
             ),
             mode!(IFREG, 0o644),
         );
-        dir.entry("read_ahead_kb", ReadAheadKbNode, mode!(IFREG, 0o644));
+        dir.entry("read_ahead_kb", BytesFile::new_node(ReadAheadKbFile), mode!(IFREG, 0o644));
         dir.entry(
             "scheduler",
             StubEmptyFile::new_node(
@@ -64,69 +58,33 @@ pub trait BlockDeviceInfo: Send + Sync {
     fn size(&self) -> Result<usize, Errno>;
 }
 
-#[derive(Clone)]
 struct BlockDeviceSizeFile {
     block_info: Weak<dyn BlockDeviceInfo>,
 }
 
 impl BlockDeviceSizeFile {
     pub fn new_node(block_info: Weak<dyn BlockDeviceInfo>) -> impl FsNodeOps {
-        DynamicFile::new_node(Self { block_info })
+        BytesFile::new_node(Self { block_info })
     }
 }
 
-impl DynamicFileSource for BlockDeviceSizeFile {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
+impl BytesFileOps for BlockDeviceSizeFile {
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         let size = self.block_info.upgrade().ok_or_else(|| errno!(EINVAL))?.size()?;
         let size_blocks = size / DEFAULT_BYTES_PER_BLOCK;
-        writeln!(sink, "{}", size_blocks)?;
+        Ok(format!("{size_blocks}").into_bytes().into())
+    }
+}
+
+struct ReadAheadKbFile;
+
+impl BytesFileOps for ReadAheadKbFile {
+    fn write(&self, _current_task: &CurrentTask, _data: Vec<u8>) -> Result<(), Errno> {
+        track_stub!(TODO("https://fxbug.dev/297295673"), "updating read_ahead_kb");
         Ok(())
     }
-}
 
-#[derive(Clone)]
-struct ReadAheadKbSource;
-
-impl DynamicFileSource for ReadAheadKbSource {
-    fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        writeln!(sink, "0").map(|_| ())
-    }
-}
-
-struct ReadAheadKbNode;
-
-impl FsNodeOps for ReadAheadKbNode {
-    fs_node_impl_not_dir!();
-
-    fn create_file_ops(
-        &self,
-        _locked: &mut Locked<FileOpsCore>,
-        _node: &FsNode,
-        _current_task: &CurrentTask,
-        _flags: OpenFlags,
-    ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(Box::new(ReadAheadKbFile { dynamic_file: DynamicFile::new(ReadAheadKbSource) }))
-    }
-}
-
-struct ReadAheadKbFile {
-    dynamic_file: DynamicFile<ReadAheadKbSource>,
-}
-
-impl FileOps for ReadAheadKbFile {
-    fileops_impl_delegate_read_and_seek!(self, self.dynamic_file);
-    fileops_impl_noop_sync!();
-
-    fn write(
-        &self,
-        _locked: &mut Locked<FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        _offset: usize,
-        data: &mut dyn InputBuffer,
-    ) -> Result<usize, Errno> {
-        let updated = data.read_all()?;
-        track_stub!(TODO("https://fxbug.dev/297295673"), "updating read_ahead_kb");
-        Ok(updated.len())
+    fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
+        Ok(b"0".into())
     }
 }
