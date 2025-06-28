@@ -263,8 +263,6 @@ rustc_library("starnix_core") {
     "vfs/pipe.rs",
     "vfs/pseudo/dynamic_file.rs",
     "vfs/pseudo/mod.rs",
-    "vfs/pseudo/pseudo_directory.rs",
-    "vfs/pseudo/pseudo_directory_builder.rs",
     "vfs/pseudo/simple_directory.rs",
     "vfs/pseudo/simple_file.rs",
     "vfs/pseudo/static_directory.rs",
