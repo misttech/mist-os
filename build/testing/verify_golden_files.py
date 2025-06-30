@@ -127,6 +127,8 @@ def main() -> int:
     inputs = []
     manual_updates = []
     goldens = set()
+
+    assert comparisons, "No comparisons were specified"
     for comparison in comparisons:
         # Unlike the candidate and formatted_golden, which are build directory
         # -relative paths, the golden is source-relative.
