@@ -26,7 +26,7 @@ var tcpCoreExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{2, 1}:   Pass,
 	{2, 2}:   Pass,
 	{2, 17}:  Pass,
-	{2, 18}:  Pass,
+	{2, 18}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
 	{2, 19}:  Pass,
 	{2, 20}:  Pass,
 	{3, 1}:   Pass,
@@ -66,7 +66,7 @@ var tcpCoreExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{5, 26}:  Pass,
 	{6, 17}:  Fail,
 	{6, 18}:  Pass,
-	{6, 20}:  Pass,
+	{6, 20}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
 	{6, 22}:  Pass,
 	{6, 23}:  Pass,
 	{6, 24}:  Fail,
@@ -96,9 +96,9 @@ var tcpCoreExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{8, 28}:  Pass,
 	{8, 29}:  Fail,
 	{9, 17}:  Pass,
-	{9, 18}:  Pass,
+	{9, 18}:  Flaky,
 	{9, 19}:  Pass,
-	{9, 20}:  Pass,
+	{9, 20}:  Flaky,
 	{9, 21}:  Fail,
 	{9, 22}:  Pass,
 	{9, 27}:  Pass,
@@ -131,7 +131,7 @@ var tcpCoreExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{12, 21}: Pass,
 	{12, 22}: Pass,
 	{12, 23}: Pass,
-	{12, 24}: Pass,
+	{12, 24}: Skip, // https://fxbug.dev/427169695: Causes ANVL exits.
 	{12, 25}: Pass,
 	{12, 26}: AnvlSkip, // IPv6 test, but this is the IPv4 suite.
 	{12, 27}: AnvlSkip, // IPv6 test, but this is the IPv4 suite.
