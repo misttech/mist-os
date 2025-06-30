@@ -355,6 +355,7 @@ if (is_kernel) {
       "LOCK_TRACING_ENABLED=$lock_tracing_enabled",
       "EXPERIMENTAL_THREAD_SAMPLER_ENABLED=$experimental_thread_sampler_enabled",
       "EXPERIMENTAL_KTRACE_STREAMING_ENABLED=$experimental_ktrace_streaming_enabled",
+      "EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED=$experimental_unified_scheduler_enabled",
     ]
 
     if (kernel_no_userabi) {
