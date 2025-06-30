@@ -1389,9 +1389,17 @@ impl<'a> NetCfg<'a> {
                                 },
                             responder,
                         } => match (interface_id, socket_marks) {
-                            (None, _) | (_, None) => responder.send(Err(
+                            (None, Some(_)) | (Some(_), None) => responder.send(Err(
                                 fnp_properties::UpdateDefaultNetworkError::MissingRequiredArgument,
                             ))?,
+                            (None, None) => responder.send({
+                                self.netpol_networks_service
+                                    .update(
+                                        network::PropertyUpdate::default().default_network_lost(),
+                                    )
+                                    .await;
+                                Ok(())
+                            })?,
                             (Some(interface_id), Some(socket_marks)) => {
                                 responder.send(
                                     (async || {
