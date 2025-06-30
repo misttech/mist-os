@@ -236,6 +236,7 @@ build_api_module("api") {
     ":images",
     ":licenses",
     ":ninja_subbuilds",
+    ":nuc11_fastboot_images_location",
     ":package-repositories",
     ":package_archives",
     ":platform_artifacts",
@@ -2048,6 +2049,26 @@ group("vnames_config.metadata") {
         path = "//build/kythe/vnames.json"
       },
     ]
+  }
+}
+
+# nuc11_fastboot_images_location.json provides the paths to images needed to
+# bootstrap NUC11s idling in fastboot over TCP.
+#
+# Type: scope
+#
+#   gpt_bin_path
+#     Required: The location of the gpt.bin for NUC firmware relative
+#     to the $root_build_dir.
+#   fastboot_tcp_gbl_path
+#     Required: The path to the fastboot TCP GBL generated after running the commands
+#     in step 2 and 3 of https://fuchsia.googlesource.com
+#     /fuchsia/+/main/src/firmware/gigaboot/boards/nuc/README.md#bootstrap-fuchsia-with-gbl .
+build_api_module("nuc11_fastboot_images_location") {
+  contents = {
+    gpt_bin_path = rebase_path("//src/firmware/gigaboot/boards/nuc/gpt.bin",
+                               root_build_dir)
+    fastboot_tcp_gbl_path = "kernel.efi_x64/gbl-installer-efi.efi"
   }
 }
 
