@@ -5,7 +5,9 @@
 """Rules used to define IDK atoms."""
 
 load("@bazel_skylib//lib:paths.bzl", "paths")
+load("@fuchsia_build_info//:args.bzl", "warn_on_sdk_changes")
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load("//build/bazel/rules:golden_files.bzl", "verify_golden_files")
 
 _TYPES_SUPPORTING_UNSTABLE_ATOMS = [
     # LINT.IfChange(unstable_atom_types)
@@ -252,6 +254,7 @@ def idk_atom(
         name,
         type,
         stable,
+        testonly,
         api_file_path = None,
         api_contents_map = None,
         atom_build_deps = [],
@@ -265,6 +268,7 @@ def idk_atom(
         api_file_path: See _create_idk_atom().
         api_contents_map:  See _create_idk_atom().
         atom_build_deps:  See _create_idk_atom().
+        testonly: Standard definition.
         **kwargs: Additional arguments for the underlying atom.  See _create_idk_atom().
     """
 
@@ -284,6 +288,7 @@ def idk_atom(
             fail("`api_contents_map` cannot be empty.")
 
         generate_api_target_name = "%s_generate_api" % name
+        verify_api_target_name = "%s_verify_api" % name
 
         # GN-generated files generally have `_sdk` from the target name.
         # TODO(https://fxbug.dev/425931839): Change this to `_idk` or drop it
@@ -294,11 +299,20 @@ def idk_atom(
             name = generate_api_target_name,
             api_contents_map = api_contents_map,
             generated_api_file = current_api_file,
+            testonly = testonly,
+            visibility = ["//visibility:private"],
         )
 
-        atom_build_deps.append(":%s" % generate_api_target_name)
+        verify_golden_files(
+            name = verify_api_target_name,
+            candidate_files = [current_api_file],
+            golden_files = [api_file_path],
+            only_warn_on_changes = warn_on_sdk_changes,
+            testonly = testonly,
+            visibility = ["//visibility:private"],
+        )
 
-        # TODO(https://fxbug.dev/417305295): Verify `generate_api_target_name` against `api_file_path`.
+        atom_build_deps.append(":%s" % verify_api_target_name)
 
     # TODO(https://fxbug.dev/417305295): Generate internal metadata (.sdk) file
     # if necessary. See https://fxbug.dev/407083737.
@@ -315,6 +329,7 @@ def idk_atom(
         api_file_path = api_file_path,
         api_contents_map = api_contents_map,
         atom_build_deps = atom_build_deps,
+        testonly = testonly,
         **kwargs
     )
 
@@ -411,7 +426,7 @@ def idk_cc_source_library(
             This file is used to ensure modifications to the library's API are
             explicitly acknowledged.
             If not specified, the path will be "<idk_name>.api".
-            GN equivalent: ``api`
+            GN equivalent: `api`
             Not allowed when `stable` is false.
         deps: List of labels for other IDK elements this element publicly depends on at build time.
             These labels must point to targets with corresponding `_create_idk_atom` targets.

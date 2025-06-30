@@ -19,6 +19,8 @@ MANUAL_UPDATE_HEADER = """
 Please run the following to acknowledge this change:
 ```"""
 
+# TODO(https://fxbug.dev/427998443): Provide the proper command when run in Bazel.
+# TODO(https://fxbug.dev/384955652): Provide the proper command when run in a sub-build.
 MANUAL_UPDATE_BODY_ENTRY = """fx run-in-build-dir cp \\
     {candidate} \\
     {golden}
@@ -88,7 +90,7 @@ def main() -> int:
         required=True,
     )
     parser.add_argument(
-        "--depfile", help="Path at which to write the depfile", required=True
+        "--depfile", help="Path at which to write the depfile", required=False
     )
     parser.add_argument(
         "--stamp-file",
@@ -225,8 +227,9 @@ def main() -> int:
     with open(args.stamp_file, "w") as stamp_file:
         stamp_file.write("Golden!\n")
 
-    with open(args.depfile, "w") as depfile:
-        depfile.write("%s: %s\n" % (args.stamp_file, " ".join(inputs)))
+    if args.depfile:
+        with open(args.depfile, "w") as depfile:
+            depfile.write("%s: %s\n" % (args.stamp_file, " ".join(inputs)))
 
     return 0
 
