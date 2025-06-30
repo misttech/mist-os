@@ -4,7 +4,6 @@
 
 use crate::ContainerStartInfo;
 use anyhow::{anyhow, Context, Error};
-use bstr::BString;
 use starnix_container_structured_config::Config as ContainerStructuredConfig;
 use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
 use starnix_core::device::remote_block_device::remote_block_device_init;
@@ -36,9 +35,8 @@ use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use std::sync::mpsc::channel;
 use {
-    fidl_fuchsia_sysinfo as fsysinfo, fidl_fuchsia_ui_composition as fuicomposition,
-    fidl_fuchsia_ui_input3 as fuiinput, fidl_fuchsia_ui_policy as fuipolicy,
-    fidl_fuchsia_ui_views as fuiviews,
+    fidl_fuchsia_ui_composition as fuicomposition, fidl_fuchsia_ui_input3 as fuiinput,
+    fidl_fuchsia_ui_policy as fuipolicy, fidl_fuchsia_ui_views as fuiviews,
 };
 
 /// A collection of parsed features, and their arguments.
@@ -590,10 +588,4 @@ pub fn run_component_features(
         }
     }
     Ok(())
-}
-
-pub async fn get_serial_number() -> anyhow::Result<BString> {
-    let sysinfo = fuchsia_component::client::connect_to_protocol::<fsysinfo::SysInfoMarker>()?;
-    let serial = sysinfo.get_serial_number().await?.map_err(zx::Status::from_raw)?;
-    Ok(BString::from(serial))
 }

@@ -112,6 +112,7 @@
         // LINT.ThenChange(//src/starnix/containers/container_config.shard.cml)
         {
             protocol: [
+                "fuchsia.boot.Items",
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.feedback.CrashReporter",

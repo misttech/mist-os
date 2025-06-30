@@ -76,6 +76,7 @@
     offer: [
         {
             protocol: [
+                "fuchsia.boot.Items",
                 "fuchsia.buildinfo.Provider",
                 "fuchsia.diagnostics.ArchiveAccessor",
                 "fuchsia.feedback.CrashReporter",
