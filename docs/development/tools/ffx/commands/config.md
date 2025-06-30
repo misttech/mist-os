@@ -29,6 +29,25 @@ The runtime parameter takes the format of comma separated key-value pairs
 ("{key}={value},{key}={value},etc...") because this is not strongly typed, any
 configurations set here will be assumed to be strings.
 
+#### Dot notation for nested configuration
+
+Dot notation (.) allows you to define nested JSON objects directly in the
+command line. When a configuration key contains a dot, each word preceding a
+dot is interpreted as a JSON object containing the subsequent part of the key.
+
+For example, `log.dir` tells `ffx` that `log` is a JSON object, and inside we
+will set the `dir` property. Therefore running
+`ffx --config "log.dir=/path/to/dir" ...` is equivalent to setting the
+following JSON configuration:
+
+```json
+{
+    "log": {
+        "dir": "/path/to/dir"
+    }
+}
+```
+
 Note:
 
 The daemon runs as its own process and currently the runtime

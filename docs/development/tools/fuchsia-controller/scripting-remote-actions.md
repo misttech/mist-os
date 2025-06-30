@@ -30,6 +30,28 @@ Setting Overnet aside, the `libfuchsia_controller_internal.so` shared library
 (which includes the ABI [header][fuchsia-controller-header-file]) is the core
 library that drives scripted remote interactions.
 
+## The Context object
+
+The `Context` object is the main entry point for all Fuchsia controller
+interactions. It is responsible for creating and managing connections to Fuchsia
+devices and is the primary method for getting access to FIDL handles.
+
+When constructed, the `Context` object can take a dictionary of configuration
+key/value pairs, similar to the usage of [`ffx config`][ffx-config].
+
+```python
+config = { "log.dir": "/path/to/logs", "log.level": "trace" }
+ctx = Context(target="nodename", config=config)
+```
+
+In most cases, a user must specify a target, which is the nodename of a Fuchsia
+device.
+
+The most common way of using this object is to connect to a specific FIDL
+protocol on a component running on a Fuchsia device. This is done by calling the
+`connect_to_protocol` method, which takes a component moniker and a protocol
+name.
+
 ## Tutorial
 
 This tutorial walks through writing a Python script that reads a list of
@@ -76,7 +98,7 @@ assert(is_host)
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="tools/fidl/fidlgen_python/BUILD.gn" region_tag="describe_host_example_build_target" %}
 ```
 
-The `ffx` tool enables the `ffx` daemon to connect to our Fuchsia device. And
+The `ffx` libraries enable connecting to our Fuchsia device. And
 the FIDL dependencies make the necessary Python FIDL bindings available to the
 script.
 
@@ -92,7 +114,7 @@ The `fidl_fuchsia_developer_remotecontrol` and `fidl_fuchsia_buildinfo` Python
 modules contains the Python FIDL bindings for the `fuchsia.developer.ffx` and
 `fuchsia.buildinfo` FIDL libraries.
 
-The `Context` object provides connections the `ffx` daemon and Fuchsia targets.
+The `Context` object provides connections to Fuchsia targets.
 
 Next, our script needs to define a function (called `describe_host` in this
 example) to retrieve information from a target device:
@@ -220,16 +242,7 @@ or not the device has come back online. This is usually done by attempting to
 connect to a protocol (usually the `RemoteControl` protocol) until a timeout is
 reached.
 
-A different approach, which results in less code, is to connect to the `ffx`
-daemon's `Target` protocol:
 
-```py
-import fidl_fuchsia_developer_ffx as f_ffx
-
-ch = ctx.connect_target_proxy()
-target_proxy = f_ffx.TargetClient(ch)
-await target_proxy.reboot(state=f_ffx.TargetRebootState.PRODUCT)
-```
 
 ### Run a component
 
@@ -509,3 +522,4 @@ For more examples on server testing, see this
 [test-fidl]: /src/developer/ffx/lib/fuchsia-controller/fidl/fuchsia_controller.test.fidl
 [async-python]: /docs/development/tools/fuchsia-controller/async-python.md
 [get-started]: /docs/get-started/README.md
+[ffx-config]: /docs/development/tools/ffx/commands/config.md#runtime-configuration
