@@ -62,12 +62,6 @@ local_path_override(
 # TODO(https://fxbug.dev/131788): Use //third_party/re2 when it's upgraded to this version.
 bazel_dep(name = "re2", version = "2024-07-02.bcr.1")
 
-bazel_dep(name = "rapidjson", version = "")
-local_path_override(
-    module_name = "rapidjson",
-    path = "third_party/rapidjson",
-)
-
 # fuchsia_build_generated/gn_target_dir is a symlink to the content
 # of the @gn_targets repository. At `fx gen` time, it will point to
 # an empty repository, but bazel_action.py will update it just before
