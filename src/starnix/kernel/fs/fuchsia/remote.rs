@@ -69,14 +69,19 @@ pub fn new_remote_fs(
     // validate the requested_path is a non-empty, non-root path.
     let requested_path = std::str::from_utf8(&options.source)
         .map_err(|_| errno!(EINVAL, "source path is not utf8"))?;
-    let create_flags = fio::PERM_READABLE
-        | fio::PERM_WRITABLE
+    let mut create_flags = fio::PERM_READABLE
         | fio::Flags::FLAG_MAYBE_CREATE
         | fio::Flags::PROTOCOL_DIRECTORY;
+    if !options.flags.contains(MountFlags::RDONLY) {
+        create_flags |= fio::PERM_WRITABLE;
+    }
     let (root_proxy, subdir) = kernel.open_ns_dir(requested_path, create_flags)?;
 
     let subdir = if subdir.is_empty() { ".".to_string() } else { subdir };
-    let open_rights = fio::PERM_READABLE | fio::PERM_WRITABLE;
+    let mut open_rights = fio::PERM_READABLE;
+    if !options.flags.contains(MountFlags::RDONLY) {
+        open_rights |= fio::PERM_WRITABLE;
+    }
     let mut subdir_options = options;
     subdir_options.source = BString::from(subdir);
     create_remotefs_filesystem(kernel, &root_proxy, subdir_options, open_rights)
