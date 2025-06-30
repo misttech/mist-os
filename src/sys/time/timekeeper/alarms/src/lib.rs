@@ -1157,13 +1157,13 @@ async fn wake_timer_loop(
                     format_timer(now.into()),
                 );
 
-                // This is the only option that requires further action.
-                if let fta::SetMode::NotifySetupDone(setup_done) = mode {
-                    defer! {
-                        // Must signal once the setup is completed.
-                        signal(&setup_done);
-                        debug!("wake_timer_loop: START: setup_done signaled");
-                    };
+                defer! {
+                    // This is the only option that requires further action.
+                    if let fta::SetMode::NotifySetupDone(setup_done) = mode {
+                            // Must signal once the setup is completed.
+                            signal(&setup_done);
+                            debug!("wake_timer_loop: START: setup_done signaled");
+                        };
                 }
                 deadline_histogram_prop.insert((deadline - now).into_nanos());
                 if Timers::expired(now, deadline) {
