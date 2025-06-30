@@ -511,7 +511,11 @@ fn get_name_str<'a>(name_bytes: &'a FsStr) -> Result<&'a str, Errno> {
 }
 
 impl XattrStorage for syncio::Zxio {
-    fn get_xattr(&self, name: &FsStr) -> Result<FsString, Errno> {
+    fn get_xattr(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        name: &FsStr,
+    ) -> Result<FsString, Errno> {
         Ok(self
             .xattr_get(name)
             .map_err(|status| match status {
@@ -521,7 +525,13 @@ impl XattrStorage for syncio::Zxio {
             .into())
     }
 
-    fn set_xattr(&self, name: &FsStr, value: &FsStr, op: XattrOp) -> Result<(), Errno> {
+    fn set_xattr(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        name: &FsStr,
+        value: &FsStr,
+        op: XattrOp,
+    ) -> Result<(), Errno> {
         let mode = match op {
             XattrOp::Set => XattrSetMode::Set,
             XattrOp::Create => XattrSetMode::Create,
@@ -534,14 +544,14 @@ impl XattrStorage for syncio::Zxio {
         })
     }
 
-    fn remove_xattr(&self, name: &FsStr) -> Result<(), Errno> {
+    fn remove_xattr(&self, _locked: &mut Locked<FileOpsCore>, name: &FsStr) -> Result<(), Errno> {
         self.xattr_remove(name).map_err(|status| match status {
             zx::Status::NOT_FOUND => errno!(ENODATA),
             _ => from_status_like_fdio!(status),
         })
     }
 
-    fn list_xattrs(&self) -> Result<Vec<FsString>, Errno> {
+    fn list_xattrs(&self, _locked: &mut Locked<FileOpsCore>) -> Result<Vec<FsString>, Errno> {
         self.xattr_list()
             .map(|attrs| attrs.into_iter().map(FsString::new).collect::<Vec<_>>())
             .map_err(|status| from_status_like_fdio!(status))

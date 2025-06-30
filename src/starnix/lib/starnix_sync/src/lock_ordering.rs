@@ -53,5 +53,7 @@ lock_ordering! {
     FileOpsCore => MemoryPressureMonitor,
     MemoryPressureMonitor => MemoryPressureMonitorClientState,
     // Fastrpc
-    UninterruptibleLock => FastrpcInnerState
+    UninterruptibleLock => FastrpcInnerState,
+    // MemoryXattrStorage
+    UninterruptibleLock => MemoryXattrStorageLevel,
 }

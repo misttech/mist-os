@@ -1006,16 +1006,22 @@ macro_rules! fs_node_impl_dir_readonly {
 /// See [`fs_node_impl_xattr_delegate`] for usage details.
 pub trait XattrStorage {
     /// Delegate for [`FsNodeOps::get_xattr`].
-    fn get_xattr(&self, name: &FsStr) -> Result<FsString, Errno>;
+    fn get_xattr(&self, locked: &mut Locked<FileOpsCore>, name: &FsStr) -> Result<FsString, Errno>;
 
     /// Delegate for [`FsNodeOps::set_xattr`].
-    fn set_xattr(&self, name: &FsStr, value: &FsStr, op: XattrOp) -> Result<(), Errno>;
+    fn set_xattr(
+        &self,
+        locked: &mut Locked<FileOpsCore>,
+        name: &FsStr,
+        value: &FsStr,
+        op: XattrOp,
+    ) -> Result<(), Errno>;
 
     /// Delegate for [`FsNodeOps::remove_xattr`].
-    fn remove_xattr(&self, name: &FsStr) -> Result<(), Errno>;
+    fn remove_xattr(&self, locked: &mut Locked<FileOpsCore>, name: &FsStr) -> Result<(), Errno>;
 
     /// Delegate for [`FsNodeOps::list_xattrs`].
-    fn list_xattrs(&self) -> Result<Vec<FsString>, Errno>;
+    fn list_xattrs(&self, locked: &mut Locked<FileOpsCore>) -> Result<Vec<FsString>, Errno>;
 }
 
 /// Implements extended attribute ops for [`FsNodeOps`] by delegating to another object which
@@ -1044,45 +1050,45 @@ macro_rules! fs_node_impl_xattr_delegate {
     ($self:ident, $delegate:expr) => {
         fn get_xattr(
             &$self,
-            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
+            locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             name: &$crate::vfs::FsStr,
             _size: usize,
         ) -> Result<$crate::vfs::ValueOrSize<$crate::vfs::FsString>, starnix_uapi::errors::Errno> {
-            Ok($delegate.get_xattr(name)?.into())
+            Ok($delegate.get_xattr(locked, name)?.into())
         }
 
         fn set_xattr(
             &$self,
-            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
+            locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             name: &$crate::vfs::FsStr,
             value: &$crate::vfs::FsStr,
             op: $crate::vfs::XattrOp,
         ) -> Result<(), starnix_uapi::errors::Errno> {
-            $delegate.set_xattr(name, value, op)
+            $delegate.set_xattr(locked, name, value, op)
         }
 
         fn remove_xattr(
             &$self,
-            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
+            locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             name: &$crate::vfs::FsStr,
         ) -> Result<(), starnix_uapi::errors::Errno> {
-            $delegate.remove_xattr(name)
+            $delegate.remove_xattr(locked, name)
         }
 
         fn list_xattrs(
             &$self,
-            _locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
+            locked: &mut starnix_sync::Locked<starnix_sync::FileOpsCore>,
             _node: &FsNode,
             _current_task: &CurrentTask,
             _size: usize,
         ) -> Result<$crate::vfs::ValueOrSize<Vec<$crate::vfs::FsString>>, starnix_uapi::errors::Errno> {
-            Ok($delegate.list_xattrs()?.into())
+            Ok($delegate.list_xattrs(locked)?.into())
         }
     };
 }
