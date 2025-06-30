@@ -74,7 +74,13 @@ struct TestFilesystemOptions {
   // match the device size (if device_block_count is non-zero), including the extra required for
   // OOB.
   zx::unowned_vmo vmo;
+
+  // Mount an fvm partition to use for the resident filesystems. If use_existing_fvm is false this
+  // will try to create a new fvm partition.
   bool use_fvm = false;
+
+  // Look for an existing fvm and attach to that.
+  bool use_existing_fvm = false;
 
   // If non-zero, create a dummy FVM partition which has the effect of moving the location of the
   // partition under test to be at a different offset on the underlying device.

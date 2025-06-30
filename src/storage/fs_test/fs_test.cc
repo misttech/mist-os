@@ -238,7 +238,15 @@ zx::result<RamDevice> CreateRamDevice(const TestFilesystemOptions& options) {
   }
 
   // Create an FVM partition if requested.
-  if (options.use_fvm) {
+  if (options.use_existing_fvm) {
+    storage::FvmOptions fvm_options = {.initial_fvm_slice_count = options.initial_fvm_slice_count};
+    auto fvm_partition = storage::OpenFvmPartition(ram_device->path(), fvm_options.name);
+    if (fvm_partition.is_error()) {
+      return fvm_partition.take_error();
+    }
+
+    ram_device->set_fvm_partition(*std::move(fvm_partition));
+  } else if (options.use_fvm) {
     storage::FvmOptions fvm_options = {.initial_fvm_slice_count = options.initial_fvm_slice_count};
     auto fvm_partition = storage::CreateFvmPartition(
         ram_device->path(), static_cast<int>(options.fvm_slice_size), fvm_options);

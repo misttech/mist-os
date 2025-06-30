@@ -83,18 +83,21 @@ class WearSimulator {
   // argument.
   void ReduceBlobfsBy(size_t* space);
 
-  // Tears down the current system in the given simulator and remounts the ftl one final time in
-  // order to dump the wear information to logs.
-  static void RemountFtl(WearSimulator&& simulator);
+  // Tears down the current system in the given simulator and remounts the ftl. Useful to log ftl
+  // wear info.
+  zx::result<RamDevice> RemountFtl();
+
+  // Tears down the current system and remounts everything.
+  void Reboot();
 
  private:
   zx::vmo vmo_;
   SystemConfig config_;
   std::unique_ptr<MountedSystem> mount_;
+  std::vector<size_t> cycle_files_;
 };
 
-// Creates the directories and initial state files inside minfs.
-void InitMinfs(const char* root_path, const SystemConfig& config) {
+void InitMinfs(const char* root_path, const SystemConfig& config, std::vector<size_t>* file_sizes) {
   constexpr size_t kMaxWritePages = 64ul;
   constexpr size_t kMaxWriteSize = kMaxWritePages * kPageSize;
   char path_buf[255];
@@ -139,6 +142,7 @@ void InitMinfs(const char* root_path, const SystemConfig& config) {
       write_size = (rand() % (kMaxWritePages - 1) + 1) * kPageSize;
     }
     space += write_size;
+    file_sizes->push_back(write_size);
     while (write_size > 0) {
       ssize_t written = write(f, write_buf.get(), write_size);
       ASSERT_GT(written, 0l) << "fd " << f << ": " << errno;
@@ -215,7 +219,7 @@ void WearSimulator::Init() {
     minfs_bind = std::move(binding.value());
   }
 
-  InitMinfs(minfs_bind.path().c_str(), config_);
+  InitMinfs(minfs_bind.path().c_str(), config_, &cycle_files_);
 
   mount_ = std::make_unique<MountedSystem>(MountedSystem{
       .ramnand = std::move(ramnand),
@@ -241,22 +245,14 @@ void WearSimulator::SimulateMinfs(int cycles) {
 
   sprintf(temp_path_buf, "%s/cycle/tmp", root_path);
 
-  int num_cycle_files = 0;
-  sprintf(path_buf, "%s/cycle", root_path);
-  for (const auto& entry : std::filesystem::directory_iterator(path_buf)) {
-    if (entry.path().c_str()[0] != '.') {
-      num_cycle_files++;
-    }
-  }
-
   memset(write_buf.get(), 0xAB, kMaxWriteSize);
   for (int i = 0; i < cycles; i++) {
     switch (rand() % 2) {
       case 0: {
         // Cycle a file.
-        int index = rand() % num_cycle_files;
+        int index = rand() % static_cast<int>(cycle_files_.size());
         sprintf(path_buf, "%s/cycle/%d", root_path, index);
-        size_t size = std::filesystem::file_size(path_buf);
+        size_t size = cycle_files_[index];
 
         int f = open(temp_path_buf, O_WRONLY | O_CREAT);
         ASSERT_GE(f, 0);
@@ -332,22 +328,71 @@ void WearSimulator::ReduceBlobfsBy(size_t* space) {
   }
 }
 
-void WearSimulator::RemountFtl(WearSimulator&& simulator) {
-  ASSERT_TRUE(simulator.mount_) << "Wear simulator not initialized";
-  simulator.mount_.reset();
+zx::result<RamDevice> WearSimulator::RemountFtl() {
+  if (!mount_) {
+    return zx::error(ZX_ERR_BAD_STATE);
+  }
+  mount_.reset();
+
   zx::vmo vmo_snapshot;
-  ASSERT_EQ(simulator.vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, simulator.config_.nand_size,
-                                        &vmo_snapshot),
-            ZX_OK);
+  if (zx_status_t s = vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, config_.nand_size, &vmo_snapshot);
+      s != ZX_OK) {
+    return zx::error(s);
+  }
   RamDevice ramnand = CreateRamDevice({
                                           .use_ram_nand = true,
                                           .vmo = vmo_snapshot.borrow(),
-                                          .use_fvm = true,
+                                          .use_existing_fvm = true,
                                           .device_block_size = kPageSize,
                                           .device_block_count = 0,
-                                          .fvm_slice_size = simulator.config_.fvm_slice_size,
+                                          .fvm_slice_size = config_.fvm_slice_size,
                                       })
                           .value();
+  vmo_ = std::move(vmo_snapshot);
+  return zx::ok(std::move(ramnand));
+}
+
+void WearSimulator::Reboot() {
+  RamDevice ramnand = RemountFtl().value();
+
+  fidl::Arena arena;
+  fs_management::MountedVolume* blobfs;
+  fs_management::NamespaceBinding blobfs_bind;
+  {
+    auto res = ramnand.fvm_partition()->fvm().fs().OpenVolume(
+        "blobfs", fuchsia_fs_startup::wire::MountOptions::Builder(arena)
+                      .as_blob(true)
+                      .uri("#meta/blobfs.cm")
+                      .Build());
+    ASSERT_TRUE(res.is_ok()) << "Failed to create blobfs: " << res.error_value();
+    blobfs = res.value();
+
+    auto binding = fs_management::NamespaceBinding::Create("/blob/", blobfs->DataRoot().value());
+    ASSERT_TRUE(binding.is_ok()) << binding.status_string();
+    blobfs_bind = std::move(binding.value());
+  }
+
+  fs_management::MountedVolume* minfs;
+  fs_management::NamespaceBinding minfs_bind;
+  {
+    auto res = ramnand.fvm_partition()->fvm().fs().OpenVolume(
+        "minfs",
+        fuchsia_fs_startup::wire::MountOptions::Builder(arena).uri("#meta/minfs.cm").Build());
+    ASSERT_TRUE(res.is_ok()) << "Failed to create minfs: " << res.error_value();
+    minfs = res.value();
+
+    auto binding = fs_management::NamespaceBinding::Create("/minfs/", minfs->DataRoot().value());
+    ASSERT_TRUE(binding.is_ok()) << binding.status_string();
+    minfs_bind = std::move(binding.value());
+  }
+
+  mount_ = std::make_unique<MountedSystem>(MountedSystem{
+      .ramnand = std::move(ramnand),
+      .blobfs_export_root = blobfs->Release(),
+      .blobfs_binding = std::move(blobfs_bind),
+      .minfs_export_root = minfs->Release(),
+      .minfs_binding = std::move(minfs_bind),
+  });
 }
 
 // Test disabled because it isn't meant to run as part of CI. Meant for local experimentation.
@@ -377,7 +422,7 @@ TEST(Wear, DISABLED_LargeScale) {
     sim.FillBlobfs(kBlobUpdateSize - reduce_by);
   }
 
-  WearSimulator::RemountFtl(std::move(sim));
+  ASSERT_TRUE(sim.RemountFtl().is_ok());
 }
 
 // A minimal test meant to be fast while exploring the full range of operations.
@@ -402,7 +447,15 @@ TEST(Wear, MinimalSimulator) {
   sim.FillBlobfs(1ul * 1024 * 1024 - reduce_by);
   sim.SimulateMinfs(100);
 
-  WearSimulator::RemountFtl(std::move(sim));
+  sim.Reboot();
+
+  sim.SimulateMinfs(100);
+  reduce_by = 1ul * 1024 * 1024;
+  sim.ReduceBlobfsBy(&reduce_by);
+  sim.FillBlobfs(1ul * 1024 * 1024 - reduce_by);
+  sim.SimulateMinfs(100);
+
+  ASSERT_TRUE(sim.RemountFtl().is_ok());
 }
 
 }  // namespace
