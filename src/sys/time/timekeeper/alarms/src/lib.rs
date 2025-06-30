@@ -37,7 +37,7 @@ use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use fuchsia_inspect::{HistogramProperty, Property};
 use futures::channel::mpsc;
 use futures::sink::SinkExt;
-use futures::{StreamExt, TryStreamExt};
+use futures::{FutureExt, StreamExt, TryStreamExt};
 use log::{debug, error, warn};
 use scopeguard::defer;
 use std::cell::RefCell;
@@ -71,6 +71,26 @@ static TEMPORARY_STARNIX_CID: LazyLock<zx::Event> = LazyLock::new(|| zx::Event::
 
 /// This is what we consider a "long" delay in alarm operations.
 const LONG_DELAY_NANOS: i64 = 2000 * MSEC_IN_NANOS;
+
+/// A macro that waits on a future, but if the future takes longer than
+/// 30 seconds to complete, logs a warning message.
+macro_rules! log_long_op {
+    ($fut:expr) => {{
+        let fut = $fut;
+        futures::pin_mut!(fut);
+        loop {
+            let timeout = fasync::Timer::new(std::time::Duration::from_secs(30));
+            futures::select! {
+                res = fut.as_mut().fuse() => {
+                    break res;
+                }
+                _ = timeout.fuse() => {
+                    warn!("unexpected blocking: long-running async operation at {}:{}", file!(), line!());
+                }
+            }
+        }
+    }};
+}
 
 /// Compares two optional deadlines and returns true if the `before is different from `after.
 /// Nones compare as equal.
@@ -146,7 +166,7 @@ impl TimerOps for HardwareTimerOps {
     }
 
     async fn get_timer_properties(&self) -> TimerConfig {
-        match self.proxy.get_properties().await {
+        match log_long_op!(self.proxy.get_properties()) {
             Ok(p) => {
                 let timers_properties = &p.timers_properties.expect("timers_properties must exist");
                 debug!("get_timer_properties: got: {:?}", timers_properties);
@@ -436,16 +456,13 @@ async fn handle_request(
                 format_timer(deadline.into())
             );
             // Expected to return quickly.
-            if let Err(e) = cmd
-                .send(Cmd::Start {
-                    cid,
-                    deadline: deadline.into(),
-                    mode,
-                    alarm_id: alarm_id.clone(),
-                    responder: responder.clone(),
-                })
-                .await
-            {
+            if let Err(e) = log_long_op!(cmd.send(Cmd::Start {
+                cid,
+                deadline: deadline.into(),
+                mode,
+                alarm_id: alarm_id.clone(),
+                responder: responder.clone(),
+            })) {
                 warn!("handle_request: error while trying to schedule `{}`: {:?}", alarm_id, e);
                 responder
                     .borrow_mut()
@@ -458,7 +475,7 @@ async fn handle_request(
         fta::WakeAlarmsRequest::Cancel { alarm_id, .. } => {
             // TODO: b/383062441 - make this into an async task so that we wait
             // less to schedule the next alarm.
-            handle_cancel(alarm_id, cid, &mut cmd).await;
+            log_long_op!(handle_cancel(alarm_id, cid, &mut cmd));
         }
         fta::WakeAlarmsRequest::_UnknownMethod { .. } => {}
     };
@@ -1222,7 +1239,7 @@ async fn wake_timer_loop(
                         // Always schedule the proximate deadline.
                         let schedulable_deadline = deadline_after.unwrap_or(deadline);
                         if needs_cancel {
-                            stop_hrtimer(&timer_proxy, &timer_config).await;
+                            log_long_op!(stop_hrtimer(&timer_proxy, &timer_config));
                         }
                         hrtimer_status = Some(
                             schedule_hrtimer(
@@ -1256,7 +1273,7 @@ async fn wake_timer_loop(
                         responder.send(Err(fta::WakeAlarmsError::Dropped)).expect("infallible");
                     }
                     if is_deadline_changed(deadline_before, deadline_after) {
-                        stop_hrtimer(&timer_proxy, &timer_config).await;
+                        log_long_op!(stop_hrtimer(&timer_proxy, &timer_config));
                     }
                     if let Some(deadline) = deadline_after {
                         // Reschedule the hardware timer if the removed timer is the earliest one,
@@ -1302,7 +1319,7 @@ async fn wake_timer_loop(
                     // This could be a resolution switch, or a straggler notification.
                     // Either way, the hardware timer is still ticking, cancel it.
                     debug!("wake_timer_loop: no expired alarms, reset hrtimer state");
-                    stop_hrtimer(&timer_proxy, &timer_config).await;
+                    log_long_op!(stop_hrtimer(&timer_proxy, &timer_config));
                 }
                 // There is a timer to reschedule, do that now.
                 hrtimer_status = match timers.peek_deadline() {
@@ -1520,7 +1537,8 @@ async fn schedule_hrtimer(
     debug!("schedule_hrtimer: waiting for event to be signaled");
 
     // We must wait here to ensure that the wake alarm has been scheduled.
-    wait_signaled(&hrtimer_scheduled).await;
+    log_long_op!(wait_signaled(&hrtimer_scheduled));
+
     let now_after_signaled = fasync::BootInstant::now();
     let duration_until_scheduled: zx::BootDuration = (now_after_signaled - now).into();
     if duration_until_scheduled > zx::BootDuration::from_nanos(LONG_DELAY_NANOS) {
