@@ -40,7 +40,16 @@ struct StackType {
 
 KCOUNTER(vm_kernel_stack_bytes, "vm.kstack.allocated_bytes")
 
-constexpr StackType kSafe = {"kernel-safe-stack", DEFAULT_STACK_SIZE, StackType::Grow::Down};
+constexpr size_t SafeStackSize() {
+  // If there is no unsafe stack on x86, double the size of the main stack for consistency.
+#if defined(__x86_64__) && !__has_feature(safe_stack)
+  return DEFAULT_STACK_SIZE * 2;
+#else
+  return DEFAULT_STACK_SIZE;
+#endif
+}
+
+constexpr StackType kSafe = {"kernel-safe-stack", SafeStackSize(), StackType::Grow::Down};
 #if __has_feature(safe_stack)
 constexpr StackType kUnsafe = {"kernel-unsafe-stack", DEFAULT_STACK_SIZE, StackType::Grow::Down};
 #endif
