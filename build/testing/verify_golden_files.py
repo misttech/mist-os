@@ -42,7 +42,12 @@ is in your GN graph.
 """
 
 
-def print_failure_msg(manual_updates, dead_goldens, golden_dir, label):
+def print_failure_msg(
+    manual_updates: list[dict[str, str]],
+    dead_goldens: list[str],
+    golden_dir: Path,
+    label: str,
+) -> None:
     if manual_updates:
         print(MANUAL_UPDATE_HEADER)
     for update in manual_updates:
@@ -61,7 +66,7 @@ def print_failure_msg(manual_updates, dead_goldens, golden_dir, label):
     print(MANUAL_UPDATE_FOOTER.format(label=label))
 
 
-def get_diff_lines(file1, file2):
+def get_diff_lines(file1: str, file2: str) -> list[str]:
     """Returns a list of strings representing the unified diff of the two file."""
     with open(file1) as f:
         lines1 = f.readlines()
@@ -70,7 +75,7 @@ def get_diff_lines(file1, file2):
     return list(difflib.unified_diff(lines1, lines2, file1, file2))
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--label", help="GN label for this test", required=True)
     parser.add_argument(
@@ -152,25 +157,25 @@ def main():
 
         if current_comparison_failed:
             type = "Warning" if args.warn or args.bless else "Error"
-            str = f"\n{type}: "
+            msg = f"\n{type}: "
             if args.err_msg:
-                str += args.err_msg
+                msg += args.err_msg
             else:
-                str += f"Golden file mismatch: `{golden}`"
-                str += f"\n\tCompared to: `{candidate}`)"
+                msg += f"Golden file mismatch: `{golden}`"
+                msg += f"\n\tCompared to: `{candidate}`)"
 
             if not os.path.exists(golden):
-                str += f"\n\tGolden file does not exist: `{golden}`"
+                msg += f"\n\tGolden file does not exist: `{golden}`"
 
             if diff_lines:
                 max_diff_lines = 16
                 if len(diff_lines) > max_diff_lines:
-                    str += f"\nDiff (-golden +actual, truncated):\n"
+                    msg += f"\nDiff (-golden +actual, truncated):\n"
                 else:
-                    str += f"\nDiff (-golden +actual):\n"
-                str += "".join(diff_lines[:max_diff_lines])
+                    msg += f"\nDiff (-golden +actual):\n"
+                msg += "".join(diff_lines[:max_diff_lines])
 
-            print(str)
+            print(msg)
 
             if args.bless:
                 os.makedirs(os.path.dirname(golden), exist_ok=True)
@@ -178,7 +183,7 @@ def main():
             else:
                 manual_updates.append(dict(golden=golden, candidate=candidate))
 
-    dead_goldens = []
+    dead_goldens: set[str] = set()
     if args.golden_dir:
         outside_goldens = sorted(
             {
@@ -203,14 +208,14 @@ def main():
             subprocess.check_call(
                 ["git", "rm", "-f", "--ignore-unmatch"] + sorted(dead_goldens)
             )
-            dead_goldens = []
+            dead_goldens = set()
             subprocess.check_call(["git", "add", args.golden_dir])
 
     # Print all of the manual update instructions once at the end to reduce the
     # amount of rebuilding and copy-pasting.
     if manual_updates or dead_goldens:
         print_failure_msg(
-            manual_updates, dead_goldens, args.golden_dir, args.label
+            manual_updates, list(dead_goldens), args.golden_dir, args.label
         )
         if not args.warn:
             return 1
