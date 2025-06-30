@@ -65,6 +65,11 @@ class FakePDev final : public fidl::WireServer<fuchsia_hardware_platform_device:
     ResourceNamesMap irq_names;
 
     std::map<uint32_t, zx::bti> btis;
+
+    // Maps the name of an bti to the index of the bti. The key is the name of the
+    // bti and the value is the index of the bti.
+    ResourceNamesMap bti_names;
+
     std::map<uint32_t, zx::resource> smcs;
 
     std::optional<fdf::PDev::DeviceInfo> device_info;
@@ -139,6 +144,7 @@ class FakePDev final : public fidl::WireServer<fuchsia_hardware_platform_device:
       fidl::UnknownMethodCompleter::Sync& completer) override;
 
   zx::result<zx::interrupt> GetInterruptById(uint32_t index);
+  zx::result<zx::bti> GetBtiById(uint32_t index);
   zx::result<fuchsia_hardware_platform_device::wire::Mmio> GetMmioById(uint32_t index,
                                                                        fidl::AnyArena& arena);
 
