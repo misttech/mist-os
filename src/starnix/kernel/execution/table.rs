@@ -312,7 +312,7 @@ pub fn dispatch_syscall(
             exit[1],
             exit_group[1],
             faccessat[3],
-            fallocate[4],
+            fallocate[6],
             fchmod[2],
             fchmodat[3],
             fchown32[3],

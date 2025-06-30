@@ -32,6 +32,7 @@ syscall_tests = [
   "custom_artifact_test",
   "epoll_test",
   "extended_pstate_test",
+  "fallocate_test",
   "fcntl_test",
   "fs_test",
   "fsverity_test",
