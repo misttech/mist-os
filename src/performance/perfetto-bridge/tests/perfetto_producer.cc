@@ -120,7 +120,8 @@ class FuchsiaProducer : public perfetto::Producer {
     FX_LOGS(INFO) << "Creating Writers";
 
     writer_ =
-        shmem_arbiter_->CreateTraceWriter(static_cast<perfetto::BufferID>(config.target_buffer()));
+        shmem_arbiter_->CreateTraceWriter(static_cast<perfetto::BufferID>(config.target_buffer()),
+                                          perfetto::BufferExhaustedPolicy::kDrop);
     perfetto_service_->RegisterTraceWriter(writer_->writer_id(), config.target_buffer());
     perfetto_service_->NotifyDataSourceStarted(id);
 
