@@ -7,10 +7,10 @@
 
   To manually fetch packages after local edits to this file, please regenerate
   the corresponding lock files first by running:
-  `//integration/update-lockfiles.sh`
+  `//manifests/update-lockfiles.sh`
 
   Then fetch the packages:
-  `jiri fetch-packages -local-manifest=true`
+  `jiri fetch-packages -local-manifest-project=fuchsia`
   -->
   <imports>
     <localimport file="cts"/>
