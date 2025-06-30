@@ -387,7 +387,7 @@ impl HrTimerManager {
 
     /// Initialize the [HrTimerManager] in the context of the current system task.
     pub fn init(self: &HrTimerManagerHandle, system_task: &CurrentTask) -> Result<(), Errno> {
-        self.init_for_test(
+        self.init_internal(
             system_task,
             /*wake_channel_for_test=*/ None,
             /*message_counter_for_test=*/ None,
@@ -395,7 +395,7 @@ impl HrTimerManager {
     }
 
     // Call this init for testing instead of the one above.
-    fn init_for_test(
+    fn init_internal(
         self: &HrTimerManagerHandle,
         system_task: &CurrentTask,
         // Can be injected for testing.
@@ -1234,7 +1234,7 @@ mod tests {
         let proxy = connect_factory(counter_clone, response_type).await;
         let counter_clone = duplicate_handle(&counter).unwrap();
         manager
-            .init_for_test(
+            .init_internal(
                 &current_task,
                 Some(proxy.into_channel().unwrap().into_zx_channel()),
                 Some(counter_clone),
