@@ -2983,7 +2983,7 @@ impl TransactionRole {
                 // bound. This means that the transaction should be marked dead if the
                 // `target_proc` matches `process`, regardless of whether or not a `thread` was
                 // provided to `mark_dead`.
-                _any_thread,
+                _,
                 TransactionRole::Sender(TransactionSender {
                     target_thread: None,
                     target_proc,
@@ -4400,11 +4400,11 @@ impl BinderDriver {
             // Select which command queue to read from, preferring the thread-local one.
             // If a transaction is pending, deadlocks can happen if reading from the process queue.
             let command_queue = Self::get_active_queue(&mut thread_state, &mut proc_command_queue);
-            let command = match command_queue.pop_front() {
-                Some(command) => Some(command),
+
+            let command = command_queue.pop_front().or_else(|| {
                 // If there is no pending command, but the current transaction is marked as dead,
                 // pop the transaction and dispatch a `DeadReply`.
-                None => match thread_state.transactions.last() {
+                match thread_state.transactions.last() {
                     Some(TransactionRole::Sender(TransactionSender {
                         is_alive: false, ..
                     })) => {
@@ -4412,8 +4412,8 @@ impl BinderDriver {
                         Some(Command::DeadReply)
                     }
                     _ => None,
-                },
-            };
+                }
+            });
 
             if let Some(command) = command {
                 profile_duration!("ThreadReadCommand");
