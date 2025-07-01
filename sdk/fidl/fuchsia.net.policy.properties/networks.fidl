@@ -21,15 +21,14 @@ type NetworkToken = resource table {
 /// a `CONNECTION_ABORTED` error
 @discoverable
 open protocol DefaultNetwork {
-    /// Update the current default network. An empty update signifies that the
-    /// default network has been lost.
+    /// Update the current default network.
     flexible Update(table {
         /// The value of the new interface id.
-        /// NOTE: Required if `socket_marks` is set.
+        /// NOTE: REQUIRED
         1: interface_id fuchsia.net.InterfaceId;
 
         /// The socket marks associated with that interface.
-        /// NOTE: Required if `interface_id` is set.
+        /// NOTE: REQUIRED
         2: socket_marks fuchsia.net.Marks;
     }) -> () error @generated_name("UpdateDefaultNetworkError") flexible enum : uint32 {
         /// The provided `interface_id` was invalid.
@@ -42,9 +41,6 @@ open protocol DefaultNetwork {
     };
 };
 
-// TODO(https://fxbug.dev/42159332): Use built-in empty struct when available.
-type Empty = struct {};
-
 /// Protocol for acquiring [`NetworkToken`]s, and querying properties of that
 /// network.
 @discoverable
@@ -54,15 +50,11 @@ open protocol Networks {
     /// The first call always returns a [`NetworkToken`] representing the
     /// current default network, or if one is not present, blocks until a
     /// default network is set. Subsequent calls will block until the default
-    /// network has changed, or has been lost, returning a new [`NetworkToken`]
-    /// for the updated default network, or [`no_default_network`] if the
-    /// network is lost.
+    /// network has changed, returning a new [`NetworkToken`] for the updated
+    /// default network.
     ///
     /// Only one call to this method should be pending per connection.
-    flexible WatchDefault() -> (flexible resource union {
-        1: network NetworkToken;
-        2: no_default_network Empty;
-    });
+    flexible WatchDefault() -> (NetworkToken);
 
     /// Watches for changes in requested properties for the given [`NetworkToken`]
     ///
@@ -111,9 +103,6 @@ open protocol Networks {
         /// When the network represented by `network` is no longer the default
         /// network, a new [`NetworkToken`] must be acquired.
         DEFAULT_NETWORK_CHANGED = 4;
-        /// When there is no longer a default network, a new [`NetworkToken`]
-        /// must be acquired.
-        DEFAULT_NETWORK_LOST = 5;
 
         /// An argument marked above as REQUIRED was not provided.
         MISSING_REQUIRED_ARGUMENT = 99;
