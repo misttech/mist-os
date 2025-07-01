@@ -232,3 +232,5 @@ void HandoffPrep::ArchSummarizeMiscZbiItem(const zbi_header_t& header,
     }
   }
 }
+
+void HandoffPrep::ArchConstructKernelAddressSpace() {}

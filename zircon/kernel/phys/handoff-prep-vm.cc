@@ -240,4 +240,8 @@ void HandoffPrep::ConstructKernelAddressSpace(const UartDriver& uart) {
       handoff_->uart_mmio = PublishSingleMmioMappingVmar("UART"sv, mmio.address, mmio.size);
     }
   });
+
+  // Construct the arch-specific bits at the end (to give the non-arch-specific
+  // placements in the address space a small amount of relative familiarity).
+  ArchConstructKernelAddressSpace();
 }

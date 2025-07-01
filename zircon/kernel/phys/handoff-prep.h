@@ -378,7 +378,10 @@ class HandoffPrep {
   // This must be the very last set-up routine called within DoHandoff().
   void SetMemory();
 
+  // Constructs and populates the kernel's address space, and returns the
+  // mapped realizations of its ABI requirements per abi_spec_.
   void ConstructKernelAddressSpace(const UartDriver& uart);
+  void ArchConstructKernelAddressSpace();  // The arch-specific subroutine
 
   const ElfImage kernel_;
   PhysHandoff* handoff_ = nullptr;

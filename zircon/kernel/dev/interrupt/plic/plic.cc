@@ -10,9 +10,7 @@
 #include <lib/arch/intrin.h>
 #include <lib/ktrace.h>
 #include <lib/root_resource_filter.h>
-#include <lib/zbi-format/driver-config.h>
 #include <reg.h>
-#include <string.h>
 #include <trace.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -27,7 +25,6 @@
 #include <kernel/thread.h>
 #include <lk/init.h>
 #include <pdev/interrupt.h>
-#include <vm/physmap.h>
 #include <vm/vm.h>
 
 // HACK: Temporary workaround for the SiFive HiFive Unleashed which has a
@@ -263,15 +260,14 @@ const struct pdev_interrupt_ops plic_ops = {
 
 }  //  anonymous namespace
 
-void PLICInitEarly(const zbi_dcfg_riscv_plic_driver_t& config) {
-  ASSERT(config.mmio_phys);
+void PLICInitEarly(const RiscvPlicDriverConfig& config) {
+  ASSERT(!config.mmio.empty());
+  ASSERT(config.zbi.num_irqs > 0);
 
   LTRACE_ENTRY;
 
-  physmap_preserve_gaps_for_mmio();
-  plic_base = (vaddr_t)paddr_to_physmap(config.mmio_phys);
-  plic_max_int = config.num_irqs;
-  ASSERT(plic_base && plic_max_int);
+  plic_base = reinterpret_cast<uintptr_t>(config.mmio.data());
+  plic_max_int = config.zbi.num_irqs;
 
   pdev_register_interrupts(&plic_ops);
 
