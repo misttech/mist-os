@@ -356,6 +356,7 @@ _NORMAL_DEPENDENCIES = {
             "fancy-regex": Label("//third_party/rust_crates/vendor/fancy-regex-0.8.0:fancy_regex"),
             "fatfs": Label("//third_party/rust_crates/vendor/fatfs-0.3.6:fatfs"),
             "flate2": Label("//third_party/rust_crates/vendor/flate2-1.1.1:flate2"),
+            "flyweights": Label("//third_party/rust_crates/vendor/flyweights-0.1.5:flyweights"),
             "foreign-types": Label("//third_party/rust_crates/vendor/foreign-types-0.3.2:foreign_types"),
             "foreign-types-shared": Label("//third_party/rust_crates/vendor/foreign-types-shared-0.1.1:foreign_types_shared"),
             "fragile": Label("//third_party/rust_crates/vendor/fragile-1.0.0:fragile"),

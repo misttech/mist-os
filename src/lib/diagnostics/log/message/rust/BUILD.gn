@@ -28,10 +28,10 @@ rustc_library("lib") {
     "//sdk/rust/zx",
     "//src/lib/diagnostics/data/rust",
     "//src/lib/diagnostics/log/encoding/rust",
-    "//src/lib/flyweights",
     "//src/sys/lib/moniker",
     "//third_party/rust_crates:bumpalo",
     "//third_party/rust_crates:byteorder",
+    "//third_party/rust_crates:flyweights",
     "//third_party/rust_crates:libc",
     "//third_party/rust_crates:thiserror",
   ]

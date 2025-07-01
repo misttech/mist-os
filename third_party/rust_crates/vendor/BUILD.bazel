@@ -919,6 +919,18 @@ alias(
 )
 
 alias(
+    name = "flyweights-0.1.5",
+    actual = "//third_party/rust_crates/vendor/flyweights-0.1.5:flyweights",
+    tags = ["manual"],
+)
+
+alias(
+    name = "flyweights",
+    actual = "//third_party/rust_crates/vendor/flyweights-0.1.5:flyweights",
+    tags = ["manual"],
+)
+
+alias(
     name = "foreign-types-0.3.2",
     actual = "//third_party/rust_crates/vendor/foreign-types-0.3.2:foreign_types",
     tags = ["manual"],

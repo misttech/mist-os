@@ -109,6 +109,7 @@ event-listener = "5.3.1"
 fancy-regex = "0.8"
 fatfs = "0.3.6"
 flate2 = { version = "1.1.1", default-features = false, features = ["rust_backend"] }
+flyweights = { version = "0.1.5", features = ["json_schema", "serde"] }
 foreign-types = "0.3.1"
 foreign-types-shared = "0.1.0"
 fragile = "=1.0.0"

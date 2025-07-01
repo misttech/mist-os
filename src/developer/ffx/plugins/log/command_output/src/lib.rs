@@ -17,12 +17,13 @@
 //!    it is built around using the concrete `LogEntry` struct. This would require several trait
 //!    definitions and, as mentioned, lots of refactoring.
 //! 2. Implementing [JsonSchema] for [LogEntry] directly. This requires piping implementations of
-//!    the trait all the way down to `//src/lib/flyweights` (a fast string representation), and
-//!    due to the way [LogData] is represented as an alias of `Data<Logs>`, ends up inflating the
-//!    schema definition unnecessarily (to the tune of a 1200 line long schema) as it requires
-//!    covering a large set of definitions, 99% of which are not actually used when printing out
-//!    the data the command invoker is actually going to use. This appears overly fragile, as it
-//!    relies on every possible definition used by not just logging, but diagnostics in general.
+//!    the trait all the way down to `//third_party/rust_crates:flyweights` (a fast string
+//!    representation), and due to the way [LogData] is represented as an alias of `Data<Logs>`,
+//!    ends up inflating the schema definition unnecessarily (to the tune of a 1200 line long
+//!    schema) as it requires covering a large set of definitions, 99% of which are not actually
+//!    used when printing out the data the command invoker is actually going to use. This appears
+//!    overly fragile, as it relies on every possible definition used by not just logging, but
+//!    diagnostics in general.
 
 use async_trait::async_trait;
 use diagnostics_data::{DataSource, LogsHierarchy, LogsMetadata};

@@ -39,7 +39,6 @@ group("tests") {
     "fidl_server:tests",
     "fidl_table_validation:tests",
     "files:tests",
-    "flyweights:tests",
     "fostr:tests",
     "fsl:fsl_tests",
     "fuchsia:tests",

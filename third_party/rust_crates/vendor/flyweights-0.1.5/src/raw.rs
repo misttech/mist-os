@@ -55,7 +55,10 @@ impl Payload {
         let header = ptr.cast::<Header>();
         // SAFETY: `header` points to memory suitable for a `Header` and is valid for writes.
         unsafe {
-            header.write(Header { ref_count: AtomicUsize::new(1), len: bytes.len() });
+            header.write(Header {
+                ref_count: AtomicUsize::new(1),
+                len: bytes.len(),
+            });
         }
 
         // SAFETY: The size of `Header` fits in an `isize` and `header` points to an allocation

@@ -3,23 +3,48 @@
 // found in the LICENSE file.
 
 //! Types implementing the [flyweight pattern](https://en.wikipedia.org/wiki/Flyweight_pattern)
-//! for reusing object allocations.
+//! for reusing string allocations.
+//!
+//! # Features
+//!
+//! * Supports UTF-8 strings with [`FlyStr`] and UTF-8-ish bytestrings with [`FlyByteStr`].
+//! * Easy drop-in replacement for immutable strings without wiring up any additional function args.
+//! * Accessing the underlying string values has overhead similar to a `Box<str>`.
+//! * Cheap to clone.
+//! * Strings in the cache are freed when the last reference to them is dropped.
+//! * Heap allocations are avoided when possible with small string optimizations (SSO).
+//! * Hashing a flyweight and comparing it for equality against another flyweight are both O(1)
+//!   operations.
+//!
+//! # Tradeoffs
+//!
+//! This was originally written for [Fuchsia](https://fuchsia.dev) at a time when popular options
+//! didn't fit the needs of adding caching to an existing long-running multithreaded system service
+//! that holds an unbounded number of user-controlled strings. The above features are suited to this
+//! use case, but there are many (many) alternative [string caching crates] to choose from if you
+//! have different constraints.
+//!
+//! [string caching crates]: https://crates.io/search?q=intern
 
-#![warn(missing_docs)]
+#![warn(missing_docs, clippy::all)]
 
 mod raw;
 
 use ahash::AHashSet;
 use bstr::{BStr, BString};
-use serde::de::{Deserializer, Visitor};
-use serde::ser::Serializer;
-use serde::{Deserialize, Serialize};
 use std::borrow::Borrow;
 use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::ptr::NonNull;
 use std::sync::Mutex;
+
+#[cfg(feature = "serde")]
+use serde::de::{Deserializer, Visitor};
+#[cfg(feature = "serde")]
+use serde::ser::Serializer;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 /// The global string cache for `FlyStr`.
 ///
@@ -119,16 +144,24 @@ impl schemars::JsonSchema for FlyStr {
 
 static_assertions::assert_eq_size!(FlyStr, usize);
 
+// `Borrow` requires that:
+//
+// > Eq, Ord and Hash must be equivalent for borrowed and owned values: x.borrow() == y.borrow()
+// > should give the same result as x == y.
+//
+// The current implementation of `FlyStr` cannot satisfy `Borrow<str>` because the O(1) hashing
+// feature means that `s.hash() != s.borrow().hash()`.
+static_assertions::assert_not_impl_any!(FlyStr: Borrow<str>);
+
 impl FlyStr {
     /// Create a `FlyStr`, allocating it in the cache if the value is not already cached.
     ///
     /// # Performance
     ///
-    /// Creating an instance of this type requires accessing the global cache of strings, which
-    /// involves taking a lock. When multiple threads are allocating lots of strings there may be
-    /// contention.
-    ///
-    /// Each string allocated is hashed for lookup in the cache.
+    /// Creating an instance of this type for strings longer than the maximum inline size requires
+    /// accessing the global cache of strings, which involves taking a lock. When multiple threads
+    /// are allocating lots of strings there may be contention. Each string allocated is hashed for
+    /// lookup in the cache.
     #[inline]
     pub fn new(s: impl AsRef<str> + Into<String>) -> Self {
         Self(RawRepr::new_str(s))
@@ -196,17 +229,17 @@ impl TryFrom<FlyByteStr> for FlyStr {
     }
 }
 
-impl Into<String> for FlyStr {
+impl From<FlyStr> for String {
     #[inline]
-    fn into(self) -> String {
-        self.as_str().to_owned()
+    fn from(s: FlyStr) -> String {
+        s.as_str().to_owned()
     }
 }
 
-impl Into<String> for &'_ FlyStr {
+impl From<&'_ FlyStr> for String {
     #[inline]
-    fn into(self) -> String {
-        self.as_str().to_owned()
+    fn from(s: &FlyStr) -> String {
+        s.as_str().to_owned()
     }
 }
 
@@ -314,27 +347,31 @@ impl Display for FlyStr {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for FlyStr {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'d> Deserialize<'d> for FlyStr {
     fn deserialize<D: Deserializer<'d>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_str(FlyStrVisitor)
     }
 }
 
+#[cfg(feature = "serde")]
 struct FlyStrVisitor;
 
+#[cfg(feature = "serde")]
 impl Visitor<'_> for FlyStrVisitor {
     type Value = FlyStr;
     fn expecting(&self, formatter: &mut Formatter<'_>) -> FmtResult {
         formatter.write_str("a string")
     }
 
-    fn visit_borrowed_str<'de, E>(self, v: &'de str) -> Result<Self::Value, E>
+    fn visit_borrowed_str<E>(self, v: &str) -> Result<Self::Value, E>
     where
         E: serde::de::Error,
     {
@@ -401,16 +438,24 @@ pub struct FlyByteStr(RawRepr);
 
 static_assertions::assert_eq_size!(FlyByteStr, usize);
 
+// `Borrow` requires that:
+//
+// > Eq, Ord and Hash must be equivalent for borrowed and owned values: x.borrow() == y.borrow()
+// > should give the same result as x == y.
+//
+// The current implementation of `FlyByteStr` cannot satisfy `Borrow<str>` because the O(1) hashing
+// feature means that `s.hash() != s.borrow().hash()`.
+static_assertions::assert_not_impl_any!(FlyByteStr: Borrow<str>);
+
 impl FlyByteStr {
     /// Create a `FlyByteStr`, allocating it in the cache if the value is not already cached.
     ///
     /// # Performance
     ///
-    /// Creating an instance of this type requires accessing the global cache of strings, which
-    /// involves taking a lock. When multiple threads are allocating lots of strings there may be
-    /// contention.
-    ///
-    /// Each string allocated is hashed for lookup in the cache.
+    /// Creating an instance of this type for strings longer than the maximum inline size requires
+    /// accessing the global cache of strings, which involves taking a lock. When multiple threads
+    /// are allocating lots of strings there may be contention. Each string allocated is hashed for
+    /// lookup in the cache.
     pub fn new(s: impl AsRef<[u8]> + Into<Vec<u8>>) -> Self {
         Self(RawRepr::new(s))
     }
@@ -445,7 +490,7 @@ impl From<&'_ [u8]> for FlyByteStr {
 impl<const N: usize> From<[u8; N]> for FlyByteStr {
     #[inline]
     fn from(s: [u8; N]) -> Self {
-        Self::new(&s)
+        Self::new(s)
     }
 }
 
@@ -527,17 +572,17 @@ impl From<&Box<str>> for FlyByteStr {
     }
 }
 
-impl Into<BString> for FlyByteStr {
+impl From<FlyByteStr> for BString {
     #[inline]
-    fn into(self) -> BString {
-        self.as_bstr().to_owned()
+    fn from(s: FlyByteStr) -> BString {
+        s.as_bstr().to_owned()
     }
 }
 
-impl Into<Vec<u8>> for FlyByteStr {
+impl From<FlyByteStr> for Vec<u8> {
     #[inline]
-    fn into(self) -> Vec<u8> {
-        self.as_bytes().to_owned()
+    fn from(s: FlyByteStr) -> Vec<u8> {
+        s.as_bytes().to_owned()
     }
 }
 
@@ -682,20 +727,24 @@ impl Display for FlyByteStr {
     }
 }
 
+#[cfg(feature = "serde")]
 impl Serialize for FlyByteStr {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_bytes(self.as_bytes())
     }
 }
 
+#[cfg(feature = "serde")]
 impl<'d> Deserialize<'d> for FlyByteStr {
     fn deserialize<D: Deserializer<'d>>(deserializer: D) -> Result<Self, D::Error> {
         deserializer.deserialize_bytes(FlyByteStrVisitor)
     }
 }
 
+#[cfg(feature = "serde")]
 struct FlyByteStrVisitor;
 
+#[cfg(feature = "serde")]
 impl<'de> Visitor<'de> for FlyByteStrVisitor {
     type Value = FlyByteStr;
     fn expecting(&self, formatter: &mut Formatter<'_>) -> FmtResult {
@@ -789,8 +838,13 @@ impl RawRepr {
     #[inline]
     fn new_inline(s: &[u8]) -> Self {
         assert!(s.len() <= MAX_INLINE_SIZE);
-        let new = Self { inline: InlineRepr::new(s) };
-        assert!(new.is_inline(), "least significant bit must be 1 for inline strings");
+        let new = Self {
+            inline: InlineRepr::new(s),
+        };
+        assert!(
+            new.is_inline(),
+            "least significant bit must be 1 for inline strings"
+        );
         new
     }
 
@@ -814,7 +868,10 @@ impl RawRepr {
 
         let for_cache = Storage(new_storage);
         let new = Self { heap: new_storage };
-        assert!(!new.is_inline(), "least significant bit must be 0 for heap strings");
+        assert!(
+            !new.is_inline(),
+            "least significant bit must be 0 for heap strings"
+        );
         cache.insert(for_cache);
         new
     }
@@ -973,7 +1030,7 @@ const MAX_INLINE_SIZE: usize = std::mem::size_of::<NonNull<raw::Payload>>() - 1;
 // Guard rail to make sure we never end up with an incorrect inline size encoding. Ensure that
 // MAX_INLINE_SIZE is always smaller than the maximum size we can represent in a byte with the LSB
 // reserved.
-static_assertions::const_assert!((std::u8::MAX >> 1) as usize >= MAX_INLINE_SIZE);
+static_assertions::const_assert!((u8::MAX >> 1) as usize >= MAX_INLINE_SIZE);
 
 impl InlineRepr {
     #[inline]
@@ -986,7 +1043,10 @@ impl InlineRepr {
         let mut contents = [0u8; MAX_INLINE_SIZE];
         contents[..s.len()].copy_from_slice(s);
 
-        Self { masked_len, contents }
+        Self {
+            masked_len,
+            contents,
+        }
     }
 
     #[inline]
@@ -1083,7 +1143,11 @@ mod tests {
         let bytes_cached = FlyByteStr::new(contents);
         assert_eq!(cached, cached.clone(), "must be equal to itself");
         assert_eq!(cached, contents, "must be equal to the original");
-        assert_eq!(cached, contents.to_owned(), "must be equal to an owned copy of the original");
+        assert_eq!(
+            cached,
+            contents.to_owned(),
+            "must be equal to an owned copy of the original"
+        );
         assert_eq!(cached, bytes_cached);
 
         // test inequality too
@@ -1175,11 +1239,19 @@ mod tests {
         assert_eq!(num_strings_in_global_cache(), 0);
 
         let original = FlyStr::new(contents);
-        assert_eq!(num_strings_in_global_cache(), 1, "only one string allocated");
+        assert_eq!(
+            num_strings_in_global_cache(),
+            1,
+            "only one string allocated"
+        );
         assert_eq!(original.0.refcount(), Some(1), "one copy on stack");
 
         let cloned = original.clone();
-        assert_eq!(num_strings_in_global_cache(), 1, "cloning just incremented refcount");
+        assert_eq!(
+            num_strings_in_global_cache(),
+            1,
+            "cloning just incremented refcount"
+        );
         assert_eq!(cloned.0.refcount(), Some(2), "two copies on stack");
 
         let deduped = FlyStr::new(contents);
@@ -1196,11 +1268,19 @@ mod tests {
         assert_eq!(num_strings_in_global_cache(), 0);
 
         let original = FlyByteStr::new(contents);
-        assert_eq!(num_strings_in_global_cache(), 1, "only one string allocated");
+        assert_eq!(
+            num_strings_in_global_cache(),
+            1,
+            "only one string allocated"
+        );
         assert_eq!(original.0.refcount(), Some(1), "one copy on stack");
 
         let cloned = original.clone();
-        assert_eq!(num_strings_in_global_cache(), 1, "cloning just incremented refcount");
+        assert_eq!(
+            num_strings_in_global_cache(),
+            1,
+            "cloning just incremented refcount"
+        );
         assert_eq!(cloned.0.refcount(), Some(2), "two copies on stack");
 
         let deduped = FlyByteStr::new(contents);
@@ -1219,7 +1299,11 @@ mod tests {
         assert_eq!(num_strings_in_global_cache(), 1, "string was allocated");
 
         let _bytes = FlyByteStr::from(MIN_LEN_LONG_STRING);
-        assert_eq!(num_strings_in_global_cache(), 1, "bytestring was pulled from cache");
+        assert_eq!(
+            num_strings_in_global_cache(),
+            1,
+            "bytestring was pulled from cache"
+        );
     }
 
     #[test_case(MIN_LEN_LONG_STRING ; "barely long strings")]
@@ -1229,7 +1313,11 @@ mod tests {
         reset_global_cache();
 
         let alloced = FlyStr::new(contents);
-        assert_eq!(num_strings_in_global_cache(), 1, "only one string allocated");
+        assert_eq!(
+            num_strings_in_global_cache(),
+            1,
+            "only one string allocated"
+        );
         drop(alloced);
         assert_eq!(num_strings_in_global_cache(), 0, "last reference dropped");
     }
@@ -1241,7 +1329,11 @@ mod tests {
         reset_global_cache();
 
         let alloced = FlyByteStr::new(contents);
-        assert_eq!(num_strings_in_global_cache(), 1, "only one string allocated");
+        assert_eq!(
+            num_strings_in_global_cache(),
+            1,
+            "only one string allocated"
+        );
         drop(alloced);
         assert_eq!(num_strings_in_global_cache(), 0, "last reference dropped");
     }
@@ -1265,10 +1357,18 @@ mod tests {
 
         // re-insert the same cmstring
         set.insert(first);
-        assert_eq!(set.len(), 1, "set did not grow because the same string was inserted as before");
+        assert_eq!(
+            set.len(),
+            1,
+            "set did not grow because the same string was inserted as before"
+        );
 
         set.insert(second.clone());
-        assert_eq!(set.len(), 2, "inserting a different string must mutate the set");
+        assert_eq!(
+            set.len(),
+            2,
+            "inserting a different string must mutate the set"
+        );
         assert!(set.contains(&second));
 
         // re-insert the second cmstring
@@ -1295,10 +1395,18 @@ mod tests {
 
         // re-insert the same string
         set.insert(first);
-        assert_eq!(set.len(), 1, "set did not grow because the same string was inserted as before");
+        assert_eq!(
+            set.len(),
+            1,
+            "set did not grow because the same string was inserted as before"
+        );
 
         set.insert(second.clone());
-        assert_eq!(set.len(), 2, "inserting a different string must mutate the set");
+        assert_eq!(
+            set.len(),
+            2,
+            "inserting a different string must mutate the set"
+        );
         assert!(set.contains(&second));
 
         // re-insert the second string
@@ -1325,10 +1433,18 @@ mod tests {
 
         // re-insert the same cmstring
         set.insert(first);
-        assert_eq!(set.len(), 1, "set did not grow because the same string was inserted as before");
+        assert_eq!(
+            set.len(),
+            1,
+            "set did not grow because the same string was inserted as before"
+        );
 
         set.insert(second.clone());
-        assert_eq!(set.len(), 2, "inserting a different string must mutate the set");
+        assert_eq!(
+            set.len(),
+            2,
+            "inserting a different string must mutate the set"
+        );
         assert!(set.contains(&second));
 
         // re-insert the second cmstring
@@ -1355,10 +1471,18 @@ mod tests {
 
         // re-insert the same string
         set.insert(first);
-        assert_eq!(set.len(), 1, "set did not grow because the same string was inserted as before");
+        assert_eq!(
+            set.len(),
+            1,
+            "set did not grow because the same string was inserted as before"
+        );
 
         set.insert(second.clone());
-        assert_eq!(set.len(), 2, "inserting a different string must mutate the set");
+        assert_eq!(
+            set.len(),
+            2,
+            "inserting a different string must mutate the set"
+        );
         assert!(set.contains(&second));
 
         // re-insert the second string
@@ -1366,6 +1490,7 @@ mod tests {
         assert_eq!(set.len(), 2);
     }
 
+    #[cfg(feature = "serde")]
     #[test_case("" ; "empty string")]
     #[test_case(SHORT_STRING ; "short strings")]
     #[test_case(MAX_LEN_SHORT_STRING ; "max len short strings")]
@@ -1381,6 +1506,7 @@ mod tests {
         assert_eq!(s, serde_json::from_str::<FlyStr>(&as_json).unwrap());
     }
 
+    #[cfg(feature = "serde")]
     #[test_case("" ; "empty string")]
     #[test_case(SHORT_STRING ; "short strings")]
     #[test_case(MAX_LEN_SHORT_STRING ; "max len short strings")]
