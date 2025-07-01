@@ -20,6 +20,7 @@ extern crate alloc;
 mod internal {
     pub(super) mod base;
     pub(super) mod counters;
+    pub(super) mod settings;
 }
 
 pub use internal::counters::{
@@ -33,3 +34,5 @@ pub use internal::base::{
     UdpSocketSet, UdpSocketState, UdpSocketTxMetadata, UdpState, UdpStateContext,
     UseUdpIpTransportContextBlanket,
 };
+
+pub use internal::settings::UdpSettings;

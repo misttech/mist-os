@@ -11,7 +11,7 @@ use futures::TryStreamExt as _;
 use log::error;
 use netstack3_core::tcp::TcpSettings;
 use netstack3_core::types::{BufferSizeSettings, SynchronizedWriterRcu};
-use netstack3_core::SettingsContext;
+use netstack3_core::{MapDerefExt as _, SettingsContext};
 use once_cell::sync::Lazy;
 use {
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
@@ -222,6 +222,10 @@ fn get_device() -> fnet_settings::Device {
 pub(crate) struct Settings {
     pub(crate) interface_defaults: SynchronizedWriterRcu<InterfaceConfig<DeviceNeighborConfig>>,
     pub(crate) tcp: SynchronizedWriterRcu<TcpSettings>,
+    pub(crate) udp: SynchronizedWriterRcu<UdpSettings>,
+    pub(crate) icmp: SynchronizedWriterRcu<IcmpSettings>,
+    pub(crate) device: SynchronizedWriterRcu<DeviceLayerSettings>,
+    pub(crate) ip: SynchronizedWriterRcu<IpLayerSettings>,
 }
 
 impl Settings {
@@ -229,6 +233,10 @@ impl Settings {
         Self {
             interface_defaults: SynchronizedWriterRcu::new(InterfaceConfig::new(interface)),
             tcp: SynchronizedWriterRcu::new(default_tcp_settings()),
+            udp: Default::default(),
+            icmp: Default::default(),
+            device: Default::default(),
+            ip: Default::default(),
         }
     }
 }
@@ -254,8 +262,75 @@ fn default_tcp_settings() -> TcpSettings {
     TcpSettings { receive_buffer, send_buffer }
 }
 
+fn default_dgram_rcvbuf_sizes() -> BufferSizeSettings<NonZeroUsize> {
+    // These values were picked to match Linux defaults.
+    const DEFAULT_DATAGRAM_MIN_RCVBUF: NonZeroUsize = NonZeroUsize::new(256).unwrap();
+    const DEFAULT_DATAGRAM_DEFAULT_RCVBUF: NonZeroUsize = NonZeroUsize::new(208 * 1024).unwrap();
+    const DEFAULT_DATAGRAM_MAX_RCVBUF: NonZeroUsize = NonZeroUsize::new(4 * 1024 * 1024).unwrap();
+    BufferSizeSettings::new(
+        DEFAULT_DATAGRAM_MIN_RCVBUF,
+        DEFAULT_DATAGRAM_DEFAULT_RCVBUF,
+        DEFAULT_DATAGRAM_MAX_RCVBUF,
+    )
+    .unwrap()
+}
+
+pub(crate) struct UdpSettings {
+    core: netstack3_core::udp::UdpSettings,
+    pub(crate) receive_buffer: BufferSizeSettings<NonZeroUsize>,
+}
+
+impl Default for UdpSettings {
+    fn default() -> Self {
+        Self { core: Default::default(), receive_buffer: default_dgram_rcvbuf_sizes() }
+    }
+}
+
+pub(crate) struct IcmpSettings {
+    echo_core: netstack3_core::icmp::IcmpEchoSettings,
+    pub(crate) echo_receive_buffer: BufferSizeSettings<NonZeroUsize>,
+}
+
+impl Default for IcmpSettings {
+    fn default() -> Self {
+        Self { echo_core: Default::default(), echo_receive_buffer: default_dgram_rcvbuf_sizes() }
+    }
+}
+
+pub(crate) struct DeviceLayerSettings {
+    pub(crate) packet_receive_buffer: BufferSizeSettings<NonZeroUsize>,
+}
+
+impl Default for DeviceLayerSettings {
+    fn default() -> Self {
+        Self { packet_receive_buffer: default_dgram_rcvbuf_sizes() }
+    }
+}
+
+pub(crate) struct IpLayerSettings {
+    pub(crate) raw_receive_buffer: BufferSizeSettings<NonZeroUsize>,
+}
+
+impl Default for IpLayerSettings {
+    fn default() -> Self {
+        Self { raw_receive_buffer: default_dgram_rcvbuf_sizes() }
+    }
+}
+
 impl SettingsContext<TcpSettings> for BindingsCtx {
     fn settings(&self) -> impl Deref<Target = TcpSettings> + '_ {
         self.settings.tcp.read()
+    }
+}
+
+impl SettingsContext<netstack3_core::udp::UdpSettings> for BindingsCtx {
+    fn settings(&self) -> impl Deref<Target = netstack3_core::udp::UdpSettings> + '_ {
+        self.settings.udp.read().map_deref(|u| &u.core)
+    }
+}
+
+impl SettingsContext<netstack3_core::icmp::IcmpEchoSettings> for BindingsCtx {
+    fn settings(&self) -> impl Deref<Target = netstack3_core::icmp::IcmpEchoSettings> + '_ {
+        self.settings.icmp.read().map_deref(|i| &i.echo_core)
     }
 }

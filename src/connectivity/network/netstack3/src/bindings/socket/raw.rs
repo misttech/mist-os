@@ -28,6 +28,7 @@ use {
     fuchsia_async as fasync,
 };
 
+use crate::bindings::settings::IpLayerSettings;
 use crate::bindings::socket::queue::{BodyLen, MessageQueue};
 use crate::bindings::socket::{ErrnoError, IntoErrno, IpSockAddrExt, SockAddr};
 use crate::bindings::util::{
@@ -67,8 +68,10 @@ pub struct SocketState<I: Ip> {
 }
 
 impl<I: IpExt> SocketState<I> {
-    fn new(event: zx::EventPair) -> Self {
-        SocketState { rx_queue: Mutex::new(MessageQueue::new(event)) }
+    fn new(event: zx::EventPair, settings: &IpLayerSettings) -> Self {
+        SocketState {
+            rx_queue: Mutex::new(MessageQueue::new(event, settings.raw_receive_buffer.default())),
+        }
     }
 
     fn enqueue_rx_packet<B: SplitByteSlice>(&self, packet: &I::Packet<B>, device: WeakDeviceId) {
@@ -133,7 +136,8 @@ impl<I: IpExt> SocketWorkerState<I> {
             Err(e) => error!("socket failed to signal peer: {:?}", e),
         };
 
-        let id = ctx.api().raw_ip_socket().create(proto, SocketState::new(local_event));
+        let state = SocketState::new(local_event, &*ctx.bindings_ctx().settings.ip.read());
+        let id = ctx.api().raw_ip_socket().create(proto, state);
         SocketWorkerState { peer_event, id }
     }
 }

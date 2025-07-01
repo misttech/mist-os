@@ -28,6 +28,7 @@ mod event;
 mod frame;
 mod inspect;
 mod ip;
+mod map_deref;
 mod matchers;
 mod num;
 mod port_alloc;
@@ -72,6 +73,7 @@ pub use ip::{
     BroadcastIpExt, IcmpErrorCode, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt,
     IpTypesIpExt, Mark, MarkDomain, MarkStorage, Marks, Mms, WrapBroadcastMarker,
 };
+pub use map_deref::{MapDeref, MapDerefExt};
 pub use matchers::{DeviceNameMatcher, Matcher, SubnetMatcher};
 pub use num::PositiveIsize;
 pub use port_alloc::{simple_randomized_port_alloc, EphemeralPort, PortAllocImpl};

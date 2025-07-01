@@ -7,10 +7,12 @@
 use std::convert::{Infallible as Never, TryInto as _};
 use std::fmt::Debug;
 use std::hash::Hash;
-use std::num::{NonZeroU16, NonZeroU64, NonZeroU8, TryFromIntError};
-use std::ops::ControlFlow;
+use std::num::{NonZeroU16, NonZeroU64, NonZeroU8, NonZeroUsize, TryFromIntError};
+use std::ops::{ControlFlow, Deref};
 
 use either::Either;
+use netstack3_core::types::BufferSizeSettings;
+use netstack3_core::MapDerefExt as _;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_posix as fposix,
     fidl_fuchsia_posix_socket as fposix_socket,
@@ -86,6 +88,8 @@ pub(crate) trait Transport<I: Ip>: Debug + Sized + Send + Sync + 'static {
     }
 
     fn external_data(id: &Self::SocketId) -> &DatagramSocketExternalData<I>;
+
+    fn get_rcvbuf_settings(ctx: &mut Ctx) -> impl Deref<Target = BufferSizeSettings<NonZeroUsize>>;
 
     #[cfg(test)]
     fn collect_all_sockets(ctx: &mut Ctx) -> Vec<Self::SocketId>;
@@ -329,6 +333,10 @@ impl<I: IpExt> Transport<I> for Udp {
 
     fn external_data(id: &Self::SocketId) -> &DatagramSocketExternalData<I> {
         id.external_data()
+    }
+
+    fn get_rcvbuf_settings(ctx: &mut Ctx) -> impl Deref<Target = BufferSizeSettings<NonZeroUsize>> {
+        ctx.bindings_ctx().settings.udp.read().map_deref(|u| &u.receive_buffer)
     }
 
     #[cfg(test)]
@@ -695,6 +703,10 @@ impl<I: IpExt> Transport<I> for IcmpEcho {
 
     fn external_data(id: &Self::SocketId) -> &DatagramSocketExternalData<I> {
         id.external_data()
+    }
+
+    fn get_rcvbuf_settings(ctx: &mut Ctx) -> impl Deref<Target = BufferSizeSettings<NonZeroUsize>> {
+        ctx.bindings_ctx().settings.icmp.read().map_deref(|i| &i.echo_receive_buffer)
     }
 
     #[cfg(test)]
@@ -1248,7 +1260,10 @@ where
     fn new(ctx: &mut Ctx, properties: SocketWorkerProperties) -> Self {
         let (local_event, peer_event) = SocketEventPair::create();
         let external_data = DatagramSocketExternalData {
-            message_queue: CoreMutex::new(MessageQueue::new(local_event.clone())),
+            message_queue: CoreMutex::new(MessageQueue::new(
+                local_event.clone(),
+                <T as Transport<I>>::get_rcvbuf_settings(ctx).default(),
+            )),
         };
         let id = T::create_unbound(ctx, external_data, local_event);
 
@@ -1865,13 +1880,19 @@ where
             .message_queue
             .lock()
             .max_available_messages_size()
+            .get()
             .try_into()
             .unwrap_or(u64::MAX)
     }
 
     fn set_max_receive_buffer_size(&mut self, max_bytes: u64) {
         let max_bytes = max_bytes.try_into().ok_checked::<TryFromIntError>().unwrap_or(usize::MAX);
-        self.external_data().message_queue.lock().set_max_available_messages_size(max_bytes)
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        let settings = <T as Transport<I>>::get_rcvbuf_settings(ctx);
+        <T as Transport<I>>::external_data(id)
+            .message_queue
+            .lock()
+            .set_max_available_messages_size(max_bytes, &*settings)
     }
 
     /// Handles a [POSIX socket connect request].
@@ -2716,7 +2737,6 @@ mod tests {
     use crate::bindings::integration_tests::{
         test_ep_name, StackSetupBuilder, TestSetup, TestSetupBuilder, TestStack,
     };
-    use crate::bindings::socket::queue::MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE;
     use crate::bindings::socket::testutil::TestSockAddr;
     use crate::bindings::socket::{ZXSIO_SIGNAL_INCOMING, ZXSIO_SIGNAL_OUTGOING};
     use net_types::ip::{IpAddr, IpAddress};
@@ -3774,13 +3794,16 @@ mod tests {
         let addr =
             A::create(<<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(), 200);
         socket.bind(&addr).await.unwrap().expect("bind should succeed");
+        let min_recv_buf =
+            <T as Transport<<A::AddrType as IpAddress>::Version>>::get_rcvbuf_settings(
+                &mut t.get_mut(0).ctx(),
+            )
+            .min()
+            .get();
 
         const SENT_PACKETS: u8 = 10;
         for i in 0..SENT_PACKETS {
-            let buf = prepare_buffer_to_send::<A>(
-                proto,
-                vec![i; MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE],
-            );
+            let buf = prepare_buffer_to_send::<A>(proto, vec![i; min_recv_buf]);
             let sent: usize = socket
                 .send_msg(
                     Some(&addr),
@@ -3849,7 +3872,7 @@ mod tests {
                 &data,
                 &expected_buffer_to_receive::<A>(
                     proto,
-                    vec![u8::try_from(i).unwrap(); MIN_OUTSTANDING_APPLICATION_MESSAGES_SIZE],
+                    vec![u8::try_from(i).unwrap(); min_recv_buf],
                     200,
                     <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),
                     <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),

@@ -13,6 +13,7 @@ rustc_library_with_features("netstack3-icmp-echo") {
   check_cfgs = [ "test" ]
   sources = [
     "src/lib.rs",
+    "src/settings.rs",
     "src/socket.rs",
   ]
   deps = [

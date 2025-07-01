@@ -29,7 +29,7 @@ use netstack3_base::sync::{RwLock, StrongRc};
 use netstack3_base::{
     AnyDevice, ContextPair, CoreTxMetadataContext, CounterContext, DeviceIdContext, IcmpIpExt,
     Inspector, InspectorDeviceExt, LocalAddressError, Mark, MarkDomain, PortAllocImpl,
-    ReferenceNotifiers, RemoveResourceResultWithContext, RngContext, SocketError,
+    ReferenceNotifiers, RemoveResourceResultWithContext, RngContext, SettingsContext, SocketError,
     StrongDeviceIdentifier, UninstantiableWrapper, WeakDeviceIdentifier,
 };
 use netstack3_datagram::{
@@ -47,6 +47,8 @@ use netstack3_ip::{
 use packet::{BufferMut, PacketBuilder, ParsablePacket as _, ParseBuffer as _};
 use packet_formats::icmp::{IcmpEchoReply, IcmpEchoRequest, IcmpPacketBuilder, IcmpPacketRaw};
 use packet_formats::ip::{IpProtoExt, Ipv4Proto, Ipv6Proto};
+
+use crate::internal::settings::IcmpEchoSettings;
 
 /// A marker trait for all IP extensions required by ICMP sockets.
 pub trait IpExt: datagram::IpExt + IcmpIpExt {}
@@ -224,7 +226,7 @@ pub type IcmpSocketTxMetadata<I, D, BT> = datagram::TxMetadata<I, D, Icmp<BT>>;
 /// The context required by the ICMP layer in order to deliver events related to
 /// ICMP sockets.
 pub trait IcmpEchoBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
-    IcmpEchoBindingsTypes + ReferenceNotifiers + RngContext
+    IcmpEchoBindingsTypes + ReferenceNotifiers + RngContext + SettingsContext<IcmpEchoSettings>
 {
     /// Receives an ICMP echo reply.
     fn receive_icmp_echo_reply<B: BufferMut>(
@@ -382,6 +384,8 @@ impl<BT: IcmpEchoBindingsTypes> DatagramSocketSpec for Icmp<BT> {
     type SerializeError = packet_formats::error::ParseError;
 
     type ExternalData<I: Ip> = BT::ExternalData<I>;
+    type Settings = IcmpEchoSettings;
+
     // NB: At present, there's no need to track per-socket ICMP counters.
     type Counters<I: Ip> = ();
     type SocketWritableListener = BT::SocketWritableListener;

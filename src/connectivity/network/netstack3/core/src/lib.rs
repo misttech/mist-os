@@ -116,7 +116,9 @@ pub mod inspect {
 
 /// Methods for dealing with ICMP sockets.
 pub mod icmp {
-    pub use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
+    pub use netstack3_icmp_echo::{
+        IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoSettings, IcmpSocketId,
+    };
 }
 
 /// The Internet Protocol, versions 4 and 6.
@@ -238,7 +240,7 @@ pub mod types {
 pub mod udp {
     pub use netstack3_udp::{
         SendError, SendToError, UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext,
-        UdpRemotePort, UdpSocketId,
+        UdpRemotePort, UdpSettings, UdpSocketId,
     };
 }
 
@@ -248,8 +250,8 @@ pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};
 pub use netstack3_base::{
     CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-    ReferenceNotifiers, RngContext, SettingsContext, TimerBindingsTypes, TimerContext, TxMetadata,
-    TxMetadataBindingsTypes,
+    MapDerefExt, ReferenceNotifiers, RngContext, SettingsContext, TimerBindingsTypes, TimerContext,
+    TxMetadata, TxMetadataBindingsTypes,
 };
 pub use state::{StackState, StackStateBuilder};
 pub use time::{AtomicInstant, Instant, TimerId};

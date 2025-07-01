@@ -32,7 +32,7 @@ use netstack3_base::{
     AnyDevice, BidirectionalConverter, ContextPair, CoreTxMetadataContext, CounterContext,
     DeviceIdContext, Inspector, InspectorDeviceExt, InstantContext, LocalAddressError, Mark,
     MarkDomain, PortAllocImpl, ReferenceNotifiers, RemoveResourceResultWithContext,
-    ResourceCounterContext as _, RngContext, SocketError, StrongDeviceIdentifier,
+    ResourceCounterContext as _, RngContext, SettingsContext, SocketError, StrongDeviceIdentifier,
     WeakDeviceIdentifier, ZonedAddressError,
 };
 use netstack3_datagram::{
@@ -68,6 +68,7 @@ use thiserror::Error;
 use crate::internal::counters::{
     CombinedUdpCounters, UdpCounterContext, UdpCountersWithSocket, UdpCountersWithoutSocket,
 };
+use crate::internal::settings::UdpSettings;
 
 /// Convenience alias to make names shorter.
 pub(crate) type UdpBoundSocketMap<I, D, BT> =
@@ -497,6 +498,7 @@ impl<BT: UdpBindingsTypes> DatagramSocketSpec for Udp<BT> {
     type SerializeError = UdpSerializeError;
 
     type ExternalData<I: Ip> = BT::ExternalData<I>;
+    type Settings = UdpSettings;
     type Counters<I: Ip> = UdpCountersWithSocket<I>;
     type SocketWritableListener = BT::SocketWritableListener;
 
@@ -1109,6 +1111,7 @@ pub trait UdpBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
     + ReferenceNotifiers
     + UdpBindingsTypes
     + SocketOpsFilterBindingContext<D>
+    + SettingsContext<UdpSettings>
 {
 }
 impl<
@@ -1118,7 +1121,8 @@ impl<
             + UdpReceiveBindingsContext<I, D>
             + ReferenceNotifiers
             + UdpBindingsTypes
-            + SocketOpsFilterBindingContext<D>,
+            + SocketOpsFilterBindingContext<D>
+            + SettingsContext<UdpSettings>,
         D: StrongDeviceIdentifier,
     > UdpBindingsContext<I, D> for BC
 {
@@ -7076,7 +7080,8 @@ mod tests {
         let mut primary_ids = Vec::new();
 
         let mut create_socket = || {
-            let primary = datagram::testutil::create_primary_id((), Default::default());
+            let primary =
+                datagram::testutil::create_primary_id((), Default::default(), &Default::default());
             let id = UdpSocketId(PrimaryRc::clone_strong(&primary));
             primary_ids.push(primary);
             id
@@ -7138,7 +7143,8 @@ mod tests {
         let mut primary_ids = Vec::new();
 
         let mut create_socket = || {
-            let primary = datagram::testutil::create_primary_id((), Default::default());
+            let primary =
+                datagram::testutil::create_primary_id((), Default::default(), &Default::default());
             let id = UdpSocketId(PrimaryRc::clone_strong(&primary));
             primary_ids.push(primary);
             id

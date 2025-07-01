@@ -32,6 +32,7 @@ rustc_library_with_features("netstack3-base") {
     "src/inspect.rs",
     "src/ip.rs",
     "src/lib.rs",
+    "src/map_deref.rs",
     "src/matchers.rs",
     "src/num.rs",
     "src/port_alloc.rs",

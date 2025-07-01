@@ -14,13 +14,7 @@ use netstack3_base::{PositiveIsize, WeakDeviceIdentifier};
 use packet::FragmentedBuffer;
 
 use crate::internal::datagram::{DatagramSocketSpec, IpExt};
-
-/// Maximum send buffer size. Value taken from Linux defaults.
-pub(crate) const MAX_SEND_BUFFER_SIZE: PositiveIsize = PositiveIsize::new(4 * 1024 * 1024).unwrap();
-/// Default send buffer size. Value taken from Linux defaults.
-pub(crate) const DEFAULT_SEND_BUFFER_SIZE: PositiveIsize = PositiveIsize::new(208 * 1024).unwrap();
-/// Minimum send buffer size. Value taken from Linux defaults.
-pub(crate) const MIN_SEND_BUFFER_SIZE: usize = 4 * 1024;
+use crate::internal::settings::DatagramSettings;
 
 #[derive(Derivative)]
 #[derivative(Debug(bound = ""))]
@@ -40,15 +34,18 @@ impl From<SendBufferFullError> for SendBufferError {
 }
 
 impl<S: DatagramSocketSpec> SendBufferTracking<S> {
-    pub(crate) fn new(listener: S::SocketWritableListener) -> Self {
-        Self(netstack3_base::socket::SendBufferTracking::new(DEFAULT_SEND_BUFFER_SIZE, listener))
+    pub(crate) fn new(listener: S::SocketWritableListener, settings: &DatagramSettings) -> Self {
+        Self(netstack3_base::socket::SendBufferTracking::new(
+            settings.send_buffer.default(),
+            listener,
+        ))
     }
 
-    pub(crate) fn set_capacity(&self, capacity: usize) {
+    pub(crate) fn set_capacity(&self, capacity: usize, settings: &DatagramSettings) {
         let Self(tracking) = self;
-        let capacity = PositiveIsize::new_unsigned(capacity.max(MIN_SEND_BUFFER_SIZE))
-            .unwrap_or(MAX_SEND_BUFFER_SIZE)
-            .min(MAX_SEND_BUFFER_SIZE);
+        let capacity = PositiveIsize::new_unsigned(capacity.max(settings.send_buffer.min().into()))
+            .unwrap_or_else(|| settings.send_buffer.max())
+            .min(settings.send_buffer.max());
         tracking.set_capacity(capacity);
     }
 

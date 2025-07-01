@@ -10,8 +10,8 @@ use core::fmt::Debug;
 
 use crate::sync::DynDebugReferences;
 use crate::testutil::{
-    FakeAtomicInstant, FakeCryptoRng, FakeEventCtx, FakeFrameCtx, FakeInstant, FakeTimerCtx,
-    WithFakeTimerContext,
+    AlwaysDefaultsSettingsContext, FakeAtomicInstant, FakeCryptoRng, FakeEventCtx, FakeFrameCtx,
+    FakeInstant, FakeTimerCtx, WithFakeTimerContext,
 };
 use crate::{
     ContextProvider, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
@@ -181,4 +181,9 @@ impl<TimerId, Event: Debug, State, FrameMeta> WithFakeTimerContext<TimerId>
     ) -> O {
         f(&mut self.timers)
     }
+}
+
+impl<TimerId, Event: Debug, State, FrameMeta> AlwaysDefaultsSettingsContext
+    for FakeBindingsCtx<TimerId, Event, State, FrameMeta>
+{
 }

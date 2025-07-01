@@ -208,11 +208,15 @@ impl BindingData {
             Err(e) => error!("socket failed to signal peer: {:?}", e),
         }
 
-        let id = ctx.api().device_socket().create(SocketState {
-            queue: Mutex::new(MessageQueue::new(local_event)),
+        let state = SocketState {
+            queue: Mutex::new(MessageQueue::new(
+                local_event,
+                ctx.bindings_ctx().settings.device.read().packet_receive_buffer.default(),
+            )),
             kind,
             bpf_filter: RwLock::new(None),
-        });
+        };
+        let id = ctx.api().device_socket().create(state);
 
         BindingData { peer_event, id }
     }
@@ -351,11 +355,14 @@ impl<'a> RequestHandler<'a> {
     }
 
     fn set_receive_buffer(self, size: u64) {
-        let Self { ctx: _, data: BindingData { peer_event: _, id } } = self;
+        let Self { ctx, data: BindingData { peer_event: _, id } } = self;
 
         let SocketState { queue, .. } = id.socket_state();
         let mut queue = queue.lock();
-        queue.set_max_available_messages_size(size.try_into().unwrap_or(usize::MAX))
+        queue.set_max_available_messages_size(
+            size.try_into().unwrap_or(usize::MAX),
+            &ctx.bindings_ctx().settings.device.read().packet_receive_buffer,
+        )
     }
 
     fn receive_buffer(self) -> u64 {
@@ -363,7 +370,7 @@ impl<'a> RequestHandler<'a> {
 
         let SocketState { queue, .. } = id.socket_state();
         let queue = queue.lock();
-        queue.max_available_messages_size().try_into().unwrap_or(u64::MAX)
+        queue.max_available_messages_size().get().try_into().unwrap_or(u64::MAX)
     }
 
     fn send_msg(
