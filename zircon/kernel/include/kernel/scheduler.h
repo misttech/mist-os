@@ -827,6 +827,12 @@ class Scheduler {
     queue.erase(*thread);
   }
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  // Adjusts the given fair thread's bandwidth and dynamic parameters for
+  // changes in bandwidth demand since it was last scheduled.
+  void AdjustFairBandwidth(Thread* thread, SchedTime now) TA_REQ(queue_lock_, thread->get_lock());
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+
   // Returns true if there is at least one eligible deadline thread in the
   // run queue.
   bool IsDeadlineThreadEligible(SchedTime eligible_time) TA_REQ(queue_lock_) {

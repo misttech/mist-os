@@ -141,12 +141,18 @@ struct WaitQueueOrderingTests {
 
     ss.start_time_ = start_time;
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+    ss.finish_time_ = start_time + SchedDefaultFairPeriod;
+    ss.time_slice_ns_ = SchedDefaultFairPeriod;
+    ss.time_slice_used_ns_ = SchedDuration{0};
+#else
     // The initial time slice, NSTR, and the virtual finish time are all
     // meaningless for a thread which is currently blocked. Just default them to
     // 0 for now.
     ss.effective_profile_.set_initial_time_slice_ns(SchedDuration{0});
     ss.effective_profile_.set_normalized_timeslice_remainder(SchedRemainder{0});
     ss.finish_time_ = SchedTime{0};
+#endif
   }
 
   static void ResetDeadline(Thread& t, SchedDuration rel_deadline,

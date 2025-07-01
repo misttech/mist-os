@@ -50,6 +50,34 @@ enum thread_state : uint8_t {
   THREAD_DEATH,
 };
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+
+// Fixed-point task weight.
+//
+// The 10bit fractional component accommodates the exponential curve defining
+// the priority-to-weight relation:
+//
+//      Weight = 1.1^(Priority - 31)
+//
+// This yields roughly a 4-5% bandwidth difference between adjacent priorities.
+//
+// Weights should not be negative, however, the value is signed for consistency
+// with zx_instant_mono_t (SchedTime) and zx_duration_mono_t (SchedDuration),
+// which are the primary types used in conjunction with SchedWeight. This is to
+// make it less likely that expressions involving weights are accidentally
+// promoted to unsigned.
+using SchedWeight = ffl::Fixed<int64_t, 10>;
+
+// Fixed-point utilization factor. Represents the ratio between capacity and
+// period or capacity and relative deadline, depending on which type of
+// utilization is being evaluated.
+//
+// The 30bit fractional component represents the utilization with a precision
+// of ~1ns.
+using SchedUtilization = ffl::Fixed<int64_t, 30>;
+
+#else
+
 // Fixed-point task weight.
 //
 // The 16bit fractional component accommodates the exponential curve defining
@@ -79,6 +107,8 @@ using SchedRemainder = ffl::Fixed<int64_t, 20>;
 // The 20bit fractional component represents the utilization with a precision
 // of ~1us.
 using SchedUtilization = ffl::Fixed<int64_t, 20>;
+
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
 // Fixed-point types wrapping time and duration types to make time expressions
 // cleaner in the scheduler code.
@@ -181,6 +211,10 @@ template <typename T>
 constexpr auto SchedMs(T milliseconds) {
   return ffl::FromInteger(ZX_MSEC(milliseconds));
 }
+
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+static constexpr SchedDuration SchedDefaultFairPeriod = SchedMs(10);
+#endif
 
 // Specifies the type of scheduling algorithm applied to a thread.
 enum class SchedDiscipline {
@@ -297,6 +331,44 @@ class SchedulerState {
 
   struct EffectiveProfile
       : public EffectiveProfileDirtyTracker<kSchedulerExtraInvariantValidation> {
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+    EffectiveProfile() = default;
+    explicit EffectiveProfile(const BaseProfile& base_profile)
+        : params_{FromBaseProfile(base_profile)} {}
+
+    SchedDiscipline discipline() const {
+      return ktl::holds_alternative<SchedWeight>(params_) ? SchedDiscipline::Fair
+                                                          : SchedDiscipline::Deadline;
+    }
+
+    bool IsFair() const { return discipline() == SchedDiscipline::Fair; }
+    bool IsDeadline() const { return discipline() == SchedDiscipline::Deadline; }
+
+    void SetFair(SchedWeight weight) { params_.emplace<SchedWeight>(weight); }
+    void SetDeadline(SchedDeadlineParams params) { params_.emplace<SchedDeadlineParams>(params); }
+
+    SchedWeight& weight() {
+      DEBUG_ASSERT(IsFair());
+      return ktl::get<SchedWeight>(params_);
+    }
+    SchedWeight weight() const {
+      DEBUG_ASSERT(IsFair());
+      return ktl::get<SchedWeight>(params_);
+    }
+    SchedWeight weight_or(SchedWeight alternative) const {
+      return IsFair() ? ktl::get<SchedWeight>(params_) : alternative;
+    }
+
+    SchedDeadlineParams& deadline() {
+      DEBUG_ASSERT(IsDeadline());
+      return ktl::get<SchedDeadlineParams>(params_);
+    }
+    SchedDeadlineParams deadline() const {
+      DEBUG_ASSERT(IsDeadline());
+      return ktl::get<SchedDeadlineParams>(params_);
+    }
+
+#else
     EffectiveProfile() : fair_{} {}
     explicit EffectiveProfile(const BaseProfile& base_profile) : fair_{} {
       if (base_profile.discipline == SchedDiscipline::Fair) {
@@ -362,8 +434,21 @@ class SchedulerState {
       DEBUG_ASSERT(IsFair());
       fair_.normalized_timeslice_remainder = normalized_timeslice_remainder;
     }
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
    private:
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+    using VariantType = ktl::variant<SchedWeight, SchedDeadlineParams>;
+    static VariantType FromBaseProfile(const BaseProfile& base_profile) {
+      if (base_profile.IsFair()) {
+        return {base_profile.fair.weight};
+      }
+      return {base_profile.deadline};
+    }
+
+    // The current fair or deadline parameters of the profile.
+    VariantType params_{SchedWeight{0}};
+#else
     // The scheduling discipline of this profile. Determines whether the thread
     // is enqueued on the fair or deadline run queues and whether the weight or
     // deadline parameters are used.
@@ -378,6 +463,7 @@ class SchedulerState {
       } fair_;
       SchedDeadlineParams deadline_;
     };
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
   };
 
   // Values stored in the SchedulerState of Thread instances which tracks the

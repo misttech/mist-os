@@ -71,9 +71,11 @@ KCOUNTER(counter_find_target_cpu_retries, "scheduler.find_target_cpu.retries")
 
 namespace {
 
+#if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 // The minimum possible weight and its reciprocal.
 constexpr SchedWeight kMinWeight = SchedulerState::ConvertPriorityToWeight(LOWEST_PRIORITY);
 constexpr SchedWeight kReciprocalMinWeight = 1 / kMinWeight;
+#endif  // !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
 // Utility operator to make expressions more succinct that update thread times
 // and durations of basic types using the fixed-point counterparts.
@@ -1287,7 +1289,9 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
   ProcessSaveStateList(now);
 
   Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&queue_lock_, SOURCE_TAG};
+#if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
   UpdateTimeline(now);
+#endif
 
   // When calling into reschedule, the current thread is only allowed to be in a
   // limited number of states, depending on where it came from.
@@ -1319,6 +1323,33 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
   // Update the energy consumption accumulators for the current task and
   // processor.
   UpdateEstimatedEnergyConsumption(current_thread, actual_runtime_ns);
+
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  // Update the used time slice before evaluating the next task. Scale the
+  // actual runtime of a deadline task by the relative performance of the CPU,
+  // effectively increasing the capacity of the task in proportion to the
+  // performance ratio. The remaining time slice may become negative due to
+  // scheduler overhead.
+  current_state->time_slice_used_ns_ +=
+      IsDeadlineThread(current_thread) ? ScaleDown(actual_runtime_ns) : actual_runtime_ns;
+
+  // Adjust the rate of the current thread when fair bandwidth demand changes.
+  if (IsThreadAdjustable(current_thread) && weight_total_ != scheduled_weight_total_ &&
+      current_state->remaining_time_slice_ns() > 0 && current_state->finish_time() > now) {
+    ktrace::Scope trace_adjust_rate =
+        LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "adjust_rate", ("total runtime", total_runtime_ns));
+    scheduled_weight_total_ = weight_total_;
+    AdjustFairBandwidth(current_thread, now);
+    target_preemption_time_ns_ = ktl::clamp<SchedTime>(
+        now + current_state->remaining_time_slice_ns(), now, current_state->finish_time());
+  }
+
+  // Use a small epsilon to avoid tripping the consistency check below due to
+  // rounding when scaling the time slice.
+  const SchedDuration time_slice_epsilon{100};
+  const bool timeslice_expired = now >= current_state->finish_time_ ||
+                                 current_state->remaining_time_slice_ns() <= time_slice_epsilon;
+#else
 
   // Adjust the rate of the current thread when demand changes. Changes in
   // demand could be due to threads entering or leaving the run queue, or due
@@ -1379,6 +1410,8 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
           ? total_runtime_ns >= current_state->time_slice_ns_
           : now >= current_state->finish_time_ ||
                 current_state->time_slice_ns_ <= deadline_time_slice_epsilon;
+
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
   // Check the consistency of the target preemption time and the current time
   // slice.
@@ -1905,6 +1938,10 @@ SchedTime Scheduler::ClampToEarlierDeadline(SchedTime completion_time, SchedTime
 }
 
 SchedTime Scheduler::NextThreadTimeslice(Thread* thread, SchedTime now) {
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  // TODO(https://fxbug.dev/428694298): Add implementation for unified bookkeeping.
+  return SchedTime{0};
+#else
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "next_timeslice");
 
   SchedulerState* const state = &thread->scheduler_state();
@@ -1950,10 +1987,14 @@ SchedTime Scheduler::NextThreadTimeslice(Thread* thread, SchedTime now) {
   }
 
   return target_preemption_time_ns;
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 }
 
 void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
                             SchedDuration total_runtime_ns) {
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  // TODO(https://fxbug.dev/428694298): Add implementation for unified bookkeeping.
+#else
   ktrace::Scope trace =
       LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "queue_thread", ("placement", ToStringRef(placement)));
 
@@ -2074,10 +2115,16 @@ void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
   if (placement != Placement::Adjustment) {
     TraceThreadQueueEvent("tqe_enque"_intern, thread);
   }
-
   trace =
       KTRACE_END_SCOPE(("start time", state->start_time_), ("finish time", state->finish_time_));
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 }
+
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+void Scheduler::AdjustFairBandwidth(Thread* thread, SchedTime now) {
+  // TODO(https://fxbug.dev/428694298): Add implementation for unified bookkeeping.
+}
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
 void Scheduler::Insert(SchedTime now, Thread* thread, Placement placement) {
   ktrace::Scope trace = LOCAL_KTRACE_BEGIN_SCOPE(DETAILED, "insert");
@@ -2415,12 +2462,25 @@ void Scheduler::Yield(Thread* const current_thread) {
 
   if (IsFairThread(current_thread)) {
     Scheduler& current_scheduler = *Get();
+    SchedulerState& current_state = current_thread->scheduler_state();
+
+    // If the thread is running in an eligible activation, expire the time slice
+    // to push it into the next activation, potentially allowing other eligible
+    // threads to run. However, if the start time is in the future, this thread
+    // is running because there were no other eligible fair threads to run and
+    // the eligible time was snapped forward. In that case, avoid pushing the
+    // activation further into the future.
     const SchedTime now = CurrentTime();
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+    if (current_state.start_time() < now) {
+      current_state.time_slice_used_ns_ = current_state.time_slice_ns_;
+      current_scheduler.RescheduleCommon(current_thread, now, trace.Completer());
+    }
+#else
     {
       // TODO(eieio,johngro): What is this protecting?
       Guard<MonitoredSpinLock, NoIrqSave> queue_guard{&current_scheduler.queue_lock_, SOURCE_TAG};
-      SchedulerState& current_state = current_thread->scheduler_state();
       EffectiveProfile& ep = current_thread->scheduler_state().effective_profile_;
 
       // Update the virtual timeline in preparation for snapping the thread's
@@ -2438,6 +2498,7 @@ void Scheduler::Yield(Thread* const current_thread) {
     }
 
     current_scheduler.RescheduleCommon(current_thread, now, trace.Completer());
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
   }
 }
 

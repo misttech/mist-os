@@ -705,6 +705,9 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
                                                            : actual_runtime_ns;
 
         state.runtime_ns_ += actual_runtime_ns;
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+        state.time_slice_used_ns_ += scaled_actual_runtime_ns;
+#else
         const SchedDuration new_tsr = (state.time_slice_ns_ <= scaled_actual_runtime_ns)
                                           ? SchedDuration{0}
                                           : (state.time_slice_ns_ - scaled_actual_runtime_ns);
@@ -713,6 +716,7 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
           cur_ep.set_normalized_timeslice_remainder(
               new_tsr / ktl::max(cur_ep.initial_time_slice_ns(), SchedDuration{1}));
         };
+#endif
 
         state.last_started_running_ = mono_now_;
         scheduler.start_of_current_time_slice_ns_ = mono_now_;
