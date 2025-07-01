@@ -1,14 +1,15 @@
 ## require optimize=none
 
-[zxdb] b pretty_types.cc:31
-Created Breakpoint 1 @ pretty_types.cc:31
+[zxdb] b pretty_types.cc:33
+Created Breakpoint 1 @ pretty_types.cc:33
 
 [zxdb] run-component fuchsia-pkg://fuchsia.com/zxdb_e2e_inferiors#meta/pretty_types.cm
-🛑 on bp 1 main() • pretty_types.cc:31
+🛑 on bp 1 main() • pretty_types.cc:33
 
 [zxdb] locals
 map = {{first = "a", second = 1}, {first = "b", second = 2}}
-p = (*)0x?? ➔ {Parent = {a = 0}, b = 1}
+p = (*)?? ➔ {Parent = {a = 0}, b = 1}
 set = {2, 1, 0}
+span = {'b', 'c'}
 sv = "abc"
-up = (*)0x?? ➔ {Parent = {a = 0}, b = 1}
+up = (*)?? ➔ {Parent = {a = 0}, b = 1}

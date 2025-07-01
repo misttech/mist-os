@@ -162,6 +162,12 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
   cpp_.emplace_back(InternalGlob("std::__2::vector<*>::iterator"),
                     std::make_unique<PrettyIterator>("*__i_"));
 
+  cpp_.emplace_back(
+      InternalGlob("std::__2::span<*>"),
+      std::make_unique<PrettyArray>(
+          "__data_", "__size_", "",
+          GetterList{{"size", "__size_"}, {"data", "__data_"}, {"empty", "__size_ == 0"}}));
+
   // Smart pointers.
   cpp_.emplace_back(InternalGlob("std::__2::unique_ptr<*>"),
                     std::make_unique<PrettyPointer>("__ptr_"));

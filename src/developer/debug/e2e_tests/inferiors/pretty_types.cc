@@ -5,6 +5,7 @@
 #include <iostream>
 #include <map>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -27,6 +28,7 @@ int main() {
   std::string_view sv = "abc";
   std::map<std::string, int> map = {{"a", 1}, {"b", 2}};
   std::unordered_set<int> set = {0, 1, 2};
+  auto span = std::span<const char>(sv.begin() + 1, 2);
 
   std::cout << sv << p->a;
 }
