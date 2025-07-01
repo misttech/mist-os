@@ -131,10 +131,8 @@ class TracingUsingFc(tracing.Tracing):
     def initialize(
         self,
         categories: list[str] | None = None,
-        buffer_size: int | None = 1,
+        buffer_size: int | None = None,
         start_timeout_milliseconds: int | None = None,
-        buffering_mode: f_tracing.BufferingMode
-        | None = f_tracing.BufferingMode.STREAMING,
     ) -> None:
         """Initializes a trace session.
 
@@ -190,7 +188,6 @@ class TracingUsingFc(tracing.Tracing):
                     categories=categories,
                     buffer_size_megabytes_hint=buffer_size,
                     start_timeout_milliseconds=start_timeout_milliseconds,
-                    buffering_mode=buffering_mode,
                 ),
                 output=trace_socket_server.take(),
             )
