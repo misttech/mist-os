@@ -290,15 +290,15 @@ void Scheduler::Dump(FILE* output_target, bool queue_state_only) {
         fprintf(output_target,
                 "\t-> name=%s weight=%s start=%" PRId64 " finish=%" PRId64 " ts=%" PRId64
                 " ema=%" PRId64 "\n",
-                active_thread_->name(), Format(ep.fair.weight).c_str(),
-                state.start_time_.raw_value(), state.finish_time_.raw_value(),
-                state.time_slice_ns_.raw_value(), state.expected_runtime_ns_.raw_value());
+                active_thread_->name(), Format(ep.weight()).c_str(), state.start_time_.raw_value(),
+                state.finish_time_.raw_value(), state.time_slice_ns_.raw_value(),
+                state.expected_runtime_ns_.raw_value());
       } else {
         fprintf(output_target,
                 "\t-> name=%s deadline=(%" PRId64 ", %" PRId64 ") start=%" PRId64 " finish=%" PRId64
                 " ts=%" PRId64 " ema=%" PRId64 "\n",
-                active_thread_->name(), ep.deadline.capacity_ns.raw_value(),
-                ep.deadline.deadline_ns.raw_value(), state.start_time_.raw_value(),
+                active_thread_->name(), ep.deadline().capacity_ns.raw_value(),
+                ep.deadline().deadline_ns.raw_value(), state.start_time_.raw_value(),
                 state.finish_time_.raw_value(), state.time_slice_ns_.raw_value(),
                 state.expected_runtime_ns_.raw_value());
       }
@@ -311,8 +311,8 @@ void Scheduler::Dump(FILE* output_target, bool queue_state_only) {
       fprintf(output_target,
               "\t   name=%s deadline=(%" PRId64 ", %" PRId64 ") start=%" PRId64 " finish=%" PRId64
               " ts=%" PRId64 " ema=%" PRId64 "\n",
-              thread.name(), ep.deadline.capacity_ns.raw_value(),
-              ep.deadline.deadline_ns.raw_value(), state.start_time_.raw_value(),
+              thread.name(), ep.deadline().capacity_ns.raw_value(),
+              ep.deadline().deadline_ns.raw_value(), state.start_time_.raw_value(),
               state.finish_time_.raw_value(), state.time_slice_ns_.raw_value(),
               state.expected_runtime_ns_.raw_value());
     }
@@ -324,7 +324,7 @@ void Scheduler::Dump(FILE* output_target, bool queue_state_only) {
       fprintf(output_target,
               "\t   name=%s weight=%s start=%" PRId64 " finish=%" PRId64 " ts=%" PRId64
               " ema=%" PRId64 "\n",
-              thread.name(), Format(ep.fair.weight).c_str(), state.start_time_.raw_value(),
+              thread.name(), Format(ep.weight()).c_str(), state.start_time_.raw_value(),
               state.finish_time_.raw_value(), state.time_slice_ns_.raw_value(),
               state.expected_runtime_ns_.raw_value());
     }
@@ -508,7 +508,7 @@ void Scheduler::InitializeFirstThread(Thread* thread) {
     queue_state.OnInsert();
     scheduler->active_thread_ = thread;
 
-    scheduler->weight_total_ = state.effective_profile_.fair.weight;
+    scheduler->weight_total_ = state.effective_profile_.weight();
     scheduler->runnable_fair_task_count_++;
     scheduler->UpdateTotalExpectedRuntime(state.expected_runtime_ns_);
   }
@@ -560,7 +560,7 @@ void Scheduler::RemoveFirstThread(Thread* thread) {
     DEBUG_ASSERT(scheduler->runnable_fair_task_count_ > 0);
     queue_state.OnRemove(INVALID_CPU);  // Set active to false.
     scheduler->active_thread_ = nullptr;
-    scheduler->weight_total_ -= state.effective_profile_.fair.weight;
+    scheduler->weight_total_ -= state.effective_profile_.weight();
     scheduler->runnable_fair_task_count_--;
     scheduler->UpdateTotalExpectedRuntime(-state.expected_runtime_ns_);
 
@@ -720,7 +720,7 @@ Scheduler::DequeueResult Scheduler::StealWork(SchedTime now,
 
         const SchedulerState& state = thread.scheduler_state();
         const EffectiveProfile& ep = state.effective_profile_;
-        const SchedUtilization scaled_utilization = ep.deadline.utilization * scale_up_factor;
+        const SchedUtilization scaled_utilization = ep.deadline().utilization * scale_up_factor;
         const bool is_scheduleable = scaled_utilization <= kThreadUtilizationMax;
 
         return check_affinity(thread) && is_scheduleable && !thread.has_migrate_fn();
@@ -1060,7 +1060,7 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
       return b_predicted_queue_time_ns > kInterClusterThreshold &&
              a_predicted_queue_time_ns < b_predicted_queue_time_ns;
     } else {
-      const SchedUtilization utilization = ep.deadline.utilization;
+      const SchedUtilization utilization = ep.deadline().utilization;
       const SchedUtilization scaled_utilization_a = utilization * a.scale_up_factor;
       const SchedUtilization scaled_utilization_b = utilization * b.scale_up_factor;
 
@@ -1088,7 +1088,7 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread) {
     }
 
     const SchedUtilization predicted_utilization = q.queue->predicted_deadline_utilization();
-    const SchedUtilization utilization = ep.deadline.utilization;
+    const SchedUtilization utilization = ep.deadline().utilization;
     const SchedUtilization scaled_utilization = utilization * q.scale_up_factor;
 
     return candidate_queue_time_ns <= kIntraClusterThreshold &&
@@ -1331,9 +1331,9 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
 
     const SchedDuration time_slice_ns = CalculateTimeslice(current_thread);
     const SchedDuration remaining_time_slice_ns =
-        time_slice_ns * ep.fair.normalized_timeslice_remainder;
+        time_slice_ns * ep.normalized_timeslice_remainder();
 
-    const bool timeslice_changed = time_slice_ns != ep.fair.initial_time_slice_ns;
+    const bool timeslice_changed = time_slice_ns != ep.initial_time_slice_ns();
     const bool timeslice_remaining = total_runtime_ns < remaining_time_slice_ns;
 
     // Update the preemption timer if necessary.
@@ -1344,7 +1344,7 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
       PreemptReset(current_cpu, now.raw_value(), preemption_time_ns.raw_value());
     }
 
-    ep.fair.initial_time_slice_ns = time_slice_ns;
+    ep.set_initial_time_slice_ns(time_slice_ns);
     current_state->time_slice_ns_ = remaining_time_slice_ns;
     trace_adjust_rate =
         KTRACE_END_SCOPE(("remaining time slice", Round<uint64_t>(remaining_time_slice_ns)),
@@ -1389,8 +1389,8 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
       " target_preemption_time_ns=%" PRId64 " total_runtime_ns=%" PRId64
       " actual_runtime_ns=%" PRId64 " finish_time=%" PRId64 " time_slice_ns=%" PRId64
       " start_of_current_time_slice_ns=%" PRId64,
-      IsDeadlineThread(current_thread) ? ep.deadline.capacity_ns.raw_value() : 0,
-      IsDeadlineThread(current_thread) ? ep.deadline.deadline_ns.raw_value() : 0, now.raw_value(),
+      IsDeadlineThread(current_thread) ? ep.deadline().capacity_ns.raw_value() : 0,
+      IsDeadlineThread(current_thread) ? ep.deadline().deadline_ns.raw_value() : 0, now.raw_value(),
       target_preemption_time_ns_.raw_value(), total_runtime_ns.raw_value(),
       actual_runtime_ns.raw_value(), current_state->finish_time_.raw_value(),
       current_state->time_slice_ns_.raw_value(), start_of_current_time_slice_ns_.raw_value());
@@ -1874,7 +1874,7 @@ SchedDuration Scheduler::CalculateTimeslice(const Thread* thread) {
 
   // Calculate the relative portion of the scheduling period.
   const SchedWeight proportional_time_slice_grans =
-      scheduling_period_grans_ * ep.fair.weight / weight_total_;
+      scheduling_period_grans_ * ep.weight() / weight_total_;
 
   // Ensure that the time slice is at least the minimum granularity.
   const int64_t time_slice_grans = Round<int64_t>(proportional_time_slice_grans);
@@ -1884,7 +1884,7 @@ SchedDuration Scheduler::CalculateTimeslice(const Thread* thread) {
   const SchedDuration time_slice_ns = minimum_time_slice_grans * minimum_granularity_ns_;
 
   trace = KTRACE_END_SCOPE(
-      ("weight", ep.fair.weight.raw_value()),
+      ("weight", ep.weight().raw_value()),
       ("total weight", KTRACE_ANNOTATED_VALUE(AssertHeld(queue_lock_), weight_total_.raw_value())));
   return time_slice_ns;
 }
@@ -1916,12 +1916,12 @@ SchedTime Scheduler::NextThreadTimeslice(Thread* thread, SchedTime now) {
     // completed.
     const SchedDuration time_slice_ns = CalculateTimeslice(thread);
     const SchedDuration remaining_time_slice_ns =
-        time_slice_ns * ep.fair.normalized_timeslice_remainder;
+        time_slice_ns * ep.normalized_timeslice_remainder();
 
     DEBUG_ASSERT(time_slice_ns > 0);
     DEBUG_ASSERT(remaining_time_slice_ns > 0);
 
-    ep.fair.initial_time_slice_ns = time_slice_ns;
+    ep.set_initial_time_slice_ns(time_slice_ns);
     state->time_slice_ns_ = remaining_time_slice_ns;
     target_preemption_time_ns = now + remaining_time_slice_ns;
 
@@ -1981,12 +1981,12 @@ void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
     const SchedRemainder normalized_timeslice_remainder =
         (placement == Placement::Insertion)
             ? SchedRemainder{0}
-            : state->time_slice_ns_ / ktl::max(ep.fair.initial_time_slice_ns, SchedDuration{1});
+            : state->time_slice_ns_ / ktl::max(ep.initial_time_slice_ns(), SchedDuration{1});
 
     DEBUG_ASSERT_MSG(normalized_timeslice_remainder <= SchedRemainder{1},
                      "time_slice_ns=%" PRId64 " initial_time_slice_ns=%" PRId64
                      " remainder=%" PRId64 "\n",
-                     state->time_slice_ns_.raw_value(), ep.fair.initial_time_slice_ns.raw_value(),
+                     state->time_slice_ns_.raw_value(), ep.initial_time_slice_ns().raw_value(),
                      normalized_timeslice_remainder.raw_value());
 
     // If we are unblocking (placement is Insertion), or we have exhausted our
@@ -2002,14 +2002,14 @@ void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
     // will trigger asserts when the thread is next scheduled).
     if (normalized_timeslice_remainder <= 0) {
       state->start_time_ = ktl::max(state->finish_time_, virtual_time_);
-      ep.fair.normalized_timeslice_remainder = SchedRemainder{1};
+      ep.set_normalized_timeslice_remainder(SchedRemainder{1});
     } else if (placement == Placement::Preemption) {
       DEBUG_ASSERT(state->time_slice_ns_ > 0);
-      ep.fair.normalized_timeslice_remainder = normalized_timeslice_remainder;
+      ep.set_normalized_timeslice_remainder(normalized_timeslice_remainder);
     }
 
     const SchedDuration scheduling_period_ns = scheduling_period_grans_ * minimum_granularity_ns_;
-    const SchedWeight rate = kReciprocalMinWeight * ep.fair.weight;
+    const SchedWeight rate = kReciprocalMinWeight * ep.weight();
     const SchedDuration delta_norm = scheduling_period_ns / rate;
     state->finish_time_ = state->start_time_ + delta_norm;
 
@@ -2029,11 +2029,11 @@ void Scheduler::QueueThread(Thread* thread, Placement placement, SchedTime now,
       // than the remaining time slice or negative if the thread blocked.
       const SchedDuration time_until_deadline_ns = state->finish_time_ - now;
       if (time_until_deadline_ns <= 0 || state->time_slice_ns_ <= 0) {
-        const SchedTime period_finish_ns = state->start_time_ + ep.deadline.deadline_ns;
+        const SchedTime period_finish_ns = state->start_time_ + ep.deadline().deadline_ns;
 
         state->start_time_ = now >= period_finish_ns ? now : period_finish_ns;
-        state->finish_time_ = state->start_time_ + ep.deadline.deadline_ns;
-        state->time_slice_ns_ = ep.deadline.capacity_ns;
+        state->finish_time_ = state->start_time_ + ep.deadline().deadline_ns;
+        state->time_slice_ns_ = ep.deadline().capacity_ns;
       }
       deadline_trace =
           KTRACE_END_SCOPE(("time until deadline", Round<uint64_t>(time_until_deadline_ns)),
@@ -2105,10 +2105,10 @@ void Scheduler::Insert(SchedTime now, Thread* thread, Placement placement) {
       UpdateTimeline(now);
       UpdatePeriod();
 
-      weight_total_ += ep.fair.weight;
+      weight_total_ += ep.weight();
       DEBUG_ASSERT(weight_total_ > 0);
     } else {
-      UpdateTotalDeadlineUtilization(ep.deadline.utilization);
+      UpdateTotalDeadlineUtilization(ep.deadline().utilization);
       runnable_deadline_task_count_++;
       DEBUG_ASSERT(runnable_deadline_task_count_ != 0);
     }
@@ -2143,10 +2143,10 @@ void Scheduler::Remove(SchedTime now, Thread* thread, cpu_num_t stolen_by) {
 
       UpdatePeriod();
 
-      weight_total_ -= effective_profile.fair.weight;
+      weight_total_ -= effective_profile.weight();
       DEBUG_ASSERT(weight_total_ >= 0);
     } else {
-      UpdateTotalDeadlineUtilization(-effective_profile.deadline.utilization);
+      UpdateTotalDeadlineUtilization(-effective_profile.deadline().utilization);
       DEBUG_ASSERT(runnable_deadline_task_count_ > 0);
       runnable_deadline_task_count_--;
     }
@@ -2433,8 +2433,8 @@ void Scheduler::Yield(Thread* const current_thread) {
       // The thread is re-evaluated with zero lag against other competing threads
       // and may skip lower priority threads with similar arrival times.
       current_state.finish_time_ = current_scheduler.virtual_time_;
-      ep.fair.initial_time_slice_ns = current_state.time_slice_ns_;
-      ep.fair.normalized_timeslice_remainder = SchedRemainder{1};
+      ep.set_initial_time_slice_ns(current_state.time_slice_ns_);
+      ep.set_normalized_timeslice_remainder(SchedRemainder{1});
     }
 
     current_scheduler.RescheduleCommon(current_thread, now, trace.Completer());

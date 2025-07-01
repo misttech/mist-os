@@ -2126,11 +2126,11 @@ void ThreadDumper::DumpLocked(const Thread* t, const char* match_owner, bool ful
   char profile_str[64]{0};
   if (const SchedulerState::EffectiveProfile& ep = t->scheduler_state().effective_profile();
       ep.IsFair()) {
-    snprintf(profile_str, sizeof(profile_str), "Fair (w %ld)", ep.fair.weight.raw_value());
+    snprintf(profile_str, sizeof(profile_str), "Fair (w %ld)", ep.weight().raw_value());
   } else {
     DEBUG_ASSERT(ep.IsDeadline());
     snprintf(profile_str, sizeof(profile_str), "Deadline (c,d = %ld,%ld)",
-             ep.deadline.capacity_ns.raw_value(), ep.deadline.deadline_ns.raw_value());
+             ep.deadline().capacity_ns.raw_value(), ep.deadline().deadline_ns.raw_value());
   }
 
   if (full_dump) {

@@ -887,8 +887,7 @@ class Scheduler {
     static SubtreeInvariants GetNodeValue(const Thread& node) TA_NO_THREAD_SAFETY_ANALYSIS {
       const SchedulerState& scheduler_state = node.scheduler_state();
       const EffectiveProfile& effective_profile = scheduler_state.effective_profile();
-      const SchedWeight min_weight =
-          effective_profile.IsFair() ? effective_profile.fair.weight : SchedWeight::Max();
+      const SchedWeight min_weight = effective_profile.weight_or(SchedWeight::Max());
 
       return {.min_finish_time = scheduler_state.finish_time_, .min_weight = min_weight};
     }

@@ -137,16 +137,15 @@ struct WaitQueueOrderingTests {
     ss.base_profile_.fair.weight = weight;
     ss.base_profile_.discipline = SchedDiscipline::Fair;
 
-    ss.effective_profile_.fair.weight = ss.base_profile_.fair.weight;
-    ss.effective_profile_.discipline = ss.base_profile_.discipline;
+    ss.effective_profile_.SetFair(ss.base_profile_.fair.weight);
 
     ss.start_time_ = start_time;
 
     // The initial time slice, NSTR, and the virtual finish time are all
     // meaningless for a thread which is currently blocked. Just default them to
     // 0 for now.
-    ss.effective_profile_.fair.initial_time_slice_ns = SchedDuration{0};
-    ss.effective_profile_.fair.normalized_timeslice_remainder = SchedRemainder{0};
+    ss.effective_profile_.set_initial_time_slice_ns(SchedDuration{0});
+    ss.effective_profile_.set_normalized_timeslice_remainder(SchedRemainder{0});
     ss.finish_time_ = SchedTime{0};
   }
 
@@ -161,11 +160,10 @@ struct WaitQueueOrderingTests {
     ss.base_profile_.discipline = SchedDiscipline::Deadline;
     ss.base_profile_.deadline = SchedDeadlineParams{kUtil, rel_deadline};
 
-    ss.effective_profile_.discipline = ss.base_profile_.discipline;
-    ss.effective_profile_.deadline = ss.base_profile_.deadline;
+    ss.effective_profile_.SetDeadline(ss.base_profile_.deadline);
 
     ss.start_time_ = start_time;
-    ss.finish_time_ = ss.start_time_ + ss.effective_profile_.deadline.deadline_ns;
+    ss.finish_time_ = ss.start_time_ + ss.effective_profile_.deadline().deadline_ns;
   }
 };
 

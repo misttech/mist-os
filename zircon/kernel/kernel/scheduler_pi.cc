@@ -204,16 +204,13 @@ SchedulerState::EffectiveProfile ComputeEffectiveProfile(const OwnedWaitQueue& o
 
   if (iss.ipvs.uncapped_utilization > SchedUtilization{0}) {
     DEBUG_ASSERT(iss.ipvs.min_deadline > SchedDuration{0});
-    ep.discipline = SchedDiscipline::Deadline;
-    ep.deadline = SchedDeadlineParams{
-        ktl::min(Scheduler::kThreadUtilizationMax, iss.ipvs.uncapped_utilization),
-        iss.ipvs.min_deadline};
+    ep.SetDeadline({ktl::min(Scheduler::kThreadUtilizationMax, iss.ipvs.uncapped_utilization),
+                    iss.ipvs.min_deadline});
   } else {
     // Note that we cannot assert that the total weight of this OWQ's IPVs has
     // dropped to zero at this point.  It is possible that there are threads
     // still in this queue, just none of them have inheritable profiles.
-    ep.discipline = SchedDiscipline::Fair;
-    ep.fair.weight = iss.ipvs.total_weight;
+    ep.SetFair(iss.ipvs.total_weight);
   }
 
   return ep;
@@ -286,8 +283,8 @@ class ThreadBaseProfileChangedOp
     } else {
       DEBUG_ASSERT(target_new_ep.IsDeadline());
       // TODO(johngro): use the `now` time latched at the start of ThreadBaseProfileChanged instead?
-      GetStartTime(target_) = SchedTime{current_mono_time()} + target_new_ep.deadline.deadline_ns;
-      GetFinishTime(target_) = GetStartTime(target_) + target_new_ep.deadline.deadline_ns;
+      GetStartTime(target_) = SchedTime{current_mono_time()} + target_new_ep.deadline().deadline_ns;
+      GetFinishTime(target_) = GetStartTime(target_) + target_new_ep.deadline().deadline_ns;
     }
     GetTimeSliceNs(target_) = SchedDuration{0};
   }
@@ -342,8 +339,8 @@ class UpstreamThreadBaseProfileChangedOp
       GetTimeSliceNs(target_) = SchedDuration{0};
     } else {
       DEBUG_ASSERT(target_new_ep.IsDeadline());
-      GetStartTime(target_) = Base::mono_now_ + target_new_ep.deadline.deadline_ns;
-      GetFinishTime(target_) = GetStartTime(target_) + target_new_ep.deadline.deadline_ns;
+      GetStartTime(target_) = Base::mono_now_ + target_new_ep.deadline().deadline_ns;
+      GetFinishTime(target_) = GetStartTime(target_) + target_new_ep.deadline().deadline_ns;
       GetTimeSliceNs(target_) = SchedDuration{0};
     }
   }
@@ -441,12 +438,12 @@ class JoinNodeToPiGraphOp
       const SchedDuration combined_ttad = ktl::min(target_ttad, upstream_ttad);
 
       GetFinishTime(target_) = ktl::min(GetFinishTime(target_), GetFinishTime(upstream_));
-      GetStartTime(target_) = GetFinishTime(target_) - target_new_ep.deadline.deadline_ns;
+      GetStartTime(target_) = GetFinishTime(target_) - target_new_ep.deadline().deadline_ns;
 
       const SchedDuration new_tsr = GetTimeSliceNs(target_) + GetTimeSliceNs(upstream_) +
-                                    (target_new_ep.deadline.utilization * combined_ttad) -
-                                    (target_old_ep.deadline.utilization * target_ttad) -
-                                    (upstream_ep().deadline.utilization * upstream_ttad);
+                                    (target_new_ep.deadline().utilization * combined_ttad) -
+                                    (target_old_ep.deadline().utilization * target_ttad) -
+                                    (upstream_ep().deadline().utilization * upstream_ttad);
 
       // Limit the TSR.  It cannot be less than zero nor can it be more than the
       // time until the absolute deadline of the new combined thread.
@@ -455,7 +452,7 @@ class JoinNodeToPiGraphOp
       // needs to turn into carried lag.
       GetTimeSliceNs(target_) = ktl::clamp<SchedDuration>(new_tsr, SchedDuration{0}, combined_ttad);
       GetFinishTime(target_) = ktl::min(GetFinishTime(target_), GetFinishTime(upstream_));
-      GetStartTime(target_) = GetFinishTime(target_) - target_new_ep.deadline.deadline_ns;
+      GetStartTime(target_) = GetFinishTime(target_) - target_new_ep.deadline().deadline_ns;
     }
   }
 
@@ -523,8 +520,8 @@ class SplitNodeFromPiGraphOp
       // change from deadline to fair, all of the deadline pressure must have been
       // coming from the upstream_ node.  Assert all of this.
       DEBUG_ASSERT(upstream_ep().IsDeadline());
-      DEBUG_ASSERT(target_old_ep.deadline.capacity_ns == upstream_ep().deadline.capacity_ns);
-      DEBUG_ASSERT(target_old_ep.deadline.deadline_ns == upstream_ep().deadline.deadline_ns);
+      DEBUG_ASSERT(target_old_ep.deadline().capacity_ns == upstream_ep().deadline().capacity_ns);
+      DEBUG_ASSERT(target_old_ep.deadline().deadline_ns == upstream_ep().deadline().deadline_ns);
 
       // Give the dynamic deadline parameters over to the upstream_ node.
       GetStartTime(upstream_) = GetStartTime(target_);
@@ -559,7 +556,7 @@ class SplitNodeFromPiGraphOp
         // timeslices to be sure that we divide by a utilization value which
         // is the sum of the two (now separated) utilization values.
         const SchedUtilization combined_uncapped_utilization =
-            target_new_ep.deadline.utilization + upstream_ep().deadline.utilization;
+            target_new_ep.deadline().utilization + upstream_ep().deadline().utilization;
 
         // If the upstream_ node's time till absolute deadline is zero, there
         // is no need to compute its time slice remaining right mono_now_; we
@@ -572,7 +569,7 @@ class SplitNodeFromPiGraphOp
           // Looks like we need to compute this value after all.
           const SchedDuration upstream_ttad = GetFinishTime(upstream_) - mono_now_;
           const SchedDuration new_upstream_tsr =
-              upstream_ep().deadline.utilization *
+              upstream_ep().deadline().utilization *
               ((GetTimeSliceNs(target_) / combined_uncapped_utilization) + upstream_ttad -
                target_ttad);
 
@@ -594,7 +591,7 @@ class SplitNodeFromPiGraphOp
         // recompute its start time so that the distance between the
         // absolute deadline and the start time is equal to the new relative
         // deadline of the target_.
-        GetStartTime(target_) = GetFinishTime(target_) - target_new_ep.deadline.deadline_ns;
+        GetStartTime(target_) = GetFinishTime(target_) - target_new_ep.deadline().deadline_ns;
 
         // The time till absolute deadline of the pre and post split target_
         // remains the same, so the ttad contributions to the timeslice
@@ -605,7 +602,7 @@ class SplitNodeFromPiGraphOp
         // Use an intermediate with the same fractional precision as the
         // utilization operands before scaling the non-fractional timeslice.
         const SchedUtilization utilization_ratio =
-            target_new_ep.deadline.utilization / combined_uncapped_utilization;
+            target_new_ep.deadline().utilization / combined_uncapped_utilization;
         const SchedDuration new_target_tsr = GetTimeSliceNs(target_) * utilization_ratio;
 
         // TODO(johngro): once again, need to consider carried lag here.
@@ -713,8 +710,8 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
                                           : (state.time_slice_ns_ - scaled_actual_runtime_ns);
         state.time_slice_ns_ = new_tsr;
         if (EffectiveProfile& cur_ep = state.effective_profile_; cur_ep.IsFair()) {
-          cur_ep.fair.normalized_timeslice_remainder =
-              new_tsr / ktl::max(cur_ep.fair.initial_time_slice_ns, SchedDuration{1});
+          cur_ep.set_normalized_timeslice_remainder(
+              new_tsr / ktl::max(cur_ep.initial_time_slice_ns(), SchedDuration{1}));
         };
 
         state.last_started_running_ = mono_now_;
@@ -730,18 +727,18 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
       // Update the scheduler bookkeeping, if necessary.
       if (disposition == Disposition::Associated || disposition == Disposition::Enqueued) {
         if (old_ep.IsFair()) {
-          scheduler.weight_total_ -= old_ep.fair.weight;
+          scheduler.weight_total_ -= old_ep.weight();
           --scheduler.runnable_fair_task_count_;
         } else {
-          scheduler.UpdateTotalDeadlineUtilization(-old_ep.deadline.utilization);
+          scheduler.UpdateTotalDeadlineUtilization(-old_ep.deadline().utilization);
           --scheduler.runnable_deadline_task_count_;
         }
 
         if (new_ep.IsFair()) {
-          scheduler.weight_total_ += new_ep.fair.weight;
+          scheduler.weight_total_ += new_ep.weight();
           ++scheduler.runnable_fair_task_count_;
         } else {
-          scheduler.UpdateTotalDeadlineUtilization(new_ep.deadline.utilization);
+          scheduler.UpdateTotalDeadlineUtilization(new_ep.deadline().utilization);
           ++scheduler.runnable_deadline_task_count_;
         }
       }

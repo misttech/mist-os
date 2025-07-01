@@ -185,7 +185,7 @@ SchedDuration WaitQueueCollection::MinInheritableRelativeDeadline() const {
   // relative deadline is either inheriting it's deadline from somewhere else,
   // or that its base deadline profile is inheritable.
   const SchedulerState& ss = t->scheduler_state();
-  const SchedDuration min_deadline = ss.effective_profile().deadline.deadline_ns;
+  const SchedDuration min_deadline = ss.effective_profile().deadline().deadline_ns;
   DEBUG_ASSERT((ss.base_profile_.IsDeadline() && (ss.base_profile_.inheritable == true)) ||
                (ss.inherited_profile_values_.min_deadline == min_deadline));
   return min_deadline;
@@ -292,7 +292,7 @@ void WaitQueueCollection::Insert(Thread* thread) {
     static_assert(OneYear >= (Scheduler::kDefaultTargetLatency / kMinPosWeight),
                   "SchedWeight resolution is too fine");
 
-    SchedTime key = sched_state.start_time() + (Scheduler::kDefaultTargetLatency / ep.fair.weight);
+    SchedTime key = sched_state.start_time() + (Scheduler::kDefaultTargetLatency / ep.weight());
     wq_state.blocked_threads_tree_sort_key_ =
         static_cast<uint64_t>(key.raw_value()) | kFairThreadSortKeyBit;
   } else {

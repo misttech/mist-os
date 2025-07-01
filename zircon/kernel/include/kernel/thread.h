@@ -2120,7 +2120,7 @@ inline SchedDuration WaitQueueCollection::MinRelativeDeadlineTraits::GetValue(co
     TA_NO_THREAD_SAFETY_ANALYSIS {
   const auto& scheduler_state = thread.scheduler_state();
   if (scheduler_state.effective_profile().IsDeadline()) {
-    return scheduler_state.effective_profile().deadline.deadline_ns;
+    return scheduler_state.effective_profile().deadline().deadline_ns;
   }
   return SchedDuration::Max();
 }
@@ -2164,8 +2164,8 @@ inline bool WaitQueueCollection::MinRelativeDeadlineTraits::Compare(ValueType a,
   // clang-format off
   if (a == nullptr) { return false; }
   if (b == nullptr) { return true; }
-  const SchedDuration a_deadline = a->scheduler_state().effective_profile().deadline.deadline_ns;
-  const SchedDuration b_deadline = b->scheduler_state().effective_profile().deadline.deadline_ns;
+  const SchedDuration a_deadline = a->scheduler_state().effective_profile().deadline().deadline_ns;
+  const SchedDuration b_deadline = b->scheduler_state().effective_profile().deadline().deadline_ns;
   return (a_deadline < b_deadline) || ((a_deadline == b_deadline) && (a < b));
   // clang-format on
 }

@@ -297,25 +297,77 @@ class SchedulerState {
 
   struct EffectiveProfile
       : public EffectiveProfileDirtyTracker<kSchedulerExtraInvariantValidation> {
-    EffectiveProfile() : fair{} {}
-    explicit EffectiveProfile(const BaseProfile& base_profile) : fair{} {
+    EffectiveProfile() : fair_{} {}
+    explicit EffectiveProfile(const BaseProfile& base_profile) : fair_{} {
       if (base_profile.discipline == SchedDiscipline::Fair) {
-        ZX_DEBUG_ASSERT(discipline == SchedDiscipline::Fair);
-        fair.weight = base_profile.fair.weight;
+        ZX_DEBUG_ASSERT(discipline_ == SchedDiscipline::Fair);
+        fair_.weight = base_profile.fair.weight;
       } else {
         ZX_DEBUG_ASSERT(base_profile.discipline == SchedDiscipline::Deadline);
-        discipline = SchedDiscipline::Deadline;
-        deadline = base_profile.deadline;
+        discipline_ = SchedDiscipline::Deadline;
+        deadline_ = base_profile.deadline;
       }
     }
 
-    bool IsFair() const { return discipline == SchedDiscipline::Fair; }
-    bool IsDeadline() const { return discipline == SchedDiscipline::Deadline; }
+    SchedDiscipline discipline() const { return discipline_; }
 
+    bool IsFair() const { return discipline() == SchedDiscipline::Fair; }
+    bool IsDeadline() const { return discipline() == SchedDiscipline::Deadline; }
+
+    void SetFair(SchedWeight weight) {
+      discipline_ = SchedDiscipline::Fair;
+      fair_.weight = weight;
+    }
+
+    void SetDeadline(SchedDeadlineParams params) {
+      discipline_ = SchedDiscipline::Deadline;
+      deadline_ = params;
+    }
+
+    SchedWeight& weight() {
+      DEBUG_ASSERT(IsFair());
+      return fair_.weight;
+    }
+    SchedWeight weight() const {
+      DEBUG_ASSERT(IsFair());
+      return fair_.weight;
+    }
+    SchedWeight weight_or(SchedWeight alternative) const {
+      return IsFair() ? fair_.weight : alternative;
+    }
+
+    SchedDeadlineParams& deadline() {
+      DEBUG_ASSERT(IsDeadline());
+      return deadline_;
+    }
+    SchedDeadlineParams deadline() const {
+      DEBUG_ASSERT(IsDeadline());
+      return deadline_;
+    }
+
+    SchedDuration initial_time_slice_ns() const {
+      DEBUG_ASSERT(IsFair());
+      return fair_.initial_time_slice_ns;
+    }
+    void set_initial_time_slice_ns(SchedDuration initial_time_slice_ns) {
+      DEBUG_ASSERT(IsFair());
+      fair_.initial_time_slice_ns = initial_time_slice_ns;
+    }
+
+    SchedRemainder normalized_timeslice_remainder() const {
+      DEBUG_ASSERT(IsFair());
+      return fair_.normalized_timeslice_remainder;
+    }
+    void set_normalized_timeslice_remainder(SchedRemainder normalized_timeslice_remainder) {
+      DEBUG_ASSERT(IsFair());
+      fair_.normalized_timeslice_remainder = normalized_timeslice_remainder;
+    }
+
+   private:
     // The scheduling discipline of this profile. Determines whether the thread
     // is enqueued on the fair or deadline run queues and whether the weight or
     // deadline parameters are used.
-    SchedDiscipline discipline{SchedDiscipline::Fair};
+    SchedDiscipline discipline_{SchedDiscipline::Fair};
 
     // The current fair or deadline parameters of the profile.
     union {
@@ -323,8 +375,8 @@ class SchedulerState {
         SchedWeight weight{0};
         SchedDuration initial_time_slice_ns{0};
         SchedRemainder normalized_timeslice_remainder{0};
-      } fair;
-      SchedDeadlineParams deadline;
+      } fair_;
+      SchedDeadlineParams deadline_;
     };
   };
 
@@ -445,7 +497,7 @@ class SchedulerState {
   const EffectiveProfile& effective_profile() const { return effective_profile_; }
 
   // Returns the type of scheduling discipline for this thread.
-  SchedDiscipline discipline() const { return effective_profile_.discipline; }
+  SchedDiscipline discipline() const { return effective_profile_.discipline(); }
 
   // Returns the key used to order the run queue.
   KeyType key() const { return {start_time_, reinterpret_cast<uintptr_t>(this)}; }
@@ -469,7 +521,7 @@ class SchedulerState {
 
   int32_t weight() const {
     return discipline() == SchedDiscipline::Fair
-               ? static_cast<int32_t>(effective_profile_.fair.weight.raw_value())
+               ? static_cast<int32_t>(effective_profile_.weight().raw_value())
                : ktl::numeric_limits<int32_t>::max();
   }
 
