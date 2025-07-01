@@ -68,10 +68,7 @@ if (is_host) {
       "//third_party/rust_crates:serde_json",
     ]
     inputs = [
-      # Configuration
       "askama.toml",
-
-      # Templates
       "templates/alias.askama",
       "templates/bits.askama",
       "templates/compat.askama",
@@ -83,9 +80,6 @@ if (is_host) {
       "templates/struct.askama",
       "templates/table.askama",
       "templates/union.askama",
-
-      # Helpers
-      "templates/constant.askama",
     ]
     rustenv = [ "CARGO_MANIFEST_DIR=${cargo_manifest_dir}" ]
     with_unit_tests = true
