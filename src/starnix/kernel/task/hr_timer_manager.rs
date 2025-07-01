@@ -46,25 +46,8 @@ fn duplicate_handle<H: HandleBased>(h: &H) -> Result<H, Errno> {
 }
 
 /// Waits forever synchronously for EVENT_SIGNALED.
-///
-/// For us there is no useful scenario where this wait times out and we can continue operating.
 fn wait_signaled_sync<H: HandleBased>(handle: &H) -> zx::WaitResult {
-    for retries_count in 0..2 {
-        let timeout = zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(30));
-        let result = handle.wait_handle(zx::Signals::EVENT_SIGNALED, timeout);
-        if let zx::WaitResult::Ok(_) = result {
-            return result;
-        }
-        ftrace::instant!(c"alarms", c"starnix:hrtimer:wait_timeout", ftrace::Scope::Process, "retries_count" => retries_count);
-        log_error!("wait_signaled_sync: not signaled yet: {result:?}");
-    }
-    // This is bad and should never happen. If it does, it's a bug that has to be
-    // found and fixed. There is no good way to proceed if these signals are not
-    // being signaled properly.
-    // TODO: b/428223204 - this should be fixed such that we never reach the panic.
-    panic!(
-        "wait_signaled_sync: HrTimer bug: exhausted wait timeout allowance count. See: b/428223204"
-    );
+    handle.wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::INFINITE)
 }
 
 /// Waits forever asynchronously for EVENT_SIGNALED.
