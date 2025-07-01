@@ -104,7 +104,7 @@ fn is_fastboot_match(info: &InterfaceInfo) -> bool {
 
     let serial = extract_debug_serial_number(info);
     if !errs.is_empty() {
-        log::debug!(
+        log::trace!(
             "Interface with serial {} is not valid fastboot match. Encountered errors: \n\t{}",
             serial,
             errs.into_iter().map(|e| e.to_string()).collect::<Vec<_>>().join("\n\t")
@@ -127,7 +127,7 @@ fn enumerate_interfaces<F>(mut cb: F)
 where
     F: FnMut(&InterfaceInfo),
 {
-    log::debug!("Enumerating USB fastboot interfaces");
+    log::trace!("Enumerating USB fastboot interfaces");
     let mut cb = |info: &InterfaceInfo| -> bool {
         if is_fastboot_match(info) {
             cb(info)
@@ -154,7 +154,7 @@ fn open_interface<F>(mut cb: F) -> Result<Interface>
 where
     F: FnMut(&InterfaceInfo) -> bool,
 {
-    log::debug!("Selecting USB fastboot interface to open");
+    log::trace!("Selecting USB fastboot interface to open");
 
     let mut open_cb = |info: &InterfaceInfo| -> bool {
         if is_fastboot_match(info) {
@@ -206,7 +206,7 @@ fn info_matches_serial(info: &InterfaceInfo, serial: &str) -> bool {
 }
 
 pub async fn open_interface_with_serial(serial: &str) -> Result<Interface> {
-    log::debug!("Opening USB fastboot interface with serial number: {}", serial);
+    log::trace!("Opening USB fastboot interface with serial number: {}", serial);
     let mut interface =
         open_interface(|info: &InterfaceInfo| -> bool { info_matches_serial(info, serial) })
             .with_context(|| format!("opening interface with serial number: {}", serial))?;
@@ -372,20 +372,20 @@ where
         // Enumerate interfaces
         let new_serials = finder.find_serial_numbers();
         let new_serials = BTreeSet::from_iter(new_serials);
-        log::debug!("found serials: {:#?}", new_serials);
+        log::trace!("found serials: {:#?}", new_serials);
         // Update Cache
         for serial in &new_serials {
             // Just because the serial is found doesnt mean that the target is ready
             if !opener.is_fastboot_usb(serial.as_str()).await {
-                log::debug!(
+                log::trace!(
                     "Skipping adding serial number: {serial} as it is not a Fastboot interface"
                 );
                 continue;
             }
 
-            log::debug!("Inserting new serial: {}", serial);
+            log::trace!("Inserting new serial: {}", serial);
             if serials.insert(serial.clone()) {
-                log::debug!("Sending discovered event for serial: {}", serial);
+                log::trace!("Sending discovered event for serial: {}", serial);
                 let _ = events_out.send(FastbootEvent::Discovered(serial.clone())).await;
                 log::trace!("Sent discovered event for serial: {}", serial);
             }
