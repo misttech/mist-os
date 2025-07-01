@@ -30,7 +30,7 @@
 # team ship a mechanism for updating Fuchsia that does not require IP networking, that functionality
 # should be moved to a higher-level product definition.
 
-bazel_product_bundle_prefix = "//products/minimal:minimal"
+bazel_product_bundle_prefix = "//products/minimal:product_bundle"
 
 # Packages to be published to universe that do not go through assembly.
 discoverable_package_labels = [ "//src/developer/debug/debug_agent" ]

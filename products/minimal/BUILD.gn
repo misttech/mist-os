@@ -13,19 +13,19 @@ assert(
 group("minimal") {
   testonly = true
   if (current_cpu == "x64") {
-    deps = [ ":minimal.x64" ]
+    deps = [ ":product_bundle.x64" ]
   } else if (current_cpu == "arm64") {
     deps = [
-      ":minimal.arm64",
-      ":minimal.vim3",
+      ":product_bundle.arm64",
+      ":product_bundle.vim3",
     ]
   } else if (current_cpu == "riscv64") {
-    deps = [ ":minimal.riscv64" ]
+    deps = [ ":product_bundle.riscv64" ]
   }
 }
 
 if (current_cpu == "x64") {
-  bazel_product_bundle("minimal.x64") {
+  bazel_product_bundle("product_bundle.x64") {
     testonly = true
     product_bundle_name = "minimal.x64"
     allow_eng_platform_bundle_use = true
@@ -41,7 +41,7 @@ if (current_cpu == "x64") {
 }
 
 if (current_cpu == "arm64") {
-  bazel_product_bundle("minimal.arm64") {
+  bazel_product_bundle("product_bundle.arm64") {
     testonly = true
     product_bundle_name = "minimal.arm64"
     allow_eng_platform_bundle_use = true
@@ -55,7 +55,7 @@ if (current_cpu == "arm64") {
     ]
   }
 
-  bazel_product_bundle("minimal.vim3") {
+  bazel_product_bundle("product_bundle.vim3") {
     testonly = true
     product_bundle_name = "minimal.vim3"
     allow_eng_platform_bundle_use = true
@@ -66,7 +66,7 @@ if (current_cpu == "arm64") {
     bazel_inputs_from_gn = [ "//boards/vim3:bazel_inputs" ]
   }
 
-  bazel_product_bundle("minimal.emac") {
+  bazel_product_bundle("product_bundle.emac") {
     testonly = true
     product_bundle_name = "minimal.emac"
     allow_eng_platform_bundle_use = true
@@ -79,7 +79,7 @@ if (current_cpu == "arm64") {
 }
 
 if (current_cpu == "riscv64") {
-  bazel_product_bundle("minimal.riscv64") {
+  bazel_product_bundle("product_bundle.riscv64") {
     testonly = true
     product_bundle_name = "minimal.riscv64"
     allow_eng_platform_bundle_use = true
