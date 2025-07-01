@@ -12,6 +12,7 @@ ffx_plugin("ffx_product") {
   config_data = [ "data/config.json" ]
 
   plugin_deps = [
+    "create:ffx_product_create",
     "create_old:ffx_product_create_old",
     "download:ffx_product_download",
     "get_artifacts:ffx_product_get_artifacts",
