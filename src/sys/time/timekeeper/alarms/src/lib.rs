@@ -62,13 +62,6 @@ static MAX_USEFUL_TICKS: LazyLock<u64> = LazyLock::new(|| *I32_MAX_AS_U64);
 /// Starnix, and should eventually no longer be critical.
 const MAIN_TIMER_ID: usize = 6;
 
-/// TODO(b/383062441): remove this special casing once Starnix hrtimer is fully
-/// migrated to multiplexed timer.
-/// A special-cased Starnix timer ID, used to allow cross-connection setup
-/// for Starnix only.
-const TEMPORARY_STARNIX_TIMER_ID: &str = "starnix-hrtimer";
-static TEMPORARY_STARNIX_CID: LazyLock<zx::Event> = LazyLock::new(|| zx::Event::create());
-
 /// This is what we consider a "long" delay in alarm operations.
 const LONG_DELAY_NANOS: i64 = 2000 * MSEC_IN_NANOS;
 
@@ -399,22 +392,8 @@ pub async fn serve(timer_loop: Rc<Loop>, requests: fta::WakeAlarmsRequestStream)
     .detach();
 }
 
-// Inject a constant KOID as connection ID (cid) if the singular alarm ID corresponds to a Starnix
-// alarm.
-// TODO(b/383062441): remove this special casing.
-fn compute_cid(cid: zx::Koid, alarm_id: &str) -> zx::Koid {
-    if alarm_id == TEMPORARY_STARNIX_TIMER_ID {
-        // Temporarily, the Starnix timer is a singleton and always gets the
-        // same CID.
-        TEMPORARY_STARNIX_CID.as_handle_ref().get_koid().expect("infallible")
-    } else {
-        cid
-    }
-}
-
 async fn handle_cancel(alarm_id: String, cid: zx::Koid, cmd: &mut mpsc::Sender<Cmd>) {
     let done = zx::Event::create();
-    let cid = compute_cid(cid, &alarm_id);
     let timer_id = TimerId { alarm_id: alarm_id.clone(), cid };
     if let Err(e) = cmd.send(Cmd::StopById { timer_id, done: clone_handle(&done) }).await {
         warn!("handle_request: error while trying to cancel: {}: {:?}", alarm_id, e);
@@ -446,7 +425,6 @@ async fn handle_request(
             // use take() to replace the struct with None so it does not need to leave
             // a Default in its place.
             let responder = Rc::new(RefCell::new(Some(responder)));
-            let cid = compute_cid(cid, &alarm_id);
 
             // Alarm is not scheduled yet!
             debug!(
