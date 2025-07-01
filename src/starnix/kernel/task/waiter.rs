@@ -1201,10 +1201,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_async_wait_exec() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let (local_socket, remote_socket) = zx::Socket::create_stream();
-        let pipe = create_fuchsia_pipe(&mut locked, &current_task, remote_socket, OpenFlags::RDWR)
-            .unwrap();
+        let pipe =
+            create_fuchsia_pipe(locked, &current_task, remote_socket, OpenFlags::RDWR).unwrap();
 
         const MEM_SIZE: usize = 1024;
         let mut output_buffer = VecOutputBuffer::new(MEM_SIZE);
@@ -1218,7 +1218,7 @@ mod tests {
             mappings: Default::default(),
         });
         let waiter = Waiter::new();
-        pipe.wait_async(&mut locked, &current_task, &waiter, FdEvents::POLLIN, handler)
+        pipe.wait_async(locked, &current_task, &waiter, FdEvents::POLLIN, handler)
             .expect("wait_async");
         let test_string_clone = test_string.clone();
 
@@ -1234,12 +1234,12 @@ mod tests {
             // this code would block on failure
 
             assert!(queue.lock().is_empty());
-            waiter.wait(&mut locked, &current_task).unwrap();
+            waiter.wait(locked, &current_task).unwrap();
             thread.join().expect("join thread")
         });
         queue.lock().iter().for_each(|item| assert!(item.events.contains(FdEvents::POLLIN)));
 
-        let read_size = pipe.read(&mut locked, &current_task, &mut output_buffer).unwrap();
+        let read_size = pipe.read(locked, &current_task, &mut output_buffer).unwrap();
 
         let no_written = write_count.get();
         assert_eq!(no_written, read_size);
@@ -1250,8 +1250,8 @@ mod tests {
     #[::fuchsia::test]
     async fn test_async_wait_cancel() {
         for do_cancel in [true, false] {
-            let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-            let event = new_eventfd(&mut locked, &current_task, 0, EventFdType::Counter, true);
+            let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+            let event = new_eventfd(locked, &current_task, 0, EventFdType::Counter, true);
             let waiter = Waiter::new();
             let queue: Arc<Mutex<VecDeque<ReadyItem>>> = Default::default();
             let handler = EventHandler::Enqueue(EnqueueEventHandler {
@@ -1261,7 +1261,7 @@ mod tests {
                 mappings: Default::default(),
             });
             let wait_canceler = event
-                .wait_async(&mut locked, &current_task, &waiter, FdEvents::POLLIN, handler)
+                .wait_async(locked, &current_task, &waiter, FdEvents::POLLIN, handler)
                 .expect("wait_async");
             if do_cancel {
                 wait_canceler.cancel();
@@ -1269,17 +1269,12 @@ mod tests {
             let add_val = 1u64;
             assert_eq!(
                 event
-                    .write(
-                        &mut locked,
-                        &current_task,
-                        &mut VecInputBuffer::new(&add_val.to_ne_bytes())
-                    )
+                    .write(locked, &current_task, &mut VecInputBuffer::new(&add_val.to_ne_bytes()))
                     .unwrap(),
                 std::mem::size_of::<u64>()
             );
 
-            let wait_result =
-                waiter.wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO);
+            let wait_result = waiter.wait_until(locked, &current_task, zx::MonotonicInstant::ZERO);
             let final_count = queue.lock().len();
             if do_cancel {
                 assert_eq!(wait_result, error!(ETIMEDOUT));
@@ -1293,19 +1288,19 @@ mod tests {
 
     #[::fuchsia::test]
     async fn single_waiter_multiple_waits_cancel_one_waiter_still_notified() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let wait_queue = WaitQueue::default();
         let waiter = Waiter::new();
         let wk1 = wait_queue.wait_async(&waiter);
         let _wk2 = wait_queue.wait_async(&waiter);
         wk1.cancel();
         wait_queue.notify_all();
-        assert!(waiter.wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO).is_ok());
+        assert!(waiter.wait_until(locked, &current_task, zx::MonotonicInstant::ZERO).is_ok());
     }
 
     #[::fuchsia::test]
     async fn multiple_waiters_cancel_one_other_still_notified() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let wait_queue = WaitQueue::default();
         let waiter1 = Waiter::new();
         let waiter2 = Waiter::new();
@@ -1313,15 +1308,13 @@ mod tests {
         let _wk2 = wait_queue.wait_async(&waiter2);
         wk1.cancel();
         wait_queue.notify_all();
-        assert!(waiter1
-            .wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO)
-            .is_err());
-        assert!(waiter2.wait_until(&mut locked, &current_task, zx::MonotonicInstant::ZERO).is_ok());
+        assert!(waiter1.wait_until(locked, &current_task, zx::MonotonicInstant::ZERO).is_err());
+        assert!(waiter2.wait_until(locked, &current_task, zx::MonotonicInstant::ZERO).is_ok());
     }
 
     #[::fuchsia::test]
     async fn test_wait_queue() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let queue = WaitQueue::default();
 
         let waiters = <[Waiter; 3]>::default();
@@ -1339,11 +1332,11 @@ mod tests {
         const INITIAL_NOTIFY_COUNT: usize = 2;
         let total_waiters = waiters.len();
         queue.notify_unordered_count(INITIAL_NOTIFY_COUNT);
-        assert_eq!(INITIAL_NOTIFY_COUNT, woken(&mut locked));
+        assert_eq!(INITIAL_NOTIFY_COUNT, woken(locked));
 
         // Only the remaining (unnotified) waiters should be notified.
         queue.notify_all();
-        assert_eq!(total_waiters - INITIAL_NOTIFY_COUNT, woken(&mut locked));
+        assert_eq!(total_waiters - INITIAL_NOTIFY_COUNT, woken(locked));
     }
 
     #[::fuchsia::test]

@@ -1219,7 +1219,7 @@ where
     do_attach(current_task.thread_group(), weak_task.clone(), attach_type, PtraceOptions::empty())?;
     if attach_type == PtraceAttachType::Attach {
         send_standard_signal(
-            &mut locked.cast_locked::<MmDumpable>(),
+            locked.cast_locked::<MmDumpable>(),
             &tracee,
             SignalInfo::default(SIGSTOP),
         );
@@ -1404,17 +1404,14 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_set_ptracer() {
-        let (kernel, mut tracee, mut locked) = create_kernel_task_and_unlocked();
-        let mut tracer = create_task(&mut locked, &kernel, "tracer");
+        let (kernel, mut tracee, locked) = create_kernel_task_and_unlocked();
+        let mut tracer = create_task(locked, &kernel, "tracer");
         kernel.ptrace_scope.store(RESTRICTED_SCOPE, Ordering::Relaxed);
-        assert_eq!(
-            sys_prctl(&mut locked, &mut tracee, PR_SET_PTRACER, 0xFFF, 0, 0, 0),
-            error!(EINVAL)
-        );
+        assert_eq!(sys_prctl(locked, &mut tracee, PR_SET_PTRACER, 0xFFF, 0, 0, 0), error!(EINVAL));
 
         assert_eq!(
             ptrace_attach(
-                &mut locked,
+                locked,
                 &mut tracer,
                 tracee.as_ref().task.tid,
                 PtraceAttachType::Attach,
@@ -1424,7 +1421,7 @@ mod tests {
         );
 
         assert!(sys_prctl(
-            &mut locked,
+            locked,
             &mut tracee,
             PR_SET_PTRACER,
             tracer.thread_group().leader as u64,
@@ -1434,10 +1431,10 @@ mod tests {
         )
         .is_ok());
 
-        let mut not_tracer = create_task(&mut locked, &kernel, "not-tracer");
+        let mut not_tracer = create_task(locked, &kernel, "not-tracer");
         assert_eq!(
             ptrace_attach(
-                &mut locked,
+                locked,
                 &mut not_tracer,
                 tracee.as_ref().task.tid,
                 PtraceAttachType::Attach,
@@ -1447,7 +1444,7 @@ mod tests {
         );
 
         assert!(ptrace_attach(
-            &mut locked,
+            locked,
             &mut tracer,
             tracee.as_ref().task.tid,
             PtraceAttachType::Attach,
@@ -1458,17 +1455,14 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_set_ptracer_any() {
-        let (kernel, mut tracee, mut locked) = create_kernel_task_and_unlocked();
-        let mut tracer = create_task(&mut locked, &kernel, "tracer");
+        let (kernel, mut tracee, locked) = create_kernel_task_and_unlocked();
+        let mut tracer = create_task(locked, &kernel, "tracer");
         kernel.ptrace_scope.store(RESTRICTED_SCOPE, Ordering::Relaxed);
-        assert_eq!(
-            sys_prctl(&mut locked, &mut tracee, PR_SET_PTRACER, 0xFFF, 0, 0, 0),
-            error!(EINVAL)
-        );
+        assert_eq!(sys_prctl(locked, &mut tracee, PR_SET_PTRACER, 0xFFF, 0, 0, 0), error!(EINVAL));
 
         assert_eq!(
             ptrace_attach(
-                &mut locked,
+                locked,
                 &mut tracer,
                 tracee.as_ref().task.tid,
                 PtraceAttachType::Attach,
@@ -1477,19 +1471,11 @@ mod tests {
             error!(EPERM)
         );
 
-        assert!(sys_prctl(
-            &mut locked,
-            &mut tracee,
-            PR_SET_PTRACER,
-            PR_SET_PTRACER_ANY as u64,
-            0,
-            0,
-            0
-        )
-        .is_ok());
+        assert!(sys_prctl(locked, &mut tracee, PR_SET_PTRACER, PR_SET_PTRACER_ANY as u64, 0, 0, 0)
+            .is_ok());
 
         assert!(ptrace_attach(
-            &mut locked,
+            locked,
             &mut tracer,
             tracee.as_ref().task.tid,
             PtraceAttachType::Attach,

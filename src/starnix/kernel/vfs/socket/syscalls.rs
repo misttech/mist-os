@@ -1048,10 +1048,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_socketpair_invalid_arguments() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         assert_eq!(
             sys_socketpair(
-                &mut locked,
+                locked,
                 &current_task,
                 AF_INET as u32,
                 SOCK_STREAM,
@@ -1062,7 +1062,7 @@ mod tests {
         );
         assert_eq!(
             sys_socketpair(
-                &mut locked,
+                locked,
                 &current_task,
                 AF_UNIX as u32,
                 7,
@@ -1073,7 +1073,7 @@ mod tests {
         );
         assert_eq!(
             sys_socketpair(
-                &mut locked,
+                locked,
                 &current_task,
                 AF_UNIX as u32,
                 SOCK_STREAM,

@@ -571,20 +571,20 @@ mod tests {
         static WRITE_COUNT: AtomicUsizeCounter = AtomicUsizeCounter::new(0);
         const EVENT_DATA: u64 = 42;
 
-        let (kernel, _init_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, _init_task, locked) = create_kernel_task_and_unlocked();
         register_pipe_fs(kernel.expando.get::<FsRegistry>().as_ref());
-        let current_task = create_task(&mut locked, &kernel, "main-task");
+        let current_task = create_task(locked, &kernel, "main-task");
 
-        let (pipe_out, pipe_in) = new_pipe(&mut locked, &current_task).unwrap();
+        let (pipe_out, pipe_in) = new_pipe(locked, &current_task).unwrap();
 
         let test_string = "hello starnix".to_string();
         let test_len = test_string.len();
 
-        let epoll_file_handle = EpollFileObject::new_file(&mut locked, &current_task);
+        let epoll_file_handle = EpollFileObject::new_file(locked, &current_task);
         let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
         epoll_file
             .add(
-                &mut locked,
+                locked,
                 &current_task,
                 &pipe_out,
                 &epoll_file_handle,
@@ -602,9 +602,8 @@ mod tests {
                 WRITE_COUNT.add(bytes_written);
             }
         });
-        let events = epoll_file
-            .wait(&mut locked, &current_task, 10, zx::MonotonicInstant::INFINITE)
-            .unwrap();
+        let events =
+            epoll_file.wait(locked, &current_task, 10, zx::MonotonicInstant::INFINITE).unwrap();
         thread.await.expect("join");
         assert_eq!(1, events.len());
         let event = &events[0];
@@ -612,7 +611,7 @@ mod tests {
         assert_eq!(event.data(), EVENT_DATA);
 
         let mut buffer = VecOutputBuffer::new(test_len);
-        let bytes_read = pipe_out.read(&mut locked, &current_task, &mut buffer).unwrap();
+        let bytes_read = pipe_out.read(locked, &current_task, &mut buffer).unwrap();
         assert_eq!(bytes_read, WRITE_COUNT.get());
         assert_eq!(bytes_read, test_len);
         assert_eq!(buffer.data(), test_string.as_bytes());
@@ -622,27 +621,25 @@ mod tests {
     async fn test_epoll_ready_then_wait() {
         const EVENT_DATA: u64 = 42;
 
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
         register_pipe_fs(kernel.expando.get::<FsRegistry>().as_ref());
 
-        let (pipe_out, pipe_in) = new_pipe(&mut locked, &current_task).unwrap();
+        let (pipe_out, pipe_in) = new_pipe(locked, &current_task).unwrap();
 
         let test_string = "hello starnix".to_string();
         let test_bytes = test_string.as_bytes();
         let test_len = test_bytes.len();
 
         assert_eq!(
-            pipe_in
-                .write(&mut locked, &current_task, &mut VecInputBuffer::new(test_bytes))
-                .unwrap(),
+            pipe_in.write(locked, &current_task, &mut VecInputBuffer::new(test_bytes)).unwrap(),
             test_bytes.len()
         );
 
-        let epoll_file_handle = EpollFileObject::new_file(&mut locked, &current_task);
+        let epoll_file_handle = EpollFileObject::new_file(locked, &current_task);
         let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
         epoll_file
             .add(
-                &mut locked,
+                locked,
                 &current_task,
                 &pipe_out,
                 &epoll_file_handle,
@@ -650,16 +647,15 @@ mod tests {
             )
             .unwrap();
 
-        let events = epoll_file
-            .wait(&mut locked, &current_task, 10, zx::MonotonicInstant::INFINITE)
-            .unwrap();
+        let events =
+            epoll_file.wait(locked, &current_task, 10, zx::MonotonicInstant::INFINITE).unwrap();
         assert_eq!(1, events.len());
         let event = &events[0];
         assert!(event.events().contains(FdEvents::POLLIN));
         assert_eq!(event.data(), EVENT_DATA);
 
         let mut buffer = VecOutputBuffer::new(test_len);
-        let bytes_read = pipe_out.read(&mut locked, &current_task, &mut buffer).unwrap();
+        let bytes_read = pipe_out.read(locked, &current_task, &mut buffer).unwrap();
         assert_eq!(bytes_read, test_len);
         assert_eq!(buffer.data(), test_bytes);
     }
@@ -667,16 +663,16 @@ mod tests {
     #[::fuchsia::test]
     async fn test_epoll_ctl_cancel() {
         for do_cancel in [true, false] {
-            let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-            let event = new_eventfd(&mut locked, &current_task, 0, EventFdType::Counter, true);
+            let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+            let event = new_eventfd(locked, &current_task, 0, EventFdType::Counter, true);
             let waiter = Waiter::new();
 
-            let epoll_file_handle = EpollFileObject::new_file(&mut locked, &current_task);
+            let epoll_file_handle = EpollFileObject::new_file(locked, &current_task);
             let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
             const EVENT_DATA: u64 = 42;
             epoll_file
                 .add(
-                    &mut locked,
+                    locked,
                     &current_task,
                     &event,
                     &epoll_file_handle,
@@ -689,13 +685,7 @@ mod tests {
             }
 
             let wait_canceler = event
-                .wait_async(
-                    &mut locked,
-                    &current_task,
-                    &waiter,
-                    FdEvents::POLLIN,
-                    EventHandler::None,
-                )
+                .wait_async(locked, &current_task, &waiter, FdEvents::POLLIN, EventHandler::None)
                 .expect("wait_async");
             if do_cancel {
                 wait_canceler.cancel();
@@ -705,18 +695,13 @@ mod tests {
 
             assert_eq!(
                 event
-                    .write(
-                        &mut locked,
-                        &current_task,
-                        &mut VecInputBuffer::new(&add_val.to_ne_bytes())
-                    )
+                    .write(locked, &current_task, &mut VecInputBuffer::new(&add_val.to_ne_bytes()))
                     .unwrap(),
                 std::mem::size_of::<u64>()
             );
 
-            let events = epoll_file
-                .wait(&mut locked, &current_task, 10, zx::MonotonicInstant::ZERO)
-                .unwrap();
+            let events =
+                epoll_file.wait(locked, &current_task, 10, zx::MonotonicInstant::ZERO).unwrap();
 
             if do_cancel {
                 assert_eq!(0, events.len());
@@ -731,12 +716,12 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_multiple_events() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let (client1, server1) = zx::Socket::create_stream();
         let (client2, server2) = zx::Socket::create_stream();
-        let pipe1 = create_fuchsia_pipe(&mut locked, &current_task, client1, OpenFlags::RDWR)
+        let pipe1 = create_fuchsia_pipe(locked, &current_task, client1, OpenFlags::RDWR)
             .expect("create_fuchsia_pipe");
-        let pipe2 = create_fuchsia_pipe(&mut locked, &current_task, client2, OpenFlags::RDWR)
+        let pipe2 = create_fuchsia_pipe(locked, &current_task, client2, OpenFlags::RDWR)
             .expect("create_fuchsia_pipe");
         let server1_zxio = Zxio::create(server1.into_handle()).expect("Zxio::create");
         let server2_zxio = Zxio::create(server2.into_handle()).expect("Zxio::create");
@@ -765,50 +750,50 @@ mod tests {
             epoll_file.wait(locked, &current_task, 2, zx::MonotonicInstant::ZERO).expect("wait")
         };
 
-        let fds = poll(&mut locked);
+        let fds = poll(locked);
         assert!(fds.is_empty());
 
         assert_eq!(server1_zxio.write(&[0]).expect("write"), 1);
 
-        let fds = poll(&mut locked);
+        let fds = poll(locked);
         assert_eq!(fds.len(), 1);
         assert_eq!(fds[0].events(), FdEvents::POLLIN);
         assert_eq!(fds[0].data(), 1);
         assert_eq!(
-            pipe1.read(&mut locked, &current_task, &mut VecOutputBuffer::new(64)).expect("read"),
+            pipe1.read(locked, &current_task, &mut VecOutputBuffer::new(64)).expect("read"),
             1
         );
 
-        let fds = poll(&mut locked);
+        let fds = poll(locked);
         assert!(fds.is_empty());
 
         assert_eq!(server2_zxio.write(&[0]).expect("write"), 1);
 
-        let fds = poll(&mut locked);
+        let fds = poll(locked);
         assert_eq!(fds.len(), 1);
         assert_eq!(fds[0].events(), FdEvents::POLLIN);
         assert_eq!(fds[0].data(), 2);
         assert_eq!(
-            pipe2.read(&mut locked, &current_task, &mut VecOutputBuffer::new(64)).expect("read"),
+            pipe2.read(locked, &current_task, &mut VecOutputBuffer::new(64)).expect("read"),
             1
         );
 
-        let fds = poll(&mut locked);
+        let fds = poll(locked);
         assert!(fds.is_empty());
     }
 
     #[::fuchsia::test]
     async fn test_cancel_after_notify() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let event = new_eventfd(&mut locked, &current_task, 0, EventFdType::Counter, true);
-        let epoll_file_handle = EpollFileObject::new_file(&mut locked, &current_task);
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let event = new_eventfd(locked, &current_task, 0, EventFdType::Counter, true);
+        let epoll_file_handle = EpollFileObject::new_file(locked, &current_task);
         let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
 
         // Add a thing
         const EVENT_DATA: u64 = 42;
         epoll_file
             .add(
-                &mut locked,
+                locked,
                 &current_task,
                 &event,
                 &epoll_file_handle,
@@ -820,16 +805,13 @@ mod tests {
         let add_val = 1u64;
         assert_eq!(
             event
-                .write(&mut locked, &current_task, &mut VecInputBuffer::new(&add_val.to_ne_bytes()))
+                .write(locked, &current_task, &mut VecInputBuffer::new(&add_val.to_ne_bytes()))
                 .unwrap(),
             std::mem::size_of::<u64>()
         );
 
         assert_eq!(
-            epoll_file
-                .wait(&mut locked, &current_task, 10, zx::MonotonicInstant::ZERO)
-                .unwrap()
-                .len(),
+            epoll_file.wait(locked, &current_task, 10, zx::MonotonicInstant::ZERO).unwrap().len(),
             1
         );
 
@@ -838,10 +820,7 @@ mod tests {
 
         // Wait for new notifications
         assert_eq!(
-            epoll_file
-                .wait(&mut locked, &current_task, 10, zx::MonotonicInstant::ZERO)
-                .unwrap()
-                .len(),
+            epoll_file.wait(locked, &current_task, 10, zx::MonotonicInstant::ZERO).unwrap().len(),
             0
         );
         // That shouldn't crash
@@ -849,9 +828,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_add_then_modify() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let (socket1, _socket2) = UnixSocket::new_pair(
-            &mut locked,
+            locked,
             &current_task,
             SocketDomain::Unix,
             SocketType::Stream,
@@ -859,13 +838,13 @@ mod tests {
         )
         .expect("Failed to create socket pair.");
 
-        let epoll_file_handle = EpollFileObject::new_file(&mut locked, &current_task);
+        let epoll_file_handle = EpollFileObject::new_file(locked, &current_task);
         let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
 
         const EVENT_DATA: u64 = 42;
         epoll_file
             .add(
-                &mut locked,
+                locked,
                 &current_task,
                 &socket1,
                 &epoll_file_handle,
@@ -873,24 +852,16 @@ mod tests {
             )
             .unwrap();
         assert_eq!(
-            epoll_file
-                .wait(&mut locked, &current_task, 10, zx::MonotonicInstant::ZERO)
-                .unwrap()
-                .len(),
+            epoll_file.wait(locked, &current_task, 10, zx::MonotonicInstant::ZERO).unwrap().len(),
             0
         );
 
         let read_write_event = FdEvents::POLLIN | FdEvents::POLLOUT;
         epoll_file
-            .modify(
-                &mut locked,
-                &current_task,
-                &socket1,
-                EpollEvent::new(read_write_event, EVENT_DATA),
-            )
+            .modify(locked, &current_task, &socket1, EpollEvent::new(read_write_event, EVENT_DATA))
             .unwrap();
         let triggered_events =
-            epoll_file.wait(&mut locked, &current_task, 10, zx::MonotonicInstant::ZERO).unwrap();
+            epoll_file.wait(locked, &current_task, 10, zx::MonotonicInstant::ZERO).unwrap();
         assert_eq!(1, triggered_events.len());
         let event = &triggered_events[0];
         assert_eq!(event.events(), FdEvents::POLLOUT);

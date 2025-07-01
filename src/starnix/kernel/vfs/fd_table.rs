@@ -478,13 +478,13 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_fd_table_install() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let files = FdTable::default();
-        let file = SyslogFile::new_file(&mut locked, &current_task);
+        let file = SyslogFile::new_file(locked, &current_task);
 
-        let fd0 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
+        let fd0 = add(locked, &current_task, &files, file.clone()).unwrap();
         assert_eq!(fd0.raw(), 0);
-        let fd1 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
+        let fd1 = add(locked, &current_task, &files, file.clone()).unwrap();
         assert_eq!(fd1.raw(), 1);
 
         assert!(Arc::ptr_eq(&files.get(fd0).unwrap(), &file));
@@ -496,12 +496,12 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_fd_table_fork() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let files = FdTable::default();
-        let file = SyslogFile::new_file(&mut locked, &current_task);
+        let file = SyslogFile::new_file(locked, &current_task);
 
-        let fd0 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
-        let fd1 = add(&mut locked, &current_task, &files, file).unwrap();
+        let fd0 = add(locked, &current_task, &files, file.clone()).unwrap();
+        let fd1 = add(locked, &current_task, &files, file).unwrap();
         let fd2 = FdNumber::from_raw(2);
 
         let forked = files.fork();
@@ -521,12 +521,12 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_fd_table_exec() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let files = FdTable::default();
-        let file = SyslogFile::new_file(&mut locked, &current_task);
+        let file = SyslogFile::new_file(locked, &current_task);
 
-        let fd0 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
-        let fd1 = add(&mut locked, &current_task, &files, file).unwrap();
+        let fd0 = add(locked, &current_task, &files, file.clone()).unwrap();
+        let fd1 = add(locked, &current_task, &files, file).unwrap();
 
         files.set_fd_flags_allowing_opath(fd0, FdFlags::CLOEXEC).unwrap();
 
@@ -543,13 +543,13 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_fd_table_pack_values() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let files = FdTable::default();
-        let file = SyslogFile::new_file(&mut locked, &current_task);
+        let file = SyslogFile::new_file(locked, &current_task);
 
         // Add two FDs.
-        let fd0 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
-        let fd1 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
+        let fd0 = add(locked, &current_task, &files, file.clone()).unwrap();
+        let fd1 = add(locked, &current_task, &files, file.clone()).unwrap();
         assert_eq!(fd0.raw(), 0);
         assert_eq!(fd1.raw(), 1);
 
@@ -560,7 +560,7 @@ mod test {
         assert!(files.get(fd0).is_err());
 
         // The next FD we insert fills in the hole we created.
-        let another_fd = add(&mut locked, &current_task, &files, file).unwrap();
+        let another_fd = add(locked, &current_task, &files, file).unwrap();
         assert_eq!(another_fd.raw(), 0);
 
         files.release(());

@@ -874,7 +874,7 @@ impl DirEntry {
             CreationResult::Created => (child, false),
             CreationResult::Existed { create_fn } => {
                 if child.ops.revalidate(
-                    &mut locked.cast_locked::<FileOpsCore>(),
+                    locked.cast_locked::<FileOpsCore>(),
                     current_task,
                     &child,
                 )? {

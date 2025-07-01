@@ -594,7 +594,7 @@ impl ThreadGroup {
                 limits: OrderedMutex::new(
                     parent
                         .as_ref()
-                        .map(|p| p.base.limits.lock(&mut locked.cast_locked()).clone())
+                        .map(|p| p.base.limits.lock(locked.cast_locked()).clone())
                         .unwrap_or(Default::default()),
                 ),
                 next_seccomp_filter_id: Default::default(),
@@ -2116,29 +2116,29 @@ mod test {
         fn get_process_group(task: &Task) -> Arc<ProcessGroup> {
             Arc::clone(&task.thread_group().read().process_group)
         }
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        assert_eq!(current_task.thread_group().setsid(&mut locked), error!(EPERM));
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        assert_eq!(current_task.thread_group().setsid(locked), error!(EPERM));
 
-        let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+        let child_task = current_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
         assert_eq!(get_process_group(&current_task), get_process_group(&child_task));
 
         let old_process_group = child_task.thread_group().read().process_group.clone();
-        assert_eq!(child_task.thread_group().setsid(&mut locked), Ok(()));
+        assert_eq!(child_task.thread_group().setsid(locked), Ok(()));
         assert_eq!(
             child_task.thread_group().read().process_group.session.leader,
             child_task.get_pid()
         );
         assert!(!old_process_group
-            .read(&mut locked)
+            .read(locked)
             .thread_groups()
             .contains(&OwnedRef::temp(child_task.thread_group())));
     }
 
     #[::fuchsia::test]
     async fn test_exit_status() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let child = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        child.thread_group().exit(&mut locked, ExitStatus::Exit(42), None);
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let child = current_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
+        child.thread_group().exit(locked, ExitStatus::Exit(42), None);
         std::mem::drop(child);
         assert_eq!(
             current_task.thread_group().read().zombie_children[0].exit_info.status,
@@ -2148,32 +2148,31 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_setgpid() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        assert_eq!(current_task.thread_group().setsid(&mut locked), error!(EPERM));
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        assert_eq!(current_task.thread_group().setsid(locked), error!(EPERM));
 
-        let child_task1 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        let child_task2 = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        let execd_child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+        let child_task1 = current_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
+        let child_task2 = current_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
+        let execd_child_task = current_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
         execd_child_task.thread_group().write().did_exec = true;
-        let other_session_child_task =
-            current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        assert_eq!(other_session_child_task.thread_group().setsid(&mut locked), Ok(()));
+        let other_session_child_task = current_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
+        assert_eq!(other_session_child_task.thread_group().setsid(locked), Ok(()));
 
         assert_eq!(
-            child_task1.thread_group().setpgid(&mut locked, &current_task, &current_task, 0),
+            child_task1.thread_group().setpgid(locked, &current_task, &current_task, 0),
             error!(ESRCH)
         );
         assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &current_task, &execd_child_task, 0),
+            current_task.thread_group().setpgid(locked, &current_task, &execd_child_task, 0),
             error!(EACCES)
         );
         assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &current_task, &current_task, 0),
+            current_task.thread_group().setpgid(locked, &current_task, &current_task, 0),
             error!(EPERM)
         );
         assert_eq!(
             current_task.thread_group().setpgid(
-                &mut locked,
+                locked,
                 &current_task,
                 &other_session_child_task,
                 0
@@ -2181,16 +2180,16 @@ mod test {
             error!(EPERM)
         );
         assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &current_task, &child_task1, -1),
+            current_task.thread_group().setpgid(locked, &current_task, &child_task1, -1),
             error!(EINVAL)
         );
         assert_eq!(
-            current_task.thread_group().setpgid(&mut locked, &current_task, &child_task1, 255),
+            current_task.thread_group().setpgid(locked, &current_task, &child_task1, 255),
             error!(EPERM)
         );
         assert_eq!(
             current_task.thread_group().setpgid(
-                &mut locked,
+                locked,
                 &current_task,
                 &child_task1,
                 other_session_child_task.tid
@@ -2199,7 +2198,7 @@ mod test {
         );
 
         assert_eq!(
-            child_task1.thread_group().setpgid(&mut locked, &current_task, &child_task1, 0),
+            child_task1.thread_group().setpgid(locked, &current_task, &child_task1, 0),
             Ok(())
         );
         assert_eq!(
@@ -2211,7 +2210,7 @@ mod test {
         let old_process_group = child_task2.thread_group().read().process_group.clone();
         assert_eq!(
             current_task.thread_group().setpgid(
-                &mut locked,
+                locked,
                 &current_task,
                 &child_task2,
                 child_task1.tid
@@ -2220,21 +2219,21 @@ mod test {
         );
         assert_eq!(child_task2.thread_group().read().process_group.leader, child_task1.tid);
         assert!(!old_process_group
-            .read(&mut locked)
+            .read(locked)
             .thread_groups()
             .contains(&OwnedRef::temp(child_task2.thread_group())));
     }
 
     #[::fuchsia::test]
     async fn test_adopt_children() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let task1 = current_task.clone_task_for_test(&mut locked, 0, None);
-        let task2 = task1.clone_task_for_test(&mut locked, 0, None);
-        let task3 = task2.clone_task_for_test(&mut locked, 0, None);
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let task1 = current_task.clone_task_for_test(locked, 0, None);
+        let task2 = task1.clone_task_for_test(locked, 0, None);
+        let task3 = task2.clone_task_for_test(locked, 0, None);
 
         assert_eq!(task3.thread_group().read().get_ppid(), task2.tid);
 
-        task2.thread_group().exit(&mut locked, ExitStatus::Exit(0), None);
+        task2.thread_group().exit(locked, ExitStatus::Exit(0), None);
         std::mem::drop(task2);
 
         // Task3 parent should be current_task.

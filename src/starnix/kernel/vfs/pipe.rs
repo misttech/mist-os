@@ -963,8 +963,8 @@ impl PipeFileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        let locked = &mut locked;
+        let locked = locked.cast_locked::<FileOpsCore>();
+        let locked = locked;
         let available = UserBuffer::cap_buffers_to_max_rw_count(
             current_task.maximum_valid_address().ok_or_else(|| errno!(EINVAL))?,
             &mut iovec,

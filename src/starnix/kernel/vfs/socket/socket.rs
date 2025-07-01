@@ -533,14 +533,14 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.ops.getsockname(&mut locked.cast_locked::<FileOpsCore>(), self)
+        self.ops.getsockname(locked.cast_locked::<FileOpsCore>(), self)
     }
 
     pub fn getpeername<L>(&self, locked: &mut Locked<L>) -> Result<SocketAddress, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.ops.getpeername(&mut locked.cast_locked::<FileOpsCore>(), self)
+        self.ops.getpeername(locked.cast_locked::<FileOpsCore>(), self)
     }
 
     pub fn setsockopt<L>(
@@ -554,7 +554,7 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let locked = locked.cast_locked::<FileOpsCore>();
         let read_timeval = || {
             let timeval_ref = TimeValPtr::new_with_ref(current_task, user_opt)?;
             let duration =
@@ -573,16 +573,9 @@ impl Socket {
                 SO_MARK if !current_task.task.kernel().features.netstack_mark => {
                     self.state.lock().mark = current_task.read_object(user_opt.try_into()?)?;
                 }
-                _ => self.ops.setsockopt(
-                    &mut locked,
-                    self,
-                    current_task,
-                    level,
-                    optname,
-                    user_opt,
-                )?,
+                _ => self.ops.setsockopt(locked, self, current_task, level, optname, user_opt)?,
             },
-            _ => self.ops.setsockopt(&mut locked, self, current_task, level, optname, user_opt)?,
+            _ => self.ops.setsockopt(locked, self, current_task, level, optname, user_opt)?,
         }
         Ok(())
     }
@@ -598,7 +591,7 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let locked = locked.cast_locked::<FileOpsCore>();
         security::check_socket_getsockopt_access(current_task, self, level, optname)?;
         let value = match level {
             SOL_SOCKET => match optname {
@@ -624,11 +617,9 @@ impl Socket {
                 SO_MARK if !current_task.task.kernel().features.netstack_mark => {
                     self.state.lock().mark.as_bytes().to_owned()
                 }
-                _ => {
-                    self.ops.getsockopt(&mut locked, self, current_task, level, optname, optlen)?
-                }
+                _ => self.ops.getsockopt(locked, self, current_task, level, optname, optlen)?,
             },
-            _ => self.ops.getsockopt(&mut locked, self, current_task, level, optname, optlen)?,
+            _ => self.ops.getsockopt(locked, self, current_task, level, optname, optlen)?,
         };
         Ok(value)
     }
@@ -1080,7 +1071,7 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.ops.bind(&mut locked.cast_locked::<FileOpsCore>(), self, current_task, socket_address)
+        self.ops.bind(locked.cast_locked::<FileOpsCore>(), self, current_task, socket_address)
     }
 
     pub fn listen<L>(
@@ -1097,14 +1088,14 @@ impl Socket {
             current_task.kernel().system_limits.socket.max_connections.load(Ordering::Relaxed);
         let backlog = std::cmp::min(backlog, max_connections);
         let credentials = current_task.as_ucred();
-        self.ops.listen(&mut locked.cast_locked::<FileOpsCore>(), self, backlog, credentials)
+        self.ops.listen(locked.cast_locked::<FileOpsCore>(), self, backlog, credentials)
     }
 
     pub fn accept<L>(&self, locked: &mut Locked<L>) -> Result<SocketHandle, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.ops.accept(&mut locked.cast_locked::<FileOpsCore>(), self)
+        self.ops.accept(locked.cast_locked::<FileOpsCore>(), self)
     }
 
     pub fn read<L>(
@@ -1118,8 +1109,8 @@ impl Socket {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         security::check_socket_recvmsg_access(current_task, self)?;
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        self.ops.read(&mut locked, self, current_task, data, flags)
+        let locked = locked.cast_locked::<FileOpsCore>();
+        self.ops.read(locked, self, current_task, data, flags)
     }
 
     pub fn write<L>(
@@ -1134,8 +1125,8 @@ impl Socket {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         security::check_socket_sendmsg_access(current_task, self)?;
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        self.ops.write(&mut locked, self, current_task, data, dest_address, ancillary_data)
+        let locked = locked.cast_locked::<FileOpsCore>();
+        self.ops.write(locked, self, current_task, data, dest_address, ancillary_data)
     }
 
     pub fn wait_async<L>(
@@ -1149,8 +1140,8 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        self.ops.wait_async(&mut locked, self, current_task, waiter, events, handler)
+        let locked = locked.cast_locked::<FileOpsCore>();
+        self.ops.wait_async(locked, self, current_task, waiter, events, handler)
     }
 
     pub fn query_events<L>(
@@ -1161,7 +1152,7 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.ops.query_events(&mut locked.cast_locked::<FileOpsCore>(), self, current_task)
+        self.ops.query_events(locked.cast_locked::<FileOpsCore>(), self, current_task)
     }
 
     pub fn shutdown<L>(
@@ -1174,14 +1165,14 @@ impl Socket {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         security::check_socket_shutdown_access(current_task, self, how)?;
-        self.ops.shutdown(&mut locked.cast_locked::<FileOpsCore>(), self, how)
+        self.ops.shutdown(locked.cast_locked::<FileOpsCore>(), self, how)
     }
 
     pub fn close<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask)
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.ops.close(&mut locked.cast_locked::<FileOpsCore>(), current_task, self)
+        self.ops.close(locked.cast_locked::<FileOpsCore>(), current_task, self)
     }
 
     pub fn to_handle(
@@ -1211,7 +1202,7 @@ impl DowncastedFile<'_, SocketFile> {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         security::check_socket_connect_access(current_task, self, &peer)?;
-        self.socket.ops.connect(&mut locked.cast_locked(), &self.socket, current_task, peer)
+        self.socket.ops.connect(locked.cast_locked(), &self.socket, current_task, peer)
     }
 }
 
@@ -1461,10 +1452,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_dgram_socket() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let bind_address = SocketAddress::Unix(b"dgram_test".into());
         let rec_dgram = Socket::new(
-            &mut locked,
+            locked,
             &current_task,
             SocketDomain::Unix,
             SocketType::Datagram,
@@ -1475,21 +1466,21 @@ mod tests {
         let passcred: u32 = 1;
         let opt_size = std::mem::size_of::<u32>();
         let user_address =
-            map_memory(&mut locked, &current_task, UserAddress::default(), opt_size as u64);
+            map_memory(locked, &current_task, UserAddress::default(), opt_size as u64);
         let opt_ref = UserRef::<u32>::new(user_address);
         current_task.write_object(opt_ref, &passcred).unwrap();
         let opt_buf = UserBuffer { address: user_address, length: opt_size };
-        rec_dgram.setsockopt(&mut locked, &current_task, SOL_SOCKET, SO_PASSCRED, opt_buf).unwrap();
+        rec_dgram.setsockopt(locked, &current_task, SOL_SOCKET, SO_PASSCRED, opt_buf).unwrap();
 
         rec_dgram
-            .bind(&mut locked, &current_task, bind_address)
+            .bind(locked, &current_task, bind_address)
             .expect("failed to bind datagram socket");
 
         let xfer_value: u64 = 1234567819;
         let xfer_bytes = xfer_value.to_ne_bytes();
 
         let send = Socket::new(
-            &mut locked,
+            locked,
             &current_task,
             SocketDomain::Unix,
             SocketType::Datagram,
@@ -1499,22 +1490,22 @@ mod tests {
         .expect("Failed to connect socket.");
         send.ops
             .connect(
-                &mut locked.cast_locked(),
+                locked.cast_locked(),
                 &send,
                 &current_task,
                 SocketPeer::Handle(rec_dgram.clone()),
             )
             .unwrap();
         let mut source_iter = VecInputBuffer::new(&xfer_bytes);
-        send.write(&mut locked, &current_task, &mut source_iter, &mut None, &mut vec![]).unwrap();
+        send.write(locked, &current_task, &mut source_iter, &mut None, &mut vec![]).unwrap();
         assert_eq!(source_iter.available(), 0);
         // Previously, this would cause the test to fail,
         // because rec_dgram was shut down.
-        send.close(&mut locked, &current_task);
+        send.close(locked, &current_task);
 
         let mut rec_buffer = VecOutputBuffer::new(8);
         let read_info = rec_dgram
-            .read(&mut locked, &current_task, &mut rec_buffer, SocketMessageFlags::empty())
+            .read(locked, &current_task, &mut rec_buffer, SocketMessageFlags::empty())
             .unwrap();
         assert_eq!(read_info.bytes_read, xfer_bytes.len());
         assert_eq!(rec_buffer.data(), xfer_bytes);
@@ -1528,6 +1519,6 @@ mod tests {
             }))
         );
 
-        rec_dgram.close(&mut locked, &current_task);
+        rec_dgram.close(locked, &current_task);
     }
 }

@@ -155,7 +155,7 @@ impl FileSystemOps for AnonFs {
         "anon_inodefs".into()
     }
 }
-pub fn anon_fs<L>(mut locked: &mut Locked<L>, kernel: &Kernel) -> FileSystemHandle
+pub fn anon_fs<L>(locked: &mut Locked<L>, kernel: &Kernel) -> FileSystemHandle
 where
     L: LockEqualOrBefore<FileOpsCore>,
 {
@@ -165,7 +165,7 @@ where
         .expando
         .get_or_init(|| {
             let fs = FileSystem::new(
-                &mut locked,
+                locked,
                 kernel,
                 CacheMode::Uncached,
                 AnonFs,

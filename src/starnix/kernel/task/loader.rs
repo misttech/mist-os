@@ -911,8 +911,8 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_load_hello_starnix() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
-        exec_hello_starnix(&mut locked, &mut current_task).expect("failed to load executable");
+        let (_kernel, mut current_task, locked) = create_kernel_task_and_unlocked_with_pkgfs();
+        exec_hello_starnix(locked, &mut current_task).expect("failed to load executable");
         assert!(current_task.mm().unwrap().get_mapping_count() > 0);
     }
 
@@ -920,14 +920,14 @@ mod tests {
     #[cfg(target_arch = "x86_64")]
     #[::fuchsia::test]
     async fn test_snapshot_hello_starnix() {
-        let (kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
-        exec_hello_starnix(&mut locked, &mut current_task).expect("failed to load executable");
+        let (kernel, mut current_task, locked) = create_kernel_task_and_unlocked_with_pkgfs();
+        exec_hello_starnix(locked, &mut current_task).expect("failed to load executable");
 
-        let current2 = create_task(&mut locked, &kernel, "another-task");
+        let current2 = create_task(locked, &kernel, "another-task");
         current_task
             .mm()
             .unwrap()
-            .snapshot_to(&mut locked, current2.mm().unwrap())
+            .snapshot_to(locked, current2.mm().unwrap())
             .expect("failed to snapshot mm");
 
         assert_eq!(

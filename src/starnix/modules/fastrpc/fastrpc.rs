@@ -1295,9 +1295,8 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn get_payload_info_test_complex_range_values() {
-        spawn_kernel_and_run(|mut locked, current_task| {
-            let addr =
-                map_memory(&mut locked, &current_task, UserAddress::from_ptr(100 as usize), 500);
+        spawn_kernel_and_run(|locked, current_task| {
+            let addr = map_memory(locked, &current_task, UserAddress::from_ptr(100 as usize), 500);
 
             // Use the same buffers as merge_buffers_test_complex but just offset them in the
             // memory we got mapped above.
@@ -1406,9 +1405,8 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn get_payload_info_test_complex_single_values() {
-        spawn_kernel_and_run(|mut locked, current_task| {
-            let addr =
-                map_memory(&mut locked, &current_task, UserAddress::from_ptr(100 as usize), 500);
+        spawn_kernel_and_run(|locked, current_task| {
+            let addr = map_memory(locked, &current_task, UserAddress::from_ptr(100 as usize), 500);
 
             // Use the same buffers as merge_buffers_test_complex but just offset them in the
             // memory we got mapped above.
@@ -1519,9 +1517,8 @@ pub mod tests {
 
     #[fuchsia::test]
     async fn get_payload_info_test_complex_single_values_with_one_mapped() {
-        spawn_kernel_and_run(|mut locked, current_task| {
-            let addr =
-                map_memory(&mut locked, &current_task, UserAddress::from_ptr(100 as usize), 400);
+        spawn_kernel_and_run(|locked, current_task| {
+            let addr = map_memory(locked, &current_task, UserAddress::from_ptr(100 as usize), 400);
 
             let mapped_addr = starnix_core::testing::map_memory_anywhere(locked, current_task, 100);
             let (mm_vmo, _mm_offset) = current_task

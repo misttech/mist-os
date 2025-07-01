@@ -75,7 +75,7 @@ where
     // This step will be performed only when the file system label is first resolved.
     if let Some(root_dir_entry) = root_node_to_init {
         fs_node_init_with_dentry(
-            Some(&mut locked.cast_locked()),
+            Some(locked.cast_locked()),
             security_server,
             current_task,
             root_dir_entry,
@@ -87,7 +87,7 @@ where
     for dir_entry in pending_entries {
         if let Some(dir_entry) = dir_entry.0.upgrade() {
             fs_node_init_with_dentry(
-                Some(&mut locked.cast_locked()),
+                Some(locked.cast_locked()),
                 security_server,
                 current_task,
                 &dir_entry,

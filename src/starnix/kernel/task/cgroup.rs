@@ -720,21 +720,21 @@ mod test {
 
     #[::fuchsia::test]
     async fn cgroup_clone_task_in_frozen_cgroup() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         let root = &kernel.cgroups.cgroup2;
         let cgroup = root.new_child("test".into()).expect("new_child on root cgroup succeeds");
 
-        let process = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+        let process = current_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
         cgroup
-            .add_process(&mut locked.cast_locked(), process.thread_group())
+            .add_process(locked.cast_locked(), process.thread_group())
             .expect("add process to cgroup");
-        cgroup.freeze(&mut locked.cast_locked());
+        cgroup.freeze(locked.cast_locked());
         assert_eq!(cgroup.get_pids(&kernel).first(), Some(process.get_pid()).as_ref());
         assert_eq!(root.get_cgroup(process.thread_group()).unwrap().as_ptr(), Arc::as_ptr(&cgroup));
 
         let thread = process.clone_task_for_test(
-            &mut locked,
+            locked,
             (CLONE_THREAD | CLONE_SIGHAND | CLONE_VM) as u64,
             Some(SIGCHLD),
         );

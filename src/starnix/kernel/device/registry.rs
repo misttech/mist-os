@@ -698,8 +698,8 @@ impl DeviceRegistry {
         L: LockBefore<DeviceOpen>,
     {
         let dev_ops = self.devices(mode).get(device_type)?;
-        let mut locked = locked.cast_locked::<DeviceOpen>();
-        dev_ops.open(&mut locked, current_task, device_type, node, flags)
+        let locked = locked.cast_locked::<DeviceOpen>();
+        dev_ops.open(locked, current_task, device_type, node, flags)
     }
 
     pub fn get_device(
@@ -790,20 +790,20 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registry_opens_device() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         let registry = DeviceRegistry::default();
         registry
             .register_major("mem".into(), DeviceMode::Char, MEM_MAJOR, simple_device_ops::<DevNull>)
             .expect("registers unique");
 
-        let fs = create_testfs(&mut locked, &kernel);
+        let fs = create_testfs(locked, &kernel);
         let node = create_fs_node_for_testing(&fs, PanickingFsNode);
 
         // Fail to open non-existent device.
         assert!(registry
             .open_device(
-                &mut locked,
+                locked,
                 &current_task,
                 &node,
                 OpenFlags::RDONLY,
@@ -815,7 +815,7 @@ mod tests {
         // Fail to open in wrong mode.
         assert!(registry
             .open_device(
-                &mut locked,
+                locked,
                 &current_task,
                 &node,
                 OpenFlags::RDONLY,
@@ -827,7 +827,7 @@ mod tests {
         // Open in correct mode.
         let _ = registry
             .open_device(
-                &mut locked,
+                locked,
                 &current_task,
                 &node,
                 OpenFlags::RDONLY,
@@ -839,7 +839,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registry_dynamic_misc() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         fn create_test_device(
             _locked: &mut Locked<DeviceOpen>,
@@ -854,7 +854,7 @@ mod tests {
         let registry = &kernel.device_registry;
         let device = registry
             .register_dyn_device(
-                &mut locked,
+                locked,
                 &current_task,
                 "test-device".into(),
                 registry.objects.virtual_block_class(),
@@ -864,11 +864,11 @@ mod tests {
         let device_type = device.metadata.expect("has metadata").device_type;
         assert!(DYN_MAJOR_RANGE.contains(&device_type.major()));
 
-        let fs = create_testfs(&mut locked, &kernel);
+        let fs = create_testfs(locked, &kernel);
         let node = create_fs_node_for_testing(&fs, PanickingFsNode);
         let _ = registry
             .open_device(
-                &mut locked,
+                locked,
                 &current_task,
                 &node,
                 OpenFlags::RDONLY,
@@ -880,7 +880,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registery_add_class() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let registry = &kernel.device_registry;
         registry
             .register_major(
@@ -894,7 +894,7 @@ mod tests {
         let input_class =
             registry.objects.get_or_create_class("input".into(), registry.objects.virtual_bus());
         registry.add_device(
-            &mut locked,
+            locked,
             &current_task,
             "mouse".into(),
             DeviceMetadata::new("mouse".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
@@ -907,7 +907,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registry_add_bus() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let registry = &kernel.device_registry;
         registry
             .register_major(
@@ -921,7 +921,7 @@ mod tests {
         let bus = registry.objects.get_or_create_bus("my-bus".into());
         let class = registry.objects.get_or_create_class("my-class".into(), bus);
         registry.add_device(
-            &mut locked,
+            locked,
             &current_task,
             "my-device".into(),
             DeviceMetadata::new(
@@ -939,7 +939,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registry_remove_device() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let registry = &kernel.device_registry;
         registry
             .register_major(
@@ -953,7 +953,7 @@ mod tests {
         let pci_bus = registry.objects.get_or_create_bus("pci".into());
         let input_class = registry.objects.get_or_create_class("input".into(), pci_bus);
         let mouse_dev = registry.add_device(
-            &mut locked,
+            locked,
             &current_task,
             "mouse".into(),
             DeviceMetadata::new("mouse".into(), DeviceType::new(INPUT_MAJOR, 0), DeviceMode::Char),
@@ -965,7 +965,7 @@ mod tests {
         assert!(registry.objects.root.lookup("devices/pci/input/mouse".into()).is_some());
         assert!(registry.objects.root.lookup("class/input/mouse".into()).is_some());
 
-        registry.remove_device(&mut locked, &current_task, mouse_dev);
+        registry.remove_device(locked, &current_task, mouse_dev);
 
         assert!(registry.objects.root.lookup("bus/pci/devices/mouse".into()).is_none());
         assert!(registry.objects.root.lookup("devices/pci/input/mouse".into()).is_none());
@@ -974,11 +974,11 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registry_add_and_remove_numberless_device() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let registry = &kernel.device_registry;
 
         let cooling_device = registry.add_numberless_device(
-            &mut locked,
+            locked,
             "cooling_device0".into(),
             registry.objects.virtual_thermal_class(),
             build_device_directory,
@@ -991,7 +991,7 @@ mod tests {
             .lookup("devices/virtual/thermal/cooling_device0".into())
             .is_some());
 
-        registry.remove_device(&mut locked, &current_task, cooling_device);
+        registry.remove_device(locked, &current_task, cooling_device);
 
         assert!(registry.objects.root.lookup("class/thermal/cooling_device0".into()).is_none());
         assert!(registry

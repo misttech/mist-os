@@ -161,9 +161,9 @@ impl Drop for KernelThreads {
     fn drop(&mut self) {
         // TODO: Replace with .release. Creating a new lock context here is not
         // actually safe, since locks may be held elsewhere on this thread.
-        let mut locked = unsafe { Unlocked::new() };
+        let locked = unsafe { Unlocked::new() };
         if let Some(system_task) = self.system_task.take() {
-            system_task.system_task.into_inner().release(&mut locked);
+            system_task.system_task.into_inner().release(locked);
         }
     }
 }
@@ -203,7 +203,7 @@ struct UnlockedForAsync {
 
 impl UnlockedForAsync {
     fn new() -> Self {
-        Self { unlocked: Fragile::new(RefCell::new(unsafe { Unlocked::new() })) }
+        Self { unlocked: Fragile::new(RefCell::new(unsafe { Unlocked::new_instance() })) }
     }
 }
 

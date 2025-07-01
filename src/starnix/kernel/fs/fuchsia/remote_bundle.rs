@@ -541,12 +541,12 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_read_image() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
         let (server, client) = zx::Channel::create();
         fdio::open("/pkg", rights, server).expect("failed to open /pkg");
         let fs = RemoteBundle::new_fs(
-            &mut locked,
+            locked,
             &kernel,
             &fio::DirectorySynchronousProxy::new(client),
             FileSystemOptions { source: "data/test-image".into(), ..Default::default() },
@@ -558,27 +558,24 @@ mod test {
         let mut context = LookupContext::default().with(SymlinkMode::NoFollow);
 
         let test_dir = root
-            .lookup_child(&mut locked, &current_task, &mut context, "foo".into())
+            .lookup_child(locked, &current_task, &mut context, "foo".into())
             .expect("lookup failed");
 
         let test_file = test_dir
-            .lookup_child(&mut locked, &current_task, &mut context, "file".into())
+            .lookup_child(locked, &current_task, &mut context, "file".into())
             .expect("lookup failed")
-            .open(&mut locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())
+            .open(locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())
             .expect("open failed");
 
         let mut buffer = VecOutputBuffer::new(64);
-        assert_eq!(
-            test_file.read(&mut locked, &current_task, &mut buffer).expect("read failed"),
-            6
-        );
+        assert_eq!(test_file.read(locked, &current_task, &mut buffer).expect("read failed"), 6);
         let buffer: Vec<u8> = buffer.into();
         assert_eq!(&buffer[..6], b"hello\n");
 
         assert_eq!(
             &test_file
                 .node()
-                .get_xattr(&mut locked, &current_task, &test_dir.mount, "user.a".into(), usize::MAX)
+                .get_xattr(locked, &current_task, &test_dir.mount, "user.a".into(), usize::MAX)
                 .expect("get_xattr failed")
                 .unwrap(),
             "apple"
@@ -586,7 +583,7 @@ mod test {
         assert_eq!(
             &test_file
                 .node()
-                .get_xattr(&mut locked, &current_task, &test_dir.mount, "user.b".into(), usize::MAX)
+                .get_xattr(locked, &current_task, &test_dir.mount, "user.b".into(), usize::MAX)
                 .expect("get_xattr failed")
                 .unwrap(),
             "ball"
@@ -594,7 +591,7 @@ mod test {
         assert_eq!(
             test_file
                 .node()
-                .list_xattrs(&mut locked, &current_task, usize::MAX)
+                .list_xattrs(locked, &current_task, usize::MAX)
                 .expect("list_xattr failed")
                 .unwrap()
                 .into_iter()
@@ -610,11 +607,11 @@ mod test {
         }
 
         let test_symlink = test_dir
-            .lookup_child(&mut locked, &current_task, &mut context, "symlink".into())
+            .lookup_child(locked, &current_task, &mut context, "symlink".into())
             .expect("lookup failed");
 
         if let SymlinkTarget::Path(target) =
-            test_symlink.readlink(&mut locked, &current_task).expect("readlink failed")
+            test_symlink.readlink(locked, &current_task).expect("readlink failed")
         {
             assert_eq!(&target, "file");
         } else {
@@ -622,7 +619,7 @@ mod test {
         }
 
         let opened_dir = test_dir
-            .open(&mut locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())
+            .open(locked, &current_task, OpenFlags::RDONLY, AccessCheck::default())
             .expect("open failed");
 
         struct Sink {
@@ -650,7 +647,7 @@ mod test {
         }
 
         let mut sink = Sink { offset: 0, entries: HashMap::new() };
-        opened_dir.readdir(&mut locked, &current_task, &mut sink).expect("readdir failed");
+        opened_dir.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
         assert_eq!(
             sink.entries,

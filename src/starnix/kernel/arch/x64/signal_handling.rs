@@ -262,7 +262,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn syscall_restart_adjusts_instruction_pointer_and_rax() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_and_task_with_stack();
+        let (_kernel, mut current_task, locked) = create_kernel_and_task_with_stack();
 
         // Register the signal action.
         current_task.thread_group().signal_actions.set(
@@ -300,7 +300,7 @@ mod tests {
         ));
 
         // Process the signal.
-        dequeue_signal_for_test(&mut locked, &mut current_task);
+        dequeue_signal_for_test(locked, &mut current_task);
 
         // The instruction pointer should have changed to the signal handling address.
         assert_eq!(current_task.thread_state.registers.rip, SA_HANDLER_ADDRESS.ptr() as u64);
@@ -335,7 +335,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn syscall_nested_restart() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_and_task_with_stack();
+        let (_kernel, mut current_task, locked) = create_kernel_and_task_with_stack();
 
         // Register the signal actions.
         current_task.thread_group().signal_actions.set(
@@ -382,7 +382,7 @@ mod tests {
         ));
 
         // Process the signal.
-        dequeue_signal_for_test(&mut locked, &mut current_task);
+        dequeue_signal_for_test(locked, &mut current_task);
 
         // The instruction pointer should have changed to the signal handling address.
         assert_eq!(current_task.thread_state.registers.rip, SA_HANDLER_ADDRESS.ptr() as u64);
@@ -413,7 +413,7 @@ mod tests {
         ));
 
         // Process the signal.
-        dequeue_signal_for_test(&mut locked, &mut current_task);
+        dequeue_signal_for_test(locked, &mut current_task);
 
         // The instruction pointer should have changed to the signal handling address.
         assert_eq!(current_task.thread_state.registers.rip, SA_HANDLER2_ADDRESS.ptr() as u64);
@@ -470,7 +470,7 @@ mod tests {
 
     #[::fuchsia::test]
     async fn syscall_does_not_restart_if_signal_action_has_no_sa_restart_flag() {
-        let (_kernel, mut current_task, mut locked) = create_kernel_and_task_with_stack();
+        let (_kernel, mut current_task, locked) = create_kernel_and_task_with_stack();
 
         // Register the signal action.
         current_task.thread_group().signal_actions.set(
@@ -508,7 +508,7 @@ mod tests {
         ));
 
         // Process the signal.
-        dequeue_signal_for_test(&mut locked, &mut current_task);
+        dequeue_signal_for_test(locked, &mut current_task);
 
         // The instruction pointer should have changed to the signal handling address.
         assert_eq!(current_task.thread_state.registers.rip, SA_HANDLER_ADDRESS.ptr() as u64);
@@ -536,7 +536,8 @@ mod tests {
     }
 
     /// Creates a kernel and initial task, giving the task a stack.
-    fn create_kernel_and_task_with_stack() -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>) {
+    fn create_kernel_and_task_with_stack(
+    ) -> (Arc<Kernel>, AutoReleasableTask, &'static mut Locked<Unlocked>) {
         let (kernel, mut current_task, locked) = create_kernel_task_and_unlocked();
 
         const STACK_SIZE: usize = 0x1000;

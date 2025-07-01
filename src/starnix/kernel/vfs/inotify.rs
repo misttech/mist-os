@@ -729,9 +729,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn notify_from_watchers() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
-        let file = InotifyFileObject::new_file(&mut locked, &current_task, true);
+        let file = InotifyFileObject::new_file(locked, &current_task, true);
         let inotify =
             file.downcast_file::<InotifyFileObject>().expect("failed to downcast to inotify");
 
@@ -765,8 +765,7 @@ mod tests {
 
         // Read 1 event.
         let mut buffer = VecOutputBuffer::new(DATA_SIZE);
-        let bytes_read =
-            file.read(&mut locked, &current_task, &mut buffer).expect("read into buffer");
+        let bytes_read = file.read(locked, &current_task, &mut buffer).expect("read into buffer");
 
         assert_eq!(bytes_read, DATA_SIZE);
         assert_eq!(inotify.available(), DATA_SIZE);
@@ -777,8 +776,7 @@ mod tests {
 
         // Read other event.
         buffer.reset();
-        let bytes_read =
-            file.read(&mut locked, &current_task, &mut buffer).expect("read into buffer");
+        let bytes_read = file.read(locked, &current_task, &mut buffer).expect("read into buffer");
 
         assert_eq!(bytes_read, DATA_SIZE);
         assert_eq!(inotify.available(), 0);
@@ -790,9 +788,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn notify_deletion_from_watchers() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
-        let file = InotifyFileObject::new_file(&mut locked, &current_task, true);
+        let file = InotifyFileObject::new_file(locked, &current_task, true);
         let inotify =
             file.downcast_file::<InotifyFileObject>().expect("failed to downcast to inotify");
 
@@ -824,9 +822,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn inotify_on_same_file() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
-        let file = InotifyFileObject::new_file(&mut locked, &current_task, true);
+        let file = InotifyFileObject::new_file(locked, &current_task, true);
         let file_key = WeakKey::from(&file);
         let inotify =
             file.downcast_file::<InotifyFileObject>().expect("failed to downcast to inotify");
@@ -878,9 +876,9 @@ mod tests {
 
     #[::fuchsia::test]
     async fn coalesce_events() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
-        let file = InotifyFileObject::new_file(&mut locked, &current_task, true);
+        let file = InotifyFileObject::new_file(locked, &current_task, true);
         let inotify =
             file.downcast_file::<InotifyFileObject>().expect("failed to downcast to inotify");
 

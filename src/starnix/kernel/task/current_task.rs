@@ -80,8 +80,8 @@ impl TaskBuilder {
     where
         L: LockBefore<TaskRelease>,
     {
-        let mut locked = locked.cast_locked::<TaskRelease>();
-        Releasable::release(self, &mut locked);
+        let locked = locked.cast_locked::<TaskRelease>();
+        Releasable::release(self, locked);
     }
 }
 
@@ -257,8 +257,8 @@ impl CurrentTask {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        self.kernel().delayed_releaser.apply(&mut locked, self);
+        let locked = locked.cast_locked::<FileOpsCore>();
+        self.kernel().delayed_releaser.apply(locked, self);
     }
 
     pub fn weak_task(&self) -> WeakRef<Task> {
@@ -290,8 +290,8 @@ impl CurrentTask {
     where
         L: LockBefore<TaskRelease>,
     {
-        let mut locked = locked.cast_locked::<TaskRelease>();
-        Releasable::release(self, &mut locked);
+        let locked = locked.cast_locked::<TaskRelease>();
+        Releasable::release(self, locked);
     }
 
     pub fn set_syscall_restart_func<R: Into<SyscallResult>>(
@@ -1001,7 +1001,7 @@ impl CurrentTask {
         // Update the SELinux state, if enabled.
         // TODO: Do we need to update this state after updating the creds for exec?
         security::update_state_on_exec(
-            &mut locked.cast_locked::<MmDumpable>(),
+            locked.cast_locked::<MmDumpable>(),
             self,
             &resolved_elf.security_state,
         );

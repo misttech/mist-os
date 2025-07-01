@@ -191,8 +191,8 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_umask() {
-        let (kernel, _task, mut locked) = create_kernel_task_and_unlocked();
-        let fs = FsContext::new(Namespace::new(TmpFs::new_fs(&mut locked, &kernel)));
+        let (kernel, _task, locked) = create_kernel_task_and_unlocked();
+        let fs = FsContext::new(Namespace::new(TmpFs::new_fs(locked, &kernel)));
 
         assert_eq!(FileMode::from_bits(0o22), fs.set_umask(FileMode::from_bits(0o3020)));
         assert_eq!(FileMode::from_bits(0o646), fs.apply_umask(FileMode::from_bits(0o666)));
@@ -202,51 +202,51 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_chdir() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked_with_pkgfs();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked_with_pkgfs();
 
         assert_eq!("/", current_task.fs().cwd().path_escaping_chroot());
 
         let bin = current_task
-            .open_file(&mut locked, "bin".into(), OpenFlags::RDONLY)
+            .open_file(locked, "bin".into(), OpenFlags::RDONLY)
             .expect("missing bin directory");
         current_task
             .fs()
-            .chdir(&mut locked, &current_task, bin.name.to_passive())
+            .chdir(locked, &current_task, bin.name.to_passive())
             .expect("Failed to chdir");
         assert_eq!("/bin", current_task.fs().cwd().path_escaping_chroot());
 
         // Now that we have changed directories to bin, we're opening a file
         // relative to that directory, which doesn't exist.
-        assert!(current_task.open_file(&mut locked, "bin".into(), OpenFlags::RDONLY).is_err());
+        assert!(current_task.open_file(locked, "bin".into(), OpenFlags::RDONLY).is_err());
 
         // However, bin still exists in the root directory.
-        assert!(current_task.open_file(&mut locked, "/bin".into(), OpenFlags::RDONLY).is_ok());
+        assert!(current_task.open_file(locked, "/bin".into(), OpenFlags::RDONLY).is_ok());
 
         let previous_directory = current_task
-            .open_file(&mut locked, "..".into(), OpenFlags::RDONLY)
+            .open_file(locked, "..".into(), OpenFlags::RDONLY)
             .expect("failed to open ..")
             .name
             .to_passive();
         current_task
             .fs()
-            .chdir(&mut locked, &current_task, previous_directory)
+            .chdir(locked, &current_task, previous_directory)
             .expect("Failed to chdir");
         assert_eq!("/", current_task.fs().cwd().path_escaping_chroot());
 
         // Now bin exists again because we've gone back to the root.
-        assert!(current_task.open_file(&mut locked, "bin".into(), OpenFlags::RDONLY).is_ok());
+        assert!(current_task.open_file(locked, "bin".into(), OpenFlags::RDONLY).is_ok());
 
         // Repeating the .. doesn't do anything because we're already at the root.
         let previous_directory = current_task
-            .open_file(&mut locked, "..".into(), OpenFlags::RDONLY)
+            .open_file(locked, "..".into(), OpenFlags::RDONLY)
             .expect("failed to open ..")
             .name
             .to_passive();
         current_task
             .fs()
-            .chdir(&mut locked, &current_task, previous_directory)
+            .chdir(locked, &current_task, previous_directory)
             .expect("Failed to chdir");
         assert_eq!("/", current_task.fs().cwd().path_escaping_chroot());
-        assert!(current_task.open_file(&mut locked, "bin".into(), OpenFlags::RDONLY).is_ok());
+        assert!(current_task.open_file(locked, "bin".into(), OpenFlags::RDONLY).is_ok());
     }
 }

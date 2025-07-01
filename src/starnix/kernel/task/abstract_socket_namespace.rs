@@ -49,11 +49,11 @@ where
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let locked = locked.cast_locked::<FileOpsCore>();
         let mut table = self.table.lock();
         match table.entry(address.clone()) {
             Entry::Vacant(entry) => {
-                socket.bind(&mut locked, current_task, (self.address_maker)(address))?;
+                socket.bind(locked, current_task, (self.address_maker)(address))?;
                 entry.insert(Arc::downgrade(socket));
             }
             Entry::Occupied(mut entry) => {
@@ -61,7 +61,7 @@ where
                 if occupant.is_some() {
                     return error!(EADDRINUSE);
                 }
-                socket.bind(&mut locked, current_task, (self.address_maker)(address))?;
+                socket.bind(locked, current_task, (self.address_maker)(address))?;
                 entry.insert(Arc::downgrade(socket));
             }
         }

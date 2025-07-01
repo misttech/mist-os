@@ -404,12 +404,12 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_tmpfs() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let fs = TmpFs::new_fs(&mut locked, &kernel);
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let fs = TmpFs::new_fs(locked, &kernel);
         let root = fs.root();
-        let usr = root.create_dir(&mut locked, &current_task, "usr".into()).unwrap();
-        let _etc = root.create_dir(&mut locked, &current_task, "etc".into()).unwrap();
-        let _usr_bin = usr.create_dir(&mut locked, &current_task, "bin".into()).unwrap();
+        let usr = root.create_dir(locked, &current_task, "usr".into()).unwrap();
+        let _etc = root.create_dir(locked, &current_task, "etc".into()).unwrap();
+        let _usr_bin = usr.create_dir(locked, &current_task, "bin".into()).unwrap();
         let mut names = root.copy_child_names();
         names.sort();
         assert!(names.iter().eq(["etc", "usr"].iter()));
@@ -417,74 +417,61 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_write_read() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         let path = "test.bin";
         let _file = current_task
             .fs()
             .root()
-            .create_node(
-                &mut locked,
-                &current_task,
-                path.into(),
-                mode!(IFREG, 0o777),
-                DeviceType::NONE,
-            )
+            .create_node(locked, &current_task, path.into(), mode!(IFREG, 0o777), DeviceType::NONE)
             .unwrap();
 
-        let wr_file = current_task.open_file(&mut locked, path.into(), OpenFlags::RDWR).unwrap();
+        let wr_file = current_task.open_file(locked, path.into(), OpenFlags::RDWR).unwrap();
 
         let test_seq = 0..10000u16;
         let test_vec = test_seq.collect::<Vec<_>>();
         let test_bytes = test_vec.as_slice().as_bytes();
 
-        let written = wr_file
-            .write(&mut locked, &current_task, &mut VecInputBuffer::new(test_bytes))
-            .unwrap();
+        let written =
+            wr_file.write(locked, &current_task, &mut VecInputBuffer::new(test_bytes)).unwrap();
         assert_eq!(written, test_bytes.len());
 
         let mut read_buffer = VecOutputBuffer::new(test_bytes.len() + 1);
-        let read = wr_file.read_at(&mut locked, &current_task, 0, &mut read_buffer).unwrap();
+        let read = wr_file.read_at(locked, &current_task, 0, &mut read_buffer).unwrap();
         assert_eq!(read, test_bytes.len());
         assert_eq!(test_bytes, read_buffer.data());
     }
 
     #[::fuchsia::test]
     async fn test_read_past_eof() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         // Open an empty file
         let path = "test.bin";
         let _file = current_task
             .fs()
             .root()
-            .create_node(
-                &mut locked,
-                &current_task,
-                path.into(),
-                mode!(IFREG, 0o777),
-                DeviceType::NONE,
-            )
+            .create_node(locked, &current_task, path.into(), mode!(IFREG, 0o777), DeviceType::NONE)
             .unwrap();
-        let rd_file = current_task.open_file(&mut locked, path.into(), OpenFlags::RDONLY).unwrap();
+        let rd_file = current_task.open_file(locked, path.into(), OpenFlags::RDONLY).unwrap();
 
         // Verify that attempting to read past the EOF (i.e. at a non-zero offset) returns 0
         let buffer_size = 0x10000;
         let mut output_buffer = VecOutputBuffer::new(buffer_size);
         let test_offset = 100;
         let result =
-            rd_file.read_at(&mut locked, &current_task, test_offset, &mut output_buffer).unwrap();
+            rd_file.read_at(locked, &current_task, test_offset, &mut output_buffer).unwrap();
         assert_eq!(result, 0);
     }
 
     #[::fuchsia::test]
     async fn test_permissions() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         let path = "test.bin";
         let file = current_task
             .open_file_at(
-                &mut locked,
+                locked,
                 FdNumber::AT_FDCWD,
                 path.into(),
                 OpenFlags::CREAT | OpenFlags::RDONLY,
@@ -495,15 +482,14 @@ mod test {
             .expect("failed to create file");
         assert_eq!(
             0,
-            file.read(&mut locked, &current_task, &mut VecOutputBuffer::new(0))
-                .expect("failed to read")
+            file.read(locked, &current_task, &mut VecOutputBuffer::new(0)).expect("failed to read")
         );
 
-        assert!(file.write(&mut locked, &current_task, &mut VecInputBuffer::new(&[])).is_err());
+        assert!(file.write(locked, &current_task, &mut VecInputBuffer::new(&[])).is_err());
 
         let file = current_task
             .open_file_at(
-                &mut locked,
+                locked,
                 FdNumber::AT_FDCWD,
                 path.into(),
                 OpenFlags::WRONLY,
@@ -513,17 +499,17 @@ mod test {
             )
             .expect("failed to open file WRONLY");
 
-        assert!(file.read(&mut locked, &current_task, &mut VecOutputBuffer::new(0)).is_err());
+        assert!(file.read(locked, &current_task, &mut VecOutputBuffer::new(0)).is_err());
 
         assert_eq!(
             0,
-            file.write(&mut locked, &current_task, &mut VecInputBuffer::new(&[]))
+            file.write(locked, &current_task, &mut VecInputBuffer::new(&[]))
                 .expect("failed to write")
         );
 
         let file = current_task
             .open_file_at(
-                &mut locked,
+                locked,
                 FdNumber::AT_FDCWD,
                 path.into(),
                 OpenFlags::RDWR,
@@ -535,46 +521,42 @@ mod test {
 
         assert_eq!(
             0,
-            file.read(&mut locked, &current_task, &mut VecOutputBuffer::new(0))
-                .expect("failed to read")
+            file.read(locked, &current_task, &mut VecOutputBuffer::new(0)).expect("failed to read")
         );
 
         assert_eq!(
             0,
-            file.write(&mut locked, &current_task, &mut VecInputBuffer::new(&[]))
+            file.write(locked, &current_task, &mut VecInputBuffer::new(&[]))
                 .expect("failed to write")
         );
     }
 
     #[::fuchsia::test]
     async fn test_persistence() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         {
             let root = &current_task.fs().root().entry;
-            let usr = root
-                .create_dir(&mut locked, &current_task, "usr".into())
-                .expect("failed to create usr");
-            root.create_dir(&mut locked, &current_task, "etc".into())
-                .expect("failed to create usr/etc");
-            usr.create_dir(&mut locked, &current_task, "bin".into())
-                .expect("failed to create usr/bin");
+            let usr =
+                root.create_dir(locked, &current_task, "usr".into()).expect("failed to create usr");
+            root.create_dir(locked, &current_task, "etc".into()).expect("failed to create usr/etc");
+            usr.create_dir(locked, &current_task, "bin".into()).expect("failed to create usr/bin");
         }
 
         // At this point, all the nodes are dropped.
 
         current_task
-            .open_file(&mut locked, "/usr/bin".into(), OpenFlags::RDONLY | OpenFlags::DIRECTORY)
+            .open_file(locked, "/usr/bin".into(), OpenFlags::RDONLY | OpenFlags::DIRECTORY)
             .expect("failed to open /usr/bin");
         assert_eq!(
             errno!(ENOENT),
             current_task
-                .open_file(&mut locked, "/usr/bin/test.txt".into(), OpenFlags::RDWR)
+                .open_file(locked, "/usr/bin/test.txt".into(), OpenFlags::RDWR)
                 .unwrap_err()
         );
         current_task
             .open_file_at(
-                &mut locked,
+                locked,
                 FdNumber::AT_FDCWD,
                 "/usr/bin/test.txt".into(),
                 OpenFlags::RDWR | OpenFlags::CREAT,
@@ -584,67 +566,60 @@ mod test {
             )
             .expect("failed to create test.txt");
         let txt = current_task
-            .open_file(&mut locked, "/usr/bin/test.txt".into(), OpenFlags::RDWR)
+            .open_file(locked, "/usr/bin/test.txt".into(), OpenFlags::RDWR)
             .expect("failed to open test.txt");
 
         let usr_bin = current_task
-            .open_file(&mut locked, "/usr/bin".into(), OpenFlags::RDONLY)
+            .open_file(locked, "/usr/bin".into(), OpenFlags::RDONLY)
             .expect("failed to open /usr/bin");
         usr_bin
             .name
-            .unlink(&mut locked, &current_task, "test.txt".into(), UnlinkKind::NonDirectory, false)
+            .unlink(locked, &current_task, "test.txt".into(), UnlinkKind::NonDirectory, false)
             .expect("failed to unlink test.text");
         assert_eq!(
             errno!(ENOENT),
             current_task
-                .open_file(&mut locked, "/usr/bin/test.txt".into(), OpenFlags::RDWR)
+                .open_file(locked, "/usr/bin/test.txt".into(), OpenFlags::RDWR)
                 .unwrap_err()
         );
         assert_eq!(
             errno!(ENOENT),
             usr_bin
                 .name
-                .unlink(
-                    &mut locked,
-                    &current_task,
-                    "test.txt".into(),
-                    UnlinkKind::NonDirectory,
-                    false
-                )
+                .unlink(locked, &current_task, "test.txt".into(), UnlinkKind::NonDirectory, false)
                 .unwrap_err()
         );
 
         assert_eq!(
             0,
-            txt.read(&mut locked, &current_task, &mut VecOutputBuffer::new(0))
-                .expect("failed to read")
+            txt.read(locked, &current_task, &mut VecOutputBuffer::new(0)).expect("failed to read")
         );
         std::mem::drop(txt);
         assert_eq!(
             errno!(ENOENT),
             current_task
-                .open_file(&mut locked, "/usr/bin/test.txt".into(), OpenFlags::RDWR)
+                .open_file(locked, "/usr/bin/test.txt".into(), OpenFlags::RDWR)
                 .unwrap_err()
         );
         std::mem::drop(usr_bin);
 
         let usr = current_task
-            .open_file(&mut locked, "/usr".into(), OpenFlags::RDONLY)
+            .open_file(locked, "/usr".into(), OpenFlags::RDONLY)
             .expect("failed to open /usr");
         assert_eq!(
             errno!(ENOENT),
-            current_task.open_file(&mut locked, "/usr/foo".into(), OpenFlags::RDONLY).unwrap_err()
+            current_task.open_file(locked, "/usr/foo".into(), OpenFlags::RDONLY).unwrap_err()
         );
         usr.name
-            .unlink(&mut locked, &current_task, "bin".into(), UnlinkKind::Directory, false)
+            .unlink(locked, &current_task, "bin".into(), UnlinkKind::Directory, false)
             .expect("failed to unlink /usr/bin");
     }
 
     #[::fuchsia::test]
     async fn test_data() {
-        let (kernel, _current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, _current_task, locked) = create_kernel_task_and_unlocked();
         let fs = TmpFs::new_fs_with_options(
-            &mut locked,
+            locked,
             &kernel,
             FileSystemOptions {
                 source: Default::default(),

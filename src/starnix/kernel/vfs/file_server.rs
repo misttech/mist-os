@@ -315,14 +315,15 @@ impl StarnixNodeConnection {
             }
 
             // Open a path under the current directory.
-            let mut locked = kernel.kthreads.unlocked_for_async();
+            let mut unlocked = kernel.kthreads.unlocked_for_async();
+            let locked = &mut unlocked;
             let path = path.into_string();
-            let (node, name) = self.lookup_parent(&mut locked, path.as_bytes().into())?;
+            let (node, name) = self.lookup_parent(locked, path.as_bytes().into())?;
             let create_directory = flags.creation_mode() != vfs::common::CreationMode::Never
                 && flags.create_directory();
             let open_flags = to_open_flags(&flags);
             let file = match current_task.open_namespace_node_at(
-                &mut locked,
+                locked,
                 node.clone(),
                 name,
                 open_flags,
@@ -334,9 +335,9 @@ impl StarnixNodeConnection {
                     let mode =
                         current_task.fs().apply_umask(FileMode::from_bits(0o777) | FileMode::IFDIR);
                     let name =
-                        node.create_node(&mut locked, &current_task, name, mode, DeviceType::NONE)?;
+                        node.create_node(locked, &current_task, name, mode, DeviceType::NONE)?;
                     name.open(
-                        &mut locked,
+                        locked,
                         &current_task,
                         open_flags & !(OpenFlags::CREAT | OpenFlags::EXCL),
                         AccessCheck::skip(),
@@ -344,7 +345,7 @@ impl StarnixNodeConnection {
                 }
                 f => f?,
             };
-            std::mem::drop(locked);
+            std::mem::drop(unlocked);
 
             let starnix_file = StarnixNodeConnection::new(self.kernel.clone(), file);
             return starnix_file.directory_entry_open(
@@ -542,18 +543,17 @@ impl directory::entry_container::MutableDirectory for StarnixNodeConnection {
     ) -> BoxFuture<'static, Result<(), zx::Status>> {
         Box::pin(async move {
             let kernel = self.kernel().unwrap();
-            let mut locked = kernel.kthreads.unlocked_for_async();
+            let locked = &mut kernel.kthreads.unlocked_for_async();
             let src_name = src_name.into_string();
             let dst_name = dst_name.into_string();
             let src_dir = src_dir
                 .into_any()
                 .downcast::<StarnixNodeConnection>()
                 .map_err(|_| errno!(EXDEV))?;
-            let (src_node, src_name) =
-                src_dir.lookup_parent(&mut locked, src_name.as_str().into())?;
-            let (dst_node, dst_name) = self.lookup_parent(&mut locked, dst_name.as_str().into())?;
+            let (src_node, src_name) = src_dir.lookup_parent(locked, src_name.as_str().into())?;
+            let (dst_node, dst_name) = self.lookup_parent(locked, dst_name.as_str().into())?;
             NamespaceNode::rename(
-                &mut locked,
+                locked,
                 &*self.task()?,
                 &src_node,
                 src_name,
@@ -735,11 +735,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn access_file_system() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let fs = TmpFs::new_fs(&mut locked, &kernel);
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let fs = TmpFs::new_fs(locked, &kernel);
 
-        let file =
-            &fs.root().open_anonymous(&mut locked, &current_task, OpenFlags::RDWR).expect("open");
+        let file = &fs.root().open_anonymous(locked, &current_task, OpenFlags::RDWR).expect("open");
         let (root_handle, scope) = serve_file(&current_task, file).expect("serve");
 
         // Capture information from the filesystem in the main thread. The filesystem must not be
@@ -872,12 +871,12 @@ mod tests {
 
     #[::fuchsia::test]
     async fn open() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let fs = TmpFs::new_fs(&mut locked, &kernel);
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let fs = TmpFs::new_fs(locked, &kernel);
 
         let file = &fs
             .root()
-            .open_anonymous(&mut locked, &current_task, OpenFlags::RDWR)
+            .open_anonymous(locked, &current_task, OpenFlags::RDWR)
             .expect("open_anonymous failed");
         let (root_handle, scope) = serve_file(&current_task, file).expect("serve_file failed");
 

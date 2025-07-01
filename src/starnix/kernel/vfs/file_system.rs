@@ -331,9 +331,9 @@ impl FileSystem {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let locked = locked.cast_locked::<FileOpsCore>();
         self.ops.rename(
-            &mut locked,
+            locked,
             self,
             current_task,
             old_parent,
@@ -382,8 +382,8 @@ impl FileSystem {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         security::sb_statfs(current_task, &self)?;
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        let mut stat = self.ops.statfs(&mut locked, self, current_task)?;
+        let locked = locked.cast_locked::<FileOpsCore>();
+        let mut stat = self.ops.statfs(locked, self, current_task)?;
         if stat.f_frsize == 0 {
             stat.f_frsize = stat.f_bsize as i64;
         }

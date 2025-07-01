@@ -175,7 +175,7 @@ where
         init_task.fs().fork(),
         |locked, pid, process_group| {
             create_zircon_process(
-                &mut locked.cast_locked::<TaskRelease>(),
+                locked.cast_locked::<TaskRelease>(),
                 kernel,
                 None,
                 pid,
@@ -195,9 +195,8 @@ where
     }
     // A child process created via fork(2) inherits its parent's
     // resource limits.  Resource limits are preserved across execve(2).
-    let limits =
-        init_task.thread_group().limits.lock(&mut locked.cast_locked::<TaskRelease>()).clone();
-    *task.thread_group().limits.lock(&mut locked.cast_locked::<TaskRelease>()) = limits;
+    let limits = init_task.thread_group().limits.lock(locked.cast_locked::<TaskRelease>()).clone();
+    *task.thread_group().limits.lock(locked.cast_locked::<TaskRelease>()) = limits;
     Ok(task)
 }
 
@@ -283,7 +282,7 @@ where
         |locked, pid, process_group| {
             let process = zx::Process::from(zx::Handle::invalid());
             let thread_group = ThreadGroup::new(
-                &mut locked.cast_locked::<TaskRelease>(),
+                locked.cast_locked::<TaskRelease>(),
                 kernel.clone(),
                 process,
                 None,
@@ -351,7 +350,7 @@ where
     let TaskInfo { thread, thread_group, memory_manager } =
         ReleaseGuard::take(task_info_factory(locked, pid, process_group.clone())?);
 
-    process_group.insert(&mut locked.cast_locked::<TaskRelease>(), &thread_group);
+    process_group.insert(locked.cast_locked::<TaskRelease>(), &thread_group);
 
     // > The timer slack values of init (PID 1), the ancestor of all processes, are 50,000
     // > nanoseconds (50 microseconds).  The timer slack value is inherited by a child created
@@ -391,7 +390,7 @@ where
             builder
                 .thread_group()
                 .limits
-                .lock(&mut locked.cast_locked::<TaskRelease>())
+                .lock(locked.cast_locked::<TaskRelease>())
                 .set(*resource, rlimit { rlim_cur: *limit, rlim_max: *limit });
         }
 

@@ -68,7 +68,7 @@ where
 /// for this use case, please consider adding one that follows the new pattern of actually running
 /// the test on the spawned task.
 pub fn create_kernel_task_and_unlocked_with_pkgfs(
-) -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>) {
+) -> (Arc<Kernel>, AutoReleasableTask, &'static mut Locked<Unlocked>) {
     create_kernel_task_and_unlocked_with_fs(create_pkgfs)
 }
 
@@ -129,13 +129,13 @@ fn spawn_kernel_and_run_internal<F>(callback: F, security_server: Option<Arc<Sec
 where
     F: FnOnce(&mut Locked<Unlocked>, &mut CurrentTask) + Send + Sync + 'static,
 {
-    let mut locked = unsafe { Unlocked::new() };
-    let kernel = create_test_kernel(&mut locked, security_server);
-    let fs = create_test_fs_context(&mut locked, &kernel, TmpFs::new_fs);
-    let init_task = create_test_init_task(&mut locked, &kernel, fs);
+    let locked = unsafe { Unlocked::new() };
+    let kernel = create_test_kernel(locked, security_server);
+    let fs = create_test_fs_context(locked, &kernel, TmpFs::new_fs);
+    let init_task = create_test_init_task(locked, &kernel, fs);
     let (sender, receiver) = mpsc::channel();
     execute_task_with_prerun_result(
-        &mut locked,
+        locked,
         init_task,
         |locked, current_task| {
             callback(locked, current_task);
@@ -159,7 +159,8 @@ where
 /// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
 /// for this use case, please consider adding one that follows the new pattern of actually running
 /// the test on the spawned task.
-pub fn create_kernel_task_and_unlocked() -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>) {
+pub fn create_kernel_task_and_unlocked(
+) -> (Arc<Kernel>, AutoReleasableTask, &'static mut Locked<Unlocked>) {
     create_kernel_task_and_unlocked_with_fs(TmpFs::new_fs)
 }
 
@@ -225,12 +226,12 @@ fn create_test_init_task(
 
 fn create_kernel_task_and_unlocked_with_fs(
     create_fs: impl FnOnce(&mut Locked<Unlocked>, &Kernel) -> FileSystemHandle,
-) -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>) {
-    let mut locked = unsafe { Unlocked::new() };
-    let kernel = create_test_kernel(&mut locked, None);
-    let fs = create_fs(&mut locked, &kernel);
-    let fs_context = create_test_fs_context(&mut locked, &kernel, |_, _| fs.clone());
-    let init_task = create_test_init_task(&mut locked, &kernel, fs_context);
+) -> (Arc<Kernel>, AutoReleasableTask, &'static mut Locked<Unlocked>) {
+    let locked = unsafe { Unlocked::new() };
+    let kernel = create_test_kernel(locked, None);
+    let fs = create_fs(locked, &kernel);
+    let fs_context = create_test_fs_context(locked, &kernel, |_, _| fs.clone());
+    let init_task = create_test_init_task(locked, &kernel, fs_context);
     (kernel, init_task.into(), locked)
 }
 
@@ -570,8 +571,8 @@ impl From<TaskBuilder> for AutoReleasableTask {
 impl Drop for AutoReleasableTask {
     fn drop(&mut self) {
         // TODO(mariagl): Find a way to avoid creating a new locked context here.
-        let mut locked = unsafe { Unlocked::new() };
-        self.0.take().unwrap().release(&mut locked);
+        let locked = unsafe { Unlocked::new() };
+        self.0.take().unwrap().release(locked);
     }
 }
 

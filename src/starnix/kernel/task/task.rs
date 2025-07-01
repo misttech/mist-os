@@ -1230,7 +1230,7 @@ impl Task {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        self.files.add_with_flags(&mut locked.cast_locked::<FileOpsCore>(), self, file, flags)
+        self.files.add_with_flags(locked.cast_locked::<FileOpsCore>(), self, file, flags)
     }
 
     pub fn creds(&self) -> Credentials {
@@ -1663,10 +1663,10 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_tid_allocation() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
 
         assert_eq!(current_task.get_tid(), 1);
-        let another_current = create_task(&mut locked, &kernel, "another-task");
+        let another_current = create_task(locked, &kernel, "another-task");
         let another_tid = another_current.get_tid();
         assert!(another_tid >= 2);
 
@@ -1677,9 +1677,9 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_clone_pid_and_parent_pid() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let thread = current_task.clone_task_for_test(
-            &mut locked,
+            locked,
             (CLONE_THREAD | CLONE_VM | CLONE_SIGHAND) as u64,
             Some(SIGCHLD),
         );
@@ -1687,7 +1687,7 @@ mod test {
         assert_ne!(current_task.get_tid(), thread.get_tid());
         assert_eq!(current_task.thread_group().leader, thread.thread_group().leader);
 
-        let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
+        let child_task = current_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
         assert_ne!(current_task.get_pid(), child_task.get_pid());
         assert_ne!(current_task.get_tid(), child_task.get_tid());
         assert_eq!(current_task.get_pid(), child_task.thread_group().read().get_ppid());
@@ -1705,19 +1705,19 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_clone_rlimit() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let prev_fsize = current_task.thread_group().get_rlimit(&mut locked, Resource::FSIZE);
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let prev_fsize = current_task.thread_group().get_rlimit(locked, Resource::FSIZE);
         assert_ne!(prev_fsize, 10);
         current_task
             .thread_group()
             .limits
-            .lock(&mut locked)
+            .lock(locked)
             .set(Resource::FSIZE, rlimit { rlim_cur: 10, rlim_max: 100 });
-        let current_fsize = current_task.thread_group().get_rlimit(&mut locked, Resource::FSIZE);
+        let current_fsize = current_task.thread_group().get_rlimit(locked, Resource::FSIZE);
         assert_eq!(current_fsize, 10);
 
-        let child_task = current_task.clone_task_for_test(&mut locked, 0, Some(SIGCHLD));
-        let child_fsize = child_task.thread_group().get_rlimit(&mut locked, Resource::FSIZE);
+        let child_task = current_task.clone_task_for_test(locked, 0, Some(SIGCHLD));
+        let child_fsize = child_task.thread_group().get_rlimit(locked, Resource::FSIZE);
         assert_eq!(child_fsize, 10)
     }
 }

@@ -1122,7 +1122,7 @@ pub fn default_ioctl(
                 });
                 let has = zxio_node_attr_has_t { wrapping_key_id: true, ..Default::default() };
                 file.node().ops().update_attributes(
-                    &mut locked.cast_locked::<FileOpsCore>(),
+                    locked.cast_locked::<FileOpsCore>(),
                     current_task,
                     &file.node().info(),
                     has,
@@ -1612,10 +1612,10 @@ impl FileObject {
                 Err(e) if e == EAGAIN => {}
                 result => return result,
             }
-            let mut locked = locked.cast_locked::<FileOpsCore>();
+            let locked = locked.cast_locked::<FileOpsCore>();
             waiter
                 .wait_until(
-                    &mut locked,
+                    locked,
                     current_task,
                     deadline.unwrap_or(zx::MonotonicInstant::INFINITE),
                 )
@@ -1663,18 +1663,18 @@ impl FileObject {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.read_internal(current_task, || {
-            let mut locked = locked.cast_locked::<FileOpsCore>();
+            let locked = locked.cast_locked::<FileOpsCore>();
             if !self.ops().has_persistent_offsets() {
                 if data.available() > MAX_LFS_FILESIZE {
                     return error!(EINVAL);
                 }
-                return self.ops.read(&mut locked, self, current_task, 0, data);
+                return self.ops.read(locked, self, current_task, 0, data);
             }
 
             let mut offset_guard = self.offset.lock();
             let offset = *offset_guard as usize;
             checked_add_offset_and_length(offset, data.available())?;
-            let read = self.ops.read(&mut locked, self, current_task, offset, data)?;
+            let read = self.ops.read(locked, self, current_task, offset, data)?;
             *offset_guard += read as off_t;
             Ok(read)
         })
@@ -1694,10 +1694,8 @@ impl FileObject {
             return error!(ESPIPE);
         }
         checked_add_offset_and_length(offset, data.available())?;
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        self.read_internal(current_task, || {
-            self.ops.read(&mut locked, self, current_task, offset, data)
-        })
+        let locked = locked.cast_locked::<FileOpsCore>();
+        self.read_internal(current_task, || self.ops.read(locked, self, current_task, offset, data))
     }
 
     /// Common checks before calling ops().write.
@@ -1720,8 +1718,8 @@ impl FileObject {
         //   insufficient space on the underlying physical medium, or the RLIMIT_FSIZE resource
         //   limit is encountered (see setrlimit(2)),
         checked_add_offset_and_length(offset, data.available())?;
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        self.ops().write(&mut locked, self, current_task, offset, data)
+        let locked = locked.cast_locked::<FileOpsCore>();
+        self.ops().write(locked, self, current_task, offset, data)
     }
 
     /// Common wrapper work for `write` and `write_at`.
@@ -1764,23 +1762,21 @@ impl FileObject {
             }
             // TODO(https://fxbug.dev/333540469): write_fn should take L: LockBefore<FsNodeAppend>,
             // but FileOpsCore must be after FsNodeAppend
-            let mut locked = unsafe { Unlocked::new() };
+            let locked = unsafe { Unlocked::new() };
             let mut offset = self.offset.lock();
             let bytes_written = if self.flags().contains(OpenFlags::APPEND) {
-                let (_guard, mut locked) =
-                    self.node().append_lock.write_and(&mut locked, current_task)?;
+                let (_guard, locked) = self.node().append_lock.write_and(locked, current_task)?;
                 *offset = self.ops().seek(
-                    &mut locked.cast_locked::<FileOpsCore>(),
+                    locked.cast_locked::<FileOpsCore>(),
                     self,
                     current_task,
                     *offset,
                     SeekTarget::End(0),
                 )?;
-                self.write_common(&mut locked, current_task, *offset as usize, data)
+                self.write_common(locked, current_task, *offset as usize, data)
             } else {
-                let (_guard, mut locked) =
-                    self.node().append_lock.read_and(&mut locked, current_task)?;
-                self.write_common(&mut locked, current_task, *offset as usize, data)
+                let (_guard, locked) = self.node().append_lock.read_and(locked, current_task)?;
+                self.write_common(locked, current_task, *offset as usize, data)
             }?;
             if self.ops().writes_update_seek_offset() {
                 *offset += bytes_written as off_t;
@@ -1805,9 +1801,8 @@ impl FileObject {
         self.write_fn(locked, current_task, |_locked| {
             // TODO(https://fxbug.dev/333540469): write_fn should take L: LockBefore<FsNodeAppend>,
             // but FileOpsCore must be after FsNodeAppend
-            let mut locked = unsafe { Unlocked::new() };
-            let (_guard, mut locked) =
-                self.node().append_lock.read_and(&mut locked, current_task)?;
+            let locked = unsafe { Unlocked::new() };
+            let (_guard, locked) = self.node().append_lock.read_and(locked, current_task)?;
 
             // According to LTP test pwrite04:
             //
@@ -1816,10 +1811,10 @@ impl FileObject {
             //   O_APPEND, pwrite() appends data to the end of the file, regardless of the value of offset.
             if self.flags().contains(OpenFlags::APPEND) && self.ops().is_seekable() {
                 checked_add_offset_and_length(offset, data.available())?;
-                offset = default_eof_offset(&mut locked, self, current_task)? as usize;
+                offset = default_eof_offset(locked, self, current_task)? as usize;
             }
 
-            self.write_common(&mut locked, current_task, offset, data)
+            self.write_common(locked, current_task, offset, data)
         })
     }
 
@@ -1832,8 +1827,8 @@ impl FileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        let locked = &mut locked;
+        let locked = locked.cast_locked::<FileOpsCore>();
+        let locked = locked;
 
         if !self.ops().is_seekable() {
             return error!(ESPIPE);
@@ -1874,13 +1869,7 @@ impl FileObject {
             return error!(EACCES);
         }
         // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
-        self.ops().get_memory(
-            &mut locked.cast_locked::<FileOpsCore>(),
-            self,
-            current_task,
-            length,
-            prot,
-        )
+        self.ops().get_memory(locked.cast_locked::<FileOpsCore>(), self, current_task, length, prot)
     }
 
     pub fn mmap<L>(
@@ -1897,7 +1886,7 @@ impl FileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let locked = locked.cast_locked::<FileOpsCore>();
         if !self.can_read() {
             return error!(EACCES);
         }
@@ -1909,7 +1898,7 @@ impl FileObject {
         }
         // TODO: Check for PERM_EXECUTE by checking whether the filesystem is mounted as noexec.
         self.ops().mmap(
-            &mut locked,
+            locked,
             self,
             current_task,
             addr,
@@ -1930,12 +1919,12 @@ impl FileObject {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let mut locked = locked.cast_locked::<FileOpsCore>();
+        let locked = locked.cast_locked::<FileOpsCore>();
         if self.name.entry.is_dead() {
             return error!(ENOENT);
         }
 
-        self.ops().readdir(&mut locked, self, current_task, sink)?;
+        self.ops().readdir(locked, self, current_task, sink)?;
         self.update_atime();
         self.notify(InotifyMask::ACCESS);
         Ok(())
@@ -2095,7 +2084,7 @@ impl FileObject {
     {
         handler.add_mapping(add_equivalent_fd_events);
         self.ops().wait_async(
-            &mut locked.cast_locked::<FileOpsCore>(),
+            locked.cast_locked::<FileOpsCore>(),
             self,
             current_task,
             waiter,
@@ -2114,7 +2103,7 @@ impl FileObject {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.ops()
-            .query_events(&mut locked.cast_locked::<FileOpsCore>(), self, current_task)
+            .query_events(locked.cast_locked::<FileOpsCore>(), self, current_task)
             .map(add_equivalent_fd_events)
     }
 
@@ -2133,7 +2122,7 @@ impl FileObject {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.name.entry.node.record_lock_release(RecordLockOwner::FdTable(id));
-        self.ops().flush(&mut locked.cast_locked::<FileOpsCore>(), self, current_task)
+        self.ops().flush(locked.cast_locked::<FileOpsCore>(), self, current_task)
     }
 
     // Notifies watchers on the current node and its parent about an event.
@@ -2189,8 +2178,8 @@ impl Releasable for FileObject {
                 }
             }
         }
-        let mut locked = locked.cast_locked::<FileOpsCore>();
-        self.ops().close(&mut locked, &self, current_task);
+        let locked = locked.cast_locked::<FileOpsCore>();
+        self.ops().close(locked, &self, current_task);
         self.name.entry.node.on_file_closed(&self);
         let event =
             if self.can_write() { InotifyMask::CLOSE_WRITE } else { InotifyMask::CLOSE_NOWRITE };
@@ -2285,13 +2274,13 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_append_truncate_race() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let root_fs = TmpFs::new_fs(&mut locked, &kernel);
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let root_fs = TmpFs::new_fs(locked, &kernel);
         let mount = MountInfo::detached();
         let root_node = Arc::clone(root_fs.root());
         let file = root_node
             .create_entry(
-                &mut locked,
+                locked,
                 &current_task,
                 &mount,
                 "test".into(),
@@ -2309,7 +2298,7 @@ mod tests {
             )
             .expect("create_node failed");
         let file_handle = file
-            .open_anonymous(&mut locked, &current_task, OpenFlags::APPEND | OpenFlags::RDWR)
+            .open_anonymous(locked, &current_task, OpenFlags::APPEND | OpenFlags::RDWR)
             .expect("open failed");
         let done = Arc::new(AtomicBool::new(false));
 
@@ -2341,9 +2330,8 @@ mod tests {
         // races, then we might unexpectedly see zeroes.
         while !done.load(Ordering::SeqCst) {
             let mut buffer = VecOutputBuffer::new(4096);
-            let amount = file_handle
-                .read_at(&mut locked, &current_task, 0, &mut buffer)
-                .expect("read failed");
+            let amount =
+                file_handle.read_at(locked, &current_task, 0, &mut buffer).expect("read failed");
             let mut last = None;
             let buffer = &Vec::from(buffer)[..amount];
             for i in buffer.chunks_exact(8).map(|chunk| U64::<LE>::read_from_bytes(chunk).unwrap())

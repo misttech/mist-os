@@ -184,9 +184,9 @@ impl RunningThread {
                 .name("kthread-dynamic-worker".to_string())
                 .spawn(move || {
                     // It's ok to create a new lock context here, since we are on a new thread.
-                    let mut locked = unsafe { Unlocked::new() };
+                    let locked = unsafe { Unlocked::new() };
                     let result =
-                        with_new_current_task(&mut locked, &system_task, |locked, current_task| {
+                        with_new_current_task(locked, &system_task, |locked, current_task| {
                             while let Ok(f) = receiver.recv() {
                                 f(locked, &current_task);
                                 // Apply any delayed releasers.
@@ -228,13 +228,13 @@ impl RunningThread {
                 .name("kthread-persistent-worker".to_string())
                 .spawn(move || {
                     // It's ok to create a new lock context here, since we are on a new thread.
-                    let mut locked = unsafe { Unlocked::new() };
+                    let locked = unsafe { Unlocked::new() };
                     let current_task = {
                         let Some(system_task) = system_task.upgrade() else {
                             return;
                         };
                         match create_kernel_thread(
-                            &mut locked,
+                            locked,
                             &system_task,
                             CString::new("kthreadd").unwrap(),
                         ) {
@@ -245,12 +245,12 @@ impl RunningThread {
                             }
                         }
                     };
-                    release_after!(current_task, &mut locked, {
+                    release_after!(current_task, locked, {
                         while let Ok(f) = receiver.recv() {
-                            f(&mut locked, &current_task);
+                            f(locked, &current_task);
 
                             // Apply any delayed releasers.
-                            current_task.trigger_delayed_releaser(&mut locked);
+                            current_task.trigger_delayed_releaser(locked);
                         }
                     });
                 })

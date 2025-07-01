@@ -133,7 +133,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                 (FsUseType::Xattr, Some(locked)) => {
                     // Determine the SID from the "security.selinux" attribute.
                     let attr = fs_node.ops().get_xattr(
-                        &mut locked.cast_locked::<FileOpsCore>(),
+                        locked.cast_locked::<FileOpsCore>(),
                         fs_node,
                         current_task,
                         XATTR_NAME_SELINUX.to_bytes().into(),
@@ -159,7 +159,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                                     .sid_to_security_context(root_or_fs_sid)
                                     .unwrap();
                                 fs_node.ops().set_xattr(
-                                    &mut locked.cast_locked::<FileOpsCore>(),
+                                    locked.cast_locked::<FileOpsCore>(),
                                     fs_node,
                                     current_task,
                                     XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1093,7 +1093,7 @@ where
     // to `get_xattr()`.
     if name != FsStr::new(XATTR_NAME_SELINUX.to_bytes()) || Anon::is_private(fs_node) {
         return fs_node.ops().get_xattr(
-            &mut locked.cast_locked::<FileOpsCore>(),
+            locked.cast_locked::<FileOpsCore>(),
             fs_node,
             current_task,
             name,
@@ -1107,7 +1107,7 @@ where
     let sid = fs_node_effective_sid_and_class(&fs_node).sid;
     if sid == InitialSid::Unlabeled.into() {
         let result = fs_node.ops().get_xattr(
-            &mut locked.cast_locked::<FileOpsCore>(),
+            locked.cast_locked::<FileOpsCore>(),
             fs_node,
             current_task,
             name,
@@ -1142,7 +1142,7 @@ where
 {
     if name != FsStr::new(XATTR_NAME_SELINUX.to_bytes()) || Anon::is_private(fs_node) {
         return fs_node.ops().set_xattr(
-            &mut locked.cast_locked::<FileOpsCore>(),
+            locked.cast_locked::<FileOpsCore>(),
             fs_node,
             current_task,
             name,
@@ -1159,7 +1159,7 @@ where
         // label on the in-memory `fs_node` to be set up when the `FileSystem`'s labeling state
         // has been initialized, during load of the initial policy.
         return fs_node.ops().set_xattr(
-            &mut locked.cast_locked::<FileOpsCore>(),
+            locked.cast_locked::<FileOpsCore>(),
             fs_node,
             current_task,
             name,
@@ -1215,7 +1215,7 @@ where
 
     // Apply the change to the file node.
     let result = fs_node.ops().set_xattr(
-        &mut locked.cast_locked::<FileOpsCore>(),
+        locked.cast_locked::<FileOpsCore>(),
         fs_node,
         current_task,
         name,
@@ -1272,7 +1272,7 @@ mod tests {
 
                 // Remove the "security.selinux" label, if any.
                 let _ = node.ops().remove_xattr(
-                    &mut locked.cast_locked::<FileOpsCore>(),
+                    locked.cast_locked::<FileOpsCore>(),
                     node,
                     &current_task,
                     XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1280,7 +1280,7 @@ mod tests {
                 assert_eq!(
                     node.ops()
                         .get_xattr(
-                            &mut locked.cast_locked::<FileOpsCore>(),
+                            locked.cast_locked::<FileOpsCore>(),
                             node,
                             &current_task,
                             XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1294,7 +1294,7 @@ mod tests {
                 clear_cached_sid(node);
                 assert_eq!(None, get_cached_sid(node));
                 fs_node_init_with_dentry(
-                    Some(&mut locked.cast_locked()),
+                    Some(locked.cast_locked()),
                     &security_server,
                     &current_task,
                     dir_entry,
@@ -1333,7 +1333,7 @@ mod tests {
                 // Set the security label to a value which is not a valid Security Context.
                 node.ops()
                     .set_xattr(
-                        &mut locked.cast_locked::<FileOpsCore>(),
+                        locked.cast_locked::<FileOpsCore>(),
                         node,
                         &current_task,
                         XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1346,7 +1346,7 @@ mod tests {
                 clear_cached_sid(node);
                 assert_eq!(None, get_cached_sid(node));
                 fs_node_init_with_dentry(
-                    Some(&mut locked.cast_locked()),
+                    Some(locked.cast_locked()),
                     &security_server,
                     &current_task,
                     dir_entry,
@@ -1388,7 +1388,7 @@ mod tests {
                 // the corresponding SID cached.
                 node.ops()
                     .set_xattr(
-                        &mut locked.cast_locked::<FileOpsCore>(),
+                        locked.cast_locked::<FileOpsCore>(),
                         node,
                         &current_task,
                         XATTR_NAME_SELINUX.to_bytes().into(),
@@ -1399,7 +1399,7 @@ mod tests {
                 clear_cached_sid(node);
                 assert_eq!(None, get_cached_sid(node));
                 fs_node_init_with_dentry(
-                    Some(&mut locked.cast_locked()),
+                    Some(locked.cast_locked()),
                     &security_server,
                     &current_task,
                     dir_entry,
@@ -1441,7 +1441,7 @@ mod tests {
                 let node = &testing::create_test_file(locked, current_task).entry.node;
 
                 node.set_xattr(
-                    &mut locked.cast_locked::<FileOpsCore>(),
+                    locked.cast_locked::<FileOpsCore>(),
                     current_task,
                     &current_task.fs().root().mount,
                     XATTR_NAME_SELINUX.to_bytes().into(),

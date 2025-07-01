@@ -1086,13 +1086,13 @@ mod test {
 
     #[fuchsia::test]
     async fn test_init_file_already_exists() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let (mut sender, mut receiver) = futures::channel::mpsc::unbounded();
 
         let path = "/path";
         current_task
             .open_file_at(
-                &mut locked,
+                locked,
                 FdNumber::AT_FDCWD,
                 path.into(),
                 OpenFlags::CREAT,
@@ -1116,11 +1116,10 @@ mod test {
 
     #[fuchsia::test]
     async fn test_init_file_wait_required() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let (mut sender, mut receiver) = futures::channel::mpsc::unbounded();
 
-        let init_task =
-            current_task.clone_task_for_test(&mut locked, CLONE_FS as u64, Some(SIGCHLD));
+        let init_task = current_task.clone_task_for_test(locked, CLONE_FS as u64, Some(SIGCHLD));
         let path = "/path";
 
         let test_init_tid = current_task.get_tid();
@@ -1139,7 +1138,7 @@ mod test {
         // Create the file that is being waited on.
         current_task
             .open_file_at(
-                &mut locked,
+                locked,
                 FdNumber::AT_FDCWD,
                 path.into(),
                 OpenFlags::CREAT,
@@ -1155,11 +1154,10 @@ mod test {
 
     #[fuchsia::test]
     async fn test_init_exits_before_file_exists() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let (mut sender, mut receiver) = futures::channel::mpsc::unbounded();
 
-        let init_task =
-            current_task.clone_task_for_test(&mut locked, CLONE_FS as u64, Some(SIGCHLD));
+        let init_task = current_task.clone_task_for_test(locked, CLONE_FS as u64, Some(SIGCHLD));
         const STARTUP_FILE_PATH: &str = "/path";
 
         let test_init_tid = init_task.get_tid();

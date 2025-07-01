@@ -304,13 +304,13 @@ fn forward_to_pty(
 
     let pty_source = pty;
     kernel.kthreads.spawn({
-        move |mut locked, current_task| {
+        move |locked, current_task| {
             let _result: Result<(), Error> =
                 fasync::LocalExecutor::new().run_singlethreaded(async {
                     let mut buffer = VecOutputBuffer::new(BUFFER_CAPACITY);
                     loop {
                         buffer.reset();
-                        let bytes = pty_source.read(&mut locked, current_task, &mut buffer)?;
+                        let bytes = pty_source.read(locked, current_task, &mut buffer)?;
                         if bytes == 0 {
                             return Ok(());
                         }

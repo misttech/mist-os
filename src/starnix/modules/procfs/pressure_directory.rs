@@ -216,7 +216,7 @@ impl FileOps for MemoryPressureFile {
         _events: FdEvents,
         handler: EventHandler,
     ) -> Option<WaitCanceler> {
-        let (monitor, mut locked) = self.monitor.lock_and(locked);
+        let (monitor, locked) = self.monitor.lock_and(locked);
         let Some(ref monitor) = *monitor else {
             return None;
         };
@@ -234,7 +234,7 @@ impl FileOps for MemoryPressureFile {
         let result = WaitCanceler::new_event(Arc::downgrade(&event), canceler);
 
         // Update the notification state.
-        monitor.client_state.lock(&mut locked).mutate_in_place(|old_value| match old_value {
+        monitor.client_state.lock(locked).mutate_in_place(|old_value| match old_value {
             // If a signal has already been latched, deliver it immediately and start a new cycle.
             PressureMonitorClientState::PressureLatched => {
                 event.signal_handle(zx::Signals::empty(), zx::Signals::EVENT_SIGNALED).unwrap();
@@ -258,11 +258,11 @@ impl FileOps for MemoryPressureFile {
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
-        let (monitor, mut locked) = self.monitor.lock_and(locked);
+        let (monitor, locked) = self.monitor.lock_and(locked);
         if let Some(ref monitor) = *monitor {
             // Note: the following logic assumes that userspace will never poll from more than one
             // thread at the same time. We'll need to revisit it if it stops being the case.
-            match &*monitor.client_state.lock(&mut locked) {
+            match &*monitor.client_state.lock(locked) {
                 // The previous cycle has ended and userspace has not yet started a new wait.
                 // Therefore, from the userspace point of view, we're still in the previous cycle.
                 // Let's act accordingly and report POLLPRI.

@@ -353,7 +353,7 @@ where
     // state, thereby ensuring safe ordering.
     if let Some(state) = &current_task.kernel().security_state.state {
         selinux_hooks::fs_node::fs_node_init_with_dentry(
-            Some(&mut locked.cast_locked()),
+            Some(locked.cast_locked()),
             &state.server,
             current_task,
             dir_entry,
@@ -1627,7 +1627,7 @@ where
         },
         |locked| {
             fs_node.ops().get_xattr(
-                &mut locked.cast_locked::<FileOpsCore>(),
+                locked.cast_locked::<FileOpsCore>(),
                 fs_node,
                 current_task,
                 name,
@@ -1681,7 +1681,7 @@ where
         |locked| {
             if current_task.creds().has_capability(CAP_SYS_ADMIN) {
                 fs_node.ops().set_xattr(
-                    &mut locked.cast_locked::<FileOpsCore>(),
+                    locked.cast_locked::<FileOpsCore>(),
                     fs_node,
                     current_task,
                     name,
@@ -2383,7 +2383,7 @@ mod tests {
                 const TEST_VALUE: &str = "Something Random";
                 node.ops()
                     .set_xattr(
-                        &mut locked.cast_locked::<FileOpsCore>(),
+                        locked.cast_locked::<FileOpsCore>(),
                         node,
                         current_task,
                         XATTR_NAME_SELINUX.to_bytes().into(),

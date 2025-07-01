@@ -188,12 +188,12 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_filesystem_creates_nodes() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
         let registry = kernel.expando.get::<FsRegistry>();
         registry.register(b"cgroup2".into(), cgroup2_fs);
 
         let fs = current_task
-            .create_filesystem(&mut locked, b"cgroup2".into(), Default::default())
+            .create_filesystem(locked, b"cgroup2".into(), Default::default())
             .expect("create_filesystem");
 
         let cgroupfs = fs.downcast_ops::<CgroupV2Fs>().expect("downcast_ops");

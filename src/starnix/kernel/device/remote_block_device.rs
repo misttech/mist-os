@@ -292,19 +292,18 @@ mod tests {
 
     #[::fuchsia::test]
     async fn test_remote_block_device_registry() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        remote_block_device_init(&mut locked, &current_task);
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        remote_block_device_init(locked, &current_task);
         let registry = kernel.remote_block_device_registry.clone();
 
         registry
-            .create_remote_block_device_if_absent(&mut locked, &current_task, "test", 1024)
+            .create_remote_block_device_if_absent(locked, &current_task, "test", 1024)
             .expect("create_remote_block_device_if_absent failed.");
 
         let device = registry.open(0).expect("open failed.");
-        let file =
-            anon_test_file(&mut locked, &current_task, device.create_file_ops(), OpenFlags::RDWR);
+        let file = anon_test_file(locked, &current_task, device.create_file_ops(), OpenFlags::RDWR);
 
-        let arg_addr = map_object_anywhere(&mut locked, &current_task, &0u64);
+        let arg_addr = map_object_anywhere(locked, &current_task, &0u64);
         // TODO(https://fxbug.dev/129314): replace with MaybeUninit::uninit_array.
         let arg: MaybeUninit<[MaybeUninit<u8>; 8]> = MaybeUninit::uninit();
         // SAFETY: We are converting from an uninitialized array to an array
@@ -312,50 +311,48 @@ mod tests {
         // https://doc.rust-lang.org/std/mem/union.MaybeUninit.html#initializing-an-array-element-by-element.
         let mut arg = unsafe { arg.assume_init() };
 
-        file.ioctl(&mut locked, &current_task, BLKGETSIZE64, arg_addr.into())
-            .expect("ioctl failed");
+        file.ioctl(locked, &current_task, BLKGETSIZE64, arg_addr.into()).expect("ioctl failed");
         let value =
             u64::read_from_bytes(current_task.read_memory(arg_addr, &mut arg).unwrap()).unwrap();
         assert_eq!(value, 1024);
 
-        file.ioctl(&mut locked, &current_task, BLKGETSIZE, arg_addr.into()).expect("ioctl failed");
+        file.ioctl(locked, &current_task, BLKGETSIZE, arg_addr.into()).expect("ioctl failed");
         let value =
             u64::read_from_bytes(current_task.read_memory(arg_addr, &mut arg).unwrap()).unwrap();
         assert_eq!(value, 2);
 
         let mut buf = VecOutputBuffer::new(512);
-        file.read(&mut locked, &current_task, &mut buf).expect("read failed.");
+        file.read(locked, &current_task, &mut buf).expect("read failed.");
         assert_eq!(buf.data(), &[0u8; 512]);
 
         let mut buf = VecInputBuffer::from(vec![1u8; 512]);
-        file.seek(&mut locked, &current_task, SeekTarget::Set(0)).expect("seek failed");
-        file.write(&mut locked, &current_task, &mut buf).expect("write failed.");
+        file.seek(locked, &current_task, SeekTarget::Set(0)).expect("seek failed");
+        file.write(locked, &current_task, &mut buf).expect("write failed.");
 
         let mut buf = VecOutputBuffer::new(512);
-        file.seek(&mut locked, &current_task, SeekTarget::Set(0)).expect("seek failed");
-        file.read(&mut locked, &current_task, &mut buf).expect("read failed.");
+        file.seek(locked, &current_task, SeekTarget::Set(0)).expect("seek failed");
+        file.read(locked, &current_task, &mut buf).expect("read failed.");
         assert_eq!(buf.data(), &[1u8; 512]);
     }
 
     #[::fuchsia::test]
     async fn test_read_write_past_eof() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        remote_block_device_init(&mut locked, &current_task);
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        remote_block_device_init(locked, &current_task);
         let registry = kernel.remote_block_device_registry.clone();
 
         registry
-            .create_remote_block_device_if_absent(&mut locked, &current_task, "test", 1024)
+            .create_remote_block_device_if_absent(locked, &current_task, "test", 1024)
             .expect("create_remote_block_device_if_absent failed.");
 
         let device = registry.open(0).expect("open failed.");
-        let file =
-            anon_test_file(&mut locked, &current_task, device.create_file_ops(), OpenFlags::RDWR);
+        let file = anon_test_file(locked, &current_task, device.create_file_ops(), OpenFlags::RDWR);
 
-        file.seek(&mut locked, &current_task, SeekTarget::End(0)).expect("seek failed");
+        file.seek(locked, &current_task, SeekTarget::End(0)).expect("seek failed");
         let mut buf = VecOutputBuffer::new(512);
-        assert_eq!(file.read(&mut locked, &current_task, &mut buf).expect("read failed."), 0);
+        assert_eq!(file.read(locked, &current_task, &mut buf).expect("read failed."), 0);
 
         let mut buf = VecInputBuffer::from(vec![1u8; 512]);
-        assert_eq!(file.write(&mut locked, &current_task, &mut buf).expect("write failed."), 0);
+        assert_eq!(file.write(locked, &current_task, &mut buf).expect("write failed."), 0);
     }
 }

@@ -290,30 +290,26 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_remove_duplicates() {
-        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let base = TmpFs::new_fs(&mut locked, &kernel);
-        base.root()
-            .create_dir_for_testing(&mut locked, &current_task, "d1".into())
-            .expect("create_dir");
-        base.root()
-            .create_dir_for_testing(&mut locked, &current_task, "d2".into())
-            .expect("create_dir");
-        let base_entries = get_root_entry_names(&mut locked, &current_task, &base);
+        let (kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let base = TmpFs::new_fs(locked, &kernel);
+        base.root().create_dir_for_testing(locked, &current_task, "d1".into()).expect("create_dir");
+        base.root().create_dir_for_testing(locked, &current_task, "d2".into()).expect("create_dir");
+        let base_entries = get_root_entry_names(locked, &current_task, &base);
         assert_eq!(base_entries.len(), 4);
         assert!(base_entries.contains(&b".".to_vec()));
         assert!(base_entries.contains(&b"..".to_vec()));
         assert!(base_entries.contains(&b"d1".to_vec()));
         assert!(base_entries.contains(&b"d2".to_vec()));
 
-        let tmpfs1 = TmpFs::new_fs(&mut locked, &kernel);
-        let tmpfs2 = TmpFs::new_fs(&mut locked, &kernel);
+        let tmpfs1 = TmpFs::new_fs(locked, &kernel);
+        let tmpfs2 = TmpFs::new_fs(locked, &kernel);
         let layered_fs = LayeredFs::new_fs(
-            &mut locked,
+            locked,
             &kernel,
             base,
             BTreeMap::from([("d1".into(), tmpfs1), ("d3".into(), tmpfs2)]),
         );
-        let layered_fs_entries = get_root_entry_names(&mut locked, &current_task, &layered_fs);
+        let layered_fs_entries = get_root_entry_names(locked, &current_task, &layered_fs);
         assert_eq!(layered_fs_entries.len(), 5);
         assert!(layered_fs_entries.contains(&b".".to_vec()));
         assert!(layered_fs_entries.contains(&b"..".to_vec()));
