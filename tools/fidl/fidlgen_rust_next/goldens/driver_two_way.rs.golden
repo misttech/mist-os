@@ -437,13 +437,13 @@ pub trait TwoWayClientHandler<___T: ::fidl_next::Transport> {}
 
 impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for TwoWay
 where
-    ___H: TwoWayClientHandler<___T>,
+    ___H: TwoWayClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <two_way::Add as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
         sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
@@ -480,18 +480,18 @@ pub trait TwoWayServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<two_way::Add, ___T>,
 
         responder: ::fidl_next::Responder<two_way::Add>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
 impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for TwoWay
 where
-    ___H: TwoWayServerHandler<___T>,
+    ___H: TwoWayServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <two_way::Add as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -504,7 +504,7 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -516,7 +516,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.add(sender, decoded, responder),
+                    Ok(decoded) => handler.add(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }

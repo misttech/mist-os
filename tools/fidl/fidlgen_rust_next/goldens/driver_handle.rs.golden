@@ -161,10 +161,10 @@ pub trait DriverProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
 impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for DriverProtocol
 where
-    ___H: DriverProtocolClientHandler<___T>,
+    ___H: DriverProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
         sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
@@ -197,10 +197,10 @@ pub trait DriverProtocolServerHandler<___T: ::fidl_next::Transport> {}
 
 impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for DriverProtocol
 where
-    ___H: DriverProtocolServerHandler<___T>,
+    ___H: DriverProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -213,7 +213,7 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -618,10 +618,10 @@ pub trait HandlesInProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
 impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for HandlesInProtocol
 where
-    ___H: HandlesInProtocolClientHandler<___T>,
+    ___H: HandlesInProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
         sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
@@ -656,18 +656,18 @@ pub trait HandlesInProtocolServerHandler<___T: ::fidl_next::Transport> {
         sender: &::fidl_next::ServerSender<HandlesInProtocol, ___T>,
 
         request: ::fidl_next::Request<handles_in_protocol::SendHandles, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
 impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for HandlesInProtocol
 where
-    ___H: HandlesInProtocolServerHandler<___T>,
+    ___H: HandlesInProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <handles_in_protocol::SendHandles as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -675,7 +675,7 @@ where
     ) {
         match ordinal {
             8904504160365833729 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.send_handles(sender, decoded),
+                Ok(decoded) => handler.send_handles(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -687,7 +687,7 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,

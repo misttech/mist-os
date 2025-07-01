@@ -4,6 +4,7 @@
 
 //! FIDL protocol servers.
 
+use core::future::Future;
 use core::num::NonZeroU32;
 
 use fidl_next_codec::{Encode, EncodeError, EncoderExt as _};
@@ -62,13 +63,22 @@ impl<T: Transport> Clone for ServerSender<T> {
 }
 
 /// A type which handles incoming events for a server.
+///
+/// The futures returned by `on_one_way` and `on_two_way` are required to be `Send`. See
+/// `LocalServerHandler` for a version of this trait which does not require the returned futures to
+/// be `Send`.
 pub trait ServerHandler<T: Transport> {
     /// Handles a received one-way server message.
     ///
     /// The server cannot handle more messages until `on_one_way` completes. If `on_one_way` may
     /// block, perform asynchronous work, or take a long time to process a message, it should
     /// offload work to an async task.
-    fn on_one_way(&mut self, sender: &ServerSender<T>, ordinal: u64, buffer: T::RecvBuffer);
+    fn on_one_way(
+        &mut self,
+        sender: &ServerSender<T>,
+        ordinal: u64,
+        buffer: T::RecvBuffer,
+    ) -> impl Future<Output = ()> + Send;
 
     /// Handles a received two-way server message.
     ///
@@ -81,7 +91,7 @@ pub trait ServerHandler<T: Transport> {
         ordinal: u64,
         buffer: T::RecvBuffer,
         responder: Responder,
-    );
+    ) -> impl Future<Output = ()> + Send;
 }
 
 /// A server for an endpoint.
@@ -113,9 +123,9 @@ impl<T: Transport> Server<T> {
             let (txid, ordinal) =
                 decode_header::<T>(&mut buffer).map_err(ProtocolError::InvalidMessageHeader)?;
             if let Some(txid) = NonZeroU32::new(txid) {
-                handler.on_two_way(&self.sender, ordinal, buffer, Responder { txid });
+                handler.on_two_way(&self.sender, ordinal, buffer, Responder { txid }).await;
             } else {
-                handler.on_one_way(&self.sender, ordinal, buffer);
+                handler.on_one_way(&self.sender, ordinal, buffer).await;
             }
         }
 

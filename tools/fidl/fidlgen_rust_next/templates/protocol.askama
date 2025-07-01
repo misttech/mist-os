@@ -254,7 +254,7 @@ pub trait {{ client_handler_name }}<___T: ::fidl_next::Transport> {
                 {% if method.maybe_response_payload.is_some() %}
                     event: ::fidl_next::Response<{{ module_name }}::{{ method_type_name }}, ___T>,
                 {% endif %}
-            );
+            ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
         {% endif %}
     {% endfor %}
 
@@ -263,16 +263,17 @@ pub trait {{ client_handler_name }}<___T: ::fidl_next::Transport> {
             &mut self,
             sender: &::fidl_next::ClientSender<{{ protocol_name }}, ___T>,
             ordinal: u64,
-        ) {
+        ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send {
             {# TODO: send epitaph before closing #}
             sender.close();
+            ::core::future::ready(())
         }
     {% endif %}
 }
 
 impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for {{ protocol_name }}
 where
-    ___H: {{ client_handler_name }}<___T>,
+    ___H: {{ client_handler_name }}<___T> + Send,
     ___T: ::fidl_next::Transport,
     {% for method in protocol.methods %}
         {% if method.maybe_response_payload.is_some() %}
@@ -282,7 +283,7 @@ where
         {% endif %}
     {% endfor %}
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
         sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
@@ -295,20 +296,20 @@ where
                     {{ method.ordinal }} => {
                         {% if method.maybe_response_payload.is_some() %}
                             match ::fidl_next::DecoderExt::decode(buffer) {
-                                Ok(decoded) => handler.{{ method_name }}(sender, decoded),
+                                Ok(decoded) => handler.{{ method_name }}(sender, decoded).await,
                                 Err(e) => {
                                     {# TODO: send epitaph / log error #}
                                     sender.close();
                                 }
                             }
                         {% else %}
-                            handler.{{ method_name}}(sender);
+                            handler.{{ method_name}}(sender).await;
                         {% endif %}
                     }
                 {% endif %}
             {% endfor %}
             {% if protocol.openness != ProtocolOpenness::Closed %}
-                ordinal => handler.on_unknown_interaction(sender, ordinal),
+                ordinal => handler.on_unknown_interaction(sender, ordinal).await,
             {% else %}
                 ordinal => {
                     {# TODO: send epitaph #}
@@ -401,7 +402,7 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::Transport> {
                     {% if let Some(request) = method.maybe_request_payload %}
                         request: ::fidl_next::Request<{{ module_name }}::{{ method_type_name }}, ___T>,
                     {% endif %}
-                );
+                ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
             {% when ProtocolMethodKind::TwoWay %}
                 {{ self::doc_string(method.attributes) -}}
                 fn {{ method_name }}(
@@ -411,7 +412,7 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::Transport> {
                         request: ::fidl_next::Request<{{ module_name }}::{{ method_type_name }}, ___T>,
                     {% endif %}
                     responder: ::fidl_next::Responder<{{ module_name }}::{{ method_type_name }}>,
-                );
+                ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
             {% when ProtocolMethodKind::Event %}
         {% endmatch %}
     {% endfor %}
@@ -421,16 +422,17 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::Transport> {
             &mut self,
             sender: &::fidl_next::ServerSender<{{ protocol_name }}, ___T>,
             ordinal: u64,
-        ) {
+        ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send {
             {# TODO: send epitaph before closing #}
             sender.close();
+            ::core::future::ready(())
         }
     {% endif %}
 }
 
 impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for {{ protocol_name }}
 where
-    ___H: {{ server_handler_name }}<___T>,
+    ___H: {{ server_handler_name }}<___T> + Send,
     ___T: ::fidl_next::Transport,
     {% for method in protocol.methods %}
         {% if method.maybe_request_payload.is_some() %}
@@ -440,7 +442,7 @@ where
         {% endif %}
     {% endfor %}
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -453,20 +455,20 @@ where
                     {{ method.ordinal }} => {
                         {% if let Some(request) = method.maybe_request_payload %}
                             match ::fidl_next::DecoderExt::decode(buffer) {
-                                Ok(decoded) => handler.{{ method_name }}(sender, decoded),
+                                Ok(decoded) => handler.{{ method_name }}(sender, decoded).await,
                                 Err(e) => {
                                     {# TODO: send epitaph / log error #}
                                     sender.close();
                                 }
                             }
                         {% else %}
-                            handler.{{ method_name}}(sender);
+                            handler.{{ method_name}}(sender).await;
                         {% endif %}
                     }
                 {% endif %}
             {% endfor %}
             {% if protocol.openness != ProtocolOpenness::Closed %}
-                ordinal => handler.on_unknown_interaction(sender, ordinal),
+                ordinal => handler.on_unknown_interaction(sender, ordinal).await,
             {% else %}
                 ordinal => {
                     {# TODO: send epitaph #}
@@ -476,7 +478,7 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -492,20 +494,20 @@ where
 
                         {% if let Some(request) = method.maybe_request_payload %}
                             match ::fidl_next::DecoderExt::decode(buffer) {
-                                Ok(decoded) => handler.{{ method_name }}(sender, decoded, responder),
+                                Ok(decoded) => handler.{{ method_name }}(sender, decoded, responder).await,
                                 Err(e) => {
                                     {# TODO: send epitaph / log error #}
                                     sender.close();
                                 }
                             }
                         {% else %}
-                            handler.{{ method_name}}(sender, responder);
+                            handler.{{ method_name}}(sender, responder).await;
                         {% endif %}
                     }
                 {% endif %}
             {% endfor %}
             {% if protocol.openness != ProtocolOpenness::Closed %}
-                ordinal => handler.on_unknown_interaction(sender, ordinal),
+                ordinal => handler.on_unknown_interaction(sender, ordinal).await,
             {% else %}
                 ordinal => {
                     {# TODO: send epitaph #}

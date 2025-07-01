@@ -201,10 +201,10 @@ pub trait ParentClientHandler<___T: ::fidl_next::Transport> {}
 
 impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for Parent
 where
-    ___H: ParentClientHandler<___T>,
+    ___H: ParentClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
         sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
@@ -239,18 +239,18 @@ pub trait ParentServerHandler<___T: ::fidl_next::Transport> {
         sender: &::fidl_next::ServerSender<Parent, ___T>,
 
         request: ::fidl_next::Request<parent::First, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
 impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for Parent
 where
-    ___H: ParentServerHandler<___T>,
+    ___H: ParentServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <parent::First as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -258,7 +258,7 @@ where
     ) {
         match ordinal {
             3973163707930985819 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.first(sender, decoded),
+                Ok(decoded) => handler.first(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -270,7 +270,7 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -521,10 +521,10 @@ pub trait ChildClientHandler<___T: ::fidl_next::Transport> {}
 
 impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for Child
 where
-    ___H: ChildClientHandler<___T>,
+    ___H: ChildClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
         sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
@@ -559,19 +559,19 @@ pub trait ChildServerHandler<___T: ::fidl_next::Transport> {
         sender: &::fidl_next::ServerSender<Child, ___T>,
 
         request: ::fidl_next::Request<child::First, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn second(
         &mut self,
         sender: &::fidl_next::ServerSender<Child, ___T>,
 
         request: ::fidl_next::Request<child::Second, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
 impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for Child
 where
-    ___H: ChildServerHandler<___T>,
+    ___H: ChildServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <child::First as ::fidl_next::Method>::Request:
@@ -580,7 +580,7 @@ where
     <child::Second as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -588,14 +588,14 @@ where
     ) {
         match ordinal {
             3973163707930985819 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.first(sender, decoded),
+                Ok(decoded) => handler.first(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
             },
 
             2545123272820824165 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.second(sender, decoded),
+                Ok(decoded) => handler.second(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -607,7 +607,7 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,

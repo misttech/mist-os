@@ -1484,7 +1484,7 @@ pub trait ProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
 impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for Protocol
 where
-    ___H: ProtocolClientHandler<___T>,
+    ___H: ProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <protocol::RequestStrictResponseFlexible as ::fidl_next::Method>::Response:
@@ -1493,7 +1493,7 @@ where
     <protocol::RequestFlexibleResponseStrict as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
         sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
@@ -1530,7 +1530,7 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<protocol::RequestStrictResponseFlexible, ___T>,
 
         responder: ::fidl_next::Responder<protocol::RequestStrictResponseFlexible>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn request_flexible_response_strict(
         &mut self,
@@ -1539,12 +1539,12 @@ pub trait ProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<protocol::RequestFlexibleResponseStrict, ___T>,
 
         responder: ::fidl_next::Responder<protocol::RequestFlexibleResponseStrict>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
 impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for Protocol
 where
-    ___H: ProtocolServerHandler<___T>,
+    ___H: ProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <protocol::RequestStrictResponseFlexible as ::fidl_next::Method>::Request:
@@ -1553,7 +1553,7 @@ where
     <protocol::RequestFlexibleResponseStrict as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -1566,7 +1566,7 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -1579,7 +1579,7 @@ where
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
                     Ok(decoded) => {
-                        handler.request_strict_response_flexible(sender, decoded, responder)
+                        handler.request_strict_response_flexible(sender, decoded, responder).await
                     }
                     Err(e) => {
                         sender.close();
@@ -1592,7 +1592,7 @@ where
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
                     Ok(decoded) => {
-                        handler.request_flexible_response_strict(sender, decoded, responder)
+                        handler.request_flexible_response_strict(sender, decoded, responder).await
                     }
                     Err(e) => {
                         sender.close();

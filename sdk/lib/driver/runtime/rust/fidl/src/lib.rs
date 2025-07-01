@@ -397,40 +397,30 @@ mod test {
 
     struct DeviceServer;
     impl DeviceServerHandler<DriverChannel> for DeviceServer {
-        fn get_hardware_id(
+        async fn get_hardware_id(
             &mut self,
             sender: &ServerSender<Device, DriverChannel>,
             responder: Responder<GetHardwareId>,
         ) {
-            let sender = sender.clone();
-            CurrentDispatcher
-                .spawn_task(async move {
-                    responder
-                        .respond(
-                            &sender,
-                            Result::<_, i32>::Ok(DeviceGetHardwareIdResponse { response: 4004 }),
-                        )
-                        .unwrap()
-                        .await
-                        .unwrap();
-                })
+            responder
+                .respond(
+                    &sender,
+                    Result::<_, i32>::Ok(DeviceGetHardwareIdResponse { response: 4004 }),
+                )
+                .unwrap()
+                .await
                 .unwrap();
         }
 
-        fn get_event(
+        async fn get_event(
             &mut self,
             sender: &ServerSender<Device, DriverChannel>,
             responder: Responder<GetEvent>,
         ) {
-            let sender = sender.clone();
             let event = Event::create();
             event.signal_handle(Signals::empty(), Signals::USER_0).unwrap();
             let response = DeviceGetEventResponse { event: event.into_handle() };
-            CurrentDispatcher
-                .spawn_task(async move {
-                    responder.respond(&sender, response).unwrap().await.unwrap();
-                })
-                .unwrap();
+            responder.respond(&sender, response).unwrap().await.unwrap();
         }
     }
 

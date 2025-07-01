@@ -521,13 +521,24 @@ mod tests {
         struct TestServer;
 
         impl<T: Transport> ServerHandler<T> for TestServer {
-            fn on_one_way(&mut self, _: &ServerSender<T>, ordinal: u64, buffer: T::RecvBuffer) {
+            async fn on_one_way(
+                &mut self,
+                _: &ServerSender<T>,
+                ordinal: u64,
+                buffer: T::RecvBuffer,
+            ) {
                 assert_eq!(ordinal, 42);
                 let message = buffer.decode::<WireString<'_>>().expect("failed to decode request");
                 assert_eq!(&**message, "Hello world");
             }
 
-            fn on_two_way(&mut self, _: &ServerSender<T>, _: u64, _: T::RecvBuffer, _: Responder) {
+            async fn on_two_way(
+                &mut self,
+                _: &ServerSender<T>,
+                _: u64,
+                _: T::RecvBuffer,
+                _: Responder,
+            ) {
                 panic!("unexpected two-way message");
             }
         }

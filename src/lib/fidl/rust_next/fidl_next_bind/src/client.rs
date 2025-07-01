@@ -58,7 +58,7 @@ pub trait ClientProtocol<
     H,
     #[cfg(feature = "fuchsia")] T: Transport = zx::Channel,
     #[cfg(not(feature = "fuchsia"))] T: Transport,
->: Sized
+>: Sized + 'static
 {
     /// Handles a received client event with the given handler.
     fn on_event(
@@ -66,7 +66,7 @@ pub trait ClientProtocol<
         sender: &ClientSender<Self, T>,
         ordinal: u64,
         buffer: T::RecvBuffer,
-    );
+    ) -> impl Future<Output = ()> + Send;
 }
 
 /// An adapter for a client protocol handler.
@@ -94,7 +94,7 @@ where
         sender: &protocol::ClientSender<T>,
         ordinal: u64,
         buffer: T::RecvBuffer,
-    ) {
+    ) -> impl Future<Output = ()> + Send {
         P::on_event(&mut self.handler, ClientSender::wrap_untyped(sender), ordinal, buffer)
     }
 }

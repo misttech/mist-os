@@ -8049,7 +8049,7 @@ pub trait TestProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
 impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for TestProtocol
 where
-    ___H: TestProtocolClientHandler<___T>,
+    ___H: TestProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <test_protocol::StrictUnionHenceResponseMayBeStackAllocated as ::fidl_next::Method>::Response:
@@ -8058,7 +8058,7 @@ where
     <test_protocol::FlexibleUnionHenceResponseMustBeHeapAllocated as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
         sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
@@ -8095,7 +8095,7 @@ pub trait TestProtocolServerHandler<___T: ::fidl_next::Transport> {
         responder: ::fidl_next::Responder<
             test_protocol::StrictUnionHenceResponseMayBeStackAllocated,
         >,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn flexible_union_hence_response_must_be_heap_allocated(
         &mut self,
@@ -8104,15 +8104,15 @@ pub trait TestProtocolServerHandler<___T: ::fidl_next::Transport> {
         responder: ::fidl_next::Responder<
             test_protocol::FlexibleUnionHenceResponseMustBeHeapAllocated,
         >,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
 impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for TestProtocol
 where
-    ___H: TestProtocolServerHandler<___T>,
+    ___H: TestProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -8125,7 +8125,7 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -8136,13 +8136,15 @@ where
             6628358876445129155 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                handler.strict_union_hence_response_may_be_stack_allocated(sender, responder);
+                handler.strict_union_hence_response_may_be_stack_allocated(sender, responder).await;
             }
 
             7588545459451501794 => {
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
-                handler.flexible_union_hence_response_must_be_heap_allocated(sender, responder);
+                handler
+                    .flexible_union_hence_response_must_be_heap_allocated(sender, responder)
+                    .await;
             }
 
             ordinal => {

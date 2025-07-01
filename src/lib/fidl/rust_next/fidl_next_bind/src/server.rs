@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::future::Future;
 use core::marker::PhantomData;
 
 use fidl_next_codec::{Encode, EncodeError};
@@ -54,7 +55,7 @@ pub trait ServerProtocol<
     H,
     #[cfg(feature = "fuchsia")] T: Transport = zx::Channel,
     #[cfg(not(feature = "fuchsia"))] T: Transport,
->: Sized
+>: Sized + 'static
 {
     /// Handles a received server one-way message with the given handler.
     fn on_one_way(
@@ -62,7 +63,7 @@ pub trait ServerProtocol<
         server: &ServerSender<Self, T>,
         ordinal: u64,
         buffer: T::RecvBuffer,
-    );
+    ) -> impl Future<Output = ()> + Send;
 
     /// Handles a received server two-way message with the given handler.
     fn on_two_way(
@@ -71,7 +72,7 @@ pub trait ServerProtocol<
         ordinal: u64,
         buffer: T::RecvBuffer,
         responder: protocol::Responder,
-    );
+    ) -> impl Future<Output = ()> + Send;
 }
 
 /// An adapter for a server protocol handler.
@@ -99,7 +100,7 @@ where
         server: &protocol::ServerSender<T>,
         ordinal: u64,
         buffer: T::RecvBuffer,
-    ) {
+    ) -> impl Future<Output = ()> + Send {
         P::on_one_way(&mut self.handler, ServerSender::wrap_untyped(server), ordinal, buffer)
     }
 
@@ -109,7 +110,7 @@ where
         ordinal: u64,
         buffer: <T as Transport>::RecvBuffer,
         responder: protocol::Responder,
-    ) {
+    ) -> impl Future<Output = ()> + Send {
         P::on_two_way(
             &mut self.handler,
             ServerSender::wrap_untyped(server),
@@ -157,6 +158,7 @@ impl<P, T: Transport> Server<P, T> {
     pub async fn run<H>(&mut self, handler: H) -> Result<(), ProtocolError<T::Error>>
     where
         P: ServerProtocol<H, T>,
+        H: Send,
     {
         self.server.run(ServerAdapter { handler, _protocol: PhantomData::<P> }).await
     }

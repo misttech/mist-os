@@ -2634,13 +2634,13 @@ pub trait SomeProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
 impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for SomeProtocol
 where
-    ___H: SomeProtocolClientHandler<___T>,
+    ___H: SomeProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <some_protocol::SomeMethod as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
         sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
@@ -2677,18 +2677,18 @@ pub trait SomeProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<some_protocol::SomeMethod, ___T>,
 
         responder: ::fidl_next::Responder<some_protocol::SomeMethod>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
 impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for SomeProtocol
 where
-    ___H: SomeProtocolServerHandler<___T>,
+    ___H: SomeProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <some_protocol::SomeMethod as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -2701,7 +2701,7 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -2713,7 +2713,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.some_method(sender, decoded, responder),
+                    Ok(decoded) => handler.some_method(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }

@@ -2533,19 +2533,19 @@ pub trait ComposedProtocolClientHandler<___T: ::fidl_next::Transport> {
         sender: &::fidl_next::ClientSender<ComposedProtocol, ___T>,
 
         event: ::fidl_next::Response<composed_protocol::OnAnonComposed, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn on_named_composed(
         &mut self,
         sender: &::fidl_next::ClientSender<ComposedProtocol, ___T>,
 
         event: ::fidl_next::Response<composed_protocol::OnNamedComposed, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
 impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for ComposedProtocol
 where
-    ___H: ComposedProtocolClientHandler<___T>,
+    ___H: ComposedProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <composed_protocol::TwoWayAnonComposed as ::fidl_next::Method>::Response:
@@ -2566,7 +2566,7 @@ where
     <composed_protocol::OnNamedComposed as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
         sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
@@ -2574,14 +2574,14 @@ where
     ) {
         match ordinal {
             5307191872315199016 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.on_anon_composed(sender, decoded),
+                Ok(decoded) => handler.on_anon_composed(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
             },
 
             1712755118419701115 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.on_named_composed(sender, decoded),
+                Ok(decoded) => handler.on_named_composed(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -2661,7 +2661,7 @@ pub trait ComposedProtocolServerHandler<___T: ::fidl_next::Transport> {
         sender: &::fidl_next::ServerSender<ComposedProtocol, ___T>,
 
         request: ::fidl_next::Request<composed_protocol::OneWayAnonComposed, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn two_way_anon_composed(
         &mut self,
@@ -2670,7 +2670,7 @@ pub trait ComposedProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<composed_protocol::TwoWayAnonComposed, ___T>,
 
         responder: ::fidl_next::Responder<composed_protocol::TwoWayAnonComposed>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn two_way_anon_composed_with_error(
         &mut self,
@@ -2679,14 +2679,14 @@ pub trait ComposedProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<composed_protocol::TwoWayAnonComposedWithError, ___T>,
 
         responder: ::fidl_next::Responder<composed_protocol::TwoWayAnonComposedWithError>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn one_way_named_composed(
         &mut self,
         sender: &::fidl_next::ServerSender<ComposedProtocol, ___T>,
 
         request: ::fidl_next::Request<composed_protocol::OneWayNamedComposed, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn two_way_named_composed(
         &mut self,
@@ -2695,7 +2695,7 @@ pub trait ComposedProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<composed_protocol::TwoWayNamedComposed, ___T>,
 
         responder: ::fidl_next::Responder<composed_protocol::TwoWayNamedComposed>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn two_way_named_composed_with_error(
         &mut self,
@@ -2704,12 +2704,12 @@ pub trait ComposedProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<composed_protocol::TwoWayNamedComposedWithError, ___T>,
 
         responder: ::fidl_next::Responder<composed_protocol::TwoWayNamedComposedWithError>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
 impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for ComposedProtocol
 where
-    ___H: ComposedProtocolServerHandler<___T>,
+    ___H: ComposedProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <composed_protocol::OneWayAnonComposed as ::fidl_next::Method>::Request:
@@ -2730,7 +2730,7 @@ where
     <composed_protocol::TwoWayNamedComposedWithError as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -2738,14 +2738,14 @@ where
     ) {
         match ordinal {
             7960710870216447007 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.one_way_anon_composed(sender, decoded),
+                Ok(decoded) => handler.one_way_anon_composed(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
             },
 
             1159174053475281336 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.one_way_named_composed(sender, decoded),
+                Ok(decoded) => handler.one_way_named_composed(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -2757,7 +2757,7 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -2769,7 +2769,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.two_way_anon_composed(sender, decoded, responder),
+                    Ok(decoded) => handler.two_way_anon_composed(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -2781,7 +2781,7 @@ where
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
                     Ok(decoded) => {
-                        handler.two_way_anon_composed_with_error(sender, decoded, responder)
+                        handler.two_way_anon_composed_with_error(sender, decoded, responder).await
                     }
                     Err(e) => {
                         sender.close();
@@ -2793,7 +2793,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.two_way_named_composed(sender, decoded, responder),
+                    Ok(decoded) => handler.two_way_named_composed(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -2805,7 +2805,7 @@ where
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
                     Ok(decoded) => {
-                        handler.two_way_named_composed_with_error(sender, decoded, responder)
+                        handler.two_way_named_composed_with_error(sender, decoded, responder).await
                     }
                     Err(e) => {
                         sender.close();
@@ -5128,33 +5128,33 @@ pub trait MainProtocolClientHandler<___T: ::fidl_next::Transport> {
         sender: &::fidl_next::ClientSender<MainProtocol, ___T>,
 
         event: ::fidl_next::Response<main_protocol::OnAnonComposed, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn on_named_composed(
         &mut self,
         sender: &::fidl_next::ClientSender<MainProtocol, ___T>,
 
         event: ::fidl_next::Response<main_protocol::OnNamedComposed, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn on_local(
         &mut self,
         sender: &::fidl_next::ClientSender<MainProtocol, ___T>,
 
         event: ::fidl_next::Response<main_protocol::OnLocal, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn on_anon(
         &mut self,
         sender: &::fidl_next::ClientSender<MainProtocol, ___T>,
 
         event: ::fidl_next::Response<main_protocol::OnAnon, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
 impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for MainProtocol
 where
-    ___H: MainProtocolClientHandler<___T>,
+    ___H: MainProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <main_protocol::TwoWayAnonComposed as ::fidl_next::Method>::Response:
@@ -5193,7 +5193,7 @@ where
     <main_protocol::OnAnon as ::fidl_next::Method>::Response:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
         sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
@@ -5201,28 +5201,28 @@ where
     ) {
         match ordinal {
             5307191872315199016 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.on_anon_composed(sender, decoded),
+                Ok(decoded) => handler.on_anon_composed(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
             },
 
             1712755118419701115 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.on_named_composed(sender, decoded),
+                Ok(decoded) => handler.on_named_composed(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
             },
 
             8208103053879750285 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.on_local(sender, decoded),
+                Ok(decoded) => handler.on_local(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
             },
 
             977183060572945300 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.on_anon(sender, decoded),
+                Ok(decoded) => handler.on_anon(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -5348,7 +5348,7 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
         request: ::fidl_next::Request<main_protocol::OneWayAnonComposed, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn two_way_anon_composed(
         &mut self,
@@ -5357,7 +5357,7 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<main_protocol::TwoWayAnonComposed, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayAnonComposed>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn two_way_anon_composed_with_error(
         &mut self,
@@ -5366,14 +5366,14 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<main_protocol::TwoWayAnonComposedWithError, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayAnonComposedWithError>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn one_way_named_composed(
         &mut self,
         sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
         request: ::fidl_next::Request<main_protocol::OneWayNamedComposed, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn two_way_named_composed(
         &mut self,
@@ -5382,7 +5382,7 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<main_protocol::TwoWayNamedComposed, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayNamedComposed>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn two_way_named_composed_with_error(
         &mut self,
@@ -5391,14 +5391,14 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<main_protocol::TwoWayNamedComposedWithError, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayNamedComposedWithError>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn one_way_local(
         &mut self,
         sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
         request: ::fidl_next::Request<main_protocol::OneWayLocal, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn two_way_local(
         &mut self,
@@ -5407,7 +5407,7 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<main_protocol::TwoWayLocal, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayLocal>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn two_way_local_with_error(
         &mut self,
@@ -5416,14 +5416,14 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<main_protocol::TwoWayLocalWithError, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayLocalWithError>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn one_way_anon(
         &mut self,
         sender: &::fidl_next::ServerSender<MainProtocol, ___T>,
 
         request: ::fidl_next::Request<main_protocol::OneWayAnon, ___T>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn two_way_anon(
         &mut self,
@@ -5432,7 +5432,7 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<main_protocol::TwoWayAnon, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayAnon>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 
     fn two_way_anon_with_error(
         &mut self,
@@ -5441,12 +5441,12 @@ pub trait MainProtocolServerHandler<___T: ::fidl_next::Transport> {
         request: ::fidl_next::Request<main_protocol::TwoWayAnonWithError, ___T>,
 
         responder: ::fidl_next::Responder<main_protocol::TwoWayAnonWithError>,
-    );
+    ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
 }
 
 impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for MainProtocol
 where
-    ___H: MainProtocolServerHandler<___T>,
+    ___H: MainProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 
     <main_protocol::OneWayAnonComposed as ::fidl_next::Method>::Request:
@@ -5485,7 +5485,7 @@ where
     <main_protocol::TwoWayAnonWithError as ::fidl_next::Method>::Request:
         ::fidl_next::Decode<<___T as ::fidl_next::Transport>::RecvBuffer>,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -5493,28 +5493,28 @@ where
     ) {
         match ordinal {
             7960710870216447007 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.one_way_anon_composed(sender, decoded),
+                Ok(decoded) => handler.one_way_anon_composed(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
             },
 
             1159174053475281336 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.one_way_named_composed(sender, decoded),
+                Ok(decoded) => handler.one_way_named_composed(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
             },
 
             4131125523789731521 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.one_way_local(sender, decoded),
+                Ok(decoded) => handler.one_way_local(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
             },
 
             8596232895075765804 => match ::fidl_next::DecoderExt::decode(buffer) {
-                Ok(decoded) => handler.one_way_anon(sender, decoded),
+                Ok(decoded) => handler.one_way_anon(sender, decoded).await,
                 Err(e) => {
                     sender.close();
                 }
@@ -5526,7 +5526,7 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -5538,7 +5538,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.two_way_anon_composed(sender, decoded, responder),
+                    Ok(decoded) => handler.two_way_anon_composed(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -5550,7 +5550,7 @@ where
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
                     Ok(decoded) => {
-                        handler.two_way_anon_composed_with_error(sender, decoded, responder)
+                        handler.two_way_anon_composed_with_error(sender, decoded, responder).await
                     }
                     Err(e) => {
                         sender.close();
@@ -5562,7 +5562,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.two_way_named_composed(sender, decoded, responder),
+                    Ok(decoded) => handler.two_way_named_composed(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -5574,7 +5574,7 @@ where
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
                     Ok(decoded) => {
-                        handler.two_way_named_composed_with_error(sender, decoded, responder)
+                        handler.two_way_named_composed_with_error(sender, decoded, responder).await
                     }
                     Err(e) => {
                         sender.close();
@@ -5586,7 +5586,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.two_way_local(sender, decoded, responder),
+                    Ok(decoded) => handler.two_way_local(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -5597,7 +5597,9 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.two_way_local_with_error(sender, decoded, responder),
+                    Ok(decoded) => {
+                        handler.two_way_local_with_error(sender, decoded, responder).await
+                    }
                     Err(e) => {
                         sender.close();
                     }
@@ -5608,7 +5610,7 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.two_way_anon(sender, decoded, responder),
+                    Ok(decoded) => handler.two_way_anon(sender, decoded, responder).await,
                     Err(e) => {
                         sender.close();
                     }
@@ -5619,7 +5621,9 @@ where
                 let responder = ::fidl_next::Responder::from_untyped(responder);
 
                 match ::fidl_next::DecoderExt::decode(buffer) {
-                    Ok(decoded) => handler.two_way_anon_with_error(sender, decoded, responder),
+                    Ok(decoded) => {
+                        handler.two_way_anon_with_error(sender, decoded, responder).await
+                    }
                     Err(e) => {
                         sender.close();
                     }

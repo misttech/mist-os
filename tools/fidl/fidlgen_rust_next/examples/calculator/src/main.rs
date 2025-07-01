@@ -7,12 +7,12 @@ use fidl_next::{
     Server, ServerEnd, ServerSender, Transport,
 };
 use fidl_next_examples_calculator::calculator::prelude::*;
-use fuchsia_async::{Scope, Task};
+use fuchsia_async::Task;
 
 struct MyCalculatorClient;
 
 impl<T: Transport> CalculatorClientHandler<T> for MyCalculatorClient {
-    fn on_error(
+    async fn on_error(
         &mut self,
         sender: &ClientSender<Calculator, T>,
         response: Response<calculator::OnError, T>,
@@ -24,12 +24,10 @@ impl<T: Transport> CalculatorClientHandler<T> for MyCalculatorClient {
     }
 }
 
-struct MyCalculatorServer {
-    scope: Scope,
-}
+struct MyCalculatorServer;
 
 impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
-    fn add(
+    async fn add(
         &mut self,
         sender: &ServerSender<Calculator, T>,
         request: Request<calculator::Add, T>,
@@ -38,15 +36,12 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
         println!("{} + {} = {}", request.a, request.b, request.a + request.b);
         let response = Flexible::Ok(CalculatorAddResponse { sum: request.a + request.b });
 
-        let sender = sender.clone();
-        self.scope.spawn(async move {
-            if responder.respond(&sender, response).unwrap().await.is_err() {
-                sender.close();
-            }
-        });
+        if responder.respond(&sender, response).unwrap().await.is_err() {
+            sender.close();
+        }
     }
 
-    fn divide(
+    async fn divide(
         &mut self,
         sender: &ServerSender<Calculator, T>,
         request: Request<calculator::Divide, T>,
@@ -70,20 +65,16 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
         };
 
         let sender = sender.clone();
-        self.scope.spawn(async move {
-            if responder.respond(&sender, response).unwrap().await.is_err() {
-                return sender.close();
-            }
-        });
+        if responder.respond(&sender, response).unwrap().await.is_err() {
+            return sender.close();
+        }
     }
 
-    fn clear(&mut self, sender: &ServerSender<Calculator, T>) {
+    async fn clear(&mut self, sender: &ServerSender<Calculator, T>) {
         println!("Cleared, sending an error back to close the connection");
 
         let sender = sender.clone();
-        self.scope.spawn(async move {
-            sender.on_error(CalculatorOnErrorRequest { status_code: 100 }).unwrap().await.unwrap();
-        });
+        sender.on_error(CalculatorOnErrorRequest { status_code: 100 }).unwrap().await.unwrap();
     }
 }
 
@@ -122,7 +113,7 @@ async fn create_endpoints(
         println!("client exited");
     });
     let server_task = Task::spawn(async move {
-        server.run(MyCalculatorServer { scope: Scope::new() }).await.unwrap();
+        server.run(MyCalculatorServer).await.unwrap();
         println!("server exited");
     });
 

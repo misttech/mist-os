@@ -72,10 +72,10 @@ pub trait MyProtocolClientHandler<___T: ::fidl_next::Transport> {}
 
 impl<___H, ___T> ::fidl_next::ClientProtocol<___H, ___T> for MyProtocol
 where
-    ___H: MyProtocolClientHandler<___T>,
+    ___H: MyProtocolClientHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 {
-    fn on_event(
+    async fn on_event(
         handler: &mut ___H,
         sender: &::fidl_next::ClientSender<Self, ___T>,
         ordinal: u64,
@@ -108,10 +108,10 @@ pub trait MyProtocolServerHandler<___T: ::fidl_next::Transport> {}
 
 impl<___H, ___T> ::fidl_next::ServerProtocol<___H, ___T> for MyProtocol
 where
-    ___H: MyProtocolServerHandler<___T>,
+    ___H: MyProtocolServerHandler<___T> + Send,
     ___T: ::fidl_next::Transport,
 {
-    fn on_one_way(
+    async fn on_one_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
@@ -124,7 +124,7 @@ where
         }
     }
 
-    fn on_two_way(
+    async fn on_two_way(
         handler: &mut ___H,
         sender: &::fidl_next::ServerSender<Self, ___T>,
         ordinal: u64,
