@@ -11,6 +11,7 @@ import("//src/starnix/tests/starnix_test_subpackages.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
 
 gvisor_tests = [
+  # keep-sorted start
   "32bit_test",
   "accept_bind_stream_test",
   "accept_bind_test",
@@ -89,8 +90,8 @@ gvisor_tests = [
   "pty_test",
   "pwrite64_test",
   "pwritev2_test",
-  "readahead_test",
   "read_test",
+  "readahead_test",
   "readv_socket_test",
   "readv_test",
   "rename_test",
@@ -100,8 +101,8 @@ gvisor_tests = [
   "seccomp_test",
   "select_test",
   "semaphore_test",
-  "sendfile_test",
   "sendfile_socket_test",
+  "sendfile_test",
   "sigaction_test",
   "sigaltstack_test",
   "signalfd_test",
@@ -155,9 +156,9 @@ gvisor_tests = [
   "socket_unix_unbound_seqpacket_test",
   "socket_unix_unbound_stream_test",
   "splice_test",
-  "statfs_test",
   "stat_test",
   "stat_times_test",
+  "statfs_test",
   "symlink_test",
   "sync_file_range_test",
   "sync_test",
@@ -165,9 +166,9 @@ gvisor_tests = [
   "sysret_test",
   "tcp_socket_test",
   "tgkill_test",
+  "time_test",
   "timerfd_test",
   "timers_test",
-  "time_test",
   "tkill_test",
   "truncate_test",
   "tuntap_hostinet_test",
@@ -183,9 +184,12 @@ gvisor_tests = [
   "wait_test",
   "write_test",
   "xattr_test",
+
+  # keep-sorted end
 ]
 
 gvisor_tests_run_as_root = [
+  # keep-sorted start
   "affinity_test",
   "chown_test",
   "chroot_test",
@@ -198,8 +202,8 @@ gvisor_tests_run_as_root = [
   "mount_test",
   "network_namespace_test",
   "packet_socket_dgram_test",
-  "packet_socket_test",
   "packet_socket_raw_test",
+  "packet_socket_test",
   "pivot_root_test",
   "prctl_setuid_test",
   "preadv2_test",
@@ -220,10 +224,12 @@ gvisor_tests_run_as_root = [
   "socket_ipv4_datagram_based_socket_unbound_loopback_test",
   "socket_netlink_route_test",
   "sticky_test",
+  "syslog_test",
   "tuntap_test",
   "uidgid_test",
   "uname_test",
-  "syslog_test",
+
+  # keep-sorted end
 ]
 
 if (current_cpu == "riscv64") {
@@ -263,11 +269,6 @@ gvisor_tests_custom_manifest = [
     test_name = "syslog_cap_syslog_test"
     binary = "syslog_test"
     capabilities = [ "SYSLOG" ]
-  },
-  {
-    test_name = "syslog_cap_sys_admin_test"
-    binary = "syslog_test"
-    capabilities = [ "SYS_ADMIN" ]
   },
 ]
 

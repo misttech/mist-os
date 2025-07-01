@@ -11,7 +11,7 @@ use fidl_fuchsia_diagnostics as fdiagnostics;
 use fuchsia_component::client::connect_to_protocol_sync;
 use serde::Deserialize;
 use starnix_sync::{Locked, Mutex, Unlocked};
-use starnix_uapi::auth::{CAP_SYSLOG, CAP_SYS_ADMIN};
+use starnix_uapi::auth::CAP_SYSLOG;
 use starnix_uapi::errors::{errno, error, Errno, EAGAIN};
 use starnix_uapi::syslog::SyslogAction;
 use starnix_uapi::vfs::FdEvents;
@@ -53,7 +53,7 @@ impl Syslog {
     }
 
     /// Validates that syslog access is unrestricted, or that the `current_task` has the relevant
-    /// capability, or global admin capability as well as applying the SELinux policy.
+    /// capability, and applies the SELinux policy.
     pub fn validate_access(current_task: &CurrentTask, access: SyslogAccess) -> Result<(), Errno> {
         let (action, check_capabilities) = match access {
             SyslogAccess::ProcKmsg(SyslogAction::Open) => (SyslogAction::Open, true),
@@ -71,24 +71,12 @@ impl Syslog {
                 | SyslogAccess::DevKmsgRead,
         );
         let restrict_dmesg = current_task.kernel().restrict_dmesg.load(Ordering::Relaxed);
-        // Access to /proc/kmsg or /dev/kmsg isn't allowed by CAP_SYS_ADMIN.
-        let allow_cap_sys_admin = matches!(access, SyslogAccess::Syscall(_));
         if check_capabilities && (action_is_privileged || restrict_dmesg) {
-            Self::check_capabilities(current_task, allow_cap_sys_admin)?;
+            security::check_task_capable(current_task, CAP_SYSLOG)?;
         }
 
         security::check_syslog_access(current_task, action)?;
         Ok(())
-    }
-
-    fn check_capabilities(
-        current_task: &CurrentTask,
-        allow_cap_sys_admin: bool,
-    ) -> Result<(), Errno> {
-        if allow_cap_sys_admin && security::is_task_capable_noaudit(current_task, CAP_SYS_ADMIN) {
-            return Ok(());
-        }
-        security::check_task_capable(current_task, CAP_SYSLOG)
     }
 
     pub fn snapshot_then_subscribe(current_task: &CurrentTask) -> Result<LogSubscription, Errno> {

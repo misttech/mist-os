@@ -21,14 +21,22 @@
 #include "src/lib/files/file.h"
 #include "src/starnix/tests/syscalls/cpp/capabilities_helper.h"
 #include "src/starnix/tests/syscalls/cpp/syscall_matchers.h"
+#include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
 namespace {
 
 // See "The symbolic names are defined in the kernel source, but are
 // not exported to user space; you will either need to use the numbers,
 // or define the names yourself" at syslog(2).
+constexpr int SYSLOG_ACTION_CLOSE = 0;
+constexpr int SYSLOG_ACTION_OPEN = 1;
 constexpr int SYSLOG_ACTION_READ = 2;
 constexpr int SYSLOG_ACTION_READ_ALL = 3;
+constexpr int SYSLOG_ACTION_READ_CLEAR = 4;
+constexpr int SYSLOG_ACTION_CLEAR = 5;
+constexpr int SYSLOG_ACTION_CONSOLE_OFF = 6;
+constexpr int SYSLOG_ACTION_CONSOLE_ON = 7;
+constexpr int SYSLOG_ACTION_CONSOLE_LEVEL = 8;
 constexpr int SYSLOG_ACTION_SIZE_UNREAD = 9;
 constexpr int SYSLOG_ACTION_SIZE_BUFFER = 10;
 
@@ -314,6 +322,9 @@ class SyslogAccessTest : public ::testing::TestWithParam<std::tuple<bool, bool, 
       GTEST_SKIP() << "Can only be run as root";
     }
 
+    dev_kmsg_ = fbl::unique_fd(open("/dev/kmsg", O_WRONLY));
+    ASSERT_TRUE(dev_kmsg_.is_valid());
+
     std::tie(is_root_, has_cap_sys_admin_, has_cap_syslog_, has_dac_override_, dmesg_restrict_) =
         GetParam();
 
@@ -362,6 +373,7 @@ class SyslogAccessTest : public ::testing::TestWithParam<std::tuple<bool, bool, 
   bool has_cap_syslog_;
   bool has_dac_override_;
   bool dmesg_restrict_;
+  fbl::unique_fd dev_kmsg_;
 
  private:
   bool skipped_ = false;
@@ -468,6 +480,124 @@ TEST_P(SyslogAccessTest, DevKmsgTrunc) {
     EXPECT_TRUE(fd);
   } else {
     EXPECT_FALSE(fd);
+  }
+}
+
+TEST_P(SyslogAccessTest, SyslogActionClose) {
+  bool expect_allowed = has_cap_syslog_;
+  if (expect_allowed) {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_CLOSE, 0, 0), SyscallSucceeds());
+  } else {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_CLOSE, 0, 0), SyscallFailsWithErrno(EPERM));
+  }
+}
+
+TEST_P(SyslogAccessTest, SyslogActionOpen) {
+  bool expect_allowed = has_cap_syslog_;
+  if (expect_allowed) {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_OPEN, 0, 0), SyscallSucceeds());
+  } else {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_OPEN, 0, 0), SyscallFailsWithErrno(EPERM));
+  }
+}
+
+TEST_P(SyslogAccessTest, SyslogActionRead) {
+  test_helper::ForkHelper fork_helper;
+  fork_helper.ExpectSignal(SIGKILL);
+
+  // In some cases, our messages get removed from the buffer before we can read them. We fork to
+  // ensure we get a steady supply of log messages we can read, with at most a 100ms wait.
+  pid_t writing_child = fork_helper.RunInForkedProcess([this] {
+    do {
+      char write_buf[] = "hello, world!\n";
+      EXPECT_THAT(write(dev_kmsg_.get(), write_buf, strlen(write_buf)), SyscallSucceeds());
+    } while (usleep(100000) == 0);
+  });
+  bool expect_allowed = has_cap_syslog_;
+  char read_buf[4096];
+  if (expect_allowed) {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_READ, read_buf, sizeof(read_buf)), SyscallSucceeds());
+  } else {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_READ, read_buf, sizeof(read_buf)),
+                SyscallFailsWithErrno(EPERM));
+  }
+  EXPECT_THAT(kill(writing_child, SIGKILL), SyscallSucceeds());
+  ASSERT_TRUE(fork_helper.WaitForChildren());
+}
+
+TEST_P(SyslogAccessTest, SyslogActionReadAll) {
+  bool expect_allowed = has_cap_syslog_ || !dmesg_restrict_;
+  char read_buf[4096];
+  if (expect_allowed) {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_READ_ALL, read_buf, sizeof(read_buf)), SyscallSucceeds());
+  } else {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_READ_ALL, read_buf, sizeof(read_buf)),
+                SyscallFailsWithErrno(EPERM));
+  }
+}
+
+TEST_P(SyslogAccessTest, SyslogActionReadClear) {
+  bool expect_allowed = has_cap_syslog_;
+  char read_buf[4096];
+  if (expect_allowed) {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_READ_CLEAR, read_buf, sizeof(read_buf)), SyscallSucceeds());
+  } else {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_READ_CLEAR, read_buf, sizeof(read_buf)),
+                SyscallFailsWithErrno(EPERM));
+  }
+}
+
+TEST_P(SyslogAccessTest, SyslogActionClear) {
+  bool expect_allowed = has_cap_syslog_;
+  if (expect_allowed) {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_CLEAR, 0, 0), SyscallSucceeds());
+  } else {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_CLEAR, 0, 0), SyscallFailsWithErrno(EPERM));
+  }
+}
+
+TEST_P(SyslogAccessTest, SyslogActionConsoleOff) {
+  bool expect_allowed = has_cap_syslog_;
+  if (expect_allowed) {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_CONSOLE_OFF, 0, 0), SyscallSucceeds());
+  } else {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_CONSOLE_OFF, 0, 0), SyscallFailsWithErrno(EPERM));
+  }
+}
+
+TEST_P(SyslogAccessTest, SyslogActionConsoleOn) {
+  bool expect_allowed = has_cap_syslog_;
+  if (expect_allowed) {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_CONSOLE_ON, 0, 0), SyscallSucceeds());
+  } else {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_CONSOLE_ON, 0, 0), SyscallFailsWithErrno(EPERM));
+  }
+}
+
+TEST_P(SyslogAccessTest, SyslogActionConsoleLevel) {
+  bool expect_allowed = has_cap_syslog_;
+  if (expect_allowed) {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_CONSOLE_LEVEL, 0, 7), SyscallSucceeds());
+  } else {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_CONSOLE_LEVEL, 0, 7), SyscallFailsWithErrno(EPERM));
+  }
+}
+
+TEST_P(SyslogAccessTest, SyslogActionSizeUnread) {
+  bool expect_allowed = has_cap_syslog_;
+  if (expect_allowed) {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_SIZE_UNREAD, 0, 0), SyscallSucceeds());
+  } else {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_SIZE_UNREAD, 0, 0), SyscallFailsWithErrno(EPERM));
+  }
+}
+
+TEST_P(SyslogAccessTest, SyslogActionSizeBuffer) {
+  bool expect_allowed = has_cap_syslog_ || !dmesg_restrict_;
+  if (expect_allowed) {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_SIZE_BUFFER, 0, 0), SyscallSucceeds());
+  } else {
+    EXPECT_THAT(klogctl(SYSLOG_ACTION_SIZE_BUFFER, 0, 0), SyscallFailsWithErrno(EPERM));
   }
 }
 
