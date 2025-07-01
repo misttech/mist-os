@@ -7,27 +7,29 @@ use crate::mm::PAGE_SIZE;
 use crate::security;
 use crate::security::PermissionFlags;
 use crate::signals::{send_standard_signal, SignalInfo};
-use crate::task::{CurrentTask, EncryptionKeyId, WaitQueue, Waiter};
+use crate::task::{
+    register_delayed_release, CurrentTask, CurrentTaskAndLocked, EncryptionKeyId, WaitQueue, Waiter,
+};
 use crate::time::utc;
 use crate::vfs::fsverity::FsVerityState;
 use crate::vfs::pipe::{Pipe, PipeHandle};
 use crate::vfs::rw_queue::{RwQueue, RwQueueReadGuard};
 use crate::vfs::socket::SocketHandle;
 use crate::vfs::{
-    checked_add_offset_and_length, inotify, CurrentTaskAndLocked, DefaultDirEntryOps, DirEntryOps,
-    FileObject, FileOps, FileSystem, FileSystemHandle, FileWriteGuardState, FsNodeReleaser, FsStr,
-    FsString, MountInfo, NamespaceNode, OPathOps, RecordLockCommand, RecordLockOwner, RecordLocks,
-    WeakFileHandle, MAX_LFS_FILESIZE,
+    checked_add_offset_and_length, inotify, DefaultDirEntryOps, DirEntryOps, FileObject, FileOps,
+    FileSystem, FileSystemHandle, FileWriteGuardState, FsStr, FsString, MountInfo, NamespaceNode,
+    OPathOps, RecordLockCommand, RecordLockOwner, RecordLocks, WeakFileHandle, MAX_LFS_FILESIZE,
 };
 use bitflags::bitflags;
 use fuchsia_runtime::UtcInstant;
 use linux_uapi::XATTR_SECURITY_PREFIX;
+use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, FileOpsCore, FsNodeAppend, LockBefore, LockEqualOrBefore, Locked, Mutex,
     RwLock, RwLockReadGuard, Unlocked,
 };
-use starnix_types::ownership::Releasable;
+use starnix_types::ownership::{Releasable, ReleaseGuard};
 use starnix_types::time::{timespec_from_time, NANOS_PER_SECOND};
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::{
@@ -196,6 +198,13 @@ impl FsNodeRareData {
     }
 }
 
+pub enum FsNodeReleaserAction {}
+impl ReleaserAction<FsNode> for FsNodeReleaserAction {
+    fn release(fs_node: ReleaseGuard<FsNode>) {
+        register_delayed_release(fs_node);
+    }
+}
+pub type FsNodeReleaser = ObjectReleaser<FsNode, FsNodeReleaserAction>;
 pub type FsNodeHandle = Arc<FsNodeReleaser>;
 pub type WeakFsNodeHandle = Weak<FsNodeReleaser>;
 

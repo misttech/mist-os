@@ -15,9 +15,9 @@ use crate::task::limits::SystemLimits;
 use crate::task::memory_attribution::MemoryAttributionManager;
 use crate::task::net::NetstackDevices;
 use crate::task::{
-    AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
-    HrTimerManagerHandle, IpTables, KernelCgroups, KernelStats, KernelThreads, PidTable,
-    SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
+    AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, DelayedReleaser,
+    HrTimerManager, HrTimerManagerHandle, IpTables, KernelCgroups, KernelStats, KernelThreads,
+    PidTable, SchedulerManager, StopState, Syslog, ThreadGroup, UtsNamespace, UtsNamespaceHandle,
 };
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::crypt_service::CryptService;
@@ -26,7 +26,7 @@ use crate::vfs::socket::{
     GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
     SocketAddress,
 };
-use crate::vfs::{DelayedReleaser, FileHandle, FileOps, FsNode, FsString, Mounts};
+use crate::vfs::{FileHandle, FileOps, FsNode, FsString, Mounts};
 use bstr::BString;
 use expando::Expando;
 use fidl::endpoints::{

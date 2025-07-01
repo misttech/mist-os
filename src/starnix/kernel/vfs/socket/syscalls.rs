@@ -979,7 +979,8 @@ pub fn cmsg_align(current_task: &CurrentTask, value: usize) -> Result<usize, Err
 // Syscalls for arch32 usage
 #[cfg(feature = "arch32")]
 mod arch32 {
-    use crate::vfs::{CurrentTask, FdNumber};
+    use crate::task::CurrentTask;
+    use crate::vfs::FdNumber;
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
     use starnix_uapi::user_address::UserAddress;

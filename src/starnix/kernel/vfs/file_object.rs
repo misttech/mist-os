@@ -7,8 +7,8 @@ use crate::mm::{DesiredAddress, MappingName, MappingOptions, MemoryAccessorExt, 
 use crate::power::OnWakeOps;
 use crate::security;
 use crate::task::{
-    CurrentTask, EncryptionKeyId, EventHandler, Task, ThreadGroupKey, WaitCallback, WaitCanceler,
-    Waiter,
+    register_delayed_release, CurrentTask, CurrentTaskAndLocked, EncryptionKeyId, EventHandler,
+    Task, ThreadGroupKey, WaitCallback, WaitCanceler, Waiter,
 };
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::file_server::serve_file;
@@ -16,10 +16,12 @@ use crate::vfs::fsverity::{
     FsVerityState, {self},
 };
 use crate::vfs::{
-    ActiveNamespaceNode, CurrentTaskAndLocked, DirentSink, EpollFileObject, EpollKey, FallocMode,
-    FdNumber, FdTableId, FileReleaser, FileSystemHandle, FileWriteGuard, FileWriteGuardMode,
-    FileWriteGuardRef, FsNodeHandle, NamespaceNode, RecordLockCommand, RecordLockOwner,
+    ActiveNamespaceNode, DirentSink, EpollFileObject, EpollKey, FallocMode, FdNumber, FdTableId,
+    FileSystemHandle, FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle,
+    NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
+use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
+use starnix_types::ownership::ReleaseGuard;
 use starnix_uapi::user_address::ArchSpecific;
 
 use fidl::HandleBased;
@@ -1466,6 +1468,13 @@ pub struct FileObject {
     pub security_state: security::FileObjectState,
 }
 
+pub enum FileObjectReleaserAction {}
+impl ReleaserAction<FileObject> for FileObjectReleaserAction {
+    fn release(file_object: ReleaseGuard<FileObject>) {
+        register_delayed_release(file_object);
+    }
+}
+pub type FileReleaser = ObjectReleaser<FileObject, FileObjectReleaserAction>;
 pub type FileHandle = Arc<FileReleaser>;
 pub type WeakFileHandle = Weak<FileReleaser>;
 

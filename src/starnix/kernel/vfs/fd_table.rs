@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::Task;
+use crate::task::{register_delayed_release, CurrentTaskAndLocked, Task};
 use crate::vfs::{FdNumber, FileHandle};
 use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
 use starnix_sync::{LockBefore, Locked, Mutex, ThreadGroupLimits};
 use starnix_syscalls::SyscallResult;
-use starnix_types::ownership::ReleasableByRef;
+use starnix_types::ownership::{Releasable, ReleasableByRef};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
@@ -54,12 +54,19 @@ pub struct FdTableEntry {
     flags: FdFlags,
 }
 
+struct FlushedFile(FileHandle, FdTableId);
+
+impl Releasable for FlushedFile {
+    type Context<'a> = CurrentTaskAndLocked<'a>;
+    fn release<'a>(self, context: Self::Context<'a>) {
+        let (locked, current_task) = context;
+        self.0.flush(locked, current_task, self.1);
+    }
+}
+
 impl Drop for FdTableEntry {
     fn drop(&mut self) {
-        let fs = self.file.name.entry.node.fs();
-        if let Some(kernel) = fs.kernel.upgrade() {
-            kernel.delayed_releaser.flush_file(&self.file, self.fd_table_id);
-        }
+        register_delayed_release(FlushedFile(Arc::clone(&self.file), self.fd_table_id));
     }
 }
 

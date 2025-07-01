@@ -9,10 +9,9 @@ use crate::execution::table::dispatch_syscall;
 use crate::signals::{deliver_signal, dequeue_signal, prepare_to_restart_syscall, SignalInfo};
 use crate::task::{
     ptrace_attach_from_state, ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask,
-    ExceptionResult, ExitStatus, PtraceCoreState, SeccompStateValue, StopState, TaskBuilder,
-    TaskFlags,
+    DelayedReleaser, ExceptionResult, ExitStatus, PtraceCoreState, SeccompStateValue, StopState,
+    TaskBuilder, TaskFlags,
 };
-use crate::vfs::DelayedReleaser;
 use anyhow::{format_err, Error};
 #[cfg(feature = "syscall_stats")]
 use fuchsia_inspect::NumericProperty;

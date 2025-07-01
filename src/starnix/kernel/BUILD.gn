@@ -195,6 +195,7 @@ rustc_library("starnix_core") {
     "task/cgroup.rs",
     "task/container_namespace.rs",
     "task/current_task.rs",
+    "task/delayed_release.rs",
     "task/dynamic_thread_spawner.rs",
     "task/hr_timer_manager.rs",
     "task/interval_timer.rs",

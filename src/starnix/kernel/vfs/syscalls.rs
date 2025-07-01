@@ -3274,11 +3274,12 @@ pub fn sys_io_uring_register(
 #[cfg(feature = "arch32")]
 mod arch32 {
     use crate::mm::MemoryAccessorExt;
+    use crate::task::CurrentTask;
     use crate::vfs::syscalls::{
         lookup_at, sys_dup3, sys_faccessat, sys_fallocate, sys_lseek, sys_mkdirat, sys_openat,
         sys_readlinkat, sys_unlinkat, LookupFlags, OpenFlags,
     };
-    use crate::vfs::{CurrentTask, FdNumber, FsNode};
+    use crate::vfs::{FdNumber, FsNode};
     use linux_uapi::off_t;
     use starnix_sync::{Locked, Unlocked};
     use starnix_syscalls::SyscallArg;
