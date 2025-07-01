@@ -450,7 +450,7 @@ func (ci *adminControlImpl) AddAddress(_ fidl.Context, subnet net.Subnet, parame
 	defer impl.mu.Unlock()
 	impl.mu.sentAddedEvent = true
 	if err := impl.mu.eventProxy.OnAddressAdded(); err != nil {
-		_ = syslog.ErrorTf(controlName, "NICID=%d failed to send OnAddressAdded() for %s - THIS MAY RESULT IN DROPPED ASP REQUESTS (https://fxbug.dev/42081560): %s", impl.nicid, protocolAddr.AddressWithPrefix.Address, err)
+		_ = syslog.WarnTf(controlName, "NICID=%d failed to send OnAddressAdded() for %s - THIS MAY RESULT IN DROPPED ASP REQUESTS (https://fxbug.dev/42081560): %s", impl.nicid, protocolAddr.AddressWithPrefix.Address, err)
 	}
 
 	// If the address was removed before we sent the OnAddressAdded event, then
