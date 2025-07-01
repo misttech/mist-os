@@ -11,7 +11,7 @@ use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode, FsString};
 #[cfg(test)]
 use starnix_sync::Unlocked;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_uapi::device_type::{DeviceType, INPUT_MAJOR};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -230,7 +230,7 @@ impl InputDevice {
         system_task: &CurrentTask,
         device_id: DeviceId,
     ) where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let kernel = system_task.kernel();
         let registry = &kernel.device_registry;
@@ -656,7 +656,7 @@ mod test {
         current_task: &CurrentTask,
     ) -> Vec<uapi::input_event>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         std::iter::from_fn(|| {
             let mut locked = locked.cast_locked::<FileOpsCore>();

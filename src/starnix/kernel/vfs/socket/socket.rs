@@ -25,7 +25,7 @@ use netlink_packet_route::address::{AddressAttribute, AddressMessage};
 use netlink_packet_route::link::{LinkAttribute, LinkFlags, LinkMessage};
 use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::time::{duration_from_timeval, timeval_from_duration};
 use starnix_types::user_buffer::UserBuffer;
@@ -1246,7 +1246,7 @@ fn get_netlink_interface_info<L>(
     read_buf: &mut VecOutputBuffer,
 ) -> Result<(FileHandle, LinkMessage), Errno>
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let iface_name = in_ifreq.name_as_str()?;
     let socket = SocketFile::new_socket(
@@ -1304,8 +1304,8 @@ fn get_netlink_ipv4_addresses<L>(
     read_buf: &mut VecOutputBuffer,
 ) -> Result<(FileHandle, Vec<AddressMessage>, u32), Errno>
 where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let uapi::sockaddr { sa_family, sa_data: _ } = in_ifreq.ifru_addr();
     if *sa_family != AF_INET {
@@ -1367,8 +1367,8 @@ fn set_netlink_interface_flags<L>(
     in_ifreq: &IfReq,
 ) -> Result<(), Errno>
 where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let iface_name = in_ifreq.name_as_str()?;
     let flags: i16 = in_ifreq.ifru_flags();
@@ -1433,8 +1433,8 @@ fn send_netlink_msg_and_wait_response<L>(
     read_buf: &mut VecOutputBuffer,
 ) -> Result<NetlinkMessage<RouteNetlinkMessage>, Errno>
 where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     msg.finalize();
     let mut buf = vec![0; msg.buffer_len()];

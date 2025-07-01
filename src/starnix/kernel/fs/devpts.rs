@@ -18,7 +18,9 @@ use crate::vfs::{
     FsNodeOps, FsStr, FsString, SpecialNode,
 };
 use starnix_logging::{log_error, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked};
+use starnix_sync::{
+    DeviceOpen, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, ProcessGroupState, Unlocked,
+};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
@@ -117,7 +119,7 @@ fn init_devpts(kernel: &Kernel, options: FileSystemOptions) -> Result<FileSystem
 
 pub fn tty_device_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let kernel = current_task.kernel();
     let state = kernel.expando.get::<TtyState>();
@@ -983,7 +985,7 @@ mod tests {
         name: &FsStr,
     ) -> Result<NamespaceNode, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let root = NamespaceNode::new_anonymous(fs.root().clone());
         root.lookup_child(locked, task, &mut Default::default(), name)

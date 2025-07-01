@@ -18,7 +18,7 @@ use starnix_core::vfs::{
     InputBufferCallback, PeekBufferSegmentsCallback,
 };
 use starnix_logging::track_stub;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::device_type::{DeviceType, LOOP_MAJOR};
@@ -141,7 +141,7 @@ struct LoopDevice {
 impl LoopDevice {
     fn new<L>(locked: &mut Locked<L>, current_task: &CurrentTask, minor: u32) -> Arc<Self>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
@@ -607,7 +607,7 @@ impl LoopDeviceRegistry {
     /// Ensure initial loop devices.
     fn ensure_initial_devices<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask)
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         for minor in 0..8 {
             self.get_or_create(locked, current_task, minor);
@@ -628,7 +628,7 @@ impl LoopDeviceRegistry {
         minor: u32,
     ) -> Arc<LoopDevice>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.devices
             .lock()
@@ -639,7 +639,7 @@ impl LoopDeviceRegistry {
 
     fn find<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask) -> Result<u32, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut devices = self.devices.lock();
         for minor in 0..u32::MAX {
@@ -665,7 +665,7 @@ impl LoopDeviceRegistry {
         minor: u32,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         match self.devices.lock().entry(minor) {
             Entry::Vacant(e) => {
@@ -686,7 +686,7 @@ impl LoopDeviceRegistry {
         minor: u32,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         match self.devices.lock().entry(minor) {
             Entry::Vacant(_) => Ok(()),

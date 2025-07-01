@@ -18,7 +18,7 @@ use crate::vfs::{
     FileWriteGuardRef, FsNode, FsNodeInfo, NamespaceNode, SeekTarget,
 };
 use starnix_logging::{log_info, track_stub, Level};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -440,7 +440,7 @@ impl<'a> starnix_logging::ToValue for LogOutputTag<'a> {
 
 pub fn mem_device_init<L>(locked: &mut Locked<L>, system_task: &CurrentTask)
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;

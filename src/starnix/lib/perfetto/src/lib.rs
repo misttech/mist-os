@@ -15,7 +15,7 @@ use starnix_core::vfs::socket::{
     resolve_unix_socket_address, SocketDomain, SocketFile, SocketPeer, SocketProtocol, SocketType,
 };
 use starnix_core::vfs::{FileHandle, FsStr};
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
@@ -91,7 +91,7 @@ impl IpcConnection {
         current_task: &CurrentTask,
     ) -> Result<(), IpcWriteError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // The first thing we need to send over our newly connected socket is send a request to
         // bind to the service.
@@ -114,7 +114,7 @@ impl IpcConnection {
         current_task: &CurrentTask,
     ) -> Result<(), IpcWriteError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let msg = IpcFrame {
             request_id: Some(self.allocate_request_id()),
@@ -136,7 +136,7 @@ impl IpcConnection {
         current_task: &CurrentTask,
     ) -> Result<(), IpcWriteError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // We need to length prefix our proto before encoding and sending it down the wire.
         let frame_len = u32::try_from(frame.encoded_len())
@@ -195,7 +195,7 @@ impl FrameReader {
         current_task: &CurrentTask,
     ) -> Result<IpcFrame, IpcReadError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         loop {
             if self.next_message_size.is_none() && self.data.len() >= 4 {
@@ -307,7 +307,7 @@ impl Consumer {
         msg: ipc_frame::Msg,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let request_id = self.request_id;
         let frame =
@@ -349,7 +349,7 @@ impl Consumer {
         req: EnableTracingRequest,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let method_id = self.method_id("EnableTracing")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
@@ -374,7 +374,7 @@ impl Consumer {
         req: DisableTracingRequest,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let method_id = self.method_id("DisableTracing")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
@@ -399,7 +399,7 @@ impl Consumer {
         req: ReadBuffersRequest,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let method_id = self.method_id("ReadBuffers")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
@@ -424,7 +424,7 @@ impl Consumer {
         req: FreeBuffersRequest,
     ) -> Result<u64, anyhow::Error>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let method_id = self.method_id("FreeBuffers")?;
         let mut encoded_args: Vec<u8> = Vec::with_capacity(req.encoded_len());
@@ -448,7 +448,7 @@ impl Consumer {
         current_task: &CurrentTask,
     ) -> Result<IpcFrame, IpcReadError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.frame_reader.next_frame_blocking(locked, current_task)
     }
@@ -485,7 +485,7 @@ impl Producer {
         socket: FileHandle,
     ) -> Result<Self, ProducerError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut producer = Self {
             frame_reader: FrameReader::new(socket.clone()),
@@ -545,7 +545,7 @@ impl Producer {
         current_task: &CurrentTask,
     ) -> Result<InitializeConnectionResponse, ProducerError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let (Some(reply), has_more) = self.invoke_method(
             "InitializeConnection",
@@ -572,7 +572,7 @@ impl Producer {
         current_task: &CurrentTask,
     ) -> Result<RegisterDataSourceResponse, ProducerError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let (Some(reply), has_more) = self.invoke_method(
             "RegisterDataSource",
@@ -602,7 +602,7 @@ impl Producer {
         current_task: &CurrentTask,
     ) -> Result<(Option<Vec<u8>>, bool), InvokeMethodError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.invoke_method_inner(method_name, arguments, locked, current_task)?;
 
@@ -638,7 +638,7 @@ impl Producer {
         current_task: &CurrentTask,
     ) -> Result<(), InvokeMethodError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let Some(method_id) = self.method_map.get(method_name).copied() else {
             return Err(InvokeMethodError::InvalidMethod(method_name.into()));
@@ -661,7 +661,7 @@ impl Producer {
         current_task: &CurrentTask,
     ) -> Result<(), ProducerError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         Ok(self.invoke_method_inner(
             "GetAsyncCommand",
@@ -678,7 +678,7 @@ impl Producer {
         current_task: &CurrentTask,
     ) -> Result<(Option<GetAsyncCommandResponse>, bool), ProducerError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let reply_frame = self.frame_reader.next_frame_blocking(locked, current_task)?;
 

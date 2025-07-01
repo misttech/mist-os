@@ -26,7 +26,7 @@ use starnix_core::vfs::{
 };
 use starnix_core::{security, signals};
 use starnix_logging::{log_debug, log_error, log_info, log_warn};
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_types::ownership::WeakRef;
 use starnix_uapi::auth::{Capabilities, Credentials};
 use starnix_uapi::device_type::DeviceType;
@@ -382,7 +382,7 @@ fn generate_component_path<L>(
     system_task: &CurrentTask,
 ) -> Result<String, Error>
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     // Checking container directory already exists.
     // If this lookup fails, the container might not have the "container" feature enabled.
@@ -479,7 +479,7 @@ impl MountRecord {
         mount_options: Option<&String>,
     ) -> Result<(), Error>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // The incoming dir_path might not be top level, e.g. it could be /foo/bar.
         // Iterate through each component directory starting from the parent and

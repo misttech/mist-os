@@ -19,7 +19,9 @@ use bitflags::bitflags;
 use fuchsia_inspect_contrib::profile_duration;
 use macro_rules_attribute::apply;
 use starnix_logging::{log_warn, set_current_task_info, set_zx_name};
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex, RwLock, RwLockWriteGuard, TaskRelease};
+use starnix_sync::{
+    FileOpsCore, LockEqualOrBefore, Locked, Mutex, RwLock, RwLockWriteGuard, TaskRelease,
+};
 use starnix_types::ownership::{
     OwnedRef, Releasable, ReleasableByRef, ReleaseGuard, TempRef, WeakRef,
 };
@@ -1226,7 +1228,7 @@ impl Task {
         flags: FdFlags,
     ) -> Result<FdNumber, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.files.add_with_flags(&mut locked.cast_locked::<FileOpsCore>(), self, file, flags)
     }

@@ -15,7 +15,7 @@ use starnix_core::fs_node_impl_not_dir;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use starnix_core::vfs::{FileOps, FsNode, FsNodeOps, FsStr, FsString};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
@@ -122,7 +122,7 @@ pub fn register_socket_tunnel_device<L>(
     dev_class_name: &FsStr,
     build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
 ) where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;

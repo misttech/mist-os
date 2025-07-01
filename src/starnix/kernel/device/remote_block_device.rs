@@ -11,7 +11,7 @@ use crate::task::CurrentTask;
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{default_ioctl, default_seek, FileObject, FileOps, FsNode, FsString, SeekTarget};
 use anyhow::Error;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::{DeviceType, REMOTE_BLOCK_MAJOR};
 use starnix_uapi::errors::Errno;
@@ -47,7 +47,7 @@ impl RemoteBlockDevice {
         backing_memory: MemoryObject,
     ) -> Arc<Self>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;
@@ -256,7 +256,7 @@ impl RemoteBlockDeviceRegistry {
         initial_size: u64,
     ) -> Result<(), Error>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut devices = self.devices.lock();
         if devices.values().find(|dev| &dev.name == name).is_some() {

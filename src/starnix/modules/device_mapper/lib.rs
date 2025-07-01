@@ -20,7 +20,7 @@ use starnix_core::vfs::{
     fileops_impl_seekless, FileHandle, FileObject, FileOps, FsNode, FsString, OutputBuffer,
 };
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::{DeviceType, DEVICE_MAPPER_MAJOR, LOOP_MAJOR};
 use starnix_uapi::errors::Errno;
@@ -147,7 +147,7 @@ impl DeviceMapperRegistry {
         minor: u32,
     ) -> Arc<DmDevice>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.devices
             .lock()
@@ -164,7 +164,7 @@ impl DeviceMapperRegistry {
         current_task: &CurrentTask,
     ) -> Result<Arc<DmDevice>, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut devices = self.devices.lock();
         for minor in 0..u32::MAX {
@@ -190,7 +190,7 @@ impl DeviceMapperRegistry {
         k_device: &Option<Device>,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         match devices.entry(minor) {
             Entry::Vacant(_) => error!(ENODEV),
@@ -217,7 +217,7 @@ pub struct DmDevice {
 impl DmDevice {
     fn new<L>(locked: &mut Locked<L>, current_task: &CurrentTask, minor: u32) -> Arc<Self>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let kernel = current_task.kernel();
         let registry = &kernel.device_registry;

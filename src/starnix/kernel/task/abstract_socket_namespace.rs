@@ -10,7 +10,7 @@ use std::sync::{Arc, Weak};
 use crate::task::CurrentTask;
 use crate::vfs::socket::{Socket, SocketAddress, SocketHandle};
 use crate::vfs::FsString;
-use starnix_sync::{FileOpsCore, LockBefore, Locked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 
@@ -47,7 +47,7 @@ where
         socket: &SocketHandle,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut locked = locked.cast_locked::<FileOpsCore>();
         let mut table = self.table.lock();

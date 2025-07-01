@@ -18,9 +18,7 @@ use crate::vfs::{
     FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
     FileSystemOptions, FsNodeInfo, FsStr, SpecialNode,
 };
-use starnix_sync::{
-    FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, MutexGuard, Unlocked,
-};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, MutexGuard, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::{UserBuffer, UserBuffers};
 use starnix_types::vfs::default_statfs;
@@ -899,7 +897,7 @@ impl PipeFileObject {
         non_blocking: bool,
     ) -> Result<usize, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
         assert!(from.downcast_file::<PipeFileObject>().is_none());
@@ -930,7 +928,7 @@ impl PipeFileObject {
         non_blocking: bool,
     ) -> Result<usize, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // If both ends are pipes, use `lock_pipes` and `Pipe::splice`.
         assert!(to.downcast_file::<PipeFileObject>().is_none());

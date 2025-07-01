@@ -777,7 +777,7 @@ mod test {
     use starnix_core::task::CurrentTask;
     use starnix_core::testing::create_kernel_task_and_unlocked;
     use starnix_core::vfs::{FileHandle, FileObject, VecOutputBuffer};
-    use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
+    use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
     use starnix_types::time::timeval_from_time;
     use starnix_uapi::errors::{Errno, EAGAIN};
     use starnix_uapi::input_id;
@@ -948,7 +948,7 @@ mod test {
         current_task: &CurrentTask,
     ) -> Vec<uapi::input_event>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         std::iter::from_fn(|| {
             let mut locked = locked.cast_locked::<FileOpsCore>();

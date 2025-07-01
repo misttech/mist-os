@@ -14,7 +14,7 @@ use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, DowncastedFile, FileHandle, FileObject,
     FileOps, FsNodeInfo,
 };
-use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::error;
 use starnix_uapi::errors::{errno, Errno};
@@ -66,7 +66,7 @@ impl SocketFile {
         kernel_private: bool,
     ) -> Result<FileHandle, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         SocketFile::from_socket(
             current_task,

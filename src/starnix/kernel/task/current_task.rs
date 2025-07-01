@@ -559,7 +559,7 @@ impl CurrentTask {
         flags: OpenFlags,
     ) -> Result<(NamespaceNode, bool), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         context.update_for_path(path);
         let mut parent_content = context.with(SymlinkMode::Follow);

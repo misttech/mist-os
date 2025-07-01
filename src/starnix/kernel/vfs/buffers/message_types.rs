@@ -10,7 +10,7 @@ use crate::vfs::socket::syscalls::CMsgHdrPtr;
 use crate::vfs::socket::{SocketAddress, SocketMessageFlags};
 use crate::vfs::{FdFlags, FdNumber, FileHandle, FsString};
 use byteorder::{ByteOrder, NativeEndian};
-use starnix_sync::{FileOpsCore, LockBefore, Locked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::user_address::{ArchSpecific, MultiArchUserRef};
 use starnix_uapi::{
@@ -193,7 +193,7 @@ impl AncillaryData {
         flags: SocketMessageFlags,
     ) -> Result<Option<ControlMsg>, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         match self {
             AncillaryData::Unix(control) => control.into_controlmsg(locked, current_task, flags),
@@ -257,7 +257,7 @@ impl AncillaryData {
         space_available: usize,
     ) -> Result<Vec<u8>, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let header_size = CMsgHdrPtr::size_of_object_for(current_task);
         let minimum_data_size = self.minimum_size();
@@ -381,7 +381,7 @@ impl UnixControlData {
         flags: SocketMessageFlags,
     ) -> Result<Option<ControlMsg>, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let (msg_type, data) = match self {
             UnixControlData::Rights(files) => {

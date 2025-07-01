@@ -139,7 +139,7 @@ pub mod ioctl {
     };
     use crate::vfs::{FileObject, FileWriteGuard, FileWriteGuardMode};
     use num_traits::FromPrimitive;
-    use starnix_sync::{FileOpsCore, LockBefore, Locked};
+    use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
     use starnix_syscalls::{SyscallResult, SUCCESS};
     use starnix_uapi::errors::Errno;
     use starnix_uapi::user_address::{UserAddress, UserRef};
@@ -154,7 +154,7 @@ pub mod ioctl {
         file: &FileObject,
     ) -> Result<SyscallResult, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         if file.can_write() {
             return error!(ETXTBSY);
@@ -187,7 +187,7 @@ pub mod ioctl {
         file: &FileObject,
     ) -> Result<SyscallResult, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let header_ref = UserRef::<uapi::fsverity_digest>::new(arg);
         let digest_addr = header_ref.next()?.addr();

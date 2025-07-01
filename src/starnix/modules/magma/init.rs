@@ -6,7 +6,7 @@ use crate::MagmaFile;
 use starnix_core::device::DeviceOps;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{FileOps, FsNode};
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -34,7 +34,7 @@ pub fn magma_device_init<L>(
     current_task: &CurrentTask,
     supported_vendors: Vec<u16>,
 ) where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;

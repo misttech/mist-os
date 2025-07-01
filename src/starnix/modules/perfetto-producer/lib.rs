@@ -16,7 +16,7 @@ use starnix_core::vfs::socket::{
 };
 use starnix_core::vfs::FsString;
 use starnix_logging::{log_error, log_info, track_stub};
-use starnix_sync::{FileOpsCore, LockBefore, Locked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::open_flags::OpenFlags;
 use thiserror::Error;
 
@@ -43,7 +43,7 @@ impl FuchsiaDataSource {
         current_task: &CurrentTask,
     ) -> Result<FuchsiaDataSource, DataSourceError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // We've established a connection on the socket. Time to initialize.
         let init_req = InitializeConnectionRequest {
@@ -124,7 +124,7 @@ impl FuchsiaDataSource {
         current_task: &CurrentTask,
     ) -> Result<(), DataSourceError>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.connection.get_command_request(locked, current_task)?;
 
@@ -178,7 +178,7 @@ fn wait_for_perfetto_ready<L>(
     socket_path: FsString,
 ) -> perfetto::Producer
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     loop {
         // This seems bad, is there a way to actually wait for the socket to appear and be ready?

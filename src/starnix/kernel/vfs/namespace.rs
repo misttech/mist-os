@@ -1073,7 +1073,7 @@ impl NamespaceNode {
         flags: OpenFlags,
     ) -> Result<NamespaceNode, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
@@ -1107,7 +1107,7 @@ impl NamespaceNode {
         dev: DeviceType,
     ) -> Result<NamespaceNode, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
@@ -1134,7 +1134,7 @@ impl NamespaceNode {
         target: &FsStr,
     ) -> Result<NamespaceNode, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let owner = current_task.as_fscred();
         let entry = self.entry.create_entry(
@@ -1162,7 +1162,7 @@ impl NamespaceNode {
         flags: OpenFlags,
     ) -> Result<NamespaceNode, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
@@ -1184,7 +1184,7 @@ impl NamespaceNode {
         child: &FsNodeHandle,
     ) -> Result<NamespaceNode, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let dir_entry = self.entry.create_entry(
             locked,
@@ -1206,7 +1206,7 @@ impl NamespaceNode {
         mode: FileMode,
     ) -> Result<NamespaceNode, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let dir_entry = self.entry.create_entry(
             locked,
@@ -1243,7 +1243,7 @@ impl NamespaceNode {
         must_be_directory: bool,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         if DirEntry::is_reserved_name(name) {
             match kind {

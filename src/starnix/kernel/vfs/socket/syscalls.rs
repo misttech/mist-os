@@ -19,7 +19,7 @@ use starnix_uapi::user_address::{ArchSpecific, MappingMultiArchUserRef, MultiArc
 use starnix_uapi::user_value::UserValue;
 
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::time::duration_from_timespec;
 use starnix_types::user_buffer::{UserBuffer, UserBuffers};
 use starnix_uapi::auth::CAP_NET_BIND_SERVICE;
@@ -518,7 +518,7 @@ fn recvmsg_internal<L>(
     deadline: Option<zx::MonotonicInstant>,
 ) -> Result<usize, Errno>
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let mut message_header = current_task.read_multi_arch_object(user_message_header)?;
     let result = recvmsg_internal_with_header(
@@ -542,7 +542,7 @@ fn recvmsg_internal_with_header<L>(
     deadline: Option<zx::MonotonicInstant>,
 ) -> Result<usize, Errno>
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let iovec = read_iovec_from_msghdr(current_task, &message_header)?;
 
@@ -743,7 +743,7 @@ fn sendmsg_internal<L>(
     flags: u32,
 ) -> Result<usize, Errno>
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let message_header = current_task.read_multi_arch_object(user_message_header)?;
     sendmsg_internal_with_header(locked, current_task, file, &message_header, flags)
@@ -757,7 +757,7 @@ fn sendmsg_internal_with_header<L>(
     flags: u32,
 ) -> Result<usize, Errno>
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     if message_header.name_len > i32::MAX as u32 {
         return error!(EINVAL);

@@ -10,6 +10,7 @@ use crate::task::CurrentTask;
 use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
 use crate::vfs::{FileOps, FsNode, FsStr, FsString};
 use starnix_logging::{log_error, log_warn};
+use starnix_sync::LockEqualOrBefore;
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::device_type::{
     DeviceType, DYN_MAJOR_RANGE, MISC_DYNANIC_MINOR_RANGE, MISC_MAJOR,
@@ -274,7 +275,7 @@ impl DeviceRegistry {
     /// Notify devfs and listeners that a device has been added to the registry.
     fn notify_device<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask, device: Device)
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         if let Some(metadata) = &device.metadata {
             if let Err(err) = devtmpfs_create_device(locked, current_task, metadata.clone()) {
@@ -340,7 +341,7 @@ impl DeviceRegistry {
         dev_ops: impl DeviceOps,
     ) -> Device
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.register_device_with_dir(
             locked,
@@ -367,7 +368,7 @@ impl DeviceRegistry {
         dev_ops: impl DeviceOps,
     ) -> Device
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let entry = DeviceEntry::new(name.into(), dev_ops);
         self.devices(metadata.mode).register_minor(metadata.device_type, entry);
@@ -391,7 +392,7 @@ impl DeviceRegistry {
         dev_ops: impl DeviceOps,
     ) -> Result<Device, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let device_type = self.state.lock().misc_chardev_allocator.allocate()?;
         let metadata = DeviceMetadata::new(name.into(), device_type, DeviceMode::Char);
@@ -424,7 +425,7 @@ impl DeviceRegistry {
         dev_ops: impl DeviceOps,
     ) -> Result<Device, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.register_dyn_device_with_dir(
             locked,
@@ -449,7 +450,7 @@ impl DeviceRegistry {
         dev_ops: impl DeviceOps,
     ) -> Result<Device, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.register_dyn_device_with_devname(
             locked,
@@ -483,7 +484,7 @@ impl DeviceRegistry {
         dev_ops: impl DeviceOps,
     ) -> Result<Device, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let device_type = self.state.lock().dyn_chardev_allocator.allocate()?;
         let metadata = DeviceMetadata::new(devname.into(), device_type, DeviceMode::Char);
@@ -533,7 +534,7 @@ impl DeviceRegistry {
         build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
     ) -> Device
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.devices(metadata.mode).get(metadata.device_type).expect("device is registered");
         let device = self.objects.create_device(name, Some(metadata), class, build_directory);
@@ -578,7 +579,7 @@ impl DeviceRegistry {
         build_directory: impl FnOnce(&Device, &SimpleDirectoryMutator),
     ) -> Device
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         self.objects.create_device(name, None, class, build_directory)
     }
@@ -593,7 +594,7 @@ impl DeviceRegistry {
         current_task: &CurrentTask,
         device: Device,
     ) where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         if let Some(metadata) = &device.metadata {
             self.dispatch_uevent(UEventAction::Remove, device.clone());

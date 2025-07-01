@@ -21,7 +21,7 @@ use starnix_core::vfs::{
     self, default_ioctl, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
 };
 use starnix_logging::log_warn;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::device_type::INPUT_MAJOR;
 use starnix_uapi::errors::Errno;
@@ -68,7 +68,7 @@ fn add_and_register_input_device<L>(
     device_id: u32,
 ) -> Device
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
@@ -212,7 +212,7 @@ impl UinputDeviceFile {
         current_task: &CurrentTask,
     ) -> Result<SyscallResult, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         // Only eng and userdebug builds include the `fuchsia.ui.test.input` service.
         let registry = match fuchsia_component::client::connect_to_protocol_sync::<
@@ -237,7 +237,7 @@ impl UinputDeviceFile {
         registry: Option<futinput::RegistrySynchronousProxy>,
     ) -> Result<SyscallResult, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         match registry {
             Some(proxy) => {
@@ -359,7 +359,7 @@ impl UinputDeviceFile {
         current_task: &CurrentTask,
     ) -> Result<SyscallResult, Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut inner = self.inner.lock();
         match inner.device_id {

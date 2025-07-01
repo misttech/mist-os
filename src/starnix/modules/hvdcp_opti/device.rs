@@ -14,14 +14,14 @@ use starnix_core::device::DeviceMode;
 use starnix_core::fs::sysfs::build_device_directory;
 use starnix_core::task::CurrentTask;
 use starnix_logging::log_warn;
-use starnix_sync::{FileOpsCore, LockBefore, Locked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::file_mode::mode;
 use std::sync::Arc;
 
 pub fn hvdcp_opti_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
 where
-    L: LockBefore<FileOpsCore>,
+    L: LockEqualOrBefore<FileOpsCore>,
 {
     let proxy = match connect_to_device() {
         Ok(proxy) => Arc::new(proxy),

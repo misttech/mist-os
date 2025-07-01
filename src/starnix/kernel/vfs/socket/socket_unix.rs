@@ -25,7 +25,7 @@ use ebpf_api::{
     SocketFilterContext, SOCKET_FILTER_CBPF_CONFIG, SOCKET_FILTER_SK_BUF_TYPE,
 };
 use starnix_logging::track_stub;
-use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::UserBuffer;
 use starnix_uapi::errors::{Errno, EACCES, EINTR, EPERM};
@@ -174,7 +174,7 @@ impl UnixSocket {
         open_flags: OpenFlags,
     ) -> Result<(FileHandle, FileHandle), Errno>
     where
-        L: LockBefore<FileOpsCore>,
+        L: LockEqualOrBefore<FileOpsCore>,
     {
         let credentials = current_task.as_ucred();
         let left = Socket::new(
