@@ -166,7 +166,9 @@ MappedMemoryRange HandoffPrep::PublishSingleMappingVmar(ktl::string_view name,
   return {aligned.subspan(addr - aligned_paddr, size), addr};
 }
 
-void HandoffPrep::ConstructKernelAddressSpace(const UartDriver& uart) {
+HandoffPrep::ZirconAbi HandoffPrep::ConstructKernelAddressSpace(const UartDriver& uart) {
+  ZirconAbi abi{};
+
   // Physmap.
   {  // Shadowing the entire physmap would be redundantly wasteful.
     PhysMapping mapping("physmap"sv, PhysMapping::Type::kNormal, kArchPhysmapVirtualBase,
@@ -244,4 +246,6 @@ void HandoffPrep::ConstructKernelAddressSpace(const UartDriver& uart) {
   // Construct the arch-specific bits at the end (to give the non-arch-specific
   // placements in the address space a small amount of relative familiarity).
   ArchConstructKernelAddressSpace();
+
+  return abi;
 }

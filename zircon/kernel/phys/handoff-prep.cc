@@ -421,8 +421,6 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
   SummarizeMiscZbiItems(zbi);
   gBootTimes.SampleNow(PhysBootTimes::kZbiDone);
 
-  ArchHandoff(patch_info);
-
   SetInstrumentation();
 
   // This transfers the log, so logging after this is not preserved.
@@ -431,7 +429,7 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
   PublishLog("i/logs/physboot", ktl::move(*ktl::exchange(gLog, nullptr)));
 
   handoff()->kernel_physical_load_address = kernel_.physical_load_address();
-  ConstructKernelAddressSpace(uart);
+  ZirconAbi abi = ConstructKernelAddressSpace(uart);
 
   // Finalize the published VMOs (e.g., the log published just above), VMARs,
   // and mappings.
@@ -453,6 +451,6 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
   // hand-off.
   handoff()->times = gBootTimes;
 
-  kernel_.Handoff<void(PhysHandoff*)>(handoff());
-  ZX_PANIC("ElfImage::Handoff returned!");
+  // Now for the remaining arch-specific settings and the actual hand-off...
+  ArchDoHandoff(abi, patch_info);
 }
