@@ -59,17 +59,17 @@ impl fmt::Display for NaturalTypeTemplate<'_> {
                     EndpointRole::Client => "::fidl_next::ClientEnd",
                     EndpointRole::Server => "::fidl_next::ServerEnd",
                 };
-                let natural_id = self.natural_id(protocol);
+                let protocol_id = self.natural_id(protocol);
                 if *nullable {
                     write!(
                         f,
-                        "{role}<{natural_id}, Option<{}>>",
+                        "Option<{role}<{protocol_id}, {}>>",
                         self.resource_bindings().channel.natural_path
                     )?;
                 } else {
                     write!(
                         f,
-                        "{role}<{natural_id}, {}>",
+                        "{role}<{protocol_id}, {}>",
                         self.resource_bindings().channel.natural_path
                     )?;
                 }

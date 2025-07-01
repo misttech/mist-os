@@ -8,7 +8,8 @@ use core::{concat, stringify};
 
 use fidl_next_codec::{
     munge, Decode, DecodeError, Encodable, EncodableOption, Encode, EncodeError, EncodeOption,
-    EncodeRef, FromWire, FromWireOption, FromWireOptionRef, FromWireRef, Slot, Wire,
+    EncodeOptionRef, EncodeRef, FromWire, FromWireOption, FromWireOptionRef, FromWireRef, Slot,
+    Wire,
 };
 
 macro_rules! endpoint {
@@ -153,6 +154,25 @@ macro_rules! endpoint {
             ) -> Result<(), EncodeError> {
                 munge!(let Self::EncodedOption { transport, _protocol: _ } = out);
                 T::encode_option(this.map(|this| this.transport), encoder, transport)
+            }
+        }
+
+        // SAFETY: `$name` is `#[repr(transparent)]` over the transport `T`, and `encode_option_ref`
+        // calls `T::encode_option_ref` on `transport`. `_protocol` is a ZST which does not have any
+        // data to encode.
+        unsafe impl<E, P, T> EncodeOptionRef<E> for $name<P, T>
+        where
+            E: ?Sized,
+            P: 'static,
+            T: EncodeOptionRef<E>,
+        {
+            fn encode_option_ref(
+                this: Option<&Self>,
+                encoder: &mut E,
+                out: &mut MaybeUninit<Self::EncodedOption>,
+            ) -> Result<(), EncodeError> {
+                munge!(let Self::EncodedOption { transport, _protocol: _ } = out);
+                T::encode_option_ref(this.map(|this| &this.transport), encoder, transport)
             }
         }
 

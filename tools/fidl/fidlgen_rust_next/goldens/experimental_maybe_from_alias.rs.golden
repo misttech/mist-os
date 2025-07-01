@@ -23,7 +23,7 @@ pub type AliasOfBytes = Vec<u8>;
 pub type WireAliasOfBytes<'de> = ::fidl_next::WireVector<'de, u8>;
 
 pub type AliasOfRequest =
-    ::fidl_next::ServerEnd<crate::MyProtocol, Option<::fidl_next::fuchsia::zx::Channel>>;
+    Option<::fidl_next::ServerEnd<crate::MyProtocol, ::fidl_next::fuchsia::zx::Channel>>;
 
 /// The wire type corresponding to [`AliasOfRequest`].
 pub type WireAliasOfRequest =
@@ -174,13 +174,13 @@ pub struct Testing {
 
     pub a3: [[u64; 1]; 4],
 
-    pub r1: ::fidl_next::ServerEnd<crate::MyProtocol, Option<::fidl_next::fuchsia::zx::Channel>>,
+    pub r1: Option<::fidl_next::ServerEnd<crate::MyProtocol, ::fidl_next::fuchsia::zx::Channel>>,
 
     pub r2:
-        Vec<::fidl_next::ServerEnd<crate::MyProtocol, Option<::fidl_next::fuchsia::zx::Channel>>>,
+        Vec<Option<::fidl_next::ServerEnd<crate::MyProtocol, ::fidl_next::fuchsia::zx::Channel>>>,
 
     pub r3:
-        [::fidl_next::ServerEnd<crate::MyProtocol, Option<::fidl_next::fuchsia::zx::Channel>>; 4],
+        [Option<::fidl_next::ServerEnd<crate::MyProtocol, ::fidl_next::fuchsia::zx::Channel>>; 4],
 
     pub b1: Vec<u8>,
 

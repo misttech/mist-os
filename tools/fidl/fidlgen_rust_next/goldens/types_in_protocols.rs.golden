@@ -3656,10 +3656,10 @@ pub struct Resource {
     pub opt_vmo: Option<::fidl_next::fuchsia::zx::Handle>,
 
     pub opt_client_end:
-        ::fidl_next::ClientEnd<crate::Protocol, Option<::fidl_next::fuchsia::zx::Channel>>,
+        Option<::fidl_next::ClientEnd<crate::Protocol, ::fidl_next::fuchsia::zx::Channel>>,
 
     pub opt_server_end:
-        ::fidl_next::ServerEnd<crate::Protocol, Option<::fidl_next::fuchsia::zx::Channel>>,
+        Option<::fidl_next::ServerEnd<crate::Protocol, ::fidl_next::fuchsia::zx::Channel>>,
 
     pub opt_struct: Option<Box<crate::ResourceStruct>>,
 

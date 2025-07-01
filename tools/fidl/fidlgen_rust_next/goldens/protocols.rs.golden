@@ -5058,14 +5058,12 @@ pub struct ProtocolEnds {
     pub server:
         ::fidl_next::ServerEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::zx::Channel>,
 
-    pub client_opt: ::fidl_next::ClientEnd<
-        crate::DiscoverableProtocol,
-        Option<::fidl_next::fuchsia::zx::Channel>,
+    pub client_opt: Option<
+        ::fidl_next::ClientEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::zx::Channel>,
     >,
 
-    pub server_opt: ::fidl_next::ServerEnd<
-        crate::DiscoverableProtocol,
-        Option<::fidl_next::fuchsia::zx::Channel>,
+    pub server_opt: Option<
+        ::fidl_next::ServerEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::zx::Channel>,
     >,
 }
 
@@ -5082,14 +5080,18 @@ impl ::fidl_next::Encodable for ProtocolEnds {
                     ::fidl_next::fuchsia::zx::Channel,
                 > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                     .is_enabled()
-                && <::fidl_next::ClientEnd<
-                    crate::DiscoverableProtocol,
-                    Option<::fidl_next::fuchsia::zx::Channel>,
+                && <Option<
+                    ::fidl_next::ClientEnd<
+                        crate::DiscoverableProtocol,
+                        ::fidl_next::fuchsia::zx::Channel,
+                    >,
                 > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                     .is_enabled()
-                && <::fidl_next::ServerEnd<
-                    crate::DiscoverableProtocol,
-                    Option<::fidl_next::fuchsia::zx::Channel>,
+                && <Option<
+                    ::fidl_next::ServerEnd<
+                        crate::DiscoverableProtocol,
+                        ::fidl_next::fuchsia::zx::Channel,
+                    >,
                 > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                     .is_enabled(),
         )
@@ -5181,9 +5183,11 @@ impl ::fidl_next::FromWire<WireProtocolEnds> for ProtocolEnds {
                     >,
                 >>::COPY_OPTIMIZATION
                     .is_enabled()
-                && <::fidl_next::ClientEnd<
-                    crate::DiscoverableProtocol,
-                    Option<::fidl_next::fuchsia::zx::Channel>,
+                && <Option<
+                    ::fidl_next::ClientEnd<
+                        crate::DiscoverableProtocol,
+                        ::fidl_next::fuchsia::zx::Channel,
+                    >,
                 > as ::fidl_next::FromWire<
                     ::fidl_next::ClientEnd<
                         crate::DiscoverableProtocol,
@@ -5191,9 +5195,11 @@ impl ::fidl_next::FromWire<WireProtocolEnds> for ProtocolEnds {
                     >,
                 >>::COPY_OPTIMIZATION
                     .is_enabled()
-                && <::fidl_next::ServerEnd<
-                    crate::DiscoverableProtocol,
-                    Option<::fidl_next::fuchsia::zx::Channel>,
+                && <Option<
+                    ::fidl_next::ServerEnd<
+                        crate::DiscoverableProtocol,
+                        ::fidl_next::fuchsia::zx::Channel,
+                    >,
                 > as ::fidl_next::FromWire<
                     ::fidl_next::ServerEnd<
                         crate::DiscoverableProtocol,
@@ -7821,9 +7827,8 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct WithProtocolEndsClientEndsResponse {
-    pub out: ::fidl_next::ClientEnd<
-        crate::DiscoverableProtocol,
-        Option<::fidl_next::fuchsia::zx::Channel>,
+    pub out: Option<
+        ::fidl_next::ClientEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::zx::Channel>,
     >,
 }
 
@@ -7833,9 +7838,11 @@ impl ::fidl_next::Encodable for WithProtocolEndsClientEndsResponse {
         WireWithProtocolEndsClientEndsResponse,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::ClientEnd<
-                crate::DiscoverableProtocol,
-                Option<::fidl_next::fuchsia::zx::Channel>,
+            true && <Option<
+                ::fidl_next::ClientEnd<
+                    crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::zx::Channel,
+                >,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -7903,9 +7910,11 @@ impl ::fidl_next::FromWire<WireWithProtocolEndsClientEndsResponse>
         Self,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::ClientEnd<
-                crate::DiscoverableProtocol,
-                Option<::fidl_next::fuchsia::zx::Channel>,
+            true && <Option<
+                ::fidl_next::ClientEnd<
+                    crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::zx::Channel,
+                >,
             > as ::fidl_next::FromWire<
                 ::fidl_next::ClientEnd<
                     crate::DiscoverableProtocol,
@@ -7965,9 +7974,8 @@ where
 #[derive(Debug)]
 #[repr(C)]
 pub struct WithProtocolEndsServerEndsRequest {
-    pub in_: ::fidl_next::ServerEnd<
-        crate::DiscoverableProtocol,
-        Option<::fidl_next::fuchsia::zx::Channel>,
+    pub in_: Option<
+        ::fidl_next::ServerEnd<crate::DiscoverableProtocol, ::fidl_next::fuchsia::zx::Channel>,
     >,
 }
 
@@ -7977,9 +7985,11 @@ impl ::fidl_next::Encodable for WithProtocolEndsServerEndsRequest {
         WireWithProtocolEndsServerEndsRequest,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::ServerEnd<
-                crate::DiscoverableProtocol,
-                Option<::fidl_next::fuchsia::zx::Channel>,
+            true && <Option<
+                ::fidl_next::ServerEnd<
+                    crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::zx::Channel,
+                >,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -8047,9 +8057,11 @@ impl ::fidl_next::FromWire<WireWithProtocolEndsServerEndsRequest>
         Self,
     > = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::ServerEnd<
-                crate::DiscoverableProtocol,
-                Option<::fidl_next::fuchsia::zx::Channel>,
+            true && <Option<
+                ::fidl_next::ServerEnd<
+                    crate::DiscoverableProtocol,
+                    ::fidl_next::fuchsia::zx::Channel,
+                >,
             > as ::fidl_next::FromWire<
                 ::fidl_next::ServerEnd<
                     crate::DiscoverableProtocol,

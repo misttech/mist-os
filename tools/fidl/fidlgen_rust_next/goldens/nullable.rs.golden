@@ -1261,15 +1261,14 @@ where
 #[repr(C)]
 pub struct StructWithNullableProtocol {
     pub val:
-        ::fidl_next::ClientEnd<crate::SimpleProtocol, Option<::fidl_next::fuchsia::zx::Channel>>,
+        Option<::fidl_next::ClientEnd<crate::SimpleProtocol, ::fidl_next::fuchsia::zx::Channel>>,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableProtocol {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireStructWithNullableProtocol> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::ClientEnd<
-                crate::SimpleProtocol,
-                Option<::fidl_next::fuchsia::zx::Channel>,
+            true && <Option<
+                ::fidl_next::ClientEnd<crate::SimpleProtocol, ::fidl_next::fuchsia::zx::Channel>,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -1332,9 +1331,8 @@ where
 impl ::fidl_next::FromWire<WireStructWithNullableProtocol> for StructWithNullableProtocol {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireStructWithNullableProtocol, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::ClientEnd<
-                crate::SimpleProtocol,
-                Option<::fidl_next::fuchsia::zx::Channel>,
+            true && <Option<
+                ::fidl_next::ClientEnd<crate::SimpleProtocol, ::fidl_next::fuchsia::zx::Channel>,
             > as ::fidl_next::FromWire<
                 ::fidl_next::ClientEnd<
                     crate::SimpleProtocol,
@@ -1393,15 +1391,14 @@ where
 #[repr(C)]
 pub struct StructWithNullableRequest {
     pub val:
-        ::fidl_next::ServerEnd<crate::SimpleProtocol, Option<::fidl_next::fuchsia::zx::Channel>>,
+        Option<::fidl_next::ServerEnd<crate::SimpleProtocol, ::fidl_next::fuchsia::zx::Channel>>,
 }
 
 impl ::fidl_next::Encodable for StructWithNullableRequest {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<Self, WireStructWithNullableRequest> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::ServerEnd<
-                crate::SimpleProtocol,
-                Option<::fidl_next::fuchsia::zx::Channel>,
+            true && <Option<
+                ::fidl_next::ServerEnd<crate::SimpleProtocol, ::fidl_next::fuchsia::zx::Channel>,
             > as ::fidl_next::Encodable>::COPY_OPTIMIZATION
                 .is_enabled(),
         )
@@ -1464,9 +1461,8 @@ where
 impl ::fidl_next::FromWire<WireStructWithNullableRequest> for StructWithNullableRequest {
     const COPY_OPTIMIZATION: ::fidl_next::CopyOptimization<WireStructWithNullableRequest, Self> = unsafe {
         ::fidl_next::CopyOptimization::enable_if(
-            true && <::fidl_next::ServerEnd<
-                crate::SimpleProtocol,
-                Option<::fidl_next::fuchsia::zx::Channel>,
+            true && <Option<
+                ::fidl_next::ServerEnd<crate::SimpleProtocol, ::fidl_next::fuchsia::zx::Channel>,
             > as ::fidl_next::FromWire<
                 ::fidl_next::ServerEnd<
                     crate::SimpleProtocol,
