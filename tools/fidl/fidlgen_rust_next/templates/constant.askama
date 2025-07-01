@@ -1,7 +1,7 @@
 {% match constant.kind %}
     {% when ConstantKind::Identifier { identifier } %}
         {% let (comp_id, member) = identifier.split() %}
-        {{ context.natural_id(comp_id) }}
+        {{ self.natural_id(comp_id) }}
         {% if let Some(member) = member %}
             {% match context.schema.get_decl_type(comp_id).unwrap() %}
                 {% when DeclType::Bits %} ::{{ member.screaming_snake() }}
@@ -24,14 +24,14 @@
             {% when LiteralKind::Numeric %}
                 {% match ty.kind %}
                     {% when TypeKind::Identifier { identifier, nullable, protocol_transport } %}
-                        {{ context.natural_id(identifier) }}::from_bits_retain({{ constant.value }})
+                        {{ self.natural_id(identifier) }}::from_bits_retain({{ constant.value }})
                     {% when TypeKind::Primitive { subtype } %} {{ literal.value }}
                     {% else %} {{ panic!("invalid constant type") }}
                 {% endmatch %}
         {% endmatch %}
     {% when ConstantKind::BinaryOperator %}
         {% if let TypeKind::Identifier { identifier, nullable, protocol_transport } = ty.kind %}
-            {{ context.natural_id(identifier) }}::from_bits_retain({{ constant.value }})
+            {{ self.natural_id(identifier) }}::from_bits_retain({{ constant.value }})
         {% else %}
             {{ panic!("invalid constant type") }}
         {% endif %}

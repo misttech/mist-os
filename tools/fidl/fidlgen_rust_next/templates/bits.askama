@@ -2,15 +2,15 @@
 {% let base_name = bits.name.decl_name().camel() %}
 {% let wire_name = format!("Wire{base_name}") %}
 {% let subtype = self.subtype() %}
-{% let natural_subtype = self::natural_prim(subtype) %}
-{% let wire_subtype = self::wire_prim(subtype) %}
+{% let natural_subtype = self.natural_prim(subtype) %}
+{% let wire_subtype = self.wire_prim(subtype) %}
 
 ::fidl_next::bitflags! {
-    {{ self::doc_string(bits.attributes) -}}
+    {{ self.doc_string(bits.attributes) -}}
     #[derive(
         Clone,
         Copy,
-        {% if context.config.emit_debug_impls -%}
+        {% if self.emit_debug_impls() -%}
             Debug,
         {%- endif %}
         PartialEq,
@@ -19,7 +19,7 @@
     )]
     pub struct {{ name }}: {{ natural_subtype }} {
         {% for member in bits.members -%}
-            {{ self::doc_string(member.attributes) -}}
+            {{ self.doc_string(member.attributes) -}}
             const {{ member.name|screaming_snake }} = {{ member.value.value }};
         {% endfor %}
         {%- if !bits.is_strict -%}
@@ -86,7 +86,7 @@ impl ::fidl_next::FromWireRef<{{ wire_name}}> for {{ name }} {
 #[derive(
     Clone,
     Copy,
-    {% if context.config.emit_debug_impls -%}
+    {% if self.emit_debug_impls() -%}
         Debug,
     {%- endif %}
 )]

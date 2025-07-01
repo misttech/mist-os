@@ -4,32 +4,30 @@
 
 use core::fmt;
 
-use super::{IdTemplate, WirePrimTemplate};
-use crate::config::Config;
-use crate::ir::{DeclType, EndpointRole, InternalSubtype, Schema, Type, TypeKind};
+use super::{Context, IdTemplate, WirePrimTemplate};
+use crate::ir::{DeclType, EndpointRole, InternalSubtype, Type, TypeKind};
 
 pub struct WireTypeTemplate<'a> {
-    schema: &'a Schema,
-    config: &'a Config,
+    context: &'a Context,
     ty: &'a Type,
     lifetime: &'a str,
 }
 
 impl<'a> WireTypeTemplate<'a> {
-    pub fn new(schema: &'a Schema, config: &'a Config, ty: &'a Type, lifetime: &'a str) -> Self {
-        Self { schema, config, ty, lifetime }
+    pub fn new(ty: &'a Type, lifetime: &'a str, context: &'a Context) -> Self {
+        Self { context, ty, lifetime }
     }
 
-    pub fn with_de(schema: &'a Schema, config: &'a Config, ty: &'a Type) -> Self {
-        Self::new(schema, config, ty, "'de")
+    pub fn with_de(ty: &'a Type, context: &'a Context) -> Self {
+        Self::new(ty, "'de", context)
     }
 
-    pub fn with_static(schema: &'a Schema, config: &'a Config, ty: &'a Type) -> Self {
-        Self::new(schema, config, ty, "'static")
+    pub fn with_static(ty: &'a Type, context: &'a Context) -> Self {
+        Self::new(ty, "'static", context)
     }
 
-    pub fn with_anonymous(schema: &'a Schema, config: &'a Config, ty: &'a Type) -> Self {
-        Self::new(schema, config, ty, "'_")
+    pub fn with_anonymous(ty: &'a Type, context: &'a Context) -> Self {
+        Self::new(ty, "'_", context)
     }
 }
 
@@ -37,11 +35,11 @@ impl fmt::Display for WireTypeTemplate<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.ty.kind {
             TypeKind::Array { element_type, element_count } => {
-                let wire_ty = Self::new(self.schema, self.config, element_type, self.lifetime);
+                let wire_ty = Self::new(element_type, self.lifetime, self.context);
                 write!(f, "[{wire_ty}; {element_count}]")?;
             }
             TypeKind::Vector { element_type, nullable, .. } => {
-                let wire_ty = Self::new(self.schema, self.config, element_type, self.lifetime);
+                let wire_ty = Self::new(element_type, self.lifetime, self.context);
                 if *nullable {
                     write!(f, "::fidl_next::WireOptionalVector<{}, {wire_ty}>", self.lifetime)?;
                 } else {
@@ -57,9 +55,13 @@ impl fmt::Display for WireTypeTemplate<'_> {
             }
             TypeKind::Handle { nullable, .. } => {
                 if *nullable {
-                    write!(f, "{}", self.config.resource_bindings.handle.optional_wire_path)?;
+                    write!(
+                        f,
+                        "{}",
+                        self.context.config.resource_bindings.handle.optional_wire_path
+                    )?;
                 } else {
-                    write!(f, "{}", self.config.resource_bindings.handle.wire_path)?;
+                    write!(f, "{}", self.context.config.resource_bindings.handle.wire_path)?;
                 }
             }
             TypeKind::Endpoint { nullable, role, protocol, .. } => {
@@ -67,18 +69,18 @@ impl fmt::Display for WireTypeTemplate<'_> {
                     EndpointRole::Client => "::fidl_next::ClientEnd",
                     EndpointRole::Server => "::fidl_next::ServerEnd",
                 };
-                let wire_id = IdTemplate::natural(self.schema, protocol);
+                let wire_id = IdTemplate::natural(protocol, self.context);
                 if *nullable {
                     write!(
                         f,
                         "{role}<{wire_id}, {}>",
-                        self.config.resource_bindings.channel.optional_wire_path
+                        self.context.config.resource_bindings.channel.optional_wire_path
                     )?;
                 } else {
                     write!(
                         f,
                         "{role}<{wire_id}, {}>",
-                        self.config.resource_bindings.channel.wire_path
+                        self.context.config.resource_bindings.channel.wire_path
                     )?;
                 }
             }
@@ -86,9 +88,9 @@ impl fmt::Display for WireTypeTemplate<'_> {
                 write!(f, "{}", WirePrimTemplate(subtype))?;
             }
             TypeKind::Identifier { identifier, nullable, .. } => {
-                let wire_id = IdTemplate::wire(self.schema, identifier);
+                let wire_id = IdTemplate::wire(identifier, self.context);
 
-                match self.schema.get_decl_type(identifier).unwrap() {
+                match self.context.schema.get_decl_type(identifier).unwrap() {
                     DeclType::Bits | DeclType::Enum => write!(f, "{wire_id}")?,
                     DeclType::Table => write!(f, "{wire_id}<{}>", self.lifetime)?,
                     DeclType::Struct => {
@@ -98,7 +100,7 @@ impl fmt::Display for WireTypeTemplate<'_> {
 
                         write!(f, "{wire_id}")?;
 
-                        if let Some(shape) = self.schema.get_type_shape(identifier) {
+                        if let Some(shape) = self.context.schema.get_type_shape(identifier) {
                             if shape.max_out_of_line != 0 {
                                 write!(f, "<{}>", self.lifetime)?;
                             }
@@ -110,9 +112,9 @@ impl fmt::Display for WireTypeTemplate<'_> {
                     }
                     DeclType::Union => {
                         let id = if *nullable {
-                            IdTemplate::wire_optional(self.schema, identifier)
+                            IdTemplate::wire_optional(identifier, self.context)
                         } else {
-                            IdTemplate::wire(self.schema, identifier)
+                            IdTemplate::wire(identifier, self.context)
                         };
                         if self.ty.shape.max_out_of_line != 0 {
                             write!(f, "{id}<{}>", self.lifetime)?;
@@ -125,10 +127,14 @@ impl fmt::Display for WireTypeTemplate<'_> {
                             write!(
                                 f,
                                 "{}",
-                                self.config.resource_bindings.handle.optional_wire_path
+                                self.context.config.resource_bindings.handle.optional_wire_path
                             )?;
                         } else {
-                            write!(f, "{}", self.config.resource_bindings.handle.wire_path)?;
+                            write!(
+                                f,
+                                "{}",
+                                self.context.config.resource_bindings.handle.wire_path
+                            )?;
                         }
                     }
                     _ => unimplemented!(),

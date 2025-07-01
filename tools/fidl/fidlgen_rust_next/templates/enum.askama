@@ -1,14 +1,14 @@
 {% let name = filters::camel(enm.name.decl_name())? %}
 {% let base_name = enm.name.decl_name().camel() %}
 {% let wire_name = format!("Wire{base_name}") %}
-{% let natural_int = self::natural_int(enm.ty) %}
-{% let wire_int = self::wire_int(enm.ty) %}
+{% let natural_int = self.natural_int(enm.ty) %}
+{% let wire_int = self.wire_int(enm.ty) %}
 
-{{ self::doc_string(enm.attributes) -}}
+{{ self.doc_string(enm.attributes) -}}
 #[derive(
     Clone,
     Copy,
-    {% if context.config.emit_debug_impls -%}
+    {% if self.emit_debug_impls() -%}
         Debug,
     {%- endif %}
     PartialEq,
@@ -125,7 +125,7 @@ impl ::fidl_next::FromWireRef<{{ wire_name }}> for {{ name }} {
 #[derive(
     Clone,
     Copy,
-    {% if context.config.emit_debug_impls -%}
+    {% if self.emit_debug_impls() -%}
         Debug,
     {%- endif %}
     PartialEq,

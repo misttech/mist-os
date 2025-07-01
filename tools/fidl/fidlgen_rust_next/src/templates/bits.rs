@@ -4,7 +4,7 @@
 
 use askama::Template;
 
-use super::{doc_string, filters, natural_prim, wire_prim, Context};
+use super::{filters, Context, Contextual};
 use crate::id::IdExt as _;
 use crate::ir::{Bits, PrimSubtype, Type, TypeKind};
 
@@ -25,5 +25,11 @@ impl<'a> BitsTemplate<'a> {
             panic!("invalid non-integral primitive subtype for bits");
         };
         *subtype
+    }
+}
+
+impl Contextual for BitsTemplate<'_> {
+    fn context(&self) -> &Context {
+        self.context
     }
 }

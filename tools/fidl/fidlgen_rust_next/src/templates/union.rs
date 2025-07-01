@@ -4,7 +4,7 @@
 
 use askama::Template;
 
-use super::{doc_string, filters, Context};
+use super::{filters, Context, Contextual};
 use crate::id::IdExt as _;
 use crate::ir::Union;
 
@@ -18,6 +18,12 @@ pub struct UnionTemplate<'a> {
 impl<'a> UnionTemplate<'a> {
     pub fn new(union: &'a Union, context: &'a Context) -> Self {
         Self { union, context }
+    }
+}
+
+impl Contextual for UnionTemplate<'_> {
+    fn context(&self) -> &Context {
+        self.context
     }
 }
 

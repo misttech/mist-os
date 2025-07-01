@@ -4,7 +4,7 @@
 
 use askama::Template;
 
-use super::{doc_string, filters, natural_int, wire_int, Context};
+use super::{filters, Context, Contextual};
 use crate::id::IdExt as _;
 use crate::ir::{Enum, IntType};
 
@@ -18,5 +18,11 @@ pub struct EnumTemplate<'a> {
 impl<'a> EnumTemplate<'a> {
     pub fn new(enm: &'a Enum, context: &'a Context) -> Self {
         Self { enm, context }
+    }
+}
+
+impl Contextual for EnumTemplate<'_> {
+    fn context(&self) -> &Context {
+        self.context
     }
 }

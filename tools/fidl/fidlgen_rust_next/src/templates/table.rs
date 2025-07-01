@@ -4,7 +4,7 @@
 
 use askama::Template;
 
-use super::{doc_string, filters, Context};
+use super::{filters, Context, Contextual};
 use crate::id::IdExt as _;
 use crate::ir::{Table, TypeKind};
 
@@ -18,5 +18,11 @@ pub struct TableTemplate<'a> {
 impl<'a> TableTemplate<'a> {
     pub fn new(table: &'a Table, context: &'a Context) -> Self {
         Self { table, context }
+    }
+}
+
+impl Contextual for TableTemplate<'_> {
+    fn context(&self) -> &Context {
+        self.context
     }
 }

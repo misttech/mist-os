@@ -11,8 +11,8 @@
 {% let server_handler_name = format!("{base_name}ServerHandler") %}
 
 /// The type corresponding to the {{ non_canonical_name }} protocol.
-{{ self::doc_string(protocol.attributes) -}}
-{% if context.config.emit_debug_impls -%}
+{{ self.doc_string(protocol.attributes) -}}
+{% if self.emit_debug_impls() -%}
     #[derive(Debug)]
 {%- endif %}
 pub struct {{ protocol_name }};
@@ -32,7 +32,7 @@ pub mod {{ module_name }} {
             {{ module_name }},
         };
         {% for ident in self.prelude_method_type_idents() %}
-            pub use {{ context.natural_id(ident) }};
+            pub use {{ self.natural_id(ident) }};
         {% endfor %}
     }
 
@@ -47,7 +47,7 @@ pub mod {{ module_name }} {
 
             {% if method.kind == ProtocolMethodKind::OneWay || method.kind == ProtocolMethodKind::TwoWay %}
                 {% if let Some(request) = method.maybe_request_payload %}
-                    type Request = {{ context.static_wire_type(request) }};
+                    type Request = {{ self.static_wire_type(request) }};
                 {% else %}
                     type Request = ();
                 {% endif %}
@@ -69,12 +69,12 @@ pub mod {{ module_name }} {
                             <
                                 'static,
                             {% if let Some(success) = method.maybe_response_success_type.as_ref() %}
-                                {{ context.static_wire_type(success) }},
+                                {{ self.static_wire_type(success) }},
                             {% else %}
                                 (),
                             {% endif %}
                             {% if let Some(error) = method.maybe_response_err_type.as_ref() %}
-                                {{ context.static_wire_type(error) }},
+                                {{ self.static_wire_type(error) }},
                             {% else %}
                                 (),
                             {% endif %}
@@ -83,21 +83,21 @@ pub mod {{ module_name }} {
                             ::fidl_next::WireFlexible<
                                 'static,
                             {% if let Some(success) = method.maybe_response_success_type.as_ref() %}
-                                {{ context.static_wire_type(success) }}
+                                {{ self.static_wire_type(success) }}
                             {% else %}
                                 ()
                             {% endif %}
                             >
                         {% else %}
                             {% if let Some(response) = method.maybe_response_payload.as_ref() %}
-                                {{ context.static_wire_type(response) }}
+                                {{ self.static_wire_type(response) }}
                             {% else %}
                                 ()
                             {% endif %}
                         {% endif %}
                     {% when ProtocolMethodKind::Event %}
                         {% if let Some(response) = method.maybe_response_payload.as_ref() %}
-                            {{ context.static_wire_type(response) }}
+                            {{ self.static_wire_type(response) }}
                         {% else %}
                             ()
                         {% endif %}
@@ -108,7 +108,7 @@ pub mod {{ module_name }} {
 
     mod ___detail {
         {% for method in protocol.methods %}
-            {% if let Some(args) = context.get_method_args_struct(method) %}
+            {% if let Some(args) = self.get_method_args_struct(method) %}
                 {% let method_type_name = filters::camel(method.name)? %}
                 {% let is_static = args.shape.max_out_of_line == 0 %}
 
@@ -133,10 +133,10 @@ pub mod {{ module_name }} {
                 >
                 where
                     {% for (i, member) in args.members.iter().enumerate() %}
-                        T{{ i }}: ::fidl_next::Encodable<Encoded = {{ context.static_wire_type(member.ty) }}>,
+                        T{{ i }}: ::fidl_next::Encodable<Encoded = {{ self.static_wire_type(member.ty) }}>,
                     {% endfor %}
                 {
-                    type Encoded = {{ context.static_wire_type(method.maybe_request_payload.as_ref().or(method.maybe_response_payload.as_ref()).unwrap()) }};
+                    type Encoded = {{ self.static_wire_type(method.maybe_request_payload.as_ref().or(method.maybe_response_payload.as_ref()).unwrap()) }};
                 }
 
                 unsafe impl<
@@ -158,7 +158,7 @@ pub mod {{ module_name }} {
                         ___E: ::fidl_next::fuchsia::HandleEncoder,
                     {% endif %}
                     {% for (i, member) in args.members.iter().enumerate() %}
-                        T{{ i }}: ::fidl_next::Encode<___E, Encoded = {{ context.static_wire_type(member.ty) }}>,
+                        T{{ i }}: ::fidl_next::Encode<___E, Encoded = {{ self.static_wire_type(member.ty) }}>,
                     {% endfor %}
                 {
                     #[inline]
@@ -209,16 +209,16 @@ pub mod {{ module_name }} {
 
                 {% match method.kind %}
                     {% when ProtocolMethodKind::OneWay %}
-                        {% if let Some(args) = context.get_method_args_struct(method) %}
+                        {% if let Some(args) = self.get_method_args_struct(method) %}
                             {% let is_static = args.shape.max_out_of_line == 0 %}
 
-                            {{ self::doc_string(method.attributes) -}}
+                            {{ self.doc_string(method.attributes) -}}
                             pub fn {{ method_name }}(
                                 &self,
                                 {% for member in args.members %}
                                     {{ member.name|snake }}: impl ::fidl_next::Encode<
                                         <___T as ::fidl_next::Transport>::SendBuffer,
-                                        Encoded = {{ context.static_wire_type(member.ty) }},
+                                        Encoded = {{ self.static_wire_type(member.ty) }},
                                     >,
                                 {% endfor %}
                             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -239,7 +239,7 @@ pub mod {{ module_name }} {
                             }
                         {% endif %}
 
-                        {{ self::doc_string(method.attributes) -}}
+                        {{ self.doc_string(method.attributes) -}}
                         {% if let Some(request) = method.maybe_request_payload %}
                             pub fn {{ method_name }}_with<___R>(
                                 &self,
@@ -248,7 +248,7 @@ pub mod {{ module_name }} {
                             where
                                 ___R: ::fidl_next::Encode<
                                     <___T as ::fidl_next::Transport>::SendBuffer,
-                                    Encoded = {{ context.static_wire_type(request) }},
+                                    Encoded = {{ self.static_wire_type(request) }},
                                 >,
                             {
                                 self.sender.send_one_way({{ method.ordinal }}, request)
@@ -261,16 +261,16 @@ pub mod {{ module_name }} {
                             }
                         {% endif %}
                     {% when ProtocolMethodKind::TwoWay %}
-                        {% if let Some(args) = context.get_method_args_struct(method) %}
+                        {% if let Some(args) = self.get_method_args_struct(method) %}
                             {% let is_static = args.shape.max_out_of_line == 0 %}
 
-                            {{ self::doc_string(method.attributes) -}}
+                            {{ self.doc_string(method.attributes) -}}
                             pub fn {{ method_name }}(
                                 &self,
                                 {% for member in args.members %}
                                     {{ member.name|snake }}: impl ::fidl_next::Encode<
                                         <___T as ::fidl_next::Transport>::SendBuffer,
-                                        Encoded = {{ context.static_wire_type(member.ty) }},
+                                        Encoded = {{ self.static_wire_type(member.ty) }},
                                     >,
                                 {% endfor %}
                             ) -> Result<
@@ -294,7 +294,7 @@ pub mod {{ module_name }} {
                             }
                         {% endif %}
 
-                        {{ self::doc_string(method.attributes) -}}
+                        {{ self.doc_string(method.attributes) -}}
                         {% if let Some(request) = method.maybe_request_payload %}
                             pub fn {{ method_name }}_with<___R>(
                                 &self,
@@ -306,7 +306,7 @@ pub mod {{ module_name }} {
                             where
                                 ___R: ::fidl_next::Encode<
                                     <___T as ::fidl_next::Transport>::SendBuffer,
-                                    Encoded = {{ context.static_wire_type(request) }},
+                                    Encoded = {{ self.static_wire_type(request) }},
                                 >,
                             {
                                 self.sender.send_two_way({{ method.ordinal }}, request)
@@ -343,16 +343,16 @@ pub mod {{ module_name }} {
                 {% let method_type_name = filters::camel(method.name)? %}
 
                 {% if method.kind == ProtocolMethodKind::Event %}
-                    {% if let Some(args) = context.get_method_args_struct(method) %}
+                    {% if let Some(args) = self.get_method_args_struct(method) %}
                         {% let is_static = args.shape.max_out_of_line == 0 %}
 
-                        {{ self::doc_string(method.attributes) -}}
+                        {{ self.doc_string(method.attributes) -}}
                         pub fn {{ method_name }}(
                             &self,
                             {% for member in args.members %}
                                 {{ member.name|snake }}: impl ::fidl_next::Encode<
                                     <___T as ::fidl_next::Transport>::SendBuffer,
-                                    Encoded = {{ context.static_wire_type(member.ty) }},
+                                    Encoded = {{ self.static_wire_type(member.ty) }},
                                 >,
                             {% endfor %}
                         ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -373,7 +373,7 @@ pub mod {{ module_name }} {
                         }
                     {% endif %}
 
-                    {{ self::doc_string(method.attributes) -}}
+                    {{ self.doc_string(method.attributes) -}}
                     {% if method.maybe_response_payload.is_some() %}
                         {% let method_type_name = filters::camel(method.name)? %}
                         pub fn {{ method_name }}_with<___R>(
@@ -410,7 +410,7 @@ pub trait {{ client_handler_name }}<___T: ::fidl_next::Transport> {
             {% let method_name = filters::snake(method.name)? %}
             {% let method_type_name = filters::camel(method.name)? %}
 
-            {{ self::doc_string(method.attributes) -}}
+            {{ self.doc_string(method.attributes) -}}
             fn {{ method_name }}(
                 &mut self,
                 sender: &::fidl_next::ClientSender<{{ protocol_name }}, ___T>,
@@ -493,7 +493,7 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::Transport> {
 
         {% match method.kind %}
             {% when ProtocolMethodKind::OneWay %}
-                {{ self::doc_string(method.attributes) -}}
+                {{ self.doc_string(method.attributes) -}}
                 fn {{ method_name }}(
                     &mut self,
                     sender: &::fidl_next::ServerSender<{{ protocol_name }}, ___T>,
@@ -502,7 +502,7 @@ pub trait {{ server_handler_name }}<___T: ::fidl_next::Transport> {
                     {% endif %}
                 ) -> impl ::core::future::Future<Output = ()> + ::core::marker::Send;
             {% when ProtocolMethodKind::TwoWay %}
-                {{ self::doc_string(method.attributes) -}}
+                {{ self.doc_string(method.attributes) -}}
                 fn {{ method_name }}(
                     &mut self,
                     sender: &::fidl_next::ServerSender<{{ protocol_name }}, ___T>,

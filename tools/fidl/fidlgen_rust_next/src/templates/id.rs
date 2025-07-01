@@ -4,30 +4,31 @@
 
 use core::fmt;
 
+use super::Context;
 use crate::id::IdExt;
-use crate::ir::{CompId, DeclType, Schema};
+use crate::ir::{CompId, DeclType};
 
 pub struct IdTemplate<'a> {
-    schema: &'a Schema,
+    context: &'a Context,
     id: &'a CompId,
     prefix: &'a str,
 }
 
 impl<'a> IdTemplate<'a> {
-    fn new(schema: &'a Schema, id: &'a CompId, prefix: &'a str) -> Self {
-        Self { schema, id, prefix }
+    fn new(id: &'a CompId, prefix: &'a str, context: &'a Context) -> Self {
+        Self { context, id, prefix }
     }
 
-    pub fn natural(schema: &'a Schema, id: &'a CompId) -> Self {
-        Self::new(schema, id, "")
+    pub fn natural(id: &'a CompId, context: &'a Context) -> Self {
+        Self::new(id, "", context)
     }
 
-    pub fn wire(schema: &'a Schema, id: &'a CompId) -> Self {
-        Self::new(schema, id, "Wire")
+    pub fn wire(id: &'a CompId, context: &'a Context) -> Self {
+        Self::new(id, "Wire", context)
     }
 
-    pub fn wire_optional(schema: &'a Schema, id: &'a CompId) -> Self {
-        Self::new(schema, id, "WireOptional")
+    pub fn wire_optional(id: &'a CompId, context: &'a Context) -> Self {
+        Self::new(id, "WireOptional", context)
     }
 }
 
@@ -41,7 +42,7 @@ impl fmt::Display for IdTemplate<'_> {
         }
 
         // Crate prefix
-        if lib == self.schema.name {
+        if lib == self.context.schema.name {
             write!(f, "crate::")?;
         } else if lib == "zx" {
             write!(f, "::fidl_next::fuchsia::zx::")?;
@@ -51,7 +52,7 @@ impl fmt::Display for IdTemplate<'_> {
         }
 
         // Type name
-        let base_name = match self.schema.get_decl_type(self.id).unwrap() {
+        let base_name = match self.context.schema.get_decl_type(self.id).unwrap() {
             DeclType::Alias
             | DeclType::Bits
             | DeclType::Enum

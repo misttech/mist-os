@@ -58,8 +58,6 @@ impl Context {
         Self { schema, config }
     }
 
-    // Items
-
     fn alias<'a>(&'a self, alias: &'a TypeAlias) -> AliasTemplate<'a> {
         AliasTemplate::new(alias, self)
     }
@@ -70,6 +68,10 @@ impl Context {
 
     fn cnst<'a>(&'a self, cnst: &'a Const) -> ConstTemplate<'a> {
         ConstTemplate::new(cnst, self)
+    }
+
+    fn compat(&self) -> CompatTemplate<'_> {
+        CompatTemplate { context: self }
     }
 
     fn enm<'a>(&'a self, enm: &'a Enum) -> EnumTemplate<'a> {
@@ -95,104 +97,82 @@ impl Context {
     fn union<'a>(&'a self, union: &'a Union) -> UnionTemplate<'a> {
         UnionTemplate::new(union, self)
     }
+}
+
+impl Contextual for Context {
+    fn context(&self) -> &Context {
+        self
+    }
+}
+
+pub trait Contextual {
+    fn context(&self) -> &Context;
 
     // Helpers
 
-    fn compat_crate_name(&self) -> String {
-        format!("fidl_{}", self.schema.name.replace('.', "_"))
+    fn doc_string<'a>(&self, attributes: &'a Attributes) -> DocStringTemplate<'a> {
+        DocStringTemplate { attributes }
+    }
+
+    fn emit_debug_impls(&self) -> bool {
+        self.context().config.emit_debug_impls
     }
 
     fn natural_id<'a>(&'a self, id: &'a CompId) -> IdTemplate<'a> {
-        IdTemplate::natural(&self.schema, id)
+        IdTemplate::natural(id, self.context())
     }
 
     fn wire_id<'a>(&'a self, id: &'a CompId) -> IdTemplate<'a> {
-        IdTemplate::wire(&self.schema, id)
+        IdTemplate::wire(id, self.context())
     }
 
     fn wire_optional_id<'a>(&'a self, id: &'a CompId) -> IdTemplate<'a> {
-        IdTemplate::wire_optional(&self.schema, id)
+        IdTemplate::wire_optional(id, self.context())
+    }
+
+    fn natural_int<'a>(&self, int: &'a IntType) -> NaturalIntTemplate<'a> {
+        NaturalIntTemplate(int)
+    }
+
+    fn natural_prim<'a>(&self, prim: &'a PrimSubtype) -> NaturalPrimTemplate<'a> {
+        NaturalPrimTemplate(prim)
     }
 
     fn natural_type<'a>(&'a self, ty: &'a Type) -> NaturalTypeTemplate<'a> {
-        NaturalTypeTemplate::new(&self.schema, &self.config, ty)
+        NaturalTypeTemplate::new(ty, self.context())
+    }
+
+    fn wire_int<'a>(&self, int: &'a IntType) -> WireIntTemplate<'a> {
+        WireIntTemplate(int)
+    }
+
+    fn wire_prim<'a>(&self, prim: &'a PrimSubtype) -> WirePrimTemplate<'a> {
+        WirePrimTemplate(prim)
     }
 
     fn wire_type<'a>(&'a self, ty: &'a Type) -> WireTypeTemplate<'a> {
-        WireTypeTemplate::with_de(&self.schema, &self.config, ty)
+        WireTypeTemplate::with_de(ty, self.context())
     }
 
     fn static_wire_type<'a>(&'a self, ty: &'a Type) -> WireTypeTemplate<'a> {
-        WireTypeTemplate::with_static(&self.schema, &self.config, ty)
+        WireTypeTemplate::with_static(ty, self.context())
     }
 
     fn anonymous_wire_type<'a>(&'a self, ty: &'a Type) -> WireTypeTemplate<'a> {
-        WireTypeTemplate::with_anonymous(&self.schema, &self.config, ty)
+        WireTypeTemplate::with_anonymous(ty, self.context())
     }
 
     fn constant<'a>(&'a self, constant: &'a Constant, ty: &'a Type) -> ConstantTemplate<'a> {
-        ConstantTemplate::new(constant, ty, self)
-    }
-
-    fn compat(&self) -> CompatTemplate<'_> {
-        CompatTemplate { context: self }
-    }
-
-    fn get_method_args_struct(&self, method: &ProtocolMethod) -> Option<&Struct> {
-        match method.kind {
-            ProtocolMethodKind::OneWay | ProtocolMethodKind::TwoWay => {
-                if let Some(args) = &method.maybe_request_payload {
-                    if let TypeKind::Identifier { identifier, .. } = &args.kind {
-                        return self
-                            .schema
-                            .struct_declarations
-                            .get(identifier)
-                            .or_else(|| self.schema.external_struct_declarations.get(identifier));
-                    }
-                }
-            }
-            ProtocolMethodKind::Event => {
-                if !method.has_error {
-                    if let Some(args) = &method.maybe_response_payload {
-                        if let TypeKind::Identifier { identifier, .. } = &args.kind {
-                            return self.schema.struct_declarations.get(identifier).or_else(|| {
-                                self.schema.external_struct_declarations.get(identifier)
-                            });
-                        }
-                    }
-                }
-            }
-        }
-        None
+        ConstantTemplate::new(constant, ty, self.context())
     }
 
     fn rust_next_denylist(&self, ident: &CompId) -> Denylist {
-        Denylist::rust_next(&self.schema, ident)
+        Denylist::rust_next(&self.context().schema, ident)
     }
 
     fn rust_or_rust_next_denylist(&self, ident: &CompId) -> Denylist {
-        Denylist::rust_or_rust_next(&self.schema, ident)
+        Denylist::rust_or_rust_next(&self.context().schema, ident)
     }
-}
-
-fn doc_string(attributes: &Attributes) -> DocStringTemplate<'_> {
-    DocStringTemplate { attributes }
-}
-
-fn natural_prim<'a>(prim: &'a PrimSubtype) -> NaturalPrimTemplate<'a> {
-    NaturalPrimTemplate(prim)
-}
-
-fn wire_prim<'a>(prim: &'a PrimSubtype) -> WirePrimTemplate<'a> {
-    WirePrimTemplate(prim)
-}
-
-fn natural_int<'a>(int: &'a IntType) -> NaturalIntTemplate<'a> {
-    NaturalIntTemplate(int)
-}
-
-fn wire_int<'a>(int: &'a IntType) -> WireIntTemplate<'a> {
-    WireIntTemplate(int)
 }
 
 #[derive(Template)]
@@ -201,8 +181,20 @@ struct CompatTemplate<'a> {
     context: &'a Context,
 }
 
+impl CompatTemplate<'_> {
+    fn compat_crate_name(&self) -> String {
+        format!("fidl_{}", self.context.schema.name.replace('.', "_"))
+    }
+}
+
+impl Contextual for CompatTemplate<'_> {
+    fn context(&self) -> &Context {
+        self.context
+    }
+}
+
 #[derive(Template)]
 #[template(path = "doc_string.askama")]
-struct DocStringTemplate<'a> {
+pub struct DocStringTemplate<'a> {
     attributes: &'a Attributes,
 }

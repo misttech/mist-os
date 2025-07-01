@@ -4,7 +4,7 @@
 
 use askama::Template;
 
-use super::{doc_string, filters, Context};
+use super::{filters, Context, Contextual};
 use crate::id::IdExt as _;
 use crate::ir::Service;
 
@@ -23,5 +23,11 @@ impl<'a> ServiceTemplate<'a> {
     fn service_name(&self) -> String {
         let (library, name) = self.service.name.split();
         format!("{}.{}", library, name.camel())
+    }
+}
+
+impl Contextual for ServiceTemplate<'_> {
+    fn context(&self) -> &Context {
+        self.context
     }
 }

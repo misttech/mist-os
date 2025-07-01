@@ -4,7 +4,7 @@
 
 use askama::Template;
 
-use super::Context;
+use super::{Context, Contextual};
 use crate::id::IdExt as _;
 use crate::ir::{Constant, ConstantKind, DeclType, LiteralKind, Type, TypeKind};
 
@@ -19,5 +19,11 @@ pub struct ConstantTemplate<'a> {
 impl<'a> ConstantTemplate<'a> {
     pub fn new(constant: &'a Constant, ty: &'a Type, context: &'a Context) -> Self {
         Self { constant, ty, context }
+    }
+}
+
+impl Contextual for ConstantTemplate<'_> {
+    fn context(&self) -> &Context {
+        self.context
     }
 }

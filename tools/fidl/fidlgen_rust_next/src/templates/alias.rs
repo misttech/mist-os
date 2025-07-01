@@ -4,7 +4,7 @@
 
 use askama::Template;
 
-use super::{doc_string, filters, Context};
+use super::{filters, Context, Contextual};
 use crate::ir::TypeAlias;
 
 #[derive(Template)]
@@ -17,5 +17,11 @@ pub struct AliasTemplate<'a> {
 impl<'a> AliasTemplate<'a> {
     pub fn new(alias: &'a TypeAlias, context: &'a Context) -> Self {
         Self { alias, context }
+    }
+}
+
+impl Contextual for AliasTemplate<'_> {
+    fn context(&self) -> &Context {
+        self.context
     }
 }

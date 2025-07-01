@@ -4,19 +4,17 @@
 
 use core::fmt;
 
-use super::{IdTemplate, NaturalPrimTemplate};
-use crate::config::Config;
-use crate::ir::{EndpointRole, InternalSubtype, Schema, Type, TypeKind};
+use super::{Context, IdTemplate, NaturalPrimTemplate};
+use crate::ir::{EndpointRole, InternalSubtype, Type, TypeKind};
 
 pub struct NaturalTypeTemplate<'a> {
-    schema: &'a Schema,
-    config: &'a Config,
+    context: &'a Context,
     ty: &'a Type,
 }
 
 impl<'a> NaturalTypeTemplate<'a> {
-    pub fn new(schema: &'a Schema, config: &'a Config, ty: &'a Type) -> Self {
-        Self { schema, config, ty }
+    pub fn new(ty: &'a Type, context: &'a Context) -> Self {
+        Self { context, ty }
     }
 }
 
@@ -24,11 +22,11 @@ impl fmt::Display for NaturalTypeTemplate<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.ty.kind {
             TypeKind::Array { element_type, element_count } => {
-                let natural_ty = Self::new(self.schema, self.config, element_type);
+                let natural_ty = Self::new(element_type, self.context);
                 write!(f, "[{natural_ty}; {element_count}]")?;
             }
             TypeKind::Vector { element_type, nullable, .. } => {
-                let natural_ty = Self::new(self.schema, self.config, element_type);
+                let natural_ty = Self::new(element_type, self.context);
                 if *nullable {
                     write!(f, "Option<Vec<{natural_ty}>>")?;
                 } else {
@@ -43,7 +41,7 @@ impl fmt::Display for NaturalTypeTemplate<'_> {
                 }
             }
             TypeKind::Handle { nullable, .. } => {
-                let handle_ty = &self.config.resource_bindings.handle.natural_path;
+                let handle_ty = &self.context.config.resource_bindings.handle.natural_path;
                 if *nullable {
                     write!(f, "Option<{handle_ty}>")?;
                 } else {
@@ -55,18 +53,18 @@ impl fmt::Display for NaturalTypeTemplate<'_> {
                     EndpointRole::Client => "::fidl_next::ClientEnd",
                     EndpointRole::Server => "::fidl_next::ServerEnd",
                 };
-                let natural_id = IdTemplate::natural(self.schema, protocol);
+                let natural_id = IdTemplate::natural(protocol, self.context);
                 if *nullable {
                     write!(
                         f,
                         "{role}<{natural_id}, Option<{}>>",
-                        self.config.resource_bindings.channel.natural_path
+                        self.context.config.resource_bindings.channel.natural_path
                     )?;
                 } else {
                     write!(
                         f,
                         "{role}<{natural_id}, {}>",
-                        self.config.resource_bindings.channel.natural_path
+                        self.context.config.resource_bindings.channel.natural_path
                     )?;
                 }
             }
@@ -74,7 +72,7 @@ impl fmt::Display for NaturalTypeTemplate<'_> {
                 write!(f, "{}", NaturalPrimTemplate(subtype))?;
             }
             TypeKind::Identifier { identifier, nullable, .. } => {
-                let natural_id = IdTemplate::natural(self.schema, identifier);
+                let natural_id = IdTemplate::natural(identifier, self.context);
                 if *nullable {
                     write!(f, "Option<Box<{natural_id}>>")?;
                 } else {

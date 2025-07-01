@@ -6,7 +6,7 @@
 
 {% if strct.is_empty_success_struct %}
 
-{{ self::doc_string(strct.attributes) -}}
+{{ self.doc_string(strct.attributes) -}}
 pub type {{ name }} = ();
 
 /// The wire type corresponding to [`{{ name }}`].
@@ -27,12 +27,12 @@ pub type {{ wire_name }} = ();
     {% let static_ = "<'static>" %}
 {% endif %}
 
-{{ self::doc_string(strct.attributes) -}}
+{{ self.doc_string(strct.attributes) -}}
 #[derive(
     {% if !strct.is_resource %}
         Clone,
     {% endif %}
-    {% if context.config.emit_debug_impls %}
+    {% if self.emit_debug_impls() %}
         Debug,
     {% endif %}
 )]
@@ -41,7 +41,7 @@ pub type {{ wire_name }} = ();
 {% endif -%}
 pub struct {{ name }} {
     {% for member in strct.members %}
-        pub {{ member.name|snake }}: {{ context.natural_type(member.ty) }},
+        pub {{ member.name|snake }}: {{ self.natural_type(member.ty) }},
     {% endfor %}
 }
 
@@ -52,7 +52,7 @@ impl ::fidl_next::Encodable for {{ name }} {
             true
             {% for member in strct.members %}
                 && <
-                    {{ context.natural_type(member.ty) }} as ::fidl_next::Encodable
+                    {{ self.natural_type(member.ty) }} as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
             {% endfor %}
         )
@@ -182,7 +182,7 @@ impl{{ de }} ::fidl_next::FromWire<{{ wire_name }}{{ de }}> for {{ name }} {
             true
             {% for member in strct.members %}
                 && <
-                    {{ context.natural_type(member.ty) }} as ::fidl_next::FromWire<{{ context.wire_type(member.ty) }}>
+                    {{ self.natural_type(member.ty) }} as ::fidl_next::FromWire<{{ self.wire_type(member.ty) }}>
                 >::COPY_OPTIMIZATION.is_enabled()
             {% endfor %}
         )
@@ -219,14 +219,14 @@ impl{{ de }} ::fidl_next::FromWireRef<{{ wire_name }}{{ de }}> for {{ name }} {
     {% if is_static && !strct.is_resource %}
         Clone,
     {% endif %}
-    {% if context.config.emit_debug_impls %}
+    {% if self.emit_debug_impls() %}
         Debug,
     {% endif %}
 )]
 #[repr(C)]
 pub struct {{ wire_name }}{{ de }} {
     {% for member in strct.members %}
-        pub {{ member.name|snake }}: {{ context.wire_type(member.ty) }},
+        pub {{ member.name|snake }}: {{ self.wire_type(member.ty) }},
     {% endfor %}
 }
 

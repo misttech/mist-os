@@ -4,7 +4,7 @@
 
 use askama::Template;
 
-use super::{doc_string, filters, natural_prim, Context};
+use super::{filters, Context, Contextual};
 use crate::ir::{Const, TypeKind};
 
 #[derive(Template)]
@@ -17,5 +17,11 @@ pub struct ConstTemplate<'a> {
 impl<'a> ConstTemplate<'a> {
     pub fn new(cnst: &'a Const, context: &'a Context) -> Self {
         Self { cnst, context }
+    }
+}
+
+impl Contextual for ConstTemplate<'_> {
+    fn context(&self) -> &Context {
+        self.context
     }
 }

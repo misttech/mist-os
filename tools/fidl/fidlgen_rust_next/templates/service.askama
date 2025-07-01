@@ -4,8 +4,8 @@
 {% let instance_trait_name = format!("{base_name}Instance") %}
 
 /// The type corresponding to the {{ non_canonical_name }} service.
-{{ self::doc_string(service.attributes) -}}
-{% if context.config.emit_debug_impls -%}
+{{ self.doc_string(service.attributes) -}}
+{% if self.emit_debug_impls() -%}
     #[derive(Debug)]
 {%- endif %}
 pub struct {{ service_name }};
@@ -31,7 +31,7 @@ pub trait {{ instance_trait_name }} {
         /// Attempts to connect the given server end to the `{{ member.name.non_canonical() }}` member.
         fn connect_to_{{ member.name|snake }}(
             &self,
-            server_end: ::fidl_next::ServerEnd<{{ context.natural_type(member.ty) }}, Self::Transport>,
+            server_end: ::fidl_next::ServerEnd<{{ self.natural_type(member.ty) }}, Self::Transport>,
         ) -> Result<(), Self::Error>;
     {% endfor %}
 }
@@ -46,7 +46,7 @@ where
     {% for member in service.members %}
         fn connect_to_{{ member.name|snake }}(
             &self,
-            server_end: ::fidl_next::ServerEnd<{{ context.natural_type(member.ty) }}, Self::Transport>,
+            server_end: ::fidl_next::ServerEnd<{{ self.natural_type(member.ty) }}, Self::Transport>,
         ) -> Result<(), Self::Error> {
             self.as_untyped().connect_to("{{ member.name.snake() }}", server_end.into_untyped())
         }

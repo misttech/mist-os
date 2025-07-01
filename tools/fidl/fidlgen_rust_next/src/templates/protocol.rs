@@ -6,9 +6,12 @@ use std::collections::BTreeSet;
 
 use askama::Template;
 
-use super::{doc_string, filters, Context};
+use super::{filters, Context, Contextual};
 use crate::id::IdExt as _;
-use crate::ir::{CompIdent, Protocol, ProtocolMethodKind, ProtocolOpenness, Type, TypeKind};
+use crate::ir::{
+    CompIdent, Protocol, ProtocolMethod, ProtocolMethodKind, ProtocolOpenness, Struct, Type,
+    TypeKind,
+};
 
 #[derive(Template)]
 #[template(path = "protocol.askama", whitespace = "preserve")]
@@ -20,6 +23,37 @@ pub struct ProtocolTemplate<'a> {
 impl<'a> ProtocolTemplate<'a> {
     pub fn new(protocol: &'a Protocol, context: &'a Context) -> Self {
         Self { protocol, context }
+    }
+
+    fn get_method_args_struct(&self, method: &ProtocolMethod) -> Option<&Struct> {
+        match method.kind {
+            ProtocolMethodKind::OneWay | ProtocolMethodKind::TwoWay => {
+                if let Some(args) = &method.maybe_request_payload {
+                    if let TypeKind::Identifier { identifier, .. } = &args.kind {
+                        return self.context.schema.struct_declarations.get(identifier).or_else(
+                            || self.context.schema.external_struct_declarations.get(identifier),
+                        );
+                    }
+                }
+            }
+            ProtocolMethodKind::Event => {
+                if !method.has_error {
+                    if let Some(args) = &method.maybe_response_payload {
+                        if let TypeKind::Identifier { identifier, .. } = &args.kind {
+                            return self
+                                .context
+                                .schema
+                                .struct_declarations
+                                .get(identifier)
+                                .or_else(|| {
+                                    self.context.schema.external_struct_declarations.get(identifier)
+                                });
+                        }
+                    }
+                }
+            }
+        }
+        None
     }
 
     fn discoverable_name(&self) -> Option<String> {
@@ -65,5 +99,11 @@ impl<'a> ProtocolTemplate<'a> {
         }
 
         result
+    }
+}
+
+impl Contextual for ProtocolTemplate<'_> {
+    fn context(&self) -> &Context {
+        self.context
     }
 }

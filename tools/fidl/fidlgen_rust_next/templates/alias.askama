@@ -1,9 +1,9 @@
 {% let name = filters::camel(alias.name.decl_name())? %}
 {% let is_static = alias.ty.shape.max_out_of_line == 0 %}
-{% let natural_ty = context.natural_type(alias.ty) %}
-{% let wire_ty = context.wire_type(alias.ty) %}
+{% let natural_ty = self.natural_type(alias.ty) %}
+{% let wire_ty = self.wire_type(alias.ty) %}
 
-{{ self::doc_string(alias.attributes) -}}
+{{ self.doc_string(alias.attributes) -}}
 pub type {{ name }} = {{ natural_ty }};
 
 /// The wire type corresponding to [`{{ name }}`].

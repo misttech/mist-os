@@ -1,4 +1,4 @@
-{% let compat_crate_name = context.compat_crate_name() %}
+{% let compat_crate_name = self.compat_crate_name() %}
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
@@ -6,7 +6,7 @@ pub mod compat {
         {% let name = filters::camel(ident.decl_name())? %}
         {% let compat_name = filters::compat_camel(ident.decl_name())? %}
 
-        {% let restriction = context.rust_or_rust_next_denylist(ident) %}
+        {% let restriction = self.rust_or_rust_next_denylist(ident) %}
         {% if !matches!(restriction, Denylist::Denied) %}
             {% match context.schema.declarations[ident] %}
                 {% when DeclType::Bits %}

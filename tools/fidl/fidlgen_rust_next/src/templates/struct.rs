@@ -4,7 +4,7 @@
 
 use askama::Template;
 
-use super::{doc_string, filters, Context};
+use super::{filters, Context, Contextual};
 use crate::id::IdExt as _;
 use crate::ir::{Struct, TypeKind};
 
@@ -18,6 +18,12 @@ pub struct StructTemplate<'a> {
 impl<'a> StructTemplate<'a> {
     pub fn new(strct: &'a Struct, context: &'a Context) -> Self {
         Self { strct, context }
+    }
+}
+
+impl Contextual for StructTemplate<'_> {
+    fn context(&self) -> &Context {
+        self.context
     }
 }
 
