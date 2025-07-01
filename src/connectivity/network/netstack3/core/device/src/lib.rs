@@ -87,8 +87,8 @@ pub mod socket {
         DeviceSocketBindingsContext, DeviceSocketContext, DeviceSocketCounters, DeviceSocketId,
         DeviceSocketMetadata, DeviceSocketTypes, DeviceSockets, EthernetFrame,
         EthernetHeaderParams, Frame, HeldDeviceSockets, HeldSockets, IpFrame, ParseSentFrameError,
-        PrimaryDeviceSocketId, Protocol, ReceivedFrame, SentFrame, SocketId, SocketInfo,
-        SocketState, SocketStateAccessor, Target, TargetDevice, WeakDeviceSocketId,
+        PrimaryDeviceSocketId, Protocol, ReceiveFrameError, ReceivedFrame, SentFrame, SocketId,
+        SocketInfo, SocketState, SocketStateAccessor, Target, TargetDevice, WeakDeviceSocketId,
     };
 }
 

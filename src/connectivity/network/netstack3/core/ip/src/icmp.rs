@@ -162,6 +162,9 @@ pub struct IcmpRxCountersInner {
     pub parameter_problem: Counter,
     /// Count of packet too big messages received.
     pub packet_too_big: Counter,
+    /// Count of ICMP Echo datagrams that could not be delivered to the socket
+    /// because its receive buffer was full.
+    pub queue_full: Counter,
 }
 
 /// Receive NDP counters.

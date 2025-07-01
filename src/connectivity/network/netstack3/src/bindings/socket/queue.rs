@@ -53,7 +53,7 @@ impl<M, L: QueueReadableListener> MessageQueue<M, L> {
         message
     }
 
-    pub(crate) fn receive(&mut self, message: M)
+    pub(crate) fn receive(&mut self, message: M) -> Result<(), NoSpace>
     where
         M: BodyLen,
     {
@@ -62,7 +62,8 @@ impl<M, L: QueueReadableListener> MessageQueue<M, L> {
         let queue_was_empty = queue.is_empty();
         match queue.push(message) {
             Err(NoSpace) => {
-                trace!("dropping {}-byte packet because the receive queue is full", body_len)
+                trace!("dropping {}-byte packet because the receive queue is full", body_len);
+                Err(NoSpace)
             }
             Ok(()) => {
                 // NB: If the queue is non-empty, it would be redundant to
@@ -72,6 +73,7 @@ impl<M, L: QueueReadableListener> MessageQueue<M, L> {
                 if queue_was_empty {
                     listener.on_readable_changed(true);
                 }
+                Ok(())
             }
         }
     }

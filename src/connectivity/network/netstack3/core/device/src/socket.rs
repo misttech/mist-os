@@ -65,6 +65,12 @@ pub trait DeviceSocketTypes {
     type SocketState<D: Send + Sync + Debug>: Send + Sync + Debug;
 }
 
+/// Errors that Bindings may encounter when receiving frames on a Device Socket.
+pub enum ReceiveFrameError {
+    /// The socket's receive queue is full and can't hold the frame.
+    QueueFull,
+}
+
 /// The execution context for device sockets provided by bindings.
 pub trait DeviceSocketBindingsContext<DeviceId: StrongDeviceIdentifier>: DeviceSocketTypes {
     /// Called for each received frame that matches the provided socket.
@@ -76,7 +82,7 @@ pub trait DeviceSocketBindingsContext<DeviceId: StrongDeviceIdentifier>: DeviceS
         device: &DeviceId,
         frame: Frame<&[u8]>,
         raw_frame: &[u8],
-    );
+    ) -> Result<(), ReceiveFrameError>;
 }
 
 /// Strong owner of socket state.
@@ -869,21 +875,32 @@ where
                                     Protocol::All => true,
                                 },
                             };
-                            if should_deliver {
+                            should_deliver.then(|| {
                                 bindings_ctx.receive_frame(
                                     external_state,
                                     &device,
                                     frame,
                                     whole_frame,
                                 )
-                            }
-                            should_deliver
+                            })
                         },
                     );
-                    if delivered {
-                        core_ctx.increment_both(socket, |counters: &DeviceSocketCounters| {
-                            &counters.rx_frames
-                        });
+                    match delivered {
+                        None => {}
+                        Some(result) => {
+                            core_ctx.increment_both(socket, |counters: &DeviceSocketCounters| {
+                                &counters.rx_frames
+                            });
+                            match result {
+                                Ok(()) => {}
+                                Err(ReceiveFrameError::QueueFull) => {
+                                    core_ctx.increment_both(
+                                        socket,
+                                        |counters: &DeviceSocketCounters| &counters.rx_queue_full,
+                                    );
+                                }
+                            }
+                        }
                     }
                 }
             })
@@ -902,6 +919,9 @@ pub struct DeviceSocketCounters {
     /// Thus this counter, when tracking the stack-wide aggregate, may exceed
     /// the total number of frames received by the stack.
     rx_frames: Counter,
+    /// Count of incoming frames that could not be delivered to a socket because
+    /// its receive buffer was full.
+    rx_queue_full: Counter,
     /// Count of outgoing frames that were sent by the socket.
     tx_frames: Counter,
     /// Count of failed tx frames due to [`SendFrameErrorReason::QueueFull`].
@@ -914,10 +934,17 @@ pub struct DeviceSocketCounters {
 
 impl Inspectable for DeviceSocketCounters {
     fn record<I: Inspector>(&self, inspector: &mut I) {
-        let Self { rx_frames, tx_frames, tx_err_queue_full, tx_err_alloc, tx_err_size_constraint } =
-            self;
+        let Self {
+            rx_frames,
+            rx_queue_full,
+            tx_frames,
+            tx_err_queue_full,
+            tx_err_alloc,
+            tx_err_size_constraint,
+        } = self;
         inspector.record_child("Rx", |inspector| {
             inspector.record_counter("DeliveredFrames", rx_frames);
+            inspector.record_counter("DroppedQueueFull", rx_queue_full);
         });
         inspector.record_child("Tx", |inspector| {
             inspector.record_counter("SentFrames", tx_frames);
@@ -950,6 +977,7 @@ impl<D: Send + Sync + Debug, BT: DeviceSocketTypes> OrderedLockAccess<AllSockets
 mod testutil {
     use alloc::vec::Vec;
     use core::num::NonZeroU64;
+    use core::ops::DerefMut;
     use netstack3_base::testutil::{FakeBindingsCtx, MonotonicIdentifier};
     use netstack3_base::StrongDeviceIdentifier;
 
@@ -957,6 +985,14 @@ mod testutil {
     use crate::internal::base::{
         DeviceClassMatcher, DeviceIdAndNameMatcher, DeviceLayerStateTypes,
     };
+
+    #[derive(Derivative, Debug)]
+    #[derivative(Default(bound = ""))]
+    pub struct RxQueue<D> {
+        pub frames: Vec<ReceivedFrame<D>>,
+        #[derivative(Default(value = "usize::MAX"))]
+        pub max_size: usize,
+    }
 
     #[derive(Clone, Debug, PartialEq)]
     pub struct ReceivedFrame<D> {
@@ -967,7 +1003,7 @@ mod testutil {
 
     #[derive(Debug, Derivative)]
     #[derivative(Default(bound = ""))]
-    pub struct ExternalSocketState<D>(pub Mutex<Vec<ReceivedFrame<D>>>);
+    pub struct ExternalSocketState<D>(pub Mutex<RxQueue<D>>);
 
     impl<TimerId, Event: Debug, State> DeviceSocketTypes
         for FakeBindingsCtx<TimerId, Event, State, ()>
@@ -1018,13 +1054,20 @@ mod testutil {
             device: &D,
             frame: Frame<&[u8]>,
             raw_frame: &[u8],
-        ) {
+        ) -> Result<(), ReceiveFrameError> {
             let ExternalSocketState(queue) = state;
-            queue.lock().push(ReceivedFrame {
-                device: device.downgrade(),
-                frame: frame.cloned(),
-                raw: raw_frame.into(),
-            })
+            let mut lock_guard = queue.lock();
+            let RxQueue { frames, max_size } = lock_guard.deref_mut();
+            if frames.len() < *max_size {
+                frames.push(ReceivedFrame {
+                    device: device.downgrade(),
+                    frame: frame.cloned(),
+                    raw: raw_frame.into(),
+                });
+                Ok(())
+            } else {
+                Err(ReceiveFrameError::QueueFull)
+            }
         }
     }
 
@@ -1063,6 +1106,7 @@ mod tests {
     use alloc::vec;
     use alloc::vec::Vec;
     use core::marker::PhantomData;
+    use core::ops::Deref;
 
     use crate::internal::socket::testutil::{ExternalSocketState, ReceivedFrame};
     use netstack3_base::testutil::{
@@ -1650,7 +1694,8 @@ mod tests {
             .filter_map(|(id, _primary)| {
                 let DeviceSocketId(rc) = &id;
                 let ExternalSocketState(frames) = &rc.external_state;
-                let frames = frames.lock();
+                let lock_guard = frames.lock();
+                let testutil::RxQueue { frames, .. } = lock_guard.deref();
                 (!frames.is_empty()).then(|| {
                     assert_eq!(
                         &*frames,
@@ -1856,7 +1901,7 @@ mod tests {
         let SocketState { external_state: ExternalSocketState(received), counters, target: _ } =
             PrimaryRc::unwrap(primary);
         assert_eq!(
-            received.into_inner(),
+            received.into_inner().frames,
             vec![
                 ReceivedFrame {
                     device: FakeWeakDeviceId(MultipleDevicesId::A),
@@ -1875,6 +1920,53 @@ mod tests {
             ]
         );
         assert_eq!(counters.rx_frames.get(), u64::try_from(RECEIVE_COUNT).unwrap());
+    }
+
+    #[test]
+    fn deliver_frame_queue_full() {
+        let mut ctx = FakeCtx::with_core_ctx(FakeCoreCtx::with_state(FakeSockets::new(
+            MultipleDevicesId::all(),
+        )));
+
+        // Simulate a full RX queue for sock1.
+        let sock1 = make_bound(
+            &mut ctx,
+            TargetDevice::AnyDevice,
+            Some(Protocol::All),
+            ExternalSocketState(Mutex::new(testutil::RxQueue { frames: vec![], max_size: 0 })),
+        );
+        let sock2 = make_bound(
+            &mut ctx,
+            TargetDevice::AnyDevice,
+            Some(Protocol::All),
+            ExternalSocketState::default(),
+        );
+
+        let FakeCtx { mut core_ctx, mut bindings_ctx } = ctx;
+
+        DeviceSocketHandler::handle_frame(
+            &mut core_ctx,
+            &mut bindings_ctx,
+            &MultipleDevicesId::A,
+            super::ReceivedFrame::from_ethernet(
+                TestData::frame(),
+                FrameDestination::Individual { local: true },
+            )
+            .into(),
+            TestData::BUFFER,
+        );
+
+        assert_eq!(core_ctx.state.counters.rx_frames.get(), 2);
+        assert_eq!(core_ctx.state.counters.rx_queue_full.get(), 1);
+        assert_eq!(sock1.counters().rx_frames.get(), 1);
+        assert_eq!(sock1.counters().rx_queue_full.get(), 1);
+        assert_eq!(sock2.counters().rx_frames.get(), 1);
+        assert_eq!(sock2.counters().rx_queue_full.get(), 0);
+
+        // Drop our strong references to the sockets so that `core_ctx` can tear
+        // down successfully.
+        drop(sock1);
+        drop(sock2);
     }
 
     pub struct FakeSendMetadata;

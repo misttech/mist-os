@@ -225,7 +225,8 @@ pub mod raw {
     pub use crate::internal::raw::{
         RawIpSocketApi, RawIpSocketIcmpFilterError, RawIpSocketId, RawIpSocketMap,
         RawIpSocketMapContext, RawIpSocketSendToError, RawIpSocketStateContext,
-        RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes, WeakRawIpSocketId,
+        RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes, ReceivePacketError,
+        WeakRawIpSocketId,
     };
 }
 

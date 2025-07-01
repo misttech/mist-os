@@ -87,6 +87,7 @@ pub use crate::bindings::interface_config::InterfaceConfigDefaults;
 use crate::bindings::interface_config::InterfaceConfigType;
 use crate::bindings::interfaces_watcher::AddressPropertiesUpdate;
 use crate::bindings::settings::Settings;
+use crate::bindings::socket::queue::NoSpace;
 use crate::bindings::time::{AtomicStackTime, StackTime};
 use crate::bindings::util::ScopeExt as _;
 use net_types::ethernet::Mac;
@@ -102,7 +103,9 @@ use netstack3_core::device::{
 };
 use netstack3_core::error::ExistsError;
 use netstack3_core::filter::{FilterBindingsTypes, SocketOpsFilter, SocketOpsFilterBindingContext};
-use netstack3_core::icmp::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
+use netstack3_core::icmp::{
+    IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId, ReceiveIcmpEchoError,
+};
 use netstack3_core::inspect::{InspectableValue, Inspector};
 use netstack3_core::ip::{
     AddIpAddrSubnetError, AddressRemovedReason, IpDeviceEvent, IpLayerEvent,
@@ -112,7 +115,7 @@ use netstack3_core::ip::{
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::RwLock as CoreRwLock;
 use netstack3_core::udp::{
-    UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId,
+    ReceiveUdpError, UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId,
 };
 use netstack3_core::{
     neighbor, CoreTxMetadata, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
@@ -662,7 +665,7 @@ impl<I: IpExt> IcmpEchoBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx
         dst_ip: I::Addr,
         id: u16,
         data: B,
-    ) {
+    ) -> Result<(), ReceiveIcmpEchoError> {
         conn.external_data().receive_icmp_echo_reply(device, src_ip, dst_ip, id, data)
     }
 }
@@ -679,8 +682,10 @@ impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<BindingsCtx>> for BindingsC
         device_id: &DeviceId<BindingsCtx>,
         meta: UdpPacketMeta<I>,
         body: &[u8],
-    ) {
-        id.external_data().receive_udp(device_id, meta, body)
+    ) -> Result<(), ReceiveUdpError> {
+        id.external_data()
+            .receive_udp(device_id, meta, body)
+            .map_err(|NoSpace {}| ReceiveUdpError::QueueFull)
     }
 }
 

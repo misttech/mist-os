@@ -711,6 +711,9 @@ async fn inspect_datagram_sockets<I: TestIpExt>(
                         Counters: {
                             Rx: {
                                 "Delivered": 0u64,
+                                Errors: {
+                                    "DroppedQueueFull": 0u64,
+                                }
                             },
                             Tx: {
                                 "Sent": 0u64,
@@ -836,6 +839,7 @@ async fn inspect_raw_ip_sockets<I: TestIpExt>(name: &str) {
                 Counters: {
                     Rx: {
                         DeliveredPackets: 0u64,
+                        DroppedQueueFull: 0u64,
                         ChecksumErrors: 0u64,
                         IcmpPacketsFiltered: 0u64,
                     },
@@ -875,6 +879,7 @@ async fn inspect_device_sockets(name: &str) {
                 Counters: {
                     Rx: {
                         DeliveredFrames: 0u64,
+                        DroppedQueueFull: 0u64,
                     },
                     Tx: {
                         SentFrames: 0u64,
@@ -1873,6 +1878,7 @@ async fn inspect_counters(name: &str) {
                         Error: 0u64,
                         ErrorDeliveredToTransportLayer: 0u64,
                         ErrorDeliveredToSocket: 0u64,
+                        DroppedQueueFull: 0u64,
                     },
                     "Tx": {
                         Reply: 0u64,
@@ -1899,6 +1905,7 @@ async fn inspect_counters(name: &str) {
                         Error: 0u64,
                         ErrorDeliveredToTransportLayer: 0u64,
                         ErrorDeliveredToSocket: 0u64,
+                        DroppedQueueFull: 0u64,
                         "NDP": {
                             NeighborSolicitation: 0u64,
                             NeighborAdvertisement: 0u64,
@@ -2111,6 +2118,7 @@ async fn inspect_counters(name: &str) {
                         DeliveredPackets: 0u64,
                         ChecksumErrors: 0u64,
                         IcmpPacketsFiltered: 0u64,
+                        DroppedQueueFull: 0u64,
                     },
                     "Tx": {
                         SentPackets: 0u64,
@@ -2122,6 +2130,7 @@ async fn inspect_counters(name: &str) {
                         DeliveredPackets: 0u64,
                         ChecksumErrors: 0u64,
                         IcmpPacketsFiltered: 0u64,
+                        DroppedQueueFull: 0u64,
                     },
                     "Tx": {
                         SentPackets: 0u64,
@@ -2132,6 +2141,7 @@ async fn inspect_counters(name: &str) {
             "DeviceSockets": {
                 "Rx": {
                     DeliveredFrames: 0u64,
+                    DroppedQueueFull: 0u64,
                 },
                 "Tx": {
                     SentFrames: 0u64,
@@ -2149,6 +2159,7 @@ async fn inspect_counters(name: &str) {
                             MappedAddr: 0u64,
                             UnknownDstPort: 0u64,
                             Malformed: 0u64,
+                            DroppedQueueFull: 0u64,
                         },
                     },
                     "Tx": {
@@ -2165,6 +2176,7 @@ async fn inspect_counters(name: &str) {
                             MappedAddr: 0u64,
                             UnknownDstPort: 0u64,
                             Malformed: 0u64,
+                            DroppedQueueFull: 0u64,
                         },
                     },
                     "Tx": {

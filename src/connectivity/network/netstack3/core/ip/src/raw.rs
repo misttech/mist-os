@@ -52,6 +52,12 @@ pub trait RawIpSocketsBindingsTypes: TxMetadataBindingsTypes {
     type RawIpSocketState<I: Ip>: Send + Sync + Debug;
 }
 
+/// Errors that Bindings may encounter when receiving a packet.
+pub enum ReceivePacketError {
+    /// The socket's receive queue is full and can't hold the packet.
+    QueueFull,
+}
+
 /// Functionality provided by bindings used in the raw IP socket implementation.
 pub trait RawIpSocketsBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
     RawIpSocketsBindingsTypes + Sized
@@ -62,7 +68,7 @@ pub trait RawIpSocketsBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
         socket: &RawIpSocketId<I, D::Weak, Self>,
         packet: &I::Packet<B>,
         device: &D,
-    );
+    ) -> Result<(), ReceivePacketError>;
 }
 
 /// The raw IP socket API.
@@ -721,7 +727,15 @@ where
                         core_ctx.increment_both(&socket, |counters: &RawIpSocketCounters<I>| {
                             &counters.rx_packets
                         });
-                        bindings_ctx.receive_packet(socket, packet, device);
+                        match bindings_ctx.receive_packet(socket, packet, device) {
+                            Ok(()) => {}
+                            Err(ReceivePacketError::QueueFull) => {
+                                core_ctx.increment_both(
+                                    &socket,
+                                    |counters: &RawIpSocketCounters<I>| &counters.rx_queue_full,
+                                );
+                            }
+                        }
                     }
                     DeliveryOutcome::WrongChecksum => {
                         core_ctx.increment_both(&socket, |counters: &RawIpSocketCounters<I>| {
@@ -865,6 +879,7 @@ mod test {
     use core::cell::RefCell;
     use core::convert::Infallible as Never;
     use core::marker::PhantomData;
+    use core::ops::DerefMut;
     use ip_test_macro::ip_test;
     use net_types::ip::{IpVersion, Ipv4, Ipv6};
     use netstack3_base::sync::{DynDebugReferences, Mutex};
@@ -890,7 +905,15 @@ mod test {
     #[derivative(Default(bound = ""))]
     struct FakeExternalSocketState<D> {
         /// The collection of IP packets received on this socket.
-        received_packets: Mutex<Vec<ReceivedIpPacket<D>>>,
+        received_packets: Mutex<RxQueue<D>>,
+    }
+
+    #[derive(Derivative, Debug)]
+    #[derivative(Default(bound = ""))]
+    struct RxQueue<D> {
+        packets: Vec<ReceivedIpPacket<D>>,
+        #[derivative(Default(value = "usize::MAX"))]
+        max_size: usize,
     }
 
     #[derive(Debug, PartialEq)]
@@ -948,10 +971,17 @@ mod test {
             socket: &RawIpSocketId<I, D::Weak, Self>,
             packet: &I::Packet<B>,
             device: &D,
-        ) {
+        ) -> Result<(), ReceivePacketError> {
             let packet = ReceivedIpPacket { data: packet.to_vec(), device: *device };
             let FakeExternalSocketState { received_packets } = socket.external_state();
-            received_packets.lock().push(packet);
+            let mut lock_guard = received_packets.lock();
+            let RxQueue { packets, max_size } = lock_guard.deref_mut();
+            if packets.len() < *max_size {
+                packets.push(packet);
+                Ok(())
+            } else {
+                Err(ReceivePacketError::QueueFull)
+            }
         }
     }
 
@@ -1239,11 +1269,11 @@ mod test {
         for packets in [sock1_packets, sock2_packets] {
             let lock_guard = packets.lock();
             let ReceivedIpPacket { data, device } =
-                assert_matches!(&lock_guard[..], [packet] => packet);
+                assert_matches!(&lock_guard.packets[..], [packet] => packet);
             assert_eq!(&data[..], buf.as_ref());
             assert_eq!(*device, DEVICE);
         }
-        assert_matches!(&wrong_sock_packets.lock()[..], []);
+        assert_matches!(&wrong_sock_packets.lock().packets[..], []);
     }
 
     // Verify that sockets created with `RawIpSocketProtocol::Raw` cannot
@@ -1272,7 +1302,7 @@ mod test {
         }
 
         let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
-        assert_matches!(&received_packets.lock()[..], []);
+        assert_matches!(&received_packets.lock().packets[..], []);
     }
 
     #[ip_test(I)]
@@ -1304,11 +1334,11 @@ mod test {
         if should_deliver {
             let lock_guard = received_packets.lock();
             let ReceivedIpPacket { data, device } =
-                assert_matches!(&lock_guard[..], [packet] => packet);
+                assert_matches!(&lock_guard.packets[..], [packet] => packet);
             assert_eq!(&data[..], buf.as_ref());
             assert_eq!(*device, send_dev);
         } else {
-            assert_matches!(&received_packets.lock()[..], []);
+            assert_matches!(&received_packets.lock().packets[..], []);
         }
     }
 
@@ -1349,10 +1379,10 @@ mod test {
         if should_deliver {
             let lock_guard = received_packets.lock();
             let ReceivedIpPacket { data, device: _ } =
-                assert_matches!(&lock_guard[..], [packet] => packet);
+                assert_matches!(&lock_guard.packets[..], [packet] => packet);
             assert_eq!(&data[..], buf.as_ref());
         } else {
-            assert_matches!(&received_packets.lock()[..], []);
+            assert_matches!(&received_packets.lock().packets[..], []);
         }
     }
 
@@ -1396,7 +1426,40 @@ mod test {
         // Verify the packet wasn't received.
         assert_counters(api.core_ctx(), 1);
         let FakeExternalSocketState { received_packets } = api.close(sock).into_removed();
-        assert_matches!(&received_packets.lock()[..], []);
+        assert_matches!(&received_packets.lock().packets[..], []);
+    }
+
+    #[ip_test(I)]
+    fn receive_ip_packet_queue_full<I: IpExt + DualStackIpExt + TestIpExt + FilterIpExt>() {
+        let mut api = new_raw_ip_socket_api::<I>();
+
+        let proto: I::Proto = IpProto::Udp.into();
+        // Simulate a full RX queue for sock1.
+        let sock1 = api.create(
+            RawIpSocketProtocol::new(proto),
+            FakeExternalSocketState {
+                received_packets: Mutex::new(RxQueue { packets: vec![], max_size: 0 }),
+            },
+        );
+        let sock2 = api.create(RawIpSocketProtocol::new(proto), Default::default());
+
+        // Receive an IP packet with protocol `proto`.
+        const DEVICE: MultipleDevicesId = MultipleDevicesId::A;
+        let buf = new_ip_packet_buf::<I>(&IP_BODY, proto);
+        let mut buf_ref = buf.as_ref();
+        let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
+        {
+            let (core_ctx, bindings_ctx) = api.ctx.contexts();
+            core_ctx.deliver_packet_to_raw_ip_sockets(bindings_ctx, &packet, &DEVICE);
+        }
+
+        // Verify the counters were updated.
+        assert_eq!(api.core_ctx().state.counters.rx_packets.get(), 2);
+        assert_eq!(api.core_ctx().state.counters.rx_queue_full.get(), 1);
+        assert_eq!(sock1.state().counters().rx_packets.get(), 1);
+        assert_eq!(sock1.state().counters().rx_queue_full.get(), 1);
+        assert_eq!(sock2.state().counters().rx_packets.get(), 1);
+        assert_eq!(sock2.state().counters().rx_queue_full.get(), 0);
     }
 
     #[ip_test(I)]

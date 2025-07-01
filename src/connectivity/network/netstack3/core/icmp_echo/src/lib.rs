@@ -27,6 +27,7 @@ pub use internal::socket::{
     BoundSockets, IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoBoundStateContext,
     IcmpEchoContextMarker, IcmpEchoIpTransportContext, IcmpEchoSocketApi, IcmpEchoStateContext,
     IcmpSocketId, IcmpSocketSet, IcmpSocketState, IcmpSocketTxMetadata, IcmpSockets,
+    ReceiveIcmpEchoError,
 };
 
 pub use internal::settings::IcmpEchoSettings;

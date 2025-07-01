@@ -22,8 +22,8 @@ use netstack3_core::device::{
 };
 use netstack3_core::device_socket::{
     DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
-    EthernetHeaderParams, Frame, FrameDestination, IpFrame, Protocol, ReceivedFrame,
-    SendFrameErrorReason, SentFrame, SocketId, SocketInfo, TargetDevice,
+    EthernetHeaderParams, Frame, FrameDestination, IpFrame, Protocol, ReceiveFrameError,
+    ReceivedFrame, SendFrameErrorReason, SentFrame, SocketId, SocketInfo, TargetDevice,
 };
 use netstack3_core::sync::{Mutex, RwLock};
 use packet::Buf;
@@ -33,7 +33,7 @@ use zx::{self as zx, HandleBased as _};
 use crate::bindings::bpf::{SocketFilterProgram, SocketFilterResult};
 use crate::bindings::devices::BindingId;
 use crate::bindings::errno::ErrnoError;
-use crate::bindings::socket::queue::{BodyLen, MessageQueue};
+use crate::bindings::socket::queue::{BodyLen, MessageQueue, NoSpace};
 use crate::bindings::socket::worker::{self, CloseResponder, SocketWorker};
 use crate::bindings::socket::{IntoErrno, SocketWorkerProperties, ZXSIO_SIGNAL_OUTGOING};
 use crate::bindings::util::{
@@ -63,14 +63,14 @@ impl DeviceSocketBindingsContext<DeviceId<Self>> for BindingsCtx {
         device: &DeviceId<Self>,
         frame: Frame<&[u8]>,
         raw: &[u8],
-    ) {
+    ) -> Result<(), ReceiveFrameError> {
         let SocketState { queue, kind, bpf_filter } = state;
 
         // Run BPF filter if any. The filter may request the packet
         // to be truncated or dropped.
         let truncated_size = match bpf_filter.read().as_ref() {
             Some(program) => match program.run(*kind, frame, raw) {
-                SocketFilterResult::Reject => return,
+                SocketFilterResult::Reject => return Ok(()),
                 SocketFilterResult::Accept(size) => size,
             },
             None => usize::MAX,
@@ -86,7 +86,7 @@ impl DeviceSocketBindingsContext<DeviceId<Self>> for BindingsCtx {
         let truncated_size = body.len().min(truncated_size);
         let body = body[..truncated_size].to_vec();
         let message = Message { data, body };
-        queue.lock().receive(message);
+        queue.lock().receive(message).map_err(|NoSpace {}| ReceiveFrameError::QueueFull)
     }
 }
 

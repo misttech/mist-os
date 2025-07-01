@@ -13,7 +13,7 @@ use net_types::SpecifiedAddr;
 use netstack3_core::ip::{
     IpSockCreateAndSendError, IpSockSendError, RawIpSocketIcmpFilter, RawIpSocketIcmpFilterError,
     RawIpSocketProtocol, RawIpSocketSendToError, RawIpSocketsBindingsContext,
-    RawIpSocketsBindingsTypes,
+    RawIpSocketsBindingsTypes, ReceivePacketError,
 };
 use netstack3_core::socket::StrictlyZonedAddr;
 use netstack3_core::sync::Mutex;
@@ -29,7 +29,7 @@ use {
 };
 
 use crate::bindings::settings::IpLayerSettings;
-use crate::bindings::socket::queue::{BodyLen, MessageQueue};
+use crate::bindings::socket::queue::{BodyLen, MessageQueue, NoSpace};
 use crate::bindings::socket::{ErrnoError, IntoErrno, IpSockAddrExt, SockAddr};
 use crate::bindings::util::{
     AllowBindingIdFromWeak, DeviceNotFoundError, ErrnoResultExt as _, IntoCore, IntoFidl,
@@ -55,8 +55,11 @@ impl<I: IpExt> RawIpSocketsBindingsContext<I, DeviceId> for BindingsCtx {
         socket: &RawIpSocketId<I>,
         packet: &I::Packet<B>,
         device: &DeviceId,
-    ) {
-        socket.external_state().enqueue_rx_packet::<B>(packet, device.downgrade())
+    ) -> Result<(), ReceivePacketError> {
+        socket
+            .external_state()
+            .enqueue_rx_packet::<B>(packet, device.downgrade())
+            .map_err(|NoSpace {}| ReceivePacketError::QueueFull)
     }
 }
 
@@ -74,10 +77,14 @@ impl<I: IpExt> SocketState<I> {
         }
     }
 
-    fn enqueue_rx_packet<B: SplitByteSlice>(&self, packet: &I::Packet<B>, device: WeakDeviceId) {
+    fn enqueue_rx_packet<B: SplitByteSlice>(
+        &self,
+        packet: &I::Packet<B>,
+        device: WeakDeviceId,
+    ) -> Result<(), NoSpace> {
         // NB: Perform the expensive tasks before taking the message queue lock.
         let packet = ReceivedIpPacket::new::<B>(packet, device);
-        self.rx_queue.lock().receive(packet);
+        self.rx_queue.lock().receive(packet)
     }
 
     fn dequeue_rx_packet(&self) -> Option<ReceivedIpPacket<I>> {

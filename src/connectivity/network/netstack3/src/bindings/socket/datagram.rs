@@ -27,6 +27,7 @@ use net_types::ip::{GenericOverIp, Ip, IpInvariant, IpVersion, Ipv4, Ipv4Addr, I
 use net_types::{MulticastAddr, SpecifiedAddr, ZonedAddr};
 use netstack3_core::device::{DeviceId, WeakDeviceId};
 use netstack3_core::error::{LocalAddressError, NotSupportedError, SocketError};
+use netstack3_core::icmp::ReceiveIcmpEchoError;
 use netstack3_core::ip::{IpSockCreateAndSendError, IpSockSendError, Mark, MarkDomain};
 use netstack3_core::socket::{
     self as core_socket, ConnInfo, ConnectError, ExpectedConnError, ExpectedUnboundError,
@@ -46,7 +47,7 @@ use zx::prelude::HandleBased as _;
 use crate::bindings::errno::ErrnoError;
 use crate::bindings::error::Error;
 use crate::bindings::socket::event_pair::SocketEventPair;
-use crate::bindings::socket::queue::{BodyLen, MessageQueue, QueueReadableListener as _};
+use crate::bindings::socket::queue::{BodyLen, MessageQueue, NoSpace, QueueReadableListener as _};
 use crate::bindings::socket::worker::{self, SocketWorker};
 use crate::bindings::util::{
     DeviceNotFoundError, ErrnoResultExt as _, IntoCore as _, IntoFidl,
@@ -671,7 +672,7 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
         device_id: &DeviceId<BindingsCtx>,
         meta: UdpPacketMeta<I>,
         body: &[u8],
-    ) {
+    ) -> Result<(), NoSpace> {
         // TODO(https://fxbug.dev/326102014): Store `UdpPacketMeta` in `AvailableMessage`.
         let UdpPacketMeta { src_ip, src_port, dst_ip, dst_port, .. } = meta;
 
@@ -687,7 +688,7 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
             dscp_and_ecn: meta.dscp_and_ecn,
         };
 
-        self.message_queue.lock().receive(message);
+        self.message_queue.lock().receive(message)
     }
 }
 
@@ -1137,7 +1138,7 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
         dst_ip: I::Addr,
         id: u16,
         data: B,
-    ) {
+    ) -> Result<(), ReceiveIcmpEchoError> {
         debug!("Received ICMP echo reply in binding: {:?}, id: {id}", I::VERSION);
         // NB: Perform the expensive tasks before taking the message queue lock.
         let message = AvailableMessage {
@@ -1150,7 +1151,10 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
             data: data.as_ref().to_vec(),
             dscp_and_ecn: DscpAndEcn::default(),
         };
-        self.message_queue.lock().receive(message);
+        self.message_queue
+            .lock()
+            .receive(message)
+            .map_err(|NoSpace {}| ReceiveIcmpEchoError::QueueFull)
     }
 }
 

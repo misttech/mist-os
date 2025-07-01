@@ -80,8 +80,8 @@ pub mod device_socket {
     pub use netstack3_base::{FrameDestination, SendFrameErrorReason};
     pub use netstack3_device::socket::{
         DeviceSocketBindingsContext, DeviceSocketMetadata, DeviceSocketTypes, EthernetFrame,
-        EthernetHeaderParams, Frame, IpFrame, Protocol, ReceivedFrame, SentFrame, SocketId,
-        SocketInfo, TargetDevice, WeakDeviceSocketId,
+        EthernetHeaderParams, Frame, IpFrame, Protocol, ReceiveFrameError, ReceivedFrame,
+        SentFrame, SocketId, SocketInfo, TargetDevice, WeakDeviceSocketId,
     };
 }
 
@@ -118,6 +118,7 @@ pub mod inspect {
 pub mod icmp {
     pub use netstack3_icmp_echo::{
         IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpEchoSettings, IcmpSocketId,
+        ReceiveIcmpEchoError,
     };
 }
 
@@ -153,7 +154,7 @@ pub mod ip {
     pub use netstack3_ip::raw::{
         RawIpSocketIcmpFilter, RawIpSocketIcmpFilterError, RawIpSocketId, RawIpSocketProtocol,
         RawIpSocketSendToError, RawIpSocketsBindingsContext, RawIpSocketsBindingsTypes,
-        WeakRawIpSocketId,
+        ReceivePacketError, WeakRawIpSocketId,
     };
     pub use netstack3_ip::socket::{
         IpSockCreateAndSendError, IpSockCreationError, IpSockSendError,
@@ -239,8 +240,8 @@ pub mod types {
 /// Methods for dealing with UDP sockets.
 pub mod udp {
     pub use netstack3_udp::{
-        SendError, SendToError, UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext,
-        UdpRemotePort, UdpSettings, UdpSocketId,
+        ReceiveUdpError, SendError, SendToError, UdpBindingsTypes, UdpPacketMeta,
+        UdpReceiveBindingsContext, UdpRemotePort, UdpSettings, UdpSocketId,
     };
 }
 

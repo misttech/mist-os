@@ -87,6 +87,9 @@ pub struct UdpCountersWithSocketInner<C = Counter> {
     /// this counter may exceed the total number of individual UDP datagrams
     /// received by the stack.
     pub rx_delivered: C,
+    /// Count of UDP datagrams that could not be delivered to a socket because
+    /// its receive buffer was full.
+    pub rx_queue_full: C,
     /// Count of outgoing UDP datagrams sent from the socket layer, including
     /// error cases.
     pub tx: C,
@@ -110,12 +113,15 @@ pub struct CombinedUdpCounters<'a, I: Ip> {
 impl<I: Ip> Inspectable for CombinedUdpCounters<'_, I> {
     fn record<II: Inspector>(&self, inspector: &mut II) {
         let CombinedUdpCounters { with_socket, without_socket } = self;
-        let UdpCountersWithSocketInner { rx_delivered, tx, tx_error } = with_socket.as_ref();
+        let UdpCountersWithSocketInner { rx_delivered, rx_queue_full, tx, tx_error } =
+            with_socket.as_ref();
 
         // Note: Organize the "without socket" counters into helper struct to
         // make the optionality more ergonomic to handle.
         struct WithoutSocketRx<'a> {
             rx: &'a Counter,
+        }
+        struct WithoutSocketRxError<'a> {
             rx_mapped_addr: &'a Counter,
             rx_unknown_dest_port: &'a Counter,
             rx_malformed: &'a Counter,
@@ -123,35 +129,43 @@ impl<I: Ip> Inspectable for CombinedUdpCounters<'_, I> {
         struct WithoutSocketError<'a> {
             rx_icmp_error: &'a Counter,
         }
-        let (without_socket_rx, without_socket_error) = match without_socket.map(AsRef::as_ref) {
-            None => (None, None),
-            Some(UdpCountersWithoutSocketInner {
-                rx_icmp_error,
-                rx,
-                rx_mapped_addr,
-                rx_unknown_dest_port,
-                rx_malformed,
-            }) => (
-                Some(WithoutSocketRx { rx, rx_mapped_addr, rx_unknown_dest_port, rx_malformed }),
-                Some(WithoutSocketError { rx_icmp_error }),
-            ),
-        };
+        let (without_socket_rx, without_socket_rx_error, without_socket_error) =
+            match without_socket.map(AsRef::as_ref) {
+                None => (None, None, None),
+                Some(UdpCountersWithoutSocketInner {
+                    rx_icmp_error,
+                    rx,
+                    rx_mapped_addr,
+                    rx_unknown_dest_port,
+                    rx_malformed,
+                }) => (
+                    Some(WithoutSocketRx { rx }),
+                    Some(WithoutSocketRxError {
+                        rx_mapped_addr,
+                        rx_unknown_dest_port,
+                        rx_malformed,
+                    }),
+                    Some(WithoutSocketError { rx_icmp_error }),
+                ),
+            };
         inspector.record_child("Rx", |inspector| {
             inspector.record_counter("Delivered", rx_delivered);
-            if let Some(WithoutSocketRx {
-                rx,
-                rx_mapped_addr,
-                rx_unknown_dest_port,
-                rx_malformed,
-            }) = without_socket_rx
-            {
+            if let Some(WithoutSocketRx { rx }) = without_socket_rx {
                 inspector.record_counter("Received", rx);
-                inspector.record_child("Errors", |inspector| {
+            }
+            inspector.record_child("Errors", |inspector| {
+                inspector.record_counter("DroppedQueueFull", rx_queue_full);
+                if let Some(WithoutSocketRxError {
+                    rx_mapped_addr,
+                    rx_unknown_dest_port,
+                    rx_malformed,
+                }) = without_socket_rx_error
+                {
                     inspector.record_counter("MappedAddr", rx_mapped_addr);
                     inspector.record_counter("UnknownDstPort", rx_unknown_dest_port);
                     inspector.record_counter("Malformed", rx_malformed);
-                });
-            }
+                }
+            });
         });
         inspector.record_child("Tx", |inspector| {
             inspector.record_counter("Sent", tx);
