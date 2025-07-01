@@ -42,8 +42,6 @@
                 "AllInetTests/RawSocketTest.SendAndReceiveViaConnect/*",
                 "AllInetTests/RawSocketTest.SetSocketDetachFilterNoInstalledFilter/*",
                 "AllInetTests/RawSocketTest.SetSocketRecvBuf/*",
-                "AllInetTests/RawSocketTest.SetSocketRecvBufAboveMax/*",
-                "AllInetTests/RawSocketTest.SetSocketRecvBufBelowMin/*",
                 "AllInetTests/RawSocketTest.SetSocketSendBuf/*",
                 "AllInetTests/RawSocketTest.SetSocketSendBufAboveMax/*",
                 "AllInetTests/RawSocketTest.SetSocketSendBufBelowMin/*",

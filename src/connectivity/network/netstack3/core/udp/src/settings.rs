@@ -5,6 +5,7 @@
 use netstack3_datagram::DatagramSettings;
 
 /// UDP layer settings.
+#[derive(Clone)]
 pub struct UdpSettings {
     /// Common datagram socket settings.
     pub datagram: DatagramSettings,

@@ -30,7 +30,18 @@ impl PositiveIsize {
     ///
     /// Returns `None` if `value` is zero or larger than `isize::MAX`.
     pub const fn new_unsigned(value: usize) -> Option<Self> {
-        if value == 0 || value > (isize::MAX as usize) {
+        match NonZeroUsize::new(value) {
+            Some(v) => Self::new_nonzero_unsigned(v),
+            None => None,
+        }
+    }
+
+    /// Creates a new `PositiveIsize` from a `NonZeroUsize` value.
+    ///
+    /// Returns `None` if `value` is zero or larger than `isize::MAX`.
+    pub const fn new_nonzero_unsigned(value: NonZeroUsize) -> Option<Self> {
+        let value = value.get();
+        if value > (isize::MAX as usize) {
             None
         } else {
             Some(Self(value as isize))

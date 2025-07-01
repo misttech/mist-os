@@ -90,6 +90,17 @@ impl<I: IpExt> SocketState<I> {
     fn dequeue_rx_packet(&self) -> Option<ReceivedIpPacket<I>> {
         self.rx_queue.lock().pop()
     }
+
+    fn set_receive_buffer(&self, value: u64, settings: &IpLayerSettings) {
+        self.rx_queue.lock().set_max_available_messages_size(
+            value.try_into().unwrap_or(usize::MAX),
+            &settings.raw_receive_buffer,
+        );
+    }
+
+    fn receive_buffer(&self) -> u64 {
+        self.rx_queue.lock().max_available_messages_size().get().try_into().unwrap_or(u64::MAX)
+    }
 }
 
 /// A received IP Packet.
@@ -257,11 +268,18 @@ impl<'a, I: IpExt + IpSockAddrExt> RequestHandler<'a, I> {
             fpraw::SocketRequest::GetSendBuffer { responder } => {
                 respond_not_supported!("raw::GetSendBuffer", responder)
             }
-            fpraw::SocketRequest::SetReceiveBuffer { value_bytes: _, responder } => {
-                respond_not_supported!("raw::SetReceiveBuffer", responder)
+            fpraw::SocketRequest::SetReceiveBuffer { value_bytes, responder } => {
+                responder
+                    .send(Ok(data
+                        .id
+                        .external_state()
+                        .set_receive_buffer(value_bytes, &ctx.bindings_ctx().settings.ip.read())))
+                    .unwrap_or_log("failed to respond");
             }
             fpraw::SocketRequest::GetReceiveBuffer { responder } => {
-                respond_not_supported!("raw::GetReceiveBuffer", responder)
+                responder
+                    .send(Ok(data.id.external_state().receive_buffer()))
+                    .unwrap_or_log("failed to respond");
             }
             fpraw::SocketRequest::SetKeepAlive { value: _, responder } => {
                 respond_not_supported!("raw::SetKeepAlive", responder)

@@ -40,6 +40,14 @@ impl<T: Copy + Ord> BufferSizeSettings<T> {
         Some(Self { default, max, min })
     }
 
+    /// Returns the clamped value `val` to the configured maximum and minimum
+    /// buffer sizes.
+    pub fn clamp(&self, val: T) -> T {
+        val.clamp(self.min, self.max)
+    }
+}
+
+impl<T: Copy> BufferSizeSettings<T> {
     /// Returns the configured default buffer size.
     pub fn default(&self) -> T {
         self.default
@@ -58,12 +66,6 @@ impl<T: Copy + Ord> BufferSizeSettings<T> {
     /// Returns a tuple of the minimum and maximum buffer size, in this order.
     pub fn min_max(&self) -> (T, T) {
         (self.min, self.max)
-    }
-
-    /// Returns the clamped value `val` to the configured maximum and minimum
-    /// buffer sizes.
-    pub fn clamp(&self, val: T) -> T {
-        val.clamp(self.min, self.max)
     }
 }
 

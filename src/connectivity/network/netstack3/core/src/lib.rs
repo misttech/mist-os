@@ -32,6 +32,13 @@ mod transport;
 #[cfg(any(test, feature = "testutils"))]
 pub mod testutil;
 
+/// Data structures.
+pub mod data_structures {
+    /// Read-copy-update data structures.
+    pub mod rcu {
+        pub use netstack3_base::rcu::{ReadGuard, SynchronizedWriterRcu, WriteGuard};
+    }
+}
 /// The device layer.
 pub mod device {
     #[path = "."]
@@ -234,7 +241,7 @@ pub mod trace {
 
 /// Miscellaneous and common types.
 pub mod types {
-    pub use netstack3_base::{BufferSizeSettings, Counter, SynchronizedWriterRcu, WorkQueueReport};
+    pub use netstack3_base::{BufferSizeSettings, Counter, PositiveIsize, WorkQueueReport};
 }
 
 /// Methods for dealing with UDP sockets.

@@ -5,6 +5,7 @@
 use netstack3_datagram::DatagramSettings;
 
 /// ICMP echo socket settings.
+#[derive(Clone)]
 pub struct IcmpEchoSettings {
     /// Common datagram socket settings.
     pub datagram: DatagramSettings,

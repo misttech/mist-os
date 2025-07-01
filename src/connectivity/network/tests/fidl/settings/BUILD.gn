@@ -11,11 +11,15 @@ rustc_test("settings") {
   deps = [
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.net.settings:fuchsia.net.settings_rust",
+    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
+    "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
+    "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
     "//src/connectivity/network/testing/netemul/rust:lib",
     "//src/connectivity/network/tests/integration/common:netstack_testing_common",
     "//src/connectivity/network/tests/integration/macros:netstack_testing_macros",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
+    "//third_party/rust_crates:socket2",
   ]
   sources = [ "src/lib.rs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]

@@ -21,7 +21,7 @@ use {
     fidl_fuchsia_net_settings as fnet_settings,
 };
 
-use crate::bindings::util::{IllegalNonPositiveValueError, IntoFidl, TryIntoCore as _};
+use crate::bindings::util::{self, IllegalNonPositiveValueError, IntoFidl, TryIntoCore as _};
 
 /// Unified view of netstack interface configuration.
 #[derive(Clone)]
@@ -483,13 +483,13 @@ impl FidlInterfaceConfig {
                 __source_breaking: fidl::marker::SourceBreaking,
             });
 
-            let arp = some_if_not_default(fnet_interfaces_admin::ArpConfiguration {
+            let arp = util::some_if_not_default(fnet_interfaces_admin::ArpConfiguration {
                 nud: nud.map(IntoFidl::into_fidl),
                 dad,
                 __source_breaking: fidl::marker::SourceBreaking,
             });
 
-            let igmp = some_if_not_default(fnet_interfaces_admin::IgmpConfiguration {
+            let igmp = util::some_if_not_default(fnet_interfaces_admin::IgmpConfiguration {
                 version: igmp_mode.map(IntoFidl::into_fidl),
                 __source_breaking: fidl::marker::SourceBreaking,
             });
@@ -525,15 +525,15 @@ impl FidlInterfaceConfig {
                 __source_breaking: fidl::marker::SourceBreaking,
             });
 
-            let slaac = some_if_not_default(slaac_config.into_fidl());
-            let ndp = some_if_not_default(fnet_interfaces_admin::NdpConfiguration {
+            let slaac = util::some_if_not_default(slaac_config.into_fidl());
+            let ndp = util::some_if_not_default(fnet_interfaces_admin::NdpConfiguration {
                 nud: nud.map(IntoFidl::into_fidl),
                 dad,
                 slaac,
                 __source_breaking: fidl::marker::SourceBreaking,
             });
 
-            let mld = some_if_not_default(fnet_interfaces_admin::MldConfiguration {
+            let mld = util::some_if_not_default(fnet_interfaces_admin::MldConfiguration {
                 version: mld_mode.map(IntoFidl::into_fidl),
                 __source_breaking: fidl::marker::SourceBreaking,
             });
@@ -677,7 +677,7 @@ impl FidlInterfaceConfig {
             None => (None, None),
         };
 
-        let device = some_if_not_default(DeviceConfigurationUpdate { arp, ndp });
+        let device = util::some_if_not_default(DeviceConfigurationUpdate { arp, ndp });
 
         Ok(InterfaceConfigUpdate { ipv4, ipv6, device })
     }
@@ -740,11 +740,6 @@ pub struct InterfaceConfigDefaults {
     /// Whether to configure interfaces with opaque IIDs by default. Note that the
     /// IID generation method can still be overridden per-interface.
     pub opaque_iids: bool,
-}
-
-#[inline]
-fn some_if_not_default<T: Default + PartialEq>(t: T) -> Option<T> {
-    (t != T::default()).then_some(t)
 }
 
 fn update_and_take_prev<T>(slot: &mut T, update: Option<T>) -> Option<T> {

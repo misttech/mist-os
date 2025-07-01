@@ -151,6 +151,13 @@ where
     }
 }
 
+/// Provides the common pattern in FIDL APIs to not report empty FIDL tables by
+/// returning `None` if `t` is equal to the default value for `T`.
+#[inline]
+pub(crate) fn some_if_not_default<T: Default + PartialEq>(t: T) -> Option<T> {
+    (t != T::default()).then_some(t)
+}
+
 /// A core type which can be fallibly converted from the FIDL type `F`.
 ///
 /// For all `C: TryFromFidl<F>`, we provide a blanket impl of

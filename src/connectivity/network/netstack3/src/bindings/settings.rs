@@ -4,13 +4,14 @@
 
 //! Provides workers and data structures for netstack-wide settings.
 
-use std::num::NonZeroUsize;
+use std::num::{NonZeroUsize, TryFromIntError};
 use std::ops::Deref;
 
 use futures::TryStreamExt as _;
-use log::error;
+use log::warn;
+use netstack3_core::data_structures::rcu::{self, SynchronizedWriterRcu};
 use netstack3_core::tcp::TcpSettings;
-use netstack3_core::types::{BufferSizeSettings, SynchronizedWriterRcu};
+use netstack3_core::types::{BufferSizeSettings, PositiveIsize};
 use netstack3_core::{MapDerefExt as _, SettingsContext};
 use once_cell::sync::Lazy;
 use {
@@ -21,7 +22,7 @@ use {
 use crate::bindings::interface_config::{
     DeviceNeighborConfig, FidlInterfaceConfig, InterfaceConfig, InterfaceConfigDefaults,
 };
-use crate::bindings::util::{ErrorLogExt, ResultExt as _};
+use crate::bindings::util::{self, ErrorLogExt, IllegalZeroValueError, IntoFidl, ResultExt as _};
 use crate::bindings::{BindingsCtx, Ctx};
 
 pub(crate) async fn serve_control(
@@ -36,28 +37,33 @@ pub(crate) async fn serve_control(
                 responder.send(r.borrowed_ok())?;
             }
             fnet_settings::ControlRequest::UpdateTcp { payload, responder } => {
-                let r = update_tcp(payload);
-                r.log_if_err("settings::UpdateTcp");
+                let mut write = ctx.bindings_ctx().settings.tcp.write();
+                let r = update_tcp(payload, &mut write);
+                discard_changes_on_err("settings::UpdateTcp", &r, write);
                 responder.send(r.borrowed_ok())?;
             }
             fnet_settings::ControlRequest::UpdateUdp { payload, responder } => {
-                let r = update_udp(payload);
-                r.log_if_err("settings::UpdateUdp");
+                let mut write = ctx.bindings_ctx().settings.udp.write();
+                let r = update_udp(payload, &mut write);
+                discard_changes_on_err("settings::UpdateUdp", &r, write);
                 responder.send(r.borrowed_ok())?;
             }
             fnet_settings::ControlRequest::UpdateIcmp { payload, responder } => {
-                let r = update_icmp(payload);
-                r.log_if_err("settings::UpdateIcmp");
+                let mut write = ctx.bindings_ctx().settings.icmp.write();
+                let r = update_icmp(payload, &mut write);
+                discard_changes_on_err("settings::UpdateIcmp", &r, write);
                 responder.send(r.borrowed_ok())?;
             }
             fnet_settings::ControlRequest::UpdateIp { payload, responder } => {
-                let r = update_ip(payload);
-                r.log_if_err("settings::UpdateIp");
+                let mut write = ctx.bindings_ctx().settings.ip.write();
+                let r = update_ip(payload, &mut write);
+                discard_changes_on_err("settings::UpdateIp", &r, write);
                 responder.send(r.borrowed_ok())?;
             }
             fnet_settings::ControlRequest::UpdateDevice { payload, responder } => {
-                let r = update_device(payload);
-                r.log_if_err("settings::UpdateDevice");
+                let mut write = ctx.bindings_ctx().settings.device.write();
+                let r = update_device(payload, &mut write);
+                discard_changes_on_err("settings::UpdateDevice", &r, write);
                 responder.send(r.borrowed_ok())?;
             }
         }
@@ -71,6 +77,28 @@ impl ErrorLogExt for fnet_settings::UpdateError {
     }
 }
 
+impl From<IllegalZeroValueError> for fnet_settings::UpdateError {
+    fn from(IllegalZeroValueError: IllegalZeroValueError) -> Self {
+        Self::IllegalZeroValue
+    }
+}
+
+#[inline]
+#[track_caller]
+fn discard_changes_on_err<'a, T, O>(
+    msg: &'static str,
+    result: &Result<O, fnet_settings::UpdateError>,
+    guard: rcu::WriteGuard<'a, T>,
+) {
+    match result {
+        Ok(_) => {}
+        Err(e) => {
+            guard.discard();
+            e.log(msg);
+        }
+    }
+}
+
 fn update_interface_defaults(
     settings: &Settings,
     interfaces: fnet_interfaces_admin::Configuration,
@@ -80,42 +108,91 @@ fn update_interface_defaults(
     Ok(FidlInterfaceConfig::new_update(changed).into())
 }
 
-fn update_tcp(tcp: fnet_settings::Tcp) -> Result<fnet_settings::Tcp, fnet_settings::UpdateError> {
+fn update_tcp(
+    tcp: fnet_settings::Tcp,
+    settings: &mut TcpSettings,
+) -> Result<fnet_settings::Tcp, fnet_settings::UpdateError> {
     let fnet_settings::Tcp { buffer_sizes, __source_breaking } = tcp;
-    let prev = fnet_settings::Tcp::default();
-    if let Some(_buffer_sizes) = buffer_sizes {
-        error!("TODO(https://fxbug.dev/425935644): Implement TCP buffer sizes setting");
+    let mut prev = fnet_settings::Tcp::default();
+    if let Some(buffer_sizes) = buffer_sizes {
+        let fnet_settings::SocketBufferSizes { send, receive, __source_breaking } = buffer_sizes;
+        let mut buffer_sizes = fnet_settings::SocketBufferSizes::default();
+        if let Some(send) = send {
+            buffer_sizes.send = Some(update_buffer_sizes(&mut settings.send_buffer, send)?);
+        }
+        if let Some(receive) = receive {
+            buffer_sizes.receive =
+                Some(update_buffer_sizes(&mut settings.receive_buffer, receive)?);
+        }
+
+        prev.buffer_sizes = util::some_if_not_default(buffer_sizes);
     }
     Ok(prev)
 }
 
-fn update_udp(udp: fnet_settings::Udp) -> Result<fnet_settings::Udp, fnet_settings::UpdateError> {
+fn update_udp(
+    udp: fnet_settings::Udp,
+    settings: &mut UdpSettings,
+) -> Result<fnet_settings::Udp, fnet_settings::UpdateError> {
     let fnet_settings::Udp { buffer_sizes, __source_breaking } = udp;
-    let prev = fnet_settings::Udp::default();
-    if let Some(_buffer_sizes) = buffer_sizes {
-        error!("TODO(https://fxbug.dev/425935644): Implement UDP buffer sizes setting");
+    let mut prev = fnet_settings::Udp::default();
+    if let Some(buffer_sizes) = buffer_sizes {
+        let fnet_settings::SocketBufferSizes { send, receive, __source_breaking } = buffer_sizes;
+        let mut buffer_sizes = fnet_settings::SocketBufferSizes::default();
+        if let Some(send) = send {
+            buffer_sizes.send =
+                Some(update_buffer_sizes(&mut settings.core.datagram.send_buffer, send)?);
+        }
+        if let Some(receive) = receive {
+            buffer_sizes.receive =
+                Some(update_buffer_sizes(&mut settings.receive_buffer, receive)?);
+        }
+        prev.buffer_sizes = util::some_if_not_default(buffer_sizes);
     }
     Ok(prev)
 }
 
 fn update_icmp(
     icmp: fnet_settings::Icmp,
+    settings: &mut IcmpSettings,
 ) -> Result<fnet_settings::Icmp, fnet_settings::UpdateError> {
     let fnet_settings::Icmp { echo_buffer_sizes, icmpv4, icmpv6, __source_breaking } = icmp;
-    let prev = fnet_settings::Icmp::default();
-    if let Some(_buffer_sizes) = echo_buffer_sizes {
-        error!("TODO(https://fxbug.dev/425935644): Implement ICMP echo buffer sizes setting");
+    let mut prev = fnet_settings::Icmp::default();
+    if let Some(buffer_sizes) = echo_buffer_sizes {
+        let fnet_settings::SocketBufferSizes { send, receive, __source_breaking } = buffer_sizes;
+        let mut buffer_sizes = fnet_settings::SocketBufferSizes::default();
+        if let Some(send) = send {
+            buffer_sizes.send =
+                Some(update_buffer_sizes(&mut settings.echo_core.datagram.send_buffer, send)?);
+        }
+        if let Some(receive) = receive {
+            buffer_sizes.receive =
+                Some(update_buffer_sizes(&mut settings.echo_receive_buffer, receive)?);
+        }
+        prev.echo_buffer_sizes = util::some_if_not_default(buffer_sizes);
     }
     if let Some(fnet_settings::Icmpv4 { __source_breaking }) = icmpv4 {}
     if let Some(fnet_settings::Icmpv6 { __source_breaking }) = icmpv6 {}
     Ok(prev)
 }
 
-fn update_ip(ip: fnet_settings::Ip) -> Result<fnet_settings::Ip, fnet_settings::UpdateError> {
+fn update_ip(
+    ip: fnet_settings::Ip,
+    settings: &mut IpLayerSettings,
+) -> Result<fnet_settings::Ip, fnet_settings::UpdateError> {
     let fnet_settings::Ip { raw_buffer_sizes, ipv4, ipv6, __source_breaking } = ip;
-    let prev = fnet_settings::Ip::default();
-    if let Some(_buffer_sizes) = raw_buffer_sizes {
-        error!("TODO(https://fxbug.dev/425935644): Implement raw IP buffer sizes setting");
+    let mut prev = fnet_settings::Ip::default();
+    if let Some(buffer_sizes) = raw_buffer_sizes {
+        let fnet_settings::SocketBufferSizes { send, receive, __source_breaking } = buffer_sizes;
+        let mut buffer_sizes = fnet_settings::SocketBufferSizes::default();
+        if let Some(_send) = send {
+            warn!("TODO(https://fxbug/dev/392111277): Support SNDBUF for raw IP sockets");
+        }
+        if let Some(receive) = receive {
+            buffer_sizes.receive =
+                Some(update_buffer_sizes(&mut settings.raw_receive_buffer, receive)?);
+        }
+        prev.raw_buffer_sizes = util::some_if_not_default(buffer_sizes);
     }
     if let Some(fnet_settings::Ipv4 { __source_breaking }) = ipv4 {}
     if let Some(fnet_settings::Ipv6 { __source_breaking }) = ipv6 {}
@@ -124,11 +201,21 @@ fn update_ip(ip: fnet_settings::Ip) -> Result<fnet_settings::Ip, fnet_settings::
 
 fn update_device(
     device: fnet_settings::Device,
+    settings: &mut DeviceLayerSettings,
 ) -> Result<fnet_settings::Device, fnet_settings::UpdateError> {
     let fnet_settings::Device { packet_buffer_sizes, __source_breaking } = device;
-    let prev = fnet_settings::Device::default();
-    if let Some(_buffer_sizes) = packet_buffer_sizes {
-        error!("TODO(https://fxbug.dev/425935644): Implement packet buffer sizes setting");
+    let mut prev = fnet_settings::Device::default();
+    if let Some(buffer_sizes) = packet_buffer_sizes {
+        let fnet_settings::SocketBufferSizes { send, receive, __source_breaking } = buffer_sizes;
+        let mut buffer_sizes = fnet_settings::SocketBufferSizes::default();
+        if let Some(_send) = send {
+            warn!("TODO(https://fxbug/dev/391946195): Support SNDBUF for packet sockets");
+        }
+        if let Some(receive) = receive {
+            buffer_sizes.receive =
+                Some(update_buffer_sizes(&mut settings.packet_receive_buffer, receive)?);
+        }
+        prev.packet_buffer_sizes = util::some_if_not_default(buffer_sizes);
     }
     Ok(prev)
 }
@@ -143,19 +230,19 @@ pub(crate) async fn serve_state(
                 responder.send(&get_interface_defaults(&ctx.bindings_ctx().settings))?;
             }
             fnet_settings::StateRequest::GetTcp { responder } => {
-                responder.send(&get_tcp())?;
+                responder.send(&get_tcp(&ctx.bindings_ctx().settings.tcp.read()))?;
             }
             fnet_settings::StateRequest::GetUdp { responder } => {
-                responder.send(&get_udp())?;
+                responder.send(&get_udp(&ctx.bindings_ctx().settings.udp.read()))?;
             }
             fnet_settings::StateRequest::GetIcmp { responder } => {
-                responder.send(&get_icmp())?;
+                responder.send(&get_icmp(&ctx.bindings_ctx().settings.icmp.read()))?;
             }
             fnet_settings::StateRequest::GetIp { responder } => {
-                responder.send(&get_ip())?;
+                responder.send(&get_ip(&ctx.bindings_ctx().settings.ip.read()))?;
             }
             fnet_settings::StateRequest::GetDevice { responder } => {
-                responder.send(&get_device())?;
+                responder.send(&get_device(&ctx.bindings_ctx().settings.device.read()))?;
             }
         }
     }
@@ -166,27 +253,36 @@ fn get_interface_defaults(settings: &Settings) -> fnet_interfaces_admin::Configu
     FidlInterfaceConfig::new_complete(settings.interface_defaults.read().clone()).into()
 }
 
-fn get_tcp() -> fnet_settings::Tcp {
-    error!("TODO(https://fxbug.dev/425935644): implement GetTcp buffer sizes");
-    let buffer_sizes = Default::default();
+fn get_tcp(settings: &TcpSettings) -> fnet_settings::Tcp {
+    let buffer_sizes = fnet_settings::SocketBufferSizes {
+        send: Some(settings.send_buffer.into_fidl()),
+        receive: Some(settings.receive_buffer.into_fidl()),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
     fnet_settings::Tcp {
         buffer_sizes: Some(buffer_sizes),
         __source_breaking: fidl::marker::SourceBreaking,
     }
 }
 
-fn get_udp() -> fnet_settings::Udp {
-    error!("TODO(https://fxbug.dev/425935644): implement GetUdp buffer sizes");
-    let buffer_sizes = Default::default();
+fn get_udp(settings: &UdpSettings) -> fnet_settings::Udp {
+    let buffer_sizes = fnet_settings::SocketBufferSizes {
+        send: Some(settings.core.datagram.send_buffer.into_fidl()),
+        receive: Some(settings.receive_buffer.into_fidl()),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
     fnet_settings::Udp {
         buffer_sizes: Some(buffer_sizes),
         __source_breaking: fidl::marker::SourceBreaking,
     }
 }
 
-fn get_icmp() -> fnet_settings::Icmp {
-    error!("TODO(https://fxbug.dev/425935644): implement GetIcmp buffer sizes");
-    let echo_buffer_sizes = Default::default();
+fn get_icmp(settings: &IcmpSettings) -> fnet_settings::Icmp {
+    let echo_buffer_sizes = fnet_settings::SocketBufferSizes {
+        send: Some(settings.echo_core.datagram.send_buffer.into_fidl()),
+        receive: Some(settings.echo_receive_buffer.into_fidl()),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
     let icmpv4 = fnet_settings::Icmpv4 { __source_breaking: fidl::marker::SourceBreaking };
     let icmpv6 = fnet_settings::Icmpv6 { __source_breaking: fidl::marker::SourceBreaking };
     fnet_settings::Icmp {
@@ -197,9 +293,13 @@ fn get_icmp() -> fnet_settings::Icmp {
     }
 }
 
-fn get_ip() -> fnet_settings::Ip {
-    error!("TODO(https://fxbug.dev/425935644): implement GetIp buffer sizes");
-    let raw_buffer_sizes = Default::default();
+fn get_ip(settings: &IpLayerSettings) -> fnet_settings::Ip {
+    let raw_buffer_sizes = fnet_settings::SocketBufferSizes {
+        // TODO(https://fxbug/dev/392111277): Support SNDBUF for raw IP sockets.
+        send: None,
+        receive: Some(settings.raw_receive_buffer.into_fidl()),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
     let ipv4 = fnet_settings::Ipv4 { __source_breaking: fidl::marker::SourceBreaking };
     let ipv6 = fnet_settings::Ipv6 { __source_breaking: fidl::marker::SourceBreaking };
     fnet_settings::Ip {
@@ -210,9 +310,13 @@ fn get_ip() -> fnet_settings::Ip {
     }
 }
 
-fn get_device() -> fnet_settings::Device {
-    error!("TODO(https://fxbug.dev/425935644): implement GetDevice buffer sizes");
-    let packet_buffer_sizes = Default::default();
+fn get_device(settings: &DeviceLayerSettings) -> fnet_settings::Device {
+    let packet_buffer_sizes = fnet_settings::SocketBufferSizes {
+        // TODO(https://fxbug/dev/391946195): Support SNDBUF for packet sockets.
+        send: None,
+        receive: Some(settings.packet_receive_buffer.into_fidl()),
+        __source_breaking: fidl::marker::SourceBreaking,
+    };
     fnet_settings::Device {
         packet_buffer_sizes: Some(packet_buffer_sizes),
         __source_breaking: fidl::marker::SourceBreaking,
@@ -275,6 +379,7 @@ fn default_dgram_rcvbuf_sizes() -> BufferSizeSettings<NonZeroUsize> {
     .unwrap()
 }
 
+#[derive(Clone)]
 pub(crate) struct UdpSettings {
     core: netstack3_core::udp::UdpSettings,
     pub(crate) receive_buffer: BufferSizeSettings<NonZeroUsize>,
@@ -286,6 +391,7 @@ impl Default for UdpSettings {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct IcmpSettings {
     echo_core: netstack3_core::icmp::IcmpEchoSettings,
     pub(crate) echo_receive_buffer: BufferSizeSettings<NonZeroUsize>,
@@ -297,6 +403,7 @@ impl Default for IcmpSettings {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct DeviceLayerSettings {
     pub(crate) packet_receive_buffer: BufferSizeSettings<NonZeroUsize>,
 }
@@ -307,6 +414,7 @@ impl Default for DeviceLayerSettings {
     }
 }
 
+#[derive(Clone)]
 pub(crate) struct IpLayerSettings {
     pub(crate) raw_receive_buffer: BufferSizeSettings<NonZeroUsize>,
 }
@@ -333,4 +441,82 @@ impl SettingsContext<netstack3_core::icmp::IcmpEchoSettings> for BindingsCtx {
     fn settings(&self) -> impl Deref<Target = netstack3_core::icmp::IcmpEchoSettings> + '_ {
         self.settings.icmp.read().map_deref(|i| &i.echo_core)
     }
+}
+
+/// This trait provides an abstraction between the conversion for the core
+/// representations for buffer sizes and the single
+/// [`fnet_settings::SocketBufferSizes`] representation that exists over FIDL.
+///
+/// Core picks representations that are more ergonomic, while FIDL is more
+/// restrictive on the types to avoid enormous values.
+trait BufferSizesRepr: Sized + Copy + Ord {
+    fn into_fidl_repr(self) -> u32;
+    fn try_from_fidl_repr(fidl: u32) -> Result<Self, fnet_settings::UpdateError>;
+}
+
+impl BufferSizesRepr for NonZeroUsize {
+    fn into_fidl_repr(self) -> u32 {
+        usize::from(self).try_into().unwrap_or(u32::MAX)
+    }
+
+    fn try_from_fidl_repr(fidl: u32) -> Result<Self, fnet_settings::UpdateError> {
+        NonZeroUsize::new(
+            fidl.try_into().map_err(|_: TryFromIntError| fnet_settings::UpdateError::OutOfRange)?,
+        )
+        .ok_or(fnet_settings::UpdateError::IllegalZeroValue)
+    }
+}
+
+impl BufferSizesRepr for PositiveIsize {
+    fn into_fidl_repr(self) -> u32 {
+        usize::from(self).try_into().unwrap_or(u32::MAX)
+    }
+
+    fn try_from_fidl_repr(fidl: u32) -> Result<Self, fnet_settings::UpdateError> {
+        PositiveIsize::new_nonzero_unsigned(NonZeroUsize::try_from_fidl_repr(fidl)?)
+            .ok_or(fnet_settings::UpdateError::OutOfRange)
+    }
+}
+
+impl<T: BufferSizesRepr> IntoFidl<fnet_settings::SocketBufferSizeRange> for BufferSizeSettings<T> {
+    fn into_fidl(self) -> fnet_settings::SocketBufferSizeRange {
+        fnet_settings::SocketBufferSizeRange {
+            max: Some(self.max().into_fidl_repr()),
+            default: Some(self.default().into_fidl_repr()),
+            min: Some(self.min().into_fidl_repr()),
+            __source_breaking: fidl::marker::SourceBreaking,
+        }
+    }
+}
+
+fn update_buffer_sizes<T>(
+    target: &mut BufferSizeSettings<T>,
+    update: fnet_settings::SocketBufferSizeRange,
+) -> Result<fnet_settings::SocketBufferSizeRange, fnet_settings::UpdateError>
+where
+    T: BufferSizesRepr,
+{
+    let fnet_settings::SocketBufferSizeRange { max, default, min, __source_breaking } = update;
+
+    let update_and_next = |cur: T, next| -> Result<_, fnet_settings::UpdateError> {
+        Ok(match next {
+            Some(v) => (Some(cur.into_fidl_repr()), T::try_from_fidl_repr(v)?),
+            None => (None, cur),
+        })
+    };
+
+    let (max_update, max) = update_and_next(target.max(), max)?;
+    let (default_update, default) = update_and_next(target.default(), default)?;
+    let (min_update, min) = update_and_next(target.min(), min)?;
+
+    let updated =
+        BufferSizeSettings::new(min, default, max).ok_or(fnet_settings::UpdateError::OutOfRange)?;
+    *target = updated;
+
+    Ok(fnet_settings::SocketBufferSizeRange {
+        max: max_update,
+        default: default_update,
+        min: min_update,
+        __source_breaking,
+    })
 }

@@ -7,6 +7,7 @@ use core::num::NonZeroUsize;
 use netstack3_base::BufferSizeSettings;
 
 /// TCP layer stack settings.
+#[derive(Clone)]
 pub struct TcpSettings {
     /// Receive buffer settings.
     pub receive_buffer: BufferSizeSettings<NonZeroUsize>,

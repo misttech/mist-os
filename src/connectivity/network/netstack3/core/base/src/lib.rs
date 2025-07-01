@@ -47,7 +47,6 @@ pub use counters::{
     Counter, CounterCollection, CounterCollectionSpec, CounterContext, CounterRepr,
     ResourceCounterContext,
 };
-pub use data_structures::rcu::SynchronizedWriterRcu;
 pub use data_structures::token_bucket::TokenBucket;
 pub use device::address::{
     AssignedAddrIpExt, IpAddressId, IpDeviceAddr, IpDeviceAddressIdContext, Ipv4DeviceAddr,
@@ -104,6 +103,11 @@ pub mod ref_counted_hash_map {
     pub use crate::data_structures::ref_counted_hash_map::{
         InsertResult, RefCountedHashMap, RefCountedHashSet, RemoveResult,
     };
+}
+
+/// Read-copy-update data structure.
+pub mod rcu {
+    pub use crate::data_structures::rcu::{ReadGuard, SynchronizedWriterRcu, WriteGuard};
 }
 
 /// Common types and utilities for sockets.
