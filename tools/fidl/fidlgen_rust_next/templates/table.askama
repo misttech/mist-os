@@ -1,7 +1,3 @@
-{% let name = filters::camel(table.name.decl_name())? %}
-{% let base_name = table.name.decl_name().camel() %}
-{% let wire_name = format!("Wire{base_name}") %}
-
 {{ self.doc_string(table.attributes) -}}
 #[derive(
 {% if !table.is_resource %}

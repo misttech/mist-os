@@ -12,17 +12,43 @@ use crate::ir::{
     CompIdent, Protocol, ProtocolMethod, ProtocolMethodKind, ProtocolOpenness, Struct, Type,
     TypeKind,
 };
+use crate::templates::reserved::escape;
 
 #[derive(Template)]
 #[template(path = "protocol.askama", whitespace = "preserve")]
 pub struct ProtocolTemplate<'a> {
     protocol: &'a Protocol,
     context: Context<'a>,
+
+    non_canonical_name: &'a str,
+    protocol_name: String,
+    module_name: String,
+
+    client_sender_name: String,
+    client_handler_name: String,
+
+    server_sender_name: String,
+    server_handler_name: String,
 }
 
 impl<'a> ProtocolTemplate<'a> {
     pub fn new(protocol: &'a Protocol, context: Context<'a>) -> Self {
-        Self { protocol, context }
+        let base_name = protocol.name.decl_name().camel();
+
+        Self {
+            protocol,
+            context,
+
+            non_canonical_name: protocol.name.decl_name().non_canonical(),
+            protocol_name: escape(protocol.name.decl_name().camel()),
+            module_name: escape(protocol.name.decl_name().snake()),
+
+            client_sender_name: escape(format!("{base_name}ClientSender")),
+            client_handler_name: escape(format!("{base_name}ClientHandler")),
+
+            server_sender_name: escape(format!("{base_name}ServerSender")),
+            server_handler_name: escape(format!("{base_name}ServerHandler")),
+        }
     }
 
     fn get_method_args_struct(&self, method: &ProtocolMethod) -> Option<&Struct> {
@@ -97,8 +123,8 @@ impl<'a> ProtocolTemplate<'a> {
     }
 }
 
-impl Contextual for ProtocolTemplate<'_> {
-    fn context(&self) -> Context<'_> {
+impl<'a> Contextual<'a> for ProtocolTemplate<'a> {
+    fn context(&self) -> Context<'a> {
         self.context
     }
 }

@@ -1,15 +1,3 @@
-{% let non_canonical_name = protocol.name.decl_name().non_canonical() %}
-{% let protocol_name = filters::camel(protocol.name.decl_name())? %}
-{% let module_name = filters::snake(protocol.name.decl_name())? %}
-
-{% let base_name = protocol.name.decl_name().camel() %}
-
-{% let client_sender_name = format!("{base_name}ClientSender") %}
-{% let client_handler_name = format!("{base_name}ClientHandler") %}
-
-{% let server_sender_name = format!("{base_name}ServerSender") %}
-{% let server_handler_name = format!("{base_name}ServerHandler") %}
-
 /// The type corresponding to the {{ non_canonical_name }} protocol.
 {{ self.doc_string(protocol.attributes) -}}
 {% if self.emit_debug_impls() -%}

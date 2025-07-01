@@ -1,5 +1,3 @@
-{% let compat_crate_name = self.compat_crate_name() %}
-
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
     {% for ident in self.schema().declaration_order %}
@@ -10,7 +8,6 @@ pub mod compat {
         {% if !matches!(restriction, Denylist::Denied) %}
             {% match self.schema().declarations[ident] %}
                 {% when DeclType::Bits %}
-                    {% let bits = self.schema().bits_declarations[ident] %}
                     {{ restriction }}
                     impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
                         #[inline]

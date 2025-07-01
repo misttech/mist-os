@@ -18,8 +18,8 @@ impl<'a> NaturalTypeTemplate<'a> {
     }
 }
 
-impl Contextual for NaturalTypeTemplate<'_> {
-    fn context(&self) -> Context<'_> {
+impl<'a> Contextual<'a> for NaturalTypeTemplate<'a> {
+    fn context(&self) -> Context<'a> {
         self.context
     }
 }

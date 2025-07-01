@@ -13,20 +13,22 @@ use super::{filters, Context, Contextual, Denylist};
 #[template(path = "compat.askama")]
 pub struct CompatTemplate<'a> {
     context: Context<'a>,
+
+    compat_crate_name: String,
 }
 
 impl<'a> CompatTemplate<'a> {
     pub fn new(context: Context<'a>) -> Self {
-        Self { context }
-    }
+        Self {
+            context,
 
-    fn compat_crate_name(&self) -> String {
-        format!("fidl_{}", self.schema().name.replace('.', "_"))
+            compat_crate_name: format!("fidl_{}", context.schema().name.replace('.', "_")),
+        }
     }
 }
 
-impl Contextual for CompatTemplate<'_> {
-    fn context(&self) -> Context<'_> {
+impl<'a> Contextual<'a> for CompatTemplate<'a> {
+    fn context(&self) -> Context<'a> {
         self.context
     }
 }

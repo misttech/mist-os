@@ -1,9 +1,3 @@
-{% let is_static = strct.shape.max_out_of_line == 0 %}
-{% let has_padding = strct.shape.has_padding %}
-{% let name = filters::camel(strct.name.decl_name())? %}
-{% let base_name = strct.name.decl_name().camel() %}
-{% let wire_name = format!("Wire{base_name}") %}
-
 {% if strct.is_empty_success_struct %}
 
 {{ self.doc_string(strct.attributes) -}}
@@ -13,19 +7,6 @@ pub type {{ name }} = ();
 pub type {{ wire_name }} = ();
 
 {% else %}
-
-{% let de %}
-{% let infer %}
-{% let static_ %}
-{% if is_static %}
-    {% let de = "" %}
-    {% let infer = "" %}
-    {% let static_ = "" %}
-{% else %}
-    {% let de = "<'de>" %}
-    {% let infer = "<'_>" %}
-    {% let static_ = "<'static>" %}
-{% endif %}
 
 {{ self.doc_string(strct.attributes) -}}
 #[derive(

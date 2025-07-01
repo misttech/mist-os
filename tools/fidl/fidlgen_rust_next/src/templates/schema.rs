@@ -63,8 +63,8 @@ impl<'a> SchemaTemplate<'a> {
     }
 }
 
-impl Contextual for SchemaTemplate<'_> {
-    fn context(&self) -> Context<'_> {
+impl<'a> Contextual<'a> for SchemaTemplate<'a> {
+    fn context(&self) -> Context<'a> {
         self.context
     }
 }

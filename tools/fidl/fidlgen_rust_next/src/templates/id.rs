@@ -4,7 +4,7 @@
 
 use core::fmt;
 
-use super::{Context, Contextual};
+use super::{escape, Context, Contextual};
 use crate::id::IdExt;
 use crate::ir::{CompId, DeclType};
 
@@ -32,8 +32,8 @@ impl<'a> IdTemplate<'a> {
     }
 }
 
-impl Contextual for IdTemplate<'_> {
-    fn context(&self) -> Context<'_> {
+impl<'a> Contextual<'a> for IdTemplate<'a> {
+    fn context(&self) -> Context<'a> {
         self.context
     }
 }
@@ -71,10 +71,7 @@ impl fmt::Display for IdTemplate<'_> {
                 todo!()
             }
         };
-        let mut name = format!("{}{base_name}", self.prefix);
-        if super::is_reserved(&name) {
-            name.push('_');
-        }
+        let name = escape(format!("{}{base_name}", self.prefix));
 
         write!(f, "{name}")?;
 

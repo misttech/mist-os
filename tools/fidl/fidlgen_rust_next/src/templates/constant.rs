@@ -22,8 +22,8 @@ impl<'a> ConstantTemplate<'a> {
     }
 }
 
-impl Contextual for ConstantTemplate<'_> {
-    fn context(&self) -> Context<'_> {
+impl<'a> Contextual<'a> for ConstantTemplate<'a> {
+    fn context(&self) -> Context<'a> {
         self.context
     }
 }

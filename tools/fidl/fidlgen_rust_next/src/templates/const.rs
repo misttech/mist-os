@@ -4,24 +4,28 @@
 
 use askama::Template;
 
-use super::{filters, Context, Contextual};
+use super::{Context, Contextual};
+use crate::id::IdExt as _;
 use crate::ir::{Const, TypeKind};
+use crate::templates::reserved::escape;
 
 #[derive(Template)]
 #[template(path = "const.askama", whitespace = "preserve")]
 pub struct ConstTemplate<'a> {
     cnst: &'a Const,
     context: Context<'a>,
+
+    name: String,
 }
 
 impl<'a> ConstTemplate<'a> {
     pub fn new(cnst: &'a Const, context: Context<'a>) -> Self {
-        Self { cnst, context }
+        Self { cnst, context, name: escape(cnst.name.decl_name().screaming_snake()) }
     }
 }
 
-impl Contextual for ConstTemplate<'_> {
-    fn context(&self) -> Context<'_> {
+impl<'a> Contextual<'a> for ConstTemplate<'a> {
+    fn context(&self) -> Context<'a> {
         self.context
     }
 }

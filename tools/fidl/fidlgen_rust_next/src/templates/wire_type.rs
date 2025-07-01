@@ -31,8 +31,8 @@ impl<'a> WireTypeTemplate<'a> {
     }
 }
 
-impl Contextual for WireTypeTemplate<'_> {
-    fn context(&self) -> Context<'_> {
+impl<'a> Contextual<'a> for WireTypeTemplate<'a> {
+    fn context(&self) -> Context<'a> {
         self.context
     }
 }

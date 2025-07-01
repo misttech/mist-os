@@ -1,21 +1,3 @@
-{% let is_static = union.shape.max_out_of_line == 0 %}
-{% let name = filters::camel(union.name.decl_name())? %}
-{% let base_name = union.name.decl_name().camel() %}
-{% let wire_name = format!("Wire{base_name}") %}
-{% let wire_optional_name = format!("WireOptional{base_name}") %}
-{% let mod_name = filters::snake(union.name.decl_name())? %}
-
-{%
-    let UnionTemplateStrings {
-        de,
-        static_,
-        phantom,
-        decode_unknown,
-        decode_as,
-        encode_as,
-    } = self.template_strings()
-%}
-
 {{ self.doc_string(union.attributes) -}}
 #[derive(
 {% if !union.is_resource %}

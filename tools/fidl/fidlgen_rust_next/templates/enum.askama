@@ -1,9 +1,3 @@
-{% let name = filters::camel(enm.name.decl_name())? %}
-{% let base_name = enm.name.decl_name().camel() %}
-{% let wire_name = format!("Wire{base_name}") %}
-{% let natural_int = self.natural_int(enm.ty) %}
-{% let wire_int = self.wire_int(enm.ty) %}
-
 {{ self.doc_string(enm.attributes) -}}
 #[derive(
     Clone,

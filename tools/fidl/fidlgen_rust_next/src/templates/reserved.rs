@@ -5,11 +5,27 @@
 use std::collections::HashSet;
 use std::sync::LazyLock;
 
-pub fn is_reserved(name: &str) -> bool {
+use crate::ir::Id;
+
+pub fn escape(mut name: String) -> String {
+    if is_reserved(&name) {
+        name.push('_');
+    }
+    name
+}
+
+pub fn escape_compat(mut name: String, id: &Id) -> String {
+    if is_compat_reserved(id.non_canonical()) {
+        name.push('_');
+    }
+    name
+}
+
+fn is_reserved(name: &str) -> bool {
     KEYWORDS.contains(name)
 }
 
-pub fn is_compat_reserved(name: &str) -> bool {
+fn is_compat_reserved(name: &str) -> bool {
     is_reserved(name) || COMPAT_RESERVED_SUFFIX_LIST.iter().any(|suffix| name.ends_with(suffix))
 }
 
