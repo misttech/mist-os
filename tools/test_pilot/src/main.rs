@@ -5,7 +5,6 @@
 mod builder;
 mod env;
 mod errors;
-mod invocation_log;
 mod logger;
 mod name;
 mod parsers;
@@ -13,13 +12,12 @@ mod run_tests;
 mod schema;
 mod std_writer;
 mod test_config;
-mod test_output;
 
 use crate::env::{ActualEnv, EnvLike};
 use crate::logger::{RetainingLogger, StderrLogger};
 use crate::schema::Schema;
-use crate::test_output::OutputDirectory;
 use std::fs;
+use test_pilot_lib::test_output::OutputDirectory;
 
 const INVALID_ARGS_CONFIG_EXIT_CODE: i32 = 222;
 const ENV_PATH: &str = "PATH";

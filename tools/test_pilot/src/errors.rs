@@ -6,6 +6,7 @@ use crate::name::Name;
 use serde_json::Value;
 use std::io;
 use std::path::PathBuf;
+use test_pilot_lib::test_output::TestOutputError;
 use thiserror::Error;
 use valico::json_schema::validators::ValidationState;
 
@@ -19,31 +20,17 @@ pub enum TestRunError {
         source: io::Error,
     },
 
-    #[error("Error reading stdout: {0:?}")]
+    #[error("Error reading stdout: {0}")]
     StdoutRead(#[source] io::Error),
 
-    #[error("Error reading stderr: {0:?}")]
+    #[error("Error reading stderr: {0}")]
     StderrRead(#[source] io::Error),
 
-    #[error("Error writing stdout: {0:?}")]
+    #[error("Error writing stdout: {0}")]
     StdoutWrite(#[source] io::Error),
 
-    #[error("Error writing stderr: {0:?}")]
+    #[error("Error writing stderr: {0}")]
     StderrWrite(#[source] io::Error),
-
-    #[error("Error reading output summary file {path}")]
-    OutputSummaryRead {
-        path: PathBuf,
-        #[source]
-        source: serde_json::Error,
-    },
-
-    #[error("Error writing output summary file {path}")]
-    OutputSummaryWrite {
-        path: PathBuf,
-        #[source]
-        source: io::Error,
-    },
 
     #[error("Error creating output file {path}")]
     FailedToCreateFile {
@@ -51,6 +38,9 @@ pub enum TestRunError {
         #[source]
         source: io::Error,
     },
+
+    #[error("Output operation failed: {0}")]
+    OutputOperationFailed(#[from] TestOutputError),
 }
 
 /// Error encountered validating config
@@ -129,7 +119,7 @@ pub enum UsageError {
     #[error("Option '{option}' has unexpected value {got}")]
     UnexpectedOptionValue { option: Name, got: Value },
 
-    #[error("Invalid 'strict' value: {0:?}. 'strict' can only be set to true")]
+    #[error("Invalid 'strict' value: {0}. 'strict' can only be set to true")]
     InvalidStrictValue(String),
 
     #[error("Included path {0} does not exist")]

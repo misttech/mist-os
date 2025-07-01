@@ -3,17 +3,17 @@
 // found in the LICENSE file.
 
 use crate::errors::TestRunError;
-use crate::invocation_log::CommandInvocationLog;
 use crate::std_writer::StdWriter;
 use crate::test_config::{OutputProcessor, TestConfig};
-use crate::test_output::{
-    is_fail_exit_status, outcome_from_exit_status, OutputDirectory, Summary, SummaryArtifact,
-};
 use std::borrow::Cow;
 use std::path::PathBuf;
 use std::process::{ExitStatus, Stdio};
 use std::time::Instant;
 use std::{fs, io};
+use test_pilot_lib::invocation_log::CommandInvocationLog;
+use test_pilot_lib::test_output::{
+    is_fail_exit_status, outcome_from_exit_status, OutputDirectory, Summary, SummaryArtifact,
+};
 use tokio::io::AsyncReadExt;
 use tokio::process::{self, Command};
 
@@ -91,9 +91,9 @@ async fn run_test_inner(
         exit_status
     };
 
-    if main_summary.maybe_merge_file(&outdir.test_summary())? {
-        main_summary.write(&outdir.main_summary())?;
-    }
+    let _merged = main_summary.maybe_merge_file(&outdir.test_summary())?;
+
+    main_summary.write(&outdir.main_summary())?;
 
     for output_processor in &test_config.output_processors {
         if (exit_status.success() && !output_processor.use_on_success)
