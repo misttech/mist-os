@@ -18,6 +18,20 @@ pub struct WireResult<'de, T, E> {
     _phantom: PhantomData<(&'de mut [Chunk], T, E)>,
 }
 
+impl<T, E> Drop for WireResult<'_, T, E> {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            ORD_OK => {
+                let _ = unsafe { self.raw.get().read_unchecked::<T>() };
+            }
+            ORD_ERR => {
+                let _ = unsafe { self.raw.get().read_unchecked::<E>() };
+            }
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
 unsafe impl<T: Wire, E: Wire> Wire for WireResult<'static, T, E> {
     type Decoded<'de> = WireResult<'de, T::Decoded<'de>, E::Decoded<'de>>;
 
@@ -77,11 +91,24 @@ impl<T, E> WireResult<'_, T, E> {
 
     /// Returns a `Result` of the owned value or error.
     pub fn into_result(self) -> Result<T, E> {
-        let raw = ManuallyDrop::new(self.raw);
-        match raw.ordinal() {
-            ORD_OK => unsafe { Ok(raw.get().read_unchecked()) },
-            ORD_ERR => unsafe { Err(raw.get().read_unchecked()) },
+        let this = ManuallyDrop::new(self);
+        match this.raw.ordinal() {
+            ORD_OK => unsafe { Ok(this.raw.get().read_unchecked()) },
+            ORD_ERR => unsafe { Err(this.raw.get().read_unchecked()) },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
+impl<T: Clone, E: Clone> Clone for WireResult<'_, T, E> {
+    fn clone(&self) -> Self {
+        Self {
+            raw: match self.raw.ordinal() {
+                ORD_OK => unsafe { self.raw.clone_inline_unchecked::<T>() },
+                ORD_ERR => unsafe { self.raw.clone_inline_unchecked::<E>() },
+                _ => unsafe { ::core::hint::unreachable_unchecked() },
+            },
+            _phantom: PhantomData,
         }
     }
 }

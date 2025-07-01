@@ -4,7 +4,7 @@
 
 use core::fmt;
 use core::marker::PhantomData;
-use core::mem::MaybeUninit;
+use core::mem::{ManuallyDrop, MaybeUninit};
 
 use fidl_next_codec::{
     munge, Chunk, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, EncodeRef, Encoder,
@@ -14,7 +14,7 @@ use fidl_next_codec::{
 use crate::{FrameworkError, WireFrameworkError};
 
 /// A flexible FIDL response.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum Flexible<T> {
     /// The value of the flexible call when successful.
     Ok(T),
@@ -37,6 +37,20 @@ impl<T> Flexible<T> {
 pub struct WireFlexible<'de, T> {
     raw: RawWireUnion,
     _phantom: PhantomData<(&'de mut [Chunk], T)>,
+}
+
+impl<T> Drop for WireFlexible<'_, T> {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            ORD_OK => {
+                let _ = unsafe { self.raw.get().read_unchecked::<T>() };
+            }
+            ORD_FRAMEWORK_ERR => {
+                let _ = unsafe { self.raw.get().read_unchecked::<WireFrameworkError>() };
+            }
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl<T: Wire> Wire for WireFlexible<'static, T> {
@@ -114,12 +128,28 @@ impl<T> WireFlexible<'_, T> {
 
     /// Returns a `Flexible` of an `Owned` value or framework error.
     pub fn to_flexible(self) -> Flexible<T> {
-        match self.raw.ordinal() {
-            ORD_OK => unsafe { Flexible::Ok(self.raw.get().read_unchecked()) },
+        let this = ManuallyDrop::new(self);
+        match this.raw.ordinal() {
+            ORD_OK => unsafe { Flexible::Ok(this.raw.get().read_unchecked()) },
             ORD_FRAMEWORK_ERR => unsafe {
-                Flexible::FrameworkErr(self.raw.get().read_unchecked::<WireFrameworkError>().into())
+                Flexible::FrameworkErr(this.raw.get().read_unchecked::<WireFrameworkError>().into())
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
+impl<T: Clone> Clone for WireFlexible<'_, T> {
+    fn clone(&self) -> Self {
+        Self {
+            raw: match self.raw.ordinal() {
+                ORD_OK => unsafe { self.raw.clone_inline_unchecked::<T>() },
+                ORD_FRAMEWORK_ERR => unsafe {
+                    self.raw.clone_inline_unchecked::<WireFrameworkError>()
+                },
+                _ => unsafe { ::core::hint::unreachable_unchecked() },
+            },
+            _phantom: PhantomData,
         }
     }
 }

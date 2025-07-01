@@ -4,7 +4,7 @@
 
 use core::fmt;
 use core::marker::PhantomData;
-use core::mem::MaybeUninit;
+use core::mem::{ManuallyDrop, MaybeUninit};
 
 use fidl_next_codec::{
     munge, Chunk, Decode, DecodeError, Decoder, Encodable, Encode, EncodeError, EncodeRef, Encoder,
@@ -14,7 +14,7 @@ use fidl_next_codec::{
 use crate::{FrameworkError, WireFrameworkError};
 
 /// A flexible FIDL result.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub enum FlexibleResult<T, E> {
     /// The value of the flexible call when successful.
     Ok(T),
@@ -40,6 +40,23 @@ impl<T, E> FlexibleResult<T, E> {
 pub struct WireFlexibleResult<'de, T, E> {
     raw: RawWireUnion,
     _phantom: PhantomData<(&'de mut [Chunk], T, E)>,
+}
+
+impl<T, E> Drop for WireFlexibleResult<'_, T, E> {
+    fn drop(&mut self) {
+        match self.raw.ordinal() {
+            ORD_OK => {
+                let _ = unsafe { self.raw.get().read_unchecked::<T>() };
+            }
+            ORD_ERR => {
+                let _ = unsafe { self.raw.get().read_unchecked::<E>() };
+            }
+            ORD_FRAMEWORK_ERR => {
+                let _ = unsafe { self.raw.get().read_unchecked::<WireFrameworkError>() };
+            }
+            _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
 }
 
 unsafe impl<T: Wire, E: Wire> Wire for WireFlexibleResult<'static, T, E> {
@@ -150,15 +167,32 @@ impl<'de, T, E> WireFlexibleResult<'de, T, E> {
 
     /// Returns a `FlexibleResult` of a value or framework error.
     pub fn to_flexible_result(self) -> FlexibleResult<T, E> {
-        match self.raw.ordinal() {
-            ORD_OK => unsafe { FlexibleResult::Ok(self.raw.get().read_unchecked()) },
-            ORD_ERR => unsafe { FlexibleResult::Err(self.raw.get().read_unchecked()) },
+        let this = ManuallyDrop::new(self);
+        match this.raw.ordinal() {
+            ORD_OK => unsafe { FlexibleResult::Ok(this.raw.get().read_unchecked()) },
+            ORD_ERR => unsafe { FlexibleResult::Err(this.raw.get().read_unchecked()) },
             ORD_FRAMEWORK_ERR => unsafe {
                 FlexibleResult::FrameworkErr(
-                    self.raw.get().read_unchecked::<WireFrameworkError>().into(),
+                    this.raw.get().read_unchecked::<WireFrameworkError>().into(),
                 )
             },
             _ => unsafe { ::core::hint::unreachable_unchecked() },
+        }
+    }
+}
+
+impl<T: Clone, E: Clone> Clone for WireFlexibleResult<'_, T, E> {
+    fn clone(&self) -> Self {
+        Self {
+            raw: match self.raw.ordinal() {
+                ORD_OK => unsafe { self.raw.clone_inline_unchecked::<T>() },
+                ORD_ERR => unsafe { self.raw.clone_inline_unchecked::<E>() },
+                ORD_FRAMEWORK_ERR => unsafe {
+                    self.raw.clone_inline_unchecked::<WireFrameworkError>()
+                },
+                _ => unsafe { ::core::hint::unreachable_unchecked() },
+            },
+            _phantom: PhantomData,
         }
     }
 }
