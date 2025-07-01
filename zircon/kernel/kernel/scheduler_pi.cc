@@ -260,8 +260,26 @@ class ThreadBaseProfileChangedOp
  public:
   using Base = Scheduler::PiOperation<ThreadBaseProfileChangedOp, Thread>;
   ThreadBaseProfileChangedOp(Thread& target) TA_REQ(target.get_lock())
-      : Base{target}, has_ever_run_{target.state() != thread_state::THREAD_INITIAL} {}
+      : Base{target}
+#if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+        ,
+        has_ever_run_{target.state() != thread_state::THREAD_INITIAL}
+#endif
+  {
+  }
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  void UpdateDynamicParams(const SchedulerState::EffectiveProfile& target_old_ep,
+                           const SchedulerState::EffectiveProfile& target_new_ep)
+      TA_REQ(chainlock_transaction_token, target_.get_lock()) {
+    // Make sure the start and finish times are consistent with the bandwidth
+    // parameters of the deadline profile. Consistency in fair profiles is
+    // handled by Scheduler::AdjustFairBandwidth.
+    if (target_new_ep.IsDeadline()) {
+      GetStartTime(target_) = GetFinishTime(target_) - target_new_ep.deadline().deadline_ns;
+    }
+  }
+#else
   void UpdateDynamicParams(const SchedulerState::EffectiveProfile& target_old_ep,
                            const SchedulerState::EffectiveProfile& target_new_ep,
                            SchedTime virt_now)
@@ -288,6 +306,7 @@ class ThreadBaseProfileChangedOp
     }
     GetTimeSliceNs(target_) = SchedDuration{0};
   }
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
   void DoOperation() TA_REQ(chainlock_transaction_token) {
     // We held this lock at construction time and should never drop any locks
@@ -302,8 +321,10 @@ class ThreadBaseProfileChangedOp
     HandlePiInteractionCommon();
   }
 
+#if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
  private:
   const bool has_ever_run_;
+#endif
 };
 
 // Definition of the UpstreamThreadBaseProfileChange operation.  Called when a
@@ -319,6 +340,18 @@ class UpstreamThreadBaseProfileChangedOp
       TA_REQ(upstream.get_lock(), target.get_lock())
       : Base{target}, upstream_{upstream} {}
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  void UpdateDynamicParams(const SchedulerState::EffectiveProfile& target_old_ep,
+                           const SchedulerState::EffectiveProfile& target_new_ep)
+      TA_REQ(target_.get_lock()) {
+    // Make sure the start and finish times are consistent with the bandwidth
+    // parameters of the deadline profile. Consistency in fair profiles is
+    // handled by Scheduler::AdjustFairBandwidth.
+    if (target_new_ep.IsDeadline()) {
+      GetStartTime(target_) = GetFinishTime(target_) - target_new_ep.deadline().deadline_ns;
+    }
+  }
+#else
   void UpdateDynamicParams(const SchedulerState::EffectiveProfile& target_old_ep,
                            const SchedulerState::EffectiveProfile& target_new_ep,
                            SchedTime virt_now) TA_REQ(target_.get_lock()) {
@@ -344,6 +377,7 @@ class UpstreamThreadBaseProfileChangedOp
       GetTimeSliceNs(target_) = SchedDuration{0};
     }
   }
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
   void DoOperation() TA_REQ(chainlock_transaction_token) {
     // We held these locks at construction time and should never drop any locks
@@ -394,9 +428,12 @@ class JoinNodeToPiGraphOp
       : Base{target}, upstream_{upstream} {}
 
   void UpdateDynamicParams(const SchedulerState::EffectiveProfile& target_old_ep,
-                           const SchedulerState::EffectiveProfile& target_new_ep,
-                           SchedTime virt_now)
-      TA_REQ(chainlock_transaction_token, target_.get_lock()) {
+                           const SchedulerState::EffectiveProfile& target_new_ep
+#if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+                           ,
+                           SchedTime virt_now
+#endif
+                           ) TA_REQ(chainlock_transaction_token, target_.get_lock()) {
     // See DoOperation for why it is ok to simply Mark instead of Assert here.
     upstream_.get_lock().MarkHeld();
     const EffectiveProfileHelper upstream_ep{upstream_};
@@ -424,7 +461,45 @@ class JoinNodeToPiGraphOp
       GetStartTime(target_) = GetStartTime(upstream_);
       GetFinishTime(target_) = GetFinishTime(upstream_);
       GetTimeSliceNs(target_) = GetTimeSliceNs(upstream_);
+      GetTimeSliceUsedNs(target_) = GetTimeSliceUsedNs(upstream_);
     } else {
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+      // The target_ was already a deadline thread, then we need to recompute the
+      // target_'s dynamic deadline parameters using the lag equation.
+      // Compute the remaining periods of the target and upstream threads.
+      const SchedDuration target_remaining_period =
+          ktl::max<SchedDuration>(GetFinishTime(target_) - mono_now_, SchedDuration{0});
+      const SchedDuration upstream_remaining_period =
+          ktl::max<SchedDuration>(GetFinishTime(upstream_) - mono_now_, SchedDuration{0});
+      const SchedDuration min_remaining_period =
+          ktl::min(target_remaining_period, upstream_remaining_period);
+
+      GetFinishTime(target_) = ktl::min(GetFinishTime(target_), GetFinishTime(upstream_));
+      GetStartTime(target_) = GetFinishTime(target_) - target_new_ep.deadline().deadline_ns;
+
+      // TODO(eieio): If a period is expired, the full bandwidth contribution of
+      // the respective task is available to the target and downstream, if any.
+      const SchedDuration new_remaining_time_slice =
+          GetRemainingTimeSliceNs(target_) + GetRemainingTimeSliceNs(upstream_) +
+          target_old_ep.deadline().utilization * (min_remaining_period - target_remaining_period) +
+          upstream_ep().deadline().utilization * (min_remaining_period - upstream_remaining_period);
+
+      // Limit the TSR.  It cannot be less than zero nor can it be more than the
+      // time until the absolute deadline of the new combined thread.
+      //
+      // TODO(johngro): If we did have to clamp the TSR, the amount we clamp by
+      // needs to turn into carried lag.
+      const SchedDuration clamped_remaining_time_slice = ktl::clamp<SchedDuration>(
+          new_remaining_time_slice, SchedDuration{0}, min_remaining_period);
+      GetTimeSliceNs(target_) = target_new_ep.deadline().capacity_ns;
+      GetTimeSliceUsedNs(target_) =
+          target_new_ep.deadline().capacity_ns - clamped_remaining_time_slice;
+      DEBUG_ASSERT_MSG(GetRemainingTimeSliceNs(target_) >= 0,
+                       "capacity=%" PRId64 " remaining_time_slice=%" PRId64
+                       " remaining_period=%" PRId64,
+                       target_new_ep.deadline().capacity_ns.raw_value(),
+                       new_remaining_time_slice.raw_value(), min_remaining_period.raw_value());
+#else
       // The target_ was already a deadline thread, then we need to recompute the
       // target_'s dynamic deadline parameters using the lag equation.
       // Compute the time till absolute deadline (ttad) of the target_ and
@@ -453,6 +528,7 @@ class JoinNodeToPiGraphOp
       GetTimeSliceNs(target_) = ktl::clamp<SchedDuration>(new_tsr, SchedDuration{0}, combined_ttad);
       GetFinishTime(target_) = ktl::min(GetFinishTime(target_), GetFinishTime(upstream_));
       GetStartTime(target_) = GetFinishTime(target_) - target_new_ep.deadline().deadline_ns;
+#endif
     }
   }
 
@@ -499,9 +575,12 @@ class SplitNodeFromPiGraphOp
       : Base{target}, upstream_{upstream} {}
 
   void UpdateDynamicParams(const SchedulerState::EffectiveProfile& target_old_ep,
-                           const SchedulerState::EffectiveProfile& target_new_ep,
-                           SchedTime virt_now)
-      TA_REQ(chainlock_transaction_token, target_.get_lock()) {
+                           const SchedulerState::EffectiveProfile& target_new_ep
+#if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+                           ,
+                           SchedTime virt_now
+#endif
+                           ) TA_REQ(chainlock_transaction_token, target_.get_lock()) {
     // During construction, we statically required that we were holding
     // upstream_.get_lock().  It should be OK to Mark it as held here.
     upstream_.get_lock().MarkHeld();
@@ -520,19 +599,32 @@ class SplitNodeFromPiGraphOp
       // change from deadline to fair, all of the deadline pressure must have been
       // coming from the upstream_ node.  Assert all of this.
       DEBUG_ASSERT(upstream_ep().IsDeadline());
-      DEBUG_ASSERT(target_old_ep.deadline().capacity_ns == upstream_ep().deadline().capacity_ns);
-      DEBUG_ASSERT(target_old_ep.deadline().deadline_ns == upstream_ep().deadline().deadline_ns);
+      DEBUG_ASSERT_MSG(target_old_ep.deadline().capacity_ns == upstream_ep().deadline().capacity_ns,
+                       "toep.deadline.capacity=%" PRId64 " uep.deadline.capacity=%" PRId64,
+                       target_old_ep.deadline().capacity_ns.raw_value(),
+                       upstream_ep().deadline().capacity_ns.raw_value());
+      DEBUG_ASSERT_MSG(target_old_ep.deadline().deadline_ns == upstream_ep().deadline().deadline_ns,
+                       "toep.deadline.deadline=%" PRId64 " uep.deadline.deadline=%" PRId64,
+                       target_old_ep.deadline().deadline_ns.raw_value(),
+                       upstream_ep().deadline().deadline_ns.raw_value());
 
       // Give the dynamic deadline parameters over to the upstream_ node.
       GetStartTime(upstream_) = GetStartTime(target_);
       GetFinishTime(upstream_) = GetFinishTime(target_);
       GetTimeSliceNs(upstream_) = GetTimeSliceNs(target_);
+      GetTimeSliceUsedNs(upstream_) = GetTimeSliceUsedNs(target_);
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+      // TODO(eieio): Just expire the time slice for now. This should actually
+      // be split out the same way as for deadline threads.
+      GetTimeSliceUsedNs(target_) = GetTimeSliceNs(target_);
+#else
       // Make sure that our fair parameters have been reset.  If we are
       // an active thread, we will mono_now_ re-arrive with our new parameters.
       GetStartTime(target_) = SchedTime{0};
       GetFinishTime(target_) = SchedTime{1};
       GetTimeSliceNs(target_) = SchedDuration{0};
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
     } else {
       // OK, the target_ node is still a deadline node.  If the upstream_ node
       // is a fair node, we don't have to do anything at all.  A fair node
@@ -545,10 +637,18 @@ class SplitNodeFromPiGraphOp
       // equation in order to figure out what the new time slice remaining and
       // absolute deadlines are.
       if (upstream_ep().IsDeadline()) {
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+        // Compute the time until absolute deadline of the target and upstream.
+        const SchedDuration target_remaining_period =
+            ktl::max<SchedDuration>(GetFinishTime(target_) - mono_now_, SchedDuration{0});
+        const SchedDuration upstream_remaining_period =
+            ktl::max<SchedDuration>(GetFinishTime(upstream_) - mono_now_, SchedDuration{0});
+#else
         // Compute the time till absolute deadline (ttad) of the target_.
         const SchedDuration target_ttad = (GetFinishTime(target_) > mono_now_)
                                               ? (GetFinishTime(target_) - mono_now_)
                                               : SchedDuration{0};
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
         // Figure out what the uncapped utilization of the combined thread
         // _would_ have been based on the utilizations of the target_ and
@@ -558,6 +658,21 @@ class SplitNodeFromPiGraphOp
         const SchedUtilization combined_uncapped_utilization =
             target_new_ep.deadline().utilization + upstream_ep().deadline().utilization;
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+        const SchedUtilization upstream_utilization_ratio =
+            upstream_ep().deadline().utilization / combined_uncapped_utilization;
+        const SchedDuration new_upstream_remaining_time_slice =
+            upstream_utilization_ratio * GetRemainingTimeSliceNs(target_) +
+            upstream_ep().deadline().utilization *
+                (upstream_remaining_period - target_remaining_period);
+
+        // TODO(johngro): This also changes when carried lag comes into
+        // play.
+        GetTimeSliceNs(upstream_) = upstream_ep().deadline().capacity_ns;
+        GetTimeSliceUsedNs(upstream_) =
+            upstream_ep().deadline().capacity_ns -
+            ktl::max(new_upstream_remaining_time_slice, SchedDuration{0});
+#else
         // If the upstream_ node's time till absolute deadline is zero, there
         // is no need to compute its time slice remaining right mono_now_; we
         // would just end up capping it to zero anyway.
@@ -577,6 +692,7 @@ class SplitNodeFromPiGraphOp
           // play.
           GetTimeSliceNs(upstream_) = ktl::max(new_upstream_tsr, SchedDuration{0});
         }
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
         // TODO(johngro): Fix this.  Logically, it is not correct to
         // preserve the abs deadline of the target_ after the split.  The
@@ -601,12 +717,21 @@ class SplitNodeFromPiGraphOp
         // assignee into account to provide headroom in certain situations.
         // Use an intermediate with the same fractional precision as the
         // utilization operands before scaling the non-fractional timeslice.
-        const SchedUtilization utilization_ratio =
+        const SchedUtilization target_utilization_ratio =
             target_new_ep.deadline().utilization / combined_uncapped_utilization;
-        const SchedDuration new_target_tsr = GetTimeSliceNs(target_) * utilization_ratio;
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+        const SchedDuration new_target_remaining_time_slice =
+            GetRemainingTimeSliceNs(target_) * target_utilization_ratio;
+
+        GetTimeSliceNs(target_) = target_new_ep.deadline().capacity_ns;
+        GetTimeSliceUsedNs(target_) = target_new_ep.deadline().capacity_ns -
+                                      ktl::max(new_target_remaining_time_slice, SchedDuration{0});
+#else
+        const SchedDuration new_target_tsr = GetTimeSliceNs(target_) * target_utilization_ratio;
 
         // TODO(johngro): once again, need to consider carried lag here.
         GetTimeSliceNs(target_) = ktl::max(new_target_tsr, SchedDuration{0});
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
       }
     }
   }
@@ -650,14 +775,15 @@ class SplitNodeFromPiGraphOp
 //    we need to:
 // 1.1) Enter the scheduler's queue lock.
 // 1.2) If the thread is active, but not actually running, remove the target
-//      thread from its scheduler's run queue.
+//      thread from its scheduler's run queue if it is in the queue.
 // 1.3) Now update the thread's effective profile.
 // 1.4) Apply any changes in the thread's effective profile to its scheduler's
 //      bookkeeping.
 // 1.5) Update the dynamic parameters of the thread.
 // 1.6) Either re-insert the thread into its scheduler's run queue (if it was
-//      READY) or adjust its schedulers preemption time (if it was RUNNING).
-// 1.7) Trigger a reschedule on the thread's scheduler.
+//      READY AND in the queue) or adjust its schedulers preemption time (if it
+//      was RUNNING).
+// 1.7) Trigger a reschedule of the the thread's CPU.
 // 2) If the target is either an OwnedWaitQueue, or a thread which is not
 //    active:
 // 2.1) Recompute the target's effective profile, adjust the target's position
@@ -730,6 +856,29 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
 
       // Update the scheduler bookkeeping, if necessary.
       if (disposition == Disposition::Associated || disposition == Disposition::Enqueued) {
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+        SchedWeight weight_delta{0};
+        SchedUtilization utilization_delta{0};
+
+        if (old_ep.IsFair()) {
+          weight_delta -= old_ep.weight();
+        } else {
+          utilization_delta -= old_ep.deadline().utilization;
+        }
+        if (new_ep.IsFair()) {
+          weight_delta += new_ep.weight();
+        } else {
+          utilization_delta += new_ep.deadline().utilization;
+        }
+
+        if (weight_delta != 0) {
+          scheduler.weight_total_ += weight_delta;
+          scheduler.UpdateFairBandwidthPeriod(mono_now_);
+        }
+        if (utilization_delta != 0) {
+          scheduler.UpdateTotalDeadlineUtilization(utilization_delta);
+        }
+#else
         if (old_ep.IsFair()) {
           scheduler.weight_total_ -= old_ep.weight();
           --scheduler.runnable_fair_task_count_;
@@ -745,26 +894,39 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
           scheduler.UpdateTotalDeadlineUtilization(new_ep.deadline().utilization);
           ++scheduler.runnable_deadline_task_count_;
         }
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
       }
 
       DEBUG_ASSERT(scheduler.weight_total_ >= SchedWeight{0});
       DEBUG_ASSERT(scheduler.total_deadline_utilization_ >= SchedUtilization{0});
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+      static_cast<Op*>(this)->UpdateDynamicParams(old_ep, new_ep);
+#else
       static_cast<Op*>(this)->UpdateDynamicParams(old_ep, new_ep, scheduler.virtual_time_);
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
-      // OK, we are done updating this thread's state, as well as most of its
-      // scheduler's state.  The last thing to do is to either put the thread
-      // back into the proper run queue (if it is READY and active), or to
-      // adjust the preemption time for the scheduler (if this thread is
-      // actively running)
       if (target_.state() == THREAD_READY) {
         if (disposition == Disposition::Enqueued) {
           scheduler.QueueThread(&target_, Placement::Adjustment);
         }
       } else {
         DEBUG_ASSERT(target_.state() == THREAD_RUNNING);
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+        if (new_ep.IsFair()) {
+          scheduler.target_preemption_time_ns_ =
+              scheduler.start_of_current_time_slice_ns_ + state.remaining_time_slice_ns();
+        } else {
+          const SchedDuration scaled_remaining_time_slice_ns =
+              scheduler.ScaleUp(state.remaining_time_slice_ns());
+          scheduler.target_preemption_time_ns_ = ktl::min<SchedTime>(
+              scheduler.start_of_current_time_slice_ns_ + scaled_remaining_time_slice_ns,
+              state.finish_time_);
+        }
+#else
         scheduler.target_preemption_time_ns_ =
             scheduler.start_of_current_time_slice_ns_ + scheduler.ScaleUp(state.time_slice_ns_);
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
       }
 
       // Check that target is left in the same disposition.
@@ -802,19 +964,32 @@ inline void Scheduler::PiOperation<Op, TargetType>::HandlePiInteractionCommon() 
       } else {
         target_.RecomputeEffectiveProfile();
       }
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+      static_cast<Op*>(this)->UpdateDynamicParams(old_ep, state.effective_profile_);
+#else
       static_cast<Op*>(this)->UpdateDynamicParams(old_ep, state.effective_profile_, SchedTime{0});
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
     }
   } else {
     static_assert(ktl::is_same_v<TargetType, OwnedWaitQueue>,
                   "Targets of PI operations must either be Threads or OwnedWaitQueues");
     SchedulerState::EffectiveProfile old_ep{ComputeEffectiveProfile(target_)};
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+    static_cast<Op*>(this)->UpdateDynamicParams(old_ep, old_ep);
+#else
     static_cast<Op*>(this)->UpdateDynamicParams(old_ep, old_ep, SchedTime{0});
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
   }
 
-  DEBUG_ASSERT_MSG(SchedTime st = GetStartTime(target_);
-                   st >= 0, "start_time %ld\n", st.raw_value());
-  DEBUG_ASSERT_MSG(SchedTime ft = GetFinishTime(target_);
-                   ft >= 0, "finish_time %ld\n", ft.raw_value());
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  // The finish time should not be negative, but the start time can be when it
+  // is re-calculated relative to the finish time.
+#else
+  DEBUG_ASSERT_MSG(SchedTime start_time = GetStartTime(target_);
+                   start_time >= 0, "start_time %ld\n", start_time.raw_value());
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  DEBUG_ASSERT_MSG(SchedTime finish_time = GetFinishTime(target_);
+                   finish_time >= 0, "finish_time %ld\n", finish_time.raw_value());
 }
 
 void Scheduler::ThreadBaseProfileChanged(Thread& thread) {
