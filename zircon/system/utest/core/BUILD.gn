@@ -266,6 +266,7 @@ if (is_fuchsia) {
       "kernel.ppb.borrow-in-supplypages=true",
       "kernel.ppb.borrow-on-mru=true",
       "kernel.ppb.loan=true",
+      "kernel.stack.canary-percent-free=10",
     ]
 
     # Only add this switch if we're building with ZX_DEBUG_ASSERT enabled
