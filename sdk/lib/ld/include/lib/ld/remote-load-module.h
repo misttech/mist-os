@@ -320,8 +320,7 @@ class RemoteLoadModule : public RemoteLoadModuleBase<Elf> {
     if (!elfldltl::RelocateRelative(diag, mutable_memory, this->reloc_info(), this->load_bias())) {
       return false;
     }
-    auto resolver =
-        elfldltl::MakeSymbolResolver(*this, modules, diag, tls_desc_resolver, ld::kResolverPolicy);
+    auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, tls_desc_resolver);
     return elfldltl::RelocateSymbolic<Machine>(mutable_memory, diag, this->reloc_info(),
                                                this->symbol_info(), this->load_bias(), resolver);
   }

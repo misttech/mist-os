@@ -25,12 +25,6 @@ using dl::testing::TestModule;
 using dl::testing::TestShlib;
 using dl::testing::TestSym;
 
-// Weak symbol resolution tests conditionalize on `ld::kResolverPolicy` to
-// verify the symbol chosen based on the resolution strategy (e.g., strict
-// link-order vs. strong-over-weak).
-// TODO(https://fxbug.dev/428046261): Use strict link order resolution.
-static_assert(ld::kResolverPolicy == elfldltl::ResolverPolicy::kStrongOverWeak);
-
 // Test that the module data structure uses its own copy of the module's name,
 // so that there is no dependency on the memory backing the original string
 // pointer.
@@ -146,15 +140,10 @@ TYPED_TEST(DlTests, OneWeakSymbol) {
   ASSERT_TRUE(sym.is_ok()) << sym.error_value();
   ASSERT_TRUE(sym.value());
 
-  switch (TestFixture::kResolverPolicy) {
-    case elfldltl::ResolverPolicy::kStrictLinkOrder: {
-      EXPECT_EQ(RunFunction<int64_t>(sym.value()), kFooV1ReturnValue);
-      break;
-    }
-    case elfldltl::ResolverPolicy::kStrongOverWeak: {
-      EXPECT_EQ(RunFunction<int64_t>(sym.value()), kFooV2ReturnValue);
-      break;
-    }
+  if (TestFixture::kStrictLinkOrderResolution) {
+    EXPECT_EQ(RunFunction<int64_t>(sym.value()), kFooV1ReturnValue);
+  } else {
+    EXPECT_EQ(RunFunction<int64_t>(sym.value()), kFooV2ReturnValue);
   }
 
   ASSERT_TRUE(this->DlClose(open.value()).is_ok());

@@ -46,7 +46,7 @@ TYPED_TEST(LdLoadTests, SymbolicNamespace) {
 }
 
 TYPED_TEST(LdLoadTests, OneWeakSymbol) {
-  constexpr int64_t kFooV2ReturnValue = 7;
+  constexpr int64_t kFooV1ReturnValue = 2;
 
   ASSERT_NO_FATAL_FAILURE(this->Init());
 
@@ -54,11 +54,7 @@ TYPED_TEST(LdLoadTests, OneWeakSymbol) {
 
   ASSERT_NO_FATAL_FAILURE(this->Load("one-weak-symbol"));
 
-  // TODO(https://fxbug.dev/428046261): libld will resolve to the strong
-  // definition found in libld-dep-foo-v2. Eventually, when strict link order
-  // resolution is enforced, libld will use the first definition found in the
-  // dependency set (from libld-dep-foo-v1).
-  EXPECT_EQ(this->Run(), kFooV2ReturnValue);
+  EXPECT_EQ(this->Run(), kFooV1ReturnValue);
 
   this->ExpectLog("");
 }

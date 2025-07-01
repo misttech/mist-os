@@ -5,7 +5,6 @@
 #ifndef LIB_C_DLFCN_DL_TEST_DL_TESTS_BASE_H_
 #define LIB_C_DLFCN_DL_TEST_DL_TESTS_BASE_H_
 
-#include <lib/elfldltl/resolve.h>
 #include <lib/fit/result.h>
 
 #include <gtest/gtest.h>
@@ -62,8 +61,7 @@ class DlTestsBase : public ::testing::Test {
 
   // Whether the test fixture will resolve to the first symbol it finds, even if
   // the symbol is marked weak.
-  static constexpr elfldltl::ResolverPolicy kResolverPolicy =
-      elfldltl::ResolverPolicy::kStrictLinkOrder;
+  static constexpr bool kStrictLinkOrderResolution = true;
 
   // Test fixtures are expected to provide definitions for the following API:
   fit::result<Error, void*> DlOpen(const char* file, int mode);

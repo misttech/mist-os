@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_C_DLFCN_DL_TEST_DL_SYSTEM_TESTS_H_
-#define LIB_C_DLFCN_DL_TEST_DL_SYSTEM_TESTS_H_
+#ifndef LIB_DL_TEST_DL_SYSTEM_TESTS_H_
+#define LIB_DL_TEST_DL_SYSTEM_TESTS_H_
 
 #include <dlfcn.h>  // for dlinfo
 
@@ -47,8 +47,7 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // DT_SONAME is matched with another module in a linking session.
   static constexpr bool kSonameLookupInPendingDeps = false;
   // Musl will look for and prefer a strong symbol over a weak symbol.
-  static constexpr elfldltl::ResolverPolicy kResolverPolicy =
-      elfldltl::ResolverPolicy::kStrongOverWeak;
+  static constexpr bool kStrictLinkOrderResolution = false;
 #endif
 
   fit::result<Error, void*> DlOpen(const char* file, int mode);
@@ -97,4 +96,4 @@ class DlSystemTests : public DlSystemLoadTestsBase {
 
 }  // namespace dl::testing
 
-#endif  // LIB_C_DLFCN_DL_TEST_DL_SYSTEM_TESTS_H_
+#endif  // LIB_DL_TEST_DL_SYSTEM_TESTS_H_
