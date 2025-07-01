@@ -24,6 +24,8 @@ per_test_modules = [
   ":precedence-in-dep-resolution",
   ":soname-filename-loaded-dep",
   ":soname-filename-dep",
+  ":one-weak-symbol",
+  ":all-weak-symbols",
 ]
 
 per_test_executables = [
@@ -39,8 +41,6 @@ per_test_executables = [
   ":missing-dep",
   ":missing-transitive-dep",
   ":cyclic-dep-parent",
-  ":one-weak-symbol",
-  ":all-weak-symbols",
 ]
 
 per_test_shlibs = [ ":multiple-transitive-foo-deps" ]
@@ -1540,8 +1540,7 @@ foreach(test, [ "" ] + per_test_suffices) {
   # one-weak-symbol:
   #  - foo-v1 -> [[gnu::weak]] foo() returns 2
   #  - foo-v2 -> foo() returns 7
-  test_executable("one-weak-symbol$suffix") {
-    can_be_in_process = true
+  test_loadable_module("one-weak-symbol$suffix.module") {
     defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     sources = [ "foo.cc" ]
     deps = [
@@ -1553,8 +1552,7 @@ foreach(test, [ "" ] + per_test_suffices) {
   # all-weak-symbols:
   #  - foo-v1 -> [[gnu::weak]] foo() returns 2
   #  - foo-v2 -> [[gnu::weak]] foo() returns 7
-  test_executable("all-weak-symbols$suffix") {
-    can_be_in_process = true
+  test_loadable_module("all-weak-symbols$suffix.module") {
     defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     sources = [ "foo.cc" ]
     deps = [

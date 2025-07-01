@@ -147,8 +147,6 @@ load_tests_in_process = [
   "relative-reloc",
   "ret17",
   "symbolic-namespace",
-  "one-weak-symbol",
-  "all-weak-symbols",
   "symbolic-reloc",
   "tls-desc",
   "tls-exec-only",
