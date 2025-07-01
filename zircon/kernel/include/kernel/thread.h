@@ -194,7 +194,15 @@ class WaitQueueCollection {
   struct MinRelativeDeadlineTraits;
 
  public:
-  using Key = ktl::pair<uint64_t, uintptr_t>;
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  using PrimaryKey = SchedTime;
+  static constexpr PrimaryKey kPrimaryKeyZero = PrimaryKey{0};
+#else
+  using PrimaryKey = uint64_t;
+  static constexpr PrimaryKey kPrimaryKeyZero = 0;
+#endif
+
+  using Key = ktl::pair<PrimaryKey, uintptr_t>;
 
   // Encapsulation of all the per-thread state for the WaitQueueCollection data structure.
   class ThreadState {
@@ -251,11 +259,16 @@ class WaitQueueCollection {
     // Primary key used for determining our position in the collection of
     // blocked threads. Pre-computed during insert in order to save a time
     // during insert, rebalance, and search operations.
-    uint64_t blocked_threads_tree_sort_key_{0};
+    PrimaryKey blocked_threads_tree_sort_key_ = kPrimaryKeyZero;
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+    // The minimum relative deadline of this node's subtree, if any.
+    SchedDuration subtree_min_deadline_{SchedDuration::Max()};
+#else
     // State variable holding the pointer to the thread in our subtree with the
     // minimum relative deadline (if any).
     Thread* subtree_min_rel_deadline_thread_{nullptr};
+#endif
 
     // Return code if woken up abnormally from suspend, sleep, or block.
     zx_status_t blocked_status_ = ZX_OK;
@@ -327,7 +340,9 @@ class WaitQueueCollection {
   WaitQueueCollection& operator=(WaitQueueCollection&&) = delete;
 
  private:
+#if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
   static constexpr uint64_t kFairThreadSortKeyBit = uint64_t{1} << 63;
+#endif
 
   struct BlockedThreadTreeTraits {
     static Key GetKey(const Thread& thread);
@@ -338,16 +353,22 @@ class WaitQueueCollection {
 
   struct MinRelativeDeadlineTraits {
     // WAVLTreeBestNodeObserver template API
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+    using ValueType = SchedDuration;
+#else
     using ValueType = Thread*;
-    static ValueType GetValue(const Thread& node);
-    static ValueType GetSubtreeBest(const Thread& node);
+#endif
+    static ValueType GetValue(const Thread& thread);
+    static ValueType GetSubtreeBest(const Thread& thread);
     static bool Compare(ValueType a, ValueType b);
-    static void AssignBest(Thread& node, ValueType val);
-    static void ResetBest(Thread& target);
+    static void AssignBest(Thread& thread, ValueType val);
+    static void ResetBest(Thread& thread);
   };
 
+#if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
   static inline bool IsFairThreadSortBitSet(const Thread& t)
       TA_REQ_SHARED(ChainLockable::GetLock(t));
+#endif
 
   using BlockedThreadTree = fbl::WAVLTree<Key, Thread*, BlockedThreadTreeTraits,
                                           fbl::DefaultObjectTag, BlockedThreadTreeTraits,
@@ -2058,11 +2079,13 @@ static inline void AssertInWaitQueue(const Thread& t, const WaitQueue& wq) TA_RE
   }();
 }
 
+#if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 // Note: This implementation *must* come after the implementation of GetThreadsLock.
 inline bool WaitQueueCollection::IsFairThreadSortBitSet(const Thread& t) {
   const uint64_t key = t.wait_queue_state().blocked_threads_tree_sort_key_;
   return (key & kFairThreadSortKeyBit) != 0;
 }
+#endif  // !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
 ////////////////////////////////////////////////////////////////////////////////
 //
@@ -2091,6 +2114,34 @@ inline fbl::WAVLTreeNodeState<Thread*>& WaitQueueCollection::BlockedThreadTreeTr
   return thread.wait_queue_state().blocked_threads_tree_node_;
 }
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+
+inline SchedDuration WaitQueueCollection::MinRelativeDeadlineTraits::GetValue(const Thread& thread)
+    TA_NO_THREAD_SAFETY_ANALYSIS {
+  const auto& scheduler_state = thread.scheduler_state();
+  if (scheduler_state.effective_profile().IsDeadline()) {
+    return scheduler_state.effective_profile().deadline.deadline_ns;
+  }
+  return SchedDuration::Max();
+}
+
+inline SchedDuration WaitQueueCollection::MinRelativeDeadlineTraits::GetSubtreeBest(
+    const Thread& thread) TA_NO_THREAD_SAFETY_ANALYSIS {
+  return thread.wait_queue_state().subtree_min_deadline_;
+}
+
+inline bool WaitQueueCollection::MinRelativeDeadlineTraits::Compare(ValueType a, ValueType b)
+    TA_NO_THREAD_SAFETY_ANALYSIS {
+  return a < b;
+}
+
+inline void WaitQueueCollection::MinRelativeDeadlineTraits::AssignBest(
+    Thread& thread, SchedDuration val) TA_NO_THREAD_SAFETY_ANALYSIS {
+  thread.wait_queue_state().subtree_min_deadline_ = val;
+}
+
+#else
+
 inline Thread* WaitQueueCollection::MinRelativeDeadlineTraits::GetValue(const Thread& thread)
     TA_NO_THREAD_SAFETY_ANALYSIS {
   // TODO(johngro), consider pre-computing this value so it is just a fetch
@@ -2105,7 +2156,7 @@ inline Thread* WaitQueueCollection::MinRelativeDeadlineTraits::GetSubtreeBest(co
   return thread.wait_queue_state().subtree_min_rel_deadline_thread_;
 }
 
-inline bool WaitQueueCollection::MinRelativeDeadlineTraits::Compare(Thread* a, Thread* b)
+inline bool WaitQueueCollection::MinRelativeDeadlineTraits::Compare(ValueType a, ValueType b)
     TA_NO_THREAD_SAFETY_ANALYSIS {
   // The thread pointer value of a non-deadline thread is null, an non-deadline
   // threads are always the worst choice when choosing the thread with the
@@ -2124,15 +2175,21 @@ inline void WaitQueueCollection::MinRelativeDeadlineTraits::AssignBest(Thread& t
   thread.wait_queue_state().subtree_min_rel_deadline_thread_ = val;
 }
 
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+
 inline void WaitQueueCollection::MinRelativeDeadlineTraits::ResetBest(Thread& thread)
     TA_NO_THREAD_SAFETY_ANALYSIS {
-  // In a debug build, zero out the subtree best as we leave the collection.
-  // This can help to find bugs by allowing us to assert that the value is zero
+  // In a debug build, reset the subtree best as we leave the collection.
+  // This can help to find bugs by allowing us to assert that the value is zero/max
   // during insertion, however it is not strictly needed in a production build
   // and can be skipped.
 #ifdef DEBUG_ASSERT_IMPLEMENTED
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  thread.wait_queue_state().subtree_min_deadline_ = SchedDuration::Max();
+#else
   thread.wait_queue_state().subtree_min_rel_deadline_thread_ = nullptr;
-#endif
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+#endif  // DEBUG_ASSERT_IMPLEMENTED
 }
 
 inline void PreemptionState::AssertCapabilityHeld(

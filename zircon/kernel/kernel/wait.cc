@@ -165,6 +165,9 @@ SchedDuration WaitQueueCollection::MinInheritableRelativeDeadline() const {
   const Thread& root_thread = *threads_.root();
   MarkInWaitQueue(root_thread);
 
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  return root_thread.wait_queue_state().subtree_min_deadline_;
+#else
   const Thread* t = root_thread.wait_queue_state().subtree_min_rel_deadline_thread_;
   if (t == nullptr) {
     return SchedDuration::Max();
@@ -186,9 +189,13 @@ SchedDuration WaitQueueCollection::MinInheritableRelativeDeadline() const {
   DEBUG_ASSERT((ss.base_profile_.IsDeadline() && (ss.base_profile_.inheritable == true)) ||
                (ss.inherited_profile_values_.min_deadline == min_deadline));
   return min_deadline;
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 }
 
 Thread* WaitQueueCollection::Peek(zx_instant_mono_t signed_now) {
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  return !threads_.is_empty() ? &threads_.front() : nullptr;
+#else
   // Find the "best" thread in the queue to run at time |now|.  See the comments
   // in thread.h, immediately above the definition of WaitQueueCollection for
   // details of how the data structure and this algorithm work.
@@ -241,13 +248,20 @@ Thread* WaitQueueCollection::Peek(zx_instant_mono_t signed_now) {
   Thread* min_relative = root_thread.wait_queue_state().subtree_min_rel_deadline_thread_;
   DEBUG_ASSERT(min_relative != nullptr);
   return min_relative;
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 }
 
 void WaitQueueCollection::Insert(Thread* thread) {
   WqTraceDepth(this, Count() + 1);
 
   WaitQueueCollection::ThreadState& wq_state = thread->wait_queue_state();
-  DEBUG_ASSERT(wq_state.blocked_threads_tree_sort_key_ == 0);
+  DEBUG_ASSERT(wq_state.blocked_threads_tree_sort_key_ == kPrimaryKeyZero);
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  DEBUG_ASSERT(wq_state.subtree_min_deadline_ == SchedDuration::Max());
+
+  const auto& sched_state = thread->scheduler_state();
+  wq_state.blocked_threads_tree_sort_key_ = sched_state.finish_time();
+#else
   DEBUG_ASSERT(wq_state.subtree_min_rel_deadline_thread_ == nullptr);
 
   // Pre-compute our sort key so that it does not have to be done every time we
@@ -285,6 +299,8 @@ void WaitQueueCollection::Insert(Thread* thread) {
     wq_state.blocked_threads_tree_sort_key_ =
         static_cast<uint64_t>(sched_state.finish_time().raw_value());
   }
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+
   threads_.insert(thread);
 }
 
@@ -298,7 +314,7 @@ void WaitQueueCollection::Remove(Thread* thread) {
   // production build and can be skipped.
   WaitQueueCollection::ThreadState& wq_state = thread->wait_queue_state();
 #ifdef DEBUG_ASSERT_IMPLEMENTED
-  wq_state.blocked_threads_tree_sort_key_ = 0;
+  wq_state.blocked_threads_tree_sort_key_ = kPrimaryKeyZero;
 #endif
 }
 
