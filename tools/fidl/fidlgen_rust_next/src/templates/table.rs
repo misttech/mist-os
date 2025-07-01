@@ -1,0 +1,22 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+use askama::Template;
+
+use super::{doc_string, filters, Context};
+use crate::id::IdExt as _;
+use crate::ir::{Table, TypeKind};
+
+#[derive(Template)]
+#[template(path = "table.askama", whitespace = "preserve")]
+pub struct TableTemplate<'a> {
+    table: &'a Table,
+    context: &'a Context,
+}
+
+impl<'a> TableTemplate<'a> {
+    pub fn new(table: &'a Table, context: &'a Context) -> Self {
+        Self { table, context }
+    }
+}

@@ -358,10 +358,10 @@ impl<'de> Drop for WireT<'de> {
             envelope.read_unchecked::<::fidl_next::fuchsia::WireHandle>()
         });
 
-        let _ = self.table.get(2).map(|envelope| unsafe {
-            envelope.read_unchecked::<::fidl_next::ClientEnd<
-            crate::DriverProtocol,::fidl_next::fuchsia::WireChannel,>>()
-        });
+        let _ = self.table.get(2)
+                .map(|envelope| unsafe {
+                    envelope.read_unchecked::<::fidl_next::ClientEnd<crate::DriverProtocol, ::fidl_next::fuchsia::WireChannel>>()
+                });
     }
 }
 

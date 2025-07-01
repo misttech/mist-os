@@ -9,7 +9,7 @@
 )]
 
 {% for ident in schema.declaration_order %}
-    {% if !matches!(self.bindings_denylist_restriction(ident), BindingsRestriction::Never) %}
+    {% if !matches!(self.rust_next_denylist(ident), Denylist::Denied) %}
         {% match schema.declarations[ident] %}
             {% when DeclType::Alias %}
                 {{ self.alias(schema.alias_declarations[ident]) }}
@@ -20,12 +20,7 @@
             {% when DeclType::Enum %}
                 {{ self.enm(schema.enum_declarations[ident]) }}
             {% when DeclType::Struct %}
-                {% let strct = schema.struct_declarations[ident] %}
-                {% if !strct.is_empty_success_struct %}
-                    {{ self.strct(schema.struct_declarations[ident]) }}
-                {% else %}
-                    {{ self.empty_success_struct(schema.struct_declarations[ident]) }}
-                {% endif %}
+                {{ self.strct(schema.struct_declarations[ident]) }}
             {% when DeclType::Table %}
                 {{ self.table(schema.table_declarations[ident]) }}
             {% when DeclType::Union %}

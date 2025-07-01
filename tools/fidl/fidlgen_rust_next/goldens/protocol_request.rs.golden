@@ -113,8 +113,7 @@ impl ::fidl_next::Encodable for ParentGetChildResponse {
             true
 
                 && <
-                    ::fidl_next::ClientEnd<
-            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::Encodable
+                    ::fidl_next::ClientEnd<crate::Child, ::fidl_next::fuchsia::zx::Channel> as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -180,9 +179,7 @@ impl ::fidl_next::FromWire<WireParentGetChildResponse> for ParentGetChildRespons
             true
 
                 && <
-                    ::fidl_next::ClientEnd<
-            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::FromWire<::fidl_next::ClientEnd<
-            crate::Child,::fidl_next::fuchsia::WireChannel,>>
+                    ::fidl_next::ClientEnd<crate::Child, ::fidl_next::fuchsia::zx::Channel> as ::fidl_next::FromWire<::fidl_next::ClientEnd<crate::Child, ::fidl_next::fuchsia::WireChannel>>
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -246,8 +243,7 @@ impl ::fidl_next::Encodable for ParentGetChildRequestResponse {
             true
 
                 && <
-                    ::fidl_next::ServerEnd<
-            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::Encodable
+                    ::fidl_next::ServerEnd<crate::Child, ::fidl_next::fuchsia::zx::Channel> as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -316,9 +312,7 @@ impl ::fidl_next::FromWire<WireParentGetChildRequestResponse> for ParentGetChild
             true
 
                 && <
-                    ::fidl_next::ServerEnd<
-            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::FromWire<::fidl_next::ServerEnd<
-            crate::Child,::fidl_next::fuchsia::WireChannel,>>
+                    ::fidl_next::ServerEnd<crate::Child, ::fidl_next::fuchsia::zx::Channel> as ::fidl_next::FromWire<::fidl_next::ServerEnd<crate::Child, ::fidl_next::fuchsia::WireChannel>>
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -379,8 +373,7 @@ impl ::fidl_next::Encodable for ParentTakeChildRequest {
             true
 
                 && <
-                    ::fidl_next::ClientEnd<
-            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::Encodable
+                    ::fidl_next::ClientEnd<crate::Child, ::fidl_next::fuchsia::zx::Channel> as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -446,9 +439,7 @@ impl ::fidl_next::FromWire<WireParentTakeChildRequest> for ParentTakeChildReques
             true
 
                 && <
-                    ::fidl_next::ClientEnd<
-            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::FromWire<::fidl_next::ClientEnd<
-            crate::Child,::fidl_next::fuchsia::WireChannel,>>
+                    ::fidl_next::ClientEnd<crate::Child, ::fidl_next::fuchsia::zx::Channel> as ::fidl_next::FromWire<::fidl_next::ClientEnd<crate::Child, ::fidl_next::fuchsia::WireChannel>>
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -512,8 +503,7 @@ impl ::fidl_next::Encodable for ParentTakeChildRequestRequest {
             true
 
                 && <
-                    ::fidl_next::ServerEnd<
-            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::Encodable
+                    ::fidl_next::ServerEnd<crate::Child, ::fidl_next::fuchsia::zx::Channel> as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -582,9 +572,7 @@ impl ::fidl_next::FromWire<WireParentTakeChildRequestRequest> for ParentTakeChil
             true
 
                 && <
-                    ::fidl_next::ServerEnd<
-            crate::Child,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::FromWire<::fidl_next::ServerEnd<
-            crate::Child,::fidl_next::fuchsia::WireChannel,>>
+                    ::fidl_next::ServerEnd<crate::Child, ::fidl_next::fuchsia::zx::Channel> as ::fidl_next::FromWire<::fidl_next::ServerEnd<crate::Child, ::fidl_next::fuchsia::WireChannel>>
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )

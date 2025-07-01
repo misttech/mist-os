@@ -4,9 +4,7 @@
 
 use serde::Deserialize;
 
-use super::r#type::Type;
-use super::{Attributes, CompIdent, Ident, TypeShape};
-use crate::de::Index;
+use super::{Attributes, CompIdent, Decl, DeclType, Ident, Type, TypeShape};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Struct {
@@ -22,11 +20,25 @@ pub struct Struct {
     pub is_empty_success_struct: bool,
 }
 
-impl Index for Struct {
-    type Key = CompIdent;
+impl Decl for Struct {
+    fn decl_type(&self) -> DeclType {
+        DeclType::Struct
+    }
 
-    fn key(&self) -> &Self::Key {
+    fn name(&self) -> &CompIdent {
         &self.name
+    }
+
+    fn attributes(&self) -> &Attributes {
+        &self.attributes
+    }
+
+    fn naming_context(&self) -> Option<&[String]> {
+        Some(&self.naming_context)
+    }
+
+    fn type_shape(&self) -> Option<&TypeShape> {
+        Some(&self.shape)
     }
 }
 

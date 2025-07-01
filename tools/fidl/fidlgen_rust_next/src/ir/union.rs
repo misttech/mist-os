@@ -6,10 +6,7 @@ use core::num::NonZeroI64;
 
 use serde::Deserialize;
 
-use super::r#type::Type;
-use super::type_shape::TypeShape;
-use super::{Attributes, CompIdent, Ident};
-use crate::de::Index;
+use super::{Attributes, CompIdent, Decl, DeclType, Ident, Type, TypeShape};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Union {
@@ -27,11 +24,25 @@ pub struct Union {
     pub shape: TypeShape,
 }
 
-impl Index for Union {
-    type Key = CompIdent;
+impl Decl for Union {
+    fn decl_type(&self) -> DeclType {
+        DeclType::Union
+    }
 
-    fn key(&self) -> &Self::Key {
+    fn name(&self) -> &CompIdent {
         &self.name
+    }
+
+    fn attributes(&self) -> &Attributes {
+        &self.attributes
+    }
+
+    fn naming_context(&self) -> Option<&[String]> {
+        Some(&self.naming_context)
+    }
+
+    fn type_shape(&self) -> Option<&TypeShape> {
+        Some(&self.shape)
     }
 }
 

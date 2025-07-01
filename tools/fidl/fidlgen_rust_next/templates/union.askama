@@ -1,9 +1,9 @@
 {% let is_static = union.shape.max_out_of_line == 0 %}
+{% let name = filters::camel(union.name.decl_name())? %}
 {% let base_name = union.name.decl_name().camel() %}
-{% let name = filters::ident(base_name)? %}
 {% let wire_name = format!("Wire{base_name}") %}
 {% let wire_optional_name = format!("WireOptional{base_name}") %}
-{% let mod_name = filters::ident(union.name.decl_name().snake())? %}
+{% let mod_name = filters::snake(union.name.decl_name())? %}
 
 {%
     let UnionTemplateStrings {
@@ -27,7 +27,7 @@
 )]
 pub enum {{ name }} {
     {% for member in union.members %}
-        {{ member.name.camel()|ident }}({{ context.natural_type(member.ty) }}),
+        {{ member.name|camel }}({{ context.natural_type(member.ty) }}),
     {% endfor %}
     {% if !union.is_strict %}
         UnknownOrdinal_(u64),
@@ -58,7 +58,7 @@ where
 
         match self {
             {% for member in union.members %}
-                Self::{{ member.name.camel()|ident }}(value) => ::fidl_next::RawWireUnion::{{ encode_as }}::<
+                Self::{{ member.name|camel }}(value) => ::fidl_next::RawWireUnion::{{ encode_as }}::<
                     ___E,
                     {{ context.natural_type(member.ty) }},
                 >(value, {{ member.ordinal }}, encoder, raw)?,
@@ -92,7 +92,7 @@ where
 
         match self {
             {% for member in union.members %}
-                Self::{{ member.name.camel()|ident }}(value) => ::fidl_next::RawWireUnion::{{ encode_as }}::<
+                Self::{{ member.name|camel }}(value) => ::fidl_next::RawWireUnion::{{ encode_as }}::<
                     ___E,
                     &{{ context.natural_type(member.ty) }},
                 >(value, {{ member.ordinal }}, encoder, raw)?,
@@ -179,7 +179,7 @@ impl{{ de }} ::fidl_next::FromWire<{{ wire_name }}{{ de }}> for {{ name }} {
         let wire = ::core::mem::ManuallyDrop::new(wire);
         match wire.raw.ordinal() {
             {% for member in union.members %}
-                {{ member.ordinal }} => Self::{{ member.name.camel()|ident }}(
+                {{ member.ordinal }} => Self::{{ member.name|camel }}(
                     ::fidl_next::FromWire::from_wire(
                         unsafe { wire.raw.get().read_unchecked::<{{ context.wire_type(member.ty) }}>() }
                     )
@@ -196,7 +196,7 @@ impl{{ de }} ::fidl_next::FromWireRef<{{ wire_name }}{{ de }}> for {{ name }} {
     fn from_wire_ref(wire: &{{ wire_name }}{{ de }}) -> Self {
         match wire.raw.ordinal() {
             {% for member in union.members %}
-                {{ member.ordinal }} => Self::{{ member.name.camel()|ident }}(
+                {{ member.ordinal }} => Self::{{ member.name|camel }}(
                     ::fidl_next::FromWireRef::from_wire_ref(
                         unsafe { wire.raw.get().deref_unchecked::<{{ context.wire_type(member.ty) }}>() }
                     )
@@ -281,7 +281,7 @@ unsafe impl ::fidl_next::Wire for {{ wire_name }}{{ static_ }} {
 pub mod {{ mod_name }} {
     pub enum Ref{{ access_params }} {
         {% for member in union.members %}
-            {{ member.name.camel()|ident }}(&'de {{ context.wire_type(member.ty) }}),
+            {{ member.name|camel }}(&'de {{ context.wire_type(member.ty) }}),
         {% endfor %}
         {% if !union.is_strict %}
             UnknownOrdinal_(u64),
@@ -293,7 +293,7 @@ impl{{ de }} {{ wire_name }}{{ de }} {
     pub fn as_ref(&self) -> crate::{{ mod_name }}::Ref{{ access_args }} {
         match self.raw.ordinal() {
             {% for member in union.members %}
-                {{ member.ordinal }} => crate::{{ mod_name }}::Ref::{{ member.name.camel()|ident }}(
+                {{ member.ordinal }} => crate::{{ mod_name }}::Ref::{{ member.name|camel }}(
                     unsafe { self.raw.get().deref_unchecked::<{{ context.anonymous_wire_type(member.ty) }}>() }
                 ),
             {% endfor %}

@@ -4,9 +4,7 @@
 
 use serde::Deserialize;
 
-use super::r#type::Type;
-use super::{Attributes, CompIdent, Constant, Ident};
-use crate::de::Index;
+use super::{Attributes, CompIdent, Constant, Decl, DeclType, Ident, Type};
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct Bits {
@@ -21,11 +19,21 @@ pub struct Bits {
     pub ty: Type,
 }
 
-impl Index for Bits {
-    type Key = CompIdent;
+impl Decl for Bits {
+    fn decl_type(&self) -> DeclType {
+        DeclType::Bits
+    }
 
-    fn key(&self) -> &Self::Key {
+    fn name(&self) -> &CompIdent {
         &self.name
+    }
+
+    fn attributes(&self) -> &Attributes {
+        &self.attributes
+    }
+
+    fn naming_context(&self) -> Option<&[String]> {
+        Some(&self.naming_context)
     }
 }
 

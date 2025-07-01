@@ -14,8 +14,7 @@ impl ::fidl_next::Encodable for ParentFirstRequest {
             true
 
                 && <
-                    ::fidl_next::ServerEnd<
-            crate::Parent,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::Encodable
+                    ::fidl_next::ServerEnd<crate::Parent, ::fidl_next::fuchsia::zx::Channel> as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -81,9 +80,7 @@ impl ::fidl_next::FromWire<WireParentFirstRequest> for ParentFirstRequest {
             true
 
                 && <
-                    ::fidl_next::ServerEnd<
-            crate::Parent,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::FromWire<::fidl_next::ServerEnd<
-            crate::Parent,::fidl_next::fuchsia::WireChannel,>>
+                    ::fidl_next::ServerEnd<crate::Parent, ::fidl_next::fuchsia::zx::Channel> as ::fidl_next::FromWire<::fidl_next::ServerEnd<crate::Parent, ::fidl_next::fuchsia::WireChannel>>
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -353,8 +350,7 @@ impl ::fidl_next::Encodable for ChildSecondRequest {
             true
 
                 && <
-                    ::fidl_next::ServerEnd<
-            crate::Parent,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::Encodable
+                    ::fidl_next::ServerEnd<crate::Parent, ::fidl_next::fuchsia::zx::Channel> as ::fidl_next::Encodable
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -420,9 +416,7 @@ impl ::fidl_next::FromWire<WireChildSecondRequest> for ChildSecondRequest {
             true
 
                 && <
-                    ::fidl_next::ServerEnd<
-            crate::Parent,::fidl_next::fuchsia::zx::Channel,> as ::fidl_next::FromWire<::fidl_next::ServerEnd<
-            crate::Parent,::fidl_next::fuchsia::WireChannel,>>
+                    ::fidl_next::ServerEnd<crate::Parent, ::fidl_next::fuchsia::zx::Channel> as ::fidl_next::FromWire<::fidl_next::ServerEnd<crate::Parent, ::fidl_next::fuchsia::WireChannel>>
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )

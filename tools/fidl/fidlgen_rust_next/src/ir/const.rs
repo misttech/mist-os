@@ -4,9 +4,7 @@
 
 use serde::Deserialize;
 
-use crate::de::Index;
-
-use super::{Attributes, CompIdent, CompIdentOrMember, Literal, Type};
+use super::{Attributes, CompIdent, CompIdentOrMember, Decl, DeclType, Literal, Type};
 
 #[derive(Clone, Debug, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -19,11 +17,17 @@ pub struct Const {
     pub value: Constant,
 }
 
-impl Index for Const {
-    type Key = CompIdent;
+impl Decl for Const {
+    fn decl_type(&self) -> DeclType {
+        DeclType::Const
+    }
 
-    fn key(&self) -> &Self::Key {
+    fn name(&self) -> &CompIdent {
         &self.name
+    }
+
+    fn attributes(&self) -> &Attributes {
+        &self.attributes
     }
 }
 

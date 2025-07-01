@@ -1,8 +1,18 @@
 {% let is_static = strct.shape.max_out_of_line == 0 %}
 {% let has_padding = strct.shape.has_padding %}
+{% let name = filters::camel(strct.name.decl_name())? %}
 {% let base_name = strct.name.decl_name().camel() %}
-{% let name = filters::ident(base_name)? %}
 {% let wire_name = format!("Wire{base_name}") %}
+
+{% if strct.is_empty_success_struct %}
+
+{{ self::doc_string(strct.attributes) -}}
+pub type {{ name }} = ();
+
+/// The wire type corresponding to [`{{ name }}`].
+pub type {{ wire_name }} = ();
+
+{% else %}
 
 {% let de %}
 {% let infer %}
@@ -31,7 +41,7 @@
 {% endif -%}
 pub struct {{ name }} {
     {% for member in strct.members %}
-        pub {{ member.name.snake()|ident }}: {{ context.natural_type(member.ty) }},
+        pub {{ member.name|snake }}: {{ context.natural_type(member.ty) }},
     {% endfor %}
 }
 
@@ -71,13 +81,13 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 {% for member in strct.members -%}
-                    {{ member.name.snake()|ident }},
+                    {{ member.name|snake }},
                 {% endfor %}
             } = out;
         }
 
         {% for member in strct.members %}
-            {% let member_name = filters::ident(member.name.snake())? %}
+            {% let member_name = filters::snake(member.name)? %}
             ::fidl_next::Encode::encode(self.{{ member_name }}, encoder, {{ member_name }})?;
         {% endfor %}
         Ok(())
@@ -101,13 +111,13 @@ where
         ::fidl_next::munge! {
             let Self::Encoded {
                 {% for member in strct.members -%}
-                    {{ member.name.snake()|ident }},
+                    {{ member.name|snake }},
                 {% endfor %}
             } = out;
         }
 
         {% for member in strct.members %}
-            {% let member_name = filters::ident(member.name.snake())? %}
+            {% let member_name = filters::snake(member.name)? %}
             ::fidl_next::EncodeRef::encode_ref(&self.{{ member_name }}, encoder, {{ member_name }})?;
         {% endfor %}
         Ok(())
@@ -183,7 +193,7 @@ impl{{ de }} ::fidl_next::FromWire<{{ wire_name }}{{ de }}> for {{ name }} {
     fn from_wire(wire: {{ wire_name }}{{ de }}) -> Self {
         Self {
             {% for member in strct.members %}
-                {% let member_name = filters::ident(member.name.snake())? %}
+                {% let member_name = filters::snake(member.name)? %}
                 {{ member_name }}: ::fidl_next::FromWire::from_wire(wire.{{ member_name }}),
             {% endfor %}
         }
@@ -196,7 +206,7 @@ impl{{ de }} ::fidl_next::FromWireRef<{{ wire_name }}{{ de }}> for {{ name }} {
     fn from_wire_ref(wire: &{{ wire_name }}{{ de }}) -> Self {
         Self {
             {% for member in strct.members %}
-                {% let member_name = filters::ident(member.name.snake())? %}
+                {% let member_name = filters::snake(member.name)? %}
                 {{ member_name }}: ::fidl_next::FromWireRef::from_wire_ref(&wire.{{ member_name }}),
             {% endfor %}
         }
@@ -216,7 +226,7 @@ impl{{ de }} ::fidl_next::FromWireRef<{{ wire_name }}{{ de }}> for {{ name }} {
 #[repr(C)]
 pub struct {{ wire_name }}{{ de }} {
     {% for member in strct.members %}
-        pub {{ member.name.snake()|ident }}: {{ context.wire_type(member.ty) }},
+        pub {{ member.name|snake }}: {{ context.wire_type(member.ty) }},
     {% endfor %}
 }
 
@@ -250,13 +260,13 @@ where
         ::fidl_next::munge! {
             let Self {
                 {% for member in strct.members -%}
-                    mut {{ member.name.snake()|ident }},
+                    mut {{ member.name|snake }},
                 {% endfor %}
             } = slot;
         }
 
         {% for member in strct.members %}
-            {% let member_name = filters::ident(member.name.snake())? %}
+            {% let member_name = filters::snake(member.name)? %}
             ::fidl_next::Decode::decode({{ member_name }}.as_mut(), decoder)?;
             {# type check #}
             {% match member.ty.kind %}
@@ -299,3 +309,5 @@ where
         Ok(())
     }
 }
+
+{% endif %}

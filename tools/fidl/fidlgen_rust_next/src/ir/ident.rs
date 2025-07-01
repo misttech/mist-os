@@ -56,12 +56,6 @@ pub struct CompIdent {
     string: String,
 }
 
-impl CompIdent {
-    pub fn new(string: String) -> Self {
-        Self { string }
-    }
-}
-
 impl Deref for CompIdent {
     type Target = CompId;
 

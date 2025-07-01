@@ -118,7 +118,7 @@ impl ::fidl_next::FromWire<WireStructLargeArray> for StructLargeArray {
             true
 
                 && <
-                    [ u32 ; 100] as ::fidl_next::FromWire<[::fidl_next::WireU32; 100]>
+                    [u32; 100] as ::fidl_next::FromWire<[::fidl_next::WireU32; 100]>
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )
@@ -288,7 +288,7 @@ impl ::fidl_next::FromWire<WireStructSmallArray> for StructSmallArray {
             true
 
                 && <
-                    [ u32 ; 2] as ::fidl_next::FromWire<[::fidl_next::WireU32; 2]>
+                    [u32; 2] as ::fidl_next::FromWire<[::fidl_next::WireU32; 2]>
                 >::COPY_OPTIMIZATION.is_enabled()
 
         )

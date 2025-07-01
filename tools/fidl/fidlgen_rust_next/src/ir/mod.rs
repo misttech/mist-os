@@ -5,7 +5,7 @@
 mod attribute;
 mod bits;
 mod r#const;
-mod decl_type;
+mod decl;
 mod r#enum;
 mod handle;
 mod ident;
@@ -24,7 +24,7 @@ mod union;
 
 pub use self::attribute::*;
 pub use self::bits::*;
-pub use self::decl_type::*;
+pub use self::decl::*;
 pub use self::handle::*;
 pub use self::ident::*;
 pub use self::library::*;
