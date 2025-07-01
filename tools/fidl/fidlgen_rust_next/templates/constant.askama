@@ -3,7 +3,7 @@
         {% let (comp_id, member) = identifier.split() %}
         {{ self.natural_id(comp_id) }}
         {% if let Some(member) = member %}
-            {% match context.schema.get_decl_type(comp_id).unwrap() %}
+            {% match self.schema().get_decl_type(comp_id).unwrap() %}
                 {% when DeclType::Bits %} ::{{ member.screaming_snake() }}
                 {% when DeclType::Enum %}
                     {% if comp_id.library() == "zx" %}

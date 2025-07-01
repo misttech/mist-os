@@ -12,17 +12,17 @@ use crate::ir::{Table, TypeKind};
 #[template(path = "table.askama", whitespace = "preserve")]
 pub struct TableTemplate<'a> {
     table: &'a Table,
-    context: &'a Context,
+    context: Context<'a>,
 }
 
 impl<'a> TableTemplate<'a> {
-    pub fn new(table: &'a Table, context: &'a Context) -> Self {
+    pub fn new(table: &'a Table, context: Context<'a>) -> Self {
         Self { table, context }
     }
 }
 
 impl Contextual for TableTemplate<'_> {
-    fn context(&self) -> &Context {
+    fn context(&self) -> Context<'_> {
         self.context
     }
 }

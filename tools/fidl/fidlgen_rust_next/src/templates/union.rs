@@ -12,17 +12,17 @@ use crate::ir::Union;
 #[template(path = "union.askama", whitespace = "preserve")]
 pub struct UnionTemplate<'a> {
     union: &'a Union,
-    context: &'a Context,
+    context: Context<'a>,
 }
 
 impl<'a> UnionTemplate<'a> {
-    pub fn new(union: &'a Union, context: &'a Context) -> Self {
+    pub fn new(union: &'a Union, context: Context<'a>) -> Self {
         Self { union, context }
     }
 }
 
 impl Contextual for UnionTemplate<'_> {
-    fn context(&self) -> &Context {
+    fn context(&self) -> Context<'_> {
         self.context
     }
 }

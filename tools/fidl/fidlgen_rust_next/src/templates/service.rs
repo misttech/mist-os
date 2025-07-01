@@ -12,11 +12,11 @@ use crate::ir::Service;
 #[template(path = "service.askama", whitespace = "preserve")]
 pub struct ServiceTemplate<'a> {
     service: &'a Service,
-    context: &'a Context,
+    context: Context<'a>,
 }
 
 impl<'a> ServiceTemplate<'a> {
-    pub fn new(service: &'a Service, context: &'a Context) -> Self {
+    pub fn new(service: &'a Service, context: Context<'a>) -> Self {
         Self { service, context }
     }
 
@@ -27,7 +27,7 @@ impl<'a> ServiceTemplate<'a> {
 }
 
 impl Contextual for ServiceTemplate<'_> {
-    fn context(&self) -> &Context {
+    fn context(&self) -> Context<'_> {
         self.context
     }
 }

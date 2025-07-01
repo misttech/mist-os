@@ -12,17 +12,17 @@ use crate::ir::{Struct, TypeKind};
 #[template(path = "struct.askama", whitespace = "preserve")]
 pub struct StructTemplate<'a> {
     strct: &'a Struct,
-    context: &'a Context,
+    context: Context<'a>,
 }
 
 impl<'a> StructTemplate<'a> {
-    pub fn new(strct: &'a Struct, context: &'a Context) -> Self {
+    pub fn new(strct: &'a Struct, context: Context<'a>) -> Self {
         Self { strct, context }
     }
 }
 
 impl Contextual for StructTemplate<'_> {
-    fn context(&self) -> &Context {
+    fn context(&self) -> Context<'_> {
         self.context
     }
 }

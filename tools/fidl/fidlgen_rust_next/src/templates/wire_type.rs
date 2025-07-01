@@ -4,30 +4,36 @@
 
 use core::fmt;
 
-use super::{Context, IdTemplate, WirePrimTemplate};
+use super::{Context, Contextual};
 use crate::ir::{DeclType, EndpointRole, InternalSubtype, Type, TypeKind};
 
 pub struct WireTypeTemplate<'a> {
-    context: &'a Context,
+    context: Context<'a>,
     ty: &'a Type,
     lifetime: &'a str,
 }
 
 impl<'a> WireTypeTemplate<'a> {
-    pub fn new(ty: &'a Type, lifetime: &'a str, context: &'a Context) -> Self {
+    pub fn new(ty: &'a Type, lifetime: &'a str, context: Context<'a>) -> Self {
         Self { context, ty, lifetime }
     }
 
-    pub fn with_de(ty: &'a Type, context: &'a Context) -> Self {
+    pub fn with_de(ty: &'a Type, context: Context<'a>) -> Self {
         Self::new(ty, "'de", context)
     }
 
-    pub fn with_static(ty: &'a Type, context: &'a Context) -> Self {
+    pub fn with_static(ty: &'a Type, context: Context<'a>) -> Self {
         Self::new(ty, "'static", context)
     }
 
-    pub fn with_anonymous(ty: &'a Type, context: &'a Context) -> Self {
+    pub fn with_anonymous(ty: &'a Type, context: Context<'a>) -> Self {
         Self::new(ty, "'_", context)
+    }
+}
+
+impl Contextual for WireTypeTemplate<'_> {
+    fn context(&self) -> Context<'_> {
+        self.context
     }
 }
 
@@ -55,13 +61,9 @@ impl fmt::Display for WireTypeTemplate<'_> {
             }
             TypeKind::Handle { nullable, .. } => {
                 if *nullable {
-                    write!(
-                        f,
-                        "{}",
-                        self.context.config.resource_bindings.handle.optional_wire_path
-                    )?;
+                    write!(f, "{}", self.resource_bindings().handle.optional_wire_path)?;
                 } else {
-                    write!(f, "{}", self.context.config.resource_bindings.handle.wire_path)?;
+                    write!(f, "{}", self.resource_bindings().handle.wire_path)?;
                 }
             }
             TypeKind::Endpoint { nullable, role, protocol, .. } => {
@@ -69,28 +71,28 @@ impl fmt::Display for WireTypeTemplate<'_> {
                     EndpointRole::Client => "::fidl_next::ClientEnd",
                     EndpointRole::Server => "::fidl_next::ServerEnd",
                 };
-                let wire_id = IdTemplate::natural(protocol, self.context);
+                let protocol_id = self.natural_id(protocol);
                 if *nullable {
                     write!(
                         f,
-                        "{role}<{wire_id}, {}>",
-                        self.context.config.resource_bindings.channel.optional_wire_path
+                        "{role}<{protocol_id}, {}>",
+                        self.resource_bindings().channel.optional_wire_path
                     )?;
                 } else {
                     write!(
                         f,
-                        "{role}<{wire_id}, {}>",
-                        self.context.config.resource_bindings.channel.wire_path
+                        "{role}<{protocol_id}, {}>",
+                        self.resource_bindings().channel.wire_path
                     )?;
                 }
             }
             TypeKind::Primitive { subtype } => {
-                write!(f, "{}", WirePrimTemplate(subtype))?;
+                write!(f, "{}", self.wire_prim(subtype))?;
             }
             TypeKind::Identifier { identifier, nullable, .. } => {
-                let wire_id = IdTemplate::wire(identifier, self.context);
+                let wire_id = self.wire_id(identifier);
 
-                match self.context.schema.get_decl_type(identifier).unwrap() {
+                match self.schema().get_decl_type(identifier).unwrap() {
                     DeclType::Bits | DeclType::Enum => write!(f, "{wire_id}")?,
                     DeclType::Table => write!(f, "{wire_id}<{}>", self.lifetime)?,
                     DeclType::Struct => {
@@ -100,7 +102,7 @@ impl fmt::Display for WireTypeTemplate<'_> {
 
                         write!(f, "{wire_id}")?;
 
-                        if let Some(shape) = self.context.schema.get_type_shape(identifier) {
+                        if let Some(shape) = self.schema().get_type_shape(identifier) {
                             if shape.max_out_of_line != 0 {
                                 write!(f, "<{}>", self.lifetime)?;
                             }
@@ -112,9 +114,9 @@ impl fmt::Display for WireTypeTemplate<'_> {
                     }
                     DeclType::Union => {
                         let id = if *nullable {
-                            IdTemplate::wire_optional(identifier, self.context)
+                            self.wire_optional_id(identifier)
                         } else {
-                            IdTemplate::wire(identifier, self.context)
+                            self.wire_id(identifier)
                         };
                         if self.ty.shape.max_out_of_line != 0 {
                             write!(f, "{id}<{}>", self.lifetime)?;
@@ -124,17 +126,9 @@ impl fmt::Display for WireTypeTemplate<'_> {
                     }
                     DeclType::Resource => {
                         if *nullable {
-                            write!(
-                                f,
-                                "{}",
-                                self.context.config.resource_bindings.handle.optional_wire_path
-                            )?;
+                            write!(f, "{}", self.resource_bindings().handle.optional_wire_path)?;
                         } else {
-                            write!(
-                                f,
-                                "{}",
-                                self.context.config.resource_bindings.handle.wire_path
-                            )?;
+                            write!(f, "{}", self.resource_bindings().handle.wire_path)?;
                         }
                     }
                     _ => unimplemented!(),

@@ -12,11 +12,11 @@ use crate::ir::{Bits, PrimSubtype, Type, TypeKind};
 #[template(path = "bits.askama", whitespace = "preserve")]
 pub struct BitsTemplate<'a> {
     bits: &'a Bits,
-    context: &'a Context,
+    context: Context<'a>,
 }
 
 impl<'a> BitsTemplate<'a> {
-    pub fn new(bits: &'a Bits, context: &'a Context) -> Self {
+    pub fn new(bits: &'a Bits, context: Context<'a>) -> Self {
         Self { bits, context }
     }
 
@@ -29,7 +29,7 @@ impl<'a> BitsTemplate<'a> {
 }
 
 impl Contextual for BitsTemplate<'_> {
-    fn context(&self) -> &Context {
+    fn context(&self) -> Context<'_> {
         self.context
     }
 }

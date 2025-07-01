@@ -4,17 +4,23 @@
 
 use core::fmt;
 
-use super::{Context, IdTemplate, NaturalPrimTemplate};
+use super::{Context, Contextual};
 use crate::ir::{EndpointRole, InternalSubtype, Type, TypeKind};
 
 pub struct NaturalTypeTemplate<'a> {
-    context: &'a Context,
+    context: Context<'a>,
     ty: &'a Type,
 }
 
 impl<'a> NaturalTypeTemplate<'a> {
-    pub fn new(ty: &'a Type, context: &'a Context) -> Self {
+    pub fn new(ty: &'a Type, context: Context<'a>) -> Self {
         Self { context, ty }
+    }
+}
+
+impl Contextual for NaturalTypeTemplate<'_> {
+    fn context(&self) -> Context<'_> {
+        self.context
     }
 }
 
@@ -41,7 +47,7 @@ impl fmt::Display for NaturalTypeTemplate<'_> {
                 }
             }
             TypeKind::Handle { nullable, .. } => {
-                let handle_ty = &self.context.config.resource_bindings.handle.natural_path;
+                let handle_ty = &self.resource_bindings().handle.natural_path;
                 if *nullable {
                     write!(f, "Option<{handle_ty}>")?;
                 } else {
@@ -53,26 +59,26 @@ impl fmt::Display for NaturalTypeTemplate<'_> {
                     EndpointRole::Client => "::fidl_next::ClientEnd",
                     EndpointRole::Server => "::fidl_next::ServerEnd",
                 };
-                let natural_id = IdTemplate::natural(protocol, self.context);
+                let natural_id = self.natural_id(protocol);
                 if *nullable {
                     write!(
                         f,
                         "{role}<{natural_id}, Option<{}>>",
-                        self.context.config.resource_bindings.channel.natural_path
+                        self.resource_bindings().channel.natural_path
                     )?;
                 } else {
                     write!(
                         f,
                         "{role}<{natural_id}, {}>",
-                        self.context.config.resource_bindings.channel.natural_path
+                        self.resource_bindings().channel.natural_path
                     )?;
                 }
             }
             TypeKind::Primitive { subtype } => {
-                write!(f, "{}", NaturalPrimTemplate(subtype))?;
+                write!(f, "{}", self.natural_prim(subtype))?;
             }
             TypeKind::Identifier { identifier, nullable, .. } => {
-                let natural_id = IdTemplate::natural(identifier, self.context);
+                let natural_id = self.natural_id(identifier);
                 if *nullable {
                     write!(f, "Option<Box<{natural_id}>>")?;
                 } else {

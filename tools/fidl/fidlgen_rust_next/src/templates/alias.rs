@@ -11,17 +11,17 @@ use crate::ir::TypeAlias;
 #[template(path = "alias.askama", whitespace = "preserve")]
 pub struct AliasTemplate<'a> {
     alias: &'a TypeAlias,
-    context: &'a Context,
+    context: Context<'a>,
 }
 
 impl<'a> AliasTemplate<'a> {
-    pub fn new(alias: &'a TypeAlias, context: &'a Context) -> Self {
+    pub fn new(alias: &'a TypeAlias, context: Context<'a>) -> Self {
         Self { alias, context }
     }
 }
 
 impl Contextual for AliasTemplate<'_> {
-    fn context(&self) -> &Context {
+    fn context(&self) -> Context<'_> {
         self.context
     }
 }

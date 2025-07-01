@@ -12,17 +12,17 @@ use crate::ir::{Enum, IntType};
 #[template(path = "enum.askama", whitespace = "preserve")]
 pub struct EnumTemplate<'a> {
     enm: &'a Enum,
-    context: &'a Context,
+    context: Context<'a>,
 }
 
 impl<'a> EnumTemplate<'a> {
-    pub fn new(enm: &'a Enum, context: &'a Context) -> Self {
+    pub fn new(enm: &'a Enum, context: Context<'a>) -> Self {
         Self { enm, context }
     }
 }
 
 impl Contextual for EnumTemplate<'_> {
-    fn context(&self) -> &Context {
+    fn context(&self) -> Context<'_> {
         self.context
     }
 }

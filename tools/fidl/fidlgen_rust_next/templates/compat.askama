@@ -2,15 +2,15 @@
 
 /// Compatibility shims which mimic some API surfaces of the current Rust bindings.
 pub mod compat {
-    {% for ident in context.schema.declaration_order %}
+    {% for ident in self.schema().declaration_order %}
         {% let name = filters::camel(ident.decl_name())? %}
         {% let compat_name = filters::compat_camel(ident.decl_name())? %}
 
         {% let restriction = self.rust_or_rust_next_denylist(ident) %}
         {% if !matches!(restriction, Denylist::Denied) %}
-            {% match context.schema.declarations[ident] %}
+            {% match self.schema().declarations[ident] %}
                 {% when DeclType::Bits %}
-                    {% let bits = context.schema.bits_declarations[ident] %}
+                    {% let bits = self.schema().bits_declarations[ident] %}
                     {{ restriction }}
                     impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
                         #[inline]
@@ -19,7 +19,7 @@ pub mod compat {
                         }
                     }
                 {% when DeclType::Enum %}
-                    {% let enm = context.schema.enum_declarations[ident] %}
+                    {% let enm = self.schema().enum_declarations[ident] %}
                     {{ restriction }}
                     impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
                         #[inline]
@@ -37,7 +37,7 @@ pub mod compat {
                         }
                     }
                 {% when DeclType::Protocol %}
-                    {% let protocol = context.schema.protocol_declarations[ident] %}
+                    {% let protocol = self.schema().protocol_declarations[ident] %}
                     {% let protocol_name = filters::camel(protocol.name.decl_name())? %}
                     {% let proxy_name = format!("{}Proxy", protocol.name.decl_name().camel()) %}
 
@@ -58,7 +58,7 @@ pub mod compat {
                     }
                 {% when DeclType::Struct %}
                     {#
-                    {% let strct = context.schema.struct_declarations[ident] %}
+                    {% let strct = self.schema().struct_declarations[ident] %}
                     {% if !strct.is_empty_success_struct %}
                         {{ restriction }}
                         impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
@@ -75,7 +75,7 @@ pub mod compat {
                     #}
                 {% when DeclType::Table %}
                     {#
-                    {% let table = context.schema.table_declarations[ident] %}
+                    {% let table = self.schema().table_declarations[ident] %}
                     {{ restriction }}
                     impl ::core::convert::From<crate::{{ name }}> for ::{{ compat_crate_name }}::{{ compat_name }} {
                         #[inline]
@@ -90,7 +90,7 @@ pub mod compat {
                     }
                     #}
                 {% when DeclType::Union %}
-                    {% let union = context.schema.union_declarations[ident] %}
+                    {% let union = self.schema().union_declarations[ident] %}
                     {% if !union.is_result %}
                         {#
                         {{ restriction }}

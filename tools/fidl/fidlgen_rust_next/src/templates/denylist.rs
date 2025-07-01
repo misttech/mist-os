@@ -22,15 +22,7 @@ impl Denylist {
         }
     }
 
-    pub fn rust_next(schema: &Schema, ident: &CompId) -> Self {
-        Self::for_ident(schema, ident, &["rust_next"])
-    }
-
-    pub fn rust_or_rust_next(schema: &Schema, ident: &CompId) -> Self {
-        Self::for_ident(schema, ident, &["rust_next", "rust"])
-    }
-
-    fn for_ident(schema: &Schema, ident: &CompId, bindings: &[&str]) -> Self {
+    pub fn for_ident(schema: &Schema, ident: &CompId, bindings: &[&str]) -> Self {
         let Some(decl) = schema.get_local_decl(ident) else {
             return Self::Allowed;
         };

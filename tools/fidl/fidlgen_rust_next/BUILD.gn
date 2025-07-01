@@ -39,9 +39,12 @@ if (is_host) {
       "src/main.rs",
       "src/templates/alias.rs",
       "src/templates/bits.rs",
+      "src/templates/compat.rs",
       "src/templates/const.rs",
       "src/templates/constant.rs",
+      "src/templates/context.rs",
       "src/templates/denylist.rs",
+      "src/templates/doc_string.rs",
       "src/templates/enum.rs",
       "src/templates/filters.rs",
       "src/templates/id.rs",
@@ -50,6 +53,7 @@ if (is_host) {
       "src/templates/prim.rs",
       "src/templates/protocol.rs",
       "src/templates/reserved.rs",
+      "src/templates/schema.rs",
       "src/templates/service.rs",
       "src/templates/struct.rs",
       "src/templates/table.rs",
@@ -81,7 +85,6 @@ if (is_host) {
       "templates/union.askama",
 
       # Helpers
-      "templates/doc_string.askama",
       "templates/constant.askama",
     ]
     rustenv = [ "CARGO_MANIFEST_DIR=${cargo_manifest_dir}" ]

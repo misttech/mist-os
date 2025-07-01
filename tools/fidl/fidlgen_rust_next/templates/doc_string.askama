@@ -1,3 +1,0 @@
-{%- if let Some(doc) = attributes.doc_string() -%}
-    #[doc = "{{ doc.escape_default() }}"]
-{%- endif -%}

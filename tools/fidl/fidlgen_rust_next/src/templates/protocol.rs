@@ -17,11 +17,11 @@ use crate::ir::{
 #[template(path = "protocol.askama", whitespace = "preserve")]
 pub struct ProtocolTemplate<'a> {
     protocol: &'a Protocol,
-    context: &'a Context,
+    context: Context<'a>,
 }
 
 impl<'a> ProtocolTemplate<'a> {
-    pub fn new(protocol: &'a Protocol, context: &'a Context) -> Self {
+    pub fn new(protocol: &'a Protocol, context: Context<'a>) -> Self {
         Self { protocol, context }
     }
 
@@ -30,9 +30,9 @@ impl<'a> ProtocolTemplate<'a> {
             ProtocolMethodKind::OneWay | ProtocolMethodKind::TwoWay => {
                 if let Some(args) = &method.maybe_request_payload {
                     if let TypeKind::Identifier { identifier, .. } = &args.kind {
-                        return self.context.schema.struct_declarations.get(identifier).or_else(
-                            || self.context.schema.external_struct_declarations.get(identifier),
-                        );
+                        return self.schema().struct_declarations.get(identifier).or_else(|| {
+                            self.schema().external_struct_declarations.get(identifier)
+                        });
                     }
                 }
             }
@@ -40,14 +40,9 @@ impl<'a> ProtocolTemplate<'a> {
                 if !method.has_error {
                     if let Some(args) = &method.maybe_response_payload {
                         if let TypeKind::Identifier { identifier, .. } = &args.kind {
-                            return self
-                                .context
-                                .schema
-                                .struct_declarations
-                                .get(identifier)
-                                .or_else(|| {
-                                    self.context.schema.external_struct_declarations.get(identifier)
-                                });
+                            return self.schema().struct_declarations.get(identifier).or_else(
+                                || self.schema().external_struct_declarations.get(identifier),
+                            );
                         }
                     }
                 }
@@ -103,7 +98,7 @@ impl<'a> ProtocolTemplate<'a> {
 }
 
 impl Contextual for ProtocolTemplate<'_> {
-    fn context(&self) -> &Context {
+    fn context(&self) -> Context<'_> {
         self.context
     }
 }

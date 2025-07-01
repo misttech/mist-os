@@ -11,17 +11,17 @@ use crate::ir::{Const, TypeKind};
 #[template(path = "const.askama", whitespace = "preserve")]
 pub struct ConstTemplate<'a> {
     cnst: &'a Const,
-    context: &'a Context,
+    context: Context<'a>,
 }
 
 impl<'a> ConstTemplate<'a> {
-    pub fn new(cnst: &'a Const, context: &'a Context) -> Self {
+    pub fn new(cnst: &'a Const, context: Context<'a>) -> Self {
         Self { cnst, context }
     }
 }
 
 impl Contextual for ConstTemplate<'_> {
-    fn context(&self) -> &Context {
+    fn context(&self) -> Context<'_> {
         self.context
     }
 }
