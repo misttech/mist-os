@@ -335,7 +335,7 @@ pub async fn trace(
                 );
             }
             let expanded_categories =
-                ffx_trace::expand_categories(&context, opts.categories.clone()).await?;
+                ffx_trace::expand_categories(&context, opts.categories.clone())?;
             let defer_transfer = match opts.buffering_mode {
                 BufferingMode::Oneshot | BufferingMode::Circular => false,
                 BufferingMode::Streaming => true,
@@ -513,8 +513,7 @@ async fn stop_tracing(
             for line in output {
                 writer.line(line)?;
             }
-            let expanded_categories =
-                ffx_trace::expand_categories(context, categories.clone()).await?;
+            let expanded_categories = ffx_trace::expand_categories(context, categories.clone())?;
             let skip_symbolization =
                 skip_symbolization || !expanded_categories.contains(&"kernel:ipc".to_string());
             if !no_verify_trace || !skip_symbolization {

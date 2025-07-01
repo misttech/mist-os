@@ -11,7 +11,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::path::Path;
 use std::sync::LazyLock;
 
-pub async fn expand_categories(
+pub fn expand_categories(
     context: &EnvironmentContext,
     categories: Vec<String>,
 ) -> Result<Vec<String>> {
@@ -19,7 +19,7 @@ pub async fn expand_categories(
     for category in categories {
         match category.strip_prefix('#') {
             Some(category_group_name) => {
-                let category_group = get_category_group(context, category_group_name).await?;
+                let category_group = get_category_group(context, category_group_name)?;
                 expanded_categories.extend(category_group);
             }
             None => {
@@ -31,7 +31,7 @@ pub async fn expand_categories(
     Ok(expanded_categories.into_iter().collect())
 }
 
-pub async fn get_category_group(
+pub fn get_category_group(
     ctx: &EnvironmentContext,
     category_group_name: &str,
 ) -> Result<Vec<String>> {

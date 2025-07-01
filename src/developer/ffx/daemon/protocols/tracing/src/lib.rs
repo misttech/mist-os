@@ -167,7 +167,7 @@ impl TraceTask {
             Some(categories) => {
                 let context = ffx_config::global_env_context()
                     .context("Discovering ffx environment context")?;
-                Some(ffx_trace::expand_categories(&context, categories).await?)
+                Some(ffx_trace::expand_categories(&context, categories)?)
             }
             None => None,
         };
