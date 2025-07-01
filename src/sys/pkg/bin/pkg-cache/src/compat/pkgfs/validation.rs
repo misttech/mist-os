@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::BasePackages;
 use fidl_fuchsia_io as fio;
 use log::{error, info};
-use std::collections::HashSet;
 use std::sync::Arc;
 use vfs::directory::entry::{EntryInfo, OpenRequest};
 use vfs::directory::immutable::connection::ImmutableConnection;
@@ -17,32 +17,27 @@ use vfs::{immutable_attributes, ObjectRequestRef, ProtocolsExt as _};
 /// have the "present" file).
 pub(crate) struct Validation {
     blobfs: blobfs::Client,
-    base_blobs: HashSet<fuchsia_hash::Hash>,
+    base_packages: Arc<BasePackages>,
 }
 
 impl Validation {
-    pub(crate) fn new(
-        blobfs: blobfs::Client,
-        base_blobs: HashSet<fuchsia_hash::Hash>,
-    ) -> Arc<Self> {
-        Arc::new(Self { blobfs, base_blobs })
+    pub(crate) fn new(blobfs: blobfs::Client, base_packages: Arc<BasePackages>) -> Arc<Self> {
+        Arc::new(Self { blobfs, base_packages })
     }
 
     // The contents of the "missing" file. The hex-encoded hashes of all the base blobs missing
     // from blobfs, separated and terminated by the newline character, '\n'.
     async fn make_missing_contents(&self) -> Vec<u8> {
-        info!("checking if any of the {} base package blobs are missing", self.base_blobs.len());
+        let base_blobs = self.base_packages.list_blobs();
 
-        let mut missing = self
-            .blobfs
-            .filter_to_missing_blobs(&self.base_blobs)
-            .await
-            .into_iter()
-            .collect::<Vec<_>>();
+        info!("checking if any of the {} base package blobs are missing", base_blobs.len());
+
+        let mut missing =
+            self.blobfs.filter_to_missing_blobs(base_blobs).await.into_iter().collect::<Vec<_>>();
         missing.sort();
 
         if missing.is_empty() {
-            info!(total = self.base_blobs.len(); "all base package blobs were found");
+            info!(total = base_blobs.len(); "all base package blobs were found");
         } else {
             error!(total = missing.len(); "base package blobs are missing");
         }
@@ -166,6 +161,7 @@ mod tests {
     use assert_matches::assert_matches;
     use blobfs_ramdisk::BlobfsRamdisk;
     use futures::prelude::*;
+    use std::collections::HashSet;
     use std::convert::TryInto as _;
     use vfs::directory::entry::GetEntryInfo;
     use vfs::directory::entry_container::Directory;
@@ -177,18 +173,22 @@ mod tests {
 
     impl TestEnv {
         async fn new() -> (Self, Arc<Validation>) {
-            Self::with_base_blobs_and_blobfs_contents(HashSet::new(), std::iter::empty()).await
+            Self::with_base_packages_and_blobfs_contents(
+                Arc::new(BasePackages::new_test_only(HashSet::new(), std::iter::empty())),
+                std::iter::empty(),
+            )
+            .await
         }
 
-        async fn with_base_blobs_and_blobfs_contents(
-            base_blobs: HashSet<fuchsia_hash::Hash>,
+        async fn with_base_packages_and_blobfs_contents(
+            base_packages: Arc<BasePackages>,
             blobfs_contents: impl IntoIterator<Item = (fuchsia_hash::Hash, Vec<u8>)>,
         ) -> (Self, Arc<Validation>) {
             let blobfs = BlobfsRamdisk::start().await.unwrap();
             for (hash, contents) in blobfs_contents.into_iter() {
                 blobfs.add_blob_from(hash, contents.as_slice()).await.unwrap()
             }
-            let validation = Validation::new(blobfs.client(), base_blobs);
+            let validation = Validation::new(blobfs.client(), base_packages);
             (Self { _blobfs: blobfs }, validation)
         }
     }
@@ -250,8 +250,11 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn directory_entry_open_missing() {
-        let (_env, validation) = TestEnv::with_base_blobs_and_blobfs_contents(
-            HashSet::from([[0; 32].into()]),
+        let (_env, validation) = TestEnv::with_base_packages_and_blobfs_contents(
+            Arc::new(BasePackages::new_test_only(
+                HashSet::from([[0; 32].into()]),
+                std::iter::empty(),
+            )),
             std::iter::empty(),
         )
         .await;
@@ -394,8 +397,11 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn make_missing_contents_missing_blob() {
-        let (_env, validation) = TestEnv::with_base_blobs_and_blobfs_contents(
-            HashSet::from([[0; 32].into()]),
+        let (_env, validation) = TestEnv::with_base_packages_and_blobfs_contents(
+            Arc::new(BasePackages::new_test_only(
+                HashSet::from([[0; 32].into()]),
+                std::iter::empty(),
+            )),
             std::iter::empty(),
         )
         .await;
@@ -408,8 +414,11 @@ mod tests {
 
     #[fuchsia_async::run_singlethreaded(test)]
     async fn make_missing_contents_two_missing_blob() {
-        let (_env, validation) = TestEnv::with_base_blobs_and_blobfs_contents(
-            HashSet::from([[0; 32].into(), [1; 32].into()]),
+        let (_env, validation) = TestEnv::with_base_packages_and_blobfs_contents(
+            Arc::new(BasePackages::new_test_only(
+                HashSet::from([[0; 32].into(), [1; 32].into()]),
+                std::iter::empty(),
+            )),
             std::iter::empty(),
         )
         .await;
@@ -426,8 +435,11 @@ mod tests {
     async fn make_missing_contents_irrelevant_blobfs_blob() {
         let blob = vec![0u8, 1u8];
         let hash = fuchsia_merkle::from_slice(&blob).root();
-        let (_env, validation) =
-            TestEnv::with_base_blobs_and_blobfs_contents(HashSet::new(), [(hash, blob)]).await;
+        let (_env, validation) = TestEnv::with_base_packages_and_blobfs_contents(
+            Arc::new(BasePackages::new_test_only(HashSet::new(), std::iter::empty())),
+            [(hash, blob)],
+        )
+        .await;
 
         assert_eq!(validation.make_missing_contents().await, Vec::<u8>::new());
     }
@@ -436,9 +448,11 @@ mod tests {
     async fn make_missing_contents_present_blob() {
         let blob = vec![0u8, 1u8];
         let hash = fuchsia_merkle::from_slice(&blob).root();
-        let (_env, validation) =
-            TestEnv::with_base_blobs_and_blobfs_contents(HashSet::from([hash]), [(hash, blob)])
-                .await;
+        let (_env, validation) = TestEnv::with_base_packages_and_blobfs_contents(
+            Arc::new(BasePackages::new_test_only(HashSet::from([hash]), std::iter::empty())),
+            [(hash, blob)],
+        )
+        .await;
 
         assert_eq!(validation.make_missing_contents().await, Vec::<u8>::new());
     }
@@ -451,8 +465,11 @@ mod tests {
         missing_hash[0] = !missing_hash[0];
         let missing_hash = missing_hash.into();
 
-        let (_env, validation) = TestEnv::with_base_blobs_and_blobfs_contents(
-            HashSet::from([hash, missing_hash]),
+        let (_env, validation) = TestEnv::with_base_packages_and_blobfs_contents(
+            Arc::new(BasePackages::new_test_only(
+                HashSet::from([hash, missing_hash]),
+                std::iter::empty(),
+            )),
             [(hash, blob)],
         )
         .await;
