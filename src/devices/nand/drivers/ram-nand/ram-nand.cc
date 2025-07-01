@@ -13,9 +13,11 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/process.h>
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
 
 #include <algorithm>
+#include <atomic>
 #include <utility>
 
 #include <bind/fuchsia/cpp/bind.h>
@@ -127,6 +129,15 @@ zx_status_t NandDevice::Bind(fuchsia_hardware_nand::wire::RamNandInfo& info) {
   zx::result<DeviceNameType> device_name = Init(std::move(info.vmo));
   if (device_name.is_error()) {
     return device_name.status_value();
+  }
+
+  if (info.wear_vmo.is_valid()) {
+    if (zx_status_t status =
+            wear_info_.Map(info.wear_vmo, 0, info.nand_info.num_blocks * sizeof(uint32_t));
+        status != ZX_OK) {
+      zxlogf(ERROR, "Failed to map wear info: %s", zx_status_get_string(status));
+      return status;
+    }
   }
 
   if (info.export_nand_config) {
@@ -490,6 +501,15 @@ zx_status_t NandDevice::Erase(nand_operation_t* operation) {
   addr = reinterpret_cast<char*>(mapped_addr_) + nand_addr;
 
   memset(addr, 0xff, length);
+
+  static_assert(std::atomic_ref<uint32_t>::is_always_lock_free);
+  uint32_t* ptr = reinterpret_cast<uint32_t*>(wear_info_.start());
+  if (ptr) {
+    for (uint32_t i = 0; i < operation->erase.num_blocks; ++i) {
+      std::atomic_ref<uint32_t> counter(ptr[operation->erase.first_block + i]);
+      counter.fetch_add(1, std::memory_order_relaxed);
+    }
+  }
 
   return ZX_OK;
 }

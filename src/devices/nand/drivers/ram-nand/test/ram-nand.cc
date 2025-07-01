@@ -833,4 +833,42 @@ TEST_F(NandTest, Erase) {
                   kOobSize * kNumPages);
 }
 
+TEST_F(NandTest, WearVmo) {
+  auto fake_parent = MockDevice::FakeRootParent();
+  NandParams params(kPageSize, kBlockSize, kNumBlocks, 6, 0);
+  NandDevice* device(new NandDevice(params, fake_parent.get()));
+
+  fuchsia_hardware_nand::wire::RamNandInfo config = BuildConfig();
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(kNumBlocks * sizeof(uint32_t), 0, &vmo));
+  ASSERT_OK(vmo.duplicate(ZX_DEFAULT_VMO_RIGHTS, &config.wear_vmo));
+
+  ASSERT_OK(device->Bind(config));
+  auto* child = fake_parent->GetLatestChild();
+  child->InitOp();
+  EXPECT_OK(child->WaitUntilInitReplyCalled());
+
+  // Starts as zero.
+  uint32_t result;
+  ASSERT_OK(vmo.read(&result, 0, sizeof(uint32_t)));
+  ASSERT_EQ(result, 0);
+
+  size_t op_size;
+  nand_info_t info;
+  device->NandQuery(&info, &op_size);
+  Operation operation(op_size, this);
+  nand_operation_t* op = operation.GetOperation();
+  op->erase.command = NAND_OP_ERASE;
+  op->erase.first_block = 0;
+  op->erase.num_blocks = 1;
+
+  device->NandQueue(op, &NandTest::CompletionCb, nullptr);
+  ASSERT_TRUE(Wait());
+  ASSERT_OK(operation.status());
+
+  // Incremented for first block.
+  ASSERT_OK(vmo.read(&result, 0, sizeof(uint32_t)));
+  ASSERT_EQ(result, 1);
+}
+
 }  // namespace

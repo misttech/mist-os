@@ -54,6 +54,7 @@
 #include "src/storage/lib/fs_management/cpp/options.h"
 #include "src/storage/testing/fvm.h"
 #include "src/storage/testing/ram_disk.h"
+#include "zircon/rights.h"
 
 namespace fs_test {
 namespace {
@@ -156,6 +157,14 @@ zx::result<std::pair<ramdevice_client::RamNand, std::string>> CreateRamNand(
                                         kPageSize / kPagesPerBlock);
   }
 
+  zx::vmo wear_vmo;
+  if (options.nand_wear_vmo->is_valid()) {
+    zx_status_t status = options.nand_wear_vmo->duplicate(ZX_DEFAULT_VMO_RIGHTS, &wear_vmo);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+  }
+
   if (zx::result channel = device_watcher::RecursiveWaitForFile(
           "/dev/sys/platform/ram-nand/nand-ctl", kDeviceWaitTime);
       channel.is_error()) {
@@ -177,6 +186,7 @@ zx::result<std::pair<ramdevice_client::RamNand, std::string>> CreateRamNand(
               .nand_class = fuchsia_hardware_nand::wire::Class::kFtl,
           },
       .fail_after = options.fail_after,
+      .wear_vmo = std::move(wear_vmo),
   };
   if (zx::result status =
           zx::make_result(ramdevice_client::RamNand::Create(std::move(config), &ram_nand));

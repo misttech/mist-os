@@ -8,6 +8,7 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/owned-vmo-mapper.h>
+#include <lib/fzl/vmo-mapper.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/vmo.h>
 #include <unistd.h>
@@ -28,12 +29,21 @@
 namespace fs_test {
 namespace {
 constexpr size_t kPageSize = 8192;
+constexpr size_t kPagesPerBlock = 32;
+constexpr size_t kSpareBytes = 16;
+
+constexpr size_t NandSize(uint32_t block_count) {
+  return static_cast<size_t>(block_count) * kPagesPerBlock * (kPageSize + kSpareBytes);
+}
+
+constexpr size_t WearSize(uint32_t block_count) {
+  return static_cast<size_t>(block_count) * sizeof(uint32_t);
+}
 
 struct SystemConfig {
   size_t fvm_slice_size;
 
-  // The size in bytes of the nand storage. Needs to account for the spare area bytes.
-  size_t nand_size;
+  uint32_t block_count;
 
   size_t blobfs_partition_size;
   size_t minfs_partition_size;
@@ -92,6 +102,7 @@ class WearSimulator {
 
  private:
   zx::vmo vmo_;
+  zx::vmo wear_vmo_;
   SystemConfig config_;
   std::unique_ptr<MountedSystem> mount_;
   std::vector<size_t> cycle_files_;
@@ -161,15 +172,18 @@ void WearSimulator::Init() {
   ASSERT_FALSE(mount_) << "Wear simulator already initialized";
 
   fzl::OwnedVmoMapper mapper;
-  ASSERT_EQ(mapper.CreateAndMap(config_.nand_size, "wear-test-vmo"), ZX_OK);
-  memset(mapper.start(), 0xff, config_.nand_size);
+  ASSERT_EQ(mapper.CreateAndMap(NandSize(config_.block_count), "wear-test-vmo"), ZX_OK);
+  memset(mapper.start(), 0xff, NandSize(config_.block_count));
   vmo_ = mapper.Release();
   ASSERT_TRUE(vmo_.is_valid());
+
+  ASSERT_EQ(zx::vmo::create(WearSize(config_.block_count), 0, &wear_vmo_), ZX_OK);
 
   auto res = CreateRamDevice({
       .use_ram_nand = true,
       .vmo = vmo_.borrow(),
       .use_fvm = true,
+      .nand_wear_vmo = wear_vmo_.borrow(),
       .device_block_size = kPageSize,
       .device_block_count = 0,
       .fvm_slice_size = config_.fvm_slice_size,
@@ -255,7 +269,7 @@ void WearSimulator::SimulateMinfs(int cycles) {
         size_t size = cycle_files_[index];
 
         int f = open(temp_path_buf, O_WRONLY | O_CREAT);
-        ASSERT_GE(f, 0);
+        ASSERT_GE(f, 0) << "Failed to open tmp file: " << errno;
         ASSERT_EQ(write(f, write_buf.get(), size), static_cast<ssize_t>(size));
         ASSERT_EQ(close(f), 0);
 
@@ -334,21 +348,52 @@ zx::result<RamDevice> WearSimulator::RemountFtl() {
   }
   mount_.reset();
 
+  // Taking a snapshot when remounting to ensure that the new component doesn't come up before the
+  // old one dies and end up with two components modifying the device at once.
   zx::vmo vmo_snapshot;
-  if (zx_status_t s = vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, config_.nand_size, &vmo_snapshot);
+  if (zx_status_t s =
+          vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0, NandSize(config_.block_count), &vmo_snapshot);
       s != ZX_OK) {
     return zx::error(s);
   }
+  // The two snapshots won't be atomic, but it won't matter much in the aggregate. Due to racing
+  // with the ramnand component the erase and wear count increment will never be perfectly in sync
+  // anyways, so it will always be racy.
+  zx::vmo wear_snapshot;
+  if (zx_status_t s = wear_vmo_.create_child(ZX_VMO_CHILD_SNAPSHOT, 0,
+                                             WearSize(config_.block_count), &wear_snapshot);
+      s != ZX_OK) {
+    return zx::error(s);
+  }
+
   RamDevice ramnand = CreateRamDevice({
                                           .use_ram_nand = true,
                                           .vmo = vmo_snapshot.borrow(),
                                           .use_existing_fvm = true,
+                                          .nand_wear_vmo = wear_snapshot.borrow(),
                                           .device_block_size = kPageSize,
                                           .device_block_count = 0,
                                           .fvm_slice_size = config_.fvm_slice_size,
                                       })
                           .value();
+
+  {
+    fzl::VmoMapper mapper;
+    if (zx_status_t s = mapper.Map(wear_snapshot); s != ZX_OK) {
+      return zx::error(s);
+    }
+
+    uint32_t* ptr = reinterpret_cast<uint32_t*>(mapper.start());
+    uint32_t max = 0;
+    uint32_t min = std::numeric_limits<uint32_t>::max();
+    for (uint32_t i = 0; i < config_.block_count; ++i) {
+      max = std::max(max, ptr[i]);
+      min = std::min(min, ptr[i]);
+    }
+    printf("Max wear: %u, Min wear: %u\n", max, min);
+  }
   vmo_ = std::move(vmo_snapshot);
+  wear_vmo_ = std::move(wear_snapshot);
   return zx::ok(std::move(ramnand));
 }
 
@@ -397,14 +442,12 @@ void WearSimulator::Reboot() {
 
 // Test disabled because it isn't meant to run as part of CI. Meant for local experimentation.
 TEST(Wear, DISABLED_LargeScale) {
-  // 1716 blocks containing 64 pages of 4 KiB with 8 bytes OOB
-  constexpr int kSize = 1716 * 64 * (4096 + 8);
   constexpr size_t kBlobUpdateSize = 178ul * 1024 * 1024;
 
   std::srand(testing::UnitTest::GetInstance()->random_seed());
   WearSimulator sim = WearSimulator({
       .fvm_slice_size = 32ul * 1024,
-      .nand_size = kSize,
+      .block_count = 1716,
       // Set up A/B partitions each with 2MB of breathing room so we don't fill up.
       .blobfs_partition_size = kBlobUpdateSize + (4ul * 1024 * 1024),
       .minfs_partition_size = 13ul * 1024 * 1024,
@@ -427,13 +470,10 @@ TEST(Wear, DISABLED_LargeScale) {
 
 // A minimal test meant to be fast while exploring the full range of operations.
 TEST(Wear, MinimalSimulator) {
-  // 100 blocks containing 64 pages of 4 KiB with 8 bytes OOB
-  constexpr int kSize = 100 * 64 * (4096 + 8);
-
   std::srand(testing::UnitTest::GetInstance()->random_seed());
   WearSimulator sim = WearSimulator({
       .fvm_slice_size = 32ul * 1024,
-      .nand_size = kSize,
+      .block_count = 100,
       .blobfs_partition_size = 10ul * 1024 * 1024,
       .minfs_partition_size = 10ul * 1024 * 1024,
       .minfs_cold_data_size = 2ul * 1024 * 1024,

@@ -66,7 +66,10 @@ source_set("common") {
     "//zircon/system/ulib/sync",
     "//zircon/system/ulib/zircon-internal",
   ]
-  public_deps = [ "//zircon/system/ulib/fbl" ]
+  public_deps = [
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fzl",
+  ]
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
