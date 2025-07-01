@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/assembly/developer_overrides.gni")
+import("//build/bazel/assembly/bazel_product_configuration.gni")
 import("//build/bazel/bazel_build_action.gni")
 import("//build/bazel/bazel_build_group.gni")
 import("//build/sdk/product_bundle_transfer_manifest.gni")
@@ -299,22 +300,23 @@ template("bazel_product_bundle") {
     },
   ]
 
+  # Declare a product config action that is not built by default.
+  # To build this build ${target_name}_product_config.
   if (defined(invoker.bazel_product_config_target)) {
+    assert(
+        defined(invoker.bazel_product_config_name),
+        "bazel_product_config_name must be supplied if bazel_product_config_target is given")
     _product_config_target = "${target_name}_product_config"
-    _subtargets += [
-      {
-        gn_target_name = _product_config_target
-        bazel_target = invoker.bazel_product_config_target
-        deps = _common_deps
-
-        copy_outputs = [
-          {
-            bazel = "{{BAZEL_TARGET_OUT_PATH}}/{{BAZEL_TARGET_NAME}}_product_config.json"
-            ninja = "${_product_config_target}/product_assembly_config.json"
-          },
-        ]
-      },
-    ]
+    bazel_product_configuration(_product_config_target) {
+      forward_variables_from(invoker,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
+      bazel_product_configuration_target = invoker.bazel_product_config_target
+      name = invoker.bazel_product_config_name
+      deps = _common_deps
+    }
   }
 
   not_needed(invoker, [ "bazel_recovery_image_target" ])

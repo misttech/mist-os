@@ -42,6 +42,23 @@ common_bazel_inputs = [
   "//src/tests/fidl/compatibility/rust:rust.bazel_input",
 ]
 
+group("products") {
+  testonly = true
+  deps = []
+  if (current_cpu == "x64") {
+    deps += [ ":product_bundle.x64_product_config" ]
+  } else if (current_cpu == "arm64") {
+    deps += [ ":product_bundle.arm64_product_config" ]
+  }
+}
+
+bazel_product_configuration("terminal_product") {
+  testonly = true
+  name = "terminal"
+  bazel_product_configuration_target = ":product_config"
+  deps = common_bazel_inputs
+}
+
 group("terminal") {
   testonly = true
   if (current_cpu == "x64") {
@@ -72,6 +89,8 @@ if (target_cpu == "x64") {
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.x64"
     bazel_product_image_target = ":image.x64"
+    bazel_product_config_target = ":product_config"
+    bazel_product_config_name = "terminal"
     bazel_recovery_image_target = "//products/zedboot:x64"
     bazel_elf_sizes_target = ":elf_sizes.x64"
     bazel_inputs_from_gn =
@@ -128,6 +147,8 @@ if (target_cpu == "arm64") {
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target = ":product_bundle.arm64"
     bazel_product_image_target = ":image.arm64"
+    bazel_product_config_target = ":product_config"
+    bazel_product_config_name = "terminal"
     bazel_recovery_image_target = "//products/zedboot:arm64"
     bazel_elf_sizes_target = ":elf_sizes.arm64"
     bazel_inputs_from_gn =

@@ -113,6 +113,10 @@ declare_args() {
 
   # Platform builders should populate this list in their product.gni file.
   # The result will be built and uploaded to CIPD by infra.
+  assembly_product_configs = []
+
+  # Platform builders should populate this list in their product.gni file.
+  # The result will be built and uploaded to CIPD by infra.
   assembly_partitions_configs = []
 
   # Platform builders can add targets to this list so that they get built with
@@ -666,6 +670,23 @@ build_api_module("boards") {
   testonly = true
   data_keys = [ "board_configs" ]
   deps = assembly_board_configs
+}
+
+# Lists the product configurations that are defined in this build.
+#
+# Type: list (scope)
+#
+#  label
+#    Required: The GN label for the product_configuration target
+#
+#  outdir
+#    Required: The path (relative to the root out dir) of the directory that
+#    contains the product configuration.
+#
+build_api_module("products") {
+  testonly = true
+  data_keys = [ "product_configs" ]
+  deps = assembly_product_configs
 }
 
 # Lists the board input bundle sets that are defined in this build.
