@@ -39,4 +39,9 @@ if (is_host) {
       "//scripts/lib/json_get",
     ]
   }
+
+  install_python_tool("install") {
+    name = "disable_ctf_tests"
+    binary = ":disable_ctf_tests"
+  }
 }

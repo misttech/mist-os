@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-""" Runs shell commands to enumerate tests or build a GN target.
+"""Runs shell commands to enumerate tests or build a GN target.
 
 Results: Returned from polling a command - tells its status and any outputs
 destined for the UI.
@@ -27,6 +27,7 @@ from typing import IO, Any
 
 import data_structure
 import util
+from json_get import JsonGet
 
 
 @dataclass
@@ -201,7 +202,7 @@ class TestEnumerator(CommandRunner):
                         "Enumeration didn't work. You may need to start emu and/or serve."
                     ]
                 )
-            info = util.JsonGet(line)
+            info = JsonGet(line)
             self._look_for_test_selections(info)
             self._look_for_program_starts(info)
             self._look_for_executing(info)
@@ -222,7 +223,7 @@ class TestEnumerator(CommandRunner):
             ):
                 self.outputs.error("You may need to do an `fx build`.")
 
-    def _look_for_test_selections(self, info: util.JsonGet) -> None:
+    def _look_for_test_selections(self, info: JsonGet) -> None:
         info.match(
             {"payload": {"test_selections": {"selected": Any}}},
             self._selected_tests_callback,
@@ -233,7 +234,7 @@ class TestEnumerator(CommandRunner):
             data_with_selected.payload.test_selections.selected.keys()
         )
 
-    def _look_for_program_starts(self, info: util.JsonGet) -> None:
+    def _look_for_program_starts(self, info: JsonGet) -> None:
         # {"id": 3, "timestamp": 1280753.01070115, "parent": 2, "starting": true,
         #   "payload": {"program_execution": {"command": "fx",
         #        "flags": ["--dir", "/usr/local/google/home/cphoenix/fuchsia/out/emu", "dldist", "-v",
@@ -254,7 +255,7 @@ class TestEnumerator(CommandRunner):
         if "dldist" in start.payload.program_execution.flags:
             self.ignore_errors.add(start.id)
 
-    def _look_for_executing(self, info: util.JsonGet) -> None:
+    def _look_for_executing(self, info: JsonGet) -> None:
         # { "id": 110, "timestamp": 406305.148786878, "parent": 16, "starting": true,
         #   "payload":
         #     {"program_execution":
@@ -279,7 +280,7 @@ class TestEnumerator(CommandRunner):
             f"{int(self.run_count*100/self.total_runs)}%: {program_name.split('?')[0]}"
         )
 
-    def _look_for_error_output(self, info: util.JsonGet) -> None:
+    def _look_for_error_output(self, info: JsonGet) -> None:
         # {"id": 11, "timestamp": 1268958.160280603, "payload": {"program_output":
         #    {"data": "ERROR: It looks like the package repository server is not running.\n",
         #       "stream": "STDERR", "print_verbatim": false}}}
@@ -297,7 +298,7 @@ class TestEnumerator(CommandRunner):
         if info.id not in self.ignore_errors:
             self._handle_errors([info.payload.program_output.data])
 
-    def _look_for_building(self, info: util.JsonGet) -> None:
+    def _look_for_building(self, info: JsonGet) -> None:
         # {"id": 8, "timestamp": 1267997.052252219, "starting": true,
         #  "payload": {"build_targets": ["--default", "//sdk/ctf/tests/pkg/fdio:fdio-spawn-tests-package",
         #       "//sdk/ctf/tests/pkg/fdio:fdio-spawn-tests-package"]}}
@@ -311,7 +312,7 @@ class TestEnumerator(CommandRunner):
             f"Building (could take a while): {info.payload.build_targets[1:]}"
         )
 
-    def _look_for_enumeration(self, info: util.JsonGet) -> None:
+    def _look_for_enumeration(self, info: JsonGet) -> None:
         # {"id": 382, "timestamp": 406316.24595807, "payload": {
         #   "enumerate_test_cases": {
         #     "test_name": "fuchsia-pkg://fuchsia.com/media-button-test-suite_ctf26#meta/media-button-conformance-test.cm",

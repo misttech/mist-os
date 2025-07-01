@@ -2,13 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-""" Entry point of the program.
+"""Entry point of the program.
 
 App ensures CTF tests are built, scans the available tests,
 and then hands off control to a UI.
 """
 
 import argparse
+import os
 import sys
 import time
 from typing import Protocol
@@ -16,7 +17,6 @@ from typing import Protocol
 import cli
 import command_runner
 import data_structure
-import gui
 import util
 
 
@@ -40,7 +40,28 @@ class App:
     def __init__(self, argv: list[str]) -> None:
         args = self._parse_args(argv)
         if args.gui:
-            self.ui: UI = gui.GUI()
+            try:
+                import gui
+
+                self.ui: UI = gui.GUI()
+            except ImportError:
+                if os.path.exists(__file__):
+                    script_path = __file__
+                elif os.path.isfile((dirname := os.path.dirname(__file__))):
+                    script_path = dirname
+                else:
+                    script_path = None
+                print(
+                    "ERROR: Failed to load GUI modules. Your Python installation may not have Tkinter installed.\n"
+                )
+                if script_path:
+                    print(
+                        "If you are using fx, you can try running this script using your installed Python version:\n"
+                        f"$ python3 {script_path} --gui\n"
+                    )
+                else:
+                    print("Try reinstalling Python.\n")
+                sys.exit(1)
         else:
             self.ui = cli.CLI()
         self.build_target = "//sdk/ctf/release:tests"
