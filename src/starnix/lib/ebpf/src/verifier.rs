@@ -8,10 +8,11 @@ use crate::scalar_value::{ScalarValueData, U32Range, U32ScalarValueData, U64Rang
 use crate::visitor::{BpfVisitor, ProgramCounter, Register, Source};
 use crate::{
     DataWidth, EbpfError, EbpfInstruction, MapSchema, BPF_MAX_INSTS, BPF_PSEUDO_MAP_IDX,
-    BPF_STACK_SIZE, GENERAL_REGISTER_COUNT, REGISTER_COUNT,
+    BPF_PSEUDO_MAP_IDX_VALUE, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT, REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian, NativeEndian};
 use fuchsia_sync::Mutex;
+use linux_uapi::bpf_map_type_BPF_MAP_TYPE_ARRAY;
 use std::cmp::Ordering;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
@@ -4074,6 +4075,38 @@ impl BpfVisitor for ComputationContext {
                     .get(usize::try_from(map_index).unwrap())
                     .map(|schema| Type::ConstPtrToMap { id: map_index.into(), schema: *schema })
                     .ok_or_else(|| format!("lddw with invalid map index: {}", map_index))?
+            }
+            BPF_PSEUDO_MAP_IDX_VALUE => {
+                let map_index = lower;
+                let offset = next_instruction.imm();
+                bpf_log!(
+                    self,
+                    context,
+                    "lddw {}, map_value_by_index({:x})+{offset}",
+                    display_register(dst),
+                    map_index
+                );
+                let id = context.next_id();
+                let map_schema = context
+                    .calling_context
+                    .maps
+                    .get(usize::try_from(map_index).unwrap())
+                    .ok_or_else(|| format!("lddw with invalid map index: {}", map_index))?;
+
+                if map_schema.map_type != bpf_map_type_BPF_MAP_TYPE_ARRAY {
+                    return Err(format!(
+                        "Invalid map type at index {map_index} for lddw. Expecting array."
+                    ));
+                }
+                if map_schema.max_entries == 0 {
+                    return Err(format!("Array has no entry."));
+                }
+
+                Type::PtrToMemory {
+                    id: MemoryId::from(id),
+                    offset: offset.into(),
+                    buffer_size: map_schema.value_size.into(),
+                }
             }
             _ => {
                 return Err(format!("invalid lddw"));

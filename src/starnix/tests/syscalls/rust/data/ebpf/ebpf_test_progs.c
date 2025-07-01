@@ -4,6 +4,10 @@
 
 #include "bpf_helpers.h"
 
+// Global variable that will be stored in a .data section (which is a BPF map).
+static volatile __u64 global_counter1 = 0;
+static volatile __u64 global_counter2 = 0;
+
 SECTION("maps")
 struct bpf_map_def ringbuf = {
     .type = BPF_MAP_TYPE_RINGBUF,
@@ -79,6 +83,10 @@ int skb_test_prog(struct __sk_buff* skb) {
 }
 
 int sock_create_prog(struct bpf_sock* sock) {
+  // Increment the global counter.
+  __sync_fetch_and_add(&global_counter1, 1);
+  __sync_fetch_and_add(&global_counter2, 2);
+
   int zero = 0;
   int* counter = bpf_map_lookup_elem(&count, &zero);
   if (!counter) {

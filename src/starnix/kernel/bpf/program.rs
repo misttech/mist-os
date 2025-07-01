@@ -211,10 +211,15 @@ fn link_maps_fds(
 
             match instruction.src_reg() {
                 0 => {}
-                BPF_PSEUDO_MAP_FD => {
-                    // If the instruction references BPF_PSEUDO_MAP_FD, then we need to look up the map fd
+                BPF_PSEUDO_MAP_FD | BPF_PSEUDO_MAP_VALUE => {
+                    let lddw_type = if instruction.src_reg() == BPF_PSEUDO_MAP_FD {
+                        BPF_PSEUDO_MAP_IDX
+                    } else {
+                        BPF_PSEUDO_MAP_IDX_VALUE
+                    };
+                    // If the instruction references a map fd, then we need to look up the map fd
                     // and create a reference from this program to that object.
-                    instruction.set_src_reg(BPF_PSEUDO_MAP_IDX);
+                    instruction.set_src_reg(lddw_type);
 
                     let fd = FdNumber::from_raw(instruction.imm());
                     let object = get_bpf_object(current_task, fd)?;
@@ -235,7 +240,6 @@ fn link_maps_fds(
                     instruction.set_imm(index.try_into().unwrap());
                 }
                 BPF_PSEUDO_MAP_IDX
-                | BPF_PSEUDO_MAP_VALUE
                 | BPF_PSEUDO_MAP_IDX_VALUE
                 | BPF_PSEUDO_BTF_ID
                 | BPF_PSEUDO_FUNC => {

@@ -67,6 +67,8 @@ pub enum Elf64SectionType {
     Symtab = 2,
     Strtab = 3,
     Rela = 4,
+    // As Progbits, but requires a array map to store the data
+    NoBits = 8,
 }
 
 #[derive(KnownLayout, FromBytes, Immutable, IntoBytes, Debug, Eq, PartialEq, Copy, Clone)]
@@ -100,7 +102,8 @@ struct bpf_map_def {
 
 #[derive(Debug)]
 pub struct MapDefinition {
-    pub name: BString,
+    // The name is missing for array maps that are defined in the bss section.
+    pub name: Option<BString>,
     pub schema: MapSchema,
     pub flags: u32,
 }
@@ -117,8 +120,10 @@ pub enum Error {
     IoError(#[from] io::Error),
     #[error("Invalid ELF file: {}", _0)]
     ElfParse(&'static str),
-    #[error("Can't find section {}", _0)]
+    #[error("Can't find section {:?}", _0)]
     ElfMissingSection(BString),
+    #[error("InvalidStringIndex {}", _0)]
+    ElfInvalidStringIndex(usize),
     #[error("InvalidSymbolIndex {}", _0)]
     ElfInvalidSymIndex(usize),
     #[error("Can't find function named: {}", _0)]
@@ -180,18 +185,22 @@ struct StringsSection {
 }
 
 impl StringsSection {
-    fn get(&self, index: u32) -> Option<&BStr> {
+    fn get(&self, index: u32) -> Result<Option<&BStr>, Error> {
         let index = index as usize;
-        if index == 0 || index >= self.data.len() {
-            return None;
+        if index >= self.data.len() {
+            return Err(Error::ElfInvalidStringIndex(index));
+        }
+        if index == 0 {
+            return Ok(None);
         }
         let end = index + self.data[index..].iter().position(|c| *c == 0).unwrap();
-        Some(<&BStr>::from(&self.data[index..end]))
+        Ok(Some(<&BStr>::from(&self.data[index..end])))
     }
 }
 
+#[derive(Debug)]
 struct SymbolInfo<'a> {
-    name: &'a BStr,
+    name: Option<&'a BStr>,
     section: &'a Elf64SectionHeader,
     data: &'a [u8],
     offset: usize,
@@ -228,7 +237,7 @@ impl ElfFile {
     fn get_section(&self, name: &BStr) -> Result<&[u8], Error> {
         let header = self
             .contents
-            .find_section(|s| self.strings.get(s.name) == Some(name))?
+            .find_section(|s| self.strings.get(s.name).unwrap_or(None) == Some(name))?
             .ok_or_else(|| Error::ElfMissingSection(name.to_owned()))?;
         self.contents.get_section_data(header)
     }
@@ -249,7 +258,7 @@ impl ElfFile {
         let data = section_data
             .get(offset..end)
             .ok_or_else(|| Error::ElfParse("Invalid symbol location"))?;
-        let name = self.strings.get(sym.name).unwrap();
+        let name = self.strings.get(sym.name)?;
         Ok(SymbolInfo { name, section, data, offset })
     }
 
@@ -258,9 +267,13 @@ impl ElfFile {
         name: &BStr,
         section_name: &BStr,
     ) -> Result<Option<SymbolInfo<'_>>, Error> {
-        for sym in self.symbols()?.iter().filter(|s| self.strings.get(s.name) == Some(name)) {
+        for sym in self
+            .symbols()?
+            .iter()
+            .filter(|s| self.strings.get(s.name).unwrap_or(None) == Some(name))
+        {
             let info = self.get_symbol_info(sym)?;
-            if self.strings.get(info.section.name) == Some(section_name) {
+            if self.strings.get(info.section.name)? == Some(section_name) {
                 return Ok(Some(info));
             }
         }
@@ -322,28 +335,63 @@ pub fn load_ebpf_program_from_file(
             let pc = offset / mem::size_of::<EbpfInstruction>();
             let sym_index = (rel.info >> 32) as usize;
             let sym = elf_file.symbol_by_index(sym_index)?;
-            let map_index = match map_indices.entry(sym.name) {
+
+            // Determine whether the map is found the map section or bss
+            let is_from_map_section = match sym {
+                SymbolInfo { name: Some(_), section: Elf64SectionHeader { type_, .. }, .. }
+                    if *type_ == Elf64SectionType::Progbits as u32 =>
+                {
+                    code[pc].set_src_reg(ebpf::BPF_PSEUDO_MAP_IDX);
+                    true
+                }
+                SymbolInfo { name: None, section: Elf64SectionHeader { type_, .. }, .. }
+                    if *type_ == Elf64SectionType::NoBits as u32 =>
+                {
+                    let offset = code[pc].imm();
+                    code[pc].set_src_reg(ebpf::BPF_PSEUDO_MAP_IDX_VALUE);
+                    code[pc + 1].set_imm(offset);
+                    false
+                }
+                _ => return Err(Error::ElfParse("Invalid map symbol")),
+            };
+
+            // Insert map index to the code. The actual map address is inserted
+            // later, when the program is linked.
+            let map_index = match map_indices.entry(sym_index) {
                 hash_map::Entry::Occupied(e) => *e.get(),
                 hash_map::Entry::Vacant(e) => {
-                    let (def, _) = bpf_map_def::ref_from_prefix(sym.data)
-                        .map_err(|_| Error::ElfParse("Failed to load map definition"))?;
+                    let (schema, flags) = if is_from_map_section {
+                        let (def, _) = bpf_map_def::ref_from_prefix(sym.data)
+                            .map_err(|_| Error::ElfParse("Failed to load map definition"))?;
+                        (
+                            MapSchema {
+                                map_type: def.map_type,
+                                key_size: def.key_size,
+                                value_size: def.value_size,
+                                max_entries: def.max_entries,
+                            },
+                            def.flags,
+                        )
+                    } else {
+                        (
+                            MapSchema {
+                                map_type: linux_uapi::bpf_map_type_BPF_MAP_TYPE_ARRAY,
+                                key_size: 4,
+                                value_size: sym.section.size as u32,
+                                max_entries: 1,
+                            },
+                            0,
+                        )
+                    };
                     maps.push(MapDefinition {
-                        name: sym.name.to_owned(),
-                        schema: MapSchema {
-                            map_type: def.map_type,
-                            key_size: def.key_size,
-                            value_size: def.value_size,
-                            max_entries: def.max_entries,
-                        },
-                        flags: def.flags,
+                        name: sym.name.map(|x| x.to_owned()),
+                        schema,
+                        flags,
                     });
                     *e.insert(maps.len() - 1)
                 }
             };
 
-            // Insert map index to the code. The actual map address is inserted
-            // later, when the program is linked.
-            code[pc].set_src_reg(ebpf::BPF_PSEUDO_MAP_IDX);
             code[pc].set_imm(map_index as i32);
         }
     }
@@ -366,7 +414,10 @@ mod test {
         // Verify that all maps were loaded.
         let mut names = maps.iter().map(|m| m.name.clone()).collect::<Vec<_>>();
         names.sort();
-        assert_eq!(&names, &[BStr::new("array"), BStr::new("hashmap")]);
+        assert_eq!(
+            &names,
+            &[None, BStr::new("array").to_owned().into(), BStr::new("hashmap").to_owned().into()]
+        );
 
         // Check that the program passes the verifier.
         let maps_schema = maps.iter().map(|m| m.schema).collect();

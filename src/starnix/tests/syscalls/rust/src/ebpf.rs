@@ -229,6 +229,13 @@ mod tests {
         pid_tgid: u64,
         cookie: u64,
     }
+
+    #[repr(C)]
+    #[derive(Debug, Immutable, FromBytes)]
+    struct GlobalVariables {
+        global_counter1: u64,
+        global_counter2: u64,
+    }
     // LINT.ThenChange(//src/starnix/tests/syscalls/rust/data/ebpf/ebpf_test_progs.c)
 
     struct MapSet {
@@ -240,9 +247,24 @@ mod tests {
             let (def, fd) = self
                 .maps
                 .iter()
-                .find(|(def, _fd)| def.name == bstr::BStr::new(name))
+                .find(|(def, _fd)| {
+                    def.name.as_ref().map(|x| x == bstr::BStr::new(name)).unwrap_or(false)
+                })
                 .unwrap_or_else(|| panic!("Failed to find map {}", name));
             assert!(def.schema.map_type == expected_type, "Invalid map type for map {}", name);
+            fd.as_fd()
+        }
+
+        fn rss(&self) -> BorrowedFd<'_> {
+            let (def, fd) = self
+                .maps
+                .iter()
+                .find(|(def, _fd)| def.name.is_none())
+                .unwrap_or_else(|| panic!("Failed to find rss map"));
+            assert!(
+                def.schema.map_type == linux_uapi::bpf_map_type_BPF_MAP_TYPE_ARRAY,
+                "Invalid map type for map rss"
+            );
             fd.as_fd()
         }
 
@@ -267,6 +289,11 @@ mod tests {
             let test_result_map_fd =
                 self.find(TEST_RESULT_MAP_NAME, linux_uapi::bpf_map_type_BPF_MAP_TYPE_ARRAY);
             bpf_map_lookup_elem(test_result_map_fd, 0u32).expect("Failed to test_result")
+        }
+
+        fn get_global_variables(&self) -> GlobalVariables {
+            let rss_map_fd = self.rss();
+            bpf_map_lookup_elem(rss_map_fd, 0u32).expect("Failed to test_result")
         }
     }
 
@@ -297,6 +324,13 @@ mod tests {
                     let map_index = inst.imm() as usize;
                     let map_fd = map_fds[map_index].as_raw_fd();
                     inst.set_src_reg(ebpf::BPF_PSEUDO_MAP_FD);
+                    inst.set_imm(map_fd);
+                }
+                if inst.code() == ebpf::BPF_LDDW && inst.src_reg() == ebpf::BPF_PSEUDO_MAP_IDX_VALUE
+                {
+                    let map_index = inst.imm() as usize;
+                    let map_fd = map_fds[map_index].as_raw_fd();
+                    inst.set_src_reg(ebpf::BPF_PSEUDO_MAP_VALUE);
                     inst.set_imm(map_fd);
                 }
             }
@@ -400,9 +434,19 @@ mod tests {
 
         // Verify that the counter is incremented when a new socket is created.
         let last_count = program.maps.get_count();
+        let initial_variable = program.maps.get_global_variables();
+
         let _socket = UdpSocket::bind("0.0.0.0:0").expect("Failed to create UDP socket");
+
         let new_count = program.maps.get_count();
+        let end_variable = program.maps.get_global_variables();
+
         assert!(new_count - last_count >= 1);
+        assert!(end_variable.global_counter1 - initial_variable.global_counter1 >= 1);
+        assert!(
+            end_variable.global_counter2 - initial_variable.global_counter2
+                >= 2 * (end_variable.global_counter1 - initial_variable.global_counter1)
+        );
     }
 
     #[test]

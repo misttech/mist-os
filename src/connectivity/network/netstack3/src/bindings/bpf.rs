@@ -449,6 +449,10 @@ impl MapReference for CachedMapRef {
     fn as_bpf_value(&self) -> BpfValue {
         self.inner.map.as_bpf_value()
     }
+
+    fn get_data_ptr(&self) -> Option<BpfValue> {
+        self.inner.map.get_data_ptr()
+    }
 }
 
 /// `EbpfMapCache` maintains list of all eBPF maps programs loaded in this

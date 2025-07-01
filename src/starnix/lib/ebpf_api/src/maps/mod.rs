@@ -122,6 +122,13 @@ impl MapReference for PinnedMap {
     fn as_bpf_value(&self) -> BpfValue {
         BpfValue::from(self.deref() as *const Map)
     }
+
+    fn get_data_ptr(&self) -> Option<BpfValue> {
+        assert!(self.0.schema.map_type == bpf_map_type_BPF_MAP_TYPE_ARRAY);
+
+        let key = [0u8; 4];
+        self.0.lookup(&key).map(|v| BpfValue::from(v.ptr().raw_ptr()))
+    }
 }
 
 // Avoid allocation for eBPF keys smaller than 16 bytes.

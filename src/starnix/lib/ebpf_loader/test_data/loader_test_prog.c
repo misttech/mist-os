@@ -4,6 +4,8 @@
 
 #include "bpf_helpers.h"
 
+static volatile __u64 static_variable = 0;
+
 SECTION("maps")
 struct bpf_map_def hashmap = {
     .type = BPF_MAP_TYPE_HASH,
@@ -23,6 +25,8 @@ struct bpf_map_def array = {
 };
 
 int test_prog(struct __sk_buff *skb) {
+  __sync_fetch_and_add(&static_variable, 1);
+
   int ifindex = skb->ifindex;
 
   __u64 *count = bpf_map_lookup_elem(&hashmap, &ifindex);

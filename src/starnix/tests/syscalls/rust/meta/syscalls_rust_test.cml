@@ -10,6 +10,9 @@
     program: {
         binary: "data/tests/syscalls_rust_test_bin",
         uid: "0",
-        environ: [ "MUTABLE_STORAGE=/data" ],
+        environ: [
+            "MUTABLE_STORAGE=/data",
+            "RUST_BACKTRACE=full",
+        ],
     },
 }

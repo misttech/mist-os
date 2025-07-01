@@ -6,7 +6,8 @@ use crate::executor::execute;
 use crate::verifier::VerifiedEbpfProgram;
 use crate::{
     CbpfConfig, DataWidth, EbpfError, EbpfInstruction, MapSchema, MemoryId, StructAccess, Type,
-    BPF_CALL, BPF_DW, BPF_JMP, BPF_LDDW, BPF_PSEUDO_MAP_IDX, BPF_SIZE_MASK,
+    BPF_CALL, BPF_DW, BPF_JMP, BPF_LDDW, BPF_PSEUDO_MAP_IDX, BPF_PSEUDO_MAP_IDX_VALUE,
+    BPF_SIZE_MASK,
 };
 use derivative::Derivative;
 use std::collections::HashMap;
@@ -83,6 +84,12 @@ where
 pub trait MapReference {
     fn schema(&self) -> &MapSchema;
     fn as_bpf_value(&self) -> BpfValue;
+
+    /// Returns the address of the first element of this map.
+    ///
+    /// This will only ever be called on a map of type `BPF_MAP_TYPE_ARRAY` with at least one
+    /// element.
+    fn get_data_ptr(&self) -> Option<BpfValue>;
 }
 
 /// `MapReference` for `EbpfProgramContext` where maps are not used.
@@ -93,6 +100,9 @@ impl MapReference for NoMap {
         unreachable!()
     }
     fn as_bpf_value(&self) -> BpfValue {
+        unreachable!()
+    }
+    fn get_data_ptr(&self) -> Option<BpfValue> {
         unreachable!()
     }
 }
@@ -629,7 +639,7 @@ pub fn link_program_internal<C: EbpfProgramContext, T: ArgumentTypeChecker<C>>(
             // and create a reference from this program to that object.
             match instruction.src_reg() {
                 0 => (),
-                BPF_PSEUDO_MAP_IDX => {
+                BPF_PSEUDO_MAP_IDX | BPF_PSEUDO_MAP_IDX_VALUE => {
                     let map_index = usize::try_from(instruction.imm())
                         .expect("negative map index in a verified program");
                     let map = maps.get(map_index).ok_or_else(|| {
@@ -637,13 +647,36 @@ pub fn link_program_internal<C: EbpfProgramContext, T: ArgumentTypeChecker<C>>(
                     })?;
                     assert!(*map.schema() == program.maps[map_index]);
 
-                    let map_ptr = map.as_bpf_value().as_u64();
-                    let (high, low) = ((map_ptr >> 32) as i32, map_ptr as i32);
+                    let (instruction, next_instruction) = {
+                        // The code was verified, so this is not expected to overflow.
+                        let (a1, a2) = code.split_at_mut(pc + 1);
+                        (&mut a1[pc], &mut a2[0])
+                    };
+
+                    let value = if instruction.src_reg() == BPF_PSEUDO_MAP_IDX {
+                        map.as_bpf_value().as_u64()
+                    } else {
+                        // BPF_PSEUDO_MAP_IDX_VALUE
+                        let map_value = map
+                            .get_data_ptr()
+                            .ok_or_else(|| {
+                                EbpfError::ProgramLinkError(format!(
+                                    "Unable to get value at 0 for map at index {map_index}"
+                                ))
+                            })?
+                            .as_u64();
+                        map_value.checked_add_signed(next_instruction.imm().into()).ok_or_else(
+                            || {
+                                EbpfError::ProgramLinkError(format!(
+                                    "Unable to use offset for map access"
+                                ))
+                            },
+                        )?
+                    };
+
+                    let (high, low) = ((value >> 32) as i32, value as i32);
                     instruction.set_src_reg(0);
                     instruction.set_imm(low);
-
-                    // The code was verified, so this is not expected to overflow.
-                    let next_instruction = &mut code[pc + 1];
                     next_instruction.set_imm(high);
                 }
                 value => {
