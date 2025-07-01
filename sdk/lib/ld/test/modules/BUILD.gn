@@ -1548,6 +1548,10 @@ foreach(test, [ "" ] + per_test_suffices) {
       ":ld-dep-foo-v1-weak$suffix",
       ":ld-dep-foo-v2$suffix",
     ]
+
+    # TODO(https://fxbug.dev/428236946): Investigate why the OneWeakSymbol test
+    # in load-tests-reloc.cc fails when LTO is enabled.
+    configs = [ "//build/config/lto:no-lto" ]
   }
 
   # all-weak-symbols:
