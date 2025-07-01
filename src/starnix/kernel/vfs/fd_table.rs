@@ -473,7 +473,7 @@ mod test {
     async fn test_fd_table_install() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let files = FdTable::default();
-        let file = SyslogFile::new_file(&current_task);
+        let file = SyslogFile::new_file(&mut locked, &current_task);
 
         let fd0 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
         assert_eq!(fd0.raw(), 0);
@@ -491,7 +491,7 @@ mod test {
     async fn test_fd_table_fork() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let files = FdTable::default();
-        let file = SyslogFile::new_file(&current_task);
+        let file = SyslogFile::new_file(&mut locked, &current_task);
 
         let fd0 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
         let fd1 = add(&mut locked, &current_task, &files, file).unwrap();
@@ -516,7 +516,7 @@ mod test {
     async fn test_fd_table_exec() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let files = FdTable::default();
-        let file = SyslogFile::new_file(&current_task);
+        let file = SyslogFile::new_file(&mut locked, &current_task);
 
         let fd0 = add(&mut locked, &current_task, &files, file.clone()).unwrap();
         let fd1 = add(&mut locked, &current_task, &files, file).unwrap();
@@ -538,7 +538,7 @@ mod test {
     async fn test_fd_table_pack_values() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let files = FdTable::default();
-        let file = SyslogFile::new_file(&current_task);
+        let file = SyslogFile::new_file(&mut locked, &current_task);
 
         // Add two FDs.
         let fd0 = add(&mut locked, &current_task, &files, file.clone()).unwrap();

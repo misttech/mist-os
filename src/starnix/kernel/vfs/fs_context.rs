@@ -182,15 +182,17 @@ impl FsContext {
 #[cfg(test)]
 mod test {
     use crate::fs::tmpfs::TmpFs;
-    use crate::testing::{create_kernel_and_task, create_kernel_task_and_unlocked_with_pkgfs};
+    use crate::testing::{
+        create_kernel_task_and_unlocked, create_kernel_task_and_unlocked_with_pkgfs,
+    };
     use crate::vfs::{FsContext, Namespace};
     use starnix_uapi::file_mode::FileMode;
     use starnix_uapi::open_flags::OpenFlags;
 
     #[::fuchsia::test]
     async fn test_umask() {
-        let (kernel, _task) = create_kernel_and_task();
-        let fs = FsContext::new(Namespace::new(TmpFs::new_fs(&kernel)));
+        let (kernel, _task, mut locked) = create_kernel_task_and_unlocked();
+        let fs = FsContext::new(Namespace::new(TmpFs::new_fs(&mut locked, &kernel)));
 
         assert_eq!(FileMode::from_bits(0o22), fs.set_umask(FileMode::from_bits(0o3020)));
         assert_eq!(FileMode::from_bits(0o646), fs.apply_umask(FileMode::from_bits(0o666)));

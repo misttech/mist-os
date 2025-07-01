@@ -19,7 +19,9 @@ use ext4_metadata::{Metadata, Node, NodeInfo};
 use fidl_fuchsia_io as fio;
 use fuchsia_sync::Mutex;
 use starnix_logging::{impossible_error, log_warn};
-use starnix_sync::{FileOpsCore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard};
+use starnix_sync::{
+    FileOpsCore, LockEqualOrBefore, Locked, RwLock, RwLockReadGuard, RwLockWriteGuard,
+};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::{Errno, SourceContext};
@@ -49,12 +51,16 @@ pub struct RemoteBundle {
 
 impl RemoteBundle {
     /// Returns a new RemoteBundle filesystem that can be found at `path` relative to `base`.
-    pub fn new_fs(
+    pub fn new_fs<L>(
+        locked: &mut Locked<L>,
         kernel: &Kernel,
         base: &fio::DirectorySynchronousProxy,
         mut options: FileSystemOptions,
         rights: fio::Flags,
-    ) -> Result<FileSystemHandle, Error> {
+    ) -> Result<FileSystemHandle, Error>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let (root, server_end) = fidl::endpoints::create_sync_proxy::<fio::DirectoryMarker>();
         let path =
             std::str::from_utf8(&options.source).map_err(|_| anyhow!("Source path is not utf8"))?;
@@ -89,6 +95,7 @@ impl RemoteBundle {
         }
 
         let fs = FileSystem::new(
+            locked,
             kernel,
             CacheMode::Cached(CacheConfig { capacity: REMOTE_BUNDLE_NODE_LRU_CAPACITY }),
             RemoteBundle { metadata, root, rights },
@@ -539,6 +546,7 @@ mod test {
         let (server, client) = zx::Channel::create();
         fdio::open("/pkg", rights, server).expect("failed to open /pkg");
         let fs = RemoteBundle::new_fs(
+            &mut locked,
             &kernel,
             &fio::DirectorySynchronousProxy::new(client),
             FileSystemOptions { source: "data/test-image".into(), ..Default::default() },

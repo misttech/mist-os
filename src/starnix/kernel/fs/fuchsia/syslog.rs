@@ -9,7 +9,7 @@ use crate::vfs::{
     FileOps,
 };
 use starnix_logging::log_info;
-use starnix_sync::{FileOpsCore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -17,9 +17,13 @@ use starnix_uapi::open_flags::OpenFlags;
 pub struct SyslogFile;
 
 impl SyslogFile {
-    pub fn new_file(current_task: &CurrentTask) -> FileHandle {
+    pub fn new_file<L>(locked: &mut Locked<L>, current_task: &CurrentTask) -> FileHandle
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // TODO: https://fxbug.dev/404739824 - Use a non-private node once labeling of external resources is addressed.
         Anon::new_private_file(
+            locked,
             current_task,
             Box::new(SyslogFile),
             OpenFlags::RDWR,

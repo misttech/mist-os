@@ -14,7 +14,7 @@ use crate::vfs::{
     FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
 };
 use serde::{Deserialize, Serialize};
-use starnix_sync::{FileOpsCore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -52,8 +52,21 @@ pub(crate) enum VersionedProperties {
 
 pub struct FuchsiaNetworkMonitorFs;
 impl FuchsiaNetworkMonitorFs {
-    pub fn new_fs(kernel: &Kernel, options: FileSystemOptions) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, FuchsiaNetworkMonitorFs, options)?;
+    pub fn new_fs<L>(
+        locked: &mut Locked<L>,
+        kernel: &Kernel,
+        options: FileSystemOptions,
+    ) -> Result<FileSystemHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let fs = FileSystem::new(
+            locked,
+            kernel,
+            CacheMode::Permanent,
+            FuchsiaNetworkMonitorFs,
+            options,
+        )?;
         let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, NetworkDirectoryNode::new());
         Ok(fs)
@@ -79,7 +92,7 @@ impl FileSystemOps for FuchsiaNetworkMonitorFs {
 }
 
 pub fn fuchsia_network_monitor_fs(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -89,7 +102,7 @@ pub fn fuchsia_network_monitor_fs(
     Ok(kernel
         .expando
         .get_or_try_init(|| {
-            FuchsiaNetworkMonitorFs::new_fs(kernel, options)
+            FuchsiaNetworkMonitorFs::new_fs(locked, kernel, options)
                 .map(|fs| FuchsiaNetworkMonitorFsHandle(fs))
         })?
         .0

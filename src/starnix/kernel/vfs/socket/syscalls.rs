@@ -329,6 +329,7 @@ pub fn sys_accept4(
 
     let open_flags = socket_flags_to_open_flags(flags);
     let accepted_socket_file = SocketFile::from_socket(
+        locked,
         current_task,
         accepted_socket,
         open_flags,

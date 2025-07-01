@@ -2021,7 +2021,7 @@ pub fn sys_eventfd2(
     let blocking = (flags & EFD_NONBLOCK) == 0;
     let eventfd_type =
         if (flags & EFD_SEMAPHORE) == 0 { EventFdType::Counter } else { EventFdType::Semaphore };
-    let file = new_eventfd(current_task, value, eventfd_type, blocking);
+    let file = new_eventfd(locked, current_task, value, eventfd_type, blocking);
     let fd_flags = if flags & EFD_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
     let fd = current_task.add_file(locked, file, fd_flags)?;
     Ok(fd)
@@ -2049,7 +2049,7 @@ pub fn sys_pidfd_open(
 
     let blocking = (flags & PIDFD_NONBLOCK) == 0;
     let open_flags = if blocking { OpenFlags::empty() } else { OpenFlags::NONBLOCK };
-    let file = new_pidfd(current_task, task.thread_group(), open_flags);
+    let file = new_pidfd(locked, current_task, task.thread_group(), open_flags);
     current_task.add_file(locked, file, FdFlags::CLOEXEC)
 }
 
@@ -2111,7 +2111,7 @@ pub fn sys_timerfd_create(
         fd_flags |= FdFlags::CLOEXEC;
     };
 
-    let timer = TimerFile::new_file(current_task, timer_type, timeline, open_flags)?;
+    let timer = TimerFile::new_file(locked, current_task, timer_type, timeline, open_flags)?;
     let fd = current_task.add_file(locked, timer, fd_flags)?;
     Ok(fd)
 }
@@ -2394,7 +2394,7 @@ pub fn sys_epoll_create1(
     if flags & !EPOLL_CLOEXEC != 0 {
         return error!(EINVAL);
     }
-    let ep_file = EpollFileObject::new_file(current_task);
+    let ep_file = EpollFileObject::new_file(locked, current_task);
     let fd_flags = if flags & EPOLL_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
     let fd = current_task.add_file(locked, ep_file, fd_flags)?;
     Ok(fd)
@@ -2882,7 +2882,7 @@ pub fn sys_inotify_init1(
     }
     let non_blocking = flags & IN_NONBLOCK != 0;
     let close_on_exec = flags & IN_CLOEXEC != 0;
-    let inotify_file = InotifyFileObject::new_file(current_task, non_blocking);
+    let inotify_file = InotifyFileObject::new_file(locked, current_task, non_blocking);
     let fd_flags = if close_on_exec { FdFlags::CLOEXEC } else { FdFlags::empty() };
     current_task.add_file(locked, inotify_file, fd_flags)
 }
@@ -3213,7 +3213,7 @@ pub fn sys_io_uring_setup(
         return error!(EINVAL);
     }
 
-    let file = IoUringFileObject::new_file(current_task, entries, &mut params)?;
+    let file = IoUringFileObject::new_file(locked, current_task, entries, &mut params)?;
 
     // io_uring file descriptors are always created with CLOEXEC.
     let fd = current_task.add_file(locked, file, FdFlags::CLOEXEC)?;

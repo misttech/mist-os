@@ -300,6 +300,7 @@ impl SeccompFilterContainer {
         // `Anon::new_file()` needs to read the `current_task` SID to label the file object.
         let the_notifier = SeccompNotifier::new();
         let handle = Anon::new_file(
+            locked,
             current_task,
             Box::new(SeccompNotifierFileObject { notifier: the_notifier.clone() }),
             OpenFlags::RDWR,

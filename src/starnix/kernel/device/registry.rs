@@ -797,7 +797,7 @@ mod tests {
             .register_major("mem".into(), DeviceMode::Char, MEM_MAJOR, simple_device_ops::<DevNull>)
             .expect("registers unique");
 
-        let fs = create_testfs(&kernel);
+        let fs = create_testfs(&mut locked, &kernel);
         let node = create_fs_node_for_testing(&fs, PanickingFsNode);
 
         // Fail to open non-existent device.
@@ -864,7 +864,7 @@ mod tests {
         let device_type = device.metadata.expect("has metadata").device_type;
         assert!(DYN_MAJOR_RANGE.contains(&device_type.major()));
 
-        let fs = create_testfs(&kernel);
+        let fs = create_testfs(&mut locked, &kernel);
         let node = create_fs_node_for_testing(&fs, PanickingFsNode);
         let _ = registry
             .open_device(

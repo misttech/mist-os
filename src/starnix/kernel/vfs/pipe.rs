@@ -430,7 +430,7 @@ impl FileSystemOps for PipeFs {
 }
 
 fn pipe_fs(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     _options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -441,8 +441,14 @@ fn pipe_fs(
         .expando
         .get_or_init(|| {
             PipeFsHandle(
-                FileSystem::new(kernel, CacheMode::Uncached, PipeFs, FileSystemOptions::default())
-                    .expect("pipefs constructed with valid options"),
+                FileSystem::new(
+                    locked,
+                    kernel,
+                    CacheMode::Uncached,
+                    PipeFs,
+                    FileSystemOptions::default(),
+                )
+                .expect("pipefs constructed with valid options"),
             )
         })
         .0

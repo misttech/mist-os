@@ -822,6 +822,7 @@ mod tests {
             .unwrap();
 
         let loop_file = anon_test_file(
+            locked,
             &current_task,
             Box::new(LoopDeviceFile { device: Arc::new(LoopDevice::default()) }),
             open_flags,
@@ -844,16 +845,14 @@ mod tests {
     #[::fuchsia::test]
     async fn basic_read() {
         spawn_kernel_and_run(|locked, current_task| {
-            let fs = create_testfs(&current_task.kernel());
+            let fs = create_testfs(locked, &current_task.kernel());
             let expected_contents = b"hello, world!";
 
             let ops = PassthroughTestFile::new_node(expected_contents);
             let backing_node = create_fs_node_for_testing(&fs, ops);
-            let backing_file = anon_test_file(
-                current_task,
-                backing_node.create_file_ops(locked, current_task, OpenFlags::RDONLY).unwrap(),
-                OpenFlags::RDONLY,
-            );
+            let file_ops =
+                backing_node.create_file_ops(locked, current_task, OpenFlags::RDONLY).unwrap();
+            let backing_file = anon_test_file(locked, current_task, file_ops, OpenFlags::RDONLY);
             let loop_file =
                 bind_simple_loop_device(locked, current_task, backing_file, OpenFlags::RDONLY);
 
@@ -867,14 +866,12 @@ mod tests {
     #[::fuchsia::test]
     async fn offset_works() {
         spawn_kernel_and_run(|locked, current_task| {
-            let fs = create_testfs(&current_task.kernel());
+            let fs = create_testfs(locked, &current_task.kernel());
             let ops = PassthroughTestFile::new_node(b"hello, world!");
             let backing_node = create_fs_node_for_testing(&fs, ops);
-            let backing_file = anon_test_file(
-                current_task,
-                backing_node.create_file_ops(locked, current_task, OpenFlags::RDONLY).unwrap(),
-                OpenFlags::RDONLY,
-            );
+            let file_ops =
+                backing_node.create_file_ops(locked, current_task, OpenFlags::RDONLY).unwrap();
+            let backing_file = anon_test_file(locked, current_task, file_ops, OpenFlags::RDONLY);
             let loop_file =
                 bind_simple_loop_device(locked, current_task, backing_file, OpenFlags::RDONLY);
 
@@ -906,7 +903,8 @@ mod tests {
 
         spawn_kernel_and_run(move |locked, current_task| {
             let backing_file =
-                new_remote_file(current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
+                new_remote_file(locked, current_task, txt_channel.into(), OpenFlags::RDONLY)
+                    .unwrap();
             let loop_file =
                 bind_simple_loop_device(locked, current_task, backing_file, OpenFlags::RDONLY);
 
@@ -940,7 +938,8 @@ mod tests {
 
         spawn_kernel_and_run(move |locked, current_task| {
             let backing_file =
-                new_remote_file(current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
+                new_remote_file(locked, current_task, txt_channel.into(), OpenFlags::RDONLY)
+                    .unwrap();
             let loop_file =
                 bind_simple_loop_device(locked, current_task, backing_file, OpenFlags::RDONLY);
 

@@ -36,8 +36,8 @@ use starnix_logging::{
     track_stub, with_zx_name, CATEGORY_STARNIX,
 };
 use starnix_sync::{
-    ordered_lock_vec, DeviceOpen, FileOpsCore, InterruptibleEvent, LockBefore, Locked, Mutex,
-    MutexGuard, ResourceAccessorAddFile, RwLock, Unlocked,
+    ordered_lock_vec, DeviceOpen, FileOpsCore, InterruptibleEvent, LockEqualOrBefore, Locked,
+    Mutex, MutexGuard, ResourceAccessorLevel, RwLock, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::convert::IntoFidl as _;
@@ -3179,12 +3179,13 @@ trait ResourceAccessor: std::fmt::Debug + MemoryAccessor {
     fn close_files(&self, fds: Vec<FdNumber>) -> Result<(), Errno>;
     fn get_files_with_flags(
         &self,
+        locked: &mut Locked<ResourceAccessorLevel>,
         current_task: &CurrentTask,
         fds: Vec<FdNumber>,
     ) -> Result<Vec<(FileHandle, FdFlags)>, Errno>;
     fn add_files_with_flags(
         &self,
-        locked: &mut Locked<ResourceAccessorAddFile>,
+        locked: &mut Locked<ResourceAccessorLevel>,
         current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3350,6 +3351,7 @@ impl ResourceAccessor for RemoteResourceAccessor {
 
     fn get_files_with_flags(
         &self,
+        locked: &mut Locked<ResourceAccessorLevel>,
         current_task: &CurrentTask,
         fds: Vec<FdNumber>,
     ) -> Result<Vec<(FileHandle, FdFlags)>, Errno> {
@@ -3370,9 +3372,9 @@ impl ResourceAccessor for RemoteResourceAccessor {
                     return error!(ENOENT);
                 };
                 let file = if let Some(file) = file {
-                    new_remote_file(current_task, file, flags.into_fidl())?
+                    new_remote_file(locked, current_task, file, flags.into_fidl())?
                 } else {
-                    new_null_file(current_task, flags.into_fidl())
+                    new_null_file(locked, current_task, flags.into_fidl())
                 };
                 files.push((file, FdFlags::empty()));
             }
@@ -3387,7 +3389,7 @@ impl ResourceAccessor for RemoteResourceAccessor {
 
     fn add_files_with_flags(
         &self,
-        _locked: &mut Locked<ResourceAccessorAddFile>,
+        _locked: &mut Locked<ResourceAccessorLevel>,
         current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3440,6 +3442,7 @@ impl ResourceAccessor for CurrentTask {
 
     fn get_files_with_flags(
         &self,
+        _locked: &mut Locked<ResourceAccessorLevel>,
         _current_task: &CurrentTask,
         fds: Vec<FdNumber>,
     ) -> Result<Vec<(FileHandle, FdFlags)>, Errno> {
@@ -3454,7 +3457,7 @@ impl ResourceAccessor for CurrentTask {
 
     fn add_files_with_flags(
         &self,
-        locked: &mut Locked<ResourceAccessorAddFile>,
+        locked: &mut Locked<ResourceAccessorLevel>,
         _current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3486,6 +3489,7 @@ impl ResourceAccessor for Task {
 
     fn get_files_with_flags(
         &self,
+        _locked: &mut Locked<ResourceAccessorLevel>,
         _current_task: &CurrentTask,
         fds: Vec<FdNumber>,
     ) -> Result<Vec<(FileHandle, FdFlags)>, Errno> {
@@ -3500,7 +3504,7 @@ impl ResourceAccessor for Task {
 
     fn add_files_with_flags(
         &self,
-        locked: &mut Locked<ResourceAccessorAddFile>,
+        locked: &mut Locked<ResourceAccessorLevel>,
         _current_task: &CurrentTask,
         files: Vec<(FileHandle, FdFlags)>,
         add_action: &mut dyn FnMut(FdNumber),
@@ -3943,7 +3947,7 @@ impl BinderDriver {
         cursor: &mut UserMemoryCursor,
     ) -> Result<(), Errno>
     where
-        L: LockBefore<ResourceAccessorAddFile>,
+        L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
         profile_duration!("ThreadWrite");
         let command = cursor.read_object::<binder_driver_command_protocol>()?;
@@ -4079,7 +4083,7 @@ impl BinderDriver {
         data: binder_transaction_data_sg,
     ) -> Result<(), TransactionError>
     where
-        L: LockBefore<ResourceAccessorAddFile>,
+        L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
         // SAFETY: Transactions can only refer to handles.
         let handle = unsafe { data.transaction_data.target.handle }.into();
@@ -4293,7 +4297,7 @@ impl BinderDriver {
         data: binder_transaction_data_sg,
     ) -> Result<(), TransactionError>
     where
-        L: LockBefore<ResourceAccessorAddFile>,
+        L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
         // Find the process and thread that initiated the transaction. This reply is for them.
         let (target_proc, target_thread, scheduler_state) =
@@ -4529,7 +4533,7 @@ impl BinderDriver {
         security_context: Option<&FsStr>,
     ) -> Result<(TransactionBuffers, TransientTransactionState<'a>), TransactionError>
     where
-        L: LockBefore<ResourceAccessorAddFile>,
+        L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
         profile_duration!("CopyTransactionBuffers");
 
@@ -4596,12 +4600,13 @@ impl BinderDriver {
         add_action: &mut dyn FnMut(FdNumber),
     ) -> Result<Vec<FdNumber>, Errno>
     where
-        L: LockBefore<ResourceAccessorAddFile>,
+        L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
-        let source_files = source_resource_accessor.get_files_with_flags(current_task, fds)?;
-        let mut locked = locked.cast_locked::<ResourceAccessorAddFile>();
+        let locked = locked.cast_locked::<ResourceAccessorLevel>();
+        let source_files =
+            source_resource_accessor.get_files_with_flags(locked, current_task, fds)?;
         target_resource_accessor.add_files_with_flags(
-            &mut locked,
+            locked,
             current_task,
             source_files,
             add_action,
@@ -4639,7 +4644,7 @@ impl BinderDriver {
         sg_buffer: &mut SharedBuffer<'_, u8>,
     ) -> Result<TransientTransactionState<'a>, TransactionError>
     where
-        L: LockBefore<ResourceAccessorAddFile>,
+        L: LockEqualOrBefore<ResourceAccessorLevel>,
     {
         profile_duration!("TranslateObjects");
 
@@ -5330,12 +5335,12 @@ impl FsNodeOps for BinderFsDir {
 
 impl BinderFs {
     pub fn new_fs(
-        _locked: &mut Locked<Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, BinderFs, options)?;
+        let fs = FileSystem::new(locked, kernel, CacheMode::Permanent, BinderFs, options)?;
         let ops = BinderFsDir::new(current_task)?;
         let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, ops);
@@ -5505,14 +5510,15 @@ pub mod tests {
         }
         fn get_files_with_flags(
             &self,
+            locked: &mut Locked<ResourceAccessorLevel>,
             current_task: &CurrentTask,
             fds: Vec<FdNumber>,
         ) -> Result<Vec<(FileHandle, FdFlags)>, Errno> {
-            self.deref().get_files_with_flags(current_task, fds)
+            self.deref().get_files_with_flags(locked, current_task, fds)
         }
         fn add_files_with_flags(
             &self,
-            locked: &mut Locked<ResourceAccessorAddFile>,
+            locked: &mut Locked<ResourceAccessorLevel>,
             current_task: &CurrentTask,
             files: Vec<(FileHandle, FdFlags)>,
             add_action: &mut dyn FnMut(FdNumber),
@@ -5541,7 +5547,7 @@ pub mod tests {
             let task = create_task(locked, current_task.kernel(), "task");
             let (proc, thread) = device.create_process_and_thread(task.thread_group_key.clone());
 
-            mmap_shared_memory(&device, &task, &proc);
+            mmap_shared_memory(locked, &device, &task, &proc);
             Self {
                 device: Arc::downgrade(device),
                 proc,
@@ -5552,14 +5558,14 @@ pub mod tests {
         }
 
         fn new_current(
-            _locked: &mut Locked<Unlocked>,
+            locked: &mut Locked<Unlocked>,
             current_task: &CurrentTask,
             device: &BinderDevice,
         ) -> Self {
             let (proc, thread) =
                 device.create_process_and_thread(current_task.thread_group_key.clone());
 
-            mmap_shared_memory(&device, current_task, &proc);
+            mmap_shared_memory(locked, &device, current_task, &proc);
             Self {
                 device: Arc::downgrade(device),
                 proc,
@@ -5608,8 +5614,13 @@ pub mod tests {
 
     /// Simulates an mmap call on the binder driver, setting up shared memory between the driver and
     /// `proc`.
-    fn mmap_shared_memory(driver: &BinderDriver, current_task: &CurrentTask, proc: &BinderProcess) {
-        let fs = create_testfs(&current_task.kernel());
+    fn mmap_shared_memory(
+        locked: &mut Locked<Unlocked>,
+        driver: &BinderDriver,
+        current_task: &CurrentTask,
+        proc: &BinderProcess,
+    ) {
+        let fs = create_testfs(locked, &current_task.kernel());
         let node = create_fs_node_for_testing(&fs, PanickingFsNode);
         let prot_flags = ProtectionFlags::READ;
         driver
@@ -7401,13 +7412,13 @@ pub mod tests {
             // Open a file in the sender process that we won't be using. It is there to occupy a file
             // descriptor so that the translation doesn't happen to use the same FDs for receiver and
             // sender, potentially hiding a bug.
-            current_task
-                .add_file(locked, PanickingFile::new_file(&current_task), FdFlags::empty())
-                .unwrap();
+            let file = PanickingFile::new_file(locked, &current_task);
+            current_task.add_file(locked, file, FdFlags::empty()).unwrap();
 
             // Open two files in the sender process. These will be sent in the transaction.
-            let files =
-                [PanickingFile::new_file(&current_task), PanickingFile::new_file(&current_task)];
+            let file1 = PanickingFile::new_file(locked, &current_task);
+            let file2 = PanickingFile::new_file(locked, &current_task);
+            let files = [file1, file2];
             let sender_fds = files
                 .iter()
                 .map(|file| {
@@ -7600,13 +7611,13 @@ pub mod tests {
             // Open a file in the sender process that we won't be using. It is there to occupy a file
             // descriptor so that the translation doesn't happen to use the same FDs for receiver and
             // sender, potentially hiding a bug.
-            current_task
-                .add_file(locked, PanickingFile::new_file(&current_task), FdFlags::empty())
-                .unwrap();
+            let file = PanickingFile::new_file(locked, &current_task);
+            current_task.add_file(locked, file, FdFlags::empty()).unwrap();
 
             // Open two files in the sender process. These will be sent in the transaction.
-            let files =
-                [PanickingFile::new_file(&current_task), PanickingFile::new_file(&current_task)];
+            let file1 = PanickingFile::new_file(locked, &current_task);
+            let file2 = PanickingFile::new_file(locked, &current_task);
+            let files = [file1, file2];
             let sender_fds = files
                 .into_iter()
                 .map(|file| {
@@ -7724,13 +7735,13 @@ pub mod tests {
             // Open a file in the sender process that we won't be using. It is there to occupy a file
             // descriptor so that the translation doesn't happen to use the same FDs for receiver and
             // sender, potentially hiding a bug.
-            current_task
-                .add_file(locked, PanickingFile::new_file(&current_task), FdFlags::empty())
-                .unwrap();
+            let file1 = PanickingFile::new_file(locked, &current_task);
+            current_task.add_file(locked, file1, FdFlags::empty()).unwrap();
 
             // Open two files in the sender process. These will be sent in the transaction.
-            let files =
-                [PanickingFile::new_file(&current_task), PanickingFile::new_file(&current_task)];
+            let file1 = PanickingFile::new_file(locked, &current_task);
+            let file2 = PanickingFile::new_file(locked, &current_task);
+            let files = [file1, file2];
             let sender_fds = files
                 .into_iter()
                 .map(|file| {
@@ -7989,7 +8000,7 @@ pub mod tests {
         binder_driver: &BinderDevice,
     ) -> FileHandle {
         // `open()` requires an `FsNode` so create one in `AnonFs`.
-        let fs = anon_fs(current_task.kernel());
+        let fs = anon_fs(locked, current_task.kernel());
         let node = fs.create_node_and_allocate_node_id(
             Anon::new_for_binder_device(),
             FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred()),
@@ -8327,7 +8338,7 @@ pub mod tests {
                 receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
             // Open a file in the sender process.
-            let file = PanickingFile::new_file(&current_task);
+            let file = PanickingFile::new_file(locked, &current_task);
             let sender_fd =
                 current_task.add_file(locked, file.clone(), FdFlags::CLOEXEC).expect("add file");
 
@@ -8410,9 +8421,9 @@ pub mod tests {
                 receiver_shared_memory.allocate_buffers(0, 0, 0, 0).expect("allocate buffers");
 
             // Open a file in the sender process.
-            let sender_fd = current_task
-                .add_file(locked, PanickingFile::new_file(&current_task), FdFlags::CLOEXEC)
-                .expect("add file");
+            let file = PanickingFile::new_file(locked, &current_task);
+            let sender_fd =
+                current_task.add_file(locked, file, FdFlags::CLOEXEC).expect("add file");
 
             // Send the fd in a transaction.
             let mut transaction_data = struct_with_union_into_bytes!(flat_binder_object {
@@ -9377,15 +9388,15 @@ pub mod tests {
             assert_eq!(vector[1], 1);
             assert_eq!(vector[..small_size], other_vector[..small_size]);
 
-            let mut locked = locked.cast_locked::<ResourceAccessorAddFile>();
+            let mut locked = locked.cast_locked::<ResourceAccessorLevel>();
 
             let mut files = vec![
-                (new_null_file(&task, OpenFlags::RDONLY), FdFlags::empty()),
-                (new_null_file(&task, OpenFlags::WRONLY), FdFlags::empty()),
+                (new_null_file(&mut locked, &task, OpenFlags::RDONLY), FdFlags::empty()),
+                (new_null_file(&mut locked, &task, OpenFlags::WRONLY), FdFlags::empty()),
             ];
             // Add more files to force chunking of requests.
             for _ in 0..fbinder::MAX_REQUEST_COUNT {
-                files.push((new_null_file(&task, OpenFlags::RDWR), FdFlags::empty()));
+                files.push((new_null_file(&mut locked, &task, OpenFlags::RDWR), FdFlags::empty()));
             }
             let fds = remote_binder_task
                 .add_files_with_flags(&mut locked, &task, files, &mut |_| {})
@@ -9396,7 +9407,7 @@ pub mod tests {
 
             assert_eq!(remote_binder_task.close_files(vec![fds[1]]), Ok(()));
             let (handle, flags) = remote_binder_task
-                .get_files_with_flags(&task, vec![fds[0]])
+                .get_files_with_flags(locked, &task, vec![fds[0]])
                 .expect("get_files_with_flags")
                 .pop()
                 .expect("pop");
@@ -9405,7 +9416,7 @@ pub mod tests {
 
             assert_eq!(
                 remote_binder_task
-                    .get_files_with_flags(&task, vec![FdNumber::from_raw(1000)])
+                    .get_files_with_flags(locked, &task, vec![FdNumber::from_raw(1000)])
                     .expect_err("bad fd"),
                 errno!(EBADF)
             );

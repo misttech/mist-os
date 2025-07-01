@@ -46,7 +46,7 @@ impl DevTmpFs {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let kernel = current_task.kernel();
-        let fs = TmpFs::new_fs_with_name(kernel, "devtmpfs".into());
+        let fs = TmpFs::new_fs_with_name(locked, kernel, "devtmpfs".into());
         let root = fs.root();
 
         let mkdir = |locked, name| {

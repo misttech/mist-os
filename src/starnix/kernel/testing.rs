@@ -41,11 +41,15 @@ use zerocopy::{Immutable, IntoBytes};
 /// Create a FileSystemHandle for use in testing.
 ///
 /// Open "/pkg" and returns an FsContext rooted in that directory.
-fn create_pkgfs(kernel: &Kernel) -> FileSystemHandle {
+fn create_pkgfs<L>(locked: &mut Locked<L>, kernel: &Kernel) -> FileSystemHandle
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
     let (server, client) = zx::Channel::create();
     fdio::open("/pkg", rights, server).expect("failed to open /pkg");
     RemoteFs::new_fs(
+        locked,
         kernel,
         client,
         FileSystemOptions { source: "/pkg".into(), ..Default::default() },
@@ -63,7 +67,7 @@ fn create_pkgfs(kernel: &Kernel) -> FileSystemHandle {
 /// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
 /// for this use case, please consider adding one that follows the new pattern of actually running
 /// the test on the spawned task.
-pub fn create_kernel_task_and_unlocked_with_pkgfs<'l>(
+pub fn create_kernel_task_and_unlocked_with_pkgfs(
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>) {
     create_kernel_task_and_unlocked_with_fs(create_pkgfs)
 }
@@ -111,7 +115,7 @@ where
         move |unlocked, current_task| {
             security::selinuxfs_init_null(
                 current_task,
-                &new_null_file(current_task, OpenFlags::empty()),
+                &new_null_file(unlocked, current_task, OpenFlags::empty()),
             );
             callback(unlocked, current_task, &security_server_for_callback)
         },
@@ -155,8 +159,7 @@ where
 /// Please use `spawn_kernel_and_run` instead. If there isn't a variant of `spawn_kernel_and_run`
 /// for this use case, please consider adding one that follows the new pattern of actually running
 /// the test on the spawned task.
-pub fn create_kernel_task_and_unlocked<'l>() -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>)
-{
+pub fn create_kernel_task_and_unlocked() -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>) {
     create_kernel_task_and_unlocked_with_fs(TmpFs::new_fs)
 }
 
@@ -179,11 +182,11 @@ fn create_test_kernel(
 }
 
 fn create_test_fs_context(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     kernel: &Kernel,
-    create_fs: impl FnOnce(&Kernel) -> FileSystemHandle,
+    create_fs: impl FnOnce(&mut Locked<Unlocked>, &Kernel) -> FileSystemHandle,
 ) -> Arc<FsContext> {
-    FsContext::new(Namespace::new(create_fs(kernel)))
+    FsContext::new(Namespace::new(create_fs(locked, kernel)))
 }
 
 fn create_test_init_task(
@@ -220,13 +223,13 @@ fn create_test_init_task(
     init_task
 }
 
-fn create_kernel_task_and_unlocked_with_fs<'l>(
-    create_fs: impl FnOnce(&Kernel) -> FileSystemHandle,
+fn create_kernel_task_and_unlocked_with_fs(
+    create_fs: impl FnOnce(&mut Locked<Unlocked>, &Kernel) -> FileSystemHandle,
 ) -> (Arc<Kernel>, AutoReleasableTask, Locked<Unlocked>) {
     let mut locked = unsafe { Unlocked::new() };
     let kernel = create_test_kernel(&mut locked, None);
-    let fs = create_fs(&kernel);
-    let fs_context = create_test_fs_context(&mut locked, &kernel, |_| fs.clone());
+    let fs = create_fs(&mut locked, &kernel);
+    let fs_context = create_test_fs_context(&mut locked, &kernel, |_, _| fs.clone());
     let init_task = create_test_init_task(&mut locked, &kernel, fs_context);
     (kernel, init_task.into(), locked)
 }
@@ -444,8 +447,8 @@ pub struct PanickingFile;
 
 impl PanickingFile {
     /// Creates a [`FileObject`] whose implementation panics on reads, writes, and ioctls.
-    pub fn new_file(current_task: &CurrentTask) -> FileHandle {
-        anon_test_file(current_task, Box::new(PanickingFile), OpenFlags::RDWR)
+    pub fn new_file(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) -> FileHandle {
+        anon_test_file(locked, current_task, Box::new(PanickingFile), OpenFlags::RDWR)
     }
 }
 
@@ -488,13 +491,17 @@ impl FileOps for PanickingFile {
 }
 
 /// Returns a new anonymous test file with the specified `ops` and `flags`.
-pub fn anon_test_file(
+pub fn anon_test_file<L>(
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     ops: Box<dyn FileOps>,
     flags: OpenFlags,
-) -> FileHandle {
+) -> FileHandle
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
-    Anon::new_private_file(current_task, ops, flags, "[fuchsia:test_file]")
+    Anon::new_private_file(locked, current_task, ops, flags, "[fuchsia:test_file]")
 }
 
 /// Helper to write out data to a task's memory sequentially.
@@ -648,13 +655,17 @@ impl FileSystemOps for TestFs {
     }
 }
 
-pub fn create_testfs(kernel: &Kernel) -> FileSystemHandle {
-    FileSystem::new(&kernel, CacheMode::Uncached, TestFs, Default::default())
+pub fn create_testfs(locked: &mut Locked<Unlocked>, kernel: &Kernel) -> FileSystemHandle {
+    FileSystem::new(locked, &kernel, CacheMode::Uncached, TestFs, Default::default())
         .expect("testfs constructed with valid options")
 }
 
-pub fn create_testfs_with_root(kernel: &Kernel, ops: impl FsNodeOps) -> FileSystemHandle {
-    let test_fs = create_testfs(kernel);
+pub fn create_testfs_with_root(
+    locked: &mut Locked<Unlocked>,
+    kernel: &Kernel,
+    ops: impl FsNodeOps,
+) -> FileSystemHandle {
+    let test_fs = create_testfs(locked, kernel);
     let root_ino = test_fs.allocate_ino();
     test_fs.create_root(root_ino, ops);
     test_fs

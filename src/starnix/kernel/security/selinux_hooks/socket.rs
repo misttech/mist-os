@@ -182,7 +182,7 @@ where
         return Ok(());
     }
 
-    let sockfs = socket_fs(current_task.kernel());
+    let sockfs = socket_fs(locked, current_task.kernel());
     // Ensure sockfs gets labeled, in case it was mounted after the SELinux policy has been loaded.
     superblock::file_system_resolve_security(locked, security_server, &current_task, &sockfs)
         .expect("resolve fs security");

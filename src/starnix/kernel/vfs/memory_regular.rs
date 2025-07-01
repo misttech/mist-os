@@ -440,7 +440,7 @@ pub fn new_memfd(
     }
 
     let fs = current_task.kernel().expando.get_or_init(|| {
-        let tmpfs = TmpFs::new_fs(current_task.kernel());
+        let tmpfs = TmpFs::new_fs(locked, current_task.kernel());
         security::file_system_resolve_security(locked, &current_task, &tmpfs)
             .expect("resolve fs security");
         let mount = Mount::new(WhatToMount::Fs(tmpfs.clone()), Default::default());

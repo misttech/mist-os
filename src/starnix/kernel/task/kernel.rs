@@ -446,7 +446,7 @@ impl Kernel {
         // Initialize the device registry before registering any devices.
         //
         // We will create sysfs recursively within this function.
-        this.device_registry.objects.init(&this);
+        this.device_registry.objects.init(&mut this.kthreads.unlocked_for_async(), &this);
 
         // Make a copy of this Arc for the inspect lazy node to use but don't create an Arc cycle
         // because the inspect node that owns this reference is owned by the kernel.

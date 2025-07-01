@@ -1176,21 +1176,26 @@ impl OverlayStack {
         let kernel = current_task.kernel();
         let stack = Arc::new(OverlayStack { lower_fs, upper_fs, work });
         let root_node = OverlayNode::new(stack.clone(), Some(lower), Some(upper), None);
-        let fs = FileSystem::new(kernel, CacheMode::Uncached, OverlayFs { stack }, options)?;
+        let fs =
+            FileSystem::new(locked, kernel, CacheMode::Uncached, OverlayFs { stack }, options)?;
         let root_ino = fs.allocate_ino();
         fs.create_root(root_ino, OverlayNodeOps { node: root_node });
         Ok(fs)
     }
 
     /// Given a filesystem, wraps it in a tmpfs-backed writable overlayfs.
-    pub fn wrap_fs_in_writable_layer(
+    pub fn wrap_fs_in_writable_layer<L>(
+        locked: &mut Locked<L>,
         kernel: &Kernel,
         rootfs: FileSystemHandle,
-    ) -> Result<FileSystemHandle, Errno> {
+    ) -> Result<FileSystemHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let lower = ActiveEntry { entry: rootfs.root().clone(), mount: MountInfo::detached() };
 
         // Create upper and work directories in an invisible tmpfs.
-        let invisible_tmp = TmpFs::new_fs(kernel);
+        let invisible_tmp = TmpFs::new_fs(locked, kernel);
 
         fn create_directory(fs: &FileSystemHandle) -> DirEntryHandle {
             let ino = fs.allocate_ino();
@@ -1210,6 +1215,7 @@ impl OverlayStack {
         let stack = Arc::new(OverlayStack { lower_fs, upper_fs, work });
         let root_node = OverlayNode::new(stack.clone(), Some(lower), Some(upper), None);
         let fs = FileSystem::new(
+            locked,
             kernel,
             CacheMode::Uncached,
             OverlayFs { stack },

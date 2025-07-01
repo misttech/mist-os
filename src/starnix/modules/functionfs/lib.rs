@@ -202,7 +202,7 @@ async fn handle_adb(
 pub struct FunctionFs;
 impl FunctionFs {
     pub fn new_fs(
-        _locked: &mut Locked<Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
@@ -232,7 +232,13 @@ impl FunctionFs {
             0
         };
 
-        let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FunctionFs, options)?;
+        let fs = FileSystem::new(
+            locked,
+            current_task.kernel(),
+            CacheMode::Uncached,
+            FunctionFs,
+            options,
+        )?;
 
         let creds = FsCred { uid, gid };
         let info = FsNodeInfo::new(mode!(IFDIR, 0o777), creds);

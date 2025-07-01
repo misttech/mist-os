@@ -379,8 +379,13 @@ mod tests {
             .abstract_vsock_namespace
             .lookup(&VSOCK_PORT)
             .expect("Failed to look up listening socket.");
-        let remote =
-            create_fuchsia_pipe(&current_task, fs2, OpenFlags::RDWR | OpenFlags::NONBLOCK).unwrap();
+        let remote = create_fuchsia_pipe(
+            &mut locked,
+            &current_task,
+            fs2,
+            OpenFlags::RDWR | OpenFlags::NONBLOCK,
+        )
+        .unwrap();
         listen_socket
             .downcast_socket::<VsockSocket>()
             .unwrap()
@@ -426,16 +431,17 @@ mod tests {
             /* kernel_private = */ false,
         )
         .expect("Failed to create socket.");
-        let remote =
-            create_fuchsia_pipe(&current_task, fs2, OpenFlags::RDWR | OpenFlags::NONBLOCK).unwrap();
-        downcast_socket_to_vsock(&socket).lock().state = VsockSocketState::Connected(remote);
-        let socket_file = SocketFile::from_socket(
+        let remote = create_fuchsia_pipe(
+            &mut locked,
             &current_task,
-            socket,
-            OpenFlags::RDWR,
-            /* kernel_private=*/ false,
+            fs2,
+            OpenFlags::RDWR | OpenFlags::NONBLOCK,
         )
-        .expect("Failed to create socket file.");
+        .unwrap();
+        downcast_socket_to_vsock(&socket).lock().state = VsockSocketState::Connected(remote);
+        let socket_file =
+            SocketFile::from_socket(&mut locked, &current_task, socket, OpenFlags::RDWR, false)
+                .expect("Failed to create socket file.");
 
         const XFER_SIZE: usize = 42;
 
@@ -465,7 +471,7 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let (client, server) = zx::Socket::create_stream();
-        let pipe = create_fuchsia_pipe(&current_task, client, OpenFlags::RDWR)
+        let pipe = create_fuchsia_pipe(&mut locked, &current_task, client, OpenFlags::RDWR)
             .expect("create_fuchsia_pipe");
         let server_zxio = Zxio::create(server.into_handle()).expect("Zxio::create");
         let socket_object = Socket::new(
@@ -479,10 +485,11 @@ mod tests {
         .expect("Failed to create socket.");
         downcast_socket_to_vsock(&socket_object).lock().state = VsockSocketState::Connected(pipe);
         let socket = SocketFile::from_socket(
+            &mut locked,
             &current_task,
             socket_object,
             OpenFlags::RDWR,
-            /* kernel_private=*/ false,
+            false,
         )
         .expect("Failed to create socket file.");
 
@@ -491,7 +498,7 @@ mod tests {
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM)
         );
 
-        let epoll_object = EpollFileObject::new_file(&current_task);
+        let epoll_object = EpollFileObject::new_file(&mut locked, &current_task);
         let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
         let event = EpollEvent::new(FdEvents::POLLIN, 0);
         epoll_file

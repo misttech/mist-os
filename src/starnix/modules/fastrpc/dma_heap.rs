@@ -21,8 +21,8 @@ use std::sync::Arc;
 pub trait Alloc: Send + Sync + 'static {
     fn alloc(
         &self,
-        current_task: &CurrentTask,
         locked: &mut Locked<Unlocked>,
+        current_task: &CurrentTask,
         size: u64,
         fd_flags: FdFlags,
     ) -> Result<FdNumber, Errno>;
@@ -58,7 +58,7 @@ impl<A: Alloc> FileOps for DmaHeapFile<A> {
                 let user_info = UserRef::<dma_heap_allocation_data>::from(arg);
                 let info = current_task.read_object(user_info)?;
                 log_debug!("DmaHeapFile ioctl alloc {:?}", info);
-                let fd = self.allocator.alloc(current_task, locked, info.len, FdFlags::CLOEXEC)?;
+                let fd = self.allocator.alloc(locked, current_task, info.len, FdFlags::CLOEXEC)?;
                 let to_user = dma_heap_allocation_data {
                     len: info.len,
                     fd: fd.raw() as u32,

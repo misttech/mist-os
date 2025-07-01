@@ -1810,12 +1810,12 @@ mod test {
     #[::fuchsia::test]
     async fn test_namespace() -> anyhow::Result<()> {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let root_fs = TmpFs::new_fs(&kernel);
+        let root_fs = TmpFs::new_fs(&mut locked, &kernel);
         let root_node = Arc::clone(root_fs.root());
         let _dev_node = root_node
             .create_dir(&mut locked, &current_task, "dev".into())
             .expect("failed to mkdir dev");
-        let dev_fs = TmpFs::new_fs(&kernel);
+        let dev_fs = TmpFs::new_fs(&mut locked, &kernel);
         let dev_root_node = Arc::clone(dev_fs.root());
         let _dev_pts_node = dev_root_node
             .create_dir(&mut locked, &current_task, "pts".into())
@@ -1852,12 +1852,12 @@ mod test {
     #[::fuchsia::test]
     async fn test_mount_does_not_upgrade() -> anyhow::Result<()> {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let root_fs = TmpFs::new_fs(&kernel);
+        let root_fs = TmpFs::new_fs(&mut locked, &kernel);
         let root_node = Arc::clone(root_fs.root());
         let _dev_node = root_node
             .create_dir(&mut locked, &current_task, "dev".into())
             .expect("failed to mkdir dev");
-        let dev_fs = TmpFs::new_fs(&kernel);
+        let dev_fs = TmpFs::new_fs(&mut locked, &kernel);
         let dev_root_node = Arc::clone(dev_fs.root());
         let _dev_pts_node = dev_root_node
             .create_dir(&mut locked, &current_task, "pts".into())
@@ -1892,12 +1892,12 @@ mod test {
     #[::fuchsia::test]
     async fn test_path() -> anyhow::Result<()> {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let root_fs = TmpFs::new_fs(&kernel);
+        let root_fs = TmpFs::new_fs(&mut locked, &kernel);
         let root_node = Arc::clone(root_fs.root());
         let _dev_node = root_node
             .create_dir(&mut locked, &current_task, "dev".into())
             .expect("failed to mkdir dev");
-        let dev_fs = TmpFs::new_fs(&kernel);
+        let dev_fs = TmpFs::new_fs(&mut locked, &kernel);
         let dev_root_node = Arc::clone(dev_fs.root());
         let _dev_pts_node = dev_root_node
             .create_dir(&mut locked, &current_task, "pts".into())
@@ -1931,14 +1931,14 @@ mod test {
     #[::fuchsia::test]
     async fn test_shadowing() -> anyhow::Result<()> {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let root_fs = TmpFs::new_fs(&kernel);
+        let root_fs = TmpFs::new_fs(&mut locked, &kernel);
         let ns = Namespace::new(root_fs.clone());
         let _foo_node = root_fs.root().create_dir(&mut locked, &current_task, "foo".into())?;
         let mut context = LookupContext::default();
         let foo_dir =
             ns.root().lookup_child(&mut locked, &current_task, &mut context, "foo".into())?;
 
-        let foofs1 = TmpFs::new_fs(&kernel);
+        let foofs1 = TmpFs::new_fs(&mut locked, &kernel);
         foo_dir.mount(WhatToMount::Fs(foofs1.clone()), MountFlags::empty())?;
         let mut context = LookupContext::default();
         assert!(Arc::ptr_eq(
@@ -1950,7 +1950,7 @@ mod test {
 
         let ns_clone = ns.clone_namespace();
 
-        let foofs2 = TmpFs::new_fs(&kernel);
+        let foofs2 = TmpFs::new_fs(&mut locked, &kernel);
         foo_dir.mount(WhatToMount::Fs(foofs2.clone()), MountFlags::empty())?;
         let mut context = LookupContext::default();
         assert!(Arc::ptr_eq(
@@ -1977,7 +1977,7 @@ mod test {
     #[::fuchsia::test]
     async fn test_unlink_mounted_directory() -> anyhow::Result<()> {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let root_fs = TmpFs::new_fs(&kernel);
+        let root_fs = TmpFs::new_fs(&mut locked, &kernel);
         let ns1 = Namespace::new(root_fs.clone());
         let ns2 = Namespace::new(root_fs.clone());
         let _foo_node = root_fs.root().create_dir(&mut locked, &current_task, "foo".into())?;
@@ -1985,7 +1985,7 @@ mod test {
         let foo_dir =
             ns1.root().lookup_child(&mut locked, &current_task, &mut context, "foo".into())?;
 
-        let foofs = TmpFs::new_fs(&kernel);
+        let foofs = TmpFs::new_fs(&mut locked, &kernel);
         foo_dir.mount(WhatToMount::Fs(foofs), MountFlags::empty())?;
 
         // Trying to unlink from ns1 should fail.
@@ -2015,7 +2015,7 @@ mod test {
     #[::fuchsia::test]
     async fn test_rename_mounted_directory() -> anyhow::Result<()> {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let root_fs = TmpFs::new_fs(&kernel);
+        let root_fs = TmpFs::new_fs(&mut locked, &kernel);
         let ns1 = Namespace::new(root_fs.clone());
         let ns2 = Namespace::new(root_fs.clone());
         let _foo_node = root_fs.root().create_dir(&mut locked, &current_task, "foo".into())?;
@@ -2025,7 +2025,7 @@ mod test {
         let foo_dir =
             ns1.root().lookup_child(&mut locked, &current_task, &mut context, "foo".into())?;
 
-        let foofs = TmpFs::new_fs(&kernel);
+        let foofs = TmpFs::new_fs(&mut locked, &kernel);
         foo_dir.mount(WhatToMount::Fs(foofs), MountFlags::empty())?;
 
         // Trying to rename over foo from ns1 should fail.
@@ -2108,7 +2108,7 @@ mod test {
     async fn test_lookup_with_symlink_chain() -> anyhow::Result<()> {
         // Set up the root filesystem
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let root_fs = TmpFs::new_fs(&kernel);
+        let root_fs = TmpFs::new_fs(&mut locked, &kernel);
         let root_node = Arc::clone(root_fs.root());
         let _first_subdir_node = root_node
             .create_dir(&mut locked, &current_task, "first_subdir".into())
@@ -2118,8 +2118,8 @@ mod test {
             .expect("failed to mkdir dev");
 
         // Set up two subdirectories under the root filesystem
-        let first_subdir_fs = TmpFs::new_fs(&kernel);
-        let second_subdir_fs = TmpFs::new_fs(&kernel);
+        let first_subdir_fs = TmpFs::new_fs(&mut locked, &kernel);
+        let second_subdir_fs = TmpFs::new_fs(&mut locked, &kernel);
 
         let ns = Namespace::new(root_fs);
         let mut context = LookupContext::default();

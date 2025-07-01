@@ -11,7 +11,7 @@ use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::{
     CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsStr,
 };
-use starnix_sync::{FileOpsCore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
@@ -23,12 +23,12 @@ struct PstoreFsHandle {
 }
 
 pub fn pstore_fs(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
     let handle = current_task.kernel().expando.get_or_try_init(|| {
-        Ok(PstoreFsHandle { fs_handle: PstoreFs::new_fs(current_task, options)? })
+        Ok(PstoreFsHandle { fs_handle: PstoreFs::new_fs(locked, current_task, options)? })
     })?;
     Ok(handle.fs_handle.clone())
 }
@@ -51,12 +51,16 @@ impl FileSystemOps for PstoreFs {
 }
 
 impl PstoreFs {
-    pub fn new_fs(
+    pub fn new_fs<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno> {
+    ) -> Result<FileSystemHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, PstoreFs, options)?;
+        let fs = FileSystem::new(locked, kernel, CacheMode::Permanent, PstoreFs, options)?;
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         if let Some(ramoops_contents) = get_console_ramoops() {

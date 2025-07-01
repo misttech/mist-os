@@ -736,7 +736,7 @@ mod tests {
     #[::fuchsia::test]
     async fn access_file_system() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let fs = TmpFs::new_fs(&kernel);
+        let fs = TmpFs::new_fs(&mut locked, &kernel);
 
         let file =
             &fs.root().open_anonymous(&mut locked, &current_task, OpenFlags::RDWR).expect("open");
@@ -873,7 +873,7 @@ mod tests {
     #[::fuchsia::test]
     async fn open() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let fs = TmpFs::new_fs(&kernel);
+        let fs = TmpFs::new_fs(&mut locked, &kernel);
 
         let file = &fs
             .root()

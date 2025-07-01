@@ -7,6 +7,7 @@
 mod seq_lock;
 
 use fuchsia_inspect_contrib::profile_duration;
+use starnix_sync::LockEqualOrBefore;
 
 use seq_lock::SeqLock;
 
@@ -114,16 +115,20 @@ impl FileSystemOps for SeLinuxFs {
 /// Notebook at
 /// https://github.com/SELinuxProject/selinux-notebook/blob/main/src/lsm_selinux.md#selinux-filesystem
 impl SeLinuxFs {
-    fn new_fs(
+    fn new_fs<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno> {
+    ) -> Result<FileSystemHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         // If SELinux is not enabled then the "selinuxfs" file system does not exist.
         let security_server = security::selinuxfs_get_admin_api(current_task)
             .ok_or_else(|| errno!(ENODEV, "selinuxfs"))?;
 
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, SeLinuxFs, options)?;
+        let fs = FileSystem::new(locked, kernel, CacheMode::Permanent, SeLinuxFs, options)?;
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         // Read-only files & directories, exposing SELinux internal state.
@@ -1163,7 +1168,7 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
 
 /// Returns the "selinuxfs" file system, used by the system userspace to administer SELinux.
 pub fn selinux_fs(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -1173,7 +1178,7 @@ pub fn selinux_fs(
     Ok(current_task
         .kernel()
         .expando
-        .get_or_try_init(|| Ok(SeLinuxFsHandle(SeLinuxFs::new_fs(current_task, options)?)))?
+        .get_or_try_init(|| Ok(SeLinuxFsHandle(SeLinuxFs::new_fs(locked, current_task, options)?)))?
         .0
         .clone())
 }

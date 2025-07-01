@@ -277,12 +277,12 @@ pub fn get_bpf_object(task: &Task, fd: FdNumber) -> Result<BpfHandle, Errno> {
 pub struct BpfFs;
 impl BpfFs {
     pub fn new_fs(
-        _locked: &mut Locked<Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, BpfFs, options)?;
+        let fs = FileSystem::new(locked, kernel, CacheMode::Permanent, BpfFs, options)?;
         let root_ino = fs.allocate_ino();
         fs.create_root_with_info(
             root_ino,

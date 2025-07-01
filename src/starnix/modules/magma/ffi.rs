@@ -504,10 +504,11 @@ pub fn export_buffer(
 
         let file = {
             if let Some(image_info) = image_info_opt {
-                ImageFile::new_file(current_task, image_info, memory)
+                ImageFile::new_file(locked, current_task, image_info, memory)
             } else {
                 // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
                 Anon::new_private_file(
+                    locked,
                     current_task,
                     Box::new(MemoryRegularFile::new(Arc::new(memory))),
                     OpenFlags::RDWR,
@@ -569,6 +570,7 @@ pub fn get_buffer_handle(
             MemoryObject::from(unsafe { zx::Vmo::from(zx::Handle::from_raw(buffer_handle_out)) });
         // TODO: https://fxbug.dev/404739824 - Confirm whether to handle this as a "private" node.
         let file = Anon::new_private_file(
+            locked,
             current_task,
             Box::new(MemoryRegularFile::new(Arc::new(memory))),
             OpenFlags::RDWR,
@@ -613,6 +615,7 @@ pub fn query(
         // Enable seek for file size discovery.
         info.size = memory_size as usize;
         let file = Anon::new_private_file_extended(
+            locked,
             current_task,
             Box::new(MemoryRegularFile::new(Arc::new(memory))),
             OpenFlags::RDWR,

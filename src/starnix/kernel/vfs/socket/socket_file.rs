@@ -38,13 +38,17 @@ impl SocketFile {
     /// - `open_flags`: The `OpenFlags` which are used to create the `FileObject`.
     /// - `kernel_private`: `true` if the socket will be used internally by the kernel, and should
     ///   therefore not be security labeled nor access-checked.
-    pub fn from_socket(
+    pub fn from_socket<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         socket: SocketHandle,
         open_flags: OpenFlags,
         kernel_private: bool,
-    ) -> Result<FileHandle, Errno> {
-        let fs = socket_fs(current_task.kernel());
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let fs = socket_fs(locked, current_task.kernel());
         let mode = mode!(IFSOCK, 0o777);
         let node = fs.create_node_and_allocate_node_id(
             Anon::new_for_socket(kernel_private),
@@ -68,12 +72,11 @@ impl SocketFile {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        SocketFile::from_socket(
-            current_task,
-            Socket::new(locked, current_task, domain, socket_type, protocol, kernel_private)?,
-            open_flags,
-            kernel_private,
-        )
+        {
+            let socket =
+                Socket::new(locked, current_task, domain, socket_type, protocol, kernel_private)?;
+            SocketFile::from_socket(locked, current_task, socket, open_flags, kernel_private)
+        }
     }
 
     pub fn get_from_file(file: &FileHandle) -> Result<DowncastedFile<'_, Self>, Errno> {

@@ -11,7 +11,7 @@ use starnix_core::vfs::{
     FileSystemHandle, FileSystemOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, MountInfo,
     SeekTarget, ValueOrSize, XattrOp,
 };
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, ino_t, off_t, statfs};
@@ -31,14 +31,19 @@ impl LayeredFs {
     /// `base_fs`: The base file system that this file system will delegate to.
     /// `mappings`: The map of top level directory to filesystems that will be layered on top of
     /// `base_fs`.
-    pub fn new_fs(
+    pub fn new_fs<L>(
+        locked: &mut Locked<L>,
         kernel: &Kernel,
         base_fs: FileSystemHandle,
         mappings: BTreeMap<FsString, FileSystemHandle>,
-    ) -> FileSystemHandle {
+    ) -> FileSystemHandle
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let options = base_fs.options.clone();
         let layered_fs = Arc::new(LayeredFs { base_fs, mappings });
         let fs = FileSystem::new(
+            locked,
             kernel,
             CacheMode::Uncached,
             LayeredFileSystemOps { fs: layered_fs.clone() },
@@ -286,7 +291,7 @@ mod test {
     #[::fuchsia::test]
     async fn test_remove_duplicates() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let base = TmpFs::new_fs(&kernel);
+        let base = TmpFs::new_fs(&mut locked, &kernel);
         base.root()
             .create_dir_for_testing(&mut locked, &current_task, "d1".into())
             .expect("create_dir");
@@ -300,13 +305,13 @@ mod test {
         assert!(base_entries.contains(&b"d1".to_vec()));
         assert!(base_entries.contains(&b"d2".to_vec()));
 
+        let tmpfs1 = TmpFs::new_fs(&mut locked, &kernel);
+        let tmpfs2 = TmpFs::new_fs(&mut locked, &kernel);
         let layered_fs = LayeredFs::new_fs(
+            &mut locked,
             &kernel,
             base,
-            BTreeMap::from([
-                ("d1".into(), TmpFs::new_fs(&kernel)),
-                ("d3".into(), TmpFs::new_fs(&kernel)),
-            ]),
+            BTreeMap::from([("d1".into(), tmpfs1), ("d3".into(), tmpfs2)]),
         );
         let layered_fs_entries = get_root_entry_names(&mut locked, &current_task, &layered_fs);
         assert_eq!(layered_fs_entries.len(), 5);

@@ -848,32 +848,36 @@ fn create_fs_context(
         // /container/component will be a tmpfs where component using the starnix kernel will have their
         // package mounted.
         let rights = fio::PERM_READABLE | fio::PERM_EXECUTABLE;
-        let container_fs = LayeredFs::new_fs(
+        let component_tmpfs = TmpFs::new_fs(locked, kernel);
+        let remotefs = create_remotefs_filesystem(
+            locked,
             kernel,
-            create_remotefs_filesystem(
-                kernel,
-                pkg_dir_proxy,
-                FileSystemOptions { source: "data".into(), ..Default::default() },
-                rights,
-            )?,
-            BTreeMap::from([("component".into(), TmpFs::new_fs(kernel))]),
+            pkg_dir_proxy,
+            FileSystemOptions { source: "data".into(), ..Default::default() },
+            rights,
+        )?;
+        let container_fs = LayeredFs::new_fs(
+            locked,
+            kernel,
+            remotefs,
+            BTreeMap::from([("component".into(), component_tmpfs)]),
         );
         mappings.push(("container".into(), container_fs));
     }
     if features.custom_artifacts {
-        mappings.push(("custom_artifacts".into(), TmpFs::new_fs(kernel)));
+        mappings.push(("custom_artifacts".into(), TmpFs::new_fs(locked, kernel)));
     }
     if features.test_data {
-        mappings.push(("test_data".into(), TmpFs::new_fs(kernel)));
+        mappings.push(("test_data".into(), TmpFs::new_fs(locked, kernel)));
     }
 
     if !mappings.is_empty() {
         // If this container has enabled any features that mount directories that might not exist
         // in the root file system, we add a LayeredFs to hold these mappings.
-        root.fs = LayeredFs::new_fs(kernel, root.fs, mappings.into_iter().collect());
+        root.fs = LayeredFs::new_fs(locked, kernel, root.fs, mappings.into_iter().collect());
     }
     if features.rootfs_rw {
-        root.fs = OverlayStack::wrap_fs_in_writable_layer(kernel, root.fs)?;
+        root.fs = OverlayStack::wrap_fs_in_writable_layer(locked, kernel, root.fs)?;
     }
     Ok(FsContext::new(Namespace::new_with_flags(root.fs, root.flags)))
 }

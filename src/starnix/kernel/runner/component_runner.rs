@@ -428,17 +428,13 @@ pub fn parse_numbered_handles(
         for numbered_handle in numbered_handles {
             let info = HandleInfo::try_from(numbered_handle.id)?;
             if info.handle_type() == HandleType::FileDescriptor {
-                files.insert(
-                    locked,
-                    current_task,
-                    FdNumber::from_raw(info.arg().into()),
-                    create_file_from_handle(current_task, numbered_handle.handle)?,
-                )?;
+                let file = create_file_from_handle(locked, current_task, numbered_handle.handle)?;
+                files.insert(locked, current_task, FdNumber::from_raw(info.arg().into()), file)?;
             }
         }
     }
 
-    let stdio = SyslogFile::new_file(current_task);
+    let stdio = SyslogFile::new_file(locked, current_task);
     // If no numbered handle is provided for each stdio handle, default to syslog.
     for i in [0, 1, 2] {
         if files.get(FdNumber::from_raw(i)).is_err() {
@@ -530,6 +526,7 @@ impl MountRecord {
         };
 
         let fs = RemoteFs::new_fs(
+            locked,
             system_task.kernel(),
             client_end,
             FileSystemOptions { source: path.into(), params, ..Default::default() },

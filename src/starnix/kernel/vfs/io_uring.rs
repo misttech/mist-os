@@ -18,7 +18,7 @@ use crate::vfs::{
     FileHandle, FileObject, FileOps, FileWriteGuardRef, NamespaceNode,
 };
 use starnix_logging::set_zx_name;
-use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::user_buffer::UserBuffers;
 use starnix_uapi::errors::Errno;
@@ -529,11 +529,15 @@ pub struct IoUringFileObject {
 }
 
 impl IoUringFileObject {
-    pub fn new_file(
+    pub fn new_file<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         entries: u32,
         params: &mut io_uring_params,
-    ) -> Result<FileHandle, Errno> {
+    ) -> Result<FileHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let sq_entries = entries.next_power_of_two();
         let cq_entries = if params.flags & IORING_SETUP_CQSIZE != 0 {
             UserValue::from_raw(params.cq_entries)
@@ -582,7 +586,7 @@ impl IoUringFileObject {
         };
 
         let object = Box::new(IoUringFileObject { queue, registered_buffers: Default::default() });
-        Ok(Anon::new_file(current_task, object, OpenFlags::RDWR, "[io_uring]"))
+        Ok(Anon::new_file(locked, current_task, object, OpenFlags::RDWR, "[io_uring]"))
     }
 
     pub fn register_buffers(&self, buffers: UserBuffers) {

@@ -187,8 +187,8 @@ struct SystemHeap {
 impl Alloc for SystemHeap {
     fn alloc(
         &self,
-        current_task: &CurrentTask,
         locked: &mut Locked<Unlocked>,
+        current_task: &CurrentTask,
         size: u64,
         fd_flags: FdFlags,
     ) -> Result<FdNumber, Errno> {
@@ -203,6 +203,7 @@ impl Alloc for SystemHeap {
         let memory = Arc::new(MemoryObject::from(vmo));
 
         let file = Anon::new_private_file(
+            locked,
             current_task,
             DmaBufFile::new(memory),
             OpenFlags::RDWR,

@@ -2277,7 +2277,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_append_truncate_race() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let root_fs = TmpFs::new_fs(&kernel);
+        let root_fs = TmpFs::new_fs(&mut locked, &kernel);
         let mount = MountInfo::detached();
         let root_node = Arc::clone(root_fs.root());
         let file = root_node

@@ -1203,7 +1203,8 @@ mod tests {
     async fn test_async_wait_exec() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (local_socket, remote_socket) = zx::Socket::create_stream();
-        let pipe = create_fuchsia_pipe(&current_task, remote_socket, OpenFlags::RDWR).unwrap();
+        let pipe = create_fuchsia_pipe(&mut locked, &current_task, remote_socket, OpenFlags::RDWR)
+            .unwrap();
 
         const MEM_SIZE: usize = 1024;
         let mut output_buffer = VecOutputBuffer::new(MEM_SIZE);
@@ -1250,7 +1251,7 @@ mod tests {
     async fn test_async_wait_cancel() {
         for do_cancel in [true, false] {
             let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-            let event = new_eventfd(&current_task, 0, EventFdType::Counter, true);
+            let event = new_eventfd(&mut locked, &current_task, 0, EventFdType::Counter, true);
             let waiter = Waiter::new();
             let queue: Arc<Mutex<VecDeque<ReadyItem>>> = Default::default();
             let handler = EventHandler::Enqueue(EnqueueEventHandler {

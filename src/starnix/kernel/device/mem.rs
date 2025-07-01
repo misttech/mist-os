@@ -35,8 +35,16 @@ use zx::{
 #[derive(Default)]
 pub struct DevNull;
 
-pub fn new_null_file(current_task: &CurrentTask, flags: OpenFlags) -> FileHandle {
+pub fn new_null_file<L>(
+    locked: &mut Locked<L>,
+    current_task: &CurrentTask,
+    flags: OpenFlags,
+) -> FileHandle
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     Anon::new_file_extended(
+        locked,
         current_task,
         Box::new(DevNull),
         flags,

@@ -11,7 +11,7 @@ use crate::vfs::{
     FsNodeOps, FsStr, MemoryRegularNode, MemoryXattrStorage, SymlinkNode, XattrStorage as _,
 };
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Unlocked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
@@ -128,36 +128,56 @@ impl FileSystemOps for Arc<TmpFs> {
 }
 
 pub fn tmp_fs(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    TmpFs::new_fs_with_options(&current_task.kernel(), options)
+    TmpFs::new_fs_with_options(locked, &current_task.kernel(), options)
 }
 
 impl TmpFs {
-    pub fn new_fs(kernel: &Kernel) -> FileSystemHandle {
-        Self::new_fs_with_options(kernel, Default::default()).expect("empty options cannot fail")
-    }
-
-    pub fn new_fs_with_name(kernel: &Kernel, name: &'static FsStr) -> FileSystemHandle {
-        Self::new_fs_with_options_and_name(kernel, Default::default(), name)
+    pub fn new_fs<L>(locked: &mut Locked<L>, kernel: &Kernel) -> FileSystemHandle
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        Self::new_fs_with_options(locked, kernel, Default::default())
             .expect("empty options cannot fail")
     }
 
-    pub fn new_fs_with_options(
+    pub fn new_fs_with_name<L>(
+        locked: &mut Locked<L>,
         kernel: &Kernel,
-        options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno> {
-        Self::new_fs_with_options_and_name(kernel, options, "tmpfs".into())
+        name: &'static FsStr,
+    ) -> FileSystemHandle
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        Self::new_fs_with_options_and_name(locked, kernel, Default::default(), name)
+            .expect("empty options cannot fail")
     }
 
-    fn new_fs_with_options_and_name(
+    pub fn new_fs_with_options<L>(
+        locked: &mut Locked<L>,
+        kernel: &Kernel,
+        options: FileSystemOptions,
+    ) -> Result<FileSystemHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        Self::new_fs_with_options_and_name(locked, kernel, options, "tmpfs".into())
+    }
+
+    fn new_fs_with_options_and_name<L>(
+        locked: &mut Locked<L>,
         kernel: &Kernel,
         options: FileSystemOptions,
         name: &'static FsStr,
-    ) -> Result<FileSystemHandle, Errno> {
-        let fs = FileSystem::new(kernel, CacheMode::Permanent, Arc::new(TmpFs(name)), options)?;
+    ) -> Result<FileSystemHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let fs =
+            FileSystem::new(locked, kernel, CacheMode::Permanent, Arc::new(TmpFs(name)), options)?;
         let mut mount_options = fs.options.params.clone();
         let mode = if let Some(mode) = mount_options.remove(b"mode") {
             FileMode::from_string(mode.as_ref())?
@@ -385,7 +405,7 @@ mod test {
     #[::fuchsia::test]
     async fn test_tmpfs() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let fs = TmpFs::new_fs(&kernel);
+        let fs = TmpFs::new_fs(&mut locked, &kernel);
         let root = fs.root();
         let usr = root.create_dir(&mut locked, &current_task, "usr".into()).unwrap();
         let _etc = root.create_dir(&mut locked, &current_task, "etc".into()).unwrap();
@@ -622,8 +642,9 @@ mod test {
 
     #[::fuchsia::test]
     async fn test_data() {
-        let (kernel, _current_task) = create_kernel_and_task();
+        let (kernel, _current_task, mut locked) = create_kernel_task_and_unlocked();
         let fs = TmpFs::new_fs_with_options(
+            &mut locked,
             &kernel,
             FileSystemOptions {
                 source: Default::default(),

@@ -8,7 +8,7 @@ use crate::vfs::{
     fs_node_impl_not_dir, CacheMode, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle,
     FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr, FsString,
 };
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
@@ -53,14 +53,18 @@ impl Anon {
     }
 
     /// Returns a new anonymous file with the specified properties, and a unique `FsNode`.
-    pub fn new_file_extended(
+    pub fn new_file_extended<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         ops: Box<dyn FileOps>,
         flags: OpenFlags,
         name: &'static str,
         info: FsNodeInfo,
-    ) -> FileHandle {
-        let fs = anon_fs(current_task.kernel());
+    ) -> FileHandle
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let fs = anon_fs(locked, current_task.kernel());
         let node =
             fs.create_node_and_allocate_node_id(Anon { name: Some(name), is_private: false }, info);
         security::fs_node_init_anon(current_task, &node, name);
@@ -68,13 +72,18 @@ impl Anon {
     }
 
     /// Returns a new anonymous file with the specified properties, and a unique `FsNode`.
-    pub fn new_file(
+    pub fn new_file<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         ops: Box<dyn FileOps>,
         flags: OpenFlags,
         name: &'static str,
-    ) -> FileHandle {
+    ) -> FileHandle
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         Self::new_file_extended(
+            locked,
             current_task,
             ops,
             flags,
@@ -85,13 +94,18 @@ impl Anon {
 
     /// Returns a new anonymous file backed by a single "private" `FsNode`, to which no security
     /// labeling nor access-checks will be applied.
-    pub fn new_private_file(
+    pub fn new_private_file<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         ops: Box<dyn FileOps>,
         flags: OpenFlags,
         name: &'static str,
-    ) -> FileHandle {
+    ) -> FileHandle
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         Self::new_private_file_extended(
+            locked,
             current_task,
             ops,
             flags,
@@ -101,14 +115,18 @@ impl Anon {
     }
 
     /// Returns a new private anonymous file, applying caller-supplied `info`.
-    pub fn new_private_file_extended(
+    pub fn new_private_file_extended<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         ops: Box<dyn FileOps>,
         flags: OpenFlags,
         name: &'static str,
         info: FsNodeInfo,
-    ) -> FileHandle {
-        let fs = anon_fs(current_task.kernel());
+    ) -> FileHandle
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        let fs = anon_fs(locked, current_task.kernel());
         let node =
             fs.create_node_and_allocate_node_id(Anon { name: Some(name), is_private: true }, info);
         security::fs_node_init_anon(current_task, &node, name);
@@ -137,15 +155,23 @@ impl FileSystemOps for AnonFs {
         "anon_inodefs".into()
     }
 }
-pub fn anon_fs(kernel: &Kernel) -> FileSystemHandle {
+pub fn anon_fs<L>(mut locked: &mut Locked<L>, kernel: &Kernel) -> FileSystemHandle
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     struct AnonFsHandle(FileSystemHandle);
 
     kernel
         .expando
         .get_or_init(|| {
-            let fs =
-                FileSystem::new(kernel, CacheMode::Uncached, AnonFs, FileSystemOptions::default())
-                    .expect("anonfs constructed with valid options");
+            let fs = FileSystem::new(
+                &mut locked,
+                kernel,
+                CacheMode::Uncached,
+                AnonFs,
+                FileSystemOptions::default(),
+            )
+            .expect("anonfs constructed with valid options");
             AnonFsHandle(fs)
         })
         .0

@@ -301,7 +301,8 @@ mod tests {
             .expect("create_remote_block_device_if_absent failed.");
 
         let device = registry.open(0).expect("open failed.");
-        let file = anon_test_file(&current_task, device.create_file_ops(), OpenFlags::RDWR);
+        let file =
+            anon_test_file(&mut locked, &current_task, device.create_file_ops(), OpenFlags::RDWR);
 
         let arg_addr = map_object_anywhere(&mut locked, &current_task, &0u64);
         // TODO(https://fxbug.dev/129314): replace with MaybeUninit::uninit_array.
@@ -347,7 +348,8 @@ mod tests {
             .expect("create_remote_block_device_if_absent failed.");
 
         let device = registry.open(0).expect("open failed.");
-        let file = anon_test_file(&current_task, device.create_file_ops(), OpenFlags::RDWR);
+        let file =
+            anon_test_file(&mut locked, &current_task, device.create_file_ops(), OpenFlags::RDWR);
 
         file.seek(&mut locked, &current_task, SeekTarget::End(0)).expect("seek failed");
         let mut buf = VecOutputBuffer::new(512);

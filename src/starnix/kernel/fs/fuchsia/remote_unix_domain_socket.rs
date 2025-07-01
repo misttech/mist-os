@@ -116,7 +116,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn read(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
@@ -149,7 +149,7 @@ impl SocketOps for RemoteUnixDomainSocket {
         let mut file_handles: Vec<FileHandle> = vec![];
         if let Some(handles) = response.handles {
             for handle in handles {
-                file_handles.push(new_remote_file(current_task, handle, OpenFlags::RDWR)?);
+                file_handles.push(new_remote_file(locked, current_task, handle, OpenFlags::RDWR)?);
             }
         }
         let ancillary_data = vec![AncillaryData::Unix(UnixControlData::Rights(file_handles))];
@@ -514,10 +514,12 @@ mod tests {
             });
         });
         spawn_kernel_and_run(move |locked, current_task| {
-            let original_file = new_remote_file(current_task, client.into(), OpenFlags::RDWR)
-                .expect("new_remote_file");
+            let original_file =
+                new_remote_file(locked, current_task, client.into(), OpenFlags::RDWR)
+                    .expect("new_remote_file");
             assert!(original_file.node().is_sock());
             let file = new_remote_file(
+                locked,
                 current_task,
                 original_file.to_handle(current_task).expect("to_handle").expect("has_handle"),
                 OpenFlags::RDWR,

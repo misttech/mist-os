@@ -134,12 +134,16 @@ pub enum CacheMode {
 
 impl FileSystem {
     /// Create a new filesystem.
-    pub fn new(
+    pub fn new<L>(
+        _locked: &mut Locked<L>,
         kernel: &Kernel,
         cache_mode: CacheMode,
         ops: impl FileSystemOps,
         mut options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno> {
+    ) -> Result<FileSystemHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let uses_external_node_ids = ops.uses_external_node_ids();
         let node_cache = Arc::new(FsNodeCache::new(uses_external_node_ids));
         assert_eq!(ops.uses_external_node_ids(), node_cache.uses_external_node_ids());

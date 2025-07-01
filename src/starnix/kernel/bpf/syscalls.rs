@@ -102,6 +102,7 @@ fn install_bpf_fd(
 
     // All BPF FDs have the CLOEXEC flag turned on by default.
     let file = Anon::new_private_file(
+        locked,
         current_task,
         Box::new(handle),
         OpenFlags::RDWR | OpenFlags::CLOEXEC,

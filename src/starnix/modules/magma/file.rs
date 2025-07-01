@@ -810,6 +810,7 @@ impl FileOps for MagmaFile {
                     let sync_file = SyncFile::new(*sync_file_name, SyncFence { sync_points });
 
                     let file = Anon::new_private_file(
+                        locked,
                         current_task,
                         Box::new(sync_file),
                         OpenFlags::RDWR,

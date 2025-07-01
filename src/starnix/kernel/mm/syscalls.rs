@@ -459,7 +459,7 @@ pub fn sys_userfaultfd(
     };
 
     let user_mode_only = raw_flags & UFFD_USER_MODE_ONLY == 0;
-    let uff_handle = UserFaultFile::new(current_task, open_flags, user_mode_only);
+    let uff_handle = UserFaultFile::new(locked, current_task, open_flags, user_mode_only);
     current_task.add_file(locked, uff_handle, fd_flags)
 }
 

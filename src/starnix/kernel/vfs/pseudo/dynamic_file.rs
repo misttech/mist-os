@@ -451,9 +451,13 @@ mod tests {
     fn create_test_file<T: SequenceFileSource>(
         source: T,
     ) -> (AutoReleasableTask, FileHandle, Locked<Unlocked>) {
-        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
-        let file =
-            anon_test_file(&current_task, Box::new(DynamicFile::new(source)), OpenFlags::RDONLY);
+        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let file = anon_test_file(
+            &mut locked,
+            &current_task,
+            Box::new(DynamicFile::new(source)),
+            OpenFlags::RDONLY,
+        );
         (current_task, file, locked)
     }
 

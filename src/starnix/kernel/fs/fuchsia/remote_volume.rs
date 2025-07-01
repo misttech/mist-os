@@ -174,7 +174,7 @@ fn get_or_create_volume_keys(
 }
 
 pub fn new_remote_vol(
-    _locked: &mut Locked<Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -273,8 +273,13 @@ pub fn new_remote_vol(
 
     let use_remote_ids = remotefs.use_remote_ids();
     let remotevol = RemoteVolume { remotefs, exposed_dir_proxy };
-    let fs =
-        FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), remotevol, options)?;
+    let fs = FileSystem::new(
+        locked,
+        kernel,
+        CacheMode::Cached(CacheConfig::default()),
+        remotevol,
+        options,
+    )?;
     if use_remote_ids {
         fs.create_root(node_id, remote_node);
     } else {

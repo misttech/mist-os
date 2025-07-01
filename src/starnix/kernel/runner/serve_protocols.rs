@@ -254,8 +254,12 @@ async fn connect_to_vsock(
         fasync::Timer::new(fasync::MonotonicDuration::from_millis(100).after_now()).await;
     };
 
-    let pipe =
-        create_fuchsia_pipe(system_task, bridge_socket, OpenFlags::RDWR | OpenFlags::NONBLOCK)?;
+    let pipe = create_fuchsia_pipe(
+        system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
+        system_task,
+        bridge_socket,
+        OpenFlags::RDWR | OpenFlags::NONBLOCK,
+    )?;
     socket.downcast_socket::<VsockSocket>().unwrap().remote_connection(
         system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
         &socket,

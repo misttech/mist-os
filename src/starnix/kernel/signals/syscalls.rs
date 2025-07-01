@@ -332,7 +332,7 @@ pub fn sys_signalfd4(
         file.set_mask(mask);
         Ok(fd)
     } else {
-        let signalfd = SignalFd::new_file(current_task, mask, flags);
+        let signalfd = SignalFd::new_file(locked, current_task, mask, flags);
         let flags = if flags & SFD_CLOEXEC != 0 { FdFlags::CLOEXEC } else { FdFlags::empty() };
         let fd = current_task.add_file(locked, signalfd, flags)?;
         Ok(fd)

@@ -99,6 +99,7 @@ impl ExtFilesystem {
         let fs = Self { parser, pager };
         let ops = ExtDirectory { inner: Arc::new(ExtNode::new(&fs, ROOT_INODE_NUM)?) };
         let fs = FileSystem::new(
+            locked,
             current_task.kernel(),
             CacheMode::Cached(CacheConfig::default()),
             fs,

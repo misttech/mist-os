@@ -10,7 +10,6 @@ use crate::vfs::{
     fileops_impl_dataless, fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle,
     FileObject, FileOps, WeakFileHandle,
 };
-
 use itertools::Itertools;
 use starnix_logging::log_warn;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
@@ -95,7 +94,10 @@ struct EpollState {
 
 impl EpollFileObject {
     /// Allocate a new, empty epoll object.
-    pub fn new_file(current_task: &CurrentTask) -> FileHandle {
+    pub fn new_file<L>(locked: &mut Locked<L>, current_task: &CurrentTask) -> FileHandle
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let epoll = Box::new(EpollFileObject::default());
 
         #[cfg(any(test, debug_assertions))]
@@ -104,7 +106,7 @@ impl EpollFileObject {
             let _l2 = epoll.trigger_list.lock();
         }
 
-        Anon::new_private_file(current_task, epoll, OpenFlags::RDWR, "[eventpoll]")
+        Anon::new_private_file(locked, current_task, epoll, OpenFlags::RDWR, "[eventpoll]")
     }
 
     fn new_wait_handler(&self, key: ReadyItemKey) -> EventHandler {
@@ -578,7 +580,7 @@ mod tests {
         let test_string = "hello starnix".to_string();
         let test_len = test_string.len();
 
-        let epoll_file_handle = EpollFileObject::new_file(&current_task);
+        let epoll_file_handle = EpollFileObject::new_file(&mut locked, &current_task);
         let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
         epoll_file
             .add(
@@ -636,7 +638,7 @@ mod tests {
             test_bytes.len()
         );
 
-        let epoll_file_handle = EpollFileObject::new_file(&current_task);
+        let epoll_file_handle = EpollFileObject::new_file(&mut locked, &current_task);
         let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
         epoll_file
             .add(
@@ -666,10 +668,10 @@ mod tests {
     async fn test_epoll_ctl_cancel() {
         for do_cancel in [true, false] {
             let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-            let event = new_eventfd(&current_task, 0, EventFdType::Counter, true);
+            let event = new_eventfd(&mut locked, &current_task, 0, EventFdType::Counter, true);
             let waiter = Waiter::new();
 
-            let epoll_file_handle = EpollFileObject::new_file(&current_task);
+            let epoll_file_handle = EpollFileObject::new_file(&mut locked, &current_task);
             let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
             const EVENT_DATA: u64 = 42;
             epoll_file
@@ -732,15 +734,15 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let (client1, server1) = zx::Socket::create_stream();
         let (client2, server2) = zx::Socket::create_stream();
-        let pipe1 = create_fuchsia_pipe(&current_task, client1, OpenFlags::RDWR)
+        let pipe1 = create_fuchsia_pipe(&mut locked, &current_task, client1, OpenFlags::RDWR)
             .expect("create_fuchsia_pipe");
-        let pipe2 = create_fuchsia_pipe(&current_task, client2, OpenFlags::RDWR)
+        let pipe2 = create_fuchsia_pipe(&mut locked, &current_task, client2, OpenFlags::RDWR)
             .expect("create_fuchsia_pipe");
         let server1_zxio = Zxio::create(server1.into_handle()).expect("Zxio::create");
         let server2_zxio = Zxio::create(server2.into_handle()).expect("Zxio::create");
 
         let poll = |locked: &mut Locked<Unlocked>| {
-            let epoll_object = EpollFileObject::new_file(&current_task);
+            let epoll_object = EpollFileObject::new_file(locked, &current_task);
             let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
             epoll_file
                 .add(
@@ -798,8 +800,8 @@ mod tests {
     #[::fuchsia::test]
     async fn test_cancel_after_notify() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let event = new_eventfd(&current_task, 0, EventFdType::Counter, true);
-        let epoll_file_handle = EpollFileObject::new_file(&current_task);
+        let event = new_eventfd(&mut locked, &current_task, 0, EventFdType::Counter, true);
+        let epoll_file_handle = EpollFileObject::new_file(&mut locked, &current_task);
         let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
 
         // Add a thing
@@ -857,7 +859,7 @@ mod tests {
         )
         .expect("Failed to create socket pair.");
 
-        let epoll_file_handle = EpollFileObject::new_file(&current_task);
+        let epoll_file_handle = EpollFileObject::new_file(&mut locked, &current_task);
         let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
 
         const EVENT_DATA: u64 = 42;
