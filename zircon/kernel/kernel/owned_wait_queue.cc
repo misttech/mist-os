@@ -620,6 +620,7 @@ void OwnedWaitQueue::FinishPropagate(UpstreamNodeType& upstream_node,
           owq_iss.start_time = ss.start_time_;
           owq_iss.finish_time = ss.finish_time_;
           owq_iss.time_slice_ns = ss.time_slice_ns_;
+          owq_iss.time_slice_used_ns = ss.time_slice_used_ns_;
         } else if (utilization_after == SchedUtilization{0}) {
           // Last deadline thread just left, reset our dynamic params.
           owq_iss.ResetDynamicParameters();
