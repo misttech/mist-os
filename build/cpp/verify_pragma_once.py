@@ -25,13 +25,12 @@ def main():
 
     has_errors = False
 
-    matcher = re.compile(r"^#pragma once")
+    matcher = re.compile(r"^#pragma once", re.MULTILINE)
     for header in args.headers:
         with open(header, "r") as header_file:
-            for line in header_file.readlines():
-                if matcher.match(line):
-                    print("Error: pragma disallowed in SDK: %s" % header)
-                    has_errors = True
+            if matcher.search(header_file.read()):
+                print(f"Error: pragma disallowed in SDK: {header}")
+                has_errors = True
     if has_errors:
         return 1
 
