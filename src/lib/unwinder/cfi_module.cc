@@ -15,6 +15,7 @@
 #include <string>
 
 #include "src/lib/unwinder/cfi_parser.h"
+#include "src/lib/unwinder/elf_utils.h"
 #include "src/lib/unwinder/error.h"
 #include "src/lib/unwinder/module.h"
 #include "src/lib/unwinder/registers.h"
@@ -247,30 +248,15 @@ Error CfiModule::LoadDebugFrame() {
     return Error("no section info, is this a stripped binary?");
   }
 
-  uint64_t shstr_hdr_ptr =
-      elf_ptr_ + ehdr.e_shoff + static_cast<uint64_t>(ehdr.e_shentsize) * ehdr.e_shstrndx;
-  Elf64_Shdr shstr_hdr;
-  if (auto err = elf_->Read(shstr_hdr_ptr, shstr_hdr); err.has_err()) {
+  Elf64_Shdr shdr;
+  if (auto err = elf_utils::GetSectionByName<Elf64_Ehdr, Elf64_Shdr>(elf_, elf_ptr_, ".debug_frame",
+                                                                     ehdr, shdr);
+      err.has_err()) {
     return err;
   }
 
-  for (uint64_t i = 0; i < ehdr.e_shnum; i++) {
-    Elf64_Shdr shdr;
-    if (auto err = elf_->Read(elf_ptr_ + ehdr.e_shoff + ehdr.e_shentsize * i, shdr);
-        err.has_err()) {
-      return err;
-    }
-    static constexpr char target_section_name[] = ".debug_frame";
-    char section_name[sizeof(target_section_name)];
-    if (auto err = elf_->Read(elf_ptr_ + shstr_hdr.sh_offset + shdr.sh_name, section_name);
-        err.has_err()) {
-      return err;
-    }
-    if (strncmp(section_name, target_section_name, sizeof(section_name)) == 0) {
-      debug_frame_ptr_ = elf_ptr_ + shdr.sh_offset;
-      debug_frame_end_ = debug_frame_ptr_ + shdr.sh_size;
-    }
-  }
+  debug_frame_ptr_ = elf_ptr_ + shdr.sh_offset;
+  debug_frame_end_ = debug_frame_ptr_ + shdr.sh_size;
 
   return Error("no debug_frame section found");
 }

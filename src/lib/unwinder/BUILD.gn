@@ -25,6 +25,7 @@ static_library("unwinder") {
     "cfi_unwinder.cc",
     "cfi_unwinder.h",
     "dwarf_expr.cc",
+    "elf_utils.h",
     "error.cc",
     "fp_unwinder.cc",
     "frame.h",
