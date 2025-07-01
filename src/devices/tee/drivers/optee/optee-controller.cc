@@ -403,20 +403,19 @@ zx_status_t OpteeController::InitThreadPools() {
   zx_status_t status = ZX_ERR_INTERNAL;
   uint32_t default_pool_size = kDefaultNumThreads;
 
-  auto decoded = ddk::GetEncodedMetadata<fuchsia_hardware_tee::wire::TeeMetadata>(
-      parent(), DEVICE_METADATA_TEE_THREAD_CONFIG);
-  if (!decoded.is_ok()) {
-    LOG(INFO, "No metadata for driver. Use default thread configuration.");
+  zx::result metadata_result = pdev_.GetFidlMetadata<fuchsia_hardware_tee::TeeMetadata>();
+  if (metadata_result.is_error()) {
+    LOG(INFO, "Using default thread configuration: Failed to get tee metadata for driver: %s",
+        metadata_result.status_string());
     return CreateThreadPool(&loop_, default_pool_size, kDefaultRoleName);
   }
-
-  fuchsia_hardware_tee::wire::TeeMetadata& metadata = *decoded.value();
+  const auto& metadata = metadata_result.value();
 
   LOG(INFO, "Default thread pool size %d, %zu custom thread pools supplied.",
-      metadata.default_thread_count(), metadata.custom_threads().count());
+      metadata.default_thread_count().value(), metadata.custom_threads().value().size());
 
-  if (metadata.has_default_thread_count() && metadata.default_thread_count() != 0) {
-    default_pool_size = metadata.default_thread_count();
+  if (metadata.default_thread_count().has_value() && metadata.default_thread_count().value() != 0) {
+    default_pool_size = metadata.default_thread_count().value();
   }
 
   status = CreateThreadPool(&loop_, default_pool_size, kDefaultRoleName);
@@ -424,18 +423,42 @@ zx_status_t OpteeController::InitThreadPools() {
     LOG(ERROR, "Failed to create default thread pool: %d", status);
   }
 
-  if (metadata.has_custom_threads()) {
+  if (metadata.custom_threads().has_value()) {
     std::map<std::string, std::list<async::Loop>::iterator> roles;
-    for (auto& custom_thread : metadata.custom_threads()) {
-      if (!custom_thread.has_count() || custom_thread.count() == 0 || !custom_thread.has_role() ||
-          custom_thread.role().empty() || !custom_thread.has_trusted_apps() ||
-          custom_thread.trusted_apps().empty()) {
-        LOG(WARNING, "Not complete custom thread configuration(some fields are missed).");
+    const auto& custom_threads = metadata.custom_threads().value();
+    for (size_t i = 0; i < custom_threads.size(); ++i) {
+      const auto& custom_thread = custom_threads[i];
+      if (!custom_thread.count().has_value()) {
+        LOG(WARNING, "Custom thread %lu missing `count` field", i);
+        continue;
+      }
+      auto count = custom_thread.count().value();
+      if (count == 0) {
+        LOG(WARNING, "Custom thread %lu's count is 0", i);
+        continue;
+      }
+
+      if (!custom_thread.role().has_value()) {
+        LOG(WARNING, "Custom thread %lu missing `role` field", i);
+        continue;
+      }
+      auto role = custom_thread.role().value();
+      if (role.empty()) {
+        LOG(WARNING, "Custom thread %lu's role is empty", i);
+        continue;
+      }
+
+      if (!custom_thread.trusted_apps().has_value()) {
+        LOG(WARNING, "Custom thread %lu missing `trusted_apps` field", i);
+        continue;
+      }
+      auto trusted_apps = custom_thread.trusted_apps().value();
+      if (trusted_apps.empty()) {
+        LOG(WARNING, "Custom thread %lu's trusted apps is empty", i);
         continue;
       }
 
       std::list<async::Loop>::iterator loop_it;
-      std::string role(custom_thread.role().get());
       auto it = roles.find(role);
       if (it != roles.end()) {
         LOG(WARNING, "Multiple declaration of %s thread pool. Appending...", role.c_str());
@@ -445,16 +468,15 @@ zx_status_t OpteeController::InitThreadPools() {
         roles.emplace(role, loop_it);
       }
 
-      status = CreateThreadPool(&(*loop_it), custom_thread.count(),
-                                std::string(custom_thread.role().get()));
+      status = CreateThreadPool(&(*loop_it), count, role);
       if (status != ZX_OK) {
-        LOG(ERROR, "Failed to create thread pool %s: %d", custom_thread.role().get().data(),
-            status);
+        LOG(ERROR, "Failed to create thread pool %s: %d", role.c_str(), status);
         return status;
       }
 
-      for (auto& app : custom_thread.trusted_apps()) {
-        uuid_config_.emplace(app, loop_it);
+      fidl::Arena arena;
+      for (auto& app : trusted_apps) {
+        uuid_config_.emplace(fidl::ToWire(arena, app), loop_it);
       }
     }
   }
