@@ -476,6 +476,97 @@ TEST_F(BpfMapTest, PinMap) {
   CheckMapInfo(map_fd);
 }
 
+TEST_F(BpfMapTest, FreezeMap) {
+  // 1. Write an initial value to the map.
+  int key = 0;
+  std::vector<char> value(1024, 'A');
+  EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM,
+                (union bpf_attr){
+                    .map_fd = static_cast<unsigned>(array_fd()),
+                    .key = reinterpret_cast<uintptr_t>(&key),
+                    .value = reinterpret_cast<uintptr_t>(value.data()),
+                }),
+            0)
+      << strerror(errno);
+
+  // 2. Freeze the map.
+  EXPECT_EQ(bpf(BPF_MAP_FREEZE,
+                (union bpf_attr){
+                    .map_fd = static_cast<unsigned>(array_fd()),
+                }),
+            0)
+      << strerror(errno);
+
+  // 3. Attempt to write to the map again (this should fail).
+  std::vector<char> new_value(1024, 'B');
+  EXPECT_EQ(bpf(BPF_MAP_UPDATE_ELEM,
+                (union bpf_attr){
+                    .map_fd = static_cast<unsigned>(array_fd()),
+                    .key = reinterpret_cast<uintptr_t>(&key),
+                    .value = reinterpret_cast<uintptr_t>(new_value.data()),
+                }),
+            -1);
+  EXPECT_EQ(errno, EPERM);
+
+  // 4. Read the value back to confirm it wasn't changed.
+  std::vector<char> read_value(1024, 0);
+  EXPECT_EQ(bpf(BPF_MAP_LOOKUP_ELEM,
+                (union bpf_attr){
+                    .map_fd = static_cast<unsigned>(array_fd()),
+                    .key = reinterpret_cast<uintptr_t>(&key),
+                    .value = reinterpret_cast<uintptr_t>(read_value.data()),
+                }),
+            0)
+      << strerror(errno);
+  EXPECT_EQ(value, read_value);
+}
+
+TEST_F(BpfMapTest, FreezeMmapInteraction) {
+  // Create a mappable array map.
+  fbl::unique_fd mappable_map_fd(SAFE_SYSCALL_SKIP_ON_EPERM(
+      bpf(BPF_MAP_CREATE, (union bpf_attr){
+                              .map_type = BPF_MAP_TYPE_ARRAY,
+                              .key_size = sizeof(int),
+                              .value_size = static_cast<uint32_t>(getpagesize()),
+                              .max_entries = 1,
+                              .map_flags = BPF_F_MMAPABLE,
+                          })));
+  ASSERT_TRUE(mappable_map_fd.is_valid());
+
+  // 1. Mmap the map, then try to freeze it. Should fail with EBUSY.
+  {
+    auto mapping = ASSERT_RESULT_SUCCESS_AND_RETURN(test_helper::ScopedMMap::MMap(
+        nullptr, getpagesize(), PROT_READ | PROT_WRITE, MAP_SHARED, mappable_map_fd.get(), 0));
+
+    EXPECT_EQ(bpf(BPF_MAP_FREEZE,
+                  (union bpf_attr){
+                      .map_fd = static_cast<unsigned>(mappable_map_fd.get()),
+                  }),
+              -1);
+    EXPECT_EQ(errno, EBUSY);
+  }
+
+  // 2. Now that it is unmapped, freezing should succeed.
+  EXPECT_EQ(bpf(BPF_MAP_FREEZE,
+                (union bpf_attr){
+                    .map_fd = static_cast<unsigned>(mappable_map_fd.get()),
+                }),
+            0)
+      << strerror(errno);
+
+  // 3. Try to mmap the frozen map. Should fail with EPERM.
+  EXPECT_EQ(test_helper::ScopedMMap::MMap(nullptr, getpagesize(), PROT_READ | PROT_WRITE,
+                                          MAP_SHARED, mappable_map_fd.get(), 0)
+                .error_value(),
+            EPERM);
+
+  // Also check read-only mmap
+  EXPECT_EQ(test_helper::ScopedMMap::MMap(nullptr, getpagesize(), PROT_READ, MAP_SHARED,
+                                          mappable_map_fd.get(), 0)
+                .error_value(),
+            EPERM);
+}
+
 TEST_F(BpfMapTest, LockTest) {
   const char* m1 = "/sys/fs/bpf/array";
   const char* m2 = "/sys/fs/bpf/map";

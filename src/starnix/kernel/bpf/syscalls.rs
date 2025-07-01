@@ -215,6 +215,10 @@ pub fn sys_bpf(
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
 
+            if map.is_frozen(locked) {
+                return error!(EPERM);
+            }
+
             let flags = elem_attr.flags;
             let key =
                 read_map_key(current_task, UserAddress::from(elem_attr.key), map.schema.key_size)?;
@@ -236,6 +240,10 @@ pub fn sys_bpf(
             let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
+
+            if map.is_frozen(locked) {
+                return error!(EPERM);
+            }
 
             let key =
                 read_map_key(current_task, UserAddress::from(elem_attr.key), map.schema.key_size)?;
@@ -489,8 +497,13 @@ pub fn sys_bpf(
             error!(EINVAL)
         }
         bpf_cmd_BPF_MAP_FREEZE => {
-            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_MAP_FREEZE");
-            error!(EINVAL)
+            let elem_attr: bpf_attr__bindgen_ty_2 = read_attr(current_task, attr_addr, attr_size)?;
+            log_trace!("BPF_MAP_FREEZE");
+            let map_fd = FdNumber::from_raw(elem_attr.map_fd as i32);
+            let map = get_bpf_object(current_task, map_fd)?;
+            let map = map.as_map()?;
+            map.freeze(locked)?;
+            Ok(SUCCESS)
         }
         bpf_cmd_BPF_BTF_GET_NEXT_ID => {
             track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_BTF_GET_NEXT_ID");

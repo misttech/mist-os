@@ -56,4 +56,6 @@ lock_ordering! {
     UninterruptibleLock => FastrpcInnerState,
     // MemoryXattrStorage
     UninterruptibleLock => MemoryXattrStorageLevel,
+    // Bpf Map State objects
+    UninterruptibleLock => BpfMapStateLevel,
 }

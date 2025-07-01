@@ -143,7 +143,7 @@ impl FileOps for BpfHandle {
 
     fn get_memory(
         &self,
-        _locked: &mut Locked<FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         length: Option<usize>,
@@ -159,7 +159,7 @@ impl FileOps for BpfHandle {
             return error!(EPERM);
         }
 
-        let memory_object = match schema.map_type {
+        match schema.map_type {
             bpf_map_type_BPF_MAP_TYPE_RINGBUF => {
                 let page_size = *PAGE_SIZE as usize;
                 // Starting from the second page, this cannot be mapped writable.
@@ -173,15 +173,21 @@ impl FileOps for BpfHandle {
                     }
                 }
 
-                // The first page of the ring buffer VMO is not visible to
-                // user-space processes. Return a VMO slice that doesn't
-                // include the first page.
-                let clone_size = 2 * page_size + schema.max_entries as usize;
-                let vmo_dup = vmo
-                    .create_child(zx::VmoChildOptions::SLICE, page_size as u64, clone_size as u64)
-                    .map_err(|_| errno!(EIO))?
-                    .into();
-                Arc::new(MemoryObject::RingBuf(vmo_dup))
+                self.as_map()?.get_memory(locked, || {
+                    // The first page of the ring buffer VMO is not visible to
+                    // user-space processes. Return a VMO slice that doesn't
+                    // include the first page.
+                    let clone_size = 2 * page_size + schema.max_entries as usize;
+                    let vmo_dup = vmo
+                        .create_child(
+                            zx::VmoChildOptions::SLICE,
+                            page_size as u64,
+                            clone_size as u64,
+                        )
+                        .map_err(|_| errno!(EIO))?
+                        .into();
+                    Ok(Arc::new(MemoryObject::RingBuf(vmo_dup)))
+                })
             }
 
             bpf_map_type_BPF_MAP_TYPE_ARRAY => {
@@ -193,19 +199,19 @@ impl FileOps for BpfHandle {
                     return error!(EINVAL);
                 }
 
-                let vmo_dup = vmo
-                    .as_handle_ref()
-                    .duplicate(zx::Rights::SAME_RIGHTS)
-                    .map_err(|_| errno!(EIO))?
-                    .into();
-                Arc::new(MemoryObject::Vmo(vmo_dup))
+                self.as_map()?.get_memory(locked, || {
+                    let vmo_dup = vmo
+                        .as_handle_ref()
+                        .duplicate(zx::Rights::SAME_RIGHTS)
+                        .map_err(|_| errno!(EIO))?
+                        .into();
+                    Ok(Arc::new(MemoryObject::Vmo(vmo_dup)))
+                })
             }
 
             // Other maps cannot be mmap'ed.
-            _ => return error!(ENODEV),
-        };
-
-        Ok(memory_object)
+            _ => error!(ENODEV),
+        }
     }
 
     fn wait_async(
