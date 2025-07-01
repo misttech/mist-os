@@ -16,10 +16,10 @@ use crate::serialized_types::{Version, LATEST_VERSION};
 use anyhow::{bail, Error};
 use async_trait::async_trait;
 use fuchsia_sync::{Mutex, MutexGuard};
-use std::cell::UnsafeCell;
 use std::cmp::{min, Ordering};
 use std::collections::BTreeMap;
-use std::ops::{Bound, Range};
+use std::ops::Bound;
+use std::ptr::NonNull;
 use std::sync::atomic::{self, AtomicPtr, AtomicU32};
 use std::sync::Arc;
 
@@ -42,36 +42,14 @@ impl<K, V> PointerList<K, V> {
     }
 
     // Extracts the pointer at the given index.
-    fn get_mut<'a>(&self, index: usize) -> Option<&'a mut SkipListNode<K, V>> {
-        unsafe { self.0[index].load(atomic::Ordering::SeqCst).as_mut() }
-    }
-
-    // Same as previous, but returns an immutable reference.
-    fn get<'a>(&self, index: usize) -> Option<&'a SkipListNode<K, V>> {
-        unsafe { self.0[index].load(atomic::Ordering::SeqCst).as_ref() }
+    fn get(&self, index: usize) -> Option<NonNull<SkipListNode<K, V>>> {
+        NonNull::new(self.0[index].load(atomic::Ordering::SeqCst))
     }
 
     // Sets the pointer at the given index.
-    fn set(&self, index: usize, node: Option<&SkipListNode<K, V>>) {
-        self.0[index].store(
-            match node {
-                None => std::ptr::null_mut(),
-                Some(node) => {
-                    // https://github.com/rust-lang/rust/issues/66136#issuecomment-550003651
-                    // suggests that the following is the best way to cast from const* to mut*.
-                    unsafe {
-                        (&*(node as *const SkipListNode<K, V>
-                            as *const UnsafeCell<SkipListNode<K, V>>))
-                            .get()
-                    }
-                }
-            },
-            atomic::Ordering::SeqCst,
-        );
-    }
-
-    fn get_ptr(&self, index: usize) -> *mut SkipListNode<K, V> {
-        self.0[index].load(atomic::Ordering::SeqCst)
+    fn set(&self, index: usize, node: Option<NonNull<SkipListNode<K, V>>>) {
+        self.0[index]
+            .store(node.map_or(std::ptr::null_mut(), |n| n.as_ptr()), atomic::Ordering::SeqCst);
     }
 }
 
@@ -126,30 +104,31 @@ struct EpochEraseList<K, V> {
     count: u16,
     // We represent the list by storing the head and tail of the list which each node chained to the
     // next.
-    range: Range<*mut SkipListNode<K, V>>,
+    start: NonNull<SkipListNode<K, V>>,
+    end: Option<NonNull<SkipListNode<K, V>>>,
 }
 
-// Required because of `erase_lists` which holds pointers.
+// SAFETY: Required because of `erase_lists` which holds pointers.
 unsafe impl<K, V> Send for Inner<K, V> {}
 
 impl<K, V> Inner<K, V> {
     fn new() -> Self {
         Inner { epoch: 0, current_count: 0, erase_lists: BTreeMap::new(), item_count: 0 }
     }
-
     fn free_erase_list(
         &mut self,
         owner: &SkipListLayer<K, V>,
-        list: Range<*mut SkipListNode<K, V>>,
+        start: NonNull<SkipListNode<K, V>>,
+        end: Option<NonNull<SkipListNode<K, V>>>,
     ) {
-        let mut maybe_node = unsafe { list.start.as_mut() };
+        let mut node = start;
         loop {
-            match maybe_node {
-                Some(node) if node as *const _ != list.end => {
-                    maybe_node = owner.free_node(node);
-                }
-                _ => break,
+            // SAFETY: This node has no more references.
+            let next = unsafe { owner.free_node(node) };
+            if next == end {
+                break;
             }
+            node = next.unwrap();
         }
     }
 }
@@ -175,12 +154,16 @@ impl<K, V> SkipListLayer<K, V> {
     }
 
     // Frees and then returns the next node in the chain.
-    // TODO(https://fxbug.dev/414761492): document or remove this `#[allow]`
-    #[allow(clippy::mut_from_ref)]
-    fn free_node(&self, node: &mut SkipListNode<K, V>) -> Option<&mut SkipListNode<K, V>> {
+    //
+    // # Safety
+    //
+    // The node must have no other references.
+    unsafe fn free_node(
+        &self,
+        node: NonNull<SkipListNode<K, V>>,
+    ) -> Option<NonNull<SkipListNode<K, V>>> {
         self.allocated.fetch_sub(1, atomic::Ordering::Relaxed);
-        // TODO(https://fxbug.dev/414760817): document unsafe usage
-        unsafe { Box::from_raw(node).pointers.get_mut(0) }
+        Box::from_raw(node.as_ptr()).pointers.get(0)
     }
 }
 
@@ -238,9 +221,10 @@ impl<K: Eq + Key + OrdLowerBound, V: LayerValue> SkipListLayer<K, V> {
 // We have to manually manage memory.
 impl<K, V> Drop for SkipListLayer<K, V> {
     fn drop(&mut self) {
-        let mut next = self.pointers.get_mut(0);
+        let mut next = self.pointers.get(0);
         while let Some(node) = next {
-            next = self.free_node(node);
+            // SAFETY: The node has no more references.
+            next = unsafe { self.free_node(node) };
         }
         assert_eq!(self.allocated.load(atomic::Ordering::Relaxed), 0);
     }
@@ -289,8 +273,12 @@ struct SkipListLayerIter<'a, K, V> {
     epoch: u64,
 
     // The current node.
-    node: Option<&'a SkipListNode<K, V>>,
+    node: Option<NonNull<SkipListNode<K, V>>>,
 }
+
+// SAFETY: We need this for `node` which is safe to pass across threads.
+unsafe impl<K, V> Send for SkipListLayerIter<'_, K, V> {}
+unsafe impl<K, V> Sync for SkipListLayerIter<'_, K, V> {}
 
 impl<'a, K: OrdUpperBound, V> SkipListLayerIter<'a, K, V> {
     fn new(skip_list: &'a SkipListLayer<K, V>, bound: Bound<&K>) -> Self {
@@ -317,6 +305,8 @@ impl<'a, K: OrdUpperBound, V> SkipListLayerIter<'a, K, V> {
             loop {
                 node = last_pointers.get(index);
                 if let Some(node) = node {
+                    // SAFETY: `node` should be valid; we took a reference to the epoch above.
+                    let node = unsafe { node.as_ref() };
                     match &node.item.key.cmp_upper_bound(key) {
                         Ordering::Equal if included => break,
                         Ordering::Greater => break,
@@ -343,8 +333,8 @@ impl<K, V> Drop for SkipListLayerIter<'_, K, V> {
                 if erase_list.count == 0 {
                     while let Some(entry) = inner.erase_lists.first_entry() {
                         if entry.get().count == 0 {
-                            let range = entry.remove_entry().1.range;
-                            inner.free_erase_list(self.skip_list, range);
+                            let EpochEraseList { start, end, .. } = entry.remove_entry().1;
+                            inner.free_erase_list(self.skip_list, start, end);
                         } else {
                             break;
                         }
@@ -360,13 +350,19 @@ impl<K: Key, V: LayerValue> LayerIterator<K, V> for SkipListLayerIter<'_, K, V> 
     async fn advance(&mut self) -> Result<(), Error> {
         match self.node {
             None => {}
-            Some(node) => self.node = node.pointers.get(0),
+            Some(node) => {
+                self.node = {
+                    // SAFETY: `node` should be valid; we took a reference to the epoch in `new`.
+                    unsafe { node.as_ref() }.pointers.get(0)
+                }
+            }
         }
         Ok(())
     }
 
     fn get(&self) -> Option<ItemRef<'_, K, V>> {
-        self.node.map(|node| node.item.as_item_ref())
+        // SAFETY: `node` should be valid; we took a reference to the epoch in `new`.
+        self.node.map(|node| unsafe { node.as_ref() }.item.as_item_ref())
     }
 }
 
@@ -432,7 +428,12 @@ impl<'a, K: Key, V: LayerValue> SkipListLayerIterMut<'a, K, V> {
                     while let Some(node) = pointers[index].get(index) {
                         // Keep iterating along this level until we encounter a key that's >= our
                         // search key.
-                        match &(node.item.key).cmp_upper_bound(key) {
+
+                        // SAFETY: `node` should be valid; a write guard was taken above so nodes
+                        // in the current epoch cannot be erased.
+                        let node = unsafe { node.as_ref() };
+
+                        match node.item.key.cmp_upper_bound(key) {
                             Ordering::Equal | Ordering::Greater => break,
                             Ordering::Less => {}
                         }
@@ -473,7 +474,10 @@ impl<K: Key, V: LayerValue> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, 
             }
         } else {
             let pointers = &mut self.prev_pointers;
-            if let Some(next) = pointers[0].get_mut(0) {
+            if let Some(next) = pointers[0].get(0) {
+                // SAFETY: `node` should be valid; a write guard was taken above so nodes
+                // in the current epoch cannot be erased.
+                let next = unsafe { next.as_ref() };
                 for i in 0..next.pointers.len() {
                     pointers[i] = &next.pointers;
                 }
@@ -482,7 +486,9 @@ impl<K: Key, V: LayerValue> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, 
     }
 
     fn get(&self) -> Option<ItemRef<'_, K, V>> {
-        self.prev_pointers[0].get(0).map(|node| node.item.as_item_ref())
+        // SAFETY: `node` should be valid; a write guard was taken above so nodes in the current
+        // epoch cannot be erased.
+        self.prev_pointers[0].get(0).map(|node| unsafe { node.as_ref() }.item.as_item_ref())
     }
 
     fn insert(&mut self, item: Item<K, V>) {
@@ -500,17 +506,18 @@ impl<K: Key, V: LayerValue> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, 
         if self.insertion_point.is_none() {
             self.insertion_point = Some(self.prev_pointers.clone());
         }
+        let node_ptr = node.into();
         for i in 0..pointer_count {
             let pointers = self.prev_pointers[i];
             node.pointers.set(i, pointers.get(i));
             if self.insertion_nodes.get(i).is_none() {
                 // If there's no insertion node at this level, record this node as the node to
                 // switch in when we commit.
-                self.insertion_nodes.set(i, Some(node));
+                self.insertion_nodes.set(i, Some(node_ptr));
             } else {
                 // There's already an insertion node at this level which means that it's part of the
                 // insertion chain, so we can just update the pointers now.
-                pointers.set(i, Some(&node));
+                pointers.set(i, Some(node_ptr));
             }
             // The iterator should point at the node following the new node i.e. the existing node.
             self.prev_pointers[i] = &node.pointers;
@@ -520,7 +527,10 @@ impl<K: Key, V: LayerValue> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, 
 
     fn erase(&mut self) {
         let pointers = &mut self.prev_pointers;
-        if let Some(next) = pointers[0].get_mut(0) {
+        if let Some(next) = pointers[0].get(0) {
+            // SAFETY: `next` should be valid; a write guard was taken above so nodes in the current
+            // epoch cannot be erased.
+            let next = unsafe { next.as_ref() };
             if self.insertion_point.is_none() {
                 self.insertion_point = Some(pointers.clone());
             }
@@ -554,7 +564,7 @@ impl<K: Key, V: LayerValue> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, 
         };
 
         // Keep track of the first node that we might need to erase later.
-        let maybe_erase = prev_pointers[0].get_mut(0);
+        let maybe_erase = prev_pointers[0].get(0);
 
         // If there are no insertion nodes, then it means that we're only erasing nodes.
         if self.insertion_nodes.get(0).is_none() {
@@ -567,7 +577,7 @@ impl<K: Key, V: LayerValue> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, 
             // so long as the bottom pointer is done first because that guarantees the new nodes
             // will be found, just maybe not as efficiently.
             for i in 0..self.insertion_nodes.len() {
-                if let Some(node) = self.insertion_nodes.get_mut(i) {
+                if let Some(node) = self.insertion_nodes.get(i) {
                     prev_pointers[i].set(i, Some(node));
                 }
             }
@@ -577,15 +587,15 @@ impl<K: Key, V: LayerValue> LayerIteratorMut<K, V> for SkipListLayerIterMut<'_, 
         let mut inner = self.skip_list.inner.lock();
         inner.item_count = inner.item_count.checked_add_signed(self.item_delta).unwrap();
         if let Some(start) = maybe_erase {
-            let end = self.prev_pointers[0].get_ptr(0);
-            if start as *mut _ != end {
+            let end = self.prev_pointers[0].get(0);
+            if maybe_erase != end {
                 if inner.current_count > 0 || !inner.erase_lists.is_empty() {
                     let count = std::mem::take(&mut inner.current_count);
                     let epoch = inner.epoch;
-                    inner.erase_lists.insert(epoch, EpochEraseList { count, range: start..end });
+                    inner.erase_lists.insert(epoch, EpochEraseList { count, start, end });
                     inner.epoch = inner.epoch.wrapping_add(1);
                 } else {
-                    inner.free_erase_list(self.skip_list, start..end);
+                    inner.free_erase_list(self.skip_list, start, end);
                 }
             }
         }
