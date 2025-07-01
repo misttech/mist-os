@@ -11,6 +11,7 @@ use futures::channel::{mpsc, oneshot};
 use futures::future::{BoxFuture, Shared};
 use futures::{select, FutureExt, SinkExt, StreamExt};
 use log::{error, info, trace};
+use std::collections::VecDeque;
 use {fuchsia_async as fasync, fuchsia_inspect as inspect};
 
 use crate::rfcomm::inspect::{DuplexDataStreamInspect, SessionChannelInspect, FLOW_CONTROLLER};
@@ -171,8 +172,8 @@ struct CreditFlowController {
     dlci: DLCI,
     /// Used to send frames to the remote peer.
     outgoing_sender: mpsc::Sender<Frame>,
-    /// Queued user data awaiting local credits.
-    outgoing_data_pending_credits: Vec<UserData>,
+    /// Application data intended for the remote peer that is awaiting local credits.
+    outgoing_data_pending_credits: VecDeque<UserData>,
     /// The current credit count for this controller.
     credits: Credits,
     /// Inspect object for tracking total bytes sent/received & the current transfer speeds.
@@ -204,59 +205,62 @@ impl CreditFlowController {
             role,
             dlci,
             outgoing_sender,
-            outgoing_data_pending_credits: Vec::new(),
+            outgoing_data_pending_credits: VecDeque::new(),
             credits: initial_credits,
             stream_inspect: DuplexDataStreamInspect::default(),
             inspect: inspect::Node::default(),
         }
     }
 
-    /// Sends the `user_data` directly to the remote peer - queues the data to be sent
-    /// later if there is an insufficient number of credits.
-    async fn send_user_data(&mut self, user_data: UserData) {
-        let data_size = user_data.information.len();
-        if data_size != 0 && self.credits.local() == 0 {
-            trace!("No local credits available - staging user data ({data_size} bytes)");
-            self.outgoing_data_pending_credits.push(user_data);
-            return;
-        }
-
+    /// Attempts to send the user `data` as an RFCOMM frame to the remote peer.
+    /// NOTE: Assumes that there are sufficient local credits to send the frame.
+    async fn send_frame_with_credits(&mut self, data: UserData) {
+        let data_size = data.information.len();
         let credits_to_replenish =
             self.credits.remote_replenish_amount().map(std::num::NonZeroU8::get);
-        let frame =
-            Frame::make_user_data_frame(self.role, self.dlci, user_data, credits_to_replenish);
+        let frame = Frame::make_user_data_frame(self.role, self.dlci, data, credits_to_replenish);
         if self.outgoing_sender.send(frame).await.is_ok() {
+            // User data frames containing a nonempty payload require a local credit to be sent.
             if data_size != 0 {
                 self.credits.decrement_local();
                 self.stream_inspect
                     .record_outbound_transfer(data_size, fasync::MonotonicInstant::now());
             }
+            // Update our bookkeeping for the remote credit count with what we gave to the peer.
             self.credits.replenish_remote(credits_to_replenish.unwrap_or(0) as usize);
         }
+    }
+
+    /// Attempts to drain the data queue and send to the remote peer.
+    async fn process_data_queue(&mut self) {
+        let before_length = self.outgoing_data_pending_credits.len();
+        while self.credits.local() > 0 && !self.outgoing_data_pending_credits.is_empty() {
+            let data = self.outgoing_data_pending_credits.pop_front().expect("queue nonempty");
+            self.send_frame_with_credits(data).await;
+        }
+        trace!(dlci:% = self.dlci; "Processed queue. Before = {before_length}. After = {}", self.outgoing_data_pending_credits.len());
     }
 
     /// Handles receiving credits in a frame from the remote peer. If a nonzero number of credits
     /// were received, attempts to send any frames pending credits.
     async fn handle_received_credits(&mut self, received_credits: u8) {
-        let need_to_send_queued = self.credits.local() == 0;
         self.credits.replenish_local(received_credits as usize);
-
-        // Note: It's possible that the number of local credits is less than the number of
-        // queued frames pending credits. This is OK. We will simply send up to the number of
-        // available credits worth of frames, and queue the rest for later.
-        if need_to_send_queued && self.credits.local() > 0 {
-            let user_data_frames = std::mem::take(&mut self.outgoing_data_pending_credits);
-            for user_data in user_data_frames {
-                self.send_user_data(user_data).await;
-            }
-        }
+        // If we were blocked on credits, attempt to send as many packets as we can.
+        self.process_data_queue().await;
     }
 }
 
 #[async_trait]
 impl FlowController for CreditFlowController {
     async fn send_data_to_peer(&mut self, data: UserData) {
-        self.send_user_data(data).await;
+        let data_size = data.information.len();
+        if data_size != 0 && self.credits.local() == 0 {
+            trace!("No local credits available - staging user data ({data_size} bytes)");
+            self.outgoing_data_pending_credits.push_back(data);
+            return;
+        }
+
+        self.send_frame_with_credits(data).await;
     }
 
     async fn receive_data_from_peer(&mut self, data: FlowControlledData, client: &Channel) {
@@ -271,8 +275,10 @@ impl FlowController for CreditFlowController {
             );
 
             if self.credits.decrement_remote() {
-                trace!("Remote credit count is low. Sending empty frame");
-                let _ = self.send_user_data(UserData { information: vec![] }).await;
+                trace!(dlci:% = self.dlci; "Remote credit count is low - replenishing with an empty frame.");
+                // An empty frame can be sent without any credits. It is considered part of the
+                // flow control.
+                let _ = self.send_frame_with_credits(UserData::empty()).await;
             }
         }
     }
@@ -688,7 +694,7 @@ mod tests {
             expect_user_data_frame(
                 &mut exec,
                 &mut outgoing_frames,
-                UserData { information: vec![] },
+                UserData::empty(),
                 Some(HIGH_CREDIT_WATER_MARK as u8),
             );
         }
@@ -776,7 +782,7 @@ mod tests {
     /// 2. Tests local client sending user data to the remote peer with insufficient
     /// credits - the frame should be queued for later.
     /// 3. Tests receiving an empty user data frame from the remote peer, replenishing our
-    /// credits, and validates the frame from 2. is sent correctly.
+    /// credits, and validates the frame from 2 is sent correctly.
     #[test]
     fn test_credit_flow_controller() {
         let initial_credits = Credits::new(2, 7);
@@ -806,7 +812,7 @@ mod tests {
             expect_user_data_frame(
                 &mut exec,
                 &mut outgoing_frames,
-                UserData { information: vec![] },
+                UserData::empty(),
                 Some(249), // 255 (Max) - (7 (initial) - 1 (received))
             );
             assert!(exec.run_until_stalled(&mut receive_fut).is_ready());
@@ -852,7 +858,7 @@ mod tests {
         }
 
         // 3. Remote peer sends an empty frame to "refresh" our credits.
-        let data3 = UserData { information: vec![] };
+        let data3 = UserData::empty();
         {
             let mut receive_fut = Box::pin(flow_controller.receive_data_from_peer(
                 FlowControlledData { user_data: data3, credits: Some(10) },

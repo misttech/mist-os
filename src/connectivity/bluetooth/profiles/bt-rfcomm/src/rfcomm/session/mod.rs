@@ -1255,7 +1255,7 @@ mod tests {
         let user_data = Frame::make_user_data_frame(
             Role::Initiator,
             random_dlci,
-            UserData { information: vec![] },
+            UserData::empty(),
             Some(10), // Random amount of credits
         );
         assert_matches!(outstanding_frames.register_frame(&user_data), Ok(false));
