@@ -325,7 +325,7 @@ class Flatland : public fidl::Server<fuchsia_ui_composition::Flatland>,
   // Sets clip bounds on the provided transform handle. Takes in TransformHandle and not
   // TransformID as a parameter so that it can be applied to content transforms that do
   // not have an external ID that they are mapped to.
-  void SetClipBoundaryInternal(TransformHandle handle, fuchsia_math::Rect bounds);
+  void SetClipBoundaryInternal(TransformHandle handle, TransformClipRegion bounds);
 
   // For each dead transform:
   //   1) remove the corresponding matrix

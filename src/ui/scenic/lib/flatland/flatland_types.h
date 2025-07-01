@@ -11,6 +11,8 @@
 #include <array>
 #include <optional>
 
+#include "src/ui/scenic/lib/types/rectangle.h"
+
 #include <glm/glm.hpp>
 
 namespace flatland {
@@ -19,7 +21,7 @@ namespace flatland {
 using ImageSampleRegion = fuchsia::math::RectF;
 
 // The clip region for a transform to bound its children.
-using TransformClipRegion = fuchsia::math::Rect;
+using TransformClipRegion = types::Rectangle;
 
 // Represents an image rectangle, parameterized by an origin point, an extent representing the width
 // and height. The texel UV coordinates specify, in clockwise order, the unnormalized clockwise

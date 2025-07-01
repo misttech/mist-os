@@ -195,7 +195,7 @@ TEST(ImageRectTest, ParentCompletelyBiggerThanChildClipTest) {
   const glm::vec2 extent(100.f, 50.f);
   auto matrix = glm::scale(glm::mat3(), extent);
 
-  TransformClipRegion clip = {0, 0, 120, 60};
+  TransformClipRegion clip({.x = 0, .y = 0, .width = 120, .height = 60});
 
   const ImageRect expected_rectangle(
       glm::vec2(0, 0), extent,
@@ -213,10 +213,10 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipTest) {
   const glm::vec2 extent(100.f, 90.f);
   auto matrix = glm::scale(glm::mat3(), extent);
 
-  TransformClipRegion clip = {20, 30, 35, 40};
+  TransformClipRegion clip({20, 30, 35, 40});
 
   const ImageRect expected_rectangle(
-      glm::vec2(clip.x, clip.y), glm::vec2(clip.width, clip.height),
+      glm::vec2(clip.x(), clip.y()), glm::vec2(clip.width(), clip.height()),
       {glm::vec2(200, 167), glm::vec2(550, 167), glm::vec2(550, 389), glm::vec2(200, 389)},
       Orientation::CCW_0_DEGREES);
 
@@ -236,13 +236,13 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipRotatedBy90Test) {
   matrix = glm::scale(matrix, extent);
 
   // Note that this clip region is specified in global space and will not be modified by the matrix.
-  TransformClipRegion clip = {20, 30, 35, 40};
+  TransformClipRegion clip({20, 30, 35, 40});
 
   // The rectangle is rotated by 90 such that, prior to clipping, it has a new extent of (90, 100).
   // The texel u-coordinate is now linearly interpolated vertically and the v-coordinate is now
   // linearly interpolated horizontally.
   const ImageRect expected_rectangle(
-      glm::vec2(clip.x, clip.y), glm::vec2(clip.width, clip.height),
+      glm::vec2(clip.x(), clip.y()), glm::vec2(clip.width(), clip.height()),
       {glm::vec2(300, 111), glm::vec2(700, 111), glm::vec2(700, 306), glm::vec2(300, 306)},
       Orientation::CCW_90_DEGREES);
 
@@ -262,12 +262,12 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipRotatedBy180Test) {
   matrix = glm::scale(matrix, extent);
 
   // Note that this clip region is specified in global space and will not be modified by the matrix.
-  TransformClipRegion clip = {20, 30, 35, 40};
+  TransformClipRegion clip({20, 30, 35, 40});
 
   // After clipping, the UV coordinates are reversed. I.e. if the coordinate was initially 0.2, then
   // it would instead be equal to 0.8.
   const ImageRect expected_rectangle(
-      glm::vec2(clip.x, clip.y), glm::vec2(clip.width, clip.height),
+      glm::vec2(clip.x(), clip.y()), glm::vec2(clip.width(), clip.height()),
       {glm::vec2(450, 111), glm::vec2(800, 111), glm::vec2(800, 333), glm::vec2(450, 333)},
       Orientation::CCW_180_DEGREES);
 
@@ -287,13 +287,13 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipRotatedBy270Test) {
   matrix = glm::scale(matrix, extent);
 
   // Note that this clip region is specified in global space and will not be modified by the matrix.
-  TransformClipRegion clip = {20, 30, 35, 40};
+  TransformClipRegion clip({20, 30, 35, 40});
 
   // The rectangle was rotated by 90, such that, prior to clipping, it has a new_extent of (90, 100)
   // and reordered_uvs of [(0, 1), (0, 0), (1, 0), (1, 1)]. The u-coordinate is now linearly
   // interpolated vertically and the v coordinate is now linearly interpolated horizontally.
   const ImageRect expected_rectangle(
-      glm::vec2(clip.x, clip.y), glm::vec2(clip.width, clip.height),
+      glm::vec2(clip.x(), clip.y()), glm::vec2(clip.width(), clip.height()),
       {glm::vec2(300, 194), glm::vec2(700, 194), glm::vec2(700, 389), glm::vec2(300, 389)},
       Orientation::CCW_270_DEGREES);
 
@@ -309,7 +309,7 @@ TEST(ImageRectTest, RectangleAndClipNoOverlap) {
   glm::mat3 matrix = glm::translate(glm::mat3(), offset);
   matrix = glm::scale(matrix, extent);
 
-  TransformClipRegion clip = {0, 0, 2, 2};
+  TransformClipRegion clip({0, 0, 2, 2});
 
   const ImageRect expected_rectangle(
       glm::vec2(0, 0), glm::vec2(0, 0),
@@ -327,7 +327,7 @@ TEST(ImageRectTest, RectangleAndClipPartialOverlap) {
   glm::mat3 matrix = glm::translate(glm::mat3(), offset);
   matrix = glm::scale(matrix, extent);
 
-  TransformClipRegion clip = {10, 30, 80, 40};
+  TransformClipRegion clip({10, 30, 80, 40});
 
   const ImageRect expected_rectangle(
       glm::vec2(20, 30), glm::vec2(70, 40),
@@ -520,10 +520,10 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipLeftRightTest) {
   const glm::vec2 extent(100.f, 90.f);
   auto matrix = glm::scale(glm::mat3(), extent);
 
-  TransformClipRegion clip = {20, 30, 35, 40};
+  TransformClipRegion clip({20, 30, 35, 40});
 
   const ImageRect expected_rectangle(
-      glm::vec2(clip.x, clip.y), glm::vec2(clip.width, clip.height),
+      glm::vec2(clip.x(), clip.y()), glm::vec2(clip.width(), clip.height()),
       {glm::vec2(450, 167), glm::vec2(800, 167), glm::vec2(800, 389), glm::vec2(450, 389)},
       Orientation::CCW_0_DEGREES);
 
@@ -544,13 +544,13 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipLeftRightRotatedBy90T
   matrix = glm::scale(matrix, extent);
 
   // Note that this clip region is specified in global space and will not be modified by the matrix.
-  TransformClipRegion clip = {20, 30, 35, 40};
+  TransformClipRegion clip({20, 30, 35, 40});
 
   // The rectangle is rotated by 90 such that, prior to clipping, it has a new extent of (90, 100).
   // The texel u-coordinate is now linearly interpolated vertically and the v-coordinate is now
   // linearly interpolated horizontally.
   const ImageRect expected_rectangle(
-      glm::vec2(clip.x, clip.y), glm::vec2(clip.width, clip.height),
+      glm::vec2(clip.x(), clip.y()), glm::vec2(clip.width(), clip.height()),
       {glm::vec2(300, 111), glm::vec2(700, 111), glm::vec2(700, 306), glm::vec2(300, 306)},
       Orientation::CCW_90_DEGREES);
 
@@ -571,12 +571,12 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipLeftRightRotatedBy180
   matrix = glm::scale(matrix, extent);
 
   // Note that this clip region is specified in global space and will not be modified by the matrix.
-  TransformClipRegion clip = {20, 30, 35, 40};
+  TransformClipRegion clip({20, 30, 35, 40});
 
   // After clipping, the UV coordinates are reversed. I.e. if the coordinate was initially 0.2, then
   // it would instead be equal to 0.8.
   const ImageRect expected_rectangle(
-      glm::vec2(clip.x, clip.y), glm::vec2(clip.width, clip.height),
+      glm::vec2(clip.x(), clip.y()), glm::vec2(clip.width(), clip.height()),
       {glm::vec2(200, 111), glm::vec2(550, 111), glm::vec2(550, 333), glm::vec2(200, 333)},
       Orientation::CCW_180_DEGREES);
 
@@ -597,13 +597,13 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipLeftRightRotatedBy270
   matrix = glm::scale(matrix, extent);
 
   // Note that this clip region is specified in global space and will not be modified by the matrix.
-  TransformClipRegion clip = {20, 30, 35, 40};
+  TransformClipRegion clip({20, 30, 35, 40});
 
   // The rectangle was rotated by 90, such that, prior to clipping, it has a new_extent of (90, 100)
   // and reordered_uvs of [(0, 1), (0, 0), (1, 0), (1, 1)]. The u-coordinate is now linearly
   // interpolated vertically and the v coordinate is now linearly interpolated horizontally.
   const ImageRect expected_rectangle(
-      glm::vec2(clip.x, clip.y), glm::vec2(clip.width, clip.height),
+      glm::vec2(clip.x(), clip.y()), glm::vec2(clip.width(), clip.height()),
       {glm::vec2(300, 194), glm::vec2(700, 194), glm::vec2(700, 389), glm::vec2(300, 389)},
       Orientation::CCW_270_DEGREES);
 
@@ -618,10 +618,10 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipUpDownTest) {
   const glm::vec2 extent(100.f, 90.f);
   auto matrix = glm::scale(glm::mat3(), extent);
 
-  TransformClipRegion clip = {20, 30, 35, 40};
+  TransformClipRegion clip({20, 30, 35, 40});
 
   const ImageRect expected_rectangle(
-      glm::vec2(clip.x, clip.y), glm::vec2(clip.width, clip.height),
+      glm::vec2(clip.x(), clip.y()), glm::vec2(clip.width(), clip.height()),
       {glm::vec2(200, 111), glm::vec2(550, 111), glm::vec2(550, 333), glm::vec2(200, 333)},
       Orientation::CCW_0_DEGREES);
 
@@ -642,13 +642,13 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipUpDownRotatedBy90Test
   matrix = glm::scale(matrix, extent);
 
   // Note that this clip region is specified in global space and will not be modified by the matrix.
-  TransformClipRegion clip = {20, 30, 35, 40};
+  TransformClipRegion clip({20, 30, 35, 40});
 
   // The rectangle is rotated by 90 such that, prior to clipping, it has a new extent of (90, 100).
   // The texel u-coordinate is now linearly interpolated vertically and the y-coordinate is now
   // linearly interpolated horizontally.
   const ImageRect expected_rectangle(
-      glm::vec2(clip.x, clip.y), glm::vec2(clip.width, clip.height),
+      glm::vec2(clip.x(), clip.y()), glm::vec2(clip.width(), clip.height()),
       {glm::vec2(300, 194), glm::vec2(700, 194), glm::vec2(700, 389), glm::vec2(300, 389)},
       Orientation::CCW_90_DEGREES);
 
@@ -669,12 +669,12 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipUpDownRotatedBy180Tes
   matrix = glm::scale(matrix, extent);
 
   // Note that this clip region is specified in global space and will not be modified by the matrix.
-  TransformClipRegion clip = {20, 30, 35, 40};
+  TransformClipRegion clip({20, 30, 35, 40});
 
   // After clipping, the UV coordinates are reversed. I.e. if the coordinate was initially 0.2, then
   // it would instead be equal to 0.8.
   const ImageRect expected_rectangle(
-      glm::vec2(clip.x, clip.y), glm::vec2(clip.width, clip.height),
+      glm::vec2(clip.x(), clip.y()), glm::vec2(clip.width(), clip.height()),
       {glm::vec2(450, 167), glm::vec2(800, 167), glm::vec2(800, 389), glm::vec2(450, 389)},
       Orientation::CCW_180_DEGREES);
 
@@ -695,13 +695,13 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipUpDownRotatedBy270Tes
   matrix = glm::scale(matrix, extent);
 
   // Note that this clip region is specified in global space and will not be modified by the matrix.
-  TransformClipRegion clip = {20, 30, 35, 40};
+  TransformClipRegion clip({20, 30, 35, 40});
 
   // The rectangle was rotated by 90, such that, prior to clipping, it has a new_extent of (90, 100)
   // and reordered_uvs of [(0, 1), (0, 0), (1, 0), (1, 1)]. The u-coordinate is now linearly
   // interpolated vertically and the v coordinate is now linearly interpolated horizontally.
   const ImageRect expected_rectangle(
-      glm::vec2(clip.x, clip.y), glm::vec2(clip.width, clip.height),
+      glm::vec2(clip.x(), clip.y()), glm::vec2(clip.width(), clip.height()),
       {glm::vec2(300, 111), glm::vec2(700, 111), glm::vec2(700, 306), glm::vec2(300, 306)},
       Orientation::CCW_270_DEGREES);
 
@@ -844,7 +844,7 @@ TEST(ImageRectTest, MultipleParentTest) {
 
   // Set up the uber struct with the above topology. Set the doubly-parented child (1,4) up
   // with an image, hit region and clip region to make sure those get duplicated properly.
-  const TransformClipRegion kClipRegion = {5, 10, 30, 40};
+  constexpr TransformClipRegion kClipRegion({5, 10, 30, 40});
   const flatland::HitRegion kHitRegion({1, 2, 10, 20});
   const float kScale = 2.0f;
 
@@ -894,18 +894,14 @@ TEST(ImageRectTest, MultipleParentTest) {
     EXPECT_EQ(clip_vector.size(), 5U);
 
     // The first clip region should match exactly the clip region above.
-    EXPECT_EQ(clip_vector[2].x, kClipRegion.x);
-    EXPECT_EQ(clip_vector[2].y, kClipRegion.y);
-    EXPECT_EQ(clip_vector[2].width, kClipRegion.width);
-    EXPECT_EQ(clip_vector[2].height, kClipRegion.height);
+    EXPECT_EQ(clip_vector[2], kClipRegion);
 
     // The second one should be magnified by the scale factor.
-    EXPECT_EQ(static_cast<float>(clip_vector[4].x), kScale * static_cast<float>(kClipRegion.x));
-    EXPECT_EQ(static_cast<float>(clip_vector[4].y), kScale * static_cast<float>(kClipRegion.y));
-    EXPECT_EQ(static_cast<float>(clip_vector[4].width),
-              kScale * static_cast<float>(kClipRegion.width));
-    EXPECT_EQ(static_cast<float>(clip_vector[4].height),
-              kScale * static_cast<float>(kClipRegion.height));
+    EXPECT_EQ(clip_vector[4],
+              TransformClipRegion({.x = static_cast<int32_t>(kScale * kClipRegion.x()),
+                                   .y = static_cast<int32_t>(kScale * kClipRegion.y()),
+                                   .width = static_cast<int32_t>(kScale * kClipRegion.width()),
+                                   .height = static_cast<int32_t>(kScale * kClipRegion.height())}));
   }
 
   // Each entry for the doubly parented node should have different hit regions.
@@ -1087,10 +1083,7 @@ TEST(GlobalTransformClipTest, EmptyClipRegionsAreInvalid) {
                                                                global_matrices, uber_structs);
   EXPECT_EQ(expected_clip_regions.size(), global_clip_regions.size());
   for (uint32_t i = 0; i < global_clip_regions.size(); i++) {
-    EXPECT_EQ(expected_clip_regions[i].x, global_clip_regions[i].x);
-    EXPECT_EQ(expected_clip_regions[i].y, global_clip_regions[i].y);
-    EXPECT_EQ(expected_clip_regions[i].width, global_clip_regions[i].width);
-    EXPECT_EQ(expected_clip_regions[i].height, global_clip_regions[i].height);
+    EXPECT_EQ(expected_clip_regions[i], global_clip_regions[i]);
   }
 }
 
@@ -1109,25 +1102,23 @@ TEST(GlobalTransformClipTest, NoOverlapClipRegions) {
   auto uber_struct = std::make_unique<UberStruct>();
 
   // The two regions do not overlap.
-  GlobalTransformClipRegionVector clip_regions = {{0, 0, 100, 200}, {200, 300, 100, 200}};
+  GlobalTransformClipRegionVector clip_regions = {
+      TransformClipRegion({.x = 0, .y = 0, .width = 100, .height = 200}),
+      TransformClipRegion({.x = 200, .y = 300, .width = 100, .height = 200})};
 
   uber_struct->local_clip_regions[{1, 0}] = clip_regions[0];
   uber_struct->local_clip_regions[{1, 1}] = clip_regions[1];
 
   uber_structs[1] = std::move(uber_struct);
 
-  GlobalTransformClipRegionVector expected_clip_regions = {clip_regions[0], {0, 0, 0, 0}};
+  GlobalTransformClipRegionVector expected_clip_regions = {
+      clip_regions[0], TransformClipRegion({.x = 0, .y = 0, .width = 0, .height = 0})};
 
   auto global_clip_regions = ComputeGlobalTransformClipRegions(topology_vector, parent_indices,
                                                                global_matrices, uber_structs);
   EXPECT_EQ(global_clip_regions.size(), expected_clip_regions.size());
   for (uint64_t i = 0; i < global_clip_regions.size(); i++) {
-    const auto& a = global_clip_regions[i];
-    const auto& b = expected_clip_regions[i];
-    EXPECT_EQ(a.x, b.x);
-    EXPECT_EQ(a.y, b.y);
-    EXPECT_EQ(a.width, b.width);
-    EXPECT_EQ(a.height, b.height);
+    EXPECT_EQ(global_clip_regions[i], expected_clip_regions[i]);
   }
 
   // Now translate the child transform, to (-200, -300). Since the clip region's region is specified
@@ -1141,12 +1132,7 @@ TEST(GlobalTransformClipTest, NoOverlapClipRegions) {
   expected_clip_regions[1] = clip_regions[0];
   EXPECT_EQ(global_clip_regions.size(), expected_clip_regions.size());
   for (uint64_t i = 0; i < global_clip_regions.size(); i++) {
-    const auto& a = global_clip_regions[i];
-    const auto& b = expected_clip_regions[i];
-    EXPECT_EQ(a.x, b.x);
-    EXPECT_EQ(a.y, b.y);
-    EXPECT_EQ(a.width, b.width);
-    EXPECT_EQ(a.height, b.height);
+    EXPECT_EQ(global_clip_regions[i], expected_clip_regions[i]);
   }
 }
 
@@ -1167,20 +1153,18 @@ TEST(GlobalTransformClipTest, ScaleAndRotate90DegreesTest) {
 
   auto uber_struct = std::make_unique<UberStruct>();
 
-  uber_struct->local_clip_regions[{1, 0}] = {0, 0, 100, 50};
+  uber_struct->local_clip_regions[{1, 0}] =
+      TransformClipRegion({.x = 0, .y = 0, .width = 100, .height = 50});
 
   uber_structs[1] = std::move(uber_struct);
 
-  GlobalTransformClipRegionVector expected_clip_regions = {{0, -300, 100, 300}};
+  GlobalTransformClipRegionVector expected_clip_regions = {
+      TransformClipRegion({.x = 0, .y = -300, .width = 100, .height = 300})};
 
   auto global_clip_regions = ComputeGlobalTransformClipRegions(topology_vector, parent_indices,
                                                                global_matrices, uber_structs);
   EXPECT_EQ(global_clip_regions.size(), expected_clip_regions.size());
-  const auto& a = global_clip_regions[0];
-  const auto& b = expected_clip_regions[0];
-  EXPECT_EQ(a.x, b.x);
-  EXPECT_EQ(a.y, b.y);
-  EXPECT_EQ(a.width, b.width);
+  EXPECT_EQ(global_clip_regions[0], expected_clip_regions[0]);
 }
 
 TEST(GlobalTransformClipTest, ScaleAndRotate180DegreesTest) {
@@ -1198,20 +1182,18 @@ TEST(GlobalTransformClipTest, ScaleAndRotate180DegreesTest) {
 
   auto uber_struct = std::make_unique<UberStruct>();
 
-  uber_struct->local_clip_regions[{1, 0}] = {0, 0, 100, 50};
+  uber_struct->local_clip_regions[{1, 0}] =
+      TransformClipRegion({.x = 0, .y = 0, .width = 100, .height = 50});
 
   uber_structs[1] = std::move(uber_struct);
 
-  GlobalTransformClipRegionVector expected_clip_regions = {{-300, -100, 300, 100}};
+  GlobalTransformClipRegionVector expected_clip_regions = {
+      TransformClipRegion({.x = -300, .y = -100, .width = 300, .height = 100})};
 
   auto global_clip_regions = ComputeGlobalTransformClipRegions(topology_vector, parent_indices,
                                                                global_matrices, uber_structs);
   EXPECT_EQ(global_clip_regions.size(), expected_clip_regions.size());
-  const auto& a = global_clip_regions[0];
-  const auto& b = expected_clip_regions[0];
-  EXPECT_EQ(a.x, b.x);
-  EXPECT_EQ(a.y, b.y);
-  EXPECT_EQ(a.width, b.width);
+  EXPECT_EQ(global_clip_regions[0], expected_clip_regions[0]);
 }
 
 TEST(GlobalTransformClipTest, ScaleAndRotate270DegreesTest) {
@@ -1229,20 +1211,18 @@ TEST(GlobalTransformClipTest, ScaleAndRotate270DegreesTest) {
 
   auto uber_struct = std::make_unique<UberStruct>();
 
-  uber_struct->local_clip_regions[{1, 0}] = {0, 0, 100, 50};
+  uber_struct->local_clip_regions[{1, 0}] =
+      TransformClipRegion({.x = 0, .y = 0, .width = 100, .height = 50});
 
   uber_structs[1] = std::move(uber_struct);
 
-  GlobalTransformClipRegionVector expected_clip_regions = {{-100, 0, 100, 300}};
+  GlobalTransformClipRegionVector expected_clip_regions = {
+      TransformClipRegion({.x = -100, .y = 0, .width = 100, .height = 300})};
 
   auto global_clip_regions = ComputeGlobalTransformClipRegions(topology_vector, parent_indices,
                                                                global_matrices, uber_structs);
   EXPECT_EQ(global_clip_regions.size(), expected_clip_regions.size());
-  const auto& a = global_clip_regions[0];
-  const auto& b = expected_clip_regions[0];
-  EXPECT_EQ(a.x, b.x);
-  EXPECT_EQ(a.y, b.y);
-  EXPECT_EQ(a.width, b.width);
+  EXPECT_EQ(global_clip_regions[0], expected_clip_regions[0]);
 }
 
 // Test a more complicated scenario with multiple transforms, each with its own
@@ -1266,8 +1246,9 @@ TEST(GlobalTransformClipTest, ComplicatedGraphClipRegions) {
   auto uber_struct = std::make_unique<UberStruct>();
 
   GlobalTransformClipRegionVector clip_regions = {
-      {0, 0, 100, 200},    {-1000, -1000, 2000, 2000}, {0, 0, 110, 300},
-      {-5, -10, 300, 400}, {-15, -30, 20, 30},
+      TransformClipRegion({0, 0, 100, 200}),   TransformClipRegion({-1000, -1000, 2000, 2000}),
+      TransformClipRegion({0, 0, 110, 300}),   TransformClipRegion({-5, -10, 300, 400}),
+      TransformClipRegion({-15, -30, 20, 30}),
   };
 
   uber_struct->local_clip_regions[{1, 0}] = clip_regions[0];
@@ -1281,19 +1262,18 @@ TEST(GlobalTransformClipTest, ComplicatedGraphClipRegions) {
   uber_structs[1] = std::move(uber_struct);
 
   GlobalTransformClipRegionVector expected_clip_regions = {
-      {5, 10, 100, 200}, {5, 10, 100, 200}, {20, 30, 85, 180}, {5, 10, 100, 200}, {0, 0, 0, 0},
+      TransformClipRegion({.x = 5, .y = 10, .width = 100, .height = 200}),
+      TransformClipRegion({.x = 5, .y = 10, .width = 100, .height = 200}),
+      TransformClipRegion({.x = 20, .y = 30, .width = 85, .height = 180}),
+      TransformClipRegion({.x = 5, .y = 10, .width = 100, .height = 200}),
+      TransformClipRegion({.x = 0, .y = 0, .width = 0, .height = 0}),
   };
 
   auto global_clip_regions = ComputeGlobalTransformClipRegions(topology_vector, parent_indices,
                                                                global_matrices, uber_structs);
   EXPECT_EQ(global_clip_regions.size(), expected_clip_regions.size());
   for (uint64_t i = 0; i < global_clip_regions.size(); i++) {
-    const auto& a = global_clip_regions[i];
-    const auto& b = expected_clip_regions[i];
-    EXPECT_EQ(a.x, b.x);
-    EXPECT_EQ(a.y, b.y);
-    EXPECT_EQ(a.width, b.width);
-    EXPECT_EQ(a.height, b.height);
+    EXPECT_EQ(global_clip_regions[i], expected_clip_regions[i]);
   }
 }
 

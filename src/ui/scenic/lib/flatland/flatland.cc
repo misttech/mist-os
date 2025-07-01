@@ -941,12 +941,18 @@ void Flatland::SetClipBoundary(TransformId transform_identifier,
     return;
   }
 
+  if (!TransformClipRegion::IsValid(*bounds)) {
+    error_reporter_->ERROR() << "SetClipBoundary failed, rectangle bounds overflow " << *bounds;
+    CloseConnection(FlatlandError::kBadOperation);
+    return;
+  }
+
   FLATLAND_VERBOSE_LOG << "Flatland::SetClipBoundary() session_id=" << session_id_
                        << "  transform_id=" << transform_id << "  rect=" << *bounds;
-  SetClipBoundaryInternal(transform_kv->second, *bounds);
+  SetClipBoundaryInternal(transform_kv->second, TransformClipRegion::From(*bounds));
 }
 
-void Flatland::SetClipBoundaryInternal(TransformHandle handle, fuchsia_math::Rect bounds) {
+void Flatland::SetClipBoundaryInternal(TransformHandle handle, TransformClipRegion bounds) {
   if (bounds.width() <= 0 || bounds.height() <= 0) {
     error_reporter_->ERROR() << "SetClipBoundary failed, width/height must both be positive "
                              << "(" << bounds.width() << ", " << bounds.height() << ")";
@@ -954,24 +960,7 @@ void Flatland::SetClipBoundaryInternal(TransformHandle handle, fuchsia_math::Rec
     return;
   }
 
-  // The following overflow checks are based on those described here:
-  //    https://wiki.sei.cmu.edu/confluence/display/c/INT32-C.
-  //    +Ensure+that+operations+on+signed+integers+do+not+result+in+overflow
-  if (((bounds.x() > 0) && (bounds.width() > (INT_MAX - bounds.x()))) ||
-      ((bounds.x() < 0) && (bounds.width() < (INT_MIN - bounds.x())))) {
-    error_reporter_->ERROR() << "SetClipBoundary failed, integer overflow on the X-axis.";
-    CloseConnection(FlatlandError::kBadOperation);
-    return;
-  }
-
-  if (((bounds.y() > 0) && (bounds.height() > (INT_MAX - bounds.y()))) ||
-      ((bounds.y() < 0) && (bounds.height() < (INT_MIN - bounds.y())))) {
-    error_reporter_->ERROR() << "SetClipBoundary failed, integer overflow on the Y-axis.";
-    CloseConnection(FlatlandError::kBadOperation);
-    return;
-  }
-
-  clip_regions_[handle] = fidl::NaturalToHLCPP(bounds);
+  clip_regions_[handle] = bounds;
 }
 
 std::vector<allocation::GlobalImageId> Flatland::ProcessDeadTransforms(
@@ -1270,12 +1259,12 @@ void Flatland::CreateViewport(
                                                                .properties = std::move(properties)};
 
   // Set clip bounds on the transform associated with the viewport content.
+  const int32_t width = static_cast<int32_t>(size.width());
+  const int32_t height = static_cast<int32_t>(size.height());
+  FX_DCHECK(width >= 0 && height >= 0)
+      << "Integer overflow.  width=" << width << ", height=" << height;
   SetClipBoundaryInternal(parent_transform_handle,
-                          fuchsia_math::Rect{}
-                              .x(0)
-                              .y(0)
-                              .width(static_cast<int32_t>(size.width()))
-                              .height(static_cast<int32_t>(size.height())));
+                          TransformClipRegion({.x = 0, .y = 0, .width = width, .height = height}));
 }
 
 void Flatland::CreateImage(CreateImageRequest& request, CreateImageCompleter::Sync& completer) {
@@ -1873,12 +1862,12 @@ void Flatland::SetViewportProperties(ContentId viewport_id,
                                        *link_data.properties.inset());
 
   // Update the clip boundaries when the properties change.
+  const int32_t width = static_cast<int32_t>(properties.logical_size()->width());
+  const int32_t height = static_cast<int32_t>(properties.logical_size()->height());
+  FX_DCHECK(width >= 0 && height >= 0)
+      << "Integer overflow.  width=" << width << ", height=" << height;
   SetClipBoundaryInternal(viewport_handle,
-                          fuchsia_math::Rect{}
-                              .x(0)
-                              .y(0)
-                              .width(static_cast<int32_t>(properties.logical_size()->width()))
-                              .height(static_cast<int32_t>(properties.logical_size()->height())));
+                          TransformClipRegion({.x = 0, .y = 0, .width = width, .height = height}));
 
   link_data.properties = properties;
   link_system_->UpdateViewportPropertiesFor(viewport_handle, fidl::NaturalToHLCPP(properties));

@@ -154,12 +154,12 @@ void FlatlandDisplay::SetContent(ViewportCreationToken token,
   auto uber_struct = std::make_unique<UberStruct>();
   uber_struct->debug_name = "FlatlandDisplay";
   uber_struct->local_topology = std::move(data.sorted_transforms);
-  uber_struct->local_clip_regions[link_to_child_.parent_transform_handle] = {
+  uber_struct->local_clip_regions[link_to_child_.parent_transform_handle] = TransformClipRegion({
       .x = 0,
       .y = 0,
       .width = static_cast<int32_t>(display_->width_in_px()),
       .height = static_cast<int32_t>(display_->height_in_px()),
-  };
+  });
 
   // By scaling the local matrix of the uberstruct here by the device pixel ratio, we ensure that
   // internally, the sizes of content on flatland instances that are hooked up to this display are

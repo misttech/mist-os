@@ -1,0 +1,30 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/testing/cc_test_executable.gni")
+
+source_set("testing_deps") {
+  testonly = true
+  public_deps = [
+    "//src/lib/fxl/test:gtest_main",
+    "//third_party/googletest:gtest",
+  ]
+}
+
+cc_test_executable("unittests") {
+  output_name = "scenic_types_unittests"
+
+  testonly = true
+  sources = [
+    "extent2_unittest.cc",
+    "point2_unittest.cc",
+    "rectangle_unittest.cc",
+  ]
+  deps = [
+    ":testing_deps",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/ui/scenic/lib/types",
+    "//third_party/googletest:gtest",
+  ]
+}

@@ -51,6 +51,7 @@ source_set("flatland") {
     "//src/ui/lib/escher",
     "//src/ui/scenic/lib/display",
     "//src/ui/scenic/lib/flatland/buffers",
+    "//src/ui/scenic/lib/types",
     "//src/ui/scenic/lib/utils",
     "//src/ui/scenic/lib/view_tree:view_tree_snapshot",
     "//third_party/glm",
@@ -83,6 +84,7 @@ source_set("flatland_types") {
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp_hlcpp_conversion",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
     "//sdk/lib/syslog/cpp",
+    "//src/ui/scenic/lib/types",
     "//third_party/glm",
   ]
 }
