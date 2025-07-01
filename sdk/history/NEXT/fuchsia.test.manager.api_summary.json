@@ -308,7 +308,7 @@
         "kind": "const",
         "name": "fuchsia.test.manager/MAX_ARGUMENT_LENGTH",
         "type": "uint64",
-        "value": "1024"
+        "value": "16384"
     },
     {
         "kind": "const",
@@ -385,7 +385,7 @@
         "kind": "table/member",
         "name": "fuchsia.test.manager/RunSuiteOptions.arguments",
         "ordinal": "4",
-        "type": "vector<string:1024>:4095"
+        "type": "vector<string:16384>:4095"
     },
     {
         "kind": "table/member",
