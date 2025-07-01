@@ -343,11 +343,6 @@
 	url = https://fuchsia.googlesource.com/third_party/github.com/pciutils/pciids
 	name = third_party/github.com/pciutils/pciids
 	ignore = all
-[submodule "third_party/perfetto"]
-	path = third_party/perfetto
-	url = https://fuchsia.googlesource.com/third_party/android.googlesource.com/platform/external/perfetto/
-	name = third_party/perfetto
-	ignore = all
 [submodule "third_party/protobuf"]
 	path = third_party/protobuf
 	url = https://fuchsia.googlesource.com/third_party/protobuf
@@ -752,4 +747,9 @@
 	path = third_party/volk/src
 	url = https://fuchsia.googlesource.com/third_party/github.com/zeux/volk
 	name = third_party/volk
+	ignore = all
+[submodule "third_party/perfetto"]
+	path = third_party/perfetto
+	url = https://github.com/google/perfetto
+	name = third_party/perfetto
 	ignore = all
