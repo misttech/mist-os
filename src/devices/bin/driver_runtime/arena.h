@@ -49,7 +49,7 @@ struct fdf_arena : public fbl::RefCounted<fdf_arena> {
     alignas(FIDL_ALIGNMENT) uint8_t data_[kExtraSize];
   };
 
-  fdf_arena(uint32_t tag) : tag_(tag) {}
+  explicit fdf_arena(uint32_t tag) : tag_(tag) {}
 
   // Returns a pointer to the newest allocated buffer.
   uint8_t* NewestBufferLocked() __TA_REQUIRES(&lock_) {
