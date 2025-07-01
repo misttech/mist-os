@@ -4,13 +4,14 @@
 
 use core::future::Future;
 use core::marker::PhantomData;
+use core::ops::Deref;
 use core::pin::Pin;
 use core::task::{Context, Poll};
 
 use fidl_next_codec::{Decode, DecoderExt as _};
 use fidl_next_protocol::{self as protocol, IgnoreEvents, ProtocolError, Transport};
 
-use crate::{ClientEnd, Error, Method, Response};
+use crate::{ClientEnd, Error, Method, Protocol, Response};
 
 /// A strongly typed client sender.
 #[repr(transparent)]
@@ -36,20 +37,24 @@ impl<P, T: Transport> ClientSender<P, T> {
         unsafe { &*(client as *const protocol::ClientSender<T>).cast() }
     }
 
-    /// Returns the underlying untyped sender.
-    pub fn as_untyped(&self) -> &protocol::ClientSender<T> {
-        &self.sender
-    }
-
     /// Closes the channel from the client end.
     pub fn close(&self) {
-        self.as_untyped().close();
+        self.sender.close();
     }
 }
 
 impl<P, T: Transport> Clone for ClientSender<P, T> {
     fn clone(&self) -> Self {
         Self { sender: self.sender.clone(), _protocol: PhantomData }
+    }
+}
+
+impl<P: Protocol<T>, T: Transport> Deref for ClientSender<P, T> {
+    type Target = P::ClientSender;
+
+    fn deref(&self) -> &Self::Target {
+        // SAFETY: `P::ClientSender` is a `#[repr(transparent)]` wrapper around `ClientSender<T>`.
+        unsafe { &*(self as *const Self).cast::<P::ClientSender>() }
     }
 }
 

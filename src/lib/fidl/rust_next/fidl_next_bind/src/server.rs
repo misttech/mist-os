@@ -4,13 +4,15 @@
 
 use core::future::Future;
 use core::marker::PhantomData;
+use core::ops::Deref;
 
 use fidl_next_codec::{Encode, EncodeError};
 use fidl_next_protocol::{self as protocol, ProtocolError, SendFuture, Transport};
 
-use super::{Method, ServerEnd};
+use crate::{Method, Protocol, ServerEnd};
 
-/// A storngly typed server sender.
+/// A strongly typed server sender.
+#[repr(transparent)]
 pub struct ServerSender<
     P,
     #[cfg(feature = "fuchsia")] T: Transport = zx::Channel,
@@ -33,20 +35,24 @@ impl<P, T: Transport> ServerSender<P, T> {
         unsafe { &*(client as *const protocol::ServerSender<T>).cast() }
     }
 
-    /// Returns the underlying untyped sender.
-    pub fn as_untyped(&self) -> &protocol::ServerSender<T> {
-        &self.sender
-    }
-
     /// Closes the channel from the server end.
     pub fn close(&self) {
-        self.as_untyped().close();
+        self.sender.close();
     }
 }
 
 impl<P, T: Transport> Clone for ServerSender<P, T> {
     fn clone(&self) -> Self {
         Self { sender: self.sender.clone(), _protocol: PhantomData }
+    }
+}
+
+impl<P: Protocol<T>, T: Transport> Deref for ServerSender<P, T> {
+    type Target = P::ServerSender;
+
+    fn deref(&self) -> &Self::Target {
+        // SAFETY: `P::ServerSender` is a `#[repr(transparent)]` wrapper around `ServerSender<T>`.
+        unsafe { &*(self as *const Self).cast::<P::ServerSender>() }
     }
 }
 
@@ -188,6 +194,6 @@ impl<M> Responder<M> {
         M: Method<Protocol = P>,
         R: Encode<T::SendBuffer, Encoded = M::Response>,
     {
-        server.as_untyped().send_response(self.responder, M::ORDINAL, response)
+        server.sender.send_response(self.responder, M::ORDINAL, response)
     }
 }

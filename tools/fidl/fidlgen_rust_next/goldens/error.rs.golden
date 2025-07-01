@@ -332,10 +332,7 @@ pub struct Example;
 
 pub mod example {
     pub mod prelude {
-        pub use crate::{
-            example, Example, ExampleClientHandler, ExampleClientSender, ExampleServerHandler,
-            ExampleServerSender,
-        };
+        pub use crate::{example, Example, ExampleClientHandler, ExampleServerHandler};
 
         pub use crate::ExampleFooRequest;
 
@@ -354,48 +351,49 @@ pub mod example {
         type Response =
             ::fidl_next::WireResult<'static, crate::WireExampleFooResponse, ::fidl_next::WireU32>;
     }
-}
 
-/// A helper trait for the `Example` client sender.
-pub trait ExampleClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::Example
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = ExampleClientSender<___T>;
+            type ServerSender = ExampleServerSender<___T>;
+        }
 
-    fn foo<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, example::Foo, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireExampleFooRequest<'static>,
-        >;
-}
+        /// The client sender for the `Example` protocol.
+        pub struct ExampleClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-impl<___T> ExampleClientSender for ::fidl_next::ClientSender<Example, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        impl<___T> ExampleClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn foo<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::ResponseFuture<'_, super::Foo, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireExampleFooRequest<'static>,
+                >,
+            {
+                self.sender
+                    .send_two_way(1107623248440401476, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
 
-    fn foo<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, example::Foo, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireExampleFooRequest<'static>,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(1107623248440401476, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+        /// The server sender for the `Example` protocol.
+        #[repr(transparent)]
+        pub struct ExampleServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> ExampleServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -424,18 +422,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `Example` server sender.
-pub trait ExampleServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> ExampleServerSender for ::fidl_next::ServerSender<Example, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the Example protocol.

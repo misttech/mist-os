@@ -137,21 +137,35 @@ pub mod driver_protocol {
     pub mod prelude {
         pub use crate::{
             driver_protocol, DriverProtocol, DriverProtocolClientHandler,
-            DriverProtocolClientSender, DriverProtocolServerHandler, DriverProtocolServerSender,
+            DriverProtocolServerHandler,
         };
     }
-}
 
-/// A helper trait for the `DriverProtocol` client sender.
-pub trait DriverProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
-}
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::DriverProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = DriverProtocolClientSender<___T>;
+            type ServerSender = DriverProtocolServerSender<___T>;
+        }
 
-impl<___T> DriverProtocolClientSender for ::fidl_next::ClientSender<DriverProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        /// The client sender for the `DriverProtocol` protocol.
+        pub struct DriverProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> DriverProtocolClientSender<___T> where ___T: ::fidl_next::Transport {}
+
+        /// The server sender for the `DriverProtocol` protocol.
+        #[repr(transparent)]
+        pub struct DriverProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> DriverProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
+    }
 }
 
 /// A client handler for the DriverProtocol protocol.
@@ -176,18 +190,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `DriverProtocol` server sender.
-pub trait DriverProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> DriverProtocolServerSender for ::fidl_next::ServerSender<DriverProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the DriverProtocol protocol.
@@ -556,8 +558,7 @@ pub mod handles_in_protocol {
     pub mod prelude {
         pub use crate::{
             handles_in_protocol, HandlesInProtocol, HandlesInProtocolClientHandler,
-            HandlesInProtocolClientSender, HandlesInProtocolServerHandler,
-            HandlesInProtocolServerSender,
+            HandlesInProtocolServerHandler,
         };
 
         pub use crate::HandlesInProtocolSendHandlesRequest;
@@ -574,40 +575,47 @@ pub mod handles_in_protocol {
 
         type Response = ::fidl_next::Never;
     }
-}
 
-/// A helper trait for the `HandlesInProtocol` client sender.
-pub trait HandlesInProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::HandlesInProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = HandlesInProtocolClientSender<___T>;
+            type ServerSender = HandlesInProtocolServerSender<___T>;
+        }
 
-    fn send_handles<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireHandlesInProtocolSendHandlesRequest<'static>,
-        >;
-}
+        /// The client sender for the `HandlesInProtocol` protocol.
+        pub struct HandlesInProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-impl<___T> HandlesInProtocolClientSender for ::fidl_next::ClientSender<HandlesInProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        impl<___T> HandlesInProtocolClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn send_handles<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireHandlesInProtocolSendHandlesRequest<'static>,
+                >,
+            {
+                self.sender.send_one_way(8904504160365833729, request)
+            }
+        }
 
-    fn send_handles<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireHandlesInProtocolSendHandlesRequest<'static>,
-        >,
-    {
-        self.as_untyped().send_one_way(8904504160365833729, request)
+        /// The server sender for the `HandlesInProtocol` protocol.
+        #[repr(transparent)]
+        pub struct HandlesInProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> HandlesInProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -633,18 +641,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `HandlesInProtocol` server sender.
-pub trait HandlesInProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> HandlesInProtocolServerSender for ::fidl_next::ServerSender<HandlesInProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the HandlesInProtocol protocol.

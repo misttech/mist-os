@@ -354,8 +354,7 @@ pub mod example_use_of_error_syntax {
     pub mod prelude {
         pub use crate::{
             example_use_of_error_syntax, ExampleUseOfErrorSyntax,
-            ExampleUseOfErrorSyntaxClientHandler, ExampleUseOfErrorSyntaxClientSender,
-            ExampleUseOfErrorSyntaxServerHandler, ExampleUseOfErrorSyntaxServerSender,
+            ExampleUseOfErrorSyntaxClientHandler, ExampleUseOfErrorSyntaxServerHandler,
         };
 
         pub use ::fidl_next_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailRequest;
@@ -411,98 +410,70 @@ pub mod example_use_of_error_syntax {
             ::fidl_next::WireU32,
         >;
     }
-}
 
-/// A helper trait for the `ExampleUseOfErrorSyntax` client sender.
-pub trait ExampleUseOfErrorSyntaxClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::ExampleUseOfErrorSyntax
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = ExampleUseOfErrorSyntaxClientSender<___T>;
+            type ServerSender = ExampleUseOfErrorSyntaxServerSender<___T>;
+        }
 
-    fn composed_call_which_may_fail<___R>(
-                        &self,
-                        request: ___R,
-                    ) -> Result<
-                        ::fidl_next::ResponseFuture<
-                            '_,
-                            example_use_of_error_syntax::ComposedCallWhichMayFail,
-                            Self::Transport,
-                        >,
-                        ::fidl_next::EncodeError,
-                    >
-                    where
-                        ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                            Encoded = ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailRequest<'static>,
-                        >;
+        /// The client sender for the `ExampleUseOfErrorSyntax` protocol.
+        pub struct ExampleUseOfErrorSyntaxClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-    fn call_which_may_fail<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            example_use_of_error_syntax::CallWhichMayFail,
-            Self::Transport,
-        >,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest<'static>,
-        >;
-}
+        impl<___T> ExampleUseOfErrorSyntaxClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn composed_call_which_may_fail<___R>(
+                                &self,
+                                request: ___R,
+                            ) -> Result<
+                                ::fidl_next::ResponseFuture<'_, super::ComposedCallWhichMayFail, ___T>,
+                                ::fidl_next::EncodeError,
+                            >
+                            where
+                                ___R: ::fidl_next::Encode<
+                                    <___T as ::fidl_next::Transport>::SendBuffer,
+                                    Encoded = ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailRequest<'static>,
+                                >,
+                            {
+                self.sender
+                    .send_two_way(3565108794310607393, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
 
-impl<___T> ExampleUseOfErrorSyntaxClientSender
-    for ::fidl_next::ClientSender<ExampleUseOfErrorSyntax, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+            pub fn call_which_may_fail<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::CallWhichMayFail, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest<'static>,
+                >,
+            {
+                self.sender
+                    .send_two_way(3757408930698888354, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
 
+        /// The server sender for the `ExampleUseOfErrorSyntax` protocol.
+        #[repr(transparent)]
+        pub struct ExampleUseOfErrorSyntaxServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
 
-
-
-
-
-
-                    fn composed_call_which_may_fail<___R>(
-                        &self,
-                        request: ___R,
-                    ) -> Result<
-                        ::fidl_next::ResponseFuture<'_, example_use_of_error_syntax::ComposedCallWhichMayFail, Self::Transport>,
-                        ::fidl_next::EncodeError,
-                    >
-                    where
-                        ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                            Encoded = ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailRequest<'static>,
-                        >,
-                    {
-        self.as_untyped()
-            .send_two_way(3565108794310607393, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
-
-    fn call_which_may_fail<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            example_use_of_error_syntax::CallWhichMayFail,
-            Self::Transport,
-        >,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest<'static>,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(3757408930698888354, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+        impl<___T> ExampleUseOfErrorSyntaxServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -534,19 +505,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `ExampleUseOfErrorSyntax` server sender.
-pub trait ExampleUseOfErrorSyntaxServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> ExampleUseOfErrorSyntaxServerSender
-    for ::fidl_next::ServerSender<ExampleUseOfErrorSyntax, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the ExampleUseOfErrorSyntax protocol.

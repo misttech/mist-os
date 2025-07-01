@@ -138,10 +138,7 @@ pub struct Parent;
 
 pub mod parent {
     pub mod prelude {
-        pub use crate::{
-            parent, Parent, ParentClientHandler, ParentClientSender, ParentServerHandler,
-            ParentServerSender,
-        };
+        pub use crate::{parent, Parent, ParentClientHandler, ParentServerHandler};
 
         pub use crate::ParentFirstRequest;
     }
@@ -157,40 +154,47 @@ pub mod parent {
 
         type Response = ::fidl_next::Never;
     }
-}
 
-/// A helper trait for the `Parent` client sender.
-pub trait ParentClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::Parent
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = ParentClientSender<___T>;
+            type ServerSender = ParentServerSender<___T>;
+        }
 
-    fn first<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireParentFirstRequest,
-        >;
-}
+        /// The client sender for the `Parent` protocol.
+        pub struct ParentClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-impl<___T> ParentClientSender for ::fidl_next::ClientSender<Parent, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        impl<___T> ParentClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn first<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireParentFirstRequest,
+                >,
+            {
+                self.sender.send_one_way(3973163707930985819, request)
+            }
+        }
 
-    fn first<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireParentFirstRequest,
-        >,
-    {
-        self.as_untyped().send_one_way(3973163707930985819, request)
+        /// The server sender for the `Parent` protocol.
+        #[repr(transparent)]
+        pub struct ParentServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> ParentServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -216,18 +220,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `Parent` server sender.
-pub trait ParentServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> ParentServerSender for ::fidl_next::ServerSender<Parent, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the Parent protocol.
@@ -421,10 +413,7 @@ pub struct Child;
 
 pub mod child {
     pub mod prelude {
-        pub use crate::{
-            child, Child, ChildClientHandler, ChildClientSender, ChildServerHandler,
-            ChildServerSender,
-        };
+        pub use crate::{child, Child, ChildClientHandler, ChildServerHandler};
 
         pub use crate::ChildSecondRequest;
 
@@ -454,63 +443,60 @@ pub mod child {
 
         type Response = ::fidl_next::Never;
     }
-}
 
-/// A helper trait for the `Child` client sender.
-pub trait ChildClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::Child
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = ChildClientSender<___T>;
+            type ServerSender = ChildServerSender<___T>;
+        }
 
-    fn first<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireParentFirstRequest,
-        >;
+        /// The client sender for the `Child` protocol.
+        pub struct ChildClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-    fn second<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChildSecondRequest,
-        >;
-}
+        impl<___T> ChildClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn first<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireParentFirstRequest,
+                >,
+            {
+                self.sender.send_one_way(3973163707930985819, request)
+            }
 
-impl<___T> ChildClientSender for ::fidl_next::ClientSender<Child, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+            pub fn second<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireChildSecondRequest,
+                >,
+            {
+                self.sender.send_one_way(2545123272820824165, request)
+            }
+        }
 
-    fn first<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireParentFirstRequest,
-        >,
-    {
-        self.as_untyped().send_one_way(3973163707930985819, request)
-    }
+        /// The server sender for the `Child` protocol.
+        #[repr(transparent)]
+        pub struct ChildServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
 
-    fn second<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChildSecondRequest,
-        >,
-    {
-        self.as_untyped().send_one_way(2545123272820824165, request)
+        impl<___T> ChildServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -536,18 +522,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `Child` server sender.
-pub trait ChildServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> ChildServerSender for ::fidl_next::ServerSender<Child, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the Child protocol.

@@ -209,7 +209,7 @@ mod tests {
 
     use fdf::Channel;
     use fidl_next::{Client, ClientEnd};
-    use fidl_next_fuchsia_driver_framework::{DriverClientSender, DriverStartRequest};
+    use fidl_next_fuchsia_driver_framework::DriverStartRequest;
 
     #[derive(Default)]
     struct TestDriver {
@@ -245,7 +245,8 @@ mod tests {
 
         let (client_exit_tx, client_exit_rx) = futures::channel::oneshot::channel();
         spawn_in_driver("driver registration", async move {
-            let client_end = ClientEnd::from_untyped(fdf_fidl::DriverChannel::new(client_chan));
+            let client_end: ClientEnd<fidl_next_fuchsia_driver_framework::Driver, _> =
+                ClientEnd::from_untyped(fdf_fidl::DriverChannel::new(client_chan));
             let mut client = Client::new(client_end);
             let client_sender = client.sender().clone();
 

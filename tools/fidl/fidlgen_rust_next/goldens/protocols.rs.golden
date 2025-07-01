@@ -14,23 +14,35 @@ pub mod another_discoverable_protocol {
     pub mod prelude {
         pub use crate::{
             another_discoverable_protocol, AnotherDiscoverableProtocol,
-            AnotherDiscoverableProtocolClientHandler, AnotherDiscoverableProtocolClientSender,
-            AnotherDiscoverableProtocolServerHandler, AnotherDiscoverableProtocolServerSender,
+            AnotherDiscoverableProtocolClientHandler, AnotherDiscoverableProtocolServerHandler,
         };
     }
-}
 
-/// A helper trait for the `AnotherDiscoverableProtocol` client sender.
-pub trait AnotherDiscoverableProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
-}
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::AnotherDiscoverableProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = AnotherDiscoverableProtocolClientSender<___T>;
+            type ServerSender = AnotherDiscoverableProtocolServerSender<___T>;
+        }
 
-impl<___T> AnotherDiscoverableProtocolClientSender
-    for ::fidl_next::ClientSender<AnotherDiscoverableProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        /// The client sender for the `AnotherDiscoverableProtocol` protocol.
+        pub struct AnotherDiscoverableProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> AnotherDiscoverableProtocolClientSender<___T> where ___T: ::fidl_next::Transport {}
+
+        /// The server sender for the `AnotherDiscoverableProtocol` protocol.
+        #[repr(transparent)]
+        pub struct AnotherDiscoverableProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> AnotherDiscoverableProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
+    }
 }
 
 /// A client handler for the AnotherDiscoverableProtocol protocol.
@@ -55,19 +67,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `AnotherDiscoverableProtocol` server sender.
-pub trait AnotherDiscoverableProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> AnotherDiscoverableProtocolServerSender
-    for ::fidl_next::ServerSender<AnotherDiscoverableProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the AnotherDiscoverableProtocol protocol.
@@ -1259,7 +1258,7 @@ pub mod channel_protocol {
     pub mod prelude {
         pub use crate::{
             channel_protocol, ChannelProtocol, ChannelProtocolClientHandler,
-            ChannelProtocolClientSender, ChannelProtocolServerHandler, ChannelProtocolServerSender,
+            ChannelProtocolServerHandler,
         };
 
         pub use crate::ChannelProtocolEventARequest;
@@ -1336,133 +1335,117 @@ pub mod channel_protocol {
 
         type Response = crate::WireChannelProtocolMutateSocketResponse;
     }
-}
 
-/// A helper trait for the `ChannelProtocol` client sender.
-pub trait ChannelProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::ChannelProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = ChannelProtocolClientSender<___T>;
+            type ServerSender = ChannelProtocolServerSender<___T>;
+        }
 
-    fn method_a<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolMethodARequest,
-        >;
+        /// The client sender for the `ChannelProtocol` protocol.
+        pub struct ChannelProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-    fn method_b<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, channel_protocol::MethodB, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolMethodBRequest,
-        >;
+        impl<___T> ChannelProtocolClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn method_a<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireChannelProtocolMethodARequest,
+                >,
+            {
+                self.sender.send_one_way(3155008840945527714, request)
+            }
 
-    fn take_handle<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, channel_protocol::TakeHandle, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolTakeHandleRequest,
-        >;
+            pub fn method_b<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::MethodB, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireChannelProtocolMethodBRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(8903004957800778182, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
 
-    fn mutate_socket<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, channel_protocol::MutateSocket, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolMutateSocketRequest,
-        >;
-}
+            pub fn take_handle<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::TakeHandle, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireChannelProtocolTakeHandleRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(591935489944717925, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
 
-impl<___T> ChannelProtocolClientSender for ::fidl_next::ClientSender<ChannelProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+            pub fn mutate_socket<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::MutateSocket, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireChannelProtocolMutateSocketRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(7411742788430590287, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
 
-    fn method_a<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolMethodARequest,
-        >,
-    {
-        self.as_untyped().send_one_way(3155008840945527714, request)
-    }
+        /// The server sender for the `ChannelProtocol` protocol.
+        #[repr(transparent)]
+        pub struct ChannelProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
 
-    fn method_b<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, channel_protocol::MethodB, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolMethodBRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(8903004957800778182, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
-
-    fn take_handle<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, channel_protocol::TakeHandle, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolTakeHandleRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(591935489944717925, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
-
-    fn mutate_socket<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, channel_protocol::MutateSocket, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireChannelProtocolMutateSocketRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(7411742788430590287, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+        impl<___T> ChannelProtocolServerSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn event_a<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = <super::EventA as ::fidl_next::Method>::Response,
+                >,
+            {
+                self.sender.send_event(2220452875311597006, request)
+            }
+        }
     }
 }
 
@@ -1510,41 +1493,6 @@ where
                 sender.close();
             }
         }
-    }
-}
-
-/// A helper trait for the `ChannelProtocol` server sender.
-pub trait ChannelProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-
-    fn event_a<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = <channel_protocol::EventA as ::fidl_next::Method>::Response,
-        >;
-}
-
-impl<___T> ChannelProtocolServerSender for ::fidl_next::ServerSender<ChannelProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-
-    fn event_a<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = <channel_protocol::EventA as ::fidl_next::Method>::Response,
-        >,
-    {
-        self.as_untyped().send_event(2220452875311597006, request)
     }
 }
 
@@ -1684,8 +1632,7 @@ pub mod discoverable_protocol {
     pub mod prelude {
         pub use crate::{
             discoverable_protocol, DiscoverableProtocol, DiscoverableProtocolClientHandler,
-            DiscoverableProtocolClientSender, DiscoverableProtocolServerHandler,
-            DiscoverableProtocolServerSender,
+            DiscoverableProtocolServerHandler,
         };
     }
 
@@ -1700,28 +1647,40 @@ pub mod discoverable_protocol {
 
         type Response = ::fidl_next::Never;
     }
-}
 
-/// A helper trait for the `DiscoverableProtocol` client sender.
-pub trait DiscoverableProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::DiscoverableProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = DiscoverableProtocolClientSender<___T>;
+            type ServerSender = DiscoverableProtocolServerSender<___T>;
+        }
 
-    fn method(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
-}
+        /// The client sender for the `DiscoverableProtocol` protocol.
+        pub struct DiscoverableProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-impl<___T> DiscoverableProtocolClientSender
-    for ::fidl_next::ClientSender<DiscoverableProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        impl<___T> DiscoverableProtocolClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn method(
+                &self,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError> {
+                self.sender.send_one_way(3455873048082739435, ())
+            }
+        }
 
-    fn method(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(3455873048082739435, ())
+        /// The server sender for the `DiscoverableProtocol` protocol.
+        #[repr(transparent)]
+        pub struct DiscoverableProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> DiscoverableProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -1747,19 +1706,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `DiscoverableProtocol` server sender.
-pub trait DiscoverableProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> DiscoverableProtocolServerSender
-    for ::fidl_next::ServerSender<DiscoverableProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the DiscoverableProtocol protocol.
@@ -2470,8 +2416,7 @@ pub mod handle_rights_protocol {
     pub mod prelude {
         pub use crate::{
             handle_rights_protocol, HandleRightsProtocol, HandleRightsProtocolClientHandler,
-            HandleRightsProtocolClientSender, HandleRightsProtocolServerHandler,
-            HandleRightsProtocolServerSender,
+            HandleRightsProtocolServerHandler,
         };
 
         pub use crate::HandleRightsProtocolAnEventRequest;
@@ -2518,72 +2463,81 @@ pub mod handle_rights_protocol {
 
         type Response = crate::WireHandleRightsProtocolAnEventRequest;
     }
-}
 
-/// A helper trait for the `HandleRightsProtocol` client sender.
-pub trait HandleRightsProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::HandleRightsProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = HandleRightsProtocolClientSender<___T>;
+            type ServerSender = HandleRightsProtocolServerSender<___T>;
+        }
 
-    fn no_response_method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireHandleRightsProtocolNoResponseMethodRequest,
-        >;
+        /// The client sender for the `HandleRightsProtocol` protocol.
+        pub struct HandleRightsProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-    fn response_method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, handle_rights_protocol::ResponseMethod, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireHandleRightsProtocolResponseMethodRequest,
-        >;
-}
+        impl<___T> HandleRightsProtocolClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn no_response_method<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireHandleRightsProtocolNoResponseMethodRequest,
+                >,
+            {
+                self.sender.send_one_way(1155044649514904573, request)
+            }
 
-impl<___T> HandleRightsProtocolClientSender
-    for ::fidl_next::ClientSender<HandleRightsProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+            pub fn response_method<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ResponseMethod, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireHandleRightsProtocolResponseMethodRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(5956276128041940295, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
 
-    fn no_response_method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireHandleRightsProtocolNoResponseMethodRequest,
-        >,
-    {
-        self.as_untyped().send_one_way(1155044649514904573, request)
-    }
+        /// The server sender for the `HandleRightsProtocol` protocol.
+        #[repr(transparent)]
+        pub struct HandleRightsProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
 
-    fn response_method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, handle_rights_protocol::ResponseMethod, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireHandleRightsProtocolResponseMethodRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(5956276128041940295, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+        impl<___T> HandleRightsProtocolServerSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn an_event<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = <super::AnEvent as ::fidl_next::Method>::Response,
+                >,
+            {
+                self.sender.send_event(476727631355490611, request)
+            }
+        }
     }
 }
 
@@ -2628,42 +2582,6 @@ where
                 sender.close();
             }
         }
-    }
-}
-
-/// A helper trait for the `HandleRightsProtocol` server sender.
-pub trait HandleRightsProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-
-    fn an_event<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = <handle_rights_protocol::AnEvent as ::fidl_next::Method>::Response,
-        >;
-}
-
-impl<___T> HandleRightsProtocolServerSender
-    for ::fidl_next::ServerSender<HandleRightsProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-
-    fn an_event<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = <handle_rights_protocol::AnEvent as ::fidl_next::Method>::Response,
-        >,
-    {
-        self.as_untyped().send_event(476727631355490611, request)
     }
 }
 
@@ -3188,7 +3106,7 @@ pub mod many_parameters {
     pub mod prelude {
         pub use crate::{
             many_parameters, ManyParameters, ManyParametersClientHandler,
-            ManyParametersClientSender, ManyParametersServerHandler, ManyParametersServerSender,
+            ManyParametersServerHandler,
         };
 
         pub use crate::ManyParametersFifteenRequest;
@@ -3205,40 +3123,47 @@ pub mod many_parameters {
 
         type Response = ::fidl_next::Never;
     }
-}
 
-/// A helper trait for the `ManyParameters` client sender.
-pub trait ManyParametersClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::ManyParameters
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = ManyParametersClientSender<___T>;
+            type ServerSender = ManyParametersServerSender<___T>;
+        }
 
-    fn fifteen<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireManyParametersFifteenRequest,
-        >;
-}
+        /// The client sender for the `ManyParameters` protocol.
+        pub struct ManyParametersClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-impl<___T> ManyParametersClientSender for ::fidl_next::ClientSender<ManyParameters, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        impl<___T> ManyParametersClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn fifteen<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireManyParametersFifteenRequest,
+                >,
+            {
+                self.sender.send_one_way(6423043252952467815, request)
+            }
+        }
 
-    fn fifteen<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireManyParametersFifteenRequest,
-        >,
-    {
-        self.as_untyped().send_one_way(6423043252952467815, request)
+        /// The server sender for the `ManyParameters` protocol.
+        #[repr(transparent)]
+        pub struct ManyParametersServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> ManyParametersServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -3264,18 +3189,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `ManyParameters` server sender.
-pub trait ManyParametersServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> ManyParametersServerSender for ::fidl_next::ServerSender<ManyParameters, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the ManyParameters protocol.
@@ -4052,7 +3965,7 @@ pub mod method_with_union {
     pub mod prelude {
         pub use crate::{
             method_with_union, MethodWithUnion, MethodWithUnionClientHandler,
-            MethodWithUnionClientSender, MethodWithUnionServerHandler, MethodWithUnionServerSender,
+            MethodWithUnionServerHandler,
         };
 
         pub use crate::MethodWithUnionUnionMethodRequest;
@@ -4071,48 +3984,52 @@ pub mod method_with_union {
 
         type Response = crate::WireMethodWithUnionUnionMethodResponse;
     }
-}
 
-/// A helper trait for the `MethodWithUnion` client sender.
-pub trait MethodWithUnionClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::MethodWithUnion
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = MethodWithUnionClientSender<___T>;
+            type ServerSender = MethodWithUnionServerSender<___T>;
+        }
 
-    fn union_method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, method_with_union::UnionMethod, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireMethodWithUnionUnionMethodRequest,
-        >;
-}
+        /// The client sender for the `MethodWithUnion` protocol.
+        pub struct MethodWithUnionClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-impl<___T> MethodWithUnionClientSender for ::fidl_next::ClientSender<MethodWithUnion, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        impl<___T> MethodWithUnionClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn union_method<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::UnionMethod, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireMethodWithUnionUnionMethodRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(4124874338266649112, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
 
-    fn union_method<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, method_with_union::UnionMethod, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireMethodWithUnionUnionMethodRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(4124874338266649112, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+        /// The server sender for the `MethodWithUnion` protocol.
+        #[repr(transparent)]
+        pub struct MethodWithUnionServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> MethodWithUnionServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -4141,18 +4058,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `MethodWithUnion` server sender.
-pub trait MethodWithUnionServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> MethodWithUnionServerSender for ::fidl_next::ServerSender<MethodWithUnion, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the MethodWithUnion protocol.
@@ -4228,21 +4133,35 @@ pub mod platform_server {
     pub mod prelude {
         pub use crate::{
             platform_server, PlatformServer, PlatformServerClientHandler,
-            PlatformServerClientSender, PlatformServerServerHandler, PlatformServerServerSender,
+            PlatformServerServerHandler,
         };
     }
-}
 
-/// A helper trait for the `PlatformServer` client sender.
-pub trait PlatformServerClientSender {
-    type Transport: ::fidl_next::Transport;
-}
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::PlatformServer
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = PlatformServerClientSender<___T>;
+            type ServerSender = PlatformServerServerSender<___T>;
+        }
 
-impl<___T> PlatformServerClientSender for ::fidl_next::ClientSender<PlatformServer, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        /// The client sender for the `PlatformServer` protocol.
+        pub struct PlatformServerClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> PlatformServerClientSender<___T> where ___T: ::fidl_next::Transport {}
+
+        /// The server sender for the `PlatformServer` protocol.
+        #[repr(transparent)]
+        pub struct PlatformServerServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> PlatformServerServerSender<___T> where ___T: ::fidl_next::Transport {}
+    }
 }
 
 /// A client handler for the PlatformServer protocol.
@@ -4267,18 +4186,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `PlatformServer` server sender.
-pub trait PlatformServerServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> PlatformServerServerSender for ::fidl_next::ServerSender<PlatformServer, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the PlatformServer protocol.
@@ -5611,8 +5518,7 @@ pub mod with_and_without_request_response {
     pub mod prelude {
         pub use crate::{
             with_and_without_request_response, WithAndWithoutRequestResponse,
-            WithAndWithoutRequestResponseClientHandler, WithAndWithoutRequestResponseClientSender,
-            WithAndWithoutRequestResponseServerHandler, WithAndWithoutRequestResponseServerSender,
+            WithAndWithoutRequestResponseClientHandler, WithAndWithoutRequestResponseServerHandler,
         };
 
         pub use crate::WithAndWithoutRequestResponseNoRequestWithResponseResponse;
@@ -5728,189 +5634,149 @@ pub mod with_and_without_request_response {
 
         type Response = crate::WireWithAndWithoutRequestResponseOnWithResponseRequest<'static>;
     }
-}
 
-/// A helper trait for the `WithAndWithoutRequestResponse` client sender.
-pub trait WithAndWithoutRequestResponseClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::WithAndWithoutRequestResponse
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = WithAndWithoutRequestResponseClientSender<___T>;
+            type ServerSender = WithAndWithoutRequestResponseServerSender<___T>;
+        }
 
-    fn no_request_no_response(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
+        /// The client sender for the `WithAndWithoutRequestResponse` protocol.
+        pub struct WithAndWithoutRequestResponseClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-    fn no_request_empty_response(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            with_and_without_request_response::NoRequestEmptyResponse,
-            Self::Transport,
-        >,
-        ::fidl_next::EncodeError,
-    >;
+        impl<___T> WithAndWithoutRequestResponseClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn no_request_no_response(
+                &self,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError> {
+                self.sender.send_one_way(5413654872775949227, ())
+            }
 
-    fn no_request_with_response(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            with_and_without_request_response::NoRequestWithResponse,
-            Self::Transport,
-        >,
-        ::fidl_next::EncodeError,
-    >;
+            pub fn no_request_empty_response(
+                &self,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::NoRequestEmptyResponse, ___T>,
+                ::fidl_next::EncodeError,
+            > {
+                self.sender
+                    .send_two_way(1631193469798418024, ())
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
 
-    fn with_request_no_response<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithAndWithoutRequestResponseWithRequestNoResponseRequest<'static>,
-        >;
+            pub fn no_request_with_response(
+                &self,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::NoRequestWithResponse, ___T>,
+                ::fidl_next::EncodeError,
+            > {
+                self.sender
+                    .send_two_way(9037369643591427517, ())
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
 
-    fn with_request_empty_response<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            with_and_without_request_response::WithRequestEmptyResponse,
-            Self::Transport,
-        >,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest<
-                'static,
-            >,
-        >;
+            pub fn with_request_no_response<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireWithAndWithoutRequestResponseWithRequestNoResponseRequest<
+                        'static,
+                    >,
+                >,
+            {
+                self.sender.send_one_way(7326057319832554103, request)
+            }
 
-    fn with_request_with_response<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            with_and_without_request_response::WithRequestWithResponse,
-            Self::Transport,
-        >,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithAndWithoutRequestResponseWithRequestWithResponseRequest<
-                'static,
-            >,
-        >;
-}
 
-impl<___T> WithAndWithoutRequestResponseClientSender
-    for ::fidl_next::ClientSender<WithAndWithoutRequestResponse, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 
-    fn no_request_no_response(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_one_way(5413654872775949227, ())
-    }
 
-    fn no_request_empty_response(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            with_and_without_request_response::NoRequestEmptyResponse,
-            Self::Transport,
-        >,
-        ::fidl_next::EncodeError,
-    > {
-        self.as_untyped()
-            .send_two_way(1631193469798418024, ())
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
 
-    fn no_request_with_response(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            with_and_without_request_response::NoRequestWithResponse,
-            Self::Transport,
-        >,
-        ::fidl_next::EncodeError,
-    > {
-        self.as_untyped()
-            .send_two_way(9037369643591427517, ())
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
 
-    fn with_request_no_response<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithAndWithoutRequestResponseWithRequestNoResponseRequest<'static>,
-        >,
-    {
-        self.as_untyped().send_one_way(7326057319832554103, request)
-    }
 
-    fn with_request_empty_response<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            with_and_without_request_response::WithRequestEmptyResponse,
-            Self::Transport,
-        >,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest<
-                'static,
-            >,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(2877322062572412767, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
 
-    fn with_request_with_response<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<
-            '_,
-            with_and_without_request_response::WithRequestWithResponse,
-            Self::Transport,
-        >,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithAndWithoutRequestResponseWithRequestWithResponseRequest<
-                'static,
-            >,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(6417226585456833969, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+                            pub fn with_request_empty_response<___R>(
+                                &self,
+                                request: ___R,
+                            ) -> Result<
+                                ::fidl_next::ResponseFuture<'_, super::WithRequestEmptyResponse, ___T>,
+                                ::fidl_next::EncodeError,
+                            >
+                            where
+                                ___R: ::fidl_next::Encode<
+                                    <___T as ::fidl_next::Transport>::SendBuffer,
+                                    Encoded = crate::WireWithAndWithoutRequestResponseWithRequestEmptyResponseRequest<'static>,
+                                >,
+                            {
+                self.sender
+                    .send_two_way(2877322062572412767, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+
+
+
+
+
+
+
+
+                            pub fn with_request_with_response<___R>(
+                                &self,
+                                request: ___R,
+                            ) -> Result<
+                                ::fidl_next::ResponseFuture<'_, super::WithRequestWithResponse, ___T>,
+                                ::fidl_next::EncodeError,
+                            >
+                            where
+                                ___R: ::fidl_next::Encode<
+                                    <___T as ::fidl_next::Transport>::SendBuffer,
+                                    Encoded = crate::WireWithAndWithoutRequestResponseWithRequestWithResponseRequest<'static>,
+                                >,
+                            {
+                self.sender
+                    .send_two_way(6417226585456833969, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
+
+        /// The server sender for the `WithAndWithoutRequestResponse` protocol.
+        #[repr(transparent)]
+        pub struct WithAndWithoutRequestResponseServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> WithAndWithoutRequestResponseServerSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn on_empty_response(
+                &self,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError> {
+                self.sender.send_event(5397663296507358806, ())
+            }
+
+            pub fn on_with_response<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = <super::OnWithResponse as ::fidl_next::Method>::Response,
+                >,
+            {
+                self.sender.send_event(5811598563493228968, request)
+            }
+        }
     }
 }
 
@@ -5967,59 +5833,6 @@ where
                 sender.close();
             }
         }
-    }
-}
-
-/// A helper trait for the `WithAndWithoutRequestResponse` server sender.
-pub trait WithAndWithoutRequestResponseServerSender {
-    type Transport: ::fidl_next::Transport;
-
-    fn on_empty_response(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>;
-
-    fn on_with_response<___R>(
-                    &self,
-                    request: ___R,
-                ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-                where
-                    ___R: ::fidl_next::Encode<
-                            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                        Encoded = <with_and_without_request_response::OnWithResponse as ::fidl_next::Method>::Response,
-                    >;
-}
-
-impl<___T> WithAndWithoutRequestResponseServerSender
-    for ::fidl_next::ServerSender<WithAndWithoutRequestResponse, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
-
-    fn on_empty_response(
-        &self,
-    ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError> {
-        self.as_untyped().send_event(5397663296507358806, ())
-    }
-
-
-
-
-
-
-
-
-                fn on_with_response<___R>(
-                    &self,
-                    request: ___R,
-                ) -> Result<::fidl_next::SendFuture<'_, Self::Transport>, ::fidl_next::EncodeError>
-                where
-                    ___R: ::fidl_next::Encode<
-                        <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-                        Encoded = <with_and_without_request_response::OnWithResponse as ::fidl_next::Method>::Response,
-                    >,
-                {
-        self.as_untyped().send_event(5811598563493228968, request)
     }
 }
 
@@ -6545,7 +6358,7 @@ pub mod with_error_syntax {
     pub mod prelude {
         pub use crate::{
             with_error_syntax, WithErrorSyntax, WithErrorSyntaxClientHandler,
-            WithErrorSyntaxClientSender, WithErrorSyntaxServerHandler, WithErrorSyntaxServerSender,
+            WithErrorSyntaxServerHandler,
         };
 
         pub use crate::ErrorEnum;
@@ -6622,89 +6435,78 @@ pub mod with_error_syntax {
             ::fidl_next::WireU32,
         >;
     }
-}
 
-/// A helper trait for the `WithErrorSyntax` client sender.
-pub trait WithErrorSyntaxClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::WithErrorSyntax
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = WithErrorSyntaxClientSender<___T>;
+            type ServerSender = WithErrorSyntaxServerSender<___T>;
+        }
 
-    fn response_as_struct(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_error_syntax::ResponseAsStruct, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >;
+        /// The client sender for the `WithErrorSyntax` protocol.
+        pub struct WithErrorSyntaxClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-    fn error_as_primitive(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_error_syntax::ErrorAsPrimitive, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >;
+        impl<___T> WithErrorSyntaxClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn response_as_struct(
+                &self,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ResponseAsStruct, ___T>,
+                ::fidl_next::EncodeError,
+            > {
+                self.sender
+                    .send_two_way(268248568430741139, ())
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
 
-    fn error_as_enum(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_error_syntax::ErrorAsEnum, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >;
+            pub fn error_as_primitive(
+                &self,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ErrorAsPrimitive, ___T>,
+                ::fidl_next::EncodeError,
+            > {
+                self.sender
+                    .send_two_way(6930994461233198567, ())
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
 
-    fn handle_in_result(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_error_syntax::HandleInResult, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >;
-}
+            pub fn error_as_enum(
+                &self,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ErrorAsEnum, ___T>,
+                ::fidl_next::EncodeError,
+            > {
+                self.sender
+                    .send_two_way(5491891352371277635, ())
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
 
-impl<___T> WithErrorSyntaxClientSender for ::fidl_next::ClientSender<WithErrorSyntax, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+            pub fn handle_in_result(
+                &self,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::HandleInResult, ___T>,
+                ::fidl_next::EncodeError,
+            > {
+                self.sender
+                    .send_two_way(1371676333068455103, ())
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
 
-    fn response_as_struct(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_error_syntax::ResponseAsStruct, Self::Transport>,
-        ::fidl_next::EncodeError,
-    > {
-        self.as_untyped()
-            .send_two_way(268248568430741139, ())
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+        /// The server sender for the `WithErrorSyntax` protocol.
+        #[repr(transparent)]
+        pub struct WithErrorSyntaxServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
 
-    fn error_as_primitive(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_error_syntax::ErrorAsPrimitive, Self::Transport>,
-        ::fidl_next::EncodeError,
-    > {
-        self.as_untyped()
-            .send_two_way(6930994461233198567, ())
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
-
-    fn error_as_enum(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_error_syntax::ErrorAsEnum, Self::Transport>,
-        ::fidl_next::EncodeError,
-    > {
-        self.as_untyped()
-            .send_two_way(5491891352371277635, ())
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
-
-    fn handle_in_result(
-        &self,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_error_syntax::HandleInResult, Self::Transport>,
-        ::fidl_next::EncodeError,
-    > {
-        self.as_untyped()
-            .send_two_way(1371676333068455103, ())
-            .map(::fidl_next::ResponseFuture::from_untyped)
+        impl<___T> WithErrorSyntaxServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -6742,18 +6544,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `WithErrorSyntax` server sender.
-pub trait WithErrorSyntaxServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> WithErrorSyntaxServerSender for ::fidl_next::ServerSender<WithErrorSyntax, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the WithErrorSyntax protocol.
@@ -7680,8 +7470,7 @@ pub mod with_protocol_ends {
     pub mod prelude {
         pub use crate::{
             with_protocol_ends, WithProtocolEnds, WithProtocolEndsClientHandler,
-            WithProtocolEndsClientSender, WithProtocolEndsServerHandler,
-            WithProtocolEndsServerSender,
+            WithProtocolEndsServerHandler,
         };
 
         pub use crate::WithProtocolEndsClientEndsRequest;
@@ -7732,110 +7521,88 @@ pub mod with_protocol_ends {
 
         type Response = crate::WireWithProtocolEndsStructContainingEndsResponse;
     }
-}
 
-/// A helper trait for the `WithProtocolEnds` client sender.
-pub trait WithProtocolEndsClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::WithProtocolEnds
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = WithProtocolEndsClientSender<___T>;
+            type ServerSender = WithProtocolEndsServerSender<___T>;
+        }
 
-    fn client_ends<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_protocol_ends::ClientEnds, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithProtocolEndsClientEndsRequest,
-        >;
+        /// The client sender for the `WithProtocolEnds` protocol.
+        pub struct WithProtocolEndsClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-    fn server_ends<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_protocol_ends::ServerEnds, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithProtocolEndsServerEndsRequest,
-        >;
+        impl<___T> WithProtocolEndsClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn client_ends<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ClientEnds, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireWithProtocolEndsClientEndsRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(5870448041025163330, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
 
-    fn struct_containing_ends<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_protocol_ends::StructContainingEnds, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithProtocolEndsStructContainingEndsRequest,
-        >;
-}
+            pub fn server_ends<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ServerEnds, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireWithProtocolEndsServerEndsRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(8115535094437022259, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
 
-impl<___T> WithProtocolEndsClientSender for ::fidl_next::ClientSender<WithProtocolEnds, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+            pub fn struct_containing_ends<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::StructContainingEnds, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireWithProtocolEndsStructContainingEndsRequest,
+                >,
+            {
+                self.sender
+                    .send_two_way(4076866772260025813, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
 
-    fn client_ends<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_protocol_ends::ClientEnds, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithProtocolEndsClientEndsRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(5870448041025163330, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
+        /// The server sender for the `WithProtocolEnds` protocol.
+        #[repr(transparent)]
+        pub struct WithProtocolEndsServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
 
-    fn server_ends<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_protocol_ends::ServerEnds, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithProtocolEndsServerEndsRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(8115535094437022259, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
-    }
-
-    fn struct_containing_ends<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, with_protocol_ends::StructContainingEnds, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireWithProtocolEndsStructContainingEndsRequest,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(4076866772260025813, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+        impl<___T> WithProtocolEndsServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -7870,18 +7637,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `WithProtocolEnds` server sender.
-pub trait WithProtocolEndsServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> WithProtocolEndsServerSender for ::fidl_next::ServerSender<WithProtocolEnds, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the WithProtocolEnds protocol.

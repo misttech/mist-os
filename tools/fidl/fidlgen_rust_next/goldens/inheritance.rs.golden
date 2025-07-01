@@ -332,10 +332,7 @@ pub struct Super;
 
 pub mod super_ {
     pub mod prelude {
-        pub use crate::{
-            super_, Super, SuperClientHandler, SuperClientSender, SuperServerHandler,
-            SuperServerSender,
-        };
+        pub use crate::{super_, Super, SuperClientHandler, SuperServerHandler};
 
         pub use crate::SuperFooRequest;
 
@@ -353,48 +350,49 @@ pub mod super_ {
 
         type Response = crate::WireSuperFooResponse;
     }
-}
 
-/// A helper trait for the `super` client sender.
-pub trait SuperClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::Super
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = SuperClientSender<___T>;
+            type ServerSender = SuperServerSender<___T>;
+        }
 
-    fn foo<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, super_::Foo, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireSuperFooRequest<'static>,
-        >;
-}
+        /// The client sender for the `super` protocol.
+        pub struct SuperClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-impl<___T> SuperClientSender for ::fidl_next::ClientSender<Super, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        impl<___T> SuperClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn foo<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::ResponseFuture<'_, super::Foo, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireSuperFooRequest<'static>,
+                >,
+            {
+                self.sender
+                    .send_two_way(7540745593380780216, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
 
-    fn foo<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<
-        ::fidl_next::ResponseFuture<'_, super_::Foo, Self::Transport>,
-        ::fidl_next::EncodeError,
-    >
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireSuperFooRequest<'static>,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(7540745593380780216, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+        /// The server sender for the `super` protocol.
+        #[repr(transparent)]
+        pub struct SuperServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> SuperServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -423,18 +421,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `super` server sender.
-pub trait SuperServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> SuperServerSender for ::fidl_next::ServerSender<Super, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the super protocol.
@@ -504,9 +490,7 @@ pub struct Sub;
 
 pub mod sub {
     pub mod prelude {
-        pub use crate::{
-            sub, Sub, SubClientHandler, SubClientSender, SubServerHandler, SubServerSender,
-        };
+        pub use crate::{sub, Sub, SubClientHandler, SubServerHandler};
 
         pub use crate::SuperFooRequest;
 
@@ -524,42 +508,49 @@ pub mod sub {
 
         type Response = crate::WireSuperFooResponse;
     }
-}
 
-/// A helper trait for the `sub` client sender.
-pub trait SubClientSender {
-    type Transport: ::fidl_next::Transport;
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::Sub
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = SubClientSender<___T>;
+            type ServerSender = SubServerSender<___T>;
+        }
 
-    fn foo<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::ResponseFuture<'_, sub::Foo, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireSuperFooRequest<'static>,
-        >;
-}
+        /// The client sender for the `sub` protocol.
+        pub struct SubClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
 
-impl<___T> SubClientSender for ::fidl_next::ClientSender<Sub, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        impl<___T> SubClientSender<___T>
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            pub fn foo<___R>(
+                &self,
+                request: ___R,
+            ) -> Result<::fidl_next::ResponseFuture<'_, super::Foo, ___T>, ::fidl_next::EncodeError>
+            where
+                ___R: ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireSuperFooRequest<'static>,
+                >,
+            {
+                self.sender
+                    .send_two_way(7540745593380780216, request)
+                    .map(::fidl_next::ResponseFuture::from_untyped)
+            }
+        }
 
-    fn foo<___R>(
-        &self,
-        request: ___R,
-    ) -> Result<::fidl_next::ResponseFuture<'_, sub::Foo, Self::Transport>, ::fidl_next::EncodeError>
-    where
-        ___R: ::fidl_next::Encode<
-            <Self::Transport as ::fidl_next::Transport>::SendBuffer,
-            Encoded = crate::WireSuperFooRequest<'static>,
-        >,
-    {
-        self.as_untyped()
-            .send_two_way(7540745593380780216, request)
-            .map(::fidl_next::ResponseFuture::from_untyped)
+        /// The server sender for the `sub` protocol.
+        #[repr(transparent)]
+        pub struct SubServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> SubServerSender<___T> where ___T: ::fidl_next::Transport {}
     }
 }
 
@@ -588,18 +579,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `sub` server sender.
-pub trait SubServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> SubServerSender for ::fidl_next::ServerSender<Sub, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the sub protocol.

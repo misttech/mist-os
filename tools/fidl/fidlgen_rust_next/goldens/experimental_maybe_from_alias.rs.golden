@@ -47,22 +47,35 @@ pub struct MyProtocol;
 pub mod my_protocol {
     pub mod prelude {
         pub use crate::{
-            my_protocol, MyProtocol, MyProtocolClientHandler, MyProtocolClientSender,
-            MyProtocolServerHandler, MyProtocolServerSender,
+            my_protocol, MyProtocol, MyProtocolClientHandler, MyProtocolServerHandler,
         };
     }
-}
 
-/// A helper trait for the `MyProtocol` client sender.
-pub trait MyProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
-}
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::MyProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = MyProtocolClientSender<___T>;
+            type ServerSender = MyProtocolServerSender<___T>;
+        }
 
-impl<___T> MyProtocolClientSender for ::fidl_next::ClientSender<MyProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        /// The client sender for the `MyProtocol` protocol.
+        pub struct MyProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> MyProtocolClientSender<___T> where ___T: ::fidl_next::Transport {}
+
+        /// The server sender for the `MyProtocol` protocol.
+        #[repr(transparent)]
+        pub struct MyProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> MyProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
+    }
 }
 
 /// A client handler for the MyProtocol protocol.
@@ -87,18 +100,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `MyProtocol` server sender.
-pub trait MyProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> MyProtocolServerSender for ::fidl_next::ServerSender<MyProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the MyProtocol protocol.

@@ -385,8 +385,8 @@ mod test {
     use fidl_next::{Client, ClientEnd, Responder, Server, ServerEnd, ServerSender};
     use fidl_next_fuchsia_examples_gizmo::device::{GetEvent, GetHardwareId};
     use fidl_next_fuchsia_examples_gizmo::{
-        Device, DeviceClientHandler, DeviceClientSender, DeviceGetEventResponse,
-        DeviceGetHardwareIdResponse, DeviceServerHandler,
+        Device, DeviceClientHandler, DeviceGetEventResponse, DeviceGetHardwareIdResponse,
+        DeviceServerHandler,
     };
     use fuchsia_async::OnSignals;
     use zx::{AsHandleRef, Event, HandleBased, Signals};
@@ -431,7 +431,8 @@ mod test {
     fn driver_fidl_server() {
         spawn_in_driver("driver fidl server", async {
             let (server_chan, client_chan) = Channel::<[Chunk]>::create();
-            let client_end = ClientEnd::from_untyped(DriverChannel::new(client_chan));
+            let client_end: ClientEnd<Device, _> =
+                ClientEnd::<Device, _>::from_untyped(DriverChannel::new(client_chan));
             let server_end: ServerEnd<Device, _> =
                 ServerEnd::from_untyped(DriverChannel::new(server_chan));
             let mut client = Client::new(client_end);

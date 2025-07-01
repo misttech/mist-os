@@ -55,22 +55,35 @@ pub mod some_driver_protocol {
     pub mod prelude {
         pub use crate::{
             some_driver_protocol, SomeDriverProtocol, SomeDriverProtocolClientHandler,
-            SomeDriverProtocolClientSender, SomeDriverProtocolServerHandler,
-            SomeDriverProtocolServerSender,
+            SomeDriverProtocolServerHandler,
         };
     }
-}
 
-/// A helper trait for the `SomeDriverProtocol` client sender.
-pub trait SomeDriverProtocolClientSender {
-    type Transport: ::fidl_next::Transport;
-}
+    mod ___detail {
+        unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::SomeDriverProtocol
+        where
+            ___T: ::fidl_next::Transport,
+        {
+            type ClientSender = SomeDriverProtocolClientSender<___T>;
+            type ServerSender = SomeDriverProtocolServerSender<___T>;
+        }
 
-impl<___T> SomeDriverProtocolClientSender for ::fidl_next::ClientSender<SomeDriverProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
+        /// The client sender for the `SomeDriverProtocol` protocol.
+        pub struct SomeDriverProtocolClientSender<___T: ::fidl_next::Transport> {
+            #[allow(dead_code)]
+            sender: ::fidl_next::protocol::ClientSender<___T>,
+        }
+
+        impl<___T> SomeDriverProtocolClientSender<___T> where ___T: ::fidl_next::Transport {}
+
+        /// The server sender for the `SomeDriverProtocol` protocol.
+        #[repr(transparent)]
+        pub struct SomeDriverProtocolServerSender<___T: ::fidl_next::Transport> {
+            sender: ::fidl_next::protocol::ServerSender<___T>,
+        }
+
+        impl<___T> SomeDriverProtocolServerSender<___T> where ___T: ::fidl_next::Transport {}
+    }
 }
 
 /// A client handler for the SomeDriverProtocol protocol.
@@ -95,18 +108,6 @@ where
             }
         }
     }
-}
-
-/// A helper trait for the `SomeDriverProtocol` server sender.
-pub trait SomeDriverProtocolServerSender {
-    type Transport: ::fidl_next::Transport;
-}
-
-impl<___T> SomeDriverProtocolServerSender for ::fidl_next::ServerSender<SomeDriverProtocol, ___T>
-where
-    ___T: ::fidl_next::Transport,
-{
-    type Transport = ___T;
 }
 
 /// A server handler for the SomeDriverProtocol protocol.
