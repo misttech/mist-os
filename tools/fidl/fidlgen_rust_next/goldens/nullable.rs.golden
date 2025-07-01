@@ -553,6 +553,52 @@ pub mod simple_protocol {
     }
 
     mod ___detail {
+
+        pub struct Add<T0, T1> {
+            a: T0,
+
+            b: T1,
+        }
+
+        impl<T0, T1> ::fidl_next::Encodable for Add<T0, T1>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+
+            T1: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = crate::WireSimpleProtocolAddRequest;
+        }
+
+        unsafe impl<___E, T0, T1> ::fidl_next::Encode<___E> for Add<T0, T1>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+
+            T1: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+                        b,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                ::fidl_next::Encode::encode(self.b, encoder, b)?;
+
+                Ok(())
+            }
+        }
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::SimpleProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -571,7 +617,27 @@ pub mod simple_protocol {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn add<___R>(
+            pub fn add(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+
+                b: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<::fidl_next::ResponseFuture<'_, super::Add, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.add_with(Add { a, b })
+            }
+
+            pub fn add_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::ResponseFuture<'_, super::Add, ___T>, ::fidl_next::EncodeError>

@@ -249,6 +249,7 @@ pub mod other_protocol {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::OtherProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -359,6 +360,7 @@ pub mod protocol {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::Protocol
         where
             ___T: ::fidl_next::Transport,

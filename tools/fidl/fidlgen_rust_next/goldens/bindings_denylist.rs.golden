@@ -995,6 +995,7 @@ pub mod allowed {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::Allowed
         where
             ___T: ::fidl_next::Transport,
@@ -1126,6 +1127,7 @@ pub mod contains_allowed {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::ContainsAllowed
         where
             ___T: ::fidl_next::Transport,
@@ -2207,6 +2209,81 @@ pub mod denied {
     }
 
     mod ___detail {
+
+        pub struct ShouldNeverAppearInAnyBinding<T0, T1, T2> {
+            should_never_appear_in_any_binding_1: T0,
+
+            should_never_appear_in_any_binding_2: T1,
+
+            should_never_appear_in_any_binding_3: T2,
+        }
+
+        impl<T0, T1, T2> ::fidl_next::Encodable for ShouldNeverAppearInAnyBinding<T0, T1, T2>
+        where
+            T0: ::fidl_next::Encodable<Encoded = crate::WireShouldNeverAppearInAnyBinding1>,
+
+            T1: ::fidl_next::Encodable<
+                Encoded = crate::WireShouldNeverAppearInAnyBinding2<'static>,
+            >,
+
+            T2: ::fidl_next::Encodable<Encoded = crate::WireShouldNeverAppearInAnyBinding3>,
+        {
+            type Encoded = crate::WireDeniedShouldNeverAppearInAnyBindingRequest<'static>;
+        }
+
+        unsafe impl<___E, T0, T1, T2> ::fidl_next::Encode<___E>
+            for ShouldNeverAppearInAnyBinding<T0, T1, T2>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::Encoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = crate::WireShouldNeverAppearInAnyBinding1>,
+
+            T1: ::fidl_next::Encode<
+                ___E,
+                Encoded = crate::WireShouldNeverAppearInAnyBinding2<'static>,
+            >,
+
+            T2: ::fidl_next::Encode<___E, Encoded = crate::WireShouldNeverAppearInAnyBinding3>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        should_never_appear_in_any_binding_1,
+                        should_never_appear_in_any_binding_2,
+                        should_never_appear_in_any_binding_3,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(
+                    self.should_never_appear_in_any_binding_1,
+                    encoder,
+                    should_never_appear_in_any_binding_1,
+                )?;
+
+                ::fidl_next::Encode::encode(
+                    self.should_never_appear_in_any_binding_2,
+                    encoder,
+                    should_never_appear_in_any_binding_2,
+                )?;
+
+                ::fidl_next::Encode::encode(
+                    self.should_never_appear_in_any_binding_3,
+                    encoder,
+                    should_never_appear_in_any_binding_3,
+                )?;
+
+                Ok(())
+            }
+        }
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::Denied
         where
             ___T: ::fidl_next::Transport,
@@ -2225,7 +2302,40 @@ pub mod denied {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn should_never_appear_in_any_binding<___R>(
+            pub fn should_never_appear_in_any_binding(
+                &self,
+
+                should_never_appear_in_any_binding_1: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireShouldNeverAppearInAnyBinding1,
+                >,
+
+                should_never_appear_in_any_binding_2: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireShouldNeverAppearInAnyBinding2<'static>,
+                >,
+
+                should_never_appear_in_any_binding_3: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireShouldNeverAppearInAnyBinding3,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+            {
+                self.should_never_appear_in_any_binding_with(ShouldNeverAppearInAnyBinding {
+                    should_never_appear_in_any_binding_1,
+
+                    should_never_appear_in_any_binding_2,
+
+                    should_never_appear_in_any_binding_3,
+                })
+            }
+
+            pub fn should_never_appear_in_any_binding_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -5531,6 +5641,223 @@ pub mod deny_each_binding {
     }
 
     mod ___detail {
+
+        pub struct OnlyDenyCpp<T0> {
+            a: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for OnlyDenyCpp<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = bool>,
+        {
+            type Encoded = crate::WireDenyEachBindingOnlyDenyCppRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for OnlyDenyCpp<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = bool>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct OnlyDenyDart<T0> {
+            a: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for OnlyDenyDart<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = bool>,
+        {
+            type Encoded = crate::WireDenyEachBindingOnlyDenyDartRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for OnlyDenyDart<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = bool>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct OnlyDenyGo<T0> {
+            a: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for OnlyDenyGo<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = bool>,
+        {
+            type Encoded = crate::WireDenyEachBindingOnlyDenyGoRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for OnlyDenyGo<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = bool>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct OnlyDenyPython<T0> {
+            a: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for OnlyDenyPython<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = bool>,
+        {
+            type Encoded = crate::WireDenyEachBindingOnlyDenyPythonRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for OnlyDenyPython<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = bool>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct OnlyDenyRust<T0> {
+            a: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for OnlyDenyRust<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = bool>,
+        {
+            type Encoded = crate::WireDenyEachBindingOnlyDenyRustRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for OnlyDenyRust<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = bool>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct OnlyDenySyzkaller<T0> {
+            a: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for OnlyDenySyzkaller<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = bool>,
+        {
+            type Encoded = crate::WireDenyEachBindingOnlyDenySyzkallerRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for OnlyDenySyzkaller<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = bool>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        a,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.a, encoder, a)?;
+
+                Ok(())
+            }
+        }
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::DenyEachBinding
         where
             ___T: ::fidl_next::Transport,
@@ -5549,7 +5876,25 @@ pub mod deny_each_binding {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn only_deny_cpp<___R>(
+            pub fn only_deny_cpp(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyCpp, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.only_deny_cpp_with(OnlyDenyCpp { a })
+            }
+
+            pub fn only_deny_cpp_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -5567,7 +5912,25 @@ pub mod deny_each_binding {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn only_deny_dart<___R>(
+            pub fn only_deny_dart(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyDart, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.only_deny_dart_with(OnlyDenyDart { a })
+            }
+
+            pub fn only_deny_dart_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -5585,7 +5948,25 @@ pub mod deny_each_binding {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn only_deny_go<___R>(
+            pub fn only_deny_go(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyGo, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.only_deny_go_with(OnlyDenyGo { a })
+            }
+
+            pub fn only_deny_go_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -5603,7 +5984,25 @@ pub mod deny_each_binding {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn only_deny_python<___R>(
+            pub fn only_deny_python(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyPython, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.only_deny_python_with(OnlyDenyPython { a })
+            }
+
+            pub fn only_deny_python_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -5621,7 +6020,25 @@ pub mod deny_each_binding {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn only_deny_rust<___R>(
+            pub fn only_deny_rust(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenyRust, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.only_deny_rust_with(OnlyDenyRust { a })
+            }
+
+            pub fn only_deny_rust_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -5639,7 +6056,25 @@ pub mod deny_each_binding {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn only_deny_syzkaller<___R>(
+            pub fn only_deny_syzkaller(
+                &self,
+
+                a: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = bool,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::OnlyDenySyzkaller, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.only_deny_syzkaller_with(OnlyDenySyzkaller { a })
+            }
+
+            pub fn only_deny_syzkaller_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -5937,6 +6372,48 @@ pub mod imports_same_name_context {
     }
 
     mod ___detail {
+
+        pub struct AlwaysDenied<T0> {
+            arg: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for AlwaysDenied<T0>
+        where
+            T0: ::fidl_next::Encodable<
+                Encoded = ::fidl_next_test_dependent::WireOnlyAppearsInImportingLibrary,
+            >,
+        {
+            type Encoded = ::fidl_next_test_dependent::WireContainsDeniedAlwaysDeniedRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for AlwaysDenied<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<
+                ___E,
+                Encoded = ::fidl_next_test_dependent::WireOnlyAppearsInImportingLibrary,
+            >,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        arg,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.arg, encoder, arg)?;
+
+                Ok(())
+            }
+        }
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::ImportsSameNameContext
         where
             ___T: ::fidl_next::Transport,
@@ -5955,7 +6432,22 @@ pub mod imports_same_name_context {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn always_denied<___R>(
+            pub fn always_denied(
+                &self,
+
+                arg: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next_test_dependent::WireOnlyAppearsInImportingLibrary,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.always_denied_with(AlwaysDenied { arg })
+            }
+
+            pub fn always_denied_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -6471,6 +6963,7 @@ pub mod only_cpp_and_deps {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::OnlyCppAndDeps
         where
             ___T: ::fidl_next::Transport,

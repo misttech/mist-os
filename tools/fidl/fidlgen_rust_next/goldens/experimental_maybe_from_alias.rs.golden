@@ -52,6 +52,7 @@ pub mod my_protocol {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::MyProtocol
         where
             ___T: ::fidl_next::Transport,

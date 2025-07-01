@@ -412,6 +412,83 @@ pub mod example_use_of_error_syntax {
     }
 
     mod ___detail {
+
+        pub struct ComposedCallWhichMayFail<T0> {
+            s: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for ComposedCallWhichMayFail<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireString<'static>>,
+        {
+            type Encoded = ::fidl_next_test_errorsyntax_parent::WireParentUsesErrorSyntaxComposedCallWhichMayFailRequest<'static>;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for ComposedCallWhichMayFail<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::Encoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireString<'static>>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        s,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.s, encoder, s)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct CallWhichMayFail<T0> {
+            s: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for CallWhichMayFail<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireString<'static>>,
+        {
+            type Encoded = crate::WireExampleUseOfErrorSyntaxCallWhichMayFailRequest<'static>;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for CallWhichMayFail<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::Encoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireString<'static>>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        s,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.s, encoder, s)?;
+
+                Ok(())
+            }
+        }
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::ExampleUseOfErrorSyntax
         where
             ___T: ::fidl_next::Transport,
@@ -430,7 +507,29 @@ pub mod example_use_of_error_syntax {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn composed_call_which_may_fail<___R>(
+            pub fn composed_call_which_may_fail(
+                &self,
+
+                s: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireString<'static>,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::ComposedCallWhichMayFail, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+            {
+                self.composed_call_which_may_fail_with(ComposedCallWhichMayFail { s })
+            }
+
+
+
+                            pub fn composed_call_which_may_fail_with<___R>(
                                 &self,
                                 request: ___R,
                             ) -> Result<
@@ -448,7 +547,27 @@ pub mod example_use_of_error_syntax {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn call_which_may_fail<___R>(
+            pub fn call_which_may_fail(
+                &self,
+
+                s: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireString<'static>,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::CallWhichMayFail, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+            {
+                self.call_which_may_fail_with(CallWhichMayFail { s })
+            }
+
+            pub fn call_which_may_fail_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<

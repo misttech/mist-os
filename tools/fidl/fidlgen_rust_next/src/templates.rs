@@ -167,6 +167,34 @@ impl Context {
         }
         result
     }
+
+    fn get_method_args_struct(&self, method: &ProtocolMethod) -> Option<&Struct> {
+        match method.kind {
+            ProtocolMethodKind::OneWay | ProtocolMethodKind::TwoWay => {
+                if let Some(args) = &method.maybe_request_payload {
+                    if let TypeKind::Identifier { identifier, .. } = &args.kind {
+                        return self
+                            .schema
+                            .struct_declarations
+                            .get(identifier)
+                            .or_else(|| self.schema.external_struct_declarations.get(identifier));
+                    }
+                }
+            }
+            ProtocolMethodKind::Event => {
+                if !method.has_error {
+                    if let Some(args) = &method.maybe_response_payload {
+                        if let TypeKind::Identifier { identifier, .. } = &args.kind {
+                            return self.schema.struct_declarations.get(identifier).or_else(|| {
+                                self.schema.external_struct_declarations.get(identifier)
+                            });
+                        }
+                    }
+                }
+            }
+        }
+        None
+    }
 }
 
 enum BindingsRestriction {

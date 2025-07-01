@@ -1815,6 +1815,7 @@ pub mod unknown_interactions_ajar_driver_protocol {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::UnknownInteractionsAjarDriverProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -5694,6 +5695,79 @@ pub mod unknown_interactions_ajar_protocol {
     }
 
     mod ___detail {
+
+        pub struct StrictEventFields<T0> {
+            some_field: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for StrictEventFields<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = crate::WireUnknownInteractionsAjarProtocolStrictEventFieldsRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for StrictEventFields<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        some_field,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct FlexibleEventFields<T0> {
+            some_field: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for FlexibleEventFields<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = crate::WireUnknownInteractionsAjarProtocolFlexibleEventFieldsRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for FlexibleEventFields<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        some_field,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+                Ok(())
+            }
+        }
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::UnknownInteractionsAjarProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -5829,7 +5903,22 @@ pub mod unknown_interactions_ajar_protocol {
                 self.sender.send_event(6927291151663612592, ())
             }
 
-            pub fn strict_event_fields<___R>(
+            pub fn strict_event_fields(
+                &self,
+
+                some_field: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.strict_event_fields_with(StrictEventFields { some_field })
+            }
+
+            pub fn strict_event_fields_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -5842,7 +5931,7 @@ pub mod unknown_interactions_ajar_protocol {
                 self.sender.send_event(5838220329633564521, request)
             }
 
-            pub fn strict_event_union<___R>(
+            pub fn strict_event_union_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -5855,7 +5944,7 @@ pub mod unknown_interactions_ajar_protocol {
                 self.sender.send_event(6303151946645602671, request)
             }
 
-            pub fn strict_event_table<___R>(
+            pub fn strict_event_table_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -5874,7 +5963,22 @@ pub mod unknown_interactions_ajar_protocol {
                 self.sender.send_event(1281760452005010931, ())
             }
 
-            pub fn flexible_event_fields<___R>(
+            pub fn flexible_event_fields(
+                &self,
+
+                some_field: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.flexible_event_fields_with(FlexibleEventFields { some_field })
+            }
+
+            pub fn flexible_event_fields_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -5887,7 +5991,7 @@ pub mod unknown_interactions_ajar_protocol {
                 self.sender.send_event(4298964238728681570, request)
             }
 
-            pub fn flexible_event_union<___R>(
+            pub fn flexible_event_union_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -5900,7 +6004,7 @@ pub mod unknown_interactions_ajar_protocol {
                 self.sender.send_event(8950943792372972717, request)
             }
 
-            pub fn flexible_event_table<___R>(
+            pub fn flexible_event_table_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -8074,6 +8178,7 @@ pub mod unknown_interactions_closed_driver_protocol {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::UnknownInteractionsClosedDriverProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -11093,6 +11198,43 @@ pub mod unknown_interactions_closed_protocol {
     }
 
     mod ___detail {
+
+        pub struct StrictEventFields<T0> {
+            some_field: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for StrictEventFields<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = crate::WireUnknownInteractionsClosedProtocolStrictEventFieldsRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for StrictEventFields<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        some_field,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+                Ok(())
+            }
+        }
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::UnknownInteractionsClosedProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -11222,7 +11364,22 @@ pub mod unknown_interactions_closed_protocol {
                 self.sender.send_event(760799297757210939, ())
             }
 
-            pub fn strict_event_fields<___R>(
+            pub fn strict_event_fields(
+                &self,
+
+                some_field: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.strict_event_fields_with(StrictEventFields { some_field })
+            }
+
+            pub fn strict_event_fields_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -11235,7 +11392,7 @@ pub mod unknown_interactions_closed_protocol {
                 self.sender.send_event(6736355582617074292, request)
             }
 
-            pub fn strict_event_union<___R>(
+            pub fn strict_event_union_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -11248,7 +11405,7 @@ pub mod unknown_interactions_closed_protocol {
                 self.sender.send_event(4288682345454280036, request)
             }
 
-            pub fn strict_event_table<___R>(
+            pub fn strict_event_table_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -15095,6 +15252,7 @@ pub mod unknown_interactions_driver_protocol {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::UnknownInteractionsDriverProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -20915,6 +21073,79 @@ pub mod unknown_interactions_protocol {
     }
 
     mod ___detail {
+
+        pub struct StrictEventFields<T0> {
+            some_field: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for StrictEventFields<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = crate::WireUnknownInteractionsProtocolStrictEventFieldsRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for StrictEventFields<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        some_field,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct FlexibleEventFields<T0> {
+            some_field: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for FlexibleEventFields<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = crate::WireUnknownInteractionsProtocolFlexibleEventFieldsRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for FlexibleEventFields<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        some_field,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.some_field, encoder, some_field)?;
+
+                Ok(())
+            }
+        }
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::UnknownInteractionsProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -21138,7 +21369,22 @@ pub mod unknown_interactions_protocol {
                 self.sender.send_event(685715276307386305, ())
             }
 
-            pub fn strict_event_fields<___R>(
+            pub fn strict_event_fields(
+                &self,
+
+                some_field: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.strict_event_fields_with(StrictEventFields { some_field })
+            }
+
+            pub fn strict_event_fields_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -21151,7 +21397,7 @@ pub mod unknown_interactions_protocol {
                 self.sender.send_event(8896208255987935026, request)
             }
 
-            pub fn strict_event_union<___R>(
+            pub fn strict_event_union_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -21164,7 +21410,7 @@ pub mod unknown_interactions_protocol {
                 self.sender.send_event(3919175221694221274, request)
             }
 
-            pub fn strict_event_table<___R>(
+            pub fn strict_event_table_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -21183,7 +21429,22 @@ pub mod unknown_interactions_protocol {
                 self.sender.send_event(7042257263728687206, ())
             }
 
-            pub fn flexible_event_fields<___R>(
+            pub fn flexible_event_fields(
+                &self,
+
+                some_field: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.flexible_event_fields_with(FlexibleEventFields { some_field })
+            }
+
+            pub fn flexible_event_fields_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -21196,7 +21457,7 @@ pub mod unknown_interactions_protocol {
                 self.sender.send_event(3613822014516746241, request)
             }
 
-            pub fn flexible_event_union<___R>(
+            pub fn flexible_event_union_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -21209,7 +21470,7 @@ pub mod unknown_interactions_protocol {
                 self.sender.send_event(2499446536152409191, request)
             }
 
-            pub fn flexible_event_table<___R>(
+            pub fn flexible_event_table_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>

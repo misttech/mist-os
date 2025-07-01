@@ -142,6 +142,7 @@ pub mod driver_protocol {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::DriverProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -577,6 +578,47 @@ pub mod handles_in_protocol {
     }
 
     mod ___detail {
+
+        pub struct SendHandles<T0> {
+            t: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for SendHandles<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = crate::WireT<'static>>,
+        {
+            type Encoded = crate::WireHandlesInProtocolSendHandlesRequest<'static>;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for SendHandles<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::Encoder,
+
+            ___E: ::fidl_next::fuchsia::HandleEncoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = crate::WireT<'static>>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        t,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.t, encoder, t)?;
+
+                Ok(())
+            }
+        }
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::HandlesInProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -595,7 +637,26 @@ pub mod handles_in_protocol {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn send_handles<___R>(
+            pub fn send_handles(
+                &self,
+
+                t: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireT<'static>,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+            {
+                self.send_handles_with(SendHandles { t })
+            }
+
+            pub fn send_handles_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>

@@ -2583,6 +2583,54 @@ pub mod some_protocol {
     }
 
     mod ___detail {
+
+        pub struct SomeMethod<T0, T1> {
+            union_member: T0,
+
+            table_member: T1,
+        }
+
+        impl<T0, T1> ::fidl_next::Encodable for SomeMethod<T0, T1>
+        where
+            T0: ::fidl_next::Encodable<Encoded = crate::WireUnionMember>,
+
+            T1: ::fidl_next::Encodable<Encoded = crate::WireTableMember<'static>>,
+        {
+            type Encoded = crate::WireSomeProtocolSomeMethodRequest<'static>;
+        }
+
+        unsafe impl<___E, T0, T1> ::fidl_next::Encode<___E> for SomeMethod<T0, T1>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            ___E: ::fidl_next::Encoder,
+
+            T0: ::fidl_next::Encode<___E, Encoded = crate::WireUnionMember>,
+
+            T1: ::fidl_next::Encode<___E, Encoded = crate::WireTableMember<'static>>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        union_member,
+                        table_member,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.union_member, encoder, union_member)?;
+
+                ::fidl_next::Encode::encode(self.table_member, encoder, table_member)?;
+
+                Ok(())
+            }
+        }
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::SomeProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -2601,7 +2649,32 @@ pub mod some_protocol {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn some_method<___R>(
+            pub fn some_method(
+                &self,
+
+                union_member: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireUnionMember,
+                >,
+
+                table_member: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = crate::WireTableMember<'static>,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::SomeMethod, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+
+                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+            {
+                self.some_method_with(SomeMethod { union_member, table_member })
+            }
+
+            pub fn some_method_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<

@@ -384,6 +384,52 @@ pub mod two_way {
     }
 
     mod ___detail {
+
+        pub struct Add<T0, T1> {
+            addend1: T0,
+
+            addend2: T1,
+        }
+
+        impl<T0, T1> ::fidl_next::Encodable for Add<T0, T1>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireU16>,
+
+            T1: ::fidl_next::Encodable<Encoded = ::fidl_next::WireU16>,
+        {
+            type Encoded = crate::WireTwoWayAddRequest;
+        }
+
+        unsafe impl<___E, T0, T1> ::fidl_next::Encode<___E> for Add<T0, T1>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireU16>,
+
+            T1: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireU16>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        addend1,
+                        addend2,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.addend1, encoder, addend1)?;
+
+                ::fidl_next::Encode::encode(self.addend2, encoder, addend2)?;
+
+                Ok(())
+            }
+        }
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::TwoWay
         where
             ___T: ::fidl_next::Transport,
@@ -402,7 +448,27 @@ pub mod two_way {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn add<___R>(
+            pub fn add(
+                &self,
+
+                addend1: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireU16,
+                >,
+
+                addend2: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireU16,
+                >,
+            ) -> Result<::fidl_next::ResponseFuture<'_, super::Add, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.add_with(Add { addend1, addend2 })
+            }
+
+            pub fn add_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::ResponseFuture<'_, super::Add, ___T>, ::fidl_next::EncodeError>

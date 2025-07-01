@@ -2325,6 +2325,7 @@ pub mod composed_protocol {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::ComposedProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -2343,7 +2344,7 @@ pub mod composed_protocol {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn one_way_anon_composed<___R>(
+            pub fn one_way_anon_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -2356,7 +2357,7 @@ pub mod composed_protocol {
                 self.sender.send_one_way(7960710870216447007, request)
             }
 
-            pub fn two_way_anon_composed<___R>(
+            pub fn two_way_anon_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -2374,7 +2375,7 @@ pub mod composed_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn two_way_anon_composed_with_error<___R>(
+            pub fn two_way_anon_composed_with_error_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -2394,7 +2395,7 @@ pub mod composed_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn one_way_named_composed<___R>(
+            pub fn one_way_named_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -2407,7 +2408,7 @@ pub mod composed_protocol {
                 self.sender.send_one_way(1159174053475281336, request)
             }
 
-            pub fn two_way_named_composed<___R>(
+            pub fn two_way_named_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -2425,7 +2426,7 @@ pub mod composed_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn two_way_named_composed_with_error<___R>(
+            pub fn two_way_named_composed_with_error_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -2454,7 +2455,7 @@ pub mod composed_protocol {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn on_anon_composed<___R>(
+            pub fn on_anon_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -2467,7 +2468,7 @@ pub mod composed_protocol {
                 self.sender.send_event(5307191872315199016, request)
             }
 
-            pub fn on_named_composed<___R>(
+            pub fn on_named_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -4651,6 +4652,7 @@ pub mod main_protocol {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::MainProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -4669,7 +4671,7 @@ pub mod main_protocol {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn one_way_anon_composed<___R>(
+            pub fn one_way_anon_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -4682,7 +4684,7 @@ pub mod main_protocol {
                 self.sender.send_one_way(7960710870216447007, request)
             }
 
-            pub fn two_way_anon_composed<___R>(
+            pub fn two_way_anon_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -4700,7 +4702,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn two_way_anon_composed_with_error<___R>(
+            pub fn two_way_anon_composed_with_error_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -4720,7 +4722,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn one_way_named_composed<___R>(
+            pub fn one_way_named_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -4733,7 +4735,7 @@ pub mod main_protocol {
                 self.sender.send_one_way(1159174053475281336, request)
             }
 
-            pub fn two_way_named_composed<___R>(
+            pub fn two_way_named_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -4751,7 +4753,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn two_way_named_composed_with_error<___R>(
+            pub fn two_way_named_composed_with_error_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -4769,7 +4771,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn one_way_local<___R>(
+            pub fn one_way_local_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -4782,7 +4784,7 @@ pub mod main_protocol {
                 self.sender.send_one_way(4131125523789731521, request)
             }
 
-            pub fn two_way_local<___R>(
+            pub fn two_way_local_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -4800,7 +4802,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn two_way_local_with_error<___R>(
+            pub fn two_way_local_with_error_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -4818,7 +4820,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn one_way_anon<___R>(
+            pub fn one_way_anon_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -4831,7 +4833,7 @@ pub mod main_protocol {
                 self.sender.send_one_way(8596232895075765804, request)
             }
 
-            pub fn two_way_anon<___R>(
+            pub fn two_way_anon_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -4849,7 +4851,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn two_way_anon_with_error<___R>(
+            pub fn two_way_anon_with_error_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -4878,7 +4880,7 @@ pub mod main_protocol {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn on_anon_composed<___R>(
+            pub fn on_anon_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -4891,7 +4893,7 @@ pub mod main_protocol {
                 self.sender.send_event(5307191872315199016, request)
             }
 
-            pub fn on_named_composed<___R>(
+            pub fn on_named_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -4904,7 +4906,7 @@ pub mod main_protocol {
                 self.sender.send_event(1712755118419701115, request)
             }
 
-            pub fn on_local<___R>(
+            pub fn on_local_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -4917,7 +4919,7 @@ pub mod main_protocol {
                 self.sender.send_event(8208103053879750285, request)
             }
 
-            pub fn on_anon<___R>(
+            pub fn on_anon_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>

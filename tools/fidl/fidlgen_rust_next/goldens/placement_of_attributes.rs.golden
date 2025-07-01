@@ -445,6 +445,43 @@ pub mod example_protocol {
     }
 
     mod ___detail {
+
+        pub struct Method<T0> {
+            arg: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for Method<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next_test_exampleusing::WireEmpty>,
+        {
+            type Encoded = crate::WireExampleProtocolMethodRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for Method<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next_test_exampleusing::WireEmpty>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        arg,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.arg, encoder, arg)?;
+
+                Ok(())
+            }
+        }
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::ExampleProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -463,7 +500,22 @@ pub mod example_protocol {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn method<___R>(
+            pub fn method(
+                &self,
+
+                arg: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next_test_exampleusing::WireEmpty,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.method_with(Method { arg })
+            }
+
+            pub fn method_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>

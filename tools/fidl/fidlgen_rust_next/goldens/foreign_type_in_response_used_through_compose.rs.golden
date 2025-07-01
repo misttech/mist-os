@@ -26,6 +26,7 @@ pub mod top {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::Top
         where
             ___T: ::fidl_next::Transport,

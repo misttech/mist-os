@@ -74,7 +74,7 @@ impl<T: Transport + 'static> CalculatorServerHandler<T> for MyCalculatorServer {
         println!("Cleared, sending an error back to close the connection");
 
         let sender = sender.clone();
-        sender.on_error(CalculatorOnErrorRequest { status_code: 100 }).unwrap().await.unwrap();
+        sender.on_error(100u32).unwrap().await.unwrap();
     }
 }
 
@@ -122,7 +122,7 @@ async fn create_endpoints(
 
 async fn add(client_sender: &ClientSender<Calculator, Endpoint>) {
     let result = client_sender
-        .add(CalculatorAddRequest { a: 16, b: 26 })
+        .add(16, 26)
         .expect("failed to encode add request")
         .await
         .expect("failed to send, receive, or decode response to add request");
@@ -134,7 +134,7 @@ async fn add(client_sender: &ClientSender<Calculator, Endpoint>) {
 async fn divide(client_sender: &ClientSender<Calculator, Endpoint>) {
     // Normal division
     let result = client_sender
-        .divide(CalculatorDivideRequest { dividend: 100, divisor: 3 })
+        .divide(100, 3)
         .expect("failed to encode divide request")
         .await
         .expect("failed to send, receive, or decode response to divide request");
@@ -145,7 +145,7 @@ async fn divide(client_sender: &ClientSender<Calculator, Endpoint>) {
 
     // Cause an error
     let result = client_sender
-        .divide(CalculatorDivideRequest { dividend: 42, divisor: 0 })
+        .divide(42, 0)
         .expect("failed to encode divide request")
         .await
         .expect("failed to send, receive, or decode response to divide request");

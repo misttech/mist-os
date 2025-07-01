@@ -2562,6 +2562,7 @@ pub mod main_protocol {
     }
 
     mod ___detail {
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::MainProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -2580,7 +2581,7 @@ pub mod main_protocol {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn one_way_anon_composed<___R>(
+            pub fn one_way_anon_composed_with<___R>(
                                 &self,
                                 request: ___R,
                             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -2600,7 +2601,9 @@ pub mod main_protocol {
 
 
 
-                            pub fn two_way_anon_composed<___R>(
+
+
+                            pub fn two_way_anon_composed_with<___R>(
                                 &self,
                                 request: ___R,
                             ) -> Result<
@@ -2625,7 +2628,9 @@ pub mod main_protocol {
 
 
 
-                            pub fn two_way_anon_composed_with_error<___R>(
+
+
+                            pub fn two_way_anon_composed_with_error_with<___R>(
                                 &self,
                                 request: ___R,
                             ) -> Result<
@@ -2643,7 +2648,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn one_way_named_composed<___R>(
+            pub fn one_way_named_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -2658,7 +2663,7 @@ pub mod main_protocol {
                 self.sender.send_one_way(6735359826241449560, request)
             }
 
-            pub fn two_way_named_composed<___R>(
+            pub fn two_way_named_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -2676,7 +2681,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn two_way_named_composed_with_error<___R>(
+            pub fn two_way_named_composed_with_error_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -2696,7 +2701,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn one_way_import<___R>(
+            pub fn one_way_import_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -2711,7 +2716,7 @@ pub mod main_protocol {
                 self.sender.send_one_way(374039999976906043, request)
             }
 
-            pub fn two_way_import<___R>(
+            pub fn two_way_import_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -2729,7 +2734,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn two_way_import_with_error<___R>(
+            pub fn two_way_import_with_error_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -2749,7 +2754,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn one_way_local<___R>(
+            pub fn one_way_local_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -2762,7 +2767,7 @@ pub mod main_protocol {
                 self.sender.send_one_way(6085941264859402051, request)
             }
 
-            pub fn two_way_local<___R>(
+            pub fn two_way_local_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -2780,7 +2785,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn two_way_local_with_error<___R>(
+            pub fn two_way_local_with_error_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -2798,7 +2803,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn one_way_anon<___R>(
+            pub fn one_way_anon_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -2811,7 +2816,7 @@ pub mod main_protocol {
                 self.sender.send_one_way(4203317713771984620, request)
             }
 
-            pub fn two_way_anon<___R>(
+            pub fn two_way_anon_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -2829,7 +2834,7 @@ pub mod main_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn two_way_anon_with_error<___R>(
+            pub fn two_way_anon_with_error_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<
@@ -2858,7 +2863,7 @@ pub mod main_protocol {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn on_anon_composed<___R>(
+            pub fn on_anon_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -2871,7 +2876,7 @@ pub mod main_protocol {
                 self.sender.send_event(9198778981238868491, request)
             }
 
-            pub fn on_named_composed<___R>(
+            pub fn on_named_composed_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -2884,7 +2889,7 @@ pub mod main_protocol {
                 self.sender.send_event(6802961197456477674, request)
             }
 
-            pub fn on_import<___R>(
+            pub fn on_import_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -2897,7 +2902,7 @@ pub mod main_protocol {
                 self.sender.send_event(6584793811321990352, request)
             }
 
-            pub fn on_local<___R>(
+            pub fn on_local_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -2910,7 +2915,7 @@ pub mod main_protocol {
                 self.sender.send_event(4199259762307646332, request)
             }
 
-            pub fn on_anon<___R>(
+            pub fn on_anon_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -3630,6 +3635,331 @@ pub mod open_protocol {
     }
 
     mod ___detail {
+
+        pub struct FlexibleOneWay<T0> {
+            value: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for FlexibleOneWay<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = ::fidl_next_test_protocollayouts_imported::WireComposedOpenProtocolFlexibleOneWayRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for FlexibleOneWay<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        value,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.value, encoder, value)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct FlexibleTwoWayNoError<T0> {
+            value: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for FlexibleTwoWayNoError<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = ::fidl_next_test_protocollayouts_imported::WireComposedOpenProtocolFlexibleTwoWayNoErrorRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for FlexibleTwoWayNoError<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        value,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.value, encoder, value)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct FlexibleTwoWayWithError<T0> {
+            value: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for FlexibleTwoWayWithError<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = ::fidl_next_test_protocollayouts_imported::WireComposedOpenProtocolFlexibleTwoWayWithErrorRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for FlexibleTwoWayWithError<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        value,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.value, encoder, value)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct FlexibleEvent<T0> {
+            value: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for FlexibleEvent<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = ::fidl_next_test_protocollayouts_imported::WireComposedOpenProtocolFlexibleEventRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for FlexibleEvent<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        value,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.value, encoder, value)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct StrictOneWay<T0> {
+            value: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for StrictOneWay<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = ::fidl_next_test_protocollayouts_imported::WireComposedOpenProtocolStrictOneWayRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for StrictOneWay<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        value,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.value, encoder, value)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct StrictTwoWayNoError<T0> {
+            value: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for StrictTwoWayNoError<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = ::fidl_next_test_protocollayouts_imported::WireComposedOpenProtocolStrictTwoWayNoErrorRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for StrictTwoWayNoError<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        value,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.value, encoder, value)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct StrictTwoWayWithError<T0> {
+            value: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for StrictTwoWayWithError<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = ::fidl_next_test_protocollayouts_imported::WireComposedOpenProtocolStrictTwoWayWithErrorRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for StrictTwoWayWithError<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        value,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.value, encoder, value)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct StrictEvent<T0> {
+            value: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for StrictEvent<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = ::fidl_next_test_protocollayouts_imported::WireComposedOpenProtocolStrictEventRequest;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for StrictEvent<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        value,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.value, encoder, value)?;
+
+                Ok(())
+            }
+        }
+
+        pub struct FlexibleOneWayNamedPayload<T0> {
+            value: T0,
+        }
+
+        impl<T0> ::fidl_next::Encodable for FlexibleOneWayNamedPayload<T0>
+        where
+            T0: ::fidl_next::Encodable<Encoded = ::fidl_next::WireI32>,
+        {
+            type Encoded = ::fidl_next_test_protocollayouts_imported::WireImportStructPayload;
+        }
+
+        unsafe impl<___E, T0> ::fidl_next::Encode<___E> for FlexibleOneWayNamedPayload<T0>
+        where
+            ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+
+            T0: ::fidl_next::Encode<___E, Encoded = ::fidl_next::WireI32>,
+        {
+            #[inline]
+            fn encode(
+                self,
+                encoder: &mut ___E,
+                out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+            ) -> Result<(), ::fidl_next::EncodeError> {
+                ::fidl_next::munge! {
+                    let Self::Encoded {
+                        value,
+
+                    } = out;
+                }
+
+                ::fidl_next::Encode::encode(self.value, encoder, value)?;
+
+                Ok(())
+            }
+        }
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::OpenProtocol
         where
             ___T: ::fidl_next::Transport,
@@ -3648,7 +3978,24 @@ pub mod open_protocol {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn flexible_one_way<___R>(
+            pub fn flexible_one_way(
+                &self,
+
+                value: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.flexible_one_way_with(FlexibleOneWay { value })
+            }
+
+
+
+                            pub fn flexible_one_way_with<___R>(
                                 &self,
                                 request: ___R,
                             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -3661,14 +4008,27 @@ pub mod open_protocol {
                 self.sender.send_one_way(3516779973873009953, request)
             }
 
+            pub fn flexible_two_way_no_error(
+                &self,
+
+                value: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::FlexibleTwoWayNoError, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.flexible_two_way_no_error_with(FlexibleTwoWayNoError { value })
+            }
 
 
 
-
-
-
-
-                            pub fn flexible_two_way_no_error<___R>(
+                            pub fn flexible_two_way_no_error_with<___R>(
                                 &self,
                                 request: ___R,
                             ) -> Result<
@@ -3686,14 +4046,27 @@ pub mod open_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
+            pub fn flexible_two_way_with_error(
+                &self,
+
+                value: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::FlexibleTwoWayWithError, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.flexible_two_way_with_error_with(FlexibleTwoWayWithError { value })
+            }
 
 
 
-
-
-
-
-                            pub fn flexible_two_way_with_error<___R>(
+                            pub fn flexible_two_way_with_error_with<___R>(
                                 &self,
                                 request: ___R,
                             ) -> Result<
@@ -3711,20 +4084,24 @@ pub mod open_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
+            pub fn strict_one_way(
+                &self,
+
+                value: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.strict_one_way_with(StrictOneWay { value })
+            }
 
 
 
-
-
-
-
-
-
-
-
-
-
-                            pub fn strict_one_way<___R>(
+                            pub fn strict_one_way_with<___R>(
                                 &self,
                                 request: ___R,
                             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -3737,14 +4114,27 @@ pub mod open_protocol {
                 self.sender.send_one_way(8790149921168801703, request)
             }
 
+            pub fn strict_two_way_no_error(
+                &self,
+
+                value: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::StrictTwoWayNoError, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.strict_two_way_no_error_with(StrictTwoWayNoError { value })
+            }
 
 
 
-
-
-
-
-                            pub fn strict_two_way_no_error<___R>(
+                            pub fn strict_two_way_no_error_with<___R>(
                                 &self,
                                 request: ___R,
                             ) -> Result<
@@ -3762,14 +4152,27 @@ pub mod open_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
+            pub fn strict_two_way_with_error(
+                &self,
+
+                value: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<
+                ::fidl_next::ResponseFuture<'_, super::StrictTwoWayWithError, ___T>,
+                ::fidl_next::EncodeError,
+            >
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.strict_two_way_with_error_with(StrictTwoWayWithError { value })
+            }
 
 
 
-
-
-
-
-                            pub fn strict_two_way_with_error<___R>(
+                            pub fn strict_two_way_with_error_with<___R>(
                                 &self,
                                 request: ___R,
                             ) -> Result<
@@ -3787,7 +4190,22 @@ pub mod open_protocol {
                     .map(::fidl_next::ResponseFuture::from_untyped)
             }
 
-            pub fn flexible_one_way_named_payload<___R>(
+            pub fn flexible_one_way_named_payload(
+                &self,
+
+                value: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.flexible_one_way_named_payload_with(FlexibleOneWayNamedPayload { value })
+            }
+
+            pub fn flexible_one_way_named_payload_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -3811,7 +4229,22 @@ pub mod open_protocol {
         where
             ___T: ::fidl_next::Transport,
         {
-            pub fn flexible_event<___R>(
+            pub fn flexible_event(
+                &self,
+
+                value: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.flexible_event_with(FlexibleEvent { value })
+            }
+
+            pub fn flexible_event_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -3824,7 +4257,22 @@ pub mod open_protocol {
                 self.sender.send_event(9152311661656086484, request)
             }
 
-            pub fn strict_event<___R>(
+            pub fn strict_event(
+                &self,
+
+                value: impl ::fidl_next::Encode<
+                    <___T as ::fidl_next::Transport>::SendBuffer,
+                    Encoded = ::fidl_next::WireI32,
+                >,
+            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+            where
+                <___T as ::fidl_next::Transport>::SendBuffer:
+                    ::fidl_next::encoder::InternalHandleEncoder,
+            {
+                self.strict_event_with(StrictEvent { value })
+            }
+
+            pub fn strict_event_with<___R>(
                 &self,
                 request: ___R,
             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>

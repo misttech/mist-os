@@ -106,6 +106,84 @@ pub mod {{ module_name }} {
     {% endfor %}
 
     mod ___detail {
+        {% for method in protocol.methods %}
+            {% if let Some(args) = context.get_method_args_struct(method) %}
+                {% let method_type_name = filters::ident(method.name.camel())? %}
+                {% let is_static = args.shape.max_out_of_line == 0 %}
+
+                pub struct {{ method_type_name }}<
+                    {% for i in 0..args.members.len() %}
+                        T{{ i }},
+                    {% endfor %}
+                > {
+                    {% for (i, member) in args.members.iter().enumerate() %}
+                        {{ member.name.snake()|ident }}: T{{ i }},
+                    {% endfor %}
+                }
+
+                impl<
+                    {% for i in 0..args.members.len() %}
+                        T{{ i }},
+                    {% endfor %}
+                > ::fidl_next::Encodable for {{ method_type_name }}<
+                    {% for i in 0..args.members.len() %}
+                        T{{ i }},
+                    {% endfor %}
+                >
+                where
+                    {% for (i, member) in args.members.iter().enumerate() %}
+                        T{{ i }}: ::fidl_next::Encodable<Encoded = {{ context.static_wire_type(member.ty) }}>,
+                    {% endfor %}
+                {
+                    type Encoded = {{ context.static_wire_type(method.maybe_request_payload.as_ref().or(method.maybe_response_payload.as_ref()).unwrap()) }};
+                }
+
+                unsafe impl<
+                    ___E,
+                    {% for i in 0..args.members.len() %}
+                        T{{ i }},
+                    {% endfor %}
+                > ::fidl_next::Encode<___E> for {{ method_type_name }}<
+                    {% for i in 0..args.members.len() %}
+                        T{{ i }},
+                    {% endfor %}
+                >
+                where
+                    ___E: ::fidl_next::encoder::InternalHandleEncoder + ?Sized,
+                    {% if !is_static %}
+                        ___E: ::fidl_next::Encoder,
+                    {% endif %}
+                    {% if args.is_resource %}
+                        ___E: ::fidl_next::fuchsia::HandleEncoder,
+                    {% endif %}
+                    {% for (i, member) in args.members.iter().enumerate() %}
+                        T{{ i }}: ::fidl_next::Encode<___E, Encoded = {{ context.static_wire_type(member.ty) }}>,
+                    {% endfor %}
+                {
+                    #[inline]
+                    fn encode(
+                        self,
+                        encoder: &mut ___E,
+                        out: &mut ::core::mem::MaybeUninit<Self::Encoded>,
+                    ) -> Result<(), ::fidl_next::EncodeError> {
+                        ::fidl_next::munge! {
+                            let Self::Encoded {
+                                {% for member in args.members -%}
+                                    {{ member.name.snake()|ident }},
+                                {% endfor %}
+                            } = out;
+                        }
+
+                        {% for member in args.members %}
+                            {% let member_name = filters::ident(member.name.snake())? %}
+                            ::fidl_next::Encode::encode(self.{{ member_name }}, encoder, {{ member_name }})?;
+                        {% endfor %}
+                        Ok(())
+                    }
+                }
+            {% endif %}
+        {% endfor %}
+
         unsafe impl<___T> ::fidl_next::Protocol<___T> for crate::{{ protocol_name }}
         where
             ___T: ::fidl_next::Transport,
@@ -130,9 +208,39 @@ pub mod {{ module_name }} {
 
                 {% match method.kind %}
                     {% when ProtocolMethodKind::OneWay %}
+                        {% if let Some(args) = context.get_method_args_struct(method) %}
+                            {% let is_static = args.shape.max_out_of_line == 0 %}
+
+                            {{ self::doc_string(method.attributes) -}}
+                            pub fn {{ method_name }}(
+                                &self,
+                                {% for member in args.members %}
+                                    {{ member.name.snake()|ident }}: impl ::fidl_next::Encode<
+                                        <___T as ::fidl_next::Transport>::SendBuffer,
+                                        Encoded = {{ context.static_wire_type(member.ty) }},
+                                    >,
+                                {% endfor %}
+                            ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+                            where
+                                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::encoder::InternalHandleEncoder,
+                                {% if !is_static %}
+                                    <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+                                {% endif %}
+                                {% if args.is_resource %}
+                                    <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+                                {% endif %}
+                            {
+                                self.{{ method_name }}_with({{ method_type_name }} {
+                                    {% for member in args.members %}
+                                        {{ member.name.snake()|ident }},
+                                    {% endfor %}
+                                })
+                            }
+                        {% endif %}
+
                         {{ self::doc_string(method.attributes) -}}
                         {% if let Some(request) = method.maybe_request_payload %}
-                            pub fn {{ method_name }}<___R>(
+                            pub fn {{ method_name }}_with<___R>(
                                 &self,
                                 request: ___R,
                             ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
@@ -152,9 +260,42 @@ pub mod {{ module_name }} {
                             }
                         {% endif %}
                     {% when ProtocolMethodKind::TwoWay %}
+                        {% if let Some(args) = context.get_method_args_struct(method) %}
+                            {% let is_static = args.shape.max_out_of_line == 0 %}
+
+                            {{ self::doc_string(method.attributes) -}}
+                            pub fn {{ method_name }}(
+                                &self,
+                                {% for member in args.members %}
+                                    {{ member.name.snake()|ident }}: impl ::fidl_next::Encode<
+                                        <___T as ::fidl_next::Transport>::SendBuffer,
+                                        Encoded = {{ context.static_wire_type(member.ty) }},
+                                    >,
+                                {% endfor %}
+                            ) -> Result<
+                                ::fidl_next::ResponseFuture<'_, super::{{ method_type_name }}, ___T>,
+                                ::fidl_next::EncodeError,
+                            >
+                            where
+                                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::encoder::InternalHandleEncoder,
+                                {% if !is_static %}
+                                    <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+                                {% endif %}
+                                {% if args.is_resource %}
+                                    <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+                                {% endif %}
+                            {
+                                self.{{ method_name }}_with({{ method_type_name }} {
+                                    {% for member in args.members %}
+                                        {{ member.name.snake()|ident }},
+                                    {% endfor %}
+                                })
+                            }
+                        {% endif %}
+
                         {{ self::doc_string(method.attributes) -}}
                         {% if let Some(request) = method.maybe_request_payload %}
-                            pub fn {{ method_name }}<___R>(
+                            pub fn {{ method_name }}_with<___R>(
                                 &self,
                                 request: ___R,
                             ) -> Result<
@@ -198,12 +339,43 @@ pub mod {{ module_name }} {
         {
             {% for method in protocol.methods %}
                 {% let method_name = filters::ident(method.name.snake())? %}
+                {% let method_type_name = filters::ident(method.name.camel())? %}
 
                 {% if method.kind == ProtocolMethodKind::Event %}
+                    {% if let Some(args) = context.get_method_args_struct(method) %}
+                        {% let is_static = args.shape.max_out_of_line == 0 %}
+
+                        {{ self::doc_string(method.attributes) -}}
+                        pub fn {{ method_name }}(
+                            &self,
+                            {% for member in args.members %}
+                                {{ member.name.snake()|ident }}: impl ::fidl_next::Encode<
+                                    <___T as ::fidl_next::Transport>::SendBuffer,
+                                    Encoded = {{ context.static_wire_type(member.ty) }},
+                                >,
+                            {% endfor %}
+                        ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
+                        where
+                            <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::encoder::InternalHandleEncoder,
+                            {% if !is_static %}
+                                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::Encoder,
+                            {% endif %}
+                            {% if args.is_resource %}
+                                <___T as ::fidl_next::Transport>::SendBuffer: ::fidl_next::fuchsia::HandleEncoder,
+                            {% endif %}
+                        {
+                            self.{{ method_name }}_with({{ method_type_name }} {
+                                {% for member in args.members %}
+                                    {{ member.name.snake()|ident }},
+                                {% endfor %}
+                            })
+                        }
+                    {% endif %}
+
                     {{ self::doc_string(method.attributes) -}}
                     {% if method.maybe_response_payload.is_some() %}
                         {% let method_type_name = filters::ident(method.name.camel())? %}
-                        pub fn {{ method_name }}<___R>(
+                        pub fn {{ method_name }}_with<___R>(
                             &self,
                             request: ___R,
                         ) -> Result<::fidl_next::SendFuture<'_, ___T>, ::fidl_next::EncodeError>
