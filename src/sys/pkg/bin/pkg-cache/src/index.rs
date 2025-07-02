@@ -8,4 +8,4 @@ mod package;
 mod retained;
 mod writing;
 
-pub use package::{set_retained_index, PackageIndex};
+pub use package::{set_retained_blobs, set_retained_index, PackageIndex};

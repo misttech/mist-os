@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::index::set_retained_index;
+use crate::index::{set_retained_blobs, set_retained_index};
 use crate::PackageIndex;
 use anyhow::Error;
 use fidl::endpoints::ClientEnd;
 use fidl_fuchsia_pkg::{
-    BlobIdIteratorMarker, RetainedPackagesRequest, RetainedPackagesRequestStream,
+    BlobIdIteratorMarker, RetainedBlobsRequest, RetainedBlobsRequestStream,
+    RetainedPackagesRequest, RetainedPackagesRequestStream,
 };
 use futures::TryStreamExt;
 use std::collections::HashSet;
@@ -23,13 +24,36 @@ pub async fn serve(
         .try_for_each_concurrent(None, |event| async {
             match event {
                 RetainedPackagesRequest::Replace { iterator, responder } => {
-                    set_retained_index(&package_index, &blobfs, &collect_blob_ids(iterator).await?)
+                    set_retained_index(&package_index, &blobfs, collect_blob_ids(iterator).await?)
                         .await;
 
                     responder.send()?;
                 }
                 RetainedPackagesRequest::Clear { responder } => {
-                    set_retained_index(&package_index, &blobfs, &[]).await;
+                    set_retained_index(&package_index, &blobfs, HashSet::new()).await;
+                    responder.send()?;
+                }
+            };
+            Ok(())
+        })
+        .await
+}
+
+pub async fn serve_retained_blobs(
+    package_index: Arc<async_lock::RwLock<PackageIndex>>,
+    stream: RetainedBlobsRequestStream,
+) -> Result<(), Error> {
+    stream
+        .map_err(anyhow::Error::new)
+        .try_for_each_concurrent(None, |event| async {
+            match event {
+                RetainedBlobsRequest::Replace { iterator, responder } => {
+                    set_retained_blobs(&package_index, collect_blob_ids(iterator).await?).await;
+
+                    responder.send()?;
+                }
+                RetainedBlobsRequest::Clear { responder } => {
+                    set_retained_blobs(&package_index, HashSet::new()).await;
                     responder.send()?;
                 }
             };
@@ -40,7 +64,7 @@ pub async fn serve(
 
 async fn collect_blob_ids(
     iterator: ClientEnd<BlobIdIteratorMarker>,
-) -> Result<Vec<fuchsia_hash::Hash>, Error> {
+) -> Result<HashSet<fuchsia_hash::Hash>, Error> {
     let iterator_proxy = iterator.into_proxy();
     let mut ids = HashSet::new();
     loop {
@@ -48,14 +72,12 @@ async fn collect_blob_ids(
         if chunk.is_empty() {
             break;
         }
-        ids.extend(chunk);
+        ids.extend(
+            chunk.into_iter().map(fidl_fuchsia_pkg_ext::BlobId::from).map(fuchsia_hash::Hash::from),
+        );
     }
 
-    Ok(ids
-        .into_iter()
-        .map(fidl_fuchsia_pkg_ext::BlobId::from)
-        .map(fuchsia_hash::Hash::from)
-        .collect::<Vec<fuchsia_hash::Hash>>())
+    Ok(ids)
 }
 
 #[cfg(test)]
@@ -92,12 +114,9 @@ mod tests {
             futures::join!(collect_blob_ids(iterator_client_end), iterator_fut);
         assert_matches!(serve_iterator_result, ());
 
-        let mut hashes = hashes?;
-        hashes.sort();
-
         assert_eq!(
-            hashes,
-            [Hash::from(BlobId::parse(ZEROES_HASH)?), Hash::from(BlobId::parse(ONES_HASH)?)]
+            hashes.unwrap(),
+            [ZEROES_HASH, ONES_HASH].map(|h| Hash::from(BlobId::parse(h).unwrap())).into()
         );
         Ok(())
     }
