@@ -61,7 +61,7 @@ var tcpCoreExpectations map[AnvlCaseNumber]outcome.Outcome = map[AnvlCaseNumber]
 	{5, 21}:  Fail,
 	{5, 22}:  Pass,
 	{5, 23}:  Pass,
-	{5, 24}:  Fail,
+	{5, 24}:  Skip, // https://fxbug.dev/427248980: Causes ANVL exits.
 	{5, 25}:  Fail,
 	{5, 26}:  Pass,
 	{6, 17}:  Fail,
