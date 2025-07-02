@@ -14,8 +14,8 @@ use crate::vfs::{FileSystem, FileSystemHandle, FsStr, Mount, NamespaceNode, Outp
 use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
 use selinux::{
-    CommonFilePermission, FileSystemMountOptions, FileSystemPermission, FsNodeClass, SecurityId,
-    SecurityServer,
+    CommonFilePermission, FileSystemMountOptions, FileSystemPermission, ForClass, FsNodeClass,
+    SecurityId, SecurityServer,
 };
 use starnix_logging::{log_debug, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};

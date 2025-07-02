@@ -19,7 +19,7 @@ use crate::security::selinux_hooks::{
 use crate::task::CurrentTask;
 use crate::vfs::{canonicalize_ioctl_request, FileHandle, FileObject, FsNodeHandle};
 use crate::TODO_DENY;
-use selinux::{CommonFsNodePermission, SecurityServer};
+use selinux::{CommonFsNodePermission, ForClass, SecurityServer};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserAddress;

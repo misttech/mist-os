@@ -24,8 +24,8 @@ use selinux::permission_check::PermissionCheck;
 use selinux::policy::FsUseType;
 use selinux::{
     ClassPermission, CommonFilePermission, CommonFsNodePermission, DirPermission, FdPermission,
-    FileClass, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, FsNodeClass,
-    InitialSid, KernelPermission, ProcessPermission, SecurityId, SecurityServer,
+    FileClass, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions, ForClass,
+    FsNodeClass, InitialSid, KernelPermission, ProcessPermission, SecurityId, SecurityServer,
 };
 use starnix_logging::{track_stub, BugRef};
 use starnix_sync::{Mutex, MutexGuard};

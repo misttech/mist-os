@@ -17,11 +17,10 @@ use crate::sid_table::SidTable;
 use crate::sync::Mutex;
 use crate::{
     ClassPermission, FileSystemLabel, FileSystemLabelingScheme, FileSystemMountOptions,
-    FsNodeClass, InitialSid, KernelPermission, NullessByteStr, ObjectClass, SeLinuxStatus,
-    SeLinuxStatusPublisher, SecurityId,
+    FileSystemMountSids, FsNodeClass, InitialSid, KernelPermission, NullessByteStr, ObjectClass,
+    SeLinuxStatus, SeLinuxStatusPublisher, SecurityId,
 };
 
-use crate::FileSystemMountSids;
 use anyhow::Context as _;
 use std::collections::HashMap;
 use std::ops::DerefMut;
@@ -635,7 +634,7 @@ mod tests {
     use super::*;
     use crate::permission_check::PermissionCheckResult;
     use crate::{
-        CommonFsNodePermission, DirPermission, FileClass, FilePermission, KernelClass,
+        CommonFsNodePermission, DirPermission, FileClass, FilePermission, ForClass, KernelClass,
         ProcessPermission,
     };
     use std::num::NonZeroU64;

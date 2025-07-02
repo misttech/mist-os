@@ -232,6 +232,13 @@ impl KernelClass {
     }
 }
 
+pub trait ForClass<T> {
+    /// Returns the `class`-affine `KernelPermission` value corresponding to this common permission.
+    /// This is used to allow hooks to resolve e.g. common "sys_nice" permission access based on the
+    /// "allow" rules for the correct target object class.
+    fn for_class(&self, class: T) -> KernelPermission;
+}
+
 enumerable_enum! {
     /// Covers the set of classes that inherit from the common "cap" symbol (e.g. "capability" for
     /// now and "cap_userns" after Starnix gains user namespacing support).
@@ -668,11 +675,11 @@ class_permission_enum! {
     CapabilityPermission extends CommonCapPermission {}
 }
 
-impl CommonCapPermission {
+impl ForClass<CapClass> for CommonCapPermission {
     /// Returns the `class`-affine `KernelPermission` value corresponding to this common permission.
     /// This is used to allow hooks to resolve e.g. common "sys_nice" permission access based on the
     /// "allow" rules for the correct target object class.
-    pub fn for_class(&self, class: CapClass) -> KernelPermission {
+    fn for_class(&self, class: CapClass) -> KernelPermission {
         match class {
             CapClass::Capability => CapabilityPermission::Common(self.clone()).into(),
         }
@@ -707,11 +714,11 @@ class_permission_enum! {
     Capability2Permission extends CommonCap2Permission {}
 }
 
-impl CommonCap2Permission {
+impl ForClass<Cap2Class> for CommonCap2Permission {
     /// Returns the `class`-affine `KernelPermission` value corresponding to this common permission.
     /// This is used to allow hooks to resolve e.g. common "mac_admin" permission access based on
     /// the "allow" rules for the correct target object class.
-    pub fn for_class(&self, class: Cap2Class) -> KernelPermission {
+    fn for_class(&self, class: Cap2Class) -> KernelPermission {
         match class {
             Cap2Class::Capability2 => Capability2Permission::Common(self.clone()).into(),
         }
@@ -754,11 +761,11 @@ common_permission_enum! {
     }
 }
 
-impl CommonFsNodePermission {
+impl<T: Into<FsNodeClass>> ForClass<T> for CommonFsNodePermission {
     /// Returns the `class`-affine `KernelPermission` value corresponding to this common permission.
     /// This is used to allow hooks to resolve e.g. common "read" permission access based on the
     /// "allow" rules for the correct target object class.
-    pub fn for_class(&self, class: impl Into<FsNodeClass>) -> KernelPermission {
+    fn for_class(&self, class: T) -> KernelPermission {
         match class.into() {
             FsNodeClass::File(file_class) => {
                 CommonFilePermission::Common(self.clone()).for_class(file_class)
@@ -795,11 +802,11 @@ common_permission_enum! {
     }
 }
 
-impl CommonSocketPermission {
+impl ForClass<SocketClass> for CommonSocketPermission {
     /// Returns the `class`-affine `KernelPermission` value corresponding to this common permission.
     /// This is used to allow hooks to resolve e.g. common "read" permission access based on the
     /// "allow" rules for the correct target object class.
-    pub fn for_class(&self, class: SocketClass) -> KernelPermission {
+    fn for_class(&self, class: SocketClass) -> KernelPermission {
         match class {
             SocketClass::Key => KeySocketPermission::Common(self.clone()).into(),
             SocketClass::Netlink => NetlinkSocketPermission::Common(self.clone()).into(),
@@ -1103,11 +1110,11 @@ common_permission_enum! {
     }
 }
 
-impl CommonFilePermission {
+impl ForClass<FileClass> for CommonFilePermission {
     /// Returns the `class`-affine `KernelPermission` value corresponding to this common permission.
     /// This is used to allow hooks to resolve e.g. common "read" permission access based on the
     /// "allow" rules for the correct target object class.
-    pub fn for_class(&self, class: FileClass) -> KernelPermission {
+    fn for_class(&self, class: FileClass) -> KernelPermission {
         match class {
             FileClass::AnonFsNode => AnonFsNodePermission::Common(self.clone()).into(),
             FileClass::Block => BlockFilePermission::Common(self.clone()).into(),

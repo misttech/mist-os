@@ -22,7 +22,7 @@ use bstr::BStr;
 use selinux::policy::FsUseType;
 use selinux::{
     CommonFilePermission, CommonFsNodePermission, DirPermission, FileClass, FileSystemLabel,
-    FileSystemLabelingScheme, FileSystemPermission, FsNodeClass, InitialSid, KernelClass,
+    FileSystemLabelingScheme, FileSystemPermission, ForClass, FsNodeClass, InitialSid, KernelClass,
     SecurityId, SecurityServer, SocketClass,
 };
 use starnix_logging::{log_debug, log_warn, track_stub};

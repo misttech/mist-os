@@ -13,8 +13,8 @@ use crate::task::{CurrentTask, Task};
 use crate::vfs::{FsNode, FsStr};
 use crate::TODO_DENY;
 use selinux::{
-    Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, InitialSid,
-    KernelClass, NullessByteStr, SystemPermission,
+    Cap2Class, CapClass, CommonCap2Permission, CommonCapPermission, FilePermission, ForClass,
+    InitialSid, KernelClass, NullessByteStr, SystemPermission,
 };
 use starnix_sync::{LockBefore, Locked, ThreadGroupLimits};
 use starnix_types::ownership::TempRef;

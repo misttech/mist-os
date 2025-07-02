@@ -17,8 +17,8 @@ use crate::vfs::{Anon, DowncastedFile, FsNode};
 use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
 use selinux::{
-    CommonFsNodePermission, CommonSocketPermission, FsNodeClass, InitialSid, KernelPermission,
-    SecurityId, SecurityServer, SocketClass, UnixStreamSocketPermission,
+    CommonFsNodePermission, CommonSocketPermission, ForClass, FsNodeClass, InitialSid,
+    KernelPermission, SecurityId, SecurityServer, SocketClass, UnixStreamSocketPermission,
 };
 use starnix_logging::{track_stub, BugRef};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
