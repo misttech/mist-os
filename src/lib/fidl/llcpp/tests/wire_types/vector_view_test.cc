@@ -8,7 +8,8 @@
 
 TEST(VectorView, DefaultConstructor) {
   fidl::VectorView<int32_t> vv;
-  EXPECT_EQ(vv.count(), 0ULL);
+  EXPECT_EQ(vv.size(), 0u);
+  EXPECT_EQ(vv.count(), 0u);
   EXPECT_TRUE(vv.empty());
   EXPECT_EQ(vv.data(), nullptr);
 }
@@ -30,7 +31,8 @@ TEST(VectorView, PointerConstructor) {
   DestructableObject arr[3] = {&ds[0], &ds[1], &ds[2]};
   {
     auto vv = fidl::VectorView<DestructableObject>::FromExternal(arr, 2);
-    EXPECT_EQ(vv.count(), 2ULL);
+    EXPECT_EQ(vv.size(), 2u);
+    EXPECT_EQ(vv.count(), 2u);
     EXPECT_FALSE(vv.empty());
     EXPECT_EQ(vv.data(), arr);
   }
@@ -43,9 +45,11 @@ TEST(VectorView, MoveConstructorUnowned) {
   std::vector<int32_t> vec{1, 2, 3};
   auto vv = fidl::VectorView<int32_t>::FromExternal(vec);
   fidl::VectorView<int32_t> moved_vv(std::move(vv));
-  EXPECT_EQ(vv.count(), 3ULL);
+  EXPECT_EQ(vv.size(), 3u);
+  EXPECT_EQ(vv.count(), 3u);
   EXPECT_EQ(vv.data(), vec.data());
-  EXPECT_EQ(moved_vv.count(), 3ULL);
+  EXPECT_EQ(moved_vv.size(), 3u);
+  EXPECT_EQ(moved_vv.count(), 3u);
   EXPECT_EQ(moved_vv.data(), vec.data());
 }
 
@@ -54,9 +58,11 @@ TEST(VectorView, MoveAssigmentUnowned) {
   auto vv = fidl::VectorView<int32_t>::FromExternal(vec);
   fidl::VectorView<int32_t> moved_vv;
   moved_vv = std::move(vv);
-  EXPECT_EQ(vv.count(), 3ULL);
+  EXPECT_EQ(vv.size(), 3u);
+  EXPECT_EQ(vv.count(), 3u);
   EXPECT_EQ(vv.data(), vec.data());
-  EXPECT_EQ(moved_vv.count(), 3ULL);
+  EXPECT_EQ(moved_vv.size(), 3u);
+  EXPECT_EQ(moved_vv.count(), 3u);
   EXPECT_EQ(moved_vv.data(), vec.data());
 }
 
@@ -82,10 +88,11 @@ TEST(VectorView, Indexing) {
 TEST(VectorView, Mutations) {
   std::vector<int32_t> vec{1, 2, 3};
   auto vv = fidl::VectorView<int32_t>::FromExternal(vec);
-  vv.set_count(2);
+  vv.set_size(2);
   *vv.data() = 4;
   vv[1] = 5;
-  EXPECT_EQ(vv.count(), 2ULL);
+  EXPECT_EQ(vv.size(), 2u);
+  EXPECT_EQ(vv.count(), 2u);
   EXPECT_EQ(vv.data(), vec.data());
   EXPECT_EQ(vv[0], 4);
   EXPECT_EQ(vv[1], 5);
@@ -100,7 +107,8 @@ TEST(VectorView, CopyFromStdVector) {
   vec[0] = 0;
   vec[1] = 0;
   vec[2] = 0;
-  EXPECT_EQ(vv.count(), 3ULL);
+  EXPECT_EQ(vv.size(), 3u);
+  EXPECT_EQ(vv.count(), 3u);
   EXPECT_EQ(vv[0], 1);
   EXPECT_EQ(vv[1], 2);
   EXPECT_EQ(vv[2], 3);
@@ -114,7 +122,8 @@ TEST(VectorView, CopyFromStdSpan) {
   vec[0] = 0;
   vec[1] = 0;
   vec[2] = 0;
-  EXPECT_EQ(vv.count(), 3ULL);
+  EXPECT_EQ(vv.size(), 3u);
+  EXPECT_EQ(vv.count(), 3u);
   EXPECT_EQ(vv[0], 1);
   EXPECT_EQ(vv[1], 2);
   EXPECT_EQ(vv[2], 3);
@@ -128,7 +137,8 @@ TEST(VectorView, CopyFromConstStdSpan) {
   vec[0] = 0;
   vec[1] = 0;
   vec[2] = 0;
-  EXPECT_EQ(vv.count(), 3ULL);
+  EXPECT_EQ(vv.size(), 3u);
+  EXPECT_EQ(vv.count(), 3u);
   EXPECT_EQ(vv[0], 1);
   EXPECT_EQ(vv[1], 2);
   EXPECT_EQ(vv[2], 3);
@@ -142,7 +152,8 @@ TEST(VectorView, CopyFromIterators) {
   vec[0] = 0;
   vec[1] = 0;
   vec[2] = 0;
-  EXPECT_EQ(vv.count(), 3ULL);
+  EXPECT_EQ(vv.size(), 3u);
+  EXPECT_EQ(vv.count(), 3u);
   EXPECT_EQ(vv[0], 1);
   EXPECT_EQ(vv[1], 2);
   EXPECT_EQ(vv[2], 3);
@@ -156,7 +167,8 @@ TEST(VectorView, CopyFromConstIterators) {
   vec[0] = 0;
   vec[1] = 0;
   vec[2] = 0;
-  EXPECT_EQ(vv.count(), 3ULL);
+  EXPECT_EQ(vv.size(), 3u);
+  EXPECT_EQ(vv.count(), 3u);
   EXPECT_EQ(vv[0], 1);
   EXPECT_EQ(vv[1], 2);
   EXPECT_EQ(vv[2], 3);
