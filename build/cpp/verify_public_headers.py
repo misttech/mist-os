@@ -9,7 +9,7 @@ import os
 import sys
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--gn-label", required=True)
     parser.add_argument("--stamp-file", required=True)

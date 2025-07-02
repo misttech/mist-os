@@ -7,6 +7,7 @@
 load("@bazel_skylib//lib:paths.bzl", "paths")
 load("@fuchsia_build_info//:args.bzl", "warn_on_sdk_changes")
 load("@rules_cc//cc:defs.bzl", "cc_library")
+load(":cpp_verification.bzl", "verify_no_pragma_once")
 load("//build/bazel/rules:golden_files.bzl", "verify_golden_files")
 
 _TYPES_SUPPORTING_UNSTABLE_ATOMS = [
@@ -508,9 +509,6 @@ def idk_cc_source_library(
         idk_metadata_sources.append(source_dest_path)
         idk_files_map |= {source_dest_path: source}
 
-    # TODO(https://fxbug.dev/417305295): Verify pragma. Add to `atom_build_deps`.
-    # TODO(https://fxbug.dev/417305295): Verify public headers. Add to
-    # `atom_build_deps`.
     # TODO(https://fxbug.dev/417306131): Implement PlaSA support. Add to
     # `atom_build_deps`.
 
@@ -523,6 +521,30 @@ def idk_cc_source_library(
     # libraries, add `[":%s" % name]`. It may also be necessary to return
     # `DefaultInfo` from the underlying library.
     atom_build_deps = []
+
+    # Ensure there are no duplicate files specified by providing all source
+    # files as a single list of labels. Bazel will report an error if the
+    # combined list containes duplicates. All this target really does is provide
+    # a clearer error message than if we relied on combining the lists in the
+    # `verify_no_pragma_once()` rule below.
+    verify_no_duplicate_files_target_name = "%s_verify_no_duplicate_files_in_hdrs_and_srcs" % name
+    native.filegroup(
+        name = verify_no_duplicate_files_target_name,
+        data = hdrs + srcs,
+        testonly = testonly,
+        visibility = ["//visibility:private"],
+    )
+    atom_build_deps.append(":%s" % verify_no_duplicate_files_target_name)
+
+    # For simplicity, check all source files, including non-header files in `srcs`.
+    verify_pragma_once_target_name = "%s_verify_pragma_once" % name
+    verify_no_pragma_once(
+        name = verify_pragma_once_target_name,
+        files = hdrs + srcs,
+        testonly = testonly,
+        visibility = ["//visibility:private"],
+    )
+    atom_build_deps.append(":%s" % verify_pragma_once_target_name)
 
     if stable:
         api_path = idk_name + ".api"

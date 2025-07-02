@@ -8,7 +8,7 @@ import re
 import sys
 
 
-def main():
+def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--headers",
