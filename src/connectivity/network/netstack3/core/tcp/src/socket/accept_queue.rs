@@ -150,7 +150,7 @@ where
     /// notifier.
     ///
     /// Panics if the queue is already closed.
-    pub(crate) fn close(&self) -> (impl Iterator<Item = S>, N) {
+    pub(crate) fn close(&self) -> (impl Iterator<Item = S> + use<S, R, N>, N) {
         self.lock().close()
     }
 
@@ -277,7 +277,7 @@ where
         }
     }
 
-    fn close(&mut self) -> (impl Iterator<Item = S>, N) {
+    fn close(&mut self) -> (impl Iterator<Item = S> + use<S, R, N>, N) {
         let AcceptQueueInner { ready_queue, all_sockets, notifier } = self;
         // Remove the notifier, this signals that the queue is closed.
         let notifier = notifier.take().expect("queue is already closed");

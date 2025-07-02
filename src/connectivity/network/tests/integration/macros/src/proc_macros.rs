@@ -287,7 +287,7 @@ fn netstack_test_inner(
 ) -> TokenStream {
     let mut item = input.clone();
     let impl_attrs = std::mem::replace(&mut item.attrs, Vec::new());
-    let syn::ItemFn { attrs: _, vis: _, ref sig, block: _ } = &item;
+    let syn::ItemFn { attrs: _, vis: _, sig, block: _ } = &item;
     let syn::Signature {
         constness: _,
         asyncness: _,
@@ -375,8 +375,8 @@ fn netstack_test_inner(
 
     // We only care about generic type parameters and their last trait bound.
     let mut type_generics = Vec::with_capacity(params.len());
-    for gen in params.iter() {
-        let generic_type = match gen {
+    for generic in params.iter() {
+        let generic_type = match generic {
             syn::GenericParam::Type(t) => t,
             other => {
                 return syn::Error::new_spanned(

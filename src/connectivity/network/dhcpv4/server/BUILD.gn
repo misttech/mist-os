@@ -9,7 +9,7 @@ import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
 network_unified_binary("bin") {
   name = "dhcpv4_server"
   with_unit_tests = true
-  edition = "2021"
+  edition = "2024"
 
   deps = [
     "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp_rust",

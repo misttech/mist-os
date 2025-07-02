@@ -417,11 +417,11 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         (
             Self,
             impl futures::Stream<
-                Item = Result<
-                    fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::AllInterest>,
-                    fidl::Error,
-                >,
-            >,
+                    Item = Result<
+                        fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::AllInterest>,
+                        fidl::Error,
+                    >,
+                > + 'static,
         ),
         WorkerInitializationError<InterfacesFidlError, InterfacesNetstackError>,
     > {
@@ -2209,31 +2209,31 @@ mod tests {
         let (mut link_sink, link_client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_1,
-                &[ModernGroup(rtnetlink_groups_RTNLGRP_LINK)],
+                [ModernGroup(rtnetlink_groups_RTNLGRP_LINK)],
             );
         let _join_handle = scope.spawn(async_work_drain_task);
         let (mut addr4_sink, addr4_client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_2,
-                &[ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR)],
+                [ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR)],
             );
         let _join_handle = scope.spawn(async_work_drain_task);
         let (mut addr6_sink, addr6_client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_3,
-                &[ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR)],
+                [ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR)],
             );
         let _join_handle = scope.spawn(async_work_drain_task);
         let (mut other_sink, other_client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_4,
-                &[ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE)],
+                [ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE)],
             );
         let _join_handle = scope.spawn(async_work_drain_task);
         let (mut all_sink, all_client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_5,
-                &[
+                [
                     ModernGroup(rtnetlink_groups_RTNLGRP_LINK),
                     ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR),
                     ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR),
@@ -2650,13 +2650,13 @@ mod tests {
             let (mut expected_sink, expected_client, async_work_drain_task) =
                 crate::client::testutil::new_fake_client::<NetlinkRoute>(
                     crate::client::testutil::CLIENT_ID_1,
-                    &[],
+                    std::iter::empty(),
                 );
             let _join_handle = scope.spawn(async_work_drain_task);
             let (mut other_sink, other_client, async_work_drain_task) =
                 crate::client::testutil::new_fake_client::<NetlinkRoute>(
                     crate::client::testutil::CLIENT_ID_2,
-                    &[],
+                    std::iter::empty(),
                 );
             let _join_handle = scope.spawn(async_work_drain_task);
             let Setup {

@@ -459,7 +459,7 @@ pub(crate) mod testutil {
     /// Creates a new client with memberships to the given groups.
     pub(crate) fn new_fake_client<F: ProtocolFamily>(
         id: ClientId,
-        group_memberships: &[ModernGroup],
+        group_memberships: impl IntoIterator<Item = ModernGroup>,
     ) -> (
         FakeSenderSink<F::InnerMessage>,
         InternalClient<F, FakeSender<F::InnerMessage>>,
@@ -470,7 +470,7 @@ pub(crate) mod testutil {
 
         let (external_client, internal_client) = new_client_pair(id, sender, async_work_sink);
         for group in group_memberships {
-            let waiter = external_client.add_membership(*group).expect("add group membership");
+            let waiter = external_client.add_membership(group).expect("add group membership");
             assert!(waiter.is_noop(), "should not use this helper for incurring blocking work");
         }
 
@@ -594,21 +594,15 @@ mod tests {
         let clients = ClientTable::default();
         let scope = fasync::Scope::new();
         let (mut sink_group1, client_group1, async_work_drain_task) =
-            testutil::new_fake_client::<FakeProtocolFamily>(
-                testutil::CLIENT_ID_1,
-                &[MODERN_GROUP1],
-            );
+            testutil::new_fake_client::<FakeProtocolFamily>(testutil::CLIENT_ID_1, [MODERN_GROUP1]);
         let _join_handle = scope.spawn(async_work_drain_task);
         let (mut sink_group2, client_group2, async_work_drain_task) =
-            testutil::new_fake_client::<FakeProtocolFamily>(
-                testutil::CLIENT_ID_2,
-                &[MODERN_GROUP2],
-            );
+            testutil::new_fake_client::<FakeProtocolFamily>(testutil::CLIENT_ID_2, [MODERN_GROUP2]);
         let _join_handle = scope.spawn(async_work_drain_task);
         let (mut sink_both_groups, client_both_groups, async_work_drain_task) =
             testutil::new_fake_client::<FakeProtocolFamily>(
                 testutil::CLIENT_ID_3,
-                &[MODERN_GROUP1, MODERN_GROUP2],
+                [MODERN_GROUP1, MODERN_GROUP2],
             );
         let _join_handle = scope.spawn(async_work_drain_task);
         clients.add_client(client_group1);

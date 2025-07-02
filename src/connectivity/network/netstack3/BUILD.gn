@@ -172,7 +172,7 @@ common_sources = [
 
 network_unified_binary("bin") {
   name = "netstack3"
-  edition = "2021"
+  edition = "2024"
   with_unit_tests = true
   check_cfgs = [
     "test",
@@ -252,7 +252,7 @@ config("netstack3_debug_configs") {
 
 rustc_binary("bin-instrumented") {
   name = "netstack3-instrumented"
-  edition = "2021"
+  edition = "2024"
   with_unit_tests = true
 
   deps = common_deps

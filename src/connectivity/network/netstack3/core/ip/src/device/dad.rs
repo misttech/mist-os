@@ -487,7 +487,7 @@ impl NonceCollection {
     pub fn evicting_create_and_store_nonce(&mut self, mut rng: impl rand::Rng) -> OwnedNdpNonce {
         let Self { nonces } = self;
         loop {
-            let nonce: OwnedNdpNonce = rng.gen();
+            let nonce: OwnedNdpNonce = rng.r#gen();
             if nonces.iter().any(|stored_nonce| stored_nonce == &nonce) {
                 continue;
             }

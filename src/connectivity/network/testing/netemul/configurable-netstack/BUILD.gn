@@ -16,7 +16,7 @@ netstack2_visibility = [
 ]
 
 rustc_binary("bin") {
-  edition = "2021"
+  edition = "2024"
   testonly = true
   name = "configurable_netstack"
   with_unit_tests = true

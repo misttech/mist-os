@@ -8,7 +8,7 @@ import("//build/testing/perf/test.gni")
 
 rustc_binary("resource_usage_benchmark") {
   testonly = true
-  edition = "2021"
+  edition = "2024"
   sources = [
     "src/interfaces.rs",
     "src/main.rs",

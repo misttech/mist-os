@@ -9,7 +9,7 @@ import("//build/rust/rustc_test.gni")
 assert(is_host)
 
 rustc_test("netstack3_core_threading_test") {
-  edition = "2021"
+  edition = "2024"
   source_root = "threading/lib.rs"
   sources = [
     "threading/device_socket.rs",

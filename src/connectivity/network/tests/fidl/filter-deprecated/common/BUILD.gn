@@ -6,7 +6,7 @@ import("//build/rust/rustc_library.gni")
 
 rustc_library("common") {
   testonly = true
-  edition = "2021"
+  edition = "2024"
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",

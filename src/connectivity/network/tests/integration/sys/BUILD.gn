@@ -6,7 +6,7 @@ import("//build/dist/resource.gni")
 import("//build/rust/rustc_test.gni")
 
 rustc_test("sys") {
-  edition = "2021"
+  edition = "2024"
   output_name = "netstack_sys_integration_test"
   deps = [
     ":persistence-configuration",

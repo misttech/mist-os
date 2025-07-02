@@ -1076,7 +1076,7 @@ mod tests {
 
         fn create_watcher_event_stream(
             &mut self,
-        ) -> impl Stream<Item = finterfaces::Event> + Unpin {
+        ) -> impl Stream<Item = finterfaces::Event> + Unpin + use<> {
             futures::stream::unfold(self.create_watcher(), |watcher| {
                 watcher.watch().map(move |e| match e {
                     Ok(event) => Some((event, watcher)),

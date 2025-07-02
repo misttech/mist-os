@@ -750,7 +750,7 @@ impl<I: Debug + Eq> SocketMapAddrStateSpec for AddrState<I> {
     fn remove_by_id(&mut self, id: I) -> RemoveResult {
         match self {
             Self::Exclusive(_) => RemoveResult::IsLast,
-            Self::Shared { ref mut priority, ref mut load_balanced } => {
+            Self::Shared { priority, load_balanced } => {
                 if let Some(pos) = priority.iter().position(|i| *i == id) {
                     let _removed: I = priority.remove(pos);
                 } else {

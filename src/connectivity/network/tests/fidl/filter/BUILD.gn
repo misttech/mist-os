@@ -5,7 +5,7 @@
 import("//build/rust/rustc_test.gni")
 
 rustc_test("filter") {
-  edition = "2021"
+  edition = "2024"
   output_name = "netstack_filter_fidl_test"
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",

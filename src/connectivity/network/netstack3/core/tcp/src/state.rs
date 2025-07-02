@@ -3475,21 +3475,19 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
             | State::SynRcvd(SynRcvd { buffer_sizes, .. })
             | State::SynSent(SynSent { buffer_sizes, .. }) => BuffersRefMut::Sizes(buffer_sizes),
             State::Established(Established { snd, rcv }) => match &mut rcv.buffer {
-                RecvBufferState::Open { buffer: ref mut recv_buf, .. } => {
+                RecvBufferState::Open { buffer: recv_buf, .. } => {
                     BuffersRefMut::Both { send: &mut snd.buffer, recv: recv_buf }
                 }
                 RecvBufferState::Closed { .. } => BuffersRefMut::SendOnly(&mut snd.buffer),
             },
             State::FinWait1(FinWait1 { snd, rcv }) => match &mut rcv.buffer {
-                RecvBufferState::Open { buffer: ref mut recv_buf, .. } => {
+                RecvBufferState::Open { buffer: recv_buf, .. } => {
                     BuffersRefMut::Both { send: &mut snd.buffer, recv: recv_buf }
                 }
                 RecvBufferState::Closed { .. } => BuffersRefMut::SendOnly(&mut snd.buffer),
             },
             State::FinWait2(FinWait2::<I, R> { rcv, .. }) => match &mut rcv.buffer {
-                RecvBufferState::Open { buffer: ref mut recv_buf, .. } => {
-                    BuffersRefMut::RecvOnly(recv_buf)
-                }
+                RecvBufferState::Open { buffer: recv_buf, .. } => BuffersRefMut::RecvOnly(recv_buf),
                 RecvBufferState::Closed { .. } => BuffersRefMut::NoBuffers,
             },
             State::Closing(Closing::<I, S> { snd, .. })
@@ -7069,7 +7067,7 @@ mod test {
         fn get_buffer(rcv: &mut Recv<FakeInstant, RingBuffer>) -> &mut RingBuffer {
             assert_matches!(
                 &mut rcv.buffer,
-                RecvBufferState::Open {ref mut buffer, .. } => buffer
+                RecvBufferState::Open {buffer, .. } => buffer
             )
         }
 
@@ -7080,7 +7078,7 @@ mod test {
             assert_eq!(get_buffer(&mut rcv).enqueue_data(TEST_BYTES), TEST_BYTES.len());
         }
         let assembler = assert_matches!(&mut rcv.buffer,
-            RecvBufferState::Open { ref mut assembler, .. } => assembler);
+            RecvBufferState::Open { assembler, .. } => assembler);
         assert_eq!(assembler.insert(TEST_IRS..TEST_IRS + CAP), CAP);
         // Since the buffer is full, we now get a zero window.
         assert_eq!(rcv.calculate_window_size().window_size, WindowSize::ZERO);

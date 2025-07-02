@@ -240,9 +240,9 @@ impl<I: Ip> Table<I> {
             }
             std::collections::hash_map::Entry::Vacant(vacant_entry) => (
                 vacant_entry.insert({
-                    let gen = *next_generation;
+                    let generation = *next_generation;
                     *next_generation = next_generation.next();
-                    EntryData::new(gen)
+                    EntryData::new(generation)
                 }),
                 true,
             ),

@@ -25,7 +25,7 @@ pub struct ReceiveQueueState<Meta, Buffer> {
 #[cfg(any(test, feature = "testutils"))]
 impl<Meta, Buffer> ReceiveQueueState<Meta, Buffer> {
     /// Takes all the pending frames from the receive queue.
-    pub fn take_frames(&mut self) -> impl Iterator<Item = (Meta, Buffer)> {
+    pub fn take_frames(&mut self) -> impl Iterator<Item = (Meta, Buffer)> + use<Meta, Buffer> {
         let Self { queue } = self;
         let mut vec = Default::default();
         assert_matches::assert_matches!(

@@ -133,7 +133,7 @@ pub(crate) mod testutil {
         // Arbitrary seed.
         let mut rng = new_rng(0x0fe50fae6c37593d71944697f1245847);
         for _ in 0..64 {
-            f(rng.gen());
+            f(rng.r#gen());
         }
     }
 }

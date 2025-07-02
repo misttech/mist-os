@@ -10,7 +10,7 @@ import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
 rustc_library("lib") {
   name = "dns"
   with_unit_tests = true
-  edition = "2021"
+  edition = "2024"
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/rust/zx",
@@ -48,7 +48,7 @@ fuchsia_test_package("dns-tests") {
 }
 
 bin_base = {
-  edition = "2021"
+  edition = "2024"
 
   deps = [
     ":lib",
@@ -91,7 +91,7 @@ bin_base = {
 }
 
 network_unified_binary("bin") {
-  edition = "2021"
+  edition = "2024"
   forward_variables_from(bin_base, "*")
 
   name = "dns_resolver"
@@ -99,7 +99,7 @@ network_unified_binary("bin") {
 }
 
 rustc_binary("bin_with_fake_time") {
-  edition = "2021"
+  edition = "2024"
   forward_variables_from(bin_base, "*")
 
   name = "dns_resolver_with_fake_time"

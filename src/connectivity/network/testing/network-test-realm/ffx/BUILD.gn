@@ -9,7 +9,7 @@ assert(is_host)
 
 ffx_plugin("ffx_net_test_realm") {
   sdk_category = "not-yet-specified"
-  edition = "2021"
+  edition = "2024"
   with_unit_tests = true
   args_deps = [
     "//src/connectivity/network/testing/network-test-realm/fidl:fuchsia.net.test.realm_rust",
@@ -46,7 +46,7 @@ ffx_plugin("ffx_net_test_realm") {
 }
 
 ffx_tool("ffx_net_test_realm_tool") {
-  edition = "2021"
+  edition = "2024"
   output_name = "ffx-net-test-realm"
   deps = [
     ":ffx_net_test_realm",

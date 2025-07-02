@@ -6,7 +6,7 @@ import("//build/rust/rustc_test.gni")
 import("//src/lib/testing/sharding/fuchsia_sharded_test_package.gni")
 
 rustc_test("netlink_integration_test") {
-  edition = "2021"
+  edition = "2024"
   output_name = "netlink_integration_test"
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",

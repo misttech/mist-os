@@ -6,7 +6,7 @@ import("//build/components.gni")
 import("//build/rust/rustc_test.gni")
 
 rustc_test("dhcpv4") {
-  edition = "2021"
+  edition = "2024"
   output_name = "netstack_dhcpv4_guest_integration_test"
   deps = [
     ":dhcpd_config",

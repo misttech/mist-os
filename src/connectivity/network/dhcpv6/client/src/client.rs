@@ -1035,10 +1035,9 @@ mod tests {
     #[test_case(client_proxy_watch_address; "watch_address")]
     #[test_case(client_proxy_watch_prefixes; "watch_prefixes")]
     #[fuchsia::test]
-    async fn test_client_should_return_error_on_double_watch<Fut, F>(watch: F)
+    async fn test_client_should_return_error_on_double_watch<F>(watch: F)
     where
-        Fut: Future<Output = Result<(), fidl::Error>>,
-        F: Fn(&fnet_dhcpv6::ClientProxy) -> Fut,
+        F: AsyncFn(&fnet_dhcpv6::ClientProxy) -> Result<(), fidl::Error>,
     {
         let (client_proxy, server_end) = create_proxy::<ClientMarker>();
 

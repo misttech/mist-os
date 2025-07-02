@@ -313,7 +313,8 @@ impl<I: fnet_routes_ext::FidlRouteIpExt + fnet_routes_ext::admin::FidlRouteAdmin
             RouteTableMap<I>,
             impl futures::Stream<
                     Item = Result<fnet_routes_ext::Event<I>, fnet_routes_ext::WatchError>,
-                > + Unpin,
+                > + Unpin
+                + 'static,
         ),
         WorkerInitializationError<RoutesFidlError, RoutesNetstackError<I>>,
     > {
@@ -1710,16 +1711,17 @@ mod tests {
                 ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_ROUTE),
             ),
         };
+
         let (mut right_sink, right_client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_1,
-                &[right_group],
+                [right_group],
             );
         let _join_handle = scope.spawn(async_work_drain_task);
         let (mut wrong_sink, wrong_client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_2,
-                &[wrong_group],
+                [wrong_group],
             );
         let _join_handle = scope.spawn(async_work_drain_task);
         let route_clients: ClientTable<NetlinkRoute, FakeSender<_>> = ClientTable::default();
@@ -1950,13 +1952,13 @@ mod tests {
         let (mut right_sink, right_client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_1,
-                &[right_group],
+                [right_group],
             );
         let _join_handle = scope.spawn(async_work_drain_task);
         let (mut wrong_sink, wrong_client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_2,
-                &[wrong_group],
+                [wrong_group],
             );
         let _join_handle = scope.spawn(async_work_drain_task);
         let route_clients: ClientTable<NetlinkRoute, FakeSender<_>> = ClientTable::default();
@@ -2813,7 +2815,7 @@ mod tests {
             let (mut route_sink, route_client, async_work_drain_task) =
                 crate::client::testutil::new_fake_client::<NetlinkRoute>(
                     crate::client::testutil::CLIENT_ID_1,
-                    &[ModernGroup(match A::Version::VERSION {
+                    [ModernGroup(match A::Version::VERSION {
                         IpVersion::V4 => rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
                         IpVersion::V6 => rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
                     })],
@@ -2822,7 +2824,7 @@ mod tests {
             let (mut other_sink, other_client, async_work_drain_task) =
                 crate::client::testutil::new_fake_client::<NetlinkRoute>(
                     crate::client::testutil::CLIENT_ID_2,
-                    &[ModernGroup(rtnetlink_groups_RTNLGRP_LINK)],
+                    [ModernGroup(rtnetlink_groups_RTNLGRP_LINK)],
                 );
             let _join_handle = scope.spawn(async_work_drain_task);
             let Setup {
@@ -4924,7 +4926,7 @@ mod tests {
         let (_route_sink, route_client, async_work_drain_task) =
             crate::client::testutil::new_fake_client::<NetlinkRoute>(
                 crate::client::testutil::CLIENT_ID_1,
-                &[ModernGroup(match I::VERSION {
+                [ModernGroup(match I::VERSION {
                     IpVersion::V4 => rtnetlink_groups_RTNLGRP_IPV4_ROUTE,
                     IpVersion::V6 => rtnetlink_groups_RTNLGRP_IPV6_ROUTE,
                 })],

@@ -135,7 +135,10 @@ impl<A: IpAddress> SocketIpAddr<A> {
     /// Callers must ensure that the addr is both a [`SpecifiedAddr`] and
     /// a [`NonMappedAddr`].
     pub const unsafe fn new_unchecked(addr: A) -> SocketIpAddr<A> {
-        SocketIpAddr(NonMappedAddr::new_unchecked(SpecifiedAddr::new_unchecked(addr)))
+        // SAFETY: delegated to caller.
+        let non_mapped =
+            unsafe { NonMappedAddr::new_unchecked(SpecifiedAddr::new_unchecked(addr)) };
+        SocketIpAddr(non_mapped)
     }
 
     /// Like [`SocketIpAddr::new_unchecked`], but the address is specified.
@@ -144,7 +147,9 @@ impl<A: IpAddress> SocketIpAddr<A> {
     ///
     /// Callers must ensure that the addr is a [`NonMappedAddr`].
     pub const unsafe fn new_from_specified_unchecked(addr: SpecifiedAddr<A>) -> SocketIpAddr<A> {
-        SocketIpAddr(NonMappedAddr::new_unchecked(addr))
+        // SAFETY: delegated to caller.
+        let non_mapped = unsafe { NonMappedAddr::new_unchecked(addr) };
+        SocketIpAddr(non_mapped)
     }
 
     /// Returns the inner address, dropping all witnesses.

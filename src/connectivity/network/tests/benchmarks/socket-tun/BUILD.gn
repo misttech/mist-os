@@ -9,7 +9,7 @@ import("//build/testing/perf/test.gni")
 
 rustc_binary("tun_socket_benchmarks") {
   testonly = true
-  edition = "2021"
+  edition = "2024"
 
   sources = [ "src/main.rs" ]
 

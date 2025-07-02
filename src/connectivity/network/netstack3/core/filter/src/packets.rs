@@ -2613,8 +2613,8 @@ impl<'a, I: IpExt> TransportPacketMut<I> for ParsedTransportHeaderMut<'a, I> {
 
     fn set_dst_port(&mut self, port: NonZeroU16) {
         match self {
-            ParsedTransportHeaderMut::Tcp(ref mut segment) => segment.set_dst_port(port),
-            ParsedTransportHeaderMut::Udp(ref mut packet) => packet.set_dst_port(port),
+            ParsedTransportHeaderMut::Tcp(segment) => segment.set_dst_port(port),
+            ParsedTransportHeaderMut::Udp(packet) => packet.set_dst_port(port),
             ParsedTransportHeaderMut::Icmp(packet) => {
                 I::map_ip::<_, ()>(
                     packet,

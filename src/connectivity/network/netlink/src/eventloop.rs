@@ -108,7 +108,7 @@ pub(crate) struct EventLoop<
 
 /// The types that implement this trait ([`Optional`] and [`Required`]) are used to signify whether
 /// a given [`EventLoopComponent`] can be omitted with a given [`EventLoopSpec`] configuration.
-pub(crate) trait EventLoopOptionality: std::fmt::Debug + Copy {}
+pub(crate) trait EventLoopOptionality: std::fmt::Debug + Copy + 'static {}
 #[cfg(test)]
 impl EventLoopOptionality for Optional {}
 impl EventLoopOptionality for Required {}

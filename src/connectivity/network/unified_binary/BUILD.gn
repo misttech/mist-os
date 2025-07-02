@@ -6,7 +6,7 @@ import("//build/rust/rustc_binary.gni")
 import("//build/toolchain/concurrent_jobs.gni")
 
 rustc_binary("network_unified_binary") {
-  edition = "2021"
+  edition = "2024"
 
   deps = [
     "//src/connectivity/network/dhcpv4/client/bindings:dhcp_client_gub_lib",

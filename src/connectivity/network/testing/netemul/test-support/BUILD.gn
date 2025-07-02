@@ -20,7 +20,7 @@ fidl("fidl") {
 rustc_binary("bin") {
   testonly = true
   name = "counter"
-  edition = "2021"
+  edition = "2024"
   deps = [
     ":config_lib",
     ":fidl_rust",

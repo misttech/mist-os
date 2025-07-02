@@ -8,7 +8,7 @@ import("//src/connectivity/network/unified_binary/network_unified_binary.gni")
 
 network_unified_binary("bin") {
   name = "netstack_proxy"
-  edition = "2021"
+  edition = "2024"
 
   deps = [
     "//sdk/fidl/fuchsia.net.stackmigrationdeprecated:fuchsia.net.stackmigrationdeprecated_rust",
@@ -28,7 +28,7 @@ network_unified_binary("bin") {
 }
 
 rustc_test("netstack_proxy_test") {
-  edition = "2021"
+  edition = "2024"
   deps = [
     "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp_rust",
     "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",

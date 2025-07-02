@@ -5,7 +5,7 @@
 import("//build/rust/rustc_test.gni")
 
 rustc_test("sandbox-test") {
-  edition = "2021"
+  edition = "2024"
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//src/connectivity/lib/net-declare",

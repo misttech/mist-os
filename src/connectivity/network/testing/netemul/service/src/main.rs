@@ -559,7 +559,7 @@ async fn create_realm_instance(
         } else {
             return Err(CreateRealmError::ModifiedNonexistentProgram(component));
         };
-        let fdata::Dictionary { ref mut entries, .. } = info;
+        let fdata::Dictionary { entries, .. } = info;
         // Create `entries` if it is None.
         let entries = entries.get_or_insert_with(|| Vec::default());
         // Create an "args" entry if there is none and replace whatever is currently in the "args"

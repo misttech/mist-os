@@ -5,7 +5,7 @@
 import("//build/rust/rustc_test.gni")
 
 rustc_test("rust") {
-  edition = "2021"
+  edition = "2024"
   output_name = "rust_test"
   sources = [ "src/lib.rs" ]
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]

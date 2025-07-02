@@ -5,7 +5,7 @@
 import("//build/rust/rustc_test.gni")
 
 rustc_test("udp") {
-  edition = "2021"
+  edition = "2024"
   output_name = "udp_filter_deprecated_fidl_test"
   deps = [
     "//sdk/fidl/fuchsia.net.filter.deprecated:fuchsia.net.filter.deprecated_rust",
