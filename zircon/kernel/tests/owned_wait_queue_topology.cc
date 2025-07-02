@@ -23,8 +23,13 @@ struct OwnedWaitQueueTopologyTests {
     ~TestThread() { Shutdown(); }
 
     static SchedDuration DeadlineForIndex(size_t index) {
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+      constexpr SchedDuration kBaseDuration{ZX_MSEC(10)};
+      constexpr SchedDuration kDurationInc{ZX_MSEC(1)};
+#else
       constexpr SchedDuration kBaseDuration{ZX_USEC(500)};
       constexpr SchedDuration kDurationInc{ZX_USEC(10)};
+#endif
       return kBaseDuration + (index * kDurationInc);
     }
 
@@ -56,6 +61,7 @@ struct OwnedWaitQueueTopologyTests {
     }
 
     bool DoBlock(TestQueue& queue, TestThread* new_owner);
+    void SetStartTimeGate(zx_instant_mono_t time) { start_time_gate_ = time; }
     Thread* thread() { return thread_; }
     const OwnedWaitQueue* target_queue() const { return target_queue_; }
     const OwnedWaitQueue* blocking_queue() const TA_EXCL(chainlock_transaction_token) {
@@ -66,6 +72,20 @@ struct OwnedWaitQueueTopologyTests {
       return OwnedWaitQueue::DowncastToOwq(thread_->wait_queue_state().blocking_wait_queue());
     }
 
+    zx_instant_mono_t start_time() const {
+      ASSERT(thread_ != nullptr);
+      SingleChainLockGuard guard{IrqSaveOption, thread_->get_lock(),
+                                 CLT_TAG("OwnedWaitQueueTopologyTests::TestThread::start_time")};
+      return thread_->scheduler_state().start_time().raw_value();
+    }
+
+    zx_instant_mono_t finish_time() const {
+      ASSERT(thread_ != nullptr);
+      SingleChainLockGuard guard{IrqSaveOption, thread_->get_lock(),
+                                 CLT_TAG("OwnedWaitQueueTopologyTests::TestThread::start_time")};
+      return thread_->scheduler_state().finish_time().raw_value();
+    }
+
    private:
     int Main();
 
@@ -73,6 +93,7 @@ struct OwnedWaitQueueTopologyTests {
 
     ktl::atomic<bool> exit_now_{false};
     ktl::atomic<bool> do_baao_{false};
+    ktl::optional<zx_instant_mono_t> start_time_gate_{ktl::nullopt};
     OwnedWaitQueue* target_queue_{nullptr};
     Thread* target_owner_{nullptr};
     Thread* thread_{nullptr};
@@ -158,6 +179,9 @@ struct OwnedWaitQueueTopologyTests {
     // queue and optionally declaring an owner as we do.  Afterwards, verify that
     // each of the threads is blocked behind the queue we expect, and that the
     // owner is who we expect.
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+    TestThread* previous_thread{nullptr};
+#endif
     for (const Action& action : actions) {
       // Make sue the action indexes are valid.
       ASSERT_LT(action.thread_index, threads.size());
@@ -170,6 +194,50 @@ struct OwnedWaitQueueTopologyTests {
         ASSERT_LT(action.owning_thread_index, threads.size());
         new_owner = &threads[action.owning_thread_index];
       }
+
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+      // Make certain that when we are setting up for a re-queue test that we
+      // carefully control the order that the threads will be selected from the
+      // wait queue when it is time to perform the actual wake-and-requeue
+      // operation.
+      //
+      // Note; this is not normally something that tests can depend on.  In
+      // theory, the priority order of a wait queue is officially "not your
+      // business" and not formally specified.  When it comes to the specific
+      // case of in-kernel unit tests and keeping them deterministic, it is
+      // probably OK to be aware of the specifics of how things are ordered,
+      // even though this means that when the sorting invariant for the wait
+      // queue changes (not a common thing at all), this test will need to be
+      // updated as well.
+      //
+      // At any rate, currently the wake order of threads in a wait queue is
+      // controlled completely by their finish time.  Threads with earlier
+      // finish times get woken before threads with later finish times.  The
+      // finish time of a deadline thread is its start time + its period.  We
+      // want the threads to wake in the order that they were setup (T0 wakes
+      // first, then T1, then T2 and so on).
+      //
+      // We have already made certain that the periods of these threads are
+      // strictly monotonically increasing, so now we just need to ensure that
+      // the start times are monotonically increasing and we should be good to
+      // go.
+      //
+      // To accomplish this, each thread has an optional "start time gate" which
+      // can be assigned.  The first thread can start whenever it wants to, but
+      // the thread T(x) needs to make sure that its start time is >= the start
+      // time of T(x-1).
+      //
+      // So, we set T(x).start_time_gate = T(x - 1).start_time for x > 0.  These
+      // threads, when released from their initial spin phase of the test, will
+      // make certain that their start time is >= their start time gate (when
+      // they have one) by sleeping until their finish time until they hit the
+      // point that the condition is satisfied.
+      //
+      if (setup_for_requeue_test && (previous_thread != nullptr)) {
+        blocking_thread.SetStartTimeGate(previous_thread->start_time());
+      }
+      previous_thread = &blocking_thread;
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
       // Then perform the block operation.
       ASSERT_TRUE(blocking_thread.DoBlock(target_queue, new_owner));
@@ -184,6 +252,7 @@ struct OwnedWaitQueueTopologyTests {
     }
 
     if (setup_for_requeue_test) {
+#if !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
       // Sleep for longer than the longest relative deadline we assigned to our
       // threads.  This will ensure that none of the currently blocked threads
       // have an active deadline (all of their deadlines will have expired).
@@ -193,6 +262,7 @@ struct OwnedWaitQueueTopologyTests {
       // queue, we should always end up choosing the thread in the queue with
       // the lowest index in the test thread array.
       Thread::Current::SleepRelative(TestThread::DeadlineForIndex(threads.size()).raw_value());
+#endif  // !EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
     } else {
       ShutdownThreads(threads);
     }
@@ -268,6 +338,23 @@ int OwnedWaitQueueTopologyTests::TestThread::Main() {
       return -1;
     }
   }
+
+#if EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
+  // If we have a "start time gate", then we need make sure that our start time
+  // >= to our gate time in order to ensure a deterministic wake order when
+  // running requeue tests.  This is a pretty simple operation; while our start
+  // time is not large enough, we can just sleep until our finish time (getting
+  // a new start time in the process).
+  //
+  // Note that we know that it is safe to observe the start_time_gate value
+  // (from a memory order perspective) as it was stored before the CST store to
+  // do_baao_ performed by the test setup thread.
+  if (start_time_gate_.has_value()) {
+    while (start_time() < start_time_gate_.value()) {
+      Thread::Current::Sleep(finish_time());
+    }
+  }
+#endif  // EXPERIMENTAL_UNIFIED_SCHEDULER_ENABLED
 
   {
     AnnotatedAutoPreemptDisabler aapd;
