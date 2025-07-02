@@ -2,8 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# TODO(https://fxbug.dev/314036868): Migrate these tests to be hermetic. Delete
+# this when all unused dependencies are removed.
+#
+# PLEASE DO NOT USE.
 group("tests") {
   testonly = true
+
+  # Please do not add to this list.
   public_deps = [
     "blobfs-ramdisk:tests",
     "mock-boot-arguments:tests",
@@ -16,5 +22,20 @@ group("tests") {
     "mock-reboot:tests",
     "mock-resolver:tests",
     "mock-space:tests",
+  ]
+}
+
+if (is_fuchsia) {
+  group("hermetic_tests") {
+    testonly = true
+    public_deps = []
+  }
+}
+
+group("all_tests") {
+  testonly = true
+  public_deps = [
+    ":hermetic_tests($target_toolchain)",
+    ":tests",
   ]
 }
