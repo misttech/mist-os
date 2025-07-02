@@ -7,7 +7,7 @@ mod fxfs_container;
 mod publisher;
 pub use fvm_container::FvmContainer;
 pub use fxfs_container::FxfsContainer;
-pub use publisher::DevicePublisher;
+pub use publisher::{DevicePublisher, SinglePublisher};
 
 use crate::copier::recursive_copy;
 use crate::crypt::fxfs::{self, CryptService};

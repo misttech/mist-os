@@ -13,7 +13,7 @@ use fs_management::format::constants::DATA_PARTITION_LABEL;
 use fs_management::partition::{find_partition_in, PartitionMatcher};
 use fs_management::DATA_TYPE_GUID;
 use fshost_test_fixture::disk_builder::{
-    DataSpec, VolumesSpec, BLOBFS_MAX_BYTES, TEST_DISK_BLOCK_SIZE,
+    DataSpec, Disk, DiskBuilder, VolumesSpec, BLOBFS_MAX_BYTES, TEST_DISK_BLOCK_SIZE,
 };
 use fshost_test_fixture::{
     round_down, BlockDeviceConfig, BlockDeviceIdentifiers, BlockDeviceParent, TestFixture,
@@ -1645,7 +1645,7 @@ async fn fuse_gpt_once_container_found() {
 
 #[fuchsia::test]
 async fn device_config() {
-    let mut builder = new_builder().with_device_config(vec![
+    let builder = new_builder().with_device_config(vec![
         BlockDeviceConfig {
             device: String::from("fts"),
             from: BlockDeviceIdentifiers {
@@ -1668,24 +1668,32 @@ async fn device_config() {
             },
         },
     ]);
-    builder
-        .with_disk()
-        .with_gpt()
-        .format_volumes(volumes_spec())
-        .with_extra_gpt_partition("fts")
-        .with_extra_gpt_partition("boot_a")
-        .with_extra_gpt_partition("boot_b");
-    let fixture = builder.build().await;
+    let mut fixture = builder.build().await;
 
-    fixture.check_fs_type("blob", blob_fs_type()).await;
-    fixture.check_fs_type("data", data_fs_type()).await;
-
+    // By attempting to open and use the block directory before we add the disk, we confirm that
+    // queuing requests for configured devices works as expected. If the queuing doesn't work, this
+    // will fail with PEER_CLOSED instead.
     let fts_dir = fixture.dir("block/fts", fio::PERM_READABLE);
     let volume =
         fuchsia_component::client::connect_to_protocol_at_dir_root::<VolumeMarker>(&fts_dir)
             .unwrap();
-    let metadata = volume.get_metadata().await.unwrap().unwrap();
-    assert_eq!(metadata.num_blocks, Some(1));
+    let task =
+        fasync::Task::spawn(
+            async move { volume.get_metadata().await.unwrap().unwrap().num_blocks },
+        );
+
+    let mut disk = DiskBuilder::new();
+    disk.with_gpt()
+        .format_volumes(volumes_spec())
+        .with_extra_gpt_partition("fts")
+        .with_extra_gpt_partition("boot_a")
+        .with_extra_gpt_partition("boot_b");
+    fixture.add_main_disk(Disk::Builder(disk)).await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    assert_eq!(task.await, Some(1));
 
     let boot_a_dir = fixture.dir("block/test-device", fio::PERM_READABLE);
     let volume =

@@ -124,8 +124,12 @@ async fn main() -> Result<(), Error> {
         inspect_runtime::publish(&inspector, inspect_runtime::PublishOptions::default());
     // matcher_lock is used to block matching temporarily and inject
     // paths to be ignored.
+    let scope = ExecutionScope::new();
     let matcher_lock = Arc::new(Mutex::new(HashSet::new()));
-    let device_publisher = DevicePublisher::new();
+    let device_publisher = DevicePublisher::new(scope.clone());
+    let extra_matchers = matcher::get_config_matchers(&device_publisher)
+        .await
+        .context("failed to get configured matchers")?;
     let publisher_block_dir = device_publisher.block_dir();
     let publisher_debug_block_dir = device_publisher.debug_block_dir();
     let mut env = FshostEnvironment::new(
@@ -198,7 +202,6 @@ async fn main() -> Result<(), Error> {
 
     let _ = service::handle_lifecycle_requests(shutdown_tx)?;
 
-    let scope = ExecutionScope::new();
     vfs::directory::serve_on(
         export,
         fio::PERM_READABLE | fio::PERM_WRITABLE | fio::PERM_EXECUTABLE,
@@ -212,8 +215,6 @@ async fn main() -> Result<(), Error> {
 
     // Run the main loop of fshost, handling devices as they appear according to our filesystem
     // policy.
-    let extra_matchers =
-        matcher::get_config_matchers().await.context("failed to get configured matchers")?;
     let mut fs_manager = manager::Manager::new(&config, env, matcher_lock, extra_matchers);
     let shutdown_responder = if config.disable_block_watcher {
         // If the block watcher is disabled, fshost just waits on the shutdown receiver instead of

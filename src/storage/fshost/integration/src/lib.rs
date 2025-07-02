@@ -247,16 +247,10 @@ impl TestFixtureBuilder {
         // TODO(https://fxbug.dev/380353856): This type of testing should be irrelevant once the
         // block devices are determined by configuration options instead of heuristically.
         for disk in self.extra_disks.into_iter() {
-            let (vmo, type_guid) = disk.into_vmo_and_type_guid().await;
-            fixture.add_ramdisk(vmo, type_guid).await;
+            fixture.add_disk(disk).await;
         }
         if let Some(disk) = self.disk {
-            let (vmo, type_guid) = disk.into_vmo_and_type_guid().await;
-            let vmo_clone =
-                vmo.create_child(zx::VmoChildOptions::SLICE, 0, vmo.get_size().unwrap()).unwrap();
-
-            fixture.add_ramdisk(vmo, type_guid).await;
-            fixture.main_disk = Some(Disk::Prebuilt(vmo_clone, type_guid));
+            fixture.add_main_disk(disk).await;
         }
 
         fixture
@@ -380,6 +374,21 @@ impl TestFixture {
         .await
         .expect_err("open_file failed");
         assert!(err.is_not_found_error());
+    }
+
+    pub async fn add_main_disk(&mut self, disk: Disk) {
+        assert!(self.main_disk.is_none());
+        let (vmo, type_guid) = disk.into_vmo_and_type_guid().await;
+        let vmo_clone =
+            vmo.create_child(zx::VmoChildOptions::SLICE, 0, vmo.get_size().unwrap()).unwrap();
+
+        self.add_ramdisk(vmo, type_guid).await;
+        self.main_disk = Some(Disk::Prebuilt(vmo_clone, type_guid));
+    }
+
+    pub async fn add_disk(&mut self, disk: Disk) {
+        let (vmo, type_guid) = disk.into_vmo_and_type_guid().await;
+        self.add_ramdisk(vmo, type_guid).await;
     }
 
     async fn add_ramdisk(&mut self, vmo: zx::Vmo, type_guid: Option<[u8; 16]>) {
