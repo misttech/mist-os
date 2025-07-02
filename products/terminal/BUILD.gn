@@ -114,7 +114,7 @@ if (target_cpu == "x64") {
     testonly = true
     product_bundle_name = "terminal_with_netstack2.x64"
     allow_eng_platform_bundle_use = true
-    bazel_product_bundle_target = ":terminal_with_netstack2.x64"
+    bazel_product_bundle_target = ":product_bundle_with_netstack2.x64"
     bazel_product_image_target = ":image_with_netstack2.x64"
     bazel_recovery_image_target = "//products/zedboot:x64"
     bazel_elf_sizes_target = ":elf_sizes_with_netstack2.x64"
@@ -128,7 +128,7 @@ if (target_cpu == "x64") {
     product_bundle_name = "terminal_with_netstack2.x64-reduced-perf-variation"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target =
-        ":terminal_with_netstack2.x64_reduced_perf_variation"
+        ":product_bundle_with_netstack2.x64_reduced_perf_variation"
     bazel_product_image_target =
         ":image_with_netstack2.x64_reduced_perf_variation"
     bazel_recovery_image_target =
@@ -198,7 +198,7 @@ if (target_cpu == "arm64") {
     testonly = true
     product_bundle_name = "terminal_with_netstack2.arm64"
     allow_eng_platform_bundle_use = true
-    bazel_product_bundle_target = ":terminal_with_netstack2.arm64"
+    bazel_product_bundle_target = ":product_bundle_with_netstack2.arm64"
     bazel_product_image_target = ":image_with_netstack2.arm64"
     bazel_recovery_image_target = "//products/zedboot:arm64"
     bazel_elf_sizes_target = ":elf_sizes_with_netstack2.arm64"
@@ -212,7 +212,7 @@ if (target_cpu == "arm64") {
     product_bundle_name = "terminal_with_netstack2.qemu-arm64"
     allow_eng_platform_bundle_use = true
     image_use_vbmeta = false
-    bazel_product_bundle_target = ":terminal_with_netstack2.qemu-arm64"
+    bazel_product_bundle_target = ":product_bundle_with_netstack2.qemu-arm64"
     bazel_product_image_target = ":image_with_netstack2.qemu-arm64"
     bazel_recovery_image_target = "//products/zedboot:qemu-arm64"
     bazel_elf_sizes_target = ":elf_sizes_with_netstack2.qemu-arm64"
@@ -224,7 +224,7 @@ if (target_cpu == "arm64") {
     testonly = true
     product_bundle_name = "terminal_with_netstack2.vim3"
     allow_eng_platform_bundle_use = true
-    bazel_product_bundle_target = ":terminal_with_netstack2.vim3"
+    bazel_product_bundle_target = ":product_bundle_with_netstack2.vim3"
     bazel_product_image_target = ":image_with_netstack2.vim3"
     bazel_recovery_image_target = "//products/zedboot:vim3"
     bazel_elf_sizes_target = ":elf_sizes_with_netstack2.vim3"
@@ -238,7 +238,7 @@ if (target_cpu == "arm64") {
     product_bundle_name = "terminal_with_netstack2.vim3-reduced-perf-variation"
     allow_eng_platform_bundle_use = true
     bazel_product_bundle_target =
-        ":terminal_with_netstack2.vim3_reduced_perf_variation"
+        ":product_bundle_with_netstack2.vim3_reduced_perf_variation"
     bazel_product_image_target =
         ":image_with_netstack2.vim3_reduced_perf_variation"
     bazel_recovery_image_target =

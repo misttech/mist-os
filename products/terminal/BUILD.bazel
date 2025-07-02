@@ -199,7 +199,7 @@ fuchsia_elf_sizes(
 )
 
 fuchsia_product_bundle(
-    name = "terminal_with_netstack2.x64",
+    name = "product_bundle_with_netstack2.x64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
     main = ":image_with_netstack2.x64",
     product_bundle_name = "terminal_with_netstack2.x64",
@@ -255,7 +255,7 @@ fuchsia_elf_sizes(
 )
 
 fuchsia_product_bundle(
-    name = "terminal_with_netstack2.x64_reduced_perf_variation",
+    name = "product_bundle_with_netstack2.x64_reduced_perf_variation",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:x64-emu-recommended",
     main = ":image_with_netstack2.x64_reduced_perf_variation",
     product_bundle_name = "terminal.x64_reduced_perf_variation",
@@ -311,7 +311,7 @@ fuchsia_elf_sizes(
 )
 
 fuchsia_product_bundle(
-    name = "terminal_with_netstack2.arm64",
+    name = "product_bundle_with_netstack2.arm64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image_with_netstack2.arm64",
     product_bundle_name = "terminal_with_netstack2.arm64",
@@ -367,7 +367,7 @@ fuchsia_elf_sizes(
 )
 
 fuchsia_product_bundle(
-    name = "terminal_with_netstack2.qemu-arm64",
+    name = "product_bundle_with_netstack2.qemu-arm64",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image_with_netstack2.qemu-arm64",
     product_bundle_name = "terminal_with_netstack2.qemu-arm64",
@@ -423,7 +423,7 @@ fuchsia_elf_sizes(
 )
 
 fuchsia_product_bundle(
-    name = "terminal_with_netstack2.vim3",
+    name = "product_bundle_with_netstack2.vim3",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image_with_netstack2.vim3",
     product_bundle_name = "terminal_with_netstack2.vim3",
@@ -522,7 +522,7 @@ fuchsia_elf_sizes(
 )
 
 fuchsia_product_bundle(
-    name = "terminal_with_netstack2.vim3_reduced_perf_variation",
+    name = "product_bundle_with_netstack2.vim3_reduced_perf_variation",
     default_virtual_device = "//build/bazel/assembly/virtual_devices:arm64-emu-recommended",
     main = ":image_with_netstack2.vim3_reduced_perf_variation",
     product_bundle_name = "terminal_with_netstack2.vim3_reduced_perf_variation",
