@@ -20,6 +20,12 @@ struct Module {
     kFile,     // Packed as a file. Data will be read from an offset.
   };
 
+  enum class AddressSize {
+    k32Bit,
+    k64Bit,
+    kUnknown,
+  };
+
   // The load address.
   uint64_t load_address;
 
@@ -31,11 +37,25 @@ struct Module {
   // Address mode.
   AddressMode mode;
 
+  AddressSize size;
+
   Module(uint64_t addr, Memory* binary, AddressMode mod)
-      : load_address(addr), binary_memory(binary), debug_info_memory(nullptr), mode(mod) {}
+      : load_address(addr),
+        binary_memory(binary),
+        debug_info_memory(nullptr),
+        mode(mod),
+        size(ProbeElfModuleClass()) {}
 
   Module(uint64_t addr, Memory* binary, Memory* debug_info, AddressMode mod)
-      : load_address(addr), binary_memory(binary), debug_info_memory(debug_info), mode(mod) {}
+      : load_address(addr),
+        binary_memory(binary),
+        debug_info_memory(debug_info),
+        mode(mod),
+        size(ProbeElfModuleClass()) {}
+
+ private:
+  // The ELF Identifier Class field tells us if this binary is 32 or 64 bit.
+  AddressSize ProbeElfModuleClass() const;
 };
 
 }  // namespace unwinder
