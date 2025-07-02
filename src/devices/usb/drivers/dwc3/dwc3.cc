@@ -397,17 +397,16 @@ void Dwc3::ReleaseResources() {
 
   // Now go ahead and release any buffers we may have pinned.
   {
+    Ep0Reset();
     std::lock_guard<std::mutex> lock(ep0_.lock);
-    ep0_.out.enabled = false;
-    ep0_.in.enabled = false;
     ep0_.buffer.reset();
     ep0_.shared_fifo.Release();
   }
 
   for (UserEndpoint& uep : user_endpoints_) {
+    UserEpReset(uep);
     std::lock_guard<std::mutex> lock(uep.ep.lock);
     uep.fifo.Release();
-    uep.ep.enabled = false;
   }
 
   event_fifo_.Release();
@@ -527,24 +526,24 @@ void Dwc3::ResetConfiguration() {
   }
 
   for (UserEndpoint& uep : user_endpoints_) {
-    uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
-    std::lock_guard<std::mutex> lock(uep.ep.lock);
-    uep.ep.got_not_ready = false;
-    EpSetStall(uep.ep, false);
+    // Disabled above.
+    uep.ep.enabled = false;
+    uep.ep.stalled = false;
+    UserEpReset(uep);
+  }
+
+  {
+    std::lock_guard<std::mutex> lock(dci_lock_);
+    if (dci_intf_.is_valid()) {
+      DciIntfSetConnected(true);
+    }
   }
 }
 
 void Dwc3::HandleResetEvent() {
   FDF_LOG(INFO, "Dwc3::HandleResetEvent");
 
-  Ep0Reset();
-
-  for (UserEndpoint& uep : user_endpoints_) {
-    uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
-    std::lock_guard<std::mutex> lock(uep.ep.lock);
-    uep.ep.got_not_ready = false;
-    EpSetStall(uep.ep, false);
-  }
+  ResetEndpoints();
 
   {
     std::lock_guard<std::mutex> lock(lock_);
@@ -556,7 +555,7 @@ void Dwc3::HandleResetEvent() {
   {
     std::lock_guard<std::mutex> lock(dci_lock_);
     if (dci_intf_.is_valid()) {
-      DciIntfSetConnected(true);
+      DciIntfSetConnected(false);
     }
   }
 }
@@ -619,24 +618,13 @@ void Dwc3::HandleDisconnectedEvent() {
   FDF_LOG(INFO, "Dwc3::HandleDisconnectedEvent");
 
   {
-    std::lock_guard<std::mutex> ep0_lock(ep0_.lock);
-    CmdEpEndTransfer(ep0_.out);
-    ep0_.state = Ep0::State::None;
-  }
-
-  {
     std::lock_guard<std::mutex> lock(dci_lock_);
     if (dci_intf_.is_valid()) {
       DciIntfSetConnected(false);
     }
   }
 
-  for (UserEndpoint& uep : user_endpoints_) {
-    uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
-    std::lock_guard<std::mutex> lock(uep.ep.lock);
-    uep.ep.got_not_ready = false;
-    EpSetStall(uep.ep, false);
-  }
+  ResetEndpoints();
 }
 
 void Dwc3::Stop() {
@@ -691,12 +679,7 @@ void Dwc3::StartController(StartControllerCompleter::Sync& completer) {
 }
 
 void Dwc3::StopController(StopControllerCompleter::Sync& completer) {
-  Ep0Reset();
-  ep0_.Reset();
-  for (UserEndpoint& uep : user_endpoints_) {
-    uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
-    uep.Reset();
-  }
+  ResetEndpoints();
 
   libsync::Completion wait;
   async::PostTask(irq_dispatcher_.async_dispatcher(), [this, &wait]() {
@@ -741,6 +724,7 @@ void Dwc3::ConfigureEndpoint(ConfigureEndpointRequest& request,
 
   if (uep->ep.enabled) {
     // Endpoint already configured, nothing to do.
+    FDF_LOG(ERROR, "Endpoint(%d) already configured!", uep->ep.ep_num);
     completer.Reply(zx::ok());
     return;
   }
@@ -756,13 +740,8 @@ void Dwc3::ConfigureEndpoint(ConfigureEndpointRequest& request,
   uep->ep.interval = request.ep_descriptor().b_interval();
   // TODO(voydanoff) USB3 support
 
-  uep->ep.enabled = true;
   EpSetConfig(uep->ep, true);
-
-  // TODO(johngro): What protects this configured_ state from a locking/threading perspective?
-  if (configured_) {
-    UserEpQueueNext(*uep);
-  }
+  UserEpQueueNext(*uep);
 
   completer.Reply(zx::ok());
 }
@@ -780,7 +759,7 @@ void Dwc3::DisableEndpoint(DisableEndpointRequest& request,
   uep->server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
   {
     std::lock_guard<std::mutex> _{uep->ep.lock};
-    uep->ep.enabled = false;
+    EpSetConfig(uep->ep, false);
   }
 
   completer.Reply(zx::ok());
@@ -964,14 +943,48 @@ void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
     queued_reqs.emplace(std::move(freq));
   }
 
-  if (dwc3_->configured_) {
-    dwc3_->UserEpQueueNext(*uep_);
-  }
+  dwc3_->UserEpQueueNext(*uep_);
 }
 
 void Dwc3::EpServer::CancelAll(CancelAllCompleter::Sync& completer) {
   CancelAll(ZX_ERR_IO_NOT_PRESENT);
   completer.Reply(zx::ok());
+}
+
+void Dwc3::EpReset(Endpoint& ep) {
+  EpSetStall(ep, false);
+  EpSetConfig(ep, false);
+  ep.got_not_ready = false;
+}
+
+void Dwc3::UserEpReset(UserEndpoint& uep) {
+  uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
+  std::lock_guard<std::mutex> _(uep.ep.lock);
+  EpReset(uep.ep);
+}
+
+void Dwc3::Ep0Reset() {
+  std::lock_guard<std::mutex> _(ep0_.lock);
+  ep0_.cur_setup = {};
+  ep0_.cur_speed = fuchsia_hardware_usb_descriptor::wire::UsbSpeed::kUndefined;
+  ep0_.state = Ep0::State::None;
+  CmdEpEndTransfer(ep0_.out);
+  {
+    std::lock_guard<std::mutex> _(ep0_.out.lock);
+    EpReset(ep0_.out);
+  }
+  {
+    std::lock_guard<std::mutex> _(ep0_.in.lock);
+    EpReset(ep0_.in);
+  }
+  ep0_.shared_fifo.Clear();
+}
+
+void Dwc3::ResetEndpoints() {
+  Ep0Reset();
+  for (UserEndpoint& uep : user_endpoints_) {
+    UserEpReset(uep);
+  }
 }
 
 }  // namespace dwc3

@@ -164,12 +164,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     bool IsOutput() const { return IsOutput(ep_num); }
     bool IsInput() const { return IsInput(ep_num); }
 
-    void Reset() {
-      enabled = false;
-      got_not_ready = false;
-      stalled = false;
-    }
-
     uint32_t rsrc_id{0};  // resource ID for current_req
 
     const uint8_t ep_num{0};
@@ -193,11 +187,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     UserEndpoint& operator=(const UserEndpoint&) = delete;
     UserEndpoint(UserEndpoint&&) = delete;
     UserEndpoint& operator=(UserEndpoint&&) = delete;
-
-    void Reset() {
-      std::lock_guard<std::mutex> _(ep.lock);
-      ep.Reset();
-    }
 
     __TA_GUARDED(ep.lock) TrbFifo fifo;
     Endpoint ep;
@@ -253,14 +242,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     Ep0& operator=(const Ep0&) = delete;
     Ep0(Ep0&&) = delete;
     Ep0& operator=(Ep0&&) = delete;
-
-    void Reset() {
-      std::lock_guard<std::mutex> _(lock);
-      cur_setup = {};
-      cur_speed = fuchsia_hardware_usb_descriptor::wire::UsbSpeed::kUndefined;
-      out.Reset();
-      in.Reset();
-    }
 
     enum class State {
       None,
@@ -338,14 +319,18 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
       __TA_EXCLUDES(lock_, ep0_.lock);
 
   // General EP stuff
-  void EpEnable(const Endpoint& ep, bool enable) __TA_EXCLUDES(lock_);
+  void EpEnable(Endpoint& ep, bool enable) __TA_EXCLUDES(lock_);
   void EpSetConfig(Endpoint& ep, bool enable) __TA_EXCLUDES(lock_);
   zx_status_t EpSetStall(Endpoint& ep, bool stall) __TA_EXCLUDES(lock_);
   void EpStartTransfer(Endpoint& ep, TrbFifo& fifo, uint32_t type, zx_paddr_t buffer, size_t length)
       __TA_EXCLUDES(lock_);
+  void EpReset(Endpoint& ep) __TA_REQUIRES(ep.lock);
 
   // Methods specific to user endpoints
+  void UserEpReset(UserEndpoint& uep) __TA_EXCLUDES(lock_);
   void UserEpQueueNext(UserEndpoint& uep) __TA_REQUIRES(uep.ep.lock) __TA_EXCLUDES(lock_);
+
+  void ResetEndpoints() __TA_EXCLUDES(lock_);
 
   // Commands
   void CmdStartNewConfig(const Endpoint& ep, uint32_t rsrc_id) __TA_EXCLUDES(lock_);
@@ -383,10 +368,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
   Ep0 ep0_;
   UserEndpointCollection user_endpoints_;
-
-  // TODO(johngro): What lock protects this?  Right now, it is effectively
-  // endpoints_[0].lock(), but how do we express this?
-  bool configured_ = false;
 
   std::unique_ptr<PlatformExtension> platform_extension_;
 

@@ -9,7 +9,7 @@
 
 namespace dwc3 {
 
-void Dwc3::EpEnable(const Endpoint& ep, bool enable) {
+void Dwc3::EpEnable(Endpoint& ep, bool enable) {
   std::lock_guard<std::mutex> lock(lock_);
   auto* mmio = get_mmio();
 
@@ -18,6 +18,8 @@ void Dwc3::EpEnable(const Endpoint& ep, bool enable) {
   } else {
     DALEPENA::Get().ReadFrom(mmio).DisableEp(ep.ep_num).WriteTo(mmio);
   }
+
+  ep.enabled = enable;
 }
 
 void Dwc3::EpSetConfig(Endpoint& ep, bool enable) {
@@ -44,7 +46,6 @@ zx_status_t Dwc3::EpSetStall(Endpoint& ep, bool stall) {
   }
 
   ep.stalled = stall;
-
   return ZX_OK;
 }
 
@@ -91,11 +92,8 @@ void Dwc3::UserEpQueueNext(UserEndpoint& uep) __TA_NO_THREAD_SAFETY_ANALYSIS {
   uep.server->current_req.emplace(std::move(uep.server->queued_reqs.front()));
   uep.server->queued_reqs.pop();
 
-  zx::result result{uep.server->get_iter(*uep.server->current_req, zx_system_get_page_size())};
-  if (result.is_error()) {
-    FDF_LOG(ERROR, "[BUG] server->phys_iter(): %s", result.status_string());
-  }
-  ZX_ASSERT(result.is_ok());
+  zx::result result = uep.server->get_iter(*uep.server->current_req, zx_system_get_page_size());
+  ZX_ASSERT_MSG(result.is_ok(), "[BUG] server->phys_iter(): %s", result.status_string());
 
   // TODO(voydanoff) scatter/gather support
   zx_paddr_t phys;
@@ -113,10 +111,10 @@ void Dwc3::HandleEpTransferCompleteEvent(uint8_t ep_num) __TA_NO_THREAD_SAFETY_A
   std::optional<usb::RequestVariant> req;
   uint32_t actual;
 
-  UserEndpoint* const uep = get_user_endpoint(ep_num);
-  ZX_DEBUG_ASSERT(uep != nullptr);
   // No thread safety analysis because this already holds uep.ep.lock, which is equivalent
   // to uep.server->uep.ep.lock
+  UserEndpoint* const uep = get_user_endpoint(ep_num);
+  ZX_DEBUG_ASSERT(uep != nullptr);
   {
     std::lock_guard<std::mutex> lock{uep->ep.lock};
     if (!uep->server->current_req.has_value()) {
