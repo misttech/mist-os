@@ -212,6 +212,11 @@ impl CreditFlowController {
         }
     }
 
+    /// Returns true if there are sufficient credits to send at least one queued packet.
+    fn can_send_queued(&self) -> bool {
+        self.credits.local() > 0 && !self.outgoing_data_pending_credits.is_empty()
+    }
+
     /// Attempts to send the user `data` as an RFCOMM frame to the remote peer.
     /// NOTE: Assumes that there are sufficient local credits to send the frame.
     async fn send_frame_with_credits(&mut self, data: UserData) {
@@ -227,26 +232,18 @@ impl CreditFlowController {
                     .record_outbound_transfer(data_size, fasync::MonotonicInstant::now());
             }
             // Update our bookkeeping for the remote credit count with what we gave to the peer.
-            self.credits.replenish_remote(credits_to_replenish.unwrap_or(0) as usize);
+            self.credits.replenish_remote(credits_to_replenish.map_or(0, Into::into));
         }
     }
 
-    /// Attempts to drain the data queue and send to the remote peer.
+    /// Attempts to drain the outgoing data queue and send to the remote peer.
     async fn process_data_queue(&mut self) {
         let before_length = self.outgoing_data_pending_credits.len();
-        while self.credits.local() > 0 && !self.outgoing_data_pending_credits.is_empty() {
+        while self.can_send_queued() {
             let data = self.outgoing_data_pending_credits.pop_front().expect("queue nonempty");
             self.send_frame_with_credits(data).await;
         }
         trace!(dlci:% = self.dlci; "Processed queue. Before = {before_length}. After = {}", self.outgoing_data_pending_credits.len());
-    }
-
-    /// Handles receiving credits in a frame from the remote peer. If a nonzero number of credits
-    /// were received, attempts to send any frames pending credits.
-    async fn handle_received_credits(&mut self, received_credits: u8) {
-        self.credits.replenish_local(received_credits as usize);
-        // If we were blocked on credits, attempt to send as many packets as we can.
-        self.process_data_queue().await;
     }
 }
 
@@ -265,8 +262,9 @@ impl FlowController for CreditFlowController {
 
     async fn receive_data_from_peer(&mut self, data: FlowControlledData, client: &Channel) {
         let FlowControlledData { user_data, credits } = data;
-        self.handle_received_credits(credits.unwrap_or(0)).await;
+        self.credits.replenish_local(credits.map_or(0, Into::into));
 
+        // Deliver the data to the application if the payload is not empty.
         if !user_data.is_empty() {
             let _ = client.write(&user_data.information[..]);
             self.stream_inspect.record_inbound_transfer(
@@ -274,13 +272,20 @@ impl FlowController for CreditFlowController {
                 fasync::MonotonicInstant::now(),
             );
 
-            if self.credits.decrement_remote() {
-                trace!(dlci:% = self.dlci; "Remote credit count is low - replenishing with an empty frame.");
+            // Attempt to refresh the remote credits if low. Will be skipped if there are any
+            // pending packets.
+            if self.credits.decrement_remote() && !self.can_send_queued() {
+                trace!(dlci:% = self.dlci; "Remote credit count is low. Replenishing.");
                 // An empty frame can be sent without any credits. It is considered part of the
                 // flow control.
-                let _ = self.send_frame_with_credits(UserData::empty()).await;
+                self.send_frame_with_credits(UserData::empty()).await;
+                return;
             }
         }
+
+        // Potentially send queued packets that were blocked on credits. Outgoing packets will
+        // include a credit refresh, if required.
+        self.process_data_queue().await;
     }
 }
 
@@ -667,64 +672,64 @@ mod tests {
         let (_inspect, mut session_channel, mut client, mut outgoing_frames) =
             create_and_establish(role, dlci, None);
 
-        {
-            let mut data_received_by_client = Box::pin(client.next());
-            exec.run_until_stalled(&mut data_received_by_client)
-                .expect_pending("shouldn't have data");
-        }
+        exec.run_until_stalled(&mut client.next()).expect_pending("no application data");
+        poll_stream(&mut exec, &mut outgoing_frames).expect_pending("no outgoing frame");
 
-        poll_stream(&mut exec, &mut outgoing_frames).expect_pending("shouldn't have frames");
-
-        // Receive user data from remote peer be relayed to the profile-client - 0 credits issued.
-        let user_data = UserData { information: vec![0x01, 0x02, 0x03] };
+        // Receive user data from remote peer be relayed to the profile-client. The peer issues 0
+        // extra credits.
+        let user_data = vec![0x01, 0x02, 0x03];
         {
             let mut receive_fut = Box::pin(session_channel.receive_user_data(FlowControlledData {
-                user_data: user_data.clone(),
+                user_data: UserData { information: user_data.clone() },
                 credits: Some(0),
             }));
             assert_matches!(exec.run_until_stalled(&mut receive_fut), Poll::Ready(Ok(_)));
         }
 
-        // Even though the remote's credit count is 0 (the default), the data should be relayed
-        // to the client. However, we expect to immediately send an outgoing empty data frame
-        // to replenish the remote's credits.
-        {
-            let mut data_received_by_client = Box::pin(client.next());
-            assert!(exec.run_until_stalled(&mut data_received_by_client).is_ready());
-            expect_user_data_frame(
-                &mut exec,
-                &mut outgoing_frames,
-                UserData::empty(),
-                Some(HIGH_CREDIT_WATER_MARK as u8),
-            );
-        }
+        // The data should be relayed to the client.
+        let received_data2 = exec
+            .run_until_stalled(&mut client.select_next_some())
+            .expect("stream ready")
+            .expect("received data");
+        assert_eq!(received_data2, user_data);
+        // Because the remote's credit count is low (0, the default), we expect to immediately send
+        // an outgoing empty data frame to replenish it.
+        expect_user_data_frame(
+            &mut exec,
+            &mut outgoing_frames,
+            UserData::empty(),
+            Some(HIGH_CREDIT_WATER_MARK as u8),
+        );
 
-        // Client wants to send data to the remote peer. We have no local credits, so it should
+        // Application wants to send data to the remote peer. We have no local credits so it should
         // be queued for later.
-        let client_data = vec![0xaa, 0xcc];
+        let client_data = vec![0xaa, 0xcc, 0xee, 0xff, 0x00, 0x11, 0x12];
         assert!(client.write(&client_data).is_ok());
-        poll_stream(&mut exec, &mut outgoing_frames).expect_pending("shouldn't have frames");
+        poll_stream(&mut exec, &mut outgoing_frames).expect_pending("no outgoing frame");
 
         // Remote peer sends more user data with a refreshed credit amount.
-        let user_data = UserData { information: vec![0x00, 0x00, 0x00, 0x00, 0x00] };
+        let user_data2 = vec![0x00, 0x00, 0x00, 0x00, 0x00];
         {
             let mut receive_fut = Box::pin(session_channel.receive_user_data(FlowControlledData {
-                user_data: user_data.clone(),
+                user_data: UserData { information: user_data2.clone() },
                 credits: Some(50),
             }));
             assert_matches!(exec.run_until_stalled(&mut receive_fut), Poll::Ready(Ok(_)));
         }
 
+        // First, the RX frame should be forwarded to the application layer.
+        let received_data2 = exec
+            .run_until_stalled(&mut client.select_next_some())
+            .expect("stream ready")
+            .expect("received data");
+        assert_eq!(received_data2, user_data2);
         // The previously queued outgoing frame should be finally sent due to the credit refresh.
-        // The received user data frame should be relayed to the client.
         expect_user_data_frame(
             &mut exec,
             &mut outgoing_frames,
             UserData { information: client_data },
-            None, // Don't expect to replenish remote.
+            Some(1), // HIGH_CREDIT_WATER_MARK - 254 (current)
         );
-        let mut data_received_by_client = Box::pin(client.next());
-        assert!(exec.run_until_stalled(&mut data_received_by_client).is_ready());
     }
 
     #[test]
