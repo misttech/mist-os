@@ -46,8 +46,24 @@ fn duplicate_handle<H: HandleBased>(h: &H) -> Result<H, Errno> {
 }
 
 /// Waits forever synchronously for EVENT_SIGNALED.
+///
+/// For us there is no useful scenario where this wait times out and we can continue operating.
 fn wait_signaled_sync<H: HandleBased>(handle: &H) -> zx::WaitResult {
-    handle.wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::INFINITE)
+    loop {
+        const TIMEOUT_SECONDS: i64 = 40; // We may need to vary this.
+        let timeout =
+            zx::MonotonicInstant::after(zx::MonotonicDuration::from_seconds(TIMEOUT_SECONDS));
+        let result = handle.wait_handle(zx::Signals::EVENT_SIGNALED, timeout);
+        if let zx::WaitResult::Ok(_) = result {
+            return result;
+        }
+        fuchsia_trace::instant!(c"alarms", c"starnix:hrtimer:wait_timeout", fuchsia_trace::Scope::Process);
+        // This is bad and should never happen. If it does, it's a bug that has to be found and
+        // fixed. There is no good way to proceed if these signals are not being signaled properly.
+        log_error!(
+            "wait_signaled_sync: not signaled yet: {result:?}. See HrTimer bug: b/428223204"
+        );
+    }
 }
 
 /// Waits forever asynchronously for EVENT_SIGNALED.
