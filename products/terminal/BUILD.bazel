@@ -167,7 +167,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes.x64",
-    product = ":image.x64",
+    product = ":product_bundle.x64",
 )
 
 fuchsia_product_bundle(
@@ -195,7 +195,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes_with_netstack2.x64",
-    product = ":image_with_netstack2.x64",
+    product = ":product_bundle_with_netstack2.x64",
 )
 
 fuchsia_product_bundle(
@@ -223,7 +223,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes.x64_reduced_perf_variation",
-    product = ":image.x64_reduced_perf_variation",
+    product = ":product_bundle.x64_reduced_perf_variation",
 )
 
 fuchsia_product_bundle(
@@ -251,7 +251,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes_with_netstack2.x64_reduced_perf_variation",
-    product = ":image_with_netstack2.x64_reduced_perf_variation",
+    product = ":product_bundle_with_netstack2.x64_reduced_perf_variation",
 )
 
 fuchsia_product_bundle(
@@ -279,7 +279,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes.arm64",
-    product = ":image.arm64",
+    product = ":product_bundle.arm64",
 )
 
 fuchsia_product_bundle(
@@ -307,7 +307,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes_with_netstack2.arm64",
-    product = ":image_with_netstack2.arm64",
+    product = ":product_bundle_with_netstack2.arm64",
 )
 
 fuchsia_product_bundle(
@@ -335,7 +335,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes.qemu-arm64",
-    product = ":image.qemu-arm64",
+    product = ":product_bundle.qemu-arm64",
 )
 
 fuchsia_product_bundle(
@@ -363,7 +363,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes_with_netstack2.qemu-arm64",
-    product = ":image_with_netstack2.qemu-arm64",
+    product = ":product_bundle_with_netstack2.qemu-arm64",
 )
 
 fuchsia_product_bundle(
@@ -391,7 +391,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes.vim3",
-    product = ":image.vim3",
+    product = ":product_bundle.vim3",
 )
 
 fuchsia_product_bundle(
@@ -419,7 +419,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes_with_netstack2.vim3",
-    product = ":image_with_netstack2.vim3",
+    product = ":product_bundle_with_netstack2.vim3",
 )
 
 fuchsia_product_bundle(
@@ -465,7 +465,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes.vim3_reduced_perf_variation",
-    product = ":image.vim3_reduced_perf_variation",
+    product = ":product_bundle.vim3_reduced_perf_variation",
 )
 
 fuchsia_product_bundle(
@@ -518,7 +518,7 @@ fuchsia_product(
 
 fuchsia_elf_sizes(
     name = "elf_sizes_with_netstack2.vim3_reduced_perf_variation",
-    product = ":image_with_netstack2.vim3_reduced_perf_variation",
+    product = ":product_bundle_with_netstack2.vim3_reduced_perf_variation",
 )
 
 fuchsia_product_bundle(

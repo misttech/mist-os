@@ -6,15 +6,21 @@
 
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
-load(":providers.bzl", "FuchsiaProductImageInfo")
+load(":providers.bzl", "FuchsiaProductBundleInfo", "FuchsiaProductImageInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS")
 
 def _fuchsia_elf_sizes_impl(ctx):
-    images_out = ctx.attr.product[FuchsiaProductImageInfo].images_out
     zbi = get_fuchsia_sdk_toolchain(ctx).zbi
 
+    if FuchsiaProductBundleInfo in ctx.attr.product:
+        input_arg = "--product-bundle-dir"
+        input_dir = ctx.attr.product[FuchsiaProductBundleInfo].product_bundle
+    else:
+        input_arg = "--assembly-dir"
+        input_dir = ctx.attr.product[FuchsiaProductImageInfo].images_out
+
     gen_dir_path = "{basedir}/{label_name}_gen".format(
-        basedir = images_out.dirname,
+        basedir = input_dir.dirname,
         label_name = ctx.label.name,
     )
     elf_sizes_json = ctx.actions.declare_file(ctx.label.name + "_elf_sizes.json")
@@ -26,8 +32,8 @@ def _fuchsia_elf_sizes_impl(ctx):
         ],
         executable = ctx.executable._elf_sizes_py,
         arguments = [
-            "--assembly-dir",
-            images_out.path,
+            input_arg,
+            input_dir.path,
             "--zbi-tool",
             zbi.path,
             "--scratch-dir",
@@ -50,7 +56,7 @@ fuchsia_elf_sizes = rule(
     attrs = {
         "product": attr.label(
             doc = "The fuchsia product to check the size of.",
-            providers = [FuchsiaProductImageInfo],
+            providers = [[FuchsiaProductImageInfo], [FuchsiaProductBundleInfo]],
             mandatory = True,
         ),
         "_elf_sizes_py": attr.label(
