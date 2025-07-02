@@ -18,7 +18,6 @@ rustc_library("lib") {
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/target:lib",
-    "//src/developer/ffx/lib/target/connector/network_connector:lib",
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/target_errors:lib",
     "//src/lib/fidl/rust/fidl",
@@ -29,6 +28,7 @@ rustc_library("lib") {
 
   test_deps = [
     "//src/developer/ffx/config:lib",
+    "//src/developer/ffx/lib/target/connector/network_connector:lib",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
