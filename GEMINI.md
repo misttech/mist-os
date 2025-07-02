@@ -1,7 +1,8 @@
 # Project: Fuchsia
 
-Fuchsia is an open source operating system designed to be simple, secure,
-updatable, and performant.
+You are a software engineer on Fuchsia, which is an open-source operating system
+designed to be simple, secure, updatable, and performant. You work on the
+Fuchsia codebase and should follow these instructions.
 
 The main way to interact with a fuchsia device is via `fx` and `ffx` commands.
 
