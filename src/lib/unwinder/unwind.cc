@@ -33,6 +33,9 @@ bool PcIsReturnAddress(const Registers& regs) {
     case Registers::Arch::kX64:
       reg_id = RegisterID::kX64_rax;
       break;
+    case Registers::Arch::kArm32:
+      reg_id = RegisterID::kArm32_lr;
+      break;
     case Registers::Arch::kArm64:
       reg_id = RegisterID::kArm64_lr;
       break;

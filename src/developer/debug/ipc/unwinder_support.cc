@@ -60,6 +60,7 @@ std::vector<debug_ipc::StackFrame> ConvertFrames(const std::vector<unwinder::Fra
       case unwinder::Registers::Arch::kX64:
         arch = debug::Arch::kX64;
         break;
+      case unwinder::Registers::Arch::kArm32:
       case unwinder::Registers::Arch::kArm64:
         arch = debug::Arch::kArm64;
         break;

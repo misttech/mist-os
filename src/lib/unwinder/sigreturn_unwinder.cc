@@ -13,6 +13,7 @@ Error SigReturnUnwinder::Step(Memory* stack, const Registers& current, Registers
   switch (current.arch()) {
     case Registers::Arch::kX64:
       return StepX64(stack, current, next);
+    case Registers::Arch::kArm32:
     case Registers::Arch::kArm64:
       return StepArm64(stack, current, next);
     case Registers::Arch::kRiscv64:
@@ -21,6 +22,10 @@ Error SigReturnUnwinder::Step(Memory* stack, const Registers& current, Registers
 }
 
 Error SigReturnUnwinder::StepX64(Memory* stack, const Registers& current, Registers& next) {
+  return Error("not implemented");
+}
+
+Error SigReturnUnwinder::StepArm32(Memory* stack, const Registers& current, Registers& next) {
   return Error("not implemented");
 }
 

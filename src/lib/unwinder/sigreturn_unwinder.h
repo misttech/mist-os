@@ -25,6 +25,7 @@ class SigReturnUnwinder : public UnwinderBase {
  private:
   Error Step(Memory* stack, const Registers& current, Registers& next);
   Error StepX64(Memory* stack, const Registers& current, Registers& next);
+  Error StepArm32(Memory* stack, const Registers& current, Registers& next);
   Error StepArm64(Memory* stack, const Registers& current, Registers& next);
   Error StepRiscv64(Memory* stack, const Registers& current, Registers& next);
 };

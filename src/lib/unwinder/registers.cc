@@ -18,6 +18,8 @@ RegisterID GetPcReg(Registers::Arch arch) {
   switch (arch) {
     case Registers::Arch::kX64:
       return RegisterID::kX64_rip;
+    case Registers::Arch::kArm32:
+      return RegisterID::kArm32_pc;
     case Registers::Arch::kArm64:
       return RegisterID::kArm64_pc;
     case Registers::Arch::kRiscv64:
@@ -29,6 +31,8 @@ RegisterID GetSpReg(Registers::Arch arch) {
   switch (arch) {
     case Registers::Arch::kX64:
       return RegisterID::kX64_rsp;
+    case Registers::Arch::kArm32:
+      return RegisterID::kArm32_sp;
     case Registers::Arch::kArm64:
       return RegisterID::kArm64_sp;
     case Registers::Arch::kRiscv64:
@@ -102,6 +106,7 @@ std::string Registers::GetRegName(RegisterID reg_id) const {
       names = x64_names;
       length = sizeof(x64_names) / sizeof(char*);
       break;
+    case Arch::kArm32:
     case Arch::kArm64:
       names = arm64_names;
       length = sizeof(arm64_names) / sizeof(char*);

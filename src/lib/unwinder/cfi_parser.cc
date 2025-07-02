@@ -75,6 +75,7 @@ CfiParser::CfiParser(Registers::Arch arch, uint64_t code_alignment_factor,
       preserved = x64_preserved;
       length = sizeof(x64_preserved) / sizeof(RegisterID);
       break;
+    case Registers::Arch::kArm32:
     case Registers::Arch::kArm64:
       preserved = arm64_preserved;
       length = sizeof(arm64_preserved) / sizeof(RegisterID);

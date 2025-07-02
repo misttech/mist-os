@@ -78,6 +78,12 @@ enum class RegisterID : uint8_t {
   // Alias.
   kArm64_lr = kArm64_x30,
 
+  // Aliases for ARM32.
+  kArm32_sp = kArm64_x13,
+  kArm32_lr = kArm64_x14,
+  kArm32_pc = kArm64_x15,
+  kArm32_last = kArm64_x16,
+
   // riscv64. https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-dwarf.adoc
   // The name is chosen to keep consistency with zx_riscv64_thread_state_general_regs_t.
   kRiscv64_zero = 0,
@@ -128,6 +134,7 @@ class Registers {
  public:
   enum class Arch {
     kX64,
+    kArm32,
     kArm64,
     kRiscv64,
   };
