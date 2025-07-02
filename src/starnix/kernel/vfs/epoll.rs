@@ -51,10 +51,6 @@ impl WaitObject {
 /// In reality it is a pointer to a FileHandle object.
 pub type EpollKey = usize;
 
-fn as_epoll_key(file: &FileHandle) -> EpollKey {
-    Arc::as_ptr(file) as EpollKey
-}
-
 /// EpollFileObject represents the FileObject used to
 /// implement epoll_create1/epoll_ctl/epoll_pwait.
 #[derive(Default)]
@@ -222,7 +218,7 @@ impl EpollFileObject {
         }
 
         let mut state = self.state.lock();
-        let key = as_epoll_key(file).into();
+        let key = file.id.as_epoll_key().into();
         match state.wait_objects.entry(key) {
             Entry::Occupied(_) => error!(EEXIST),
             Entry::Vacant(entry) => {
@@ -249,7 +245,7 @@ impl EpollFileObject {
         L: LockEqualOrBefore<FileOpsCore>,
     {
         let mut state = self.state.lock();
-        let key = as_epoll_key(file);
+        let key = file.id.as_epoll_key();
         state.rearm_list.retain(|x| x.key != key.into());
         match state.wait_objects.entry(key.into()) {
             Entry::Occupied(mut entry) => {
@@ -275,9 +271,9 @@ impl EpollFileObject {
 
     /// Cancel an asynchronous wait on an object. Events triggered before
     /// calling this will still be delivered.
-    pub fn delete(&self, file: &FileHandle) -> Result<(), Errno> {
+    pub fn delete(&self, file: &FileObject) -> Result<(), Errno> {
         let mut state = self.state.lock();
-        let key = as_epoll_key(file).into();
+        let key = file.id.as_epoll_key().into();
         if let Some(mut wait_object) = state.wait_objects.remove(&key) {
             if let Some(wait_canceler) = wait_object.wait_canceler.take() {
                 wait_canceler.cancel();
@@ -479,7 +475,7 @@ impl EpollFileObject {
     /// Drop the wake lease associated with the `file`.
     pub fn drop_lease(&self, current_task: &CurrentTask, file: &FileHandle) {
         let mut guard = self.state.lock();
-        let key = as_epoll_key(file);
+        let key = file.id.as_epoll_key();
         if let Entry::Occupied(_) = guard.wait_objects.entry(key.into()) {
             current_task.kernel().suspend_resume_manager.remove_epoll(key);
         }
@@ -495,7 +491,7 @@ impl EpollFileObject {
         file: &FileHandle,
         _baton_lease: &zx::Handle,
     ) -> Result<(), Errno> {
-        let key = as_epoll_key(file);
+        let key = file.id.as_epoll_key();
         current_task.kernel().suspend_resume_manager.add_epoll(key);
         Ok(())
     }
@@ -866,5 +862,28 @@ mod tests {
         let event = &triggered_events[0];
         assert_eq!(event.events(), FdEvents::POLLOUT);
         assert_eq!(event.data(), EVENT_DATA);
+    }
+
+    #[::fuchsia::test]
+    async fn test_waiter_removal() {
+        let (_kernel, current_task, locked) = create_kernel_task_and_unlocked();
+        let event = new_eventfd(locked, &current_task, 0, EventFdType::Counter, true);
+        let epoll_file_handle = EpollFileObject::new_file(locked, &current_task);
+        let epoll_file = epoll_file_handle.downcast_file::<EpollFileObject>().unwrap();
+
+        const EVENT_DATA: u64 = 42;
+        epoll_file
+            .add(
+                locked,
+                &current_task,
+                &event,
+                &epoll_file_handle,
+                EpollEvent::new(FdEvents::POLLIN, EVENT_DATA),
+            )
+            .unwrap();
+
+        std::mem::drop(event);
+
+        assert!(epoll_file.state.lock().waiters.is_empty());
     }
 }

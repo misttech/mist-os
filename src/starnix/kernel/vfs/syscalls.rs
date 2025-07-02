@@ -20,11 +20,10 @@ use crate::vfs::pipe::{new_pipe, PipeFileObject};
 use crate::vfs::timer::TimerFile;
 use crate::vfs::{
     checked_add_offset_and_length, new_memfd, splice, CheckAccessReason, DirentSink64,
-    EpollFileObject, EpollKey, FallocMode, FdFlags, FdNumber, FileAsyncOwner, FileHandle,
-    FileSystemOptions, FlockOperation, FsStr, FsString, LookupContext, NamespaceNode,
-    PathWithReachability, RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode,
-    SymlinkTarget, TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount,
-    XattrOp,
+    EpollFileObject, FallocMode, FdFlags, FdNumber, FileAsyncOwner, FileHandle, FileSystemOptions,
+    FlockOperation, FsStr, FsString, LookupContext, NamespaceNode, PathWithReachability,
+    RecordLockCommand, RenameFlags, SeekTarget, StatxFlags, SymlinkMode, SymlinkTarget,
+    TargetFdNumber, TimeUpdateType, UnlinkKind, ValueOrSize, WdNumber, WhatToMount, XattrOp,
 };
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
@@ -2434,7 +2433,7 @@ pub fn sys_epoll_ctl(
     match op {
         EPOLL_CTL_ADD => {
             epoll_file.add(locked, current_task, &operand_file, &file, epoll_event?)?;
-            operand_file.register_epfd(epfd);
+            operand_file.register_epfd(&file);
         }
         EPOLL_CTL_MOD => {
             epoll_file.modify(locked, current_task, &operand_file, epoll_event?)?;
@@ -2444,8 +2443,8 @@ pub fn sys_epoll_ctl(
             current_task
                 .kernel()
                 .suspend_resume_manager
-                .remove_epoll(operand_file.weak_handle.as_ptr() as EpollKey);
-            operand_file.unregister_epfd(epfd);
+                .remove_epoll(operand_file.id.as_epoll_key());
+            operand_file.unregister_epfd(&file);
         }
         _ => return error!(EINVAL),
     }

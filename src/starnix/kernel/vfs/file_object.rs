@@ -16,7 +16,7 @@ use crate::vfs::fsverity::{
     FsVerityState, {self},
 };
 use crate::vfs::{
-    ActiveNamespaceNode, DirentSink, EpollFileObject, EpollKey, FallocMode, FdNumber, FdTableId,
+    ActiveNamespaceNode, DirentSink, EpollFileObject, EpollKey, FallocMode, FdTableId,
     FileSystemHandle, FileWriteGuard, FileWriteGuardMode, FileWriteGuardRef, FsNodeHandle,
     NamespaceNode, RecordLockCommand, RecordLockOwner,
 };
@@ -37,6 +37,7 @@ use starnix_sync::{
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_types::math::round_up_to_system_page_size;
 use starnix_types::ownership::Releasable;
+use starnix_uapi::arc_key::WeakKey;
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::{CAP_FOWNER, CAP_SYS_RAWIO};
 use starnix_uapi::errors::{Errno, EAGAIN, ETIMEDOUT};
@@ -55,7 +56,7 @@ use starnix_uapi::{
     FS_IOC_READ_VERITY_METADATA, FS_IOC_REMOVE_ENCRYPTION_KEY, FS_IOC_SET_ENCRYPTION_POLICY,
     FS_VERITY_FL, SEEK_CUR, SEEK_DATA, SEEK_END, SEEK_HOLE, SEEK_SET, TCGETS,
 };
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::fmt;
 use std::ops::Deref;
 use std::sync::{Arc, Weak};
@@ -1426,6 +1427,12 @@ impl FileAsyncOwner {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FileObjectId(u64);
 
+impl FileObjectId {
+    pub fn as_epoll_key(&self) -> EpollKey {
+        self.0 as EpollKey
+    }
+}
+
 /// A session with a file object.
 ///
 /// Each time a client calls open(), we create a new FileObject from the
@@ -1457,7 +1464,7 @@ pub struct FileObject {
 
     /// A set of epoll file descriptor numbers that tracks which `EpollFileObject`s add this
     /// `FileObject` as the control file.
-    epoll_files: Mutex<HashSet<FdNumber>>,
+    epoll_files: Mutex<HashMap<FileHandleKey, WeakFileHandle>>,
 
     /// See fcntl F_SETLEASE and F_GETLEASE.
     lease: Mutex<FileLeaseType>,
@@ -1477,6 +1484,7 @@ impl ReleaserAction<FileObject> for FileObjectReleaserAction {
 pub type FileReleaser = ObjectReleaser<FileObject, FileObjectReleaserAction>;
 pub type FileHandle = Arc<FileReleaser>;
 pub type WeakFileHandle = Weak<FileReleaser>;
+pub type FileHandleKey = WeakKey<FileReleaser>;
 
 impl FileObject {
     /// Create a FileObject that is not mounted in a namespace.
@@ -2152,12 +2160,12 @@ impl FileObject {
 
     /// Register the fd number of an `EpollFileObject` that listens to events from this
     /// `FileObject`.
-    pub fn register_epfd(&self, fd: FdNumber) {
-        self.epoll_files.lock().insert(fd);
+    pub fn register_epfd(&self, file: &FileHandle) {
+        self.epoll_files.lock().insert(WeakKey::from(file), file.weak_handle.clone());
     }
 
-    pub fn unregister_epfd(&self, fd: FdNumber) {
-        self.epoll_files.lock().remove(&fd);
+    pub fn unregister_epfd(&self, file: &FileHandle) {
+        self.epoll_files.lock().remove(&WeakKey::from(file));
     }
 }
 
@@ -2168,13 +2176,14 @@ impl Releasable for FileObject {
         let (locked, current_task) = context;
         // Release all wake leases associated with this file in the corresponding `WaitObject`
         // of each registered epfd.
-        for epfd in self.epoll_files.lock().drain() {
-            if let Ok(file) = current_task.files.get(epfd) {
-                if let Some(_epoll_object) = file.downcast_file::<EpollFileObject>() {
+        for (_, file) in self.epoll_files.lock().drain() {
+            if let Some(file) = file.upgrade() {
+                if let Some(epoll_object) = file.downcast_file::<EpollFileObject>() {
                     current_task
                         .kernel()
                         .suspend_resume_manager
-                        .remove_epoll(self.weak_handle.as_ptr() as EpollKey);
+                        .remove_epoll(self.id.as_epoll_key());
+                    let _ = epoll_object.delete(&self);
                 }
             }
         }
@@ -2203,8 +2212,8 @@ impl OnWakeOps for FileReleaser {
     /// Called when the underneath `FileOps` is waken up by the power framework.
     fn on_wake(&self, current_task: &CurrentTask, baton_lease: &zx::Handle) {
         // Activate associated wake leases in registered epfd.
-        for epfd in self.epoll_files.lock().iter() {
-            if let Ok(file) = current_task.files.get(*epfd) {
+        for (_, file) in self.epoll_files.lock().iter() {
+            if let Some(file) = file.upgrade() {
                 if let Some(epoll_file) = file.downcast_file::<EpollFileObject>() {
                     if let Some(weak_handle) = self.weak_handle.upgrade() {
                         if let Err(e) =

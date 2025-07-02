@@ -9,7 +9,7 @@ use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
 use crate::vfs::{
     default_ioctl, fileops_impl_nonseekable, fileops_impl_noop_sync, fs_args, inotify, Anon,
-    DirEntryHandle, FileHandle, FileObject, FileOps, FileReleaser, FsNodeOps, FsStr, FsString,
+    DirEntryHandle, FileHandle, FileHandleKey, FileObject, FileOps, FsNodeOps, FsStr, FsString,
     WdNumber,
 };
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
@@ -31,8 +31,6 @@ use std::sync::atomic::{AtomicI32, Ordering};
 use zerocopy::IntoBytes;
 
 const DATA_SIZE: usize = size_of::<inotify_event>();
-
-type FileHandleKey = WeakKey<FileReleaser>;
 
 // InotifyFileObject represents an inotify instance created by inotify_init(2) or inotify_init1(2).
 pub struct InotifyFileObject {
