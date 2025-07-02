@@ -26,6 +26,7 @@ rustc_library("alarms") {
     "//sdk/fidl/fuchsia.time.alarms:fuchsia.time.alarms_rust",
     "//sdk/lib/device-watcher/rust",
     "//sdk/rust/zx",
+    "//src/lib/debug/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",

@@ -37,7 +37,7 @@ use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use fuchsia_inspect::{HistogramProperty, Property};
 use futures::channel::mpsc;
 use futures::sink::SinkExt;
-use futures::{FutureExt, StreamExt, TryStreamExt};
+use futures::{StreamExt, TryStreamExt};
 use log::{debug, error, warn};
 use scopeguard::defer;
 use std::cell::RefCell;
@@ -69,6 +69,7 @@ const LONG_DELAY_NANOS: i64 = 2000 * MSEC_IN_NANOS;
 /// 30 seconds to complete, logs a warning message.
 macro_rules! log_long_op {
     ($fut:expr) => {{
+        use futures::FutureExt;
         let fut = $fut;
         futures::pin_mut!(fut);
         loop {
@@ -79,6 +80,8 @@ macro_rules! log_long_op {
                 }
                 _ = timeout.fuse() => {
                     warn!("unexpected blocking: long-running async operation at {}:{}", file!(), line!());
+                    #[cfg(all(target_os = "fuchsia", not(doc)))]
+                    ::debug::backtrace_request_all_threads();
                 }
             }
         }
@@ -1477,6 +1480,7 @@ async fn schedule_hrtimer(
         ticks,
         clone_handle(&hrtimer_scheduled),
     );
+    let hrtimer_scheduled_if_error = clone_handle(&hrtimer_scheduled);
     let hrtimer_task = fasync::Task::local(async move {
         debug!("hrtimer_task: waiting for hrtimer driver response");
         trace::instant!(c"alarms", c"hrtimer:started", trace::Scope::Process);
@@ -1484,17 +1488,26 @@ async fn schedule_hrtimer(
         trace::instant!(c"alarms", c"hrtimer:response", trace::Scope::Process);
         match response {
             Err(TimerOpsError::Fidl(e)) => {
+                defer! {
+                    // Allow hrtimer_scheduled to proceed anyways.
+                    signal(&hrtimer_scheduled_if_error);
+                }
                 trace::instant!(c"alarms", c"hrtimer:response:fidl_error", trace::Scope::Process);
-                debug!("hrtimer_task: hrtimer FIDL error: {:?}", e);
+                warn!("hrtimer_task: hrtimer FIDL error: {:?}", e);
                 command_send
                     .start_send(Cmd::AlarmFidlError { expired_deadline: now, error: e })
                     .unwrap();
                 // BAD: no way to keep alive.
             }
             Err(TimerOpsError::Driver(e)) => {
+                defer! {
+                    // This should be idempotent if the error occurs after
+                    // the timer was scheduled.
+                    signal(&hrtimer_scheduled_if_error);
+                }
                 let driver_error_str = format!("{:?}", e);
                 trace::instant!(c"alarms", c"hrtimer:response:driver_error", trace::Scope::Process, "error" => &driver_error_str[..]);
-                debug!("schedule_hrtimer: hrtimer driver error: {:?}", e);
+                warn!("schedule_hrtimer: hrtimer driver error: {:?}", e);
                 command_send
                     .start_send(Cmd::AlarmDriverError { expired_deadline: now, error: e })
                     .unwrap();
@@ -1625,6 +1638,7 @@ pub async fn connect_to_hrtimer_async() -> Result<ffhh::DeviceProxy> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_matches::assert_matches;
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use futures::{select, Future};
     use std::task::Poll;
@@ -2326,6 +2340,59 @@ mod tests {
                         slack_ns: AnyProperty,
                     },
                 });
+            },
+        );
+    }
+
+    // If we get two scheduling FIDL errors one after another, the wake alarm
+    // manager must not lock up.
+    #[fuchsia::test]
+    fn test_fidl_error_on_reschedule() {
+        const LONG_DEADLINE_NANOS: i64 = 200;
+        const SHORT_DEADLINE_NANOS: i64 = 100;
+        run_in_fake_time_and_test_context(
+            zx::MonotonicDuration::from_nanos(LONG_DEADLINE_NANOS + 50),
+            |_, _| async move {
+                let (wake_proxy, _stream) =
+                    fidl::endpoints::create_proxy_and_stream::<fta::WakeAlarmsMarker>();
+                drop(_stream);
+
+                let wake_proxy = Rc::new(RefCell::new(wake_proxy));
+                let keep_alive = fta::SetMode::KeepAlive(create_fake_wake_lease());
+                let (mut sync_send, mut sync_recv) = mpsc::channel(1);
+
+                let wake_proxy_clone = wake_proxy.clone();
+                let short_deadline_fut = async move {
+                    let wake_fut = wake_proxy_clone.borrow().set_and_wait(
+                        zx::BootInstant::from_nanos(SHORT_DEADLINE_NANOS).into(),
+                        keep_alive,
+                        "hello1".into(),
+                    );
+                    // Yield-wait for the first scheduled timer.
+                    let result = wake_fut.await;
+                    assert_matches!(result, Err(_));
+
+                    // Allow the rest of the test to proceed from here.
+                    sync_send.send(()).await.unwrap();
+                };
+
+                let long_deadline_fut = async move {
+                    // Wait until we know that the other deadline timer has been scheduled.
+                    let _ = sync_recv.next().await;
+
+                    // This will lock up in case of errors!
+                    let keep_alive2 = fta::SetMode::KeepAlive(create_fake_wake_lease());
+                    let result = wake_proxy
+                        .borrow()
+                        .set_and_wait(
+                            zx::BootInstant::from_nanos(LONG_DEADLINE_NANOS).into(),
+                            keep_alive2,
+                            "hello2".into(),
+                        )
+                        .await;
+                    assert_matches!(result, Err(_));
+                };
+                futures::join!(long_deadline_fut, short_deadline_fut);
             },
         );
     }
