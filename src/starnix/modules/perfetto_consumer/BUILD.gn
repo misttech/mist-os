@@ -11,7 +11,10 @@ rustc_library("perfetto_consumer") {
   version = "0.1.0"
   source_root = "lib.rs"
 
-  sources = [ "lib.rs" ]
+  sources = [
+    "atrace.rs",
+    "lib.rs",
+  ]
 
   deps = [
     "//sdk/rust/zx",
