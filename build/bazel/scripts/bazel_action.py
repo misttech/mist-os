@@ -1109,6 +1109,12 @@ def main() -> int:
         "--command-file",
         help="If specified, write the command used to invoke Bazel to file.",
     )
+    parser.add_argument(
+        "--verbose_failures",
+        action="store_true",
+        default=False,
+        help="If specified, extra information is printed on Bazel failures.",
+    )
     parser.add_argument("extra_bazel_args", nargs=argparse.REMAINDER)
 
     args = parser.parse_args()
@@ -1165,9 +1171,11 @@ def main() -> int:
 
     bazel_launcher = build_utils.BazelLauncher(
         args.bazel_launcher,
-        log_err=lambda msg: print(f"BAZEL_ACTION_ERROR: {msg}", file=sys.stderr)
-        if _DEBUG
-        else None,
+        log_err=lambda msg: (
+            print(f"BAZEL_ACTION_ERROR: {msg}", file=sys.stderr)
+            if _DEBUG
+            else None
+        ),
     )
 
     query_cache = build_utils.BazelQueryCache(
@@ -1184,9 +1192,11 @@ def main() -> int:
             query_cmd,
             query_args,
             bazel_launcher,
-            log=lambda m: print(f"DEBUG: {m}", file=sys.stderr)
-            if _DEBUG_BAZEL_QUERIES
-            else None,
+            log=lambda m: (
+                print(f"DEBUG: {m}", file=sys.stderr)
+                if _DEBUG_BAZEL_QUERIES
+                else None
+            ),
         )
 
     configured_args = args.extra_bazel_args
@@ -1251,10 +1261,8 @@ def main() -> int:
     cmd += configured_args
     cmd += ["//buildfiles_genquery:genquery"]
     cmd += args.bazel_targets
-    # Always use --verbose_failures to get relevant information when
-    # Bazel commands fail. This is necessary to make the log output of
-    # CQ/CI bots usable.
-    cmd += ["--verbose_failures"]
+    if _DEBUG or args.verbose_failures:
+        cmd += ["--verbose_failures"]
 
     # Add --sandbox_debug if FUCHSIA_DEBUG_BAZEL_SANDBOX=1 is
     # in the environment.
@@ -1303,11 +1311,15 @@ def main() -> int:
                 return 1
 
         # This is a different error, just print it as is.
-        print(
-            "\nERROR when calling Bazel. To reproduce, run this in the Ninja output directory:\n\n  %s\n"
-            % " ".join(shlex.quote(c) for c in cmd),
-            file=sys.stderr,
-        )
+        #
+        # Note most build users are not interested in executing bazel directly, so hiding this
+        # message bechind a flag.
+        if _DEBUG or args.verbose_failures:
+            print(
+                "\nERROR when calling Bazel. To reproduce, run this in the Ninja output directory:\n\n  %s\n"
+                % " ".join(shlex.quote(c) for c in cmd),
+                file=sys.stderr,
+            )
         return 1
 
     if args.command == "build":
