@@ -14,6 +14,7 @@
 
 #include "diagnostics.h"
 #include "machine.h"
+#include "memory.h"
 #include "relocation.h"
 
 namespace elfldltl {
@@ -23,9 +24,12 @@ namespace elfldltl {
 // relocation records.  This calls memory.Store(reloc_address, runtime_address)
 // or memory.StoreAdd(reloc_address, bias) to store the adjusted values.
 // Returns false iff any calls into the Memory object returned false.
-template <class Diagnostics, class Memory, class RelocInfo>
-constexpr bool RelocateRelative(Diagnostics& diag, Memory& memory, const RelocInfo& info,
-                                typename RelocInfo::size_type bias) {
+template <class Diagnostics, class RelocInfo>
+
+constexpr bool RelocateRelative(
+    Diagnostics& diag,
+    MemoryWriter<typename RelocInfo::size_type, typename RelocInfo::Addr> auto& memory,
+    const RelocInfo& info, typename RelocInfo::size_type bias) {
   using Addr = typename RelocInfo::Addr;
   using size_type = typename RelocInfo::size_type;
 
@@ -48,7 +52,7 @@ constexpr bool RelocateRelative(Diagnostics& diag, Memory& memory, const RelocIn
       return CheckStore(memory_.template StoreAdd<Addr>(addr, bias_), addr);
     }
 
-    Memory& memory_;
+    decltype(memory) memory_;
     Diagnostics& diag_;
     size_type bias_;
   };
@@ -118,11 +122,13 @@ enum class RelocateTls {
 //    This overload does not require the addend up front.  Instead, the
 //    TlsDescGot::value field will have the addend applied implicitly.
 //
-template <ElfMachine Machine = ElfMachine::kNative, class Memory, class DiagnosticsType,
-          class RelocInfo, class SymbolInfo, typename Resolve>
-constexpr bool RelocateSymbolic(Memory& memory, DiagnosticsType& diagnostics,
-                                const RelocInfo& reloc_info, const SymbolInfo& symbol_info,
-                                typename RelocInfo::size_type bias, Resolve&& resolve) {
+template <ElfMachine Machine = ElfMachine::kNative, class DiagnosticsType, class RelocInfo,
+          class SymbolInfo, typename Resolve>
+constexpr bool RelocateSymbolic(
+    MemoryApi<typename RelocInfo::size_type, typename RelocInfo::Elf::Addr,
+              typename RelocInfo::Elf::Addend> auto& memory,
+    DiagnosticsType& diagnostics, const RelocInfo& reloc_info, const SymbolInfo& symbol_info,
+    typename RelocInfo::size_type bias, Resolve&& resolve) {
   using namespace std::literals;
 
   using Elf = RelocInfo::Elf;

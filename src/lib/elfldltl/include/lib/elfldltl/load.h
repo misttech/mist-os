@@ -15,6 +15,7 @@
 #include "constants.h"
 #include "internal/load-segment-types.h"
 #include "layout.h"
+#include "memory.h"
 #include "phdr.h"
 
 namespace elfldltl {
@@ -30,8 +31,9 @@ namespace elfldltl {
 // This returns the return value of calling file.ReadFromFile<Ehdr>,
 // i.e. some type std::optional<E> where `const Ehdr& ehdr = <E object>;`
 // works and the E object owns the storage ehdr points into.
-template <class Elf, class Diagnostics, class File>
-constexpr auto LoadEhdrFromFile(Diagnostics& diagnostics, File& file,
+template <class Elf, class Diagnostics>
+constexpr auto LoadEhdrFromFile(Diagnostics& diagnostics,
+                                CanReadFromFile<typename Elf::Ehdr, decltype(0)> auto& file,
                                 std::optional<ElfMachine> machine = ElfMachine::kNative)
     -> decltype(file.template ReadFromFile<typename Elf::Ehdr>(0)) {
   using namespace std::literals::string_view_literals;
@@ -65,7 +67,10 @@ constexpr auto LoadEhdrFromFile(Diagnostics& diagnostics, File& file,
 //     ...
 //   }
 // ```
-template <class Elf, class Diagnostics, class File, typename PhdrAllocator>
+template <class Elf, class Diagnostics, class File,
+          ReadArrayFromFileAllocator<typename Elf::Phdr, uint32_t> PhdrAllocator>
+  requires CanReadFromFile<File, typename Elf::Ehdr> &&
+           CanReadArrayFromFile<File, typename Elf::Phdr, PhdrAllocator>
 constexpr auto LoadHeadersFromFile(Diagnostics& diagnostics, File& file,
                                    PhdrAllocator&& phdr_allocator,
                                    std::optional<ElfMachine> machine = ElfMachine::kNative)

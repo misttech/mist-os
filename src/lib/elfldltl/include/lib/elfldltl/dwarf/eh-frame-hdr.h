@@ -11,6 +11,7 @@
 
 #include "../diagnostics.h"
 #include "../layout.h"
+#include "../memory.h"
 #include "encoding.h"
 
 namespace elfldltl::dwarf {
@@ -294,17 +295,19 @@ class EhFrameHdr {
   constexpr address_size_type eh_frame_ptr() const { return eh_frame_ptr_; }
 
   // Initialize directly from the PT_GNU_EH_FRAME phdr.
-  template <class Diagnostics, class Memory, typename... ErrorArgs>
-  constexpr bool Init(Diagnostics& diag, Memory& memory, const Phdr& phdr,
-                      ErrorArgs&&... error_args) {
+  template <class Diagnostics, typename... ErrorArgs>
+  constexpr bool Init(Diagnostics& diag,
+                      MemoryReader<address_size_type, std::byte, EhFrameHdrEncoding> auto& memory,
+                      const Phdr& phdr, ErrorArgs&&... error_args) {
     return Init(diag, memory, phdr.vaddr, std::forward<ErrorArgs>(error_args)...);
   }
 
   // Initialize from .eh_frame_hdr data read from the vaddr via the Memory
   // object.  The return value is propagated from the Diagnostics object.
-  template <class Diagnostics, class Memory, typename... ErrorArgs>
-  constexpr bool Init(Diagnostics& diag, Memory& memory, address_size_type vaddr,
-                      ErrorArgs&&... error_args) {
+  template <class Diagnostics, typename... ErrorArgs>
+  constexpr bool Init(Diagnostics& diag,
+                      MemoryReader<address_size_type, std::byte, EhFrameHdrEncoding> auto& memory,
+                      address_size_type vaddr, ErrorArgs&&... error_args) {
     using namespace std::string_view_literals;
 
     // Record the vaddr of the start of .eh_frame_hdr (the header).  The vaddr

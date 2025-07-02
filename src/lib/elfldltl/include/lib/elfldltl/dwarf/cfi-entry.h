@@ -216,9 +216,10 @@ struct CfiEntry {
 
   // This does ReadEhFrame, but using a Memory object to read the FDE at vaddr.
   // The error_args do not need to include reporting the FDE vaddr passed here.
-  template <class Elf = Elf<>, class Diagnostics, class Memory, typename... ErrorArgs>
+  template <class Elf = Elf<>, class Diagnostics, typename... ErrorArgs>
   static constexpr std::optional<CfiEntry> ReadEhFrameFromMemory(  //
-      Diagnostics& diag, Memory& memory, typename Elf::size_type vaddr, ErrorArgs&&... error_args) {
+      Diagnostics& diag, MemoryReader<typename Elf::size_type, std::byte> auto& memory,
+      typename Elf::size_type vaddr, ErrorArgs&&... error_args) {
     auto bytes = memory.template ReadArray<std::byte>(vaddr);
     if (!bytes) [[unlikely]] {
       diag.FormatError("invalid FDE pointer ", FileAddress{vaddr},
@@ -245,9 +246,10 @@ struct CfiEntry {
   // Read the CIE referenced by this FDE.  The Memory object is used to read
   // from virtual addresses in the same address space used in NormalizeEhFrame
   // on this object.
-  template <class Elf = Elf<>, class Diagnostics, class Memory, typename... ErrorArgs>
+  template <class Elf = Elf<>, class Diagnostics, typename... ErrorArgs>
   constexpr std::optional<CfiEntry> ReadEhFrameCieFromMemory(  //
-      Diagnostics& diag, Memory& memory, ErrorArgs&&... error_args) const {
+      Diagnostics& diag, MemoryReader<typename Elf::size_type, std::byte> auto& memory,
+      ErrorArgs&&... error_args) const {
     using size_type = typename Elf::size_type;
 
     if (IsCie()) [[unlikely]] {

@@ -11,6 +11,7 @@
 #include <span>
 
 #include "../layout.h"
+#include "../memory.h"
 
 namespace elfldltl::dwarf {
 
@@ -185,10 +186,11 @@ struct EncodedPtr {
   // in the single call.  Returns std::nullopt if the Memory object fails.
   // Otherwise the value is extended to 64 bits.  In the case of a signed
   // encoding, bit_cast<int64_t> should be used on the value.
-  template <class Elf = Elf<>, class Memory>
-  static constexpr std::optional<uint64_t> FromMemory(  //
-      uint8_t encoding, Memory& memory, typename Elf::size_type vaddr,
-      uint8_t address_size = sizeof(typename Elf::Addr)) {
+  template <class Elf = Elf<>>
+  static constexpr std::optional<uint64_t> FromMemory(
+      uint8_t encoding,
+      MemoryReader<typename Elf::size_type, std::byte, typename Elf::Addr> auto& memory,
+      typename Elf::size_type vaddr, uint8_t address_size = sizeof(typename Elf::Addr)) {
     uint8_t size = EncodedSize(encoding, address_size);
     if (size == 0) {
       return 0;
