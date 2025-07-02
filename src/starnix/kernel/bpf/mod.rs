@@ -21,7 +21,7 @@ use crate::security;
 use crate::task::{register_delayed_release, CurrentTask, CurrentTaskAndLocked};
 use ebpf_api::PinnedMap;
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
-use starnix_sync::{BpfMapStateLevel, EbpfStateLock, LockBefore, Locked, OrderedMutex};
+use starnix_sync::{BpfMapStateLevel, EbpfStateLock, LockBefore, Locked, MutexGuard, OrderedMutex};
 use starnix_types::ownership::{Releasable, ReleaseGuard};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
@@ -96,11 +96,11 @@ impl BpfMap {
         self.id
     }
 
-    fn is_frozen<L>(&self, locked: &mut Locked<L>) -> bool
+    fn frozen<'a, L>(&'a self, locked: &'a mut Locked<L>) -> impl Deref<Target = bool> + 'a
     where
         L: LockBefore<BpfMapStateLevel>,
     {
-        self.state.lock(locked).is_frozen
+        MutexGuard::map(self.state.lock(locked), |s| &mut s.is_frozen)
     }
 
     fn freeze<L>(&self, locked: &mut Locked<L>) -> Result<(), Errno>

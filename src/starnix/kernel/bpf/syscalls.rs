@@ -216,7 +216,10 @@ pub fn sys_bpf(
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
 
-            if map.is_frozen(locked) {
+            // Get the frozen state and keep the lock to prevent a race.
+            let frozen = map.frozen(locked);
+
+            if *frozen {
                 return error!(EPERM);
             }
 
@@ -242,7 +245,10 @@ pub fn sys_bpf(
             let map = get_bpf_object(current_task, map_fd)?;
             let map = map.as_map()?;
 
-            if map.is_frozen(locked) {
+            // Get the frozen state and keep the lock to prevent a race.
+            let frozen = map.frozen(locked);
+
+            if *frozen {
                 return error!(EPERM);
             }
 
