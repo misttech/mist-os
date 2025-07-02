@@ -52,7 +52,7 @@ pub struct EventDispatcher {
 }
 
 impl EventDispatcher {
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "src_model_tests")))]
     pub fn new(
         subscriber: ExtendedMoniker,
         scopes: Vec<EventDispatcherScope>,
@@ -155,7 +155,7 @@ impl EventDispatcherScope {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;

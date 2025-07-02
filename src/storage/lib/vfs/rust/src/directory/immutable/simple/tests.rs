@@ -1190,11 +1190,6 @@ impl File for MockWritableFile {
         unimplemented!()
     }
 
-    #[cfg(target_os = "fuchsia")]
-    async fn get_backing_memory(&self, _: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        unimplemented!()
-    }
-
     async fn update_attributes(&self, _: fio::MutableNodeAttributes) -> Result<(), Status> {
         unimplemented!()
     }

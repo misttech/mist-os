@@ -13,7 +13,6 @@ use cm_types::{LongName, Path, RelativePath};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy, ServerEnd};
 use fidl_fuchsia_inspect::InspectSinkMarker;
 use fidl_fuchsia_logger::LogSinkMarker;
-use flyweights::FlyStr;
 use fuchsia_component::server as fserver;
 use futures::future::BoxFuture;
 use futures::lock::Mutex;
@@ -1060,7 +1059,7 @@ impl RealmNodeState {
     // ChildDecl in this node's ComponentDecl.
     fn contains_child(&self, child_name: &LongName) -> bool {
         self.decl.children.iter().any(|c| c.name.as_str() == child_name.as_str())
-            || self.mutable_children.contains_key(&FlyStr::new(child_name.as_str()))
+            || self.mutable_children.contains_key(child_name.as_str())
     }
 
     fn add_child_decl(
@@ -1366,7 +1365,7 @@ impl RealmNode2 {
         }
         state_guard
             .mutable_children
-            .get(&FlyStr::new(child_name))
+            .get(child_name)
             .cloned()
             .map(|(_, r)| r)
             .ok_or_else(|| RealmBuilderError::NoSuchChild(child_name.into()))
@@ -1779,7 +1778,7 @@ async fn add_use_decl_if_needed(
         _ => {}
     }
     if let fcdecl::Ref::Child(child) = ref_ {
-        if let Some(child) = realm.get_updateable_children().get(&FlyStr::new(&child.name)) {
+        if let Some(child) = realm.get_updateable_children().get(child.name.as_str()) {
             let mut decl = child.get_decl().await;
             // If the original `Capability` contained a source dictionary path, the effect
             // is to extract the capability from that dictionary. So we should not copy the
@@ -1837,7 +1836,7 @@ async fn add_expose_decl_if_needed(
     capability: ftest::Capability,
 ) -> Result<(), RealmBuilderError> {
     if let fcdecl::Ref::Child(child) = from {
-        if let Some(child) = realm.get_updateable_children().get(&FlyStr::new(child.name)) {
+        if let Some(child) = realm.get_updateable_children().get(child.name.as_str()) {
             let mut decl = child.get_decl().await;
             // If the `Capability` contains a source dictionary path, just skip it. We don't
             // support autogenerating dictionaries.

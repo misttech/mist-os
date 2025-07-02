@@ -9,10 +9,11 @@ use starnix_core::device::kobject::KObject;
 use starnix_core::fs::sysfs::KObjectSymlinkDirectory;
 use starnix_core::mm::MemoryAccessorExt;
 use starnix_core::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
     DirectoryEntryType, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    InputBuffer, OutputBuffer, VecDirectory, VecDirectoryEntry, VecInputBuffer,
+    InputBuffer, OutputBuffer, VecInputBuffer,
 };
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, Locked, Mutex, Unlocked};
@@ -34,7 +35,7 @@ pub const QBGIOCXEPW: u32 = 0xC0304203;
 pub const QBGIOCXSTEPCHGCFG: u32 = 0xC0F74204;
 
 pub fn create_qbg_device(
-    _locked: &mut Locked<'_, DeviceOpen>,
+    _locked: &mut Locked<DeviceOpen>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -68,7 +69,7 @@ impl FsNodeOps for QbgClassDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -78,16 +79,15 @@ impl FsNodeOps for QbgClassDirectory {
 
     fn lookup(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
-            b"qbg_context" => Ok(node.fs().create_node(
-                current_task,
+            b"qbg_context" => Ok(node.fs().create_node_and_allocate_node_id(
                 ReadWriteBytesFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o666), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o666), FsCred::root()),
             )),
             _ => self.base_dir.lookup(locked, node, current_task, name),
         }
@@ -165,7 +165,7 @@ impl FileOps for QbgDeviceFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -247,7 +247,7 @@ impl FileOps for QbgDeviceFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
@@ -277,7 +277,7 @@ impl FileOps for QbgDeviceFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -297,7 +297,7 @@ impl FileOps for QbgDeviceFile {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -309,7 +309,7 @@ impl FileOps for QbgDeviceFile {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {

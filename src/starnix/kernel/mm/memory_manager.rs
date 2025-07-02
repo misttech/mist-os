@@ -12,10 +12,8 @@ use crate::security;
 use crate::signals::{SignalDetail, SignalInfo};
 use crate::task::{CurrentTask, ExceptionResult, PageFaultExceptionReport, Task};
 use crate::vfs::aio::AioContext;
-use crate::vfs::{
-    DynamicFile, DynamicFileBuf, FileWriteGuardRef, FsNodeOps, FsStr, FsString, NamespaceNode,
-    SequenceFileSource,
-};
+use crate::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, SequenceFileSource};
+use crate::vfs::{FileWriteGuardRef, FsNodeOps, FsStr, FsString, NamespaceNode};
 use anyhow::{anyhow, Error};
 use bitflags::bitflags;
 use flyweights::FlyByteStr;
@@ -1424,8 +1422,8 @@ impl MemoryManagerState {
         // TODO(https://fxbug.dev/411617451): `mprotect` should apply the protection flags
         // until it encounters a mapping that doesn't allow it, rather than not apply the protection
         // flags at all if a single mapping doesn't allow it.
-        for (_range, mapping) in self.mappings.range(prot_range.clone()) {
-            security::file_mprotect(current_task, mapping, prot_flags)?;
+        for (range, mapping) in self.mappings.range(prot_range.clone()) {
+            security::file_mprotect(current_task, range, mapping, prot_flags)?;
         }
 
         // Make one call to mprotect to update all the zircon protections.
@@ -3465,7 +3463,7 @@ impl MemoryManager {
 
     pub fn snapshot_to<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         target: &Arc<MemoryManager>,
     ) -> Result<(), Errno>
     where
@@ -4228,6 +4226,14 @@ impl MemoryManager {
         stats
     }
 
+    pub fn atomic_load_u32_acquire(&self, futex_addr: FutexAddress) -> Result<u32, Errno> {
+        if let Some(usercopy) = usercopy() {
+            usercopy.atomic_load_u32_acquire(futex_addr.ptr()).map_err(|_| errno!(EFAULT))
+        } else {
+            unreachable!("can only control memory ordering of atomics with usercopy");
+        }
+    }
+
     pub fn atomic_load_u32_relaxed(&self, futex_addr: FutexAddress) -> Result<u32, Errno> {
         if let Some(usercopy) = usercopy() {
             usercopy.atomic_load_u32_relaxed(futex_addr.ptr()).map_err(|_| errno!(EFAULT))
@@ -4258,12 +4264,72 @@ impl MemoryManager {
         }
     }
 
+    pub fn atomic_compare_exchange_u32_acq_rel(
+        &self,
+        futex_addr: FutexAddress,
+        current: u32,
+        new: u32,
+    ) -> CompareExchangeResult<u32> {
+        let Some(usercopy) = usercopy() else {
+            unreachable!("Atomic compare/exchange requires usercopy.");
+        };
+        CompareExchangeResult::from_usercopy(usercopy.atomic_compare_exchange_u32_acq_rel(
+            futex_addr.ptr(),
+            current,
+            new,
+        ))
+    }
+
+    pub fn atomic_compare_exchange_weak_u32_acq_rel(
+        &self,
+        futex_addr: FutexAddress,
+        current: u32,
+        new: u32,
+    ) -> CompareExchangeResult<u32> {
+        let Some(usercopy) = usercopy() else {
+            unreachable!("Atomic compare/exchange requires usercopy.");
+        };
+        CompareExchangeResult::from_usercopy(usercopy.atomic_compare_exchange_weak_u32_acq_rel(
+            futex_addr.ptr(),
+            current,
+            new,
+        ))
+    }
+
     pub fn get_restricted_vmar_info(&self) -> Option<VmarInfo> {
         use zx::HandleBased;
         if self.root_vmar.is_invalid_handle() {
             return None;
         }
         Some(VmarInfo { base: RESTRICTED_ASPACE_BASE, len: RESTRICTED_ASPACE_SIZE })
+    }
+}
+
+/// The result of an atomic compare/exchange operation on user memory.
+#[derive(Debug, Clone)]
+pub enum CompareExchangeResult<T> {
+    /// The current value provided matched the one observed in memory and the new value provided
+    /// was written.
+    Success,
+    /// The provided current value did not match the current value in memory.
+    Stale { observed: T },
+    /// There was a general error while accessing the requested memory.
+    Error(Errno),
+}
+
+impl<T> CompareExchangeResult<T> {
+    fn from_usercopy(usercopy_res: Result<Result<T, T>, ()>) -> Self {
+        match usercopy_res {
+            Ok(Ok(_)) => Self::Success,
+            Ok(Err(observed)) => Self::Stale { observed },
+            Err(()) => Self::Error(errno!(EFAULT)),
+        }
+    }
+}
+
+impl<T> From<Errno> for CompareExchangeResult<T> {
+    fn from(e: Errno) -> Self {
+        Self::Error(e)
     }
 }
 
@@ -4321,11 +4387,7 @@ fn write_map(
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => 0,
         },
-        if let MappingName::File(filename) = &map.name() {
-            filename.entry.node.info().ino
-        } else {
-            0
-        }
+        if let MappingName::File(filename) = &map.name() { filename.entry.node.ino } else { 0 }
     )?;
     let fill_to_name = |sink: &mut DynamicFileBuf| {
         // The filename goes at >= the 74th column (73rd when zero indexed)
@@ -5688,7 +5750,7 @@ mod tests {
     }
 
     fn map_memory_growsdown<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         length: u64,
     ) -> UserAddress

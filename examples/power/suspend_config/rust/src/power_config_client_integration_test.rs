@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 use anyhow::Result;
-use fidl_test_configexample::ConfigUserMarker;
+use fidl_test_configexample::{ConfigUserMarker, ConfigUserProxy};
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use test_case::test_case;
 
@@ -56,10 +56,8 @@ async fn test_config_user(suspend_enabled: bool) {
     let realm = create_realm(suspend_enabled).await.expect("Failed to create realm");
 
     log::info!("Connecting to user protocol");
-    let proxy = realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<ConfigUserMarker>()
-        .expect("Failed to connect");
+    let proxy: ConfigUserProxy =
+        realm.root.connect_to_protocol_at_exposed_dir().expect("Failed to connect");
 
     let is_managing_power = proxy.is_managing_power().await.expect("Failed to query ConfigUser");
     assert_eq!(is_managing_power, suspend_enabled);

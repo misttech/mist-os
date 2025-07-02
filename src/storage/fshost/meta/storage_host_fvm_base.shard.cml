@@ -35,10 +35,7 @@
             from: "framework",
         },
         {
-            service: [
-                "fuchsia.hardware.block.volume.Service",
-                "fuchsia.hardware.ramdisk.Service",
-            ],
+            service: [ "fuchsia.hardware.block.volume.Service" ],
         },
 
         // This is only here to facilitate shutdown ordering.
@@ -89,7 +86,10 @@
             availability: "same_as_target",
         },
         {
-            protocol: "fuchsia.fshost.StarnixVolumeProvider",
+            protocol: [
+                "fuchsia.fshost.StarnixVolumeProvider",
+                "fuchsia.fxfs.FileBackedVolumeProvider",
+            ],
             from: "void",
             availability: "optional",
         },

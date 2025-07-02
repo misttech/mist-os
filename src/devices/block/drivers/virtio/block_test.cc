@@ -404,6 +404,78 @@ TEST_F(BlockDriverTest, BlockServer) {
   EXPECT_OK(client->FifoTransaction(&big_request, 1));
 }
 
+TEST_F(BlockDriverTest, BarriersOk) {
+  StartDriver();
+
+  auto [volume_client, volume_server] =
+      fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
+  driver_test().driver()->block_device().ServeRequests(std::move(volume_server));
+  zx::result client = block_client::RemoteBlockDevice::Create(std::move(volume_client));
+  ASSERT_OK(client);
+
+  fuchsia_hardware_block::wire::BlockInfo info;
+  ASSERT_OK(client->BlockGetInfo(&info));
+  const size_t kLen = info.max_transfer_size + kBlkSize;
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(kLen, 0, &vmo));
+
+  storage::Vmoid owned_vmoid;
+  EXPECT_OK(client->BlockAttachVmo(vmo, &owned_vmoid));
+
+  // It doesn't matter if we leak the ID.
+  vmoid_t vmoid = owned_vmoid.TakeId();
+
+  block_fifo_request_t requests[] = {
+      {.command =
+           {
+               .opcode = BLOCK_OPCODE_WRITE,
+               .flags = BLOCK_IO_FLAG_PRE_BARRIER,
+           },
+       .vmoid = vmoid,
+       .length = 3,
+       .vmo_offset = 0,
+       .dev_offset = 0},
+  };
+
+  EXPECT_OK(client->FifoTransaction(requests, 1));
+}
+
+TEST_F(BlockDriverTest, BarriersError) {
+  StartDriver(VIRTIO_BLK_S_IOERR);
+
+  auto [volume_client, volume_server] =
+      fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
+  driver_test().driver()->block_device().ServeRequests(std::move(volume_server));
+  zx::result client = block_client::RemoteBlockDevice::Create(std::move(volume_client));
+  ASSERT_OK(client);
+
+  fuchsia_hardware_block::wire::BlockInfo info;
+  ASSERT_OK(client->BlockGetInfo(&info));
+  const size_t kLen = info.max_transfer_size + kBlkSize;
+  zx::vmo vmo;
+  ASSERT_OK(zx::vmo::create(kLen, 0, &vmo));
+
+  storage::Vmoid owned_vmoid;
+  EXPECT_OK(client->BlockAttachVmo(vmo, &owned_vmoid));
+
+  // It doesn't matter if we leak the ID.
+  vmoid_t vmoid = owned_vmoid.TakeId();
+
+  block_fifo_request_t requests[] = {
+      {.command =
+           {
+               .opcode = BLOCK_OPCODE_WRITE,
+               .flags = BLOCK_IO_FLAG_PRE_BARRIER,
+           },
+       .vmoid = vmoid,
+       .length = 3,
+       .vmo_offset = 0,
+       .dev_offset = 0},
+  };
+
+  ASSERT_EQ(ZX_ERR_IO, client->FifoTransaction(requests, 1));
+}
+
 FUCHSIA_DRIVER_EXPORT(TestBlockDriver);
 
 }  // anonymous namespace

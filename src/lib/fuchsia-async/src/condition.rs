@@ -30,6 +30,7 @@ use std::task::{Poll, Waker};
 // Condition is implemented as an intrusive doubly linked list.  Typical use should avoid any
 // additional heap allocations after creation, as the nodes of the list are stored as part of the
 // caller's future.
+#[derive(Default)]
 pub struct Condition<T>(Arc<Mutex<Inner<T>>>);
 
 impl<T> Condition<T> {
@@ -45,14 +46,12 @@ impl<T> Condition<T> {
 
     /// Same as `Mutex::lock`.
     pub fn lock(&self) -> ConditionGuard<'_, T> {
-        ConditionGuard(&self.0, self.0.lock().unwrap())
+        ConditionGuard(self.0.lock().unwrap())
     }
 
     /// Returns when `poll` resolves.
     pub async fn when<R>(&self, poll: impl Fn(&mut T) -> Poll<R>) -> R {
-        let mut entry = WakerEntry::new();
-        entry.list = Some(self.0.clone());
-        let mut entry = pin!(entry);
+        let mut entry = pin!(self.waker_entry());
         poll_fn(|cx| {
             let mut guard = self.0.lock().unwrap();
             // SAFETY: We uphold the pin guarantee.
@@ -68,8 +67,17 @@ impl<T> Condition<T> {
         })
         .await
     }
+
+    /// Returns a new waker entry.
+    pub fn waker_entry(&self) -> WakerEntry<T> {
+        WakerEntry {
+            list: self.0.clone(),
+            node: Node { next: None, prev: None, waker: None, _pinned: PhantomPinned },
+        }
+    }
 }
 
+#[derive(Default)]
 struct Inner<T> {
     head: Option<NonNull<Node>>,
     count: usize,
@@ -80,17 +88,16 @@ struct Inner<T> {
 unsafe impl<T: Send> Send for Inner<T> {}
 
 /// Guard returned by `lock`.
-pub struct ConditionGuard<'a, T>(&'a Arc<Mutex<Inner<T>>>, MutexGuard<'a, Inner<T>>);
+pub struct ConditionGuard<'a, T>(MutexGuard<'a, Inner<T>>);
 
 impl<'a, T> ConditionGuard<'a, T> {
     /// Adds the waker entry to the condition's list of wakers.
     pub fn add_waker(&mut self, waker_entry: Pin<&mut WakerEntry<T>>, waker: Waker) {
         // SAFETY: We never move the data out.
         let waker_entry = unsafe { waker_entry.get_unchecked_mut() };
-        waker_entry.list = Some(self.0.clone());
         // SAFETY: We set list correctly above.
         unsafe {
-            waker_entry.node.add(&mut *self.1, waker);
+            waker_entry.node.add(&mut *self.0, waker);
         }
     }
 
@@ -104,7 +111,7 @@ impl<'a, T> ConditionGuard<'a, T> {
 
     /// Returns the number of wakers registered with the condition.
     pub fn waker_count(&self) -> usize {
-        self.1.count
+        self.0.count
     }
 }
 
@@ -112,43 +119,25 @@ impl<T> Deref for ConditionGuard<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
-        &self.1.data
+        &self.0.data
     }
 }
 
 impl<T> DerefMut for ConditionGuard<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.1.data
+        &mut self.0.data
     }
 }
 
 /// A waker entry that can be added to a list.
 pub struct WakerEntry<T> {
-    list: Option<Arc<Mutex<Inner<T>>>>,
+    list: Arc<Mutex<Inner<T>>>,
     node: Node,
-}
-
-impl<T> WakerEntry<T> {
-    /// Returns a new entry.
-    pub fn new() -> Self {
-        Self {
-            list: None,
-            node: Node { next: None, prev: None, waker: None, _pinned: PhantomPinned },
-        }
-    }
-}
-
-impl<T> Default for WakerEntry<T> {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl<T> Drop for WakerEntry<T> {
     fn drop(&mut self) {
-        if let Some(list) = &self.list {
-            self.node.remove(&mut *list.lock().unwrap());
-        }
+        self.node.remove(&mut *self.list.lock().unwrap());
     }
 }
 
@@ -212,28 +201,28 @@ pub struct Drainer<'a, 'b, T>(&'a mut ConditionGuard<'b, T>);
 impl<T> Iterator for Drainer<'_, '_, T> {
     type Item = Waker;
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(mut head) = self.0 .1.head {
+        if let Some(mut head) = self.0 .0.head {
             // SAFETY: Safe because we have exclusive access to `Inner` and `head is set correctly.
-            unsafe { head.as_mut().remove(&mut self.0 .1) }
+            unsafe { head.as_mut().remove(&mut self.0 .0) }
         } else {
             None
         }
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.0 .1.count, Some(self.0 .1.count))
+        (self.0 .0.count, Some(self.0 .0.count))
     }
 }
 
 impl<T> ExactSizeIterator for Drainer<'_, '_, T> {
     fn len(&self) -> usize {
-        self.0 .1.count
+        self.0 .0.count
     }
 }
 
 #[cfg(all(target_os = "fuchsia", test))]
 mod tests {
-    use super::{Condition, WakerEntry};
+    use super::Condition;
     use crate::TestExecutor;
     use futures::stream::FuturesUnordered;
     use futures::task::noop_waker;
@@ -286,11 +275,11 @@ mod tests {
     fn test_dropping_waker_entry_removes_from_list() {
         let condition = Condition::new(());
 
-        let entry1 = pin!(WakerEntry::new());
+        let entry1 = pin!(condition.waker_entry());
         condition.lock().add_waker(entry1, noop_waker());
 
         {
-            let entry2 = pin!(WakerEntry::new());
+            let entry2 = pin!(condition.waker_entry());
             condition.lock().add_waker(entry2, noop_waker());
 
             assert_eq!(condition.waker_count(), 2);
@@ -304,7 +293,7 @@ mod tests {
 
         assert_eq!(condition.waker_count(), 0);
 
-        let entry3 = pin!(WakerEntry::new());
+        let entry3 = pin!(condition.waker_entry());
         condition.lock().add_waker(entry3, noop_waker());
 
         assert_eq!(condition.waker_count(), 1);
@@ -314,10 +303,10 @@ mod tests {
     fn test_waker_can_be_added_multiple_times() {
         let condition = Condition::new(());
 
-        let mut entry1 = pin!(WakerEntry::new());
+        let mut entry1 = pin!(condition.waker_entry());
         condition.lock().add_waker(entry1.as_mut(), noop_waker());
 
-        let mut entry2 = pin!(WakerEntry::new());
+        let mut entry2 = pin!(condition.waker_entry());
         condition.lock().add_waker(entry2.as_mut(), noop_waker());
 
         assert_eq!(condition.waker_count(), 2);

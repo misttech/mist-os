@@ -2,6 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::bail;
+use fuchsia_trace::{
+    category_enabled, trace_string_ref_t, BufferingMode, ProlongedContext, TraceState,
+};
+use fxt::blob::{BlobHeader, BlobType};
 use perfetto_protos::perfetto::protos::trace_config::buffer_config::FillPolicy;
 use perfetto_protos::perfetto::protos::trace_config::{BufferConfig, DataSource};
 use perfetto_protos::perfetto::protos::{
@@ -13,15 +18,11 @@ use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::FsString;
 use starnix_logging::{log_error, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
 use starnix_sync::{Locked, Unlocked};
-use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
-use std::sync::mpsc::{channel, Sender};
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
-use fuchsia_trace::{category_enabled, trace_state, ProlongedContext, TraceState};
-
-/// Sender for the trace state, which sends a message each time trace state is updated.
-static TRACE_STATE_SENDER: OnceLock<Sender<TraceState>> = OnceLock::new();
+use fuchsia_async as fasync;
+use fuchsia_trace_observer::TraceObserver;
 
 const PERFETTO_BUFFER_SIZE_KB: u32 = 63488;
 
@@ -44,7 +45,7 @@ struct CallbackState {
 impl CallbackState {
     fn connection(
         &mut self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
     ) -> Result<&mut perfetto::Consumer, anyhow::Error> {
         match self.connection {
@@ -59,10 +60,12 @@ impl CallbackState {
 
     fn on_state_change(
         &mut self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         new_state: TraceState,
         current_task: &CurrentTask,
     ) -> Result<(), anyhow::Error> {
+        let prev_state = self.prev_state;
+        self.prev_state = new_state;
         match new_state {
             TraceState::Started => {
                 self.prolonged_context = ProlongedContext::acquire();
@@ -160,37 +163,35 @@ impl CallbackState {
                 )?;
             }
             TraceState::Stopping | TraceState::Stopped => {
-                if self.prev_state == TraceState::Started {
-                    let context = fuchsia_trace::Context::acquire();
-                    // Now that we have acquired a context (or at least attempted to),
-                    // we can drop the prolonged context. We want to do this early to
-                    // avoid making the trace session hang if this function exits
-                    // on an error path.
-                    self.prolonged_context = None;
+                if prev_state == TraceState::Started {
+                    // We want to hold the prolonged context to ensure the trace session doesn't
+                    // exit out from under us, but we also want to ensure we drop the prolonged
+                    // context if we bail for whatever reason below.
+                    let _local_prolonged_context =
+                        std::mem::replace(&mut self.prolonged_context, None);
 
-                    let disable_request;
-                    let read_buffers_request;
-                    let blob_name_ref;
-                    {
-                        let connection = self.connection(locked, current_task)?;
-                        disable_request = connection.disable_tracing(
-                            locked,
-                            current_task,
-                            DisableTracingRequest {},
-                        )?;
-                        loop {
-                            let frame = connection.next_frame_blocking(locked, current_task)?;
-                            if frame.request_id == Some(disable_request) {
-                                break;
-                            }
+                    let connection = self.connection(locked, current_task)?;
+                    let disable_request = connection.disable_tracing(
+                        locked,
+                        current_task,
+                        DisableTracingRequest {},
+                    )?;
+                    loop {
+                        let frame = connection.next_frame_blocking(locked, current_task)?;
+                        if frame.request_id == Some(disable_request) {
+                            break;
                         }
-
-                        read_buffers_request =
-                            connection.read_buffers(locked, current_task, ReadBuffersRequest {})?;
-                        blob_name_ref = context
-                            .as_ref()
-                            .map(|context| context.register_string_literal(NAME_PERFETTO_BLOB));
                     }
+
+                    let read_buffers_request =
+                        connection.read_buffers(locked, current_task, ReadBuffersRequest {})?;
+
+                    let blob_name_ref = {
+                        let Some(context) = fuchsia_trace::Context::acquire() else {
+                            bail!("Tracing stopped despite holding prolonged context");
+                        };
+                        context.register_string_literal(NAME_PERFETTO_BLOB)
+                    };
 
                     // IPC responses may be spread across multiple frames, so loop until we get a
                     // message that indicates it is the last one. Additionally, if there are
@@ -229,15 +230,11 @@ impl CallbackState {
                                         // `append` moves all data out of the passed Vec, so
                                         // s.packet_data will be empty after this call.
                                         blob_data.append(&mut self.packet_data);
-                                        if let Some(context) = &context {
-                                            context.write_blob_record(
-                                                fuchsia_trace::TRACE_BLOB_TYPE_PERFETTO,
-                                                blob_name_ref.as_ref().expect(
-                                                    "blob_name_ref is Some whenever context is",
-                                                ),
-                                                blob_data.as_slice(),
-                                            );
-                                        }
+
+                                        // Ignore a failure to write the packet here. We don't
+                                        // return immediately because we want to allow the
+                                        // remaining records to be recorded as dropped.
+                                        let _ = self.forward_packet(blob_name_ref, blob_data);
                                     }
                                 }
                             }
@@ -255,11 +252,82 @@ impl CallbackState {
                             current_task,
                             FreeBuffersRequest { buffer_ids: vec![0] },
                         )?;
+                } else {
+                    // If we receive a stop request and we don't think we're actually tracing, our
+                    // local state likely desynced from the global trace state. Clean up our state
+                    // and ensure we're stopped so we re-synchronize.
+                    self.prolonged_context = None;
+                    self.packet_data.clear();
                 }
             }
         }
-        self.prev_state = new_state;
         Ok(())
+    }
+
+    // Forward `data` to the trace buffer by wrapping it in fxt blob records with the name
+    // `blob_name_ref`..
+    fn forward_packet(&self, blob_name_ref: trace_string_ref_t, data: Vec<u8>) -> Option<usize> {
+        // The blob data may be larger than what we can fit in a single record. If so, split it up
+        // over multiple chunks.
+        let mut bytes_written = 0;
+        let mut data_to_write = &data[..];
+
+        // We want to break the data into chunks:
+        // - Bigger chunks means less per-write overheader
+        // - Bigger chunks means less overhead due to blob meta
+        //
+        // However, too big and the blobs won't fit nicely into the trace buffer.
+        // The trace buffer is minimum 1MiB in size, so writing 4k at a time seems like a
+        // reasonable place to start that is both reasonably large and not going to leave a ton of
+        // space at the end of the trace buffer.
+        let max_chunk_size = 4096;
+        while !data_to_write.is_empty() {
+            let chunk_size = data_to_write.len().min(max_chunk_size);
+            let chunk = &data_to_write[..chunk_size];
+            self.forward_blob(blob_name_ref, &chunk)?;
+            data_to_write = &data_to_write[chunk_size..];
+            bytes_written += chunk_size;
+        }
+        Some(bytes_written)
+    }
+
+    // Given a blob name, wrap the data in an fxt perfetto blob and write it to the trace buffer.
+    fn forward_blob(&self, blob_name_ref: trace_string_ref_t, blob_data: &[u8]) -> Option<usize> {
+        let mut header = BlobHeader::empty();
+        header.set_name_ref(blob_name_ref.encoded_value);
+        header.set_payload_len(blob_data.len() as u16);
+        header.set_blob_format_type(BlobType::Perfetto.into());
+
+        let record_bytes = fxt::fxt_builder::FxtBuilder::new(header).atom(blob_data).build();
+        assert!(record_bytes.len() % std::mem::size_of::<u64>() == 0);
+        let num_words = record_bytes.len() / std::mem::size_of::<u64>();
+        let record_data = record_bytes.as_ptr();
+        let record_words =
+            unsafe { std::slice::from_raw_parts(record_data.cast::<u64>(), num_words) };
+
+        while let Some(context) = fuchsia_trace::Context::acquire() {
+            if let Some(bytes) = context.copy_record(record_words) {
+                return Some(bytes);
+            }
+            if context.buffering_mode() != BufferingMode::Streaming {
+                // If we're not in streaming mode, there will never be room for this record. Drop
+                // it.
+                return None;
+            }
+            // We're writing records pretty quick here, we're just forwarding data from
+            // perfetto with no breaks. trace_manager might not be able to keep up if it's also
+            // servicing other trace-providers. We want to back off we if find that we run out
+            // of space.
+            //
+            // We drop the context to decrement the refcount on the trace session. This allows
+            // trace-engine to switch the buffers if needed and drain out the buffers so that
+            // when we wake, there will hopefully be room.
+            //
+            // TODO(b/304532640)
+            drop(context);
+            std::thread::sleep(std::time::Duration::from_millis(100));
+        }
+        None
     }
 }
 
@@ -267,9 +335,21 @@ pub fn start_perfetto_consumer_thread(
     kernel: &Arc<Kernel>,
     socket_path: FsString,
 ) -> Result<(), Errno> {
-    let (sender, receiver) = channel::<TraceState>();
-    kernel.kthreads.spawner().spawn({
-        move |locked, current_task| {
+    // We unfortunately need to spawn a dedicated thread to run our async task.
+    //
+    // While the TraceObserver waits asynchronously, the interactions we do with Perfetto over the
+    // vfs::socket are blocking.
+    //
+    // It blocks in two scenarios:
+    // 1) When we forward a control plane request over the socket and block for a response. This is
+    //    for a few ms. See `perfetto::Consumer::enable_tracing`.
+    // 2) When a trace ends, we repeatedly do blocking reads on the socket until we read and
+    //    forward all the trace data. This servicing of trace data would hold the executor for
+    //    several seconds. See `perfetto::Consumer::next_frame_blocking`.
+    kernel.kthreads.spawner().spawn(|locked, current_task| {
+        let mut executor = fasync::LocalExecutor::new();
+        executor.run_singlethreaded(async move {
+            let observer = TraceObserver::new();
             let mut callback_state = CallbackState {
                 prev_state: TraceState::Stopped,
                 socket_path,
@@ -277,28 +357,13 @@ pub fn start_perfetto_consumer_thread(
                 prolonged_context: None,
                 packet_data: Vec::new(),
             };
-            while let Ok(state) = receiver.recv() {
+            while let Ok(state) = observer.on_state_changed().await {
                 callback_state.on_state_change(locked, state, &current_task).unwrap_or_else(|e| {
                     log_error!("perfetto_consumer callback error: {:?}", e);
                 })
             }
-        }
+        });
     });
-    // Store the other end of the channel so that it can be called from a static callback function
-    // when the trace is changed.
-    TRACE_STATE_SENDER.set(sender).or_else(|e| {
-        log_error!("Failed to set perfetto_consumer trace state sender: {:?}", e);
-        error!(EINVAL)
-    })?;
-    fuchsia_trace_observer::start_trace_observer(c_callback);
-    Ok(())
-}
 
-extern "C" fn c_callback() {
-    let state = trace_state();
-    if let Some(sender) = TRACE_STATE_SENDER.get() {
-        sender.send(state).unwrap_or_else(|e| log_error!("perfetto_consumer send failed: {:?}", e));
-    } else {
-        log_error!("perfetto_consumer sender was not set when the callback was called");
-    }
+    Ok(())
 }

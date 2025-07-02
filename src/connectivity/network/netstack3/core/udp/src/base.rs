@@ -24,7 +24,7 @@ use netstack3_base::socket::{
     AddrEntry, AddrIsMappedError, AddrVec, Bound, ConnAddr, ConnInfoAddr, ConnIpAddr, FoundSockets,
     IncompatibleError, InsertError, Inserter, ListenerAddr, ListenerAddrInfo, ListenerIpAddr,
     MaybeDualStack, NotDualStackCapableError, RemoveResult, SetDualStackEnabledError, ShutdownType,
-    SocketAddrType, SocketIpAddr, SocketMapAddrSpec, SocketMapAddrStateSpec,
+    SocketAddrType, SocketCookie, SocketIpAddr, SocketMapAddrSpec, SocketMapAddrStateSpec,
     SocketMapConflictPolicy, SocketMapStateSpec, SocketWritableListener,
 };
 use netstack3_base::socketmap::{IterShadows as _, SocketMap, Tagged};
@@ -50,6 +50,7 @@ use netstack3_datagram::{
     SetMulticastMembershipError, SocketInfo, SocketState as DatagramSocketState,
     WrapOtherStackIpOptions, WrapOtherStackIpOptionsMut,
 };
+use netstack3_filter::{SocketIngressFilterResult, SocketOpsFilter, SocketOpsFilterBindingContext};
 use netstack3_ip::socket::{
     IpSockCreateAndSendError, IpSockCreationError, IpSockSendError, SocketHopLimits,
 };
@@ -59,7 +60,7 @@ use netstack3_ip::{
     TransportReceiveError,
 };
 use netstack3_trace::trace_duration;
-use packet::{BufferMut, Nested, ParsablePacket, Serializer};
+use packet::{BufferMut, FragmentedByteSlice, Nested, PacketBuilder, ParsablePacket};
 use packet_formats::ip::{DscpAndEcn, IpProto, IpProtoExt};
 use packet_formats::udp::{UdpPacket, UdpPacketBuilder, UdpParseArgs};
 use thiserror::Error;
@@ -470,9 +471,11 @@ pub struct DualStackSocketState<D: WeakDeviceIdentifier> {
 }
 
 /// Serialization errors for Udp Packets.
+#[derive(Debug, Error)]
 pub enum UdpSerializeError {
     /// Disallow sending packets with a remote port of 0. See
     /// [`UdpRemotePort::Unset`] for the rationale.
+    #[error("sending packets with a remote port of 0 is not allowed")]
     RemotePortUnset,
 }
 
@@ -518,12 +521,8 @@ impl<BT: UdpBindingsTypes> DatagramSocketSpec for Udp<BT> {
             UdpRemotePort::Unset => return Err(UdpSerializeError::RemotePortUnset),
             UdpRemotePort::Set(remote_port) => *remote_port,
         };
-        Ok(body.encapsulate(UdpPacketBuilder::new(
-            local_ip.addr(),
-            remote_ip.addr(),
-            Some(*local_port),
-            remote_port,
-        )))
+        Ok(UdpPacketBuilder::new(local_ip.addr(), remote_ip.addr(), Some(*local_port), remote_port)
+            .wrap_body(body))
     }
 
     fn try_alloc_listen_identifier<I: IpExt, D: WeakDeviceIdentifier>(
@@ -908,6 +907,14 @@ pub struct UdpSocketId<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes>(
     datagram::StrongRc<I, D, Udp<BT>>,
 );
 
+impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> UdpSocketId<I, D, BT> {
+    /// Returns `SocketCookie` for the socket.
+    pub fn socket_cookie(&self) -> SocketCookie {
+        let Self(inner) = self;
+        SocketCookie::new(inner.resource_token())
+    }
+}
+
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: UdpBindingsTypes> Clone for UdpSocketId<I, D, BT> {
     #[cfg_attr(feature = "instrumented", track_caller)]
     fn clone(&self) -> Self {
@@ -1066,12 +1073,12 @@ impl UdpPacketMeta<Ipv4> {
 /// The bindings context handling received UDP frames.
 pub trait UdpReceiveBindingsContext<I: IpExt, D: StrongDeviceIdentifier>: UdpBindingsTypes {
     /// Receives a UDP packet on a socket.
-    fn receive_udp<B: BufferMut>(
+    fn receive_udp(
         &mut self,
         id: &UdpSocketId<I, D::Weak, Self>,
         device_id: &D,
         meta: UdpPacketMeta<I>,
-        body: &B,
+        body: &[u8],
     );
 }
 
@@ -1101,6 +1108,7 @@ pub trait UdpBindingsContext<I: IpExt, D: StrongDeviceIdentifier>:
     + UdpReceiveBindingsContext<I, D>
     + ReferenceNotifiers
     + UdpBindingsTypes
+    + SocketOpsFilterBindingContext<D>
 {
 }
 impl<
@@ -1109,7 +1117,8 @@ impl<
             + RngContext
             + UdpReceiveBindingsContext<I, D>
             + ReferenceNotifiers
-            + UdpBindingsTypes,
+            + UdpBindingsTypes
+            + SocketOpsFilterBindingContext<D>,
         D: StrongDeviceIdentifier,
     > UdpBindingsContext<I, D> for BC
 {
@@ -1325,11 +1334,8 @@ fn receive_ip_packet<
     trace!("received UDP packet: {:x?}", buffer.as_mut());
     let src_ip: I::Addr = src_ip.into_addr();
 
-    let packet = if let Ok(packet) =
-        buffer.parse_with::<_, UdpPacket<_>>(UdpParseArgs::new(src_ip, dst_ip.get()))
-    {
-        packet
-    } else {
+    let Ok(packet) = buffer.parse_with::<_, UdpPacket<_>>(UdpParseArgs::new(src_ip, dst_ip.get()))
+    else {
         // There isn't much we can do if the UDP packet is
         // malformed.
         CounterContext::<UdpCountersWithoutSocket<I>>::counters(core_ctx).rx_malformed.increment();
@@ -1414,14 +1420,15 @@ fn receive_ip_packet<
         dscp_and_ecn: header_info.dscp_and_ecn(),
     };
     let was_delivered = recipients.into_iter().fold(false, |was_delivered, lookup_result| {
-        let delivered = try_dual_stack_deliver::<I, B, BC, CC>(
+        let delivered = try_dual_stack_deliver::<I, BC, CC, H>(
             core_ctx,
             bindings_ctx,
             lookup_result,
             device,
             &meta,
             require_transparent,
-            &buffer,
+            header_info,
+            packet.clone(),
         );
         was_delivered | delivered
     });
@@ -1442,7 +1449,8 @@ fn try_deliver<
     I: IpExt,
     CC: StateContext<I, BC> + UdpCounterContext<I, CC::WeakDeviceId, BC>,
     BC: UdpBindingsContext<I, CC::DeviceId>,
-    B: BufferMut,
+    WireI: IpExt,
+    H: IpHeaderInfo<WireI>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1450,7 +1458,8 @@ fn try_deliver<
     device_id: &CC::DeviceId,
     meta: UdpPacketMeta<I>,
     require_transparent: bool,
-    buffer: &B,
+    header_info: &H,
+    packet: UdpPacket<&[u8]>,
 ) -> bool {
     let delivered = core_ctx.with_socket_state(&id, |core_ctx, state| {
         let should_deliver = match state {
@@ -1486,7 +1495,23 @@ fn try_deliver<
                 }
             }
 
-            bindings_ctx.receive_udp(id, device_id, meta, buffer);
+            let [ip_prefix, ip_options] = header_info.as_bytes();
+            let [udp_header, data] = packet.as_bytes();
+            let mut slices = [ip_prefix, ip_options, udp_header, data];
+            let data = FragmentedByteSlice::new(&mut slices);
+            let filter_result = bindings_ctx.socket_ops_filter().on_ingress(
+                &data,
+                device_id,
+                id.socket_cookie(),
+                state.get_options(core_ctx).marks(),
+            );
+
+            match filter_result {
+                SocketIngressFilterResult::Accept => {
+                    bindings_ctx.receive_udp(id, device_id, meta, packet.body());
+                }
+                SocketIngressFilterResult::Drop => (),
+            }
         }
         should_deliver
     });
@@ -1500,12 +1525,12 @@ fn try_deliver<
 /// A wrapper for [`try_deliver`] that supports dual stack delivery.
 fn try_dual_stack_deliver<
     I: IpExt,
-    B: BufferMut,
     BC: UdpBindingsContext<I, CC::DeviceId> + UdpBindingsContext<I::OtherVersion, CC::DeviceId>,
     CC: StateContext<I, BC>
         + StateContext<I::OtherVersion, BC>
         + UdpCounterContext<I, CC::WeakDeviceId, BC>
         + UdpCounterContext<I::OtherVersion, CC::WeakDeviceId, BC>,
+    H: IpHeaderInfo<I>,
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
@@ -1513,7 +1538,8 @@ fn try_dual_stack_deliver<
     device_id: &CC::DeviceId,
     meta: &UdpPacketMeta<I>,
     require_transparent: bool,
-    buffer: &B,
+    header_info: &H,
+    packet: UdpPacket<&[u8]>,
 ) -> bool {
     #[derive(GenericOverIp)]
     #[generic_over_ip(I, Ip)]
@@ -1557,7 +1583,8 @@ fn try_dual_stack_deliver<
             device_id,
             meta,
             require_transparent,
-            buffer,
+            header_info,
+            packet,
         ),
         DualStackOutputs::OtherStack(Outputs { meta, socket }) => try_deliver(
             core_ctx,
@@ -1566,7 +1593,8 @@ fn try_dual_stack_deliver<
             device_id,
             meta,
             require_transparent,
-            buffer,
+            header_info,
+            packet,
         ),
     }
 }
@@ -1640,14 +1668,14 @@ pub enum SendToError {
     /// An error was encountered while trying to create a temporary IP socket
     /// to use for the send operation.
     #[error("could not create a temporary connection socket: {0}")]
-    CreateSock(IpSockCreationError),
+    CreateSock(#[from] IpSockCreationError),
     /// An error was encountered while trying to send via the temporary IP
     /// socket.
     #[error("could not send via temporary socket: {0}")]
-    Send(IpSockSendError),
+    Send(#[from] IpSockSendError),
     /// There was a problem with the remote address relating to its zone.
     #[error("zone error: {0}")]
-    Zone(ZonedAddressError),
+    Zone(#[from] ZonedAddressError),
     /// Disallow sending packets with a remote port of 0. See
     /// [`UdpRemotePort::Unset`] for the rationale.
     #[error("the remote port was unset")]
@@ -1810,7 +1838,7 @@ where
             .with_other_stack_ip_options_mut_if_unbound(id, |other_stack| {
                 I::map_ip(
                     (enabled, WrapOtherStackIpOptionsMut(other_stack)),
-                    |(_enabled, _v4)| Err(SetDualStackEnabledError::NotCapable),
+                    |(_enabled, _v4)| Err(NotDualStackCapableError.into()),
                     |(enabled, WrapOtherStackIpOptionsMut(other_stack))| {
                         let DualStackSocketState { dual_stack_enabled, .. } = other_stack;
                         *dual_stack_enabled = enabled;
@@ -1822,7 +1850,7 @@ where
                 // NB: Match Linux and prefer to return `NotCapable` errors over
                 // `SocketIsBound` errors, for IPv4 sockets.
                 match I::VERSION {
-                    IpVersion::V4 => SetDualStackEnabledError::NotCapable,
+                    IpVersion::V4 => NotDualStackCapableError.into(),
                     IpVersion::V6 => SetDualStackEnabledError::SocketIsBound,
                 }
             })?
@@ -2480,19 +2508,24 @@ where
 }
 
 /// Error when sending a packet on a socket.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, GenericOverIp)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, GenericOverIp, Error)]
 #[generic_over_ip()]
 pub enum SendError {
     /// The socket is not writeable.
+    #[error("socket not writable")]
     NotWriteable,
     /// The packet couldn't be sent.
-    IpSock(IpSockSendError),
+    #[error("packet couldn't be sent: {0}")]
+    IpSock(#[from] IpSockSendError),
     /// Disallow sending packets with a remote port of 0. See
     /// [`UdpRemotePort::Unset`] for the rationale.
+    #[error("remote port unset")]
     RemotePortUnset,
     /// The socket's send buffer is full.
+    #[error("send buffer is full")]
     SendBufferFull,
     /// Invalid message length.
+    #[error("invalid message length")]
     InvalidLength,
 }
 
@@ -2734,7 +2767,7 @@ mod tests {
     use netstack3_ip::socket::testutil::{FakeDeviceConfig, FakeDualStackIpSocketCtx};
     use netstack3_ip::testutil::{DualStackSendIpPacketMeta, FakeIpHeaderInfo};
     use netstack3_ip::{IpPacketDestination, ResolveRouteError, SendIpPacketMeta};
-    use packet::Buf;
+    use packet::{Buf, Serializer};
     use test_case::test_case;
 
     use crate::internal::counters::testutil::{
@@ -2901,19 +2934,19 @@ mod tests {
     impl<I: IpExt, D: StrongDeviceIdentifier> UdpReceiveBindingsContext<I, D>
         for FakeUdpBindingsCtx<D>
     {
-        fn receive_udp<B: BufferMut>(
+        fn receive_udp(
             &mut self,
             id: &UdpSocketId<I, D::Weak, Self>,
             _device_id: &D,
             meta: UdpPacketMeta<I>,
-            body: &B,
+            body: &[u8],
         ) {
             self.state
                 .received_mut::<I>()
                 .entry(id.downgrade())
                 .or_default()
                 .packets
-                .push(ReceivedPacket { meta, body: body.as_ref().to_owned() })
+                .push(ReceivedPacket { meta, body: body.to_owned() })
         }
     }
 
@@ -3307,8 +3340,8 @@ mod tests {
         let UdpPacketMeta { src_ip, src_port, dst_ip, dst_port, dscp_and_ecn } = meta;
         let builder = UdpPacketBuilder::new(src_ip, dst_ip, src_port, dst_port);
 
-        let buffer = Buf::new(body.to_owned(), ..)
-            .encapsulate(builder)
+        let buffer = builder
+            .wrap_body(Buf::new(body.to_owned(), ..))
             .serialize_vec_outer()
             .unwrap()
             .into_inner();
@@ -7224,7 +7257,7 @@ mod tests {
         for enabled in [true, false] {
             assert_eq!(
                 api.set_dual_stack_enabled(&socket, enabled),
-                Err(SetDualStackEnabledError::NotCapable)
+                Err(NotDualStackCapableError.into())
             );
             assert_eq!(api.get_dual_stack_enabled(&socket), Err(NotDualStackCapableError));
         }

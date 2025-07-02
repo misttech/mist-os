@@ -43,13 +43,12 @@ source_set("sdmmc-driver-source") {
   ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_cpp",
-    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
-    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devfs/cpp",
     "//sdk/lib/driver/metadata/cpp",
+    "//sdk/lib/driver/power/cpp",
     "//sdk/lib/driver/runtime:driver_runtime",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/inspect/component/cpp",
@@ -71,9 +70,11 @@ source_set("sdmmc-driver-source") {
     "//sdk/banjo/fuchsia.hardware.sdio:fuchsia.hardware.sdio_banjo_cpp",
     "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.block.driver:fuchsia.hardware.block.driver_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
     "//sdk/fidl/fuchsia.hardware.rpmb:fuchsia.hardware.rpmb_cpp",
     "//sdk/fidl/fuchsia.hardware.sdio:fuchsia.hardware.sdio_cpp",
     "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_cpp",
+    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/lib/async-loop:async-loop-cpp",
     "//sdk/lib/async-loop:async-loop-default",
     "//sdk/lib/driver/compat/cpp",
@@ -126,17 +127,23 @@ fuchsia_structured_config_values("sc-values") {
   }
 }
 
-power_config("power-config") {
-  output_name = "power_config.fidl"
-  value_file = "power_config.json5"
+power_config("sdmmc-power-config") {
+  output_name = "sdmmc_power_config.fidl"
+  value_file = "sdmmc_power_config.json5"
+}
+
+power_config("sdio-power-config") {
+  output_name = "sdio_power_config.fidl"
+  value_file = "sdio_power_config.json5"
 }
 
 fuchsia_driver_package("package") {
   package_name = "sdmmc"
   driver_components = [ ":sdmmc" ]
   deps = [
-    ":power-config",
     ":sc-values",
+    ":sdio-power-config",
+    ":sdmmc-power-config",
   ]
 }
 
@@ -176,8 +183,8 @@ test("sdmmc-block-test-bin") {
 
 fuchsia_unittest_package("sdmmc-block-test") {
   deps = [
-    ":power-config",
     ":sdmmc-block-test-bin",
+    ":sdmmc-power-config",
   ]
   test_specs = {
     environments = basic_envs
@@ -202,7 +209,10 @@ test("sdio-controller-test-bin") {
 }
 
 fuchsia_unittest_package("sdio-controller-test") {
-  deps = [ ":sdio-controller-test-bin" ]
+  deps = [
+    ":sdio-controller-test-bin",
+    ":sdio-power-config",
+  ]
   test_specs = {
     environments = basic_envs
     log_settings = {

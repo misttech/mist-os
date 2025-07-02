@@ -19,7 +19,7 @@
 {{- define "Method:WireWeakOnewayClientImpl:WireMessagingSource" }}
   ::fidl::OneWayStatus {{ .Protocol.WireWeakOnewayClientImpl.NoLeading }}::{{ .Name }}(
         {{- RenderParams .RequestArgs }}) {
-    FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+    __UNINITIALIZED
     {{ .WireTransactionalRequest }} _request_object{ {{ RenderForwardParams .RequestArgs }} };
     ::fidl::internal::OwnedEncodedMessage<{{ .WireTransactionalRequest }}, {{ .Transport.Type }}> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);

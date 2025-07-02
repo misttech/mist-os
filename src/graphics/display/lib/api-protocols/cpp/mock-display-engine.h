@@ -27,12 +27,11 @@
 #include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
-#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 
 namespace display::testing {
 
-// Strict mock for the Banjo-generated DisplayEngineListener protocol.
+// Strict mock for DisplayEngineInterface implementations.
 //
 // This is a very rare case where strict mocking is warranted. The code under
 // test is an adapter that maps Banjo or FIDL calls 1:1 to C++ calls. So, the
@@ -54,8 +53,7 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
   using ReleaseImageChecker = fit::function<void(display::DriverImageId driver_image_id)>;
   using CheckConfigurationChecker = fit::function<display::ConfigCheckResult(
       display::DisplayId display_id, display::ModeId display_mode_id,
-      cpp20::span<const display::DriverLayer> layers,
-      cpp20::span<display::LayerCompositionOperations> layer_composition_operations)>;
+      cpp20::span<const display::DriverLayer> layers)>;
   using ApplyConfigurationChecker = fit::function<void(
       display::DisplayId display_id, display::ModeId display_mode_id,
       cpp20::span<const display::DriverLayer> layers, display::DriverConfigStamp config_stamp)>;
@@ -113,8 +111,7 @@ class MockDisplayEngine : public display::DisplayEngineInterface {
   void ReleaseImage(display::DriverImageId driver_image_id) override;
   display::ConfigCheckResult CheckConfiguration(
       display::DisplayId display_id, display::ModeId display_mode_id,
-      cpp20::span<const display::DriverLayer> layers,
-      cpp20::span<display::LayerCompositionOperations> layer_composition_operations) override;
+      cpp20::span<const display::DriverLayer> layers) override;
   void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                           cpp20::span<const display::DriverLayer> layers,
                           display::DriverConfigStamp config_stamp) override;

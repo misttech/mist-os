@@ -45,7 +45,6 @@ rustc_test("logspam_test_bin") {
   name = "logspam_test"
   deps = [
     "//examples/components/routing/fidl:echo_rust",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",

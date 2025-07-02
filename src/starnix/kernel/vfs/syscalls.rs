@@ -156,7 +156,7 @@ pub type IocbPtr = MultiArchUserRef<iocb, iocb>;
 pub type IocbPtrPtr = MultiArchUserRef<IocbPtr, IocbPtr>;
 
 pub fn sys_read(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     address: UserAddress,
@@ -172,7 +172,7 @@ pub fn sys_read(
 }
 
 pub fn sys_write(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     address: UserAddress,
@@ -188,7 +188,7 @@ pub fn sys_write(
 }
 
 pub fn sys_close(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
 ) -> Result<(), Errno> {
@@ -197,7 +197,7 @@ pub fn sys_close(
 }
 
 pub fn sys_close_range(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     first: u32,
     last: u32,
@@ -224,7 +224,7 @@ pub fn sys_close_range(
 }
 
 pub fn sys_lseek(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     offset: off_t,
@@ -235,7 +235,7 @@ pub fn sys_lseek(
 }
 
 pub fn sys_fcntl(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     cmd: u32,
@@ -413,7 +413,7 @@ pub fn sys_fcntl(
 }
 
 pub fn sys_pread64(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     address: UserAddress,
@@ -431,7 +431,7 @@ pub fn sys_pread64(
 }
 
 pub fn sys_pwrite64(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     address: UserAddress,
@@ -449,7 +449,7 @@ pub fn sys_pwrite64(
 }
 
 fn do_readv(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: IOVecPtr,
@@ -479,7 +479,7 @@ fn do_readv(
 }
 
 pub fn sys_readv(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: IOVecPtr,
@@ -489,7 +489,7 @@ pub fn sys_readv(
 }
 
 pub fn sys_preadv(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: IOVecPtr,
@@ -500,7 +500,7 @@ pub fn sys_preadv(
 }
 
 pub fn sys_preadv2(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: IOVecPtr,
@@ -514,7 +514,7 @@ pub fn sys_preadv2(
 }
 
 fn do_writev(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: IOVecPtr,
@@ -554,7 +554,7 @@ fn do_writev(
 }
 
 pub fn sys_writev(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: IOVecPtr,
@@ -564,7 +564,7 @@ pub fn sys_writev(
 }
 
 pub fn sys_pwritev(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: IOVecPtr,
@@ -575,7 +575,7 @@ pub fn sys_pwritev(
 }
 
 pub fn sys_pwritev2(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: IOVecPtr,
@@ -591,7 +591,7 @@ pub fn sys_pwritev2(
 type StatFsPtr = MultiArchUserRef<uapi::statfs, uapi::arch32::statfs>;
 
 pub fn fstatfs<T32: IntoBytes + Immutable + TryFrom<uapi::statfs>>(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buf: MultiArchUserRef<uapi::statfs, T32>,
@@ -609,7 +609,7 @@ pub fn fstatfs<T32: IntoBytes + Immutable + TryFrom<uapi::statfs>>(
 }
 
 pub fn sys_fstatfs(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buf: StatFsPtr,
@@ -618,7 +618,7 @@ pub fn sys_fstatfs(
 }
 
 fn statfs<T32: IntoBytes + Immutable + TryFrom<uapi::statfs>>(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     user_buf: MultiArchUserRef<uapi::statfs, T32>,
@@ -633,7 +633,7 @@ fn statfs<T32: IntoBytes + Immutable + TryFrom<uapi::statfs>>(
 }
 
 pub fn sys_statfs(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     user_buf: StatFsPtr,
@@ -642,7 +642,7 @@ pub fn sys_statfs(
 }
 
 pub fn sys_sendfile(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     out_fd: FdNumber,
     in_fd: FdNumber,
@@ -656,7 +656,7 @@ pub fn sys_sendfile(
 ///
 /// Reads user_path from user memory and then calls through to Task::open_file_at.
 fn open_file_at(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -678,14 +678,14 @@ fn open_file_at(
 }
 
 fn lookup_parent_at<T, F>(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
     callback: F,
 ) -> Result<T, Errno>
 where
-    F: Fn(&mut Locked<'_, Unlocked>, LookupContext, NamespaceNode, &FsStr) -> Result<T, Errno>,
+    F: Fn(&mut Locked<Unlocked>, LookupContext, NamespaceNode, &FsStr) -> Result<T, Errno>,
 {
     let path = current_task.read_c_string_to_vec(user_path, PATH_MAX as usize)?;
     log_trace!(dir_fd:%, path:%; "lookup_parent_at");
@@ -751,7 +751,7 @@ impl From<StatxFlags> for LookupFlags {
 }
 
 pub fn lookup_at<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -792,7 +792,7 @@ where
 }
 
 fn do_openat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -806,7 +806,7 @@ fn do_openat(
 }
 
 pub fn sys_openat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -817,7 +817,7 @@ pub fn sys_openat(
 }
 
 pub fn sys_openat2(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -870,7 +870,7 @@ pub fn sys_openat2(
 }
 
 pub fn sys_faccessat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -880,7 +880,7 @@ pub fn sys_faccessat(
 }
 
 pub fn sys_faccessat2(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -894,7 +894,7 @@ pub fn sys_faccessat2(
 }
 
 pub fn sys_getdents64(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buffer: UserAddress,
@@ -908,7 +908,7 @@ pub fn sys_getdents64(
 }
 
 pub fn sys_chroot(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
 ) -> Result<(), Errno> {
@@ -923,7 +923,7 @@ pub fn sys_chroot(
 }
 
 pub fn sys_chdir(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
 ) -> Result<(), Errno> {
@@ -936,7 +936,7 @@ pub fn sys_chdir(
 }
 
 pub fn sys_fchdir(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
 ) -> Result<(), Errno> {
@@ -954,7 +954,7 @@ pub fn sys_fchdir(
 }
 
 pub fn sys_fstat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     buffer: UserRef<uapi::stat>,
@@ -973,7 +973,7 @@ pub fn sys_fstat(
 type StatPtr = MultiArchUserRef<uapi::stat, uapi::arch32::stat64>;
 
 pub fn sys_fstatat64(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -991,7 +991,7 @@ pub fn sys_fstatat64(
 pub use sys_fstatat64 as sys_newfstatat;
 
 pub fn sys_statx(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -1013,7 +1013,7 @@ pub fn sys_statx(
 }
 
 pub fn sys_readlinkat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -1050,7 +1050,7 @@ pub fn sys_readlinkat(
 }
 
 pub fn sys_truncate(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     length: off_t,
@@ -1063,7 +1063,7 @@ pub fn sys_truncate(
 }
 
 pub fn sys_ftruncate(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     length: off_t,
@@ -1075,7 +1075,7 @@ pub fn sys_ftruncate(
 }
 
 pub fn sys_mkdirat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -1103,7 +1103,7 @@ pub fn sys_mkdirat(
 }
 
 pub fn sys_mknodat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -1126,7 +1126,7 @@ pub fn sys_mknodat(
 }
 
 pub fn sys_linkat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     old_dir_fd: FdNumber,
     old_user_path: UserCString,
@@ -1168,7 +1168,7 @@ pub fn sys_linkat(
 }
 
 pub fn sys_unlinkat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -1192,7 +1192,7 @@ pub fn sys_unlinkat(
 }
 
 pub fn sys_renameat2(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     old_dir_fd: FdNumber,
     old_user_path: UserCString,
@@ -1243,7 +1243,7 @@ pub fn sys_renameat2(
 }
 
 pub fn sys_fchmod(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     mode: FileMode,
@@ -1257,7 +1257,7 @@ pub fn sys_fchmod(
 }
 
 pub fn sys_fchmodat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -1280,7 +1280,7 @@ fn maybe_uid(id: u32) -> Option<uid_t> {
 }
 
 pub fn sys_fchown(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     owner: u32,
@@ -1299,7 +1299,7 @@ pub fn sys_fchown(
 }
 
 pub fn sys_fchownat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -1333,7 +1333,7 @@ fn read_xattr_name(current_task: &CurrentTask, name_addr: UserCString) -> Result
 }
 
 fn do_getxattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     node: &NamespaceNode,
     name_addr: UserCString,
@@ -1356,7 +1356,7 @@ fn do_getxattr(
 }
 
 pub fn sys_getxattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     name_addr: UserCString,
@@ -1369,7 +1369,7 @@ pub fn sys_getxattr(
 }
 
 pub fn sys_fgetxattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     name_addr: UserCString,
@@ -1381,7 +1381,7 @@ pub fn sys_fgetxattr(
 }
 
 pub fn sys_lgetxattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     name_addr: UserCString,
@@ -1394,7 +1394,7 @@ pub fn sys_lgetxattr(
 }
 
 fn do_setxattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     node: &NamespaceNode,
     name_addr: UserCString,
@@ -1418,7 +1418,7 @@ fn do_setxattr(
 }
 
 pub fn sys_fsetxattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     name_addr: UserCString,
@@ -1431,7 +1431,7 @@ pub fn sys_fsetxattr(
 }
 
 pub fn sys_lsetxattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     name_addr: UserCString,
@@ -1445,7 +1445,7 @@ pub fn sys_lsetxattr(
 }
 
 pub fn sys_setxattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     name_addr: UserCString,
@@ -1459,7 +1459,7 @@ pub fn sys_setxattr(
 }
 
 fn do_removexattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     node: &NamespaceNode,
     name_addr: UserCString,
@@ -1473,7 +1473,7 @@ fn do_removexattr(
 }
 
 pub fn sys_removexattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     name_addr: UserCString,
@@ -1484,7 +1484,7 @@ pub fn sys_removexattr(
 }
 
 pub fn sys_lremovexattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     name_addr: UserCString,
@@ -1495,7 +1495,7 @@ pub fn sys_lremovexattr(
 }
 
 pub fn sys_fremovexattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     name_addr: UserCString,
@@ -1505,7 +1505,7 @@ pub fn sys_fremovexattr(
 }
 
 fn do_listxattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     node: &NamespaceNode,
     list_addr: UserAddress,
@@ -1545,7 +1545,7 @@ fn do_listxattr(
 }
 
 pub fn sys_listxattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     list_addr: UserAddress,
@@ -1557,7 +1557,7 @@ pub fn sys_listxattr(
 }
 
 pub fn sys_llistxattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     path_addr: UserCString,
     list_addr: UserAddress,
@@ -1569,7 +1569,7 @@ pub fn sys_llistxattr(
 }
 
 pub fn sys_flistxattr(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     list_addr: UserAddress,
@@ -1580,7 +1580,7 @@ pub fn sys_flistxattr(
 }
 
 pub fn sys_getcwd(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     buf: UserAddress,
     size: usize,
@@ -1605,7 +1605,7 @@ pub fn sys_getcwd(
 }
 
 pub fn sys_umask(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     umask: FileMode,
 ) -> Result<FileMode, Errno> {
@@ -1621,7 +1621,7 @@ fn get_fd_flags(flags: u32) -> FdFlags {
 }
 
 pub fn sys_pipe2(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_pipe: UserRef<FdNumber>,
     flags: u32,
@@ -1649,7 +1649,7 @@ pub fn sys_pipe2(
 }
 
 pub fn sys_ioctl(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     request: u32,
@@ -1672,7 +1672,7 @@ pub fn sys_ioctl(
 }
 
 pub fn sys_symlinkat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_target: UserCString,
     new_dir_fd: FdNumber,
@@ -1710,7 +1710,7 @@ pub fn sys_symlinkat(
 }
 
 pub fn sys_dup(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     oldfd: FdNumber,
 ) -> Result<FdNumber, Errno> {
@@ -1718,7 +1718,7 @@ pub fn sys_dup(
 }
 
 pub fn sys_dup3(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     oldfd: FdNumber,
     newfd: FdNumber,
@@ -1742,7 +1742,7 @@ pub fn sys_dup3(
 const MEMFD_NAME_MAX_LEN: usize = 250;
 
 pub fn sys_memfd_create(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_name: UserCString,
     flags: u32,
@@ -1796,7 +1796,7 @@ pub fn sys_memfd_create(
 }
 
 pub fn sys_mount(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     source_addr: UserCString,
     target_addr: UserCString,
@@ -1870,7 +1870,7 @@ fn do_mount_remount(
 }
 
 fn do_mount_bind(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     source_addr: UserCString,
     target: NamespaceNode,
@@ -1922,7 +1922,7 @@ fn do_mount_change_propagation_type(
 }
 
 fn do_mount_create(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     source_addr: UserCString,
     target: NamespaceNode,
@@ -1961,7 +1961,7 @@ fn do_mount_create(
 }
 
 pub fn sys_umount2(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     target_addr: UserCString,
     flags: u32,
@@ -1997,7 +1997,7 @@ pub fn sys_umount2(
 }
 
 pub fn sys_eventfd2(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     value: u32,
     flags: u32,
@@ -2015,7 +2015,7 @@ pub fn sys_eventfd2(
 }
 
 pub fn sys_pidfd_open(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pid: pid_t,
     flags: u32,
@@ -2041,7 +2041,7 @@ pub fn sys_pidfd_open(
 }
 
 pub fn sys_pidfd_getfd(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     pidfd: FdNumber,
     targetfd: FdNumber,
@@ -2063,7 +2063,7 @@ pub fn sys_pidfd_getfd(
 }
 
 pub fn sys_timerfd_create(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     clock_id: u32,
     flags: u32,
@@ -2104,7 +2104,7 @@ pub fn sys_timerfd_create(
 }
 
 pub fn sys_timerfd_gettime(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_current_value: ITimerSpecPtr,
@@ -2118,7 +2118,7 @@ pub fn sys_timerfd_gettime(
 }
 
 pub fn sys_timerfd_settime(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     flags: u32,
@@ -2170,7 +2170,7 @@ fn deadline_after_timespec(
 static_assertions::assert_eq_size!(uapi::__kernel_fd_set, uapi::arch32::__kernel_fd_set);
 
 fn select(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     nfds: u32,
     readfds_addr: UserRef<__kernel_fd_set>,
@@ -2289,7 +2289,7 @@ fn select(
 }
 
 pub fn sys_pselect6(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     nfds: u32,
     readfds_addr: UserRef<__kernel_fd_set>,
@@ -2327,7 +2327,7 @@ pub fn sys_pselect6(
 }
 
 pub fn sys_select(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     nfds: u32,
     readfds_addr: UserRef<__kernel_fd_set>,
@@ -2374,7 +2374,7 @@ pub fn sys_select(
 }
 
 pub fn sys_epoll_create1(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
@@ -2388,7 +2388,7 @@ pub fn sys_epoll_create1(
 }
 
 pub fn sys_epoll_ctl(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     epfd: FdNumber,
     op: u32,
@@ -2441,7 +2441,7 @@ pub fn sys_epoll_ctl(
 
 // Backend for sys_epoll_pwait and sys_epoll_pwait2 that takes an already-decoded deadline.
 fn do_epoll_pwait(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
@@ -2480,7 +2480,7 @@ fn do_epoll_pwait(
 }
 
 pub fn sys_epoll_pwait(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
@@ -2493,7 +2493,7 @@ pub fn sys_epoll_pwait(
 }
 
 pub fn sys_epoll_pwait2(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
@@ -2520,7 +2520,7 @@ impl<Key: Into<ReadyItemKey>> Default for FileWaiter<Key> {
 impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
     fn add<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         key: Key,
         file: Option<&FileHandle>,
@@ -2553,7 +2553,7 @@ impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
 
     fn wait<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &mut CurrentTask,
         signal_mask: Option<SigSet>,
         deadline: zx::MonotonicInstant,
@@ -2589,7 +2589,7 @@ impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
 }
 
 pub fn poll(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     user_pollfds: UserRef<pollfd>,
     num_fds: i32,
@@ -2646,7 +2646,7 @@ pub fn poll(
 }
 
 pub fn sys_ppoll(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     user_fds: UserRef<pollfd>,
     num_fds: i32,
@@ -2703,7 +2703,7 @@ pub fn sys_ppoll(
 }
 
 pub fn sys_flock(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     operation: u32,
@@ -2714,16 +2714,13 @@ pub fn sys_flock(
     file.flock(locked, current_task, operation)
 }
 
-pub fn sys_sync(
-    _locked: &mut Locked<'_, Unlocked>,
-    _current_task: &CurrentTask,
-) -> Result<(), Errno> {
+pub fn sys_sync(_locked: &mut Locked<Unlocked>, _current_task: &CurrentTask) -> Result<(), Errno> {
     track_stub!(TODO("https://fxbug.dev/322875826"), "sync()");
     Ok(())
 }
 
 pub fn sys_syncfs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
 ) -> Result<(), Errno> {
@@ -2733,7 +2730,7 @@ pub fn sys_syncfs(
 }
 
 pub fn sys_fsync(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
 ) -> Result<(), Errno> {
@@ -2742,7 +2739,7 @@ pub fn sys_fsync(
 }
 
 pub fn sys_fdatasync(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
 ) -> Result<(), Errno> {
@@ -2751,7 +2748,7 @@ pub fn sys_fdatasync(
 }
 
 pub fn sys_sync_file_range(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     offset: off_t,
@@ -2791,7 +2788,7 @@ pub fn sys_sync_file_range(
 }
 
 pub fn sys_fadvise64(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     offset: off_t,
@@ -2838,7 +2835,7 @@ pub fn sys_fadvise64(
 }
 
 pub fn sys_fallocate(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     mode: u32,
@@ -2861,7 +2858,7 @@ pub fn sys_fallocate(
 }
 
 pub fn sys_inotify_init1(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     flags: u32,
 ) -> Result<FdNumber, Errno> {
@@ -2876,7 +2873,7 @@ pub fn sys_inotify_init1(
 }
 
 pub fn sys_inotify_add_watch(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_path: UserCString,
@@ -2902,7 +2899,7 @@ pub fn sys_inotify_add_watch(
 }
 
 pub fn sys_inotify_rm_watch(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     watch_id: WdNumber,
@@ -2913,7 +2910,7 @@ pub fn sys_inotify_rm_watch(
 }
 
 pub fn sys_utimensat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     dir_fd: FdNumber,
     user_path: UserCString,
@@ -2968,7 +2965,7 @@ pub fn sys_utimensat(
 }
 
 pub fn sys_splice(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
     off_in: OffsetPtr,
@@ -2981,7 +2978,7 @@ pub fn sys_splice(
 }
 
 pub fn sys_vmsplice(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     iovec_addr: IOVecPtr,
@@ -2992,7 +2989,7 @@ pub fn sys_vmsplice(
 }
 
 pub fn sys_copy_file_range(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
     off_in: OffsetPtr,
@@ -3005,7 +3002,7 @@ pub fn sys_copy_file_range(
 }
 
 pub fn sys_tee(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd_in: FdNumber,
     fd_out: FdNumber,
@@ -3016,7 +3013,7 @@ pub fn sys_tee(
 }
 
 pub fn sys_readahead(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     offset: off_t,
@@ -3030,7 +3027,7 @@ pub fn sys_readahead(
 }
 
 pub fn sys_io_setup(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_nr_events: UserValue<u32>,
     user_ctx_idp: MultiArchUserRef<uapi::aio_context_t, uapi::arch32::aio_context_t>,
@@ -3059,7 +3056,7 @@ pub fn sys_io_setup(
 }
 
 pub fn sys_io_submit(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
     user_nr: UserValue<i32>,
@@ -3099,7 +3096,7 @@ pub fn sys_io_submit(
 }
 
 pub fn sys_io_getevents(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
     min_nr: i64,
@@ -3126,7 +3123,7 @@ pub fn sys_io_getevents(
 }
 
 pub fn sys_io_cancel(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
     user_iocb: IocbPtr,
@@ -3144,7 +3141,7 @@ pub fn sys_io_cancel(
 }
 
 pub fn sys_io_destroy(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     ctx_id: aio_context_t,
 ) -> Result<(), Errno> {
@@ -3155,7 +3152,7 @@ pub fn sys_io_destroy(
 }
 
 pub fn sys_io_uring_setup(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_entries: UserValue<u32>,
     user_params: UserRef<io_uring_params>,
@@ -3210,7 +3207,7 @@ pub fn sys_io_uring_setup(
 }
 
 pub fn sys_io_uring_enter(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     to_submit: u32,
@@ -3228,7 +3225,7 @@ pub fn sys_io_uring_enter(
 }
 
 pub fn sys_io_uring_register(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     opcode: u32,
@@ -3281,7 +3278,7 @@ mod arch32 {
     type StatFs64Ptr = MultiArchUserRef<uapi::statfs, uapi::arch32::statfs64>;
 
     pub fn sys_arch32_open(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_path: UserCString,
         flags: u32,
@@ -3291,7 +3288,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_access(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_path: UserCString,
         mode: u32,
@@ -3299,7 +3296,7 @@ mod arch32 {
         sys_faccessat(locked, current_task, FdNumber::AT_FDCWD, user_path, mode)
     }
     pub fn stat64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         node: &FsNode,
         arch32_stat_buf: UserRef<uapi::arch32::stat64>,
@@ -3312,7 +3309,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_fstat64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fd: FdNumber,
         arch32_stat_buf: UserRef<uapi::arch32::stat64>,
@@ -3321,7 +3318,7 @@ mod arch32 {
         stat64(locked, current_task, file.node(), arch32_stat_buf)
     }
     pub fn sys_arch32_stat64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_path: UserCString,
         arch32_stat_buf: UserRef<uapi::arch32::stat64>,
@@ -3332,7 +3329,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_readlink(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_path: UserCString,
         buffer: UserAddress,
@@ -3342,7 +3339,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_mkdir(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_path: UserCString,
         mode: FileMode,
@@ -3351,7 +3348,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_rmdir(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_path: UserCString,
     ) -> Result<(), Errno> {
@@ -3360,7 +3357,7 @@ mod arch32 {
 
     #[allow(non_snake_case)]
     pub fn sys_arch32__llseek(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fd: FdNumber,
         offset_high: u32,
@@ -3374,7 +3371,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_dup2(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         oldfd: FdNumber,
         newfd: FdNumber,
@@ -3393,7 +3390,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_unlink(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_path: UserCString,
     ) -> Result<(), Errno> {
@@ -3401,7 +3398,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_pread64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fd: FdNumber,
         address: UserAddress,
@@ -3421,7 +3418,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_pwrite64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fd: FdNumber,
         address: UserAddress,
@@ -3441,7 +3438,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_ftruncate64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fd: FdNumber,
         _: SyscallArg,
@@ -3452,7 +3449,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_chmod(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_path: UserCString,
         mode: FileMode,
@@ -3461,7 +3458,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_chown32(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_path: UserCString,
         owner: uapi::arch32::__kernel_uid32_t,
@@ -3471,7 +3468,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_poll(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &mut CurrentTask,
         user_fds: UserRef<uapi::pollfd>,
         num_fds: i32,
@@ -3482,7 +3479,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_epoll_create(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         size: i32,
     ) -> Result<FdNumber, Errno> {
@@ -3496,7 +3493,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_epoll_wait(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &mut CurrentTask,
         epfd: FdNumber,
         events: UserRef<EpollEvent>,
@@ -3515,7 +3512,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_rename(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         old_user_path: UserCString,
         new_user_path: UserCString,
@@ -3532,7 +3529,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_creat(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_path: UserCString,
         mode: FileMode,
@@ -3548,7 +3545,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_symlink(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_target: UserCString,
         user_path: UserCString,
@@ -3557,7 +3554,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_eventfd(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         value: u32,
     ) -> Result<FdNumber, Errno> {
@@ -3565,14 +3562,14 @@ mod arch32 {
     }
 
     pub fn sys_arch32_inotify_init(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
     ) -> Result<FdNumber, Errno> {
         super::sys_inotify_init1(locked, current_task, 0)
     }
 
     pub fn sys_arch32_link(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         old_user_path: UserCString,
         new_user_path: UserCString,
@@ -3589,7 +3586,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_fstatfs64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fd: FdNumber,
         user_buf_len: u32,
@@ -3602,7 +3599,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_statfs64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_path: UserCString,
         user_buf_len: u32,
@@ -3615,7 +3612,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_arm_fadvise64_64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fd: FdNumber,
         advice: u32,
@@ -3631,7 +3628,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_sendfile64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         out_fd: FdNumber,
         in_fd: FdNumber,

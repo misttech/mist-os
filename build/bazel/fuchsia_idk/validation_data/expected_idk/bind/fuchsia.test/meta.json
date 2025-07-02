@@ -4,7 +4,7 @@
   "root": "bind/fuchsia.test",
   "sources": [
     "bind/fuchsia.test/fuchsia.test.bind",
-    "@test_idk//bind/fuchsia.test:fuchsia.test.generated.bind"
+    "@@test_idk//bind/fuchsia.test:fuchsia.test.generated.bind"
   ],
   "type": "bind_library"
 }

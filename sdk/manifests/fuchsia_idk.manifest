@@ -17,6 +17,7 @@ bind_library://bind/fuchsia.focaltech.platform
 bind_library://bind/fuchsia.google.platform
 bind_library://bind/fuchsia.gpio
 bind_library://bind/fuchsia.i2c
+bind_library://bind/fuchsia.interconnect
 bind_library://bind/fuchsia.khadas.platform
 bind_library://bind/fuchsia.mailbox
 bind_library://bind/fuchsia.nxp.platform
@@ -188,6 +189,7 @@ fidl_library://fidl/fuchsia.component
 fidl_library://fidl/fuchsia.component.decl
 fidl_library://fidl/fuchsia.component.resolution
 fidl_library://fidl/fuchsia.component.runner
+fidl_library://fidl/fuchsia.component.runtime
 fidl_library://fidl/fuchsia.component.sandbox
 fidl_library://fidl/fuchsia.component.test
 fidl_library://fidl/fuchsia.data
@@ -195,6 +197,7 @@ fidl_library://fidl/fuchsia.debugdata
 fidl_library://fidl/fuchsia.developer.tiles
 fidl_library://fidl/fuchsia.device.fs
 fidl_library://fidl/fuchsia.diagnostics
+fidl_library://fidl/fuchsia.diagnostics.system
 fidl_library://fidl/fuchsia.diagnostics.types
 fidl_library://fidl/fuchsia.driver.development
 fidl_library://fidl/fuchsia.driver.framework
@@ -305,6 +308,7 @@ fidl_library://fidl/fuchsia.net.mdns
 fidl_library://fidl/fuchsia.net.reachability
 fidl_library://fidl/fuchsia.net.routes
 fidl_library://fidl/fuchsia.net.stackmigrationdeprecated
+fidl_library://fidl/fuchsia.pkg.resolution
 fidl_library://fidl/fuchsia.power
 fidl_library://fidl/fuchsia.power.broker (unstable)
 fidl_library://fidl/fuchsia.power.clientlevel

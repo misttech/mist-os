@@ -10,7 +10,7 @@ use assert_matches::assert_matches;
 use diagnostics_assertions::{assert_data_tree, tree_assertion, AnyProperty};
 use diagnostics_hierarchy::DiagnosticsHierarchy;
 use fidl_fuchsia_io as fio;
-use fidl_fuchsia_pkg::{self as fpkg, BlobInfo, NeededBlobsMarker, PackageCacheMarker};
+use fidl_fuchsia_pkg::{self as fpkg, BlobInfo, NeededBlobsMarker};
 use fidl_fuchsia_pkg_ext::BlobId;
 use fuchsia_pkg_testing::{PackageBuilder, SystemImageBuilder};
 use futures::prelude::*;
@@ -168,7 +168,7 @@ async fn package_cache_get() {
         hierarchy
     }
 
-    fn contains_missing_blob_stats(
+    async fn contains_missing_blob_stats(
         hierarchy: &DiagnosticsHierarchy,
         remaining: u64,
         open: u64,
@@ -228,7 +228,7 @@ async fn package_cache_get() {
 
     // Missing blobs requested, expect client writing content blobs.
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
-    contains_missing_blob_stats(&hierarchy, 2, 0, 0);
+    contains_missing_blob_stats(&hierarchy, 2, 0, 0).await;
 
     let mut contents = contents
         .into_iter()
@@ -244,13 +244,13 @@ async fn package_cache_get() {
 
     // Content blob open for writing.
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
-    contains_missing_blob_stats(&hierarchy, 2, 1, 0);
+    contains_missing_blob_stats(&hierarchy, 2, 1, 0).await;
     let () = compress_and_write_blob(&buf, *content_blob).await.unwrap();
     let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
 
     // Content blob written.
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
-    contains_missing_blob_stats(&hierarchy, 1, 0, 1);
+    contains_missing_blob_stats(&hierarchy, 1, 0, 1).await;
 
     let blob = missing_blobs_iter.next().unwrap();
 
@@ -260,7 +260,7 @@ async fn package_cache_get() {
 
     // Last content blob open for writing.
     let hierarchy = expect_and_return_inspect(&env, "need-content-blobs").await;
-    contains_missing_blob_stats(&hierarchy, 1, 1, 1);
+    contains_missing_blob_stats(&hierarchy, 1, 1, 1).await;
     let () = compress_and_write_blob(&buf, *content_blob).await.unwrap();
     let () = blob_written(&needed_blobs, BlobId::from(blob.blob_id).into()).await;
 
@@ -307,11 +307,11 @@ async fn package_cache_concurrent_gets() {
         .map_ok(|res| res.map_err(zx::Status::from_raw));
 
     // Initiate concurrent connection to `PackageCache`.
-    let package_cache_proxy2 = env
+    let package_cache_proxy2: fpkg::PackageCacheProxy = env
         .apps
         .realm_instance
         .root
-        .connect_to_protocol_at_exposed_dir::<PackageCacheMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect to package cache");
 
     let blob_id2 = BlobId::from(*package2.hash());

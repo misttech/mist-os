@@ -36,7 +36,7 @@ fit::result<Error, void*> DlSystemTests::DlOpen(const char* file, int mode) {
     }
     return TakeError();
   }
-  TrackModule(result, std::string{file});
+  TrackModule(result, file);
   return fit::ok(result);
 }
 

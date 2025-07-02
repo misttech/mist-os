@@ -213,7 +213,7 @@ impl DictExt for Dict {
 
         let mut segments = path.iter_segments();
         let _ = segments.next().unwrap();
-        let path = RelativePath::from(segments.map(|s| s.clone()).collect::<Vec<_>>());
+        let path = RelativePath::from(segments.collect::<Vec<_>>());
 
         Router::<T>::new(ScopedDictRouter { router, path, not_found_error: not_found_error.into() })
     }
@@ -237,7 +237,7 @@ impl DictExt for Dict {
                             Ok(None) => {
                                 let dict = Dict::new();
                                 current_dict.insert(
-                                    current_name.clone(),
+                                    current_name.into(),
                                     Capability::Dictionary(dict.clone()),
                                 )?;
                                 dict
@@ -250,7 +250,7 @@ impl DictExt for Dict {
                     current_name = next_name;
                 }
                 None => {
-                    return current_dict.insert(current_name.clone(), capability);
+                    return current_dict.insert(current_name.into(), capability);
                 }
             }
         }

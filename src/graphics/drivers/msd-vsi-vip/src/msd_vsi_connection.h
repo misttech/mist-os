@@ -114,21 +114,21 @@ class MsdVsiAbiConnection : public msd::Connection {
     return connection;
   }
 
-  magma_status_t MapBuffer(msd::Buffer& buffer, uint64_t gpu_va, uint64_t offset, uint64_t length,
-                           uint64_t flags) override;
+  magma_status_t MsdMapBuffer(msd::Buffer& buffer, uint64_t gpu_va, uint64_t offset,
+                              uint64_t length, uint64_t flags) override;
 
-  void ReleaseBuffer(msd::Buffer& buffer, bool shutting_down) override;
+  void MsdReleaseBuffer(msd::Buffer& buffer, bool shutting_down) override;
 
-  magma_status_t UnmapBuffer(msd::Buffer& buffer, uint64_t gpu_va) override;
+  magma_status_t MsdUnmapBuffer(msd::Buffer& buffer, uint64_t gpu_va) override;
 
-  magma_status_t BufferRangeOp(msd::Buffer& buffer, uint32_t options, uint64_t start_offset,
-                               uint64_t length) override {
+  magma_status_t MsdBufferRangeOp(msd::Buffer& buffer, uint32_t options, uint64_t start_offset,
+                                  uint64_t length) override {
     return MAGMA_STATUS_INVALID_ARGS;
   }
 
-  void SetNotificationCallback(msd::NotificationHandler* handler) override;
+  void MsdSetNotificationCallback(msd::NotificationHandler* handler) override;
 
-  std::unique_ptr<msd::Context> CreateContext() override;
+  std::unique_ptr<msd::Context> MsdCreateContext() override;
 
   std::shared_ptr<MsdVsiConnection> ptr() { return ptr_; }
 

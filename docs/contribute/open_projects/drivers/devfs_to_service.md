@@ -329,7 +329,7 @@ called whenever someone connects to your service. Fortunately,
 Add the binding group to your server class:
 
 ```cpp
-fidl::ServerBindingGroup<fuchsia_examples::EchoService> bindings_;
+fidl::ServerBindingGroup<fuchsia_examples::Echo> bindings_;
 ```
 
 You can then create a `ServiceInstanceHandler`.  `this` in this example points
@@ -469,7 +469,7 @@ service capability from the driver under test to the test code.
         async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
         std::vector<fuchsia_component_test::Capability> exposes = { {
             fuchsia_component_test::Capability::WithService(
-                fuchsia_component_test::Service{ {.name = "fuchsia_examples::EchoService"}}),
+                fuchsia_component_test::Service{ {.name = fuchsia_examples::EchoService::Name}}),
         }};
         driver_test_realm::AddDtrExposes(realm_builder, exposes);
         auto realm = realm_builder.Build(loop.dispatcher());
@@ -482,7 +482,7 @@ service capability from the driver under test to the test code.
         let builder = RealmBuilder::new().await?;
         builder.driver_test_realm_setup().await?;
 
-        let expose = fuchsia_component_test::Capability::service::<ft::DeviceMarker>().into();
+        let expose = fuchsia_component_test::Capability::service::<fuchsia_examples::EchoServiceMarker>().into();
         let dtr_exposes = vec![expose];
 
         builder.driver_test_realm_add_dtr_exposes(&dtr_exposes).await?;
@@ -495,9 +495,7 @@ service capability from the driver under test to the test code.
     *  {C++}
 
         ```cpp
-        auto realm_args = fuchsia_driver_test::RealmArgs();
-        realm_args.root_driver("fuchsia-boot:///dtr#meta/root_driver.cm");
-        realm_args.dtr_exposes(exposes);
+        fuchsia_driver_test::RealmArgs realm_args{ {.dtr_exposes = std::move(exposes)}};
         fidl::Result result = fidl::Call(*client)->Start(std::move(realm_args));
         ```
 
@@ -505,12 +503,8 @@ service capability from the driver under test to the test code.
 
         ```rust
         // Start the DriverTestRealm.
-        let args = fdt::RealmArgs {
-            root_driver: Some("#meta/v1_driver.cm".to_string()),
-            dtr_exposes: Some(dtr_exposes),
-            ..Default::default()
-        };
-        realm.driver_test_realm_start(args).await?;
+        let realm_args = RealmArgs { dtr_exposes: Some(dtr_exposes), ..Default::default() };
+        realm.driver_test_realm_start(realm_args).await?;
         ```
 
  3. Finally, you will need to connect to the realm's `exposed()` directory to wait for
@@ -519,11 +513,12 @@ service capability from the driver under test to the test code.
     *  {C++}
 
         ```cpp
-        fidl::UnownedClientEnd<fuchsia_io::Directory> svc = launcher.GetExposedDir();
-        component::SyncServiceMemberWatcher<fuchsia_examples::EchoService::MyDevice> watcher(
-            svc);
+        fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir{
+          realm.component().exposed().unowned_channel()->get()};
+        component::SyncServiceMemberWatcher<fuchsia_examples::EchoService::Device> watcher(
+            svc_dir);
         // Wait indefinitely until a service instance appears in the service directory
-        zx::result<fidl::ClientEnd<fuchsia_examples::Echo>> peripheral =
+        zx::result<fidl::ClientEnd<fuchsia_examples::Echo>> echo_client =
             watcher.GetNextInstance(false);
         ```
 
@@ -531,14 +526,13 @@ service capability from the driver under test to the test code.
 
         ```rust
         // Connect to the `Device` service.
-        let device = client::Service::open_from_dir(realm.root.get_exposed_dir(), ft::DeviceMarker)
+        let device = client::Service::open_from_dir(realm.root.get_exposed_dir(), fuchsia_examples::EchoServiceMarker)
             .context("Failed to open service")?
             .watch_for_any()
             .await
-            .context("Failed to find instance")?;
-        // Use the `ControlPlane` protocol from the `Device` service.
-        let control = device.connect_to_control()?;
-        control.control_do().await?;
+            .context("Failed to find instance")?
+            .connect_to_device()
+            .context("Failed to connect to device protocol")?;
         ```
 
 Examples: The code in this section is from the following CLs:

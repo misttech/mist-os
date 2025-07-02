@@ -12,6 +12,8 @@
 #include <zircon/syscalls/object.h>
 #include <zircon/time.h>
 
+#include <cstddef>
+
 #include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
@@ -83,7 +85,8 @@ void StartOperationWhenResumedThenSuspend(
     return;
   }
 
-  EXPECT_FALSE(op->Start());
+  EXPECT_TRUE(op->Start());
+  EXPECT_TRUE(op->GetWakeLeaseCopy().is_error());
   async::PostTask(server_loop.dispatcher(), [sag]() { sag->SendSuspend(); });
   DoOperationAfterSuspend(op, client_loop, do_after_suspended);
 }
@@ -194,7 +197,7 @@ TEST_F(WakeLeaseTest, TestManualWakeLeaseWhenResumed) {
               return;
             }
 
-            EXPECT_FALSE(op->Start());
+            EXPECT_FALSE(op->GetWakeLeaseCopy().is_ok());
             loop.Quit();
           };
 
@@ -221,7 +224,8 @@ TEST_F(WakeLeaseTest, TestManualWakeLeaseStartAndEndAfterResumeIsObserved) {
             }
 
             // Since the system is resumed we expect no lease to be taken
-            EXPECT_FALSE(op->Start());
+            EXPECT_TRUE(op->Start());
+            EXPECT_TRUE(op->GetWakeLeaseCopy().is_error());
             // Since the system was resumed teh whole time, there should be no
             // lease to return when the operation ends.
             EXPECT_TRUE(op->End().is_error());
@@ -241,7 +245,9 @@ TEST_F(WakeLeaseTest, TestManualWakeLeaseWhenSuspended) {
                      const std::shared_ptr<SystemActivityGovernor>& sag, async::Loop& sag_loop) {
         EXPECT_TRUE(op->IsSuspended());
         EXPECT_TRUE(op->Start());
-        EXPECT_FALSE(op->Start());
+        EXPECT_TRUE(op->GetWakeLeaseCopy()->is_valid());
+        EXPECT_TRUE(op->Start());
+        EXPECT_TRUE(op->GetWakeLeaseCopy()->is_valid());
         loop.Quit();
       };
   DoWakeLeaseTest<fdf_power::ManualWakeLease>(
@@ -620,13 +626,28 @@ TEST_F(WakeLeaseTest, TestWakeLeaseTimeouts) {
   EXPECT_GE(next_timeout, (before + timeout).get());
   EXPECT_LE(next_timeout, (after + timeout).get());
 
+  // Check that the lease handle zircon object does not change. Since we
+  // have a lease handle, we expect that calling HandleInterrupt won't obtain
+  // a new one.
+  auto lease_handle = test_lease.GetWakeLeaseCopy();
+  EXPECT_FALSE(lease_handle.is_error());
+  zx_info_handle_basic_t handle_info;
+  EXPECT_EQ(ZX_OK, lease_handle.value().get_info(ZX_INFO_HANDLE_BASIC, &handle_info,
+                                                 sizeof(handle_info), nullptr, nullptr));
+  zx_koid_t koid = handle_info.koid;
   // Since the wake lease has never heard anything about whether the system is
   // suspended or resumed, it assumes we're suspended, tell it we're resumed
   test_lease.SetSuspended(false);
 
   // Now tell it we need to keep the system awake until a given time
   before = zx::clock::get_monotonic();
-  EXPECT_FALSE(test_lease.HandleInterrupt(timeout));
+  EXPECT_TRUE(test_lease.HandleInterrupt(timeout));
+
+  lease_handle = test_lease.GetWakeLeaseCopy();
+  EXPECT_FALSE(lease_handle.is_error());
+  EXPECT_EQ(ZX_OK, lease_handle.value().get_info(ZX_INFO_HANDLE_BASIC, &handle_info,
+                                                 sizeof(handle_info), nullptr, nullptr));
+  EXPECT_EQ(handle_info.koid, koid);
   // Add a little slack here because we get some small delays later on
   // since the implementation translates from an absolute time to an offset
   // and then posts the task at that offset a bit after calculating it. Local

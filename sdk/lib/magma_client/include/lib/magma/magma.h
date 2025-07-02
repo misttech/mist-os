@@ -61,6 +61,29 @@ MAGMA_EXPORT void magma_device_release(
     magma_device_t device);
 
 ///
+/// \brief Returns information describing the magma devices that are available.  Returns:
+///        MAGMA_STATUS_MEMORY_ERROR if |device_count_inout| is insufficient;
+///        MAGMA_STATUS_INVALID_ARGS if |device_path_size| is insufficient.
+/// \param device_namespace Namespace corresponding to the |device_directory_channel|; this should
+///        be MAGMA_DEVICE_NAMESPACE.  Used only on Fuchsia.
+/// \param device_directory_channel Channel used for reading devices from |device_namespace|.  Used
+///        only on Fuchsia.
+/// \param device_count_inout The number of array elements in |device_paths_out|. On success, will
+///        be set to the number of elements written.
+/// \param device_path_size Size of each entry in |device_paths_out|.  PATH_MAX should be
+///        sufficient.
+/// \param device_paths_out Pointer to storage for magma device paths.  The buffer's size in bytes
+///        should be |*device_count_inout| * |device_path_size|.
+///
+MAGMA_EXPORT magma_status_t magma_enumerate_devices(
+    const char* device_namespace,
+    magma_handle_t device_directory_channel,
+    uint32_t* device_count_inout,
+    uint32_t device_path_size,
+    char* device_paths_out)
+MAGMA_AVAILABLE_SINCE(NEXT);
+
+///
 /// \brief Performs a query synchronously. On MAGMA_STATUS_OK, a given query |id| will return either
 ///        a buffer in |result_buffer_out|, or a value in |result_out|. A NULL pointer may be
 ///        provided for whichever result parameter is not needed.

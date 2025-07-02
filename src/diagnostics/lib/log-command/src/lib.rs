@@ -4,7 +4,7 @@
 
 use anyhow::format_err;
 use argh::{ArgsInfo, FromArgs, TopLevelCommand};
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Local, Utc};
 use chrono_english::{parse_date_string, Dialect};
 use component_debug::query::get_instances_from_query;
 use diagnostics_data::Severity;
@@ -78,6 +78,13 @@ pub struct DumpCommand {}
 pub fn parse_time(value: &str) -> Result<DetailedDateTime, String> {
     parse_date_string(value, Local::now(), Dialect::Us)
         .map(|time| DetailedDateTime { time, is_now: value == "now" })
+        .map_err(|e| format!("invalid date string: {e}"))
+}
+
+/// Parses a time string that defaults to UTC. The time returned will be in the local time zone.
+pub fn parse_utc_time(value: &str) -> Result<DetailedDateTime, String> {
+    parse_date_string(value, Utc::now(), Dialect::Us)
+        .map(|time| DetailedDateTime { time: time.into(), is_now: value == "now" })
         .map_err(|e| format!("invalid date string: {e}"))
 }
 
@@ -332,6 +339,11 @@ pub struct LogCommand {
     #[cfg(target_os = "fuchsia")]
     #[argh(switch)]
     pub json: bool,
+
+    /// disable automatic reconnect
+    #[cfg(not(target_os = "fuchsia"))]
+    #[argh(switch)]
+    pub disable_reconnect: bool,
 }
 
 impl Default for LogCommand {
@@ -363,6 +375,8 @@ impl Default for LogCommand {
             tid: None,
             #[cfg(target_os = "fuchsia")]
             json: false,
+            #[cfg(not(target_os = "fuchsia"))]
+            disable_reconnect: false,
             #[cfg(not(target_os = "fuchsia"))]
             symbolize: SymbolizeMode::Pretty,
         }

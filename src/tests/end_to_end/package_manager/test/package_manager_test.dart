@@ -431,5 +431,41 @@ void main() {
           originalRewriteRuleJson,
           0);
     });
+    test('Test that we can serve packages through a forwarding tunnel',
+        () async {
+      String repoUrl = 'fuchsia-pkg://$repoName';
+      final noInitialHashOutput = (await repoServer.pkgctlGethash(
+              'Checking if the package initially doesn\'t exist',
+              '$repoUrl/$testPackageName',
+              1))
+          .stdout
+          .toString();
+      log.info('noInitialHashOutput: $noInitialHashOutput');
+
+      await repoServer.setupServe(
+          '$testPackageName-0.far', manifestPath, repoName,
+          bindLoopback: true);
+      final optionalPort = repoServer.getServePort();
+      expect(optionalPort.isPresent, isTrue);
+      final port = optionalPort.value;
+
+      // Confirm our serve is serving what we expect.
+      log.info('Getting the available packages');
+      final curlResponse = await Process.run(
+          'curl', ['http://localhost:$port/$repoName/targets.json', '-i']);
+
+      log.info('curl response: ${curlResponse.stdout.toString()}');
+      expect(curlResponse.exitCode, 0);
+      final curlOutput = curlResponse.stdout.toString();
+      expect(curlOutput.contains('$testPackageName/0'), isTrue);
+
+      final gethashOutput = (await repoServer.pkgctlGethash(
+              'Checking if the package now exists',
+              '$repoUrl/$testPackageName',
+              0))
+          .stdout
+          .toString();
+      log.info('gethashOutput: $gethashOutput');
+    });
   }, timeout: _timeout);
 }

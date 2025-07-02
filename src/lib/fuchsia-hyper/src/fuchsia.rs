@@ -110,6 +110,7 @@ impl HyperConnector {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/421409340)
 #[derive(Clone)]
 pub struct Executor;
 
@@ -119,6 +120,7 @@ impl<F: Future + Send + 'static> hyper::rt::Executor<F> for Executor {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/421409340)
 #[derive(Clone)]
 pub struct LocalExecutor;
 

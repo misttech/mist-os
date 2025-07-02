@@ -11,7 +11,8 @@ type Domain = table {
     1: id uint32;
 };
 
-/// Passed to the power core driver in metadata as DEVICE_METADATA_POWER_DOMAINS.
+/// Passed to the power core driver in metadata.
+@serializable
 type DomainMetadata = table {
     /// List of power domains to be managed by this power driver.
     1: domains vector<Domain>:MAX;

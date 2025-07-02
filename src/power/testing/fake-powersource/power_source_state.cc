@@ -4,12 +4,10 @@
 
 #include "power_source_state.h"
 
-#include <lib/driver/logging/cpp/structured_logger.h>
-
 namespace fake_powersource {
 
 PowerSourceState::PowerSourceState(fuchsia_hardware_powersource::SourceInfo info)
-    : source_info_(info) {}
+    : source_info_(std::move(info)) {}
 
 void PowerSourceState::NotifyObservers() {
   // Make a copy of the observers so each observer can remove themselves after notify.

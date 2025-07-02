@@ -165,27 +165,32 @@ void CpuRenderer::SetColorConversionValues(const fidl::Array<float, 9>& coeffici
 void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
                          const std::vector<ImageRect>& rectangles,
                          const std::vector<allocation::ImageMetadata>& images,
-                         const std::vector<zx::event>& release_fences = {},
-                         bool apply_color_conversion = false) {
+                         const RenderArgs& render_args) {
   TRACE_DURATION("gfx", "CpuRenderer::Render");
   std::scoped_lock lock(lock_);
   FX_CHECK(images.size() == rectangles.size());
   for (uint32_t i = 0; i < images.size(); i++) {
-    // TODO(b/304596608): Currently this solution is not feature complete:
-    //   * We let multiple images overwrite each other.
-    //   * Origin is ignored.
-    //   * Mapping to the target rectangle is ignored.
-    // Fix these use cases.
     auto image = images[i];
-    auto image_id = image.identifier;
+    const auto image_id = image.identifier;
 
-    ImageRect rectangle = rectangles[i];
-    uint32_t rectangle_width = static_cast<uint32_t>(rectangle.extent.x);
-    uint32_t rectangle_height = static_cast<uint32_t>(rectangle.extent.y);
+    const ImageRect rectangle = rectangles[i];
+    const uint32_t rectangle_width = static_cast<uint32_t>(rectangle.extent.x);
+    const uint32_t rectangle_height = static_cast<uint32_t>(rectangle.extent.y);
+
+    const uint32_t rectangle_origin_x = static_cast<uint32_t>(rectangle.origin.x);
+    const uint32_t rectangle_origin_y = static_cast<uint32_t>(rectangle.origin.y);
+    // TODO(https://fxbug.dev/406902418): image contents are currently copied at the render target
+    // origin, ignoring the output rectangle origin.
+    if (rectangle_origin_x != 0 || rectangle_origin_y != 0) {
+      // TODO(https://fxbug.dev/422817637): This should be WARNING not DEBUG, but log-spam.
+      FX_LOGS(DEBUG) << "CpuRenderer::Render() non-zero rectangle origin is not supported: "
+                     << rectangle_origin_x << ", " << rectangle_origin_y;
+    }
 
     constexpr uint64_t kBytesPerPixel = 4;
 
     // |allocation::kInvalidImageId| indicates solid fill color. Create and fill vmo for common ops.
+    // TODO(https://fxbug.dev/406903965): this is inefficient.
     if (image_id == allocation::kInvalidImageId) {
       image.width = rectangle_width;
       image.height = rectangle_height;
@@ -205,6 +210,14 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
                      });
       image_map_[allocation::kInvalidImageId] =
           std::make_pair(std::move(solid_fill_vmo), std::move(constraints));
+    }
+
+    // TODO(https://fxbug.dev/406902798): only 1x image scaling is properly supported.
+    if (image.width != rectangle_width || image.height != rectangle_height) {
+      // TODO(https://fxbug.dev/422817637): This should be WARNING not DEBUG, but log-spam.
+      FX_LOGS(DEBUG) << "CpuRenderer::Render() image size does not match rectangle size: "
+                     << image.width << "x" << image.height << " != " << rectangle_width << "x"
+                     << rectangle_height;
     }
 
     const auto& image_map_itr_ = image_map_.find(image_id);
@@ -289,7 +302,7 @@ void CpuRenderer::Render(const allocation::ImageMetadata& render_target,
   }
 
   // Fire all of the release fences.
-  for (auto& fence : release_fences) {
+  for (auto& fence : render_args.release_fences) {
     fence.signal(0, ZX_EVENT_SIGNALED);
   }
 }

@@ -35,6 +35,8 @@ pub enum PhyManagerError {
     PhyQueryFailure,
     #[error("failed to set country for new PHY")]
     PhySetCountryFailure,
+    #[error("unable to reset PHY")]
+    PhyResetFailure,
     #[error("unable to query iface information")]
     IfaceQueryFailure,
     #[error("unable to create iface")]
@@ -819,10 +821,26 @@ impl PhyManagerApi for PhyManager {
                     );
                 }
                 RecoveryAction::PhyRecovery(PhyRecoveryOperation::ResetPhy { phy_id }) => {
-                    warn!(
-                        "PHY reset has been requested for PHY {} but is not currently possible.",
-                        phy_id
-                    );
+                    for recorded_phy_id in self.phys.keys() {
+                        if phy_id == *recorded_phy_id {
+                            if let Err(e) = reset_phy(&self.device_monitor, phy_id).await {
+                                warn!("Resetting PHY {} failed: {:?}", phy_id, e);
+                            }
+
+                            // The phy reset may clear its country code. Re-set it now if we have one.
+                            if let Some(country_code) = self.saved_country_code {
+                                info!("Setting country code after phy reset");
+                                if let Err(e) =
+                                    set_phy_country_code(&self.device_monitor, phy_id, country_code)
+                                        .await
+                                {
+                                    warn!("Proceeding with default country code because we failed to set the cached one: {}", e);
+                                }
+                            };
+
+                            return;
+                        }
+                    }
                 }
                 RecoveryAction::IfaceRecovery(IfaceRecoveryOperation::Disconnect { iface_id }) => {
                     if let Err(e) = disconnect(&self.device_monitor, iface_id).await {
@@ -849,13 +867,14 @@ async fn destroy_iface(
     let (destroy_iface_response, metric) = match proxy.destroy_iface(&request).await {
         Ok(status) => match status {
             zx::sys::ZX_OK => (Ok(()), Some(Ok(()))),
-            ref e => {
-                let metric = match *e {
-                    zx::sys::ZX_ERR_NOT_FOUND => None,
-                    _ => Some(Err(())),
-                };
+            zx::sys::ZX_ERR_NOT_FOUND => {
+                info!("Interface not found, assuming it is already destroyed");
+                // Don't return a metric here, we neither succeeded nor failed to destroy
+                (Ok(()), None)
+            }
+            e => {
                 warn!("failed to destroy iface {}: {}", iface_id, e);
-                (Err(PhyManagerError::IfaceDestroyFailure), metric)
+                (Err(PhyManagerError::IfaceDestroyFailure), Some(Err(())))
             }
         },
         Err(e) => {
@@ -869,6 +888,21 @@ async fn destroy_iface(
     }
 
     destroy_iface_response
+}
+
+async fn reset_phy(
+    proxy: &fidl_service::DeviceMonitorProxy,
+    phy_id: u16,
+) -> Result<(), PhyManagerError> {
+    let result = proxy.reset(phy_id).await.map_err(|e| {
+        warn!("Request to reset PHY {} failed: {:?}", phy_id, e);
+        PhyManagerError::InternalError
+    })?;
+
+    result.map_err(|e| {
+        warn!("Failed to reset PHY {}: {:?}", phy_id, e);
+        PhyManagerError::PhyResetFailure
+    })
 }
 
 async fn set_phy_country_code(
@@ -3594,10 +3628,7 @@ mod tests {
         send_destroy_iface_response(&mut exec, &mut test_values.monitor_stream, ZX_ERR_NOT_FOUND);
 
         // The future should complete.
-        assert_variant!(
-            exec.run_until_stalled(&mut fut),
-            Poll::Ready(Err(PhyManagerError::IfaceDestroyFailure))
-        );
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
 
         // Verify that no metric has been logged.
         assert_variant!(test_values.telemetry_receiver.try_next(), Err(_))
@@ -4033,6 +4064,7 @@ mod tests {
         Defect::Iface(IfaceFailure::CanceledScan { iface_id: 456 }) ;
         "recommend canceled scan recovery"
     )]
+    #[fuchsia::test(add_test_attr = false)]
     fn log_defect_for_destroyed_iface(defect: Defect) {
         let _exec = TestExecutor::new();
         let test_values = test_setup();
@@ -4057,6 +4089,74 @@ mod tests {
         // Record the defect.
         phy_manager.record_defect(defect);
         assert_eq!(phy_manager.phys[&fake_phy_id].defects.events.len(), 1);
+    }
+
+    #[fuchsia::test]
+    fn test_reset_request_fails() {
+        let mut exec = TestExecutor::new();
+        let test_values = test_setup();
+
+        // Drop the DeviceMonitor request stream so that the request fails.
+        drop(test_values.monitor_stream);
+
+        // Make the reset request and observe that it fails.
+        let fut = reset_phy(&test_values.monitor_proxy, 0);
+        let mut fut = pin!(fut);
+        assert_variant!(
+            exec.run_until_stalled(&mut fut),
+            Poll::Ready(Err(PhyManagerError::InternalError))
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_reset_fails() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+
+        // Make the reset request.
+        let fut = reset_phy(&test_values.monitor_proxy, 0);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Send back a failure.
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+            Poll::Ready(Some(Ok(
+                fidl_service::DeviceMonitorRequest::Reset { phy_id: 0, responder }
+            ))) => {
+                responder.send(Err(ZX_ERR_NOT_FOUND)).expect("sending fake reset response");
+            }
+        );
+
+        // Ensure that the failure is returned to the caller.
+        assert_variant!(
+            exec.run_until_stalled(&mut fut),
+            Poll::Ready(Err(PhyManagerError::PhyResetFailure))
+        );
+    }
+
+    #[fuchsia::test]
+    fn test_reset_succeeds() {
+        let mut exec = TestExecutor::new();
+        let mut test_values = test_setup();
+
+        // Make the reset request.
+        let fut = reset_phy(&test_values.monitor_proxy, 0);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Send back a success.
+        assert_variant!(
+            exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+            Poll::Ready(Some(Ok(
+                fidl_service::DeviceMonitorRequest::Reset { phy_id: 0, responder }
+            ))) => {
+                responder.send(Ok(())).expect("sending fake reset response");
+            }
+        );
+
+        // Ensure that the success is returned to the caller.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(Ok(())));
     }
 
     #[fuchsia::test]
@@ -4459,8 +4559,10 @@ mod tests {
         assert!(phy_manager.phys[&0].destroyed_ifaces.contains(&2));
     }
 
-    #[fuchsia::test]
-    fn test_perform_recovery_reset_does_nothing() {
+    #[test_case(Some([4, 2]); "Cached country code")]
+    #[test_case(None; "No cached country code")]
+    #[fuchsia::test(add_test_attr = false)]
+    fn test_perform_recovery_reset_requests_phy_reset(cached_country_code: Option<[u8; 2]>) {
         let mut exec = TestExecutor::new();
         let mut test_values = test_setup();
         let mut phy_manager = phy_manager_for_recovery_test(
@@ -4469,6 +4571,9 @@ mod tests {
             test_values.telemetry_sender,
             test_values.recovery_sender,
         );
+
+        // Set a country code in the phy manager
+        phy_manager.saved_country_code = cached_country_code;
 
         // Suggest a recovery action to reset the PHY.
         let summary = recovery::RecoverySummary {
@@ -4480,15 +4585,47 @@ mod tests {
 
         let fut = phy_manager.perform_recovery(summary);
         let mut fut = pin!(fut);
-
-        // The future should complete immediately.
-        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
         // Verify that the Reset request was made and respond with a success.
         assert_variant!(
             exec.run_until_stalled(&mut test_values.monitor_stream.next()),
-            Poll::Pending,
+            Poll::Ready(Some(Ok(
+                fidl_service::DeviceMonitorRequest::Reset {
+                    phy_id: 0,
+                    responder,
+                }
+            ))) => {
+                responder
+                    .send(Ok(()))
+                    .expect("failed to send reset response.");
+            }
         );
+
+        // Check that we set the country code if we had a cached country code
+        if let Some(cached_cc) = cached_country_code {
+            assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+            assert_variant!(
+                exec.run_until_stalled(&mut test_values.monitor_stream.next()),
+                Poll::Ready(Some(Ok(
+                    fidl_service::DeviceMonitorRequest::SetCountry {
+                        req: fidl_service::SetCountryRequest {
+                            phy_id: 0,
+                            alpha2: cc_in_req,
+                        },
+                        responder,
+                    }
+                ))) => {
+                    assert_eq!(cc_in_req, cached_cc);
+                    responder
+                        .send(zx::sys::ZX_OK)
+                        .expect("failed to send setCountry response.");
+                }
+            );
+        }
+
+        // The future should complete now.
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
     }
 
     #[fuchsia::test]

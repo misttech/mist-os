@@ -7,7 +7,7 @@
 # It is important to limit what is loaded in this file as any loads will need
 # to be loaded whenever the flag is used.
 
-load("@bazel_skylib//rules:common_settings.bzl", "bool_flag")
+load("@bazel_skylib//rules:common_settings.bzl", "bool_flag", "string_flag")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -20,4 +20,13 @@ package(default_visibility = ["//visibility:public"])
 bool_flag(
     name = "fuchsia_targets_enabled",
     build_setting_default = True,
+)
+
+# Set --@rules_fuchsia//fuchsia:fuchsia_release_repository=<your repository name>
+# to note the origin of your assembly artifacts. This value (in conjunction
+# with some other details) will be used in fuchsia infra, MOS and CIPD to
+# uniquely describe assembly artifacts released from your repository.
+string_flag(
+    name = "fuchsia_release_repository",
+    build_setting_default = "",
 )

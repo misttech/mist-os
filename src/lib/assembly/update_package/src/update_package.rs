@@ -519,6 +519,8 @@ mod tests {
         builder.add_slot_images(Slot::Primary(AssembledSystem {
             images: vec![Image::ZBI { path: fake_zbi.to_path_buf(), signed: true }],
             board_name: "my_board".into(),
+            partitions_config: None,
+            system_release_info: None,
         }));
 
         builder.set_repository(RepositoryUrl::parse_host("test.com".to_string()).unwrap());
@@ -664,6 +666,8 @@ mod tests {
                 Image::Dtbo(fake_dtbo.to_path_buf()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
+            system_release_info: None,
         }));
 
         // Add a Recovery ZBI/VBMeta to the update.
@@ -679,6 +683,8 @@ mod tests {
                 Image::VBMeta(fake_recovery_vbmeta.to_path_buf()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
+            system_release_info: None,
         }));
 
         // Build and ensure the output is correct.
@@ -874,6 +880,8 @@ mod tests {
                 Image::VBMeta(fake_recovery_vbmeta.to_path_buf()),
             ],
             board_name: "my_board".into(),
+            partitions_config: None,
+            system_release_info: None,
         }));
 
         let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));

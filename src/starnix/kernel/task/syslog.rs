@@ -101,7 +101,7 @@ impl GrantedSyslog<'_> {
 
     pub fn blocking_read(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         out: &mut dyn OutputBuffer,
     ) -> Result<i32, Errno> {

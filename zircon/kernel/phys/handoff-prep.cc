@@ -89,7 +89,11 @@ constexpr ktl::string_view VmoNameString(const PhysVmo::Name& name) {
 
 }  // namespace
 
-void HandoffPrep::Init() {
+HandoffPrep::HandoffPrep(ElfImage kernel)
+    : kernel_(ktl::move(kernel)),
+      temporary_data_allocator_(VirtualAddressAllocator::TemporaryHandoffDataAllocator(kernel_)),
+      permanent_data_allocator_(VirtualAddressAllocator::PermanentHandoffDataAllocator(kernel_)),
+      first_class_mapping_allocator_(VirtualAddressAllocator::FirstClassMappingAllocator(kernel_)) {
   PhysHandoffTemporaryPtr<const PhysHandoff> handoff;
   fbl::AllocChecker ac;
   handoff_ = New(handoff, ac);
@@ -135,6 +139,27 @@ void HandoffPrep::FinishVmObjects() {
                 "Too many phys VMOs in hand-off! %zu > max %zu", extra_vmos_.size(),
                 PhysVmo::kMaxExtraHandoffPhysVmos);
 
+  auto populate_vmar = [this](PhysVmar* vmar, ktl::string_view name,
+                              HandoffMappingList mapping_list) {
+    vmar->set_name(name);
+    ktl::span mappings = NewFromList(vmar->mappings, ktl::move(mapping_list));
+    ZX_DEBUG_ASSERT(!mappings.empty());
+    vmar->base = mappings.front().vaddr;
+    uintptr_t vmar_end = mappings.back().vaddr_end();
+    vmar->size = vmar_end - vmar->base;
+  };
+
+  fbl::AllocChecker ac;
+  PhysVmar* temporary_vmar = New(handoff()->temporary_vmar, ac);
+  ZX_ASSERT(ac.check());
+  populate_vmar(temporary_vmar, "temporary hand-off data",
+                temporary_data_allocator_.allocate_function().memory().TakeMappings());
+
+  PhysVmar permanent_data_vmar;
+  populate_vmar(&permanent_data_vmar, "permanent hand-off data",
+                permanent_data_allocator_.allocate_function().memory().TakeMappings());
+  vmars_.push_front(HandoffVmar::New(ktl::move(permanent_data_vmar)));
+
   NewFromList(handoff()->vmars, ktl::move(vmars_));
   NewFromList(handoff()->extra_vmos, ktl::move(extra_vmos_));
 }
@@ -160,6 +185,7 @@ void HandoffPrep::SetMemory() {
       case memalloc::Type::kKernel:
       case memalloc::Type::kKernelPageTables:
       case memalloc::Type::kPhysDebugdata:
+      case memalloc::Type::kPermanentPhysHandoff:
       case memalloc::Type::kPeripheral:
       case memalloc::Type::kPhysLog:
       case memalloc::Type::kReservedLow:
@@ -372,6 +398,7 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
         mappings = mappings.subspan(1);
         mapping = PhysMapping{
             "",
+            PhysMapping::Type::kNormal,
             segment.vaddr() + load_bias,
             segment.memsz(),
             segment.filesz() == 0 ? PhysElfImage::kZeroFill : segment.offset(),
@@ -384,8 +411,7 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
   return handoff_elf;
 }
 
-[[noreturn]] void HandoffPrep::DoHandoff(const ElfImage& kernel, UartDriver& uart,
-                                         ktl::span<ktl::byte> zbi,
+[[noreturn]] void HandoffPrep::DoHandoff(UartDriver& uart, ktl::span<ktl::byte> zbi,
                                          const KernelStorage::Bootfs& kernel_package,
                                          const ArchPatchInfo& patch_info) {
   // Hand off the boot options first, which don't really change.  But keep a
@@ -414,8 +440,8 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
   // hand-off.
   handoff()->times = gBootTimes;
 
-  handoff()->kernel_physical_load_address = kernel.physical_load_address();
-  ConstructKernelAddressSpace(kernel);
+  handoff()->kernel_physical_load_address = kernel_.physical_load_address();
+  ConstructKernelAddressSpace(uart);
 
   // Finalize the published VMOs (e.g., the log published just above), VMARs,
   // and mappings.
@@ -429,7 +455,7 @@ PhysElfImage HandoffPrep::MakePhysElfImage(KernelStorage::Bootfs::iterator file,
   handoff()->uart = ktl::move(uart).TakeUart();
 
   debugf("%s: Handing off at physical load address %#" PRIxPTR ", entry %#" PRIx64 "...\n",
-         gSymbolize->name(), kernel.physical_load_address(), kernel.entry());
-  kernel.Handoff<void(PhysHandoff*)>(handoff());
+         gSymbolize->name(), kernel_.physical_load_address(), kernel_.entry());
+  kernel_.Handoff<void(PhysHandoff*)>(handoff());
   ZX_PANIC("ElfImage::Handoff returned!");
 }

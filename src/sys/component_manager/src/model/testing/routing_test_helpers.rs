@@ -31,8 +31,8 @@ use fidl::{self};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::channel::oneshot;
 use futures::prelude::*;
-use hooks::{EventType, HooksRegistration};
-use moniker::{ChildName, Moniker};
+use hooks::HooksRegistration;
+use moniker::Moniker;
 use router_error::Explain;
 use sandbox::{Capability, Message, RouterResponse};
 use std::collections::{HashMap, HashSet};
@@ -49,6 +49,9 @@ use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
     fuchsia_inspect as inspect,
 };
+
+#[cfg(feature = "src_model_tests")]
+use moniker::ChildName;
 
 // TODO(https://fxbug.dev/42140194): remove type aliases once the routing_test_helpers lib has a stable
 // API.
@@ -112,6 +115,7 @@ impl RoutingTestBuilder {
     /// Add a configuration file at a given `path`.
     /// This will be added to the resolver for the created test and given to
     /// a component that requests this file.
+    #[cfg(feature = "src_model_tests")]
     pub fn add_config(mut self, path: &str, values: ConfigValuesData) -> Self {
         self.configs.push((path.to_string(), values));
         self
@@ -134,12 +138,14 @@ impl RoutingTestBuilder {
 
     /// Add the given runner as a "builtin runner", registered in the root's environment
     /// under the given name.
+    #[cfg(not(feature = "src_model_tests"))]
     pub fn add_builtin_runner(mut self, name: &str, runner: Arc<dyn BuiltinRunnerFactory>) -> Self {
         self.builtin_runners.insert(name.parse().unwrap(), runner);
         self
     }
 
     /// Request a custom outgoing directory host function.
+    #[cfg(not(feature = "src_model_tests"))]
     pub fn set_component_outgoing_host_fn(mut self, component: &str, function: HostFn) -> Self {
         self.custom_outgoing_host_fns.insert(component.to_string(), function);
         self
@@ -157,6 +163,7 @@ impl RoutingTestBuilder {
         self
     }
 
+    #[cfg(feature = "src_model_tests")]
     pub fn set_reboot_on_terminate_policy(mut self, allowlist: Vec<AllowlistEntry>) -> Self {
         self.child_policy.reboot_on_terminate = allowlist;
         self
@@ -175,6 +182,7 @@ impl RoutingTestBuilder {
 
     /// Set a custom execution scope on components. This is useful for tests that wish
     /// to directly control the execution of scoped tasks.
+    #[cfg(feature = "src_model_tests")]
     pub fn set_scope_factory(
         mut self,
         f: impl Fn() -> ExecutionScope + Send + Sync + 'static,
@@ -240,6 +248,7 @@ impl RoutingTestModelBuilder for RoutingTestBuilder {
 pub struct RoutingTest {
     components: Vec<(&'static str, ComponentDecl)>,
     pub model: Arc<Model>,
+    #[allow(unused)]
     pub builtin_environment: BuiltinEnvironment,
     pub mock_runner: Arc<MockRunner>,
     test_dir: TempDir,
@@ -425,6 +434,7 @@ impl RoutingTest {
 
     /// Deletes a dynamic child `child_decl` in `moniker`'s `collection`, waiting for destruction
     /// to complete.
+    #[cfg(feature = "src_model_tests")]
     pub async fn destroy_dynamic_child<'a>(
         &'a self,
         moniker: Moniker,
@@ -441,6 +451,7 @@ impl RoutingTest {
         component.remove_dynamic_child(&child_moniker).await.expect("failed to remove child");
     }
 
+    #[cfg(feature = "src_model_tests")]
     pub async fn bind_and_get_namespace(&self, moniker: Moniker) -> Arc<ManagedNamespace> {
         let component_name = self.start_instance_and_wait_start(&moniker).await.unwrap();
         let component_resolved_url = Self::resolved_url(&component_name);
@@ -633,7 +644,7 @@ impl RoutingTest {
         reason: StartReason,
         wait_for_start: bool,
     ) -> Result<(Arc<ComponentInstance>, String), ModelError> {
-        let component_name = match moniker.path().last() {
+        let component_name = match moniker.leaf() {
             Some(part) => part.name().to_string(),
             None => self.root_component_name.to_string(),
         };
@@ -660,7 +671,11 @@ impl RoutingTest {
     }
 
     /// Create a new event stream for the test components.
-    pub async fn new_event_stream(&self, events: Vec<EventType>) -> fcomponent::EventStreamProxy {
+    #[cfg(not(feature = "src_model_tests"))]
+    pub async fn new_event_stream(
+        &self,
+        events: Vec<hooks::EventType>,
+    ) -> fcomponent::EventStreamProxy {
         new_event_stream(&self.builtin_environment, events).await
     }
 }
@@ -1459,7 +1474,7 @@ pub mod capability_util {
             .sandbox
             .component_output
             .framework()
-            .get(&capability_name)
+            .get(capability_name)
             .expect(
                 "component is missing capability in sandbox, does the expose to framework exist?",
             )

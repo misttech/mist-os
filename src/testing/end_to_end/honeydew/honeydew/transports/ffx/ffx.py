@@ -122,6 +122,7 @@ class FFX(abc.ABC):
         timeout: float | None = None,
         capture_output: bool = True,
         log_output: bool = True,
+        include_target: bool = True,
     ) -> str:
         """Runs an FFX command.
 

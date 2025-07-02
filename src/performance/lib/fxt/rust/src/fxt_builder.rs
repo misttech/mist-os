@@ -4,7 +4,7 @@
 use thiserror::Error;
 
 #[derive(Clone)]
-pub(crate) struct FxtBuilder<H> {
+pub struct FxtBuilder<H> {
     header: H,
     buf: Vec<u8>,
 }

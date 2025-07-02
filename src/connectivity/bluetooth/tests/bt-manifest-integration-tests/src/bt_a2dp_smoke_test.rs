@@ -135,19 +135,19 @@ async fn mock_a2dp_client(
     mut sender: mpsc::Sender<Event>,
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
-    let peer_manager_svc = handles.connect_to_protocol::<fidl_avdtp::PeerManagerMarker>()?;
+    let peer_manager_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::Avdtp { _avdtp: Some(peer_manager_svc) })
         .await
         .expect("failed sending ack to test");
 
-    let audio_mode_svc = handles.connect_to_protocol::<fidl_a2dp::AudioModeMarker>()?;
+    let audio_mode_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::AudioMode { _audio_mode: Some(audio_mode_svc) })
         .await
         .expect("failed sending ack to test");
 
-    let a2dp_media_stream_svc = handles.connect_to_protocol::<ControllerMarker>()?;
+    let a2dp_media_stream_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::A2dpMediaStream { _a2dp_media_stream: Some(a2dp_media_stream_svc) })
         .await

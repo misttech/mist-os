@@ -3,9 +3,13 @@
 // found in the LICENSE file.
 
 use crate::access_vector_cache::{FifoQueryCache, Locked, Query};
-use crate::policy::{AccessVector, AccessVectorComputer, SELINUX_AVD_FLAGS_PERMISSIVE};
+use crate::policy::{
+    AccessDecision, AccessVector, AccessVectorComputer, SELINUX_AVD_FLAGS_PERMISSIVE,
+};
 use crate::security_server::SecurityServer;
-use crate::{ClassPermission, FsNodeClass, KernelPermission, NullessByteStr, SecurityId};
+use crate::{
+    ClassPermission, FsNodeClass, KernelPermission, NullessByteStr, ObjectClass, SecurityId,
+};
 
 #[cfg(target_os = "fuchsia")]
 use fuchsia_inspect_contrib::profile_duration;
@@ -125,6 +129,16 @@ impl<'a> PermissionCheck<'a> {
         }
         self.access_vector_cache.compute_new_fs_node_sid(source_sid, target_sid, fs_node_class)
     }
+
+    /// Returns the raw `AccessDecision` for a specified source, target and class.
+    pub fn compute_access_decision(
+        &self,
+        source_sid: SecurityId,
+        target_sid: SecurityId,
+        target_class: ObjectClass,
+    ) -> AccessDecision {
+        self.access_vector_cache.compute_access_decision(source_sid, target_sid, target_class)
+    }
 }
 
 /// Internal implementation of the `has_permission()` API, in terms of the `Query` and `AccessVectorComputer` traits.
@@ -236,7 +250,6 @@ fn has_ioctl_permission<P: ClassPermission + Into<KernelPermission> + Clone + 's
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::access_vector_cache::DenyAll;
     use crate::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
     use crate::policy::{AccessDecision, AccessVector, IoctlAccessDecision};
     use crate::{
@@ -286,16 +299,16 @@ mod tests {
     }
 
     #[derive(Default)]
-    pub struct DenyAllPermissions(DenyAll);
+    pub struct DenyAllPermissions;
 
     impl Query for DenyAllPermissions {
         fn compute_access_decision(
             &self,
-            source_sid: SecurityId,
-            target_sid: SecurityId,
-            target_class: ObjectClass,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _target_class: ObjectClass,
         ) -> AccessDecision {
-            self.0.compute_access_decision(source_sid, target_sid, target_class)
+            AccessDecision::allow(AccessVector::NONE)
         }
 
         fn compute_new_fs_node_sid(
@@ -319,12 +332,12 @@ mod tests {
 
         fn compute_ioctl_access_decision(
             &self,
-            source_sid: SecurityId,
-            target_sid: SecurityId,
-            target_class: ObjectClass,
-            ioctl_prefix: u8,
+            _source_sid: SecurityId,
+            _target_sid: SecurityId,
+            _target_class: ObjectClass,
+            _ioctl_prefix: u8,
         ) -> IoctlAccessDecision {
-            self.0.compute_ioctl_access_decision(source_sid, target_sid, target_class, ioctl_prefix)
+            IoctlAccessDecision::DENY_ALL
         }
     }
 

@@ -213,12 +213,7 @@ final_fuchsia_idk_for_cpus_and_levels("final_fuchsia_idk.exported") {
 bazel_build_action("bazel_built_fuchsia_idk") {
   testonly = true
   bazel_target = "//build/bazel/bazel_sdk:final_fuchsia_idk"
-  deps = [
-    "//sdk:fuchsia_collection_all_subbuilds_for_merge",
-
-    # Used by the Bazel rule.
-    "//build/tools/json_validator:json_validator_valico.bazel_input",
-  ]
+  deps = [ "//sdk:fuchsia_collection_all_subbuilds_for_merge" ]
   ninja_base_dir = root_build_dir
   directory_outputs = [
     {
@@ -358,8 +353,7 @@ if (!is_host) {
   }
 
   # In-tree, ffx plugins/tools and tests depend on the existence of a
-  # collection (not IDK) manifest at "$OUT_DIR/sdk/manifest/core" and/or
-  # associated directory at "$OUT_DIR/sdk/exported/core" to determine the
+  # collection (not IDK) at "$OUT_DIR/sdk/exported/core" to determine the
   # location of tools. Create a collection that generates a manifest with the
   # necessary paths.
   # TODO(https://fxbug.dev/317385989): Remove once these legacy dependencies
@@ -562,9 +556,9 @@ if (is_host) {
     deps = [
       "//build/assembly/tools/assembly_config:assembly_config_sdk",
       "//src/developer/ffx:bin_sdk",
-      "//src/developer/ffx/plugins/driver:sdk",
       "//src/developer/ffx/plugins/product:sdk",
       "//src/developer/ffx/plugins/test:sdk",
+      "//src/developer/ffx/tools/driver:sdk",
       "//tools/bootserver_old:bootserver_sdk",
       "//tools/funnel:funnel_sdk",
       "//tools/sdk-tools/fssh:fssh_sdk",
@@ -685,6 +679,7 @@ sdk_molecule("core_bindlib") {
     "//src/devices/bind/fuchsia.google.platform:fuchsia.google.platform_sdk",
     "//src/devices/bind/fuchsia.gpio:fuchsia.gpio_sdk",
     "//src/devices/bind/fuchsia.i2c:fuchsia.i2c_sdk",
+    "//src/devices/bind/fuchsia.interconnect:fuchsia.interconnect_sdk",
     "//src/devices/bind/fuchsia.khadas.platform:fuchsia.khadas.platform_sdk",
     "//src/devices/bind/fuchsia.mailbox:fuchsia.mailbox_sdk",
     "//src/devices/bind/fuchsia.nxp.platform:fuchsia.nxp.platform_sdk",
@@ -826,6 +821,7 @@ sdk_molecule("core_cc_source_libraries") {
     "//sdk/lib/inspect/component/cpp:cpp_sdk",
     "//sdk/lib/magma_common:magma_common_sdk",
     "//sdk/lib/media/cpp:cpp_sdk",
+    "//sdk/lib/memory_barriers:memory_barriers_sdk",
     "//sdk/lib/stdcompat:stdcompat_sdk",
     "//sdk/lib/sys/component/cpp/testing:cpp_library_sdk",
     "//sdk/lib/sys/cpp:cpp_sdk",
@@ -840,7 +836,6 @@ sdk_molecule("core_cc_source_libraries") {
     "//sdk/lib/virtgralloc:virtgralloc_headers_sdk",
     "//sdk/lib/zbi-format:zbi-format_sdk",
     "//src/devices/lib/mmio:mmio_sdk",
-    "//src/lib/memory_barriers:memory_barriers_sdk",
     "//zircon/system/ulib/hwreg:hwreg_public_sdk",
     "//zircon/system/ulib/inspect:inspect_sdk",
     "//zircon/system/ulib/trace:trace_sdk",
@@ -1053,7 +1048,18 @@ if (current_toolchain == default_toolchain) {
         # Do not add to this list. See  the comment in
         # `//src/developer/ffx:ffx_bin`.
 
+        "//src/developer/ffx/lib/e2e_emu:isolated_emulator_data",
         "//src/developer/ffx/lib/fuchsia-controller/tests:core_sdk_host_test_data",
+        "//src/developer/ffx/lib/profiler/tests:ffx_profiler_lib_e2e_test_emulator_data",
+        "//src/developer/ffx/lib/symbolize/tests:ffx_symbolize_lib_e2e_test_emulator_data",
+        "//src/developer/ffx/lib/target_net/tests:ffx_target_net_lib_e2e_test_emulator_data",
+        "//src/developer/ffx/plugins/component/create/tests/structured_config:verify_ffx_component_create_parent_overrides_emulator_data",
+        "//src/developer/ffx/plugins/component/run/tests/structured_config:verify_ffx_component_run_parent_overrides_emulator_data",
+        "//src/developer/ffx/plugins/profile/heapdump:verify_ffx_profile_heapdump_emulator_data",
+        "//src/developer/ffx/plugins/target/package/explore/tests:verify_ffx_target_package_explore_emulator_data",
+        "//src/developer/ffx/plugins/target/ssh:ffx_target_ssh_e2e_tests_emulator_data",
+        "//src/developer/ffx/tools/power/system-activity/application-activity:ffx_power_system_activity_application_activity_e2e_tests_emulator_data",
+        "//tools/dupefinder/tests/e2e:verify_dupefinder_e2e_emulator_data",
         "//vendor/*",
       ]
 
@@ -1083,45 +1089,6 @@ if (is_host) {
     deps = [
       ":emulators($host_toolchain)",
       ":host_tools_for_single_toolchain",
-    ]
-  }
-
-  # A collection that only contains host tools that are used by the Fuchsia
-  # build when running ffx tools via the `ffx_action()` template. This allows
-  # "ffx-assembly" to find the tools it needs via an IDK manifest just as it
-  # would when used with a real IDK.
-  sdk_collection("host_tools_used_by_ffx_action_during_build") {
-    # This (sorta) restricts the use of this group to instances of the
-    # `ffx_action()` template, which uses the group below.
-    visibility = []
-    visibility = [ "//src/developer/ffx/build:host_tools_used_by_ffx_action" ]
-
-    # TODO(https://fxbug.dev/317385989): Find a solution that doesn't depend on
-    # sdk_* templates.
-    category = "internal"
-
-    id = sdk_id
-
-    # This is a collection of host tools that are used _by_ ffx itself to
-    # perform actions within the build.  As such, it CANNOT have a dependency
-    # the main ffx binary, or any of the subtools, or it will cause all
-    # ffx_action()'s using subtools to be dependent on the compilation of the
-    # main ffx binary (and/or all subtools), adding minutes to any incremental
-    # build of an ffx subtool.
-    assert_no_deps = [
-      "//src/developer/ffx:bin_sdk",
-      "//src/developer/ffx:ffx_tool",
-      "//src/developer/ffx/frontends/ffx:ffx_bin($host_toolchain)",
-    ]
-
-    deps = [
-      # Do not add to this list.
-      # Prefer solutions that do not require locating tool dependencies via an
-      # IDK manifest.
-      "//src/storage/bin/fvm:fvm_sdk",
-      "//src/storage/blobfs/tools:blobfs_sdk",
-      "//tools/cmc:cmc_sdk",
-      "//zircon/tools/zbi:zbi_sdk",
     ]
   }
 }  # end if (is_host)
@@ -1185,6 +1152,10 @@ copy("idk_build_tools") {
     "//tools/fidl/measure-tape/src:measure-tape($host_toolchain)",
     "//zircon/tools/zither($host_toolchain)",
   ]
+
+  # The following tools are generated directly from Bazel.
+  sources += [ "$host_out_dir/json_validator_valico" ]
+  deps += [ "//build/bazel:bazel_root_host_targets" ]
 }
 
 # Controls the maximum number of simultaneous subbuilds.

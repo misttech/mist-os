@@ -11,7 +11,7 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Invalid FIDL Power Information: {:?}", .info)]
-    Info { info: Information },
+    Info { info: Box<Information> },
     #[error("Invalid Identifier: {:?}", .identifier)]
     Identifier { identifier: Identifier },
     #[error("Invalid Battery Information: {}", .message)]
@@ -39,7 +39,7 @@ impl Error {
 
 impl From<&Information> for Error {
     fn from(src: &Information) -> Error {
-        Error::Info { info: src.clone() }
+        Error::Info { info: Box::new(src.clone()) }
     }
 }
 

@@ -6,7 +6,6 @@
 #define SRC_POWER_TESTING_FAKE_POWERSOURCE_POWER_SOURCE_PROTOCOL_SERVER_H_
 
 #include <fidl/fuchsia.hardware.powersource/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.powersource/cpp/natural_types.h>
 #include <lib/zx/event.h>
 #include <zircon/types.h>
 

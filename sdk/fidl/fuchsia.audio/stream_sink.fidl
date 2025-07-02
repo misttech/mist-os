@@ -95,7 +95,7 @@ type Timestamp = flexible union {
     /// a previous packet. If there is no previous packet, this option is equivalent to a
     /// `specified` value of 0.
     ///
-    /// This option implies that the stream timeline should not ‘slip’ even if the packet
+    /// This option implies that the stream timeline should not 'slip' even if the packet
     /// arrives late. The packet is intended to be presented immediately after the previous packet,
     /// and the resulting timing is to be maintained regardless of the arrival time of the packet.
     2: unspecified_continuous struct {};
@@ -103,7 +103,7 @@ type Timestamp = flexible union {
     /// Indicates the packet should be presented as soon as possible after the previous packet, if
     /// there is one, as soon as possible if not.
     ///
-    /// This option implies that the stream time should ‘slip’ if the packet arrives too late
+    /// This option implies that the stream time should 'slip’ if the packet arrives too late
     /// to be rendered immediately after the previous packet. This option is often used when a gap
     /// occurs in an un-timestamped stream, perhaps due to a lossy upstream source.
     3: unspecified_best_effort struct {};

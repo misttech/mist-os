@@ -21,6 +21,7 @@ if (is_fuchsia) {
     deps = [
       "component:package_deps_for_host_tests",
       "profile:package_deps_for_host_tests",
+      "target:package_deps_for_host_tests",
     ]
   }
 }

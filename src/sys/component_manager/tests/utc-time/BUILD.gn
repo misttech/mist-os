@@ -70,7 +70,6 @@ rustc_test("integration_test_bin") {
   source_root = "integration_test.rs"
   name = "utc_time_integration_test"
   deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",

@@ -57,6 +57,7 @@ More details can be found by running with `--help`.
 *   `bb_fetch_rbe_cas.sh`: retrieve a remote-built artifact from the
     RBE CAS using a buildbucket id and the path under the build output
     directory.
+*   `cas.py`: interface to CAS tool, including fetching objects.
 *   `detail-diff.sh`: attempts to compare human-readable representations
     of files, including some binary files, by using tools like `objdump`.
 *   `remotetool.sh`: can lookup actions and artifacts in the RBE CAS.

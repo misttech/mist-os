@@ -145,15 +145,34 @@ type ProofOfInterfaceAuthorization = resource struct {
 };
 
 /// Options for creating an interface.
-type Options = table {
+type Options = resource table {
     /// New interface name.
     ///
-    /// If not set, an implementation-defined name will be selected.
+    /// An implementation-defined name is selected if absent.
     1: name fuchsia.net.interfaces.Name;
     /// The default metric value used for routes through this interface.
     ///
-    /// If not set, the server will use a sensible default.
+    /// The server uses a sensible default if absent.
     2: metric fuchsia.net.RouteMetric;
+    /// The designation for the netstack-sourced routes.
+    ///
+    /// Interpreted as `NetstackManagedRoutesDesignation.main` if absent.
+    3: netstack_managed_routes_designation NetstackManagedRoutesDesignation;
+};
+
+/// This can be provided on interface creation to appoint a route table into
+/// which netstack managed routes are installed.
+// This is a resource type for the possible future where we pass in the credential
+// for a specific route table.
+type NetstackManagedRoutesDesignation = flexible resource union {
+    /// The netstack managed routes are installed in the main table.
+    1: main Empty;
+    /// The netstack managed routes are installed in an interface-local table.
+    ///
+    /// The interface creates local tables (one for each IP version). When the
+    /// interface is removed and all the outstanding `RouteTableV{4,6}` protocol
+    /// channels are closed, the local table is removed.
+    2: interface_local Empty;
 };
 
 /// Provides control over an interface.

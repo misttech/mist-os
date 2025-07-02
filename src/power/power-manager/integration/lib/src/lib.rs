@@ -393,12 +393,7 @@ pub struct TestEnv {
 impl TestEnv {
     /// Connects to a protocol exposed by a component within the RealmInstance.
     pub fn connect_to_protocol<P: DiscoverableProtocolMarker>(&self) -> P::Proxy {
-        self.realm_instance
-            .as_ref()
-            .unwrap()
-            .root
-            .connect_to_protocol_at_exposed_dir::<P>()
-            .unwrap()
+        self.realm_instance.as_ref().unwrap().root.connect_to_protocol_at_exposed_dir().unwrap()
     }
 
     pub fn connect_to_device<P: ProtocolMarker>(&self, driver_path: &str) -> P::Proxy {
@@ -473,10 +468,8 @@ impl Drop for TestEnv {
 
 /// Increases the time scale so Power Manager's interval-based operation runs faster for testing.
 async fn set_fake_time_scale(realm_instance: &RealmInstance, scale: u32) {
-    let fake_clock_control = realm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<ftesting::FakeClockControlMarker>()
-        .unwrap();
+    let fake_clock_control: ftesting::FakeClockControlProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     fake_clock_control.pause().await.expect("failed to pause fake time: FIDL error");
     fake_clock_control

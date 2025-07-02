@@ -58,7 +58,7 @@ class LocationFCTests(unittest.TestCase):
         )
 
     def test_verify_supported(self) -> None:
-        """Test if _verify_supported works."""
+        """Test if verify_supported works."""
         self.ffx_transport_obj.run.return_value = ""
 
         with self.assertRaises(NotSupportedError):

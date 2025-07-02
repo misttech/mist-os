@@ -43,7 +43,7 @@
 ## commands, adding each new build dir to the multi list (if it succeeded).
 ## It's like running `fx multi clear` and then a series of:
 ##
-##   fx set PRODUCT.BOARD --auto-dir SWITCHES... && fx multi add
+##   fx set PRODUCT.BOARD SWITCHES... && fx multi add
 ##
 ## Arguments before SWITCHES... can be explicit PRODUCT.BOARD or can be
 ## one of a fixed set of SPEC strings.  Run `fx multi set` alone to see
@@ -108,7 +108,7 @@ function for-each-build {
 
 function read-multi-list {
   if [[ $# -eq 0 ]]; then
-     set -- "$MULTI_LIST_FILE"
+    set -- "$MULTI_LIST_FILE"
   fi
   MULTI_LIST=()
   if [[ -r "$1" ]]; then
@@ -120,10 +120,10 @@ function read-multi-list {
 
 function write-multi-list {
   if [[ $# -eq 0 ]]; then
-     set -- "$MULTI_LIST_FILE"
+    set -- "$MULTI_LIST_FILE"
   fi
   local -r tmpfile="$(mktemp)"
-  for-each-build : list-one --quiet > "$tmpfile"
+  for-each-build : list-one --quiet >"$tmpfile"
   mv -f "$tmpfile" "$1"
 }
 
@@ -264,20 +264,26 @@ function multi-set {
       spec_file=
     else
       spec_file="$(find-spec-file "$build")"
-      exec 3< "$spec_file" || {
+      exec 3<"$spec_file" || {
         fx-error "$build is not a known fx multi set SPEC"
         return 1
       }
     fi
     while [[ -z "$spec_file" ]] || {
-            read build <&3 &&
-              while [[ -z "$build" || "$build" == \#* ]] && read build <&3; do
-                :
-              done
-          }; do
-      set_cmd=(set $build --auto-dir "${spec_switches[@]}" "$@")
+      read build <&3 &&
+        while [[ -z "$build" || "$build" == \#* ]] && read build <&3; do
+          :
+        done
+    }; do
+      # Clear the build directory variable so the checks in `fx-build-dir-if-present` allow us to
+      # change the build directory, otherwise we end up with the first build directory as the
+      # directory for each set invocation.
+      FUCHSIA_BUILD_DIR=""
+      set_cmd=("set" "$build" "${spec_switches[@]}" "$@")
       if fx-command-run "${set_cmd[@]}" 3<&-; then
-        fx-build-dir-if-present
+        # FUCHSIA_BUILD_DIR is not updated by fx-* functions after the first build directory so use
+        # .fx-build-dir to update it ourselves.
+        FUCHSIA_BUILD_DIR="$(<"${FUCHSIA_DIR}/.fx-build-dir")"
         add
       else
         status=$?
@@ -303,19 +309,19 @@ function main {
 
   while [[ "$1" == -* ]]; do
     case "$1" in
-      -p|--parallel)
-        PARALLEL=true
-        ;;
-      -f|--fail)
-        FAIL_FAST=true
-        ;;
-      --)
-        break
-        ;;
-      *)
-        fx-command-help
-        return 1
-        ;;
+    -p | --parallel)
+      PARALLEL=true
+      ;;
+    -f | --fail)
+      FAIL_FAST=true
+      ;;
+    --)
+      break
+      ;;
+    *)
+      fx-command-help
+      return 1
+      ;;
     esac
     shift
   done
@@ -328,20 +334,20 @@ function main {
   read-multi-list "$MULTI_LIST_FILE" || :
 
   case "$1" in
-    add|clear|list|remove|save|use)
-      "$@"
-      ;;
-    rm)
-      shift
-      remove "$@"
-      ;;
-    set)
-      shift
-      multi-set "$@"
-      ;;
-    *)
-      for-each-build one-failed execute-one "$@"
-      ;;
+  add | clear | list | remove | save | use)
+    "$@"
+    ;;
+  rm)
+    shift
+    remove "$@"
+    ;;
+  set)
+    shift
+    multi-set "$@"
+    ;;
+  *)
+    for-each-build one-failed execute-one "$@"
+    ;;
   esac
 }
 

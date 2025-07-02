@@ -52,14 +52,14 @@ typedef uint32_t trace_cpu_number_t;
 typedef uint32_t trace_thread_priority_t;
 
 // Represents an index into the string table.
-typedef uint32_t trace_string_index_t;
+typedef uint16_t trace_string_index_t;
 
 // Represents the encoded form of string references.
-typedef uint32_t trace_encoded_string_ref_t;
+typedef uint16_t trace_encoded_string_ref_t;
 #define TRACE_ENCODED_STRING_REF_EMPTY ((trace_encoded_string_ref_t)0u)
 #define TRACE_ENCODED_STRING_REF_INLINE_FLAG ((trace_encoded_string_ref_t)0x8000u)
 #define TRACE_ENCODED_STRING_REF_LENGTH_MASK ((trace_encoded_string_ref_t)0x7fffu)
-#define TRACE_ENCODED_STRING_REF_MAX_LENGTH ((trace_encoded_string_ref_t)32000)
+#define TRACE_ENCODED_STRING_REF_MAX_LENGTH ((size_t)32000)
 #define TRACE_ENCODED_STRING_REF_MIN_INDEX ((trace_encoded_string_ref_t)0x1u)
 #define TRACE_ENCODED_STRING_REF_MAX_INDEX ((trace_encoded_string_ref_t)0x7fffu)
 
@@ -117,9 +117,9 @@ static inline trace_string_ref_t trace_make_inline_string_ref(const char* string
   ZX_DEBUG_ASSERT(string != NULL);
   if (length > TRACE_ENCODED_STRING_REF_MAX_LENGTH)
     length = TRACE_ENCODED_STRING_REF_MAX_LENGTH;
-  trace_string_ref_t ref = {
-      .encoded_value = TRACE_ENCODED_STRING_REF_INLINE_FLAG | (trace_encoded_string_ref_t)length,
-      .inline_string = string};
+  trace_encoded_string_ref_t encoded_value =
+      TRACE_ENCODED_STRING_REF_INLINE_FLAG | (trace_encoded_string_ref_t)length;
+  trace_string_ref_t ref = {.encoded_value = encoded_value, .inline_string = string};
   return ref;
 }
 

@@ -8,9 +8,9 @@ library fuchsia.time.alarms;
 using zx;
 using fuchsia.power.system;
 
-alias AlarmId = string:128;
-
 // The main protocol to look at in this file is `Wake` below.
+
+alias AlarmId = string:128;
 
 /// [Wake] provides setting up platform-wide wake alarms.
 ///
@@ -33,18 +33,9 @@ alias AlarmId = string:128;
 open protocol Wake {
     // Protocol fragment with an initial approach to scheduling wake alarms.
     compose ClientSideBatonManagement;
-
-    /// Call to establish whether Wake is operational.  This just returns
-    /// immediately.
-    GetProperties() -> (table {
-        /// Set to true if the wake alarms functionality is supported.
-        /// The wake alarms may be unavailable if the hardware does
-        /// not have the required circuitry.
-        1: is_supported bool;
-    });
 };
 
-protocol ClientSideBatonManagement {
+open protocol ClientSideBatonManagement {
     /// Sets a wake alarm with the provided parameters, and waits for the alarm
     /// to fire.
     ///
@@ -79,10 +70,17 @@ protocol ClientSideBatonManagement {
         /// The deadline at which the timer is supposed to fire.
         deadline zx.InstantBoot;
 
-        /// The callee signals this event once the alarm is scheduled. This
-        /// signals that the caller can drop any pending wake leases related
-        /// to this call.
-        setup_done zx.Handle:EVENT;
+        /// Optional mode that allows the API to support a number of use cases.
+        mode @generated_name("SetAndWaitMode") flexible resource union {
+            /// This lease is dropped as immediately after the alarm is scheduled
+            /// (or an error occurs during scheduling), thus guaranteeing that the
+            /// alarm is scheduled before the system is suspended.
+            1: keep_alive fuchsia.power.system.LeaseToken;
+            /// The callee signals this event (with ZX_EVENT_SIGNALED) once the alarm
+            /// is scheduled. This indicates that the caller can drop any pending wake
+            /// leases related to this call.
+            2: notify_setup_done zx.Handle:EVENT;
+        };
 
         /// Set to a nonempty value to identify the alarm. A unique value
         /// of [AlarmId] must be picked per each unique alarm within a
@@ -113,11 +111,6 @@ protocol ClientSideBatonManagement {
         /// The caller must handle such an event gracefully.
         alarm_id AlarmId;
     });
-
-    /// Same as [Cancel], but waits until `alarm_id` is canceled.
-    CancelSync(struct {
-        alarm_id AlarmId;
-    }) -> () error WakeError;
 };
 
 /// WakeError describes the error code that can be returned from wake

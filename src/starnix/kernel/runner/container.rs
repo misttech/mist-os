@@ -22,18 +22,17 @@ use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use serde::Deserialize;
 use starnix_container_structured_config::Config as ContainerStructuredConfig;
-use starnix_core::container_namespace::ContainerNamespace;
 use starnix_core::execution::{
     create_init_process, create_system_task, execute_task_with_prerun_result,
 };
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
+use starnix_core::task::container_namespace::ContainerNamespace;
 use starnix_core::task::{CurrentTask, ExitStatus, Kernel, RoleOverrides, SchedulerManager, Task};
 use starnix_core::time::utc::update_utc_clock;
-use starnix_core::vfs::{
-    FileSystemOptions, FsContext, LookupContext, Namespace, StaticDirectoryBuilder, WhatToMount,
-};
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, Namespace, WhatToMount};
 use starnix_logging::{
     log_debug, log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX,
     NAME_CREATE_CONTAINER,
@@ -46,7 +45,7 @@ use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
-use starnix_uapi::{errno, pid_t, rlimit};
+use starnix_uapi::{errno, rlimit, tid_t};
 use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::ops::DerefMut;
@@ -151,7 +150,7 @@ pub struct ContainerStartInfo {
 
     /// Mapping of top-level namespace entries to an associated channel.
     /// For example, "/svc" to the respective channel.
-    container_namespace: ContainerNamespace,
+    pub container_namespace: ContainerNamespace,
 
     /// The runtime directory of the container, used to provide CF introspection.
     runtime_dir: Option<ServerEnd<fio::DirectoryMarker>>,
@@ -461,6 +460,7 @@ async fn server_component_controller(
 
 pub async fn create_component_from_stream(
     mut request_stream: frunner::ComponentRunnerRequestStream,
+    kernel_extra_features: Vec<String>,
 ) -> Result<(Container, ContainerServiceConfig), Error> {
     if let Some(event) = request_stream.try_next().await? {
         match event {
@@ -468,8 +468,9 @@ pub async fn create_component_from_stream(
                 let request_stream = controller.into_stream();
                 let mut start_info = ContainerStartInfo::new(start_info)?;
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
-                let container =
-                    create_container(&mut start_info, sender).await.with_source_context(|| {
+                let container = create_container(&mut start_info, &kernel_extra_features, sender)
+                    .await
+                    .with_source_context(|| {
                         format!("creating container \"{}\"", start_info.program.name)
                     })?;
                 let service_config =
@@ -501,6 +502,7 @@ pub async fn create_component_from_stream(
 
 async fn create_container(
     start_info: &mut ContainerStartInfo,
+    kernel_extra_features: &[String],
     task_complete: oneshot::Sender<TaskResult>,
 ) -> Result<Container, Error> {
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
@@ -510,7 +512,7 @@ async fn create_container(
     let pkg_channel = start_info.container_namespace.get_namespace_channel("/pkg").unwrap();
     let pkg_dir_proxy = fio::DirectorySynchronousProxy::new(pkg_channel);
 
-    let features = parse_features(&start_info)?;
+    let features = parse_features(&start_info, kernel_extra_features)?;
     log_debug!("Creating container with {:#?}", features);
     let mut kernel_cmdline = BString::from(start_info.program.kernel_cmdline.as_bytes());
     if features.android_serialno {
@@ -617,17 +619,14 @@ async fn create_container(
     .source_context("create system task")?;
     // The system task gives pid 2. This value is less critical than giving
     // pid 1 to init, but this value matches what is supposed to happen.
-    debug_assert_eq!(system_task.id, 2);
+    debug_assert_eq!(system_task.tid, 2);
 
     kernel.kthreads.init(system_task).source_context("initializing kthreads")?;
     let system_task = kernel.kthreads.system_task();
 
     kernel.syslog.init(&system_task).source_context("initializing syslog")?;
 
-    kernel
-        .hrtimer_manager
-        .init(system_task, None, None)
-        .source_context("initializing HrTimer manager")?;
+    kernel.hrtimer_manager.init(system_task).source_context("initializing HrTimer manager")?;
 
     if let Err(e) = kernel.suspend_resume_manager.init(&system_task) {
         log_warn!("Suspend/Resume manager initialization failed: ({e:?})");
@@ -751,7 +750,7 @@ async fn create_container(
 }
 
 fn create_fs_context(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     kernel: &Arc<Kernel>,
     features: &Features,
     start_info: &ContainerStartInfo,
@@ -839,6 +838,7 @@ fn parse_rlimits(rlimits: &[String]) -> Result<Vec<(Resource, u64)>, Error> {
         let value = value.parse::<u64>()?;
         let kv = match key {
             "RLIMIT_NOFILE" => (Resource::NOFILE, value),
+            "RLIMIT_RTPRIO" => (Resource::RTPRIO, value),
             _ => bail!("Unknown rlimit: {key}"),
         };
         res.push(kv);
@@ -848,7 +848,7 @@ fn parse_rlimits(rlimits: &[String]) -> Result<Vec<(Resource, u64)>, Error> {
 }
 
 fn mount_filesystems(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     start_info: &ContainerStartInfo,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
@@ -857,8 +857,14 @@ fn mount_filesystems(
     // Skip the first mount, that was used to create the root filesystem.
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
-        let action = MountAction::from_spec(locked, system_task, pkg_dir_proxy, mount_spec)
-            .with_source_context(|| format!("creating filesystem from spec: {}", &mount_spec))?;
+        let action = MountAction::from_spec(
+            locked,
+            system_task,
+            Some(start_info),
+            pkg_dir_proxy,
+            mount_spec,
+        )
+        .with_source_context(|| format!("creating filesystem from spec: {}", &mount_spec))?;
         let mount_point = system_task
             .lookup_path_from_root(locked, action.path.as_ref())
             .with_source_context(|| format!("lookup path from root: {}", action.path))?;
@@ -868,7 +874,7 @@ fn mount_filesystems(
 }
 
 fn init_remote_block_devices(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     start_info: &ContainerStartInfo,
 ) -> Result<(), Error> {
@@ -900,7 +906,7 @@ fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {
 }
 
 fn create_remote_block_device_from_spec<'a>(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     spec: &'a str,
 ) -> Result<(), Error> {
@@ -922,7 +928,7 @@ fn create_remote_block_device_from_spec<'a>(
 async fn wait_for_init_file(
     startup_file_path: &str,
     current_task: &CurrentTask,
-    init_pid: pid_t,
+    init_tid: tid_t,
 ) -> Result<(), Error> {
     // TODO(https://fxbug.dev/42178400): Use inotify machinery to wait for the file.
     loop {
@@ -940,7 +946,7 @@ async fn wait_for_init_file(
             Err(error) => return Err(anyhow::Error::from(error)),
         }
 
-        if current_task.get_task(init_pid).upgrade().is_none() {
+        if current_task.get_task(init_tid).upgrade().is_none() {
             return Err(anyhow!("Init task terminated before startup_file_path was ready"));
         }
     }
@@ -1029,7 +1035,7 @@ mod test {
             .expect("Failed to create file");
 
         fasync::Task::local(async move {
-            wait_for_init_file(path, &current_task, current_task.get_pid())
+            wait_for_init_file(path, &current_task, current_task.get_tid())
                 .await
                 .expect("failed to wait for file");
             sender.send(()).await.expect("failed to send message");
@@ -1049,10 +1055,10 @@ mod test {
             current_task.clone_task_for_test(&mut locked, CLONE_FS as u64, Some(SIGCHLD));
         let path = "/path";
 
-        let test_init_pid = current_task.get_pid();
+        let test_init_tid = current_task.get_tid();
         fasync::Task::local(async move {
             sender.send(()).await.expect("failed to send message");
-            wait_for_init_file(path, &init_task, test_init_pid)
+            wait_for_init_file(path, &init_task, test_init_tid)
                 .await
                 .expect("failed to wait for file");
             sender.send(()).await.expect("failed to send message");
@@ -1088,10 +1094,10 @@ mod test {
             current_task.clone_task_for_test(&mut locked, CLONE_FS as u64, Some(SIGCHLD));
         const STARTUP_FILE_PATH: &str = "/path";
 
-        let test_init_pid = init_task.get_pid();
+        let test_init_tid = init_task.get_tid();
         fasync::Task::local(async move {
             sender.send(()).await.expect("failed to send message");
-            wait_for_init_file(STARTUP_FILE_PATH, &current_task, test_init_pid)
+            wait_for_init_file(STARTUP_FILE_PATH, &current_task, test_init_tid)
                 .await
                 .expect_err("Did not detect init exit");
             sender.send(()).await.expect("failed to send message");

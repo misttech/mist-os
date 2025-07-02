@@ -127,7 +127,10 @@ impl From<PartialNodeHierarchy> for DiagnosticsHierarchy {
 }
 
 impl DiagnosticsHierarchyGetter<String> for PartialNodeHierarchy {
-    fn get_diagnostics_hierarchy(&self) -> Cow<'_, DiagnosticsHierarchy> {
+    async fn get_diagnostics_hierarchy<'a>(&'a self) -> Cow<'_, DiagnosticsHierarchy>
+    where
+        String: 'a,
+    {
         let hierarchy: DiagnosticsHierarchy = self.clone().into();
         if !hierarchy.missing.is_empty() {
             panic!(
@@ -614,7 +617,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn tombstone_reads() {
+    async fn tombstone_reads() {
         let inspector = Inspector::default();
         let node1 = inspector.root().create_child("child1");
         let node2 = node1.create_child("child2");
@@ -859,13 +862,13 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_matching_with_inspector() {
+    async fn test_matching_with_inspector() {
         let inspector = Inspector::default();
         assert_json_diff!(inspector, root: {});
     }
 
     #[fuchsia::test]
-    fn test_matching_with_partial() {
+    async fn test_matching_with_partial() {
         let propreties = vec![Property::String("sub".to_string(), "sub_value".to_string())];
         let partial = PartialNodeHierarchy::new("root", propreties, vec![]);
         assert_json_diff!(partial, root: {
@@ -875,7 +878,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_missing_values_with_partial() {
+    async fn test_missing_values_with_partial() {
         let mut partial = PartialNodeHierarchy::new("root", vec![], vec![]);
         partial.links = vec![LinkValue {
             name: "missing-link".to_string(),
@@ -886,7 +889,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_matching_with_expression_as_key() {
+    async fn test_matching_with_expression_as_key() {
         let properties = vec![Property::String("sub".to_string(), "sub_value".to_string())];
         let partial = PartialNodeHierarchy::new("root", properties, vec![]);
         let value = || "sub_value";

@@ -50,6 +50,12 @@ impl<'a> ProxyableRW<'a> for Socket {
 impl IntoProxied for fidl::Socket {
     type Proxied = Socket;
     fn into_proxied(self) -> Result<Socket, Error> {
+        // TODO(https://fxbug.dev/418249087): Handle socket disposition changes
+        // better. By using the async implementation in fuchsia_async, we
+        // observe closed on read or write whenever the socket is in a
+        // half-closed state. Which is proxied by overnet as a PEER_CLOSED
+        // instead. We should intercept the disposition signals there and send
+        // them over the proxy.
         Ok(Socket { socket: AsyncSocket::from_socket(self) })
     }
 }

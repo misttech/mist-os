@@ -268,6 +268,14 @@
       "short": null,
       "description": "if enabled, selectors will be passed directly to Archivist without any filtering. If disabled and no matching components are found, the user will be prompted to either enable this or be given a list of selectors to choose from. This applies to both --set-severity and --set-severity-persist.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--disable-reconnect",
+      "short": null,
+      "description": "disable automatic reconnect",
+      "hidden": false
     }
   ],
   "notes": [

@@ -221,7 +221,7 @@ class LockedParentWalker {
       current_is_pre_locked_parent_ = true;
     } else {
       current_is_pre_locked_parent_ = false;
-      current_ = VmCowPages::LockedPtr(next, next->lock_order(), VmLockAcquireMode::Reentrant);
+      current_ = VmCowPages::LockedPtr(next, next->lock_order());
     }
   }
 
@@ -529,11 +529,11 @@ class VmCowPages::TreeWalkCursor
       cur_locked_.release();
 
       {
-        LockedPtr child(child_ref.get(), VmLockAcquireMode::First);
+        LockedPtr child(child_ref.get());
         // While the locks were dropped things could have changed, so check that the child still has
         // a parent before attempting to acquire the parents lock.
         if (child.locked().parent_) {
-          LockedPtr parent(child.locked().parent_.get(), VmLockAcquireMode::Reentrant);
+          LockedPtr parent(child.locked().parent_.get());
           Guard<CriticalMutex> guard{&lock_};
           // If nothing raced then the parent of child should still be cur_.
           if (parent.get() == cur_) {
@@ -618,7 +618,7 @@ class VmCowPages::TreeWalkCursor
       fbl::RefPtr<VmCowPages> sibling_ref;
       {
         // Acquire the parent lock and check for a sibling.
-        LockedPtr parent(cur.locked_or(start).parent_.get(), VmLockAcquireMode::Reentrant);
+        LockedPtr parent(cur.locked_or(start).parent_.get());
         auto iter = ++parent.locked().children_list_.make_iterator(cur.locked_or(start));
         if (!iter.IsValid()) {
           // If no sibling then walk up to the parent, ensuring we do not walk past the root.
@@ -642,8 +642,7 @@ class VmCowPages::TreeWalkCursor
         sibling_ref = fbl::MakeRefPtrUpgradeFromRaw(&*iter, parent.locked().lock());
       }
 
-      LockedPtr sibling(sibling_ref.get(), cur.locked_or(start).lock_order() + 1,
-                        VmLockAcquireMode::Reentrant);
+      LockedPtr sibling(sibling_ref.get(), cur.locked_or(start).lock_order() + 1);
       // If the sibling is still from the same parent then no race occurred and sibling must still
       // be alive.
       if (sibling.locked().parent_ == cur.locked_or(start).parent_) {
@@ -668,20 +667,24 @@ class VmCowPages::TreeWalkCursor
     // cursor lock to acquire cur_locked_, cur_ could move again.
     Guard<CriticalMutex> guard{&lock_};
     fbl::RefPtr<VmCowPages> cur;
+    // Use a local cur_locked while we are looping and only update cur_locked_ at the end once we
+    // are certain we have the correct lock.
+    LockedPtr cur_locked = ktl::move(cur_locked_);
     do {
       // Clear any previous lock.
-      cur_locked_.release();
+      cur_locked.release();
       // Cursor was deleted.
       if (!cur_) {
         return false;
       }
       cur = fbl::MakeRefPtrUpgradeFromRaw(cur_, lock_);
-      guard.CallUnlocked([&]() { cur_locked_ = LockedPtr(cur.get(), VmLockAcquireMode::First); });
-    } while (cur_locked_.get() != cur_);
+      guard.CallUnlocked([&cur, &cur_locked]() { cur_locked = LockedPtr(cur.get()); });
+    } while (cur_locked.get() != cur_);
     // We have the lock to cur_ and so we safely drop the RefPtr, knowing that the object cannot be
     // destroyed without our backlink being updated, which would require someone else to acquire the
     // lock first. All this is only true if the object is presently in the Alive state.
-    DEBUG_ASSERT(cur_locked_.locked().life_cycle_ == LifeCycle::Alive);
+    DEBUG_ASSERT(cur_locked.locked().life_cycle_ == LifeCycle::Alive);
+    cur_locked_ = ktl::move(cur_locked);
     return true;
   }
 
@@ -727,8 +730,7 @@ class VmCowPages::TreeWalkCursor
         return;
       }
       root = fbl::MakeRefPtrUpgradeFromRaw(root_, lock_);
-      guard.CallUnlocked(
-          [&]() { root_locked = LockedPtr(root.get(), VmLockAcquireMode::Reentrant); });
+      guard.CallUnlocked([&]() { root_locked = LockedPtr(root.get()); });
     } while (root_locked.get() != root_);
     EraseLocked(&cur.locked(), &root_locked.locked());
   }
@@ -915,13 +917,11 @@ zx_status_t VmCowPages::ReplaceReferenceWithPageLocked(VmPageOrMarkerRef page_or
   return ZX_OK;
 }
 
-VmCowPages::VmCowPages(const fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr,
-                       VmCowPagesOptions options, uint32_t pmm_alloc_flags, uint64_t size,
+VmCowPages::VmCowPages(VmCowPagesOptions options, uint32_t pmm_alloc_flags, uint64_t size,
                        fbl::RefPtr<PageSource> page_source,
                        ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker,
                        uint64_t lock_order)
-    : VmHierarchyBase(ktl::move(hierarchy_state_ptr)),
-      pmm_alloc_flags_(pmm_alloc_flags),
+    : pmm_alloc_flags_(pmm_alloc_flags),
       options_(options),
 // If both local and shared locks are defined then there is still only one true lock, the shared
 // one, with the local lock existing to increase the tracking ability of lockdep. The local lock
@@ -973,7 +973,7 @@ fbl::RefPtr<VmCowPages> VmCowPages::MaybeDeadTransition() {
     VmCowPages* parent_raw;
     // Use a subscope as we potentially need to drop and then reacquire the locks.
     {
-      Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+      Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
       // With the lock now held check if we even need to do a dead transition.
       if (!should_dead_transition_locked()) {
         return nullptr;
@@ -982,7 +982,7 @@ fbl::RefPtr<VmCowPages> VmCowPages::MaybeDeadTransition() {
       if (!parent_) {
         return DeadTransitionLocked(LockedPtr(), LockedPtr());
       }
-      LockedPtr parent(parent_.get(), VmLockAcquireMode::Reentrant);
+      LockedPtr parent(parent_.get());
       // If we are the only child, then no need to check for siblings.
       if (parent.locked().children_list_len_ == 1) {
         return DeadTransitionLocked(ktl::move(parent), LockedPtr());
@@ -997,9 +997,8 @@ fbl::RefPtr<VmCowPages> VmCowPages::MaybeDeadTransition() {
         // simply to allow the default destruction order to correctly release the locks in order.
         sibling_ref = fbl::MakeRefPtrUpgradeFromRaw(&*sibling_iter, parent.locked().lock());
         parent.release();
-        LockedPtr sibling =
-            LockedPtr(sibling_ref.get(), lock_order() + 1, VmLockAcquireMode::Reentrant);
-        LockedPtr parent2(parent_.get(), VmLockAcquireMode::Reentrant);
+        LockedPtr sibling = LockedPtr(sibling_ref.get(), lock_order() + 1);
+        LockedPtr parent2(parent_.get());
         // We have continuously held our lock, so we know that parent_ is unchanged for us, but
         // check if this is still our sibling or not by recalculating and comparing.
         sibling_iter = ++parent2.locked().children_list_.make_iterator(*this);
@@ -1023,11 +1022,10 @@ fbl::RefPtr<VmCowPages> VmCowPages::MaybeDeadTransition() {
     }
 
     // Reacquire the locks, sibling first as it is to the 'left' in list order.
-    LockedPtr sibling = LockedPtr(sibling_ref.get(), VmLockAcquireMode::First);
+    LockedPtr sibling = LockedPtr(sibling_ref.get());
     // We could have the same lock order as our sibling, so we use the gap in the lock orders to
     // acquire.
-    Guard<VmoLockType> guard{AssertOrderedLock, lock(), sibling_ref->lock_order() + 1,
-                             VmLockAcquireMode::Reentrant};
+    Guard<CriticalMutex> guard{AssertOrderedLock, lock(), sibling_ref->lock_order() + 1};
     // With our lock reacquired, check that this still needs a dead transition, as it could already
     // have been done by someone else.
     if (!should_dead_transition_locked()) {
@@ -1041,7 +1039,7 @@ fbl::RefPtr<VmCowPages> VmCowPages::MaybeDeadTransition() {
     if (parent_.get() != parent_raw || sibling.locked().parent_.get() != parent_raw) {
       continue;
     }
-    LockedPtr parent(parent_.get(), VmLockAcquireMode::Reentrant);
+    LockedPtr parent(parent_.get());
     // Even if parent didn't change it could have gained new children and we might be needing to
     // acquire a right sibling instead. For simplicity just retry.
     if (parent.locked().children_list_len_ != 2) {
@@ -1133,7 +1131,7 @@ VmCowPages::~VmCowPages() {
   // DiscardableVmoTracker::DebugDiscardablePageCounts that depends upon this being here instead of
   // during the dead transition.
   if (discardable_tracker_) {
-    Guard<VmoLockType> guard{lock()};
+    Guard<CriticalMutex> guard{lock()};
     discardable_tracker_->assert_cow_pages_locked();
     discardable_tracker_->RemoveFromDiscardableListLocked();
   }
@@ -1284,7 +1282,7 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
   canary_.Assert();
 
   __UNINITIALIZED DeferredOps deferred(this);
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
 
   // Forbid zero page deduping if this is high priority.
   if (high_priority_count_ != 0) {
@@ -1353,15 +1351,14 @@ bool VmCowPages::DedupZeroPage(vm_page_t* page, uint64_t offset) {
   return false;
 }
 
-zx_status_t VmCowPages::Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
-                               uint32_t pmm_alloc_flags, uint64_t size,
+zx_status_t VmCowPages::Create(VmCowPagesOptions options, uint32_t pmm_alloc_flags, uint64_t size,
                                ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker,
                                fbl::RefPtr<VmCowPages>* cow_pages) {
   DEBUG_ASSERT(!(options & VmCowPagesOptions::kInternalOnlyMask));
   fbl::AllocChecker ac;
-  auto cow = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(ktl::move(root_lock), options, pmm_alloc_flags, size, nullptr,
-                           ktl::move(discardable_tracker), kLockOrderFirstAnon));
+  auto cow = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(options, pmm_alloc_flags, size, nullptr,
+                                                            ktl::move(discardable_tracker),
+                                                            kLockOrderFirstAnon));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -1374,13 +1371,11 @@ zx_status_t VmCowPages::Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPag
 }
 
 zx_status_t VmCowPages::CreateExternal(fbl::RefPtr<PageSource> src, VmCowPagesOptions options,
-                                       fbl::RefPtr<VmHierarchyState> root_lock, uint64_t size,
-                                       fbl::RefPtr<VmCowPages>* cow_pages) {
+                                       uint64_t size, fbl::RefPtr<VmCowPages>* cow_pages) {
   DEBUG_ASSERT(!(options & VmCowPagesOptions::kInternalOnlyMask));
   fbl::AllocChecker ac;
-  auto cow = fbl::AdoptRef<VmCowPages>(
-      new (&ac) VmCowPages(ktl::move(root_lock), options, PMM_ALLOC_FLAG_CAN_WAIT, size,
-                           ktl::move(src), nullptr, kLockOrderRoot));
+  auto cow = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
+      options, PMM_ALLOC_FLAG_CAN_WAIT, size, ktl::move(src), nullptr, kLockOrderRoot));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }
@@ -1451,7 +1446,7 @@ VmCowPages::ParentAndRange VmCowPages::FindParentAndRangeForCloneLocked(
 
   // Walk up the hierarchy until we find the last node which can correctly be the clone's parent.
   while (VmCowPages* next_parent = parent.locked_or(this).parent_.get()) {
-    grandparent = LockedPtr(next_parent, VmLockAcquireMode::Reentrant);
+    grandparent = LockedPtr(next_parent);
 
     // `parent` will always satisfy `parent_must_be_hidden` at this point.
     //
@@ -1502,15 +1497,11 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneNewHiddenParentLocked(
   const VmCowPagesOptions options = inheritable_options();
 
   fbl::AllocChecker ac;
-  fbl::RefPtr<VmHierarchyState> state;
-#if VMO_USE_SHARED_LOCK
-  state = hierarchy_state_ptr_;
-#endif
   LockedRefPtr cow_clone;
   // Use a sub-scope to limit visibility of cow_clone_ref as it's just a temporary.
   {
     auto cow_clone_ref = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-        state, options, pmm_alloc_flags_, size, nullptr, nullptr, kLockOrderFirstAnon));
+        options, pmm_alloc_flags_, size, nullptr, nullptr, kLockOrderFirstAnon));
     if (!ac.check()) {
       return zx::error(ZX_ERR_NO_MEMORY);
     }
@@ -1519,7 +1510,7 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneNewHiddenParentLocked(
     // then we must set the lock order after it.
     DEBUG_ASSERT(parent_.get() == parent.get());
     const uint64_t order = (parent ? parent->lock_order() : lock_order()) + 1;
-    cow_clone = LockedRefPtr(ktl::move(cow_clone_ref), order, VmLockAcquireMode::Reentrant);
+    cow_clone = LockedRefPtr(ktl::move(cow_clone_ref), order);
   }
 
   DEBUG_ASSERT(!is_hidden());
@@ -1546,8 +1537,8 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneNewHiddenParentLocked(
     const uint64_t hidden_lock_order =
         parent_ ? parent_->lock_order() - kLockOrderDelta : kLockOrderRoot;
     auto hidden_parent_ref = fbl::AdoptRef<VmCowPages>(
-        new (&ac) VmCowPages(ktl::move(state), options | VmCowPagesOptions::kHidden,
-                             pmm_alloc_flags_, size_, nullptr, nullptr, hidden_lock_order));
+        new (&ac) VmCowPages(options | VmCowPagesOptions::kHidden, pmm_alloc_flags_, size_, nullptr,
+                             nullptr, hidden_lock_order));
     if (!ac.check()) {
       return zx::error(ZX_ERR_NO_MEMORY);
     }
@@ -1557,7 +1548,7 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneNewHiddenParentLocked(
     // the gap in the regular lock orders, taking into account that the new leaf node was already
     // acquired into the same gap.
     const uint64_t order = parent ? parent->lock_order() + 2 : hidden_parent_ref->lock_order();
-    hidden_parent = LockedRefPtr(ktl::move(hidden_parent_ref), order, VmLockAcquireMode::Reentrant);
+    hidden_parent = LockedRefPtr(ktl::move(hidden_parent_ref), order);
   }
 
   // Create a temporary page list collect the parent content markers we might need to make. This
@@ -1705,10 +1696,6 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneChildLocked(uint64_t offse
   // Use a sub-scope to limit visibility of cow_clone_ref as it's just a temporary.
   {
     fbl::AllocChecker ac;
-    fbl::RefPtr<VmHierarchyState> state;
-#if VMO_USE_SHARED_LOCK
-    state = hierarchy_state_ptr_;
-#endif
     // We are either constructing the first visible anonymous node in a chain, which gets
     // kLockOrderFirstAnon, or this is part of a unidirectional clone chain and takes a lock order
     // derived from ourselves. In full these possibilities are:
@@ -1720,8 +1707,8 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneChildLocked(uint64_t offse
     // See comment above lock_order_ definition for more details.
     const uint64_t clone_order =
         (parent_ && !is_hidden()) ? lock_order() - kLockOrderDelta : kLockOrderFirstAnon;
-    auto cow_clone_ref = fbl::AdoptRef<VmCowPages>(new (&ac) VmCowPages(
-        ktl::move(state), options, pmm_alloc_flags_, size, nullptr, nullptr, clone_order));
+    auto cow_clone_ref = fbl::AdoptRef<VmCowPages>(
+        new (&ac) VmCowPages(options, pmm_alloc_flags_, size, nullptr, nullptr, clone_order));
     if (!ac.check()) {
       return zx::error(ZX_ERR_NO_MEMORY);
     }
@@ -1730,8 +1717,7 @@ zx::result<VmCowPages::LockedRefPtr> VmCowPages::CloneChildLocked(uint64_t offse
     // then we must set the lock order after it.
     DEBUG_ASSERT(parent_.get() == parent.get());
     cow_clone =
-        LockedRefPtr(ktl::move(cow_clone_ref), (parent ? parent->lock_order() : lock_order()) + 1,
-                     VmLockAcquireMode::Reentrant);
+        LockedRefPtr(ktl::move(cow_clone_ref), (parent ? parent->lock_order() : lock_order()) + 1);
   }
 
   AddChildLocked(&cow_clone.locked(), offset, limit);
@@ -1987,7 +1973,7 @@ void VmCowPages::RemoveChildLocked(VmCowPages* removed, const LockedPtr& sibling
   // non-zero count.
   LockedPtr locked_parent;
   if (parent_) {
-    locked_parent = LockedPtr(parent_.get(), VmLockAcquireMode::Reentrant);
+    locked_parent = LockedPtr(parent_.get());
   }
   if (locked_parent) {
     DEBUG_ASSERT(high_priority_count_ == 0 || locked_parent.locked().high_priority_count_ != 0);
@@ -2178,7 +2164,7 @@ uint32_t VmCowPages::DebugLookupDepthLocked() const {
   LockedPtr ptr;
   while (VmCowPages* parent = ptr.locked_or(this).parent_.get()) {
     depth++;
-    ptr = LockedPtr(parent, VmLockAcquireMode::Reentrant);
+    ptr = LockedPtr(parent);
   }
   return depth;
 }
@@ -2594,19 +2580,62 @@ zx_status_t VmCowPages::CloneCowPageLocked(uint64_t offset, list_node_t* alloc_l
   return ZX_OK;
 }
 
-zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* freed_list,
-                                                 VmCowPages* page_owner, vm_page_t* page,
-                                                 uint64_t owner_offset,
-                                                 AnonymousPageRequest* page_request) {
-  DEBUG_ASSERT(page != vm_get_zero_page());
+void VmCowPages::DecrementCowContentShareCount(VmPageOrMarkerRef content, uint64_t offset,
+                                               ScopedPageFreedList& list,
+                                               VmCompression* compression) {
+  // Only hidden nodes have content with a non-zero share count.
+  DEBUG_ASSERT(is_hidden());
+
+  // Release the reference we held to the forked page.
+  if (content->IsPage()) {
+    vm_page_t* page = content->Page();
+    if (page->object.share_count > 0) {
+      // The page is now shared one less time.
+      page->object.share_count--;
+    } else {
+      // Remove the page from the owner.
+      VmPageOrMarker removed = page_list_.RemoveContent(offset);
+      vm_page* removed_page = removed.ReleasePage();
+      DEBUG_ASSERT(removed_page == page);
+      Pmm::Node().GetPageQueues()->Remove(removed_page);
+      DEBUG_ASSERT(!page->is_loaned());
+
+      list_add_tail(list.List(), &page->queue_node);
+    }
+  } else {
+    DEBUG_ASSERT(content->IsReference());
+    uint32_t prev = compression->GetMetadata(content->Reference());
+    if (prev > 0) {
+      compression->SetMetadata(content->Reference(), prev - 1);
+    } else {
+      VmPageOrMarker removed = page_list_.RemoveContent(offset);
+      compression->Free(removed.ReleaseReference());
+    }
+  }
+}
+
+zx_status_t VmCowPages::CloneCowContentAsZeroLocked(uint64_t offset, ScopedPageFreedList& list,
+                                                    VmCowPages* content_owner,
+                                                    VmPageOrMarkerRef owner_content,
+                                                    uint64_t owner_offset) {
   DEBUG_ASSERT(parent_);
-  DEBUG_ASSERT(!page_source_ || page_source_->DebugIsPageOk(page, offset));
   // We only clone pages from hidden to visible nodes.
-  DEBUG_ASSERT(page_owner->is_hidden());
+  DEBUG_ASSERT(content_owner->is_hidden());
   DEBUG_ASSERT(!is_hidden());
   // We don't want to handle intervals here. They should only be present when this node is backed by
   // a user pager, and such nodes don't have parents so cannot be the target of a forked page.
   DEBUG_ASSERT(!is_source_preserving_page_content());
+
+  if (owner_content->IsMarker()) {
+    // Markers do not have ref counts so nothing else to do, this will already see this as zero.
+    return ZX_OK;
+  }
+  // Only other valid items should be pages or references.
+  DEBUG_ASSERT(owner_content->IsPageOrRef());
+  // Performing a cow zero of a parent content marker would require clearing a slot in |this| page
+  // list, which is a problem for our caller who might be iterating that some page list. As such
+  // this method may not be used if there might be parent content markers.
+  DEBUG_ASSERT(!node_has_parent_content_markers());
 
   // Go ahead and insert the new zero marker into the target. We don't have anything to rollback
   // if this fails so we can just bail immediately.
@@ -2618,20 +2647,8 @@ zx_status_t VmCowPages::CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* f
     return prev_content.status_value();
   }
   DEBUG_ASSERT(prev_content->IsEmpty());
-
-  // Release the reference we held to the forked page.
-  if (page->object.share_count > 0) {
-    // The page is now shared one less time.
-    page->object.share_count--;
-  } else {
-    // Remove the page from the owner.
-    VmPageOrMarker removed = page_owner->page_list_.RemoveContent(owner_offset);
-    vm_page* removed_page = removed.ReleasePage();
-    DEBUG_ASSERT(removed_page == page);
-    pmm_page_queues()->Remove(removed_page);
-
-    list_add_tail(freed_list, &page->queue_node);
-  }
+  content_owner->DecrementCowContentShareCount(owner_content, owner_offset, list,
+                                               Pmm::Node().GetPageCompression());
 
   return ZX_OK;
 }
@@ -2788,7 +2805,7 @@ void VmCowPages::FindPageContentLocked(uint64_t offset, uint64_t max_owner_lengt
     }
 
     offset += cur.locked_or(this).parent_offset_;
-    cur = LockedPtr(parent, VmLockAcquireMode::Reentrant);
+    cur = LockedPtr(parent);
   }
   *out = {cur.locked_or(this).page_list_.LookupMutableCursor(offset), ktl::move(cur), offset,
           max_owner_length + this_offset};
@@ -2796,7 +2813,7 @@ void VmCowPages::FindPageContentLocked(uint64_t offset, uint64_t max_owner_lengt
 
 void VmCowPages::FindInitialPageContentLocked(uint64_t offset, PageLookup* out) {
   if (parent_ && offset < parent_limit_) {
-    LockedPtr parent = LockedPtr(parent_.get(), VmLockAcquireMode::Reentrant);
+    LockedPtr parent = LockedPtr(parent_.get());
     parent.locked().FindPageContentLocked(offset + parent_offset_, PAGE_SIZE, out);
     if (!out->owner) {
       out->owner = ktl::move(parent);
@@ -3467,7 +3484,7 @@ uint VmCowPages::LookupCursor::IfExistPages(bool will_write, uint max_pages, pad
   uint pages = 0;
   owner_info_.cursor.ForEveryContiguous([&](VmPageOrMarkerRef page) {
     if (page->IsPage()) {
-      paddrs[pages] = page->Page()->paddr();
+      paddrs[pages] = page->PageAsPaddr();
       pages++;
       return pages == max_pages ? ZX_ERR_STOP : ZX_ERR_NEXT;
     }
@@ -3807,7 +3824,7 @@ zx_status_t VmCowPages::DecommitRange(VmCowRange range) {
   canary_.Assert();
 
   __UNINITIALIZED DeferredOps deferred(this);
-  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
   // Validate the size and perform our zero-length hot-path check before we recurse
   // up to our top-level ancestor.  Size bounding needs to take place relative
   // to the child the operation was originally targeted against.
@@ -4325,19 +4342,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, Defe
     // perform slightly more complex cow forking.
     const InitialPageContent& content = get_initial_page_content(offset);
     if (!slot && content.page_owner.locked_or(this).is_hidden()) {
-      // TODO(https://fxbug.dev/42138396): This could be more optimal since unlike a regular cow
-      // clone, we are not going to actually need to read the target page we are cloning, and hence
-      // it does not actually need to get converted.
-      if (content.page_or_marker->IsReference()) {
-        zx_status_t result = content.page_owner.locked_or(this).ReplaceReferenceWithPageLocked(
-            content.page_or_marker, content.owner_offset, page_request->GetAnonymous());
-        if (result != ZX_OK) {
-          return result;
-        }
-      }
-      zx_status_t result = CloneCowPageAsZeroLocked(
-          offset, deferred.FreedList(this).List(), &content.page_owner.locked_or(this),
-          content.page_or_marker->Page(), content.owner_offset, page_request->GetAnonymous());
+      zx_status_t result = CloneCowContentAsZeroLocked(
+          offset, deferred.FreedList(this), &content.page_owner.locked_or(this),
+          content.page_or_marker, content.owner_offset);
       if (result != ZX_OK) {
         return result;
       }
@@ -4406,36 +4413,9 @@ zx_status_t VmCowPages::ZeroPagesLocked(VmCowRange range, bool dirty_track, Defe
           DEBUG_ASSERT(can_see_parent(offset) && parent_has_content(offset) &&
                        !root_has_page_source());
           const InitialPageContent& content = get_initial_page_content(offset);
-          if (content.page_or_marker->IsPage()) {
-            vm_page_t* page = content.page_or_marker->Page();
-            // Release the reference we held to the forked page.
-            if (page->object.share_count > 0) {
-              // The page is now shared one less time.
-              page->object.share_count--;
-            } else {
-              // Remove the page from the owner.
-              VmPageOrMarker removed =
-                  content.page_owner.locked().page_list_.RemoveContent(content.owner_offset);
-              vm_page* removed_page = removed.ReleasePage();
-              DEBUG_ASSERT(removed_page == page);
-              pmm_page_queues()->Remove(removed_page);
-
-              list_add_tail(deferred.FreedList(this).List(), &page->queue_node);
-            }
-          } else if (content.page_or_marker->IsReference()) {
-            VmCompression* compression = Pmm::Node().GetPageCompression();
-            uint32_t prev = compression->GetMetadata(content.page_or_marker->Reference());
-            if (prev > 0) {
-              compression->SetMetadata(content.page_or_marker->Reference(), prev - 1);
-            } else {
-              VmPageOrMarker removed =
-                  content.page_owner.locked().page_list_.RemoveContent(content.owner_offset);
-              compression->Free(removed.ReleaseReference());
-            }
-          } else {
-            // Markers do not have ref counts and so we just leave it.
-            DEBUG_ASSERT(content.page_or_marker->IsMarker());
-          }
+          content.page_owner.locked_or(this).DecrementCowContentShareCount(
+              content.page_or_marker, content.owner_offset, deferred.FreedList(this),
+              Pmm::Node().GetPageCompression());
           *slot = VmPageOrMarker::Empty();
           *zeroed_len_out += PAGE_SIZE;
           return ZX_ERR_NEXT;
@@ -4617,7 +4597,7 @@ zx_status_t VmCowPages::PromoteRangeForReclamation(VmCowRange range) {
     return ZX_OK;
   }
 
-  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
   if (!range.IsBoundedBy(size_)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -4670,7 +4650,7 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
   // tolerate the VMO shrinking during the operation, the range must be valid at the point we
   // started.
   {
-    Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+    Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
     if (!range.IsBoundedBy(size_)) {
       return ZX_ERR_OUT_OF_RANGE;
     }
@@ -4693,7 +4673,7 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
     zx_status_t status;
     {
       __UNINITIALIZED DeferredOps deferred(this);
-      Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+      Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
       // The size might have changed since we dropped the lock. Adjust the range if required.
       if (range.offset >= size_) {
         // No more pages to hint.
@@ -4808,7 +4788,7 @@ zx_status_t VmCowPages::ProtectRangeFromReclamation(VmCowRange range, bool set_a
 zx_status_t VmCowPages::DecompressInRange(VmCowRange range) {
   canary_.Assert();
 
-  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
   if (!range.IsBoundedBy(size_)) {
     return ZX_ERR_OUT_OF_RANGE;
   }
@@ -4893,7 +4873,7 @@ void VmCowPages::ChangeHighPriorityCountLocked(int64_t delta) {
     if (!parent) {
       break;
     }
-    cur = LockedPtr(parent, VmLockAcquireMode::Reentrant);
+    cur = LockedPtr(parent);
   }
 }
 
@@ -5117,7 +5097,7 @@ zx_status_t VmCowPages::Resize(uint64_t s) {
   // and checks where this is set to true for details on the correctness.
   bool update_child_limits = false;
   {
-    Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+    Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
 
     // make sure everything is aligned before we get started
     DEBUG_ASSERT(IS_PAGE_ALIGNED(size_));
@@ -5252,7 +5232,7 @@ zx_status_t VmCowPages::Resize(uint64_t s) {
     // Use a TreeWalkCursor to walk all our children.
     // A child's parent limit will also limit that child's descendants' views into this node, so
     // this method only needs to touch the direct children.
-    TreeWalkCursor cursor(LockedPtr(this, VmLockAcquireMode::First));
+    TreeWalkCursor cursor(LockedPtr(this));
     // Go to the first child, if we still have one.
     if (cursor.NextChild()) {
       // Update this child and all its siblings.
@@ -5500,7 +5480,7 @@ zx_status_t VmCowPages::TakePages(VmCowRange range, VmPageSpliceList* pages, uin
   DEBUG_ASSERT(range.is_page_aligned());
 
   __UNINITIALIZED DeferredOps deferred(this);
-  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
 
   if (!range.IsBoundedBy(size_)) {
     pages->Finalize();
@@ -5561,7 +5541,7 @@ zx_status_t VmCowPages::TakePages(VmCowRange range, VmPageSpliceList* pages, uin
   // VMO whose parent is concurrently closed. In this case, we have to append to the splice list
   // one VmPageOrMarker at a time.
   if (likely(pages->IsEmpty())) {
-    *pages = page_list_.TakePages(range.offset, range.len);
+    page_list_.TakePages(pages);
   } else {
     for (uint64_t position = range.offset; position < range.end(); position += PAGE_SIZE) {
       VmPageOrMarker content = page_list_.RemoveContent(position);
@@ -5868,7 +5848,7 @@ zx_status_t VmCowPages::DirtyPages(VmCowRange range, list_node_t* alloc_list,
   const uint64_t end_offset = range.end();
 
   __UNINITIALIZED DeferredOps deferred(this);
-  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
 
   if (start_offset > size_locked()) {
     return ZX_ERR_OUT_OF_RANGE;
@@ -6453,7 +6433,7 @@ zx_status_t VmCowPages::WritebackEndLocked(VmCowRange range) {
 fbl::RefPtr<VmCowPages> VmCowPages::DebugGetParent() {
   canary_.Assert();
 
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   return parent_;
 }
 
@@ -6461,7 +6441,7 @@ void VmCowPages::DetachSource() {
   canary_.Assert();
 
   __UNINITIALIZED DeferredOps deferred(this);
-  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
 
   DEBUG_ASSERT(page_source_);
   page_source_->Detach();
@@ -6691,7 +6671,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
   }
 
   __UNINITIALIZED DeferredOps deferred(this);
-  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
 
   const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
   if (!CanReclaimPageLocked(page, page_or_marker)) {
@@ -6743,6 +6723,18 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEviction(vm_page_t* page, ui
     return ReclaimCounts{};
   }
 
+  char vmo_name[ZX_MAX_NAME_LEN] __UNINITIALIZED = "\0";
+  // Lambda so that vmo_name is only filled out if tracing is enabled.
+  auto get_vmo_name = [&]() __ALWAYS_INLINE {
+    AssertHeld(lock_);
+    if (paged_ref_) {
+      paged_ref_->get_name(vmo_name, sizeof(vmo_name));
+    }
+    return vmo_name;
+  };
+  VM_KTRACE_INSTANT(1, "evict_page", ("vmo_id", paged_ref_ ? paged_ref_->user_id() : 0),
+                    ("offset", offset), ("vmo_name", get_vmo_name()));
+
   // Use RemovePage over just writing to page_or_marker so that the page list has the opportunity
   // to release any now empty intermediate nodes.
   vm_page_t* p = page_list_.RemoveContent(offset).ReleasePage();
@@ -6770,7 +6762,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
   bool reclaimed = false;
   {
     __UNINITIALIZED DeferredOps deferred(this);
-    Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+    Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
     // Not allowed to reclaim if uncached.
     if ((paged_ref_ && (paged_backlink_locked(this)->GetMappingCachePolicyLocked() &
                         ZX_CACHE_POLICY_MASK) != ZX_CACHE_POLICY_CACHED)) {
@@ -6828,7 +6820,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompression(vm_page_t* page,
   compressor->Compress();
 
   {
-    Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+    Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
 
     // Retrieve the result of compression now that we hold the VMO lock again.
     VmCompressor::CompressResult compression_result = compressor->TakeCompressionResult();
@@ -6957,7 +6949,7 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offs
   // since our failure was not based on page contents.
   // Before touching it double check this page is page of this VMO, as otherwise we cannot safely
   // know its state to call MarkAccessed.
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
   if (!page_or_marker || !page_or_marker->IsPage() || page_or_marker->Page() != page) {
     return ReclaimCounts{};
@@ -7029,14 +7021,14 @@ zx_status_t VmCowPages::ReplacePageWithLoaned(vm_page_t* before_page, uint64_t o
   canary_.Assert();
 
   __UNINITIALIZED DeferredOps deferred(this);
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   return ReplacePageLocked(before_page, offset, true, nullptr, deferred, nullptr);
 }
 
 zx_status_t VmCowPages::ReplacePage(vm_page_t* before_page, uint64_t offset, bool with_loaned,
                                     vm_page_t** after_page, AnonymousPageRequest* page_request) {
   __UNINITIALIZED DeferredOps deferred(this);
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   return ReplacePageLocked(before_page, offset, with_loaned, after_page, deferred, page_request);
 }
 
@@ -7547,7 +7539,7 @@ uint64_t VmCowPages::DebugGetPageCountLocked() const {
 bool VmCowPages::DebugIsPage(uint64_t offset) const {
   canary_.Assert();
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   const VmPageOrMarker* p = page_list_.Lookup(offset);
   return p && p->IsPage();
 }
@@ -7555,7 +7547,7 @@ bool VmCowPages::DebugIsPage(uint64_t offset) const {
 bool VmCowPages::DebugIsMarker(uint64_t offset) const {
   canary_.Assert();
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   const VmPageOrMarker* p = page_list_.Lookup(offset);
   return p && p->IsMarker();
 }
@@ -7563,14 +7555,14 @@ bool VmCowPages::DebugIsMarker(uint64_t offset) const {
 bool VmCowPages::DebugIsEmpty(uint64_t offset) const {
   canary_.Assert();
   DEBUG_ASSERT(IS_PAGE_ALIGNED(offset));
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   const VmPageOrMarker* p = page_list_.Lookup(offset);
   return !p || p->IsEmpty();
 }
 
 vm_page_t* VmCowPages::DebugGetPage(uint64_t offset) const {
   canary_.Assert();
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   return DebugGetPageLocked(offset);
 }
 
@@ -7586,7 +7578,7 @@ vm_page_t* VmCowPages::DebugGetPageLocked(uint64_t offset) const {
 
 bool VmCowPages::DebugIsHighMemoryPriority() const {
   canary_.Assert();
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   return is_high_memory_priority_locked();
 }
 
@@ -7599,7 +7591,7 @@ VmCowPages::DiscardablePageCounts VmCowPages::DebugGetDiscardablePageCounts() co
     return counts;
   }
 
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
 
   discardable_tracker_->assert_cow_pages_locked();
   const DiscardableVmoTracker::DiscardableState state =
@@ -7639,7 +7631,7 @@ uint64_t VmCowPages::DiscardPages() {
   canary_.Assert();
 
   __UNINITIALIZED DeferredOps deferred(this);
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   // Discard any errors and overlap a 0 return value for errors.
   return DiscardPagesLocked(deferred).value_or(0);
 }
@@ -7671,7 +7663,7 @@ zx::result<uint64_t> VmCowPages::ReclaimDiscardable(vm_page_t* page, uint64_t of
   DEBUG_ASSERT(discardable_tracker_);
 
   __UNINITIALIZED DeferredOps deferred(this);
-  Guard<VmoLockType> guard{AssertOrderedLock, lock(), lock_order(), VmLockAcquireMode::First};
+  Guard<CriticalMutex> guard{AssertOrderedLock, lock(), lock_order()};
 
   const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
   if (!CanReclaimPageLocked(page, page_or_marker)) {
@@ -7688,6 +7680,9 @@ zx::result<uint64_t> VmCowPages::ReclaimDiscardable(vm_page_t* page, uint64_t of
     return ZX_ERR_STOP;
   });
   if (!first) {
+    // Mark the page accessed so that it's no longer a reclamation candidate. The other error path
+    // above already does this inside the CanReclaimPageLocked() helper.
+    pmm_page_queues()->MarkAccessed(page);
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
@@ -7721,8 +7716,7 @@ VmCowPages::DeferredOps::DeferredOps(VmCowPages* self) : self_(self) {
   if (self_->root_has_page_source()) {
     fbl::RefPtr<PageSource> source;
     {
-      Guard<VmoLockType> guard{AssertOrderedLock, self_->lock(), self_->lock_order(),
-                               VmLockAcquireMode::First};
+      Guard<CriticalMutex> guard{AssertOrderedLock, self_->lock(), self_->lock_order()};
       if (self_->life_cycle_ != LifeCycle::Alive) {
         // Although the C++ object is guaranteed to be valid by the caller, it's possible that VMO
         // has transitioned into a dead state. This race can occur typically due to reclamation
@@ -7740,7 +7734,7 @@ VmCowPages::DeferredOps::DeferredOps(VmCowPages* self) : self_(self) {
       }
       LockedPtr current;
       while (current.locked_or(self_).parent_) {
-        current = LockedPtr(current.locked_or(self_).parent_.get(), VmLockAcquireMode::Reentrant);
+        current = LockedPtr(current.locked_or(self_).parent_.get());
       }
       source = current.locked_or(self_).page_source_;
     }
@@ -7751,7 +7745,7 @@ VmCowPages::DeferredOps::DeferredOps(VmCowPages* self) : self_(self) {
 
 VmCowPages::DeferredOps::~DeferredOps() {
   if (range_op_.has_value()) {
-    LockedPtr self(self_, VmLockAcquireMode::First);
+    LockedPtr self(self_);
     VmCowPages::RangeChangeUpdateCowChildren(ktl::move(self), range_op_->range, range_op_->op);
   }
   if (page_source_lock_.has_value()) {

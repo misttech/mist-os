@@ -14,8 +14,7 @@ use super::{
 use crate::bpf::fs::BpfHandle;
 use crate::mm::{Mapping, MappingName, MappingOptions, ProtectionFlags};
 use crate::security::selinux_hooks::{
-    check_self_permission, todo_check_permission, todo_has_file_permissions, track_stub,
-    ProcessPermission,
+    check_self_permission, todo_check_permission, todo_has_file_permissions, ProcessPermission,
 };
 use crate::task::CurrentTask;
 use crate::vfs::{canonicalize_ioctl_request, FileHandle, FileObject, FsNodeHandle};
@@ -23,10 +22,12 @@ use crate::TODO_DENY;
 use selinux::{CommonFsNodePermission, SecurityServer};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{
     FIBMAP, FIGETBSZ, FIOASYNC, FIONBIO, FIONREAD, FS_IOC_GETFLAGS, FS_IOC_GETVERSION,
     FS_IOC_SETFLAGS, FS_IOC_SETVERSION, F_GETLK, F_SETFL, F_SETLK, F_SETLKW,
 };
+use std::ops::Range;
 
 /// Returns the security state for a new file object created by `current_task`.
 pub(in crate::security) fn file_alloc_security(current_task: &CurrentTask) -> FileObjectState {
@@ -91,7 +92,7 @@ pub(in crate::security) fn file_receive(
             &[],
             current_task.into(),
         )?;
-        match bpf_handle {
+        match *bpf_handle {
             BpfHandle::Map(ref map) => {
                 check_bpf_map_access(security_server, current_task, map, permission_flags)?
             }
@@ -269,28 +270,45 @@ pub(in crate::security) fn check_file_fcntl_access(
 pub fn file_mprotect(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
+    mapping_range: &Range<UserAddress>,
     mapping: &Mapping,
     prot: ProtectionFlags,
 ) -> Result<(), Errno> {
     if !mapping.can_exec() && prot.contains(ProtectionFlags::EXEC) {
-        match mapping.name() {
-            MappingName::Heap => {
-                let current_sid = task_effective_sid(current_task);
-                check_self_permission(
-                    &security_server.as_permission_check(),
-                    current_task.kernel(),
-                    current_sid,
-                    ProcessPermission::ExecHeap,
-                    current_task.into(),
-                )?;
-            }
-            MappingName::Stack => {
-                track_stub!(TODO("https://fxbug.dev/415257144"), "Check `execstack`");
-            }
-            _ => {
+        let permission = match mapping.name() {
+            MappingName::Heap => Some(ProcessPermission::ExecHeap),
+            // `execstack` is checked when making executable the stack of the initial thread.
+            MappingName::Stack => Some(ProcessPermission::ExecStack),
+            MappingName::None
+            | MappingName::Vdso
+            | MappingName::Vvar
+            | MappingName::File(_)
+            | MappingName::Vma(_)
+            | MappingName::Ashmem(_)
+            | MappingName::AioContext(_) => {
                 // TODO(b/409256444): Check `execmod`
+
+                // `execstack` is checked when making executable a mapping that contains
+                // the stackpointer.
+                let stack_pointer_register =
+                    current_task.thread_state.registers.stack_pointer_register();
+                if mapping_range.contains(&UserAddress::const_from(stack_pointer_register)) {
+                    Some(ProcessPermission::ExecStack)
+                } else {
+                    None
+                }
             }
         };
+        if let Some(permission) = permission {
+            let subject_sid = task_effective_sid(current_task);
+            check_self_permission(
+                &security_server.as_permission_check(),
+                current_task.kernel(),
+                subject_sid,
+                permission,
+                current_task.into(),
+            )?;
+        }
     }
     let fs_node = if let MappingName::File(active_namespace_node) = mapping.name() {
         Some((&(*active_namespace_node).entry.node).clone())

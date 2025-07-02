@@ -115,9 +115,10 @@ pub struct ComponentEventRoute {
 
 impl ComponentEventRoute {
     fn from_moniker(moniker: &Moniker, scope: Option<Vec<EventScope>>) -> ComponentEventRoute {
-        let component = moniker
-            .leaf()
-            .map(|leaf| ChildRef { name: leaf.name.clone(), collection: leaf.collection.clone() });
+        let component = moniker.leaf().map(|leaf| ChildRef {
+            name: leaf.name().into(),
+            collection: leaf.collection().map(Into::into),
+        });
         ComponentEventRoute { component, scope }
     }
 }
@@ -345,8 +346,8 @@ impl EventRegistry {
         if let Some(moniker) = component.child_moniker() {
             route.push(ComponentEventRoute {
                 component: Some(ChildRef {
-                    name: moniker.name().clone(),
-                    collection: moniker.collection().cloned(),
+                    name: moniker.name().into(),
+                    collection: moniker.collection().map(Into::into),
                 }),
                 scope: event_decl.scope,
             });
@@ -383,7 +384,7 @@ impl EventRegistry {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "src_model_tests")))]
     async fn dispatchers_per_event_type(&self, event_type: EventType) -> usize {
         let dispatcher_map = self.dispatcher_map.lock().await;
         dispatcher_map
@@ -401,7 +402,7 @@ impl Hook for EventRegistry {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::model::testing::test_helpers::*;

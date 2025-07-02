@@ -17,10 +17,13 @@ rustc_library("lib") {
 
   deps = [
     ":config_lib",
+    "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
+    "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
     "//sdk/fidl/fuchsia.pkg.internal:fuchsia.pkg.internal_rust",
+    "//sdk/fidl/fuchsia.pkg.resolution:fuchsia.pkg.resolution_rust",
     "//sdk/fidl/fuchsia.pkg.rewrite:fuchsia.pkg.rewrite_rust",
     "//sdk/rust/zx",
     "//src/lib/cobalt/rust/builders",
@@ -41,10 +44,13 @@ rustc_library("lib") {
     "//src/lib/http-uri-ext",
     "//src/lib/trace/rust:trace",
     "//src/lib/trace/rust:trace-provider",
+    "//src/lib/versioning/version-history/rust",
     "//src/storage/lib/delivery_blob",
+    "//src/sys/lib/fidl-fuchsia-component-abi-ext",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
     "//src/sys/lib/fidl-fuchsia-pkg-rewrite-ext",
     "//src/sys/lib/fuchsia_backoff",
+    "//src/sys/lib/mem_util",
     "//src/sys/pkg/lib/async-generator",
     "//src/sys/pkg/lib/eager-package-config",
     "//src/sys/pkg/lib/fuchsia-pkg",
@@ -69,7 +75,10 @@ rustc_library("lib") {
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//src/lib/fuchsia-component-test",
+    "//src/storage/lib/vfs/rust:vfs",
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//third_party/cobalt/src/lib/client/rust:cobalt-client",
     "//third_party/rust_crates:assert_matches",
@@ -87,6 +96,7 @@ rustc_library("lib") {
     "src/cache/retry.rs",
     "src/cache_package_index.rs",
     "src/clock.rs",
+    "src/component_resolver.rs",
     "src/config.rs",
     "src/eager_package_manager.rs",
     "src/error.rs",
@@ -174,9 +184,11 @@ fuchsia_test_package("unit-tests-package") {
   }
   package_name = "pkg-resolver-tests"
   deps = [
+    ":eng-component-and-config",
     ":unit-tests-driver",
     "//src/connectivity/network:netstack-for-tests",
     "//src/connectivity/network/dns:component",
+    "//src/sys/pkg/lib/fuchsia-pkg-testing/certs",
     "//src/sys/pkg/tests/pkg-resolver:empty-repo",
   ]
   test_components = [ ":unit-tests-root" ]

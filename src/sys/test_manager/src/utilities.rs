@@ -24,6 +24,7 @@ where
     .try_flatten()
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/421408765)
 /// A struct which logs a set string when it drops out of scope.
 pub struct LogOnDrop(pub &'static str);
 

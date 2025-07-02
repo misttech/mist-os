@@ -45,22 +45,11 @@ pub enum MemoryReclamationStrategy {
 #[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(default, deny_unknown_fields)]
 pub struct PlatformKernelConfig {
-    /// What should happen if the device runs out-of-memory.
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub oom_behavior: OOMBehavior,
-
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub memory_compression: bool,
 
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub lru_memory_compression: bool,
-
-    /// Configures kernel eviction to run continually in the background to try
-    /// and keep the system out of memory pressure, as opposed to triggering
-    /// one-shot eviction only at memory pressure level transitions.
-    /// Enables the `kernel_evict_continuous` assembly input bundle.
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub continuous_eviction: bool,
 
     /// Configures cprng related behaviors
     #[serde(default)]
@@ -229,6 +218,18 @@ pub struct OomConfig {
     /// signaling that processes should slow down memory allocations.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub warning_mb: Option<u32>,
+
+    /// Delta (in MiB) above OOM level at which the Imminent-OOM event is signaled.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub imminent_oom_delta_mb: Option<u32>,
+
+    /// Memory pressure state is changed only if free memory is debounce_mb outside of that state.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub debounce_mb: Option<u32>,
+
+    /// Hysteresis interval (in seconds) between memory pressure state transitions.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub hysteresis_seconds: Option<u32>,
 }
 
 impl Default for OomConfig {
@@ -243,6 +244,9 @@ impl Default for OomConfig {
             out_of_memory_mb: None,
             critical_mb: None,
             warning_mb: None,
+            imminent_oom_delta_mb: None,
+            debounce_mb: None,
+            hysteresis_seconds: None,
         }
     }
 }

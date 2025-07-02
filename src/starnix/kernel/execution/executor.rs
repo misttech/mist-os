@@ -185,7 +185,7 @@ struct RestrictedEnterContext<'a> {
 ///   5. Handle pending signals.
 ///   6. Goto 1.
 fn run_task(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     mut restricted_state: RestrictedState,
 ) -> Result<ExitStatus, Error> {
@@ -194,7 +194,7 @@ fn run_task(
     set_current_task_info(
         &current_task.task.command(),
         current_task.task.thread_group().leader,
-        current_task.id,
+        current_task.tid,
     );
 
     firehose_trace_duration!(CATEGORY_STARNIX, NAME_RUN_TASK);
@@ -396,7 +396,7 @@ fn process_restricted_exit(
 }
 
 pub fn execute_task_with_prerun_result<L, F, R, G>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     task_builder: TaskBuilder,
     pre_run: F,
     task_complete: G,
@@ -404,10 +404,7 @@ pub fn execute_task_with_prerun_result<L, F, R, G>(
 ) -> Result<R, Errno>
 where
     L: LockBefore<TaskRelease>,
-    F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) -> Result<R, Errno>
-        + Send
-        + Sync
-        + 'static,
+    F: FnOnce(&mut Locked<Unlocked>, &mut CurrentTask) -> Result<R, Errno> + Send + Sync + 'static,
     R: Send + Sync + 'static,
     G: FnOnce(Result<ExitStatus, Error>) + Send + Sync + 'static,
 {
@@ -435,7 +432,7 @@ where
 }
 
 pub fn execute_task<L, F, G>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     task_builder: TaskBuilder,
     pre_run: F,
     task_complete: G,
@@ -443,10 +440,7 @@ pub fn execute_task<L, F, G>(
 ) -> Result<(), Errno>
 where
     L: LockBefore<TaskRelease>,
-    F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask) -> Result<(), Errno>
-        + Send
-        + Sync
-        + 'static,
+    F: FnOnce(&mut Locked<Unlocked>, &mut CurrentTask) -> Result<(), Errno> + Send + Sync + 'static,
     G: FnOnce(Result<ExitStatus, Error>) + Send + Sync + 'static,
 {
     // Set the process handle to the new task's process, so the new thread is spawned in that
@@ -585,7 +579,7 @@ where
 }
 
 fn process_completed_exception(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     exception_result: ExceptionResult,
     restricted_exception: zx::sys::zx_restricted_exception_t,
@@ -642,7 +636,7 @@ pub struct ErrorContext {
 /// Returns an `ErrorContext` if the system call returned an error.
 #[inline(never)] // Inlining this function breaks the CFI directives used to unwind into user code.
 pub fn execute_syscall(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     syscall_decl: SyscallDecl,
 ) -> Option<ErrorContext> {
@@ -701,7 +695,7 @@ pub fn execute_syscall(
 ///
 /// Returns an `ExitStatus` if the task is meant to exit.
 pub fn process_completed_restricted_exit(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     error_context: &Option<ErrorContext>,
 ) -> Result<Option<ExitStatus>, Errno> {

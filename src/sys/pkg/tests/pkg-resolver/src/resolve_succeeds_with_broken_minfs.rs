@@ -339,10 +339,6 @@ impl FailingWriteFileStreamHandler {
                     fio::FileRequest::Write { data, responder } => {
                         self.handle_write(data, responder).await
                     }
-                    fio::FileRequest::GetAttr { responder } => {
-                        let (status, attrs) = self.backing_file.get_attr().await.unwrap();
-                        responder.send(status, &attrs).unwrap();
-                    }
                     fio::FileRequest::Read { count, responder } => {
                         let result = self.backing_file.read(count).await.unwrap();
                         responder.send(result.as_deref().map_err(|e| *e)).unwrap();
@@ -434,10 +430,6 @@ impl OpenRequestHandler for RenameFailOrTempFs {
         fasync::Task::spawn(async move {
             while let Some(req) = requests.next().await {
                 match req.unwrap() {
-                    fio::DirectoryRequest::GetAttr { responder } => {
-                        let (status, attrs) = tempdir_proxy.get_attr().await.unwrap();
-                        responder.send(status, &attrs).unwrap();
-                    }
                     fio::DirectoryRequest::Close { responder } => {
                         let result = tempdir_proxy.close().await.unwrap();
                         responder.send(result).unwrap();

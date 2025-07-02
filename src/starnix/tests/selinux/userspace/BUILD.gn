@@ -100,10 +100,13 @@ source_set("userspace_test_main") {
 test_names = [
   # keep-sorted start
   "anon_inode",
+  "binder",
+  "inherit",
   "ioctl",
   "load_policy",
   "memfd",
   "mount",
+  "mprotect",
   "pipe",
   "procattr",
   "selinuxfs",
@@ -114,20 +117,69 @@ test_names = [
   # keep-sorted end
 ]
 
+# List of programs launched by "inherit" tests.
+inherit_test_executable_names = [
+  # keep-sorted start
+  "is_selinux_null_inode",
+  "true",
+
+  # keep-sorted end
+]
+
 # Policies made available to the tests.
 resource("policies") {
   sources = [
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/anon_inode_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/binder.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/file_transition_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/inherit_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/ioctl_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/memfd_transition.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/minimal_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/mprotect.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/pipe_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/selinuxfs_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/socket_policy.pp",
     "//src/starnix/lib/selinux/testdata/composite_policies/compiled/timerslack.pp",
   ]
   outputs = "data/policies/{{source_file_part}}"
+}
+
+inherit_test_executables = []
+inherit_test_resources = []
+foreach(executable_name, inherit_test_executable_names) {
+  inherit_test_executables += [ ":${executable_name}" ]
+  executable("${executable_name}") {
+    testonly = true
+
+    # TODO: https://fxbug.dev/297293167 - enable ASan instrumentation for Linux binaries in Starnix
+    exclude_toolchain_tags = [ "instrumented" ]
+    sources = [
+      "tests/inherit_test_executables/${executable_name}.cc",
+      "util.cc",
+      "util.h",
+    ]
+    deps = [
+      "//sdk/lib/fit",
+      "//src/lib/files",
+      "//src/starnix/tests/syscalls/cpp:test_utils",
+      "//third_party/googletest:gmock",
+      "//third_party/googletest:gtest",
+    ]
+    output_name = "${executable_name}_bin"
+    configs += [ ":rpath_config" ]
+  }
+
+  inherit_test_resources += [ ":${executable_name}_bin" ]
+
+  resource("${executable_name}_bin") {
+    testonly = true
+    out_dir = get_label_info(":${executable_name}($target_linux_toolchain)",
+                             "root_out_dir")
+    deps = [ ":${executable_name}($target_linux_toolchain)" ]
+    sources = [ "${out_dir}/${executable_name}_bin" ]
+    outputs = "data/bin/${executable_name}_bin"
+  }
 }
 
 copy("expectations") {
@@ -147,6 +199,7 @@ foreach(test_name, test_names) {
       "//sdk/lib/fit",
       "//src/lib/files",
       "//src/lib/fxl",
+      "//src/starnix/tests/syscalls/cpp:test_utils",
       "//third_party/googletest:gtest",
       "//zircon/system/ulib/fbl",
     ]
@@ -187,6 +240,7 @@ fuchsia_test_package("sestarnix_userspace_tests") {
   test_components = test_component_targets
   subpackages =
       starnix_test_subpackages + [ ":sestarnix_userspace_test_container" ]
+  deps = inherit_test_resources
 }
 
 group("tests") {

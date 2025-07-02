@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.views/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
+#include <lib/async/cpp/wait.h>
 #include <lib/component/incoming/cpp/protocol.h>
 
 #include <filesystem>
@@ -31,10 +32,6 @@ namespace escher {
 
 const fuchsia_ui_composition::TransformId kTransform = {1};
 const fuchsia_ui_composition::TransformId kTransformNone = {0};
-
-// Reserved hrtimer id. Do not change!
-constexpr uint64_t kHrtimerId = 8;
-static constexpr char kHrtimerDeviceDirectory[] = "/dev/class/hrtimer";
 
 VulkanInstance::Params GetVulkanInstanceParams() {
   VulkanInstance::Params instance_params{
@@ -197,29 +194,29 @@ zx::eventpair escher::EscherFlatland::ConnectPowerResources() {
   sag_ = fidl::SyncClient(std::move(*sag_client_end));
 
   // Hold onto an activity lease to stop going to suspend mode before running CPU and GPU commands.
-  auto setup_lease = GetActivityLease();
-
-  return setup_lease;
+  return GetActivityLease();
 }
 
 void escher::EscherFlatland::ConnectTimerResources() {
-  // Connect to hrtimer.
-  std::string path;
-  for (const auto& entry : std::filesystem::directory_iterator(kHrtimerDeviceDirectory)) {
-    path = entry.path().string();
-    break;
-  }
-  zx::result connector = component::Connect<fuchsia_hardware_hrtimer::Device>(path.c_str());
-  if (connector.is_error()) {
-    FX_LOGS(FATAL) << "Could not connect to:" << path << " status:" << connector.status_string();
-  }
-  hrtimer_device_ = fidl::Client(std::move(connector.value()), dispatcher_);
+  // Connect to fuchsia.time.alarms.Wake.
+  zx::result wake_client_end = component::Connect<fuchsia_time_alarms::Wake>();
+  FX_CHECK(wake_client_end.is_ok());
+  wake_alarms_ = fidl::SyncClient(std::move(*wake_client_end));
 }
 
 void escher::EscherFlatland::RenderLoopWithWakingDelay(RenderFrameFn render_frame,
                                                        zx::eventpair wake_lease) {
+  if (!enable_wake_alarms_) {
+    FX_LOGS(INFO) << "EscherFlatland::RenderLoopWithWakingDelay was called while"
+                  << " use of wake alarms was disabled; skipping render.";
+    return;
+  }
+
   FX_CHECK(sag_) << "Missing SAG. Make sure to \"ConnectPowerResources\" first.";
-  FX_CHECK(hrtimer_device_) << "Missing hrtimer. Make sure to \"ConnectTimerResources\" first.";
+  FX_CHECK(wake_alarms_) << "Missing wake alarms. Make sure to \"ConnectTimerResources\" first.";
+
+  // The wake_lease given from the prior call is not enough to start GPU.
+  // Get a new activity lease to wake GPU for render work.
   auto activity_lease = GetActivityLease();
   RenderFrame(render_frame);
 
@@ -236,22 +233,19 @@ void escher::EscherFlatland::RenderLoopWithWakingDelay(RenderFrameFn render_fram
       kSuspendDelayForComposition);
 
   FX_CHECK(wake_lease.is_valid());
-  (*hrtimer_device_)
-      .StartAndWait2(
-          {kHrtimerId, fuchsia_hardware_hrtimer::Resolution::WithDuration(zx::usec(1).to_nsecs()),
-           static_cast<uint64_t>(delay_until_next_render_.to_usecs()), std::move(wake_lease)})
-      .Then([&](fidl::Result<fuchsia_hardware_hrtimer::Device::StartAndWait2>& result) mutable {
-        if (!result.is_ok()) {
-          if (result.error_value().domain_error() ==
-              fuchsia_hardware_hrtimer::DriverError::kCanceled) {
-            return;
-          }
-          FX_LOGS(FATAL) << "StartAndWait2 failed: " << result.error_value().FormatDescription();
-        }
-        // Drop expiration_keep_alive lease from |result| as it is a wake lease that isn't enough
-        // to start gpu. Instead get a new activity lease.
-        RenderLoopWithWakingDelay(render_frame, std::move(result.value().expiration_keep_alive()));
-      });
+  fidl::Result<fuchsia_time_alarms::Wake::SetAndWait> result = wake_alarms_->SetAndWait(
+      {next_render_time_, fuchsia_time_alarms::SetAndWaitMode::WithKeepAlive(std::move(wake_lease)),
+       name_});
+  if (result.is_ok()) {
+    // We do not need to check `enable_wake_alarms_` before the recursive call
+    // because a cancelled alarm would have resulted in `WakeError::DROPPED`.
+    async::PostTask(dispatcher_, [render_frame = std::move(render_frame),
+                                  lease = std::move(result->keep_alive()), this]() mutable {
+      RenderLoopWithWakingDelay(render_frame, std::move(lease));
+    });
+  } else {
+    FX_LOGS(ERROR) << "SetAndWait failed: " << result.error_value().FormatDescription();
+  }
 }
 
 void escher::EscherFlatland::GetStatus(OnStatusFn on_status) {
@@ -262,23 +256,40 @@ zx::eventpair escher::EscherFlatland::GetActivityLease() {
   FX_CHECK(sag_) << "Missing SAG. Make sure to \"ConnectPowerResources\" first.";
   // Activity lease allows for running GPU work which is necessary.
   auto take_activity_lease_result = sag_->TakeApplicationActivityLease(name_);
-  FX_CHECK(take_activity_lease_result.is_ok());
-  return std::move(take_activity_lease_result->token());
+  if (take_activity_lease_result.is_ok()) {
+    return std::move(take_activity_lease_result->token());
+  } else {
+    FX_LOGS(ERROR) << "TakeApplicationActivityLease failed: "
+                   << take_activity_lease_result.error_value();
+    return zx::eventpair();
+  }
 }
 
 zx::eventpair escher::EscherFlatland::GetWakeLease() {
   FX_CHECK(sag_) << "Missing SAG. Make sure to \"ConnectPowerResources\" first.";
-  auto take_wake_lease_result = sag_->TakeWakeLease(name_);
-  FX_CHECK(take_wake_lease_result.is_ok());
-  return std::move(take_wake_lease_result->token());
+  auto acquire_wake_lease_result = sag_->AcquireWakeLease(name_);
+  if (acquire_wake_lease_result.is_ok()) {
+    return std::move(acquire_wake_lease_result->token());
+  } else {
+    FX_LOGS(ERROR) << "AcquireWakeLease failed: " << acquire_wake_lease_result.error_value();
+    return zx::eventpair();
+  }
 }
 
-void escher::EscherFlatland::StopTimer() {
-  hrtimer_device_->Stop({kHrtimerId}).Then([](auto& result) {
-    if (!result.is_ok()) {
-      FX_LOGS(FATAL) << "Stop failed: " << result.error_value().FormatDescription();
-    }
-  });
+void escher::EscherFlatland::EnableWakeAlarms(bool enable) {
+  if (enable_wake_alarms_ == enable) {
+    return;
+  }
+
+  enable_wake_alarms_ = enable;
+  if (enable) {
+    return;
+  }
+
+  const auto& cancel_result = wake_alarms_->Cancel({{.alarm_id = name_}});
+  if (!cancel_result.is_ok()) {
+    FX_LOGS(ERROR) << "Cancel failed: " << cancel_result.error_value();
+  }
 }
 
 void escher::EscherFlatland::SetVisible(bool is_visible) {

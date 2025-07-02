@@ -112,6 +112,14 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             f"path was {self.test_data_path} for {__file__}",
         )
 
+        disabled_tests_source_file = os.path.join(
+            self.test_data_path, "disabled_tests.json"
+        )
+        self.assertTrue(
+            os.path.isfile(disabled_tests_source_file),
+            f"path was {self.test_data_path} for {__file__}",
+        )
+
         with open(
             os.path.join(self.fuchsia_dir.name, ".fx-build-dir"), "w"
         ) as f:
@@ -131,6 +139,16 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 os.path.join(self.test_data_path, name),
                 os.path.join(self.out_dir, name),
             )
+
+        # disabled_tests.json must be in place for e2e tests to pass.
+        disabled_tests_dest_path = os.path.join(
+            self.fuchsia_dir.name, "sdk", "ctf"
+        )
+        os.makedirs(disabled_tests_dest_path)
+        shutil.copy(
+            disabled_tests_source_file,
+            os.path.join(disabled_tests_dest_path, "disabled_tests.json"),
+        )
 
         # Simulate the generated package metadata to test merging.
         gen_dir = os.path.join(
@@ -157,7 +175,8 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             )
         )
 
-        # Make sure that generated test list is identical to input.
+        # Provide hard-coded predictable test-list.json content rather than
+        # actually running the generate_test_list program.
         self._mock_generate_test_list()
 
         return super().setUp()
@@ -260,6 +279,31 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 ret.add(tuple(cur))
 
         return ret
+
+    def _assert_ffx_test_has_args(
+        self, call_list: mock._CallList, desired_args: list[str]
+    ) -> None:
+        """Verifies args were passed to "ffx test".
+
+        Given a list of mock calls, verifies it includes a call to
+        "ffx test run" which includes the given sequence of args."""
+
+        for call in call_list:
+            try:
+                call_args = list(call.args)
+                ffx_pos = call_args.index("ffx")
+            except:
+                continue
+            if call_args[ffx_pos : ffx_pos + 3] != ["ffx", "test", "run"]:
+                continue
+            args_after_ffx_run = call_args[ffx_pos + 3 :]
+            for index, item in enumerate(args_after_ffx_run):
+                if (
+                    desired_args
+                    == args_after_ffx_run[index : index + len(desired_args)]
+                ):
+                    return
+            self.fail(f"{desired_args} not found in {call_list}")
 
     def _mock_get_device_environment(
         self, env: environment.DeviceEnvironment
@@ -580,6 +624,7 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
         call_prefixes = self._make_call_args_prefix_set(
             command_mock.call_args_list
         )
+
         call_prefixes.update(
             self._make_call_args_prefix_set(subprocess_mock.call_args_list)
         )
@@ -619,6 +664,18 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                 ),
             },
             call_prefixes,
+        )
+
+        # Make sure we properly exclude the "broken_case" and "bad_case"
+        # and count an empty test case set as passing.
+        self._assert_ffx_test_has_args(
+            command_mock.call_args_list, ["--test-filter", "-broken_case"]
+        )
+        self._assert_ffx_test_has_args(
+            command_mock.call_args_list, ["--test-filter", "-bad_case"]
+        )
+        self._assert_ffx_test_has_args(
+            command_mock.call_args_list, ["--no-cases-equals-success"]
         )
 
         # Make sure we ran the host tests.
@@ -1314,3 +1371,112 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
                     found_error,
                     "Expected to find an error about output directory existing",
                 )
+
+    async def test_list_runtime_deps_success(self) -> None:
+        """Tests the successful listing of runtime dependencies."""
+        deps_path = "path/to/my_deps.json"
+        full_deps_path = os.path.join(self.out_dir, deps_path)
+        os.makedirs(os.path.dirname(full_deps_path), exist_ok=True)
+        with open(full_deps_path, "w") as f:
+            json.dump(["dep1", "dep2"], f)
+
+        empty_deps_path = "path/to/empty_deps.json"
+        full_empty_deps_path = os.path.join(self.out_dir, empty_deps_path)
+        os.makedirs(os.path.dirname(full_empty_deps_path), exist_ok=True)
+        with open(full_empty_deps_path, "w") as f:
+            json.dump([], f)
+
+        mock_test_with_deps = mock.MagicMock()
+        mock_test_with_deps.name.return_value = "test_with_deps"
+        mock_test_with_deps.build.test.runtime_deps = deps_path
+
+        mock_test_with_empty_deps = mock.MagicMock()
+        mock_test_with_empty_deps.name.return_value = "test_with_empty_deps"
+        mock_test_with_empty_deps.build.test.runtime_deps = empty_deps_path
+
+        mock_test_without_deps = mock.MagicMock()
+        mock_test_without_deps.name.return_value = "test_without_deps"
+        mock_test_without_deps.build.test.runtime_deps = None
+
+        mock_selections = mock.MagicMock()
+        mock_selections.selected = [
+            mock_test_with_deps,
+            mock_test_with_empty_deps,
+            mock_test_without_deps,
+        ]
+        mock_selections.selected_but_not_run = []
+
+        selection_patch = mock.patch(
+            "main.selection.select_tests",
+            mock.AsyncMock(return_value=mock_selections),
+        )
+        selection_patch.start()
+        self.addCleanup(selection_patch.stop)
+
+        validate_patch = mock.patch(
+            "main.AsyncMain._validate_test_selections",
+            mock.AsyncMock(return_value=None),
+        )
+        validate_patch.start()
+        self.addCleanup(validate_patch.stop)
+
+        recorder = event.EventRecorder()
+        ret = await main.async_main_wrapper(
+            args.parse_args(["--simple", "--list-runtime-deps", "--no-build"]),
+            recorder=recorder,
+        )
+        self.assertEqual(ret, 0)
+        payloads = [
+            e.payload.user_message.value
+            async for e in recorder.iter()
+            if e.payload
+            and e.payload.user_message
+            and e.payload.user_message.value
+        ]
+        start_index = payloads.index("test_with_deps:")
+        self.assertNotEqual(start_index, -1)
+        deps_full_output = payloads[start_index:]
+        expected_output = [
+            "test_with_deps:",
+            f"  Runtime deps file at: {full_deps_path}",
+            "  dep1",
+            "  dep2",
+            "test_with_empty_deps:",
+            f"  Runtime deps file at: {full_empty_deps_path}",
+            "  File is empty",
+            "test_without_deps:",
+            "  No runtime deps found for this test",
+        ]
+        self.assertListEqual(deps_full_output, expected_output)
+
+    async def test_list_runtime_deps_file_not_found(self) -> None:
+        """Tests that a missing runtime_deps file raises an exception."""
+        missing_deps_path = "path/to/non_existent_deps.json"
+        mock_test = mock.MagicMock()
+        mock_test.name.return_value = "test_with_missing_deps"
+        mock_test.build.test.runtime_deps = missing_deps_path
+
+        mock_selections = mock.MagicMock()
+        mock_selections.selected = [mock_test]
+        mock_selections.selected_but_not_run = []
+
+        selection_patch = mock.patch(
+            "main.selection.select_tests",
+            mock.AsyncMock(return_value=mock_selections),
+        )
+        selection_patch.start()
+        self.addCleanup(selection_patch.stop)
+
+        validate_patch = mock.patch(
+            "main.AsyncMain._validate_test_selections",
+            mock.AsyncMock(return_value=None),
+        )
+        validate_patch.start()
+        self.addCleanup(validate_patch.stop)
+
+        with self.assertRaises(FileNotFoundError):
+            await main.async_main_wrapper(
+                args.parse_args(
+                    ["--simple", "--list-runtime-deps", "--no-build"]
+                )
+            )

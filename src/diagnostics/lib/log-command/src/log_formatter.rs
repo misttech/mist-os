@@ -463,6 +463,7 @@ where
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/421409178)
 /// Symbolizer that does nothing.
 pub struct NoOpSymbolizer;
 

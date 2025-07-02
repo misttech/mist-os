@@ -19,7 +19,7 @@ use netstack3_base::{
     InspectableValue, Inspector, InspectorExt, Instant, InstantContext, Ipv4DeviceAddr,
     ResourceCounterContext, WeakDeviceIdentifier,
 };
-use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, PacketBuilder, Serializer};
+use packet::{BufferMut, EmptyBuf, InnerPacketBuilder, PacketBuilder};
 use packet_formats::error::ParseError;
 use packet_formats::igmp::messages::{
     IgmpLeaveGroup, IgmpMembershipQueryV2, IgmpMembershipQueryV3, IgmpMembershipReportV1,
@@ -559,7 +559,7 @@ where
         for report in reports {
             self.increment_both(device, |counters: &IgmpCounters| &counters.tx_igmpv3_report);
             let destination = IpPacketDestination::Multicast(dst_ip);
-            let ip_frame = report.into_serializer().encapsulate(header.clone());
+            let ip_frame = header.clone().wrap_body(report.into_serializer());
             IpLayerHandler::send_ip_frame(self, bindings_ctx, device, destination, ip_frame)
                 .unwrap_or_else(|ErrorAndSerializer { error, .. }| {
                     self.increment_both(device, |counters: &IgmpCounters| &counters.tx_err);
@@ -848,7 +848,7 @@ where
     let header = new_ip_header_builder(core_ctx, device, dst_ip);
     let body =
         IgmpPacketBuilder::<EmptyBuf, M>::new_with_resp_time(group_addr.get(), max_resp_time);
-    let body = body.into_serializer().encapsulate(header);
+    let body = header.wrap_body(body.into_serializer());
     let destination = IpPacketDestination::Multicast(dst_ip);
     IpLayerHandler::send_ip_frame(core_ctx, bindings_ctx, &device, destination, body)
         .map_err(|_| IgmpError::SendFailure { addr: *group_addr })
@@ -1038,7 +1038,7 @@ mod tests {
         CounterContext, CtxPair, Instant as _, IntoCoreTimerCtx, SendFrameContext as _,
     };
     use packet::serialize::Buf;
-    use packet::{ParsablePacket as _, ParseBuffer};
+    use packet::{ParsablePacket as _, ParseBuffer, Serializer};
     use packet_formats::gmp::GroupRecordType;
     use packet_formats::igmp::messages::{
         IgmpMembershipQueryV2, IgmpMembershipQueryV3Builder, Igmpv3QQIC, Igmpv3QRV,
@@ -2299,7 +2299,10 @@ mod tests {
                     Ipv4::ALL_SYSTEMS_MULTICAST_ADDRESS.into(),
                     q.clone(),
                     &LocalDeliveryPacketInfo {
-                        header_info: FakeIpHeaderInfo { hop_limit: BAD_TTL, ..base_header_info },
+                        header_info: FakeIpHeaderInfo {
+                            hop_limit: BAD_TTL,
+                            ..base_header_info.clone()
+                        },
                         ..Default::default()
                     }
                 ),
@@ -2335,7 +2338,7 @@ mod tests {
                         header_info: FakeIpHeaderInfo {
                             // Router alert must be set.
                             router_alert: false,
-                            ..base_header_info
+                            ..base_header_info.clone()
                         },
                         ..Default::default()
                     },

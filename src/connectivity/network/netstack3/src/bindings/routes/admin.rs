@@ -14,9 +14,10 @@ use fnet_routes_ext::{FidlRouteIpExt, Responder as _};
 use futures::channel::{mpsc, oneshot};
 use futures::{Future, FutureExt as _, StreamExt as _, TryStreamExt as _};
 use log::{debug, error, warn};
-use net_types::ip::{Ip, Ipv4, Ipv6};
+use net_types::ip::Ip;
 use netstack3_core::device::DeviceId;
 use netstack3_core::routes::AddableEntry;
+use thiserror::Error;
 use zx::{self as zx, AsHandleRef, HandleBased as _};
 use {
     fidl_fuchsia_net_routes_admin as fnet_routes_admin,
@@ -91,20 +92,20 @@ pub(crate) fn spawn_user_route_set<
     });
 }
 
-pub(crate) async fn serve_route_table_provider_v4(
-    stream: fnet_routes_admin::RouteTableProviderV4RequestStream,
+pub(crate) async fn serve_route_table_provider<I: Ip + FidlRouteIpExt + FidlRouteAdminIpExt>(
+    stream: <I::RouteTableProviderMarker as fidl::endpoints::ProtocolMarker>::RequestStream,
     ctx: Ctx,
 ) -> Result<(), fidl::Error> {
-    let mut stream = pin!(stream);
+    let mut stream = pin!(stream.map_ok(I::into_route_table_provider_request));
 
     while let Some(req) = stream.try_next().await? {
         match req {
-            fnet_routes_admin::RouteTableProviderV4Request::NewRouteTable {
+            fnet_routes_ext::admin::RouteTableProviderRequest::NewRouteTable {
                 provider,
-                options: fnet_routes_admin::RouteTableOptionsV4 { name, __source_breaking: _ },
+                options: fnet_routes_ext::admin::RouteTableOptions { name, _marker: _ },
                 control_handle,
             } => {
-                let route_table = match ctx.bindings_ctx().routes.add_table::<Ipv4>(name).await {
+                let route_table = match ctx.bindings_ctx().routes.add_table::<I>(name).await {
                     Ok((table_id, route_work_sink, token)) => {
                         UserRouteTable::new(ctx.clone(), token, table_id, route_work_sink)
                     }
@@ -116,40 +117,15 @@ pub(crate) async fn serve_route_table_provider_v4(
                 let stream = provider.into_stream();
 
                 fasync::Scope::current().spawn_request_stream_handler(stream, |stream| {
-                    serve_route_table::<Ipv4, UserRouteTable<Ipv4>>(stream, route_table)
+                    serve_route_table::<I, UserRouteTable<I>>(stream, route_table)
                 });
             }
-        }
-    }
-    Ok(())
-}
-
-pub(crate) async fn serve_route_table_provider_v6(
-    stream: fnet_routes_admin::RouteTableProviderV6RequestStream,
-    ctx: Ctx,
-) -> Result<(), fidl::Error> {
-    let mut stream = pin!(stream);
-
-    while let Some(req) = stream.try_next().await? {
-        match req {
-            fnet_routes_admin::RouteTableProviderV6Request::NewRouteTable {
-                provider,
-                options: fnet_routes_admin::RouteTableOptionsV6 { name, __source_breaking: _ },
-                control_handle,
+            fnet_routes_ext::admin::RouteTableProviderRequest::GetInterfaceLocalTable {
+                credential: _,
+                responder,
             } => {
-                let route_table = match ctx.bindings_ctx().routes.add_table::<Ipv6>(name).await {
-                    Ok((table_id, route_work_sink, token)) => {
-                        UserRouteTable::new(ctx.clone(), token, table_id, route_work_sink)
-                    }
-                    Err(routes::TableIdOverflowsError) => {
-                        control_handle.shutdown_with_epitaph(zx::Status::NO_SPACE);
-                        break;
-                    }
-                };
-                let stream = provider.into_stream();
-                fasync::Scope::current().spawn_request_stream_handler(stream, |stream| {
-                    serve_route_table::<Ipv6, UserRouteTable<Ipv6>>(stream, route_table)
-                });
+                responder
+                    .send(Err(fnet_routes_admin::GetInterfaceLocalTableError::NoLocalRouteTable))?;
             }
         }
     }
@@ -522,7 +498,7 @@ impl<I: FidlRouteAdminIpExt> RouteSet<I> for GlobalRouteSet {
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub(crate) enum ModifyTableError {
     #[error("backing route table is removed")]
     TableRemoved,

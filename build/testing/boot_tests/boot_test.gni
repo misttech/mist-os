@@ -180,7 +180,8 @@ template("_boot_test") {
 #    - Optional: A label specifying a ZBI, QEMU kernel, VBMeta, dtbo, UEFI
 #      executable, or a bootable UEFI filesystem or disk image, respectively.
 #      At least one of these parameters must be set, but each on their own is
-#      optional.
+#      optional. `efi_disk` must provide `efi_input` metadata entry consisting
+#      of a `name`, `path` and `type`.
 #    - Type: label
 #
 #  * timeout
@@ -199,6 +200,24 @@ template("_boot_test") {
 #
 #  * assert_no_deps, data_deps, metadata, visibility
 #    - Optional: Usual GN meanings.
+#
+#  Metadata Protocol:
+#
+#  * efi_input
+#    - Optional: Protocol for identifying the presence of a EFI disk, that shall be used
+#      instead of a ZBI. Using `efi_input` data key and `efi_input_barrier`, a single entry must
+#      be provided. This entry will be used to generated the partition configuration for the product
+#      bundle of this `boot_test()`.
+#    - Type: list[scope]
+#      * name
+#        - Required: partition name assigned to the bootloader partition entries in the partitionconfig.
+#        - Type: string
+#      * path
+#        - Required: relative path to $root_build_dir of the image of the partition.
+#        - Type: string
+#      * type
+#        - Required: type of the partition as defined in the bootloader partition entry.
+#        - Type: string
 #
 template("boot_test") {
   assert(defined(invoker.environments),
@@ -221,8 +240,8 @@ template("boot_test") {
     generated_file(efi_disk_manifest_target) {
       testonly = true
 
-      data_keys = [ "images" ]
-      walk_keys = [ "images_barrier" ]
+      data_keys = [ "efi_input" ]
+      walk_keys = [ "efi_input_barrier" ]
       output_conversion = "json"
 
       deps = [ invoker.efi_disk ]
@@ -286,9 +305,15 @@ template("boot_test") {
       deps = [ ":$partition_config_intermediate_target" ]
     }
 
-    _partition_config_label = ":$partition_config_target"
+    # Take the existing board, and shove the new partitions config in.
+    #board_config_target = "_boot_test.${target_name}.create_board_config"
+    #hybrid_board_configuration(board_config_target) {
+    #  board_config = board_configuration_label
+    #  replace_partitions_config = ":$partition_config_target"
+    #}
+    #_board_config_label = ":${board_config_target}"
   } else {
-    _partition_config_label = "//boards/partitions:default($default_toolchain)"
+    #_partition_config_label = "//boards/partitions:default($default_toolchain)"
     if (has_board) {
       assert(partitions_config_label != false,
              "Need to define partitions_config_label")
@@ -368,7 +393,7 @@ template("boot_test") {
 
       name = main_target
       system_a = rebased_image_manifest
-      partitions = _partition_config_label
+      #partitions = _partition_config_label
 
       deps = [ ":$rebased_image_manifest_target" ]
     }
@@ -378,12 +403,12 @@ template("boot_test") {
 
       name = main_target
       #system_a = "$target_out_dir/$assembled_system_target/images.json"
-      partitions = _partition_config_label
+      #partitions = _partition_config_label
 
       #deps = [ ":$assembled_system_target" ]
     }
   } else {
-    not_needed([ "_partition_config_label" ])
+    not_needed([ "_board_config_label" ])
     group(product_bundle_target) {
       testonly = true
       deps = [ ":${product_bundle_target}($default_toolchain)" ]

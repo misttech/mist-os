@@ -14,9 +14,8 @@ use std::borrow::Cow;
 use std::sync::{Arc, Weak};
 
 use starnix_core::task::{CgroupOps, CurrentTask};
-use starnix_core::vfs::{
-    FileObject, FileOps, FsNodeOps, InputBuffer, OutputBuffer, SimpleFileNode,
-};
+use starnix_core::vfs::pseudo::simple_file::SimpleFileNode;
+use starnix_core::vfs::{FileObject, FileOps, FsNodeOps, InputBuffer, OutputBuffer};
 use starnix_core::{fileops_impl_noop_sync, fileops_impl_seekable};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errno;
@@ -43,7 +42,7 @@ impl FileOps for EventsFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -54,7 +53,7 @@ impl FileOps for EventsFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -75,7 +74,7 @@ impl FileOps for EventsFile {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {

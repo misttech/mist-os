@@ -6,7 +6,7 @@ pub mod constants;
 
 use anyhow::{anyhow, Context, Error};
 use async_trait::async_trait;
-use fidl::endpoints::{create_proxy, ClientEnd};
+use fidl::endpoints::create_proxy;
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
 use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
 use fidl_fuchsia_hardware_block_partition::{PartitionMarker, PartitionProxy};
@@ -14,13 +14,16 @@ use fidl_fuchsia_hardware_block_volume::{VolumeMarker, VolumeProxy};
 use fidl_fuchsia_io::{self as fio};
 use fs_management::filesystem::{BlockConnector, DirBasedBlockConnector};
 use fs_management::format::{detect_disk_format, DiskFormat};
+use fuchsia_async as fasync;
 use fuchsia_async::condition::Condition;
 use fuchsia_component::client::connect_to_protocol_at_path;
-use ramdevice_client::RamdiskClient;
+use futures::stream::{AbortHandle, Abortable};
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::task::Poll;
+use std::thread::JoinHandle;
+use vmo_backed_block_server::{VmoBackedServer, VmoBackedServerConnector};
 
 #[async_trait]
 pub trait Device: Send + Sync {
@@ -564,9 +567,14 @@ impl Device for VolumeProtocolDevice {
     fn set_fshost_ramdisk(&mut self, _v: bool) {}
 }
 
-/// A device that represents the fshost Ramdisk.
-pub struct RamdiskDevice {
-    ramdisk: Arc<RamdiskClient>,
+/// A device backed by a local BlockServer running in fshost.
+pub struct LocalBlockDevice {
+    // The thread that runs the block server and handles connections.
+    thread: Option<JoinHandle<()>>,
+    // A handle which is used to shut down the executor running in `thread`.
+    abort_handle: AbortHandle,
+
+    connector: Arc<VmoBackedServerConnector>,
 
     // Cache a proxy to the device's Volume interface so we can use it internally.  (This assumes
     // that devices speak Volume, which is currently always true).
@@ -576,16 +584,48 @@ pub struct RamdiskDevice {
     content_format: Option<DiskFormat>,
 }
 
-impl RamdiskDevice {
-    pub fn new(ramdisk: RamdiskClient) -> Result<Self, Error> {
-        let volume_proxy =
-            ClientEnd::<VolumeMarker>::new(ramdisk.open()?.into_channel()).into_proxy();
-        Ok(Self { ramdisk: Arc::new(ramdisk), volume_proxy, content_format: None })
+impl Drop for LocalBlockDevice {
+    fn drop(&mut self) {
+        self.abort_handle.abort();
+        self.thread.take().map(|t| t.join());
+    }
+}
+
+impl LocalBlockDevice {
+    /// Runs `server` in a dedicated thread.
+    ///
+    /// This server runs in a dedicated thread to avoid issues with reentrant synchronous calls from
+    /// fshost to the server.  For example, fshost might try to read key-bag contents from a
+    /// filesystem running in the device, which is synchronous due to using regular POSIX filesystem
+    /// APIs.
+    pub async fn new(server: VmoBackedServer) -> Result<Self, Error> {
+        let server = Arc::new(server);
+        let (abort_handle, registration) = AbortHandle::new_pair();
+        let (scope_tx, scope_rx) = futures::channel::oneshot::channel();
+        // Note that to avoid deadlock, resources must not be shared between this thread and the
+        // rest of the fshost executor.  Note that tasks spawned in `scope` run in this thread.
+        // Take care when modifying this!
+        let thread = std::thread::spawn(move || {
+            let mut executor = fasync::LocalExecutor::new();
+            scope_tx.send(executor.root_scope().new_child()).unwrap();
+            let _ = executor
+                .run_singlethreaded(Abortable::new(std::future::pending::<()>(), registration));
+        });
+        let scope = scope_rx.await.unwrap();
+        let connector = Arc::new(VmoBackedServerConnector::new(scope, server));
+        let volume_proxy = connector.connect_volume()?.into_proxy();
+        Ok(Self {
+            thread: Some(thread),
+            abort_handle,
+            connector,
+            volume_proxy,
+            content_format: None,
+        })
     }
 }
 
 #[async_trait]
-impl Device for RamdiskDevice {
+impl Device for LocalBlockDevice {
     async fn get_block_info(&self) -> Result<fidl_fuchsia_hardware_block::BlockInfo, Error> {
         let info = self.volume_proxy.get_info().await?.map_err(zx::Status::from_raw)?;
         Ok(info)
@@ -639,15 +679,15 @@ impl Device for RamdiskDevice {
     }
 
     fn block_connector(&self) -> Result<Box<dyn BlockConnector>, Error> {
-        Ok(Box::new(self.ramdisk.clone()))
+        Ok(Box::new(self.connector.clone()))
     }
 
     fn block_proxy(&self) -> Result<BlockProxy, Error> {
-        Ok(self.ramdisk.open()?.into_proxy())
+        Ok(self.connector.connect_block()?.into_proxy())
     }
 
     fn volume_proxy(&self) -> Result<VolumeProxy, Error> {
-        Ok(ClientEnd::<VolumeMarker>::new(self.ramdisk.open()?.into_channel()).into_proxy())
+        Ok(self.connector.connect_volume()?.into_proxy())
     }
 
     async fn get_child(&self, _suffix: &str) -> Result<Box<dyn Device>, Error> {

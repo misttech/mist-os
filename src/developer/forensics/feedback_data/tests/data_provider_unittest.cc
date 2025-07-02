@@ -228,11 +228,14 @@ TEST_F(DataProviderTest, GetSnapshotViaChannel) {
     ASSERT_TRUE(archive.is_bound());
 
     // Get archive attributes.
-    uint64_t archive_size;
-    archive->GetAttr([&archive_size](zx_status_t status, fuchsia::io::NodeAttributes attributes) {
-      ASSERT_EQ(ZX_OK, status);
-      archive_size = attributes.content_size;
-    });
+    uint64_t archive_size{};
+    archive->GetAttributes(fuchsia::io::NodeAttributesQuery::CONTENT_SIZE,
+                           [&archive_size](fuchsia::io::Node_GetAttributes_Result result) {
+                             ASSERT_TRUE(result.is_response());
+                             if (result.response().immutable_attributes.has_content_size()) {
+                               archive_size = result.response().immutable_attributes.content_size();
+                             }
+                           });
 
     RunLoopUntilIdle();
     ASSERT_TRUE(archive_size > 0);

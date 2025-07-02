@@ -33,7 +33,7 @@ impl HangingGetTest {
     pub fn connect_to_dndmarker(instance: &RealmInstance) -> DoNotDisturbProxy {
         return instance
             .root
-            .connect_to_protocol_at_exposed_dir::<DoNotDisturbMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connecting to DoNotDisturb");
     }
 }

@@ -6,10 +6,11 @@ use crate::mm::MemoryAccessorExt;
 use crate::security;
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
 use crate::vfs::{
     default_ioctl, fileops_impl_nonseekable, fileops_impl_noop_sync, fs_args, inotify, Anon,
-    BytesFile, BytesFileOps, DirEntryHandle, FileHandle, FileObject, FileOps, FileReleaser,
-    FsNodeOps, FsStr, FsString, WdNumber,
+    DirEntryHandle, FileHandle, FileObject, FileOps, FileReleaser, FsNodeOps, FsStr, FsString,
+    WdNumber,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -200,7 +201,7 @@ impl FileOps for InotifyFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -212,7 +213,7 @@ impl FileOps for InotifyFileObject {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -245,7 +246,7 @@ impl FileOps for InotifyFileObject {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -264,7 +265,7 @@ impl FileOps for InotifyFileObject {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -276,7 +277,7 @@ impl FileOps for InotifyFileObject {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -289,7 +290,7 @@ impl FileOps for InotifyFileObject {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
     ) {

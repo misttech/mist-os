@@ -157,7 +157,7 @@ where
     let mut rng = new_rng(70812476915813);
     let mut body: Vec<u8> = core::iter::repeat_with(|| rng.gen()).take(100).collect();
     let buf = Buf::new(&mut body[..], ..)
-        .encapsulate(I::PacketBuilder::new(
+        .wrap_in(I::PacketBuilder::new(
             src_ip.get(),
             config.remote_ip.get(),
             64,
@@ -209,7 +209,7 @@ where
 
     // Test routing a packet to an unknown address.
     let buf_unknown_dest = Buf::new(&mut body[..], ..)
-        .encapsulate(I::PacketBuilder::new(
+        .wrap_in(I::PacketBuilder::new(
             src_ip.get(),
             // Addr must be remote, otherwise this will cause an NDP/ARP
             // request rather than ICMP unreachable.
@@ -326,7 +326,7 @@ fn receive_simple_ip_packet_test<A: IpAddress>(
     A::Version: TestIpExt + IpExt,
 {
     let buf = Buf::new(Vec::new(), ..)
-        .encapsulate(
+        .wrap_in(
             <<A::Version as packet_formats::ip::IpExt>::PacketBuilder as IpPacketBuilder<_>>::new(
                 src_ip,
                 dst_ip,

@@ -105,6 +105,20 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 responder.send(Ok(()))?;
                 return Ok(ConnectionState::Closed);
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::DirectoryRequest::DeprecatedGetAttr { responder } => {
+                async move {
+                    let (status, attrs) = crate::common::io2_to_io1_attrs(
+                        self.directory.as_ref(),
+                        self.options.rights,
+                    )
+                    .await;
+                    responder.send(status.into_raw(), &attrs)
+                }
+                .trace(trace::trace_future_args!(c"storage", c"Directory::GetAttr"))
+                .await?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::DirectoryRequest::GetAttr { responder } => {
                 async move {
                     let (status, attrs) = crate::common::io2_to_io1_attrs(
@@ -557,34 +571,21 @@ mod tests {
     use crate::directory::immutable::Simple;
     use assert_matches::assert_matches;
     use fidl_fuchsia_io as fio;
-    use futures::prelude::*;
 
     #[fuchsia::test]
     async fn test_open_not_found() {
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-
         let dir = Simple::new();
-        dir.deprecated_open(
-            ExecutionScope::new(),
-            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            Path::dot(),
-            ServerEnd::new(dir_server_end.into_channel()),
-        );
-
-        let (node_proxy, node_server_end) = fidl::endpoints::create_proxy();
+        let dir_proxy = crate::directory::serve(dir, fio::PERM_READABLE);
 
         // Try to open a file that doesn't exist.
-        assert_matches!(
-            dir_proxy.deprecated_open(
-                fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-                fio::ModeType::empty(),
-                "foo",
-                node_server_end
-            ),
-            Ok(())
-        );
+        let node_proxy = fuchsia_fs::directory::open_async::<fio::NodeMarker>(
+            &dir_proxy,
+            "foo",
+            fio::PERM_READABLE,
+        )
+        .unwrap();
 
-        // The channel also be closed with a NOT_FOUND epitaph.
+        // The channel is closed with a NOT_FOUND epitaph.
         assert_matches!(
             node_proxy.query().await,
             Err(fidl::Error::ClientChannelClosed {
@@ -596,71 +597,19 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_open_not_found_event_stream() {
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-
+    async fn test_open_with_send_representation_not_found() {
         let dir = Simple::new();
-        dir.deprecated_open(
-            ExecutionScope::new(),
-            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            Path::dot(),
-            ServerEnd::new(dir_server_end.into_channel()),
-        );
-
-        let (node_proxy, node_server_end) = fidl::endpoints::create_proxy();
+        let dir_proxy = crate::directory::serve(dir, fio::PERM_READABLE);
 
         // Try to open a file that doesn't exist.
-        assert_matches!(
-            dir_proxy.deprecated_open(
-                fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-                fio::ModeType::empty(),
-                "foo",
-                node_server_end
-            ),
-            Ok(())
-        );
+        let node_proxy = fuchsia_fs::directory::open_async::<fio::NodeMarker>(
+            &dir_proxy,
+            "foo",
+            fio::PERM_READABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
+        )
+        .unwrap();
 
-        // The event stream should be closed with the epitaph.
-        let mut event_stream = node_proxy.take_event_stream();
-        assert_matches!(
-            event_stream.try_next().await,
-            Err(fidl::Error::ClientChannelClosed {
-                status: Status::NOT_FOUND,
-                protocol_name: "fuchsia.io.Node",
-                ..
-            })
-        );
-        assert_matches!(event_stream.try_next().await, Ok(None));
-    }
-
-    #[fuchsia::test]
-    async fn test_open_with_describe_not_found() {
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-
-        let dir = Simple::new();
-        dir.deprecated_open(
-            ExecutionScope::new(),
-            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            Path::dot(),
-            ServerEnd::new(dir_server_end.into_channel()),
-        );
-
-        let (node_proxy, node_server_end) = fidl::endpoints::create_proxy();
-
-        // Try to open a file that doesn't exist.
-        assert_matches!(
-            dir_proxy.deprecated_open(
-                fio::OpenFlags::DIRECTORY
-                    | fio::OpenFlags::DESCRIBE
-                    | fio::OpenFlags::RIGHT_READABLE,
-                fio::ModeType::empty(),
-                "foo",
-                node_server_end,
-            ),
-            Ok(())
-        );
-
-        // The channel should be closed with a NOT_FOUND epitaph.
+        // The channel is closed with a NOT_FOUND epitaph.
         assert_matches!(
             node_proxy.query().await,
             Err(fidl::Error::ClientChannelClosed {
@@ -669,53 +618,5 @@ mod tests {
                 ..
             })
         );
-    }
-
-    #[fuchsia::test]
-    async fn test_open_describe_not_found_event_stream() {
-        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
-
-        let dir = Simple::new();
-        dir.deprecated_open(
-            ExecutionScope::new(),
-            fio::OpenFlags::DIRECTORY | fio::OpenFlags::RIGHT_READABLE,
-            Path::dot(),
-            ServerEnd::new(dir_server_end.into_channel()),
-        );
-
-        let (node_proxy, node_server_end) = fidl::endpoints::create_proxy();
-
-        // Try to open a file that doesn't exist.
-        assert_matches!(
-            dir_proxy.deprecated_open(
-                fio::OpenFlags::DIRECTORY
-                    | fio::OpenFlags::DESCRIBE
-                    | fio::OpenFlags::RIGHT_READABLE,
-                fio::ModeType::empty(),
-                "foo",
-                node_server_end,
-            ),
-            Ok(())
-        );
-
-        // The event stream should return that the file does not exist.
-        let mut event_stream = node_proxy.take_event_stream();
-        assert_matches!(
-            event_stream.try_next().await,
-            Ok(Some(fio::NodeEvent::OnOpen_ {
-                s,
-                info: None,
-            }))
-            if Status::from_raw(s) == Status::NOT_FOUND
-        );
-        assert_matches!(
-            event_stream.try_next().await,
-            Err(fidl::Error::ClientChannelClosed {
-                status: Status::NOT_FOUND,
-                protocol_name: "fuchsia.io.Node",
-                ..
-            })
-        );
-        assert_matches!(event_stream.try_next().await, Ok(None));
     }
 }

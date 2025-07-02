@@ -16,13 +16,15 @@
 
 namespace temperature {
 
-constexpr size_t kSensorMmioIndex = 0;
-constexpr size_t kTrimMmioIndex = 1;
-
 class AmlTrip final : public fdf::DriverBase {
  public:
+  static constexpr std::string_view kDriverName = "aml-trip";
+  static constexpr std::string_view kChildNodeName = "aml-trip-device";
+  static constexpr size_t kSensorMmioIndex = 0;
+  static constexpr size_t kTrimMmioIndex = 1;
+
   AmlTrip(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
-      : fdf::DriverBase("aml-trip", std::move(start_args), std::move(dispatcher)),
+      : fdf::DriverBase(kDriverName, std::move(start_args), std::move(dispatcher)),
         devfs_connector_(fit::bind_member<&AmlTrip::Serve>(this)) {}
 
   // Lifecycle Management.

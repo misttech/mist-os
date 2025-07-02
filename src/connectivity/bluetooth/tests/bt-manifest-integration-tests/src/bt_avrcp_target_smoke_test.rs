@@ -75,7 +75,7 @@ async fn mock_avrcp_target_client(
     mut sender: mpsc::Sender<Event>,
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
-    let binder_svc = handles.connect_to_protocol::<BinderMarker>()?;
+    let binder_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::Binder { _binder: Some(binder_svc) })
         .await

@@ -134,7 +134,7 @@ async fn list_minidumps(rcs: &RemoteControlProxy, capability: &str) -> Result<Ve
         .map_err(|e| anyhow!("Could not open component storage: {:?}", e))?;
 
     // NOTE: This is the implementation detail of feedback.cm and is subject to change.
-    let reports_dir = open_directory_async(&root_dir, "reports", fio::Flags::empty())
+    let reports_dir = open_directory_async(&root_dir, "reports", fio::Flags::PERM_READ_BYTES)
         .context("Could not open the \"reports\" directory")?;
     let reports_dir_ref = &reports_dir;
 
@@ -150,15 +150,20 @@ async fn list_minidumps(rcs: &RemoteControlProxy, capability: &str) -> Result<Ve
                     && entry.name.ends_with("/minidump.dmp")
             })
             .map(|entry| async move {
-                let proxy = open_file_async(reports_dir_ref, &entry.name, fio::Flags::empty())?;
-                let (status, fio::NodeAttributes { modification_time, .. }) =
-                    proxy.get_attr().await.context("FIDL error in get_attr")?;
-
-                if status != 0 {
-                    bail!("Failed to get_attr: {}", Status::from_raw(status));
+                let proxy =
+                    open_file_async(reports_dir_ref, &entry.name, fio::Flags::PERM_READ_BYTES)?;
+                let result = proxy
+                    .get_attributes(fio::NodeAttributesQuery::MODIFICATION_TIME)
+                    .await
+                    .context("FIDL error in get_attr")?;
+                match result {
+                    Err(e) => bail!("Failed to get_attr: {}", Status::from_raw(e)),
+                    Ok((mutable_attributes, _)) => Ok(File {
+                        filename: entry.name,
+                        modification_time: mutable_attributes.modification_time.unwrap_or_default(),
+                        proxy,
+                    }),
                 }
-
-                Ok(File { filename: entry.name, modification_time, proxy })
             }),
     )
     .await

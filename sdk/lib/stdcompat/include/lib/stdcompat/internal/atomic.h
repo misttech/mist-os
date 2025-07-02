@@ -65,25 +65,25 @@ template <typename T>
 using value_t = std::remove_volatile_t<T>;
 
 template <typename T>
-struct alignment<T, std::enable_if_t<cpp17::is_integral_v<T>>> {
+struct alignment<T, std::enable_if_t<std::is_integral_v<T>>> {
   static constexpr size_t required_alignment = sizeof(T) > alignof(T) ? sizeof(T) : alignof(T);
 };
 
 template <typename T>
-struct alignment<T, std::enable_if_t<cpp17::is_pointer_v<T> || cpp17::is_floating_point_v<T>>> {
+struct alignment<T, std::enable_if_t<std::is_pointer_v<T> || std::is_floating_point_v<T>>> {
   static constexpr size_t required_alignment = alignof(T);
 };
 
 template <typename T>
-static constexpr bool unqualified = cpp17::is_same_v<T, std::remove_cv_t<T>>;
+static constexpr bool unqualified = std::is_same_v<T, std::remove_cv_t<T>>;
 
 template <typename T>
 LIB_STDCOMPAT_INLINE_LINKAGE inline bool compare_exchange(T* ptr, value_t<T>& expected,
                                                           value_t<T> desired, bool is_weak,
                                                           std::memory_order success,
                                                           std::memory_order failure) {
-  return __atomic_compare_exchange(ptr, cpp17::addressof(expected), cpp17::addressof(desired),
-                                   is_weak, to_builtin_memory_order(success),
+  return __atomic_compare_exchange(ptr, std::addressof(expected), std::addressof(desired), is_weak,
+                                   to_builtin_memory_order(success),
                                    to_builtin_memory_order(failure));
 }
 
@@ -105,7 +105,7 @@ class atomic_ops {
  public:
   LIB_STDCOMPAT_INLINE_LINKAGE void store(
       T desired, std::memory_order order = std::memory_order_seq_cst) const noexcept {
-    __atomic_store(ptr(), cpp17::addressof(desired), to_builtin_memory_order(order));
+    __atomic_store(ptr(), std::addressof(desired), to_builtin_memory_order(order));
   }
 
   LIB_STDCOMPAT_INLINE_LINKAGE T
@@ -123,7 +123,7 @@ class atomic_ops {
     storage_t store;
     value_t<T> nv_desired = desired;
     auto* ret = reinterpret_cast<value_t<T>*>(&store);
-    __atomic_exchange(ptr(), cpp17::addressof(nv_desired), ret, to_builtin_memory_order(order));
+    __atomic_exchange(ptr(), std::addressof(nv_desired), ret, to_builtin_memory_order(order));
     return *ret;
   }
 
@@ -230,9 +230,9 @@ class arithmetic_ops {};
 
 // Non volatile pointers Pointer and Integral operations.
 template <typename Derived, typename T>
-class arithmetic_ops<Derived, T,
-                     std::enable_if_t<cpp17::is_integral_v<T> ||
-                                      (cpp17::is_pointer_v<T> && !cpp17::is_volatile_v<T>)>> {
+class arithmetic_ops<
+    Derived, T,
+    std::enable_if_t<std::is_integral_v<T> || (std::is_pointer_v<T> && !std::is_volatile_v<T>)>> {
   using return_t = typename arithmetic_ops_helper<T>::return_type;
   using operand_t = typename arithmetic_ops_helper<T>::operand_type;
   using ptr_t = typename arithmetic_ops_helper<T>::ptr_type;
@@ -269,7 +269,7 @@ class arithmetic_ops<Derived, T,
 // Floating point arithmetic operations.
 // Based on CAS cycles to perform atomic add and sub.
 template <typename Derived, typename T>
-class arithmetic_ops<Derived, T, std::enable_if_t<cpp17::is_floating_point_v<T>>> {
+class arithmetic_ops<Derived, T, std::enable_if_t<std::is_floating_point_v<T>>> {
  public:
   LIB_STDCOMPAT_INLINE_LINKAGE T
   fetch_add(T operand, std::memory_order order = std::memory_order_seq_cst) const noexcept {
@@ -322,7 +322,7 @@ template <typename Derived, typename T, typename Enabled = void>
 class bitwise_ops {};
 
 template <typename Derived, typename T>
-class bitwise_ops<Derived, T, std::enable_if_t<cpp17::is_integral_v<T>>> {
+class bitwise_ops<Derived, T, std::enable_if_t<std::is_integral_v<T>>> {
  public:
   LIB_STDCOMPAT_INLINE_LINKAGE T
   fetch_and(T operand, std::memory_order order = std::memory_order_seq_cst) const noexcept {

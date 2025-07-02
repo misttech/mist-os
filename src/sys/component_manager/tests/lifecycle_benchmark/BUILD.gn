@@ -62,7 +62,7 @@ fuchsia_package_with_single_component("component_lifecycle_benchmark") {
     "test_data:with_log",
     "test_data:with_log_and_stdout",
     "test_data:without_log",
-    "//src/sys/full-resolver:component",
+    "//src/sys/loopback_resolver:component",
   ]
   manifest = "meta/component_lifecycle_benchmark.cml"
 }

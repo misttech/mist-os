@@ -31,6 +31,7 @@ use crate::lsm_tree::cache::NullCache;
 use crate::lsm_tree::types::Layer;
 use crate::object_handle::{ObjectHandle as _, ReadObjectHandle};
 use crate::object_store::allocator::Allocator;
+use crate::object_store::data_object_handle::OverwriteOptions;
 use crate::object_store::extent_record::{
     ExtentKey, ExtentMode, ExtentValue, DEFAULT_DATA_ATTRIBUTE_ID,
 };
@@ -46,7 +47,7 @@ use crate::object_store::object_manager::ObjectManager;
 use crate::object_store::object_record::{AttributeKey, ObjectKey, ObjectKeyData, ObjectValue};
 use crate::object_store::transaction::{
     lock_keys, AllocatorMutation, LockKey, Mutation, MutationV40, MutationV41, MutationV43,
-    MutationV46, ObjectStoreMutation, Options, Transaction, TxnMutation,
+    MutationV46, MutationV47, ObjectStoreMutation, Options, Transaction, TxnMutation,
     TRANSACTION_MAX_JOURNAL_USAGE,
 };
 use crate::object_store::{
@@ -113,17 +114,17 @@ pub struct JournalCheckpointV32 {
     pub version: Version,
 }
 
-pub type JournalRecord = JournalRecordV46;
+pub type JournalRecord = JournalRecordV47;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum JournalRecordV46 {
+pub enum JournalRecordV47 {
     // Indicates no more records in this block.
     EndBlock,
     // Mutation for a particular object.  object_id here is for the collection i.e. the store or
     // allocator.
-    Mutation { object_id: u64, mutation: MutationV46 },
+    Mutation { object_id: u64, mutation: MutationV47 },
     // Commits records in the transaction.
     Commit,
     // Discard all mutations with offsets greater than or equal to the given offset.
@@ -145,6 +146,18 @@ pub enum JournalRecordV46 {
     // extents, we only check the checksums for a block if it has been written to for the first
     // time since the last flush, because otherwise we can't roll it back anyway so it doesn't
     // matter. For copy-on-write extents, the bool is always true.
+    DataChecksums(Range<u64>, ChecksumsV38, bool),
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(JournalRecordV47)]
+pub enum JournalRecordV46 {
+    EndBlock,
+    Mutation { object_id: u64, mutation: MutationV46 },
+    Commit,
+    Discard(u64),
+    DidFlushDevice(u64),
     DataChecksums(Range<u64>, ChecksumsV38, bool),
 }
 
@@ -290,6 +303,15 @@ struct Inner {
     reclaim_size: u64,
 
     image_builder_mode: Option<SuperBlockInstance>,
+
+    // If true and `needs_barrier`, issue a pre-barrier on the first device write of each journal
+    // write (which happens in multiples of `BLOCK_SIZE`). This ensures that all the corresponding
+    // data writes make it to disk before the journal gets written to.
+    barriers_enabled: bool,
+
+    // If true, indicates that data write requests have been made to the device since the last
+    // journal write.
+    needs_barrier: bool,
 }
 
 impl Inner {
@@ -320,11 +342,16 @@ pub struct JournalOptions {
     /// number and this number.  New super-blocks will be written every time about half of this
     /// amount is written to the journal.
     pub reclaim_size: u64,
+
+    // If true, issue a pre-barrier on the first device write of each journal write (which happens
+    // in multiples of `BLOCK_SIZE`). This ensures that all the corresponding data writes make it
+    // to disk before the journal gets written to.
+    pub barriers_enabled: bool,
 }
 
 impl Default for JournalOptions {
     fn default() -> Self {
-        JournalOptions { reclaim_size: DEFAULT_RECLAIM_SIZE }
+        JournalOptions { reclaim_size: DEFAULT_RECLAIM_SIZE, barriers_enabled: false }
     }
 }
 
@@ -420,6 +447,8 @@ impl Journal {
                 discard_offset: None,
                 reclaim_size: options.reclaim_size,
                 image_builder_mode: None,
+                barriers_enabled: options.barriers_enabled,
+                needs_barrier: false,
             }),
             writer_mutex: Mutex::new(()),
             sync_mutex: futures::lock::Mutex::new(()),
@@ -444,6 +473,16 @@ impl Journal {
 
     pub fn image_builder_mode(&self) -> Option<SuperBlockInstance> {
         self.inner.lock().image_builder_mode
+    }
+
+    #[cfg(feature = "migration")]
+    pub fn set_filesystem_uuid(&self, uuid: &[u8; 16]) -> Result<(), Error> {
+        ensure!(
+            self.inner.lock().image_builder_mode.is_some(),
+            "Can only set filesystem uuid in image builder mode."
+        );
+        self.inner.lock().super_block_header.guid.0 = uuid::Uuid::from_bytes(*uuid);
+        Ok(())
     }
 
     /// Used during replay to validate a mutation.  This should return false if the mutation is not
@@ -679,7 +718,8 @@ impl Journal {
             }
         }
 
-        // Validate the checksums.
+        // Validate the checksums. Note if barriers are enabled, there will be no checksums in
+        // practice to verify.
         let valid_to = checksum_list
             .verify(device.as_ref(), valid_to)
             .await
@@ -1578,6 +1618,9 @@ impl Journal {
             let _guard = self.writer_mutex.lock();
             checkpoint_before = {
                 let mut inner = self.inner.lock();
+                if transaction.includes_write() {
+                    inner.needs_barrier = true;
+                }
                 let checkpoint = inner.writer.journal_file_checkpoint();
                 for TxnMutation { object_id, mutation, .. } in transaction.mutations() {
                     self.objects.write_mutation(
@@ -1700,9 +1743,25 @@ impl Journal {
     async fn flush(&self, amount: usize) -> Result<(), Error> {
         let handle = self.handle.get().unwrap();
         let mut buf = handle.allocate_buffer(amount).await;
-        let offset = self.inner.lock().writer.take_flushable(buf.as_mut());
-        let len = buf.len() as u64;
-        self.handle.get().unwrap().overwrite(offset, buf.as_mut(), false).await?;
+        let (offset, len, barrier_on_first_write) = {
+            let mut inner = self.inner.lock();
+            let offset = inner.writer.take_flushable(buf.as_mut());
+            let barrier_on_first_write = inner.needs_barrier && inner.barriers_enabled;
+            // Reset `needs_barrier` before instead of after the overwrite in case a txn commit
+            // that contains data happens during the overwrite.
+            inner.needs_barrier = false;
+            (offset, buf.len() as u64, barrier_on_first_write)
+        };
+        self.handle
+            .get()
+            .unwrap()
+            .overwrite(
+                offset,
+                buf.as_mut(),
+                OverwriteOptions { barrier_on_first_write, ..Default::default() },
+            )
+            .await?;
+
         let mut inner = self.inner.lock();
         if let Some(waker) = inner.sync_waker.take() {
             waker.wake();

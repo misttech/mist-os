@@ -22,7 +22,7 @@ rustc_library("ramdevice_client") {
     "//sdk/lib/device-watcher/rust",
     "//sdk/rust/zx",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-component/client",
     "//src/lib/fuchsia-fs",
     "//src/storage/lib/fs_management/rust:fs_management",
     "//third_party/rust_crates:anyhow",

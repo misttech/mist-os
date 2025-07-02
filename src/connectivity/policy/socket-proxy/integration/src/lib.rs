@@ -480,14 +480,12 @@ async fn integration(should_set_default: bool, expected_mark: OptionalUint32) ->
 
     let realm = builder.build().await?;
 
-    let posix_socket = realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<fposix_socket::ProviderMarker>()
-        .context("While connecting to provider")?;
+    let posix_socket: fposix_socket::ProviderProxy =
+        realm.root.connect_to_protocol_at_exposed_dir().context("While connecting to provider")?;
 
-    let posix_socket_raw = realm
+    let posix_socket_raw: fposix_socket_raw::ProviderProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fposix_socket_raw::ProviderMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("While connecting to raw provider")?;
 
     {
@@ -508,9 +506,9 @@ async fn integration(should_set_default: bool, expected_mark: OptionalUint32) ->
         assert_eq!(*first_mark, OptionalUint32::Unset(fposix_socket::Empty));
     }
 
-    let starnix_networks = realm
+    let starnix_networks: fnp_socketproxy::StarnixNetworksProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::StarnixNetworksMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("while connecting to StarnixNetworks")?;
 
     starnix_networks
@@ -708,10 +706,8 @@ async fn integration_across_registries() -> Result<(), Error> {
 
     let realm = builder.build().await?;
 
-    let posix_socket = realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<fposix_socket::ProviderMarker>()
-        .context("While connecting to provider")?;
+    let posix_socket: fposix_socket::ProviderProxy =
+        realm.root.connect_to_protocol_at_exposed_dir().context("While connecting to provider")?;
 
     {
         let socket = posix_socket
@@ -731,13 +727,13 @@ async fn integration_across_registries() -> Result<(), Error> {
         assert_eq!(*first_mark, OptionalUint32::Unset(fposix_socket::Empty));
     }
 
-    let starnix_networks = realm
+    let starnix_networks: fnp_socketproxy::StarnixNetworksProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::StarnixNetworksMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("while connecting to StarnixNetworks")?;
-    let fuchsia_networks = realm
+    let fuchsia_networks: fnp_socketproxy::FuchsiaNetworksProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::FuchsiaNetworksMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("while connecting to FuchsiaNetworks")?;
 
     // Add a network to the Starnix and Fuchsia registries.
@@ -850,9 +846,9 @@ async fn test_socket_proxy_no_double_connect() -> Result<(), Error> {
     let realm = builder.build().await?;
 
     // Make two simultaneous connections to StarnixNetworksMarker
-    let starnix_networks = realm
+    let starnix_networks: fnp_socketproxy::StarnixNetworksProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::StarnixNetworksMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("While connecting to StarnixNetworks 1")?;
     // The first connection should work fine
     assert_eq!(
@@ -860,9 +856,9 @@ async fn test_socket_proxy_no_double_connect() -> Result<(), Error> {
         Err(fnp_socketproxy::NetworkRegistryRemoveError::NotFound)
     );
 
-    let starnix_networks2 = realm
+    let starnix_networks2: fnp_socketproxy::StarnixNetworksProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::StarnixNetworksMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("While connecting to StarnixNetworks 2")?;
     // The second connection should fail
     assert_matches!(
@@ -891,16 +887,16 @@ async fn test_dns_server_watcher_no_double_connect() -> Result<(), Error> {
 
     let realm = builder.build().await?;
     // Make two simultaneous connections to DnsServerWatcherMarker
-    let dns_server_watcher = realm
+    let dns_server_watcher: fnp_socketproxy::DnsServerWatcherProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::DnsServerWatcherMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("While connecting to DnsServerWatcher 1")?;
     // The first connection should work fine
     assert_eq!(dns_server_watcher.watch_servers().await?, vec![]);
 
-    let dns_server_watcher2 = realm
+    let dns_server_watcher2: fnp_socketproxy::DnsServerWatcherProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::DnsServerWatcherMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("While connecting to DnsServerWatcher 2")?;
     // The second connection should fail
     assert_matches!(
@@ -946,14 +942,14 @@ async fn watch_dns_with_registry() -> Result<(), Error> {
 
     let realm = builder.build().await?;
 
-    let dns_watcher = realm
+    let dns_watcher: fnp_socketproxy::DnsServerWatcherProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::DnsServerWatcherMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("trying to connect to DNS Server watcher")?;
 
-    let starnix_networks = realm
+    let starnix_networks: fnp_socketproxy::StarnixNetworksProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::StarnixNetworksMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("trying to connect to StarnixNetworks")?;
 
     // Add network 1 with 1 v4 address
@@ -1047,19 +1043,19 @@ async fn watch_dns_across_registries() -> Result<(), Error> {
 
     let realm = builder.build().await?;
 
-    let dns_watcher = realm
+    let dns_watcher: fnp_socketproxy::DnsServerWatcherProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::DnsServerWatcherMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("trying to connect to DNS Server watcher")?;
 
-    let starnix_networks = realm
+    let starnix_networks: fnp_socketproxy::StarnixNetworksProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::StarnixNetworksMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("trying to connect to StarnixNetworks")?;
 
-    let fuchsia_networks = realm
+    let fuchsia_networks: fnp_socketproxy::FuchsiaNetworksProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::FuchsiaNetworksMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("trying to connect to FuchsiaNetworks")?;
 
     // Add a network with 1 v4 address to the Starnix registry.

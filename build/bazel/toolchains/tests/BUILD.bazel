@@ -1,0 +1,69 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@rules_cc//cc:defs.bzl", "cc_binary")
+load("@rules_rust//rust:defs.bzl", "rust_binary")
+load("//build/bazel/rules:stamp_group.bzl", "stamp_group")
+
+package(default_visibility = ["//visibility:public"])
+
+filegroup(
+    name = "tests",
+    srcs = [":build"],
+)
+
+# A stamp group used to ensure that all dependencies are properly
+# built in the current build configuration. This is used to verify
+# that the toolchain configuration can compile and link C and C++
+# targets properly.
+stamp_group(
+    name = "build",
+    stamp = "build.stamp",
+    deps = [
+        ":hello_libc",
+        ":hello_libcpp",
+    ] + select({
+        "@platforms//os:macos": [
+            ":hello_cpp_macos_framework",
+            ":hello_rust_macos_framework",
+        ],
+        "//conditions:default": [],
+    }),
+)
+
+# A trivial C source file that prints "hello libc" to stdout.
+# Building this verifies that the toolchain can link a C executable
+# that only depends on the C library properly.
+cc_binary(
+    name = "hello_libc",
+    srcs = ["hello_libc.c"],
+)
+
+# A trivial C++ source file that prints "hello libc++" to std::cout.
+# Building this verifies that the toolchain can link a C++ executable
+# that only depends on the C++ runtime library properly.
+cc_binary(
+    name = "hello_libcpp",
+    srcs = ["hello_libcpp.cc"],
+)
+
+# A trivial C++ source file that must link to a MacOS framework.
+cc_binary(
+    name = "hello_cpp_macos_framework",
+    srcs = ["hello_cpp_macos_framework.cc"],
+    linkopts = ["-framework CoreFoundation"],
+    target_compatible_with = [
+        "@platforms//os:macos",
+    ],
+)
+
+# A trivial Rust source file that must link to a MacOS framework.
+rust_binary(
+    name = "hello_rust_macos_framework",
+    srcs = ["hello_rust_macos_framework.rs"],
+    edition = "2021",
+    target_compatible_with = [
+        "@platforms//os:macos",
+    ],
+)

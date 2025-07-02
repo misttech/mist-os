@@ -5,6 +5,11 @@
 # Lack of shebang in this file is intentional
 # shellcheck disable=SC2148
 
+# This file can be sourced multiple times when running certain tests.
+# Guard against it to avoid errors about redefining readonly variables.
+if [[ -z "${lib_vars_sh_sourced:-}" ]]; then
+readonly lib_vars_sh_sourced=true
+
 if [[ -n "${ZSH_VERSION:-}" ]]; then
   # shellcheck disable=SC2296,SC2298
   devshell_lib_dir=${${(%):-%x}:a:h}
@@ -1368,3 +1373,10 @@ function fx-get-ui-mode() {
 function fx-choose-tui {
     fx-command-run gum choose "$@"
 }
+
+# Gum - wrapped functionality for choosing amongst options
+function fx-filter-tui {
+    fx-command-run gum filter "$@"
+}
+
+fi  # -z "${lib_vars_sh_sourced:-}"

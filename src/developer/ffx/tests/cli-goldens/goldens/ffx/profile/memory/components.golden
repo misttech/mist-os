@@ -34,6 +34,14 @@
       "short": null,
       "description": "outputs data in csv format.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--buckets",
+      "short": null,
+      "description": "prints a bucketized digest of the memory usage.",
+      "hidden": false
     }
   ],
   "notes": [],

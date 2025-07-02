@@ -4,7 +4,7 @@
 
 use crate::mutable_state::{ordered_state_accessor, state_implementation};
 use crate::signals::SignalInfo;
-use crate::task::{Session, ThreadGroup};
+use crate::task::{PidTable, Session, ThreadGroup};
 use macro_rules_attribute::apply;
 use starnix_sync::{LockBefore, Locked, OrderedRwLock, ProcessGroupState};
 use starnix_types::ownership::{TempRef, WeakRef};
@@ -86,24 +86,24 @@ impl ProcessGroup {
 
     ordered_state_accessor!(ProcessGroup, mutable_state, ProcessGroupState);
 
-    pub fn insert<L>(&self, locked: &mut Locked<'_, L>, thread_group: &ThreadGroup)
+    pub fn insert<L>(&self, locked: &mut Locked<L>, thread_group: &ThreadGroup)
     where
         L: LockBefore<ProcessGroupState>,
     {
         self.write(locked)
             .thread_groups
-            .insert(thread_group.leader, thread_group.weak_thread_group.clone());
+            .insert(thread_group.leader, thread_group.weak_self.clone());
     }
 
     /// Removes the thread group from the process group. Returns whether the process group is empty.
-    pub fn remove<L>(&self, locked: &mut Locked<'_, L>, thread_group: &ThreadGroup) -> bool
+    pub fn remove<L>(&self, locked: &mut Locked<L>, thread_group: &ThreadGroup) -> bool
     where
         L: LockBefore<ProcessGroupState>,
     {
         self.write(locked).remove(thread_group)
     }
 
-    pub fn send_signals<L>(&self, locked: &mut Locked<'_, L>, signals: &[Signal])
+    pub fn send_signals<L>(&self, locked: &mut Locked<L>, signals: &[Signal])
     where
         L: LockBefore<ProcessGroupState>,
     {
@@ -114,7 +114,10 @@ impl ProcessGroup {
 
     /// Check whether the process group became orphaned. If this is the case, send signals to its
     /// members if at least one is stopped.
-    pub fn check_orphaned<L>(&self, locked: &mut Locked<'_, L>)
+    ///
+    /// Takes a read lock on the PidTable to ensure the object cannot be removed while this method
+    /// is running.
+    pub fn check_orphaned<L>(&self, locked: &mut Locked<L>, _pids: &PidTable)
     where
         L: LockBefore<ProcessGroupState>,
     {

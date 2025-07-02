@@ -181,7 +181,7 @@ TEST_F(NetStreamSocketsTest, PeerClosedPOLLOUT) {
       .fd = server().get(),
       .events = POLLOUT,
   };
-  int n = poll(&pfd, 1, std::chrono::milliseconds(kDeprecatedTimeout).count());
+  int n = poll(&pfd, 1, std::chrono::milliseconds(kPositiveCheckTimeout).count());
   EXPECT_GE(n, 0) << strerror(errno);
   EXPECT_EQ(n, 1);
   EXPECT_EQ(pfd.revents, POLLOUT | POLLERR | POLLHUP);
@@ -1498,6 +1498,63 @@ INSTANTIATE_TEST_SUITE_P(
     NetStreamTest, ConnectAcrossIpVersionTest,
     testing::Combine(testing::Values(SocketDomain::IPv4(), SocketDomain::IPv6()), testing::Bool()),
     DomainAndPreexistingErrorToString);
+
+using DomainAndPeer = std::tuple<SocketDomain, std::string>;
+
+class NonUnicastPeerTest : public testing::TestWithParam<DomainAndPeer> {
+ protected:
+  void SetUp() override {
+    auto const& [domain, peer_address] = GetParam();
+    ASSERT_TRUE(fd_ = fbl::unique_fd(socket(domain.Get(), SOCK_STREAM, 0))) << strerror(errno);
+  }
+
+  void TearDown() override { EXPECT_EQ(close(fd_.release()), 0) << strerror(errno); }
+
+  const fbl::unique_fd& fd() const { return fd_; }
+
+  static constexpr uint16_t kPort = 10000;
+
+ private:
+  fbl::unique_fd fd_;
+};
+
+TEST_P(NonUnicastPeerTest, ConnectReturnsError) {
+  auto const& [domain, peer_address] = GetParam();
+
+  sockaddr_storage addr{
+      .ss_family = domain.Get(),
+  };
+  switch (domain.which()) {
+    case SocketDomain::Which::IPv4: {
+      auto& sin = *reinterpret_cast<sockaddr_in*>(&addr);
+      ASSERT_EQ(inet_pton(domain.Get(), peer_address.c_str(), &sin.sin_addr.s_addr), 1)
+          << strerror(errno);
+      sin.sin_port = htons(kPort);
+      break;
+    }
+    case SocketDomain::Which::IPv6: {
+      auto& sin6 = *reinterpret_cast<sockaddr_in6*>(&addr);
+      ASSERT_EQ(inet_pton(domain.Get(), peer_address.c_str(), &sin6.sin6_addr), 1)
+          << strerror(errno);
+      sin6.sin6_port = htons(kPort);
+      break;
+    }
+  }
+
+  ASSERT_EQ(connect(fd().get(), reinterpret_cast<const sockaddr*>(&addr), sizeof(addr)), -1);
+  ASSERT_EQ(errno, ENETUNREACH) << strerror(errno);
+}
+
+constexpr DomainAndPeer kNonUnicastTestCases[] = {
+    {SocketDomain::IPv4(), "224.0.0.1"},
+    {SocketDomain::IPv4(), "255.255.255.255"},
+    {SocketDomain::IPv6(), "ff00::1"},
+    {SocketDomain::IPv6(), "::ffff:224.0.0.1"},
+    {SocketDomain::IPv6(), "::ffff:255.255.255.255"},
+};
+
+INSTANTIATE_TEST_SUITE_P(NetStreamTest, NonUnicastPeerTest,
+                         testing::ValuesIn(kNonUnicastTestCases));
 
 // Note: we choose 100 because the max number of fds per process is limited to
 // 256.

@@ -11,8 +11,8 @@ from mobly import asserts, test_runner
 from honeydew.affordances.connectivity.bluetooth.utils import (
     types as bluetooth_types,
 )
-from honeydew.errors import Sl4fError
 from honeydew.fuchsia_device import fuchsia_device
+from honeydew.transports.sl4f.errors import Sl4fError
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 

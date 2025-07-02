@@ -9,6 +9,7 @@ use starnix_types::PAGE_SIZE;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error, from_status_like_fdio};
 use zerocopy::{Immutable, IntoBytes};
+use zx::BootTimeline;
 
 // The default ring buffer size (2MB).
 // TODO(https://fxbug.dev/357665908): This should be based on /sys/kernel/tracing/buffer_size_kb.
@@ -79,12 +80,15 @@ struct TraceEventHeader {
 }
 
 impl TraceEventHeader {
-    fn new(size: usize, prev_timestamp: zx::BootInstant, timestamp: zx::BootInstant) -> Self {
-        let time_delta = (timestamp - prev_timestamp).into_nanos() as u32;
+    fn new(size: usize) -> Self {
         // The size reported in the event's header includes the size of `size` (a u32) and the size
         // of the event data.
         let size = (std::mem::size_of::<u32>() + size) as u32;
-        Self { time_delta: time_delta << 5, data: size }
+        Self { time_delta: 0, data: size }
+    }
+
+    fn set_time_delta(&mut self, nanos: u32) {
+        self.time_delta = nanos << 5;
     }
 }
 
@@ -102,14 +106,9 @@ pub struct TraceEvent<'a> {
 }
 
 impl<'a> TraceEvent<'a> {
-    pub fn new(
-        prev_timestamp: zx::BootInstant,
-        timestamp: zx::BootInstant,
-        pid: i32,
-        data: &'a [u8],
-    ) -> Self {
+    pub fn new(pid: i32, data: &'a [u8]) -> Self {
         let event: PrintEvent<'_> = PrintEvent::new(pid, data);
-        let header = TraceEventHeader::new(event.size(), prev_timestamp, timestamp);
+        let header = TraceEventHeader::new(event.size());
         Self { header, event }
     }
 
@@ -122,6 +121,15 @@ impl<'a> TraceEvent<'a> {
         bytes.extend_from_slice(self.header.as_bytes());
         self.event.get_bytes(&mut bytes);
         bytes
+    }
+
+    fn set_timestamp(&mut self, timestamp: zx::BootInstant, prev_timestamp: zx::BootInstant) {
+        // Debug assert here so if it happens, we can notice it happened and hopefully fix it.
+        // In non-debug, use 0 as the delta. It will be less disruptive to the process and the
+        // resulting trace data.
+        debug_assert!(timestamp >= prev_timestamp, "Timestamp must be >= prev_timestamp");
+        let nanos: u32 = (timestamp - prev_timestamp).into_nanos().try_into().unwrap_or(0);
+        self.header.set_time_delta(nanos);
     }
 }
 
@@ -349,12 +357,24 @@ impl<'a> TraceEventQueue {
     ///
     /// Should eventually allow for a writer to preempt another writer.
     /// See https://docs.kernel.org/trace/ring-buffer-design.html.
+    /// Returns the delta duration between this event and the previous event written.
     pub fn push_event(
         &self,
-        event: TraceEvent<'a>,
-        timestamp: zx::BootInstant,
-    ) -> Result<(), Errno> {
+        mut event: TraceEvent<'a>,
+    ) -> Result<zx::Duration<BootTimeline>, Errno> {
         let mut metadata = self.metadata.lock();
+
+        // The timestamp for the current event must be after the metadata.prev_timestamp.
+        // This is because the event data header only stores the delta time, not the entire timestamp.
+        // This is stored as an unsigned 27 bit value, so the delta must be a positive value to be
+        // stored correctly.
+        // To make sure this is the case, the timestamp and delta calculation are done while holding
+        // the metadata lock. This definitely could be refined, potentially using an atomic to hold
+        // the previous timestamp or similar synchronization to make sure the previous timestamp is not
+        // updated past this timestamp.
+        let timestamp = zx::BootInstant::get();
+
+        event.set_timestamp(timestamp, metadata.prev_timestamp);
 
         // Get the offset of `ring_buffer` to write this event to.
         let old_tail_page = metadata.tail_page_offset();
@@ -377,13 +397,16 @@ impl<'a> TraceEventQueue {
                 metadata.commit_field_offset(),
             )
             .map_err(|e| from_status_like_fdio!(e))?;
+
+        let delta = timestamp - metadata.prev_timestamp;
         metadata.prev_timestamp = timestamp;
 
-        Ok(())
+        Ok(delta)
     }
 
+    #[cfg(test)]
     /// Returns the timestamp of the previous event in `ring_buffer`.
-    pub fn prev_timestamp(&self) -> zx::BootInstant {
+    fn prev_timestamp(&self) -> zx::BootInstant {
         self.metadata.lock().prev_timestamp
     }
 
@@ -510,21 +533,15 @@ mod tests {
         assert_eq!(queue.ring_buffer.get_size(), 0);
 
         // Enable tracing and check the queue's state.
-        let time_before_enable = zx::BootInstant::get();
         assert!(queue.enable().is_ok());
         assert_eq!(queue.ring_buffer.get_size(), DEFAULT_RING_BUFFER_SIZE_BYTES);
-        assert!(queue.prev_timestamp() > time_before_enable);
 
         // Confirm we can push an event.
-        let timestamp = zx::BootInstant::get();
-        let event = TraceEvent::new(
-            queue.prev_timestamp(),
-            zx::BootInstant::get(),
-            1234,
-            b"B|1234|slice_name",
-        );
+        let event = TraceEvent::new(1234, b"B|1234|slice_name");
         let event_size = event.size() as u64;
-        assert!(queue.push_event(event, timestamp).is_ok());
+        let result = queue.push_event(event);
+        assert!(result.is_ok());
+        assert!(result.ok().expect("delta").into_nanos() > 0);
         assert_eq!(queue.metadata.lock().commit, PAGE_HEADER_SIZE + event_size);
 
         // Disable tracing and check that the queue's state has been reset.
@@ -535,12 +552,8 @@ mod tests {
 
     #[fuchsia::test]
     fn create_trace_event() {
-        let prev_timestamp = zx::BootInstant::get();
-        let timestamp = zx::BootInstant::get();
-
         // Create an event.
-        let event: TraceEvent<'_> =
-            TraceEvent::new(prev_timestamp, timestamp, 1234, b"B|1234|slice_name");
+        let event: TraceEvent<'_> = TraceEvent::new(1234, b"B|1234|slice_name");
         let event_size = event.size();
         assert_eq!(event_size, 42);
     }
@@ -551,14 +564,13 @@ mod tests {
         let inspect_node = fuchsia_inspect::Node::default();
         let queue = TraceEventQueue::new(&inspect_node).expect("create queue");
         queue.enable().expect("enable queue");
-        let queue_start_timestamp = queue.prev_timestamp();
-
         // Create an event.
-        let timestamp = zx::BootInstant::get();
-        let event = TraceEvent::new(queue_start_timestamp, timestamp, 1234, b"B|1234|slice_name");
+        let event = TraceEvent::new(1234, b"B|1234|slice_name");
 
         // Push the event into the queue.
-        assert!(queue.push_event(event, timestamp).is_ok());
+        let result = queue.push_event(event);
+        assert!(result.is_ok());
+        assert!(result.ok().expect("delta").into_nanos() > 0);
 
         let mut buffer = VecOutputBuffer::new(*PAGE_SIZE as usize);
         assert_eq!(queue.read(&mut buffer), error!(EAGAIN));
@@ -570,17 +582,18 @@ mod tests {
         let queue = TraceEventQueue::new(&inspect_node).expect("create queue");
         queue.enable().expect("enable queue");
         let queue_start_timestamp = queue.prev_timestamp();
-        let timestamp = zx::BootInstant::get();
         let pid = 1234;
         let data = b"B|1234|loooooooooooooooooooooooooooooooooooooooooooooooooooooooooo\
         ooooooooooooooooooooooooooooooooooooooooooooooooooooooooongevent";
-        let expected_event = TraceEvent::new(queue_start_timestamp, timestamp, pid, data);
+        let expected_event = TraceEvent::new(pid, data);
         assert_eq!(expected_event.size(), 155);
 
         // Push the event into the queue.
         for _ in 0..27 {
-            let event = TraceEvent::new(queue_start_timestamp, timestamp, pid, data);
-            assert!(queue.push_event(event, timestamp).is_ok());
+            let event = TraceEvent::new(pid, data);
+            let result = queue.push_event(event);
+            assert!(result.is_ok());
+            assert!(result.ok().expect("delta").into_nanos() > 0);
         }
 
         // Read a page of data.
@@ -588,15 +601,12 @@ mod tests {
         assert!(queue.read(&mut buffer).is_ok());
         assert_eq!(buffer.bytes_written() as u64, *PAGE_SIZE);
 
-        // Confirm our event is in the page and accounted for in the page header.
-        let mut expected_bytes = Vec::with_capacity(*PAGE_SIZE as usize);
-        expected_bytes
+        let mut expected_page_header: Vec<u8> = vec![];
+        expected_page_header
             .extend_from_slice(&(queue_start_timestamp.into_nanos() as u64).to_le_bytes());
-        expected_bytes.extend_from_slice(&(expected_event.size() * 26).to_le_bytes());
-        for _ in 0..26 {
-            expected_bytes.extend_from_slice(&expected_event.as_bytes());
-        }
-        assert!(buffer.data().starts_with(&expected_bytes));
+        expected_page_header.extend_from_slice(&(expected_event.size() * 26).to_le_bytes());
+
+        assert!(buffer.data().starts_with(&expected_page_header));
 
         // Try reading another page.
         let mut buffer = VecOutputBuffer::new(*PAGE_SIZE as usize);

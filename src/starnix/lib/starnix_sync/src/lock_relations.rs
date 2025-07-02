@@ -58,7 +58,7 @@ macro_rules! lock_level {
     ($A:ident) => {
         pub enum $A {}
         impl $crate::LockEqualOrBefore<$A> for $A {}
-        static_assertions::const_assert_eq!(std::mem::size_of::<$crate::Locked<'static, $A>>(), 0);
+        static_assertions::const_assert_eq!(std::mem::size_of::<$crate::Locked<$A>>(), 0);
     };
 }
 
@@ -110,7 +110,7 @@ mod test {
 
         let mut locked = unsafe { Unlocked::new() };
 
-        let (a, mut locked) = locked.lock_and::<A, _>(&state);
+        let (a, locked) = locked.lock_and::<A, _>(&state);
         assert_eq!(*a, A_DATA);
         // Show that A: LockBefore<B> and B: LockBefore<C> => A: LockBefore<C>.
         // Otherwise this wouldn't compile:
@@ -118,25 +118,25 @@ mod test {
         assert_eq!(*c, C_DATA);
     }
 
-    fn access_c<L: LockBefore<C>>(locked: &mut Locked<'_, L>, state: &FakeLocked) -> char {
+    fn access_c<L: LockBefore<C>>(locked: &mut Locked<L>, state: &FakeLocked) -> char {
         let c = locked.lock::<C, _>(state);
         *c
     }
 
     // Uses a fixed level B
-    fn fixed1(locked: &mut Locked<'_, B>, state: &FakeLocked) -> char {
+    fn fixed1(locked: &mut Locked<B>, state: &FakeLocked) -> char {
         relaxed(locked, state)
     }
 
     // Uses a fixed level B
-    fn fixed2(locked: &mut Locked<'_, B>, state: &FakeLocked) -> char {
+    fn fixed2(locked: &mut Locked<B>, state: &FakeLocked) -> char {
         access_c(locked, state)
     }
 
     // `LockBefore<B>` cannot be used here because then it would be impossible
     // to use it from fixed1. `LockBefore<C>` can't be used because then
     // `cast_locked::<B>` wouldn't work (there could be other ancestors of `C`)
-    fn relaxed<L>(locked: &mut Locked<'_, L>, state: &FakeLocked) -> char
+    fn relaxed<L>(locked: &mut Locked<L>, state: &FakeLocked) -> char
     where
         L: LockEqualOrBefore<B>,
     {

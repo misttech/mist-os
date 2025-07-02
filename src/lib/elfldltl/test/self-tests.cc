@@ -88,7 +88,7 @@ TEST(ElfldltlSelfTests, Memory) {
   // tagged as zero, though it covers all the tagged globals in the program.
   // The test works just fine, but is incompatible with hwasan, so we can just disable
   // hwasan for these particular globals.
-  [[clang::no_sanitize("hwaddress")]] static const int something_in_memory = 0x12345678;
+  [[gnu::no_sanitize("hwaddress")]] static const int something_in_memory = 0x12345678;
 
   const auto rodata_addr = reinterpret_cast<uintptr_t>(&something_in_memory);
   auto array = memory.ReadArray<int>(rodata_addr - bias, 1);
@@ -105,7 +105,7 @@ TEST(ElfldltlSelfTests, Memory) {
   EXPECT_EQ(0xabcdef, something_on_stack);
 
   // Set an initial value for a data word that will be overwritten by Store.
-  [[clang::no_sanitize("hwaddress")]] static int mutable_in_memory;
+  [[gnu::no_sanitize("hwaddress")]] static int mutable_in_memory;
   mutable_in_memory = 0xbad;
 
   // This cast to integer for the Memory API makes the compiler lose track of

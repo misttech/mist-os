@@ -93,6 +93,14 @@ class TracingUsingFc(tracing.Tracing):
         # every device bootup.
         self._reset_state()
         reboot_affordance.register_for_on_device_boot(fn=self._reset_state)
+        self.verify_supported()
+
+    def verify_supported(self) -> None:
+        """Check if Trace is supported on the DUT.
+        Raises:
+            NotSupportedError: Tracing affordance is not supported by Fuchsia device.
+        """
+        # TODO(http://b/409625325): Implement the method logic
 
     def _reset_state(self) -> None:
         """Resets internal state tracking variables to correspond to an inactive
@@ -265,7 +273,7 @@ class TracingUsingFc(tracing.Tracing):
     def terminate(self) -> None:
         """Terminates the trace session without saving the trace."""
         if self._trace_controller_proxy is not None:
-            self._trace_controller_proxy.channel.close()
+            self._trace_controller_proxy.close_cleanly()
         self._reset_state()
 
     def terminate_and_download(
@@ -329,8 +337,9 @@ class TracingUsingFc(tracing.Tracing):
         socket_task = asyncio.get_running_loop().create_task(
             self._trace_socket.read_all()
         )
-        self.terminate()
-
+        if self._trace_controller_proxy is not None:
+            self._trace_controller_proxy.close_cleanly()
         trace_buffer: bytes = await socket_task
+        self._reset_state()
 
         return trace_buffer

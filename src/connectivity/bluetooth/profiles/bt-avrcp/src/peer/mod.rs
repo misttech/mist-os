@@ -1731,7 +1731,7 @@ pub(crate) mod tests {
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 
         // Inspect tree should be updated with the connection error count.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             peer: contains {},
             metrics: contains {
                 connection_errors: 1u64,
@@ -1761,7 +1761,7 @@ pub(crate) mod tests {
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 
         // Inspect tree should be updated with the connection.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             peer: contains {
                 control: "Connected",
             },
@@ -1779,7 +1779,7 @@ pub(crate) mod tests {
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
 
         // Inspect tree should be updated with the browse connection.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             peer: contains {
                 control: "Connected",
             },
@@ -1795,7 +1795,7 @@ pub(crate) mod tests {
         // Run to update watcher state.
         let _ = exec.run_until_stalled(&mut futures::future::pending::<()>());
         // Inspect tree should be updated with the disconnection.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             peer: contains {
                 control: "Disconnected",
             },

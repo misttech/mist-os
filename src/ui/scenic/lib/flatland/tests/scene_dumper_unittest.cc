@@ -37,7 +37,7 @@ namespace {
 constexpr int kIgnoredLinesAtStartOfDump = 3;
 
 // Instance topologies are dumped on the same line containing this token.
-constexpr char kInstanceDumpLineIdentifierToken[] = "Instance";
+constexpr char kInstanceDumpLineIdentifierToken[] = "Session";
 
 // Images are dumped on the same line containing this token.
 constexpr char kImageDumpLineIdentifierToken[] = "image:";
@@ -171,14 +171,13 @@ void ExpectNodeNameAndKoid(flatland::TransformHandle node, size_t node_line_numb
   EXPECT_GT(name_index, node_index);  // Name appears to right of node.
 }
 
-// Find the line number containing an instance dump (and also |kInstanceDumpLineIdentifierToken|).
-// Returns the line number of the following line (after the found instance). This can then be
-// specified as |beginning_at| to find subsequent instances.
+// Returns the line number containing an instance dump, i.e. a line beginning with
+// `kInstanceDumpLineIdentifierToken` followed by the `instance_id`.
 size_t FindInstanceDumpLineNumber(const std::vector<std::string>& line_dump,
                                   flatland::TransformHandle::InstanceId instance_id) {
   for (size_t i = 0; i < line_dump.size(); i++) {
-    if (line_dump[i].find(std::string(kInstanceDumpLineIdentifierToken) + " " +
-                          std::to_string(instance_id)) == 0) {
+    if (line_dump[i].starts_with(std::string(kInstanceDumpLineIdentifierToken) + " " +
+                                 std::to_string(instance_id))) {
       return i;
     }
   }
@@ -190,7 +189,7 @@ size_t FindInstanceDumpLineNumber(const std::vector<std::string>& line_dump,
 void ExpectInstanceDumpCount(const std::vector<std::string>& line_dump, int expected_count) {
   int count = 0;
   for (auto& line : line_dump) {
-    if (line.find(kInstanceDumpLineIdentifierToken) == 0) {
+    if (line.starts_with(kInstanceDumpLineIdentifierToken)) {
       count++;
     }
   }

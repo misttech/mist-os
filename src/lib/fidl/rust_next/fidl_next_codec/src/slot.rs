@@ -22,6 +22,9 @@ pub struct Slot<'de, T: ?Sized> {
     _phantom: PhantomData<&'de mut [u8]>,
 }
 
+unsafe impl<T: Send> Send for Slot<'_, T> {}
+unsafe impl<T: Sync> Sync for Slot<'_, T> {}
+
 impl<'de, T: ?Sized> Slot<'de, T> {
     /// Returns a new `Slot` backed by the given `MaybeUninit`.
     pub fn new(backing: &'de mut MaybeUninit<T>) -> Self

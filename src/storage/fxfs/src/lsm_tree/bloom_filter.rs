@@ -231,6 +231,13 @@ impl<V: FuzzyHash> BloomFilterWriter<V> {
             self.data.set(idx, true);
         }
     }
+
+    // Clear the bits in the bloom filter. Intended to be used for testing, e.g., to create an
+    // invalid bloom filter.
+    #[cfg(test)]
+    pub(crate) fn clear(&mut self) {
+        self.data.clear();
+    }
 }
 
 #[cfg(test)]

@@ -25,8 +25,8 @@ void hexdump_stdio_printf(void* printf_arg, const char* fmt, ...) {
 // fault reading them than to display some garbage.  The other functions
 // here (and their callees) have normal instrumentation since they don't
 // derference pointers into the suspect buffer.
-#if defined(__clang__) && _KERNEL
-#define MAYBE_NO_ASAN [[clang::no_sanitize("address")]]
+#ifdef _KERNEL
+#define MAYBE_NO_ASAN [[gnu::no_sanitize("address")]]
 #else
 #define MAYBE_NO_ASAN
 #endif

@@ -39,11 +39,13 @@ TYPED_TEST(DlTests, DlIteratePhdrStartupModules) {
   ModuleInfoList startup_info_list;
   EXPECT_EQ(this->DlIteratePhdr(CollectModulePhdrInfo, &startup_info_list), 0);
 
-  // If the dlopen implementation can't unload modules, there will be additional
-  // modules that are collected by dl_iterate_phdr that were loaded by tests
-  // that ran before this one. This checks that `startup_info_list` at least
-  // starts with the elements in `gStartupPhdrInfo`.
-  EXPECT_THAT(startup_info_list, ::testing::ElementsAreArray(gStartupPhdrInfo));
+  // If the dlopen implementation can't unload modules or if previous tests
+  // tested with RTLD_NODELETE, there will be additional modules that are
+  // collected by dl_iterate_phdr that were loaded by tests that ran before this
+  // one. This checks that `startup_info_list` at least starts with the elements
+  // in `gStartupPhdrInfo`.
+  EXPECT_THAT(std::span(startup_info_list).subspan(0, gStartupPhdrInfo.size()),
+              ::testing::ElementsAreArray(gStartupPhdrInfo));
 }
 
 // Test the following as it affects `dl_iterate_phdr` output:

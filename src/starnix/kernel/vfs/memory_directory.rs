@@ -41,11 +41,11 @@ impl MemoryDirectoryFile {
 /// necessary to subtract 2 from the offset in subsequent logic.
 pub fn emit_dotdot(file: &FileObject, sink: &mut dyn DirentSink) -> Result<(), Errno> {
     if sink.offset() == 0 {
-        sink.add(file.node().node_id, 1, DirectoryEntryType::DIR, ".".into())?;
+        sink.add(file.node().ino, 1, DirectoryEntryType::DIR, ".".into())?;
     }
     if sink.offset() == 1 {
         sink.add(
-            file.name.entry.parent_or_self().node.node_id,
+            file.name.entry.parent_or_self().node.ino,
             2,
             DirectoryEntryType::DIR,
             "..".into(),
@@ -60,13 +60,13 @@ impl FileOps for MemoryDirectoryFile {
 
     fn seek(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        let new_offset = default_seek(current_offset, target, |_| error!(EINVAL))?;
+        let new_offset = default_seek(current_offset, target, || error!(EINVAL))?;
         // Nothing to do.
         if current_offset == new_offset {
             return Ok(new_offset);
@@ -93,7 +93,7 @@ impl FileOps for MemoryDirectoryFile {
 
     fn readdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -105,11 +105,10 @@ impl FileOps for MemoryDirectoryFile {
             for (name, maybe_entry) in children.range((readdir_position.clone(), Bound::Unbounded))
             {
                 if let Some(entry) = maybe_entry.upgrade() {
-                    let mode = entry.node.info().mode;
                     sink.add(
-                        entry.node.node_id,
+                        entry.node.ino,
                         sink.offset() + 1,
-                        DirectoryEntryType::from_mode(mode),
+                        DirectoryEntryType::from_mode(entry.node.info().mode),
                         name.as_ref(),
                     )?;
                     *readdir_position = Bound::Excluded(name.clone());

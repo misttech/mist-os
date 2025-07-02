@@ -19,6 +19,9 @@
 
 namespace {
 
+bool psci_cpu_suspend_supported = false;
+bool psci_set_suspend_mode_supported = false;
+
 uint64_t shutdown_args[3] = {0, 0, 0};
 uint64_t reboot_args[3] = {0, 0, 0};
 uint64_t reboot_bootloader_args[3] = {0, 0, 0};
@@ -35,8 +38,9 @@ zx_status_t psci_status_to_zx_status(uint64_t psci_result) {
     case PSCI_DISABLED:
       return ZX_ERR_NOT_SUPPORTED;
     case PSCI_INVALID_PARAMETERS:
-    case PSCI_INVALID_ADDRESS:
       return ZX_ERR_INVALID_ARGS;
+    case PSCI_INVALID_ADDRESS:
+      return ZX_ERR_OUT_OF_RANGE;
     case PSCI_DENIED:
       return ZX_ERR_ACCESS_DENIED;
     case PSCI_ALREADY_ON:
@@ -47,17 +51,13 @@ zx_status_t psci_status_to_zx_status(uint64_t psci_result) {
       return ZX_ERR_INTERNAL;
     case PSCI_NOT_PRESENT:
       return ZX_ERR_NOT_FOUND;
-    case PSCI_TIMEOUT:
-      return ZX_ERR_TIMED_OUT;
-    case PSCI_RATE_LIMITED:
-    case PSCI_BUSY:
-      return ZX_ERR_UNAVAILABLE;
     default:
       return ZX_ERR_BAD_STATE;
   }
 }
 
 uint64_t psci_smc_call(uint32_t function, uint64_t arg0, uint64_t arg1, uint64_t arg2) {
+  LTRACEF("0x%x 0x%" PRIx64 " 0x%" PRIx64 " 0x%" PRIx64 "\n", function, arg0, arg1, arg2);
   return arm_smccc_smc(function, arg0, arg1, arg2, 0, 0, 0, 0).x0;
 }
 
@@ -70,6 +70,46 @@ using psci_call_proc = uint64_t (*)(uint32_t, uint64_t, uint64_t, uint64_t);
 psci_call_proc do_psci_call = psci_smc_call;
 
 }  // anonymous namespace
+
+// Saves register state in |context|, then issues a PSCI call, using
+// |psci_call|, for the specified |psci_func|, passing along the supplied
+// |power_state|, |entry|, and |context| arguments.
+//
+// This function is designed to be called with PSCI64_CPU_SUSPEND and work with
+// |psci_do_resume| and |arm64_secondary_start|.
+//
+// In all cases, this function will always appear to return to its caller.
+// Depending on the PSCI implementation and the conditions, it may do so
+// directly, or in the case of a successful CPU_SUSPEND, it may do so via
+// |arm64_secondary_start| and |psci_do_resume|.
+//
+// If the return value is less than or equal to zero, then control did not
+// branch to |entry| and the return value should be interpreted as a PSCI return
+// value (see section 5.4.5 of DEN0022F.b):
+//
+//   PSCI_SUCCESS - The CPU_SUSPEND call succeeded.  However, the CPU did not
+//   reach a power down state because of a pending interrupt, or simply because
+//   the requested |power_state| is not a power down state.
+//
+//   PSCI_INVALID_PARAMETERS - The |power_state| is invalid, or a low-power
+//   state was requested for a higher-than-core-level topology node
+//   (e.g. cluster) and at least one of the children in that node is in a local
+//   low-power state that is incompatible with the request.
+//
+//   PSCI_DENIED - A low-power state is requested for a higher-than-core-level
+//   topology node (e.g. cluster) and all the cores that are in an incompatible
+//   state with the request are running, as opposed to being in a low-power
+//   state.
+//
+//   PSCI_INVALID_ADDRESS - |entry| is not a valid physical address.
+//
+// If the return value is greater than zero, then the CPU did in fact suspend
+// and resume execution at |entry| before returning to the caller.
+//
+// Implemented in assembly.
+extern "C" int64_t psci_do_suspend(psci_call_proc psci_call, uint32_t power_state, paddr_t entry,
+                                   psci_cpu_resume_context* context);
+extern "C" zx_status_t psci_do_resume(psci_cpu_resume_context* context) __NO_RETURN;
 
 zx_status_t psci_system_off() {
   return psci_status_to_zx_status(
@@ -88,6 +128,45 @@ zx_status_t psci_cpu_off() {
 zx_status_t psci_cpu_on(uint64_t mpid, paddr_t entry, uint64_t context) {
   LTRACEF("CPU_ON mpid %#" PRIx64 ", entry %#" PRIx64 "\n", mpid, entry);
   return psci_status_to_zx_status(do_psci_call(PSCI64_CPU_ON, mpid, entry, context));
+}
+
+PsciCpuSuspendResult psci_cpu_suspend(uint32_t power_state) {
+  LTRACE_ENTRY;
+
+  DEBUG_ASSERT(arch_ints_disabled());
+
+  if (!psci_cpu_suspend_supported) {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  const paddr_t entry_pa = KernelPhysicalAddressOf<arm64_secondary_start>();
+
+  psci_cpu_resume_context context{};
+
+  LTRACEF("cpu %u, psci_call_routine 0x%" PRIx64 ", power_state 0x%x, entry 0x%" PRIx64
+          ", context %p\n",
+          arch_curr_cpu_num(), reinterpret_cast<uintptr_t>(do_psci_call), power_state, entry_pa,
+          &context);
+
+  const int64_t result = psci_do_suspend(do_psci_call, power_state, entry_pa, &context);
+  if (result > 0) {
+    // We took the "long way" and restored CPU context from a power down state.
+    return zx::ok(CpuPoweredDown::Yes);
+  }
+
+  switch (result) {
+    case PSCI_SUCCESS:
+      return zx::ok(CpuPoweredDown::No);
+    case PSCI_INVALID_PARAMETERS:
+      return zx::error(ZX_ERR_INVALID_ARGS);
+    case PSCI_DENIED:
+      return zx::error(ZX_ERR_ACCESS_DENIED);
+    default:
+      panic("cpu %u, psci_call_routine 0x%" PRIx64 ", power_state 0x%x, entry 0x%" PRIx64
+            ", context %p\n",
+            arch_curr_cpu_num(), reinterpret_cast<uintptr_t>(do_psci_call), power_state, entry_pa,
+            &context);
+  };
 }
 
 int64_t psci_get_affinity_info(uint64_t mpid) {
@@ -136,6 +215,14 @@ zx_status_t psci_system_reset(power_reboot_flags flags) {
   return psci_status_to_zx_status(do_psci_call(reset_command, args[0], args[1], args[2]));
 }
 
+zx_status_t psci_set_suspend_mode(psci_suspend_mode mode) {
+  return psci_status_to_zx_status(do_psci_call(PSCI64_PSCI_SET_SUSPEND_MODE, mode, 0, 0));
+}
+
+bool psci_is_set_suspend_mode_supported() { return psci_set_suspend_mode_supported; }
+
+bool psci_is_cpu_suspend_supported() { return psci_cpu_suspend_supported; }
+
 void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
   do_psci_call = config.use_hvc ? psci_hvc_call : psci_smc_call;
   memcpy(shutdown_args, config.shutdown_args, sizeof(shutdown_args));
@@ -153,40 +240,41 @@ void PsciInit(const zbi_dcfg_arm_psci_driver_t& config) {
     // query features
     dprintf(INFO, "PSCI supported features:\n");
 
-    auto probe_feature = [](uint32_t feature, const char* feature_name) -> bool {
+    // Prints info about the features and returns supported flags or nullopt if not supported.
+    auto probe_feature = [](uint32_t feature, const char* feature_name) -> ktl::optional<uint32_t> {
       uint32_t result = psci_get_feature(feature);
       if (static_cast<int32_t>(result) < 0) {
         // Not supported
-        return false;
+        return ktl::nullopt;
       }
-      dprintf(INFO, "\t%s\n", feature_name);
-      return true;
+      dprintf(INFO, "\t%s (0x%x)\n", feature_name, result);
+      return result;
     };
 
-    probe_feature(PSCI64_CPU_SUSPEND, "CPU_SUSPEND");
+    psci_cpu_suspend_supported = probe_feature(PSCI64_CPU_SUSPEND, "CPU_SUSPEND").has_value();
     probe_feature(PSCI64_CPU_OFF, "CPU_OFF");
     probe_feature(PSCI64_CPU_ON, "CPU_ON");
-    probe_feature(PSCI64_AFFINITY_INFO, "CPU_AFFINITY_INFO");
-    probe_feature(PSCI64_MIGRATE, "CPU_MIGRATE");
-    probe_feature(PSCI64_MIGRATE_INFO_TYPE, "CPU_MIGRATE_INFO_TYPE");
-    probe_feature(PSCI64_MIGRATE_INFO_UP_CPU, "CPU_MIGRATE_INFO_UP_CPU");
+    probe_feature(PSCI64_AFFINITY_INFO, "AFFINITY_INFO");
+    probe_feature(PSCI64_MIGRATE, "MIGRATE");
+    probe_feature(PSCI64_MIGRATE_INFO_TYPE, "MIGRATE_INFO_TYPE");
+    probe_feature(PSCI64_MIGRATE_INFO_UP_CPU, "MIGRATE_INFO_UP_CPU");
     probe_feature(PSCI64_SYSTEM_OFF, "SYSTEM_OFF");
     probe_feature(PSCI64_SYSTEM_RESET, "SYSTEM_RESET");
-    bool supported = probe_feature(PSCI64_SYSTEM_RESET2, "SYSTEM_RESET2");
-    if (supported) {
+    if (probe_feature(PSCI64_SYSTEM_RESET2, "SYSTEM_RESET2").has_value()) {
       // Prefer RESET2 if present. It explicitly supports arguments, but some vendors have
       // extended RESET to behave the same way.
       reset_command = PSCI64_SYSTEM_RESET2;
     }
     probe_feature(PSCI64_CPU_FREEZE, "CPU_FREEZE");
     probe_feature(PSCI64_CPU_DEFAULT_SUSPEND, "CPU_DEFAULT_SUSPEND");
-    probe_feature(PSCI64_NODE_HW_STATE, "CPU_NODE_HW_STATE");
-    probe_feature(PSCI64_SYSTEM_SUSPEND, "CPU_SYSTEM_SUSPEND");
-    probe_feature(PSCI64_PSCI_SET_SUSPEND_MODE, "CPU_PSCI_SET_SUSPEND_MODE");
-    probe_feature(PSCI64_PSCI_STAT_RESIDENCY, "CPU_PSCI_STAT_RESIDENCY");
-    probe_feature(PSCI64_PSCI_STAT_COUNT, "CPU_PSCI_STAT_COUNT");
-    probe_feature(PSCI64_MEM_PROTECT, "CPU_MEM_PROTECT");
-    probe_feature(PSCI64_MEM_PROTECT_RANGE, "CPU_MEM_PROTECT_RANGE");
+    probe_feature(PSCI64_NODE_HW_STATE, "NODE_HW_STATE");
+    probe_feature(PSCI64_SYSTEM_SUSPEND, "SYSTEM_SUSPEND");
+    psci_set_suspend_mode_supported =
+        probe_feature(PSCI64_PSCI_SET_SUSPEND_MODE, "PSCI_SET_SUSPEND_MODE").has_value();
+    probe_feature(PSCI64_PSCI_STAT_RESIDENCY, "PSCI_STAT_RESIDENCY");
+    probe_feature(PSCI64_PSCI_STAT_COUNT, "PSCI_STAT_COUNT");
+    probe_feature(PSCI64_MEM_PROTECT, "MEM_PROTECT");
+    probe_feature(PSCI64_MEM_PROTECT_RANGE, "MEM_PROTECT_RANGE");
 
     probe_feature(PSCI64_SMCCC_VERSION, "PSCI64_SMCCC_VERSION");
   }
@@ -226,9 +314,7 @@ int cmd_psci(int argc, const cmd_args* argv, uint32_t flags) {
       goto notenoughargs;
     }
 
-    uintptr_t secondary_entry_paddr =
-        KernelPhysicalLoadAddress() + (reinterpret_cast<uintptr_t>(&arm64_secondary_start) -
-                                       reinterpret_cast<uintptr_t>(__executable_start));
+    paddr_t secondary_entry_paddr = KernelPhysicalAddressOf<arm64_secondary_start>();
     uint32_t ret = psci_cpu_on(argv[2].u, secondary_entry_paddr, 0);
     printf("psci_cpu_on returns %u\n", ret);
   } else if (!strcmp(argv[1].str, "affinity_info")) {

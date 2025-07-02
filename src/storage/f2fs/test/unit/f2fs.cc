@@ -229,8 +229,7 @@ TEST_F(StorageTest, LargeIOs) {
   auto device =
       std::make_unique<block_client::FakeBlockDevice>(block_client::FakeBlockDevice::Config{
           .block_count = kDefaultSectorCount / kDefaultSectorsPerBlock, .block_size = kBlockSize});
-  bool readonly_device = false;
-  zx::result block_or = CreateBcacheMapper(std::move(device), &readonly_device);
+  zx::result block_or = CreateBcacheMapper(std::move(device), true);
   ASSERT_TRUE(block_or.is_ok());
 
   // Create |reader_| and |writer | based on the fake block

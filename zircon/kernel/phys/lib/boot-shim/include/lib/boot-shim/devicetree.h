@@ -130,11 +130,11 @@ class DevicetreeIrqResolver {
   // May only be called after resolving the IRQ Controller, see |ResolveIrqController()|.
   size_t num_entries() const {
     ZX_ASSERT(interrupt_cells_);
-    return interrupt_bytes_.size() / *interrupt_cells_;
+    return (interrupt_bytes_.size() / sizeof(uint32_t)) / *interrupt_cells_;
   }
 
   // Returns whether additional scans are required to resolve the |interrupt_parent|.
-  // This is only meaningful if |ResolveIrqController| return |ScanState::kActive|.
+  // This is only meaningful if |ResolveIrqController| returned false.
   bool NeedsInterruptParent() const { return !error_ && interrupt_parent_ && !irq_resolver_; }
 
  private:
@@ -1102,6 +1102,140 @@ class DevicetreeSecureEntropyItem : public DevicetreeItemBase<DevicetreeSecureEn
  private:
   std::span<std::byte> rng_bytes_;
   std::span<std::byte> kaslr_bytes_;
+};
+
+class ArmDevicetreeTimerMmioItem
+    : public DevicetreeItemBase<ArmDevicetreeTimerMmioItem, 2>,
+      public SingleOptionalItem<zbi_dcfg_arm_generic_timer_mmio_driver_t, ZBI_TYPE_KERNEL_DRIVER,
+                                ZBI_KERNEL_DRIVER_ARM_GENERIC_TIMER_MMIO> {
+ public:
+  static constexpr auto kCompatibleDevices = std::to_array({"arm,armv7-timer-mem"});
+  static constexpr bool kMatchOkNodesOnly = false;
+
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+
+  devicetree::ScanState OnSubtree(const devicetree::NodePath& path) {
+    // We just finished visiting all timer frames.
+    // Note that this callback implies that the matcher is still in `kActive` state, meaning
+    // IRQs need to be resolved.
+    if (timer_ != nullptr && timer_ == &path.back()) {
+      timer_ = nullptr;
+      if (unresolved_irqs_ == 0) {
+        return devicetree::ScanState::kDone;
+      }
+    }
+    return devicetree::ScanState::kActive;
+  }
+
+  devicetree::ScanState OnScan() {
+    if (unresolved_irqs_ == 0) {
+      return devicetree::ScanState::kDone;
+    }
+    return devicetree::ScanState::kActive;
+  }
+
+  // When the scans are done, if by any chance all frames have some errors, do not emit an item.
+  void OnDone() {
+    if (present_ == 0 && payload()) {
+      set_payload();
+    } else {
+      payload()->active_frames_mask = active_;
+    }
+  }
+
+ private:
+  devicetree::ScanState OnTimerNode(const devicetree::NodePath& path,
+                                    const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState OnFrameNode(const devicetree::NodePath& path,
+                                    const devicetree::PropertyDecoder& decoder);
+
+  constexpr std::span<zbi_dcfg_arm_generic_timer_mmio_frame_t> frames() {
+    return payload()->frames;
+  }
+  constexpr bool IsFramePresent(size_t frame_index) const {
+    return (present_ & (1 << frame_index)) != 0;
+  }
+
+  // This is called AT MOST once per frame.
+  void SetFrameIrq(size_t frame_index) {
+    auto& irq_resolver = irq_resolvers_[frame_index];
+    auto& frame = frames()[frame_index];
+    ZX_DEBUG_ASSERT(frame.irq_phys == 0);
+    ZX_DEBUG_ASSERT(frame.irq_virt == 0);
+    if (irq_resolver.num_entries() > 0) {
+      auto irq_config = irq_resolver.GetIrqConfig(0);
+      frame.irq_phys = irq_config.irq;
+      frame.irq_phys_flags = irq_config.flags;
+    }
+    if (irq_resolver.num_entries() > 1) {
+      auto irq_config = irq_resolver.GetIrqConfig(1);
+      frame.irq_virt = irq_config.irq;
+      frame.irq_virt_flags = irq_config.flags;
+    }
+    unresolved_irqs_--;
+  }
+
+  const devicetree::Node* timer_ = nullptr;
+  uint8_t active_ = 0;
+  uint8_t present_ = 0;
+  std::array<DevicetreeIrqResolver, 8> irq_resolvers_;
+  size_t unresolved_irqs_ = 0;
+};
+
+// Extract `idle-states` and `domain-idle-states` information.
+//
+// For `idle-states` see
+// https://www.kernel.org/doc/Documentation/devicetree/bindings/arm/idle-states.txt For
+// `domain-idle-states see
+// https://www.kernel.org/doc/Documentation/devicetree/bindings/power/domain-idle-state.yaml
+//
+// Note: There is inconsistency in the use of `domain-idle-states` and `idle-states, specifically on
+// where they are located in the devicetree with respect to the spec.
+class ArmDevicetreePsciCpuSuspendItem
+    : public DevicetreeItemBase<ArmDevicetreePsciCpuSuspendItem, 2>,
+      public ItemBase {
+  using Base = DevicetreeItemBase<ArmDevicetreePsciCpuSuspendItem, 2>;
+
+ public:
+  template <typename Shim>
+  void Init(Shim& shim) {
+    Base::Init(shim);
+    allocator_ = &shim.allocator();
+  }
+
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+
+  devicetree::ScanState OnSubtree(const devicetree::NodePath& root);
+  devicetree::ScanState OnScan();
+
+  constexpr size_t size_bytes() const {
+    return num_idle_states_ == 0
+               ? 0
+               : ItemSize(num_idle_states_ * sizeof(zbi_dcfg_arm_psci_cpu_suspend_state_t));
+  }
+
+  fit::result<DataZbi::Error> AppendItems(DataZbi& zbi);
+
+ private:
+  devicetree::ScanState OnIdleStateCount(const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState OnIdleStateFill(const devicetree::PropertyDecoder& decoder);
+
+  std::span<zbi_dcfg_arm_psci_cpu_suspend_state_t> idle_states() {
+    return {states_, num_idle_states_};
+  }
+
+  // Allocation is environment specific, so we delegate that to a lambda.
+  const DevicetreeBootShimAllocator* allocator_ = nullptr;
+
+  const devicetree::Node* idle_states_ = nullptr;
+  const devicetree::Node* domain_idle_states_ = nullptr;
+  uint32_t subtree_visited_count_ = 0;
+
+  uint32_t current_idle_state_ = 0;
+  uint32_t num_idle_states_ = 0;
+  zbi_dcfg_arm_psci_cpu_suspend_state_t* states_ = nullptr;
 };
 
 }  // namespace boot_shim

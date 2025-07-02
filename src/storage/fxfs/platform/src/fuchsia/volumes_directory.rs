@@ -15,7 +15,7 @@ use async_trait::async_trait;
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
 use fidl_fuchsia_fs_startup::{CheckOptions, MountOptions, VolumeRequest, VolumeRequestStream};
-use fidl_fuchsia_fxfs::ProjectIdMarker;
+use fidl_fuchsia_fxfs::{FileBackedVolumeProviderMarker, ProjectIdMarker};
 use fs_inspect::{FsInspectTree, FsInspectVolume};
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
@@ -547,6 +547,16 @@ impl VolumesDirectory {
                 }
             }),
         )?;
+        let vol = volume.clone();
+        svc_dir.add_entry(
+            FileBackedVolumeProviderMarker::PROTOCOL_NAME,
+            vfs::service::host(move |requests| {
+                let vol = vol.clone();
+                async move {
+                    let _ = vol.handle_file_backed_volume_provider_requests(requests).await;
+                }
+            }),
+        )?;
         volume.root().clone().register_additional_volume_services(&svc_dir)?;
 
         // Use the volume's scope here which should be OK for now.  In theory the scope represents a
@@ -906,12 +916,7 @@ mod tests {
 
         let new_dirty = {
             let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
-            vfs::directory::serve_on(
-                vol.root().clone().as_directory(),
-                fio::PERM_READABLE | fio::PERM_WRITABLE,
-                vol.volume().scope().clone(),
-                server_end,
-            );
+            vol.root().clone().serve(fio::PERM_READABLE | fio::PERM_WRITABLE, server_end);
             let f = open_file_checked(
                 &root,
                 "foo",

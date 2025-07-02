@@ -268,7 +268,6 @@
                 "fuchsia.hardware.thermal.Service", // replaces /dev/class/thermal
                 "fuchsia.hardware.trippoint.TripPointService", // replaces /dev/class/trippoint
                 "fuchsia.input.report.Service", // replaces /dev/class/input-report
-                "fuchsia.power.battery.InfoService", // replaces /dev/class/battery
             ],
             from: "parent",
             to: "#session-manager",
@@ -309,6 +308,13 @@
             availability: "same_as_target",
         },
         {
+            // replaces /dev/class/battery
+            service: [ "fuchsia.power.battery.InfoService" ],
+            from: "parent",
+            to: "#session-manager",
+            availability: "same_as_target",
+        },
+        {
             storage: [
                 "cache",
                 "data",
@@ -324,7 +330,6 @@
                 "fuchsia.session.window.Collection",
                 "fuchsia.session.window.InitialElementUrl",
                 "fuchsia.session.window.InitialViewIdAnnotation",
-                "fuchsia.time.config.HasWakeAlarms",
                 "fuchsia.time.config.WritableUTCTime",
                 "fuchsia.ui.VisualDebuggingLevel",
             ],

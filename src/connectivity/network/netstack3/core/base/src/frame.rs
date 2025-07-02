@@ -14,6 +14,7 @@ use packet::{BufferMut, SerializeError, Serializer};
 use thiserror::Error;
 
 use crate::error::ErrorAndSerializer;
+use crate::socket::SocketCookie;
 
 /// A context for receiving frames.
 ///
@@ -233,6 +234,17 @@ impl<D, M, I: Ip> RecvIpFrameMeta<D, M, I> {
     }
 }
 
+/// A trait for the metadata associated with a TX frame.
+///
+/// The `Default` impl yields the default, i.e. unspecified, metadata
+/// instance.
+pub trait TxMetadata: Default + Debug + Send + Sync + 'static {
+    /// Returns [`SocketCookie`] for the socket associate with the packet.
+    /// `None` is returned if the packet is not associated with a local socket
+    /// or the socket has been destroyed.
+    fn socket_cookie(&self) -> Option<SocketCookie>;
+}
+
 /// A trait abstracting TX frame metadata when traversing the stack.
 ///
 /// This trait allows for stack integration crate to define a single concrete
@@ -246,10 +258,7 @@ impl<D, M, I: Ip> RecvIpFrameMeta<D, M, I> {
 /// parameter explosion.
 pub trait TxMetadataBindingsTypes {
     /// The metadata associated with a TX frame.
-    ///
-    /// The `Default` impl yields the default, i.e. unspecified, metadata
-    /// instance.
-    type TxMetadata: Default + Debug + Send + Sync + 'static;
+    type TxMetadata: TxMetadata;
 }
 
 /// A core context providing tx metadata type conversion.
@@ -366,6 +375,12 @@ pub(crate) mod testutil {
     /// The fake metadata supported by [`FakeBindingsCtx`].
     #[derive(Default, Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
     pub struct FakeTxMetadata;
+
+    impl TxMetadata for FakeTxMetadata {
+        fn socket_cookie(&self) -> Option<SocketCookie> {
+            None
+        }
+    }
 }
 
 #[cfg(test)]

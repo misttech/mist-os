@@ -25,7 +25,11 @@
 //! Of course, for everything to work well, your component will need appropriate
 //! capability routing.  Refer to capability routing docs for those details.
 
+mod emu;
+
+use crate::emu::EmulationTimerOps;
 use anyhow::{anyhow, Result};
+use async_trait::async_trait;
 use fidl::encoding::ProxyChannelBox;
 use fidl::endpoints::RequestStream;
 use fidl::HandleBased;
@@ -77,17 +81,171 @@ fn is_deadline_changed(
     }
 }
 
+// Errors returnable from [TimerOps] calls.
+#[derive(Debug)]
+pub(crate) enum TimerOpsError {
+    /// The driver reported an error.
+    Driver(ffhh::DriverError),
+    /// FIDL-specific RPC error.
+    Fidl(fidl::Error),
+}
+
+trait SawResponseFut: std::future::Future<Output = Result<zx::EventPair, TimerOpsError>> {
+    // nop
+}
+
+/// Abstracts away timer operations.
+#[async_trait(?Send)]
+pub(crate) trait TimerOps {
+    /// Stop the timer with the specified ID.
+    async fn stop(&self, id: u64);
+
+    /// Examine the timer's properties, such as supported resolutions and tick
+    /// counts.
+    async fn get_timer_properties(&self) -> TimerConfig;
+
+    /// This method must return an actual future, to handle the borrow checker:
+    /// making this async will assume that `self` remains borrowed, which will
+    /// thwart attempts to move the return value of this call into a separate
+    /// closure.
+    fn start_and_wait(
+        &self,
+        id: u64,
+        resolution: &ffhh::Resolution,
+        ticks: u64,
+        setup_event: zx::Event,
+    ) -> std::pin::Pin<Box<dyn SawResponseFut>>;
+}
+
+/// TimerOps backed by an actual hardware timer.
+struct HardwareTimerOps {
+    proxy: ffhh::DeviceProxy,
+}
+
+impl HardwareTimerOps {
+    fn new(proxy: ffhh::DeviceProxy) -> Box<Self> {
+        Box::new(Self { proxy })
+    }
+}
+
+#[async_trait(?Send)]
+impl TimerOps for HardwareTimerOps {
+    async fn stop(&self, id: u64) {
+        let _ = self
+            .proxy
+            .stop(id)
+            .await
+            .map(|result| {
+                let _ = result.map_err(|e| warn!("stop_hrtimer: driver error: {:?}", e));
+            })
+            .map_err(|e| warn!("stop_hrtimer: could not stop prior timer: {}", e));
+    }
+
+    async fn get_timer_properties(&self) -> TimerConfig {
+        match self.proxy.get_properties().await {
+            Ok(p) => {
+                let timers_properties = &p.timers_properties.expect("timers_properties must exist");
+                debug!("get_timer_properties: got: {:?}", timers_properties);
+
+                // Pick the correct hrtimer to use for wakes.
+                let timer_index = if timers_properties.len() > MAIN_TIMER_ID {
+                    // Mostly vim3, where we have pre-existing timer allocations
+                    // that we don't need to change.
+                    MAIN_TIMER_ID
+                } else if timers_properties.len() > 0 {
+                    // Newer devices that don't need to allocate timer IDs, and/or
+                    // may not even have as many timers as vim3 does. But, at least
+                    // one timer is needed.
+                    0
+                } else {
+                    // Give up.
+                    return TimerConfig::new_empty();
+                };
+                let main_timer_properties = &timers_properties[timer_index];
+                debug!("alarms: main_timer_properties: {:?}", main_timer_properties);
+                // Not sure whether it is useful to have more ticks than this, so limit it.
+                let max_ticks: u64 = std::cmp::min(
+                    main_timer_properties.max_ticks.unwrap_or(*MAX_USEFUL_TICKS),
+                    *MAX_USEFUL_TICKS,
+                );
+                let resolutions = &main_timer_properties
+                    .supported_resolutions
+                    .as_ref()
+                    .expect("supported_resolutions is populated")
+                    .iter()
+                    .last() //  Limits the resolution to the coarsest available.
+                    .map(|r| match *r {
+                        ffhh::Resolution::Duration(d) => d,
+                        _ => {
+                            error!(
+                            "get_timer_properties: Unknown resolution type, returning millisecond."
+                        );
+                            MSEC_IN_NANOS
+                        }
+                    })
+                    .map(|d| zx::BootDuration::from_nanos(d))
+                    .into_iter() // Used with .last() above.
+                    .collect::<Vec<_>>();
+                let timer_id = main_timer_properties.id.expect("timer ID is always present");
+                TimerConfig::new_from_data(timer_id, resolutions, max_ticks)
+            }
+            Err(e) => {
+                error!("could not get timer properties: {:?}", e);
+                TimerConfig::new_empty()
+            }
+        }
+    }
+
+    fn start_and_wait(
+        &self,
+        id: u64,
+        resolution: &ffhh::Resolution,
+        ticks: u64,
+        setup_event: zx::Event,
+    ) -> std::pin::Pin<Box<dyn SawResponseFut>> {
+        let inner = self.proxy.start_and_wait(id, resolution, ticks, setup_event);
+        Box::pin(HwResponseFut { pinner: Box::pin(inner) })
+    }
+}
+
+// Untangles the borrow checker issues that otherwise result from making
+// TimerOps::start_and_wait an async function.
+struct HwResponseFut {
+    pinner: std::pin::Pin<
+        Box<
+            fidl::client::QueryResponseFut<
+                ffhh::DeviceStartAndWaitResult,
+                fidl::encoding::DefaultFuchsiaResourceDialect,
+            >,
+        >,
+    >,
+}
+
+use std::task::Poll;
+impl SawResponseFut for HwResponseFut {}
+impl std::future::Future for HwResponseFut {
+    type Output = Result<zx::EventPair, TimerOpsError>;
+    fn poll(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Self::Output> {
+        let inner_poll = self.pinner.as_mut().poll(cx);
+        match inner_poll {
+            Poll::Ready(result) => Poll::Ready(match result {
+                Ok(Ok(keep_alive)) => Ok(keep_alive),
+                Ok(Err(e)) => Err(TimerOpsError::Driver(e)),
+                Err(e) => Err(TimerOpsError::Fidl(e)),
+            }),
+            Poll::Pending => Poll::Pending,
+        }
+    }
+}
+
 /// Stops a currently running hardware timer.
-async fn stop_hrtimer(hrtimer: &ffhh::DeviceProxy, timer_config: &TimerConfig) {
+async fn stop_hrtimer(hrtimer: &Box<dyn TimerOps>, timer_config: &TimerConfig) {
     trace::duration!(c"alarms", c"hrtimer:stop", "id" => timer_config.id);
     debug!("stop_hrtimer: stopping hardware timer: {}", timer_config.id);
-    let _ = hrtimer
-        .stop(timer_config.id)
-        .await
-        .map(|result| {
-            let _ = result.map_err(|e| warn!("stop_hrtimer: driver error: {:?}", e));
-        })
-        .map_err(|e| warn!("stop_hrtimer: could not stop prior timer: {}", e));
+    hrtimer.stop(timer_config.id).await;
     debug!("stop_hrtimer: stopped  hardware timer: {}", timer_config.id);
 }
 
@@ -103,12 +261,8 @@ enum Cmd {
         cid: zx::Koid,
         /// A timestamp (presumably in the future), at which to expire the timer.
         deadline: fasync::BootInstant,
-        /// A wake lease token. Hold onto this value while we must prevent the
-        /// system from going to sleep.
-        ///
-        /// This is important so that wake alarms can be scheduled before we
-        /// allow the system to go to sleep.
-        setup_done: zx::Event,
+        // The API supports several modes. See fuchsia.time.alarms/Wake.fidl.
+        mode: fta::SetAndWaitMode,
         /// An alarm identifier, chosen by the caller.
         alarm_id: String,
         /// A responder that will be called when the timer expires. The
@@ -251,7 +405,7 @@ async fn handle_cancel(alarm_id: String, cid: zx::Koid, cmd: &mut mpsc::Sender<C
 /// - `request`: a single inbound Wake FIDL API request.
 async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta::WakeRequest) {
     match request {
-        fta::WakeRequest::SetAndWait { deadline, setup_done, alarm_id, responder } => {
+        fta::WakeRequest::SetAndWait { deadline, mode, alarm_id, responder } => {
             // Since responder is consumed by the happy path and the error path, but not both,
             // and because the responder does not implement Default, this is a way to
             // send it in two mutually exclusive directions.  Each direction will reverse
@@ -276,7 +430,7 @@ async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta:
                 .send(Cmd::Start {
                     cid,
                     deadline: deadline.into(),
-                    setup_done,
+                    mode,
                     alarm_id: alarm_id.clone(),
                     responder: responder.clone(),
                 })
@@ -295,17 +449,6 @@ async fn handle_request(cid: zx::Koid, mut cmd: mpsc::Sender<Cmd>, request: fta:
             // TODO: b/383062441 - make this into an async task so that we wait
             // less to schedule the next alarm.
             handle_cancel(alarm_id, cid, &mut cmd).await;
-        }
-        // Similar to above, but wait for the cancel to complete.
-        fta::WakeRequest::CancelSync { alarm_id, responder, .. } => {
-            handle_cancel(alarm_id, cid, &mut cmd).await;
-            responder.send(Ok(())).expect("infallible");
-        }
-        fta::WakeRequest::GetProperties { responder, .. } => {
-            let response =
-                fta::WakeGetPropertiesResponse { is_supported: Some(true), ..Default::default() };
-            debug!("sending: Wake.GetProperties: {:?}", &response);
-            responder.send(&response).expect("send success");
         }
         fta::WakeRequest::_UnknownMethod { .. } => {}
     };
@@ -327,10 +470,21 @@ impl Loop {
     ///
     /// `device_proxy` is a connection to a low-level timer device.
     pub fn new(device_proxy: ffhh::DeviceProxy, inspect: finspect::Node) -> Self {
+        let hw_device_timer_ops = HardwareTimerOps::new(device_proxy);
+        Loop::new_internal(hw_device_timer_ops, inspect)
+    }
+
+    // Creates a new instance of [Loop] with emulated wake alarms.
+    pub fn new_emulated(inspect: finspect::Node) -> Self {
+        let timer_ops = Box::new(EmulationTimerOps::new());
+        Loop::new_internal(timer_ops, inspect)
+    }
+
+    fn new_internal(timer_ops: Box<dyn TimerOps>, inspect: finspect::Node) -> Self {
         let (snd, rcv) = mpsc::channel(CHANNEL_SIZE);
         let snd_clone = snd.clone();
         let _task = fasync::Task::local(async move {
-            wake_timer_loop(snd_clone, rcv, device_proxy, inspect).await
+            wake_timer_loop(snd_clone, rcv, timer_ops, inspect).await
         });
         Self { _task, snd_cloneable: snd }
     }
@@ -600,7 +754,7 @@ impl Timers {
 }
 
 // Clones a handle. Needed for 1:N notifications.
-fn clone_handle<H: HandleBased>(handle: &H) -> H {
+pub(crate) fn clone_handle<H: HandleBased>(handle: &H) -> H {
     handle.duplicate_handle(zx::Rights::SAME_RIGHTS).expect("infallible")
 }
 
@@ -608,7 +762,7 @@ async fn wait_signaled<H: HandleBased>(handle: &H) {
     fasync::OnSignals::new(handle, zx::Signals::EVENT_SIGNALED).await.expect("infallible");
 }
 
-fn signal<H: HandleBased>(handle: &H) {
+pub(crate) fn signal<H: HandleBased>(handle: &H) {
     handle.signal_handle(zx::Signals::NONE, zx::Signals::EVENT_SIGNALED).expect("infallible");
 }
 
@@ -648,8 +802,14 @@ impl std::cmp::Ord for TimerDuration {
     /// Two [TimerDuration]s compare equal if they model exactly the same duration of time,
     /// no matter the resolutions.
     fn cmp(&self, other: &TimerDuration) -> std::cmp::Ordering {
-        let self_nanos = self.resolution_as_nanos() * self.ticks;
-        let other_nanos = other.resolution_as_nanos() * other.ticks;
+        let self_ticks_128: i128 = self.ticks as i128;
+        let self_resolution: i128 = self.resolution_as_nanos() as i128;
+        let self_nanos = self_resolution * self_ticks_128;
+
+        let other_ticks_128: i128 = other.ticks as i128;
+        let other_resolution: i128 = other.resolution_as_nanos() as i128;
+        let other_nanos = other_resolution * other_ticks_128;
+
         self_nanos.cmp(&other_nanos)
     }
 }
@@ -740,7 +900,7 @@ impl std::ops::Mul<u64> for TimerDuration {
 
 /// Contains the configuration of a specific timer.
 #[derive(Debug)]
-struct TimerConfig {
+pub(crate) struct TimerConfig {
     /// The resolutions supported by this timer. Each entry is one possible
     /// duration for on timer "tick".  The resolution is picked when a timer
     /// request is sent.
@@ -805,7 +965,9 @@ impl TimerConfig {
             let largest_slack_smaller_than_duration = max_tick_at_res < duration_slack;
 
             if smallest_slack_larger_than_duration {
-                if smallest_unit < best_negative_slack {
+                if duration_slack == TimerDuration::zero() {
+                    best_negative_slack = TimerDuration::zero();
+                } else if smallest_unit < best_negative_slack {
                     best_negative_slack = smallest_unit;
                 }
             }
@@ -853,7 +1015,7 @@ impl TimerConfig {
         };
         debug!("TimerConfig: picked slack: {} for duration: {}", ret, format_duration(duration));
         assert!(
-            ret.duration().into_nanos() > 0,
+            ret.duration().into_nanos() >= 0,
             "ret: {}, p_slack: {}, n_slack: {}, orig.duration: {}\n\tbest_p_slack: {}\n\tbest_n_slack: {}\n\ttarget: {}\n\t 1: {} 2: {:?}, 3: {:?}",
             ret,
             format_duration(p_slack),
@@ -870,60 +1032,9 @@ impl TimerConfig {
     }
 }
 
-async fn get_timer_properties(hrtimer: &ffhh::DeviceProxy) -> TimerConfig {
+async fn get_timer_properties(hrtimer: &Box<dyn TimerOps>) -> TimerConfig {
     debug!("get_timer_properties: requesting timer properties.");
-    match hrtimer.get_properties().await {
-        Ok(p) => {
-            let timers_properties = &p.timers_properties.expect("timers_properties must exist");
-            debug!("get_timer_properties: got: {:?}", timers_properties);
-
-            // Pick the correct hrtimer to use for wakes.
-            let timer_index = if timers_properties.len() > MAIN_TIMER_ID {
-                // Mostly vim3, where we have pre-existing timer allocations
-                // that we don't need to change.
-                MAIN_TIMER_ID
-            } else if timers_properties.len() > 0 {
-                // Newer devices that don't need to allocate timer IDs, and/or
-                // may not even have as many timers as vim3 does. But, at least
-                // one timer is needed.
-                0
-            } else {
-                // Give up.
-                return TimerConfig::new_empty();
-            };
-            let main_timer_properties = &timers_properties[timer_index];
-            debug!("alarms: main_timer_properties: {:?}", main_timer_properties);
-            // Not sure whether it is useful to have more ticks than this, so limit it.
-            let max_ticks: u64 = std::cmp::min(
-                main_timer_properties.max_ticks.unwrap_or(*MAX_USEFUL_TICKS),
-                *MAX_USEFUL_TICKS,
-            );
-            let resolutions = &main_timer_properties
-                .supported_resolutions
-                .as_ref()
-                .expect("supported_resolutions is populated")
-                .iter()
-                .last() //  Limits the resolution to the coarsest available.
-                .map(|r| match *r {
-                    ffhh::Resolution::Duration(d) => d,
-                    _ => {
-                        error!(
-                            "get_timer_properties: Unknown resolution type, returning millisecond."
-                        );
-                        MSEC_IN_NANOS
-                    }
-                })
-                .map(|d| zx::BootDuration::from_nanos(d))
-                .into_iter() // Used with .last() above.
-                .collect::<Vec<_>>();
-            let timer_id = main_timer_properties.id.expect("timer ID is always present");
-            TimerConfig::new_from_data(timer_id, resolutions, max_ticks)
-        }
-        Err(e) => {
-            error!("could not get timer properties: {:?}", e);
-            TimerConfig::new_empty()
-        }
-    }
+    hrtimer.get_timer_properties().await
 }
 
 /// The state of a single hardware timer that we must bookkeep.
@@ -945,7 +1056,7 @@ struct TimerState {
 async fn wake_timer_loop(
     snd: mpsc::Sender<Cmd>,
     mut cmds: mpsc::Receiver<Cmd>,
-    timer_proxy: ffhh::DeviceProxy,
+    timer_proxy: Box<dyn TimerOps>,
     inspect: finspect::Node,
 ) {
     debug!("wake_timer_loop: started");
@@ -990,7 +1101,7 @@ async fn wake_timer_loop(
         now_prop.set(now.into_nanos());
         trace::instant!(c"alarms", c"wake_timer_loop", trace::Scope::Process, "now" => now.into_nanos());
         match cmd {
-            Cmd::Start { cid, deadline, setup_done, alarm_id, responder } => {
+            Cmd::Start { cid, deadline, mode, alarm_id, responder } => {
                 trace::duration!(c"alarms", c"Cmd::Start");
                 let responder = responder.borrow_mut().take().expect("responder is always present");
                 // NOTE: hold keep_alive until all work is done.
@@ -1001,11 +1112,15 @@ async fn wake_timer_loop(
                     format_timer(deadline.into()),
                     format_timer(now.into()),
                 );
-                defer! {
-                    // Must signal once the setup is completed.
-                    signal(&setup_done);
-                    debug!("wake_timer_loop: START: setup_done signaled");
-                };
+
+                // This is the only option that requires further action.
+                if let fta::SetAndWaitMode::NotifySetupDone(setup_done) = mode {
+                    defer! {
+                        // Must signal once the setup is completed.
+                        signal(&setup_done);
+                        debug!("wake_timer_loop: START: setup_done signaled");
+                    };
+                }
                 deadline_histogram_prop.insert((deadline - now).into_nanos());
                 if Timers::expired(now, deadline) {
                     trace::duration!(c"alarms", c"Cmd::Start:immediate");
@@ -1255,20 +1370,13 @@ async fn wake_timer_loop(
 /// - `needs_cancel`: if set, we must first cancel a hrtimer before scheduling a new one.
 async fn schedule_hrtimer(
     now: fasync::BootInstant,
-    hrtimer: &ffhh::DeviceProxy,
+    hrtimer: &Box<dyn TimerOps>,
     deadline: fasync::BootInstant,
     mut command_send: mpsc::Sender<Cmd>,
     timer_config: &TimerConfig,
 ) -> TimerState {
-    let timeout = deadline - now;
+    let timeout = std::cmp::max(zx::BootDuration::ZERO, deadline - now);
     trace::duration!(c"alarms", c"schedule_hrtimer", "timeout" => timeout.into_nanos());
-    assert!(
-        now < deadline,
-        "now: {}, deadline: {}, diff: {}",
-        format_timer(now.into()),
-        format_timer(deadline.into()),
-        format_duration(timeout),
-    );
     // When signaled, the hrtimer has been scheduled.
     let hrtimer_scheduled = zx::Event::create();
 
@@ -1300,7 +1408,7 @@ async fn schedule_hrtimer(
         let response = start_and_wait_fut.await;
         trace::instant!(c"alarms", c"hrtimer:response", trace::Scope::Process);
         match response {
-            Err(e) => {
+            Err(TimerOpsError::Fidl(e)) => {
                 trace::instant!(c"alarms", c"hrtimer:response:fidl_error", trace::Scope::Process);
                 debug!("hrtimer_task: hrtimer FIDL error: {:?}", e);
                 command_send
@@ -1308,7 +1416,7 @@ async fn schedule_hrtimer(
                     .unwrap();
                 // BAD: no way to keep alive.
             }
-            Ok(Err(e)) => {
+            Err(TimerOpsError::Driver(e)) => {
                 let driver_error_str = format!("{:?}", e);
                 trace::instant!(c"alarms", c"hrtimer:response:driver_error", trace::Scope::Process, "error" => &driver_error_str[..]);
                 debug!("schedule_hrtimer: hrtimer driver error: {:?}", e);
@@ -1317,7 +1425,7 @@ async fn schedule_hrtimer(
                     .unwrap();
                 // BAD: no way to keep alive.
             }
-            Ok(Ok(keep_alive)) => {
+            Ok(keep_alive) => {
                 trace::instant!(c"alarms", c"hrtimer:response:alarm", trace::Scope::Process);
                 debug!("hrtimer: got alarm response: {:?}", keep_alive);
                 // May trigger sooner than the deadline.
@@ -1333,6 +1441,16 @@ async fn schedule_hrtimer(
 
     // We must wait here to ensure that the wake alarm has been scheduled.
     wait_signaled(&hrtimer_scheduled).await;
+    let now_after_signaled = fasync::BootInstant::now();
+    let duration_until_scheduled: zx::BootDuration = (now_after_signaled - now).into();
+    if duration_until_scheduled > zx::BootDuration::from_nanos(1000 * MSEC_IN_NANOS) {
+        trace::duration!(c"alarms", c"schedule_hrtimer:unusual_duration",
+            "duration" => duration_until_scheduled.into_nanos());
+        warn!(
+            "unusual duration until hrtimer scheduled: {}",
+            format_duration(duration_until_scheduled)
+        );
+    }
     debug!("schedule_hrtimer: hrtimer wake alarm has been scheduled.");
     TimerState { task: hrtimer_task, deadline }
 }
@@ -1361,6 +1479,15 @@ fn notify_all(
         let alarm_id = timer_node.get_alarm_id().to_string();
         let cid = timer_node.get_cid().clone();
         let slack: zx::BootDuration = deadline - now;
+        if slack < zx::BootDuration::from_nanos(-1000 * MSEC_IN_NANOS) {
+            trace::duration!(c"alarms", c"schedule_hrtimer:unusual_slack", "slack" => slack.into_nanos());
+            // This alarm triggered noticeably later than it should have.
+            warn!(
+                "alarm id: {} had an unusually large slack: {}",
+                alarm_id,
+                format_duration(slack)
+            );
+        }
         debug!(
             concat!(
                 "wake_alarm_loop: ALARM alarm_id: \"{}\"\n\tdeadline: {},\n\tcid: {:?},\n\t",
@@ -1530,6 +1657,28 @@ mod tests {
         );
     }
 
+    fn create_fake_wake_lease() -> fidl_fuchsia_power_system::LeaseToken {
+        let (_lease, peer) = zx::EventPair::create();
+        peer
+    }
+
+    #[test]
+    fn timer_duration_no_overflow() {
+        let duration1 = TimerDuration {
+            resolution: zx::BootDuration::from_seconds(100_000_000),
+            ticks: u64::MAX,
+        };
+        let duration2 = TimerDuration {
+            resolution: zx::BootDuration::from_seconds(110_000_000),
+            ticks: u64::MAX,
+        };
+        assert_eq!(duration1, duration1);
+        assert_eq!(duration2, duration2);
+
+        assert_lt!(duration1, duration2);
+        assert_gt!(duration2, duration1);
+    }
+
     #[test_case(
         TimerDuration::new(zx::BootDuration::from_nanos(1), 1),
         TimerDuration::new(zx::BootDuration::from_nanos(1), 1)
@@ -1574,6 +1723,12 @@ mod tests {
         assert_gt!(one, other);
     }
 
+    #[test_case(
+        vec![zx::BootDuration::from_nanos(1)],
+        100,
+        zx::BootDuration::from_nanos(0),
+        TimerDuration::new(zx::BootDuration::from_nanos(1), 0) ; "Exact at 0x1ns"
+    )]
     #[test_case(
         vec![zx::BootDuration::from_nanos(1)],
         100,
@@ -1813,6 +1968,12 @@ mod tests {
                                         })
                                         .expect("");
                                 }
+                                ffhh::DeviceRequest::ReadTimer { responder, .. } => {
+                                    responder.send(Err(ffhh::DriverError::NotSupported)).expect("");
+                                }
+                                ffhh::DeviceRequest::ReadClock { responder, .. } => {
+                                    responder.send(Err(ffhh::DriverError::NotSupported)).expect("");
+                                }
                                 ffhh::DeviceRequest::_UnknownMethod { .. } => todo!(),
                             }
                         }
@@ -1829,15 +1990,27 @@ mod tests {
         let deadline = zx::BootInstant::from_nanos(100);
         let test_duration = zx::MonotonicDuration::from_nanos(110);
         run_in_fake_time_and_test_context(test_duration, |wake_proxy, _| async move {
-            let keep_alive = zx::Event::create();
+            let setup_done = zx::Event::create();
+            let duplicate = clone_handle(&setup_done);
 
             wake_proxy
-                .set_and_wait(deadline.into(), keep_alive, "Hello".into())
+                .set_and_wait(
+                    deadline.into(),
+                    fta::SetAndWaitMode::NotifySetupDone(setup_done),
+                    "Hello".into(),
+                )
                 .await
                 .unwrap()
                 .unwrap();
 
             assert_gt!(fasync::BootInstant::now().into_nanos(), deadline.into_nanos());
+
+            // Ideally this would test that the event was signaled as soon as the alarm was set, and
+            // before it was signaled, but at least it verifies that it was signaled.
+            let signals = duplicate
+                .wait_handle(zx::Signals::EVENT_SIGNALED, zx::MonotonicInstant::INFINITE_PAST)
+                .unwrap();
+            assert_eq!(signals, zx::Signals::EVENT_SIGNALED);
         });
     }
 
@@ -1870,10 +2043,10 @@ mod tests {
         duration: zx::MonotonicDuration,
     ) {
         run_in_fake_time_and_test_context(duration, |wake_proxy, _| async move {
-            let lease1 = zx::Event::create();
+            let lease1 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
             let fut1 = wake_proxy.set_and_wait(first_deadline.into(), lease1, "Hello1".into());
 
-            let lease2 = zx::Event::create();
+            let lease2 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
             let fut2 = wake_proxy.set_and_wait(second_deadline.into(), lease2, "Hello2".into());
 
             let (result1, result2) = futures::join!(fut1, fut2);
@@ -1916,14 +2089,14 @@ mod tests {
         duration: zx::MonotonicDuration,
     ) {
         run_in_fake_time_and_test_context(duration, |wake_proxy, _| async move {
-            let lease1 = zx::Event::create();
+            let lease1 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
 
             wake_proxy
                 .set_and_wait(first_deadline.into(), lease1, "Hello".into())
                 .await
                 .unwrap()
                 .unwrap();
-            let lease2 = zx::Event::create();
+            let lease2 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
             wake_proxy
                 .set_and_wait(second_deadline.into(), lease2, "Hello2".into())
                 .await
@@ -1944,7 +2117,7 @@ mod tests {
             |wake_proxy, _| async move {
                 let wake_proxy = Rc::new(RefCell::new(wake_proxy));
 
-                let keep_alive = zx::Event::create();
+                let keep_alive = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
 
                 let (mut sync_send, mut sync_recv) = mpsc::channel(1);
 
@@ -1971,7 +2144,7 @@ mod tests {
                     // Wait until we know that the long deadline timer has been scheduled.
                     let _ = sync_recv.next().await;
 
-                    let keep_alive2 = zx::Event::create();
+                    let keep_alive2 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
                     let _ = wake_proxy
                         .borrow()
                         .set_and_wait(
@@ -2004,7 +2177,7 @@ mod tests {
             |wake_proxy, inspector| async move {
                 let wake_proxy = Rc::new(RefCell::new(wake_proxy));
 
-                let keep_alive = zx::Event::create();
+                let keep_alive = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
 
                 let (mut sync_send, mut sync_recv) = mpsc::channel(1);
 
@@ -2037,7 +2210,7 @@ mod tests {
                     // Wait until we know that the other deadline timer has been scheduled.
                     let _ = sync_recv.next().await;
 
-                    let keep_alive2 = zx::Event::create();
+                    let keep_alive2 = fta::SetAndWaitMode::KeepAlive(create_fake_wake_lease());
                     let _ = wake_proxy
                         .borrow()
                         .set_and_wait(

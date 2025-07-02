@@ -40,6 +40,7 @@ rustc_test("fuchsia_test") {
     ":fuchsia",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:log",
   ]
   source_root = "src/test.rs"
   sources = [ "src/test.rs" ]

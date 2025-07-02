@@ -21,13 +21,13 @@ impl DeprecatedRebootWatcherClient {
         let (mut reboot_reason_sender, reboot_reason_receiver) = mpsc::channel(1);
 
         // Create a new watcher proxy/stream and register the proxy end with Power Manager
-        let watcher_register_proxy = realm
+        let watcher_register_proxy: fpower::RebootMethodsWatcherRegisterProxy = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fpower::RebootMethodsWatcherRegisterMarker>();
+            .connect_to_protocol_at_exposed_dir()
+            .expect("Should be able to connect the proxy correctly");
         let (watcher_client, mut watcher_request_stream) =
             fidl::endpoints::create_request_stream::<fpower::RebootMethodsWatcherMarker>();
         watcher_register_proxy
-            .expect("Should be able to connect the proxy correctly")
             .register_with_ack(watcher_client)
             .await
             .expect("Failed to register reboot watcher");
@@ -63,13 +63,13 @@ impl RebootWatcherClient {
         let (mut reboot_options_sender, reboot_options_receiver) = mpsc::channel(1);
 
         // Create a new watcher proxy/stream and register the proxy end with Power Manager
-        let watcher_register_proxy = realm
+        let watcher_register_proxy: fpower::RebootMethodsWatcherRegisterProxy = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fpower::RebootMethodsWatcherRegisterMarker>();
+            .connect_to_protocol_at_exposed_dir()
+            .expect("Should be able to connect the proxy correctly");
         let (watcher_client, mut watcher_request_stream) =
             fidl::endpoints::create_request_stream::<fpower::RebootWatcherMarker>();
         watcher_register_proxy
-            .expect("Should be able to connect the proxy correctly")
             .register_watcher(watcher_client)
             .await
             .expect("Failed to register reboot watcher");

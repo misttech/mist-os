@@ -9,11 +9,12 @@ use crate::fs::devtmpfs::{devtmpfs_create_symlink, devtmpfs_mkdir, devtmpfs_remo
 use crate::mm::MemoryAccessorExt;
 use crate::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, Waiter};
 use crate::vfs::buffers::{InputBuffer, OutputBuffer};
+use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_args, fs_node_impl_dir_readonly,
     CacheMode, DirEntryHandle, DirectoryEntryType, FileHandle, FileObject, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, FsString, SpecialNode, VecDirectory, VecDirectoryEntry,
+    FsNodeOps, FsStr, FsString, SpecialNode,
 };
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked};
@@ -58,7 +59,7 @@ const PTMX_NODE_ID: ino_t = 2;
 const FIRST_PTS_NODE_ID: ino_t = 3;
 
 pub fn dev_pts_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -88,7 +89,7 @@ fn ensure_devpts(
 /// is mounted at `/dev/pts`. These assumptions are necessary so that the
 /// `FileHandle` objects returned have appropriate `NamespaceNode` objects.
 pub fn create_main_and_replica(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     window_size: uapi::winsize,
 ) -> Result<(FileHandle, FileHandle), Errno> {
@@ -117,15 +118,11 @@ fn init_devpts(
 
     let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs { uid, gid }, options)
         .expect("devpts filesystem constructed with valid options");
-    let mut root = FsNode::new_root_with_properties(DevPtsRootDir { state }, |info| {
-        info.ino = ROOT_NODE_ID;
-    });
-    root.node_id = ROOT_NODE_ID;
-    fs.set_root_node(root);
+    fs.create_root(ROOT_NODE_ID, DevPtsRootDir { state });
     Ok(fs)
 }
 
-pub fn tty_device_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
+pub fn tty_device_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
 where
     L: LockBefore<FileOpsCore>,
 {
@@ -183,7 +180,7 @@ struct DevPtsFs {
 impl FileSystemOps for DevPtsFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -193,7 +190,7 @@ impl FileSystemOps for DevPtsFs {
         "devpts".into()
     }
 
-    fn generate_node_ids(&self) -> bool {
+    fn uses_external_node_ids(&self) -> bool {
         false
     }
 }
@@ -212,7 +209,7 @@ impl FsNodeOps for DevPtsRootDir {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -239,28 +236,25 @@ impl FsNodeOps for DevPtsRootDir {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| errno!(ENOENT))?;
         if name == "ptmx" {
-            let mut info = FsNodeInfo::new(PTMX_NODE_ID, mode!(IFCHR, 0o666), FsCred::root());
+            let mut info = FsNodeInfo::new(mode!(IFCHR, 0o666), FsCred::root());
             info.rdev = DeviceType::PTMX;
             info.blksize = BLOCK_SIZE;
-            let node = node.fs().create_node_with_id(current_task, SpecialNode, info.ino, info);
+            let node = node.fs().create_node(PTMX_NODE_ID, SpecialNode, info);
             return Ok(node);
         }
         if let Ok(id) = name.parse::<u32>() {
             let terminal = self.state.terminals.read().get(&id).and_then(Weak::upgrade);
             if let Some(terminal) = terminal {
                 if !terminal.read().is_main_closed() {
-                    let mut info = FsNodeInfo::new(
-                        (id as ino_t) + FIRST_PTS_NODE_ID,
-                        mode!(IFCHR, 0o620),
-                        terminal.fscred.clone(),
-                    );
+                    let ino = (id as ino_t) + FIRST_PTS_NODE_ID;
+                    let mut info = FsNodeInfo::new(mode!(IFCHR, 0o620), terminal.fscred.clone());
                     info.rdev = get_device_type_for_pts(id);
                     info.blksize = BLOCK_SIZE;
                     let fs = node.fs();
@@ -269,7 +263,7 @@ impl FsNodeOps for DevPtsRootDir {
                         .expect("DevPts should only handle `DevPtsFs`s");
                     info.uid = devptsfs.uid.unwrap_or_else(|| current_task.creds().uid);
                     info.gid = devptsfs.gid.unwrap_or_else(|| current_task.creds().gid);
-                    let node = fs.create_node_with_id(current_task, SpecialNode, info.ino, info);
+                    let node = fs.create_node(ino, SpecialNode, info);
                     return Ok(node);
                 }
             }
@@ -291,7 +285,7 @@ impl DevPtsDevice {
 impl DeviceOps for Arc<DevPtsDevice> {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         current_task: &CurrentTask,
         id: DeviceType,
         _node: &FsNode,
@@ -383,7 +377,7 @@ impl FileOps for DevPtmxFile {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) {
@@ -394,7 +388,7 @@ impl FileOps for DevPtmxFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -412,7 +406,7 @@ impl FileOps for DevPtmxFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -430,7 +424,7 @@ impl FileOps for DevPtmxFile {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -442,7 +436,7 @@ impl FileOps for DevPtmxFile {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -451,7 +445,7 @@ impl FileOps for DevPtmxFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -499,7 +493,7 @@ impl FileOps for TtyFile {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -508,7 +502,7 @@ impl FileOps for TtyFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -526,7 +520,7 @@ impl FileOps for TtyFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -544,7 +538,7 @@ impl FileOps for TtyFile {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -556,7 +550,7 @@ impl FileOps for TtyFile {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -565,7 +559,7 @@ impl FileOps for TtyFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -604,7 +598,7 @@ fn into_termio(value: uapi::termios) -> uapi::termio {
 
 /// The ioctl behaviour common to main and replica terminal file descriptors.
 fn shared_ioctl<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     terminal: &Arc<Terminal>,
     is_main: bool,
     file: &FileObject,
@@ -961,7 +955,7 @@ mod tests {
     use starnix_uapi::signals::{SIGCHLD, SIGTTOU};
 
     fn ioctl<T: zerocopy::IntoBytes + zerocopy::FromBytes + zerocopy::Immutable + Copy>(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         file: &FileHandle,
         command: u32,
@@ -980,7 +974,7 @@ mod tests {
     }
 
     fn set_controlling_terminal(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         file: &FileHandle,
         steal: bool,
@@ -990,7 +984,7 @@ mod tests {
     }
 
     fn lookup_node<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
@@ -1003,7 +997,7 @@ mod tests {
     }
 
     fn open_file_with_flags(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
@@ -1014,7 +1008,7 @@ mod tests {
     }
 
     fn open_file(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
@@ -1023,7 +1017,7 @@ mod tests {
     }
 
     fn open_ptmx_and_unlock(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         fs: &FileSystemHandle,
     ) -> Result<FileHandle, Errno> {
@@ -1521,18 +1515,18 @@ mod tests {
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
         let pts = open_file(&mut locked, &task, &fs, "0".into()).expect("open file");
 
-        let has_data_ready_to_read = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle| {
+        let has_data_ready_to_read = |locked: &mut Locked<Unlocked>, fd: &FileHandle| {
             fd.query_events(locked, &task).expect("query_events").contains(FdEvents::POLLIN)
         };
 
-        let write_and_assert = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle, data: &[u8]| {
+        let write_and_assert = |locked: &mut Locked<Unlocked>, fd: &FileHandle, data: &[u8]| {
             assert_eq!(
                 fd.write(locked, &task, &mut VecInputBuffer::new(data)).expect("write"),
                 data.len()
             );
         };
 
-        let read_and_check = |locked: &mut Locked<'_, Unlocked>, fd: &FileHandle, data: &[u8]| {
+        let read_and_check = |locked: &mut Locked<Unlocked>, fd: &FileHandle, data: &[u8]| {
             assert!(has_data_ready_to_read(locked, fd));
             let mut buffer = VecOutputBuffer::new(data.len() + 1);
             assert_eq!(fd.read(locked, &task, &mut buffer).expect("read"), data.len());

@@ -329,6 +329,35 @@
                     "/core/testing/component-framework-tests:**",
                 ],
             },
+
+            // Allow full packages to resolve on eng builds.
+            {
+                source_moniker: "/core/pkg-resolver",
+                source: "component",
+                source_name: "full-resolver",
+                capability: "resolver",
+                target_monikers: [
+                    "/**",
+                ],
+            },
+            {
+                source_moniker: "/core/pkg-resolver",
+                source: "component",
+                source_name: "fuchsia.component.resolution.Resolver",
+                capability: "protocol",
+                target_monikers: [
+                    "/**",
+                ],
+            },
+            {
+                source_moniker: "/core/pkg-resolver",
+                source: "component",
+                source_name: "fuchsia.pkg.resolution.PackageResolver",
+                capability: "protocol",
+                target_monikers: [
+                    "/toolbox",
+                ],
+            },
             {
                 source_moniker: "/core/lowpanservice",
                 source: "component",

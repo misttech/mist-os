@@ -310,7 +310,7 @@ mod tests {
         }
     }
 
-    fn inflate_and_validate(pfns: &[u32], expected_calls: &[Range<u64>]) {
+    async fn inflate_and_validate(pfns: &[u32], expected_calls: &[Range<u64>]) {
         let inspector = Inspector::default();
         let mem = IdentityDriverMem::new();
         let mut state = TestQueue::new(32, &mem);
@@ -369,7 +369,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_deflate_command() {
+    async fn test_deflate_command() {
         let inspector = Inspector::default();
         let mem = IdentityDriverMem::new();
         let mut state = TestQueue::new(32, &mem);
@@ -392,25 +392,26 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_inflate_command_mix_ascending_descending() {
+    async fn test_inflate_command_mix_ascending_descending() {
         inflate_and_validate(
             &[4, 5, 8, 9, 11, 7, 14, 13, 12, 1, 17, 16],
             &[4..6, 8..10, 11..12, 7..8, 12..15, 1..2, 16..18],
-        );
+        )
+        .await;
     }
 
     #[fuchsia::test]
-    fn test_inflate_command_ascending_sequence() {
-        inflate_and_validate(&[1, 2, 3, 4, 7, 8, 11, 12, 13], &[1..5, 7..9, 11..14]);
+    async fn test_inflate_command_ascending_sequence() {
+        inflate_and_validate(&[1, 2, 3, 4, 7, 8, 11, 12, 13], &[1..5, 7..9, 11..14]).await;
     }
 
     #[fuchsia::test]
-    fn test_inflate_command_descending_sequence() {
-        inflate_and_validate(&[3, 2, 1, 5, 12, 11, 10], &[1..4, 5..6, 10..13]);
+    async fn test_inflate_command_descending_sequence() {
+        inflate_and_validate(&[3, 2, 1, 5, 12, 11, 10], &[1..4, 5..6, 10..13]).await;
     }
 
     #[fuchsia::test]
-    fn test_inflate_command_out_of_bounds_pfn() {
+    async fn test_inflate_command_out_of_bounds_pfn() {
         let inspector = Inspector::default();
         let mem = IdentityDriverMem::new();
         let mut state = TestQueue::new(32, &mem);
@@ -456,7 +457,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_free_page_reporting() {
+    async fn test_free_page_reporting() {
         let inspector = Inspector::default();
         let mem = IdentityDriverMem::new();
         let mut state = TestQueue::new(32, &mem);

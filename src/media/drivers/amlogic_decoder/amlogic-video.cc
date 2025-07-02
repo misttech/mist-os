@@ -11,6 +11,7 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/platform-device/cpp/pdev.h>
 #include <lib/media/codec_impl/codec_diagnostics.h>
+#include <lib/memory_barriers/memory_barriers.h>
 #include <lib/trace/event.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
@@ -45,7 +46,6 @@
 #include "mpeg12_decoder.h"
 #include "pts_manager.h"
 #include "registers.h"
-#include "src/lib/memory_barriers/memory_barriers.h"
 #include "src/media/lib/internal_buffer/internal_buffer.h"
 #include "util.h"
 #include "vdec1.h"

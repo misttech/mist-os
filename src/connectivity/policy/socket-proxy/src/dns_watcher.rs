@@ -187,9 +187,9 @@ mod test {
     async fn test_normal_operation() -> Result<(), Error> {
         let (realm, mut dns_tx) = setup_test().await?;
 
-        let dns_server_watcher = realm
+        let dns_server_watcher: fnp_socketproxy::DnsServerWatcherProxy = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::DnsServerWatcherMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to DnsServerWatcher")?;
 
         // Initial watch should return immediately
@@ -221,9 +221,9 @@ mod test {
     #[fuchsia::test]
     async fn test_duplicate_list() -> Result<(), Error> {
         let (realm, mut dns_tx) = setup_test().await?;
-        let dns_server_watcher = realm
+        let dns_server_watcher: fnp_socketproxy::DnsServerWatcherProxy = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::DnsServerWatcherMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to DnsServerWatcher")?;
 
         // Initial watch should return immediately
@@ -274,9 +274,9 @@ mod test {
     async fn test_duplicate_watch() -> Result<(), Error> {
         let (realm, _dns_tx) = setup_test().await?;
 
-        let dns_server_watcher = realm
+        let dns_server_watcher: fnp_socketproxy::DnsServerWatcherProxy = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::DnsServerWatcherMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to DnsServerWatcher")?;
 
         // Initial watch should return immediately

@@ -20,18 +20,16 @@ class LoaderImpl final : public fidl::Server<fuchsia_vulkan_loader::Loader>,
                          public LoaderApp::Observer {
  public:
   // Add a handler for this protocol to |outgoing_dir|. Any connections made to the protocol will
-  // create a new loader instance, which keeps a reference to |app|. The loader instance will be
-  // alive as long as |dispatcher| has tasks with active connections.
+  // create a new loader instance.  The loader instance will be alive as long as |dispatcher| has
+  // tasks with active connections.  The owner of an instance of this class must ensure that
+  // |app| and |dispatcher| outlive the instance.
   static zx::result<> Add(component::OutgoingDirectory& outgoing_dir, LoaderApp* app,
                           async_dispatcher_t* dispatcher);
 
   ~LoaderImpl() final;
 
  private:
-  static fidl::ProtocolHandler<fuchsia_vulkan_loader::Loader> GetHandler(
-      LoaderApp* app, async_dispatcher_t* dispatcher);
-
-  explicit LoaderImpl(LoaderApp* app) : app_(app) {}
+  explicit LoaderImpl(LoaderApp* app, bool trusted) : app_(app), trusted_(trusted) {}
 
   // LoaderApp::Observer implementation.
   void OnIcdListChanged(LoaderApp* app) override;
@@ -52,6 +50,7 @@ class LoaderImpl final : public fidl::Server<fuchsia_vulkan_loader::Loader>,
   }
 
   LoaderApp* app_;
+  bool trusted_;
   std::list<std::pair<std::string, GetCompleter::Async>> callbacks_;
   std::vector<fidl::ServerEnd<fuchsia_io::Directory>> connect_manifest_handles_;
 };

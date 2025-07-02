@@ -165,9 +165,11 @@ void GenericSuspend::Suspend(SuspendRequestView request, SuspendCompleter::Sync&
     n.RecordInt(fobs::kSuspendAttemptedAt, function_start);
   });
 
+  FDF_LOG(INFO, "on suspend: current monotonic time %ld", zx_clock_get_monotonic());
   auto suspend_start = zx_clock_get_boot();
   zx_status_t result = SystemSuspendEnter();
   auto suspend_return = zx_clock_get_boot();
+  FDF_LOG(INFO, "on resume: current monotonic time %ld", zx_clock_get_monotonic());
 
   if (result != ZX_OK) {
     FDF_LOG(ERROR, "zx_system_suspend_enter failed: %s", zx_status_get_string(result));

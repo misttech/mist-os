@@ -266,11 +266,6 @@ void DebugAgentServer::OnNotification(const debug_ipc::NotifyException& notify) 
   // We always destruct ourselves whenever the client hangs up.
   FX_DCHECK(binding_ref_);
 
-  if (debug_ipc::IsDebug(notify.type)) {
-    // Not the kind of exception that our clients are interested in.
-    return;
-  }
-
   // The thread is in an exception, we don't need to suspend it, but we do need
   // to resume it when we're done (if there isn't a debug_ipc client).
   auto thread = debug_agent_->GetDebuggedThread(notify.thread.id);

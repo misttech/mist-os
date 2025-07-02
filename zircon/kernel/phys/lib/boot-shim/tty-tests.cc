@@ -156,6 +156,40 @@ TEST(TtyFromCmdlineTest, AmlEntryWithIndexIsTtyMSMN) {
   }
 }
 
+TEST(TtyFromCmdlineTest, AmlEntryWithIndexIsTtySACN) {
+  {
+    auto tty = boot_shim::TtyFromCmdline("foo console=ttySAC1234 foobar");
+    ASSERT_TRUE(tty);
+    EXPECT_EQ(tty->type, boot_shim::TtyType::kSac);
+    EXPECT_EQ(tty->index, 1234);
+    EXPECT_EQ(tty->vendor, "samsung");
+  }
+
+  {
+    auto tty = boot_shim::TtyFromCmdline("foo console=ttySAC1234 ");
+    ASSERT_TRUE(tty);
+    EXPECT_EQ(tty->type, boot_shim::TtyType::kSac);
+    EXPECT_EQ(tty->index, 1234);
+    EXPECT_EQ(tty->vendor, "samsung");
+  }
+
+  {
+    auto tty = boot_shim::TtyFromCmdline("foo console=ttySAC12345");
+    ASSERT_TRUE(tty);
+    EXPECT_EQ(tty->type, boot_shim::TtyType::kSac);
+    EXPECT_EQ(tty->index, 12345);
+    EXPECT_EQ(tty->vendor, "samsung");
+  }
+
+  {
+    auto tty = boot_shim::TtyFromCmdline("foo console=ttySAC1234,arg2,arg3 foobar");
+    ASSERT_TRUE(tty);
+    EXPECT_EQ(tty->type, boot_shim::TtyType::kSac);
+    EXPECT_EQ(tty->vendor, "samsung");
+    EXPECT_EQ(tty->index, 1234);
+  }
+}
+
 TEST(TtyFromCmdlineTest, InvalidArgumentIsNullOpt) {
   constexpr auto kInvalidArgs = std::to_array({
       "console=tyS123",

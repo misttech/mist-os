@@ -2203,7 +2203,7 @@ mod tests {
             assert_eq!(result, ConnectResult::Success);
         });
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -2290,7 +2290,7 @@ mod tests {
             assert_eq!(result, ConnectResult::Success);
         });
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -2384,7 +2384,7 @@ mod tests {
             assert_eq!(result, ConnectResult::Success);
         });
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -2452,7 +2452,7 @@ mod tests {
             assert_eq!(result, ConnectResult::Success);
         });
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -2512,7 +2512,7 @@ mod tests {
             assert_eq!(result, ConnectResult::Success);
         });
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -2604,7 +2604,7 @@ mod tests {
         let state = exchange_deauth(state, &mut h);
         assert_idle(state);
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -2661,7 +2661,7 @@ mod tests {
         });
         assert_idle(state);
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -2700,7 +2700,7 @@ mod tests {
         });
         assert_idle(state);
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -2743,7 +2743,7 @@ mod tests {
         });
         assert_idle(state);
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -2785,7 +2785,7 @@ mod tests {
 
         expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {},
                 rsn_events: {
@@ -2820,7 +2820,7 @@ mod tests {
 
         expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {},
                 rsn_events: {
@@ -2858,7 +2858,7 @@ mod tests {
             )
         });
 
-        assert_data_tree!(h.inspector, root: {
+        assert_data_tree!(@executor h.executor, h.inspector, root: {
             usme: contains {
                 state_events: {},
                 rsn_events:  {
@@ -2902,7 +2902,7 @@ mod tests {
         let state = state.on_mlme_event(deauth_conf, &mut h.context);
         assert_idle(state);
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -2998,7 +2998,7 @@ mod tests {
         let state = state.on_mlme_event(deauth_conf, &mut h.context);
         assert_idle(state);
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -3090,7 +3090,7 @@ mod tests {
         // Check that the connection does not fail
         expect_stream_empty(&mut h.mlme_stream, "unexpected event in mlme stream");
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -3234,7 +3234,7 @@ mod tests {
         let state = state.on_mlme_event(deauth_conf, &mut h.context);
         assert_idle(state);
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -3413,7 +3413,7 @@ mod tests {
         let state = state.on_mlme_event(deauth_conf, &mut h.context);
         assert_idle(state);
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -3527,7 +3527,7 @@ mod tests {
         assert_connecting(state, &connect_command_two().0.bss);
     }
 
-    fn expect_state_events_link_up_roaming_link_up(
+    async fn expect_state_events_link_up_roaming_link_up(
         inspector: &Inspector,
         selected_bss: BssDescription,
     ) {
@@ -3597,7 +3597,10 @@ mod tests {
             assert_eq!(result, RoamResult::Success(Box::new(*selected_bss.clone())));
         });
 
-        expect_state_events_link_up_roaming_link_up(&h.inspector, *selected_bss.clone());
+        h.executor.run_singlethreaded(expect_state_events_link_up_roaming_link_up(
+            &h.inspector,
+            *selected_bss.clone(),
+        ));
     }
 
     #[test]
@@ -3635,10 +3638,13 @@ mod tests {
             assert_eq!(result, RoamResult::Success(Box::new(*selected_bss.clone())));
         });
 
-        expect_state_events_link_up_roaming_link_up(&h.inspector, *selected_bss.clone());
+        h.executor.run_singlethreaded(expect_state_events_link_up_roaming_link_up(
+            &h.inspector,
+            *selected_bss.clone(),
+        ));
     }
 
-    fn expect_state_events_link_up_roaming_rsna(
+    async fn expect_state_events_link_up_roaming_rsna(
         inspector: &Inspector,
         selected_bss: BssDescription,
     ) {
@@ -3712,7 +3718,10 @@ mod tests {
             assert_variant!(&state.link_state, LinkState::EstablishingRsna { .. });
         });
 
-        expect_state_events_link_up_roaming_rsna(&h.inspector, selected_bss);
+        h.executor.run_singlethreaded(expect_state_events_link_up_roaming_rsna(
+            &h.inspector,
+            selected_bss,
+        ));
 
         // Note: because a new supplicant is created for the roam to the target, we can't easily
         // test the 802.1X portion of the roam.
@@ -3756,7 +3765,10 @@ mod tests {
             assert_variant!(&state.link_state, LinkState::EstablishingRsna { .. });
         });
 
-        expect_state_events_link_up_roaming_rsna(&h.inspector, selected_bss);
+        h.executor.run_singlethreaded(expect_state_events_link_up_roaming_rsna(
+            &h.inspector,
+            selected_bss,
+        ));
 
         // Note: because a new supplicant is created for the roam to the target, we can't easily
         // test the 802.1X portion of the roam.
@@ -3799,7 +3811,7 @@ mod tests {
         }
     }
 
-    fn expect_state_events_link_up_disconnecting_idle(inspector: &Inspector) {
+    async fn expect_state_events_link_up_disconnecting_idle(inspector: &Inspector) {
         assert_data_tree!(inspector, root: contains {
             usme: contains {
                 state_events: {
@@ -3861,7 +3873,7 @@ mod tests {
             &mut connect_txn_stream,
         );
 
-        expect_state_events_link_up_disconnecting_idle(&h.inspector);
+        h.executor.run_singlethreaded(expect_state_events_link_up_disconnecting_idle(&h.inspector));
     }
 
     #[test]
@@ -3899,7 +3911,7 @@ mod tests {
             &mut connect_txn_stream,
         );
 
-        expect_state_events_link_up_disconnecting_idle(&h.inspector);
+        h.executor.run_singlethreaded(expect_state_events_link_up_disconnecting_idle(&h.inspector));
     }
 
     #[test]
@@ -3941,7 +3953,7 @@ mod tests {
             &mut connect_txn_stream,
         );
 
-        expect_state_events_link_up_disconnecting_idle(&h.inspector);
+        h.executor.run_singlethreaded(expect_state_events_link_up_disconnecting_idle(&h.inspector));
     }
 
     #[test]
@@ -3987,7 +3999,7 @@ mod tests {
             &mut connect_txn_stream,
         );
 
-        expect_state_events_link_up_disconnecting_idle(&h.inspector);
+        h.executor.run_singlethreaded(expect_state_events_link_up_disconnecting_idle(&h.inspector));
     }
 
     #[test]
@@ -4110,7 +4122,7 @@ mod tests {
         assert_variant!(connect_txn_stream.try_next(), Ok(None));
     }
 
-    fn expect_state_events_roaming_disconnecting_idle(inspector: &Inspector) {
+    async fn expect_state_events_roaming_disconnecting_idle(inspector: &Inspector) {
         assert_data_tree!(inspector, root: contains {
             usme: contains {
                 state_events: {
@@ -4175,7 +4187,7 @@ mod tests {
             &mut connect_txn_stream,
         );
 
-        expect_state_events_roaming_disconnecting_idle(&h.inspector);
+        h.executor.run_singlethreaded(expect_state_events_roaming_disconnecting_idle(&h.inspector));
     }
 
     #[test]
@@ -4220,7 +4232,7 @@ mod tests {
             &mut connect_txn_stream,
         );
 
-        expect_state_events_roaming_disconnecting_idle(&h.inspector);
+        h.executor.run_singlethreaded(expect_state_events_roaming_disconnecting_idle(&h.inspector));
     }
 
     fn make_disconnect_request(
@@ -4254,7 +4266,7 @@ mod tests {
         assert!(h.mlme_stream.try_next().is_err());
         assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4280,7 +4292,7 @@ mod tests {
         });
         assert_idle(state);
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4307,7 +4319,7 @@ mod tests {
         let state = exchange_deauth(state, &mut h);
         assert_idle(state);
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4348,7 +4360,7 @@ mod tests {
         assert_idle(state);
         assert_variant!(h.executor.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4395,7 +4407,7 @@ mod tests {
         let state = exchange_deauth(state, &mut h);
         assert_connecting(state, &connect_command_two().0.bss);
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4439,7 +4451,7 @@ mod tests {
         );
         assert_eq!(result, ConnectResult::Canceled);
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4531,7 +4543,7 @@ mod tests {
         );
         assert!(!info.is_sme_reconnecting);
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4565,7 +4577,7 @@ mod tests {
             &fake_bss_description!(Wpa2, ssid: Ssid::try_from("wpa2").unwrap()),
         );
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4607,7 +4619,7 @@ mod tests {
             })
         );
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4665,7 +4677,7 @@ mod tests {
             assert!(is_reconnect);
         });
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4728,7 +4740,7 @@ mod tests {
             assert!(is_reconnect);
         });
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4771,7 +4783,7 @@ mod tests {
             fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::WlanSmeUnitTesting)
         );
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4817,7 +4829,7 @@ mod tests {
             fidl_sme::DisconnectSource::User(fidl_sme::UserDisconnectReason::WlanSmeUnitTesting)
         );
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4882,7 +4894,7 @@ mod tests {
         // State did not change to Connecting because command is invalid, thus ignored.
         assert_variant!(state, ClientState::Idle(_));
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {
@@ -4918,7 +4930,7 @@ mod tests {
         // State did not change to Connecting because command is invalid, thus ignored.
         assert_variant!(state, ClientState::Idle(_));
 
-        assert_data_tree!(h.inspector, root: contains {
+        assert_data_tree!(@executor h.executor, h.inspector, root: contains {
             usme: contains {
                 state_events: {
                     "0": {

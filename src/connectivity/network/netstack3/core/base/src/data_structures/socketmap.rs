@@ -13,9 +13,9 @@ use alloc::collections::{hash_map, HashMap};
 use core::fmt::Debug;
 use core::hash::Hash;
 use core::num::NonZeroUsize;
-use either::Either;
 
 use derivative::Derivative;
+use either::Either;
 
 /// A type whose values can "shadow" other values of the type.
 ///
@@ -45,7 +45,7 @@ pub trait IterShadows {
 /// integer-like type.
 pub trait Tagged<A> {
     /// The tag type.
-    type Tag: Copy + Eq + core::fmt::Debug;
+    type Tag: Copy + Eq + Debug;
 
     /// Returns the tag value for `self` at the given address.
     ///
@@ -465,7 +465,7 @@ mod tests {
     #[derive(Eq, PartialEq, Clone, Copy, Debug)]
     struct TV<T, V>(T, V);
 
-    impl<T: Copy + Eq + core::fmt::Debug, V> Tagged<Address> for TV<T, V> {
+    impl<T: Copy + Eq + Debug, V> Tagged<Address> for TV<T, V> {
         type Tag = T;
 
         fn tag(&self, _: &Address) -> Self::Tag {

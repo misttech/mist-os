@@ -578,10 +578,6 @@ TEST_F(CheckpointTest, CompactedSummaries) TA_NO_THREAD_SAFETY_ANALYSIS {
       for (int i = static_cast<int>(CursegType::kCursegHotData);
            i <= static_cast<int>(CursegType::kCursegColdData); ++i) {
         CursegInfo *curseg = segment_manager.CURSEG_I(static_cast<CursegType>(i));
-
-        if (cp->checkpoint_ver > 3) {  // cp_ver 2 and 3 have random segno
-          ASSERT_EQ(curseg->segno, (cp->checkpoint_ver - 3) * 3 + i + 1);
-        }
         ASSERT_EQ(curseg->next_blkoff, kEntriesInSum / 2);
 
         for (uint32_t j = 0; j < kEntriesInSum / 2; ++j) {
@@ -676,10 +672,6 @@ TEST_F(CheckpointTest, NormalSummaries) TA_NO_THREAD_SAFETY_ANALYSIS {
       for (int i = static_cast<int>(CursegType::kCursegHotData);
            i <= static_cast<int>(CursegType::kCursegColdNode); ++i) {
         CursegInfo *curseg = segment_manager.CURSEG_I(static_cast<CursegType>(i));
-
-        if (cp->checkpoint_ver > 3) {  // cp_ver 2 and 3 have random segno
-          ASSERT_EQ(curseg->segno, (cp->checkpoint_ver - 3) * kNrCursegType + i + 1);
-        }
         ASSERT_EQ(curseg->next_blkoff, kEntriesInSum);
 
         for (uint32_t j = 0; j < kEntriesInSum; ++j) {

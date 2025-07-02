@@ -14,7 +14,6 @@
 #include <lib/fxt/serializer.h>
 #include <lib/fxt/string_ref.h>
 #include <lib/fxt/trace_base.h>
-#include <lib/ktrace/ktrace_internal.h>
 #include <lib/spsc_buffer/spsc_buffer.h>
 #include <lib/user_copy/user_ptr.h>
 #include <lib/zircon-internal/ktrace.h>
@@ -22,6 +21,7 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
+#include <kernel/mutex.h>
 #include <kernel/thread.h>
 #include <ktl/atomic.h>
 #include <ktl/tuple.h>
@@ -632,13 +632,7 @@ using fxt::operator""_intern;
 void ktrace_report_live_threads();
 void ktrace_report_live_processes();
 
-enum class BufferMode {
-  kSingle,
-  kPerCpu,
-};
-
-template <BufferMode Mode>
-class KTraceImpl {
+class KTrace {
  private:
   // Allocator used by SpscBuffer to allocate and free its underlying storage.
   class KernelAspaceAllocator {
@@ -821,7 +815,7 @@ class KTraceImpl {
   };
 
  public:
-  // PendingCommit encapsulates a pending write to the KTrace buffer.
+  // Reservation encapsulates a pending write to the KTrace buffer.
   //
   // This class implements the fxt::Writer::Reservation trait, which is required by the FXT
   // serializer.
@@ -831,23 +825,19 @@ class KTraceImpl {
   // single-writer invariant of each per-CPU buffer and lead to subtle concurrency bugs that may
   // manifest as corrupt trace data. Unfortunately, there is no way for us to programmatically
   // ensure this, so we do our best by asserting that interrupts are disabled in every method of
-  // this class. It is therefore up to the caller to ensure that interrupts are never re-enabled.
-  class PendingCommit {
+  // this class. It is therefore up to the caller to ensure that interrupts are disabled for the
+  // lifetime of this object.
+  class Reservation {
    public:
-    ~PendingCommit() {
-      DEBUG_ASSERT(arch_ints_disabled());
-      arch_interrupt_restore(state_);
-    }
+    ~Reservation() { DEBUG_ASSERT(arch_ints_disabled()); }
 
     // Disallow copies and move assignment, but allow moves.
     // Disallowing move assignment allows the saved interrupt state to be const.
-    PendingCommit(const PendingCommit&) = delete;
-    PendingCommit& operator=(const PendingCommit&) = delete;
-    PendingCommit& operator=(PendingCommit&&) = delete;
-    PendingCommit(PendingCommit&& other)
-        : reservation_(ktl::move(other.reservation_)), state_(other.state_) {
+    Reservation(const Reservation&) = delete;
+    Reservation& operator=(const Reservation&) = delete;
+    Reservation& operator=(Reservation&&) = delete;
+    Reservation(Reservation&& other) : reservation_(ktl::move(other.reservation_)) {
       DEBUG_ASSERT(arch_ints_disabled());
-      other.state_ = kNoopInterruptSavedState;
     }
 
     void WriteWord(uint64_t word) {
@@ -877,27 +867,22 @@ class KTraceImpl {
     }
 
    private:
-    // Only KTraceImpl::Reserve<BufferMode::kPerCpu> should be able to create a PendingCommit.
-    friend class KTraceImpl<BufferMode::kPerCpu>;
-    PendingCommit(PerCpuBuffer::Reservation reservation, interrupt_saved_state_t state,
-                  uint64_t header)
-        : reservation_(ktl::move(reservation)), state_(state) {
+    friend class KTrace;
+    Reservation(PerCpuBuffer::Reservation reservation, uint64_t header)
+        : reservation_(ktl::move(reservation)) {
       DEBUG_ASSERT(arch_ints_disabled());
       WriteWord(header);
     }
 
     PerCpuBuffer::Reservation reservation_;
-    interrupt_saved_state_t state_;
   };
-  using Reservation = ktl::conditional_t<Mode == BufferMode::kSingle,
-                                         internal::KTraceState::PendingCommit, PendingCommit>;
 
   // Control is responsible for starting, stopping, or rewinding the ktrace buffer.
   //
   // The meaning of the options changes based on the action. If the action is to start tracing,
   // then the options field functions as the group mask.
   zx_status_t Control(uint32_t action, uint32_t options) TA_EXCL(lock_) {
-    KTraceGuard guard{&lock_};
+    Guard<Mutex> guard{&lock_};
     switch (action) {
       case KTRACE_ACTION_START:
       case KTRACE_ACTION_START_CIRCULAR:
@@ -921,7 +906,14 @@ class KTraceImpl {
   //    * On failure, a zx_status_t error code is returned.
   zx::result<size_t> ReadUser(user_out_ptr<void> ptr, uint32_t off, size_t len);
 
-  // Reserve reserves a slot in the ring buffer to write a record into.
+  // Reserve reserves a slot of memory to write a record into.
+  //
+  // This is likely not the method you want to use. In fact, it is exposed as a public method only
+  // because the FXT serializer library requires it. If you're trying to write a record to the
+  // global KTrace buffer, prefer using the Emit* methods below instead.
+  //
+  // This method MUST be invoked with interrupts disabled to enforce the single-writer invariant of
+  // the per-CPU buffers.
   zx::result<Reservation> Reserve(uint64_t header);
 
   // Sentinel type for unused arguments.
@@ -949,9 +941,10 @@ class KTraceImpl {
   // category is enabled.
   static void Probe(Context context, const fxt::InternedString& label, uint64_t a, uint64_t b) {
     if (CategoryEnabled("kernel:probe"_category)) {
+      InterruptDisableGuard guard;
       const fxt::StringRef name_ref = fxt::StringRef{label};
       fxt::WriteInstantEventRecord(
-          &GetInstance(), KTraceImpl::Timestamp(), ThreadRefFromContext(context),
+          &GetInstance(), KTrace::Timestamp(), ThreadRefFromContext(context),
           fxt::StringRef{"kernel:probe"_category.label()}, name_ref,
           fxt::Argument{"arg0"_intern, a}, fxt::Argument{"arg1"_intern, b});
     }
@@ -963,6 +956,7 @@ class KTraceImpl {
   static void EmitKernelObject(zx_koid_t koid, zx_obj_type_t obj_type,
                                const fxt::StringRef<name_type>& name,
                                const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteKernelObjectRecord(&GetInstance(), fxt::Koid(koid), obj_type, name,
@@ -975,6 +969,7 @@ class KTraceImpl {
   static void EmitComplete(const fxt::InternedCategory& category,
                            const fxt::StringRef<name_type>& label, uint64_t start_time,
                            uint64_t end_time, Context context, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteDurationCompleteEventRecord(
@@ -988,6 +983,7 @@ class KTraceImpl {
   static void EmitInstant(const fxt::InternedCategory& category,
                           const fxt::StringRef<name_type>& label, uint64_t timestamp,
                           Context context, Unused, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteInstantEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
@@ -1000,6 +996,7 @@ class KTraceImpl {
   static void EmitDurationBegin(const fxt::InternedCategory& category,
                                 const fxt::StringRef<name_type>& label, uint64_t timestamp,
                                 Context context, Unused, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteDurationBeginEventRecord(
@@ -1013,6 +1010,7 @@ class KTraceImpl {
   static void EmitDurationEnd(const fxt::InternedCategory& category,
                               const fxt::StringRef<name_type>& label, uint64_t timestamp,
                               Context context, Unused, const ktl::tuple<Ts...> args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteDurationEndEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
@@ -1026,6 +1024,7 @@ class KTraceImpl {
   static void EmitCounter(const fxt::InternedCategory& category,
                           const fxt::StringRef<name_type>& label, uint64_t timestamp,
                           Context context, uint64_t counter_id, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteCounterEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
@@ -1039,6 +1038,7 @@ class KTraceImpl {
   static void EmitFlowBegin(const fxt::InternedCategory& category,
                             const fxt::StringRef<name_type>& label, uint64_t timestamp,
                             Context context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteFlowBeginEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
@@ -1052,6 +1052,7 @@ class KTraceImpl {
   static void EmitFlowStep(const fxt::InternedCategory& category,
                            const fxt::StringRef<name_type>& label, uint64_t timestamp,
                            Context context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteFlowStepEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
@@ -1065,6 +1066,7 @@ class KTraceImpl {
   static void EmitFlowEnd(const fxt::InternedCategory& category,
                           const fxt::StringRef<name_type>& label, uint64_t timestamp,
                           Context context, uint64_t flow_id, const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteFlowEndEventRecord(&GetInstance(), timestamp, ThreadRefFromContext(context),
@@ -1080,6 +1082,7 @@ class KTraceImpl {
   static void EmitThreadWakeup(const cpu_num_t cpu,
                                fxt::ThreadRef<fxt::RefType::kInline> thread_ref,
                                const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteThreadWakeupRecord(&GetInstance(), Timestamp(), static_cast<uint16_t>(cpu),
@@ -1093,6 +1096,7 @@ class KTraceImpl {
                                 const fxt::ThreadRef<fxt::RefType::kInline>& outgoing_thread,
                                 const fxt::ThreadRef<fxt::RefType::kInline>& incoming_thread,
                                 const ktl::tuple<Ts...>& args) {
+    InterruptDisableGuard guard;
     ktl::apply(
         [&](const Ts&... unpacked_args) {
           fxt::WriteContextSwitchRecord(&GetInstance(), Timestamp(), static_cast<uint16_t>(cpu),
@@ -1103,30 +1107,25 @@ class KTraceImpl {
   }
 
   // Retrieves a reference to the global KTrace instance.
-  static KTraceImpl& GetInstance() { return instance_; }
-
-  // Retrieves the pseudo-KOID generated for the given CPU number.
-  static zx_koid_t GetCpuKoid(cpu_num_t cpu_num) {
-    return GetInstance().cpu_context_map_.GetCpuKoid(cpu_num);
-  }
-
-  // A special KOID used to signify the lack of an associated process.
-  constexpr static fxt::Koid kNoProcess{0u};
+  static KTrace& GetInstance() { return instance_; }
 
  private:
   friend class KTraceTests;
   friend class TestKTrace;
 
+  // A special KOID used to signify the lack of an associated process.
+  constexpr static fxt::Koid kNoProcess{0u};
+
   // Set this class up as a singleton by:
   // * Making the constructor and destructor private
   // * Preventing copies and moves
-  constexpr explicit KTraceImpl(bool disable_diagnostic_logs = false)
+  constexpr explicit KTrace(bool disable_diagnostic_logs = false)
       : disable_diagnostic_logs_(disable_diagnostic_logs) {}
-  virtual ~KTraceImpl() = default;
-  KTraceImpl(const KTraceImpl&) = delete;
-  KTraceImpl& operator=(const KTraceImpl&) = delete;
-  KTraceImpl(KTraceImpl&&) = delete;
-  KTraceImpl& operator=(KTraceImpl&&) = delete;
+  virtual ~KTrace() = default;
+  KTrace(const KTrace&) = delete;
+  KTrace& operator=(const KTrace&) = delete;
+  KTrace(KTrace&&) = delete;
+  KTrace& operator=(KTrace&&) = delete;
 
   // Maintains the mapping from CPU numbers to pre-allocated KOIDs.
   class CpuContextMap {
@@ -1169,7 +1168,7 @@ class KTraceImpl {
   }
 
   // The global KTrace singleton.
-  static inline KTraceImpl instance_;
+  static KTrace instance_;
 
   // A small printf stand-in which gives tests the ability to disable diagnostic
   // printing during testing.
@@ -1188,7 +1187,7 @@ class KTraceImpl {
   // should be a no-op. This should only be called from the InitHook.
   void Init(uint32_t bufsize, uint32_t initial_grpmask) TA_EXCL(lock_);
 
-  // Allocate our per-CPU buffers. This is only called when BufferMode::kPerCpu is enabled.
+  // Allocate our per-CPU buffers.
   zx_status_t Allocate() TA_REQ(lock_);
 
   // Start collecting trace data.
@@ -1257,13 +1256,6 @@ class KTraceImpl {
   // True if diagnostic log messages should not be printed. Set to true in tests to avoid logspam.
   const bool disable_diagnostic_logs_{false};
 
-  // The internal ring buffer implementation when using BufferMode::kSingle.
-  internal::KTraceState internal_state_;
-
-  //
-  // The following fields are only used when using BufferMode::kPerCpu.
-  //
-
   // Stores whether writes are currently enabled.
   ktl::atomic<bool> writes_enabled_{false};
 
@@ -1277,22 +1269,7 @@ class KTraceImpl {
   uint32_t buffer_size_ TA_GUARDED(lock_){0};
 
   // Lock used to serialize non-write operations.
-  // The internal::KTraceState object already has a lock to synchronize these operations, so this
-  // is a NullLock when using BufferMode::kSingle. Setting up the LockType in this way allows us
-  // to annotate methods with thread safety annotations.
-  using LockType =
-      ktl::conditional_t<Mode == BufferMode::kSingle, fbl::NullLock, DECLARE_MUTEX(KTraceImpl)>;
-  using KTraceGuard =
-      ktl::conditional_t<Mode == BufferMode::kSingle, lockdep::NullGuard, Guard<Mutex>>;
-  LockType lock_;
+  DECLARE_MUTEX(KTrace) lock_;
 };
-
-// Utilize the per-CPU implementation of ktrace if streaming has been enabled.
-// Otherwise, default to using the single buffer version.
-#if EXPERIMENTAL_KTRACE_STREAMING_ENABLED
-using KTrace = KTraceImpl<BufferMode::kPerCpu>;
-#else
-using KTrace = KTraceImpl<BufferMode::kSingle>;
-#endif
 
 #endif  // ZIRCON_KERNEL_INCLUDE_LIB_KTRACE_H_

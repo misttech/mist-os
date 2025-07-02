@@ -878,5 +878,19 @@ func infraToolLogChecks() []FailureModeCheck {
 			// LINT.ThenChange(//src/testing/end_to_end/mobly_base_tests/fuchsia_base_test/fuchsia_base_test.py)
 			Type: swarmingOutputType,
 		},
+		&stringInLogCheck{
+			String: fmt.Sprintf("botanist ERROR: %s", sshutilconstants.FailedToStartSshSessionMsg),
+			Type:   swarmingOutputType,
+		},
+		&stringInLogCheck{
+			String: fmt.Sprintf("botanist ERROR: %s", botanistconstants.FailedToDeriveSshConnectionMsg),
+			Type:   swarmingOutputType,
+		},
+		// For https://fxbug.dev/421926925
+		&stringInLogCheck{
+			String:             "launching monocle_wm#meta/escher_screensaver.cm",
+			Type:               syslogType,
+			SkipAllPassedTests: true,
+		},
 	}
 }

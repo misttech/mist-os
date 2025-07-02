@@ -29,7 +29,7 @@ use crate::fpb::PowerLevel;
 use crate::topology::*;
 
 /// Max value for inspect event history.
-const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 8192;
+const INSPECT_GRAPH_EVENT_BUFFER_SIZE: usize = 16384;
 
 // Below are a series of type aliases for convenience
 type LevelHangingGet<T> =
@@ -2292,7 +2292,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_initialize_current_and_broker_status() {
+    async fn test_initialize_current_and_broker_status() {
         let inspect = fuchsia_inspect::Inspector::default();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
@@ -2365,7 +2365,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_current_required_level_inspect() {
+    async fn test_current_required_level_inspect() {
         let inspect = fuchsia_inspect::Inspector::default();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
@@ -2464,7 +2464,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_add_element_dependency_never_and_unregistered() {
+    async fn test_add_element_dependency_never_and_unregistered() {
         let inspect = fuchsia_inspect::Inspector::default();
         let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_mithril = DependencyToken::create();
@@ -2622,7 +2622,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_remove_element() {
+    async fn test_remove_element() {
         let inspect = fuchsia_inspect::Inspector::default();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
@@ -2848,7 +2848,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_broker_lease_direct() {
+    async fn test_broker_lease_direct() {
         // Create a topology of a child element with two direct assertive dependencies.
         // P1 <= C => P2
         let inspect = fuchsia_inspect::Inspector::default();
@@ -7517,7 +7517,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_add_element_dependency_list_of_levels() {
+    async fn test_add_element_dependency_list_of_levels() {
         let inspect = fuchsia_inspect::Inspector::default();
         let mut broker = Broker::new(inspect.root().create_child("test"));
         let token_mithril = DependencyToken::create();

@@ -23,7 +23,19 @@ zx::result<> ParentSetCollector::AddNode(
   parent_properties_[index] =
       fuchsia_driver_framework::NodePropertyEntry2(parent_names_[index], node_properties);
 
+  if (auto node_ptr = parents_[index].lock(); node_ptr) {
+    node_ptr->MarkAsCompositeParent();
+  }
+
   return zx::ok();
+}
+
+void ParentSetCollector::ReleaseNodes() {
+  for (auto& node : parents_) {
+    if (auto node_ptr = node.lock(); node_ptr) {
+      node_ptr->UnmarkAsCompositeParent();
+    }
+  }
 }
 
 zx::result<std::shared_ptr<Node>> ParentSetCollector::TryToAssemble(

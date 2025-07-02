@@ -6,9 +6,10 @@
 
 use bootreason::get_console_ramoops;
 use starnix_core::task::CurrentTask;
+use starnix_core::vfs::pseudo::simple_file::BytesFile;
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::{
-    BytesFile, CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
-    FsNodeInfo, FsStr, StaticDirectoryBuilder,
+    CacheMode, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsStr,
 };
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_types::vfs::default_statfs;
@@ -22,7 +23,7 @@ struct PstoreFsHandle {
 }
 
 pub fn pstore_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -37,7 +38,7 @@ pub struct PstoreFs;
 impl FileSystemOps for PstoreFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -45,7 +46,7 @@ impl FileSystemOps for PstoreFs {
     }
 
     fn name(&self) -> &'static FsStr {
-        "pstorefs".into()
+        "pstore".into()
     }
 }
 
@@ -62,18 +63,16 @@ impl PstoreFs {
             let ramoops_contents_0 = ramoops_contents.clone();
             dir.node(
                 "console-ramoops-0",
-                fs.create_node(
-                    current_task,
+                fs.create_node_and_allocate_node_id(
                     BytesFile::new_node(ramoops_contents_0),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
                 ),
             );
             dir.node(
                 "console-ramoops",
-                fs.create_node(
-                    current_task,
+                fs.create_node_and_allocate_node_id(
                     BytesFile::new_node(ramoops_contents),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o440), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o440), FsCred::root()),
                 ),
             );
         }

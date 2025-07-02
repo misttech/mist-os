@@ -24,6 +24,7 @@ rustc_staticlib("lib") {
     "//sdk/rust/zx-types",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/errors:lib",
+    "//src/developer/ffx/lib/logging:lib",
     "//src/developer/ffx/lib/netext:lib",
     "//src/developer/ffx/lib/rcs:lib",
     "//src/developer/ffx/lib/target:lib",
@@ -42,6 +43,8 @@ rustc_staticlib("lib") {
   test_deps = [
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:futures-test",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:tempfile",
   ]
 
   sources = [
@@ -50,6 +53,7 @@ rustc_staticlib("lib") {
     "src/ext_buffer.rs",
     "src/lib.rs",
     "src/lib_context.rs",
+    "src/logging.rs",
     "src/waker.rs",
   ]
 }

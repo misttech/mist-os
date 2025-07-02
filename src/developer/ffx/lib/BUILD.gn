@@ -10,6 +10,7 @@ libs = [
   "buildid",
   "compat_info",
   "daemonize",
+  "diagnostics",
   "discovery",
   "doctor_utils",
   "emulator_instance",
@@ -38,6 +39,7 @@ libs = [
   "target/connector",
   "target/holders",
   "target_errors",
+  "target_net",
   "tasks",
   "testing",
   "timeout",
@@ -81,6 +83,8 @@ group("host_tests") {
   deps = [
     "e2e_emu:host_tests",
     "fuchsia-controller:host_tests",
+    "profiler:host_tests",
     "symbolize:host_tests",
+    "target_net:host_tests",
   ]
 }

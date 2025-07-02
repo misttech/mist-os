@@ -8,22 +8,18 @@
 #include <fidl/fuchsia.hardware.gpio/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.pin/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/component/incoming/cpp/service.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/fake-bti/cpp/fake-bti.h>
-#include <lib/driver/incoming/cpp/namespace.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/internal/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
+#include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 #include <lib/fdio/directory.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <zircon/errors.h>
 
-#include <algorithm>
-
 #include <gtest/gtest.h>
+
+#include "src/lib/testing/predicates/status.h"
 
 namespace audio::aml_g12 {
 
@@ -45,128 +41,13 @@ constexpr std::array<fuchsia_hardware_audio::ElementId, 6> kAllValidRingBufferId
     kEngineARingBufferIdInput,  kEngineBRingBufferIdInput,  kEngineCRingBufferIdInput,
 };
 
-class FakePlatformDevice : public fidl::Server<fuchsia_hardware_platform_device::Device> {
- public:
-  fuchsia_hardware_platform_device::Service::InstanceHandler GetInstanceHandler() {
-    return fuchsia_hardware_platform_device::Service::InstanceHandler({
-        .device = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                          fidl::kIgnoreBindingClosure),
-    });
-  }
-
-  void InitResources() {
-    EXPECT_EQ(ZX_OK, zx::vmo::create(kMmioSize, 0, &mmio_));
-    zx::result bti = fake_bti::CreateFakeBti();
-    EXPECT_EQ(ZX_OK, bti.status_value());
-    bti_ = std::move(bti.value());
-  }
-
-  cpp20::span<uint32_t> mmio() {
-    // The test has to wait for the driver to set the MMIO cache policy before mapping.
-    if (!mapped_mmio_.start()) {
-      MapMmio();
-    }
-
-    return {reinterpret_cast<uint32_t*>(mapped_mmio_.start()), kMmioSize / sizeof(uint32_t)};
-  }
-
- private:
-  static constexpr size_t kMmioSize = 0x1000;
-
-  void GetMmioById(GetMmioByIdRequest& request, GetMmioByIdCompleter::Sync& completer) override {
-    if (request.index() != 0) {
-      return completer.Reply(zx::error(ZX_ERR_OUT_OF_RANGE));
-    }
-
-    zx::vmo vmo;
-    if (zx_status_t status = mmio_.duplicate(ZX_RIGHT_SAME_RIGHTS, &vmo); status != ZX_OK) {
-      return completer.Reply(zx::error(status));
-    }
-
-    completer.Reply(zx::ok(fuchsia_hardware_platform_device::Mmio{{
-        .offset = 0,
-        .size = kMmioSize,
-        .vmo = std::move(vmo),
-    }}));
-  }
-
-  void GetMmioByName(GetMmioByNameRequest& request,
-                     GetMmioByNameCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void GetInterruptById(GetInterruptByIdRequest& request,
-                        GetInterruptByIdCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void GetInterruptByName(GetInterruptByNameRequest& request,
-                          GetInterruptByNameCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void GetBtiById(GetBtiByIdRequest& request, GetBtiByIdCompleter::Sync& completer) override {
-    zx::bti bti;
-    if (zx_status_t status = bti_.duplicate(ZX_RIGHT_SAME_RIGHTS, &bti); status != ZX_OK) {
-      return completer.Reply(zx::error(status));
-    }
-    completer.Reply(zx::ok((std::move(bti))));
-  }
-
-  void GetBtiByName(GetBtiByNameRequest& request, GetBtiByNameCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void GetSmcById(GetSmcByIdRequest& request, GetSmcByIdCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void GetNodeDeviceInfo(GetNodeDeviceInfoCompleter::Sync& completer) override {
-    fuchsia_hardware_platform_device::NodeDeviceInfo info;
-    info.vid(PDEV_VID_AMLOGIC).pid(PDEV_PID_AMLOGIC_A311D);
-    completer.Reply(zx::ok(std::move(info)));
-  }
-
-  void GetSmcByName(GetSmcByNameRequest& request, GetSmcByNameCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void GetBoardInfo(GetBoardInfoCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void GetMetadata(GetMetadataRequest& request, GetMetadataCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  void GetPowerConfiguration(GetPowerConfigurationCompleter::Sync& completer) override {
-    completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-  }
-
-  // This test should use the same SDK version as the driver (unless specifically engineered to be
-  // otherwise), so receiving an unknown method should trigger a failure.
-  void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_platform_device::Device> metadata,
-      fidl::UnknownMethodCompleter::Sync& completer) override {
-    FAIL() << "unknown method (fuchsia_hardware_platform_device::Device) ordinal "
-           << metadata.method_ordinal;
-  }
-
-  void MapMmio() { EXPECT_EQ(ZX_OK, mapped_mmio_.Map(mmio_)); }
-
-  zx::vmo mmio_;
-  fzl::VmoMapper mapped_mmio_;
-  zx::bti bti_;
-
-  fidl::ServerBindingGroup<fuchsia_hardware_platform_device::Device> bindings_;
-};
-
 // Fake clock for power management test.
 class FakeClock : public fidl::testing::WireTestBase<fuchsia_hardware_clock::Clock> {
  public:
   FakeClock() = default;
 
-  bool IsFakeClockEnabled() { return enabled_; }
+  bool IsFakeClockEnabled() const { return enabled_; }
+
   fuchsia_hardware_clock::Service::InstanceHandler GetInstanceHandler() {
     return fuchsia_hardware_clock::Service::InstanceHandler({
         .clock = bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
@@ -223,21 +104,38 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
  public:
   FakeGpio() = default;
 
-  fuchsia_hardware_gpio::Service::InstanceHandler GetGpioInstanceHandler() {
-    return fuchsia_hardware_gpio::Service::InstanceHandler({
-        .device = gpio_bindings_.CreateHandler(
-            this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
-    });
+  zx::result<> Serve(async_dispatcher_t* dispatcher, fdf::OutgoingDirectory& to_driver_vfs,
+                     std::string_view instance) {
+    // Serve gpio service.
+    {
+      fuchsia_hardware_gpio::Service::InstanceHandler handler{{
+          .device = gpio_bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+      }};
+
+      zx::result result =
+          to_driver_vfs.AddService<fuchsia_hardware_gpio::Service>(std::move(handler), instance);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+
+    // Serve pin service.
+    {
+      fuchsia_hardware_pin::Service::InstanceHandler handler{{
+          .device = pin_bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+      }};
+
+      zx::result result =
+          to_driver_vfs.AddService<fuchsia_hardware_pin::Service>(std::move(handler), instance);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+
+    return zx::ok();
   }
 
-  fuchsia_hardware_pin::Service::InstanceHandler GetPinInstanceHandler() {
-    return fuchsia_hardware_pin::Service::InstanceHandler({
-        .device = pin_bindings_.CreateHandler(
-            this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
-    });
-  }
-
-  bool IsFakeGpioSetToSclk() { return set_to_sclk_; }
+  bool IsFakeGpioSetToSclk() const { return set_to_sclk_; }
 
  protected:
   void SetBufferMode(SetBufferModeRequestView request,
@@ -271,101 +169,128 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   fidl::ServerBindingGroup<fuchsia_hardware_pin::Pin> pin_bindings_;
 };
 
-struct IncomingNamespace {
-  fdf_testing::TestNode node_{std::string("root")};
-  fdf_testing::internal::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
-};
-
-// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
-// library.
-class AmlG12CompositeTest : public testing::Test {
+class AmlG12CompositeTestEnvironment : public fdf_testing::Environment {
  public:
-  AmlG12CompositeTest()
-      : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        driver_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        incoming_(env_dispatcher(), std::in_place) {}
-
-  void SetUp() override { Init(); }
+  static constexpr size_t kMmioRegSize = sizeof(uint32_t);
+  static constexpr size_t kMmioRegCount = 0x1000 / kMmioRegSize;
 
   void Init() {
-    fuchsia_driver_framework::DriverStartArgs driver_start_args;
-    incoming_.SyncCall([&driver_start_args, this](IncomingNamespace* incoming) {
-      auto start_args_result = incoming->node_.CreateStartArgsAndServe();
-      ASSERT_TRUE(start_args_result.is_ok());
+    zx::result bti = fake_bti::CreateFakeBti();
+    ASSERT_OK(bti);
+    std::map<uint32_t, zx::bti> btis;
+    btis.insert({0, std::move(bti.value())});
 
-      auto init_result =
-          incoming->env_.Initialize(std::move(start_args_result->incoming_directory_server));
-      ASSERT_TRUE(init_result.is_ok());
+    std::map<uint32_t, fdf_fake::Mmio> mmios;
+    mmios.insert({0, mmio_reg_region_.GetMmioBuffer()});
 
-      platform_device_.InitResources();
-      const zx::result add_platform_result =
-          incoming->env_.incoming_directory().AddService<fuchsia_hardware_platform_device::Service>(
-              platform_device_.GetInstanceHandler());
-      EXPECT_TRUE(add_platform_result.is_ok());
+    pdev_.SetConfig({.mmios = std::move(mmios),
+                     .btis = std::move(btis),
+                     .device_info{{
+                         .vid = PDEV_VID_AMLOGIC,
+                         .pid = PDEV_PID_AMLOGIC_A311D,
+                     }}});
 
-      auto add_clock_gate_result =
-          incoming->env_.incoming_directory().AddService<fuchsia_hardware_clock::Service>(
-              clock_gate_server_.GetInstanceHandler(), "clock-gate");
-      ASSERT_TRUE(add_clock_gate_result.is_ok());
-
-      auto add_clock_pll_result =
-          incoming->env_.incoming_directory().AddService<fuchsia_hardware_clock::Service>(
-              clock_pll_server_.GetInstanceHandler(), "clock-pll");
-      ASSERT_TRUE(add_clock_pll_result.is_ok());
-
-      auto add_sclk_tdm_a_gpio_result =
-          incoming->env_.incoming_directory().AddService<fuchsia_hardware_gpio::Service>(
-              sclk_tdm_a_server_.GetGpioInstanceHandler(), "gpio-tdm-a-sclk");
-      ASSERT_TRUE(add_sclk_tdm_a_gpio_result.is_ok());
-
-      auto add_sclk_tdm_a_pin_result =
-          incoming->env_.incoming_directory().AddService<fuchsia_hardware_pin::Service>(
-              sclk_tdm_a_server_.GetPinInstanceHandler(), "gpio-tdm-a-sclk");
-      ASSERT_TRUE(add_sclk_tdm_a_pin_result.is_ok());
-
-      auto add_sclk_tdm_b_gpio_result =
-          incoming->env_.incoming_directory().AddService<fuchsia_hardware_gpio::Service>(
-              sclk_tdm_b_server_.GetGpioInstanceHandler(), "gpio-tdm-b-sclk");
-      ASSERT_TRUE(add_sclk_tdm_b_gpio_result.is_ok());
-
-      auto add_sclk_tdm_b_pin_result =
-          incoming->env_.incoming_directory().AddService<fuchsia_hardware_pin::Service>(
-              sclk_tdm_b_server_.GetPinInstanceHandler(), "gpio-tdm-b-sclk");
-      ASSERT_TRUE(add_sclk_tdm_b_pin_result.is_ok());
-
-      auto add_sclk_tdm_c_gpio_result =
-          incoming->env_.incoming_directory().AddService<fuchsia_hardware_gpio::Service>(
-              sclk_tdm_c_server_.GetGpioInstanceHandler(), "gpio-tdm-c-sclk");
-      ASSERT_TRUE(add_sclk_tdm_c_gpio_result.is_ok());
-
-      auto add_sclk_tdm_c_pin_result =
-          incoming->env_.incoming_directory().AddService<fuchsia_hardware_pin::Service>(
-              sclk_tdm_c_server_.GetPinInstanceHandler(), "gpio-tdm-c-sclk");
-      ASSERT_TRUE(add_sclk_tdm_c_pin_result.is_ok());
-
-      driver_start_args = std::move(start_args_result->start_args);
-    });
-
-    zx::result result = runtime_.RunToCompletion(dut_.SyncCall(
-        &fdf_testing::internal::DriverUnderTest<Driver>::Start, std::move(driver_start_args)));
-    ASSERT_EQ(ZX_OK, result.status_value());
-
-    incoming_.SyncCall([this](IncomingNamespace* incoming) {
-      auto client_channel = incoming->node_.children().at(kDriverName).ConnectToDevice();
-      client_.Bind(
-          fidl::ClientEnd<fuchsia_hardware_audio::Composite>(std::move(client_channel.value())));
-      ASSERT_TRUE(client_.is_valid());
-    });
+    for (size_t i = 0; i < kMmioRegCount; ++i) {
+      auto& mmio_reg = mmio_reg_region_[i * kMmioRegSize];
+      mmio_reg.SetReadCallback([this, i]() { return mmio_reg_values_[i]; });
+      mmio_reg.SetWriteCallback([this, i](uint64_t value) { mmio_reg_values_[i] = value; });
+    }
   }
 
-  void TearDown() override {
-    zx::result result = runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::internal::DriverUnderTest<Driver>::PrepareStop));
-    ASSERT_EQ(ZX_OK, result.status_value());
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+
+    {
+      zx::result result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
+          pdev_.GetInstanceHandler(dispatcher));
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+
+    {
+      zx::result result = to_driver_vfs.AddService<fuchsia_hardware_clock::Service>(
+          clock_gate_.GetInstanceHandler(), Driver::kClockGateParentName);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+
+    {
+      zx::result result = to_driver_vfs.AddService<fuchsia_hardware_clock::Service>(
+          clock_pll_.GetInstanceHandler(), Driver::kClockPllParentName);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+
+    {
+      zx::result result =
+          sclk_tdm_a_.Serve(dispatcher, to_driver_vfs, Driver::kGpioTdmASclkParentName);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+
+    {
+      zx::result result =
+          sclk_tdm_b_.Serve(dispatcher, to_driver_vfs, Driver::kGpioTdmBSclkParentName);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+
+    {
+      zx::result result =
+          sclk_tdm_c_.Serve(dispatcher, to_driver_vfs, Driver::kGpioTdmCSclkParentName);
+      if (result.is_error()) {
+        return result.take_error();
+      }
+    }
+
+    return zx::ok();
   }
+
+  FakeClock& clock_gate() { return clock_gate_; }
+  FakeClock& clock_pll() { return clock_pll_; }
+  FakeGpio& sclk_tdm_a() { return sclk_tdm_a_; }
+  FakeGpio& sclk_tdm_b() { return sclk_tdm_b_; }
+  FakeGpio& sclk_tdm_c() { return sclk_tdm_c_; }
+  fake_mmio::FakeMmioRegRegion& mmio() { return mmio_reg_region_; }
+
+ private:
+  fdf_fake::FakePDev pdev_;
+  FakeClock clock_gate_;
+  FakeClock clock_pll_;
+  FakeGpio sclk_tdm_a_;
+  FakeGpio sclk_tdm_b_;
+  FakeGpio sclk_tdm_c_;
+
+  fake_mmio::FakeMmioRegRegion mmio_reg_region_{kMmioRegSize, kMmioRegCount};
+  std::array<uint64_t, kMmioRegCount> mmio_reg_values_;
+};
+
+class FixtureConfig final {
+ public:
+  using DriverType = Driver;
+  using EnvironmentType = AmlG12CompositeTestEnvironment;
+};
+
+class AmlG12CompositeTest : public testing::Test {
+ public:
+  void SetUp() override {
+    driver_test_.RunInEnvironmentTypeContext([](auto& env) { env.Init(); });
+    ASSERT_OK(driver_test_.StartDriver());
+    zx::result client =
+        driver_test_.ConnectThroughDevfs<fuchsia_hardware_audio::Composite>(Driver::kDriverName);
+    ASSERT_OK(client);
+    client_.Bind(std::move(client.value()));
+  }
+
+  void TearDown() override { ASSERT_OK(driver_test_.StopDriver()); }
 
  protected:
-  fuchsia_hardware_audio::DaiFormat GetDefaultDaiFormat() {
+  static fuchsia_hardware_audio::DaiFormat GetDefaultDaiFormat() {
     return fuchsia_hardware_audio::DaiFormat(
         2, 3, fuchsia_hardware_audio::DaiSampleFormat::kPcmSigned,
         fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
@@ -373,7 +298,7 @@ class AmlG12CompositeTest : public testing::Test {
         48'000, 32, 16);
   }
 
-  fuchsia_hardware_audio::Format GetDefaultRingBufferFormat() {
+  static fuchsia_hardware_audio::Format GetDefaultRingBufferFormat() {
     fuchsia_hardware_audio::PcmFormat pcm_format{
         2, fuchsia_hardware_audio::SampleFormat::kPcmSigned, 2, 16, 48'000};
     fuchsia_hardware_audio::Format format;
@@ -381,15 +306,33 @@ class AmlG12CompositeTest : public testing::Test {
     return format;
   }
 
-  bool IsFakeClockGateEnabled() { return clock_gate_server_.IsFakeClockEnabled(); }
-  bool IsFakeClockPllEnabled() { return clock_pll_server_.IsFakeClockEnabled(); }
+  bool IsFakeClockGateEnabled() {
+    return driver_test_.RunInEnvironmentTypeContext<bool>(
+        [](auto& env) { return env.clock_gate().IsFakeClockEnabled(); });
+  }
 
-  bool IsTdmASclkSet() { return sclk_tdm_a_server_.IsFakeGpioSetToSclk(); }
-  bool IsTdmBSclkSet() { return sclk_tdm_b_server_.IsFakeGpioSetToSclk(); }
-  bool IsTdmCSclkSet() { return sclk_tdm_c_server_.IsFakeGpioSetToSclk(); }
+  bool IsFakeClockPllEnabled() {
+    return driver_test_.RunInEnvironmentTypeContext<bool>(
+        [](auto& env) { return env.clock_pll().IsFakeClockEnabled(); });
+  }
+
+  bool IsTdmASclkSet() {
+    return driver_test_.RunInEnvironmentTypeContext<bool>(
+        [](auto& env) { return env.sclk_tdm_a().IsFakeGpioSetToSclk(); });
+  }
+
+  bool IsTdmBSclkSet() {
+    return driver_test_.RunInEnvironmentTypeContext<bool>(
+        [](auto& env) { return env.sclk_tdm_b().IsFakeGpioSetToSclk(); });
+  }
+
+  bool IsTdmCSclkSet() {
+    return driver_test_.RunInEnvironmentTypeContext<bool>(
+        [](auto& env) { return env.sclk_tdm_c().IsFakeGpioSetToSclk(); });
+  }
 
   void CheckDefaultDaiFormats(fuchsia_hardware_audio::ElementId id) {
-    auto dai_formats_result = client_->GetDaiFormats(id);
+    auto dai_formats_result = client()->GetDaiFormats(id);
     ASSERT_TRUE(dai_formats_result.is_ok());
     ASSERT_EQ(1, dai_formats_result->dai_formats().size());
     auto& dai_formats = dai_formats_result->dai_formats()[0];
@@ -437,7 +380,7 @@ class AmlG12CompositeTest : public testing::Test {
   void SetDaiFormatDefault(fuchsia_hardware_audio::ElementId id) {
     auto format = GetDefaultDaiFormat();
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_ok());
   }
 
@@ -446,7 +389,7 @@ class AmlG12CompositeTest : public testing::Test {
     auto format = GetDefaultDaiFormat();
     format.frame_format(std::move(frame_format));
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_ok());
   }
 
@@ -454,7 +397,7 @@ class AmlG12CompositeTest : public testing::Test {
     auto format = GetDefaultDaiFormat();
     format.frame_rate(rate);
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_ok());
   }
 
@@ -464,7 +407,7 @@ class AmlG12CompositeTest : public testing::Test {
     format.bits_per_sample(bits_per_sample);
     format.bits_per_slot(bits_per_slot);
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_ok());
   }
 
@@ -476,7 +419,7 @@ class AmlG12CompositeTest : public testing::Test {
     format.channels_to_use_bitmask((1 << number_of_channels) - 1);
     format.frame_format(std::move(frame_format));
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(id, std::move(format));
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_ok());
   }
 
@@ -488,31 +431,21 @@ class AmlG12CompositeTest : public testing::Test {
     EXPECT_EQ(IsFakeClockPllEnabled(), on);
   }
 
-  fidl::SyncClient<fuchsia_hardware_audio::Composite> client_;
-  FakePlatformDevice platform_device_;
-  FakeClock clock_gate_server_;
-  FakeClock clock_pll_server_;
-  FakeGpio sclk_tdm_a_server_;
-  FakeGpio sclk_tdm_b_server_;
-  FakeGpio sclk_tdm_c_server_;
-  fdf_testing::DriverRuntime runtime_;
+  fidl::SyncClient<fuchsia_hardware_audio::Composite>& client() { return client_; }
+
+  uint32_t GetMmioValue(uint32_t mmio_reg_index) {
+    auto address = mmio_reg_index * AmlG12CompositeTestEnvironment::kMmioRegSize;
+    return driver_test_.RunInEnvironmentTypeContext<uint32_t>(
+        [address](auto& env) { return env.mmio()[address].Read(); });
+  }
 
  private:
-  async_dispatcher_t* driver_dispatcher() { return driver_dispatcher_->async_dispatcher(); }
-  async_dispatcher_t* env_dispatcher() { return env_dispatcher_->async_dispatcher(); }
-
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_;
-  fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
-  // Use dut_ instead of driver_ because driver_ is used by gtest.
-  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<Driver>> dut_{
-      driver_dispatcher(), std::in_place};
-
- protected:
-  async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
+  fidl::SyncClient<fuchsia_hardware_audio::Composite> client_;
+  fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
 };
 
 TEST_F(AmlG12CompositeTest, CompositeProperties) {
-  fidl::Result result = client_->GetProperties();
+  fidl::Result result = client()->GetProperties();
   ASSERT_TRUE(result.is_ok());
   ASSERT_EQ("Amlogic", result->properties().manufacturer().value());
   ASSERT_EQ("g12", result->properties().product().value());
@@ -523,34 +456,34 @@ TEST_F(AmlG12CompositeTest, CompositeProperties) {
 TEST_F(AmlG12CompositeTest, Reset) {
   // TODO(https://fxbug.dev/42082341): Add behavior to change state recovered to the configuration
   // below.
-  fidl::Result reset_result = client_->Reset();
+  fidl::Result reset_result = client()->Reset();
   ASSERT_TRUE(reset_result.is_ok());
 
   // After reset we check we have configured all engines for TDM output and input.
 
   // Configure TDM OUT for I2S 16 bits per slot and per sample (default).
   // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 16 bits per slot.
-  ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x500 / 4]);  // A output.
-  ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x540 / 4]);  // B output.
-  ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x580 / 4]);  // C output.
+  ASSERT_EQ(0x3001'002F, GetMmioValue(0x500 / 4));  // A output.
+  ASSERT_EQ(0x3001'002F, GetMmioValue(0x540 / 4));  // B output.
+  ASSERT_EQ(0x3001'002F, GetMmioValue(0x580 / 4));  // C output.
 
   // Configure TDM IN for I2S 16 bits per slot and per sample (default).
   // TDM IN CTRL0 config, PAD_TDMIN A(0), B(1) and C(2).
-  ASSERT_EQ(0x7003'000F, platform_device_.mmio()[0x300 / 4]);  // A input.
-  ASSERT_EQ(0x7013'000F, platform_device_.mmio()[0x340 / 4]);  // B input.
-  ASSERT_EQ(0x7023'000F, platform_device_.mmio()[0x380 / 4]);  // C input.
+  ASSERT_EQ(0x7003'000F, GetMmioValue(0x300 / 4));  // A input.
+  ASSERT_EQ(0x7013'000F, GetMmioValue(0x340 / 4));  // B input.
+  ASSERT_EQ(0x7023'000F, GetMmioValue(0x380 / 4));  // C input.
 
   // Configure clocks.
   // SCLK CTRL, clk in/out enabled, 24 sdiv, 16 lrduty, 32 lrdiv.
-  ASSERT_EQ(0xc180'3c1f, platform_device_.mmio()[0x040 / 4]);  // A.
-  ASSERT_EQ(0xc180'3c1f, platform_device_.mmio()[0x048 / 4]);  // B.
-  ASSERT_EQ(0xc180'3c1f, platform_device_.mmio()[0x050 / 4]);  // C.
+  ASSERT_EQ(0xc180'3c1f, GetMmioValue(0x040 / 4));  // A.
+  ASSERT_EQ(0xc180'3c1f, GetMmioValue(0x048 / 4));  // B.
+  ASSERT_EQ(0xc180'3c1f, GetMmioValue(0x050 / 4));  // C.
 }
 
 TEST_F(AmlG12CompositeTest, ElementsAndTopology) {
   auto endpoints =
       fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
-  auto connect_result = client_->SignalProcessingConnect(std::move(endpoints->server));
+  auto connect_result = client()->SignalProcessingConnect(std::move(endpoints->server));
   ASSERT_TRUE(connect_result.is_ok());
   fidl::SyncClient signal_client{std::move(endpoints->client)};
   auto elements_result = signal_client->GetElements();
@@ -650,7 +583,7 @@ TEST_F(AmlG12CompositeTest, ElementsAndTopology) {
 TEST_F(AmlG12CompositeTest, ElementsState) {
   auto endpoints =
       fidl::CreateEndpoints<fuchsia_hardware_audio_signalprocessing::SignalProcessing>();
-  auto connect_result = client_->SignalProcessingConnect(std::move(endpoints->server));
+  auto connect_result = client()->SignalProcessingConnect(std::move(endpoints->server));
   ASSERT_TRUE(connect_result.is_ok());
   fidl::SyncClient signal_client{std::move(endpoints->client)};
   auto elements_result = signal_client->GetElements();
@@ -662,7 +595,7 @@ TEST_F(AmlG12CompositeTest, ElementsState) {
     if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect) {
       fuchsia_hardware_audio_signalprocessing::SignalProcessingSetElementStateRequest request;
       request.processing_element_id(*element.id());
-      auto set_element_result = signal_client->SetElementState(std::move(request));
+      auto set_element_result = signal_client->SetElementState(request);
       ASSERT_TRUE(set_element_result.is_ok());
     }
   }
@@ -671,14 +604,14 @@ TEST_F(AmlG12CompositeTest, ElementsState) {
 TEST_F(AmlG12CompositeTest, GetDaiFormatsErrors) {
   // Only ids 1, 2, and 3 configure HW DAI formats.
   {
-    auto dai_formats_result = client_->GetDaiFormats(0);
+    auto dai_formats_result = client()->GetDaiFormats(0);
     ASSERT_TRUE(dai_formats_result.is_error());
     ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
     ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
                 fuchsia_hardware_audio::DriverError::kInvalidArgs);
   }
   {
-    auto dai_formats_result = client_->GetDaiFormats(4);
+    auto dai_formats_result = client()->GetDaiFormats(4);
     ASSERT_TRUE(dai_formats_result.is_error());
     ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
     ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
@@ -697,7 +630,7 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsErrors) {
   // Only ids 1, 2, and 3 configure HW DAI formats.
   {
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(0, GetDefaultDaiFormat());
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_error());
     ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
     ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
@@ -705,7 +638,7 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsErrors) {
   }
   {
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(4, GetDefaultDaiFormat());
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_error());
     ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
     ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
@@ -713,34 +646,34 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsErrors) {
   }
   {
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(1, GetDefaultDaiFormat());
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_ok());
 
     // Configure TDM A for 32 bits I2S:
     // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
-    ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
+    ASSERT_EQ(0x3001'003F, GetMmioValue(0x500 / 4));
     // TDM IN CTRL0 config, PAD_TDMIN A, 32 bits per slot.
-    ASSERT_EQ(0x7003'001F, platform_device_.mmio()[0x300 / 4]);
+    ASSERT_EQ(0x7003'001F, GetMmioValue(0x300 / 4));
   }
   {
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(2, GetDefaultDaiFormat());
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_ok());
     // Configure TDM B for 32 bits I2S:
     // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
-    ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x540 / 4]);
+    ASSERT_EQ(0x3001'003F, GetMmioValue(0x540 / 4));
     // TDM IN CTRL0 config, PAD_TDMIN B, 32 bits per slot.
-    ASSERT_EQ(0x7013'001F, platform_device_.mmio()[0x340 / 4]);
+    ASSERT_EQ(0x7013'001F, GetMmioValue(0x340 / 4));
   }
   {
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, GetDefaultDaiFormat());
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_ok());
     // Configure TDM C for 32 bits I2S:
     // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
-    ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x580 / 4]);
+    ASSERT_EQ(0x3001'003F, GetMmioValue(0x580 / 4));
     // TDM IN CTRL0 config, PAD_TDMIN C, 32bits per slot.
-    ASSERT_EQ(0x7023'001F, platform_device_.mmio()[0x380 / 4]);
+    ASSERT_EQ(0x7023'001F, GetMmioValue(0x380 / 4));
   }
 
   // Any DAI field not in the supported ones returns an error.
@@ -748,7 +681,7 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsErrors) {
     auto format = GetDefaultDaiFormat();
     format.number_of_channels(123);
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_error());
     ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
     ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
@@ -758,7 +691,7 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsErrors) {
     auto format = GetDefaultDaiFormat();
     format.sample_format(fuchsia_hardware_audio::DaiSampleFormat::kPcmFloat);
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_error());
     ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
     ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
@@ -769,7 +702,7 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsErrors) {
     format.frame_format(fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
         fuchsia_hardware_audio::DaiFrameFormatStandard::kStereoRight));
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_error());
     ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
     ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
@@ -779,7 +712,7 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsErrors) {
     auto format = GetDefaultDaiFormat();
     format.frame_rate(123);
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_error());
     ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
     ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
@@ -789,7 +722,7 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsErrors) {
     auto format = GetDefaultDaiFormat();
     format.bits_per_slot(123);
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_error());
     ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
     ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
@@ -799,7 +732,7 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsErrors) {
     auto format = GetDefaultDaiFormat();
     format.bits_per_sample(123);
     fuchsia_hardware_audio::CompositeSetDaiFormatRequest request(3, std::move(format));
-    auto dai_formats_result = client_->SetDaiFormat(std::move(request));
+    auto dai_formats_result = client()->SetDaiFormat(request);
     ASSERT_TRUE(dai_formats_result.is_error());
     ASSERT_TRUE(dai_formats_result.error_value().is_domain_error());
     ASSERT_TRUE(dai_formats_result.error_value().domain_error() ==
@@ -813,51 +746,51 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsValid) {
   SetDaiFormatDefault(1);
   // Configure TDM A for 32 bits I2S:
   // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
-  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
+  ASSERT_EQ(0x3001'003F, GetMmioValue(0x500 / 4));
   // TDM IN CTRL0 config, PAD_TDMIN A, 32 bits per slot.
-  ASSERT_EQ(0x7003'001F, platform_device_.mmio()[0x300 / 4]);
+  ASSERT_EQ(0x7003'001F, GetMmioValue(0x300 / 4));
 
   SetDaiFormatDefault(2);
   // Configure TDM B for 32 bits I2S:
   // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
-  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x540 / 4]);
+  ASSERT_EQ(0x3001'003F, GetMmioValue(0x540 / 4));
   // TDM IN CTRL0 config, PAD_TDMIN B, 32 bits per slot.
-  ASSERT_EQ(0x7013'001F, platform_device_.mmio()[0x340 / 4]);
+  ASSERT_EQ(0x7013'001F, GetMmioValue(0x340 / 4));
 
   SetDaiFormatDefault(3);
   // Configure TDM C for 32 bits I2S:
   // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
-  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x580 / 4]);
+  ASSERT_EQ(0x3001'003F, GetMmioValue(0x580 / 4));
   // TDM IN CTRL0 config, PAD_TDMIN C, 32bits per slot.
-  ASSERT_EQ(0x7023'001F, platform_device_.mmio()[0x380 / 4]);
+  ASSERT_EQ(0x7023'001F, GetMmioValue(0x380 / 4));
 
   SetDaiFormatFrameFormat(1, fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
                                  fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm1));
   // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 3
-  ASSERT_EQ(0x3001'803F, platform_device_.mmio()[0x500 / 4]);
+  ASSERT_EQ(0x3001'803F, GetMmioValue(0x500 / 4));
   // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 4
-  ASSERT_EQ(0x3004'001F, platform_device_.mmio()[0x300 / 4]);
+  ASSERT_EQ(0x3004'001F, GetMmioValue(0x300 / 4));
 
   SetDaiFormatFrameFormat(1, fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
                                  fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm2));
   // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 2
-  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
+  ASSERT_EQ(0x3001'003F, GetMmioValue(0x500 / 4));
   // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 3
-  ASSERT_EQ(0x3003'001F, platform_device_.mmio()[0x300 / 4]);
+  ASSERT_EQ(0x3003'001F, GetMmioValue(0x300 / 4));
 
   SetDaiFormatFrameFormat(1, fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
                                  fuchsia_hardware_audio::DaiFrameFormatStandard::kTdm3));
   // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 1
-  ASSERT_EQ(0x3000'803F, platform_device_.mmio()[0x500 / 4]);
+  ASSERT_EQ(0x3000'803F, GetMmioValue(0x500 / 4));
   // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 2
-  ASSERT_EQ(0x3002'001F, platform_device_.mmio()[0x300 / 4]);
+  ASSERT_EQ(0x3002'001F, GetMmioValue(0x300 / 4));
 
   SetDaiFormatFrameFormat(1, fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatStandard(
                                  fuchsia_hardware_audio::DaiFrameFormatStandard::kStereoLeft));
   // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 3
-  ASSERT_EQ(0x3001'803F, platform_device_.mmio()[0x500 / 4]);
+  ASSERT_EQ(0x3001'803F, GetMmioValue(0x500 / 4));
   // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 4
-  ASSERT_EQ(0x3004'001F, platform_device_.mmio()[0x300 / 4]);
+  ASSERT_EQ(0x3004'001F, GetMmioValue(0x300 / 4));
 
   // Custom with sclk_on_raising=true, 1 channel.
   SetDaiFormatFrameFormatNumberOfChannels(
@@ -867,84 +800,84 @@ TEST_F(AmlG12CompositeTest, SetDaiFormatsValid) {
       1);
   // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 2
   // (same as TDM2 for frame_sync_sclks_offset=1).
-  ASSERT_EQ(0x3001'001F, platform_device_.mmio()[0x500 / 4]);
+  ASSERT_EQ(0x3001'001F, GetMmioValue(0x500 / 4));
   // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 3
   // (same as TDM2 for frame_sync_sclks_offset=1).
-  ASSERT_EQ(0x3003'001F, platform_device_.mmio()[0x300 / 4]);
+  ASSERT_EQ(0x3003'001F, GetMmioValue(0x300 / 4));
   // SCLK CTRL, clk in/out enabled, 24 sdiv, 1 lrduty, 16 lrdiv (1 channel).
-  ASSERT_EQ(0xc180'001f, platform_device_.mmio()[0x040 / 4]);
+  ASSERT_EQ(0xc180'001f, GetMmioValue(0x040 / 4));
   // SCLK CTRL, no clk_inv (sclk_on_raising=true)
-  ASSERT_EQ(0x0000'0000, platform_device_.mmio()[0x044 / 4]);
+  ASSERT_EQ(0x0000'0000, GetMmioValue(0x044 / 4));
 
   // Custom with sclk_on_raising=false, 2 channels.
   SetDaiFormatFrameFormat(1, fuchsia_hardware_audio::DaiFrameFormat::WithFrameFormatCustom(
                                  fuchsia_hardware_audio::DaiFrameFormatCustom(true, false, 1, 1)));
   // TDM OUT CTRL0 config, reg_tdm_init_bitnum (bitoffset) 2
   // (same as TDM2 for frame_sync_sclks_offset=1).
-  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
+  ASSERT_EQ(0x3001'003F, GetMmioValue(0x500 / 4));
   // TDM IN CTRL0 config, reg_tdmin_in_bit_skew 3
   // (same as TDM2 for frame_sync_sclks_offset=1).
-  ASSERT_EQ(0x3003'001F, platform_device_.mmio()[0x300 / 4]);
+  ASSERT_EQ(0x3003'001F, GetMmioValue(0x300 / 4));
   // SCLK CTRL, clk in/out enabled, 24 sdiv, 1 lrduty, 32 lrdiv (2x16 bits channels).
-  ASSERT_EQ(0xc180'003f, platform_device_.mmio()[0x040 / 4]);
+  ASSERT_EQ(0xc180'003f, GetMmioValue(0x040 / 4));
   // SCLK CTRL, clk_inv ph0 (sclk_on_raising=false).
-  ASSERT_EQ(0x0000'0001, platform_device_.mmio()[0x044 / 4]);
+  ASSERT_EQ(0x0000'0001, GetMmioValue(0x044 / 4));
 
   SetDaiFormatFrameRate(1, 8'000);
-  EXPECT_EQ(0x8400'003b, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 60.
+  EXPECT_EQ(0x8400'003b, GetMmioValue(0x001));  // MCLK CTRL, div 60.
 
   SetDaiFormatFrameRate(1, 16'000);
-  EXPECT_EQ(0x8400'001d, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 30.
+  EXPECT_EQ(0x8400'001d, GetMmioValue(0x001));  // MCLK CTRL, div 30.
 
   SetDaiFormatFrameRate(1, 32'000);
-  EXPECT_EQ(0x8400'000e, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 15.
+  EXPECT_EQ(0x8400'000e, GetMmioValue(0x001));  // MCLK CTRL, div 15.
 
   SetDaiFormatFrameRate(1, 48'000);
-  EXPECT_EQ(0x8400'0009, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 10.
+  EXPECT_EQ(0x8400'0009, GetMmioValue(0x001));  // MCLK CTRL, div 10.
 
   SetDaiFormatFrameRate(1, 96'000);
-  EXPECT_EQ(0x8400'0004, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 5.
+  EXPECT_EQ(0x8400'0004, GetMmioValue(0x001));  // MCLK CTRL, div 5.
 
-  SetDaiFormatFrameRate(2, 8'000);                         // A change to id 2 does not affect id 1.
-  SetDaiFormatFrameRate(3, 48'000);                        // A change to id 3 does not affect id 1.
-  EXPECT_EQ(0x8400'0004, platform_device_.mmio()[0x001]);  // MCLK CTRL, div 5.
+  SetDaiFormatFrameRate(2, 8'000);              // A change to id 2 does not affect id 1.
+  SetDaiFormatFrameRate(3, 48'000);             // A change to id 3 does not affect id 1.
+  EXPECT_EQ(0x8400'0004, GetMmioValue(0x001));  // MCLK CTRL, div 5.
 
   SetDaiFormatBitsPerSampleAndBitsPerSlot(1, 32, 32);
   // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
-  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
+  ASSERT_EQ(0x3001'003F, GetMmioValue(0x500 / 4));
   // TDM OUT CTRL1 FRDDR with 32 bits per sample.
-  ASSERT_EQ(0x0000'1f40, platform_device_.mmio()[0x504 / 4]);
+  ASSERT_EQ(0x0000'1f40, GetMmioValue(0x504 / 4));
   // SCLK CTRL, clk in/out enabled, 24 sdiv, 32 lrduty, 32 lrdiv.
-  ASSERT_EQ(0xc180'7c3f, platform_device_.mmio()[0x040 / 4]);
+  ASSERT_EQ(0xc180'7c3f, GetMmioValue(0x040 / 4));
 
   SetDaiFormatBitsPerSampleAndBitsPerSlot(1, 16, 16);
   // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 16 bits per slot.
-  ASSERT_EQ(0x3001'002F, platform_device_.mmio()[0x500 / 4]);
+  ASSERT_EQ(0x3001'002F, GetMmioValue(0x500 / 4));
   // TDM OUT CTRL1 FRDDR with 16 bits per sample.
-  ASSERT_EQ(0x0000'0f20, platform_device_.mmio()[0x504 / 4]);
+  ASSERT_EQ(0x0000'0f20, GetMmioValue(0x504 / 4));
   // SCLK CTRL, clk in/out enabled, 24 sdiv, 16 lrduty, 16 lrdiv.
-  ASSERT_EQ(0xc180'3c1f, platform_device_.mmio()[0x040 / 4]);
+  ASSERT_EQ(0xc180'3c1f, GetMmioValue(0x040 / 4));
 
   SetDaiFormatBitsPerSampleAndBitsPerSlot(1, 16, 32);
   // TDM OUT CTRL0 config, bitoffset 2, 2 slots, 32 bits per slot.
-  ASSERT_EQ(0x3001'003F, platform_device_.mmio()[0x500 / 4]);
+  ASSERT_EQ(0x3001'003F, GetMmioValue(0x500 / 4));
   // TDM OUT CTRL1 FRDDR with 16 bits per sample.
-  ASSERT_EQ(0x0000'0f20, platform_device_.mmio()[0x504 / 4]);
+  ASSERT_EQ(0x0000'0f20, GetMmioValue(0x504 / 4));
   // SCLK CTRL, clk in/out enabled, 24 sdiv, 32 lrduty, 32 lrdiv.
-  ASSERT_EQ(0xc180'7c3f, platform_device_.mmio()[0x040 / 4]);
+  ASSERT_EQ(0xc180'7c3f, GetMmioValue(0x040 / 4));
 }
 
 TEST_F(AmlG12CompositeTest, GetRingBufferFormats) {
   {
-    auto ring_buffer_formats_result = client_->GetRingBufferFormats(kInvalidBufferId0);
+    auto ring_buffer_formats_result = client()->GetRingBufferFormats(kInvalidBufferId0);
     ASSERT_FALSE(ring_buffer_formats_result.is_ok());
   }
   {
-    auto ring_buffer_formats_result = client_->GetRingBufferFormats(kInvalidBufferId1);
+    auto ring_buffer_formats_result = client()->GetRingBufferFormats(kInvalidBufferId1);
     ASSERT_FALSE(ring_buffer_formats_result.is_ok());
   }
   {
-    auto ring_buffer_formats_result = client_->GetRingBufferFormats(kEngineARingBufferIdOutput);
+    auto ring_buffer_formats_result = client()->GetRingBufferFormats(kEngineARingBufferIdOutput);
     ASSERT_TRUE(ring_buffer_formats_result.is_ok());
     // There is at least one entry reported.
     ASSERT_GE(1, ring_buffer_formats_result->ring_buffer_formats().size());
@@ -965,14 +898,14 @@ TEST_F(AmlG12CompositeTest, CreateRingBuffer) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         kInvalidBufferId0, GetDefaultRingBufferFormat(), std::move(endpoints->server));
-    auto ring_buffer_result = client_->CreateRingBuffer(std::move(request));
+    auto ring_buffer_result = client()->CreateRingBuffer(std::move(request));
     ASSERT_FALSE(ring_buffer_result.is_ok());
   }
   {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         kInvalidBufferId1, GetDefaultRingBufferFormat(), std::move(endpoints->server));
-    auto ring_buffer_result = client_->CreateRingBuffer(std::move(request));
+    auto ring_buffer_result = client()->CreateRingBuffer(std::move(request));
     ASSERT_FALSE(ring_buffer_result.is_ok());
   }
   // Any Ring Buffer field not in the supported ones returns an error.
@@ -982,7 +915,7 @@ TEST_F(AmlG12CompositeTest, CreateRingBuffer) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         kEngineARingBufferIdOutput, std::move(format), std::move(endpoints->server));
-    auto ring_buffer_result = client_->CreateRingBuffer(std::move(request));
+    auto ring_buffer_result = client()->CreateRingBuffer(std::move(request));
     ASSERT_FALSE(ring_buffer_result.is_ok());
   }
   {
@@ -992,7 +925,7 @@ TEST_F(AmlG12CompositeTest, CreateRingBuffer) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         kEngineARingBufferIdOutput, std::move(format), std::move(endpoints->server));
-    auto ring_buffer_result = client_->CreateRingBuffer(std::move(request));
+    auto ring_buffer_result = client()->CreateRingBuffer(std::move(request));
     ASSERT_FALSE(ring_buffer_result.is_ok());
   }
   {
@@ -1001,7 +934,7 @@ TEST_F(AmlG12CompositeTest, CreateRingBuffer) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         kEngineARingBufferIdOutput, std::move(format), std::move(endpoints->server));
-    auto ring_buffer_result = client_->CreateRingBuffer(std::move(request));
+    auto ring_buffer_result = client()->CreateRingBuffer(std::move(request));
     ASSERT_FALSE(ring_buffer_result.is_ok());
   }
   {
@@ -1010,7 +943,7 @@ TEST_F(AmlG12CompositeTest, CreateRingBuffer) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         kEngineARingBufferIdOutput, std::move(format), std::move(endpoints->server));
-    auto ring_buffer_result = client_->CreateRingBuffer(std::move(request));
+    auto ring_buffer_result = client()->CreateRingBuffer(std::move(request));
     ASSERT_FALSE(ring_buffer_result.is_ok());
   }
   {
@@ -1019,7 +952,7 @@ TEST_F(AmlG12CompositeTest, CreateRingBuffer) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         kEngineARingBufferIdOutput, std::move(format), std::move(endpoints->server));
-    auto ring_buffer_result = client_->CreateRingBuffer(std::move(request));
+    auto ring_buffer_result = client()->CreateRingBuffer(std::move(request));
     ASSERT_FALSE(ring_buffer_result.is_ok());
   }
 }
@@ -1033,7 +966,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         id, GetDefaultRingBufferFormat(), std::move(endpoints->server));
-    auto ring_buffer_result = client_->CreateRingBuffer(std::move(request));
+    auto ring_buffer_result = client()->CreateRingBuffer(std::move(request));
     ZX_ASSERT(ring_buffer_result.is_ok());
     return fidl::SyncClient<fuchsia_hardware_audio::RingBuffer>(std::move(endpoints->client));
   }
@@ -1045,7 +978,7 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
     format.pcm_format()->number_of_channels(number_of_channels);
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(id, format,
                                                                      std::move(endpoints->server));
-    auto ring_buffer_result = client_->CreateRingBuffer(std::move(request));
+    auto ring_buffer_result = client()->CreateRingBuffer(std::move(request));
     ZX_ASSERT(ring_buffer_result.is_ok());
     auto ring_buffer_client =
         fidl::SyncClient<fuchsia_hardware_audio::RingBuffer>(std::move(endpoints->client));
@@ -1252,7 +1185,7 @@ TEST_F(AmlG12CompositeRingBufferTest, RingBuffersClientCloseChannel) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         id, GetDefaultRingBufferFormat(), std::move(endpoints->server));
-    auto ring_buffer_result = client_->CreateRingBuffer(std::move(request));
+    auto ring_buffer_result = client()->CreateRingBuffer(std::move(request));
     ASSERT_TRUE(ring_buffer_result.is_ok());
 
     endpoints->client.TakeChannel().reset();

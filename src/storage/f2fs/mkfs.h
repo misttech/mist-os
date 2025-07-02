@@ -80,7 +80,7 @@ class MkfsWorker {
 
   zx_status_t WriteToDisk(void* buf, block_t bno);
 
-  zx::result<> SetSpace();
+  zx::result<uint32_t> SetSpace();
 
   zx_status_t PrepareSuperblock();
   zx_status_t InitSitArea();

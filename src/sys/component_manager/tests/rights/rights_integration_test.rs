@@ -50,16 +50,14 @@ async fn run_test(url: &str, expected_result: &str) {
 
     let instance = cm_builder.build().await.unwrap();
 
-    let lifecycle_controller = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>()
-        .unwrap();
+    let lifecycle_controller: fsys::LifecycleControllerProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_, binder_server) = fidl::endpoints::create_endpoints();
     lifecycle_controller.start_instance(".", binder_server).await.unwrap().unwrap();
 
-    let realm_query = instance
+    let realm_query: fsys::RealmQueryProxy = instance
         .root
-        .connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("failed to connect to RealmQuery");
     let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     realm_query
@@ -211,17 +209,15 @@ async fn route_directories_from_component_manager_namespace() {
 
     let instance = cm_builder.build().await.unwrap();
 
-    let lifecycle_controller = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>()
-        .unwrap();
+    let lifecycle_controller: fsys::LifecycleControllerProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let (_, binder_server) = fidl::endpoints::create_endpoints();
     lifecycle_controller.start_instance(".", binder_server).await.unwrap().unwrap();
 
-    let realm_query = instance
+    let realm_query: fsys::RealmQueryProxy = instance
         .root
-        .connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("failed to connect to RealmQuery");
     let (exposed_dir, server_end) = create_proxy::<fio::DirectoryMarker>();
     realm_query

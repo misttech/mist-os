@@ -36,10 +36,7 @@ fbl::WAVLTreeNodeState<VmMapping*>& VmObject::MappingTreeTraits::node_state(VmMa
 
 VmObject::GlobalList VmObject::all_vmos_ = {};
 
-VmObject::VmObject(VMOType type, fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr)
-    : VmHierarchyBase(ktl::move(hierarchy_state_ptr)), type_(type) {
-  LTRACEF("%p\n", this);
-}
+VmObject::VmObject(VMOType type) : type_(type) { LTRACEF("%p\n", this); }
 
 VmObject::~VmObject() {
   canary_.Assert();
@@ -98,13 +95,13 @@ void VmObject::RemoveMappingLocked(VmMapping* r) {
 
 uint32_t VmObject::num_mappings() const {
   canary_.Assert();
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   return num_mappings_locked();
 }
 
 bool VmObject::IsMappedByUser() const {
   canary_.Assert();
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   return ktl::any_of(mapping_list_.cbegin(), mapping_list_.cend(),
                      [](const VmMapping& m) -> bool { return m.aspace()->is_user(); });
 }
@@ -112,7 +109,7 @@ bool VmObject::IsMappedByUser() const {
 uint32_t VmObject::share_count() const {
   canary_.Assert();
 
-  Guard<VmoLockType> guard{lock()};
+  Guard<CriticalMutex> guard{lock()};
   if (mapping_list_len_ < 2) {
     return 1;
   }
@@ -153,81 +150,6 @@ uint32_t VmObject::share_count() const {
   // Or calculate it when adding/removing a new mapping under an aspace
   // not in the list.
   return num_aspaces;
-}
-
-zx_status_t VmObject::ReadUserVector(user_out_iovec_t vec, uint64_t offset, size_t len,
-                                     size_t* out_actual) {
-  if (len == 0u) {
-    return ZX_OK;
-  }
-  if (len > UINT64_MAX - offset) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-
-  zx_status_t status = vec.ForEach([&](user_out_ptr<char> ptr, size_t capacity) {
-    if (capacity > len) {
-      capacity = len;
-    }
-
-    size_t chunk_actual = 0;
-    zx_status_t status =
-        ReadUser(ptr, offset, capacity, VmObjectReadWriteOptions::None, &chunk_actual);
-
-    // Always add |chunk_actual| since some bytes may have been transferred, even on error
-    if (out_actual != nullptr) {
-      *out_actual += chunk_actual;
-    }
-    if (status != ZX_OK) {
-      return status;
-    }
-
-    DEBUG_ASSERT(chunk_actual == capacity);
-
-    offset += chunk_actual;
-    len -= chunk_actual;
-    return len > 0 ? ZX_ERR_NEXT : ZX_ERR_STOP;
-  });
-
-  // Return |ZX_ERR_BUFFER_TOO_SMALL| if all of |len| was not transferred.
-  return (status == ZX_OK && len > 0) ? ZX_ERR_BUFFER_TOO_SMALL : status;
-}
-
-zx_status_t VmObject::WriteUserVector(user_in_iovec_t vec, uint64_t offset, size_t len,
-                                      size_t* out_actual,
-                                      const OnWriteBytesTransferredCallback& on_bytes_transferred) {
-  if (len == 0u) {
-    return ZX_OK;
-  }
-  if (len > UINT64_MAX - offset) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-
-  zx_status_t status = vec.ForEach([&](user_in_ptr<const char> ptr, size_t capacity) {
-    if (capacity > len) {
-      capacity = len;
-    }
-
-    size_t chunk_actual = 0;
-    zx_status_t status = WriteUser(ptr, offset, capacity, VmObjectReadWriteOptions::None,
-                                   &chunk_actual, on_bytes_transferred);
-
-    // Always add |chunk_actual| since some bytes may have been transferred, even on error
-    if (out_actual != nullptr) {
-      *out_actual += chunk_actual;
-    }
-    if (status != ZX_OK) {
-      return status;
-    }
-
-    DEBUG_ASSERT(chunk_actual == capacity);
-
-    offset += chunk_actual;
-    len -= chunk_actual;
-    return len > 0 ? ZX_ERR_NEXT : ZX_ERR_STOP;
-  });
-
-  // Return |ZX_ERR_BUFFER_TOO_SMALL| if all of |len| was not transferred.
-  return (status == ZX_OK && len > 0) ? ZX_ERR_BUFFER_TOO_SMALL : status;
 }
 
 void VmObject::SetChildObserver(VmObjectChildObserver* child_observer) {
@@ -404,13 +326,6 @@ void VmObject::RangeChangeUpdateMappingsLocked(uint64_t offset, uint64_t len, Ra
     node = node.parent();
   }
 }
-
-#if VMO_USE_SHARED_LOCK
-VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state)
-    : hierarchy_state_ptr_(ktl::move(state)) {}
-#else
-VmHierarchyBase::VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state) { DEBUG_ASSERT(!state); }
-#endif
 
 // TODO(https://fxbug.dev/408878701): add option to dump by koid.
 static int cmd_vm_object(int argc, const cmd_args* argv, uint32_t flags) {

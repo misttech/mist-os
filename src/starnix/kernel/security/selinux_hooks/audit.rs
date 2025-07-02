@@ -191,7 +191,7 @@ impl Display for Auditable<'_> {
                 write!(f, " dev=\"{}\"", fs.options.source)
             }
             Auditable::FsNode(node) => {
-                write!(f, " ino={}", node.node_id)
+                write!(f, " ino={}", node.ino)
             }
             Auditable::IoctlCommand(ioctl) => {
                 write!(f, " ioctlcmd={:#x}", ioctl)

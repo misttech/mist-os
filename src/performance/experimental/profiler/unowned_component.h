@@ -19,12 +19,12 @@ namespace profiler {
 class UnownedComponent : public ComponentTarget {
  public:
   // An unowned component needs to be described by at least one of a moniker or url.
-  explicit UnownedComponent(async_dispatcher_t* dispatcher, std::optional<std::string> url,
-                            std::optional<Moniker> moniker)
-      : component_watcher_{dispatcher}, moniker_{std::move(moniker)}, url_{std::move(url)} {}
+  explicit UnownedComponent(std::optional<std::string> url, std::optional<Moniker> moniker,
+                            ComponentWatcher& component_watcher)
+      : component_watcher_{component_watcher}, moniker_{std::move(moniker)}, url_{std::move(url)} {}
   static zx::result<std::unique_ptr<UnownedComponent>> Create(
-      async_dispatcher_t* dispatcher, const std::optional<std::string>& moniker,
-      const std::optional<std::string>& url);
+      const std::optional<std::string>& moniker, const std::optional<std::string>& url,
+      ComponentWatcher& component_watcher);
   zx::result<> Start(fxl::WeakPtr<Sampler> notify) override;
   zx::result<> Stop() override;
   zx::result<> Destroy() override;
@@ -34,7 +34,9 @@ class UnownedComponent : public ComponentTarget {
   // the requested moniker or as a child of the moniker.
   zx::result<> Attach(const fidl::SyncClient<fuchsia_sys2::RealmQuery>& client,
                       const Moniker& moniker);
-  ComponentWatcher component_watcher_;
+  // LIFETIME: Reference is to a ComponentWatcher created in main() which lives for the life of the
+  // program.
+  ComponentWatcher& component_watcher_;
   std::optional<Moniker> moniker_;
   std::optional<std::string> url_;
   std::optional<ComponentWatcher::ComponentEventHandler> on_start_;

@@ -129,7 +129,7 @@ impl Model {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 pub mod tests {
     use crate::model::actions::{ActionsManager, ShutdownAction, ShutdownType};
     use crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult};

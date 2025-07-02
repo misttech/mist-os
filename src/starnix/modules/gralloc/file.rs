@@ -81,7 +81,7 @@ impl FileOps for GrallocFile {
 
     fn seek(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _current_offset: starnix_uapi::off_t,
@@ -92,7 +92,7 @@ impl FileOps for GrallocFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -124,7 +124,7 @@ impl FileOps for GrallocFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -137,7 +137,7 @@ impl FileOps for GrallocFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

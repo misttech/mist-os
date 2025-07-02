@@ -11,6 +11,7 @@ use starnix_core::device::remote_block_device::remote_block_device_init;
 use starnix_core::mm::MlockPinFlavor;
 use starnix_core::task::{CurrentTask, Kernel, KernelFeatures};
 use starnix_core::vfs::FsString;
+use starnix_features::Feature;
 use starnix_logging::log_error;
 use starnix_modules_ashmem::ashmem_device_init;
 use starnix_modules_framebuffer::{AspectRatio, Framebuffer};
@@ -113,11 +114,6 @@ pub struct Features {
     pub android_bootreason: bool,
 
     pub hvdcp_opti: bool,
-
-    /// If set, Starnix will use the wake alarms APIs. When set to `false`, the
-    /// underlying platform will not have power management, so we can also skip
-    /// programming wake alarms.
-    pub enable_wake_alarms: bool,
 }
 
 #[derive(Default, Debug, PartialEq)]
@@ -149,6 +145,7 @@ impl Features {
                         mlock_always_onfault,
                         mlock_pin_flavor,
                         netstack_mark,
+                        rtnetlink_assume_ifb0_existence,
                     },
                 selinux,
                 ashmem,
@@ -174,7 +171,6 @@ impl Features {
                 thermal,
                 android_bootreason,
                 hvdcp_opti,
-                enable_wake_alarms,
             } => {
                 inspect_node.record_bool("selinux", selinux.enabled);
                 inspect_node.record_bool("ashmem", *ashmem);
@@ -247,11 +243,14 @@ impl Features {
                     );
                     inspect_node
                         .record_bool("enable_utc_time_adjustment", *enable_utc_time_adjustment);
-                    inspect_node.record_bool("enable_wake_alarms", *enable_wake_alarms);
                     inspect_node.record_bool("mlock_always_onfault", *mlock_always_onfault);
                     inspect_node
                         .record_string("mlock_pin_flavor", format!("{:?}", mlock_pin_flavor));
                     inspect_node.record_bool("netstack_mark", *netstack_mark);
+                    inspect_node.record_bool(
+                        "rtnetlink_assume_ifb0_existence",
+                        *rtnetlink_assume_ifb0_existence,
+                    );
                 });
             }
         });
@@ -261,7 +260,10 @@ impl Features {
 /// Parses all the featurse in `entries`.
 ///
 /// Returns an error if parsing fails, or if an unsupported feature is present in `features`.
-pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error> {
+pub fn parse_features(
+    start_info: &ContainerStartInfo,
+    kernel_extra_features: &[String],
+) -> Result<Features, Error> {
     let ContainerStructuredConfig {
         enable_utc_time_adjustment,
         extra_features,
@@ -269,18 +271,22 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
         mlock_pin_flavor,
         selinux_exceptions,
         ui_visual_debugging_level,
-        enable_wake_alarms,
     } = &start_info.config;
 
     let mut features = Features::default();
-    for entry in start_info.program.features.iter().chain(extra_features.iter()) {
-        let (raw_flag, raw_args) =
-            entry.split_once(':').map(|(f, a)| (f, Some(a.to_string()))).unwrap_or((entry, None));
-        match (raw_flag, raw_args) {
-            ("android_fdr", _) => features.android_fdr = true,
-            ("android_serialno", _) => features.android_serialno = true,
-            ("android_bootreason", _) => features.android_bootreason = true,
-            ("aspect_ratio", Some(args)) => {
+    for entry in start_info
+        .program
+        .features
+        .iter()
+        .chain(kernel_extra_features.iter())
+        .chain(extra_features.iter())
+    {
+        let (feature, raw_args) = Feature::try_parse_feature_and_args(entry)?;
+        match (feature, raw_args) {
+            (Feature::AndroidFdr, _) => features.android_fdr = true,
+            (Feature::AndroidSerialno, _) => features.android_serialno = true,
+            (Feature::AndroidBootreason, _) => features.android_bootreason = true,
+            (Feature::AspectRatio, Some(args)) => {
                 let e = anyhow!("Invalid aspect_ratio: {:?}", args);
                 let components: Vec<_> = args.split(':').collect();
                 if components.len() != 2 {
@@ -290,23 +296,23 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
                 let height: u32 = components[1].parse().map_err(|_| anyhow!("Invalid aspect ratio height"))?;
                 features.aspect_ratio = Some(AspectRatio { width, height });
             }
-            ("aspect_ratio", None) => {
+            (Feature::AspectRatio, None) => {
                 return Err(anyhow!(
                     "Aspect ratio feature must contain the aspect ratio in the format: aspect_ratio:w:h"
                 ))
             }
-            ("container", _) => features.container = true,
-            ("custom_artifacts", _) => features.custom_artifacts = true,
-            ("ashmem", _) => features.ashmem = true,
-            ("framebuffer", _) => features.framebuffer = true,
-            ("gralloc", _) => features.gralloc = true,
-            ("kgsl", _) => features.kgsl = true,
-            ("magma", _) => if features.magma_supported_vendors.is_none() {
+            (Feature::Container, _) => features.container = true,
+            (Feature::CustomArtifacts, _) => features.custom_artifacts = true,
+            (Feature::Ashmem, _) => features.ashmem = true,
+            (Feature::Framebuffer, _) => features.framebuffer = true,
+            (Feature::Gralloc, _) => features.gralloc = true,
+            (Feature::Kgsl, _) => features.kgsl = true,
+            (Feature::Magma, _) => if features.magma_supported_vendors.is_none() {
                 const VENDOR_ARM: u16 = 0x13B5;
                 const VENDOR_INTEL: u16 = 0x8086;
                 features.magma_supported_vendors = Some(vec![VENDOR_ARM, VENDOR_INTEL])
             },
-            ("magma_supported_vendors", Some(arg)) => {
+            (Feature::MagmaSupportedVendors, Some(arg)) => {
                 features.magma_supported_vendors = Some(
                     arg.split(',')
                         .map(|s| {
@@ -315,44 +321,51 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
                             u16::from_str_radix(trimmed, 16).map_err(|_| err)
                         }).collect::<Result<Vec<u16>, Error>>()?);
             },
-            ("nanohub", _) => features.nanohub = true,
-            ("netstack_mark", _) => features.kernel.netstack_mark = true,
-            ("network_manager", _) => features.network_manager = true,
-            ("gfxstream", _) => features.gfxstream = true,
-            ("bpf", Some(version)) => features.kernel.bpf_v2 = version == "v2",
-            ("enable_suid", _) => features.kernel.enable_suid = true,
-            ("io_uring", _) => features.kernel.io_uring = true,
-            ("error_on_failed_reboot", _) => features.kernel.error_on_failed_reboot = true,
-            ("perfetto", Some(socket_path)) => {
+            (Feature::MagmaSupportedVendors, None) => {
+                return Err(anyhow!("Feature format must be: magma_supported_vendors:0x1234[,0xabcd]"))
+            }
+            (Feature::Nanohub, _) => features.nanohub = true,
+            (Feature::NetstackMark, _) => features.kernel.netstack_mark = true,
+            (Feature::NetworkManager, _) => features.network_manager = true,
+            (Feature::Gfxstream, _) => features.gfxstream = true,
+            (Feature::Bpf, Some(version)) => features.kernel.bpf_v2 = version == "v2",
+            (Feature::Bpf, None) => return Err(anyhow!("bpf feature must have an argument (e.g. \"bpf:v2\")")),
+            (Feature::EnableSuid, _) => features.kernel.enable_suid = true,
+            (Feature::IoUring, _) => features.kernel.io_uring = true,
+            (Feature::ErrorOnFailedReboot, _) => features.kernel.error_on_failed_reboot = true,
+            (Feature::Perfetto, Some(socket_path)) => {
                 features.perfetto = Some(socket_path.into());
             }
-            ("perfetto", None) => {
+            (Feature::Perfetto, None) => {
                 return Err(anyhow!("Perfetto feature must contain a socket path"));
             }
-            ("perfetto_producer", Some(socket_path)) => {
+            (Feature::PerfettoProducer, Some(socket_path)) => {
                 features.perfetto_producer = Some(socket_path.into());
             }
-            ("perfetto_producer", None) => {
+            (Feature::PerfettoProducer, None) => {
                 return Err(anyhow!("Perfetto Producer feature must contain a socket path"));
             }
-            ("rootfs_rw", _) => features.rootfs_rw = true,
-            ("self_profile", _) => features.self_profile = true,
-            ("selinux", arg) => {
+            (Feature::RootfsRw, _) => features.rootfs_rw = true,
+            (Feature::RtnetlinkAssumeIfb0Existence, _) => {
+                features.kernel.rtnetlink_assume_ifb0_existence = true;
+            }
+            (Feature::SelfProfile, _) => features.self_profile = true,
+            (Feature::Selinux, arg) => {
                 features.selinux = SELinuxFeature {
                     enabled: true,
                     options: arg.unwrap_or_default(),
                     exceptions: selinux_exceptions.clone(),
                 };
             }
-            ("selinux_test_suite", _) => features.kernel.selinux_test_suite = true,
-            ("test_data", _) => features.test_data = true,
-            ("thermal", Some(arg)) =>
+            (Feature::SelinuxTestSuite, _) => features.kernel.selinux_test_suite = true,
+            (Feature::TestData, _) => features.test_data = true,
+            (Feature::Thermal, Some(arg)) =>
                 features.thermal = Some(
                     arg.split(',').map(String::from).collect::<Vec<String>>()),
-            ("hvdcp_opti", _) => features.hvdcp_opti = true,
-            (f, _) => {
-                return Err(anyhow!("Unsupported feature: {}", f));
+            (Feature::Thermal, None) => {
+                return Err(anyhow!("thermal feature must have an argument"))
             }
+            (Feature::HvdcpOpti, _) => features.hvdcp_opti = true,
         };
     }
 
@@ -360,7 +373,6 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
         features.enable_visual_debugging = true;
     }
     features.enable_utc_time_adjustment = *enable_utc_time_adjustment;
-    features.enable_wake_alarms = *enable_wake_alarms;
 
     features.kernel.default_uid = start_info.program.default_uid.0;
     features.kernel.default_seclabel = start_info.program.default_seclabel.clone();
@@ -388,7 +400,7 @@ pub fn parse_features(start_info: &ContainerStartInfo) -> Result<Features, Error
 
 /// Runs all the features that are enabled in `system_task.kernel()`.
 pub fn run_container_features(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     features: &Features,
 ) -> Result<(), Error> {

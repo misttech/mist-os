@@ -98,7 +98,7 @@ async fn test_pstore_present() {
     let reboot = LastReboot {
         graceful: Some(true),
         uptime: Some(65000),
-        reason: Some(RebootReason::UserRequest),
+        reason: Some(RebootReason::KernelPanic),
         ..Default::default()
     };
     let mut events = EventStream::open().await.unwrap();
@@ -122,6 +122,41 @@ async fn test_pstore_present() {
     assert!(
         console.contains("Fuchsia Console Ramoops\n"),
         "console-ramoops ({console}) has unexpected contents"
+    );
+}
+
+#[fasync::run_singlethreaded(test)]
+async fn test_pstore_present_but_no_ramoops_created() {
+    let reboot = LastReboot {
+        graceful: Some(true),
+        uptime: Some(65000),
+        reason: Some(RebootReason::UserRequest),
+        ..Default::default()
+    };
+    let mut events = EventStream::open().await.unwrap();
+    let realm_instance = build_test_realm(&reboot).await;
+    let realm_moniker = format!("realm_builder:{}", realm_instance.root.child_name());
+    let mount_pstore_moniker = format!("{realm_moniker}/mount_pstore");
+
+    // Wait for /sys and /sys/fs/pstore to be mounted inside the starnix realm.
+    info!(mount_pstore_moniker:%; "waiting for mount_pstore to exit");
+    let stopped = EventMatcher::ok()
+        .moniker(&mount_pstore_moniker)
+        .wait::<Stopped>(&mut events)
+        .await
+        .unwrap();
+    let status = stopped.result().unwrap().status;
+    info!(status:?; "mount_pstore stopped");
+    assert_eq!(status, ExitStatus::Clean);
+    let file_path = "/fs_root/sys/fs/pstore/console-ramoops";
+    let exposed_dir = realm_instance.root.get_exposed_dir();
+    let open_result =
+        fuchsia_fs::directory::open_file(exposed_dir, file_path, fuchsia_fs::PERM_READABLE).await;
+
+    assert!(
+        open_result.is_err(),
+        "console-ramoops should NOT exist, but open succeeded. File content if opened: {:?}",
+        open_result.map(|_| "...file was opened...").err()
     );
 }
 

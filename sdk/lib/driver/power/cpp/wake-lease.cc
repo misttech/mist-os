@@ -78,7 +78,7 @@ bool ManualWakeLease::Start(bool ignore_system_state) {
   // Now, if we are called with ignore_system_state true, we need to consider
   // the possibility we'll need to acquire an actual lease.
   if (active_ && !ignore_system_state) {
-    return false;
+    return true;
   }
 
   active_ = true;
@@ -171,7 +171,7 @@ void ManualWakeLease::ResetSagClient() {
 
 bool ManualWakeLease::AcquireLease(bool ignore_system_state) {
   if (lease_) {
-    return false;
+    return true;
   }
 
   if (!sag_client_) {
@@ -179,7 +179,7 @@ bool ManualWakeLease::AcquireLease(bool ignore_system_state) {
   }
 
   if (!ignore_system_state && !system_suspended_) {
-    return false;
+    return true;
   }
 
   wake_lease_last_attempted_acquisition_timestamp_.Set(zx::clock::get_monotonic().get());

@@ -106,13 +106,13 @@ class TestMsdArmDevice {
     // Use device thread so the test can wait for a reset interrupt.
     std::unique_ptr<MsdArmDevice> device = MsdArmDevice::Create(GetTestDeviceHandle(), true);
     ASSERT_NE(nullptr, device);
-    if (!device->IsProtectedModeSupported()) {
+    if (!device->NdtIsProtectedModeSupported()) {
       printf("Protected mode not supported, skipping test\n");
       return;
     }
 
     // Run on the device thread to make the thread checker happy.
-    auto reply = device->RunTaskOnDeviceThread([](MsdArmDevice* device) {
+    auto reply = device->NdtPostTask([](MsdArmDevice* device) {
       EXPECT_FALSE(device->IsInProtectedMode());
       EXPECT_EQ(1u, device->power_manager_->l2_ready_status());
 
@@ -145,7 +145,7 @@ class TestMsdArmDevice {
     // In theory this could work without protected mode, but it's not needed. On the amlogic
     // T820 in the VIM2, powering down the L2 seems to cause GPU faults when the shader cores
     // are later powered back up again.
-    if (!device->IsProtectedModeSupported()) {
+    if (!device->NdtIsProtectedModeSupported()) {
       printf("Protected mode not supported, skipping test\n");
       return;
     }

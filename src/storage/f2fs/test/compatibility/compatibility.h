@@ -163,8 +163,7 @@ class FuchsiaOperator : public CompatibilityTestOperator {
       : CompatibilityTestOperator(test_device), block_count_(block_count), block_size_(block_size) {
     auto fd = fbl::unique_fd(open(test_device_.c_str(), O_RDWR));
     auto device = std::make_unique<FileBackedBlockDevice>(std::move(fd), block_count_, block_size_);
-    bool read_only = false;
-    auto bc_or = CreateBcacheMapper(std::move(device), &read_only);
+    auto bc_or = CreateBcacheMapper(std::move(device), true);
     if (bc_or.is_ok()) {
       bc_ = std::move(*bc_or);
     }

@@ -4,10 +4,9 @@
 
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
-use std::any::Any;
 use std::ops::Deref;
 
-use ffx_command_error::{bug, user_error, Result};
+use ffx_command_error::{user_error, Result};
 use fho::{return_user_error, FfxContext, FhoEnvironment, TryFromEnv};
 use fidl_fuchsia_developer_ffx as ffx_fidl;
 
@@ -49,10 +48,6 @@ impl TargetInfoHolder {
             None
         }
     }
-
-    fn as_any(&self) -> &dyn Any {
-        self
-    }
 }
 
 async fn resolve_target_query_to_info(
@@ -71,15 +66,10 @@ impl TryFromEnv for TargetInfoHolder {
         let query = ffx_target::get_target_specifier(&env.environment_context()).await?;
         let info_list = resolve_target_query_to_info(query, env.environment_context()).await?;
 
-        match &info_list[..] {
-            [info] => match info.as_any().downcast_ref::<Self>() {
-                Some(info) => Ok(info.clone()),
-                None => {
-                    Err(bug!("TryFromEnv for TargetInfoHolder was not passed a TargetInfoHolder"))
-                }
-            },
-            [] => Err(user_error!("Matched no targets.")),
-            _ => Err(user_error!("Ambiguous target query. Matched multiple targets.")),
+        match info_list.len() {
+            1 => Ok(info_list.into_iter().next().unwrap()),
+            0 => return Err(user_error!("Matched no targets.")),
+            _ => return Err(user_error!("Ambiguous target query. Matched multiple targets.")),
         }
     }
 }

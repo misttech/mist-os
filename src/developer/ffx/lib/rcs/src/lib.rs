@@ -48,9 +48,6 @@ pub use fdomain_fuchsia_sys2::OpenDirType;
 #[cfg(not(feature = "fdomain"))]
 pub use fidl_fuchsia_sys2::OpenDirType;
 
-// TODO(375266424): Turn this module on for FDomain or delete it.
-#[cfg(not(feature = "fdomain"))]
-pub mod port_forward;
 pub mod toolbox;
 
 /// Note that this is only used for backwards compatibility. All new usages should prefer using the

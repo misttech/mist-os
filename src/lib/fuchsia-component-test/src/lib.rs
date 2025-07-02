@@ -893,9 +893,9 @@ impl RealmInstance {
     /// component manager and attempts to start the root component. This should only be used
     /// when a realm is built in a nested component manager in debug mode.
     pub async fn start_component_tree(&self) -> Result<(), Error> {
-        let lifecycle_controller = self
+        let lifecycle_controller: fsys::LifecycleControllerProxy = self
             .root
-            .connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .map_err(|e| Error::CannotStartRootComponent(e))?;
         let (_, binder_server) = fidl::endpoints::create_endpoints::<fcomponent::BinderMarker>();
         lifecycle_controller.start_instance("./", binder_server).await?.map_err(|e| {
@@ -1998,7 +1998,7 @@ impl ScopedInstance {
     /// manifest.
     pub fn connect_to_binder(&self) -> Result<fcomponent::BinderProxy, anyhow::Error> {
         let binder: fcomponent::BinderProxy = self
-            .connect_to_protocol_at_exposed_dir::<fcomponent::BinderMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("failed to connect to fuchsia.component.Binder")?;
 
         Ok(binder)
@@ -2016,8 +2016,8 @@ impl ScopedInstance {
             .await
             .context("failed to create EventSource")?;
 
-        let _ = self
-            .connect_to_protocol_at_exposed_dir::<fcomponent::BinderMarker>()
+        let _: ClientEnd<fcomponent::BinderMarker> = self
+            .connect_to_protocol_at_exposed_dir()
             .context("failed to connect to fuchsia.component.Binder")?;
 
         let _ = EventMatcher::ok()
@@ -2030,10 +2030,10 @@ impl ScopedInstance {
     }
 
     /// Connect to an instance of a FIDL protocol hosted in the component's exposed directory`,
-    pub fn connect_to_protocol_at_exposed_dir<P: DiscoverableProtocolMarker>(
+    pub fn connect_to_protocol_at_exposed_dir<T: fclient::Connect>(
         &self,
-    ) -> Result<P::Proxy, anyhow::Error> {
-        fclient::connect_to_protocol_at_dir_root::<P>(&self.exposed_dir)
+    ) -> Result<T, anyhow::Error> {
+        T::connect_at_dir_root(&self.exposed_dir)
     }
 
     /// Connect to an instance of a FIDL protocol hosted in the component's exposed directory`,

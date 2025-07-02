@@ -57,9 +57,9 @@ hermetic_code_blob("subprocess.blob") {
   sources = [ "subprocess.cc" ]
   deps = [
     ":headers",
+    "//sdk/lib/c/string:hermetic",
     "//src/lib/debug:backtrace-request",
     "//src/zircon/lib/zircon:headers",
-    "//zircon/system/ulib/c/string:hermetic",
   ]
 
   # This target is built without `//` in the default include dirs but

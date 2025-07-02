@@ -207,6 +207,7 @@ where
         Some(inner) => Box::new(inner),
         None => Box::new(NoOpSymoblizer {}),
     };
+    let disable_reconnect = cmd.disable_reconnect;
     let mut stream_mode = get_stream_mode(cmd.clone())?;
     // TODO(https://fxbug.dev/42080003): Add support for reconnect handling to Overnet.
     // This plugin needs special logic to handle reconnects as logging should tolerate
@@ -219,6 +220,9 @@ where
         // Linear backoff up to 10 seconds.
         let mut backoff = 0;
         let mut last_error = None;
+        if disable_reconnect && prev_boot_id.is_some() {
+            return Ok(());
+        }
         loop {
             let maybe_connection =
                 connect_to_target(&mut stream_mode, prev_boot_id, &rcs_connector).await;
@@ -349,8 +353,8 @@ mod tests {
     use fuchsia_async as fasync;
     use futures::StreamExt;
     use log_command::{
-        parse_seconds_string_as_duration, parse_time, DumpCommand, LogData, OneOrMany,
-        SymbolizeMode, TimeFormat, TIMESTAMP_FORMAT,
+        parse_seconds_string_as_duration, parse_time, parse_utc_time, DumpCommand, LogData,
+        OneOrMany, SymbolizeMode, TimeFormat, TIMESTAMP_FORMAT,
     };
     use moniker::Moniker;
     use selectors::parse_log_interest_selector;
@@ -631,6 +635,52 @@ ffx log --force-set-severity.
     }
 
     #[fuchsia::test]
+    async fn logger_does_not_reconnect_if_disable_reconnect_flag_passed() {
+        let selectors = vec![OneOrMany::One(parse_log_interest_selector("core/foo#INFO").unwrap())];
+        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
+            send_connected_event: true,
+            ..Default::default()
+        })
+        .await;
+
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
+            symbolize: SymbolizeMode::Off,
+            no_color: true,
+            disable_reconnect: true,
+            until: None,
+            set_severity: selectors.clone(),
+            ..LogCommand::default()
+        };
+
+        let rcs_connector = environment.rcs_connector().await;
+        let tool = LogTool { cmd, rcs_connector };
+        let buffers = TestBuffers::default();
+        let writer = CommandOutputMachineWriter::new_test(None, &buffers);
+        let mut event_stream = environment.take_event_stream().unwrap();
+
+        let result = fasync::Task::local(tool.main_no_timestamp(writer));
+        // Run the stream until we get the expected message.
+        check_for_message(&buffers, "[00000.000000][ffx] INFO: Hello world!\n").await;
+
+        // First connection should have used Subscribe mode.
+        assert_matches!(
+            event_stream.next().await,
+            Some(TestEvent::Connected(StreamMode::SnapshotThenSubscribe))
+        );
+
+        // Interest should be set
+        assert_eq!(
+            event_stream.next().await,
+            Some(TestEvent::SetInterest(selectors.clone().into_iter().flatten().collect()))
+        );
+
+        environment.reboot_target(Some(42));
+        // If reconnect is disabled, we should return Ok(())
+        assert!(result.await.is_ok());
+    }
+
+    #[fuchsia::test]
     async fn logger_shows_logs_filtered_by_severity() {
         logger_dump_test(
             TestEnvironmentConfig {
@@ -665,10 +715,10 @@ ffx log --force-set-severity.
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             symbolize: SymbolizeMode::Off,
-            clock: TimeFormat::Local,
+            clock: TimeFormat::Utc,
             since: Some(log_command::DetailedDateTime {
                 is_now: true,
-                ..parse_time("1980-01-01T00:00:01").unwrap()
+                ..parse_utc_time("1980-01-01T00:00:01").unwrap()
             }),
             until: None,
             set_severity: selectors.clone(),
@@ -741,10 +791,10 @@ ffx log --force-set-severity.
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             symbolize: SymbolizeMode::Off,
-            clock: TimeFormat::Local,
+            clock: TimeFormat::Utc,
             since: Some(log_command::DetailedDateTime {
                 is_now: true,
-                ..parse_time("1980-01-01T00:00:01").unwrap()
+                ..parse_utc_time("1980-01-01T00:00:01").unwrap()
             }),
             until: None,
             ..LogCommand::default()
@@ -782,10 +832,10 @@ ffx log --force-set-severity.
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
             symbolize: SymbolizeMode::Off,
-            clock: TimeFormat::Local,
+            clock: TimeFormat::Utc,
             since: Some(log_command::DetailedDateTime {
                 is_now: true,
-                ..parse_time("1980-01-01T00:00:01").unwrap()
+                ..parse_utc_time("1980-01-01T00:00:01").unwrap()
             }),
             until: None,
             ..LogCommand::default()
@@ -853,9 +903,9 @@ ffx log --force-set-severity.
                 ..Default::default()
             },
             LogCommand {
-                since: Some(parse_time("1980-01-01T00:00:01").unwrap()),
-                until: Some(parse_time("1980-01-01T00:00:05").unwrap()),
-                clock: TimeFormat::Local,
+                since: Some(parse_utc_time("1980-01-01T00:00:01").unwrap()),
+                until: Some(parse_utc_time("1980-01-01T00:00:05").unwrap()),
+                clock: TimeFormat::Utc,
                 ..LogCommand::default()
             },
             "[1980-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n",

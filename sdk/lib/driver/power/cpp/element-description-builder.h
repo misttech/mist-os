@@ -28,6 +28,8 @@ struct ElementDesc {
       level_control_servers;
   fidl::ServerEnd<fuchsia_power_broker::Lessor> lessor_server;
   fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_server;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementRunner>> element_runner_client;
+  std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementRunner>> element_runner_server;
 
   // The below are created if the caller did not supply their corresponding server end
   std::optional<fidl::ClientEnd<fuchsia_power_broker::CurrentLevel>> current_level_client;
@@ -46,10 +48,12 @@ class ElementDescBuilder {
   /// If assertive or opportunistic tokens are not set, `zx::event` objects are
   /// created.
   ///
-  /// If current level, required level, or lessor channels are not set, these
-  /// are created.  The `fidl::ClientEnd` of these channel is placed in the
-  /// `current_level_client_`, `required_level_client_`, and `lessor_client_`
-  /// fields of the `ElementDesc` object returned.
+  /// If the lessor channel is not set, it is created.  The `fidl::ClientEnd` of this channel is
+  /// placed in the `lessor_client_` field of the `ElementDesc` object returned.
+  /// Similarly, if element runner, current level, and required level are all not set, the current
+  /// level and required level channels will be created and placed in the `current_level_client_`
+  /// and `required_level_client_`, and `lessor_client_` fields.
+  /// If element runner is set, current level and required level should not be used.
   ElementDesc Build();
 
   /// Sets the assertive token to associate with this element by duplicating
@@ -74,6 +78,10 @@ class ElementDescBuilder {
   ElementDescBuilder& SetElementControl(
       fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control);
 
+  /// Sets the channel to use for the ElementRunner protocol.
+  ElementDescBuilder& SetElementRunner(
+      fidl::ClientEnd<fuchsia_power_broker::ElementRunner> element_runner);
+
  private:
   PowerElementConfiguration element_config;
   TokenMap tokens_;
@@ -83,6 +91,7 @@ class ElementDescBuilder {
   std::optional<fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>> required_level_;
   std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor_;
   std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control_;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementRunner>> element_runner_;
 };
 
 }  // namespace fdf_power

@@ -177,7 +177,7 @@ async fn configure_interface(
         device_control.create_interface(
             &port_id,
             server_end,
-            &fnet_interfaces_admin::Options {
+            fnet_interfaces_admin::Options {
                 name: Some(name.clone()),
                 metric: Some(DEFAULT_METRIC),
                 ..Default::default()

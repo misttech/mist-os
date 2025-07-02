@@ -1,11 +1,11 @@
 {{>copyright comment="#"}}
 
-{{>generated comment="#"}}
+# TODO: You only need one BUILD file. Chose between this one or the bazel one and then
+# delete the other one. Use bazel for vendor repo drivers. Use gn for in-tree drivers.
 
-import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
-import("//build/test.gni")
+import("//build/testing/cc_test_executable.gni")
 
 group("{{PROJECT_NAME}}") {
   testonly = true
@@ -19,59 +19,57 @@ group("{{PROJECT_NAME}}") {
 # Then delete this comment.
 group("tests") {
   testonly = true
-  deps = [ ":{{PROJECT_NAME}}-tests" ]
+  deps = [ ":test_pkg_gn" ]
 }
 
-driver_bind_rules("bind") {
+driver_bind_rules("bind_rules") {
   rules = "meta/{{snake_case PROJECT_NAME}}.bind"
   bind_output = "{{snake_case PROJECT_NAME}}.bindbc"
 }
 
-fuchsia_cc_driver("driver") {
-  legacy = true
-  output_name = "{{PROJECT_NAME}}"
-  sources = [ "{{snake_case PROJECT_NAME}}.cc" ]
-  deps = [
-    ":bind",
-    "//src/devices/lib/driver",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
-fuchsia_driver_component("component") {
-  component_name = "{{PROJECT_NAME}}"
-  deps = [ ":driver" ]
-  info = "meta/{{snake_case PROJECT_NAME}}-info.json"
-  manifest = "meta/component.cml"
-}
-
-fuchsia_driver_package("pkg") {
-  package_name = "{{PROJECT_NAME}}"
-  driver_components = [ ":component" ]
-}
-
-test("{{PROJECT_NAME}}-unit-tests") {
+source_set("{{snake_case PROJECT_NAME}}_common") {
   sources = [
     "{{snake_case PROJECT_NAME}}.cc",
     "{{snake_case PROJECT_NAME}}.h",
-    "unit-tests.cc",
   ]
-  deps = [
-    ":bind",
-    "//sdk/lib/inspect/testing/cpp:zxtest",
-    "//src/devices/lib/driver",
-    "//src/devices/testing/mock-ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/zx",
-    "//zircon/system/ulib/zxtest",
+  public_deps = [
+    "//sdk/lib/driver/component/cpp",
+    "//src/devices/lib/driver:driver_runtime",
   ]
 }
 
-fuchsia_unittest_package("{{PROJECT_NAME}}-tests") {
-  deps = [ ":{{PROJECT_NAME}}-unit-tests" ]
+fuchsia_cc_driver("driver") {
+  output_name = "{{snake_case PROJECT_NAME}}"
+  deps = [ ":{{snake_case PROJECT_NAME}}_common" ]
+}
+
+fuchsia_driver_component("component") {
+  component_name = "{{snake_case PROJECT_NAME}}"
+  manifest = "meta/{{snake_case PROJECT_NAME}}.cml"
+  deps = [
+    ":bind_rules",
+    ":driver",
+  ]
+  info = "meta/{{snake_case PROJECT_NAME}}_info.json"
+}
+
+fuchsia_driver_package("pkg") {
+  package_name = "{{snake_case PROJECT_NAME}}_gn"  # TODO remove the _gn
+  driver_components = [ ":component" ]
+}
+
+cc_test_executable("{{snake_case PROJECT_NAME}}_test") {
+  testonly = true
+  sources = [ "tests/{{snake_case PROJECT_NAME}}_test.cc" ]
+  deps = [
+    ":{{snake_case PROJECT_NAME}}_common",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+fuchsia_unittest_package("test_pkg_gn") {  # TODO remove the _gn
+  deps = [ ":{{snake_case PROJECT_NAME}}_test" ]
+  package_name = "{{snake_case PROJECT_NAME}}_test_gn"  # TODO remove the _gn
+  component_name = "{{snake_case PROJECT_NAME}}_test"
 }

@@ -101,6 +101,11 @@ python_binary("kernel_aib_tool") {
   deps = [ "//build/python/modules/assembly" ]
 }
 
+python_binary("emulator_support_aib_tool") {
+  main_source = "emulator_support_aib.py"
+  deps = [ "//build/python/modules/assembly" ]
+}
+
 # The standard `install_host_tools()` template doesn't work for this, because it
 # assumes that all binaries are at `${root_build_dir}/<tool>`, and the
 # `python_binary()` uses `$target_out_dir/<tool>`.  But the import is still

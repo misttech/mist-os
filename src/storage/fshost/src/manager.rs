@@ -6,73 +6,12 @@ use crate::device::Device;
 use crate::environment::Environment;
 use crate::{matcher, service};
 use anyhow::{format_err, Error};
-use fidl::endpoints::DiscoverableProtocolMarker as _;
-use fidl_fuchsia_hardware_block_volume::VolumeMarker;
-use fs_management::filesystem::BlockConnector;
 use fs_management::format::DiskFormat;
 use futures::channel::mpsc;
 use futures::lock::Mutex;
 use futures::StreamExt;
 use std::collections::HashSet;
 use std::sync::Arc;
-use vfs::directory::helper::DirectlyMutable;
-use vfs::directory::simple::Simple;
-use vfs::service::endpoint;
-
-pub struct DevicePublisher {
-    debug_block_dir: Arc<Simple>,
-    block_dir: Arc<Simple>,
-}
-
-impl DevicePublisher {
-    pub fn new() -> Self {
-        Self { debug_block_dir: vfs::pseudo_directory! {}, block_dir: vfs::pseudo_directory! {} }
-    }
-
-    /// Publishes *all* block devices.  Only suitable for routing outside of fshost on eng
-    /// configurations.
-    pub fn debug_block_dir(&self) -> Arc<Simple> {
-        self.debug_block_dir.clone()
-    }
-
-    /// Publishes block devices which are not already managed by fshost (i.e. block devices from the
-    /// low-level storage drivers).
-    pub fn block_dir(&self) -> Arc<Simple> {
-        self.block_dir.clone()
-    }
-
-    fn publish_to_debug_block_dir(&self, device: &dyn Device, name: &str) -> Result<(), Error> {
-        let volume = device.block_connector()?;
-        self.debug_block_dir.add_entry(
-            name,
-            vfs::pseudo_directory! {
-                VolumeMarker::PROTOCOL_NAME => endpoint(move |_scope, channel| {
-                    volume.connect_channel_to_volume(channel.into_zx_channel().into())
-                        .unwrap_or_else(|error| {
-                            log::error!(error:%; "failed to open volume");
-                        });
-                }),
-                "source" => vfs::file::read_only(device.source()),
-            },
-        )?;
-        Ok(())
-    }
-
-    fn publish(&self, volume: Box<dyn BlockConnector>, name: &str) -> Result<(), Error> {
-        self.block_dir.add_entry(
-            name,
-            vfs::pseudo_directory! {
-                VolumeMarker::PROTOCOL_NAME => endpoint(move |_scope, channel| {
-                    volume.connect_channel_to_volume(channel.into_zx_channel().into())
-                        .unwrap_or_else(|error| {
-                            log::error!(error:%; "failed to open volume");
-                        });
-                }),
-            },
-        )?;
-        Ok(())
-    }
-}
 
 pub struct Manager {
     matcher: matcher::Matchers,
@@ -81,7 +20,6 @@ pub struct Manager {
     /// should be ignored when matching. When matched, the ignored paths are removed from the set.
     /// (i.e. The device is ignored only once.)
     matcher_lock: Arc<Mutex<HashSet<String>>>,
-    device_publisher: DevicePublisher,
 }
 
 impl Manager {
@@ -89,14 +27,8 @@ impl Manager {
         config: &fshost_config::Config,
         environment: Arc<Mutex<dyn Environment>>,
         matcher_lock: Arc<Mutex<HashSet<String>>>,
-        device_publisher: DevicePublisher,
     ) -> Self {
-        Manager {
-            matcher: matcher::Matchers::new(config),
-            environment,
-            matcher_lock,
-            device_publisher,
-        }
+        Manager { matcher: matcher::Matchers::new(config), environment, matcher_lock }
     }
 
     /// The main loop of fshost. Watch for new devices, match them against filesystems we expect,
@@ -140,12 +72,11 @@ impl Manager {
                 continue;
             }
 
+            let mut environment = self.environment.lock().await;
             let content_format = device.content_format().await.unwrap_or(DiskFormat::Unknown);
             let label = device.partition_label().await.ok().map(|s| s.to_string());
             let type_guid =
                 device.partition_type().await.ok().map(|guid| uuid::Uuid::from_bytes(guid.clone()));
-            let is_managed = device.is_managed();
-            let connector = device.block_connector().ok();
             log::info!(
                 source:% = device.source(),
                 path:% = device.path(),
@@ -157,27 +88,14 @@ impl Manager {
             );
             // Publish devices we find as needed.
             // If we get an error from this just log a warning and continue.
-            if let Err(error) =
-                self.device_publisher.publish_to_debug_block_dir(device.as_ref(), &name)
-            {
+            if let Err(error) = environment.publish_device_to_debug_block(device.as_ref(), &name) {
                 log::warn!(error:?; "Failed to publish block device");
             }
 
             let device_path = device.path().to_string();
-            match self.matcher.match_device(device, &mut *self.environment.lock().await).await {
-                Ok(was_matched) => {
-                    if !was_matched {
-                        log::info!(path:% = device_path; "ignored");
-                    }
-                    if let Some(connector) = connector {
-                        if !is_managed && !was_matched {
-                            log::info!("Publishing {device_path} to /block");
-                            if let Err(error) = self.device_publisher.publish(connector, &name) {
-                                log::warn!(error:?; "Failed to publish block device");
-                            }
-                        }
-                    }
-                }
+            match self.matcher.match_device(device, &mut *environment).await {
+                Ok(true) => (),
+                Ok(false) => log::info!(path:% = device_path; "ignored"),
                 Err(error) => {
                     log::error!(
                         path:% = device_path,

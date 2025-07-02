@@ -32,7 +32,7 @@ const TTL: u8 = 64;
 
 fn default_ip_packet<I: TestIpExt>() -> Buf<Vec<u8>> {
     Buf::new(Vec::new(), ..)
-        .encapsulate(I::PacketBuilder::new(
+        .wrap_in(I::PacketBuilder::new(
             I::TEST_ADDRS.remote_ip.get(),
             I::TEST_ADDRS.local_ip.get(),
             TTL,

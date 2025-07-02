@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
-import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/legacy_image_metadata_overrides.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/board.gni")
@@ -21,28 +20,11 @@ assert(current_toolchain == default_toolchain,
 files = {
   # Outputs of assembly.
   outdir = target_out_dir + "/bringup"
-  zbi = "${outdir}/bringup.zbi"
-  zbi_signed = "${outdir}/bringup.zbi.signed"
-  vbmeta = "${outdir}/bringup.vbmeta"
-  images_json = "${outdir}/images.json"
 
   # Outputs of recovery.
   recovery_name = get_label_info(recovery_label, "name")
   recovery_outdir =
       get_label_info(recovery_label, "target_out_dir") + "/" + recovery_name
-  recovery_zbi = "${recovery_outdir}/${recovery_name}.zbi"
-  recovery_zbi_signed = "${recovery_outdir}/${recovery_name}.zbi.signed"
-  recovery_vbmeta = "${recovery_outdir}/${recovery_name}.vbmeta"
-  recovery_images_json = "${recovery_outdir}/images.json"
-
-  qemu_kernel = qemu_boot_shim.path
-}
-
-_partitions_config = "//boards/partitions:default"
-if (has_board) {
-  assert(partitions_config_label != false,
-         "Need to define partitions_config_label")
-  _partitions_config = partitions_config_label
 }
 
 assert(fuchsia_product_assembly_config_label != false,
@@ -81,25 +63,8 @@ product_bundle("product_bundle") {
   ]
 
   name = main_product_bundle_name
-  partitions = _partitions_config
-  system_a = files.images_json
-  system_r = files.recovery_images_json
-
-  # Create lists of the files that are referenced by the assembly manifests.
-  _assembly_contents = [ files.qemu_kernel ]
-  _recovery_contents = [ files.qemu_kernel ]
-
-  _assembly_contents += [ files.zbi ]
-  _recovery_contents += [ files.recovery_zbi ]
-
-  if (use_vbmeta) {
-    _assembly_contents += [ files.vbmeta ]
-    _recovery_contents += [ files.recovery_vbmeta ]
-  }
-
-  # List the contents of each input so that the outputs can be calculated.
-  system_a_contents = _assembly_contents
-  system_r_contents = _recovery_contents
+  system_a = files.outdir
+  system_r = files.recovery_outdir
 }
 
 group("bringup") {

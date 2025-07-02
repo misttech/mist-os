@@ -25,11 +25,11 @@ pub use policy::ClassId;
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct SecurityId(NonZeroU32);
 
-impl SecurityId {
-    /// Returns a `SecurityId` encoding the specified initial Security Context.
-    /// These are used when labeling kernel resources created before policy
-    /// load, allowing the policy to determine the Security Context to use.
-    pub fn initial(initial_sid: InitialSid) -> Self {
+impl From<InitialSid> for SecurityId {
+    fn from(initial_sid: InitialSid) -> Self {
+        // Initial SIDs are used by the kernel as placeholder `SecurityId` values for objects
+        // created prior to the SELinux policy being loaded, and are resolved to the policy-defined
+        // Security Context when referenced after policy load.
         Self(NonZeroU32::new(initial_sid as u32).unwrap())
     }
 }
@@ -1258,6 +1258,8 @@ class_permission_enum! {
         ExecHeap("execheap"),
         /// Permission to execute arbitrary code from memory.
         ExecMem("execmem"),
+        /// Permission to execute arbitrary code from the stack.
+        ExecStack("execstack"),
         /// Permission to fork the current running process.
         Fork("fork"),
         /// Permission to get the process group ID.
@@ -1345,13 +1347,12 @@ enum ReferenceInitialSid {
     Unlabeled = 3,
     _Fs = 4,
     File = 5,
-    _AnySocket = 6,
-    _Port = 7,
-    _Netif = 8,
-    _Netmsg = 9,
-    _Node = 10,
-    _Sysctl = 15,
-    _Devnull = 25,
+    _Port = 9,
+    _Netif = 10,
+    _Netmsg = 11,
+    _Node = 12,
+    _Sysctl = 17,
+    Devnull = 27,
 
     FirstUnused,
 }
@@ -1391,6 +1392,7 @@ initial_sid_enum! {
 #[derive(Copy, Clone, Debug, Eq, Hash, PartialEq)]
     InitialSid {
         // keep-sorted start
+        Devnull("devnull"),
         File("file"),
         Kernel("kernel"),
         Security("security"),
@@ -1445,10 +1447,9 @@ pub enum FileSystemLabelingScheme {
     /// This filesystem was mounted with "context=".
     Mountpoint { sid: SecurityId },
     /// This filesystem has an "fs_use_xattr", "fs_use_task", or "fs_use_trans" entry in the
-    /// policy. `root_sid` identifies the context for the root of the filesystem and
-    /// `computed_def_sid`  identifies the context to use for unlabeled files in the filesystem
-    /// (the "default context").
-    FsUse { fs_use_type: FsUseType, computed_def_sid: SecurityId },
+    /// policy. If the `fs_use_type` is "fs_use_xattr" then the `default_sid` specifies the SID
+    /// with which to label `FsNode`s of files that do not have the "security.selinux" xattr.
+    FsUse { fs_use_type: FsUseType, default_sid: SecurityId },
     /// This filesystem has one or more "genfscon" statements associated with it in the policy.
     GenFsCon,
 }

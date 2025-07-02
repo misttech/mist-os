@@ -25,6 +25,8 @@ import("//build/testing/host_test_data.gni")
 #   golden_files (required)
 #     The list of all files in the golden project. These will be compared against
 #     the output of running the `fx create` tool.
+#   year (optional)
+#     The year to use in the copyright header. Defaults to 2020.
 #
 # Example of usage:
 #
@@ -95,6 +97,11 @@ template("golden_test") {
   # all files visible to the test. These include the golden project files.
   test_args += [ rebase_path("${test_dir}/goldens.json", root_build_dir) ]
 
+  year = "2020"
+  if (defined(invoker.year)) {
+    year = invoker.year
+  }
+
   # `fx create` arguments.
   test_args += [
     project_type,
@@ -107,7 +114,7 @@ template("golden_test") {
                              # executing BUILD.gn file of the // prefix
     "--override-copyright-year",  # Keeps tests hermetic. Don't want tests
                                   # failing in the new year.
-    "2020",
+    year,
     "--silent",
   ]
 

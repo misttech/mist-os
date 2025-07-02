@@ -43,7 +43,7 @@ class AddressManager final : public AddressSpaceObserver {
   std::shared_ptr<AddressSlotMapping> AllocateMappingForAddressSpace(
       std::shared_ptr<MsdArmConnection> connection);
 
-  // AddressSpaceObserver implementation.
+  // AddressSpaceObserver implementation (must be threadsafe).
   void FlushAddressMappingRange(AddressSpace*, uint64_t start, uint64_t length,
                                 bool synchronous) override;
   void ReleaseSpaceMappings(const AddressSpace* address_space) override;

@@ -632,6 +632,8 @@ func (t *FFXTester) testWithFile(ctx context.Context, test testsharder.Test, std
 			Parallel:                 test.Parallel,
 			MaxSeverityLogs:          test.LogSettings.MaxSeverity,
 			MinSeverityLogs:          test.LogSettings.MinSeverity,
+			TestFilters:              test.TestFilters,
+			NoCasesEqualsSuccess:     test.NoCasesEqualsSuccess,
 			Realm:                    test.Realm,
 			CreateNoExceptionChannel: test.CreateNoExceptionChannel,
 		},
@@ -756,7 +758,7 @@ func processTestResult(runResult *ffxutil.TestRunResult, test testsharder.Test, 
 				return testResult, err
 			}
 			suiteArtifacts = append(suiteArtifacts, runtests.TestOutputFilename)
-		} else {
+		} else if metadata.ArtifactType != ffxutil.DebugType {
 			suiteArtifacts = append(suiteArtifacts, artifact)
 		}
 	}
@@ -937,6 +939,22 @@ func (t *FFXTester) getSinks(ctx context.Context, testOutDir string, sinksPerTes
 	runArtifactDir := filepath.Join(testOutDir, runResult.ArtifactDir)
 	seen := make(map[string]struct{})
 	startTime := clock.Now(ctx)
+
+	// The new test_manager API moves the artifacts previously associated with the run to the
+	// suite. Look for data sinks there.
+	if len(runResult.Artifacts) == 0 && len(runResult.Suites) == 1 {
+		suiteArtifactDir := filepath.Join(testOutDir, runResult.Suites[0].ArtifactDir)
+		for artifact, meta := range runResult.Suites[0].Artifacts {
+			artifactPath := filepath.Join(suiteArtifactDir, artifact)
+			if meta.ArtifactType != ffxutil.DebugType {
+				continue
+			}
+			if err := t.getSinksFromArtifactDir(ctx, artifactPath, sinksPerTest, seen, ignoreEarlyBoot); err != nil {
+				return err
+			}
+		}
+	}
+
 	// The runResult's artifacts should contain a directory with the profiles from
 	// component v2 tests along with a summary.json that lists the data sinks per test.
 	// It should also contain a second directory with early boot data sinks.

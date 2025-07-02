@@ -87,6 +87,16 @@
             "minLength": 1,
             "type": "string"
         },
+        "has_min_volume_size": {
+            "default": false,
+            "description": "True if the filesystem requires a minimum volume size, in which case the default volume size is configured as device_block_size * device_block_count",
+            "type": "boolean"
+        },
+        "inode_size": {
+            "default": 256,
+            "description": "inode_size",
+            "type": "integer"
+        },
         "options": {
             "description": "A list of test options to be applied to the filesystem",
             "items": {
@@ -105,14 +115,14 @@
                         "description": "device_block_size",
                         "type": "integer"
                     },
-                    "has_min_volume_size": {
-                        "default": false,
-                        "description": "True if the filesystem requires a minimum volume size, in which case its volume size is configured as device_block_size * device_block_count for all tests",
-                        "type": "boolean"
-                    },
                     "use_fvm": {
                         "description": "True if FVM should be used",
                         "type": "boolean"
+                    },
+                    "fvm_slice_size": {
+                        "default": 32768,
+                        "description": "fvm_slice_size",
+                        "type": "integer"
                     }
                 },
                 "required": [

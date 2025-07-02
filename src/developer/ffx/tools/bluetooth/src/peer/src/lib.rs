@@ -4,21 +4,15 @@
 
 use ::async_trait::async_trait;
 use ::ffx_bluetooth_peer_args::{PeerCommand, PeerSubCommand};
-use ::fho::{
-    AvailabilityFlag, Error, FfxMain, FfxTool, FhoEnvironment, Result, TryFromEnv, TryFromEnvWith,
-};
-use async_utils::hanging_get::client::HangingGetStream;
+use ::fho::{AvailabilityFlag, Error, FfxMain, FfxTool, Result};
 use ffx_bluetooth_common::PeerIdOrAddr;
 use ffx_writer::{SimpleWriter, ToolIO as _};
 use fidl_fuchsia_bluetooth::PeerId as FidlPeerId;
-use fidl_fuchsia_bluetooth_sys::{AccessProxy, Peer as FidlPeer};
-use fuchsia_async::TimeoutExt;
+use fidl_fuchsia_bluetooth_affordances::PeerControllerProxy;
+use fidl_fuchsia_bluetooth_sys::AccessProxy;
 use fuchsia_bluetooth::types::{Address, Peer, PeerId};
-use futures::stream::StreamExt;
 use prettytable::{cell, format, row, Row, Table};
 use std::cmp::Ordering;
-use std::collections::HashMap;
-use std::time::Duration;
 use target_holders::toolbox;
 
 #[derive(FfxTool)]
@@ -26,8 +20,8 @@ use target_holders::toolbox;
 pub struct PeerTool {
     #[command]
     cmd: PeerCommand,
-    peer_watcher_stream: PeerWatcherStream,
-    state: State,
+    #[with(toolbox())]
+    peer_controller: PeerControllerProxy,
     #[with(toolbox())]
     access_proxy: AccessProxy,
 }
@@ -37,23 +31,27 @@ fho::embedded_plugin!(PeerTool);
 impl FfxMain for PeerTool {
     type Writer = SimpleWriter;
     async fn main(mut self, mut writer: Self::Writer) -> Result<()> {
-        let _ = get_known_peers(&mut self).await?;
+        let peers: Vec<Peer> = self.get_peers().await?;
         match self.cmd.subcommand.clone() {
             // ffx bluetooth peer list
-            PeerSubCommand::List(ref cmd) => {
-                let args: &[&str] = match cmd.filter.as_ref().map(|s| s.as_str()) {
-                    Some(filter) => &[filter],
-                    None => &[],
-                };
-                writer.line(get_peers(args, &self.state, cmd.details))?;
+            PeerSubCommand::List(ref mut cmd) => {
+                writer.line(get_peer_list(
+                    &peers,
+                    cmd.filter.get_or_insert("".to_string()),
+                    cmd.details,
+                ))?;
             }
             // ffx bluetooth peer show
             PeerSubCommand::Show(ref cmd) => {
-                writer.line(get_peer(&cmd.id_or_addr, self.state))?;
+                if let Some(peer_id) = to_identifier(&peers, &cmd.id_or_addr) {
+                    writer.line(get_peer(&peers, &peer_id).unwrap())?;
+                } else {
+                    writer.line("No known peer")?;
+                }
             }
             // ffx bluetooth peer connect
             PeerSubCommand::Connect(ref cmd) => {
-                let Some(peer_id) = to_identifier(&self.state, &cmd.id_or_addr) else {
+                let Some(peer_id) = to_identifier(&peers, &cmd.id_or_addr) else {
                     return Err(fho::Error::User(anyhow::anyhow!(
                         "Unable to connect: Unknown address {}",
                         cmd.id_or_addr
@@ -75,7 +73,7 @@ impl FfxMain for PeerTool {
             }
             // ffx bluetooth peer disconnect
             PeerSubCommand::Disconnect(ref cmd) => {
-                let Some(peer_id) = to_identifier(&self.state, &cmd.id_or_addr) else {
+                let Some(peer_id) = to_identifier(&peers, &cmd.id_or_addr) else {
                     return Err(fho::Error::User(anyhow::anyhow!(
                         "Unable to disconnect: Unknown address {}",
                         cmd.id_or_addr
@@ -100,6 +98,61 @@ impl FfxMain for PeerTool {
     }
 }
 
+impl PeerTool {
+    async fn get_peers(&self) -> Result<Vec<Peer>> {
+        Ok(self
+            .peer_controller
+            .get_known_peers()
+            .await
+            .map_err(|err| fho::Error::Unexpected(anyhow::anyhow!("FIDL error: {err}")))?
+            .map_err(|err| {
+                fho::Error::Unexpected(anyhow::anyhow!(
+                    "fuchsia.bluetooth.affordances.PeerController error: {err:?}"
+                ))
+            })?
+            .iter()
+            .map(|peer| Peer::try_from(peer.clone()).expect("Failed to convert between Peer types"))
+            .collect())
+    }
+}
+
+fn get_peer_list(peers: &Vec<Peer>, filter: &String, full_details: bool) -> String {
+    if peers.is_empty() {
+        return String::from("No known peers");
+    }
+    let mut matched_peers: Vec<&Peer> = peers.iter().filter(|p| match_peer(filter, p)).collect();
+    matched_peers.sort_by(|a, b| cmp_peers(&*a, &*b));
+    let match_msg = format!("Showing {}/{} peers\n", matched_peers.len(), peers.len());
+
+    if full_details {
+        return String::from_iter(
+            std::iter::once(match_msg).chain(matched_peers.iter().map(|p| p.to_string())),
+        );
+    }
+
+    // Create table of results
+    let mut table = Table::new();
+    table.set_format(*format::consts::FORMAT_NO_BORDER);
+    let _ = table.set_titles(row![
+        "PeerId",
+        "Address",
+        "Technology",
+        "Name",
+        "Appearance",
+        "Connected",
+        "Bonded",
+    ]);
+    for val in matched_peers.into_iter() {
+        let _ = table.add_row(peer_to_table_row(&val));
+    }
+    [match_msg, format!("{}", table)].join("\n")
+}
+
+/// Get the string representation of a peer
+fn get_peer(peers: &Vec<Peer>, peer_id: &PeerId) -> Option<String> {
+    peers.iter().find(|peer| peer.id.eq(peer_id)).map(|peer| peer.to_string())
+}
+
 /// Disconnects an active BR/EDR or LE connection by input peer ID.
 pub async fn disconnect(access: &AccessProxy, id: PeerId) -> Result<(), Error> {
     let fidl_peer_id: FidlPeerId = id.into();
@@ -118,47 +171,6 @@ async fn connect(access: &AccessProxy, id: PeerId) -> Result<(), fho::Error> {
         fho::Error::User(user_err)
     })?;
     Ok(())
-}
-
-/// Get the string representation of a peer from either an identifier or address
-fn get_peer<'a>(key: &PeerIdOrAddr, state: State) -> String {
-    to_identifier(&state, &key)
-        .and_then(|id| state.peers.get(&id).map(|peer| peer.to_string()))
-        .unwrap_or_else(|| String::from("No known peer"))
-}
-
-fn get_peers<'a>(args: &'a [&'a str], state: &State, full_details: bool) -> String {
-    let find = args.first().unwrap_or(&"");
-
-    if state.peers.is_empty() {
-        return String::from("No known peers");
-    }
-    let mut peers: Vec<&Peer> = state.peers.values().filter(|p| match_peer(&find, p)).collect();
-    peers.sort_by(|a, b| cmp_peers(&*a, &*b));
-    let matched = format!("Showing {}/{} peers\n", peers.len(), state.peers.len());
-
-    if full_details {
-        return String::from_iter(
-            std::iter::once(matched).chain(peers.iter().map(|p| p.to_string())),
-        );
-    }
-
-    // Create table of results
-    let mut table = Table::new();
-    table.set_format(*format::consts::FORMAT_NO_BORDER);
-    let _ = table.set_titles(row![
-        "PeerId",
-        "Address",
-        "Technology",
-        "Name",
-        "Appearance",
-        "Connected",
-        "Bonded",
-    ]);
-    for val in peers.into_iter() {
-        let _ = table.add_row(peer_to_table_row(val));
-    }
-    [matched, format!("{}", table)].join("\n")
 }
 
 fn match_peer<'a>(pattern: &'a str, peer: &Peer) -> bool {
@@ -194,98 +206,22 @@ fn peer_to_table_row(peer: &Peer) -> Row {
 
 // Find the identifier for a `Peer` based on a `key` that is either an identifier or an address.
 // Returns `None` if the given address does not belong to a known peer.
-fn to_identifier(state: &State, key: &PeerIdOrAddr) -> Option<PeerId> {
+fn to_identifier(peers: &Vec<Peer>, key: &PeerIdOrAddr) -> Option<PeerId> {
     match key {
         PeerIdOrAddr::PeerId(id) => Some(*id),
-        PeerIdOrAddr::BdAddr(addr) => state
-            .peers
-            .values()
-            .find(|peer| peer.address.as_hex_string() == addr.0)
-            .map(|peer| peer.id),
-    }
-}
-
-async fn get_known_peers(peer_tool: &mut PeerTool) -> Result<HashMap<PeerId, Peer>, Error> {
-    loop {
-        let Some(stream) = &mut peer_tool.peer_watcher_stream.peer_watcher_stream else {
-            break Err(fho::Error::Unexpected(anyhow::anyhow!(
-                "Peer Watcher Stream not available"
-            )));
-        };
-
-        let Some(res) = stream.next().on_timeout(Duration::from_millis(50), || None).await else {
-            break Ok(peer_tool.state.peers.clone());
-        };
-
-        match res {
-            Ok(d) => {
-                let (discovered_peers, removed_peers) = d;
-
-                for peer_id in removed_peers {
-                    let peer_id = PeerId(peer_id.value);
-                    if peer_tool.state.peers.contains_key(&peer_id) {
-                        peer_tool.state.peers.remove(&peer_id);
-                    }
-                }
-
-                let peers_iter = discovered_peers.iter().map(|d| {
-                    let peer: Peer =
-                        Peer::try_from(d.clone()).expect("Failed to convert FidlPeer to Peer");
-                    (PeerId(d.id.unwrap().value), peer)
-                });
-
-                peer_tool.state.peers.extend(peers_iter);
-            }
-            Err(e) => {
-                break Err(fho::Error::Unexpected(anyhow::anyhow!(
-                    "Peer Watcher Stream failed with: {:?}",
-                    e
-                )));
-            }
+        PeerIdOrAddr::BdAddr(addr) => {
+            peers.iter().find(|peer| peer.address.as_hex_string() == addr.0).map(|peer| peer.id)
         }
     }
 }
 
-pub struct PeerWatcherStream {
-    pub peer_watcher_stream:
-        Option<HangingGetStream<AccessProxy, (Vec<FidlPeer>, Vec<FidlPeerId>)>>,
-}
-
-#[async_trait(?Send)]
-impl TryFromEnv for PeerWatcherStream {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        let access_proxy = toolbox::<AccessProxy>().try_from_env_with(env).await?;
-        let stream = HangingGetStream::new_with_fn_ptr(access_proxy, AccessProxy::watch_peers);
-        Ok(PeerWatcherStream { peer_watcher_stream: Some(stream) })
-    }
-}
-
 /// Tracks all state local to the command line tool.
-#[derive(Clone, Debug)]
-pub struct State {
-    pub peers: HashMap<PeerId, Peer>,
-}
-
-impl State {
-    pub fn new() -> State {
-        State { peers: HashMap::new() }
-    }
-}
-
-#[async_trait(?Send)]
-impl TryFromEnv for State {
-    async fn try_from_env(_env: &FhoEnvironment) -> Result<Self> {
-        Ok(State::new())
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use ffx_bluetooth_common::{BdAddr, PeerIdOrAddr};
     use fuchsia_bluetooth::types::Address;
     use regex::Regex;
-    use std::str::FromStr;
     use {fidl_fuchsia_bluetooth as fbt, fidl_fuchsia_bluetooth_sys as fsys};
 
     fn named_peer(id: PeerId, address: Address, name: Option<String>) -> Peer {
@@ -356,83 +292,75 @@ mod tests {
     }
 
     #[test]
-    fn test_get_peers_full_details() {
-        let mut state = State::new();
-        let _ = state.peers.insert(
-            PeerId(0xabcd),
+    fn test_get_peer_list_full_details() {
+        let peers = vec![
             named_peer(PeerId(0xabcd), Address::Public([0xAB, 0x89, 0x67, 0x45, 0x23, 0x01]), None),
-        );
-        let _ = state.peers.insert(
-            PeerId(0xbeef),
             named_peer(
                 PeerId(0xbeef),
                 Address::Public([0x11, 0x00, 0x55, 0x7E, 0xDE, 0xAD]),
                 Some("Sapphire".to_string()),
             ),
-        );
+        ];
 
-        let get_peers = |args: &[&str], state: &State| -> String { get_peers(args, state, true) };
+        let get_peer_list =
+            |filter: &str| -> String { get_peer_list(&peers, &filter.to_string(), true) };
 
         // Fields for detailed view of peers
         let fields = Regex::new(r"Id(?s).*Address(?s).*Technology(?s).*Name(?s).*Appearance(?s).*Connected(?s).*Bonded(?s).*LE Services(?s).*BR/EDR Serv\.").unwrap();
 
         // Empty arguments matches everything
-        assert!(fields.is_match(&get_peers(&[], &state)));
-        assert!(get_peers(&[], &state).contains("2/2 peers"));
-        assert!(get_peers(&[], &state).contains("01:23:45"));
-        assert!(get_peers(&[], &state).contains("AD:DE:7E"));
+        assert!(fields.is_match(&get_peer_list("")));
+        assert!(get_peer_list("").contains("2/2 peers"));
+        assert!(get_peer_list("").contains("01:23:45"));
+        assert!(get_peer_list("").contains("AD:DE:7E"));
 
         // No matches prints nothing.
-        assert!(!fields.is_match(&get_peers(&["nomatch"], &state)));
-        assert!(get_peers(&["nomatch"], &state).contains("0/2 peers"));
-        assert!(!get_peers(&["nomatch"], &state).contains("01:23:45"));
-        assert!(!get_peers(&["nomatch"], &state).contains("AD:DE:7E"));
+        assert!(!fields.is_match(&get_peer_list("nomatch")));
+        assert!(get_peer_list("nomatch").contains("0/2 peers"));
+        assert!(!get_peer_list("nomatch").contains("01:23:45"));
+        assert!(!get_peer_list("nomatch").contains("AD:DE:7E"));
 
         // We can match either one
-        assert!(get_peers(&["01:23"], &state).contains("1/2 peers"));
-        assert!(get_peers(&["01:23"], &state).contains("01:23:45"));
-        assert!(get_peers(&["abcd"], &state).contains("1/2 peers"));
-        assert!(get_peers(&["beef"], &state).contains("AD:DE:7E"));
+        assert!(get_peer_list("01:23").contains("1/2 peers"));
+        assert!(get_peer_list("01:23").contains("01:23:45"));
+        assert!(get_peer_list("abcd").contains("1/2 peers"));
+        assert!(get_peer_list("beef").contains("AD:DE:7E"));
     }
 
     #[test]
-    fn test_get_peers_less_details() {
-        let mut state = State::new();
-        let _ = state.peers.insert(
-            PeerId(0xabcd),
+    fn test_get_peer_list_less_details() {
+        let peers = vec![
             named_peer(PeerId(0xabcd), Address::Public([0xAB, 0x89, 0x67, 0x45, 0x23, 0x01]), None),
-        );
-        let _ = state.peers.insert(
-            PeerId(0xbeef),
             named_peer(
                 PeerId(0xbeef),
                 Address::Public([0x11, 0x00, 0x55, 0x7E, 0xDE, 0xAD]),
                 Some("Sapphire".to_string()),
             ),
-        );
+        ];
 
-        let get_peers = |args: &[&str], state: &State| -> String { get_peers(args, state, false) };
+        let get_peer_list =
+            |filter: &str| -> String { get_peer_list(&peers, &filter.to_string(), false) };
 
         // Fields for table view of peers
         let fields = Regex::new(r"PeerId[ \t]*\|[ \t]*Address[ \t]*\|[ \t]*Technology[ \t]*\|[ \t]*Name[ \t]*\|[ \t]*Appearance[ \t]*\|[ \t]*Connected[ \t]*\|[ \t]*Bonded").unwrap();
 
         // Empty arguments matches everything
-        assert!(fields.is_match(&get_peers(&[], &state)));
-        assert!(get_peers(&[], &state).contains("2/2 peers"));
-        assert!(get_peers(&[], &state).contains("01:23:45"));
-        assert!(get_peers(&[], &state).contains("AD:DE:7E"));
+        assert!(fields.is_match(&get_peer_list("")));
+        assert!(get_peer_list("").contains("2/2 peers"));
+        assert!(get_peer_list("").contains("01:23:45"));
+        assert!(get_peer_list("").contains("AD:DE:7E"));
 
         // No matches prints nothing.
-        assert!(!fields.is_match(&get_peers(&["nomatch"], &state)));
-        assert!(get_peers(&["nomatch"], &state).contains("0/2 peers"));
-        assert!(!get_peers(&["nomatch"], &state).contains("01:23:45"));
-        assert!(!get_peers(&["nomatch"], &state).contains("AD:DE:7E"));
+        assert!(!fields.is_match(&get_peer_list("nomatch")));
+        assert!(get_peer_list("nomatch").contains("0/2 peers"));
+        assert!(!get_peer_list("nomatch").contains("01:23:45"));
+        assert!(!get_peer_list("nomatch").contains("AD:DE:7E"));
 
         // We can match either one
-        assert!(get_peers(&["01:23"], &state).contains("1/2 peers"));
-        assert!(get_peers(&["01:23"], &state).contains("01:23:45"));
-        assert!(get_peers(&["abcd"], &state).contains("1/2 peers"));
-        assert!(get_peers(&["beef"], &state).contains("AD:DE:7E"));
+        assert!(get_peer_list("01:23").contains("1/2 peers"));
+        assert!(get_peer_list("01:23").contains("01:23:45"));
+        assert!(get_peer_list("abcd").contains("1/2 peers"));
+        assert!(get_peer_list("beef").contains("AD:DE:7E"));
     }
 
     #[test]
@@ -454,84 +382,61 @@ mod tests {
 
     #[test]
     fn test_get_peer() {
-        let mut state = State::new();
-
-        let peer_id1 = PeerId(0xabcd);
-        let address1 = Address::Public([0xAB, 0x89, 0x67, 0x45, 0x23, 0x01]);
-        let peer1 = named_peer(peer_id1, address1, Some("Sapphire".to_string()));
-        let _ = state.peers.insert(peer_id1, peer1.clone());
-
-        let peer_id2 = PeerId(0xbeef);
-        let address2 = Address::Public([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]);
-        let peer2 = named_peer(peer_id2, address2, None);
-        let _ = state.peers.insert(peer_id2, peer2.clone());
+        let mut peers = vec![
+            named_peer(
+                PeerId(0xabcd),
+                Address::Public([0xAB, 0x89, 0x67, 0x45, 0x23, 0x01]),
+                Some("Sapphire".to_string()),
+            ),
+            named_peer(PeerId(0xbeef), Address::Public([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]), None),
+        ];
 
         // Valid ID
-        let result =
-            get_peer(&PeerIdOrAddr::from_str(&peer_id1.to_string()).unwrap(), state.clone());
-        assert_eq!(result, peer1.to_string());
-
-        // Valid Address
-        let result =
-            get_peer(&PeerIdOrAddr::from_str(&address2.as_hex_string()).unwrap(), state.clone());
-        assert_eq!(result, peer2.to_string());
+        assert_eq!(get_peer(&peers, &PeerId(0xabcd)), Some(peers[0].to_string()));
+        assert_eq!(get_peer(&peers, &PeerId(0xbeef)), Some(peers[1].to_string()));
 
         // Invalid ID
-        let invalid_peer_id = PeerId(0x1234);
-        let result =
-            get_peer(&PeerIdOrAddr::from_str(&invalid_peer_id.to_string()).unwrap(), state.clone());
-        assert_eq!(result, "No known peer");
+        assert_eq!(get_peer(&peers, &PeerId(0x1234)), None);
 
-        // Invalid Address Format
-        let result = get_peer(
-            &PeerIdOrAddr::from_str("invalid_address_format")
-                .unwrap_or(PeerIdOrAddr::PeerId(PeerId(0))),
-            state.clone(),
-        );
-        assert_eq!(result, "No known peer");
-
-        // Empty State
-        let empty_state = State::new();
-        let result = get_peer(&PeerIdOrAddr::from_str(&peer_id1.to_string()).unwrap(), empty_state);
-        assert_eq!(result, "No known peer");
+        // Empty peer cache
+        peers.clear();
+        assert_eq!(get_peer(&peers, &PeerId(0xabcd)), None);
+        assert_eq!(get_peer(&peers, &PeerId(0xbeef)), None);
     }
 
     #[test]
     fn test_to_identifier() {
-        let mut state = State::new();
-        let peer_id1 = PeerId(0xabcd);
-        let address1 = Address::Public([0xAB, 0x89, 0x67, 0x45, 0x23, 0x01]);
-        let peer1 = named_peer(peer_id1, address1.clone(), Some("Sapphire".to_string()));
-        state.peers.insert(peer_id1, peer1);
-
-        let peer_id2 = PeerId(0xbeef);
-        let address2 = Address::Public([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]);
-        let peer2 = named_peer(peer_id2, address2.clone(), None);
-        state.peers.insert(peer_id2, peer2);
+        let mut peers = vec![
+            named_peer(
+                PeerId(0xabcd),
+                Address::Public([0xAB, 0x89, 0x67, 0x45, 0x23, 0x01]),
+                Some("Sapphire".to_string()),
+            ),
+            named_peer(PeerId(0xbeef), Address::Public([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]), None),
+        ];
 
         // Valid ID Input
-        let result = to_identifier(&state, &PeerIdOrAddr::PeerId(peer_id1));
-        assert_eq!(result, Some(peer_id1));
+        assert_eq!(
+            to_identifier(&peers, &PeerIdOrAddr::PeerId(PeerId(0xabcd))),
+            Some(PeerId(0xabcd))
+        );
 
         // Valid Address Input
-        let bd_addr2 = PeerIdOrAddr::BdAddr(BdAddr(address2.as_hex_string()));
-        let result = to_identifier(&state, &bd_addr2);
-        assert_eq!(result, Some(peer_id2));
+        let bd_addr = PeerIdOrAddr::BdAddr(BdAddr(
+            Address::Public([0x11, 0x22, 0x33, 0x44, 0x55, 0x66]).as_hex_string(),
+        ));
+        assert_eq!(to_identifier(&peers, &bd_addr), Some(PeerId(0xbeef)));
 
         // Invalid Address Input
         let invalid_address = PeerIdOrAddr::BdAddr(BdAddr("00:00:00:00:00:00".to_string()));
-        let result = to_identifier(&state, &invalid_address);
-        assert_eq!(result, None);
+        assert_eq!(to_identifier(&peers, &invalid_address), None);
 
         // Invalid Address Format
         let invalid_format = PeerIdOrAddr::BdAddr(BdAddr("invalid-format".to_string()));
-        let result = to_identifier(&state, &invalid_format);
-        assert_eq!(result, None);
+        assert_eq!(to_identifier(&peers, &invalid_format), None);
 
         // Empty State
-        let empty_state = State::new();
-        let bd_addr1 = PeerIdOrAddr::BdAddr(BdAddr(address1.as_hex_string()));
-        let result = to_identifier(&empty_state, &bd_addr1);
-        assert_eq!(result, None);
+        peers.clear();
+        assert_eq!(to_identifier(&peers, &bd_addr), None);
     }
 }

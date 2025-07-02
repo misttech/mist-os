@@ -415,7 +415,7 @@ impl ThermalPolicy {
 
             self.log_platform_metric(PlatformMetric::ThrottlingResultShutdown).await;
 
-            self.send_message(&self.config.sys_pwr_handler, &Message::HighTemperatureReboot)
+            self.send_message(&self.config.sys_pwr_handler, &Message::HighTemperatureShutdown)
                 .await
                 .map_err(|e| format_err!("Failed to shut down the system: {}", e))?;
         }

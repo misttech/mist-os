@@ -21,10 +21,8 @@ async fn build_realm() -> RealmInstance {
 #[fuchsia::test]
 async fn test_register_wake_watcher() {
     let realm_instance = build_realm().await;
-    let manager = realm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fstarnix::ManagerMarker>()
-        .unwrap();
+    let manager: fstarnix::ManagerProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let job = fuchsia_runtime::job_default();
     let child_job = job.create_child_job().unwrap();
@@ -60,10 +58,8 @@ async fn test_register_wake_watcher() {
 #[fasync::run_singlethreaded(test)]
 async fn test_wake_lock() {
     let realm_instance = build_realm().await;
-    let manager = realm_instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fstarnix::ManagerMarker>()
-        .unwrap();
+    let manager: fstarnix::ManagerProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let (wake_lock, wake_lock_remote) = zx::EventPair::create();
     let job = fuchsia_runtime::job_default();

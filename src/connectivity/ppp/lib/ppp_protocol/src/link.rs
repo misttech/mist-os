@@ -194,9 +194,9 @@ where
     B: ::packet::BufferMut,
 {
     let frame = buf
-        .encapsulate(ProtocolRejectPacketBuilder::new(rejected_protocol))
-        .encapsulate(ControlProtocolPacketBuilder::new(CODE_PROTOCOL_REJECT, identifier))
-        .encapsulate(PppPacketBuilder::new(PROTOCOL_LINK_CONTROL))
+        .wrap_in(ProtocolRejectPacketBuilder::new(rejected_protocol))
+        .wrap_in(ControlProtocolPacketBuilder::new(CODE_PROTOCOL_REJECT, identifier))
+        .wrap_in(PppPacketBuilder::new(PROTOCOL_LINK_CONTROL))
         .serialize_vec_outer()
         .ok()
         .unwrap();
@@ -216,9 +216,9 @@ where
     T: FrameTransmitter,
 {
     let frame = Buf::new(&mut [], ..)
-        .encapsulate(EchoDiscardPacketBuilder::new(magic_number))
-        .encapsulate(ControlProtocolPacketBuilder::new(CODE_ECHO_REPLY, identifier))
-        .encapsulate(PppPacketBuilder::new(PROTOCOL_LINK_CONTROL))
+        .wrap_in(EchoDiscardPacketBuilder::new(magic_number))
+        .wrap_in(ControlProtocolPacketBuilder::new(CODE_ECHO_REPLY, identifier))
+        .wrap_in(PppPacketBuilder::new(PROTOCOL_LINK_CONTROL))
         .serialize_vec_outer()
         .ok()
         .unwrap();

@@ -233,6 +233,10 @@ struct BoardArgs {
     #[argh(option)]
     config: Utf8PathBuf,
 
+    /// the partitions config to add to the board.
+    #[argh(option)]
+    partitions_config: Option<Utf8PathBuf>,
+
     /// paths to board input bundles to include.
     #[argh(option)]
     board_input_bundles: Vec<Utf8PathBuf>,
@@ -322,6 +326,10 @@ struct HybridBoardArgs {
     /// replace all the bibs from these sets that are found in `config`.
     #[argh(option)]
     replace_bib_sets: Vec<Utf8PathBuf>,
+
+    /// a partitions config to insert into `config`.
+    #[argh(option)]
+    replace_partitions_config: Option<Utf8PathBuf>,
 
     /// a depfile to write.
     #[argh(option)]

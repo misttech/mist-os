@@ -16,7 +16,7 @@ use fshost_test_fixture::write_test_blob;
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio};
 
 #[cfg(feature = "fxblob")]
-use {fshost::StarnixVolumeProviderMarker, fshost_test_fixture::STARNIX_VOLUME_NAME};
+use {fshost::StarnixVolumeProviderProxy, fshost_test_fixture::STARNIX_VOLUME_NAME};
 
 pub mod config;
 use config::{blob_fs_type, data_fs_spec, data_fs_type, new_builder, volumes_spec};
@@ -38,8 +38,8 @@ async fn no_fvm_device() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     let result = admin
         .wipe_storage(Some(blobfs_server), None)
@@ -88,8 +88,8 @@ async fn write_blob() {
     let (blob_creator_proxy, blob_creator_server_end) = fidl::endpoints::create_proxy();
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
         .wipe_storage(Some(blobfs_server), Some(blob_creator_server_end))
@@ -119,11 +119,10 @@ async fn wipe_storage_deletes_starnix_volume() {
 
     // Need to connect to the StarnixVolumeProvider protocol that fshost exposes and Mount the
     // starnix volume.
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (_exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -172,8 +171,8 @@ async fn wipe_storage_deletes_starnix_volume() {
     };
 
     // Invoke the WipeStorage API.
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
         .wipe_storage(Some(blobfs_server), blob_creator)
@@ -241,8 +240,8 @@ async fn write_blob_no_existing_data_partition() {
     let (blob_creator_proxy, blob_creator_server_end) = fidl::endpoints::create_proxy();
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
         .wipe_storage(Some(blobfs_server), Some(blob_creator_server_end))
@@ -308,8 +307,8 @@ async fn blobfs_formatted() {
     };
 
     // Invoke the WipeStorage API.
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
         .wipe_storage(Some(blobfs_server), blob_creator)
@@ -325,13 +324,12 @@ async fn blobfs_formatted() {
 }
 
 // Verify that the data partition is wiped and remains unformatted.
-// TODO(https://fxbug.dev/416145492): this test doesn't work on f2fs.
 // This test is very specific to fvm, so we don't run it against fxblob. Since both volumes are in
 // fxfs anyway with fxblob, this test is somewhat redundant with the basic tests.
 #[fuchsia::test]
-#[cfg_attr(any(feature = "f2fs", feature = "fxblob"), ignore)]
+#[cfg_attr(any(feature = "fxblob"), ignore)]
 async fn data_unformatted() {
-    const BUFF_LEN: usize = 512;
+    const BUFF_LEN: usize = 4096;
     let mut builder = new_builder();
     builder.fshost().set_config_value("ramdisk_image", true);
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec()).with_gpt();
@@ -403,8 +401,8 @@ async fn data_unformatted() {
     }
 
     // Invoke WipeStorage.
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
         .wipe_storage(Some(blobfs_server), None)

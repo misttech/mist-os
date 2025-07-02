@@ -46,13 +46,13 @@ class SetPowerStateCallback : public DeviceCallback {
 
 CppDevice::~CppDevice() { msd_device_release(device_); }
 
-magma_status_t CppDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) {
+magma_status_t CppDevice::MsdQuery(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) {
   return msd_device_query(device_, id,
                           result_buffer_out ? result_buffer_out->reset_and_get_address() : nullptr,
                           result_out);
 }
 
-magma_status_t CppDevice::GetIcdList(std::vector<MsdIcdInfo>* icd_info_out) {
+magma_status_t CppDevice::MsdGetIcdList(std::vector<MsdIcdInfo>* icd_info_out) {
   ZX_DEBUG_ASSERT(icd_info_out);
 
   std::vector<MsdIcdInfo> icd_info = {MsdIcdInfo{
@@ -65,7 +65,7 @@ magma_status_t CppDevice::GetIcdList(std::vector<MsdIcdInfo>* icd_info_out) {
   return MAGMA_STATUS_OK;
 }
 
-std::unique_ptr<Connection> CppDevice::Open(msd_client_id_t client_id) {
+std::unique_ptr<Connection> CppDevice::MsdOpen(msd_client_id_t client_id) {
   struct MsdConnection* msd_connection = msd_device_create_connection(device_, client_id);
   if (!msd_connection)
     return MAGMA_DRETP(nullptr, "msd_device_create_connection failed");
@@ -73,7 +73,8 @@ std::unique_ptr<Connection> CppDevice::Open(msd_client_id_t client_id) {
   return std::make_unique<CppConnection>(msd_connection, client_id);
 }
 
-void CppDevice::SetPowerState(int64_t power_state, fit::callback<void(magma_status_t)> completer) {
+void CppDevice::MsdSetPowerState(int64_t power_state,
+                                 fit::callback<void(magma_status_t)> completer) {
   auto callback = std::make_unique<SetPowerStateCallback>(this, std::move(completer));
   {
     std::lock_guard<std::mutex> lock(device_callback_mutex_);

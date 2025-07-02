@@ -51,6 +51,9 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
         }
         .context("Could not write zxcrypt configuration")?;
 
+        let inline_crypto =
+            Config::new_bool(context.board_info.provides_feature("fuchsia::storage_inline_crypto"));
+
         builder
             .bootfs()
             .file(FileEntry {
@@ -246,6 +249,7 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             ),
             ("fuchsia.fshost.DisableAutomount", disable_automount),
             ("fuchsia.fshost.StarnixVolumeName", starnix_volume_name),
+            ("fuchsia.fshost.InlineCrypto", inline_crypto),
             ("fuchsia.blobfs.WriteCompressionAlgorithm", algorithm),
             ("fuchsia.blobfs.CacheEvictionPolicy", policy),
         ];

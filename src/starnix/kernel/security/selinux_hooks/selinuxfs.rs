@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{check_permission, superblock, task_effective_sid};
+use super::{check_permission, set_cached_sid, superblock, task_effective_sid};
 
 use crate::task::CurrentTask;
 use crate::vfs::FileHandle;
-use selinux::{InitialSid, SecurityId, SecurityPermission, SecurityServer};
+use selinux::{InitialSid, SecurityPermission, SecurityServer};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::errors::Errno;
 
@@ -14,6 +14,9 @@ pub(in crate::security) fn selinuxfs_init_null(
     current_task: &CurrentTask,
     null_file_handle: &FileHandle,
 ) {
+    // Apply the "devnull" initial SID to the node.
+    set_cached_sid(null_file_handle.node(), InitialSid::Devnull.into());
+
     let kernel_state = current_task
         .kernel()
         .security_state
@@ -30,7 +33,7 @@ pub(in crate::security) fn selinuxfs_init_null(
 /// Called by the "selinuxfs" when a policy has been successfully loaded, to allow policy-dependent
 /// initialization to be completed.
 pub(in crate::security) fn selinuxfs_policy_loaded<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
 ) where
@@ -63,7 +66,7 @@ pub(in crate::security) fn selinuxfs_check_access(
     permission: SecurityPermission,
 ) -> Result<(), Errno> {
     let source_sid = task_effective_sid(current_task);
-    let target_sid = SecurityId::initial(InitialSid::Security);
+    let target_sid = InitialSid::Security.into();
     let permission_check = security_server.as_permission_check();
     check_permission(
         &permission_check,

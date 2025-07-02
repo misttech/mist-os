@@ -41,7 +41,7 @@ impl RemoteBlockDevice {
     }
 
     fn new<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         minor: u32,
         name: &str,
@@ -105,22 +105,20 @@ impl FileOps for RemoteBlockDeviceFile {
     // devices).
     fn seek(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        default_seek(current_offset, target, |offset| {
-            let eof_offset =
-                self.device.backing_memory_size.try_into().map_err(|_| errno!(EINVAL))?;
-            offset.checked_add(eof_offset).ok_or_else(|| errno!(EINVAL))
+        default_seek(current_offset, target, || {
+            self.device.backing_memory_size.try_into().map_err(|_| errno!(EINVAL))
         })
     }
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         mut offset: usize,
@@ -143,7 +141,7 @@ impl FileOps for RemoteBlockDeviceFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         mut offset: usize,
@@ -167,7 +165,7 @@ impl FileOps for RemoteBlockDeviceFile {
 
     fn get_memory(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         requested_length: Option<usize>,
@@ -185,7 +183,7 @@ impl FileOps for RemoteBlockDeviceFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -211,7 +209,7 @@ impl FileOps for RemoteBlockDeviceFile {
 }
 
 fn open_remote_block_device(
-    _locked: &mut Locked<'_, DeviceOpen>,
+    _locked: &mut Locked<DeviceOpen>,
     current_task: &CurrentTask,
     id: DeviceType,
     _node: &FsNode,
@@ -220,7 +218,7 @@ fn open_remote_block_device(
     Ok(current_task.kernel().remote_block_device_registry.open(id.minor())?.create_file_ops())
 }
 
-pub fn remote_block_device_init(_locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTask) {
+pub fn remote_block_device_init(_locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
     current_task
         .kernel()
         .device_registry
@@ -253,7 +251,7 @@ impl RemoteBlockDeviceRegistry {
     /// exists.
     pub fn create_remote_block_device_if_absent<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &str,
         initial_size: u64,

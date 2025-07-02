@@ -794,7 +794,7 @@ async fn serve_manifest_bytes_iterator(
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::capability;

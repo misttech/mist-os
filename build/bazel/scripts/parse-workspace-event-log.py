@@ -106,8 +106,7 @@ def find_default_log_file() -> Optional[str]:
         return None
 
     top_dir = os.path.join(
-        build_dir,
-        workspace_utils.get_bazel_relative_topdir(fuchsia_dir, "main"),
+        build_dir, workspace_utils.get_bazel_topdir(fuchsia_dir)
     )
     log_file = os.path.join(top_dir, "logs", "workspace-events.log")
     return log_file

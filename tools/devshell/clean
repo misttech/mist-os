@@ -9,11 +9,16 @@
 ## Delete the contents of the output directory except for args.gn and
 ## create a Ninja build environment sufficient to regenerate the build.
 ##
-## This is equivalent to running `gn clean` on FUCHSIA_BUILD_DIR.
+## This is equivalent to running `gn clean` on FUCHSIA_BUILD_DIR, then
+## invoking `fx gen` to regenerate critical build files.
 
+# shellcheck source=/dev/null
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 fx-config-read
 
-set -ex
+set -e
 
-fx-gn clean "$FUCHSIA_BUILD_DIR"
+(set -x; fx-gn clean "$FUCHSIA_BUILD_DIR")
+
+# Ensure //build/regenerator is invoked to regenerate a working Bazel workspace.
+fx-command-run gen

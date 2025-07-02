@@ -6,7 +6,7 @@ use fuchsia_async::{DurationExt, OnTimeout, TimeoutExt};
 use fuchsia_bluetooth::types::Channel;
 use fuchsia_sync::Mutex;
 use futures::future::{FusedFuture, MaybeDone};
-use futures::stream::Stream;
+use futures::stream::{FusedStream, Stream};
 use futures::task::{Context, Poll, Waker};
 use futures::{ready, Future, FutureExt, TryFutureExt};
 use log::{info, trace, warn};
@@ -76,7 +76,7 @@ impl Peer {
             }
         }
 
-        RequestStream { inner: self.inner.clone() }
+        RequestStream::new(self.inner.clone())
     }
 
     /// Send a Stream End Point Discovery (Sec 8.6) command to the remote peer.
@@ -401,7 +401,7 @@ macro_rules! parse_one_seid {
         } else {
             Ok(Request::$request_variant {
                 stream_id: StreamEndpointId::from_msg(&$body[0]),
-                responder: $responder_type { signal: $signal, peer: $peer, id: $id },
+                responder: $responder_type { signal: $signal, peer: $peer.clone(), id: $id },
             })
         }
     };
@@ -436,7 +436,7 @@ impl Request {
     }
 
     fn parse(
-        peer: Arc<PeerInner>,
+        peer: &Arc<PeerInner>,
         id: TxLabel,
         signal: SignalIdentifier,
         body: &[u8],
@@ -447,7 +447,7 @@ impl Request {
                 if body.len() > 0 {
                     return Err(Error::RequestInvalid(ErrorCode::BadLength));
                 }
-                Ok(Request::Discover { responder: DiscoverResponder { peer, id } })
+                Ok(Request::Discover { responder: DiscoverResponder { peer: peer.clone(), id } })
             }
             SignalIdentifier::GetCapabilities => {
                 parse_one_seid!(body, signal, peer, id, GetCapabilities, GetCapabilitiesResponder)
@@ -469,7 +469,7 @@ impl Request {
                     local_stream_id: StreamEndpointId::from_msg(&body[0]),
                     remote_stream_id: StreamEndpointId::from_msg(&body[1]),
                     capabilities: requested,
-                    responder: ConfigureResponder { signal, peer, id },
+                    responder: ConfigureResponder { signal, peer: peer.clone(), id },
                 })
             }
             SignalIdentifier::GetConfiguration => {
@@ -492,7 +492,7 @@ impl Request {
                 Ok(Request::Reconfigure {
                     local_stream_id: StreamEndpointId::from_msg(&body[0]),
                     capabilities: requested,
-                    responder: ConfigureResponder { signal, peer, id },
+                    responder: ConfigureResponder { signal, peer: peer.clone(), id },
                 })
             }
             SignalIdentifier::Open => {
@@ -502,7 +502,7 @@ impl Request {
                 let seids = Request::get_req_seids(body)?;
                 Ok(Request::Start {
                     stream_ids: seids,
-                    responder: StreamResponder { signal, peer, id },
+                    responder: StreamResponder { signal, peer: peer.clone(), id },
                 })
             }
             SignalIdentifier::Close => {
@@ -512,7 +512,7 @@ impl Request {
                 let seids = Request::get_req_seids(body)?;
                 Ok(Request::Suspend {
                     stream_ids: seids,
-                    responder: StreamResponder { signal, peer, id },
+                    responder: StreamResponder { signal, peer: peer.clone(), id },
                 })
             }
             SignalIdentifier::Abort => {
@@ -527,7 +527,7 @@ impl Request {
                 Ok(Request::DelayReport {
                     stream_id: StreamEndpointId::from_msg(&body[0]),
                     delay,
-                    responder: SimpleResponder { signal, peer, id },
+                    responder: SimpleResponder { signal, peer: peer.clone(), id },
                 })
             }
             _ => Err(Error::UnimplementedMessage),
@@ -539,6 +539,13 @@ impl Request {
 #[derive(Debug)]
 pub struct RequestStream {
     inner: Arc<PeerInner>,
+    terminated: bool,
+}
+
+impl RequestStream {
+    fn new(inner: Arc<PeerInner>) -> Self {
+        Self { inner, terminated: false }
+    }
 }
 
 impl Unpin for RequestStream {}
@@ -546,10 +553,10 @@ impl Unpin for RequestStream {}
 impl Stream for RequestStream {
     type Item = Result<Request>;
 
-    fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+    fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
         Poll::Ready(match ready!(self.inner.poll_recv_request(cx)) {
             Ok(UnparsedRequest(SignalingHeader { label, signal, .. }, body)) => {
-                match Request::parse(self.inner.clone(), label, signal, &body) {
+                match Request::parse(&self.inner, label, signal, &body) {
                     Err(Error::RequestInvalid(code)) => {
                         self.inner.send_reject(label, signal, code)?;
                         return Poll::Pending;
@@ -565,9 +572,18 @@ impl Stream for RequestStream {
                     x => Some(x),
                 }
             }
-            Err(Error::PeerDisconnected) => None,
+            Err(Error::PeerDisconnected) => {
+                self.terminated = true;
+                None
+            }
             Err(e) => Some(Err(e)),
         })
+    }
+}
+
+impl FusedStream for RequestStream {
+    fn is_terminated(&self) -> bool {
+        self.terminated
     }
 }
 

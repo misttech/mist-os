@@ -231,14 +231,12 @@ async fn resolve_regular_components() {
     let (test_channel_tx, mut test_channel_rx) = mpsc::channel(1);
     let instance = create_realm("", test_channel_tx).await;
     // get a handle to lifecycle controller to start components
-    let lifecycle_controller = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>()
-        .unwrap();
+    let lifecycle_controller: fsys::LifecycleControllerProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     // get a handle to realmquery to get component info
-    let realm_query = instance
+    let realm_query: fsys::RealmQueryProxy = instance
         .root
-        .connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("failed to connect to RealmQuery");
 
     // Test resolution of a component with an absent abi revision
@@ -295,14 +293,12 @@ async fn resolve_allowlisted_components() {
     // component names are allowlisted in abi_compat_cm_config.json5.
     let instance = create_realm("exempt_", test_channel_tx).await;
     // get a handle to lifecycle controller to start components
-    let lifecycle_controller = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>()
-        .unwrap();
+    let lifecycle_controller: fsys::LifecycleControllerProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     // get a handle to realmquery to get component info
-    let realm_query = instance
+    let realm_query: fsys::RealmQueryProxy = instance
         .root
-        .connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("failed to connect to RealmQuery");
 
     // Test resolution of a component with an absent abi revision

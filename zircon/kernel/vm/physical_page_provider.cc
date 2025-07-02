@@ -237,6 +237,8 @@ void PhysicalPageProvider::UnloanRange(uint64_t range_offset, uint64_t length, l
       Pmm::Node().WithLoanedPage(page, [&maybe_vmo_backlink](vm_page_t* page) {
         maybe_vmo_backlink = pmm_page_queues()->GetCowForLoanedPage(page);
       });
+      // Either we got a backlink, or the page is already back in the PMM.
+      DEBUG_ASSERT(maybe_vmo_backlink || page->is_free_loaned());
       if (maybe_vmo_backlink) {
         // As we will be calling back into the VMO we want to drop the loaned state lock to both
         // avoid lock ordering issues, and to not excessively hold the lock. During this section we
@@ -262,17 +264,23 @@ void PhysicalPageProvider::UnloanRange(uint64_t range_offset, uint64_t length, l
             if (replace_result == ZX_ERR_SHOULD_WAIT) {
               page_request.Cancel();
             }
+            // If replacement succeeded, i.e. we are not going to fall back to eviction, then the
+            // page should be back in the PMM.
+            DEBUG_ASSERT(needs_evict || page->is_free_loaned());
           }
           if (needs_evict) {
-            cow_container->ReclaimPageForEviction(page, vmo_backlink.offset,
-                                                  VmCowPages::EvictionAction::Require);
+            [[maybe_unused]] VmCowPages::ReclaimCounts counts =
+                cow_container->ReclaimPageForEviction(page, vmo_backlink.offset,
+                                                      VmCowPages::EvictionAction::Require);
             // Either we succeeded eviction, or another thread raced and did it first. If another
             // thread did it first then it would have done so under the VMO lock, which we have
             // since acquired, and so we know the page is either on the way (in a
             // FreeLoanedPagesHolder) or in the PMM. We can ensure the page is fully migrated to the
             // PMM by waiting for any holding to be concluded.
+            DEBUG_ASSERT(counts.evicted_loaned == 0 || page->is_free_loaned());
             if (!page->is_free_loaned()) {
               Pmm::Node().WithLoanedPage(page, [](vm_page_t* page) {});
+              DEBUG_ASSERT(page->is_free_loaned());
             }
           }
         });
@@ -371,10 +379,7 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
       uint64_t supply_offset =
           list_peek_head_type(&contiguous_pages, vm_page_t, queue_node)->paddr() - phys_base_;
 
-      auto splice_list =
-          VmPageSpliceList::CreateFromPageList(supply_offset, supply_length, &contiguous_pages);
-      DEBUG_ASSERT(list_is_empty(&contiguous_pages));
-      uint64_t supplied_len = 0;
+      VmPageSpliceList splice_list;
 
       // Any pages that do not get supplied for any reason, due to failures from supply or because
       // we got detached, should be re-loaned.
@@ -392,10 +397,23 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event,
         }
       });
 
+      zx_status_t status = VmPageSpliceList::CreateFromPageList(supply_offset, supply_length,
+                                                                &contiguous_pages, &splice_list);
+      if (status != ZX_OK) {
+        // Only possible error is out of memory.
+        ASSERT(status == ZX_ERR_NO_MEMORY);
+        DEBUG_ASSERT(PageSource::IsValidInternalFailureCode(status));
+        page_source_->OnPagesFailed(supply_offset, supply_length, status);
+        // Do not attempt to then supply the pages, move to the next range.
+        continue;
+      }
+      DEBUG_ASSERT(list_is_empty(&contiguous_pages));
+      uint64_t supplied_len = 0;
+
       // First take the VMO lock before taking our lock to ensure lock ordering is correct. As we
       // hold a RefPtr we know that even if racing with OnClose this is a valid object.
       VmCowPages::DeferredOps deferred(cow_pages_);
-      Guard<VmoLockType> cow_lock{cow_pages_->lock()};
+      Guard<CriticalMutex> cow_lock{cow_pages_->lock()};
       bool detached;
       // Now take our lock and check to see if we have been detached.
       {

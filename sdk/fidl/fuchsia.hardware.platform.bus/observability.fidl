@@ -10,9 +10,11 @@ using fuchsia.driver.framework;
 /// Provides information related to interrupts assigned by the board driver to various
 /// devices.
 closed protocol InterruptAttributor {
-    strict GetInterruptInfo(struct {
+    strict GetInterruptInfo(strict union {
         /// The vector the interrupt controller uses to refer to this interrupt.
-        interrupt_vector uint32;
+        1: interrupt_vector uint32;
+        /// The koid of the interrupt object that triggered the interrupt.
+        2: interrupt_koid zx.Koid;
     }) -> (resource struct {
         /// The name of the device which the board driver gave to the device the interrupt
         /// was assigned to.

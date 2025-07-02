@@ -4,6 +4,7 @@
 
 import("//build/bazel/bazel_inputs.gni")
 import("//build/python/python_action.gni")
+import("//build/zircon/tools.gni")
 
 # Creates a directory of platform artifacts that can be shipped to out-of-tree
 # customers.
@@ -73,6 +74,8 @@ template("platform_artifacts") {
     args = [
       "--aib-list",
       rebase_path(files.aib_list, root_build_dir),
+      "--repo",
+      "fuchsia",
       "--outdir",
       rebase_path(files.platform_artifacts, root_build_dir),
       "--depfile",
@@ -85,6 +88,33 @@ template("platform_artifacts") {
         invoker.version,
       ]
     }
+
+    fvm_tool_target = "//src/storage/bin/fvm($host_toolchain)"
+    fvm_tool_path = get_label_info(fvm_tool_target, "root_out_dir") + "/fvm"
+
+    cmc_tool_target = "//tools/cmc($host_toolchain)"
+    cmc_tool_path = get_label_info(cmc_tool_target, "root_out_dir") + "/cmc"
+
+    # Add all the platform host tools.
+    deps += [
+      blobfs_tool_target,
+      cmc_tool_target,
+      fvm_tool_target,
+      zbi_tool_target,
+    ]
+    inputs = [
+      blobfs_tool_path,
+      fvm_tool_path,
+      zbi_tool_path,
+      cmc_tool_path,
+    ]
+    args += [
+      "--tools",
+      rebase_path(blobfs_tool_path, root_build_dir),
+      rebase_path(fvm_tool_path, root_build_dir),
+      rebase_path(zbi_tool_path, root_build_dir),
+      rebase_path(cmc_tool_path, root_build_dir),
+    ]
   }
 
   bazel_input_directory(labels.bazel_inputs) {
@@ -101,10 +131,10 @@ template("platform_artifacts") {
                              "visibility",
                            ])
 
-    deps = [
-      ":${labels.bazel_inputs}",
-      ":${labels.platform_artifacts}",
-    ]
+    deps = [ ":${labels.bazel_inputs}" ]
+
+    # Make the platform artifacts available to upstream dependencies.
+    public_deps = [ ":${labels.platform_artifacts}" ]
 
     if (_check_production_eligibility) {
       assert_no_deps = [ "//build/validate:non_production_tag" ]

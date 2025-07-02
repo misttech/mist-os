@@ -25,10 +25,11 @@ use index::PolicyIndex;
 use metadata::HandleUnknown;
 use parsed_policy::ParsedPolicy;
 use parser::{ByRef, ByValue, ParseStrategy};
-use std::fmt::{Debug, Display};
+use std::fmt::{Debug, Display, LowerHex};
 use std::marker::PhantomData;
 use std::num::{NonZeroU32, NonZeroU64};
 use std::ops::Deref;
+use std::str::FromStr;
 use symbols::{find_class_by_name, find_common_symbol_by_name_bytes};
 use zerocopy::{
     little_endian as le, FromBytes, Immutable, KnownLayout, Ref, SplitByteSlice, Unaligned,
@@ -138,6 +139,21 @@ impl AccessVector {
     }
 }
 
+impl FromStr for AccessVector {
+    type Err = <u32 as FromStr>::Err;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        // Access Vector values are always serialized to/from hexadecimal.
+        Ok(AccessVector(u32::from_str_radix(value, 16)?))
+    }
+}
+
+impl LowerHex for AccessVector {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        LowerHex::fmt(&self.0, f)
+    }
+}
+
 impl std::ops::BitAnd for AccessVector {
     type Output = Self;
 
@@ -169,6 +185,14 @@ impl std::ops::BitOrAssign for AccessVector {
 impl std::ops::SubAssign for AccessVector {
     fn sub_assign(&mut self, rhs: Self) {
         self.0 = self.0 ^ (self.0 & rhs.0);
+    }
+}
+
+impl std::ops::Sub for AccessVector {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        AccessVector(self.0 ^ (self.0 & rhs.0))
     }
 }
 

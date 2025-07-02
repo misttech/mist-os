@@ -13,6 +13,7 @@
 #include <zircon/process.h>
 #include <zircon/processargs.h>
 
+#include "src/developer/sshd-host/authorized_keys.h"
 #include "src/developer/sshd-host/service.h"
 
 const uint16_t kPort = 22;

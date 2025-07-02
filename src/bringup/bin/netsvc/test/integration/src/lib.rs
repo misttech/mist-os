@@ -14,8 +14,8 @@ use netstack_testing_common::realms::{Netstack2, TestSandboxExt as _};
 use netstack_testing_macros::netstack_test;
 use netsvc_proto::{debuglog, netboot, tftp};
 use packet::{
-    FragmentedBuffer as _, InnerPacketBuilder as _, MaybeReuseBufferProvider, ParseBuffer as _,
-    Serializer,
+    FragmentedBuffer as _, InnerPacketBuilder as _, MaybeReuseBufferProvider, PacketBuilder as _,
+    ParseBuffer as _, Serializer,
 };
 use std::borrow::Cow;
 use std::convert::{TryFrom as _, TryInto as _};
@@ -605,16 +605,15 @@ async fn discover(sock: &fuchsia_async::net::UdpSocket, scope_id: u32) -> std::n
             Action::Poll => {
                 cookie += 1;
                 // Build a query for all nodes ("*" + null termination).
-                let query = ("*\0".as_bytes())
-                    .into_serializer()
-                    .encapsulate(netboot::NetbootPacketBuilder::new(
-                        netboot::OpcodeOrErr::Op(netboot::Opcode::Query),
-                        cookie,
-                        ARG,
-                    ))
-                    .serialize_vec_outer()
-                    .expect("serialize query")
-                    .unwrap_b();
+                let query = netboot::NetbootPacketBuilder::new(
+                    netboot::OpcodeOrErr::Op(netboot::Opcode::Query),
+                    cookie,
+                    ARG,
+                )
+                .wrap_body(("*\0".as_bytes()).into_serializer())
+                .serialize_vec_outer()
+                .expect("serialize query")
+                .unwrap_b();
 
                 let sent = sock
                     .send_to(
@@ -964,7 +963,7 @@ where
             let index = index.try_into().expect("index doesn't fit wire representation");
 
             let () = send_message(
-                (&block[..]).into_serializer().encapsulate(tftp::DataPacketBuilder::new(index)),
+                tftp::DataPacketBuilder::new(index).wrap_body((&block[..]).into_serializer()),
                 &sock,
                 socket_addr,
             )
@@ -1468,6 +1467,10 @@ async fn starts_device_in_multicast_promiscuous(name: &str) {
             assert_eq!(mcast_filters, vec![]);
         }
     );
+    // Disable checking for clean shutdown on drop. This test exits before
+    // netsvc completes opening the session, which may cause it to exit with a
+    // sad exit code.
+    netsvc_realm.set_checked_shutdown_on_drop(false);
 }
 
 #[netstack_test]

@@ -26,4 +26,5 @@ target_repository_register.json
 target_snapshot.json
 target_screenshot.json
 target_show.json
+target_status.json
 target_wait.json

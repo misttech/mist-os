@@ -10,8 +10,9 @@ use crate::trace::duration;
 use crate::{artifacts, diagnostics};
 use diagnostics_data::Severity;
 use fidl_fuchsia_test_manager::{
-    self as ftest_manager, CaseArtifact, CaseFinished, CaseFound, CaseStarted, CaseStopped,
-    SuiteArtifact, SuiteStopped,
+    self as ftest_manager, LaunchError, SuiteArtifactGeneratedEventDetails,
+    SuiteStoppedEventDetails, TestCaseArtifactGeneratedEventDetails, TestCaseFinishedEventDetails,
+    TestCaseFoundEventDetails, TestCaseStartedEventDetails, TestCaseStoppedEventDetails,
 };
 use fuchsia_async as fasync;
 use futures::future::Either;
@@ -47,7 +48,13 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
     duration!(c"collect_suite");
 
     let RunningSuite {
-        mut event_stream, stopper, timeout, timeout_grace, max_severity_logs, ..
+        mut event_stream,
+        stopper,
+        timeout,
+        timeout_grace,
+        max_severity_logs,
+        no_cases_equals_success,
+        ..
     } = running_suite;
 
     let log_opts =
@@ -66,46 +73,54 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
     let collect_results_fut = async {
         while let Some(event_result) = event_stream.next().named("next_event").await {
             match event_result {
-                Err(e) => {
-                    suite_state
-                        .reporter
-                        .stopped(&output::ReportedOutcome::Error, Timestamp::Unknown)?;
-                    return Err(e);
-                }
+                Err(e) => match (e, no_cases_equals_success) {
+                    (RunTestSuiteError::Launch(LaunchError::NoMatchingCases), Some(true)) => {
+                        suite_state.lifecycle = Lifecycle::Stopped;
+                    }
+                    (e, _) => {
+                        suite_state
+                            .reporter
+                            .stopped(&output::ReportedOutcome::Error, Timestamp::Unknown)?;
+                        return Err(e);
+                    }
+                },
                 Ok(event) => {
                     let timestamp = Timestamp::from_nanos(event.timestamp);
-                    match event.payload.expect("event cannot be None") {
-                        ftest_manager::SuiteEventPayload::CaseFound(CaseFound {
-                            test_case_name,
-                            identifier,
+                    match event.details.expect("event cannot be None") {
+                        ftest_manager::EventDetails::TestCaseFound(TestCaseFoundEventDetails {
+                            test_case_name: Some(test_case_name),
+                            test_case_id: Some(test_case_id),
+                            ..
                         }) => {
-                            if test_cases.contains_key(&identifier) {
+                            if test_cases.contains_key(&test_case_id) {
                                 return Err(UnexpectedEventError::InvalidCaseEvent {
                                     last_state: Lifecycle::Found,
                                     next_state: Lifecycle::Found,
                                     test_case_name,
-                                    identifier,
+                                    test_case_id,
                                 }
                                 .into());
                             }
                             test_cases.insert(
-                                identifier,
+                                test_case_id,
                                 CollectedEntityState {
                                     reporter: suite_reporter
-                                        .new_case(&test_case_name, &CaseId(identifier))?,
+                                        .new_case(&test_case_name, &CaseId(test_case_id))?,
                                     name: test_case_name,
                                     lifecycle: Lifecycle::Found,
                                     artifact_tasks: vec![],
                                 },
                             );
                         }
-                        ftest_manager::SuiteEventPayload::CaseStarted(CaseStarted {
-                            identifier,
-                        }) => {
-                            let entry = test_cases.get_mut(&identifier).ok_or(
+                        ftest_manager::EventDetails::TestCaseStarted(
+                            TestCaseStartedEventDetails {
+                                test_case_id: Some(test_case_id), ..
+                            },
+                        ) => {
+                            let entry = test_cases.get_mut(&test_case_id).ok_or(
                                 UnexpectedEventError::CaseEventButNotFound {
                                     next_state: Lifecycle::Started,
-                                    identifier,
+                                    test_case_id,
                                 },
                             )?;
                             match &entry.lifecycle {
@@ -120,22 +135,25 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                                         last_state: *other,
                                         next_state: Lifecycle::Started,
                                         test_case_name: entry.name.clone(),
-                                        identifier,
+                                        test_case_id,
                                     }
                                     .into());
                                 }
                             }
                         }
-                        ftest_manager::SuiteEventPayload::CaseArtifact(CaseArtifact {
-                            identifier,
-                            artifact,
-                        }) => {
-                            let entry = test_cases.get_mut(&identifier).ok_or(
-                                UnexpectedEventError::CaseArtifactButNotFound { identifier },
+                        ftest_manager::EventDetails::TestCaseArtifactGenerated(
+                            TestCaseArtifactGeneratedEventDetails {
+                                test_case_id: Some(test_case_id),
+                                artifact: Some(artifact),
+                                ..
+                            },
+                        ) => {
+                            let entry = test_cases.get_mut(&test_case_id).ok_or(
+                                UnexpectedEventError::CaseArtifactButNotFound { test_case_id },
                             )?;
                             if matches!(entry.lifecycle, Lifecycle::Finished) {
                                 return Err(UnexpectedEventError::CaseArtifactButFinished {
-                                    identifier,
+                                    test_case_id,
                                 }
                                 .into());
                             }
@@ -147,21 +165,24 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                             .await?;
                             entry.artifact_tasks.push(fasync::Task::spawn(artifact_fut));
                         }
-                        ftest_manager::SuiteEventPayload::CaseStopped(CaseStopped {
-                            identifier,
-                            status,
-                        }) => {
-                            let entry = test_cases.get_mut(&identifier).ok_or(
+                        ftest_manager::EventDetails::TestCaseStopped(
+                            TestCaseStoppedEventDetails {
+                                test_case_id: Some(test_case_id),
+                                result: Some(result),
+                                ..
+                            },
+                        ) => {
+                            let entry = test_cases.get_mut(&test_case_id).ok_or(
                                 UnexpectedEventError::CaseEventButNotFound {
                                     next_state: Lifecycle::Stopped,
-                                    identifier,
+                                    test_case_id,
                                 },
                             )?;
                             match &entry.lifecycle {
                                 Lifecycle::Started => {
                                     // TODO(https://fxbug.dev/42159975): Record per-case runtime once we have an
                                     // accurate way to measure it.
-                                    entry.reporter.stopped(&status.into(), Timestamp::Unknown)?;
+                                    entry.reporter.stopped(&result.into(), Timestamp::Unknown)?;
                                     entry.lifecycle = Lifecycle::Stopped;
                                 }
                                 other => {
@@ -169,19 +190,21 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                                         last_state: *other,
                                         next_state: Lifecycle::Stopped,
                                         test_case_name: entry.name.clone(),
-                                        identifier,
+                                        test_case_id,
                                     }
                                     .into());
                                 }
                             }
                         }
-                        ftest_manager::SuiteEventPayload::CaseFinished(CaseFinished {
-                            identifier,
-                        }) => {
-                            let entry = test_cases.get_mut(&identifier).ok_or(
+                        ftest_manager::EventDetails::TestCaseFinished(
+                            TestCaseFinishedEventDetails {
+                                test_case_id: Some(test_case_id), ..
+                            },
+                        ) => {
+                            let entry = test_cases.get_mut(&test_case_id).ok_or(
                                 UnexpectedEventError::CaseEventButNotFound {
                                     next_state: Lifecycle::Finished,
-                                    identifier,
+                                    test_case_id,
                                 },
                             )?;
                             match &entry.lifecycle {
@@ -195,15 +218,15 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                                         last_state: *other,
                                         next_state: Lifecycle::Finished,
                                         test_case_name: entry.name.clone(),
-                                        identifier,
+                                        test_case_id,
                                     }
                                     .into());
                                 }
                             }
                         }
-                        ftest_manager::SuiteEventPayload::SuiteArtifact(SuiteArtifact {
-                            artifact,
-                        }) => {
+                        ftest_manager::EventDetails::SuiteArtifactGenerated(
+                            SuiteArtifactGeneratedEventDetails { artifact: Some(artifact), .. },
+                        ) => {
                             let artifact_fut = artifacts::drain_artifact(
                                 suite_reporter,
                                 artifact,
@@ -212,14 +235,14 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                             .await?;
                             suite_state.artifact_tasks.push(fasync::Task::spawn(artifact_fut));
                         }
-                        ftest_manager::SuiteEventPayload::SuiteStarted(_) => {
+                        ftest_manager::EventDetails::SuiteStarted(_) => {
                             match &suite_state.lifecycle {
                                 Lifecycle::Found => {
                                     suite_state.reporter.started(timestamp)?;
                                     suite_state.lifecycle = Lifecycle::Started;
                                 }
                                 other => {
-                                    return Err(UnexpectedEventError::InvalidSuiteEvent {
+                                    return Err(UnexpectedEventError::InvalidEvent {
                                         last_state: *other,
                                         next_state: Lifecycle::Started,
                                     }
@@ -227,44 +250,43 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
                                 }
                             }
                         }
-                        ftest_manager::SuiteEventPayload::SuiteStopped(SuiteStopped { status }) => {
-                            match &suite_state.lifecycle {
-                                Lifecycle::Started => {
-                                    suite_state.lifecycle = Lifecycle::Stopped;
-                                    suite_finish_timestamp = timestamp;
-                                    outcome = match status {
-                                        ftest_manager::SuiteStatus::Passed => Outcome::Passed,
-                                        ftest_manager::SuiteStatus::Failed => Outcome::Failed,
-                                        ftest_manager::SuiteStatus::DidNotFinish => {
-                                            Outcome::Inconclusive
-                                        }
-                                        ftest_manager::SuiteStatus::TimedOut
-                                        | ftest_manager::SuiteStatus::Stopped => Outcome::Timedout,
-                                        ftest_manager::SuiteStatus::InternalError => {
-                                            Outcome::error(
-                                                UnexpectedEventError::InternalErrorSuiteStatus,
-                                            )
-                                        }
-                                        s => {
-                                            return Err(
-                                                UnexpectedEventError::UnrecognizedSuiteStatus {
-                                                    status: s,
-                                                }
-                                                .into(),
-                                            );
-                                        }
-                                    };
-                                }
-                                other => {
-                                    return Err(UnexpectedEventError::InvalidSuiteEvent {
-                                        last_state: *other,
-                                        next_state: Lifecycle::Stopped,
+                        ftest_manager::EventDetails::SuiteStopped(SuiteStoppedEventDetails {
+                            result: Some(result),
+                            ..
+                        }) => match &suite_state.lifecycle {
+                            Lifecycle::Started => {
+                                suite_state.lifecycle = Lifecycle::Stopped;
+                                suite_finish_timestamp = timestamp;
+                                outcome = match result {
+                                    ftest_manager::SuiteResult::Finished => Outcome::Passed,
+                                    ftest_manager::SuiteResult::Failed => Outcome::Failed,
+                                    ftest_manager::SuiteResult::DidNotFinish => {
+                                        Outcome::Inconclusive
                                     }
-                                    .into());
-                                }
+                                    ftest_manager::SuiteResult::TimedOut
+                                    | ftest_manager::SuiteResult::Stopped => Outcome::Timedout,
+                                    ftest_manager::SuiteResult::InternalError => Outcome::error(
+                                        UnexpectedEventError::InternalErrorSuiteResult,
+                                    ),
+                                    r => {
+                                        return Err(
+                                            UnexpectedEventError::UnrecognizedSuiteResult {
+                                                result: r,
+                                            }
+                                            .into(),
+                                        );
+                                    }
+                                };
                             }
-                        }
-                        ftest_manager::SuiteEventPayloadUnknown!() => {
+                            other => {
+                                return Err(UnexpectedEventError::InvalidEvent {
+                                    last_state: *other,
+                                    next_state: Lifecycle::Stopped,
+                                }
+                                .into());
+                            }
+                        },
+                        ftest_manager::EventDetailsUnknown!() => {
                             warn!("Encountered unrecognized suite event");
                         }
                     }
@@ -416,18 +438,18 @@ pub(crate) async fn run_suite_and_collect_logs<F: Future<Output = ()> + Unpin>(
     Ok(outcome)
 }
 
-type SuiteEventStream = std::pin::Pin<
-    Box<dyn Stream<Item = Result<ftest_manager::SuiteEvent, RunTestSuiteError>> + Send>,
->;
+type EventStream =
+    std::pin::Pin<Box<dyn Stream<Item = Result<ftest_manager::Event, RunTestSuiteError>> + Send>>;
 
 /// A test suite that is known to have started execution. A suite is considered started once
 /// any event is produced for the suite.
 pub(crate) struct RunningSuite {
-    event_stream: SuiteEventStream,
+    event_stream: EventStream,
     stopper: RunningSuiteStopper,
     max_severity_logs: Option<Severity>,
     timeout: Option<std::time::Duration>,
     timeout_grace: std::time::Duration,
+    no_cases_equals_success: Option<bool>,
 }
 
 struct RunningSuiteStopper(Arc<ftest_manager::SuiteControllerProxy>);
@@ -438,23 +460,35 @@ impl RunningSuiteStopper {
     }
 }
 
+pub(crate) struct WaitForStartArgs {
+    pub(crate) proxy: ftest_manager::SuiteControllerProxy,
+    pub(crate) max_severity_logs: Option<Severity>,
+    pub(crate) timeout: Option<std::time::Duration>,
+    pub(crate) timeout_grace: std::time::Duration,
+    pub(crate) max_pipelined: Option<usize>,
+    pub(crate) no_cases_equals_success: Option<bool>,
+}
+
 impl RunningSuite {
-    /// Number of concurrently active GetEvents requests. Chosen by testing powers of 2 when
+    /// Number of concurrently active WatchEvents requests. Chosen by testing powers of 2 when
     /// running a set of tests using ffx test against an emulator, and taking the value at
     /// which improvement stops.
     const DEFAULT_PIPELINED_REQUESTS: usize = 8;
-    pub(crate) async fn wait_for_start(
-        proxy: ftest_manager::SuiteControllerProxy,
-        max_severity_logs: Option<Severity>,
-        timeout: Option<std::time::Duration>,
-        timeout_grace: std::time::Duration,
-        max_pipelined: Option<usize>,
-    ) -> Self {
+    pub(crate) async fn wait_for_start(args: WaitForStartArgs) -> Self {
+        let WaitForStartArgs {
+            proxy,
+            max_severity_logs,
+            timeout,
+            timeout_grace,
+            max_pipelined,
+            no_cases_equals_success,
+        } = args;
+
         let proxy = Arc::new(proxy);
         let proxy_clone = proxy.clone();
         // Stream of fidl responses, with multiple concurrently active requests.
         let unprocessed_event_stream = futures::stream::repeat_with(move || {
-            proxy.get_events().inspect(|events_result| match events_result {
+            proxy.watch_events().inspect(|events_result| match events_result {
                 Ok(Ok(ref events)) => info!("Latest suite event: {:?}", events.last()),
                 _ => (),
             })
@@ -481,15 +515,13 @@ impl RunningSuite {
             timeout,
             timeout_grace,
             max_severity_logs,
+            no_cases_equals_success,
         }
     }
 
     fn convert_to_result_vec(
-        vec: Result<
-            Result<Vec<ftest_manager::SuiteEvent>, ftest_manager::LaunchError>,
-            fidl::Error,
-        >,
-    ) -> Vec<Result<ftest_manager::SuiteEvent, RunTestSuiteError>> {
+        vec: Result<Result<Vec<ftest_manager::Event>, ftest_manager::LaunchError>, fidl::Error>,
+    ) -> Vec<Result<ftest_manager::Event, RunTestSuiteError>> {
         match vec {
             Ok(Ok(events)) => events.into_iter().map(Ok).collect(),
             Ok(Err(e)) => vec![Err(e.into())],
@@ -501,14 +533,14 @@ impl RunningSuite {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::output::{EntityId, SuiteId};
+    use crate::output::EntityId;
     use assert_matches::assert_matches;
     use fidl::endpoints::create_proxy_and_stream;
     use maplit::hashmap;
 
-    async fn respond_to_get_events(
+    async fn respond_to_watch_events(
         request_stream: &mut ftest_manager::SuiteControllerRequestStream,
-        events: Vec<ftest_manager::SuiteEvent>,
+        events: Vec<ftest_manager::Event>,
     ) {
         let request = request_stream
             .next()
@@ -516,8 +548,8 @@ mod test {
             .expect("did not get next request")
             .expect("error getting next request");
         let responder = match request {
-            ftest_manager::SuiteControllerRequest::GetEvents { responder } => responder,
-            r => panic!("Expected GetEvents request but got {:?}", r),
+            ftest_manager::SuiteControllerRequest::WatchEvents { responder } => responder,
+            r => panic!("Expected WatchEvents request but got {:?}", r),
         };
 
         responder.send(Ok(events)).expect("send events");
@@ -526,29 +558,29 @@ mod test {
     /// Serves all events to completion.
     async fn serve_all_events(
         mut request_stream: ftest_manager::SuiteControllerRequestStream,
-        events: Vec<ftest_manager::SuiteEvent>,
+        events: Vec<ftest_manager::Event>,
     ) {
         const BATCH_SIZE: usize = 5;
         let mut event_iter = events.into_iter();
         while event_iter.len() > 0 {
-            respond_to_get_events(
+            respond_to_watch_events(
                 &mut request_stream,
                 event_iter.by_ref().take(BATCH_SIZE).collect(),
             )
             .await;
         }
-        respond_to_get_events(&mut request_stream, vec![]).await;
+        respond_to_watch_events(&mut request_stream, vec![]).await;
     }
 
     /// Serves all events to completion, then wait for the channel to close.
     async fn serve_all_events_then_hang(
         mut request_stream: ftest_manager::SuiteControllerRequestStream,
-        events: Vec<ftest_manager::SuiteEvent>,
+        events: Vec<ftest_manager::Event>,
     ) {
         const BATCH_SIZE: usize = 5;
         let mut event_iter = events.into_iter();
         while event_iter.len() > 0 {
-            respond_to_get_events(
+            respond_to_watch_events(
                 &mut request_stream,
                 event_iter.by_ref().take(BATCH_SIZE).collect(),
             )
@@ -557,11 +589,11 @@ mod test {
         let _requests = request_stream.collect::<Vec<_>>().await;
     }
 
-    /// Creates a SuiteEvent which is unpopulated, except for timestamp.
+    /// Creates an Event which is unpopulated, except for timestamp.
     /// This isn't representative of an actual event from test framework, but is sufficient
     /// to assert events are routed correctly.
-    fn create_empty_event(timestamp: i64) -> ftest_manager::SuiteEvent {
-        ftest_manager::SuiteEvent { timestamp: Some(timestamp), ..Default::default() }
+    fn create_empty_event(timestamp: i64) -> ftest_manager::Event {
+        ftest_manager::Event { timestamp: Some(timestamp), ..Default::default() }
     }
 
     macro_rules! assert_empty_events_eq {
@@ -571,18 +603,24 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn running_suite_events_simple() {
+    async fn running_events_simple() {
         let (suite_proxy, mut suite_request_stream) =
             create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let suite_server_task = fasync::Task::spawn(async move {
-            respond_to_get_events(&mut suite_request_stream, vec![create_empty_event(0)]).await;
-            respond_to_get_events(&mut suite_request_stream, vec![]).await;
+            respond_to_watch_events(&mut suite_request_stream, vec![create_empty_event(0)]).await;
+            respond_to_watch_events(&mut suite_request_stream, vec![]).await;
             drop(suite_request_stream);
         });
 
-        let mut running_suite =
-            RunningSuite::wait_for_start(suite_proxy, None, None, std::time::Duration::ZERO, None)
-                .await;
+        let mut running_suite = RunningSuite::wait_for_start(WaitForStartArgs {
+            proxy: suite_proxy,
+            max_severity_logs: None,
+            timeout: None,
+            timeout_grace: std::time::Duration::ZERO,
+            max_pipelined: None,
+            no_cases_equals_success: None,
+        })
+        .await;
         assert_empty_events_eq!(
             running_suite.event_stream.next().await.unwrap().unwrap(),
             create_empty_event(0)
@@ -594,27 +632,33 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn running_suite_events_multiple_events() {
+    async fn running_events_multiple_events() {
         let (suite_proxy, mut suite_request_stream) =
             create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let suite_server_task = fasync::Task::spawn(async move {
-            respond_to_get_events(
+            respond_to_watch_events(
                 &mut suite_request_stream,
                 vec![create_empty_event(0), create_empty_event(1)],
             )
             .await;
-            respond_to_get_events(
+            respond_to_watch_events(
                 &mut suite_request_stream,
                 vec![create_empty_event(2), create_empty_event(3)],
             )
             .await;
-            respond_to_get_events(&mut suite_request_stream, vec![]).await;
+            respond_to_watch_events(&mut suite_request_stream, vec![]).await;
             drop(suite_request_stream);
         });
 
-        let mut running_suite =
-            RunningSuite::wait_for_start(suite_proxy, None, None, std::time::Duration::ZERO, None)
-                .await;
+        let mut running_suite = RunningSuite::wait_for_start(WaitForStartArgs {
+            proxy: suite_proxy,
+            max_severity_logs: None,
+            timeout: None,
+            timeout_grace: std::time::Duration::ZERO,
+            max_pipelined: None,
+            no_cases_equals_success: None,
+        })
+        .await;
 
         for num in 0..4 {
             assert_empty_events_eq!(
@@ -627,17 +671,23 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn running_suite_events_peer_closed() {
+    async fn running_events_peer_closed() {
         let (suite_proxy, mut suite_request_stream) =
             create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let suite_server_task = fasync::Task::spawn(async move {
-            respond_to_get_events(&mut suite_request_stream, vec![create_empty_event(1)]).await;
+            respond_to_watch_events(&mut suite_request_stream, vec![create_empty_event(1)]).await;
             drop(suite_request_stream);
         });
 
-        let mut running_suite =
-            RunningSuite::wait_for_start(suite_proxy, None, None, std::time::Duration::ZERO, None)
-                .await;
+        let mut running_suite = RunningSuite::wait_for_start(WaitForStartArgs {
+            proxy: suite_proxy,
+            max_severity_logs: None,
+            timeout: None,
+            timeout_grace: std::time::Duration::ZERO,
+            max_pipelined: None,
+            no_cases_equals_success: None,
+        })
+        .await;
         assert_empty_events_eq!(
             running_suite.event_stream.next().await.unwrap().unwrap(),
             create_empty_event(1)
@@ -649,123 +699,149 @@ mod test {
         suite_server_task.await;
     }
 
-    fn suite_event_from_payload(
+    fn event_from_details(
         timestamp: i64,
-        payload: ftest_manager::SuiteEventPayload,
-    ) -> ftest_manager::SuiteEvent {
+        details: ftest_manager::EventDetails,
+    ) -> ftest_manager::Event {
         let mut event = create_empty_event(timestamp);
-        event.payload = Some(payload);
+        event.details = Some(details);
         event
     }
 
-    fn case_found_event(timestamp: i64, identifier: u32, name: &str) -> ftest_manager::SuiteEvent {
-        suite_event_from_payload(
+    fn case_found_event(timestamp: i64, test_case_id: u32, name: &str) -> ftest_manager::Event {
+        event_from_details(
             timestamp,
-            ftest_manager::SuiteEventPayload::CaseFound(ftest_manager::CaseFound {
-                test_case_name: name.into(),
-                identifier,
+            ftest_manager::EventDetails::TestCaseFound(ftest_manager::TestCaseFoundEventDetails {
+                test_case_name: Some(name.into()),
+                test_case_id: Some(test_case_id),
+                ..Default::default()
             }),
         )
     }
 
-    fn case_started_event(timestamp: i64, identifier: u32) -> ftest_manager::SuiteEvent {
-        suite_event_from_payload(
+    fn case_started_event(timestamp: i64, test_case_id: u32) -> ftest_manager::Event {
+        event_from_details(
             timestamp,
-            ftest_manager::SuiteEventPayload::CaseStarted(ftest_manager::CaseStarted {
-                identifier,
-            }),
+            ftest_manager::EventDetails::TestCaseStarted(
+                ftest_manager::TestCaseStartedEventDetails {
+                    test_case_id: Some(test_case_id),
+                    ..Default::default()
+                },
+            ),
         )
     }
 
     fn case_stopped_event(
         timestamp: i64,
-        identifier: u32,
-        status: ftest_manager::CaseStatus,
-    ) -> ftest_manager::SuiteEvent {
-        suite_event_from_payload(
+        test_case_id: u32,
+        result: ftest_manager::TestCaseResult,
+    ) -> ftest_manager::Event {
+        event_from_details(
             timestamp,
-            ftest_manager::SuiteEventPayload::CaseStopped(ftest_manager::CaseStopped {
-                identifier,
-                status,
-            }),
+            ftest_manager::EventDetails::TestCaseStopped(
+                ftest_manager::TestCaseStoppedEventDetails {
+                    test_case_id: Some(test_case_id),
+                    result: Some(result),
+                    ..Default::default()
+                },
+            ),
         )
     }
 
-    fn case_finished_event(timestamp: i64, identifier: u32) -> ftest_manager::SuiteEvent {
-        suite_event_from_payload(
+    fn case_finished_event(timestamp: i64, test_case_id: u32) -> ftest_manager::Event {
+        event_from_details(
             timestamp,
-            ftest_manager::SuiteEventPayload::CaseFinished(ftest_manager::CaseFinished {
-                identifier,
-            }),
+            ftest_manager::EventDetails::TestCaseFinished(
+                ftest_manager::TestCaseFinishedEventDetails {
+                    test_case_id: Some(test_case_id),
+                    ..Default::default()
+                },
+            ),
         )
     }
 
     fn case_stdout_event(
         timestamp: i64,
-        identifier: u32,
+        test_case_id: u32,
         stdout: fidl::Socket,
-    ) -> ftest_manager::SuiteEvent {
-        suite_event_from_payload(
+    ) -> ftest_manager::Event {
+        event_from_details(
             timestamp,
-            ftest_manager::SuiteEventPayload::CaseArtifact(ftest_manager::CaseArtifact {
-                identifier,
-                artifact: ftest_manager::Artifact::Stdout(stdout),
-            }),
+            ftest_manager::EventDetails::TestCaseArtifactGenerated(
+                ftest_manager::TestCaseArtifactGeneratedEventDetails {
+                    test_case_id: Some(test_case_id),
+                    artifact: Some(ftest_manager::Artifact::Stdout(stdout)),
+                    ..Default::default()
+                },
+            ),
         )
     }
 
     fn case_stderr_event(
         timestamp: i64,
-        identifier: u32,
+        test_case_id: u32,
         stderr: fidl::Socket,
-    ) -> ftest_manager::SuiteEvent {
-        suite_event_from_payload(
+    ) -> ftest_manager::Event {
+        event_from_details(
             timestamp,
-            ftest_manager::SuiteEventPayload::CaseArtifact(ftest_manager::CaseArtifact {
-                identifier,
-                artifact: ftest_manager::Artifact::Stderr(stderr),
-            }),
+            ftest_manager::EventDetails::TestCaseArtifactGenerated(
+                ftest_manager::TestCaseArtifactGeneratedEventDetails {
+                    test_case_id: Some(test_case_id),
+                    artifact: Some(ftest_manager::Artifact::Stderr(stderr)),
+                    ..Default::default()
+                },
+            ),
         )
     }
 
-    fn suite_started_event(timestamp: i64) -> ftest_manager::SuiteEvent {
-        suite_event_from_payload(
+    fn suite_started_event(timestamp: i64) -> ftest_manager::Event {
+        event_from_details(
             timestamp,
-            ftest_manager::SuiteEventPayload::SuiteStarted(ftest_manager::SuiteStarted),
+            ftest_manager::EventDetails::SuiteStarted(ftest_manager::SuiteStartedEventDetails {
+                ..Default::default()
+            }),
         )
     }
 
     fn suite_stopped_event(
         timestamp: i64,
-        status: ftest_manager::SuiteStatus,
-    ) -> ftest_manager::SuiteEvent {
-        suite_event_from_payload(
+        result: ftest_manager::SuiteResult,
+    ) -> ftest_manager::Event {
+        event_from_details(
             timestamp,
-            ftest_manager::SuiteEventPayload::SuiteStopped(ftest_manager::SuiteStopped { status }),
+            ftest_manager::EventDetails::SuiteStopped(ftest_manager::SuiteStoppedEventDetails {
+                result: Some(result),
+                ..Default::default()
+            }),
         )
     }
 
     #[fuchsia::test]
-    async fn collect_suite_events_simple() {
+    async fn collect_events_simple() {
         let all_events = vec![
             suite_started_event(0),
             case_found_event(100, 0, "my_test_case"),
             case_started_event(200, 0),
-            case_stopped_event(300, 0, ftest_manager::CaseStatus::Passed),
+            case_stopped_event(300, 0, ftest_manager::TestCaseResult::Passed),
             case_finished_event(400, 0),
-            suite_stopped_event(500, ftest_manager::SuiteStatus::Passed),
+            suite_stopped_event(500, ftest_manager::SuiteResult::Finished),
         ];
 
         let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
         let test_fut = async move {
             let reporter = output::InMemoryReporter::new();
             let run_reporter = output::RunReporter::new(reporter.clone());
-            let suite_reporter =
-                run_reporter.new_suite("test-url", &SuiteId(0)).expect("create new suite");
+            let suite_reporter = run_reporter.new_suite("test-url").expect("create new suite");
 
-            let suite =
-                RunningSuite::wait_for_start(proxy, None, None, std::time::Duration::ZERO, None)
-                    .await;
+            let suite = RunningSuite::wait_for_start(WaitForStartArgs {
+                proxy,
+                max_severity_logs: None,
+                timeout: None,
+                timeout_grace: std::time::Duration::ZERO,
+                max_pipelined: None,
+                no_cases_equals_success: None,
+            })
+            .await;
             assert_eq!(
                 run_suite_and_collect_logs(
                     suite,
@@ -782,15 +858,14 @@ mod test {
             let reports = reporter.get_reports();
             let case = reports
                 .iter()
-                .find(|report| report.id == EntityId::Case { suite: SuiteId(0), case: CaseId(0) })
+                .find(|report| report.id == EntityId::Case { case: CaseId(0) })
                 .unwrap();
             assert_eq!(case.report.name, "my_test_case");
             assert_eq!(case.report.outcome, Some(output::ReportedOutcome::Passed));
             assert!(case.report.is_finished);
             assert!(case.report.artifacts.is_empty());
             assert!(case.report.directories.is_empty());
-            let suite =
-                reports.iter().find(|report| report.id == EntityId::Suite(SuiteId(0))).unwrap();
+            let suite = reports.iter().find(|report| report.id == EntityId::Suite).unwrap();
             assert_eq!(suite.report.name, "test-url");
             assert_eq!(suite.report.outcome, Some(output::ReportedOutcome::Passed));
             assert!(suite.report.is_finished);
@@ -802,7 +877,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn collect_suite_events_with_case_artifacts() {
+    async fn collect_events_with_case_artifacts() {
         const STDOUT_CONTENT: &str = "stdout from my_test_case";
         const STDERR_CONTENT: &str = "stderr from my_test_case";
 
@@ -814,9 +889,9 @@ mod test {
             case_started_event(200, 0),
             case_stdout_event(300, 0, stdout_read),
             case_stderr_event(300, 0, stderr_read),
-            case_stopped_event(300, 0, ftest_manager::CaseStatus::Passed),
+            case_stopped_event(300, 0, ftest_manager::TestCaseResult::Passed),
             case_finished_event(400, 0),
-            suite_stopped_event(500, ftest_manager::SuiteStatus::Passed),
+            suite_stopped_event(500, ftest_manager::SuiteResult::Finished),
         ];
 
         let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
@@ -829,12 +904,17 @@ mod test {
         let test_fut = async move {
             let reporter = output::InMemoryReporter::new();
             let run_reporter = output::RunReporter::new(reporter.clone());
-            let suite_reporter =
-                run_reporter.new_suite("test-url", &SuiteId(0)).expect("create new suite");
+            let suite_reporter = run_reporter.new_suite("test-url").expect("create new suite");
 
-            let suite =
-                RunningSuite::wait_for_start(proxy, None, None, std::time::Duration::ZERO, None)
-                    .await;
+            let suite = RunningSuite::wait_for_start(WaitForStartArgs {
+                proxy,
+                max_severity_logs: None,
+                timeout: None,
+                timeout_grace: std::time::Duration::ZERO,
+                max_pipelined: None,
+                no_cases_equals_success: None,
+            })
+            .await;
             assert_eq!(
                 run_suite_and_collect_logs(
                     suite,
@@ -851,7 +931,7 @@ mod test {
             let reports = reporter.get_reports();
             let case = reports
                 .iter()
-                .find(|report| report.id == EntityId::Case { suite: SuiteId(0), case: CaseId(0) })
+                .find(|report| report.id == EntityId::Case { case: CaseId(0) })
                 .unwrap();
             assert_eq!(case.report.name, "my_test_case");
             assert_eq!(case.report.outcome, Some(output::ReportedOutcome::Passed));
@@ -870,8 +950,7 @@ mod test {
             );
             assert!(case.report.directories.is_empty());
 
-            let suite =
-                reports.iter().find(|report| report.id == EntityId::Suite(SuiteId(0))).unwrap();
+            let suite = reports.iter().find(|report| report.id == EntityId::Suite).unwrap();
             assert_eq!(suite.report.name, "test-url");
             assert_eq!(suite.report.outcome, Some(output::ReportedOutcome::Passed));
             assert!(suite.report.is_finished);
@@ -884,7 +963,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn collect_suite_events_case_artifacts_complete_after_suite() {
+    async fn collect_events_case_artifacts_complete_after_suite() {
         const STDOUT_CONTENT: &str = "stdout from my_test_case";
         const STDERR_CONTENT: &str = "stderr from my_test_case";
 
@@ -896,9 +975,9 @@ mod test {
             case_started_event(200, 0),
             case_stdout_event(300, 0, stdout_read),
             case_stderr_event(300, 0, stderr_read),
-            case_stopped_event(300, 0, ftest_manager::CaseStatus::Passed),
+            case_stopped_event(300, 0, ftest_manager::TestCaseResult::Passed),
             case_finished_event(400, 0),
-            suite_stopped_event(500, ftest_manager::SuiteStatus::Passed),
+            suite_stopped_event(500, ftest_manager::SuiteResult::Finished),
         ];
 
         let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
@@ -913,12 +992,17 @@ mod test {
         let test_fut = async move {
             let reporter = output::InMemoryReporter::new();
             let run_reporter = output::RunReporter::new(reporter.clone());
-            let suite_reporter =
-                run_reporter.new_suite("test-url", &SuiteId(0)).expect("create new suite");
+            let suite_reporter = run_reporter.new_suite("test-url").expect("create new suite");
 
-            let suite =
-                RunningSuite::wait_for_start(proxy, None, None, std::time::Duration::ZERO, Some(1))
-                    .await;
+            let suite = RunningSuite::wait_for_start(WaitForStartArgs {
+                proxy,
+                max_severity_logs: None,
+                timeout: None,
+                timeout_grace: std::time::Duration::ZERO,
+                max_pipelined: Some(1),
+                no_cases_equals_success: None,
+            })
+            .await;
             assert_eq!(
                 run_suite_and_collect_logs(
                     suite,
@@ -935,7 +1019,7 @@ mod test {
             let reports = reporter.get_reports();
             let case = reports
                 .iter()
-                .find(|report| report.id == EntityId::Case { suite: SuiteId(0), case: CaseId(0) })
+                .find(|report| report.id == EntityId::Case { case: CaseId(0) })
                 .unwrap();
             assert_eq!(case.report.name, "my_test_case");
             assert_eq!(case.report.outcome, Some(output::ReportedOutcome::Passed));
@@ -954,8 +1038,7 @@ mod test {
             );
             assert!(case.report.directories.is_empty());
 
-            let suite =
-                reports.iter().find(|report| report.id == EntityId::Suite(SuiteId(0))).unwrap();
+            let suite = reports.iter().find(|report| report.id == EntityId::Suite).unwrap();
             assert_eq!(suite.report.name, "test-url");
             assert_eq!(suite.report.outcome, Some(output::ReportedOutcome::Passed));
             assert!(suite.report.is_finished);
@@ -967,7 +1050,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn collect_suite_events_with_case_artifacts_sent_after_case_stopped() {
+    async fn collect_events_with_case_artifacts_sent_after_case_stopped() {
         const STDOUT_CONTENT: &str = "stdout from my_test_case";
         const STDERR_CONTENT: &str = "stderr from my_test_case";
 
@@ -977,11 +1060,11 @@ mod test {
             suite_started_event(0),
             case_found_event(100, 0, "my_test_case"),
             case_started_event(200, 0),
-            case_stopped_event(300, 0, ftest_manager::CaseStatus::Passed),
+            case_stopped_event(300, 0, ftest_manager::TestCaseResult::Passed),
             case_stdout_event(300, 0, stdout_read),
             case_stderr_event(300, 0, stderr_read),
             case_finished_event(400, 0),
-            suite_stopped_event(500, ftest_manager::SuiteStatus::Passed),
+            suite_stopped_event(500, ftest_manager::SuiteResult::Finished),
         ];
 
         let (proxy, stream) = create_proxy_and_stream::<ftest_manager::SuiteControllerMarker>();
@@ -994,12 +1077,17 @@ mod test {
         let test_fut = async move {
             let reporter = output::InMemoryReporter::new();
             let run_reporter = output::RunReporter::new(reporter.clone());
-            let suite_reporter =
-                run_reporter.new_suite("test-url", &SuiteId(0)).expect("create new suite");
+            let suite_reporter = run_reporter.new_suite("test-url").expect("create new suite");
 
-            let suite =
-                RunningSuite::wait_for_start(proxy, None, None, std::time::Duration::ZERO, None)
-                    .await;
+            let suite = RunningSuite::wait_for_start(WaitForStartArgs {
+                proxy,
+                max_severity_logs: None,
+                timeout: None,
+                timeout_grace: std::time::Duration::ZERO,
+                max_pipelined: None,
+                no_cases_equals_success: None,
+            })
+            .await;
             assert_eq!(
                 run_suite_and_collect_logs(
                     suite,
@@ -1016,7 +1104,7 @@ mod test {
             let reports = reporter.get_reports();
             let case = reports
                 .iter()
-                .find(|report| report.id == EntityId::Case { suite: SuiteId(0), case: CaseId(0) })
+                .find(|report| report.id == EntityId::Case { case: CaseId(0) })
                 .unwrap();
             assert_eq!(case.report.name, "my_test_case");
             assert_eq!(case.report.outcome, Some(output::ReportedOutcome::Passed));
@@ -1035,8 +1123,7 @@ mod test {
             );
             assert!(case.report.directories.is_empty());
 
-            let suite =
-                reports.iter().find(|report| report.id == EntityId::Suite(SuiteId(0))).unwrap();
+            let suite = reports.iter().find(|report| report.id == EntityId::Suite).unwrap();
             assert_eq!(suite.report.name, "test-url");
             assert_eq!(suite.report.outcome, Some(output::ReportedOutcome::Passed));
             assert!(suite.report.is_finished);
@@ -1049,7 +1136,7 @@ mod test {
     }
 
     #[fuchsia::test]
-    async fn collect_suite_events_timed_out_case_with_hanging_artifacts() {
+    async fn collect_events_timed_out_case_with_hanging_artifacts() {
         // create sockets and leave the server end open to simulate a hang.
         let (_stdout_write, stdout_read) = fidl::Socket::create_stream();
         let (_stderr_write, stderr_read) = fidl::Socket::create_stream();
@@ -1065,16 +1152,16 @@ mod test {
         let test_fut = async move {
             let reporter = output::InMemoryReporter::new();
             let run_reporter = output::RunReporter::new(reporter.clone());
-            let suite_reporter =
-                run_reporter.new_suite("test-url", &SuiteId(0)).expect("create new suite");
+            let suite_reporter = run_reporter.new_suite("test-url").expect("create new suite");
 
-            let suite = RunningSuite::wait_for_start(
+            let suite = RunningSuite::wait_for_start(WaitForStartArgs {
                 proxy,
-                None,
-                Some(std::time::Duration::from_secs(2)),
-                std::time::Duration::ZERO,
-                None,
-            )
+                max_severity_logs: None,
+                timeout: Some(std::time::Duration::from_secs(2)),
+                timeout_grace: std::time::Duration::ZERO,
+                max_pipelined: None,
+                no_cases_equals_success: None,
+            })
             .await;
             assert_eq!(
                 run_suite_and_collect_logs(
@@ -1092,7 +1179,7 @@ mod test {
             let reports = reporter.get_reports();
             let case = reports
                 .iter()
-                .find(|report| report.id == EntityId::Case { suite: SuiteId(0), case: CaseId(0) })
+                .find(|report| report.id == EntityId::Case { case: CaseId(0) })
                 .unwrap();
             assert_eq!(case.report.name, "my_test_case");
             assert_eq!(case.report.outcome, Some(output::ReportedOutcome::Timedout));
@@ -1111,8 +1198,7 @@ mod test {
             );
             assert!(case.report.directories.is_empty());
 
-            let suite =
-                reports.iter().find(|report| report.id == EntityId::Suite(SuiteId(0))).unwrap();
+            let suite = reports.iter().find(|report| report.id == EntityId::Suite).unwrap();
             assert_eq!(suite.report.name, "test-url");
             assert_eq!(suite.report.outcome, Some(output::ReportedOutcome::Timedout));
             assert!(suite.report.is_finished);

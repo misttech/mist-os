@@ -400,7 +400,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_alias_inspect_data() {
+    async fn test_alias_inspect_data() {
         let alias = "Alif";
         let overrides = Some(Arc::new(TypefaceQueryOverrides {
             style: StyleOptions {
@@ -425,7 +425,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_family_inspect_data() {
+    async fn test_family_inspect_data() {
         let mut family = FontFamilyBuilder::new("Alpha", Some(GenericFontFamily::Cursive));
         family.add_typeface_once(Arc::new(Typeface {
             asset_id: AssetId(0),

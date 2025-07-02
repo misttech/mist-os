@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.pwm/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.vreg/cpp/wire_test_base.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
 #include <memory>
@@ -174,11 +175,20 @@ class AmlPowerTestEnvironment : public fdf_testing::Environment {
   void InitVim3() { mode_ = Mode::kVim3; }
 
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+
     device_server_.Initialize(component::kDefaultInstance, std::nullopt);
-    zx_status_t status =
-        device_server_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs);
+    zx_status_t status = device_server_.Serve(dispatcher, &to_driver_vfs);
     if (status != ZX_OK) {
       return zx::error(status);
+    }
+
+    {
+      zx::result result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
+          pdev_.GetInstanceHandler(dispatcher));
+      if (result.is_error()) {
+        return result.take_error();
+      }
     }
 
     switch (mode_) {
@@ -230,6 +240,7 @@ class AmlPowerTestEnvironment : public fdf_testing::Environment {
   FakeVregServer little_cluster_vreg_;
 
   compat::DeviceServer device_server_;
+  fdf_fake::FakePDev pdev_;
 };
 
 class FixtureConfig final {
@@ -343,6 +354,7 @@ class AmlPowerTest : public ::testing::Test {
           node_offers.insert(node_offers.end(), additional_node_offers.begin(),
                              additional_node_offers.end());
           node_offers.emplace_back(MakeOffer<fuchsia_driver_compat::Service>());
+          node_offers.emplace_back(MakeOffer<fuchsia_hardware_platform_device::Service>());
         }));
   }
 

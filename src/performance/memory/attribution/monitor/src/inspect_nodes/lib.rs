@@ -5,7 +5,7 @@ use anyhow::{anyhow, Error, Result};
 use attribution_processing::digest::{BucketDefinition, Digest};
 use attribution_processing::AttributionDataProvider;
 use fpressure::WatcherRequest;
-use fuchsia_async::{MonotonicDuration, Task, WakeupTime};
+use fuchsia_async::{MonotonicDuration, MonotonicInstant, Task, WakeupTime};
 use fuchsia_inspect::{ArrayProperty, Inspector, Node};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use futures::{select, try_join, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
@@ -14,6 +14,7 @@ use log::debug;
 use memory_monitor2_config::Config;
 use stalls::StallProvider;
 use std::sync::Arc;
+use std::u64;
 use {
     fidl_fuchsia_kernel as fkernel, fidl_fuchsia_memorypressure as fpressure, fuchsia_inspect as _,
     inspect_runtime as _,
@@ -29,12 +30,12 @@ pub struct ServiceTask {
 /// Begins to serve the inspect tree, and returns an object holding the server's resources.
 /// Dropping the `ServiceTask` stops the service.
 pub fn start_service(
-    attribution_data_service: Arc<impl AttributionDataProvider>,
+    attribution_data_service: Arc<impl AttributionDataProvider + 'static>,
     kernel_stats_proxy: fkernel::StatsProxy,
     stall_provider: Arc<impl StallProvider>,
     memory_monitor2_config: Config,
     memorypressure_proxy: fpressure::ProviderProxy,
-    bucket_definitions: Vec<BucketDefinition>,
+    bucket_definitions: Arc<[BucketDefinition]>,
 ) -> Result<ServiceTask> {
     debug!("Start serving inspect tree.");
 
@@ -47,7 +48,12 @@ pub fn start_service(
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default())
             .ok_or_else(|| anyhow!("Failed to serve server handling `fuchsia.inspect.Tree`"))?;
 
-    build_inspect_tree(kernel_stats_proxy.clone(), stall_provider.clone(), inspector);
+    build_inspect_tree(
+        kernel_stats_proxy.clone(),
+        stall_provider.clone(),
+        inspector,
+        &memory_monitor2_config,
+    );
     let digest_service = digest_service(
         memory_monitor2_config,
         attribution_data_service,
@@ -64,7 +70,11 @@ fn build_inspect_tree(
     kernel_stats_proxy: fkernel::StatsProxy,
     stall_provider: Arc<impl StallProvider>,
     inspector: &Inspector,
+    config: &Config,
 ) {
+    // Register the current config.
+    inspector.root().record_child("config", |node| config.record_inspect(node));
+
     // Lazy evaluation is unregistered when the `LazyNode` is dropped.
     {
         let kernel_stats_proxy = kernel_stats_proxy.clone();
@@ -181,13 +191,28 @@ fn build_inspect_tree(
             let stall_info = stall_provider.get_stall_info().unwrap();
             async move {
                 let inspector = Inspector::default();
-                inspector.root().record_int("some", stall_info.stall_time_some);
-                inspector.root().record_int("full", stall_info.stall_time_full);
+                inspector.root().record_uint(
+                    "some_ms",
+                    stall_info.some.as_millis().try_into().unwrap_or(u64::MAX),
+                );
+                inspector.root().record_uint(
+                    "full_ms",
+                    stall_info.full.as_millis().try_into().unwrap_or(u64::MAX),
+                );
                 Ok(inspector)
             }
             .boxed()
         });
     }
+}
+
+fn pressure_to_deadline(level: fpressure::Level, config: &Config) -> MonotonicInstant {
+    MonotonicInstant::now()
+        + MonotonicDuration::from_seconds(match level {
+            fpressure::Level::Normal => config.normal_capture_delay_s,
+            fpressure::Level::Warning => config.warning_capture_delay_s,
+            fpressure::Level::Critical => config.critical_capture_delay_s,
+        } as i64)
 }
 
 fn digest_service(
@@ -196,7 +221,7 @@ fn digest_service(
     stall_provider: Arc<impl StallProvider>,
     kernel_stats_proxy: fkernel::StatsProxy,
     memorypressure_proxy: fpressure::ProviderProxy,
-    bucket_definitions: Vec<BucketDefinition>,
+    bucket_definitions: Arc<[BucketDefinition]>,
     digest_node: Node,
 ) -> Result<Task<Result<(), Error>>> {
     // Initialize pressure monitoring.
@@ -214,24 +239,17 @@ fn digest_service(
 
         // Get the initial, baseline pressure level.
         let (request, mut pressure_stream) = pressure_stream.into_future().await;
-        let WatcherRequest::OnLevelChanged { level, responder } = request.ok_or_else(|| {
-            anyhow::Error::msg(
-                "Unexpectedly exhausted pressure stream before receiving baseline pressure level",
-            )
-        })??;
-        responder.send()?;
-        let mut current_level = level;
-        let new_timer = |level| {
-            MonotonicDuration::from_seconds(match level {
-                fpressure::Level::Normal => memory_monitor2_config.normal_capture_delay_s,
-                fpressure::Level::Warning => memory_monitor2_config.warning_capture_delay_s,
-                fpressure::Level::Critical => memory_monitor2_config.critical_capture_delay_s,
-            } as i64)
-            .into_timer()
-            .boxed()
-            .fuse()
+        let mut current_level = {
+            let WatcherRequest::OnLevelChanged { level, responder } = request.ok_or_else(|| {
+                anyhow::Error::msg(
+                    "Unexpectedly exhausted pressure stream before receiving baseline pressure level",
+                )
+            })??;
+            responder.send()?;
+            level
         };
-        let mut timer = new_timer(current_level);
+        let mut deadline = pressure_to_deadline(current_level, &memory_monitor2_config);
+        let mut timer = Box::pin(deadline.into_timer());
         loop {
             // Wait for either a pressure change or the timer corresponding to the current level. In
             // either case, reset the timer.
@@ -242,15 +260,31 @@ fn digest_service(
                     match pressure.ok_or_else(|| anyhow::Error::msg("Unexpectedly exhausted pressure stream"))?? {
                         WatcherRequest::OnLevelChanged{level, responder} => {
                             responder.send()?;
+                            // Don't do anything if the pressure has not changed.
                             if level == current_level { continue; }
                             current_level = level;
-                            timer = new_timer(level);
-                            if !memory_monitor2_config.capture_on_pressure_change { continue; }
+                            let new_deadline = pressure_to_deadline(level, &memory_monitor2_config);
+                            if memory_monitor2_config.capture_on_pressure_change {
+                                // Do a capture then use new schedule
+                                deadline = new_deadline;
+                                timer = Box::pin(deadline.into_timer());
+                            } else {
+                                // Schedule the next capture if needed. Never postpone a previously
+                                // scheduled but not yet honored capture: this would risk captures
+                                // being arbitrarily delayed if pressure changes frequently.
+                                if deadline > new_deadline {
+                                    deadline = new_deadline;
+                                    timer = Box::pin(deadline.into_timer());
+                                }
+                                continue;
+                            }
                         },
                     },
-                // If instead we reached the deadline, do a capture anyway. The deadline depends on
-                // the current pressure level and the configuration.
-                _ = timer => {timer = new_timer(current_level);}
+                // If we reached the deadline, schedule the next capture and do the current one.
+                _ = timer => {
+                    deadline = pressure_to_deadline(current_level, &memory_monitor2_config);
+                    timer = Box::pin(deadline.into_timer());
+                },
             };
 
             let timestamp = zx::BootInstant::get();
@@ -265,7 +299,7 @@ fn digest_service(
                 &*attribution_data_service,
                 &kmem_stats,
                 &kmem_stats_compression,
-                &bucket_definitions,
+                &*bucket_definitions,
             )?;
 
             // Initialize the inspect property containing the buckets names, if necessary.
@@ -291,8 +325,14 @@ fn digest_service(
                 }
                 n.record(ia);
                 n.record_child("stalls", |child| {
-                    child.record_int("some", stall_values.stall_time_some);
-                    child.record_int("full", stall_values.stall_time_full);
+                    child.record_uint(
+                        "some_ms",
+                        stall_values.some.as_millis().try_into().unwrap_or(u64::MAX),
+                    );
+                    child.record_uint(
+                        "full_ms",
+                        stall_values.full.as_millis().try_into().unwrap_or(u64::MAX),
+                    );
                 });
             });
         }
@@ -311,6 +351,7 @@ mod tests {
     use fuchsia_async::TestExecutor;
     use futures::task::Poll;
     use futures::TryStreamExt;
+    use stalls::MemoryStallMetrics;
     use std::time::Duration;
     use {
         fidl_fuchsia_memory_attribution_plugin as fplugin,
@@ -415,15 +456,10 @@ mod tests {
 
     struct FakeStallProvider {}
     impl StallProvider for FakeStallProvider {
-        fn get_stall_info(&self) -> Result<zx::MemoryStall, anyhow::Error> {
-            Ok(zx::MemoryStall { stall_time_some: 10, stall_time_full: 20 })
-        }
-
-        fn get_stall_rate(&self) -> Option<stalls::MemoryStallRate> {
-            Some(stalls::MemoryStallRate {
-                interval: fasync::MonotonicDuration::from_seconds(60),
-                rate_some: 1,
-                rate_full: 2,
+        fn get_stall_info(&self) -> Result<MemoryStallMetrics, anyhow::Error> {
+            Ok(MemoryStallMetrics {
+                some: Duration::from_millis(10),
+                full: Duration::from_millis(20),
             })
         }
     }
@@ -441,13 +477,24 @@ mod tests {
 
         let inspector = fuchsia_inspect::Inspector::default();
 
-        build_inspect_tree(stats_provider, Arc::new(FakeStallProvider {}), &inspector);
+        build_inspect_tree(
+            stats_provider,
+            Arc::new(FakeStallProvider {}),
+            &inspector,
+            &Config {
+                capture_on_pressure_change: true,
+                critical_capture_delay_s: 1,
+                imminent_oom_capture_delay_s: 2,
+                normal_capture_delay_s: 3,
+                warning_capture_delay_s: 4,
+            },
+        );
 
         let output = exec
             .run_singlethreaded(fuchsia_inspect::reader::read(&inspector))
             .expect("got hierarchy");
 
-        assert_data_tree!(output, root: {
+        assert_data_tree!(@executor exec, output, root: {
             kmem_stats: {
                 total_bytes: 1u64,
                 free_bytes: 2u64,
@@ -488,9 +535,16 @@ mod tests {
                 ]
             },
             stalls: {
-                some: 10i64,
-                full: 20i64,
-            }
+                some_ms: 10u64,
+                full_ms: 20u64,
+            },
+            config: {
+                capture_on_pressure_change: true,
+                critical_capture_delay_s: 1u64,
+                imminent_oom_capture_delay_s: 2u64,
+                normal_capture_delay_s: 3u64,
+                warning_capture_delay_s: 4u64,
+            },
         });
     }
 
@@ -520,7 +574,7 @@ mod tests {
             Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
-            vec![],
+            Default::default(),
             inspector.root().create_child("logger"),
         )?);
         // Expects digst_service to register a watcher, answers with
@@ -572,7 +626,7 @@ mod tests {
             panic!("Couldn't retrieve inspect output");
         };
 
-        assert_data_tree!(output, root: {
+        assert_data_tree!(@executor exec, output, root: {
             logger: {
                 buckets: vec![
                     "Undigested",
@@ -603,8 +657,8 @@ mod tests {
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
                         stalls: {
-                            some: 10i64,
-                            full: 20i64,
+                            some_ms: 10u64,
+                            full_ms: 20u64,
                         },
                     },
                     // Corresponds to the capture after the passage of time
@@ -623,8 +677,8 @@ mod tests {
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
                         stalls: {
-                            some: 10i64,
-                            full: 20i64,
+                            some_ms: 10u64,
+                            full_ms: 20u64,
                         },
                     },
                 },
@@ -658,7 +712,7 @@ mod tests {
             Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
-            vec![],
+            Default::default(),
             inspector.root().create_child("logger"),
         )?);
         // digest_service registers a watcher; make sure we answer.  Also, make sure not to drop the
@@ -705,7 +759,7 @@ mod tests {
             panic!("Couldn't retrieve inspect output");
         };
 
-        assert_data_tree!(output, root: {
+        assert_data_tree!(@executor exec, output, root: {
             logger: {
                 buckets: vec![
                     "Undigested",
@@ -736,8 +790,132 @@ mod tests {
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
                         stalls: {
-                            some: 10i64,
-                            full: 20i64,
+                            some_ms: 10u64,
+                            full_ms: 20u64,
+                        },
+                    },
+            },
+            },
+        });
+        Ok(())
+    }
+
+    #[test]
+    fn test_digest_service_new_pressure_does_not_postpone() -> anyhow::Result<()> {
+        // See https://fxbug.dev/417722087 for context.
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let (stats_provider, stats_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fkernel::StatsMarker>();
+
+        fasync::Task::spawn(async move {
+            serve_kernel_stats(stats_request_stream).await.unwrap();
+        })
+        .detach();
+        let (pressure_provider, pressure_request_stream) =
+            fidl::endpoints::create_proxy_and_stream::<fpressure::ProviderMarker>();
+        let inspector = fuchsia_inspect::Inspector::default();
+        let mut digest_service = std::pin::pin!(digest_service(
+            Config {
+                capture_on_pressure_change: false,
+                imminent_oom_capture_delay_s: 10,
+                critical_capture_delay_s: 10,
+                warning_capture_delay_s: 100,
+                normal_capture_delay_s: 100,
+            },
+            get_attribution_data_provider(),
+            Arc::new(FakeStallProvider {}),
+            stats_provider,
+            pressure_provider,
+            Default::default(),
+            inspector.root().create_child("logger"),
+        )?);
+        // digest_service registers a watcher; make sure we answer.  Also, make sure not to drop the
+        // proxy nor the pressure stream; early termination would get reported to digest_service,
+        // which then prematurely interrupts it, before the timers have a chance to run.
+        let Poll::Ready((watcher, _pressure_stream)) = exec
+            .run_until_stalled(
+                &mut std::pin::pin!(pressure_request_stream.then(|request| async {
+                    let fpressure::ProviderRequest::RegisterWatcher { watcher, .. } =
+                        request.map_err(anyhow::Error::from)?;
+                    let watcher_proxy = watcher.into_proxy();
+                    watcher_proxy.on_level_changed(fpressure::Level::Critical).await?;
+                    Ok::<fpressure::WatcherProxy, anyhow::Error>(watcher_proxy)
+                }))
+                .into_future(),
+            )
+            .map(|(watcher, pressure_stream)| {
+                (
+                    watcher.ok_or_else(|| {
+                        anyhow::Error::msg("Pressure stream unexpectedly exhausted")
+                    }),
+                    pressure_stream,
+                )
+            })
+        else {
+            panic!("Failed to register the watcher");
+        };
+
+        // Keep the watcher alive; otherwise the pressure stream would get dropped, which would
+        // cause digest_service to early error out.
+        let watcher = watcher??;
+        // Give digest_service the opportunity to setup its timers.
+        assert!(exec.run_until_stalled(&mut digest_service)?.is_pending());
+        // Fake a pressure change, so that the frequency of captures drops down.
+        assert!(exec
+            .run_until_stalled(&mut watcher.on_level_changed(fpressure::Level::Normal))?
+            .is_ready());
+        assert!(exec.run_until_stalled(&mut digest_service)?.is_pending());
+        // Fake the passage of time, so that digest_service may do a capture; wait long enough that
+        // the first two captures at Critical frequency would have already happened, but short
+        // enough that no capture happens at the Normal frequency.
+        assert!(exec
+            .run_until_stalled(&mut std::pin::pin!(TestExecutor::advance_to(
+                exec.now() + Duration::from_secs(25).into()
+            )))
+            .is_ready());
+        // Ensure that digest_service has an opportunity to react to the passage of time.
+        assert!(exec.run_until_stalled(&mut digest_service)?.is_pending());
+        // This should resolve immediately because the inspect hierarchy has been populated by now.
+        let Poll::Ready(output) = exec
+            .run_until_stalled(&mut fuchsia_inspect::reader::read(&inspector).boxed())
+            .map(|r| r.expect("got hierarchy"))
+        else {
+            panic!("Couldn't retrieve inspect output");
+        };
+
+        assert_data_tree!(@executor exec, output, root: {
+            logger: {
+                buckets: vec![
+                    "Undigested",
+                    "Orphaned",
+                    "Kernel",
+                    "Free",
+                    "[Addl]PagerTotal",
+                    "[Addl]PagerNewest",
+                    "[Addl]PagerOldest",
+                    "[Addl]DiscardableLocked",
+                    "[Addl]DiscardableUnlocked",
+                    "[Addl]ZramCompressedBytes",
+                ],
+                measurements: {
+                    // Corresponds to the capture after the passage of time
+                    "0": {
+                        timestamp: NonZeroIntProperty,
+                        bucket_sizes: vec![
+                            1024u64, // Undigested: matches the single unmatched VMO
+                            6u64,    // Orphaned: vmo_bytes reported by the kernel but not covered by any bucket
+                            31u64,   // Kernel: 3 wired + 4 heap + 7 mmu + 8 IPC + 9 other = 31
+                            2u64,    // Free
+                            14u64,   // [Addl]PagerTotal
+                            15u64,   // [Addl]PagerNewest
+                            16u64,   // [Addl]PagerOldest
+                            18u64,   // [Addl]DiscardableLocked
+                            19u64,   // [Addl]DiscardableUnlocked
+                            21u64,   // [Addl]ZramCompressedBytes
+                        ],
+                        stalls: {
+                            some_ms: 10u64,
+                            full_ms: 20u64,
                         },
                     },
             },
@@ -781,7 +959,7 @@ mod tests {
             Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
-            vec![],
+            Default::default(),
             inspector.root().create_child("logger"),
         )?);
         let watcher =
@@ -792,7 +970,7 @@ mod tests {
             .run_singlethreaded(fuchsia_inspect::reader::read(&inspector))
             .expect("got hierarchy");
 
-        assert_data_tree!(output, root: {
+        assert_data_tree!(@executor exec, output, root: {
             logger: {
                 measurements: {},
             },
@@ -835,7 +1013,7 @@ mod tests {
             Arc::new(FakeStallProvider {}),
             stats_provider,
             pressure_provider,
-            vec![],
+            Default::default(),
             inspector.root().create_child("logger"),
         )?);
         let watcher =
@@ -846,7 +1024,7 @@ mod tests {
             .run_singlethreaded(fuchsia_inspect::reader::read(&inspector))
             .expect("got hierarchy");
 
-        assert_data_tree!(output, root: {
+        assert_data_tree!(@executor exec, output, root: {
             logger: {
                 buckets: vec![
                     "Undigested",
@@ -876,8 +1054,8 @@ mod tests {
                             21u64,   // [Addl]ZramCompressedBytes
                         ],
                         stalls: {
-                            some: 10i64,
-                            full: 20i64,
+                            some_ms: 10u64,
+                            full_ms: 20u64,
                         },
                     },
                 },

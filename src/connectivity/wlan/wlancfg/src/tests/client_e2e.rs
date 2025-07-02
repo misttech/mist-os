@@ -1000,6 +1000,7 @@ fn test_save_and_fail_to_connect(
 #[test_case(fidl_policy::NetworkConfigChangeError::CredentialLenError, TEST_SSID.clone().into(), Saved::Wpa2, fidl_policy::Credential::Psk(hex::decode(b"12345678").unwrap()))]
 // Saving this network should fail because the password is too short.
 #[test_case(fidl_policy::NetworkConfigChangeError::CredentialLenError, TEST_SSID.clone().into(), Saved::Wpa2, fidl_policy::Credential::Password(b"12".to_vec()))]
+#[fuchsia::test(add_test_attr = false)]
 fn test_fail_to_save(
     save_error: fidl_policy::NetworkConfigChangeError,
     ssid: Vec<u8>,
@@ -1762,6 +1763,129 @@ fn test_autoconnect_to_hidden_saved_network_and_reconnect() {
         assert_eq!(state.unwrap(), fidl_policy::WlanClientState::ConnectionsDisabled);
         assert_eq!(networks.unwrap().len(), 0);
     }
+}
+
+#[fuchsia::test]
+fn test_destroy_iface_recovery() {
+    let mut exec = fasync::TestExecutor::new();
+    let mut test_values =
+        test_setup(&mut exec, "thresholded_recovery", true, RoamingPolicy::Disabled);
+
+    // No request has been sent yet. Future should be idle.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Enable client connections.
+    let _iface_sme_stream = prepare_client_interface(&mut exec, &mut test_values);
+
+    // Turn off client connections via Policy API
+    let stop_connections_fut =
+        test_values.external_interfaces.client_controller.stop_client_connections();
+    let mut stop_connections_fut = pin!(stop_connections_fut);
+    assert_variant!(exec.run_until_stalled(&mut stop_connections_fut), Poll::Pending);
+
+    // Device monitor gets an iface destruction request and responds indicating that the interface
+    // destruction was unsuccessful.
+    let iface_destruction_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    assert_variant!(
+        iface_destruction_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::DestroyIface {
+            req: fidl_fuchsia_wlan_device_service::DestroyIfaceRequest {
+                iface_id: TEST_CLIENT_IFACE_ID
+            },
+            responder
+        })) => {
+            assert!(responder.send(
+                zx::sys::ZX_ERR_INTERNAL
+            ).is_ok());
+        }
+    );
+
+    // Check for a response to the Policy API stop client connections request
+    let stop_connections_resp = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        &mut stop_connections_fut,
+    );
+    assert_variant!(
+        stop_connections_resp,
+        Ok(fidl_fuchsia_wlan_policy::RequestStatus::Acknowledged)
+    );
+
+    // Run the wlancfg internals and verify that a PHY reset has been requested.
+    let phy_reset_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    assert_variant!(
+        phy_reset_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::Reset {
+            phy_id: TEST_PHY_ID,
+            ..
+        }))
+    );
+}
+
+#[fuchsia::test]
+fn test_create_iface_recovery() {
+    let mut exec = fasync::TestExecutor::new();
+    let mut test_values =
+        test_setup(&mut exec, "thresholded_recovery", true, RoamingPolicy::Disabled);
+
+    // No request has been sent yet. Future should be idle.
+    assert_variant!(
+        exec.run_until_stalled(&mut test_values.internal_objects.internal_futures),
+        Poll::Pending
+    );
+
+    // Add a fake PHY.
+    add_phy(&mut exec, &mut test_values);
+
+    // Start client connections so that a CreateIface request is made.
+    let start_connections_fut =
+        test_values.external_interfaces.client_controller.start_client_connections();
+    let mut start_connections_fut = pin!(start_connections_fut);
+    assert_variant!(exec.run_until_stalled(&mut start_connections_fut), Poll::Pending);
+
+    // Expect an interface creation request and reply with a failure to trigger recovery.
+    let iface_creation_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    assert_variant!(
+        iface_creation_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::CreateIface {
+            payload,
+            responder
+        })) => {
+            assert_eq!(payload.phy_id.unwrap(), TEST_PHY_ID);
+            assert_eq!(payload.role.unwrap(), fidl_common::WlanMacRole::Client);
+            assert_eq!(payload.sta_address.unwrap(), [0, 0, 0, 0, 0, 0]);
+            assert!(responder.send(Err(fidl_fuchsia_wlan_device_service::DeviceMonitorError::unknown())).is_ok());
+        }
+    );
+
+    // Run the internal futures to process the failure causing the reset request to be made.
+    let phy_reset_req = run_while(
+        &mut exec,
+        &mut test_values.internal_objects.internal_futures,
+        test_values.external_interfaces.monitor_service_stream.next(),
+    );
+    assert_variant!(
+        phy_reset_req,
+        Some(Ok(fidl_fuchsia_wlan_device_service::DeviceMonitorRequest::Reset {
+            phy_id: TEST_PHY_ID,
+            ..
+        }))
+    );
 }
 
 fn request_scan_and_reply(
@@ -2632,26 +2756,98 @@ fn test_roam_profile_scans_obey_wait_time<F>(
 #[test_case(
     RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
     solicit_roam_scan_weak_rssi,
+    Saved::None,
+    Scanned::Open,
     true;
     "enabled stationary weak rssi should roam"
 )]
 #[test_case(
     RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::MetricsOnly},
     solicit_roam_scan_weak_rssi,
+    Saved::None,
+    Scanned::Open,
     false;
     "enabled stationary metrics only weak rssi should not roam"
 )]
 #[test_case(
     RoamingPolicy::Disabled,
     solicit_roam_scan_weak_rssi,
+    Saved::None,
+    Scanned::Open,
     false;
     "disabled weak rssi should not roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa,
+    Scanned::Wpa1Wpa2Personal,
+    true;
+    "enabled wpa saved wpa1wpa2 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa2,
+    Scanned::Wpa1Wpa2Personal,
+    true;
+    "enabled wpa2 saved wpa1wpa2 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa,
+    Scanned::Wpa2Personal,
+    true;
+    "enabled wpa saved wpa2 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa2,
+    Scanned::Wpa2Personal,
+    true;
+    "enabled wpa2 saved wpa2 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa2,
+    Scanned::Wpa2Wpa3Personal,
+    true;
+    "enabled wpa2 saved wpa2wpa3 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa3,
+    Scanned::Wpa2Wpa3Personal,
+    true;
+    "enabled wpa3 saved wpa2wpa3 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa2,
+    Scanned::Wpa3Personal,
+    true;
+    "enabled wpa2 saved wpa3 ap should roam"
+)]
+#[test_case(
+    RoamingPolicy::Enabled {profile: RoamingProfile::Stationary, mode: RoamingMode::CanRoam},
+    solicit_roam_scan_weak_rssi,
+    Saved::Wpa3,
+    Scanned::Wpa3Personal,
+    true;
+    "enabled wpa3 saved wpa3 ap should roam"
 )]
 #[fuchsia::test(add_test_attr = false)]
 // Tests if roaming policies trigger roam requests in different scenarios.
 fn test_roam_policy_sends_roam_request<F>(
     roaming_policy: RoamingPolicy,
     mut roam_scan_solicit_func: F,
+    saved_security: Saved,
+    ap_security: Scanned,
     should_trigger_roam_request: bool,
 ) where
     F: RoamScanSolicitFunc,
@@ -2660,12 +2856,19 @@ fn test_roam_policy_sends_roam_request<F>(
     let mut test_values =
         test_setup(&mut exec, RECOVERY_PROFILE_EMPTY_STRING, false, roaming_policy);
 
+    // Choose an appropriate credential for the security type.
+    let credential = if saved_security == Saved::None {
+        TEST_CREDS.none.clone()
+    } else {
+        TEST_CREDS.wpa_pass_min.clone()
+    };
+
     // Connect to a network.
     let mut existing_connection = save_and_connect(
         TEST_SSID.clone(),
-        Saved::None,
-        Scanned::Open,
-        TEST_CREDS.none.clone(),
+        saved_security,
+        ap_security,
+        credential,
         &mut exec,
         &mut test_values,
     );
@@ -2673,11 +2876,11 @@ fn test_roam_policy_sends_roam_request<F>(
     // Create a mock scan result roam candidate with a very strong BSS.
     let mock_scan_results = vec![fidl_sme::ScanResult {
         compatibility: fidl_sme::Compatibility::Compatible(fidl_sme::Compatible {
-            mutual_security_protocols: security_protocols_from_protection(Scanned::Open),
+            mutual_security_protocols: security_protocols_from_protection(ap_security),
         }),
         timestamp_nanos: zx::MonotonicInstant::get().into_nanos(),
         bss_description: random_fidl_bss_description!(
-            protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(Scanned::Open),
+            protection =>  wlan_common::test_utils::fake_stas::FakeProtectionCfg::from(ap_security),
             bssid: [1, 1, 1, 1, 1, 1],
             ssid: TEST_SSID.clone(),
             rssi_dbm: -10,

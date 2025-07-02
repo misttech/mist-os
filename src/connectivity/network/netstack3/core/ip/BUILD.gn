@@ -65,7 +65,6 @@ rustc_library_with_features("netstack3-ip") {
     "//src/connectivity/lib/packet-formats",
     "//src/connectivity/network/lib/explicit",
     "//src/connectivity/network/netstack3/core/lock-order",
-    "//src/connectivity/network/netstack3/core/trace:netstack3-trace",
     "//src/lib/fakealloc",
     "//src/lib/network/packet",
     "//third_party/rust_crates:arrayvec",
@@ -90,6 +89,7 @@ rustc_library_with_features("netstack3-ip") {
       deps += [
         "//src/connectivity/network/netstack3/core/base:netstack3-base",
         "//src/connectivity/network/netstack3/core/filter:netstack3-filter",
+        "//src/connectivity/network/netstack3/core/trace:netstack3-trace",
       ]
     },
 
@@ -104,6 +104,7 @@ rustc_library_with_features("netstack3-ip") {
       deps += [
         "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
         "//src/connectivity/network/netstack3/core/filter:netstack3-filter-testutils",
+        "//src/connectivity/network/netstack3/core/trace:netstack3-trace-instrumented",
       ]
     },
     {
@@ -113,6 +114,7 @@ rustc_library_with_features("netstack3-ip") {
       deps += [
         "//src/connectivity/network/netstack3/core/base:netstack3-base-benchmarks",
         "//src/connectivity/network/netstack3/core/filter:netstack3-filter-benchmarks",
+        "//src/connectivity/network/netstack3/core/trace:netstack3-trace",
       ]
       configs += [ "//src/connectivity/network/netstack3/core:benchmark" ]
     },
@@ -123,11 +125,13 @@ rustc_library_with_features("netstack3-ip") {
       non_test_deps = [
         "//src/connectivity/network/netstack3/core/base:netstack3-base-instrumented",
         "//src/connectivity/network/netstack3/core/filter:netstack3-filter-instrumented",
+        "//src/connectivity/network/netstack3/core/trace:netstack3-trace-instrumented",
       ]
       test_deps = [
         "//src/connectivity/lib/ip-test-macro",
         "//src/connectivity/network/netstack3/core/base:netstack3-base-testutils",
         "//src/connectivity/network/netstack3/core/filter:netstack3-filter-testutils",
+        "//src/connectivity/network/netstack3/core/trace:netstack3-trace-instrumented",
         "//src/lib/test_util",
         "//third_party/rust_crates:itertools",
         "//third_party/rust_crates:static_assertions",
@@ -147,6 +151,7 @@ rustc_library_with_features("netstack3-ip") {
         deps += [
           "//src/connectivity/network/netstack3/core/base:netstack3-base-loom",
           "//src/connectivity/network/netstack3/core/filter:netstack3-filter-loom",
+          "//src/connectivity/network/netstack3/core/trace:netstack3-trace-loom",
         ]
         configs += [ "//src/connectivity/network/netstack3/core:loom" ]
       },

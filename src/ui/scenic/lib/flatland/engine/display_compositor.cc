@@ -452,6 +452,8 @@ bool DisplayCompositor::ImportBufferImage(const allocation::ImageMetadata& metad
   }
 
   if (!display_support_already_set) {
+    // TODO(https://fxbug.dev/386263977): this makes blocking FIDL calls while `lock_` is held.
+    // This isn't great, because means that a Flatland session thread can block the render thread.
     const auto pixel_format_modifier =
         DetermineDisplaySupportFor(TakeDisplayBufferCollectionPtr(collection_id));
     buffer_collection_supports_display_[collection_id] = pixel_format_modifier.has_value();
@@ -821,17 +823,23 @@ bool DisplayCompositor::PerformGpuComposition(const uint64_t frame_number,
       }
     }
 
-    const auto apply_cc = (cc_state_machine_.GetDataToApply() != std::nullopt);
     std::vector<zx::event> render_fences;
     render_fences.push_back(std::move(event_data.wait_event));
+
+    Renderer::RenderArgs render_args{
+        .release_fences = render_fences,
+        .apply_color_conversion = cc_state_machine_.GetDataToApply().has_value(),
+    };
+
     // Only add render_finished_fence if we're rendering the final display's framebuffer.
     if (is_final_display) {
       render_fences.push_back(std::move(render_finished_fence));
-      renderer_->Render(render_target, render_data.rectangles, images, render_fences, apply_cc);
+      render_args.release_fences = render_fences;
+      renderer_->Render(render_target, render_data.rectangles, images, render_args);
       // Retrieve fence.
       render_finished_fence = std::move(render_fences.back());
     } else {
-      renderer_->Render(render_target, render_data.rectangles, images, render_fences, apply_cc);
+      renderer_->Render(render_target, render_data.rectangles, images, render_args);
     }
 
     // Retrieve fence.

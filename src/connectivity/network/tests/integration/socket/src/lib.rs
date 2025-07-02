@@ -1480,7 +1480,6 @@ trait TestIpExt: packet_formats::ip::IpExt {
     const DOMAIN: fposix_socket::Domain;
     const CLIENT_SUBNET: fnet::Subnet;
     const SERVER_SUBNET: fnet::Subnet;
-    const CLIENT_ADDR: Self::Addr;
     const SERVER_ADDR: Self::Addr;
 }
 
@@ -1488,7 +1487,6 @@ impl TestIpExt for Ipv4 {
     const DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv4;
     const CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.2/24");
     const SERVER_SUBNET: fnet::Subnet = fidl_subnet!("192.168.0.1/24");
-    const CLIENT_ADDR: Ipv4Addr = net_ip_v4!("192.168.0.2");
     const SERVER_ADDR: Ipv4Addr = net_ip_v4!("192.168.0.1");
 }
 
@@ -1496,7 +1494,6 @@ impl TestIpExt for Ipv6 {
     const DOMAIN: fposix_socket::Domain = fposix_socket::Domain::Ipv6;
     const CLIENT_SUBNET: fnet::Subnet = fidl_subnet!("2001:0db8:85a3::8a2e:0370:7334/64");
     const SERVER_SUBNET: fnet::Subnet = fidl_subnet!("2001:0db8:85a3::8a2e:0370:7335/64");
-    const CLIENT_ADDR: Ipv6Addr = net_ip_v6!("2001:0db8:85a3::8a2e:0370:7334");
     const SERVER_ADDR: Ipv6Addr = net_ip_v6!("2001:0db8:85a3::8a2e:0370:7335");
 }
 
@@ -2016,7 +2013,7 @@ async fn install_ip_device(
         let (control, server_end) =
             fnet_interfaces_ext::admin::Control::create_endpoints().expect("create endpoints");
         let () = device_control
-            .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
+            .create_interface(&port_id, server_end, fnet_interfaces_admin::Options::default())
             .expect("create interface");
         control
     };
@@ -2327,13 +2324,13 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
     let src_ip = Ipv4Addr::new(BOB_ADDR_V4.addr);
     let dst_ip = Ipv4Addr::new(ALICE_ADDR_V4.addr);
     let packet = packet::Buf::new(&mut payload[..], ..)
-        .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
+        .wrap_in(IcmpPacketBuilder::<Ipv4, _>::new(
             src_ip,
             dst_ip,
             IcmpZeroCode,
             IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
         ))
-        .encapsulate(Ipv4PacketBuilder::new(src_ip, dst_ip, 1, Ipv4Proto::Icmp))
+        .wrap_in(Ipv4PacketBuilder::new(src_ip, dst_ip, 1, Ipv4Proto::Icmp))
         .serialize_vec_outer()
         .expect("serialization failed")
         .as_ref()
@@ -2402,13 +2399,13 @@ async fn ip_endpoint_packets<N: Netstack>(name: &str) {
     let src_ip = Ipv6Addr::from_bytes(BOB_ADDR_V6.addr);
     let dst_ip = Ipv6Addr::from_bytes(ALICE_ADDR_V6.addr);
     let packet = packet::Buf::new(&mut payload[..], ..)
-        .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+        .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
             src_ip,
             dst_ip,
             IcmpZeroCode,
             IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
         ))
-        .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, 1, Ipv6Proto::Icmpv6))
+        .wrap_in(Ipv6PacketBuilder::new(src_ip, dst_ip, 1, Ipv6Proto::Icmpv6))
         .serialize_vec_outer()
         .expect("serialization failed")
         .as_ref()
@@ -3543,6 +3540,9 @@ async fn zx_socket_rights<N: Netstack>(name: &str, protocol: ProtocolWithZirconS
             | zx::sys::ZX_RIGHT_INSPECT
             | zx::sys::ZX_RIGHT_WRITE
             | zx::sys::ZX_RIGHT_READ
+            // TODO(https://fxbug.dev/417777189): Remove signal rights when no
+            // longer necessary for ffx support.
+            | zx::sys::ZX_RIGHT_SIGNAL
     );
 }
 
@@ -3719,19 +3719,19 @@ async fn tcp_connect_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I> + D
                     return;
                 }
                 let icmp_error = packet::Buf::new(&mut eth.body().to_vec(), ..)
-                    .encapsulate(IcmpPacketBuilder::<I, _>::new(
+                    .wrap_in(IcmpPacketBuilder::<I, _>::new(
                         ip.dst_ip(),
                         ip.src_ip(),
                         code,
                         message,
                     ))
-                    .encapsulate(I::PacketBuilder::new(
+                    .wrap_in(I::PacketBuilder::new(
                         ip.dst_ip(),
                         ip.src_ip(),
                         u8::MAX,
                         I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6),
                     ))
-                    .encapsulate(EthernetFrameBuilder::new(
+                    .wrap_in(EthernetFrameBuilder::new(
                         eth.dst_mac(),
                         eth.src_mac(),
                         EtherType::from_ip_version(I::VERSION),
@@ -3946,7 +3946,7 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
         let (eth, ip, tcp) = frames.next().await.unwrap();
         assert!(tcp.syn_set());
 
-        // Send a SYN/ACK in response and wait for the ACK response.
+        // Send a SYN/ACK in response.
         let ethernet_builder = EthernetFrameBuilder::new(
             eth.dst_mac(),
             eth.src_mac(),
@@ -3964,34 +3964,37 @@ async fn tcp_established_icmp_error<N: Netstack, I: TestIpExt, M: IcmpMessage<I>
         );
         syn_ack.syn(true);
         let frame = packet::Buf::new([], ..)
-            .encapsulate(syn_ack)
-            .encapsulate(I::PacketBuilder::new(
-                ip.dst_ip(),
-                ip.src_ip(),
-                u8::MAX,
-                IpProto::Tcp.into(),
-            ))
-            .encapsulate(ethernet_builder.clone())
+            .wrap_in(syn_ack)
+            .wrap_in(I::PacketBuilder::new(ip.dst_ip(), ip.src_ip(), u8::MAX, IpProto::Tcp.into()))
+            .wrap_in(ethernet_builder.clone())
             .serialize_vec_outer()
             .expect("serialize SYN/ACK")
             .unwrap_b();
         fake_ep.write(frame.as_ref()).await.expect("write SYN/ACK");
-        let _ack = frames.next().await.unwrap();
+
+        // Wait for the ACK response, skipping any other packets (such as
+        // retransmitted SYNs).
+        loop {
+            let (_eth, _ip, tcp) = frames.next().await.unwrap();
+            if tcp.ack_num().is_some() {
+                break;
+            }
+        }
 
         // Now that the connection is established, respond to the next packet with an
         // ICMP error to cause a soft error on the connection.
         let (_eth, ip, tcp) = frames.next().await.unwrap();
         let icmp_error = packet::Buf::new([], ..)
-            .encapsulate(tcp)
-            .encapsulate(ip.clone())
-            .encapsulate(IcmpPacketBuilder::<I, _>::new(ip.dst_ip(), ip.src_ip(), code, message))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(tcp)
+            .wrap_in(ip.clone())
+            .wrap_in(IcmpPacketBuilder::<I, _>::new(ip.dst_ip(), ip.src_ip(), code, message))
+            .wrap_in(I::PacketBuilder::new(
                 ip.dst_ip(),
                 ip.src_ip(),
                 u8::MAX,
                 I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6),
             ))
-            .encapsulate(ethernet_builder)
+            .wrap_in(ethernet_builder)
             .serialize_vec_outer()
             .expect("serialize ICMP error")
             .unwrap_b();
@@ -4134,18 +4137,13 @@ async fn tcp_update_mss_from_pmtu<N: Netstack, I: TestPmtuIpExt>(name: &str) {
         );
         syn_ack.syn(true);
         let frame = packet::Buf::new([], ..)
-            .encapsulate(
+            .wrap_in(
                 // Advertise an initial MSS that is large enough to fit the sender's payload in
                 // a single segment.
                 TcpSegmentBuilderWithOptions::new(syn_ack, [TcpOption::Mss(1500)]).unwrap(),
             )
-            .encapsulate(I::PacketBuilder::new(
-                ip.dst_ip(),
-                ip.src_ip(),
-                u8::MAX,
-                IpProto::Tcp.into(),
-            ))
-            .encapsulate(ethernet_builder.clone())
+            .wrap_in(I::PacketBuilder::new(ip.dst_ip(), ip.src_ip(), u8::MAX, IpProto::Tcp.into()))
+            .wrap_in(ethernet_builder.clone())
             .serialize_vec_outer()
             .expect("serialize SYN/ACK")
             .unwrap_b();
@@ -4174,16 +4172,16 @@ async fn tcp_update_mss_from_pmtu<N: Netstack, I: TestPmtuIpExt>(name: &str) {
 
         let (message, code) = I::packet_too_big();
         let icmp_error = packet::Buf::new([], ..)
-            .encapsulate(tcp)
-            .encapsulate(ip.clone())
-            .encapsulate(IcmpPacketBuilder::<I, _>::new(ip.dst_ip(), ip.src_ip(), code, message))
-            .encapsulate(I::PacketBuilder::new(
+            .wrap_in(tcp)
+            .wrap_in(ip.clone())
+            .wrap_in(IcmpPacketBuilder::<I, _>::new(ip.dst_ip(), ip.src_ip(), code, message))
+            .wrap_in(I::PacketBuilder::new(
                 ip.dst_ip(),
                 ip.src_ip(),
                 u8::MAX,
                 I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6),
             ))
-            .encapsulate(ethernet_builder)
+            .wrap_in(ethernet_builder)
             .serialize_vec_outer()
             .expect("serialize ICMP error")
             .unwrap_b();
@@ -5135,14 +5133,14 @@ async fn broadcast_recv<N: Netstack>(name: &str) {
 
     let mut test_packet = [1, 2, 3, 4, 5];
     let broadcast_packet = packet::Buf::new(&mut test_packet, ..)
-        .encapsulate(UdpPacketBuilder::new(
+        .wrap_in(UdpPacketBuilder::new(
             SRC_IP,
             DST_IP,
             core::num::NonZero::new(SRC_PORT),
             core::num::NonZero::new(PORT).unwrap(),
         ))
-        .encapsulate(Ipv4PacketBuilder::new(SRC_IP, DST_IP, /*ttl=*/ 30, IpProto::Udp.into()))
-        .encapsulate(EthernetFrameBuilder::new(
+        .wrap_in(Ipv4PacketBuilder::new(SRC_IP, DST_IP, /*ttl=*/ 30, IpProto::Udp.into()))
+        .wrap_in(EthernetFrameBuilder::new(
             /*src_mac=*/ netstack_testing_common::constants::eth::MAC_ADDR,
             /*dst_mac=*/ net_types::ethernet::Mac::BROADCAST,
             EtherType::Ipv4,

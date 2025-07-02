@@ -2,12 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/cpp/sdk_source_set.gni")
-
-sdk_source_set("memory_barriers") {
-  category = "partner"
-  stable = false
-  sdk_name = "memory_barriers"
-  include_base = "//"
-  sources = [ "memory_barriers.h" ]
+# TODO(ddorwin): Remove this directory once vendor repos have transitioned.
+group("memory_barriers") {
+  deps = [ "//sdk/lib/memory_barriers" ]
 }

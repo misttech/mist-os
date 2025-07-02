@@ -1,8 +1,5 @@
 # Threading tips in tests
 
-Note: This guide is applicable to both the new driver framework (DFv2) and the
-legacy version of the driver framework (DFv1).
-
 Quite a few asynchronous types used in driver writing are thread-unsafe and
 they [check][check] that they are always used from their associated synchronized
 dispatcher, to ensure memory safety, for example:

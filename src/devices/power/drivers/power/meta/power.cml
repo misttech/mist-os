@@ -18,7 +18,9 @@
     capabilities: [
         { service: "fuchsia.hardware.power.Service" },
     ],
-    use: [],
+    use: [
+        { service: "fuchsia.hardware.power.DomainMetadata" },
+    ],
     expose: [
         {
             service: "fuchsia.hardware.power.Service",

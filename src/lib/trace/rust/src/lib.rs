@@ -12,7 +12,8 @@ use std::task::Poll;
 use std::{mem, ptr};
 
 pub use sys::{
-    trace_site_t, TRACE_BLOB_TYPE_DATA, TRACE_BLOB_TYPE_LAST_BRANCH, TRACE_BLOB_TYPE_PERFETTO,
+    trace_site_t, trace_string_ref_t, TRACE_BLOB_TYPE_DATA, TRACE_BLOB_TYPE_LAST_BRANCH,
+    TRACE_BLOB_TYPE_PERFETTO,
 };
 
 /// `Scope` represents the scope of a trace event.
@@ -63,6 +64,14 @@ pub fn trace_state() -> TraceState {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(i32)]
+pub enum BufferingMode {
+    OneShot = sys::TRACE_BUFFERING_MODE_ONESHOT,
+    Circular = sys::TRACE_BUFFERING_MODE_CIRCULAR,
+    Streaming = sys::TRACE_BUFFERING_MODE_STREAMING,
+}
+
 /// An identifier for flows and async spans.
 #[repr(transparent)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -86,8 +95,9 @@ impl Id {
     /// `Id::new` is likely to hit the UI bug because it (per process) generates trace ids
     /// consecutively starting from 1.
     /// https://cs.opensource.google/fuchsia/fuchsia/+/main:zircon/system/ulib/trace-engine/nonce.cc;l=15-17;drc=b1c2f508a59e6c87c617852ed3e424693a392646
-    /// TODO(https://fxbug.dev/42054669) Delete this and migrate clients to `Id::new` once UIs stop grouping
-    /// async durations with the same trace id but different process ids.
+    /// TODO(https://fxbug.dev/42054669) Delete this and migrate clients to `Id::new` when:
+    /// 1. UIs stop grouping async durations with the same trace id but different process ids.
+    /// 2. input events tracing cross components has uid for flow id.
     pub fn random() -> Self {
         let ts = zx::BootInstant::get().into_nanos() as u64;
         let high_order = ts << 16;
@@ -965,14 +975,14 @@ pub fn flow_step(
 ///
 /// ```rust
 /// let flow_id = 1234;
-/// instaflow_begin!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
+/// instaflow_begin!(c"category", c"flow", c"step", flow_id, "x" => 5, "y" => "boo");
 /// ```
 #[macro_export]
 macro_rules! instaflow_begin {
     (
         $category:expr,
-        $event_name:expr,
         $flow_name:expr,
+        $step_name:expr,
         $flow_id:expr
         $(, $key:expr => $val:expr)*
     ) => {
@@ -981,8 +991,8 @@ macro_rules! instaflow_begin {
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::instaflow_begin(
                     &context,
-                    $event_name,
                     $flow_name,
+                    $step_name,
                     $flow_id,
                     &[$($crate::ArgValue::of($key, $val)),*],
                 )
@@ -1002,14 +1012,14 @@ macro_rules! instaflow_begin {
 ///
 /// ```rust
 /// let flow_id = 1234;
-/// instaflow_end!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
+/// instaflow_end!(c"category", c"flow", c"step", flow_id, "x" => 5, "y" => "boo");
 /// ```
 #[macro_export]
 macro_rules! instaflow_end {
     (
         $category:expr,
-        $event_name:expr,
         $flow_name:expr,
+        $step_name:expr,
         $flow_id:expr
         $(, $key:expr => $val:expr)*
     ) => {
@@ -1018,8 +1028,8 @@ macro_rules! instaflow_end {
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::instaflow_end(
                     &context,
-                    $event_name,
                     $flow_name,
+                    $step_name,
                     $flow_id,
                     &[$($crate::ArgValue::of($key, $val)),*],
                 )
@@ -1039,14 +1049,14 @@ macro_rules! instaflow_end {
 ///
 /// ```rust
 /// let flow_id = 1234;
-/// instaflow_step!(c"category", c"event", c"flow", flow_id, "x" => 5, "y" => "boo");
+/// instaflow_step!(c"category", c"flow", c"step", flow_id, "x" => 5, "y" => "boo");
 /// ```
 #[macro_export]
 macro_rules! instaflow_step {
     (
         $category:expr,
-        $event_name:expr,
         $flow_name:expr,
+        $step_name:expr,
         $flow_id:expr
         $(, $key:expr => $val:expr)*
     ) => {
@@ -1055,8 +1065,8 @@ macro_rules! instaflow_step {
             if let Some(context) = $crate::TraceCategoryContext::acquire_cached($category, &CACHE) {
                 $crate::instaflow_step(
                     &context,
-                    $event_name,
                     $flow_name,
+                    $step_name,
                     $flow_id,
                     &[$($crate::ArgValue::of($key, $val)),*],
                 )
@@ -1078,20 +1088,20 @@ macro_rules! instaflow_step {
 /// end events are combined together in the trace; it is not necessary to repeat them.
 pub fn instaflow_begin(
     context: &TraceCategoryContext,
-    event_name: &'static CStr,
     flow_name: &'static CStr,
+    step_name: &'static CStr,
     flow_id: Id,
     args: &[Arg<'_>],
 ) {
     let ticks = zx::BootTicks::get();
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    let event_name_ref = context.register_string_literal(event_name);
     let flow_name_ref = context.register_string_literal(flow_name);
+    let step_name_ref = context.register_string_literal(step_name);
 
-    context.write_duration_begin(ticks, event_name_ref, args);
+    context.write_duration_begin(ticks, step_name_ref, args);
     context.write_flow_begin(ticks, flow_name_ref, flow_id, args);
-    context.write_duration_end(ticks, event_name_ref, args);
+    context.write_duration_end(ticks, step_name_ref, args);
 }
 
 /// Convenience function to the end of a flow attached to an instant event.
@@ -1107,20 +1117,20 @@ pub fn instaflow_begin(
 /// end events are combined together in the trace; it is not necessary to repeat them.
 pub fn instaflow_end(
     context: &TraceCategoryContext,
-    event_name: &'static CStr,
     flow_name: &'static CStr,
+    step_name: &'static CStr,
     flow_id: Id,
     args: &[Arg<'_>],
 ) {
     let ticks = zx::BootTicks::get();
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    let event_name_ref = context.register_string_literal(event_name);
     let flow_name_ref = context.register_string_literal(flow_name);
+    let step_name_ref = context.register_string_literal(step_name);
 
-    context.write_duration_begin(ticks, event_name_ref, args);
+    context.write_duration_begin(ticks, step_name_ref, args);
     context.write_flow_end(ticks, flow_name_ref, flow_id, args);
-    context.write_duration_end(ticks, event_name_ref, args);
+    context.write_duration_end(ticks, step_name_ref, args);
 }
 
 /// Convenience function to emit a step in a flow attached to an instant event.
@@ -1136,20 +1146,20 @@ pub fn instaflow_end(
 /// end events are combined together in the trace; it is not necessary to repeat them.
 pub fn instaflow_step(
     context: &TraceCategoryContext,
-    event_name: &'static CStr,
     flow_name: &'static CStr,
+    step_name: &'static CStr,
     flow_id: Id,
     args: &[Arg<'_>],
 ) {
     let ticks = zx::BootTicks::get();
     assert!(args.len() <= 15, "no more than 15 trace arguments are supported");
 
-    let event_name_ref = context.register_string_literal(event_name);
     let flow_name_ref = context.register_string_literal(flow_name);
+    let step_name_ref = context.register_string_literal(step_name);
 
-    context.write_duration_begin(ticks, event_name_ref, args);
+    context.write_duration_begin(ticks, step_name_ref, args);
     context.write_flow_step(ticks, flow_name_ref, flow_id, args);
-    context.write_duration_end(ticks, event_name_ref, args);
+    context.write_duration_end(ticks, step_name_ref, args);
 }
 
 // translated from trace-engine/types.h for inlining
@@ -1182,13 +1192,12 @@ fn trim_to_last_char_boundary(string: &str, max_len: usize) -> &[u8] {
 // The resulting `trace_string_ref_t` only lives as long as the input `string`.
 #[inline]
 fn trace_make_inline_string_ref(string: &str) -> sys::trace_string_ref_t {
-    let len = string.len() as u32;
+    let len = string.len() as u16;
     if len == 0 {
         return trace_make_empty_string_ref();
     }
 
-    let string =
-        trim_to_last_char_boundary(string, sys::TRACE_ENCODED_STRING_REF_MAX_LENGTH as usize);
+    let string = trim_to_last_char_boundary(string, sys::TRACE_ENCODED_STRING_REF_MAX_LENGTH);
 
     sys::trace_string_ref_t {
         encoded_value: sys::TRACE_ENCODED_STRING_REF_INLINE_FLAG | len,
@@ -1590,6 +1599,30 @@ impl Context {
             );
         }
     }
+
+    // Write fxt formatted bytes to the trace buffer
+    //
+    // returns Ok(num_bytes_written) on success
+    pub fn copy_record(&self, buffer: &[u64]) -> Option<usize> {
+        unsafe {
+            let ptr =
+                sys::trace_context_alloc_record(self.context, 8 * buffer.len() as libc::size_t);
+            if ptr == std::ptr::null_mut() {
+                return None;
+            }
+            ptr.cast::<u64>().copy_from(buffer.as_ptr(), buffer.len());
+        };
+        Some(buffer.len())
+    }
+
+    pub fn buffering_mode(&self) -> BufferingMode {
+        match unsafe { sys::trace_context_get_buffering_mode(self.context) } {
+            sys::TRACE_BUFFERING_MODE_ONESHOT => BufferingMode::OneShot,
+            sys::TRACE_BUFFERING_MODE_CIRCULAR => BufferingMode::Circular,
+            sys::TRACE_BUFFERING_MODE_STREAMING => BufferingMode::Streaming,
+            m => panic!("Unknown trace buffering mode: {:?}", m),
+        }
+    }
 }
 
 impl std::ops::Drop for Context {
@@ -1636,11 +1669,11 @@ mod sys {
     pub type trace_context_t = libc::c_void;
     pub type trace_prolonged_context_t = libc::c_void;
 
-    pub type trace_encoded_string_ref_t = u32;
+    pub type trace_encoded_string_ref_t = u16;
     pub const TRACE_ENCODED_STRING_REF_EMPTY: trace_encoded_string_ref_t = 0;
     pub const TRACE_ENCODED_STRING_REF_INLINE_FLAG: trace_encoded_string_ref_t = 0x8000;
     pub const TRACE_ENCODED_STRING_REF_LENGTH_MASK: trace_encoded_string_ref_t = 0x7fff;
-    pub const TRACE_ENCODED_STRING_REF_MAX_LENGTH: trace_encoded_string_ref_t = 32000;
+    pub const TRACE_ENCODED_STRING_REF_MAX_LENGTH: usize = 32000;
     pub const TRACE_ENCODED_STRING_REF_MIN_INDEX: trace_encoded_string_ref_t = 0x1;
     pub const TRACE_ENCODED_STRING_REF_MAX_INDEX: trace_encoded_string_ref_t = 0x7fff;
 
@@ -1663,6 +1696,11 @@ mod sys {
     pub const TRACE_BLOB_TYPE_DATA: trace_blob_type_t = 1;
     pub const TRACE_BLOB_TYPE_LAST_BRANCH: trace_blob_type_t = 2;
     pub const TRACE_BLOB_TYPE_PERFETTO: trace_blob_type_t = 3;
+
+    pub type trace_buffering_mode_t = libc::c_int;
+    pub const TRACE_BUFFERING_MODE_ONESHOT: trace_buffering_mode_t = 0;
+    pub const TRACE_BUFFERING_MODE_CIRCULAR: trace_buffering_mode_t = 1;
+    pub const TRACE_BUFFERING_MODE_STREAMING: trace_buffering_mode_t = 2;
 
     #[repr(C)]
     #[derive(Copy, Clone)]
@@ -2000,18 +2038,7 @@ mod sys {
         pub fn trace_context_alloc_record(
             context: *const trace_context_t,
             num_bytes: libc::size_t,
-        ) -> *const libc::c_void;
-
-        // From trace-engine/handler.h
-        /*
-        pub fn trace_start_engine(
-            async_ptr: *const async_t,
-            handler: *const trace_handler_t,
-            buffer: *const (),
-            buffer_num_bytes: libc::size_t) -> zx_status_t;
-            */
-
-        pub fn trace_stop_engine(disposition: zx_status_t) -> zx_status_t;
+        ) -> *mut libc::c_void;
 
         // From trace-engine/instrumentation.h
 
@@ -2045,6 +2072,10 @@ mod sys {
         pub fn trace_unregister_observer(event: zx_handle_t) -> zx_status_t;
 
         pub fn trace_notify_observer_updated(event: zx_handle_t);
+
+        pub fn trace_context_get_buffering_mode(
+            context: *const trace_context_t,
+        ) -> trace_buffering_mode_t;
     }
 }
 

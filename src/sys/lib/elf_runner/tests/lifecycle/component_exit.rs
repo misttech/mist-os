@@ -58,8 +58,8 @@ async fn test_exit_after_rendezvous() {
         .expect("failed to observe events");
 
     // Rendezvous with the component
-    let trigger =
-        instance.connect_to_protocol_at_exposed_dir::<test_protocol::TriggerMarker>().unwrap();
+    let trigger: test_protocol::TriggerProxy =
+        instance.connect_to_protocol_at_exposed_dir().unwrap();
     let result = trigger.run().await.unwrap();
     assert_eq!(result, "Rendezvous complete!");
 

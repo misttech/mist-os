@@ -1219,12 +1219,6 @@ mod tests {
     const FILE_NAME: &str = "file";
     const ONE_DAY: u64 = Duration::from_secs(60 * 60 * 24).as_nanos() as u64;
 
-    async fn get_attrs_checked(file: &fio::FileProxy) -> fio::NodeAttributes {
-        let (status, attrs) = file.get_attr().await.expect("FIDL call failed");
-        zx::Status::ok(status).expect("get_attr failed");
-        attrs
-    }
-
     async fn get_attributes_checked(
         file: &fio::FileProxy,
         query: fio::NodeAttributesQuery,
@@ -1236,41 +1230,6 @@ mod tests {
             .map_err(zx::ok)
             .expect("get_attributes failed");
         fio::NodeAttributes2 { mutable_attributes, immutable_attributes }
-    }
-
-    async fn get_attrs_and_attributes_parity_checked(file: &fio::FileProxy) {
-        let attrs = get_attrs_checked(&file).await;
-        let attributes = get_attributes_checked(
-            &file,
-            fio::NodeAttributesQuery::ID
-                | fio::NodeAttributesQuery::CONTENT_SIZE
-                | fio::NodeAttributesQuery::STORAGE_SIZE
-                | fio::NodeAttributesQuery::LINK_COUNT
-                | fio::NodeAttributesQuery::CREATION_TIME
-                | fio::NodeAttributesQuery::MODIFICATION_TIME,
-        )
-        .await;
-        assert_eq!(attrs.id, attributes.immutable_attributes.id.expect("get_attributes failed"));
-        assert_eq!(
-            attrs.content_size,
-            attributes.immutable_attributes.content_size.expect("get_attributes failed")
-        );
-        assert_eq!(
-            attrs.storage_size,
-            attributes.immutable_attributes.storage_size.expect("get_attributes failed")
-        );
-        assert_eq!(
-            attrs.link_count,
-            attributes.immutable_attributes.link_count.expect("get_attributes failed")
-        );
-        assert_eq!(
-            attrs.creation_time,
-            attributes.mutable_attributes.creation_time.expect("get_attributes failed")
-        );
-        assert_eq!(
-            attrs.modification_time,
-            attributes.mutable_attributes.modification_time.expect("get_attributes failed")
-        );
     }
 
     async fn update_attributes_checked(
@@ -1304,12 +1263,7 @@ mod tests {
 
     fn open_volume(volume: &FxVolumeAndRoot) -> fio::DirectoryProxy {
         let (root, server_end) = create_proxy::<fio::DirectoryMarker>();
-        vfs::directory::serve_on(
-            volume.root().clone().as_directory(),
-            fio::PERM_READABLE | fio::PERM_WRITABLE,
-            volume.volume().scope().clone(),
-            server_end,
-        );
+        volume.root().clone().serve(fio::PERM_READABLE | fio::PERM_WRITABLE, server_end);
         root
     }
 
@@ -1510,7 +1464,10 @@ mod tests {
         )
         .await;
 
-        let initial_time = get_attrs_checked(&file).await.modification_time;
+        let node_attrs =
+            get_attributes_checked(&file, fio::NodeAttributesQuery::MODIFICATION_TIME).await;
+        let initial_time = node_attrs.mutable_attributes.modification_time.unwrap();
+
         // Advance the mtime by a large amount that should be reachable by the test.
         update_attributes_checked(
             &file,
@@ -1521,18 +1478,27 @@ mod tests {
         )
         .await;
 
-        let updated_time = get_attrs_checked(&file).await.modification_time;
+        let node_attrs =
+            get_attributes_checked(&file, fio::NodeAttributesQuery::MODIFICATION_TIME).await;
+
+        let updated_time = node_attrs.mutable_attributes.modification_time.unwrap();
         assert!(updated_time > initial_time);
 
         file::write(&file, &[1, 2, 3, 4]).await.expect("write failed");
 
         // Writing to the file after advancing the mtime will bring the mtime back to the current
         // time.
-        let current_mtime = get_attrs_checked(&file).await.modification_time;
+        let node_attrs =
+            get_attributes_checked(&file, fio::NodeAttributesQuery::MODIFICATION_TIME).await;
+        let current_mtime = node_attrs.mutable_attributes.modification_time.unwrap();
+
         assert!(current_mtime < updated_time);
 
         file.sync().await.unwrap().unwrap();
-        let synced_mtime = get_attrs_checked(&file).await.modification_time;
+        let node_attrs =
+            get_attributes_checked(&file, fio::NodeAttributesQuery::MODIFICATION_TIME).await;
+        let synced_mtime = node_attrs.mutable_attributes.modification_time.unwrap();
+
         assert_eq!(synced_mtime, current_mtime);
 
         close_file_checked(file).await;
@@ -1561,12 +1527,16 @@ mod tests {
             .map_err(zx::Status::from_raw)
             .expect("write failed");
 
-        let first_mtime = get_attrs_checked(&file).await.modification_time;
+        let node_attrs =
+            get_attributes_checked(&file, fio::NodeAttributesQuery::MODIFICATION_TIME).await;
+        let first_mtime = node_attrs.mutable_attributes.modification_time.unwrap();
 
         // The contents of the file haven't changed since get_attr was called so the flushed mtime
         // should be the same as the mtime returned from the get_attr call.
         file.sync().await.unwrap().unwrap();
-        let flushed_mtime = get_attrs_checked(&file).await.modification_time;
+        let node_attrs =
+            get_attributes_checked(&file, fio::NodeAttributesQuery::MODIFICATION_TIME).await;
+        let flushed_mtime = node_attrs.mutable_attributes.modification_time.unwrap();
         assert_eq!(flushed_mtime, first_mtime);
 
         close_file_checked(file).await;
@@ -1601,8 +1571,10 @@ mod tests {
         .await;
         file::write(&file, [1, 2, 3, 4]).await.unwrap();
 
-        let attrs = get_attrs_checked(&file).await;
-        let future = attrs.creation_time + ONE_DAY;
+        let node_attrs =
+            get_attributes_checked(&file, fio::NodeAttributesQuery::CREATION_TIME).await;
+        let creation_time = node_attrs.mutable_attributes.creation_time.unwrap();
+        let future = creation_time + ONE_DAY;
         update_attributes_checked(
             &file,
             &fio::MutableNodeAttributes {
@@ -1617,9 +1589,13 @@ mod tests {
         file.sync().await.unwrap().expect_err("sync should fail");
         fail_transaction.store(false, Ordering::Relaxed);
 
-        let attrs = get_attrs_checked(&file).await;
-        assert_eq!(attrs.creation_time, future);
-        assert_eq!(attrs.modification_time, future);
+        let node_attrs = get_attributes_checked(
+            &file,
+            fio::NodeAttributesQuery::CREATION_TIME | fio::NodeAttributesQuery::MODIFICATION_TIME,
+        )
+        .await;
+        assert_eq!(node_attrs.mutable_attributes.creation_time.unwrap(), future);
+        assert_eq!(node_attrs.mutable_attributes.modification_time.unwrap(), future);
 
         close_file_checked(file).await;
         close_dir_checked(root).await;
@@ -1654,7 +1630,10 @@ mod tests {
                 .expect_err("write should fail");
         })
         .await;
-        assert_eq!(get_attrs_checked(&file).await.content_size, MAX_FILE_SIZE);
+
+        let node_attrs =
+            get_attributes_checked(&file, fio::NodeAttributesQuery::CONTENT_SIZE).await;
+        assert_eq!(node_attrs.immutable_attributes.content_size.unwrap(), MAX_FILE_SIZE);
 
         file.resize(MAX_FILE_SIZE).await.unwrap().expect("resize should succeed");
         file.resize(MAX_FILE_SIZE + 1).await.unwrap().expect_err("resize should fail");
@@ -1822,8 +1801,12 @@ mod tests {
         let initial_file_size = zx::system_get_page_size() as usize * 10;
         file::write(&file, vec![5u8; initial_file_size]).await.unwrap();
         file.sync().await.unwrap().map_err(zx::ok).unwrap();
-        let initial_attrs = get_attrs_checked(&file).await;
-        assert_geq!(initial_attrs.storage_size, initial_file_size as u64);
+
+        let initial_attrs =
+            get_attributes_checked(&file, fio::NodeAttributesQuery::STORAGE_SIZE).await;
+        let initial_storage_size = initial_attrs.immutable_attributes.storage_size.unwrap();
+
+        assert_geq!(initial_storage_size, initial_file_size as u64);
         file.resize(0).await.unwrap().map_err(zx::ok).unwrap();
 
         fail_transaction.store(true, Ordering::Relaxed);
@@ -1831,13 +1814,15 @@ mod tests {
         fail_transaction.store(false, Ordering::Relaxed);
 
         // Verify that the file wasn't resized and non of the blocks were freed.
-        let attrs = get_attrs_checked(&file).await;
-        assert_eq!(attrs.storage_size, initial_attrs.storage_size);
+        let node_attrs =
+            get_attributes_checked(&file, fio::NodeAttributesQuery::STORAGE_SIZE).await;
+        assert_eq!(node_attrs.immutable_attributes.storage_size.unwrap(), initial_storage_size,);
 
         file.sync().await.unwrap().map_err(zx::ok).unwrap();
-        let attrs = get_attrs_checked(&file).await;
+        let node_attrs =
+            get_attributes_checked(&file, fio::NodeAttributesQuery::STORAGE_SIZE).await;
         // The shrink transaction was retried and the blocks were freed.
-        assert_eq!(attrs.storage_size, 0);
+        assert_eq!(node_attrs.immutable_attributes.storage_size.unwrap(), 0);
 
         close_file_checked(file).await;
         close_dir_checked(root).await;
@@ -1883,8 +1868,11 @@ mod tests {
                 .unwrap_or_else(|e| panic!("Write {} failed {:?}", i, e));
         }
         file.sync().await.unwrap().map_err(zx::ok).unwrap();
-        let initial_attrs = get_attrs_checked(&file).await;
-        assert_geq!(initial_attrs.storage_size, write_count * page_size);
+        let initial_attrs =
+            get_attributes_checked(&file, fio::NodeAttributesQuery::STORAGE_SIZE).await;
+        let initial_storage_size = initial_attrs.immutable_attributes.storage_size.unwrap();
+
+        assert_geq!(initial_storage_size, write_count * page_size);
         file.resize(0).await.unwrap().map_err(zx::ok).unwrap();
 
         // Allow the shrink transaction, fail the trim transaction.
@@ -1893,14 +1881,14 @@ mod tests {
         fail_transaction_after.store(i64::MAX, Ordering::Relaxed);
 
         // Some of the extents will be freed by the shrink transactions but not all of them.
-        let attrs = get_attrs_checked(&file).await;
-        assert_ne!(attrs.storage_size, 0);
-        assert_lt!(attrs.storage_size, initial_attrs.storage_size);
+        let attrs = get_attributes_checked(&file, fio::NodeAttributesQuery::STORAGE_SIZE).await;
+        assert_ne!(attrs.immutable_attributes.storage_size.unwrap(), 0);
+        assert_lt!(attrs.immutable_attributes.storage_size.unwrap(), initial_storage_size);
 
         file.sync().await.unwrap().map_err(zx::ok).unwrap();
-        let attrs = get_attrs_checked(&file).await;
+        let attrs = get_attributes_checked(&file, fio::NodeAttributesQuery::STORAGE_SIZE).await;
         // The trim transaction was retried and the extents were freed.
-        assert_eq!(attrs.storage_size, 0);
+        assert_eq!(attrs.immutable_attributes.storage_size.unwrap(), 0);
 
         close_file_checked(file).await;
         close_dir_checked(root).await;
@@ -1936,8 +1924,8 @@ mod tests {
             &Default::default(),
         )
         .await;
-        let attrs = get_attrs_checked(&file).await;
-        assert_eq!(attrs.content_size, page_size);
+        let attrs = get_attributes_checked(&file, fio::NodeAttributesQuery::CONTENT_SIZE).await;
+        assert_eq!(attrs.immutable_attributes.content_size.unwrap(), page_size);
 
         close_file_checked(file).await;
         fixture.close().await;
@@ -1958,10 +1946,6 @@ mod tests {
             &Default::default(),
         )
         .await;
-
-        // The attributes value returned from `get_attrs` and `get_attributes` (io2) should
-        // be equivalent
-        get_attrs_and_attributes_parity_checked(&file).await;
 
         let now = Timestamp::now().as_nanos();
         update_attributes_checked(
@@ -1993,7 +1977,6 @@ mod tests {
         expected_attributes.mutable_attributes.mode = Some(111);
         expected_attributes.mutable_attributes.gid = Some(222);
         assert_eq!(updated_attributes, expected_attributes);
-        get_attrs_and_attributes_parity_checked(&file).await;
 
         // Check that updating some of the attributes will not overwrite those that are not updated
         update_attributes_checked(
@@ -2013,7 +1996,6 @@ mod tests {
         expected_attributes.mutable_attributes.uid = Some(333);
         expected_attributes.mutable_attributes.gid = Some(444);
         assert_eq!(current_attributes, expected_attributes);
-        get_attrs_and_attributes_parity_checked(&file).await;
 
         // The contents of the file hasn't changed, so the flushed attributes should remain the same
         file.sync().await.unwrap().unwrap();
@@ -2027,7 +2009,6 @@ mod tests {
         )
         .await;
         assert_eq!(synced_attributes, expected_attributes);
-        get_attrs_and_attributes_parity_checked(&file).await;
 
         close_file_checked(file).await;
         fixture.close().await;
@@ -2296,7 +2277,8 @@ mod tests {
             }
 
             fn page_in(self: Arc<Self>, range: PageInRange<Self>) {
-                default_page_in(self, range);
+                let read_ahead_size = self.handle.owner().read_ahead_size();
+                default_page_in(self, range, read_ahead_size);
             }
 
             fn mark_dirty(self: Arc<Self>, range: MarkDirtyRange<Self>) {
@@ -2304,10 +2286,6 @@ mod tests {
             }
 
             fn on_zero_children(self: Arc<Self>) {}
-
-            fn read_alignment(&self) -> u64 {
-                self.handle.block_size()
-            }
 
             fn byte_size(&self) -> u64 {
                 self.handle.uncached_size()

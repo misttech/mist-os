@@ -4,6 +4,7 @@
 """Contains errors raised by Honeydew."""
 
 import logging
+import typing
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
@@ -14,15 +15,16 @@ class HoneydewError(Exception):
     More specific exceptions will be created by inheriting from this exception.
     """
 
-    def __init__(self, msg: str | Exception) -> None:
+    def __init__(self, msg: str | Exception, *args: typing.Any) -> None:
         """Inits HoneydewError with 'msg' (an error message string).
 
         Args:
             msg: an error message string or an Exception instance.
+            args: positional arguments formatted into msg.
 
-        Note: Additionally, logs 'msg' to debug log level file.
+        Note: Additionally, logs the error to debug log level file.
         """
-        super().__init__(msg)
+        super().__init__(msg, *args)
         _LOGGER.debug(repr(self), exc_info=True)
 
 
@@ -79,9 +81,9 @@ class NotSupportedError(HoneydewError):
     underlying Fuchsia platform."""
 
 
-class StarnixError(HoneydewError):
-    """Exception to be raised if a starnix operation fails."""
-
-
 class InspectError(HoneydewError):
     """Exception to be raised for Inspect affordance related failures."""
+
+
+class AffordanceError(HoneydewError):
+    """Exception to be raised for an error in an affordance."""

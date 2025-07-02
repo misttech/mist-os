@@ -254,7 +254,7 @@ impl TunWorker {
                     .id
                     .ok_or_else(|| starnix_uapi::errno!(ENOENT, "got PortInfo with no ID"))?,
                 server_end,
-                &fnet_interfaces_admin::Options {
+                fnet_interfaces_admin::Options {
                     name: Some(name.clone()),
                     metric: None,
                     ..Default::default()
@@ -332,7 +332,7 @@ impl FileOps for DevTun {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, starnix_sync::FileOpsCore>,
+        _locked: &mut Locked<starnix_sync::FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -345,7 +345,7 @@ impl FileOps for DevTun {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, starnix_sync::FileOpsCore>,
+        _locked: &mut Locked<starnix_sync::FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -358,7 +358,7 @@ impl FileOps for DevTun {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

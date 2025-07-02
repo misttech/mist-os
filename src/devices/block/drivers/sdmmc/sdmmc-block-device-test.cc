@@ -349,6 +349,14 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
   void SetUp() override {
     sdmmc_.Reset();
 
+    sdmmc_.set_command_callback(MMC_SEND_OP_COND, [](uint32_t out_response[4]) -> void {
+      out_response[0] = MMC_OCR_BUSY;
+    });
+
+    sdmmc_.set_command_callback(SDMMC_SEND_STATUS, [](uint32_t out_response[4]) -> void {
+      out_response[0] = MMC_STATUS_CURRENT_STATE_TRAN;
+    });
+
     sdmmc_.set_command_callback(SDMMC_SEND_CSD, [](uint32_t out_response[4]) -> void {
       uint8_t* response = reinterpret_cast<uint8_t*>(out_response);
       response[MMC_CSD_SPEC_VERSION] = MMC_CID_SPEC_VRSN_40 << 2;
@@ -478,6 +486,7 @@ class SdmmcBlockDeviceTest : public zxtest::TestWithParam<bool> {
     {
       sdmmc_config::Config fake_config;
       fake_config.enable_suspend() = supply_power_framework;
+      fake_config.storage_power_management_enabled() = supply_power_framework;
       start_args.config(fake_config.ToVmo());
     }
 
@@ -2061,6 +2070,7 @@ TEST_P(SdmmcBlockDeviceTest, Inspect) {
   sdmmc_.set_command_callback(MMC_SEND_EXT_CSD, [](cpp20::span<uint8_t> out_data) {
     *reinterpret_cast<uint32_t*>(&out_data[212]) = htole32(FakeSdmmcDevice::kBlockCount);
     out_data[MMC_EXT_CSD_CACHE_CTRL] = 1;
+    out_data[MMC_EXT_CSD_BARRIER_CTRL] = 1;
     out_data[MMC_EXT_CSD_CACHE_FLUSH_POLICY] = 1;
     out_data[MMC_EXT_CSD_CACHE_SIZE_LSB] = 0x78;
     out_data[MMC_EXT_CSD_CACHE_SIZE_250] = 0x56;

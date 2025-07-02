@@ -28,7 +28,11 @@ fn common_filters(watcher: fuchsia_fs::directory::Watcher) -> stream::BoxStream<
                 Some(filename.to_str().unwrap().to_owned())
             }
             Err(error) => {
-                log::error!(error:?; "fshost block watcher stream error");
+                // TODO(https://fxbug.dev/422230360): This is probably worth using error for, but
+                // sometimes in tests the gpt2 watcher stream gets closed while we are still trying
+                // to read watch messages, which was causing flakes. Upgrade again once the flake
+                // is addressed.
+                log::warn!(error:?; "fshost block watcher stream error");
                 None
             }
             _ => None,

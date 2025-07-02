@@ -89,6 +89,7 @@ def run_test(
     test_name: str,
     kernel_path: pathlib.Path,
     initrd_path: pathlib.Path,
+    args: argparse.Namespace,
 ) -> bool:
     """Runs a test, returns success or failure."""
 
@@ -105,6 +106,8 @@ def run_test(
             "none",
             "-serial",
             "stdio",
+            "-m",
+            "1G",
             "-enable-kvm",
             "-append",
             "console=ttyS0 security=selinux debug=all panic=-1 -- data/tests/"
@@ -117,17 +120,24 @@ def run_test(
     )
     (work_dir / "output").mkdir(exist_ok=True, parents=True)
     (work_dir / "output" / (test_name + ".log")).write_text(result.stdout)
-    if SUCCESS_RE.search(result.stdout):
+
+    passed = SUCCESS_RE.search(result.stdout) != None
+    if passed:
         print("... OK")
-        return True
     else:
         print("... FAILED")
+
+    if args.all_output:
+        print(result.stdout)
+    elif not passed:
         print("Failure output:")
         result_lines: list[str] = []
         record_lines: bool = False
+        tests_were_run = False
         for line in result.stdout.splitlines():
             if "[ RUN      ]" in line:
                 record_lines = True
+                tests_were_run = True
             if not record_lines:
                 continue
             result_lines.append(line)
@@ -138,8 +148,12 @@ def run_test(
                 print(*result_lines, sep="\n")
                 result_lines = []
 
+        if not tests_were_run:
+            print(result.stdout)
+            print("Failed to run any tests! See all preceding output.")
         print(f"End of output ({test_name})")
-        return False
+
+    return passed
 
 
 def main() -> None:
@@ -147,11 +161,16 @@ def main() -> None:
         "run_on_linux.py",
     )
     parser.add_argument(
-        "--test_filter", type=str, default="*", help="Test filter."
+        "--test-filter", type=str, default="*", help="Test filter."
     )
     parser.add_argument(
-        "--preserve_work_dir",
+        "--preserve-work-dir",
         help="Keep the work directory on exit.",
+        action="store_true",
+    )
+    parser.add_argument(
+        "--all-output",
+        help="Emit all output from tests directly, with no pretty-filtering.",
         action="store_true",
     )
     args = parser.parse_args()
@@ -199,7 +218,7 @@ def build_and_run_tests(
     print(f"Matched {len(matched_tests)} tests.")
     failed_tests = []
     for test_name in sorted(matched_tests):
-        if not run_test(work_dir, test_name, kernel_path, initrd_path):
+        if not run_test(work_dir, test_name, kernel_path, initrd_path, args):
             failed_tests.append(test_name)
     if failed_tests:
         print(f"Failed tests:")

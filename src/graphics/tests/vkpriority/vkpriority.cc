@@ -118,7 +118,7 @@ bool VkPriorityTest::InitVulkan() {
   VkPhysicalDeviceProperties properties;
   vkGetPhysicalDeviceProperties(physical_devices[0], &properties);
   if (properties.vendorID == 0x13b5 && properties.deviceID >= 0x1000) {
-    printf("Upping low priority execution count for ARM Bifrost GPU");
+    printf("Upping low priority execution count for ARM Bifrost GPU\n");
     // With the default execution count the test completes too quickly and
     // the commands won't be preempted.
     low_priority_execution_count_ = 100000;
@@ -389,10 +389,10 @@ bool VkPriorityTest::Exec() {
     return false;
   }
   auto high_prio_duration = high_prio_end_time - high_prio_start_time;
-  printf("first vkQueueWaitIdle finished duration: %lld",
+  printf("high priority vkQueueWaitIdle finished duration: %lld\n",
          std::chrono::duration_cast<std::chrono::milliseconds>(high_prio_duration).count());
   auto low_prio_duration = low_prio_end_time - low_prio_start_time;
-  printf("second vkQueueWaitIdle finished duration: %lld",
+  printf("low priority vkQueueWaitIdle finished duration: %lld\n",
          std::chrono::duration_cast<std::chrono::milliseconds>(low_prio_duration).count());
 
   if (different_priority_) {

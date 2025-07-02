@@ -25,6 +25,7 @@
 #include <platform/timer.h>
 #include <vm/handoff-end.h>
 #include <vm/physmap.h>
+#include <vm/vm.h>
 #include <vm/vm_object_paged.h>
 
 #include <ktl/enforce.h>
@@ -32,11 +33,6 @@
 PhysHandoff* gPhysHandoff;
 
 namespace {
-
-// TODO(https://fxbug.dev/42164859): Eventually physboot will hand off a permanent pointer
-// we can store in gBootOptions.  For now, handoff only provides temporary
-// pointers that we must copy out of.
-BootOptions gBootOptionsInstance;
 
 paddr_t gKernelPhysicalLoadAddress;
 
@@ -176,24 +172,19 @@ HandoffEnd::Elf CreatePhysElf(const PhysElfImage& image) {
 #endif
 }  // namespace
 
-template <>
-void* PhysHandoffPtrImportPhysAddr<PhysHandoffPtrEncoding::PhysAddr>(uintptr_t ptr) {
-  return paddr_to_physmap(ptr);
-}
-
 // This function is called first thing on kernel entry, so it should be
 // careful on what it assumes is present.
-void HandoffFromPhys(paddr_t handoff_paddr) {
+void HandoffFromPhys(PhysHandoff* handoff) {
+  gPhysHandoff = handoff;
+
   // This serves as a verification that code-patching was performed before
   // the kernel was booted; if unpatched, we would trap here and halt.
   CodePatchingNopTest();
 
-  gPhysHandoff = static_cast<PhysHandoff*>(paddr_to_physmap(handoff_paddr));
-
-  gBootOptionsInstance = *gPhysHandoff->boot_options;
-  gBootOptions = &gBootOptionsInstance;
+  gBootOptions = gPhysHandoff->boot_options.get();
 
   gKernelPhysicalLoadAddress = gPhysHandoff->kernel_physical_load_address;
+  ZX_DEBUG_ASSERT(KernelPhysicalAddressOf<__executable_start>() == gKernelPhysicalLoadAddress);
 
   if (gPhysHandoff->reboot_reason) {
     platform_set_hw_reboot_reason(gPhysHandoff->reboot_reason.value());
@@ -201,6 +192,14 @@ void HandoffFromPhys(paddr_t handoff_paddr) {
 }
 
 paddr_t KernelPhysicalLoadAddress() { return gKernelPhysicalLoadAddress; }
+
+paddr_t KernelPhysicalAddressOf(uintptr_t va) {
+  const uintptr_t start = reinterpret_cast<uintptr_t>(__executable_start);
+  [[maybe_unused]] const uintptr_t end = reinterpret_cast<uintptr_t>(_end);
+  ZX_DEBUG_ASSERT_MSG(va >= start, "%#" PRIxPTR " < %p", va, __executable_start);
+  ZX_DEBUG_ASSERT_MSG(va < end, "%#" PRIxPTR " < %p", va, _end);
+  return gKernelPhysicalLoadAddress + (va - start);
+}
 
 HandoffEnd EndHandoff() {
   HandoffEnd end{
@@ -222,10 +221,10 @@ HandoffEnd EndHandoff() {
     end.extra_phys_vmos[i] = CreateStubVmoHandle();
   }
 
-  // Point of temporary hand-off memory expiration. The PMM maintains the list
-  // of such memory and will free it on this call. Since the memory backing
-  // gPhysHandoff itself is in that list, we immediately unset immediately unset
-  // the pointer afterward.
+  // Point of temporary hand-off memory expiration: first unmapped, then freed
+  // in the PMM. Since gPhysHandoff is itself temporary hand-off memory, we
+  // immediately unset the pointer afterward.
+  vm_end_handoff();
   pmm_end_handoff();
   gPhysHandoff = nullptr;
 

@@ -39,14 +39,14 @@ zx::result<> VirtioDriver::MagmaStart() {
   {
     std::lock_guard lock(magma_mutex());
 
-    set_magma_driver(msd::Driver::Create());
+    set_magma_driver(msd::Driver::MsdCreate());
 
     if (!magma_driver()) {
       FDF_LOG(ERROR, "msd::Driver::Create failed");
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    auto msd_device = magma_driver()->CreateDevice(static_cast<VirtioGpuControl*>(this));
+    auto msd_device = magma_driver()->MsdCreateDevice(static_cast<VirtioGpuControl*>(this));
 
     set_magma_system_device(msd::MagmaSystemDevice::Create(magma_driver(), std::move(msd_device)));
 

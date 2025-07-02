@@ -6,7 +6,7 @@ that may apply to your driver.
 
 ## What is the difference between Banjo and FIDL?
 
-[Banjo][banjo] is a "transpiler" (similar to `fidlc` in FIDL). It converts
+Banjo is a "transpiler" (similar to `fidlc` in FIDL). It converts
 an interface definition language (IDL) into target language specific files.
 [FIDL][fidl] is the inter-process communication (IPC) system for Fuchsia.
 
@@ -141,7 +141,6 @@ testing server or client) in the test class. For more information, see
 
 <!-- Reference links -->
 
-[banjo]: /docs/development/drivers/concepts/device_driver_model/banjo.md
 [fidl]: /docs/concepts/fidl/overview.md
 [migrate-from-dfv1-to-dfv2]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2.md
 [driver-runtime-rfc]: /docs/contribute/governance/rfcs/0126_driver_runtime.md

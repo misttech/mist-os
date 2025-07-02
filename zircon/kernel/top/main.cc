@@ -67,8 +67,10 @@ bool ConstructorsCalled() { return lk_global_constructors_called(); }
 }  // namespace cxxabi_dynamic_init::internal
 
 // called from arch code
-void lk_main(paddr_t handoff_paddr) {
-  HandoffFromPhys(handoff_paddr);
+void lk_main(PhysHandoff* handoff) {
+  HandoffFromPhys(handoff);
+
+  // After HandoffFromPhys(), gPhysHandoff should now be set.
   ZX_DEBUG_ASSERT(gPhysHandoff != nullptr);
 
   // Initialize debug tracing (if enabled) as early as possible. This allows

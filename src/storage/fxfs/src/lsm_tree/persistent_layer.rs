@@ -522,9 +522,16 @@ impl<K: Key, V: LayerValue> PersistentLayer<K, V> {
 
         let bloom_filter_offset =
             header.block_size * (NUM_HEADER_BLOCKS + layer_info.num_data_blocks);
-        let bloom_filter = load_bloom_filter(&handle, bloom_filter_offset, &layer_info)
-            .await
-            .context("Failed to load bloom filter")?;
+        let bloom_filter = if version == LATEST_VERSION {
+            load_bloom_filter(&handle, bloom_filter_offset, &layer_info)
+                .await
+                .context("Failed to load bloom filter")?
+        } else {
+            // Ignore the bloom filter for layer files in outdated versions.  We don't know whether
+            // keys have changed formats or not (and therefore have different hash values), so we
+            // must ignore the bloom filter and always query the layer.
+            None
+        };
         let bloom_filter_stats = bloom_filter.as_ref().map(|b| b.stats());
 
         let seek_offset = header.block_size
@@ -548,6 +555,14 @@ impl<K: Key, V: LayerValue> PersistentLayer<K, V> {
             close_event: Mutex::new(Some(Arc::new(DropEvent::new()))),
             _value_type: PhantomData::default(),
         }))
+    }
+
+    /// Whether the bloom filter for the layer file is consulted or not.  If this is false, then
+    /// `maybe_contains_key` will always return true.
+    /// Note that the persistent layer file may still have a bloom filter, but it might be ignored
+    /// (e.g. for a layer file on an older version).
+    pub fn has_bloom_filter(&self) -> bool {
+        self.bloom_filter.is_some()
     }
 
     fn data_offset(&self) -> u64 {
@@ -752,9 +767,18 @@ impl<W: WriteBytes, K: Key, V: LayerValue> PersistentLayerWriter<W, K, V> {
     /// merged.  That results in bloom filters that are slightly bigger than necessary, which isn't
     /// a significant problem.
     pub async fn new(
+        writer: W,
+        estimated_num_items: usize,
+        block_size: u64,
+    ) -> Result<Self, Error> {
+        Self::new_with_version(writer, estimated_num_items, block_size, LATEST_VERSION).await
+    }
+
+    async fn new_with_version(
         mut writer: W,
         estimated_num_items: usize,
         block_size: u64,
+        version: Version,
     ) -> Result<Self, Error> {
         ensure!(block_size <= MAX_BLOCK_SIZE, FxfsError::NotSupported);
         ensure!(block_size >= MIN_BLOCK_SIZE, FxfsError::NotSupported);
@@ -764,7 +788,8 @@ impl<W: WriteBytes, K: Key, V: LayerValue> PersistentLayerWriter<W, K, V> {
         let mut buf = vec![0u8; block_size as usize];
         {
             let mut cursor = std::io::Cursor::new(&mut buf[..]);
-            header.serialize_with_version(&mut cursor)?;
+            version.serialize_into(&mut cursor)?;
+            header.serialize_into(&mut cursor)?;
         }
         writer.write_bytes(&buf[..]).await?;
 
@@ -878,6 +903,13 @@ impl<W: WriteBytes, K: Key, V: LayerValue> PersistentLayerWriter<W, K, V> {
         Ok(self.bloom_filter.serialized_size())
     }
 
+    // Returns the bloom filter writer. Intended to be used for testing purposes, e.g., gain access
+    // to the bloom filter to then corrupt it.
+    #[cfg(test)]
+    pub(crate) fn bloom_filter(&mut self) -> &mut BloomFilterWriter<K> {
+        &mut self.bloom_filter
+    }
+
     fn data_blocks(&self) -> usize {
         if self.item_count == 0 {
             0
@@ -949,6 +981,7 @@ impl<W: WriteBytes, K: Key, V: LayerValue> Drop for PersistentLayerWriter<W, K, 
 mod tests {
     use super::{PersistentLayer, PersistentLayerWriter};
     use crate::filesystem::MAX_BLOCK_SIZE;
+    use crate::lsm_tree::persistent_layer::MINIMUM_DATA_BLOCKS_FOR_BLOOM_FILTER;
     use crate::lsm_tree::types::{
         DefaultOrdUpperBound, FuzzyHash, Item, ItemRef, Layer, LayerKey, LayerWriter, MergeType,
         SortByU64,
@@ -1528,5 +1561,70 @@ mod tests {
             }
             PersistentLayer::<TestKey, u64>::open(handle).await.expect("new failed");
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_ignore_bloom_filter_on_older_versions() {
+        const BLOCK_SIZE: u64 = 512;
+        // Items will be 37 bytes each. Max length varint u64 is 9 bytes, 3 of those plus one
+        // straight encoded sequence number for another 8 bytes. Then 2 more for each seek table
+        // entry.
+        const ITEMS_TO_FILL_BLOCK: u64 = BLOCK_SIZE / 37;
+        // Add enough items to create enough blocks for a bloom filter to be necessary.
+        const ITEM_COUNT: u64 =
+            (1 + MINIMUM_DATA_BLOCKS_FOR_BLOOM_FILTER as u64) * ITEMS_TO_FILL_BLOCK;
+
+        let old_version_handle =
+            FakeObjectHandle::new_with_block_size(Arc::new(FakeObject::new()), BLOCK_SIZE as usize);
+        let current_version_handle =
+            FakeObjectHandle::new_with_block_size(Arc::new(FakeObject::new()), BLOCK_SIZE as usize);
+        {
+            let mut old_version_writer =
+                PersistentLayerWriter::<_, TestKey, u64>::new_with_version(
+                    Writer::new(&old_version_handle).await,
+                    ITEM_COUNT as usize,
+                    BLOCK_SIZE,
+                    Version { major: LATEST_VERSION.major - 1, minor: 0 },
+                )
+                .await
+                .expect("writer new");
+            let mut current_version_writer = PersistentLayerWriter::<_, TestKey, u64>::new(
+                Writer::new(&current_version_handle).await,
+                ITEM_COUNT as usize,
+                BLOCK_SIZE,
+            )
+            .await
+            .expect("writer new");
+
+            // Make all values take up maximum space for varint encoding.
+            let initial_value = u32::MAX as u64 + 1;
+            for i in 0..ITEM_COUNT {
+                old_version_writer
+                    .write(
+                        Item::new(TestKey(initial_value + i..initial_value + i), initial_value)
+                            .as_item_ref(),
+                    )
+                    .await
+                    .expect("write failed");
+                current_version_writer
+                    .write(
+                        Item::new(TestKey(initial_value + i..initial_value + i), initial_value)
+                            .as_item_ref(),
+                    )
+                    .await
+                    .expect("write failed");
+            }
+
+            old_version_writer.flush().await.expect("flush failed");
+            current_version_writer.flush().await.expect("flush failed");
+        }
+
+        let old_layer =
+            PersistentLayer::<TestKey, u64>::open(old_version_handle).await.expect("open failed");
+        let current_layer = PersistentLayer::<TestKey, u64>::open(current_version_handle)
+            .await
+            .expect("open failed");
+        assert!(!old_layer.has_bloom_filter());
+        assert!(current_layer.has_bloom_filter());
     }
 }

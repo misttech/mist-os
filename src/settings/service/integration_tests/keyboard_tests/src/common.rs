@@ -30,9 +30,6 @@ impl KeyboardTest {
     }
 
     pub fn connect_to_keyboardmarker(instance: &RealmInstance) -> KeyboardProxy {
-        return instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<KeyboardMarker>()
-            .expect("connecting to Keyboard");
+        return instance.root.connect_to_protocol_at_exposed_dir().expect("connecting to Keyboard");
     }
 }

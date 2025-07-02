@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.ui.display.singleton/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/fit/function.h>
-#include <lib/inspect/contrib/cpp/bounded_list_node.h>
 #include <lib/inspect/cpp/inspect.h>
 
 #include "src/lib/fxl/macros.h"
@@ -41,7 +40,7 @@ class DisplayPowerManager : public fidl::Server<fuchsia_ui_display_singleton::Di
 
  private:
   DisplayManager& display_manager_;
-  inspect::contrib::BoundedListNode inspect_display_power_events_;
+  inspect::BoundedListNode inspect_display_power_events_;
   fidl::ServerBindingGroup<fuchsia_ui_display_singleton::DisplayPower> bindings_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(DisplayPowerManager);

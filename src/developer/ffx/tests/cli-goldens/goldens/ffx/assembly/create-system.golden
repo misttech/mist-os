@@ -40,7 +40,7 @@
       "optionality": "required",
       "long": "--outdir",
       "short": null,
-      "description": "the directory to write assembled outputs to.",
+      "description": "the directory to write the assembled system to.",
       "hidden": false
     },
     {

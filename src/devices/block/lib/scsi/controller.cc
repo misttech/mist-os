@@ -415,4 +415,142 @@ zx::result<uint32_t> Controller::ScanAndBindLogicalUnits(uint8_t target,
   return zx::ok(lun_count.value());
 }
 
+zx::result<PostProcess> Controller::CheckSenseData(const FixedFormatSenseDataHeader& sense_data) {
+  // Currently, we only support fixed format sense data.
+  if (sense_data.response_code() != SenseDataResponseCodes::kFixedCurrentInformation) {
+    FDF_LOGL(WARNING, driver_logger(),
+             "SCSI: It only supports FixedFormatSenseData, response_code=0x%x",
+             static_cast<uint8_t>(sense_data.response_code()));
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  if (sense_data.filemark() || sense_data.eom() || sense_data.ili()) {
+    FDF_LOGL(WARNING, driver_logger(), "SCSI: Invalid flags, filemark=%d, EOM=%d, ILI=%d",
+             sense_data.filemark(), sense_data.eom(), sense_data.ili());
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
+  PostProcess post_process = PostProcess::kNone;
+  switch (sense_data.sense_key()) {
+    case SenseKey::NO_SENSE:
+    case SenseKey::RECOVERED_ERROR:
+      break;
+    case SenseKey::ABORTED_COMMAND: {
+      if (sense_data.additional_sense_code == 0x10) {  // DIF(Data Integrity Field)
+        // If aborted due to a DIF error, there is no reason to retry.
+        return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
+      }
+      // Check if the abort is due to a command timeout.
+      // - ASC=0x2e, ASCQ=0x01: COMMAND TIMEOUT BEFORE PROCESSING
+      // - ASC=0x2e, ASCQ=0x02: COMMAND TIMEOUT DURING PROCESSING
+      // - ASC=0x2e, ASCQ=0x03: COMMAND TIMEOUT DURING PROCESSING DUE TO ERROR RECOVERY
+      if (sense_data.additional_sense_code == 0x2e &&
+          sense_data.additional_sense_code_qualifier >= 0x01 &&
+          sense_data.additional_sense_code_qualifier <= 0x03) {
+        return zx::error(ZX_ERR_TIMED_OUT);
+      }
+      post_process = PostProcess::kNeedsRetry;
+      break;
+    }
+    case SenseKey::NOT_READY:
+    case SenseKey::UNIT_ATTENTION:
+      // Expecting a CHECK_CONDITION/UNIT_ATTENTION because of a bus reset. In this case, we
+      // need to retry.
+      // - ASC=0x28, ASCQ=0x00: NOT READY TO READY CHANGE, MEDIUM MAY HAVE CHANGED
+      if (expect_check_condition_or_unit_attention_ &&
+          (sense_data.additional_sense_code != 0x28 ||
+           sense_data.additional_sense_code_qualifier != 0x00)) {
+        expect_check_condition_or_unit_attention_ = false;
+        post_process = PostProcess::kNeedsRetry;
+        break;
+      }
+
+      // TODO(b/317838849): ASC=0x3f, ASCQ=0x0e: REPORTED LUN DATA HAS CHANGED
+      // TODO(b/317838849): ASC=0x04, ASCQ=0x02: LOGICAL UNIT NOT READY, INITIALIZING COMMAND
+      // REQUIRED
+
+      // If the device is preparing, we should retry.
+      // - ASC=0x04, ASCQ=0x01: LOGICAL UNIT IS IN PROCESS OF BECOMING READY
+      if (sense_data.additional_sense_code == 0x04 &&
+          sense_data.additional_sense_code_qualifier == 0x01) {
+        post_process = PostProcess::kNeedsRetry;
+        break;
+      }
+      return zx::error(ZX_ERR_BAD_STATE);
+    default:
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+  }
+  return zx::ok(post_process);
+}
+
+zx::result<PostProcess> Controller::CheckScsiStatus(StatusCode status_code,
+                                                    const FixedFormatSenseDataHeader& sense_data) {
+  PostProcess post_process = PostProcess::kNone;
+  switch (status_code) {
+    case StatusCode::GOOD:
+    case StatusCode::TASK_ABORTED:
+      break;
+    case StatusCode::CHECK_CONDITION:
+      return CheckSenseData(sense_data);
+    case StatusCode::TASK_SET_FULL:
+    case StatusCode::BUSY:
+      post_process = PostProcess::kNeedsRetry;
+      break;
+    case StatusCode::CONDITION_MET:
+    case StatusCode::INTERMEDIATE:
+    case StatusCode::INTERMEDIATE_CONDITION_MET:
+    case StatusCode::ACA_ACTIVE:
+    case StatusCode::RESERVATION_CONFILCT:
+      return zx::error(ZX_ERR_NOT_SUPPORTED);
+    default:
+      return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+  return zx::ok(post_process);
+}
+
+zx::result<> Controller::ScsiComplete(StatusMessage status_message,
+                                      const FixedFormatSenseDataHeader& sense_data) {
+  zx::result<PostProcess> post_process = zx::ok(PostProcess::kNone);
+
+  switch (status_message.host_status_code) {
+    case HostStatusCode::kOk: {
+      post_process = CheckScsiStatus(status_message.scsi_status_code, sense_data);
+      break;
+    }
+    case HostStatusCode::kTimeout:
+      post_process = zx::ok(PostProcess::kNeedsErrorHandling);
+      break;
+    case HostStatusCode::kRequeue:
+    case HostStatusCode::kError:
+      post_process = zx::ok(PostProcess::kNeedsRetry);
+      break;
+    case HostStatusCode::kAbort:
+      post_process = zx::error(ZX_ERR_IO_REFUSED);
+      break;
+    default:
+      FDF_LOGL(WARNING, driver_logger(), "SCSI: Unexpected host status value(%d)",
+               static_cast<uint8_t>(status_message.host_status_code));
+      post_process = zx::error(ZX_ERR_BAD_STATE);
+      break;
+  }
+
+  if (post_process.is_ok() && post_process == PostProcess::kNeedsErrorHandling) {
+    // Always returns PostProcess::kNone until we implement an error handler.
+    post_process = zx::ok(PostProcess::kNone);
+  }
+
+  if (post_process.is_ok() && post_process == PostProcess::kNeedsRetry) {
+    // Before retry is implemented, UNIT_ATTENTION is ignored by returning ZX_ERR_UNAVAILABLE.
+    if (sense_data.sense_key() == SenseKey::UNIT_ATTENTION) {
+      return zx::error(ZX_ERR_UNAVAILABLE);
+    }
+
+    // TODO(b/317838849): We need to implement the retry behavior.
+
+    post_process = zx::error(ZX_ERR_BAD_STATE);
+  }
+
+  return zx::make_result(post_process.status_value());
+}
+
 }  // namespace scsi

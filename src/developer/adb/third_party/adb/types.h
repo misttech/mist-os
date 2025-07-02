@@ -138,5 +138,6 @@ constexpr std::string_view kShellService = "SHELL";
 constexpr std::string_view kFfxService = "FFX";
 constexpr std::string_view kFileSyncService = "FILE_SYNC";
 constexpr std::string_view kRebootService = "REBOOT";
+constexpr std::string_view kSideloadService = "SIDELOAD";
 
 #endif  // SRC_DEVELOPER_ADB_THIRD_PARTY_ADB_TYPES_H_

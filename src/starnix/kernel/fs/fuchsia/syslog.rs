@@ -35,7 +35,7 @@ impl FileOps for SyslogFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -53,7 +53,7 @@ impl FileOps for SyslogFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -65,7 +65,7 @@ impl FileOps for SyslogFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

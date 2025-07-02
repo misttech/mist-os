@@ -137,7 +137,7 @@ pub mod ioctl {
         fsverity_descriptor_from_enable_arg, fsverity_enable_arg, fsverity_measurement,
         fsverity_read_metadata_arg, FsVerityState, HashAlgorithm, MetadataType,
     };
-    use crate::vfs::{FileObject, FileWriteGuardMode};
+    use crate::vfs::{FileObject, FileWriteGuard, FileWriteGuardMode};
     use num_traits::FromPrimitive;
     use starnix_sync::{FileOpsCore, LockBefore, Locked};
     use starnix_syscalls::{SyscallResult, SUCCESS};
@@ -148,7 +148,7 @@ pub mod ioctl {
 
     /// ioctl handler for FS_IOC_ENABLE_VERITY.
     pub fn enable<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         task: &CurrentTask,
         arg: UserAddress,
         file: &FileObject,
@@ -165,7 +165,7 @@ pub mod ioctl {
         let mut descriptor = fsverity_descriptor_from_enable_arg(task, block_size, &args)?;
         descriptor.data_size = file.node().fetch_and_refresh_info(locked, task)?.size as u64;
         // The "Exec" writeguard mode means 'no writers'.
-        let _guard = file.node().create_write_guard(FileWriteGuardMode::Exec)?;
+        let _guard = FileWriteGuard::new(file.node(), FileWriteGuardMode::Exec)?;
         let mut fsverity = file.node().fsverity.lock();
         match *fsverity {
             FsVerityState::Building => error!(EBUSY),
@@ -181,7 +181,7 @@ pub mod ioctl {
 
     /// ioctl handler for FS_IOC_MEASURE_VERITY.
     pub fn measure<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         task: &CurrentTask,
         arg: UserAddress,
         file: &FileObject,

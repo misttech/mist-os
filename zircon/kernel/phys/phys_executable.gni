@@ -45,6 +45,12 @@ phys_toolchain = "//zircon/kernel/phys:kernel.phys_$current_cpu"
 #     - Type: boolean
 #     - Default: false
 #
+#   * emulator_support_aib
+#     - Optional: If true, will generate an `emulator_support_aib_input` metadata entry and barrier
+#       making this image findable as a QEMU Kernel by `assembled_system`.
+#     - Type: boolean
+#     - Default: false
+#
 # See executable() for other parameters.
 #
 template("phys_executable") {
@@ -79,6 +85,7 @@ template("phys_executable") {
                                "target_name",
                                "visibility",
                                "release_output",
+                               "emulator_support_aib",
                              ])
       deps += [ "//zircon/kernel/phys:phys_executable.deps" ]
       inputs += _phys_linker_scripts
@@ -117,7 +124,7 @@ template("phys_executable") {
         output_extension = "bin"
       }
       output_path = "$output_dir/$output_name.$output_extension"
-
+      rebased_output_path = rebase_path(output_path, root_build_dir)
       metadata = {
         images = []
 
@@ -142,14 +149,24 @@ template("phys_executable") {
 
             # The caller can't override `path` since that would
             # not refer to this target's output any more.
-            path = rebase_path(output_path, root_build_dir)
+            path = rebased_output_path
           },
         ]
         if (defined(release_output) && release_output) {
           exported_files = [
             {
               name = target_name
-              path = rebase_path(output_path, root_build_dir)
+              path = rebased_output_path
+            },
+          ]
+        }
+        if (defined(invoker.emulator_support_aib) &&
+            invoker.emulator_support_aib) {
+          emulator_support_aib_input_barrier = []
+          emulator_support_aib_input = [
+            {
+              label = get_label_info(":$target_name", "label_with_toolchain")
+              path = rebased_output_path
             },
           ]
         }

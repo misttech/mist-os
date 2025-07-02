@@ -101,62 +101,6 @@ verify_assembly_configs("verify_assembly_configs") {
 
   # Avoid building board configs in both GN and Bazel.
   board_configs = []
-
-  partitions_configs = []
-  _partitions_config_label_no_toolchain =
-      get_label_info(partitions_config_label, "label_no_toolchain")
-  if (_partitions_config_label_no_toolchain == "//boards/partitions:x64") {
-    partitions_configs += [
-      {
-        name = "x64_partitions_config"
-        gn_target = "//boards/partitions:x64"
-        bazel_target = "//build/bazel/assembly/partitions_configurations:x64"
-        extra_copy_outputs = [ "bootloader_partitions/0/image/fuchsia.esp.blk" ]
-        deps = [ "//build/images/flash:esp.bazel_input" ]
-      },
-    ]
-  }
-  if (_partitions_config_label_no_toolchain == "//boards/partitions:arm64") {
-    partitions_configs += [
-      {
-        name = "arm64_partitions_config"
-        gn_target = "//boards/partitions:arm64"
-        bazel_target = "//build/bazel/assembly/partitions_configurations:arm64"
-        extra_copy_outputs = [ "bootloader_partitions/0/image/fuchsia.esp.blk" ]
-        deps = [ "//build/images/flash:esp.bazel_input" ]
-      },
-    ]
-  }
-  if (_partitions_config_label_no_toolchain ==
-      "//boards/partitions/vim3:vim3") {
-    partitions_configs += [
-      {
-        name = "vim3_partitions_config"
-        gn_target = "//boards/partitions/vim3"
-        bazel_target = "//boards/partitions/vim3"
-      },
-    ]
-  }
-  if (_partitions_config_label_no_toolchain == "//boards/partitions:riscv64") {
-    partitions_configs += [
-      {
-        name = "riscv64_partitions_config"
-        gn_target = "//boards/partitions:riscv64"
-        bazel_target =
-            "//build/bazel/assembly/partitions_configurations:riscv64"
-      },
-    ]
-  }
-  if (_partitions_config_label_no_toolchain == "//boards/partitions:default") {
-    partitions_configs += [
-      {
-        name = "default_partitions_config"
-        gn_target = "//boards/partitions:default"
-        bazel_target =
-            "//build/bazel/assembly/partitions_configurations:default"
-      },
-    ]
-  }
 }
 
 if (is_host) {

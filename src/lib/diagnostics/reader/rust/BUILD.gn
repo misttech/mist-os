@@ -42,7 +42,6 @@ rustc_library("lib") {
   ]
 
   test_deps = [
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",

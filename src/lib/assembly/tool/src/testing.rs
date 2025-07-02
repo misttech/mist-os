@@ -68,6 +68,7 @@ impl ToolProvider for FakeToolProvider {
 }
 
 /// A fake tool that does not execute a command, but only writes it to the |log|.
+#[derive(Clone)]
 struct FakeTool {
     /// The name of the tool.
     name: String,

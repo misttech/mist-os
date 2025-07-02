@@ -8,9 +8,6 @@
 #include <lib/arch/intrin.h>
 #include <lib/zircon-internal/thread_annotations.h>
 
-#include <tuple>
-#include <type_traits>
-
 namespace uart {
 
 // Degenerate case of unsynchronized policy, that provides the expected API to be implemented when

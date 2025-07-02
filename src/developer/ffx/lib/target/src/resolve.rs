@@ -372,7 +372,7 @@ pub async fn resolve_target_query_with(
     resolve_target_query_with_sources(query, ctx, sources).await
 }
 
-async fn resolve_target_query_with_sources(
+pub async fn resolve_target_query_with_sources(
     query: TargetInfoQuery,
     ctx: &EnvironmentContext,
     sources: DiscoverySources,
@@ -738,7 +738,7 @@ impl Resolution {
         Self::from_target(ResolutionTarget::Addr(addr))
     }
 
-    fn from_target_handle(th: TargetHandle) -> Result<Self> {
+    pub fn from_target_handle(th: TargetHandle) -> Result<Self> {
         let target = ResolutionTarget::from_target_handle(&th)?;
         Ok(Self { discovered: Some(th), ..Self::from_target(target) })
     }

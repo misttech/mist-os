@@ -19,6 +19,7 @@ group("tools") {
     "//tools/create:install($host_toolchain)",
     "//tools/debroot($host_toolchain)",
     "//tools/doc_checker($host_toolchain)",
+    "//tools/dupefinder($host_toolchain)",
     "//tools/fidl($host_toolchain)",
     "//tools/fidlcat:fidlcat_host($host_toolchain)",
     "//tools/funnel:($host_toolchain)",
@@ -84,7 +85,7 @@ group("e2e_tests") {
 group("host_tests") {
   testonly = true
 
-  deps = []
+  deps = [ "//tools/dupefinder:host_tests($host_toolchain)" ]
 }
 
 group("tests_no_e2e") {

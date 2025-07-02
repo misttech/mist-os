@@ -135,7 +135,7 @@ func (*Service) Sync(fidl.Context) (io.NodeSyncResult, error) {
 	return io.NodeSyncResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*Service) GetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
+func (*Service) DeprecatedGetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	return int32(zx.ErrOk), io.NodeAttributes{
 		Mode:      uint32(io.ModeTypeService),
 		Id:        io.InoUnknown,
@@ -322,7 +322,7 @@ func (*directoryState) Sync(fidl.Context) (io.NodeSyncResult, error) {
 	return io.NodeSyncResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (*directoryState) GetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
+func (*directoryState) DeprecatedGetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	return int32(zx.ErrOk), io.NodeAttributes{
 		Mode:      uint32(io.ModeTypeDirectory) | uint32(fdio.VtypeIRUSR),
 		Id:        io.InoUnknown,
@@ -434,7 +434,7 @@ func (dirState *directoryState) ReadDirents(ctx fidl.Context, maxOut uint64) (in
 				return err
 			}
 			defer cleanup()
-			status, attr, err := ioNode.GetAttr(ctx)
+			status, attr, err := ioNode.DeprecatedGetAttr(ctx)
 			if err != nil {
 				return err
 			}
@@ -727,7 +727,7 @@ func (*fileState) Sync(fidl.Context) (io.NodeSyncResult, error) {
 	return io.NodeSyncResultWithErr(int32(zx.ErrNotSupported)), nil
 }
 
-func (fState *fileState) GetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
+func (fState *fileState) DeprecatedGetAttr(fidl.Context) (int32, io.NodeAttributes, error) {
 	return int32(zx.ErrOk), io.NodeAttributes{
 		Mode:        uint32(io.ModeTypeFile) | uint32(fdio.VtypeIRUSR),
 		Id:          io.InoUnknown,

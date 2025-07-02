@@ -65,7 +65,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn value_list_drop_recorded() {
+    async fn value_list_drop_recorded() {
         let inspector = Inspector::default();
         let child = inspector.root().create_child("test");
         let value_list = ValueList::new();

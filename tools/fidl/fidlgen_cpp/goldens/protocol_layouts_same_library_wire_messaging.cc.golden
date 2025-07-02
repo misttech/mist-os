@@ -138,7 +138,7 @@
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -176,7 +176,7 @@
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -244,7 +244,7 @@
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -312,7 +312,7 @@
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -350,7 +350,7 @@
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -418,7 +418,7 @@
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::ComposedProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -483,14 +483,14 @@
   ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>(result) {}
 
   ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocollayoutssamelibrary::ComposedProtocol>::OneWayAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) {
-    FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+    __UNINITIALIZED
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed> _request_object{ ComposedProtocolOneWayAnonComposedRequest };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayAnonComposed>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
   ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocollayoutssamelibrary::ComposedProtocol>::OneWayNamedComposed(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
-    FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+    __UNINITIALIZED
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed> _request_object{ TablePayload };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::ComposedProtocol::OneWayNamedComposed>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
@@ -790,7 +790,7 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedPro
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>::MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse ComposedProtocolTwoWayAnonComposedResponse) {
   ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed> _response{ ComposedProtocolTwoWayAnonComposedResponse };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -843,7 +843,7 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedPro
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>::MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult) {
   ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError> _response{ ComposedProtocolTwoWayAnonComposedWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -916,7 +916,7 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedPro
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>::MakeReply(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
   ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed> _response{ TablePayload };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -969,7 +969,7 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedPro
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>::MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult) {
   ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError> _response{ ComposedProtocolTwoWayNamedComposedWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::ComposedProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -1519,7 +1519,7 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWay
 
 ::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayoutssamelibrary::ComposedProtocol>::OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) {
   ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed> _response{ComposedProtocolOnAnonComposedRequest };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -1543,7 +1543,7 @@ fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayo
 
 fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayoutssamelibrary::ComposedProtocol>::OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) {
   ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed> _response{ComposedProtocolOnAnonComposedRequest };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnAnonComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -1570,7 +1570,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 ::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayoutssamelibrary::ComposedProtocol>::OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed> _response{UnionPayload };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -1594,7 +1594,7 @@ fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayo
 
 fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayoutssamelibrary::ComposedProtocol>::OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed> _response{UnionPayload };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::ComposedProtocol::OnNamedComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -1869,7 +1869,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -1907,7 +1907,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -1975,7 +1975,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -2043,7 +2043,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -2081,7 +2081,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -2149,7 +2149,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -2217,7 +2217,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -2255,7 +2255,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -2323,7 +2323,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -2391,7 +2391,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -2429,7 +2429,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -2497,7 +2497,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
     ::fidl::UnownedClientEnd<::test_protocollayoutssamelibrary::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -2562,28 +2562,28 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
   ::fidl::WireUnownedResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>(result) {}
 
   ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::OneWayAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOneWayAnonComposedRequest ComposedProtocolOneWayAnonComposedRequest) {
-    FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+    __UNINITIALIZED
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed> _request_object{ ComposedProtocolOneWayAnonComposedRequest };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnonComposed>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
   ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::OneWayNamedComposed(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
-    FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+    __UNINITIALIZED
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed> _request_object{ TablePayload };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayNamedComposed>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
   ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::OneWayLocal(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
-    FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+    __UNINITIALIZED
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal> _request_object{ TablePayload };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayLocal>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
   ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocollayoutssamelibrary::MainProtocol>::OneWayAnon(::test_protocollayoutssamelibrary::wire::MainProtocolOneWayAnonRequest MainProtocolOneWayAnonRequest) {
-    FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+    __UNINITIALIZED
     ::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon> _request_object{ MainProtocolOneWayAnonRequest };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocollayoutssamelibrary::MainProtocol::OneWayAnon>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
@@ -3117,7 +3117,7 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtoco
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>::MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedResponse ComposedProtocolTwoWayAnonComposedResponse) {
   ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed> _response{ ComposedProtocolTwoWayAnonComposedResponse };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -3170,7 +3170,7 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtoco
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>::MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayAnonComposedWithErrorResult ComposedProtocolTwoWayAnonComposedWithErrorResult) {
   ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError> _response{ ComposedProtocolTwoWayAnonComposedWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonComposedWithError>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -3243,7 +3243,7 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtoco
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>::MakeReply(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
   ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed> _response{ TablePayload };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -3296,7 +3296,7 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtoco
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>::MakeReply(::test_protocollayoutssamelibrary::wire::ComposedProtocolTwoWayNamedComposedWithErrorResult ComposedProtocolTwoWayNamedComposedWithErrorResult) {
   ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError> _response{ ComposedProtocolTwoWayNamedComposedWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayNamedComposedWithError>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -3369,7 +3369,7 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtoco
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>::MakeReply(::test_protocollayoutssamelibrary::wire::TablePayload TablePayload) {
   ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal> _response{ TablePayload };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocal>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -3422,7 +3422,7 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtoco
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>::MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayLocalWithErrorResult MainProtocolTwoWayLocalWithErrorResult) {
   ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError> _response{ MainProtocolTwoWayLocalWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -3495,7 +3495,7 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtoco
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>::MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonResponse MainProtocolTwoWayAnonResponse) {
   ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon> _response{ MainProtocolTwoWayAnonResponse };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnon>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -3548,7 +3548,7 @@ fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtoco
 void
 fidl::internal::WireCompleterImpl<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>::MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnonWithErrorResult MainProtocolTwoWayAnonWithErrorResult) {
   ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError> _response{ MainProtocolTwoWayAnonWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocollayoutssamelibrary::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -4580,7 +4580,7 @@ return MakeReply(::test_protocollayoutssamelibrary::wire::MainProtocolTwoWayAnon
 
 ::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayoutssamelibrary::MainProtocol>::OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) {
   ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed> _response{ComposedProtocolOnAnonComposedRequest };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -4604,7 +4604,7 @@ fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayo
 
 fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayoutssamelibrary::MainProtocol>::OnAnonComposed(::test_protocollayoutssamelibrary::wire::ComposedProtocolOnAnonComposedRequest ComposedProtocolOnAnonComposedRequest) {
   ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed> _response{ComposedProtocolOnAnonComposedRequest };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnonComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -4631,7 +4631,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 ::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayoutssamelibrary::MainProtocol>::OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed> _response{UnionPayload };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -4655,7 +4655,7 @@ fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayo
 
 fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayoutssamelibrary::MainProtocol>::OnNamedComposed(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed> _response{UnionPayload };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnNamedComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -4682,7 +4682,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 ::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayoutssamelibrary::MainProtocol>::OnLocal(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal> _response{UnionPayload };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -4706,7 +4706,7 @@ fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayo
 
 fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayoutssamelibrary::MainProtocol>::OnLocal(::test_protocollayoutssamelibrary::wire::UnionPayload UnionPayload) {
   ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal> _response{UnionPayload };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnLocal>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -4733,7 +4733,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocollayoutss
 
 ::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocollayoutssamelibrary::MainProtocol>::OnAnon(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) {
   ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon> _response{MainProtocolOnAnonRequest };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -4757,7 +4757,7 @@ fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocollayo
 
 fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocollayoutssamelibrary::MainProtocol>::OnAnon(::test_protocollayoutssamelibrary::wire::MainProtocolOnAnonRequest MainProtocolOnAnonRequest) {
   ::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon> _response{MainProtocolOnAnonRequest };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocollayoutssamelibrary::MainProtocol::OnAnon>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };

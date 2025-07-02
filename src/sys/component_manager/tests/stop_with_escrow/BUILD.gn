@@ -18,13 +18,17 @@ rustc_test("stop_with_escrow_integration_test_bin") {
   source_root = "stop_with_escrow_integration_test.rs"
   deps = [
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/rust/zx",
     "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-runtime",
     "//src/sys/component_manager/tests/fidl:components_rust",
     "//src/sys/lib/component-events",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:futures",
   ]
 
   sources = [ "stop_with_escrow_integration_test.rs" ]
@@ -79,6 +83,39 @@ fuchsia_component("stop_with_delivery_on_readable_request") {
   restricted_features = [ "delivery_type" ]
 }
 
+rustc_binary("stop_with_dynamic_dictionary_bin") {
+  name = "stop_with_dynamic_dictionary"
+  edition = "2021"
+  source_root = "stop_with_dynamic_dictionary.rs"
+  deps = [
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
+    "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
+    "//sdk/rust/zx",
+    "//src/lib/detect-stall",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+    "//src/lib/fuchsia-component",
+    "//src/lib/fuchsia-runtime",
+    "//src/lib/sandbox",
+    "//src/sys/component_manager/tests/fidl:components_rust",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
+  ]
+
+  sources = [ "stop_with_dynamic_dictionary.rs" ]
+}
+
+fuchsia_component("stop_with_dynamic_dictionary") {
+  testonly = true
+  manifest = "meta/stop_with_dynamic_dictionary.cml"
+  deps = [ ":stop_with_dynamic_dictionary_bin" ]
+  restricted_features = [
+    "delivery_type",
+    "dynamic_dictionaries",
+  ]
+}
+
 rustc_binary("stop_with_escrowed_dictionary_bin") {
   name = "stop_with_escrowed_dictionary"
   edition = "2021"
@@ -116,6 +153,7 @@ fuchsia_unittest_package("stop_with_escrow_integration_test") {
   manifest = "meta/stop_with_escrow_integration_test.cml"
   deps = [
     ":stop_with_delivery_on_readable_request",
+    ":stop_with_dynamic_dictionary",
     ":stop_with_escrow_integration_test_bin",
     ":stop_with_escrowed_dictionary",
     ":stop_with_pending_request",

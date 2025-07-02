@@ -166,6 +166,7 @@ mod tests {
 
     #[test_case(true)]
     #[test_case(false)]
+    #[fuchsia::test(add_test_attr = false)]
     fn persistent_data_from_network_config_has_connected(has_ever_connected: bool) {
         // Check that from() works when has_ever_connected is true and false.
         let ssid = "ssid";
@@ -187,6 +188,7 @@ mod tests {
     }
 
     #[test_case(SecurityType::Wpa, storage::SecurityType::Wpa)]
+    #[fuchsia::test(add_test_attr = false)]
     fn persistent_data_from_network_config_security(
         security: SecurityType,
         storage_security: storage::SecurityType,

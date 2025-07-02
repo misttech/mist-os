@@ -12,7 +12,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::common::{path_schema, vec_path_schema, DriverDetails};
-use crate::release_info::ProductReleaseInfo;
+use assembly_release_info::ProductReleaseInfo;
 
 /// The Product-provided configuration details.
 #[derive(Debug, Default, Deserialize, Serialize, JsonSchema, WalkPaths, PartialEq)]

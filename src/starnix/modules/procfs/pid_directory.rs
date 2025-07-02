@@ -11,21 +11,27 @@ use starnix_core::task::{
     ThreadGroupKey,
 };
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
-use starnix_core::vfs::stub_empty_file::StubEmptyFile;
+use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::pseudo::simple_file::{
+    parse_i32_file, parse_unsigned_file, serialize_for_file, BytesFile, BytesFileOps,
+    SimpleFileNode,
+};
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::pseudo::stub_empty_file::StubEmptyFile;
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     default_seek, emit_dotdot, fileops_impl_delegate_read_and_seek, fileops_impl_directory,
-    fileops_impl_noop_sync, fs_node_impl_dir_readonly, parse_i32_file, parse_unsigned_file,
-    serialize_for_file, unbounded_seek, BytesFile, BytesFileOps, CallbackSymlinkNode,
-    DirectoryEntryType, DirentSink, DynamicFile, DynamicFileBuf, DynamicFileSource, FdNumber,
-    FileObject, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    FsString, ProcMountinfoFile, ProcMountsFile, SeekTarget, SimpleFileNode,
-    StaticDirectoryBuilder, SymlinkTarget, VecDirectory, VecDirectoryEntry,
+    fileops_impl_noop_sync, fileops_impl_unbounded_seek, fs_node_impl_dir_readonly,
+    CallbackSymlinkNode, DirectoryEntryType, DirentSink, FdNumber, FileObject, FileOps,
+    FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    ProcMountinfoFile, ProcMountsFile, SeekTarget, SymlinkTarget,
 };
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_types::ownership::{OwnedRef, TempRef, WeakRef};
 use starnix_types::time::duration_to_scheduler_clock;
 use starnix_uapi::auth::{CAP_SYS_NICE, CAP_SYS_RESOURCE};
+use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
@@ -113,22 +119,16 @@ impl Deref for TaskDirectoryNode {
 }
 
 impl TaskDirectory {
-    fn new(
-        current_task: &CurrentTask,
-        fs: &FileSystemHandle,
-        task: &TempRef<'_, Task>,
-        scope: TaskEntryScope,
-    ) -> FsNodeHandle {
+    fn new(fs: &FileSystemHandle, task: &TempRef<'_, Task>, scope: TaskEntryScope) -> FsNodeHandle {
         let creds = task.creds().euid_as_fscred();
         let task_weak = WeakRef::from(task);
-        fs.create_node(
-            current_task,
+        fs.create_node_and_allocate_node_id(
             TaskDirectoryNode(Arc::new(TaskDirectory {
                 task_weak,
                 scope,
-                inode_range: fs.allocate_node_id(task_entries(scope).len()),
+                inode_range: fs.allocate_ino_range(task_entries(scope).len()),
             })),
-            FsNodeInfo::new_factory(mode!(IFDIR, 0o777), creds),
+            FsNodeInfo::new(mode!(IFDIR, 0o777), creds),
         )
     }
 }
@@ -138,7 +138,7 @@ impl FsNodeOps for TaskDirectoryNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -148,15 +148,15 @@ impl FsNodeOps for TaskDirectoryNode {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let task_weak = self.task_weak.clone();
         let creds = node.info().cred();
         let fs = node.fs();
-        let (mode, inode) = task_entries(self.scope)
+        let (mode, ino) = task_entries(self.scope)
             .into_iter()
             .enumerate()
             .find_map(|(index, (n, mode))| {
@@ -214,7 +214,6 @@ impl FsNodeOps for TaskDirectoryNode {
             }
             b"attr" => {
                 let mut subdir = StaticDirectoryBuilder::new(&fs);
-                subdir.entry_creds(creds);
                 subdir.dir_creds(creds);
                 for (attr, name) in [
                     (security::ProcAttr::Current, "current"),
@@ -223,23 +222,22 @@ impl FsNodeOps for TaskDirectoryNode {
                     (security::ProcAttr::KeyCreate, "keycreate"),
                     (security::ProcAttr::SockCreate, "sockcreate"),
                 ] {
-                    subdir.entry(
-                        current_task,
+                    subdir.entry_etc(
                         name,
                         AttrNode::new(task_weak.clone(), attr),
                         mode!(IFREG, 0o666),
+                        DeviceType::NONE,
+                        creds,
                     );
                 }
-                subdir.entry(
-                    current_task,
+                subdir.entry_etc(
                     "prev",
                     AttrNode::new(task_weak, security::ProcAttr::Previous),
                     mode!(IFREG, 0o444),
+                    DeviceType::NONE,
+                    creds,
                 );
-                let (ops, _file_ops) = subdir.build_ops();
-                // We need to return the FsNodeOps, not the FileOps here.
-                // The FsNode will handle creating the FileOps when opened.
-                ops
+                subdir.build_ops()
             }
             b"ns" => Box::new(NsDirectory { task: task_weak }),
             b"mountinfo" => Box::new(ProcMountinfoFile::new_node(task_weak)),
@@ -262,28 +260,18 @@ impl FsNodeOps for TaskDirectoryNode {
             ),
         };
 
-        Ok(fs.create_node_with_id(current_task, ops, inode, FsNodeInfo::new(inode, mode, creds)))
+        Ok(fs.create_node(ino, ops, FsNodeInfo::new(mode, creds)))
     }
 }
 
 impl FileOps for TaskDirectory {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -319,19 +307,15 @@ pub fn pid_directory(
 ) -> FsNodeHandle {
     // proc(5): "The files inside each /proc/pid directory are normally
     // owned by the effective user and effective group ID of the process."
-    let fs_node = TaskDirectory::new(current_task, fs, task, TaskEntryScope::ThreadGroup);
+    let fs_node = TaskDirectory::new(fs, task, TaskEntryScope::ThreadGroup);
 
     security::task_to_fs_node(current_task, task, &fs_node);
     fs_node
 }
 
 /// Creates an [`FsNode`] that represents the `/proc/<pid>/task/<tid>` directory for `task`.
-fn tid_directory(
-    current_task: &CurrentTask,
-    fs: &FileSystemHandle,
-    task: &TempRef<'_, Task>,
-) -> FsNodeHandle {
-    TaskDirectory::new(current_task, fs, task, TaskEntryScope::Task)
+fn tid_directory(fs: &FileSystemHandle, task: &TempRef<'_, Task>) -> FsNodeHandle {
+    TaskDirectory::new(fs, task, TaskEntryScope::Task)
 }
 
 /// `FdDirectory` implements the directory listing operations for a `proc/<pid>/fd` directory.
@@ -353,7 +337,7 @@ impl FsNodeOps for FdDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -365,9 +349,9 @@ impl FsNodeOps for FdDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let fd = FdNumber::from_fs_str(name).map_err(|_| errno!(ENOENT))?;
@@ -375,14 +359,13 @@ impl FsNodeOps for FdDirectory {
         // Make sure that the file descriptor exists before creating the node.
         let _ = task.files.get_allowing_opath(fd).map_err(|_| errno!(ENOENT))?;
         let task_reference = self.task.clone();
-        Ok(node.fs().create_node(
-            current_task,
+        Ok(node.fs().create_node_and_allocate_node_id(
             CallbackSymlinkNode::new(move || {
                 let task = Task::from_weak(&task_reference)?;
                 let file = task.files.get_allowing_opath(fd).map_err(|_| errno!(ENOENT))?;
                 Ok(SymlinkTarget::Node(file.name.to_passive()))
             }),
-            FsNodeInfo::new_factory(mode!(IFLNK, 0o777), task.as_fscred()),
+            FsNodeInfo::new(mode!(IFLNK, 0o777), task.as_fscred()),
         ))
     }
 }
@@ -441,7 +424,7 @@ impl FsNodeOps for NsDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -462,7 +445,7 @@ impl FsNodeOps for NsDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -487,9 +470,10 @@ impl FsNodeOps for NsDirectory {
             if !NS_IDENTIFIER_RE.is_match(id) {
                 return error!(ENOENT);
             }
-            let node_info = || FsNodeInfo::new_factory(mode!(IFREG, 0o444), task.as_fscred());
-            let fallback =
-                || node.fs().create_node(current_task, BytesFile::new_node(vec![]), node_info());
+            let node_info = || FsNodeInfo::new(mode!(IFREG, 0o444), task.as_fscred());
+            let fallback = || {
+                node.fs().create_node_and_allocate_node_id(BytesFile::new_node(vec![]), node_info())
+            };
             Ok(match ns {
                 "cgroup" => {
                     track_stub!(TODO("https://fxbug.dev/297313673"), "cgroup namespaces");
@@ -499,8 +483,7 @@ impl FsNodeOps for NsDirectory {
                     track_stub!(TODO("https://fxbug.dev/297313673"), "ipc namespaces");
                     fallback()
                 }
-                "mnt" => node.fs().create_node(
-                    current_task,
+                "mnt" => node.fs().create_node_and_allocate_node_id(
                     current_task.task.fs().namespace(),
                     node_info(),
                 ),
@@ -540,12 +523,11 @@ impl FsNodeOps for NsDirectory {
         } else {
             // The name is {namespace}, link to the correct one of the current task.
             let id = current_task.task.fs().namespace().id;
-            Ok(node.fs().create_node(
-                current_task,
+            Ok(node.fs().create_node_and_allocate_node_id(
                 CallbackSymlinkNode::new(move || {
                     Ok(SymlinkTarget::Path(format!("{name}:[{id}]").into()))
                 }),
-                FsNodeInfo::new_factory(mode!(IFLNK, 0o7777), task.as_fscred()),
+                FsNodeInfo::new(mode!(IFLNK, 0o7777), task.as_fscred()),
             ))
         }
     }
@@ -571,7 +553,7 @@ impl FsNodeOps for FdInfoDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -583,9 +565,9 @@ impl FsNodeOps for FdInfoDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let task = Task::from_weak(&self.task)?;
@@ -594,10 +576,9 @@ impl FsNodeOps for FdInfoDirectory {
         let pos = *file.offset.lock();
         let flags = file.flags();
         let data = format!("pos:\t{}flags:\t0{:o}\n", pos, flags.bits()).into_bytes();
-        Ok(node.fs().create_node(
-            current_task,
+        Ok(node.fs().create_node_and_allocate_node_id(
             BytesFile::new_node(data),
-            FsNodeInfo::new_factory(mode!(IFREG, 0o444), task.as_fscred()),
+            FsNodeInfo::new(mode!(IFREG, 0o444), task.as_fscred()),
         ))
     }
 }
@@ -628,7 +609,7 @@ impl FsNodeOps for TaskListDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -648,9 +629,9 @@ impl FsNodeOps for TaskListDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let thread_group = self.thread_group()?;
@@ -668,7 +649,7 @@ impl FsNodeOps for TaskListDirectory {
         let task = weak_task.upgrade().ok_or_else(|| errno!(ENOENT))?;
         std::mem::drop(pid_state);
 
-        Ok(tid_directory(current_task, &node.fs(), &task))
+        Ok(tid_directory(&node.fs(), &task))
     }
 }
 
@@ -801,7 +782,7 @@ impl FileOps for CommFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
@@ -911,18 +892,18 @@ impl FileOps for MemFile {
 
     fn seek(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        default_seek(current_offset, target, |_| error!(EINVAL))
+        default_seek(current_offset, target, || error!(EINVAL))
     }
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -954,7 +935,7 @@ impl FileOps for MemFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,

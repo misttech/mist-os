@@ -4,6 +4,11 @@
 
 """The fuchsia_idk_repository() repository rule definition."""
 
+load(
+    "@rules_fuchsia//fuchsia/workspace:utils.bzl",
+    "abspath_from_full_label_or_repo_relpath",
+)
+
 # This repository rule is used to populate an IDK export directory
 # whose metadata file reference Ninja-generated artifacts as targets,
 # for example for `sdk://pkg/fdio/meta.json` the original metadata
@@ -52,7 +57,10 @@ def _fuchsia_idk_repository(repo_ctx):
     ninja_build_dir_path = repo_ctx.path("%s/%s" % (repo_ctx.workspace_root, repo_ctx.attr.ninja_build_dir))
     ret = repo_ctx.execute(
         [
-            repo_ctx.path(Label("@//:" + repo_ctx.attr.python_executable)),
+            abspath_from_full_label_or_repo_relpath(
+                repo_ctx,
+                repo_ctx.attr.python_executable,
+            ),
             "-S",
             repo_ctx.path(Label("@//build/bazel/fuchsia_idk:generate_repository.py")),
             "--repository-name",
@@ -88,11 +96,11 @@ fuchsia_idk_repository = repository_rule(
             mandatory = True,
         ),
         "python_executable": attr.string(
-            doc = "Path to python3 executable, relative to workspace root.",
+            doc = "Path to python3 executable, a full label, or relative to workspace root.",
             mandatory = True,
         ),
         "content_hash_file": attr.string(
-            doc = "Path to content hash file for this repository, relative to workspace root.",
+            doc = "Path to content hash file for this repository, a full label.",
             mandatory = False,
         ),
     },

@@ -7,8 +7,9 @@
 use anyhow::{Context, Error};
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fidl_fuchsia_net_policy_socketproxy::{
-    self as fnp_socketproxy, FuchsiaNetworksRequest, Network, NetworkDnsServers, NetworkInfo,
-    StarnixNetworksRequest,
+    self as fnp_socketproxy, FuchsiaNetworkInfo, FuchsiaNetworksRequest, Network,
+    NetworkDnsServers, NetworkInfo, NetworkRegistryAddError, NetworkRegistryRemoveError,
+    NetworkRegistrySetDefaultError, StarnixNetworksRequest,
 };
 use fuchsia_inspect_derive::{IValue, Inspect, Unit};
 use futures::channel::mpsc;
@@ -17,7 +18,11 @@ use futures::{SinkExt as _, StreamExt as _, TryStreamExt as _};
 use log::{error, info, warn};
 use std::collections::HashMap;
 use std::sync::Arc;
-use {fidl_fuchsia_net as fnet, fidl_fuchsia_posix_socket as fposix_socket};
+use thiserror::Error;
+use {
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fidl_fuchsia_posix_socket as fposix_socket,
+};
 
 /// RFC-1035§4.2 specifies port 53 (decimal) as the default port for DNS requests.
 const DEFAULT_DNS_PORT: u16 = 53;
@@ -70,6 +75,79 @@ impl NetworkInfoExt for NetworkInfo {
             // the mark to None.
             NetworkInfo::Fuchsia(_) | _ => None,
         }
+    }
+}
+
+// Errors produced when communicating updates to
+// the socket proxy.
+#[derive(Clone, Debug, Error)]
+pub enum NetworkRegistryError {
+    #[error("Error during socketproxy Add: {0:?}")]
+    Add(NetworkRegistryAddError),
+    #[error("Error during socketproxy Remove: {0:?}")]
+    Remove(NetworkRegistryRemoveError),
+    #[error("Error during socketproxy SetDefault: {0:?}")]
+    SetDefault(NetworkRegistrySetDefaultError),
+}
+
+impl From<NetworkRegistryAddError> for NetworkRegistryError {
+    fn from(error: NetworkRegistryAddError) -> Self {
+        NetworkRegistryError::Add(error)
+    }
+}
+
+impl From<NetworkRegistryRemoveError> for NetworkRegistryError {
+    fn from(error: NetworkRegistryRemoveError) -> Self {
+        NetworkRegistryError::Remove(error)
+    }
+}
+
+impl From<NetworkRegistrySetDefaultError> for NetworkRegistryError {
+    fn from(error: NetworkRegistrySetDefaultError) -> Self {
+        NetworkRegistryError::SetDefault(error)
+    }
+}
+
+#[derive(Clone, Debug, Error)]
+pub enum NetworkConversionError {
+    #[error("Could not convert id ({0}) to u32")]
+    InvalidInterfaceId(u64),
+}
+
+pub trait NetworkExt<I: fnet_interfaces_ext::FieldInterests> {
+    fn from_watcher_properties(
+        properties: &fnet_interfaces_ext::Properties<I>,
+    ) -> Result<Self, NetworkConversionError>
+    where
+        Self: Sized;
+}
+
+impl<I: fnet_interfaces_ext::FieldInterests> NetworkExt<I> for Network {
+    fn from_watcher_properties(
+        properties: &fnet_interfaces_ext::Properties<I>,
+    ) -> Result<Self, NetworkConversionError> {
+        // We expect interface ids to safely fit in the range of u32 values.
+        let network_id: u32 =
+            properties.id.get().try_into().or_else(|_| {
+                Err(NetworkConversionError::InvalidInterfaceId(properties.id.into()))
+            })?;
+        let network = Self {
+            network_id: Some(network_id),
+            info: Some(NetworkInfo::Fuchsia(FuchsiaNetworkInfo {
+                // No Fuchsia-specific information to provide.
+                ..Default::default()
+            })),
+            // DNS servers of Fuchsia networks are observable in netcfg already, so don't provide
+            // them to the Socketproxy. Socketproxy requires these fields to be provided so
+            // instantiate the v4 and v6 fields as empty vectors.
+            dns_servers: Some(fnp_socketproxy::NetworkDnsServers {
+                v4: Some(vec![]),
+                v6: Some(vec![]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        Ok(network)
     }
 }
 
@@ -736,11 +814,11 @@ mod test {
         let (realm, _) = setup_test().await?;
         let starnix_networks = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::StarnixNetworksMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to StarnixNetworks")?;
         let fuchsia_networks = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::FuchsiaNetworksMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to FuchsiaNetworks")?;
 
         for op in operations {
@@ -797,7 +875,7 @@ mod test {
         let (realm, mut dns_rx) = setup_test().await?;
         let starnix_networks = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::StarnixNetworksMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to StarnixNetworks")?;
 
         let mut last_dns = None;
@@ -867,11 +945,11 @@ mod test {
         let (realm, mut dns_rx) = setup_test().await?;
         let starnix_networks = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::StarnixNetworksMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to StarnixNetworks")?;
         let fuchsia_networks = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnp_socketproxy::FuchsiaNetworksMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to FuchsiaNetworks")?;
 
         let mut last_dns = None;

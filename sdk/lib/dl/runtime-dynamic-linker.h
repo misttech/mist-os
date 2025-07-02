@@ -86,15 +86,16 @@ class RuntimeDynamicLinker {
       return fit::error{Error{"invalid mode parameter"}};
     }
 
-    if (!file || !strlen(file)) {
-      return fit::error{
-          Error{"TODO(https://fxbug.dev/361674544): nullptr for file is unsupported."}};
-    }
-
     // Use a non-scoped diagnostics object for the root module. Because errors
     // are generated on this module directly, its name does not need to be
     // prefixed to the error, as is the case using ld::ScopedModuleDiagnostics.
     dl::Diagnostics diag;
+
+    // If NULL is passed in for `file`, return a handle to the first module in
+    // the modules_ list (ie the executable).
+    if (!file) {
+      return diag.ok(&modules_.front());
+    }
 
     Soname name{file};
     // If a module for this file is already loaded, return a reference to it.
@@ -105,6 +106,9 @@ class RuntimeDynamicLinker {
       }
       if (mode & OpenSymbolScope::kGlobal) {
         MakeGlobal(found->module_tree());
+      }
+      if (mode & OpenFlags::kNodelete) {
+        found->set_no_delete();
       }
       return diag.ok(found);
     }
@@ -144,6 +148,10 @@ class RuntimeDynamicLinker {
     // ordering of all loaded modules.
     if (mode & OpenSymbolScope::kGlobal) {
       MakeGlobal(root_module.module_tree());
+    }
+
+    if (mode & OpenFlags::kNodelete) {
+      root_module.set_no_delete();
     }
 
     return diag.ok(&root_module);

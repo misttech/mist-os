@@ -1,0 +1,67 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# The following are example uses of the IDK atom rules that can be built and
+# analyzed with cquery.
+load("//build/bazel/bazel_idk:defs.bzl", "idk_atom", "idk_cc_source_library", "idk_molecule")
+
+idk_atom(
+    name = "test_atom_idk",
+    testonly = True,
+    category = "partner",
+    id = "sdk://pkg/test",
+    idk_name = "test_atom",
+    meta_dest = "/pkg/test",
+    stable = True,
+    type = "prebuilt_library",
+)
+
+idk_cc_source_library(
+    name = "test-source-set",
+    testonly = True,
+    srcs = ["some_library.cc"],
+    hdrs = ["different_include_base/lib/some_library/some_library.h"],
+    api_area = "Unknown",
+    api_file_path = "different_file_name.api",
+    category = "partner",
+    idk_name = "test_source_set",
+    include_base = "different_include_base",
+    stable = True,
+    deps = [":test_source_set_dependency"],
+)
+
+idk_cc_source_library(
+    name = "test_source_set_dependency",
+    testonly = True,
+    hdrs = ["include/lib/helper_library/helper_library.h"],
+    category = "partner",
+    idk_name = "source_set_dependency",
+    stable = True,
+)
+
+idk_molecule(
+    name = "test_submolecule",
+    testonly = True,
+    deps = [
+        ":test-source-set_idk",
+        ":test_atom_idk",
+    ],
+)
+
+idk_molecule(
+    name = "test_molecule",
+    testonly = True,
+    deps = [
+        ":test_submolecule",
+        "//sdk/lib/memory_barriers:memory_barriers_idk",
+    ],
+)
+
+filegroup(
+    name = "build_only_tests",
+    testonly = True,
+    srcs = [
+        ":test_molecule",
+    ],
+)

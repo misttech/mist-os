@@ -37,8 +37,6 @@
 
 namespace temperature {
 
-static constexpr char kDeviceName[] = "aml-trip-device";
-
 zx::result<> AmlTrip::Start() {
   fidl::Arena arena;
   std::optional<TemperatureCelsius> critical_temperature = std::nullopt;
@@ -102,7 +100,7 @@ zx::result<> AmlTrip::Start() {
 
   auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_trippoint::TripPoint>(
       trippoint_bindings_.CreateHandler(device_.get(), dispatcher(), fidl::kIgnoreBindingClosure),
-      kDeviceName);
+      kChildNodeName);
   if (result.is_error()) {
     FDF_LOG(ERROR, "Failed to add Device service %s", result.status_string());
     return result.take_error();
@@ -138,7 +136,7 @@ zx::result<> AmlTrip::CreateDevfsNode() {
        .class_name = "trippoint",
        .connector_supports = fuchsia_device_fs::ConnectionType::kController}};
 
-  zx::result child = AddOwnedChild(kDeviceName, devfs_args);
+  zx::result child = AddOwnedChild(kChildNodeName, devfs_args);
   if (child.is_error()) {
     FDF_LOG(ERROR, "Failed to add owned child: %s", child.status_string());
     return child.take_error();

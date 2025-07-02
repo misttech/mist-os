@@ -150,9 +150,6 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   struct DisplayConfigResponse {
     // Whether or not the config can be successfully applied or not.
     fuchsia_hardware_display_types::ConfigResult result;
-    // If the config is invalid, this vector will list all the operations
-    // that need to be performed to make the config valid again.
-    std::vector<fuchsia_hardware_display::ClientCompositionOp> ops;
   };
 
   struct FrameEventData {
@@ -168,7 +165,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
     // (1 for each render target).
     uint32_t vmo_count = 0;
 
-    // The current target that is being rendererd to by the software renderer.
+    // The current target that is being rendered to by the software renderer.
     uint32_t curr_vmo = 0;
 
     // The information used to create images for each render target from the vmo data.

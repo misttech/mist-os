@@ -603,6 +603,18 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
                 .trace(trace::trace_future_args!(c"storage", c"File::Sync"))
                 .await?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::FileRequest::DeprecatedGetAttr { responder } => {
+                async move {
+                    let (status, attrs) =
+                        crate::common::io2_to_io1_attrs(self.file.as_ref(), self.options.rights)
+                            .await;
+                    responder.send(status.into_raw(), &attrs)
+                }
+                .trace(trace::trace_future_args!(c"storage", c"File::GetAttr"))
+                .await?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::FileRequest::GetAttr { responder } => {
                 async move {
                     let (status, attrs) =
@@ -958,7 +970,7 @@ impl<T: 'static + File, U: Deref<Target = OpenNode<T>> + DerefMut + IoOpHandler 
 
     #[cfg(target_os = "fuchsia")]
     async fn handle_get_backing_memory(&mut self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        get_backing_memory_validate_flags(flags, self.options.to_io1())?;
+        get_backing_memory_validate_flags(flags, self.options)?;
         self.file.get_backing_memory(flags).await
     }
 
@@ -1165,13 +1177,21 @@ mod tests {
 
     const RIGHTS_R: fio::Operations =
         fio::Operations::READ_BYTES.union(fio::Operations::GET_ATTRIBUTES);
-    const RIGHTS_W: fio::Operations = fio::Operations::WRITE_BYTES
-        .union(fio::Operations::GET_ATTRIBUTES)
-        .union(fio::Operations::UPDATE_ATTRIBUTES);
+    const RIGHTS_W: fio::Operations =
+        fio::Operations::WRITE_BYTES.union(fio::Operations::UPDATE_ATTRIBUTES);
     const RIGHTS_RW: fio::Operations = fio::Operations::READ_BYTES
         .union(fio::Operations::WRITE_BYTES)
         .union(fio::Operations::GET_ATTRIBUTES)
         .union(fio::Operations::UPDATE_ATTRIBUTES);
+
+    // These are shorthand for the flags we get back from get_flags for various permissions. We
+    // can't use the fio::PERM_ aliases directly - they include more flags than just these, because
+    // get_flags returns the union of those and the actual abilities of the node (in this case, a
+    // file).
+    const FLAGS_R: fio::Flags = fio::Flags::PERM_READ_BYTES.union(fio::Flags::PERM_GET_ATTRIBUTES);
+    const FLAGS_W: fio::Flags =
+        fio::Flags::PERM_WRITE_BYTES.union(fio::Flags::PERM_UPDATE_ATTRIBUTES);
+    const FLAGS_RW: fio::Flags = FLAGS_R.union(FLAGS_W);
 
     #[derive(Debug, PartialEq)]
     enum FileOperation {
@@ -1381,7 +1401,7 @@ mod tests {
         pub scope: ExecutionScope,
     }
 
-    fn init_mock_file(callback: MockCallbackType, flags: fio::OpenFlags) -> TestEnv {
+    fn init_mock_file(callback: MockCallbackType, flags: fio::Flags) -> TestEnv {
         let file = MockFile::new(callback);
         let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
 
@@ -1400,7 +1420,7 @@ mod tests {
     async fn test_open_flag_truncate() {
         let env = init_mock_file(
             Box::new(always_succeed_callback),
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::TRUNCATE,
+            fio::PERM_WRITABLE | fio::Flags::FILE_TRUNCATE,
         );
         // Do a no-op sync() to make sure that the open has finished.
         let () = env.proxy.sync().await.unwrap().map_err(Status::from_raw).unwrap();
@@ -1418,47 +1438,8 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_clone_same_rights() {
-        let env = init_mock_file(
-            Box::new(always_succeed_callback),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        );
-        // Read from original proxy.
-        let _: Vec<u8> = env.proxy.read(6).await.unwrap().map_err(Status::from_raw).unwrap();
-        let (clone_proxy, remote) = fidl::endpoints::create_proxy::<fio::FileMarker>();
-        env.proxy
-            .deprecated_clone(fio::OpenFlags::CLONE_SAME_RIGHTS, remote.into_channel().into())
-            .unwrap();
-        // Seek and read from clone_proxy.
-        let _: u64 = clone_proxy
-            .seek(fio::SeekOrigin::Start, 100)
-            .await
-            .unwrap()
-            .map_err(Status::from_raw)
-            .unwrap();
-        let _: Vec<u8> = clone_proxy.read(5).await.unwrap().map_err(Status::from_raw).unwrap();
-
-        // Read from original proxy.
-        let _: Vec<u8> = env.proxy.read(5).await.unwrap().map_err(Status::from_raw).unwrap();
-
-        let events = env.file.operations.lock();
-        // Each connection should have an independent seek.
-        assert_eq!(
-            *events,
-            vec![
-                FileOperation::Init {
-                    options: FileOptions { rights: RIGHTS_RW, is_append: false, is_linkable: true }
-                },
-                FileOperation::ReadAt { offset: 0, count: 6 },
-                FileOperation::ReadAt { offset: 100, count: 5 },
-                FileOperation::ReadAt { offset: 6, count: 5 },
-            ]
-        );
-    }
-
-    #[fuchsia::test]
     async fn test_close_succeeds() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_READABLE);
         let () = env.proxy.close().await.unwrap().map_err(Status::from_raw).unwrap();
 
         let events = env.file.operations.lock();
@@ -1475,10 +1456,8 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_close_fails() {
-        let env = init_mock_file(
-            Box::new(only_allow_init),
-            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        );
+        let env =
+            init_mock_file(Box::new(only_allow_init), fio::PERM_READABLE | fio::PERM_WRITABLE);
         let status = env.proxy.close().await.unwrap().map_err(Status::from_raw);
         assert_eq!(status, Err(Status::IO));
 
@@ -1497,7 +1476,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_close_called_when_dropped() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_READABLE);
         let _ = env.proxy.sync().await;
         std::mem::drop(env.proxy);
         env.scope.shutdown();
@@ -1516,15 +1495,15 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_describe() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
+    async fn test_query() {
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_READABLE);
         let protocol = env.proxy.query().await.unwrap();
         assert_eq!(protocol, fio::FILE_PROTOCOL_NAME.as_bytes());
     }
 
     #[fuchsia::test]
     async fn test_get_attributes() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::empty());
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::Flags::empty());
         let (mutable_attributes, immutable_attributes) = env
             .proxy
             .get_attributes(fio::NodeAttributesQuery::all())
@@ -1559,7 +1538,7 @@ mod tests {
             vec![
                 FileOperation::Init {
                     options: FileOptions {
-                        rights: fio::Operations::GET_ATTRIBUTES,
+                        rights: fio::Operations::empty(),
                         is_append: false,
                         is_linkable: true
                     }
@@ -1571,7 +1550,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_getbuffer() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_READABLE);
         let result = env
             .proxy
             .get_backing_memory(fio::VmoFlags::READ)
@@ -1594,7 +1573,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_getbuffer_no_perms() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::empty());
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::Flags::empty());
         let result = env
             .proxy
             .get_backing_memory(fio::VmoFlags::READ)
@@ -1611,7 +1590,7 @@ mod tests {
             *events,
             vec![FileOperation::Init {
                 options: FileOptions {
-                    rights: fio::Operations::GET_ATTRIBUTES,
+                    rights: fio::Operations::empty(),
                     is_append: false,
                     is_linkable: true
                 }
@@ -1621,7 +1600,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_getbuffer_vmo_exec_requires_right_executable() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_READABLE);
         let result = env
             .proxy
             .get_backing_memory(fio::VmoFlags::EXECUTE)
@@ -1643,17 +1622,14 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_deprecated_get_flags() {
+    async fn test_get_flags() {
         let env = init_mock_file(
             Box::new(always_succeed_callback),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::TRUNCATE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::FILE_TRUNCATE,
         );
-        let (status, flags) = env.proxy.deprecated_get_flags().await.unwrap();
-        assert_eq!(Status::from_raw(status), Status::OK);
-        // OPEN_FLAG_TRUNCATE should get stripped because it only applies at open time.
-        assert_eq!(flags, fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+        let flags = env.proxy.get_flags().await.unwrap().map_err(Status::from_raw).unwrap();
+        // Flags::FILE_TRUNCATE should get stripped because it only applies at open time.
+        assert_eq!(flags, FLAGS_RW | fio::Flags::PROTOCOL_FILE);
         let events = env.file.operations.lock();
         assert_eq!(
             *events,
@@ -1667,26 +1643,26 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_open_flag_describe() {
+    async fn test_open_flag_send_representation() {
         let env = init_mock_file(
             Box::new(always_succeed_callback),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::DESCRIBE,
+            fio::PERM_READABLE | fio::PERM_WRITABLE | fio::Flags::FLAG_SEND_REPRESENTATION,
         );
         let event = env.proxy.take_event_stream().try_next().await.unwrap();
         match event {
-            Some(fio::FileEvent::OnOpen_ { s, info: Some(boxed) }) => {
-                assert_eq!(Status::from_raw(s), Status::OK);
+            Some(fio::FileEvent::OnRepresentation { payload }) => {
                 assert_eq!(
-                    *boxed,
-                    fio::NodeInfoDeprecated::File(fio::FileObject { event: None, stream: None })
+                    payload,
+                    fio::Representation::File(fio::FileInfo {
+                        is_append: Some(false),
+                        ..Default::default()
+                    })
                 );
             }
-            Some(fio::FileEvent::OnRepresentation { payload }) => {
-                assert_eq!(payload, fio::Representation::File(fio::FileInfo::default()));
-            }
-            e => panic!("Expected OnOpen event with fio::NodeInfoDeprecated::File, got {:?}", e),
+            e => panic!(
+                "Expected OnRepresentation event with fio::Representation::File, got {:?}",
+                e
+            ),
         }
         let events = env.file.operations.lock();
         assert_eq!(
@@ -1699,7 +1675,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_succeeds() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_READABLE);
         let data = env.proxy.read(10).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
 
@@ -1717,14 +1693,14 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_not_readable() {
-        let env = init_mock_file(Box::new(only_allow_init), fio::OpenFlags::RIGHT_WRITABLE);
+        let env = init_mock_file(Box::new(only_allow_init), fio::PERM_WRITABLE);
         let result = env.proxy.read(10).await.unwrap().map_err(Status::from_raw);
         assert_eq!(result, Err(Status::BAD_HANDLE));
     }
 
     #[fuchsia::test]
     async fn test_read_validates_count() {
-        let env = init_mock_file(Box::new(only_allow_init), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(only_allow_init), fio::PERM_READABLE);
         let result =
             env.proxy.read(fio::MAX_TRANSFER_SIZE + 1).await.unwrap().map_err(Status::from_raw);
         assert_eq!(result, Err(Status::OUT_OF_RANGE));
@@ -1732,7 +1708,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_at_succeeds() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_READABLE);
         let data = env.proxy.read_at(5, 10).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(data, vec![10, 11, 12, 13, 14]);
 
@@ -1750,7 +1726,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_read_at_validates_count() {
-        let env = init_mock_file(Box::new(only_allow_init), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(only_allow_init), fio::PERM_READABLE);
         let result = env
             .proxy
             .read_at(fio::MAX_TRANSFER_SIZE + 1, 0)
@@ -1762,7 +1738,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_seek_start() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_READABLE);
         let offset = env
             .proxy
             .seek(fio::SeekOrigin::Start, 10)
@@ -1788,7 +1764,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_seek_cur() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_READABLE);
         let offset = env
             .proxy
             .seek(fio::SeekOrigin::Start, 10)
@@ -1823,7 +1799,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_seek_before_start() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_READABLE);
         let result =
             env.proxy.seek(fio::SeekOrigin::Current, -4).await.unwrap().map_err(Status::from_raw);
         assert_eq!(result, Err(Status::OUT_OF_RANGE));
@@ -1831,7 +1807,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_seek_end() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_READABLE);
         let offset = env
             .proxy
             .seek(fio::SeekOrigin::End, -4)
@@ -1858,7 +1834,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_update_attributes() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_WRITABLE);
         let attributes = fio::MutableNodeAttributes {
             creation_time: Some(40000),
             modification_time: Some(100000),
@@ -1886,18 +1862,21 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_deprecated_set_flags() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
-        let status = env.proxy.deprecated_set_flags(fio::OpenFlags::APPEND).await.unwrap();
-        assert_eq!(Status::from_raw(status), Status::OK);
-        let (status, flags) = env.proxy.deprecated_get_flags().await.unwrap();
-        assert_eq!(Status::from_raw(status), Status::OK);
-        assert_eq!(flags, fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND);
+    async fn test_set_flags() {
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_WRITABLE);
+        env.proxy
+            .set_flags(fio::Flags::FILE_APPEND)
+            .await
+            .unwrap()
+            .map_err(Status::from_raw)
+            .unwrap();
+        let flags = env.proxy.get_flags().await.unwrap().map_err(Status::from_raw).unwrap();
+        assert_eq!(flags, FLAGS_W | fio::Flags::FILE_APPEND | fio::Flags::PROTOCOL_FILE);
     }
 
     #[fuchsia::test]
     async fn test_sync() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::empty());
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::Flags::empty());
         let () = env.proxy.sync().await.unwrap().map_err(Status::from_raw).unwrap();
         let events = env.file.operations.lock();
         assert_eq!(
@@ -1905,7 +1884,7 @@ mod tests {
             vec![
                 FileOperation::Init {
                     options: FileOptions {
-                        rights: fio::Operations::GET_ATTRIBUTES,
+                        rights: fio::Operations::empty(),
                         is_append: false,
                         is_linkable: true
                     }
@@ -1917,7 +1896,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_resize() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_WRITABLE);
         let () = env.proxy.resize(10).await.unwrap().map_err(Status::from_raw).unwrap();
         let events = env.file.operations.lock();
         assert_matches!(
@@ -1933,7 +1912,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_resize_no_perms() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_READABLE);
         let result = env.proxy.resize(10).await.unwrap().map_err(Status::from_raw);
         assert_eq!(result, Err(Status::BAD_HANDLE));
         let events = env.file.operations.lock();
@@ -1947,7 +1926,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_write() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_WRITABLE);
         let data = "Hello, world!".as_bytes();
         let count = env.proxy.write(data).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(count, data.len() as u64);
@@ -1970,7 +1949,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_write_no_perms() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_READABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_READABLE);
         let data = "Hello, world!".as_bytes();
         let result = env.proxy.write(data).await.unwrap().map_err(Status::from_raw);
         assert_eq!(result, Err(Status::BAD_HANDLE));
@@ -1985,7 +1964,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_write_at() {
-        let env = init_mock_file(Box::new(always_succeed_callback), fio::OpenFlags::RIGHT_WRITABLE);
+        let env = init_mock_file(Box::new(always_succeed_callback), fio::PERM_WRITABLE);
         let data = "Hello, world!".as_bytes();
         let count = env.proxy.write_at(data, 10).await.unwrap().map_err(Status::from_raw).unwrap();
         assert_eq!(count, data.len() as u64);
@@ -2010,7 +1989,7 @@ mod tests {
     async fn test_append() {
         let env = init_mock_file(
             Box::new(always_succeed_callback),
-            fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND,
+            fio::PERM_WRITABLE | fio::Flags::FILE_APPEND,
         );
         let data = "Hello, world!".as_bytes();
         let count = env.proxy.write(data).await.unwrap().map_err(Status::from_raw).unwrap();
@@ -2044,7 +2023,7 @@ mod tests {
     mod stream_tests {
         use super::*;
 
-        fn init_mock_stream_file(vmo: zx::Vmo, flags: fio::OpenFlags) -> TestEnv {
+        fn init_mock_stream_file(vmo: zx::Vmo, flags: fio::Flags) -> TestEnv {
             let file = MockFile::new_with_vmo(Box::new(always_succeed_callback), vmo);
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>();
 
@@ -2067,7 +2046,7 @@ mod tests {
             const VMO_CONTENTS: &[u8] = b"hello there";
             let vmo = zx::Vmo::create(VMO_CONTENTS.len() as u64).unwrap();
             vmo.write(VMO_CONTENTS, 0).unwrap();
-            let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+            let flags = fio::PERM_READABLE | fio::PERM_WRITABLE;
             let env = init_mock_stream_file(vmo, flags);
 
             let fio::FileInfo { stream: Some(stream), .. } = env.proxy.describe().await.unwrap()
@@ -2084,7 +2063,7 @@ mod tests {
             let vmo_contents = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
             let vmo = zx::Vmo::create(vmo_contents.len() as u64).unwrap();
             vmo.write(&vmo_contents, 0).unwrap();
-            let flags = fio::OpenFlags::RIGHT_READABLE;
+            let flags = fio::PERM_READABLE;
             let env = init_mock_stream_file(vmo, flags);
 
             let data = env
@@ -2110,7 +2089,7 @@ mod tests {
             let vmo_contents = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
             let vmo = zx::Vmo::create(vmo_contents.len() as u64).unwrap();
             vmo.write(&vmo_contents, 0).unwrap();
-            let flags = fio::OpenFlags::RIGHT_READABLE;
+            let flags = fio::PERM_READABLE;
             let env = init_mock_stream_file(vmo, flags);
 
             const OFFSET: u64 = 4;
@@ -2136,7 +2115,7 @@ mod tests {
         async fn test_stream_write() {
             const DATA_SIZE: u64 = 10;
             let vmo = zx::Vmo::create(DATA_SIZE).unwrap();
-            let flags = fio::OpenFlags::RIGHT_WRITABLE;
+            let flags = fio::PERM_WRITABLE;
             let env = init_mock_stream_file(
                 vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
                 flags,
@@ -2163,7 +2142,7 @@ mod tests {
             const OFFSET: u64 = 4;
             const DATA_SIZE: u64 = 10;
             let vmo = zx::Vmo::create(DATA_SIZE + OFFSET).unwrap();
-            let flags = fio::OpenFlags::RIGHT_WRITABLE;
+            let flags = fio::PERM_WRITABLE;
             let env = init_mock_stream_file(
                 vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
                 flags,
@@ -2191,7 +2170,7 @@ mod tests {
             let vmo_contents = [9, 8, 7, 6, 5, 4, 3, 2, 1, 0];
             let vmo = zx::Vmo::create(vmo_contents.len() as u64).unwrap();
             vmo.write(&vmo_contents, 0).unwrap();
-            let flags = fio::OpenFlags::RIGHT_READABLE;
+            let flags = fio::PERM_READABLE;
             let env = init_mock_stream_file(vmo, flags);
 
             let position = env
@@ -2239,10 +2218,10 @@ mod tests {
         }
 
         #[fuchsia::test]
-        async fn test_stream_deprecated_set_flags() {
+        async fn test_stream_set_flags() {
             let data = [0, 1, 2, 3, 4];
             let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, 100).unwrap();
-            let flags = fio::OpenFlags::RIGHT_WRITABLE;
+            let flags = fio::PERM_WRITABLE;
             let env = init_mock_stream_file(
                 vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
                 flags,
@@ -2254,7 +2233,12 @@ mod tests {
             assert_eq!(vmo.get_content_size().unwrap(), 100);
 
             // Switch to append mode.
-            zx::ok(env.proxy.deprecated_set_flags(fio::OpenFlags::APPEND).await.unwrap()).unwrap();
+            env.proxy
+                .set_flags(fio::Flags::FILE_APPEND)
+                .await
+                .unwrap()
+                .map_err(Status::from_raw)
+                .unwrap();
             env.proxy
                 .seek(fio::SeekOrigin::Start, 0)
                 .await
@@ -2267,7 +2251,12 @@ mod tests {
             assert_eq!(vmo.get_content_size().unwrap(), 105);
 
             // Switch out of append mode.
-            zx::ok(env.proxy.deprecated_set_flags(fio::OpenFlags::empty()).await.unwrap()).unwrap();
+            env.proxy
+                .set_flags(fio::Flags::empty())
+                .await
+                .unwrap()
+                .map_err(Status::from_raw)
+                .unwrap();
             env.proxy
                 .seek(fio::SeekOrigin::Start, 0)
                 .await
@@ -2283,7 +2272,7 @@ mod tests {
         #[fuchsia::test]
         async fn test_stream_read_validates_count() {
             let vmo = zx::Vmo::create(10).unwrap();
-            let flags = fio::OpenFlags::RIGHT_READABLE;
+            let flags = fio::PERM_READABLE;
             let env = init_mock_stream_file(vmo, flags);
             let result =
                 env.proxy.read(fio::MAX_TRANSFER_SIZE + 1).await.unwrap().map_err(Status::from_raw);
@@ -2293,7 +2282,7 @@ mod tests {
         #[fuchsia::test]
         async fn test_stream_read_at_validates_count() {
             let vmo = zx::Vmo::create(10).unwrap();
-            let flags = fio::OpenFlags::RIGHT_READABLE;
+            let flags = fio::PERM_READABLE;
             let env = init_mock_stream_file(vmo, flags);
             let result = env
                 .proxy

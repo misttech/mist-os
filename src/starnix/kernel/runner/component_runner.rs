@@ -240,7 +240,7 @@ pub async fn start_component(
                 current_task.set_creds(credentials);
 
                 for mount in &program.component_mounts {
-                    let action = MountAction::from_spec(locked, current_task, &pkg, mount)
+                    let action = MountAction::from_spec(locked, current_task, None, &pkg, mount)
                         .map_err(|e| {
                             log_error!("Error while mounting the filesystems: {e:?}");
                             errno!(EINVAL)
@@ -372,7 +372,7 @@ async fn serve_component_controller(
 
 /// Returns /container/component/{random} that doesn't already exist
 fn generate_component_path<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     system_task: &CurrentTask,
 ) -> Result<String, Error>
 where
@@ -464,7 +464,7 @@ impl MountRecord {
 
     fn mount_remote<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         system_task: &CurrentTask,
         directory: &fio::DirectorySynchronousProxy,
         path: &str,

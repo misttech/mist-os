@@ -11,7 +11,7 @@
 
 MsdVirtioDevice::MsdVirtioDevice(VirtioGpuControl* control) : control_(control) {}
 
-magma_status_t MsdVirtioDevice::GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {
+magma_status_t MsdVirtioDevice::MsdGetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {
   MAGMA_DMESSAGE("MsdVirtioDevice::GetIcdList");
 
   icd_info_out->clear();
@@ -117,8 +117,8 @@ zx::result<zx::vmo> MsdVirtioDevice::GetCapset(uint32_t capset_id, uint32_t caps
   return zx::ok(std::move(capset_vmo));
 }
 
-magma_status_t MsdVirtioDevice::Query(uint64_t id, zx::vmo* result_buffer_out,
-                                      uint64_t* result_out) {
+magma_status_t MsdVirtioDevice::MsdQuery(uint64_t id, zx::vmo* result_buffer_out,
+                                         uint64_t* result_out) {
   MAGMA_DMESSAGE("MsdVirtioDevice::Query id %lu", id);
 
   // Upper bits may contain parameters

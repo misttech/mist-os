@@ -5,7 +5,7 @@
 use crate::app::strategies::base::AppStrategy;
 use crate::app::{InternalSender, MessageInternal};
 use crate::view::strategies::base::{FlatlandParams, ViewStrategyParams, ViewStrategyPtr};
-use crate::view::strategies::flatland::FlatlandViewStrategy;
+use crate::view::strategies::flatland::{FlatlandViewStrategy, FLATLAND_DEBUG_NAME};
 use crate::view::ViewKey;
 use anyhow::{bail, Context as _, Error};
 use async_trait::async_trait;
@@ -86,7 +86,7 @@ impl AppStrategy for FlatlandAppStrategy {
                                     .unbounded_send(MessageInternal::CreateView(
                                         ViewStrategyParams::Flatland(FlatlandParams {
                                             args,
-                                            debug_name: Some("Carnelian View".to_string()),
+                                            debug_name: Some(FLATLAND_DEBUG_NAME.to_string()),
                                         }),
                                     ))
                                     .expect("unbounded_send");

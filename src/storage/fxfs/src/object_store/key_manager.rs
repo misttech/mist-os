@@ -4,11 +4,12 @@
 
 use crate::errors::FxfsError;
 use crate::log::*;
+use crate::object_store::object_record::EncryptionKeys;
 use crate::object_store::{FSCRYPT_KEY_ID, VOLUME_DATA_KEY_ID};
 use anyhow::Error;
 use event_listener::Event;
 use fuchsia_sync::Mutex;
-use fxfs_crypto::{CipherSet, Crypt, FindKeyResult, Key, UnwrappedKeys, WrappedKeys};
+use fxfs_crypto::{Cipher, CipherSet, Crypt, FindKeyResult};
 use scopeguard::ScopeGuard;
 use std::cell::UnsafeCell;
 use std::collections::btree_map::Entry;
@@ -199,7 +200,7 @@ impl KeyManager {
     /// wait until that has finished.  This should be used with permanent keys.  This will return
     /// None if the key isn't present in the cache, but can also return None if they key isn't
     /// present in the set of keys.
-    pub async fn get(&self, object_id: u64) -> Result<Option<Key>, Error> {
+    pub async fn get(&self, object_id: u64) -> Result<Option<Arc<dyn Cipher>>, Error> {
         loop {
             let (unwrap_result, listener) = {
                 let mut inner = self.inner.lock();
@@ -230,14 +231,14 @@ impl KeyManager {
 
     /// This retrieves keys from the cache or initiates unwrapping if they are not in the cache.  If
     /// `force` is true, then this will always attempt to unwrap the keys again, even if the keys
-    /// are present in the cache.  `wrapped_keys` is a future to be used to retrieve the wrapped
+    /// are present in the cache.  `encryption_keys` is a future to be used to retrieve the wrapped
     /// keys.  It is passed in an `Option` so that callers can tell if the keys were freshly
     /// retrieved.
     pub async fn get_keys(
         &self,
         object_id: u64,
         crypt: &dyn Crypt,
-        wrapped_keys: &mut Option<impl AsyncFnOnce() -> Result<WrappedKeys, Error>>,
+        encryption_keys: &mut Option<impl AsyncFnOnce() -> Result<EncryptionKeys, Error>>,
         permanent: bool,
         force: bool,
     ) -> Result<Arc<CipherSet>, Error> {
@@ -283,17 +284,21 @@ impl KeyManager {
             unwrap_result.set(&inner, object_id, permanent, result);
         });
 
-        let wrapped_keys = match wrapped_keys.take().unwrap()().await {
-            Ok(wrapped_keys) => wrapped_keys,
+        let encryption_keys = match encryption_keys.take().unwrap()().await {
+            Ok(encryption_keys) => encryption_keys,
             Err(error) => {
-                error!(error:?; "Failed to get wrapped keys");
+                error!(error:?; "Failed to get key specs");
                 *result = Err(zx::Status::INTERNAL);
                 return Err(zx::Status::INTERNAL.into());
             }
         };
+
+        // TODO(b/418125391): Extend crypt protocol and interfaces in fxfs-crypto to support
+        // additional key types.
+        let wrapped_keys = encryption_keys.into();
         match crypt.unwrap_keys(&wrapped_keys, object_id).await {
-            Ok(unwrapped_keys) => {
-                let keys = unwrapped_keys.to_cipher_set();
+            Ok(cipher_set) => {
+                let keys = Arc::new(cipher_set);
                 let _ = ScopeGuard::into_inner(result);
                 if unwrap_result.set(&inner, object_id, permanent, Ok(Some(keys.clone()))) {
                     Err(zx::Status::CANCELED.into())
@@ -308,32 +313,39 @@ impl KeyManager {
         }
     }
 
-    /// Returns the key specified by `key_id`, or None if it isn't present. If the key specified by
-    /// `key_id` cannot be unwrapped, this will return FxfsError::NoKey.
+    /// Returns a cipher for the key specified by `key_id`.
+    /// Returns Fxfs::NotFound if the key_id is unknown.
+    /// Returns Fxfs::NoKey if the requested key is not available (i.e. is locked).
     pub async fn get_key(
         &self,
         object_id: u64,
         crypt: &dyn Crypt,
-        wrapped_keys: impl AsyncFnOnce() -> Result<WrappedKeys, Error>,
+        encryption_keys: impl AsyncFnOnce() -> Result<EncryptionKeys, Error>,
         key_id: u64,
-    ) -> Result<Option<Key>, Error> {
-        let mut wrapped_keys = Some(wrapped_keys);
+    ) -> Result<Arc<dyn Cipher>, Error> {
+        let mut encryption_keys = Some(encryption_keys);
         let mut force = false;
         loop {
             let keys = self
-                .get_keys(object_id, crypt, &mut wrapped_keys, /* permanent= */ false, force)
+                .get_keys(
+                    object_id,
+                    crypt,
+                    &mut encryption_keys,
+                    /* permanent= */ false,
+                    force,
+                )
                 .await?;
             return match keys.find_key(key_id) {
-                FindKeyResult::NotFound => Ok(None),
+                FindKeyResult::NotFound => Err(FxfsError::NotFound.into()),
                 FindKeyResult::Unavailable => {
-                    if force || wrapped_keys.is_none() {
+                    if force || encryption_keys.is_none() {
                         Err(FxfsError::NoKey.into())
                     } else {
                         force = true;
                         continue;
                     }
                 }
-                FindKeyResult::Key(k) => Ok(Some(k)),
+                FindKeyResult::Key(k) => Ok(k),
             };
         }
     }
@@ -346,25 +358,33 @@ impl KeyManager {
         &self,
         object_id: u64,
         crypt: &dyn Crypt,
-        wrapped_keys: impl AsyncFnOnce() -> Result<WrappedKeys, Error>,
-    ) -> Result<Key, Error> {
-        let mut wrapped_keys = Some(wrapped_keys);
+        encryption_keys: impl AsyncFnOnce() -> Result<EncryptionKeys, Error>,
+    ) -> Result<(u64, Arc<dyn Cipher>), Error> {
+        let mut encryption_keys = Some(encryption_keys);
         let mut force = false;
         loop {
             let keys = self
-                .get_keys(object_id, crypt, &mut wrapped_keys, /* permanent= */ false, force)
+                .get_keys(
+                    object_id,
+                    crypt,
+                    &mut encryption_keys,
+                    /* permanent= */ false,
+                    force,
+                )
                 .await?;
             return match keys.find_key(FSCRYPT_KEY_ID) {
-                FindKeyResult::NotFound => Ok(to_result(keys.find_key(VOLUME_DATA_KEY_ID))?),
+                FindKeyResult::NotFound => {
+                    Ok((VOLUME_DATA_KEY_ID, to_result(keys.find_key(VOLUME_DATA_KEY_ID))?))
+                }
                 FindKeyResult::Unavailable => {
-                    if force || wrapped_keys.is_none() {
+                    if force || encryption_keys.is_none() {
                         Err(FxfsError::NoKey.into())
                     } else {
                         force = true;
                         continue;
                     }
                 }
-                FindKeyResult::Key(k) => Ok(k),
+                FindKeyResult::Key(k) => Ok((FSCRYPT_KEY_ID, k)),
             };
         }
     }
@@ -376,18 +396,24 @@ impl KeyManager {
         &self,
         object_id: u64,
         crypt: &dyn Crypt,
-        wrapped_keys: impl AsyncFnOnce() -> Result<WrappedKeys, Error>,
-    ) -> Result<Option<Key>, Error> {
-        let mut wrapped_keys = Some(wrapped_keys);
+        encryption_keys: impl AsyncFnOnce() -> Result<EncryptionKeys, Error>,
+    ) -> Result<Option<Arc<dyn Cipher>>, Error> {
+        let mut encryption_keys = Some(encryption_keys);
         let mut force = false;
         loop {
             let keys = self
-                .get_keys(object_id, crypt, &mut wrapped_keys, /* permanent= */ false, force)
+                .get_keys(
+                    object_id,
+                    crypt,
+                    &mut encryption_keys,
+                    /* permanent= */ false,
+                    force,
+                )
                 .await?;
             return match keys.find_key(FSCRYPT_KEY_ID) {
                 FindKeyResult::NotFound => Err(FxfsError::NotFound.into()),
                 FindKeyResult::Unavailable => {
-                    if force || wrapped_keys.is_none() {
+                    if force || encryption_keys.is_none() {
                         Ok(None)
                     } else {
                         force = true;
@@ -401,9 +427,9 @@ impl KeyManager {
 
     /// This inserts the keys into the cache.  Any existing keys will be overwritten.  It's
     /// unspecified what happens if keys for the object are currently being unwrapped.
-    pub fn insert(&self, object_id: u64, keys: impl ToCipherSet, permanent: bool) {
+    pub fn insert(&self, object_id: u64, keys: Arc<CipherSet>, permanent: bool) {
         let mut inner = self.inner.lock();
-        inner.keys.insert(object_id, keys.to_cipher_set(), permanent);
+        inner.keys.insert(object_id, keys, permanent);
         inner.start_purge_task(&self.inner);
     }
 
@@ -452,23 +478,7 @@ impl KeyManager {
     }
 }
 
-pub trait ToCipherSet {
-    fn to_cipher_set(self) -> Arc<CipherSet>;
-}
-
-impl ToCipherSet for &UnwrappedKeys {
-    fn to_cipher_set(self) -> Arc<CipherSet> {
-        Arc::new(CipherSet::new(self))
-    }
-}
-
-impl ToCipherSet for Arc<CipherSet> {
-    fn to_cipher_set(self) -> Arc<CipherSet> {
-        self
-    }
-}
-
-fn to_result(find_key_result: FindKeyResult) -> Result<Key, FxfsError> {
+fn to_result(find_key_result: FindKeyResult) -> Result<Arc<dyn Cipher>, FxfsError> {
     match find_key_result {
         FindKeyResult::NotFound => Err(FxfsError::NotFound),
         FindKeyResult::Unavailable => Err(FxfsError::NoKey),
@@ -479,16 +489,17 @@ fn to_result(find_key_result: FindKeyResult) -> Result<Key, FxfsError> {
 #[cfg(target_os = "fuchsia")]
 #[cfg(test)]
 mod tests {
-    use super::{to_result, KeyManager, PURGE_TIMEOUT};
+    use super::{to_result, EncryptionKeys, KeyManager, PURGE_TIMEOUT};
     use crate::log::*;
     use async_trait::async_trait;
     use fuchsia_async::{self as fasync, MonotonicInstant, TestExecutor};
 
+    use crate::object_store::object_record::EncryptionKey;
     use futures::channel::oneshot;
     use futures::join;
     use fxfs_crypto::{
-        CipherSet, Crypt, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes, WrappedKeys,
-        KEY_SIZE, WRAPPED_KEY_SIZE,
+        Cipher, Crypt, FxfsCipher, FxfsKey, KeyPurpose, UnwrappedKey, WrappedKey, WrappedKeyBytes,
+        FXFS_KEY_SIZE, FXFS_WRAPPED_KEY_SIZE,
     };
     use std::future::pending;
     use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
@@ -498,26 +509,27 @@ mod tests {
     const ERROR_COUNTER: u8 = 0xff;
 
     fn unwrapped_key(counter: u8) -> UnwrappedKey {
-        UnwrappedKey::new(vec![counter; KEY_SIZE].try_into().unwrap())
+        UnwrappedKey::new([counter; FXFS_KEY_SIZE].to_vec())
+    }
+    fn cipher(counter: u8) -> Arc<dyn Cipher> {
+        Arc::new(FxfsCipher::new(&unwrapped_key(counter)))
     }
 
     fn cipher_text(counter: u8) -> Vec<u8> {
         let mut text = PLAIN_TEXT.to_vec();
-        to_result(Arc::new(CipherSet::new(&vec![(0, Some(unwrapped_key(counter)))])).find_key(0))
-            .unwrap()
-            .encrypt(0, &mut text)
-            .expect("encrypt failed");
+        cipher(counter).encrypt(0, 0, 0, &mut text).expect("encrypt failed");
         text
     }
 
-    fn wrapped_keys() -> WrappedKeys {
-        WrappedKeys::from(vec![(
+    fn encryption_keys() -> EncryptionKeys {
+        vec![(
             0,
-            WrappedKey {
+            EncryptionKey::Fxfs(FxfsKey {
                 wrapping_key_id: 0x1234567812345678,
-                key: WrappedKeyBytes::from([0xff; WRAPPED_KEY_SIZE]),
-            },
-        )])
+                key: WrappedKeyBytes::from([0xff; FXFS_WRAPPED_KEY_SIZE]),
+            }),
+        )]
+        .into()
     }
 
     struct TestCrypt {
@@ -544,7 +556,7 @@ mod tests {
             &self,
             _owner: u64,
             _purpose: KeyPurpose,
-        ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
+        ) -> Result<(FxfsKey, UnwrappedKey), zx::Status> {
             unimplemented!("Not used in tests");
         }
 
@@ -552,7 +564,7 @@ mod tests {
             &self,
             _owner: u64,
             _wrapping_key_id: u128,
-        ) -> Result<(WrappedKey, UnwrappedKey), zx::Status> {
+        ) -> Result<(FxfsKey, UnwrappedKey), zx::Status> {
             unimplemented!("Not used in tests");
         }
 
@@ -592,7 +604,7 @@ mod tests {
                     .get_keys(
                         1,
                         crypt1.as_ref(),
-                        &mut Some(async || Ok(wrapped_keys())),
+                        &mut Some(async || Ok(encryption_keys())),
                         false,
                         false,
                     )
@@ -601,7 +613,7 @@ mod tests {
                     .find_key(0),
             )
             .unwrap()
-            .decrypt(0, &mut buf)
+            .decrypt(0, 0, 0, &mut buf)
             .expect("decrypt failed");
             assert_eq!(&buf, PLAIN_TEXT);
         });
@@ -612,7 +624,7 @@ mod tests {
                     .get_keys(
                         1,
                         crypt2.as_ref(),
-                        &mut Some(async || Ok(wrapped_keys())),
+                        &mut Some(async || Ok(encryption_keys())),
                         false,
                         false,
                     )
@@ -621,7 +633,7 @@ mod tests {
                     .find_key(0),
             )
             .unwrap()
-            .decrypt(0, &mut buf)
+            .decrypt(0, 0, 0, &mut buf)
             .expect("decrypt failed");
             assert_eq!(&buf, PLAIN_TEXT);
         });
@@ -634,7 +646,7 @@ mod tests {
                 .await
                 .expect("get failed")
                 .expect("missing key")
-                .decrypt(0, &mut buf)
+                .decrypt(0, 0, 0, &mut buf)
                 .expect("decrypt failed");
             assert_eq!(&buf, PLAIN_TEXT);
         });
@@ -651,14 +663,14 @@ mod tests {
     async fn test_insert_and_remove() {
         let manager = Arc::new(KeyManager::new());
 
-        manager.insert(1, &vec![(0, Some(unwrapped_key(0)))], false);
+        manager.insert(1, Arc::new(vec![(0, Some(cipher(0)))].into()), false);
         let mut buf = cipher_text(0);
         manager
             .get(1)
             .await
             .expect("get failed")
             .expect("missing key")
-            .decrypt(0, &mut buf)
+            .decrypt(0, 0, 0, &mut buf)
             .expect("decrypt failed");
         assert_eq!(&buf, PLAIN_TEXT);
         let _ = manager.remove(1);
@@ -670,7 +682,7 @@ mod tests {
         TestExecutor::advance_to(MonotonicInstant::from_nanos(0)).await;
 
         let manager = Arc::new(KeyManager::new());
-        manager.insert(1, &vec![(0, Some(unwrapped_key(0)))], false);
+        manager.insert(1, Arc::new(vec![(0, Some(cipher(0)))].into()), false);
 
         TestExecutor::advance_to(MonotonicInstant::after(PURGE_TIMEOUT.into())).await;
 
@@ -693,8 +705,8 @@ mod tests {
         TestExecutor::advance_to(MonotonicInstant::from_nanos(0)).await;
 
         let manager = Arc::new(KeyManager::new());
-        manager.insert(1, &vec![(0, Some(unwrapped_key(0)))], true);
-        manager.insert(2, &vec![(0, Some(unwrapped_key(0)))], false);
+        manager.insert(1, Arc::new(vec![(0, Some(cipher(0)))].into()), true);
+        manager.insert(2, Arc::new(vec![(0, Some(cipher(0)))].into()), false);
 
         // Skip forward two periods which should cause 2 to be purged but not 1.
         TestExecutor::advance_to(MonotonicInstant::after((2 * PURGE_TIMEOUT).into())).await;
@@ -708,9 +720,9 @@ mod tests {
         TestExecutor::advance_to(MonotonicInstant::from_nanos(0)).await;
 
         let manager = Arc::new(KeyManager::new());
-        manager.insert(1, &vec![(0, Some(unwrapped_key(0)))], true);
-        manager.insert(2, &vec![(0, Some(unwrapped_key(0)))], false);
-        manager.insert(3, &vec![(0, Some(unwrapped_key(0)))], false);
+        manager.insert(1, Arc::new(vec![(0, Some(cipher(0)))].into()), true);
+        manager.insert(2, Arc::new(vec![(0, Some(cipher(0)))].into()), false);
+        manager.insert(3, Arc::new(vec![(0, Some(cipher(0)))].into()), false);
 
         // Skip forward 1 period which should make keys 2 and 3 pending deletion.
         TestExecutor::advance_to(MonotonicInstant::after(PURGE_TIMEOUT.into())).await;
@@ -738,13 +750,25 @@ mod tests {
 
         let task1 = fasync::Task::spawn(async move {
             assert!(manager1
-                .get_keys(1, crypt1.as_ref(), &mut Some(async || Ok(wrapped_keys())), false, false,)
+                .get_keys(
+                    1,
+                    crypt1.as_ref(),
+                    &mut Some(async || Ok(encryption_keys())),
+                    false,
+                    false,
+                )
                 .await
                 .is_err());
         });
         let task2 = fasync::Task::spawn(async move {
             assert!(manager2
-                .get_keys(1, crypt2.as_ref(), &mut Some(async || Ok(wrapped_keys())), false, false,)
+                .get_keys(
+                    1,
+                    crypt2.as_ref(),
+                    &mut Some(async || Ok(encryption_keys())),
+                    false,
+                    false,
+                )
                 .await
                 .is_err());
         });
@@ -776,7 +800,7 @@ mod tests {
                     sender.send(()).unwrap();
                     // This should wait until both the remove calls below are waiting.
                     let _ = TestExecutor::poll_until_stalled(pending::<()>()).await;
-                    Ok(wrapped_keys())
+                    Ok(encryption_keys())
                 });
                 manager.get_keys(1, crypt.as_ref(), &mut unwrap_keys, false, false).await
             },

@@ -59,7 +59,7 @@ ktl::optional<Evictor::EvictedPageCounts> ReclaimFromGlobalPageQueues(
   // some explicit checks here (or in PageQueues) to guarantee forward progress. Or we might want
   // to use cursors to iterate the queues instead of peeking the tail each time.
   if (ktl::optional<PageQueues::VmoBacklink> backlink =
-          pmm_page_queues()->PeekReclaim(lowest_evict_queue)) {
+          pmm_page_queues()->PeekIsolate(lowest_evict_queue)) {
     // A valid backlink always has a valid cow
     DEBUG_ASSERT(backlink->cow);
 
@@ -136,7 +136,7 @@ void Evictor::EnableEviction(bool use_compression) {
     Evictor* evictor = reinterpret_cast<Evictor*>(arg);
     return evictor->EvictionThreadLoop();
   };
-  eviction_thread_ = Thread::Create("eviction-thread", eviction_thread, this, LOW_PRIORITY);
+  eviction_thread_ = Thread::Create("eviction-thread", eviction_thread, this, DEFAULT_PRIORITY);
   DEBUG_ASSERT(eviction_thread_);
   eviction_thread_->Resume();
 }

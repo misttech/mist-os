@@ -197,7 +197,7 @@ pub struct WindowSize(u32);
 
 impl WindowSize {
     /// The largest possible window size.
-    pub const MAX: WindowSize = WindowSize(1 << 30 - 1);
+    pub const MAX: WindowSize = WindowSize((1 << 30) - 1);
     /// The smallest possible window size.
     pub const ZERO: WindowSize = WindowSize(0);
     /// A window size of 1, the smallest nonzero window size.
@@ -481,5 +481,19 @@ mod tests {
         fn window_size_greater_than_max(wnd in WindowSize::MAX.0+1..=u32::MAX) {
             prop_assert_eq!(WindowSize::from_u32(wnd), None);
         }
+    }
+
+    /// Verify that the maximum value for [`WindowSize`] corresponds to
+    /// appropriate values for [`UnscaledWindowSize`] and [`WindowScale`].
+    #[test]
+    fn max_window_size() {
+        // Verify that constructing a `WindowSize` from it's maximum
+        // constituents is valid.
+        let window_size = UnscaledWindowSize(u16::MAX) << WindowScale::MAX;
+        assert!(window_size <= WindowSize::MAX, "actual={window_size:?}");
+
+        // Verify that deconstructing a maximum `WindowSize` into it's
+        // constituents is valid.
+        assert_eq!(WindowSize::MAX.scale(), WindowScale::MAX);
     }
 }

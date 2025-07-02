@@ -129,7 +129,7 @@ async fn run<F: Future<Output = ()>>(
 ) {
     run_without_connecting(behavior, move |addr, http_client| async move {
         let loader = http_client
-            .connect_to_protocol_at_exposed_dir::<http::LoaderMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("failed to connect to http client");
         func(loader, addr).await;
     })
@@ -546,8 +546,7 @@ async fn test_http_client_stops(behavior: &str) {
         let mut event_stream = EventStream::open().await.unwrap();
 
         // Connect to the loader.
-        let loader =
-            http_client.connect_to_protocol_at_exposed_dir::<http::LoaderMarker>().unwrap();
+        let loader: http::LoaderProxy = http_client.connect_to_protocol_at_exposed_dir().unwrap();
 
         // Cause the framework to deliver the loader server endpoint to the component.
         // This will start the component.
@@ -586,8 +585,7 @@ async fn test_http_client_never_stops(behavior: &str) {
         let mut event_stream = EventStream::open().await.unwrap();
 
         // Connect to the loader.
-        let loader =
-            http_client.connect_to_protocol_at_exposed_dir::<http::LoaderMarker>().unwrap();
+        let loader: http::LoaderProxy = http_client.connect_to_protocol_at_exposed_dir().unwrap();
 
         // Cause the framework to deliver the loader server endpoint to the component.
         // This will start the component.
@@ -657,11 +655,7 @@ async fn test_fetch_http_long_start_call_blocks_stop(behavior: &str) {
 
         // `http-client` should still respond to connection requests. This would hang if the
         // component incorrectly prematurely escrowed the outgoing directory.
-        check_loader_http(
-            http_client.connect_to_protocol_at_exposed_dir::<http::LoaderMarker>().unwrap(),
-            addr,
-        )
-        .await;
+        check_loader_http(http_client.connect_to_protocol_at_exposed_dir().unwrap(), addr).await;
 
         // Close the `LoaderClient`. `http-client` should then stop.
         drop(rx);
@@ -696,8 +690,8 @@ async fn test_fetch_http_many_concurrent_connections_at_different_intervals(beha
             let tasks = FuturesUnordered::new();
 
             for _ in 0..5 {
-                let loader =
-                    http_client.connect_to_protocol_at_exposed_dir::<http::LoaderMarker>().unwrap();
+                let loader: http::LoaderProxy =
+                    http_client.connect_to_protocol_at_exposed_dir().unwrap();
                 tasks.push(check_loader_http(loader, addr));
             }
 

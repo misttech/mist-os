@@ -30,8 +30,10 @@ const HARNESS_EXEC_PATH: &'static str = "/pkg/bin/io_conformance_harness_rustvfs
 fn new_executable_file() -> Result<Arc<vmo::VmoFile>, Error> {
     let file = fdio::open_fd(HARNESS_EXEC_PATH, fio::PERM_READABLE | fio::PERM_EXECUTABLE)?;
     let exec_vmo = fdio::get_vmo_exec_from_file(&file)?;
-    let exec_file = vmo::VmoFile::new(
-        exec_vmo, /*readable*/ true, /*writable*/ false, /*executable*/ true,
+    let exec_file = vmo::VmoFile::new_with_inode_and_executable(
+        exec_vmo,
+        fio::INO_UNKNOWN,
+        /*executable*/ true,
     );
     Ok(exec_file)
 }

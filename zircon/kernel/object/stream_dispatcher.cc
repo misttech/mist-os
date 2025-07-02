@@ -87,18 +87,18 @@ StreamDispatcher::StreamDispatcher(uint32_t options, fbl::RefPtr<VmObjectPaged> 
 
 StreamDispatcher::~StreamDispatcher() { kcounter_add(dispatcher_stream_destroy_count, 1); }
 
-zx_status_t StreamDispatcher::ReadVector(user_out_iovec_t user_data, size_t* out_actual) {
+ktl::pair<zx_status_t, size_t> StreamDispatcher::ReadVector(user_out_iovec_t user_data) {
   canary_.Assert();
-  DEBUG_ASSERT(out_actual);
-  DEBUG_ASSERT(*out_actual == 0);
 
-  size_t total_capacity;
-  zx_status_t status = user_data.GetTotalCapacity(&total_capacity);
-  if (status != ZX_OK) {
-    return status;
-  }
-  if (total_capacity == 0) {
-    return ZX_OK;
+  size_t total_capacity = 0;
+  {
+    zx_status_t status = user_data.GetTotalCapacity(&total_capacity);
+    if (status != ZX_OK) {
+      return {status, 0};
+    }
+    if (total_capacity == 0) {
+      return {ZX_OK, 0};
+    }
   }
 
   size_t length = 0u;
@@ -114,36 +114,36 @@ zx_status_t StreamDispatcher::ReadVector(user_out_iovec_t user_data, size_t* out
     if (size_limit <= seek_) {
       // Return |ZX_OK| since there is nothing to be read.
       op.CancelLocked();
-      return ZX_OK;
+      return {ZX_OK, 0};
     }
 
     offset = seek_;
     length = size_limit - offset;
   }
 
-  status = vmo_->ReadUserVector(user_data, offset, length, out_actual);
-  seek_ += *out_actual;
+  auto [status, read_bytes] = vmo_->ReadUserVector(user_data, offset, length);
+  seek_ += read_bytes;
 
   // Reacquire the lock to commit the operation.
   Guard<Mutex> content_size_guard{op.lock()};
   op.CommitLocked();
 
-  return *out_actual > 0 ? ZX_OK : status;
+  return {read_bytes > 0 ? ZX_OK : status, read_bytes};
 }
 
-zx_status_t StreamDispatcher::ReadVectorAt(user_out_iovec_t user_data, zx_off_t offset,
-                                           size_t* out_actual) {
+ktl::pair<zx_status_t, size_t> StreamDispatcher::ReadVectorAt(user_out_iovec_t user_data,
+                                                              zx_off_t offset) {
   canary_.Assert();
-  DEBUG_ASSERT(out_actual);
-  DEBUG_ASSERT(*out_actual == 0);
 
-  size_t total_capacity;
-  zx_status_t status = user_data.GetTotalCapacity(&total_capacity);
-  if (status != ZX_OK) {
-    return status;
-  }
-  if (total_capacity == 0) {
-    return ZX_OK;
+  size_t total_capacity = 0;
+  {
+    zx_status_t status = user_data.GetTotalCapacity(&total_capacity);
+    if (status != ZX_OK) {
+      return {status, 0};
+    }
+    if (total_capacity == 0) {
+      return {ZX_OK, 0};
+    }
   }
 
   size_t length = 0u;
@@ -157,39 +157,39 @@ zx_status_t StreamDispatcher::ReadVectorAt(user_out_iovec_t user_data, zx_off_t 
     if (size_limit <= offset) {
       // Return |ZX_OK| since there is nothing to be read.
       op.CancelLocked();
-      return ZX_OK;
+      return {ZX_OK, 0};
     }
 
     length = size_limit - offset;
   }
 
-  status = vmo_->ReadUserVector(user_data, offset, length, out_actual);
+  auto [status, read_bytes] = vmo_->ReadUserVector(user_data, offset, length);
 
   // Reacquire the lock to commit the operation.
   Guard<Mutex> content_size_guard{op.lock()};
   op.CommitLocked();
 
-  return *out_actual > 0 ? ZX_OK : status;
+  return {read_bytes > 0 ? ZX_OK : status, read_bytes};
 }
 
-zx_status_t StreamDispatcher::WriteVector(user_in_iovec_t user_data, size_t* out_actual) {
+ktl::pair<zx_status_t, size_t> StreamDispatcher::WriteVector(user_in_iovec_t user_data) {
   canary_.Assert();
-  DEBUG_ASSERT(out_actual);
-  DEBUG_ASSERT(*out_actual == 0);
 
   if (IsInAppendMode()) {
-    return AppendVector(user_data, out_actual);
+    return AppendVector(user_data);
   }
 
-  size_t total_capacity;
-  zx_status_t status = user_data.GetTotalCapacity(&total_capacity);
-  if (status != ZX_OK) {
-    return status;
-  }
+  size_t total_capacity = 0;
+  {
+    zx_status_t status = user_data.GetTotalCapacity(&total_capacity);
+    if (status != ZX_OK) {
+      return {status, 0};
+    }
 
-  // Return early if writing zero bytes since there's nothing to do.
-  if (total_capacity == 0) {
-    return ZX_OK;
+    // Return early if writing zero bytes since there's nothing to do.
+    if (total_capacity == 0) {
+      return {ZX_OK, 0};
+    }
   }
 
   size_t length = 0u;
@@ -198,117 +198,115 @@ zx_status_t StreamDispatcher::WriteVector(user_in_iovec_t user_data, size_t* out
 
   Guard<Mutex> seek_guard{&seek_lock_};
 
-  status = CreateWriteOpAndExpandVmo(total_capacity, seek_, &length, &prev_content_size, &op);
-  if (status != ZX_OK) {
-    return status;
+  {
+    zx_status_t status =
+        CreateWriteOpAndExpandVmo(total_capacity, seek_, &length, &prev_content_size, &op);
+    if (status != ZX_OK) {
+      return {status, 0};
+    }
   }
 
-  if (prev_content_size) {
-    status = vmo_->WriteUserVector(
-        user_data, seek_, length, out_actual,
-        [&prev_content_size, &op](const uint64_t write_offset, const size_t len) {
+  auto [status, written] = vmo_->WriteUserVector(
+        user_data, seek_, length,
+        prev_content_size ? [&prev_content_size, &op](const uint64_t write_offset, const size_t len) {
           if (write_offset + len > *prev_content_size) {
             op.UpdateContentSizeFromProgress(write_offset + len);
           }
-        });
-  } else {
-    status = vmo_->WriteUserVector(user_data, seek_, length, out_actual, nullptr);
-  }
+        } : VmObject::OnWriteBytesTransferredCallback());
 
   // Reacquire the lock to potentially shrink and commit the operation.
   Guard<Mutex> content_size_guard{op.lock()};
 
   // Update the content size operation if operation was partially successful.
-  if (*out_actual < length) {
+  if (written < length) {
     DEBUG_ASSERT(status != ZX_OK);
 
-    if (*out_actual == 0u) {
+    if (written == 0u) {
       // Do not commit the operation if nothing was written.
       op.CancelLocked();
-      return status;
+      return {status, written};
     } else {
-      op.ShrinkSizeLocked(seek_ + *out_actual);
+      op.ShrinkSizeLocked(seek_ + written);
     }
   }
 
-  seek_ += *out_actual;
+  seek_ += written;
 
   op.CommitLocked();
-  return *out_actual > 0 ? ZX_OK : status;
+  return {written > 0 ? ZX_OK : status, written};
 }
 
-zx_status_t StreamDispatcher::WriteVectorAt(user_in_iovec_t user_data, zx_off_t offset,
-                                            size_t* out_actual) {
+ktl::pair<zx_status_t, size_t> StreamDispatcher::WriteVectorAt(user_in_iovec_t user_data,
+                                                               zx_off_t offset) {
   canary_.Assert();
-  DEBUG_ASSERT(out_actual);
-  DEBUG_ASSERT(*out_actual == 0);
 
-  size_t total_capacity;
-  zx_status_t status = user_data.GetTotalCapacity(&total_capacity);
-  if (status != ZX_OK) {
-    return status;
-  }
+  size_t total_capacity = 0;
+  {
+    zx_status_t status = user_data.GetTotalCapacity(&total_capacity);
+    if (status != ZX_OK) {
+      return {status, 0};
+    }
 
-  // Return early if writing zero bytes
-  if (total_capacity == 0) {
-    return ZX_OK;
+    // Return early if writing zero bytes
+    if (total_capacity == 0) {
+      return {ZX_OK, 0};
+    }
   }
 
   size_t length = 0u;
   ContentSizeManager::Operation op(content_size_mgr_.get());
   ktl::optional<uint64_t> prev_content_size;
 
-  status = CreateWriteOpAndExpandVmo(total_capacity, offset, &length, &prev_content_size, &op);
-  if (status != ZX_OK) {
-    return status;
+  {
+    zx_status_t status =
+        CreateWriteOpAndExpandVmo(total_capacity, offset, &length, &prev_content_size, &op);
+    if (status != ZX_OK) {
+      return {status, 0};
+    }
   }
 
-  if (prev_content_size) {
-    status = vmo_->WriteUserVector(
-        user_data, offset, length, out_actual,
-        [&prev_content_size, &op](const uint64_t write_offset, const size_t len) {
+  auto [status, written] = vmo_->WriteUserVector(
+        user_data, offset, length,
+        prev_content_size ? [&prev_content_size, &op](const uint64_t write_offset, const size_t len) {
           if (write_offset + len > *prev_content_size) {
             op.UpdateContentSizeFromProgress(write_offset + len);
           }
-        });
-  } else {
-    status = vmo_->WriteUserVector(user_data, offset, length, out_actual, nullptr);
-  }
+        } : VmObject::OnWriteBytesTransferredCallback());
 
   // Reacquire the lock to potentially shrink and commit the operation.
   Guard<Mutex> content_size_guard{op.lock()};
 
   // Update the content size operation if operation was partially successful.
-  if (*out_actual < length) {
+  if (written < length) {
     DEBUG_ASSERT(status != ZX_OK);
 
-    if (*out_actual == 0u) {
+    if (written == 0u) {
       // Do not commit the operation if nothing was written.
       op.CancelLocked();
-      return status;
+      return {status, written};
     } else {
-      op.ShrinkSizeLocked(offset + *out_actual);
+      op.ShrinkSizeLocked(offset + written);
     }
   }
 
   op.CommitLocked();
-  return *out_actual > 0 ? ZX_OK : status;
+  return {written > 0 ? ZX_OK : status, written};
 }
 
-zx_status_t StreamDispatcher::AppendVector(user_in_iovec_t user_data, size_t* out_actual) {
+ktl::pair<zx_status_t, size_t> StreamDispatcher::AppendVector(user_in_iovec_t user_data) {
   canary_.Assert();
-  DEBUG_ASSERT(out_actual);
-  DEBUG_ASSERT(*out_actual == 0);
 
-  size_t total_capacity;
-  zx_status_t status = user_data.GetTotalCapacity(&total_capacity);
-  if (status != ZX_OK) {
-    return status;
-  }
+  size_t total_capacity = 0;
+  {
+    zx_status_t status = user_data.GetTotalCapacity(&total_capacity);
+    if (status != ZX_OK) {
+      return {status, 0};
+    }
 
-  // Return early if writing zero bytes since there's nothing to do.
-  if (total_capacity == 0) {
-    return ZX_OK;
+    // Return early if writing zero bytes since there's nothing to do.
+    if (total_capacity == 0) {
+      return {ZX_OK, 0};
+    }
   }
 
   const bool can_resize_vmo = CanResizeVmo();
@@ -322,9 +320,10 @@ zx_status_t StreamDispatcher::AppendVector(user_in_iovec_t user_data, size_t* ou
   {
     Guard<Mutex> content_size_guard{AliasedLock, content_size_mgr_->lock(), op.lock()};
 
-    status = content_size_mgr_->BeginAppendLocked(total_capacity, &content_size_guard, &op);
+    zx_status_t status =
+        content_size_mgr_->BeginAppendLocked(total_capacity, &content_size_guard, &op);
     if (status != ZX_OK) {
-      return status;
+      return {status, 0};
     }
 
     uint64_t new_content_size = op.GetSizeLocked();
@@ -340,7 +339,7 @@ zx_status_t StreamDispatcher::AppendVector(user_in_iovec_t user_data, size_t* ou
 
         // Return `ZX_ERR_OUT_OF_RANGE` for range errors. Otherwise, clients expect all other errors
         // related to resize failure to be `ZX_ERR_NO_SPACE`.
-        return status == ZX_ERR_OUT_OF_RANGE ? status : ZX_ERR_NO_SPACE;
+        return {status == ZX_ERR_OUT_OF_RANGE ? status : ZX_ERR_NO_SPACE, 0};
       }
     }
 
@@ -354,30 +353,30 @@ zx_status_t StreamDispatcher::AppendVector(user_in_iovec_t user_data, size_t* ou
     length = ktl::min(vmo_size, new_content_size) - offset;
   }
 
-  status = vmo_->WriteUserVector(user_data, offset, length, out_actual,
-                                 [&op](const uint64_t write_offset, const size_t len) {
-                                   op.UpdateContentSizeFromProgress(write_offset + len);
-                                 });
-  seek_ = offset + *out_actual;
+  auto [status, written] = vmo_->WriteUserVector(
+      user_data, offset, length, [&op](const uint64_t write_offset, const size_t len) {
+        op.UpdateContentSizeFromProgress(write_offset + len);
+      });
+  seek_ = offset + written;
 
   // Reacquire the lock to potentially shrink and commit the operation.
   Guard<Mutex> content_size_guard{AliasedLock, content_size_mgr_->lock(), op.lock()};
 
   // Update the content size operation if operation was partially successful.
-  if (*out_actual < length) {
+  if (written < length) {
     DEBUG_ASSERT(status != ZX_OK);
 
-    if (*out_actual == 0) {
+    if (written == 0) {
       // Do not commit the operation if nothing was written.
       op.CancelLocked();
-      return status;
+      return {status, written};
     } else {
-      op.ShrinkSizeLocked(offset + *out_actual);
+      op.ShrinkSizeLocked(offset + written);
     }
   }
 
   op.CommitLocked();
-  return *out_actual > 0 ? ZX_OK : status;
+  return {written > 0 ? ZX_OK : status, written};
 }
 
 zx_status_t StreamDispatcher::Seek(zx_stream_seek_origin_t whence, int64_t offset,

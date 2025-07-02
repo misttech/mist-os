@@ -6,9 +6,8 @@
 
 use std::fmt::Debug;
 
-use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, ServerEnd};
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
 use futures::future::Either;
-use futures::TryStream;
 use net_types::ip::{GenericOverIp, Ip, IpInvariant, Ipv4, Ipv6};
 use thiserror::Error;
 use {
@@ -78,6 +77,22 @@ pub trait FidlRouteAdminIpExt: Ip {
     /// The control handle for RouteTable protocols.
     type RouteTableControlHandle: fidl::endpoints::ControlHandle + Debug;
 
+    /// The control handle for RouteTableProvider protocols.
+    type RouteTableProviderControlHandle: fidl::endpoints::ControlHandle + Debug;
+
+    /// The responder for the GetInterfaceLocalTable method.
+    type GetInterfaceLocalTableResponder: Responder<
+        Payload = Result<
+            fidl::endpoints::ClientEnd<Self::RouteTableMarker>,
+            fnet_routes_admin::GetInterfaceLocalTableError,
+        >,
+    >;
+
+    /// Turns a FIDL route table provider request into the extension type.
+    fn into_route_table_provider_request(
+        request: fidl::endpoints::Request<Self::RouteTableProviderMarker>,
+    ) -> RouteTableProviderRequest<Self>;
+
     /// Turns a FIDL route set request into the extension type.
     fn into_route_set_request(
         request: fidl::endpoints::Request<Self::RouteSetMarker>,
@@ -115,6 +130,15 @@ impl FidlRouteAdminIpExt for Ipv4 {
     type RouteTableGetAuthorizationResponder =
         fnet_routes_admin::RouteTableV4GetAuthorizationForRouteTableResponder;
     type RouteTableControlHandle = fnet_routes_admin::RouteTableV4ControlHandle;
+    type RouteTableProviderControlHandle = fnet_routes_admin::RouteTableProviderV4ControlHandle;
+    type GetInterfaceLocalTableResponder =
+        fnet_routes_admin::RouteTableProviderV4GetInterfaceLocalTableResponder;
+
+    fn into_route_table_provider_request(
+        request: fidl::endpoints::Request<Self::RouteTableProviderMarker>,
+    ) -> RouteTableProviderRequest<Ipv4> {
+        RouteTableProviderRequest::from(request)
+    }
 
     fn into_route_set_request(
         request: fidl::endpoints::Request<Self::RouteSetMarker>,
@@ -157,6 +181,15 @@ impl FidlRouteAdminIpExt for Ipv6 {
     type RouteTableGetAuthorizationResponder =
         fnet_routes_admin::RouteTableV6GetAuthorizationForRouteTableResponder;
     type RouteTableControlHandle = fnet_routes_admin::RouteTableV6ControlHandle;
+    type RouteTableProviderControlHandle = fnet_routes_admin::RouteTableProviderV6ControlHandle;
+    type GetInterfaceLocalTableResponder =
+        fnet_routes_admin::RouteTableProviderV6GetInterfaceLocalTableResponder;
+
+    fn into_route_table_provider_request(
+        request: fidl::endpoints::Request<Self::RouteTableProviderMarker>,
+    ) -> RouteTableProviderRequest<Ipv6> {
+        RouteTableProviderRequest::from(request)
+    }
 
     fn into_route_set_request(
         request: fidl::endpoints::Request<Self::RouteSetMarker>,
@@ -225,63 +258,112 @@ impl_responder!(
     fnet_routes_admin::RouteTableV6GetAuthorizationForRouteTableResponder,
     fnet_routes_admin::GrantForRouteTableAuthorization,
 );
+impl_responder!(
+    fnet_routes_admin::RouteTableProviderV4GetInterfaceLocalTableResponder,
+    Result<
+        fidl::endpoints::ClientEnd<fnet_routes_admin::RouteTableV4Marker>,
+        fnet_routes_admin::GetInterfaceLocalTableError,
+    >,
+);
+impl_responder!(
+    fnet_routes_admin::RouteTableProviderV6GetInterfaceLocalTableResponder,
+    Result<
+        fidl::endpoints::ClientEnd<fnet_routes_admin::RouteTableV6Marker>,
+        fnet_routes_admin::GetInterfaceLocalTableError,
+    >,
+);
 
-/// The compiler often fails to infer that an item in the RouteTableProvider request stream is a
-/// Result. This function helps force it to understand this so that the Result can be unwrapped
-/// to get the actual RouteTableProvider request inside.
-pub fn concretize_route_table_provider_request<I: Ip + FidlRouteAdminIpExt>(
-    item: <<<I as FidlRouteAdminIpExt>::RouteTableProviderMarker as ProtocolMarker>::RequestStream as futures::Stream>::Item,
-) -> Result<(ServerEnd<I::RouteTableMarker>, Option<String>), fidl::Error> {
-    #[derive(GenericOverIp)]
-    #[generic_over_ip(I, Ip)]
-    struct In<I: FidlRouteAdminIpExt>(<<<I as FidlRouteAdminIpExt>::RouteTableProviderMarker as ProtocolMarker>::RequestStream as futures::Stream>::Item);
-
-    #[derive(GenericOverIp)]
-    #[generic_over_ip(I, Ip)]
-    struct Out<I: FidlRouteAdminIpExt>(
-        Result<(ServerEnd<I::RouteTableMarker>, Option<String>), fidl::Error>,
-    );
-
-    let Out(result) = net_types::map_ip_twice!(I, In(item), |In(item)| Out(
-        item.map(unpack_route_table_provider_request::<I>)
-    ));
-    result
+/// Options for creating route tables.
+#[derive(Clone, Debug, GenericOverIp)]
+#[generic_over_ip(I, Ip)]
+pub struct RouteTableOptions<I: Ip> {
+    /// Optional name for the table.
+    pub name: Option<String>,
+    /// Marker for the IP version.
+    pub _marker: std::marker::PhantomData<I>,
 }
 
-/// Unpacks the `[ServerEnd]` and debug name from a request for a new route table.
-pub fn unpack_route_table_provider_request<I: Ip + FidlRouteAdminIpExt>(
-    request: <<I::RouteTableProviderMarker as ProtocolMarker>::RequestStream as TryStream>::Ok,
-) -> (ServerEnd<I::RouteTableMarker>, Option<String>) {
-    #[derive(GenericOverIp)]
-    #[generic_over_ip(I, Ip)]
-    struct Request<I: FidlRouteAdminIpExt>(
-        <<I::RouteTableProviderMarker as ProtocolMarker>::RequestStream as TryStream>::Ok,
-    );
+impl From<RouteTableOptions<Ipv4>> for fnet_routes_admin::RouteTableOptionsV4 {
+    fn from(val: RouteTableOptions<Ipv4>) -> Self {
+        let RouteTableOptions { name, _marker } = val;
+        Self { name, __source_breaking: fidl::marker::SourceBreaking }
+    }
+}
 
-    #[derive(GenericOverIp)]
-    #[generic_over_ip(I, Ip)]
-    struct Contents<I: FidlRouteAdminIpExt>((ServerEnd<I::RouteTableMarker>, Option<String>));
+impl From<RouteTableOptions<Ipv6>> for fnet_routes_admin::RouteTableOptionsV6 {
+    fn from(val: RouteTableOptions<Ipv6>) -> Self {
+        let RouteTableOptions { name, _marker } = val;
+        Self { name, __source_breaking: fidl::marker::SourceBreaking }
+    }
+}
 
-    let Contents(contents) = I::map_ip(
-        Request(request),
-        |Request(request)| {
-            let fnet_routes_admin::RouteTableProviderV4Request::NewRouteTable {
+impl From<fnet_routes_admin::RouteTableOptionsV4> for RouteTableOptions<Ipv4> {
+    fn from(val: fnet_routes_admin::RouteTableOptionsV4) -> Self {
+        let fnet_routes_admin::RouteTableOptionsV4 { name, __source_breaking: _ } = val;
+        Self { name, _marker: std::marker::PhantomData }
+    }
+}
+
+impl From<fnet_routes_admin::RouteTableOptionsV6> for RouteTableOptions<Ipv6> {
+    fn from(val: fnet_routes_admin::RouteTableOptionsV6) -> Self {
+        let fnet_routes_admin::RouteTableOptionsV6 { name, __source_breaking: _ } = val;
+        Self { name, _marker: std::marker::PhantomData }
+    }
+}
+
+/// GenericOverIp version of RouteTableProviderV{4, 6}Request.
+#[derive(derivative::Derivative, GenericOverIp)]
+#[derivative(Debug(bound = ""))]
+#[generic_over_ip(I, Ip)]
+pub enum RouteTableProviderRequest<I: Ip + FidlRouteAdminIpExt> {
+    /// Request to create a new route table.
+    NewRouteTable {
+        /// The server end of the RouteTable request
+        provider: fidl::endpoints::ServerEnd<I::RouteTableMarker>,
+        /// The creation options.
+        options: RouteTableOptions<I>,
+        /// The control handle for the protocol.
+        control_handle: I::RouteTableProviderControlHandle,
+    },
+    /// Request to get the interface-local route table.
+    GetInterfaceLocalTable {
+        /// The credentials for the interface.
+        credential: fnet_interfaces_admin::ProofOfInterfaceAuthorization,
+        /// Responder to return the local table.
+        responder: I::GetInterfaceLocalTableResponder,
+    },
+}
+
+impl From<fnet_routes_admin::RouteTableProviderV4Request> for RouteTableProviderRequest<Ipv4> {
+    fn from(val: fnet_routes_admin::RouteTableProviderV4Request) -> Self {
+        match val {
+            fnet_routes_admin::RouteTableProviderV4Request::NewRouteTable {
                 provider,
-                options: fnet_routes_admin::RouteTableOptionsV4 { name, __source_breaking },
-                control_handle: _,
-            } = request;
-            Contents((provider, name))
-        },
-        |Request(request)| {
-            let fnet_routes_admin::RouteTableProviderV6Request::NewRouteTable {
+                options,
+                control_handle,
+            } => Self::NewRouteTable { provider, options: options.into(), control_handle },
+            fnet_routes_admin::RouteTableProviderV4Request::GetInterfaceLocalTable {
+                credential,
+                responder,
+            } => Self::GetInterfaceLocalTable { credential, responder },
+        }
+    }
+}
+
+impl From<fnet_routes_admin::RouteTableProviderV6Request> for RouteTableProviderRequest<Ipv6> {
+    fn from(val: fnet_routes_admin::RouteTableProviderV6Request) -> Self {
+        match val {
+            fnet_routes_admin::RouteTableProviderV6Request::NewRouteTable {
                 provider,
-                options: fnet_routes_admin::RouteTableOptionsV6 { name, __source_breaking },
-                control_handle: _,
-            } = request;
-            Contents((provider, name))
-        },
-    );
-    contents
+                options,
+                control_handle,
+            } => Self::NewRouteTable { provider, options: options.into(), control_handle },
+            fnet_routes_admin::RouteTableProviderV6Request::GetInterfaceLocalTable {
+                credential,
+                responder,
+            } => Self::GetInterfaceLocalTable { credential, responder },
+        }
+    }
 }
 
 /// Dispatches `new_route_table` on either the `RouteTableProviderV4`

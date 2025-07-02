@@ -82,7 +82,7 @@ pub(in crate::security) fn fs_node_notify_security_context(
 /// `dir_entry`. If `locked_or_no_xattr` is `None`, xattrs will not be read - this makes sense
 /// for entries containing anonymous nodes, that will not have an associated filesystem entry.
 pub(in crate::security) fn fs_node_init_with_dentry(
-    locked_or_no_xattr: Option<&mut Locked<'_, FileOpsCore>>,
+    locked_or_no_xattr: Option<&mut Locked<FileOpsCore>>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     dir_entry: &DirEntryHandle,
@@ -132,7 +132,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
         FileSystemLabelingScheme::Mountpoint { sid } => sid,
         // fs_use_xattr-labelling defers to the security attribute on the file node, with fall-back
         // behaviours for missing and invalid labels.
-        FileSystemLabelingScheme::FsUse { fs_use_type, computed_def_sid: def_sid, .. } => {
+        FileSystemLabelingScheme::FsUse { fs_use_type, default_sid, .. } => {
             match (fs_use_type, locked_or_no_xattr) {
                 (FsUseType::Xattr, Some(locked)) => {
                     // Determine the SID from the "security.selinux" attribute.
@@ -147,7 +147,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                         Ok(ValueOrSize::Value(security_context)) => Some(
                             security_server
                                 .security_context_to_sid((&security_context).into())
-                                .unwrap_or_else(|_| SecurityId::initial(InitialSid::Unlabeled)),
+                                .unwrap_or_else(|_| InitialSid::Unlabeled.into()),
                         ),
                         Ok(ValueOrSize::Size(_)) => None,
                         Err(err) => {
@@ -180,17 +180,13 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                     };
                     maybe_sid.unwrap_or_else(||{
                         // The node does not have a label, so apply the filesystem's default SID.
-                        if fs.name() == "remotefs" {
-                            track_stub!(TODO("https://fxbug.dev/378688761"), "RemoteFS node missing security label. Perhaps your device needs re-flashing?");
-                        } else {
-                            log_warn!(
-                                "Unlabeled node {:?} in {} ({:?}-labeled) filesystem",
-                                dir_entry,
-                                fs.name(),
-                                fs_use_type
-                            );
-                        };
-                        def_sid
+                        log_warn!(
+                            "Unlabeled node {:?} in {} ({:?}-labeled) filesystem",
+                            dir_entry,
+                            fs.name(),
+                            fs_use_type
+                        );
+                        default_sid
                     })
                 }
                 (FsUseType::Xattr, None) => {
@@ -201,7 +197,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                         fs.name(),
                         fs_use_type
                     );
-                    SecurityId::initial(InitialSid::Unlabeled)
+                    InitialSid::Unlabeled.into()
                 }
                 _ => {
                     // Ephemeral nodes are then labeled by applying SID computation between their
@@ -248,7 +244,7 @@ pub(in crate::security) fn fs_node_init_with_dentry(
                     sub_path.as_slice().into(),
                     Some(class_id),
                 )
-                .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled))
+                .unwrap_or_else(|| InitialSid::Unlabeled.into())
         }
     };
 
@@ -478,7 +474,7 @@ pub(in crate::security) fn fs_node_init_on_create(
 }
 
 /// Called to label file nodes not linked in any filesystem's directory structure, e.g.
-/// usereventfds, etc.
+/// usereventfds, kernel-private sockets, etc.
 pub(in crate::security) fn fs_node_init_anon(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -486,11 +482,11 @@ pub(in crate::security) fn fs_node_init_anon(
     node_type: &str,
 ) {
     let fs_node_class = FileClass::AnonFsNode.into();
-
+    let is_private_node = Anon::is_private(new_node);
     // TODO: https://fxbug.dev/405062002 - Fold this into the `fs_node_init_with_dentry*()` logic?
-    let sid = if Anon::is_private(new_node) {
+    let sid = if is_private_node {
         // TODO: https://fxbug.dev/404773987 - Introduce a new `FsNode` labeling state for this?
-        SecurityId::initial(InitialSid::Unlabeled)
+        InitialSid::Unlabeled.into()
     } else if security_server.has_policy() {
         let task_sid = task_effective_sid(current_task);
         security_server
@@ -499,11 +495,18 @@ pub(in crate::security) fn fs_node_init_anon(
             .expect("Compute label for anon_inode")
     } else {
         // If no policy has been loaded then `anon_inode`s receive the "unlabeled" context.
-        SecurityId::initial(InitialSid::Unlabeled)
+        InitialSid::Unlabeled.into()
     };
 
     let mut state = new_node.security_state.lock();
-    state.class = fs_node_class;
+    // TODO: https://fxbug.dev/364569157 - The class and label of kernel-private sockets are not
+    // used in access decisions since permissions are always allowed in this case. But we need to
+    // know the socket-like class before calling into `has_socket_permission()`, so don't overwrite
+    // the class for kernel-private sockets.
+    if !is_private_node {
+        assert!(matches!(state.class, FsNodeClass::File(_)));
+        state.class = fs_node_class;
+    }
     state.label = FsNodeLabel::SecurityId { sid };
 }
 
@@ -527,14 +530,14 @@ fn may_create(
     let fs = parent.fs();
 
     let audit_context =
-        [current_task.into(), parent.into(), fs.as_ref().into(), Auditable::Name(name)];
+        &[current_task.into(), parent.into(), fs.as_ref().into(), Auditable::Name(name)];
     check_permission(
         &permission_check,
         current_task.kernel(),
         current_sid,
         parent_sid,
         DirPermission::Search,
-        (&audit_context).into(),
+        audit_context.into(),
     )?;
     check_permission(
         &permission_check,
@@ -542,7 +545,7 @@ fn may_create(
         current_sid,
         parent_sid,
         DirPermission::AddName,
-        (&audit_context).into(),
+        audit_context.into(),
     )?;
 
     // Verify that the caller has permission to create new nodes of the desired type.
@@ -556,16 +559,16 @@ fn may_create(
         name.into(),
     )?
     .map(|(sid, _)| sid)
-    .unwrap_or_else(|| SecurityId::initial(InitialSid::File));
+    .unwrap_or_else(|| InitialSid::File.into());
 
-    let audit_context = [current_task.into(), fs.as_ref().into(), Auditable::Name(name)];
+    let audit_context = &[current_task.into(), fs.as_ref().into(), Auditable::Name(name)];
     check_permission(
         &permission_check,
         current_task.kernel(),
         current_sid,
         new_file_sid,
         CommonFsNodePermission::Create.for_class(new_file_class),
-        (&audit_context).into(),
+        audit_context.into(),
     )?;
 
     // Verify that the new node's label is permitted to be created in the target filesystem.
@@ -585,7 +588,7 @@ fn may_create(
         new_file_sid,
         filesystem_sid,
         FileSystemPermission::Associate,
-        (&audit_context).into(),
+        audit_context.into(),
     )?;
 
     Ok(())
@@ -657,7 +660,7 @@ fn may_unlink_or_rmdir(
     assert!(!Anon::is_private(parent));
     assert!(!Anon::is_private(fs_node));
 
-    let audit_context = [current_task.into(), Auditable::Name(name)];
+    let audit_context = &[current_task.into(), Auditable::Name(name)];
 
     let permission_check = security_server.as_permission_check();
     let current_sid = task_effective_sid(current_task);
@@ -669,7 +672,7 @@ fn may_unlink_or_rmdir(
         current_sid,
         parent_sid,
         DirPermission::Search,
-        (&audit_context).into(),
+        audit_context.into(),
     )?;
     check_permission(
         &permission_check,
@@ -677,7 +680,7 @@ fn may_unlink_or_rmdir(
         current_sid,
         parent_sid,
         DirPermission::RemoveName,
-        (&audit_context).into(),
+        audit_context.into(),
     )?;
 
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
@@ -693,7 +696,7 @@ fn may_unlink_or_rmdir(
             current_sid,
             file_sid,
             CommonFilePermission::Unlink.for_class(file_class),
-            (&audit_context).into(),
+            audit_context.into(),
         ),
         UnlinkKind::Directory => check_permission(
             &permission_check,
@@ -701,7 +704,7 @@ fn may_unlink_or_rmdir(
             current_sid,
             file_sid,
             DirPermission::RemoveDir,
-            (&audit_context).into(),
+            audit_context.into(),
         ),
     }
 }
@@ -826,14 +829,14 @@ pub(in crate::security) fn check_fs_node_rename_access(
         current_task.into(),
     )?;
 
-    let audit_context_old_name = [current_task.into(), Auditable::Name(old_basename)];
+    let audit_context_old_name = &[current_task.into(), Auditable::Name(old_basename)];
     check_permission(
         &permission_check,
         current_task.kernel(),
         current_sid,
         old_parent_sid,
         DirPermission::RemoveName,
-        (&audit_context_old_name).into(),
+        audit_context_old_name.into(),
     )?;
 
     let FsNodeSidAndClass { sid: file_sid, class: file_class } =
@@ -848,10 +851,10 @@ pub(in crate::security) fn check_fs_node_rename_access(
         current_sid,
         file_sid,
         CommonFilePermission::Rename.for_class(file_class),
-        (&audit_context_old_name).into(),
+        audit_context_old_name.into(),
     )?;
 
-    let audit_context_new_name = [current_task.into(), Auditable::Name(new_basename)];
+    let audit_context_new_name = &[current_task.into(), Auditable::Name(new_basename)];
     let new_parent_sid = fs_node_effective_sid_and_class(new_parent).sid;
     check_permission(
         &permission_check,
@@ -859,7 +862,7 @@ pub(in crate::security) fn check_fs_node_rename_access(
         current_sid,
         new_parent_sid,
         DirPermission::AddName,
-        (&audit_context_new_name).into(),
+        audit_context_new_name.into(),
     )?;
 
     // If a file already exists with the new name, then verify that the existing file can be
@@ -1087,7 +1090,7 @@ pub(in crate::security) fn fs_node_listsecurity(fs_node: &FsNode) -> Option<FsSt
 /// Returns the Security Context corresponding to the SID with which `FsNode`
 /// is labelled, otherwise delegates to the node's [`crate::vfs::FsNodeOps`].
 pub(in crate::security) fn fs_node_getsecurity<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -1113,7 +1116,7 @@ where
     // Security Context, which we should return, so return the `get_xattr()` result, unless it indicates
     // that the filesystem does not support the attribute.
     let sid = fs_node_effective_sid_and_class(&fs_node).sid;
-    if sid == SecurityId::initial(InitialSid::Unlabeled) {
+    if sid == InitialSid::Unlabeled.into() {
         let result = fs_node.ops().get_xattr(
             &mut locked.cast_locked::<FileOpsCore>(),
             fs_node,
@@ -1137,7 +1140,7 @@ where
 /// Sets the `name`d security attribute on `fs_node` and updates internal
 /// kernel state.
 pub(in crate::security) fn fs_node_setsecurity<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     fs_node: &FsNode,
@@ -1190,8 +1193,8 @@ where
     // Verify that the requested modification is permitted by the loaded policy.
     let new_sid = security_server.security_context_to_sid(value.into()).ok();
     if security_server.is_enforcing() {
-        let audit_context = [current_task.into(), fs_node.into(), fs.as_ref().into()];
-        let audit_context = (&audit_context).into();
+        let audit_context = &[current_task.into(), fs_node.into(), fs.as_ref().into()];
+        let audit_context = audit_context.into();
 
         let new_sid = new_sid.ok_or_else(|| errno!(EINVAL))?;
         let task_sid = task_effective_sid(current_task);
@@ -1236,8 +1239,7 @@ where
 
     // If the operation succeeded then update the label cached on the file node.
     if result.is_ok() {
-        let effective_new_sid =
-            new_sid.unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled));
+        let effective_new_sid = new_sid.unwrap_or_else(|| InitialSid::Unlabeled.into());
         set_cached_sid(fs_node, effective_new_sid);
     }
 
@@ -1315,7 +1317,7 @@ mod tests {
 
                 // `fs_node_getsecurity()` should now fall-back to the policy's "file" Context.
                 let default_file_context = security_server
-                    .sid_to_security_context(SecurityId::initial(InitialSid::File))
+                    .sid_to_security_context(InitialSid::File.into())
                     .unwrap()
                     .into();
                 let result = fs_node_getsecurity(
@@ -1378,13 +1380,11 @@ mod tests {
                 assert_eq!(result, ValueOrSize::Value(INVALID_CONTEXT.into()));
 
                 // The SID cached for the `node` should be "unlabeled".
-                assert_eq!(Some(SecurityId::initial(InitialSid::Unlabeled)), get_cached_sid(node));
+                let unlabeled_initial_sid = InitialSid::Unlabeled.into();
+                assert_eq!(Some(unlabeled_initial_sid), get_cached_sid(node));
 
                 // The effective SID of the node should be "unlabeled".
-                assert_eq!(
-                    SecurityId::initial(InitialSid::Unlabeled),
-                    fs_node_effective_sid_and_class(node).sid
-                );
+                assert_eq!(unlabeled_initial_sid, fs_node_effective_sid_and_class(node).sid);
             },
         )
     }

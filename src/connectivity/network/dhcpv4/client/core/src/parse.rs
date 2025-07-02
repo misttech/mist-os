@@ -92,11 +92,7 @@ pub(crate) fn serialize_dhcp_message_to_ip_packet(
         packet_formats::ip::Ipv4Proto::Proto(packet_formats::ip::IpProto::Udp),
     );
 
-    match message
-        .into_serializer()
-        .encapsulate(udp_builder)
-        .encapsulate(ipv4_builder)
-        .serialize_vec_outer()
+    match message.into_serializer().wrap_in(udp_builder).wrap_in(ipv4_builder).serialize_vec_outer()
     {
         Ok(buf) => buf,
         Err(e) => {
@@ -963,8 +959,8 @@ mod test {
         );
         let bytes = vec![1, 2, 3, 4, 5]
             .into_serializer()
-            .encapsulate(tcp_builder)
-            .encapsulate(ipv4_builder)
+            .wrap_in(tcp_builder)
+            .wrap_in(ipv4_builder)
             .serialize_vec_outer()
             .expect("serialize error");
 
@@ -997,8 +993,8 @@ mod test {
             .bytes()
             .collect::<Vec<_>>()
             .into_serializer()
-            .encapsulate(udp_builder)
-            .encapsulate(ipv4_builder)
+            .wrap_in(udp_builder)
+            .wrap_in(ipv4_builder)
             .serialize_vec_outer()
             .expect("serialize error");
 

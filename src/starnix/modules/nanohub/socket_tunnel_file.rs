@@ -54,7 +54,7 @@ impl FsNodeOps for FirmwareFile {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -88,7 +88,7 @@ fn connect(socket_label: Arc<FsString>) -> Result<Box<dyn FileOps>, Errno> {
 impl DeviceOps for SocketTunnelFile {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         _current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -103,7 +103,7 @@ impl FsNodeOps for SocketTunnelSysfsFile {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -114,7 +114,7 @@ impl FsNodeOps for SocketTunnelSysfsFile {
 
 /// Create and register a device node backed by a SocketTunnelFile
 pub fn register_socket_tunnel_device<F, N, L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     socket_label: &FsStr,
     dev_node_name: &FsStr,

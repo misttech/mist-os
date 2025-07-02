@@ -185,6 +185,10 @@ where
             .data_length
             .get())
     }
+
+    pub fn into_source(self) -> T {
+        self.source
+    }
 }
 
 #[cfg(test)]

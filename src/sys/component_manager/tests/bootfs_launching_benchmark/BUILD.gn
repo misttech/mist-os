@@ -86,6 +86,7 @@ if (current_toolchain == default_toolchain) {
   board_configuration("board_config") {
     name = "test"
     version = "fake_version"
+    partitions_config = "//boards/partitions:default"
   }
 
   img_name = "bootfs_launching_benchmark_test_zbi"

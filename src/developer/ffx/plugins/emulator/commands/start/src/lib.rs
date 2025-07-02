@@ -572,7 +572,8 @@ mod tests {
     use ffx_config::{ConfigLevel, ConfigQuery, TestEnv};
     use ffx_writer::TestBuffers;
     use pbms::ProductBundle;
-    use sdk_metadata::{ProductBundleV2, VirtualDevice};
+    use product_bundle::ProductBundleV2;
+    use sdk_metadata::VirtualDevice;
     use std::fs;
     use std::path::Path;
     use std::process::Command;
@@ -736,6 +737,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: Some(dev_manifest.to_str().unwrap().into()),
+            release_info: None,
         })
     }
 

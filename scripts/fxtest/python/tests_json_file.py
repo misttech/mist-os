@@ -58,6 +58,10 @@ class TestSection:
     # level will fail if test_manager creates its customary exception channels.
     create_no_exception_channel: bool | None = None
 
+    # Indicates the path to the runtime_deps json file, which lists the files necessary to run the
+    # test on a test runner successfully.
+    runtime_deps: str | None = None
+
 
 @dataparse
 @dataclass

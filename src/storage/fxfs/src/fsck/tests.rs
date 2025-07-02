@@ -12,6 +12,7 @@ use crate::lsm_tree::types::{Item, ItemRef, Key, LayerIterator, LayerWriter, Val
 use crate::lsm_tree::Query;
 use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle, INVALID_OBJECT_ID};
 use crate::object_store::allocator::{AllocatorKey, AllocatorValue, CoalescingIterator};
+use crate::object_store::data_object_handle::OverwriteOptions;
 use crate::object_store::directory::{self, Directory, MutableAttributesInternal};
 use crate::object_store::transaction::{self, lock_keys, LockKey, ObjectStoreMutation, Options};
 use crate::object_store::volume::root_volume;
@@ -29,7 +30,7 @@ use assert_matches::assert_matches;
 use fidl_fuchsia_io as fio;
 use fuchsia_sync::Mutex;
 use futures::join;
-use fxfs_crypto::{Crypt, KeyPurpose, WrappedKeys};
+use fxfs_crypto::{Crypt, KeyPurpose};
 use fxfs_insecure_crypto::InsecureCrypt;
 use mundane::hash::{Digest, Hasher, Sha256};
 use std::ops::Deref;
@@ -78,6 +79,7 @@ impl FsckTest {
         );
         Ok(())
     }
+    // TODO(https://fxbug.dev/422604584): Validate layer file contents for root store.
     async fn run(&self, test_options: TestOptions) -> Result<(), Error> {
         let options = FsckOptions {
             fail_on_warning: true,
@@ -2012,7 +2014,7 @@ async fn test_orphaned_keys() {
             store_id,
             Mutation::insert_object(
                 ObjectKey::keys(1000),
-                ObjectValue::Keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![]))),
+                ObjectValue::Keys(EncryptionKeys::default()),
             ),
         );
         transaction.commit().await.expect("commit failed");
@@ -2117,7 +2119,7 @@ async fn test_encrypted_symlink_has_missing_keys() {
             .await
             .expect("new_transaction failed");
 
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         handle
             .update_attributes(
                 transaction,
@@ -2208,7 +2210,7 @@ async fn test_encrypted_directory_has_unencrypted_child() {
             .await
             .expect("new_transaction failed");
 
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         handle
             .update_attributes(
                 transaction,
@@ -2409,7 +2411,7 @@ async fn test_parent_and_child_encrypted_with_different_wrapping_keys() {
             .await
             .expect("new_transaction failed");
 
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         handle
             .update_attributes(
                 transaction,
@@ -2528,7 +2530,7 @@ async fn test_encrypted_directory_no_wrapping_key() {
             .await
             .expect("new_transaction failed");
 
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         handle
             .update_attributes(
                 transaction,
@@ -2706,7 +2708,7 @@ async fn test_directory_missing_encryption_key_for_fscrypt() {
             .await
             .expect("new_transaction failed");
 
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         handle.set_wrapping_key(&mut transaction, 2).await.expect("failed to set wrapping key");
 
         let txn_mutation = transaction
@@ -2717,12 +2719,12 @@ async fn test_directory_missing_encryption_key_for_fscrypt() {
                     item:
                         Item {
                             key: ObjectKey { data: ObjectKeyData::Keys, .. },
-                            value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)),
+                            value: ObjectValue::Keys(keys),
                             ..
                         },
                     ..
                 }) => {
-                    assert!(keys.iter().find(|x| x.0 == 1).is_some());
+                    assert!(keys.get(1).is_some());
                     true
                 }
                 _ => false,
@@ -2734,15 +2736,13 @@ async fn test_directory_missing_encryption_key_for_fscrypt() {
         transaction.remove(store_id, mutation.clone());
 
         if let Mutation::ObjectStore(ObjectStoreMutation {
-            item: Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. },
+            item: Item { value: ObjectValue::Keys(keys), .. },
             ..
         }) = &mut mutation
         {
-            use std::ops::DerefMut as _;
-            let keys = keys.deref_mut();
-            let idx = keys.iter().position(|x| x.0 == 1).unwrap();
-            let (_, wrapped_key) = keys.remove(idx);
-            keys.push((0, wrapped_key));
+            // Move the key from index 1 (FSCRYPT_KEY_ID) to index 0 (VOLUME_DATA_KEY_ID).
+            let key = keys.remove(1).unwrap();
+            keys.insert(0, key);
         } else {
             unreachable!();
         }
@@ -2807,15 +2807,13 @@ async fn test_duplicate_key() {
 
         let key_id;
         if let Mutation::ObjectStore(ObjectStoreMutation {
-            item: Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. },
+            item: Item { value: ObjectValue::Keys(keys), .. },
             ..
         }) = &mut mutation
         {
-            use std::ops::DerefMut as _;
-            let keys = keys.deref_mut();
-            let duplicate = keys.first().unwrap().clone();
-            key_id = duplicate.0;
-            keys.push(duplicate);
+            let (id, key) = keys.first().unwrap().clone();
+            key_id = id;
+            keys.insert(id, key);
         } else {
             unreachable!();
         }
@@ -3251,7 +3249,14 @@ async fn test_full_disk() {
         )
         .await
         .expect("open allocator handle failed");
-        handle.overwrite(0, buf.as_mut(), true).await.expect("overwrite failed");
+        handle
+            .overwrite(
+                0,
+                buf.as_mut(),
+                OverwriteOptions { allow_allocations: true, ..Default::default() },
+            )
+            .await
+            .expect("overwrite failed");
 
         // Add "layer_handle" to the layer stack for the allocator but be careful not to
         // allocate anything in the process.
@@ -3271,7 +3276,14 @@ async fn test_full_disk() {
         )
         .await
         .expect("open allocator handle failed");
-        handle.overwrite(0, buf.as_mut(), true).await.expect("overwrite failed");
+        handle
+            .overwrite(
+                0,
+                buf.as_mut(),
+                OverwriteOptions { allow_allocations: true, ..Default::default() },
+            )
+            .await
+            .expect("overwrite failed");
     }
 
     test.remount().await.expect_err("Remount succeeded");
@@ -3513,4 +3525,195 @@ async fn test_overwrite_extent_flag_not_set() {
         test.errors()[..],
         [FsckIssue::Error(FsckError::OverwriteExtentFlagUnset(..)), ..]
     );
+}
+
+#[fuchsia::test]
+async fn test_invalid_bloom_filter_for_allocator() {
+    let mut test = FsckTest::new().await;
+
+    {
+        let fs = test.filesystem();
+        let root_store = fs.root_store();
+        let device = fs.device();
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let layer_handle = ObjectStore::create_object(
+            &root_store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+        )
+        .await
+        .expect("create_object failed");
+        transaction.commit().await.expect("commit failed");
+
+        {
+            // Fill persistent layers with enough items to start using bloom filter. The following
+            // value was chosen from trial and error. The minimum number of items to add is
+            // complicated to calculate. It depends on the serialized size of the item,
+            // `MINIMUM_DATA_BLOCKS_FOR_BLOOM_FILTER`, and `fs.block_size()`. See the
+            // `PersistentLayerWriter`'s implementation of`LayerWriter::write(..)` for details of
+            // of how the items are written to the persistent layer.
+            let item_count = 600;
+            let mut items: Vec<Item<AllocatorKey, AllocatorValue>> = vec![];
+            for i in 0..item_count as u64 {
+                // The range per item needs to be disjoint to avoid them being merged.
+                items.push(Item::new(
+                    AllocatorKey { device_range: (2 * i * 100)..(2 * i + 1) * 100 },
+                    AllocatorValue::Abs { count: 1, owner_object_id: 1 },
+                ));
+            }
+
+            let mut writer = PersistentLayerWriter::<_, AllocatorKey, AllocatorValue>::new(
+                Writer::new(&layer_handle).await,
+                items.len(),
+                fs.block_size(),
+            )
+            .await
+            .expect("Writer::new failed");
+
+            // Write the items into the layer - requires a minimum amount of items before the bloom
+            // filter is used.
+            for item in AsRef::<Vec<Item<AllocatorKey, AllocatorValue>>>::as_ref(&items) {
+                writer.write(item.as_item_ref()).await.expect("write failed");
+            }
+
+            // Corrupt the bloom filter by clearing it. This will cause the filter to report that
+            // no items exist.
+            writer.bloom_filter().clear();
+
+            writer.flush().await.expect("flush failed");
+        }
+        let mut allocator_info = fs.allocator().info();
+        allocator_info.layers.push(layer_handle.object_id());
+        let mut allocator_info_vec = vec![];
+        allocator_info.serialize_with_version(&mut allocator_info_vec).expect("serialize failed");
+        let mut buf = device.allocate_buffer(allocator_info_vec.len()).await;
+        buf.as_mut_slice().copy_from_slice(&allocator_info_vec[..]);
+
+        let handle = ObjectStore::open_object(
+            &root_store,
+            fs.allocator().object_id(),
+            HandleOptions::default(),
+            None,
+        )
+        .await
+        .expect("open allocator handle failed");
+        let mut transaction = handle.new_transaction().await.expect("new_transaction failed");
+        handle.txn_write(&mut transaction, 0, buf.as_ref()).await.expect("txn_write failed");
+        transaction.commit().await.expect("commit failed");
+    }
+
+    test.remount().await.expect("remount failed");
+    test.run(TestOptions::default()).await.expect_err("Fsck should fail");
+    assert_matches!(test.errors()[..], [FsckIssue::Fatal(FsckFatal::InvalidBloomFilter(..))]);
+}
+
+#[fuchsia::test]
+async fn test_invalid_bloom_filter_for_volume() {
+    let mut test = FsckTest::new().await;
+
+    // The following is similar to `install_items_in_store` function above, but we need to interact
+    // with the persistent layer directly to corrupt the bloom filter.
+    let store_id = {
+        let fs = test.filesystem();
+        let root_volume = root_volume(fs.clone()).await.unwrap();
+        let store = root_volume.new_volume("vol", NO_OWNER, None).await.unwrap();
+        let root_store = fs.root_store();
+        let device = fs.device();
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let layer_handle = ObjectStore::create_object(
+            &root_store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+        )
+        .await
+        .expect("create_object failed");
+        transaction.commit().await.expect("commit failed");
+
+        {
+            // Fill persistent layers with enough items to start using bloom filter. The following
+            // value was chosen from trial and error. The minimum number of items to add is
+            // complicated to calculate. It depends on the serialized size of the item,
+            // `MINIMUM_DATA_BLOCKS_FOR_BLOOM_FILTER`, and `fs.block_size()`. See the
+            // `PersistentLayerWriter`'s implementation of`LayerWriter::write(..)` for details of
+            // of how the items are written to the persistent layer.
+            let item_count = 600;
+            let mut items: Vec<Item<ObjectKey, ObjectValue>> = vec![];
+            for i in 0..item_count as u64 {
+                // The range per item needs to be disjoint to avoid them being merged.
+                items.push(Item::new(
+                    ObjectKey::extent(0, 0, (2 * i * 100)..(2 * i + 1) * 100),
+                    ObjectValue::deleted_extent(),
+                ));
+            }
+
+            let mut writer = PersistentLayerWriter::<_, ObjectKey, ObjectValue>::new(
+                Writer::new(&layer_handle).await,
+                items.len(),
+                fs.block_size(),
+            )
+            .await
+            .expect("Writer::new failed");
+
+            // Write the items into the layer - requires a minimum amount of items before the bloom
+            // filter is used.
+            for item in AsRef::<Vec<Item<ObjectKey, ObjectValue>>>::as_ref(&items) {
+                writer.write(item.as_item_ref()).await.expect("write failed");
+            }
+
+            // Corrupt the bloom filter by clearing it. This will cause the filter to report that
+            // no items exist.
+            writer.bloom_filter().clear();
+
+            writer.flush().await.expect("flush failed");
+        }
+        let store_info_handle = ObjectStore::open_object(
+            &root_store,
+            store.store_info_handle_object_id().unwrap(),
+            HandleOptions::default(),
+            None,
+        )
+        .await
+        .expect("open store info handle failed");
+
+        let mut store_info = if store_info_handle.get_size() == 0 {
+            StoreInfo::default()
+        } else {
+            let mut cursor = std::io::Cursor::new(
+                store_info_handle.contents(1000).await.expect("error reading content"),
+            );
+            StoreInfo::deserialize_with_version(&mut cursor).expect("deserialize_error").0
+        };
+        store_info.layers.push(layer_handle.object_id());
+        let mut store_info_vec = vec![];
+        store_info.serialize_with_version(&mut store_info_vec).expect("serialize failed");
+        let mut buf = device.allocate_buffer(store_info_vec.len()).await;
+        buf.as_mut_slice().copy_from_slice(&store_info_vec[..]);
+
+        let mut transaction =
+            store_info_handle.new_transaction().await.expect("new_transaction failed");
+        store_info_handle
+            .txn_write(&mut transaction, 0, buf.as_ref())
+            .await
+            .expect("txn_write failed");
+        transaction.commit().await.expect("commit failed");
+        store.store_object_id()
+    };
+
+    test.remount().await.expect("remount failed");
+    test.run(TestOptions { volume_store_id: Some(store_id), ..Default::default() })
+        .await
+        .expect_err("Fsck should fail");
+    assert_matches!(test.errors()[..], [FsckIssue::Fatal(FsckFatal::InvalidBloomFilter(..))]);
 }

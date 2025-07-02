@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::capability::{BuiltinCapability, CapabilityProvider, FrameworkCapability};
+use crate::framework::capability_factory::RemotedRuntimeCapabilities;
 use crate::model::component::WeakComponentInstance;
 use crate::model::token::InstanceRegistry;
 use ::routing::capability_source::{BuiltinSource, CapabilitySource, FrameworkSource};
@@ -28,6 +29,7 @@ pub struct ModelContext {
     instance_registry: Arc<InstanceRegistry>,
     config_developer_overrides: Mutex<HashMap<Moniker, HashMap<String, cm_rust::ConfigValue>>>,
     pub scope_factory: Box<dyn Fn() -> ExecutionScope + Send + Sync + 'static>,
+    remote_capabilities: Arc<Mutex<RemotedRuntimeCapabilities>>,
 }
 
 impl ModelContext {
@@ -54,6 +56,7 @@ impl ModelContext {
             instance_registry,
             config_developer_overrides: Mutex::new(HashMap::new()),
             scope_factory,
+            remote_capabilities: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
@@ -85,6 +88,10 @@ impl ModelContext {
         &self.instance_registry
     }
 
+    pub fn remote_capabilities(&self) -> &Arc<Mutex<RemotedRuntimeCapabilities>> {
+        &self.remote_capabilities
+    }
+
     pub async fn init_internal_capabilities(
         &self,
         b: Vec<Box<dyn BuiltinCapability>>,
@@ -102,7 +109,7 @@ impl ModelContext {
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "src_model_tests"))]
     pub async fn add_framework_capability(&self, c: Box<dyn FrameworkCapability>) {
         // Internal capabilities added for a test should preempt existing ones that match the
         // same metadata.

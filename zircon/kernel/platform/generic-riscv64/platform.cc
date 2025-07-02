@@ -139,6 +139,10 @@ void platform_halt_cpu() {
   panic("power_cpu_off returned %d\n", status);
 }
 
+bool platform_supports_suspend_cpu() { return false; }
+
+zx_status_t platform_suspend_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
 zx::result<power_cpu_state> platform_get_cpu_state(cpu_num_t cpu_id) {
   DEBUG_ASSERT(cpu_id < SMP_MAX_CPUS);
   return power_get_cpu_state(arch_cpu_num_to_hart_id(cpu_id));
@@ -541,9 +545,6 @@ zx_status_t platform_mp_cpu_unplug(cpu_num_t cpu_id) { return arch_mp_cpu_unplug
 
 zx_status_t platform_append_mexec_data(ktl::span<ktl::byte> data_zbi) { return ZX_OK; }
 
-ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num) { return irq_num; }
+void PlatformUartPrepareMmio(paddr_t paddr, size_t size) {}
 
-volatile void* PlatformUartMapMmio(paddr_t paddr, size_t size) {
-  physmap_preserve_gaps_for_mmio();
-  return reinterpret_cast<volatile void*>(paddr_to_physmap(paddr));
-}
+ktl::optional<uint32_t> PlatformUartGetIrqNumber(uint32_t irq_num) { return irq_num; }

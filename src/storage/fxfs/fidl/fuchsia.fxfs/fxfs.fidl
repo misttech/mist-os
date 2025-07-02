@@ -5,7 +5,11 @@
 library fuchsia.fxfs;
 
 using fuchsia.io;
+using fuchsia.hardware.block.volume;
+using fuchsia.mem;
 using zx;
+
+type EmptyStruct = struct {};
 
 /// Designates the purpose of a key.
 type KeyPurpose = flexible enum {
@@ -13,6 +17,49 @@ type KeyPurpose = flexible enum {
     METADATA = 1;
     /// The key will be used to encrypt data.
     DATA = 2;
+};
+
+type FxfsKey = struct {
+    wrapping_key_id array<uint8, 16>;
+    wrapped_key array<uint8, 48>;
+};
+
+type FscryptKeyIdentifierAndNonce = struct {
+    key_identifier array<uint8, 16>;
+    nonce array<uint8, 16>;
+};
+type FscryptKeyIdentifier = struct {
+    key_identifier array<uint8, 16>;
+};
+
+type WrappedKey = flexible union {
+    /// Fxfs's default crypto (AES256GCM-SIV wrapped key using AES256XTS encryption)
+    ///   In: 16-byte wrapping_key_id + 48-byte wrapped key.
+    ///   Out: 32-byte unwrapped key.
+    1: fxfs FxfsKey;
+
+    /// Zxcrypt (For use with FVM/Minfs only)
+    ///   In: 132-byte request blob.
+    ///   Out: 80-byte unwrapped key blob.
+    2: zxcrypt vector<uint8>:132;
+
+    /// Fscrypt INO_LBLK32 directory (For use with starnix only)
+    ///   In: 16-byte key_identifier + 16-byte UUID + 16-byte nonce.
+    ///   Out: 32-byte xts_key1, 32-byte xts_key2, 16-byte ino_hash, 16-byte dirhash.
+    3: fscrypt_ino_lblk32_dir FscryptKeyIdentifierAndNonce;
+
+    /// Fscrypt INO_LBLK32 file (For use with starnix only)
+    ///   In: 16-byte key_identifier + 16-byte UUID.
+    ///   Out: 32-byte xts_key1, 32-byte xts_key2, 16-byte ino_hash.
+    4: fscrypt_ino_lblk32_file FscryptKeyIdentifier;
+
+    /// Devicemapper DefaultKey (For use with starnix only)
+    ///   In: None. This is a singleton. wrapping_key_id should be set to 0.
+    ///   Out: 32-byte xts_key1, 32-byte xts_key2.
+    5: dm_default_key EmptyStruct;
+
+    /// fscrypt default per-file encryption.
+    6: fscrypt_per_file FscryptKeyIdentifierAndNonce;
 };
 
 @discoverable
@@ -41,16 +88,14 @@ closed protocol Crypt {
         unwrapped_key vector<uint8>:80;
     }) error zx.Status;
 
-    /// Unwraps a key that is wrapped by the key identified by `wrapping_key_id`.  `owner` must be
-    /// the same as that passed to `CreateKey`.  This can fail due to permission reasons, but an
-    /// incorrect key or owner will not fail; it will just return an unwrapped key that won't
-    /// actually decrpyt the data.
+    /// Unwraps a key.  `owner` must be the same as that passed to `CreateKey`.
+    /// This can fail due to permission reasons, but an incorrect key or owner will not fail;
+    /// it will just return an unwrapped key that won't actually decrpyt the data.
     strict UnwrapKey(struct {
-        wrapping_key_id array<uint8, 16>;
         owner uint64;
-        key vector<uint8>:132;
+        wrapped_key WrappedKey;
     }) -> (struct {
-        unwrapped_key vector<uint8>:80;
+        unwrapped_key vector<uint8>:128;
     }) error zx.Status;
 };
 
@@ -238,4 +283,50 @@ closed protocol Debug {
     /// Stops all profile recording and replay activity. Ongoing recordings are completed and
     /// persisted.
     strict StopProfileTasks() -> () error zx.Status;
+};
+
+/// A protocol to serve the Volume protocol on a file-backed device.
+@discoverable
+closed protocol FileBackedVolumeProvider {
+    /// Opens a file as a block device and starts serving block requests.
+    ///
+    /// `name` must refer to an existing file in the directory represented by
+    /// `parent_directory_token`.
+    ///
+    /// The block size of the device will match the underlying filesystem's block size.  If the
+    /// file's size is not a multiple of the block size, the apparent size of the device will be
+    /// rounded down.
+    ///
+    /// `parent_directory_token` is a token obtained via `fuchsia.io.Directory/GetToken`.  The
+    /// directory connection must have the `MODIFY_DIRECTORY` right.
+    ///
+    /// Errors will be sent as an epitaph on `server_end`.
+    strict Open(resource struct {
+        parent_directory_token zx.Handle;
+        name fuchsia.io.Name;
+        server_end server_end:fuchsia.hardware.block.volume.Volume;
+    });
+};
+
+/// Internal protocol used for streaming a new blob volume to disk.
+///
+/// This is intended primarily for use with paving/fastboot workflows which need to overwrite the
+/// system blob volume, while preserving other existing volumes (e.g. userdata).
+///
+/// *WARNING*: Still under development, may result in unrecoverable data loss. Use at your own risk!
+@discoverable
+closed protocol BlobVolumeWriter {
+    /// Writes the blob volume from `payload` into this partition. `payload` must be an fxfs
+    /// partition containing a single volume named "blob". `payload` may be truncated to exclude
+    /// unused blocks.
+    ///
+    /// *WARNING*: The system may not boot if this process is interrupted.
+    ///
+    // TODO(https://fxbug.dev/415300916): Figure out what format we should use in production.
+    // TODO(https://fxbug.dev/415300916): Split this method up into separate steps so we can report
+    // more detailed logs from fastboot (e.g. first wipe all existing blobs, then stream payload to
+    // disk, and finally post-process the blobs).
+    strict Write(resource struct {
+        payload fuchsia.mem.Buffer;
+    }) -> () error zx.Status;
 };

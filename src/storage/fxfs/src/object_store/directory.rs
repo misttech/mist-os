@@ -7,28 +7,25 @@ use crate::lsm_tree::merge::{Merger, MergerIterator};
 use crate::lsm_tree::types::{Item, ItemRef, LayerIterator};
 use crate::lsm_tree::Query;
 use crate::object_handle::{ObjectHandle, ObjectProperties, INVALID_OBJECT_ID};
-use crate::object_store::key_manager::ToCipherSet;
 use crate::object_store::object_record::{
-    ChildValue, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey, ObjectKeyData,
-    ObjectKind, ObjectValue, Timestamp,
+    ChildValue, EncryptionKey, ObjectAttributes, ObjectDescriptor, ObjectItem, ObjectKey,
+    ObjectKeyData, ObjectKind, ObjectValue, Timestamp,
 };
 use crate::object_store::transaction::{
     lock_keys, LockKey, LockKeys, Mutation, Options, Transaction,
 };
 use crate::object_store::{
-    DataObjectHandle, EncryptionKeys, HandleOptions, HandleOwner, ObjectStore,
-    SetExtendedAttributeMode, StoreObjectHandle,
+    DataObjectHandle, HandleOptions, HandleOwner, ObjectStore, SetExtendedAttributeMode,
+    StoreObjectHandle,
 };
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use fidl_fuchsia_io as fio;
 use fscrypt::proxy_filename::ProxyFilename;
 use fuchsia_sync::Mutex;
-use fxfs_crypto::{Cipher, CipherSet, Key, WrappedKeys};
+use fxfs_crypto::Cipher;
 use std::fmt;
-use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
-use zerocopy::IntoBytes;
 
 use super::FSCRYPT_KEY_ID;
 
@@ -69,47 +66,19 @@ impl MutableAttributesInternal {
     }
 }
 
-/// We need to be able to perform case-insensitive searches on encrypted file names for when
-/// both casefold and encryption are used together. To do this, we create a hash of the filename
-/// that is case insensitive (if using casefold) and prefix all EncryptedChild records with this
-/// hash. When a lookup is requested, we can calculate the same hash and use it to seek close
-/// to the record of interest in the index. We still have to do a brute-force search in the case
-/// that both features are used together, but the set of records is significantly smaller than
-/// it would be without this hash.
-///
-/// Even without casefold, the hash still provides some value in the case where we do not know
-/// the encryption key to decrypt filenames. In these cases, we embed the hash in the base64
-/// encoded proxy filenames we generate which we leverage to jump closer
-/// to records of interest in lookups and iterators.
-fn get_casefold_hash(key: Option<&Key>, name: &str, casefold: bool) -> u32 {
-    // Special case for empty string. This means start from beginning of the directory.
-    if name == "" {
-        return 0;
-    }
-    let mut hasher = rustc_hash::FxHasher::default();
-    if casefold {
-        for ch in fxfs_unicode::casefold(name.chars()) {
-            ch.hash(&mut hasher);
-        }
-    } else {
-        name.hash(&mut hasher);
-    }
-    let mut hash = hasher.finish() as u32;
-    if let Some(key) = key {
-        key.encrypt(0, hash.as_mut_bytes()).unwrap();
-    }
-    hash
-}
-
 /// Encrypts a unicode `name` into a sequence of bytes using the fscrypt key.
-fn encrypt_filename(key: &Key, object_id: u64, name: &str) -> Result<Vec<u8>, Error> {
+fn encrypt_filename(key: &Arc<dyn Cipher>, object_id: u64, name: &str) -> Result<Vec<u8>, Error> {
     let mut name_bytes = name.to_string().into_bytes();
     key.encrypt_filename(object_id, &mut name_bytes)?;
     Ok(name_bytes)
 }
 
 /// Decrypts a unicode `name` from a sequence of bytes using the fscrypt key.
-fn decrypt_filename(key: &Key, object_id: u64, data: &Vec<u8>) -> Result<String, Error> {
+fn decrypt_filename(
+    key: &Arc<dyn Cipher>,
+    object_id: u64,
+    data: &Vec<u8>,
+) -> Result<String, Error> {
     let mut raw = data.clone();
     key.decrypt_filename(object_id, &mut raw)?;
     Ok(String::from_utf8(raw)?)
@@ -156,7 +125,7 @@ impl<S: HandleOwner> Directory<S> {
     /// Retrieves keys from the key manager or unwraps the wrapped keys in the directory's key
     /// record.  Returns None if the key is currently unavailable due to the wrapping key being
     /// unavailable.
-    pub async fn get_fscrypt_key(&self) -> Result<Option<Key>, Error> {
+    pub async fn get_fscrypt_key(&self) -> Result<Option<Arc<dyn Cipher>>, Error> {
         let object_id = self.object_id();
         let store = self.store();
         store
@@ -262,19 +231,18 @@ impl<S: HandleOwner> Directory<S> {
                     store.store_object_id(),
                     Mutation::insert_object(
                         ObjectKey::keys(object_id),
-                        ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![(
-                            FSCRYPT_KEY_ID,
-                            key,
-                        )]))),
+                        ObjectValue::keys(vec![(FSCRYPT_KEY_ID, EncryptionKey::Fxfs(key))].into()),
                     ),
                 );
                 // Note that it's possible that this entry gets inserted into the key manager but
                 // this transaction doesn't get committed. This shouldn't be a problem because
                 // unused keys get purged on a standard timeout interval and this key shouldn't
                 // conflict with any other keys.
+                let cipher: Arc<dyn Cipher> =
+                    Arc::new(fxfs_crypto::FxfsCipher::new(&unwrapped_key));
                 store.key_manager.insert(
                     object_id,
-                    &vec![(FSCRYPT_KEY_ID, Some(unwrapped_key))],
+                    Arc::new(vec![(FSCRYPT_KEY_ID, Some(cipher))].into()),
                     false,
                 );
             } else {
@@ -288,7 +256,7 @@ impl<S: HandleOwner> Directory<S> {
         &self,
         transaction: &mut Transaction<'_>,
         id: u128,
-    ) -> Result<Cipher, Error> {
+    ) -> Result<Arc<dyn Cipher>, Error> {
         let object_id = self.object_id();
         let store = self.store();
         if let Some(crypt) = store.crypt() {
@@ -338,28 +306,25 @@ impl<S: HandleOwner> Directory<S> {
                         store.store_object_id(),
                         Mutation::insert_object(
                             ObjectKey::keys(object_id),
-                            ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![
-                                (FSCRYPT_KEY_ID, key),
-                            ]))),
+                            ObjectValue::keys(
+                                vec![(FSCRYPT_KEY_ID, EncryptionKey::Fxfs(key))].into(),
+                            ),
                         ),
                     );
                 }
-                Some(Item {
-                    value: ObjectValue::Keys(EncryptionKeys::AES256XTS(mut keys)),
-                    ..
-                }) => {
-                    keys.push((FSCRYPT_KEY_ID, key));
+                Some(Item { value: ObjectValue::Keys(mut keys), .. }) => {
+                    keys.insert(FSCRYPT_KEY_ID, EncryptionKey::Fxfs(key));
                     transaction.add(
                         store.store_object_id(),
                         Mutation::replace_or_insert_object(
                             ObjectKey::keys(object_id),
-                            ObjectValue::keys(EncryptionKeys::AES256XTS(keys)),
+                            ObjectValue::keys(keys),
                         ),
                     );
                 }
                 Some(item) => bail!("Unexpected item in lookup: {item:?}"),
             }
-            Ok(Cipher::new(FSCRYPT_KEY_ID, &unwrapped_key))
+            Ok(Arc::new(fxfs_crypto::FxfsCipher::new(&unwrapped_key)))
         } else {
             Err(anyhow!("No crypt"))
         }
@@ -518,8 +483,7 @@ impl<S: HandleOwner> Directory<S> {
         }
         let res = if self.wrapping_key_id.lock().is_some() {
             if let Some(fscrypt_key) = self.get_fscrypt_key().await? {
-                let target_casefold_hash =
-                    get_casefold_hash(Some(&fscrypt_key), name, self.casefold());
+                let target_casefold_hash = fscrypt_key.hash_code(name.as_bytes(), self.casefold());
                 if !self.casefold() {
                     let encrypted_name = encrypt_filename(&fscrypt_key, self.object_id(), name)?;
                     self.store()
@@ -646,14 +610,10 @@ impl<S: HandleOwner> Directory<S> {
         )
         .await?;
         if self.wrapping_key_id.lock().is_some() {
-            let key = if let Some(key) = self.get_fscrypt_key().await? {
-                key
-            } else {
-                bail!(FxfsError::NoKey);
-            };
-            let casefold_hash = get_casefold_hash(Some(&key), name, self.casefold());
+            let fscrypt_key = self.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
+            let casefold_hash = fscrypt_key.hash_code(name.as_bytes(), self.casefold());
             let encrypted_name =
-                encrypt_filename(&key, self.object_id(), name).expect("encrypt_filename");
+                encrypt_filename(&fscrypt_key, self.object_id(), name).expect("encrypt_filename");
             transaction.add(
                 self.store().store_object_id(),
                 Mutation::replace_or_insert_object(
@@ -694,14 +654,10 @@ impl<S: HandleOwner> Directory<S> {
     ) -> Result<(), Error> {
         ensure!(!self.is_deleted(), FxfsError::Deleted);
         if self.wrapping_key_id.lock().is_some() {
-            let key = if let Some(key) = self.get_fscrypt_key().await? {
-                key
-            } else {
-                bail!(FxfsError::NoKey);
-            };
-            let casefold_hash = get_casefold_hash(Some(&key), name, self.casefold());
+            let fscrypt_key = self.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
+            let casefold_hash = fscrypt_key.hash_code(name.as_bytes(), self.casefold());
             let encrypted_name =
-                encrypt_filename(&key, self.object_id(), name).expect("encrypt_filename");
+                encrypt_filename(&fscrypt_key, self.object_id(), name).expect("encrypt_filename");
             transaction.add(
                 self.store().store_object_id(),
                 Mutation::replace_or_insert_object(
@@ -872,25 +828,25 @@ impl<S: HandleOwner> Directory<S> {
 
         if let Some(wrapping_key_id) = wrapping_key_id {
             if let Some(crypt) = self.store().crypt() {
-                let (wrapped_key, unwrapped_key) =
+                let (fxfs_key, unwrapped_key) =
                     crypt.create_key_with_id(symlink_id, wrapping_key_id).await?;
 
                 // Note that it's possible that this entry gets inserted into the key manager but
                 // this transaction doesn't get committed. This shouldn't be a problem because
                 // unused keys get purged on a standard timeout interval and this key shouldn't
                 // conflict with any other keys.
-                let unwrapped_keys = vec![(FSCRYPT_KEY_ID, Some(unwrapped_key))];
-                self.store().key_manager.insert(symlink_id, &unwrapped_keys, false);
-                let symlink_key = Key::new(unwrapped_keys.to_cipher_set(), 0);
+                let cipher: Arc<dyn Cipher> =
+                    Arc::new(fxfs_crypto::FxfsCipher::new(&unwrapped_key));
+                self.store().key_manager.insert(
+                    symlink_id,
+                    Arc::new(vec![(FSCRYPT_KEY_ID, Some(cipher.clone()))].into()),
+                    false,
+                );
 
-                let dir_key = if let Some(key) = self.get_fscrypt_key().await? {
-                    key
-                } else {
-                    bail!(FxfsError::NoKey);
-                };
-                let casefold_hash = get_casefold_hash(Some(&dir_key), name, self.casefold());
+                let dir_key = self.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
+                let casefold_hash = dir_key.hash_code(name.as_bytes(), self.casefold());
                 let encrypted_name = encrypt_filename(&dir_key, self.object_id(), name)?;
-                symlink_key.encrypt_filename(symlink_id, &mut link)?;
+                cipher.encrypt_filename(symlink_id, &mut link)?;
 
                 transaction.add(
                     self.store().store_object_id(),
@@ -903,10 +859,9 @@ impl<S: HandleOwner> Directory<S> {
                     self.store().store_object_id(),
                     Mutation::insert_object(
                         ObjectKey::keys(symlink_id),
-                        ObjectValue::keys(EncryptionKeys::AES256XTS(WrappedKeys::from(vec![(
-                            FSCRYPT_KEY_ID,
-                            wrapped_key,
-                        )]))),
+                        ObjectValue::keys(
+                            vec![(FSCRYPT_KEY_ID, EncryptionKey::Fxfs(fxfs_key))].into(),
+                        ),
                     ),
                 );
                 transaction.add(
@@ -1013,7 +968,7 @@ impl<S: HandleOwner> Directory<S> {
         let sub_dirs_delta = if descriptor == ObjectDescriptor::Directory { 1 } else { 0 };
         if self.wrapping_key_id.lock().is_some() {
             let key = self.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
-            let casefold_hash = get_casefold_hash(Some(&key), name, self.casefold());
+            let casefold_hash = key.hash_code(name.as_bytes(), self.casefold());
             let encrypted_name = encrypt_filename(&key, self.object_id(), name)?;
             transaction.add(
                 self.store().store_object_id(),
@@ -1089,12 +1044,15 @@ impl<S: HandleOwner> Directory<S> {
         }
         transaction
             .commit_with_callback(|_| {
-                if let Some((key_id, unwrapped_key)) = wrapping_key {
-                    *self.wrapping_key_id.lock() = Some(key_id);
-                    self.store().key_manager.merge(self.object_id(), |existing| {
-                        let mut new = existing.map_or(Vec::new(), |e| e.ciphers().to_vec());
-                        new.push(unwrapped_key);
-                        Arc::new(CipherSet::from(new))
+                if let Some((wrapping_key_id, cipher)) = wrapping_key {
+                    *self.wrapping_key_id.lock() = Some(wrapping_key_id);
+                    self.store().key_manager.merge(self.object_id(), |existing| match existing {
+                        Some(existing) => {
+                            let mut cipher_set = (**existing).clone();
+                            cipher_set.add_key(FSCRYPT_KEY_ID, Some(cipher));
+                            Arc::new(cipher_set)
+                        }
+                        None => Arc::new(vec![(FSCRYPT_KEY_ID, Some(cipher))].into()),
                     });
                 }
             })
@@ -1253,7 +1211,7 @@ impl<S: HandleOwner> Directory<S> {
         let (query_key, requested_filename) = if self.wrapping_key_id.lock().is_some() {
             if let Some(key) = self.get_fscrypt_key().await? {
                 // Unlocked EncryptedChild case.
-                let casefold_hash = get_casefold_hash(Some(&key), from, self.casefold());
+                let casefold_hash = key.hash_code(from.as_bytes(), self.casefold());
                 let encrypted_name = encrypt_filename(&key, self.object_id(), from)?;
                 (ObjectKey::encrypted_child(self.object_id(), encrypted_name, casefold_hash), None)
             } else {
@@ -1351,7 +1309,7 @@ impl<S: HandleOwner> fmt::Debug for Directory<S> {
 pub struct DirectoryIterator<'a, 'b> {
     object_id: u64,
     iter: MergerIterator<'a, 'b, ObjectKey, ObjectValue>,
-    key: Option<Key>,
+    key: Option<Arc<dyn Cipher>>,
     // Holds decrypted or proxy filenames so we can return a reference from get().
     filename: Option<String>,
 }
@@ -1463,13 +1421,8 @@ pub async fn replace_child<'a, S: HandleOwner>(
                 ensure!(src_id == dst_id, FxfsError::NotSupported);
                 // Renames only work on unlocked encrypted directories. Fail rename if src is
                 // locked.
-                let key = if let Some(key) = src_dir.get_fscrypt_key().await? {
-                    key
-                } else {
-                    bail!(FxfsError::NoKey);
-                };
-
-                let src_casefold_hash = get_casefold_hash(Some(&key), src_name, src_dir.casefold());
+                let key = src_dir.get_fscrypt_key().await?.ok_or(FxfsError::NoKey)?;
+                let src_casefold_hash = key.hash_code(src_name.as_bytes(), src_dir.casefold());
                 let encrypted_src_name = encrypt_filename(&key, src_dir.object_id(), src_name)?;
                 transaction.add(
                     store_id,
@@ -1577,7 +1530,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
     };
     if dst.0.wrapping_key_id().is_some() {
         if let Some(key) = dst.0.get_fscrypt_key().await? {
-            let dst_casefold_hash = get_casefold_hash(Some(&key), dst.1, dst.0.casefold());
+            let dst_casefold_hash = key.hash_code(dst.1.as_bytes(), dst.0.casefold());
             let encrypted_dst_name = encrypt_filename(&key, dst.0.object_id(), dst.1)?;
             transaction.add(
                 store_id,
@@ -1649,7 +1602,7 @@ pub async fn replace_child_with_object<'a, S: HandleOwner>(
 
 #[cfg(test)]
 mod tests {
-    use super::{encrypt_filename, get_casefold_hash, replace_child_with_object, ProxyFilename};
+    use super::{encrypt_filename, replace_child_with_object, ProxyFilename};
     use crate::errors::FxfsError;
     use crate::filesystem::{FxFilesystem, JournalingObject, SyncOptions};
     use crate::object_handle::{ObjectHandle, ReadObjectHandle, WriteObjectHandle};
@@ -1665,7 +1618,7 @@ mod tests {
     };
     use assert_matches::assert_matches;
     use fidl_fuchsia_io as fio;
-    use fxfs_crypto::Crypt;
+    use fxfs_crypto::{Cipher, Crypt};
     use fxfs_insecure_crypto::InsecureCrypt;
     use std::collections::HashSet;
     use std::future::poll_fn;
@@ -1811,7 +1764,7 @@ mod tests {
             .await
             .expect_err("wrapping key id 2 has not been added");
         transaction.commit().await.expect("commit failed");
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         let mut transaction = fs
             .clone()
             .new_transaction(
@@ -1902,7 +1855,7 @@ mod tests {
             .await
             .expect("create_child_dir failed");
         transaction.commit().await.expect("commit failed");
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         let transaction = fs
             .clone()
             .new_transaction(
@@ -1976,7 +1929,7 @@ mod tests {
                 .await
                 .expect("create_child_dir failed");
             transaction.commit().await.expect("commit failed");
-            crypt.add_wrapping_key(2, [1; 32]);
+            crypt.add_wrapping_key(2, [1; 32].into());
             let transaction = fs
                 .clone()
                 .new_transaction(
@@ -3818,7 +3771,7 @@ mod tests {
 
             // Create a (very weak) key for our encrypted directory.
             let wrapping_key_id = 2;
-            crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+            crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
 
             object_id = {
                 let mut transaction = fs
@@ -3864,7 +3817,7 @@ mod tests {
             // Derive the proxy filename now, for use later when operating on the locked volume
             // as we won't have the key then.
             let key = dir.get_fscrypt_key().await.expect("key").unwrap();
-            let casefold_hash = get_casefold_hash(Some(&key), "bAr", true);
+            let casefold_hash = key.hash_code(b"bAr", true);
             let encrypted_name =
                 encrypt_filename(&key, dir.object_id(), "bAr").expect("encrypt_filename");
             proxy_filename = ProxyFilename::new(casefold_hash as u64, &encrypted_name);
@@ -3873,10 +3826,7 @@ mod tests {
             assert!(dir.lookup("BAR").await.expect("casefold lookup failed").is_some());
 
             // Check hash values generated are stable across case.
-            assert_eq!(
-                get_casefold_hash(Some(&key), "bar", true),
-                get_casefold_hash(Some(&key), "BaR", true)
-            );
+            assert_eq!(key.hash_code(b"bar", true), key.hash_code(b"BaR", true));
 
             // We can't easily check iteration from here as we only get encrypted entries so
             // we just count instead.
@@ -3946,13 +3896,13 @@ mod tests {
     #[allow(dead_code)]
     fn find_out_of_order_sha256_long_prefix_pair(
         object_id: u64,
-        key: &fxfs_crypto::Key,
+        key: &Arc<dyn Cipher>,
     ) -> Option<[String; 2]> {
         let mut collision_map: std::collections::HashMap<u32, (usize, ProxyFilename, Vec<u8>)> =
             std::collections::HashMap::new();
         for i in 0..(1usize << 32) {
             let filename = format!("{:0>160}_{i}", 0);
-            let casefold_hash = get_casefold_hash(Some(&key), &filename, true);
+            let casefold_hash = key.hash_code(filename.as_bytes(), true);
             let encrypted_name =
                 encrypt_filename(&key, object_id, &filename).expect("encrypt_filename");
             let a = ProxyFilename::new(casefold_hash as u64, &encrypted_name);
@@ -3982,7 +3932,7 @@ mod tests {
 
             // Create a (very weak) key for our encrypted directory.
             let wrapping_key_id = 2;
-            crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+            crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
 
             object_id = {
                 let mut transaction = fs
@@ -4036,7 +3986,7 @@ mod tests {
                 .map(|i| format!("{:0>160}_{i}", 0))
                 .chain(collision_pair.into_iter())
             {
-                let casefold_hash = get_casefold_hash(Some(&key), &filename, true);
+                let casefold_hash = key.hash_code(filename.as_bytes(), true);
                 let encrypted_name =
                     encrypt_filename(&key, dir.object_id(), &filename).expect("encrypt_filename");
                 let proxy_filename = ProxyFilename::new(casefold_hash as u64, &encrypted_name);

@@ -213,28 +213,3 @@ class MetricsProcessor:
             line_no=py_inspect.getsourcelines(cls)[1],
             metrics=[tcr.describe() for tcr in metrics],
         )
-
-
-class ConstantMetricsProcessor(MetricsProcessor):
-    """A metrics processor that returns constant results.
-
-    Enables publishing of metrics gathered via means other than trace processing.
-    """
-
-    def __init__(
-        self,
-        metrics: Sequence[TestCaseResult] = (),
-        freeform_metrics: tuple[str, JSON] = ("", None),
-    ):
-        self.metrics = metrics
-        self.freeform_metrics = freeform_metrics
-
-    def process_metrics(
-        self, model: trace_model.Model
-    ) -> Sequence[TestCaseResult]:
-        return self.metrics
-
-    def process_freeform_metrics(
-        self, model: trace_model.Model
-    ) -> tuple[str, JSON]:
-        return self.freeform_metrics

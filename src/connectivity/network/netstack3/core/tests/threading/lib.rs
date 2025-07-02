@@ -112,7 +112,7 @@ impl TestIpExt for Ipv4 {
             Self::NEIGHBOR_ADDR,
         )
         .into_serializer()
-        .encapsulate(EthernetFrameBuilder::new(DEVICE_MAC, Mac::BROADCAST, EtherType::Arp, 0))
+        .wrap_in(EthernetFrameBuilder::new(DEVICE_MAC, Mac::BROADCAST, EtherType::Arp, 0))
         .serialize_vec_outer()
         .unwrap()
         .unwrap_b()
@@ -127,7 +127,7 @@ impl TestIpExt for Ipv4 {
             Self::DEVICE_ADDR,
         )
         .into_serializer()
-        .encapsulate(EthernetFrameBuilder::new(
+        .wrap_in(EthernetFrameBuilder::new(
             NEIGHBOR_MAC,
             DEVICE_MAC,
             EtherType::Arp,
@@ -153,7 +153,7 @@ impl TestIpExt for Ipv6 {
             Self::NEIGHBOR_ADDR,
             DEVICE_MAC,
         )
-        .encapsulate(EthernetFrameBuilder::new(
+        .wrap_in(EthernetFrameBuilder::new(
             DEVICE_MAC,
             Mac::from(&snmc),
             EtherType::Ipv6,
@@ -173,7 +173,7 @@ impl TestIpExt for Ipv6 {
             false, /* override_flag */
             NEIGHBOR_MAC,
         )
-        .encapsulate(EthernetFrameBuilder::new(
+        .wrap_in(EthernetFrameBuilder::new(
             NEIGHBOR_MAC,
             DEVICE_MAC,
             EtherType::Ipv6,

@@ -5,8 +5,6 @@
 #include "coverage-example.h"
 
 #include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
 
 // This file defines functions that will be instrumented in a test run.
 //
@@ -21,7 +19,7 @@ void Unique(const char* msg) { __asm__ volatile("" : : "r"(msg)); }
 // This just avoids constant-folding so there is a real runtime test executed.
 bool RunTimeBool(bool flag) {
   uint32_t x = flag;
-  __asm__ volatile("" : "=r"(x) : "r"(x));
+  __asm__ volatile("" : "=r"(x) : "0"(x));
   return x;
 }
 

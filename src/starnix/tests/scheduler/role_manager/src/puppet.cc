@@ -36,7 +36,7 @@ void wait_for_expected_control_message(const std::string& expected) {
   std::cout << "waiting for `" << expected << "` control message...\n";
   wait_for_control_message([expected](const std::string& msg) {
     if (msg != expected) {
-      std::cout << "expected `" << expected << "` control message, got `" << msg << "`\n";
+      std::cerr << "expected `" << expected << "` control message, got `" << msg << "`\n";
       abort();
     }
   });
@@ -46,14 +46,14 @@ void set_priority_or_panic(int new_nice) {
   wait_for_control_message([new_nice](const std::string& msg) {
     int requested = std::atoi(msg.c_str());
     if (requested != new_nice) {
-      std::cout << "test controller requested an unexpected nice. code says " << new_nice
+      std::cerr << "test controller requested an unexpected nice. code says " << new_nice
                 << ", socket says `" << requested << "`\n";
       abort();
     }
   });
 
   if (setpriority(PRIO_PROCESS, 0, new_nice)) {
-    std::cout << "failed to update nice: " << std::strerror(errno) << "\n";
+    std::cerr << "failed to update nice: " << std::strerror(errno) << "\n";
     abort();
   }
   std::cout << "set nice to " << new_nice << "\n";
@@ -100,7 +100,7 @@ int main(int argc, const char** argv) {
 
   sched_param fifo_params = {.sched_priority = 1};
   if (sched_setscheduler(0, SCHED_FIFO, &fifo_params)) {
-    std::cout << "failed to set scheduler: " << std::strerror(errno) << "\n";
+    std::cerr << "failed to set scheduler: " << std::strerror(errno) << "\n";
     abort();
   }
 
@@ -109,16 +109,16 @@ int main(int argc, const char** argv) {
 
   fifo_params.sched_priority = 2;
   if (sched_setscheduler(0, SCHED_FIFO, &fifo_params)) {
-    std::cout << "failed to set scheduler after rename: " << std::strerror(errno) << "\n";
+    std::cerr << "failed to set scheduler after rename: " << std::strerror(errno) << "\n";
     abort();
   }
 
   new_name = "renamed_again";
   prctl(PR_SET_NAME, new_name);
 
-  fifo_params.sched_priority = 2;
+  fifo_params.sched_priority = 3;
   if (sched_setscheduler(0, SCHED_FIFO, &fifo_params)) {
-    std::cout << "failed to set scheduler after rename: " << std::strerror(errno) << "\n";
+    std::cerr << "failed to set scheduler after rename: " << std::strerror(errno) << "\n";
     abort();
   }
 

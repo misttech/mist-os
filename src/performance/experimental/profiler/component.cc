@@ -224,7 +224,8 @@ zx::result<profiler::Moniker> profiler::Moniker::Parse(std::string_view moniker)
 }
 
 zx::result<std::unique_ptr<profiler::ControlledComponent>> profiler::ControlledComponent::Create(
-    async_dispatcher_t* dispatcher, const std::string& url, const std::string& moniker_string) {
+    const std::string& url, const std::string& moniker_string,
+    ComponentWatcher& component_watcher) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__, "moniker", moniker_string, "url", url);
   zx::result moniker = profiler::Moniker::Parse(moniker_string);
   if (moniker.is_error()) {
@@ -235,7 +236,8 @@ zx::result<std::unique_ptr<profiler::ControlledComponent>> profiler::ControlledC
                    << "'. Moniker is missing a collection";
     return zx::error(ZX_ERR_BAD_PATH);
   }
-  std::unique_ptr component = std::make_unique<ControlledComponent>(dispatcher, url, *moniker);
+  std::unique_ptr component =
+      std::make_unique<ControlledComponent>(url, *moniker, component_watcher);
   auto client_end = component::Connect<fuchsia_sys2::LifecycleController>(
       "/svc/fuchsia.sys2.LifecycleController.root");
   if (client_end.is_error()) {
@@ -285,9 +287,6 @@ zx::result<> profiler::ControlledComponent::Start(fxl::WeakPtr<Sampler> notify) 
     return watch_result;
   }
 
-  if (zx::result res = component_watcher_.Watch(); res.is_error()) {
-    return res;
-  }
   auto [binder_client, binder_server] = fidl::Endpoints<fuchsia_component::Binder>::Create();
   fidl::Result<fuchsia_sys2::LifecycleController::StartInstance> start_res =
       lifecycle_controller_client_->StartInstance({{
@@ -304,9 +303,6 @@ zx::result<> profiler::ControlledComponent::Start(fxl::WeakPtr<Sampler> notify) 
 
 zx::result<> profiler::ControlledComponent::Stop() {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__, "moniker", moniker_.ToString());
-  if (zx::result res = component_watcher_.Reset(); res.is_error()) {
-    return res;
-  }
   if (auto stop_res = lifecycle_controller_client_->StopInstance({{
           .moniker = moniker_.ToString(),
       }});

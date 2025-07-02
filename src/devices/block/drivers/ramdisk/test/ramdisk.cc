@@ -198,107 +198,6 @@ zx::result<std::unique_ptr<block_client::Client>> CreateSession(
       std::make_unique<block_client::Client>(std::move(session), std::move(fifo_response->fifo)));
 }
 
-TEST_P(RamdiskTests, RamdiskStatsTest) {
-  // TODO(https://fxbug.dev/348077960): Support stats on v2 driver
-  if (GetParam())
-    GTEST_SKIP() << "Stats not yet supported on v2 driver";
-
-  constexpr uint32_t kBlockSize = 512;
-  constexpr size_t kBlockCount = 512;
-  // Set up the initial handshake connection with the ramdisk
-  std::unique_ptr<RamdiskTest> ramdisk;
-  ASSERT_NO_FATAL_FAILURE(RamdiskTest::Create(GetParam(), kBlockSize, kBlockCount, &ramdisk));
-
-  fidl::UnownedClientEnd block_interface = ramdisk->block_interface();
-
-  zx::result client_ptr = CreateSession(block_interface);
-  ASSERT_TRUE(client_ptr.is_ok()) << client_ptr.status_string();
-  block_client::Client& client = *client_ptr.value();
-
-  groupid_t group = 0;
-
-  // Create an arbitrary VMO, fill it with some stuff
-  uint64_t vmo_size = zx_system_get_page_size() * 3;
-  zx::vmo vmo;
-  ASSERT_EQ(zx::vmo::create(vmo_size, 0, &vmo), ZX_OK) << "Failed to create VMO";
-  std::unique_ptr<uint8_t[]> buf(new uint8_t[vmo_size]);
-  fill_random(buf.get(), vmo_size);
-
-  ASSERT_EQ(vmo.write(buf.get(), 0, vmo_size), ZX_OK);
-
-  // Send a handle to the vmo to the block device, get a vmoid which identifies it
-  zx::result vmoid_result = client.RegisterVmo(vmo);
-  ASSERT_TRUE(vmoid_result.is_ok()) << vmoid_result.status_string();
-  vmoid_t vmoid = vmoid_result.value().TakeId();
-
-  const fidl::WireResult clear_stats_result = fidl::WireCall(block_interface)->GetStats(true);
-  ASSERT_TRUE(clear_stats_result.ok()) << clear_stats_result.FormatDescription();
-  const fit::result clear_stats_response = clear_stats_result.value();
-  ASSERT_TRUE(clear_stats_response.is_ok())
-      << zx_status_get_string(clear_stats_response.error_value());
-
-  // Batch write the VMO to the ramdisk
-  // Split it into two requests, spread across the disk
-  block_fifo_request_t requests[] = {
-      {
-          .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
-          .group = group,
-          .vmoid = vmoid,
-          .length = 1,
-          .vmo_offset = 0,
-          .dev_offset = 0,
-      },
-      {
-          .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
-          .group = group,
-          .vmoid = vmoid,
-          .length = 1,
-          .vmo_offset = 1,
-          .dev_offset = 100,
-      },
-      {
-          .command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0},
-          .group = group,
-          .vmoid = vmoid,
-          .length = 0,
-          .vmo_offset = 0,
-          .dev_offset = 0,
-      },
-      {
-          .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
-          .group = group,
-          .vmoid = vmoid,
-          .length = 1,
-          .vmo_offset = 0,
-          .dev_offset = 0,
-      },
-  };
-
-  ASSERT_EQ(client.Transaction(requests, std::size(requests)), ZX_OK);
-
-  const fidl::WireResult stats_result = fidl::WireCall(block_interface)->GetStats(true);
-  ASSERT_TRUE(stats_result.ok()) << stats_result.FormatDescription();
-  const fit::result stats_response = stats_result.value();
-  ASSERT_TRUE(stats_response.is_ok()) << zx_status_get_string(stats_response.error_value());
-
-  const fuchsia_hardware_block::wire::BlockStats& stats = stats_response.value()->stats;
-  ASSERT_EQ(stats.write.success.total_calls, 2ul);
-  ASSERT_EQ(stats.write.success.bytes_transferred, 2 * kBlockSize);
-  ASSERT_GE(stats.read.success.total_calls, 1ul);
-  ASSERT_GE(stats.read.success.bytes_transferred, 1 * kBlockSize);
-  ASSERT_EQ(stats.flush.success.total_calls, 1ul);
-  ASSERT_EQ(stats.flush.success.bytes_transferred, 0ul);
-
-  ASSERT_EQ(stats.read.failure.total_calls, 0ul);
-  ASSERT_EQ(stats.read.failure.bytes_transferred, 0ul);
-  ASSERT_EQ(stats.write.failure.total_calls, 0ul);
-  ASSERT_EQ(stats.write.failure.bytes_transferred, 0ul);
-
-  // Close the current vmo
-  requests[0].command = {.opcode = BLOCK_OPCODE_CLOSE_VMO, .flags = 0};
-  ASSERT_EQ(client.Transaction(requests, 1), ZX_OK);
-}
-
 TEST_P(RamdiskTests, RamdiskTestGuid) {
   std::unique_ptr<RamdiskTest> ramdisk;
   ASSERT_NO_FATAL_FAILURE(RamdiskTest::CreateWithGuid(GetParam(), zx_system_get_page_size() / 2,
@@ -1723,6 +1622,72 @@ TEST_P(RamdiskTestWithClient, DiscardRandomOnWake) {
     // them.
     found |= 1 << different;
   } while (found != 0xf);
+}
+
+TEST_P(RamdiskTestWithClient, DiscardRandomOnWakeWithBarriers) {
+  if (GetParam()) {
+    ASSERT_EQ(ramdisk_set_flags(
+                  ramdisk_->ramdisk_client(),
+                  static_cast<uint32_t>(
+                      fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardNotFlushedOnWake |
+                      fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardRandom)),
+              ZX_OK);
+
+    // Loop 100 times to try and catch an error.
+    for (size_t i = 0; i < 100; ++i) {
+      ASSERT_EQ(ramdisk_sleep_after(ramdisk_->ramdisk_client(), 100), ZX_OK);
+      fill_random(buf_.get(), vmo_size_);
+      ASSERT_EQ(vmo_.write(buf_.get(), 0, vmo_size_), ZX_OK);
+
+      block_fifo_request_t requests[4];
+      for (size_t i = 0; i < std::size(requests); ++i) {
+        if (i == 2) {
+          // Insert a barrier midway through
+          requests[i].group = 0;
+          requests[i].vmoid = vmoid_.id;
+          requests[i].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = BLOCK_IO_FLAG_PRE_BARRIER};
+          requests[i].length = 1;
+          requests[i].vmo_offset = i;
+          requests[i].dev_offset = i;
+        } else {
+          requests[i].group = 0;
+          requests[i].vmoid = vmoid_.id;
+          requests[i].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
+          requests[i].length = 1;
+          requests[i].vmo_offset = i;
+          requests[i].dev_offset = i;
+        }
+      }
+      ASSERT_EQ(client_->Transaction(requests, std::size(requests)), ZX_OK);
+
+      // Wake the device and it should randomly discard blocks.
+      ASSERT_EQ(ramdisk_wake(ramdisk_->ramdisk_client()), ZX_OK);
+
+      memset(mapping_.start(), 0, vmo_size_);
+
+      // Read back all the blocks.
+      for (size_t i = 0; i < std::size(requests); ++i) {
+        requests[i].command = {.opcode = BLOCK_OPCODE_READ, .flags = 0};
+      }
+      ASSERT_EQ(client_->Transaction(requests, std::size(requests)), ZX_OK);
+
+      // Verify that if either of the first two blocks was discarded, all the blocks following the
+      // barrier were also discarded
+      bool discard = false;
+      for (size_t i = 0; i < std::size(requests); ++i) {
+        if (i < 2) {
+          if (memcmp(static_cast<uint8_t*>(mapping_.start()) + zx_system_get_page_size() * i,
+                     &buf_[zx_system_get_page_size() * i], zx_system_get_page_size()) != 0) {
+            discard = true;
+          }
+        } else if (discard == true) {
+          EXPECT_NE(memcmp(static_cast<uint8_t*>(mapping_.start()) + zx_system_get_page_size() * i,
+                           &buf_[zx_system_get_page_size() * i], zx_system_get_page_size()),
+                    0);
+        }
+      }
+    }
+  }
 }
 
 INSTANTIATE_TEST_SUITE_P(/* no prefix */, RamdiskTestWithClient, testing::Values(false, true));

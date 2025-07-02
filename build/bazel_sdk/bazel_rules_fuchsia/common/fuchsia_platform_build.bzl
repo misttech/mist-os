@@ -54,7 +54,7 @@ def _get_ninja_output_dir(repo_ctx):
     # in it.
     config_path = _get_fuchsia_source_relative_path(
         repo_ctx,
-        "build/bazel/config/main_workspace_top_dir",
+        "build/bazel/config/bazel_top_dir",
     )
     top_dir = repo_ctx.read(config_path).strip()
     num_fragments = len(top_dir.split("/"))
@@ -257,6 +257,36 @@ platform(
         exec_properties_str = _get_formatted_starlark_dict(exec_properties, "    "),
     )
     repo_ctx.file("BUILD.bazel", build_bazel_content)
+
+    # Create symlinks used to locate host prebuilts without an explicit
+    # fuchsia_host_tag in their path, making the top-level MODULE.bazel easier
+    # to write.
+    prebuilt_host_subdirs = ["go", "rust", "llvm", "python3"]
+    prebuilt_host_tools = ["ninja", "gn", "buildifier"]
+
+    # In case users set a custom clang prefix in GN, respect that config.
+    # LINT.IfChange
+    gn_args = json.decode(
+        repo_ctx.read("{}/fuchsia_build_generated/args.json".format(repo_ctx.workspace_root)),
+    )
+
+    # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
+    if "clang_prefix" in gn_args:
+        clang_prefix = gn_args["clang_prefix"]
+
+        # GN clang_prefix can be GN labels, which are relative to workspace root.
+        if clang_prefix.startswith("//"):
+            clang_prefix = "{}/{}".format(repo_ctx.workspace_root, clang_prefix[2:])
+
+        # GN clang_prefix points to the `bin` directory under clang dir.
+        repo_ctx.symlink(repo_ctx.path(clang_prefix).dirname, "host_prebuilts/clang")
+    else:
+        prebuilt_host_subdirs.append("clang")
+
+    for subdir in prebuilt_host_subdirs:
+        repo_ctx.symlink("{}/prebuilt/third_party/{}/{}".format(repo_ctx.workspace_root, subdir, host_tag), "host_prebuilts/{}".format(subdir))
+    for tool in prebuilt_host_tools:
+        repo_ctx.symlink("{}/prebuilt/third_party/{}/{}/{}".format(repo_ctx.workspace_root, tool, host_tag, tool), "host_prebuilts/{}".format(tool))
 
 fuchsia_build_config_repository = repository_rule(
     implementation = _fuchsia_build_config_repository_impl,

@@ -26,7 +26,7 @@ use net_types::ip::Ipv4Addr;
 use net_types::SpecifiedAddr;
 use zx::HandleBased;
 
-use crate::{dns, errors, InterfaceId};
+use crate::{dns, errors, network, InterfaceId};
 
 #[derive(Debug)]
 pub(super) struct ClientState {
@@ -59,6 +59,7 @@ pub(super) async fn update_configuration(
     configuration: fnet_dhcp_ext::Configuration,
     dns_servers: &mut DnsServers,
     dns_server_watch_responders: &mut dns::DnsServerWatchResponders,
+    netpol_networks_service: &mut network::NetpolNetworksService,
     control: &fnet_interfaces_ext::admin::Control,
     lookup_admin: &fnet_name::LookupAdminProxy,
 ) {
@@ -90,6 +91,7 @@ pub(super) async fn update_configuration(
         lookup_admin,
         dns_servers,
         dns_server_watch_responders,
+        netpol_networks_service,
         DnsServersUpdateSource::Dhcpv4 { interface_id: interface_id.get() },
         new_dns_servers
             .iter()
@@ -193,6 +195,7 @@ pub(super) async fn stop_client(
     configuration_streams: &mut ConfigurationStreamMap,
     dns_servers: &mut DnsServers,
     dns_server_watch_responders: &mut dns::DnsServerWatchResponders,
+    netpol_networks_service: &mut network::NetpolNetworksService,
     control: &fnet_interfaces_ext::admin::Control,
     lookup_admin: &fnet_name::LookupAdminProxy,
     already_observed_exit: AlreadyObservedClientExit,
@@ -205,6 +208,7 @@ pub(super) async fn stop_client(
         fnet_dhcp_ext::Configuration::default(),
         dns_servers,
         dns_server_watch_responders,
+        netpol_networks_service,
         control,
         lookup_admin,
     )

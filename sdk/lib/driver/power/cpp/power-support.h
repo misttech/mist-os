@@ -240,7 +240,8 @@ class LeaseDependency {
 /// In effect, this function converts the provided |power_configs| into their
 /// corresponding `ElementDesc` objects and returns them.
 fit::result<Error, std::vector<ElementDesc>> ApplyPowerConfiguration(
-    const fdf::Namespace& ns, cpp20::span<PowerElementConfiguration> power_configs);
+    const fdf::Namespace& ns, cpp20::span<PowerElementConfiguration> power_configs,
+    bool use_element_runner = false);
 
 /// Create a lease based on the set of dependencies represented by
 /// |dependencies|. When the lease is fulfilled those dependencies will be at
@@ -354,7 +355,8 @@ fit::result<Error> AddElement(
     std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor,
     std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control,
     std::optional<fidl::UnownedClientEnd<fuchsia_power_broker::ElementControl>>
-        element_control_client);
+        element_control_client,
+    std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementRunner>> element_runner);
 
 /// Call `AddElement` on the `power_broker` channel passed in.
 /// This function uses `ElementDescription` passed in to make the proper call

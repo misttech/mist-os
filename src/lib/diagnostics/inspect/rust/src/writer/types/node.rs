@@ -660,7 +660,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_adoption() {
+    async fn test_adoption() {
         let insp = Inspector::default();
         let root = insp.root();
         let a = root.create_child("a");
@@ -795,7 +795,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn record() {
+    async fn record() {
         let inspector = Inspector::default();
         let property = inspector.root().create_uint("a", 1);
         inspector.root().record_uint("b", 2);
@@ -822,7 +822,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn clear_recorded() {
+    async fn clear_recorded() {
         let inspector = Inspector::default();
         let one = inspector.root().create_child("one");
         let two = inspector.root().create_child("two");
@@ -859,7 +859,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn record_child() {
+    async fn record_child() {
         let inspector = Inspector::default();
         inspector.root().record_child("test", |node| {
             node.record_int("a", 1);
@@ -872,7 +872,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn record_weak() {
+    async fn record_weak() {
         let inspector = Inspector::default();
         let main = inspector.root().create_child("main");
         let main_weak = main.clone_weak();
@@ -908,7 +908,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn string_arrays_on_record() {
+    async fn string_arrays_on_record() {
         let inspector = Inspector::default();
         inspector.root().record_child("child", |node| {
             node.record_int("my_int", 1i64);
@@ -926,7 +926,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn we_can_delete_a_node_explicitly_with_the_weak_clone() {
+    async fn we_can_delete_a_node_explicitly_with_the_weak_clone() {
         let insp = Inspector::default();
         let a = insp.root().create_child("a");
         let _property = a.create_int("foo", 1);
@@ -954,7 +954,7 @@ mod fuchsia_tests {
     use zx::{self as zx, AsHandleRef, Peered};
 
     #[fuchsia::test]
-    async fn atomic_update_reader() {
+    fn atomic_update_reader() {
         let inspector = Inspector::default();
 
         // Spawn a read thread that holds a duplicate handle to the VMO that will be written.
@@ -1004,12 +1004,16 @@ mod fuchsia_tests {
             wait_and_notify_writer! {{
                 let hierarchy: DiagnosticsHierarchy<String> =
                     reader::PartialNodeHierarchy::try_from(vmo.as_ref()).unwrap().into();
-                assert_json_diff!(hierarchy, root: {
-                   value: 2i64,
-                   child: {
-                       a: 1i64,
-                       b: 2i64,
-                   }
+                // Attempting to make this whole lambda async and using Scope or similar
+                // results in https://github.com/rust-lang/rust/issues/100013.
+                fuchsia_async::TestExecutor::new().run_singlethreaded(async move {
+                    assert_json_diff!(hierarchy, root: {
+                       value: 2i64,
+                       child: {
+                           a: 1i64,
+                           b: 2i64,
+                       }
+                    });
                 });
             }};
         });
@@ -1039,13 +1043,15 @@ mod fuchsia_tests {
 
         // Ensure that the variable that we mutated internally can be used.
         child.record_int("c", 3);
-        assert_json_diff!(inspector, root: {
-            value: 2i64,
-            child: {
-                a: 1i64,
-                b: 2i64,
-                c: 3i64,
-            }
+        fuchsia_async::TestExecutor::new().run_singlethreaded(async move {
+            assert_json_diff!(inspector, root: {
+                value: 2i64,
+                child: {
+                    a: 1i64,
+                    b: 2i64,
+                    c: 3i64,
+                }
+            });
         });
     }
 }

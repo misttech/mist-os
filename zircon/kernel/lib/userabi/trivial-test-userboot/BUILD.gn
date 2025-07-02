@@ -21,10 +21,10 @@ kernel_elf_binary("trivial-test-userboot") {
   defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
 
   deps = [
+    "//sdk/lib/c/stdlib:hermetic",
+    "//sdk/lib/c/string:hermetic",
     "//src/lib/elfldltl/test:static-pie",
     "//src/zircon/lib/zircon",
-    "//zircon/system/ulib/c/stdlib:hermetic",
-    "//zircon/system/ulib/c/string:hermetic",
   ]
 
   exclude_toolchain_tags = [ "instrumented" ]

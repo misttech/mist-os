@@ -202,7 +202,7 @@ impl ActionSet {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 pub mod tests {
     use super::*;
     use crate::model::actions::{DestroyAction, ShutdownAction, ShutdownType};

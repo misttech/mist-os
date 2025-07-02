@@ -91,6 +91,7 @@ const char kReportTimeMillis[] = "reportTimeMillis";
 const char kIsFatalKey[] = "isFatal";
 const char kProcessNameKey[] = "crash.process.name";
 const char kThreadNameKey[] = "crash.thread.name";
+const char kWeightKey[] = "weight";
 
 // Extra keys that the crash server does *not* have a dependency on.
 const char kProcessKoidKey[] = "crash.process.koid";
@@ -135,6 +136,10 @@ void ExtractAnnotationsAndAttachments(fuchsia::feedback::CrashReport report,
 
   if (report.has_is_fatal()) {
     annotations->Set(kIsFatalKey, report.is_fatal());
+  }
+
+  if (report.has_weight()) {
+    annotations->Set(kWeightKey, report.weight());
   }
 
   // Dart-specific annotations.
@@ -197,7 +202,6 @@ void ExtractAnnotationsAndAttachments(fuchsia::feedback::CrashReport report,
     if (native_report.has_minidump()) {
       *minidump = std::move(*native_report.mutable_minidump());
     } else {
-      FX_LOGS(WARNING) << "no minidump to attach to crash report";
       // We don't want to overwrite the client-provided signature.
       if (!report.has_crash_signature()) {
         annotations->Set(kCrashSignatureKey, "fuchsia-no-minidump");

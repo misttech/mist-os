@@ -134,7 +134,7 @@ impl ActionNotifier {
 
     /// Returns the number of references that exist to the shared future in this notifier. Returns
     /// None if the future has completed.
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "src_model_tests")))]
     pub fn get_reference_count(&self) -> Option<usize> {
         self.fut.strong_count()
     }
@@ -223,7 +223,7 @@ impl ActionsManager {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 pub(crate) mod test_utils {
     use super::*;
     use crate::model::component::instance::InstanceState;
@@ -278,7 +278,7 @@ pub(crate) mod test_utils {
         let moniker = child.moniker().leaf().expect("Root component cannot be destroyed");
 
         // Verify the parent-child relationship
-        assert_eq!(parent.moniker().child(moniker.clone()), *child.moniker());
+        assert_eq!(parent.moniker().child(moniker.into()), *child.moniker());
 
         let parent_state = parent.lock_state().await;
         let parent_resolved_state = parent_state.get_resolved_state().expect("not resolved");

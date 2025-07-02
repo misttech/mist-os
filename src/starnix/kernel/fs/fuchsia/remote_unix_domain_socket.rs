@@ -78,7 +78,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn connect(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &SocketHandle,
         _current_task: &CurrentTask,
         _peer: SocketPeer,
@@ -88,7 +88,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn listen(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _backlog: i32,
         _credentials: ucred,
@@ -98,7 +98,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn accept(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
     ) -> Result<SocketHandle, Errno> {
         error!(EOPNOTSUPP)
@@ -106,7 +106,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn bind(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         _socket_address: SocketAddress,
@@ -116,7 +116,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
@@ -161,7 +161,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -208,7 +208,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -232,7 +232,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -246,20 +246,20 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn shutdown(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _how: SocketShutdownFlags,
     ) -> Result<(), Errno> {
         Ok(())
     }
 
-    fn close(&self, _locked: &mut Locked<'_, FileOpsCore>, _socket: &Socket) {
+    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {
         let _ = self.client.close(zx::MonotonicInstant::ZERO);
     }
 
     fn getsockname(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
     ) -> Result<SocketAddress, Errno> {
         Ok(SocketAddress::default_for_domain(SocketDomain::Unix))
@@ -267,7 +267,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn getpeername(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
     ) -> Result<SocketAddress, Errno> {
         self.getsockname(locked, socket)
@@ -275,7 +275,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn setsockopt(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         _level: u32,
@@ -287,7 +287,7 @@ impl SocketOps for RemoteUnixDomainSocket {
 
     fn getsockopt(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         level: u32,

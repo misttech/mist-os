@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/fit/result.h>
 #include <lib/magma/magma.h>
 #include <lib/magma/magma_common_defs.h>
 #include <lib/magma/magma_logging.h>
@@ -24,6 +25,8 @@
 #include <chrono>
 #include <map>
 
+#include "enumerator.h"
+
 namespace {
 
 class IdGenerator {
@@ -42,6 +45,23 @@ IdGenerator s_buffer_id_generator;
 IdGenerator s_semaphore_id_generator;
 
 }  // namespace
+
+magma_status_t magma_enumerate_devices(const char* device_namespace,
+                                       magma_handle_t device_directory_channel,
+                                       uint32_t* device_count_inout, uint32_t device_path_size,
+                                       char* device_paths_out) {
+  magma::Enumerator enumerator(device_namespace, zx::channel(device_directory_channel));
+
+  uint32_t device_path_count = *device_count_inout;
+
+  fit::result result = enumerator.Enumerate(device_path_count, device_path_size, device_paths_out);
+  if (result.is_ok()) {
+    *device_count_inout = result.value();
+    return MAGMA_STATUS_OK;
+  }
+
+  return result.error_value();
+}
 
 magma_status_t magma_device_import(uint32_t device_handle, magma_device_t* device) {
   auto platform_device_client = magma::PlatformDeviceClient::Create(device_handle);

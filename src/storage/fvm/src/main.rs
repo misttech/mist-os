@@ -16,9 +16,9 @@ use device::Device;
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
 use fidl_fuchsia_fs_startup::{
-    CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, FormatOptions, MountOptions,
-    StartOptions, StartupMarker, StartupRequest, StartupRequestStream, VolumeRequest,
-    VolumeRequestStream, VolumesMarker, VolumesRequest, VolumesRequestStream,
+    CreateOptions, FormatOptions, MountOptions, StartOptions, StartupMarker, StartupRequest,
+    StartupRequestStream, VolumeRequest, VolumeRequestStream, VolumesMarker, VolumesRequest,
+    VolumesRequestStream,
 };
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fs_management::filesystem::{BlockConnector, Filesystem};
@@ -418,10 +418,15 @@ impl Fvm {
         }
 
         info!(
-            "Mounted fvm, slice size {} partitions: {:?}",
+            "Mounted fvm, slice size {} ({}/{} allocated) partitions: {:?}",
             metadata.header.slice_size,
+            assigned_slice_count,
+            metadata.header.pslice_count,
             metadata.partitions.iter().map(|(_, e)| e.name()).collect::<Vec<_>>()
         );
+        for (idx, partition) in metadata.partitions.iter() {
+            info!("  {idx}: {partition:?}");
+        }
 
         let slice_blocks = metadata.header.slice_size / client.block_size() as u64;
         Ok(Self {
@@ -1157,15 +1162,7 @@ impl Component {
                         component_name: &self.0,
                         reuse_component_after_serving: false,
                         format_options: FormatOptions::default(),
-                        start_options: StartOptions {
-                            read_only: false,
-                            verbose: false,
-                            fsck_after_every_transaction: false,
-                            write_compression_level: -1,
-                            write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
-                            cache_eviction_policy_override: EvictionPolicyOverride::None,
-                            startup_profiling_seconds: 0,
-                        },
+                        start_options: StartOptions::default(),
                         component_type: ComponentType::DynamicChild {
                             // Use a separate collection for blobfs because it needs additional
                             // capabilities routed to it (e.g. VmexResource) and we don't want
@@ -1478,6 +1475,10 @@ impl Interface for PartitionInterface {
         })
     }
 
+    fn barrier(&self) -> Result<(), zx::Status> {
+        return Err(zx::Status::NOT_SUPPORTED);
+    }
+
     async fn write(
         &self,
         device_block_offset: u64,
@@ -1491,6 +1492,10 @@ impl Interface for PartitionInterface {
             "write {}: @{device_block_offset}, count={block_count}, vmo_offset={vmo_offset}",
             self.partition_index
         );
+        // Punting barrier support on the FVM.
+        if options.contains(WriteOptions::PRE_BARRIER) {
+            return Err(zx::Status::NOT_SUPPORTED);
+        }
         let device = &self.fvm.device;
         if let Some(key) = &self.key {
             let device_block_offset = device_block_offset
@@ -1820,7 +1825,10 @@ fn map_to_status(error: anyhow::Error) -> zx::Status {
     }
 }
 
-#[fuchsia::main(logging_tags = ["fvm"], threads = 2)]
+#[fuchsia::main(
+    logging_tags = ["fvm"],
+    threads = 2,
+    thread_role = "fuchsia.devices.block.drivers.core.block-server")]
 async fn main() -> Result<(), Error> {
     fuchsia_trace_provider::trace_provider_create_with_fdio();
 
@@ -1890,12 +1898,12 @@ mod tests {
     use block_client::{
         BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient, WriteOptions,
     };
-    use fake_block_server::{FakeServer, FakeServerOptions};
+    use block_server::{BlockInfo, DeviceInfo};
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_fs::AdminMarker;
     use fidl_fuchsia_fs_startup::{
-        CheckOptions, CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, MountOptions,
-        StartOptions, StartupMarker, VolumeMarker, VolumesMarker,
+        CheckOptions, CreateOptions, MountOptions, StartOptions, StartupMarker, VolumeMarker,
+        VolumesMarker,
     };
     use fidl_fuchsia_hardware_block::BlockMarker;
     use fs_management::DATA_TYPE_GUID;
@@ -1906,6 +1914,9 @@ mod tests {
     use std::collections::HashSet;
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::Arc;
+    use vmo_backed_block_server::{
+        InitialContents, VmoBackedServer, VmoBackedServerOptions, VmoBackedServerTestingExt as _,
+    };
     use {
         fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
         fidl_fuchsia_io as fio, fuchsia_async as fasync,
@@ -1914,7 +1925,7 @@ mod tests {
     struct Fixture {
         component: Arc<Component>,
         outgoing_dir: fio::DirectoryProxy,
-        fake_server: Arc<FakeServer>,
+        fake_server: Arc<VmoBackedServer>,
     }
 
     const BLOCK_SIZE: u32 = 512;
@@ -1923,7 +1934,7 @@ mod tests {
     impl Fixture {
         async fn new(extra_space: u64) -> Self {
             let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
-            let fake_server = Arc::new(FakeServer::new(
+            let fake_server = Arc::new(VmoBackedServer::new(
                 (contents.len() as u64 + extra_space) / BLOCK_SIZE as u64,
                 BLOCK_SIZE,
                 &contents,
@@ -1931,7 +1942,7 @@ mod tests {
             Self::from_fake_server(fake_server).await
         }
 
-        async fn from_fake_server(fake_server: Arc<FakeServer>) -> Self {
+        async fn from_fake_server(fake_server: Arc<VmoBackedServer>) -> Self {
             let (outgoing_dir, server_end) =
                 fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
             let fixture =
@@ -1948,18 +1959,7 @@ mod tests {
                 connect_to_protocol_at_dir_svc::<StartupMarker>(&fixture.outgoing_dir).unwrap();
 
             startup_proxy
-                .start(
-                    block_client.into_channel().into(),
-                    StartOptions {
-                        read_only: false,
-                        verbose: false,
-                        fsck_after_every_transaction: false,
-                        write_compression_algorithm: CompressionAlgorithm::ZstdChunked,
-                        write_compression_level: 0,
-                        cache_eviction_policy_override: EvictionPolicyOverride::None,
-                        startup_profiling_seconds: 0,
-                    },
-                )
+                .start(block_client.into_channel().into(), &StartOptions::default())
                 .await
                 .expect("start failed (FIDL")
                 .expect("start failed");
@@ -1985,7 +1985,7 @@ mod tests {
             connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap()
         }
 
-        fn take_fake_server(self) -> Arc<FakeServer> {
+        fn take_fake_server(self) -> Arc<VmoBackedServer> {
             self.fake_server
         }
     }
@@ -2813,7 +2813,7 @@ mod tests {
 
         struct Observer(Arc<AtomicBool>);
 
-        impl fake_block_server::Observer for Observer {
+        impl vmo_backed_block_server::Observer for Observer {
             fn write(
                 &self,
                 _device_block_offset: u64,
@@ -2821,25 +2821,25 @@ mod tests {
                 _vmo: &Arc<zx::Vmo>,
                 _vmo_offset: u64,
                 opts: WriteOptions,
-            ) -> fake_block_server::WriteAction {
+            ) -> vmo_backed_block_server::WriteAction {
                 assert_eq!(
                     opts.contains(WriteOptions::FORCE_ACCESS),
                     self.0.load(Ordering::Relaxed)
                 );
-                fake_block_server::WriteAction::Write
+                vmo_backed_block_server::WriteAction::Write
             }
         }
 
         let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
         let fake_server = Arc::new(
-            FakeServerOptions {
-                block_count: Some(contents.len() as u64 / BLOCK_SIZE as u64),
+            VmoBackedServerOptions {
                 block_size: BLOCK_SIZE,
-                initial_content: Some(&contents),
+                initial_contents: InitialContents::FromBuffer(&contents),
                 observer: Some(Box::new(Observer(expect_force_access.clone()))),
                 ..Default::default()
             }
-            .into(),
+            .build()
+            .unwrap(),
         );
 
         let fixture = Fixture::from_fake_server(fake_server).await;
@@ -2880,7 +2880,7 @@ mod tests {
 
         struct Observer(Arc<AtomicBool>);
 
-        impl fake_block_server::Observer for Observer {
+        impl vmo_backed_block_server::Observer for Observer {
             fn flush(&self) {
                 self.0.store(true, Ordering::Relaxed);
             }
@@ -2888,14 +2888,17 @@ mod tests {
 
         let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
         let fake_server = Arc::new(
-            FakeServerOptions {
-                block_count: Some((contents.len() as u64 + SLICE_SIZE) / BLOCK_SIZE as u64),
+            VmoBackedServerOptions {
                 block_size: BLOCK_SIZE,
-                initial_content: Some(&contents),
+                initial_contents: InitialContents::FromBufferAndCapactity(
+                    (contents.len() as u64 + SLICE_SIZE) / BLOCK_SIZE as u64,
+                    &contents,
+                ),
                 observer: Some(Box::new(Observer(flush_called.clone()))),
                 ..Default::default()
             }
-            .into(),
+            .build()
+            .unwrap(),
         );
 
         let fixture = Fixture::from_fake_server(fake_server).await;
@@ -3071,7 +3074,7 @@ mod tests {
 
         struct Observer(Arc<AtomicBool>);
 
-        impl fake_block_server::Observer for Observer {
+        impl vmo_backed_block_server::Observer for Observer {
             fn trim(&self, _device_block_offset: u64, _block_count: u32) {
                 self.0.store(true, Ordering::Relaxed)
             }
@@ -3079,14 +3082,14 @@ mod tests {
 
         let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
         let fake_server = Arc::new(
-            FakeServerOptions {
-                block_count: Some(contents.len() as u64 / BLOCK_SIZE as u64),
+            VmoBackedServerOptions {
                 block_size: BLOCK_SIZE,
-                initial_content: Some(&contents),
+                initial_contents: InitialContents::FromBuffer(&contents),
                 observer: Some(Box::new(Observer(trim_called.clone()))),
                 ..Default::default()
             }
-            .into(),
+            .build()
+            .unwrap(),
         );
 
         let fixture = Fixture::from_fake_server(fake_server).await;
@@ -3119,14 +3122,17 @@ mod tests {
     async fn test_volume_info() {
         let contents = std::fs::read("/pkg/data/golden-fvm.blk").unwrap();
         let fake_server = Arc::new(
-            FakeServerOptions {
-                flags: fblock::Flag::READONLY,
-                block_count: Some(contents.len() as u64 / BLOCK_SIZE as u64),
+            VmoBackedServerOptions {
+                info: DeviceInfo::Block(BlockInfo {
+                    device_flags: fblock::Flag::READONLY,
+                    ..Default::default()
+                }),
                 block_size: BLOCK_SIZE,
-                initial_content: Some(&contents),
+                initial_contents: InitialContents::FromBuffer(&contents),
                 ..Default::default()
             }
-            .into(),
+            .build()
+            .unwrap(),
         );
 
         let fixture = Fixture::from_fake_server(fake_server).await;

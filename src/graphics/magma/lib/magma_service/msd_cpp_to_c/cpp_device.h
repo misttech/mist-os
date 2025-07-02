@@ -43,10 +43,11 @@ class CppDevice : public Device {
   ~CppDevice();
 
   // Device implementation
-  magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
-  magma_status_t GetIcdList(std::vector<MsdIcdInfo>* icd_info_out) override;
-  void SetPowerState(int64_t power_state, fit::callback<void(magma_status_t)> completer) override;
-  std::unique_ptr<Connection> Open(msd_client_id_t client_id) override;
+  magma_status_t MsdQuery(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) override;
+  magma_status_t MsdGetIcdList(std::vector<MsdIcdInfo>* icd_info_out) override;
+  void MsdSetPowerState(int64_t power_state,
+                        fit::callback<void(magma_status_t)> completer) override;
+  std::unique_ptr<Connection> MsdOpen(msd_client_id_t client_id) override;
 
   // Other implementation
   void ReleaseCallback(DeviceCallback* callback);

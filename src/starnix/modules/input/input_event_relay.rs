@@ -787,7 +787,7 @@ mod test {
     const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 
     fn start_input_relays(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
     ) -> (
         Arc<InputEventsRelay>,
@@ -943,7 +943,7 @@ mod test {
     }
 
     fn read_uapi_events<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         file: &FileHandle,
         current_task: &CurrentTask,
     ) -> Vec<uapi::input_event>
@@ -974,7 +974,7 @@ mod test {
     }
 
     fn create_test_touch_device(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         input_relay: Arc<InputEventsRelay>,
         device_id: u32,

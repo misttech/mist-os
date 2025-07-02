@@ -123,49 +123,49 @@ mod tests {
     use test_util::assert_lt;
 
     #[fuchsia::test]
-    fn test_time_metadata_format() {
+    async fn test_time_metadata_format() {
         let inspector = Inspector::default();
 
         let time_property = inspector
             .root()
             .create_time_at("time", zx::MonotonicInstant::from_nanos(123_456_700_000));
-        let t1 = validate_inspector_get_time(&inspector, 123_456_700_000i64);
+        let t1 = validate_inspector_get_time(&inspector, 123_456_700_000i64).await;
 
         time_property.set_at(zx::MonotonicInstant::from_nanos(333_005_000_000));
-        let t2 = validate_inspector_get_time(&inspector, 333_005_000_000i64);
+        let t2 = validate_inspector_get_time(&inspector, 333_005_000_000i64).await;
 
         time_property.set_at(zx::MonotonicInstant::from_nanos(333_444_000_000));
-        let t3 = validate_inspector_get_time(&inspector, 333_444_000_000i64);
+        let t3 = validate_inspector_get_time(&inspector, 333_444_000_000i64).await;
 
         assert_lt!(t1, t2);
         assert_lt!(t2, t3);
     }
 
     #[fuchsia::test]
-    fn test_create_time_and_update() {
+    async fn test_create_time_and_update() {
         let inspector = Inspector::default();
         let CreateTimeResult { timestamp: recorded_t1, property: time_property }: CreateTimeResult<
             zx::MonotonicTimeline,
         > = inspector.root().create_time("time");
-        let t1 = validate_inspector_get_time(&inspector, AnyProperty);
+        let t1 = validate_inspector_get_time(&inspector, AnyProperty).await;
         assert_eq!(recorded_t1.into_nanos(), t1);
 
         time_property.update();
-        let t2 = validate_inspector_get_time(&inspector, AnyProperty);
+        let t2 = validate_inspector_get_time(&inspector, AnyProperty).await;
 
         time_property.update();
-        let t3 = validate_inspector_get_time(&inspector, AnyProperty);
+        let t3 = validate_inspector_get_time(&inspector, AnyProperty).await;
 
         assert_lt!(t1, t2);
         assert_lt!(t2, t3);
     }
 
     #[fuchsia::test]
-    fn test_record_time() {
+    async fn test_record_time() {
         let before_time = zx::MonotonicInstant::get().into_nanos();
         let inspector = Inspector::default();
         NodeTimeExt::<zx::MonotonicTimeline>::record_time(inspector.root(), "time");
-        let after_time = validate_inspector_get_time(&inspector, AnyProperty);
+        let after_time = validate_inspector_get_time(&inspector, AnyProperty).await;
         assert_lt!(before_time, after_time);
     }
 
@@ -181,11 +181,11 @@ mod tests {
         NodeTimeExt::<zx::MonotonicTimeline>::record_time(inspector.root(), "time");
     }
 
-    fn validate_inspector_get_time<T>(inspector: &Inspector, expected: T) -> i64
+    async fn validate_inspector_get_time<T>(inspector: &Inspector, expected: T) -> i64
     where
         T: PropertyAssertion<String> + 'static,
     {
-        let hierarchy = inspector.get_diagnostics_hierarchy();
+        let hierarchy = inspector.get_diagnostics_hierarchy().await;
         assert_data_tree!(hierarchy, root: { time: expected });
         hierarchy.get_property("time").and_then(|t| t.int()).unwrap()
     }

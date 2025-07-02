@@ -9,7 +9,6 @@ mod ffx_tool;
 mod host_tool;
 mod json;
 mod manifest;
-mod product_bundle;
 
 // These need to be addressable from external code, because they have conflicting types
 // named "Hardware" and "Cpu". In order to use one of these types in external code, it
@@ -22,7 +21,6 @@ pub use crate::ffx_tool::*;
 pub use crate::host_tool::*;
 pub use crate::json::JsonObject;
 pub use crate::manifest::*;
-pub use crate::product_bundle::*;
 pub use crate::virtual_device::{
     AudioDevice, DataAmount, InputDevice, Screen, VirtualDevice, VirtualDeviceManifest,
     VirtualDeviceV1, VsockDevice,

@@ -14,16 +14,14 @@ async fn rename_with_sufficient_rights() {
     }
     let contents = "abcdef".as_bytes();
 
-    for dir_flags in
-        harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
-    {
+    for flags in harness.file_rights.combinations_containing(fio::W_STAR_DIR) {
         let entries = vec![
             directory("src", vec![file("old.txt", contents.to_vec())]),
             directory("dest", vec![]),
         ];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let src_dir = deprecated_open_dir_with_flags(&dir, dir_flags, "src").await;
-        let dest_dir = deprecated_open_rw_dir(&dir, "dest").await;
+        let src_dir = dir.open_node::<fio::DirectoryMarker>("src", flags, None).await.unwrap();
+        let dest_dir = dir.open_node::<fio::DirectoryMarker>("dest", flags, None).await.unwrap();
         let dest_token = get_token(&dest_dir).await;
 
         // Rename src/old.txt -> dest/new.txt.
@@ -37,7 +35,12 @@ async fn rename_with_sufficient_rights() {
         assert_eq!(read_file(&dir, "dest/new.txt").await, contents);
 
         // Check src/old.txt no longer exists.
-        assert_file_not_found(&dir, "src/old.txt").await;
+        assert_eq!(
+            dir.open_node::<fio::FileMarker>("src/old.txt", fio::PERM_READABLE, None)
+                .await
+                .unwrap_err(),
+            zx::Status::NOT_FOUND
+        );
     }
 }
 
@@ -48,18 +51,21 @@ async fn rename_with_insufficient_rights() {
         return;
     }
     let contents = "abcdef".as_bytes();
-
-    for dir_flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
+    for flags in harness.file_rights.combinations_without(fio::W_STAR_DIR) {
         let entries = vec![
             directory("src", vec![file("old.txt", contents.to_vec())]),
             directory("dest", vec![]),
         ];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let src_dir = deprecated_open_dir_with_flags(&dir, dir_flags, "src").await;
-        let dest_dir = deprecated_open_rw_dir(&dir, "dest").await;
+        let src_dir = dir.open_node::<fio::DirectoryMarker>("src", flags, None).await.unwrap();
+        let dest_dir = dir
+            .open_node::<fio::DirectoryMarker>("dest", harness.dir_rights.all_flags(), None)
+            .await
+            .unwrap();
         let dest_token = get_token(&dest_dir).await;
 
-        // Try renaming src/old.txt -> dest/new.txt.
+        // Renaming "src/old.txt" to "dest/new.txt" should fail as we lack MODIFY_DIRECTORY rights
+        // on src_dir.
         let status = src_dir
             .rename("old.txt", zx::Event::from(dest_token), "new.txt")
             .await
@@ -77,16 +83,21 @@ async fn rename_with_slash_in_path_fails() {
     }
     let contents = "abcdef".as_bytes();
 
-    for dir_flags in
-        harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES)
-    {
+    for flags in harness.file_rights.combinations_containing(fio::W_STAR_DIR) {
         let entries = vec![
             directory("src", vec![file("old.txt", contents.to_vec())]),
             directory("dest", vec![]),
         ];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let src_dir = deprecated_open_dir_with_flags(&dir, dir_flags, "src").await;
-        let dest_dir = deprecated_open_rw_dir(&dir, "dest").await;
+        let src_dir = dir.open_node::<fio::DirectoryMarker>("src", flags, None).await.unwrap();
+        let dest_dir = dir
+            .open_node::<fio::DirectoryMarker>(
+                "dest",
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
+                None,
+            )
+            .await
+            .unwrap();
 
         // Including a slash in the src or dest path should fail.
         let status = dir

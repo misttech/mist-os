@@ -39,58 +39,58 @@ type DynamicsBand = table {
 /// If included, each bit representing a parameter of the dynamics processing bands can be changed
 /// with `SetElementState`.
 type DynamicsSupportedControls = flexible bits : uint64 {
-    /// If included, the `knee_width_db` parameter can be changed.
+    /// If set, `SetElementState` can change a dynamics band's `knee_width_db` parameter.
     KNEE_WIDTH = 0x1;
 
-    /// If included, the `attack` parameter can be changed.
+    /// If set, `SetElementState` can change a dynamics band's `attack` parameter.
     ATTACK = 0x2;
 
-    /// If included, the `release` parameter can be changed.
+    /// If set, `SetElementState` can change a dynamics band's `release` parameter.
     RELEASE = 0x4;
 
-    /// If included, the `output_gain_db` parameter can be changed.
+    /// If set, `SetElementState` can change a dynamics band's `output_gain_db` parameter.
     OUTPUT_GAIN = 0x8;
 
-    /// If included, the `input_gain_db` parameter can be changed.
+    /// If set, `SetElementState` can change a dynamics band's `input_gain_db` parameter.
     INPUT_GAIN = 0x10;
 
-    /// If included, the `lookahead` parameter can be changed.
+    /// If set, `SetElementState` can change a dynamics band's `lookahead` parameter.
     LOOKAHEAD = 0x20;
 
-    /// If included, the `level_type` parameter can be changed.
+    /// If set, `SetElementState` can change a dynamics band's `level_type` parameter.
     LEVEL_TYPE = 0x40;
 
-    /// If included, the `linked_channels` parameter can be changed.
+    /// If set, `SetElementState` can change a dynamics band's `linked_channels` parameter.
     LINKED_CHANNELS = 0x80;
 
-    /// If included, the `threshold_type` parameter can be changed.
+    /// If set, `SetElementState` can change a dynamics band's `threshold_type` parameter.
     @available(replaced=20, renamed="THRESHOLD_TYPE")
     THREDSHOLD_TYPE = 0x100;
 
-    /// If included, the `threshold_type` parameter can be changed.
+    /// If set, `SetElementState` can change a dynamics band's `threshold_type` parameter.
     @available(added=20)
     THRESHOLD_TYPE = 0x100;
 };
 
 /// Parameters for an `Element` with `type` equal to `DYNAMICS`.
 type Dynamics = table {
-    /// `Dynamics` elements in this protocol may support multiple bands, each
-    /// specifying a number of parameters in `DynamicsElementState` that can be changed
-    /// with `SetElementState`.
-    /// The number of elements of the `bands` vector determines the number of bands supported by
+    /// `Dynamics` elements in this protocol may support multiple bands. Each band specifies a
+    /// number of parameters in `DynamicsElementState` that can be changed with `SetElementState`.
+    /// The number of elements in the `bands` vector determines the number of bands supported by
     /// this processing element.
     ///
     /// Required. Must contain at least one entry.
     1: bands vector<DynamicsBand>:MAX_COUNT_DYNAMICS_BANDS;
 
-    /// The controls supported by this processing element.
+    /// The controls supported by this processing element (i.e. that can be changed by a call to
+    /// `SetElementState`).
     ///
     /// Optional.
     2: supported_controls DynamicsSupportedControls;
 };
 
 /// State for a single band within an `Element` with `type` equal to `DYNAMICS`.
-/// Servers may include control band fields even if the values are not able to be changed by the
+/// `WatchElementState` may return control band fields, even if the values cannot be changed by the
 /// client (i.e. the bits are not set in `supported_controls`).
 type DynamicsBandState = table {
     /// Unique ID for the band. Must match one of the `id`s specified in
@@ -117,19 +117,19 @@ type DynamicsBandState = table {
     /// `knee_width_db`), in input dB.
     /// Some signal processing like `input_gain` and `output_gain` are not affected by this value.
     ///
-    /// Required.
+    /// Required. Must be finite.
     4: threshold_db float32;
 
     /// Dynamics processing is applied `ABOVE` or `BELOW` the threshold.
     ///
-    /// Required for a server.
-    /// A client must not include this field in a `SetElementState` if
-    /// `DynamicsSupportedControls.THRESHOLD_TYPE` is not set in `supported_controls`.
+    /// Required for `WatchElementState`.
+    /// Disallowed in `SetElementState` if `DynamicsSupportedControls.THRESHOLD_TYPE` is not set
+    /// in `supported_controls`.
     5: threshold_type ThresholdType;
 
     /// The input-to-output dB ratio above or below (see `threshold_type`) the knee region.
     ///
-    /// Required.
+    /// Required. Must be finite.
     6: ratio float32;
 
     /// The width of the knee region, in input dB. If present, cannot be negative.
@@ -137,57 +137,57 @@ type DynamicsBandState = table {
     /// A value of zero is a "hard" knee; larger values lead to "softer" knees.
     /// This knee is centered on `threshold_db`.
     ///
-    /// Optional.
-    /// A client must not include this field in a `SetElementState` if
-    /// `DynamicsSupportedControls.KNEE_WIDTH` is not set in `supported_controls`.
+    /// Optional. If specified, must be finite.
+    /// Disallowed in `SetElementState` if `DynamicsSupportedControls.KNEE_WIDTH` is not set
+    /// in `supported_controls`.
     7: knee_width_db float32;
 
     /// Attack time.
     /// If not included, the attack time is unspecified.
     ///
-    /// Optional.
-    /// A client must not include this field in a `SetElementState` if
-    /// `DynamicsSupportedControls.ATTACK` is not set in `supported_controls`.
+    /// Optional. If specified, must be non-negative.
+    /// Disallowed in `SetElementState` if `DynamicsSupportedControls.ATTACK` is not set
+    /// in `supported_controls`.
     8: attack zx.Duration;
 
     /// Release time.
     /// If not included, the release time is unspecified.
     ///
-    /// Optional.
-    /// A client must not include this field in a `SetElementState` if
-    /// `DynamicsSupportedControls.RELEASE` is not set in `supported_controls`.
+    /// Optional. If specified, must be non-negative.
+    /// Disallowed in `SetElementState` if `DynamicsSupportedControls.RELEASE` is not set
+    /// in `supported_controls`.
     9: release zx.Duration;
 
     /// Output (a.k.a. make up or post) gain value in dB.
     /// If not included, the output gain is unspecified.
     ///
-    /// Optional.
-    /// A client must not include this field in a `SetElementState` if
-    /// `DynamicsSupportedControls.OUTPUT_GAIN` is not set in `supported_controls`.
+    /// Optional. If specified, must be finite.
+    /// Disallowed in `SetElementState` if `DynamicsSupportedControls.OUTPUT_GAIN` is not set
+    /// in `supported_controls`.
     10: output_gain_db float32;
 
-    /// input (a.k.a. pre) gain value in dB.
+    /// Input (a.k.a. pre) gain value in dB.
     /// If not included, the input gain is unspecified.
     ///
-    /// Optional.
-    /// A client must not include this field in a `SetElementState` if
-    /// `DynamicsSupportedControls.INPUT_GAIN` is not set in `supported_controls`.
+    /// Optional. If specified, must be finite.
+    /// Disallowed in `SetElementState` if `DynamicsSupportedControls.INPUT_GAIN` is not set
+    /// in `supported_controls`.
     11: input_gain_db float32;
 
     /// Level type (peak or RMS).
     /// If not included, the level type is unspecified.
     ///
     /// Optional.
-    /// A client must not include this field in a `SetElementState` if
-    /// `DynamicsSupportedControls.LEVEL_TYPE` is not set in `supported_controls`.
+    /// Disallowed in `SetElementState` if `DynamicsSupportedControls.LEVEL_TYPE` is not set
+    /// in `supported_controls`.
     12: level_type LevelType;
 
     /// Look-ahead time.
     /// If not included, the look-ahead time is unspecified.
     ///
-    /// Optional.
-    /// A client must not include this field in a `SetElementState` if
-    /// `DynamicsSupportedControls.LOOKAHEAD` is not set in `supported_controls`.
+    /// Optional. If specified, must be non-negative.
+    /// Disallowed in `SetElementState` if `DynamicsSupportedControls.LOOKAHEAD` is not set
+    /// in `supported_controls`.
     13: lookahead zx.Duration;
 
     /// Linked channels (a.k.a. Stereo linked for 2-channel systems).
@@ -196,8 +196,8 @@ type DynamicsBandState = table {
     /// If false, each channel has its own dynamics response.
     ///
     /// Optional.
-    /// A client must not include this field in a `SetElementState` if
-    /// `DynamicsSupportedControls.LINKED_CHANNELS` is not set in `supported_controls`.
+    /// Disallowed in `SetElementState` if `DynamicsSupportedControls.LINKED_CHANNELS` is not set
+    /// in `supported_controls`.
     14: linked_channels bool;
 };
 
@@ -207,6 +207,6 @@ type DynamicsElementState = table {
     /// `band_states` must have at least one element.
     /// The bands controlled by `band_states` are determined by each `band.id`.
     ///
-    // Required.
+    /// Required. Must contain at least one entry.
     1: band_states vector<DynamicsBandState>:MAX_COUNT_DYNAMICS_BANDS;
 };

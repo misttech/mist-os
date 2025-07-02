@@ -144,5 +144,9 @@
             protocol: [ "fuchsia.element.Manager" ],
             from: "#element_manager",
         },
+        {
+            protocol: [ "fuchsia.session.window.Manager" ],
+            from: "#tiling_wm",
+        },
     ],
 }

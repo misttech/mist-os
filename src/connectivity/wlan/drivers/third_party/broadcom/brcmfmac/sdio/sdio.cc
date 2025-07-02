@@ -3828,6 +3828,53 @@ static zx_status_t brcmf_sdio_get_bootloader_macaddr(brcmf_bus* bus_if, uint8_t*
   return ZX_OK;
 }
 
+static zx_status_t brcmf_sdio_suspend(struct brcmf_bus* bus) TA_NO_THREAD_SAFETY_ANALYSIS {
+  struct brcmf_sdio_dev* sdiod = bus->bus_priv.sdio;
+  struct brcmf_pub* drvr = sdiod->drvr;
+  zx_status_t error = ZX_OK;
+
+  // Lock the firmware reload mutex for this function so that no interrupt will be handled in
+  // the middle of it.
+  drvr->fw_reloading.lock();
+  // Close sdiod, so that no more data operation can proceed during during firmware reload.
+  brcmf_sdiod_change_state(sdiod, BRCMF_SDIOD_DOWN);
+  // Sdio clean-ups
+  brcmf_sdio_reset(sdiod->bus);
+
+  if ((error = brcmf_sdio_request_card_reset(sdiod)) != ZX_OK) {
+    BRCMF_ERR("Failed to reset sdio - error: %s", zx_status_get_string(error));
+    brcmf_proto_bcdc_detach(drvr);
+    return error;
+  }
+  return ZX_OK;
+}
+
+static zx_status_t brcmf_sdio_resume(struct brcmf_bus* bus) TA_NO_THREAD_SAFETY_ANALYSIS {
+  struct brcmf_sdio_dev* sdiod = bus->bus_priv.sdio;
+  zx_status_t error = ZX_OK;
+  struct brcmf_pub* drvr = sdiod->drvr;
+
+  if ((error = brcmf_sdiod_probe(sdiod, true)) != ZX_OK) {
+    BRCMF_ERR("Failed to probe sdio - error: %s", zx_status_get_string(error));
+    brcmf_proto_bcdc_detach(drvr);
+    return error;
+  }
+
+  if ((error = brcmf_sdio_load_files(drvr, true)) != ZX_OK) {
+    BRCMF_ERR("Failed to reload images - error: %s", zx_status_get_string(error));
+    brcmf_proto_bcdc_detach(drvr);
+    return error;
+  }
+
+  if ((error = brcmf_bus_started(sdiod->drvr, true)) != ZX_OK) {
+    BRCMF_ERR("Initialization after bus started failed.");
+    brcmf_proto_bcdc_detach(drvr);
+    return error;
+  }
+
+  return ZX_OK;
+}
+
 static const struct brcmf_bus_ops brcmf_sdio_bus_ops = {
     .get_bus_type = []() { return BRCMF_BUS_TYPE_SDIO; },
     .get_bootloader_macaddr = brcmf_sdio_get_bootloader_macaddr,
@@ -3850,6 +3897,8 @@ static const struct brcmf_bus_ops brcmf_sdio_bus_ops = {
     .release_vmo = brcmf_sdio_release_vmo,
     .queue_rx_space = brcmf_sdio_queue_rx_space,
     .acquire_tx_space = brcmf_sdio_acquire_tx_space,
+    .suspend = brcmf_sdio_suspend,
+    .resume = brcmf_sdio_resume,
 };
 
 zx_status_t brcmf_sdio_firmware_callback(brcmf_pub* drvr, const void* firmware,
@@ -3966,6 +4015,7 @@ zx_status_t brcmf_sdio_firmware_callback(brcmf_pub* drvr, const void* firmware,
     // brcmf_sdiod_intr_register() creates the interrupt thread and enables the sdio interrupt
     // through sdio proto, so it can be skipped while doing crash recovery.
 
+    // TODO(https://txbug.dev/422524411) Revisit this locking mechanism.
     auto reloading = !bus->sdiodev->drvr->fw_reloading.try_lock();
     err = brcmf_sdiod_intr_register(sdiodev, reloading);
     if (err != ZX_OK) {

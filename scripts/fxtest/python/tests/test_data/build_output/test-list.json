@@ -14,7 +14,12 @@
             ],
             "execution": {
                 "component_url": "fuchsia-pkg://fuchsia.com/foo-test#meta/foo_test.cm",
-                "max_severity_logs": "ERROR"
+                "max_severity_logs": "ERROR",
+                "test_filters": [
+                    "-broken_case",
+                    "-bad_case"
+                ],
+                "no_cases_equals_success": true
             }
         },
         {

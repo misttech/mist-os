@@ -8,11 +8,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use crate::common::{PackageDetails, PackagedDriverDetails};
 use crate::platform_config::sysmem_config::BoardSysmemConfig;
-use crate::release_info::{BoardReleaseInfo, ReleaseInfo};
 use anyhow::Result;
 use assembly_constants::Arm64DebugDapSoc;
 use assembly_container::{assembly_container, AssemblyContainer, DirectoryPathBuf, WalkPaths};
 use assembly_images_config::BoardFilesystemConfig;
+use assembly_release_info::{BoardReleaseInfo, ReleaseInfo};
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 
@@ -51,6 +51,13 @@ pub struct BoardInformation {
     #[walk_paths]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub devicetree_overlay: Option<Utf8PathBuf>,
+
+    /// The partitions config that details what partitions are available for
+    /// this board.
+    #[serde(default)]
+    #[walk_paths]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub partitions_config: Option<DirectoryPathBuf>,
 
     /// Configuration for the various filesystems that the product can choose to
     /// include.
@@ -321,10 +328,6 @@ pub struct BoardKernelConfig {
     /// The system will halt on a kernel panic instead of rebooting.
     #[serde(skip_serializing_if = "crate::common::is_default")]
     pub halt_on_panic: bool,
-
-    /// OOM related configurations.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub oom: Option<OOM>,
 }
 
 impl Default for BoardKernelConfig {
@@ -337,45 +340,8 @@ impl Default for BoardKernelConfig {
             serial: None,
             scheduler_prefer_little_cpus: false,
             halt_on_panic: false,
-            oom: None,
         }
     }
-}
-
-/// This struct defines supported Out of memory features.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
-#[serde(default, deny_unknown_fields)]
-pub struct OOM {
-    /// This option triggers eviction of file pages at the Warning pressure
-    /// state, in addition to the default behavior, which is to evict at the
-    /// Critical and OOM states.
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub evict_at_warning: bool,
-
-    /// This option configures kernel eviction to run continually in the
-    /// background to try and keep the system out of memory pressure, as opposed
-    /// to triggering one-shot eviction only at memory pressure level
-    /// transitions.
-    #[serde(skip_serializing_if = "crate::common::is_default")]
-    pub evict_continuous: bool,
-
-    /// This option specifies the free-memory threshold at which the
-    /// out-of-memory (OOM) thread will trigger an out-of-memory event and begin
-    /// killing processes, or rebooting the system.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub out_of_memory_mb: Option<u32>,
-
-    /// This option specifies the free-memory threshold at which the
-    /// out-of-memory (OOM) thread will trigger a critical memory pressure
-    /// event, signaling that processes should free up memory.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub critical_mb: Option<u32>,
-
-    /// This option specifies the free-memory threshold at which the
-    /// out-of-memory (OOM) thread will trigger a warning memory pressure event,
-    /// signaling that processes should slow down memory allocations.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub warning_mb: Option<u32>,
 }
 
 /// This struct defines platform configurations specified by board.
@@ -555,7 +521,6 @@ mod test {
                 serial: None,
                 scheduler_prefer_little_cpus: true,
                 halt_on_panic: false,
-                oom: None,
                 arm64_event_stream_enable: false,
             },
             platform: PlatformConfig {

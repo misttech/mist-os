@@ -25,26 +25,6 @@ source_set("read_visitor") {
   ]
 }
 
-source_set("bounded_list_node") {
-  sources = [
-    "bounded_list_node.cc",
-    "bounded_list_node.h",
-  ]
-
-  public_deps = [ "//zircon/system/ulib/inspect" ]
-  public_configs = [ "//sdk/config" ]
-}
-
-cc_test_executable("bounded_list_node_test") {
-  testonly = true
-  output_name = "bounded_list_node_test"
-  sources = [ "bounded_list_node_unittest.cc" ]
-  deps = [
-    ":bounded_list_node",
-    "//zircon/system/ulib/zxtest",
-  ]
-}
-
 cc_test_executable("read_visitor_test") {
   testonly = true
   output_name = "read_visitor_test"
@@ -59,13 +39,6 @@ fuchsia_unittest_component("read_visitor_unittest") {
   deps = [ ":read_visitor_test" ]
 }
 
-fuchsia_unittest_component("bounded_list_node_unittest") {
-  deps = [ ":bounded_list_node_test" ]
-}
-
 fuchsia_test_package("inspect_contrib_cpp_tests") {
-  test_components = [
-    ":read_visitor_unittest",
-    ":bounded_list_node_unittest",
-  ]
+  test_components = [ ":read_visitor_unittest" ]
 }

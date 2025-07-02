@@ -7,37 +7,22 @@ use crate::power::{
     PowerWakeupCountFile,
 };
 use crate::task::CurrentTask;
-use crate::vfs::{create_bytes_file_with_handler, StaticDirectoryBuilder};
+use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
+use crate::vfs::pseudo::simple_file::create_bytes_file_with_handler;
 use starnix_uapi::file_mode::mode;
 use std::sync::Arc;
 
-pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirectoryBuilder<'_>) {
+pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &SimpleDirectoryMutator) {
     let kernel = current_task.kernel();
-    dir.subdir(current_task, "power", 0o755, |dir| {
-        dir.entry(
-            current_task,
-            "wakeup_count",
-            PowerWakeupCountFile::new_node(),
-            mode!(IFREG, 0o644),
-        );
-        dir.entry(current_task, "wake_lock", PowerWakeLockFile::new_node(), mode!(IFREG, 0o660));
-        dir.entry(
-            current_task,
-            "wake_unlock",
-            PowerWakeUnlockFile::new_node(),
-            mode!(IFREG, 0o660),
-        );
-        dir.entry(current_task, "state", PowerStateFile::new_node(), mode!(IFREG, 0o644));
-        dir.entry(
-            current_task,
-            "sync_on_suspend",
-            PowerSyncOnSuspendFile::new_node(),
-            mode!(IFREG, 0o644),
-        );
-        dir.subdir(current_task, "suspend_stats", 0o755, |dir| {
+    dir.subdir("power", 0o755, |dir| {
+        dir.entry("wakeup_count", PowerWakeupCountFile::new_node(), mode!(IFREG, 0o644));
+        dir.entry("wake_lock", PowerWakeLockFile::new_node(), mode!(IFREG, 0o660));
+        dir.entry("wake_unlock", PowerWakeUnlockFile::new_node(), mode!(IFREG, 0o660));
+        dir.entry("state", PowerStateFile::new_node(), mode!(IFREG, 0o644));
+        dir.entry("sync_on_suspend", PowerSyncOnSuspendFile::new_node(), mode!(IFREG, 0o644));
+        dir.subdir("suspend_stats", 0o755, |dir| {
             let read_only_file_mode = mode!(IFREG, 0o444);
             dir.entry(
-                current_task,
                 "success",
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel.suspend_resume_manager.suspend_stats().success_count.to_string()
@@ -45,7 +30,6 @@ pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirecto
                 read_only_file_mode,
             );
             dir.entry(
-                current_task,
                 "fail",
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel.suspend_resume_manager.suspend_stats().fail_count.to_string()
@@ -53,7 +37,6 @@ pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirecto
                 read_only_file_mode,
             );
             dir.entry(
-                current_task,
                 "last_failed_dev",
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel
@@ -65,7 +48,6 @@ pub fn sysfs_power_directory(current_task: &CurrentTask, dir: &mut StaticDirecto
                 read_only_file_mode,
             );
             dir.entry(
-                current_task,
                 "last_failed_errno",
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel

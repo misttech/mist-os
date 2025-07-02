@@ -38,6 +38,8 @@ go_library("testsharder_lib") {
     "preprocess_test.go",
     "shard.go",
     "shard_test.go",
+    "task_requests.go",
+    "task_requests_test.go",
     "test.go",
     "test_modifier.go",
     "test_modifier_test.go",

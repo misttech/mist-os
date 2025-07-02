@@ -171,6 +171,22 @@ AUTO_DERIVE_TRAITS = [
         r"fuse_dirent",
         ["KnownLayout", "Clone", "IntoBytes", "FromBytes", "Immutable"],
     ),
+    (
+        r"fuse_open_out.*",
+        ["KnownLayout", "Clone", "IntoBytes", "FromBytes", "Immutable"],
+    ),
+    (
+        r"fuse_open_out$",
+        ["Debug"],
+    ),
+    (
+        r"fuse_in_header.*",
+        ["KnownLayout", "Clone", "IntoBytes", "FromBytes", "Immutable"],
+    ),
+    (
+        r"fuse_in_header$",
+        ["Debug"],
+    ),
     (r"ifreq.*", ["KnownLayout", "FromBytes", "Immutable"]),
     (r"if_settings.*", ["KnownLayout", "FromBytes", "Immutable"]),
     (r"in6_addr", ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"]),

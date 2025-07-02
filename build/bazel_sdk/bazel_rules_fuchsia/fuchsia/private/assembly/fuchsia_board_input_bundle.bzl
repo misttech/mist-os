@@ -4,12 +4,13 @@
 
 """Rules for defining assembly board input bundle."""
 
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load(":providers.bzl", "FuchsiaBoardInputBundleInfo")
 load(":utils.bzl", "LOCAL_ONLY_ACTION_KWARGS", "select_root_dir_with_file")
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_board_input_bundle_impl(ctx):
     sdk = get_fuchsia_sdk_toolchain(ctx)
@@ -48,17 +49,28 @@ def _fuchsia_board_input_bundle_impl(ctx):
 
     creation_args = ["--drivers", driver_list_file.path]
 
-    if ctx.attr.version and ctx.file.version_file:
-        fail("Only one of \"version\" or \"version_file\" can be set.")
-        # TODO(https://fxbug.dev/397489730):
-        # Make it required to have exactly one of these set
-        # once these changes have rolled into all downstream repositories.
+    # Ensure that exactly one of "version" and "version_file" is set.
+    # Note: an empty string "" is acceptable: non-official builds may not
+    # have access to a version number. The config generator tool will convert
+    # the empty string to "unversioned".
+    if ((ctx.attr.version != "__unset") == (ctx.attr.version_file != None)):
+        fail("Exactly one of \"version\" or \"version_file\" must be set.")
 
-    if ctx.attr.version:
+    if ctx.attr.version != "__unset":
         creation_args.extend(["--version", ctx.attr.version])
     elif ctx.file.version_file:
         creation_args.extend(["--version-file", ctx.file.version_file.path])
         creation_inputs.append(ctx.file.version_file)
+
+    if ctx.attr.repo:
+        repo = ctx.attr.repo
+    else:
+        repo = ctx.attr._release_repository_flag[BuildSettingInfo].value
+
+    # TODO(https://b.corp.google.com/issues/416239346): Make "repo" field
+    # required.
+    if repo:
+        creation_args += ["--repo", repo]
 
     # Add single-file configs
     for (arg, file) in [
@@ -208,10 +220,18 @@ fuchsia_board_input_bundle = rule(
         ),
         "version": attr.string(
             doc = "Release version string",
+            default = "__unset",
         ),
         "version_file": attr.label(
             doc = "Path to a file containing the current release version.",
             allow_single_file = True,
+        ),
+        "repo": attr.string(
+            doc = "Name of the release repository. Overrides _release_repository_flag when set.",
+        ),
+        "_release_repository_flag": attr.label(
+            doc = "String flag used to set the name of the release repository.",
+            default = "@rules_fuchsia//fuchsia/flags:fuchsia_release_repository",
         ),
     } | COMPATIBILITY.HOST_ATTRS,
 )

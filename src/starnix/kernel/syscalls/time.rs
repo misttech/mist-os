@@ -22,10 +22,10 @@ use starnix_uapi::auth::CAP_WAKE_ALARM;
 use starnix_uapi::errors::{Errno, EINTR};
 use starnix_uapi::user_address::{MultiArchUserRef, UserRef};
 use starnix_uapi::{
-    errno, error, from_status_like_fdio, pid_t, timespec, timezone, tms, uapi, CLOCK_BOOTTIME,
-    CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE, CLOCK_MONOTONIC_RAW,
-    CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM, CLOCK_REALTIME_COARSE,
-    CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
+    errno, error, from_status_like_fdio, pid_t, tid_t, timespec, timezone, tms, uapi,
+    CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_MONOTONIC_COARSE,
+    CLOCK_MONOTONIC_RAW, CLOCK_PROCESS_CPUTIME_ID, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
+    CLOCK_REALTIME_COARSE, CLOCK_TAI, CLOCK_THREAD_CPUTIME_ID, MAX_CLOCKS, TIMER_ABSTIME,
 };
 use zx::{
     Task, {self as zx},
@@ -58,7 +58,7 @@ fn get_clock_res(current_task: &CurrentTask, which_clock: i32) -> Result<timespe
 }
 
 pub fn sys_clock_getres(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     which_clock: i32,
     tp_addr: TimeSpecPtr,
@@ -94,11 +94,11 @@ fn get_clock_gettime(current_task: &CurrentTask, which_clock: i32) -> Result<tim
             }
             CLOCK_THREAD_CPUTIME_ID => {
                 profile_duration!("GetThreadCpuTime");
-                get_thread_cpu_time(current_task, current_task.id)?
+                get_thread_cpu_time(current_task, current_task.tid)?
             }
             CLOCK_PROCESS_CPUTIME_ID => {
                 profile_duration!("GetProcessCpuTime");
-                get_process_cpu_time(current_task, current_task.id)?
+                get_process_cpu_time(current_task, current_task.get_pid())?
             }
             _ => return error!(EINVAL),
         }
@@ -107,7 +107,7 @@ fn get_clock_gettime(current_task: &CurrentTask, which_clock: i32) -> Result<tim
 }
 
 pub fn sys_clock_gettime(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     which_clock: i32,
     tp_addr: TimeSpecPtr,
@@ -118,7 +118,7 @@ pub fn sys_clock_gettime(
 }
 
 pub fn sys_gettimeofday(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_tv: TimeValPtr,
     user_tz: TimeZonePtr,
@@ -139,7 +139,7 @@ pub fn sys_gettimeofday(
 }
 
 pub fn sys_settimeofday(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     tv: TimeValPtr,
     _tz: TimeZonePtr,
@@ -192,7 +192,7 @@ pub fn sys_settimeofday(
 }
 
 pub fn sys_clock_nanosleep(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     which_clock: ClockId,
     flags: u32,
@@ -264,7 +264,7 @@ pub fn sys_clock_nanosleep(
 /// Sleep until we've satisfied |request| relative to the UTC clock which may advance at
 /// a different rate from the boot clock by repeatdly computing a boot target and sleeping.
 fn clock_nanosleep_relative_to_utc(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     request: timespec,
     is_absolute: bool,
@@ -302,7 +302,7 @@ fn clock_nanosleep_relative_to_utc(
 }
 
 fn clock_nanosleep_boot_with_deadline(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     is_absolute: bool,
     deadline: zx::BootInstant,
@@ -319,7 +319,7 @@ fn clock_nanosleep_boot_with_deadline(
     waiter
         .wake_on_zircon_signals(&timer, zx::Signals::TIMER_SIGNALED, signal_handler)
         .expect("wait can only fail in OOM conditions");
-    let timer_slack = zx::Duration::from_nanos(current_task.read().get_timerslack_ns() as i64);
+    let timer_slack = current_task.read().get_timerslack();
     timer.set(deadline, timer_slack).expect("timer set cannot fail with valid handles and slack");
     match waiter.wait(locked, current_task) {
         Err(err) if err == EINTR && is_absolute => error!(ERESTARTNOHAND),
@@ -354,7 +354,7 @@ fn clock_nanosleep_boot_with_deadline(
 }
 
 pub fn sys_nanosleep(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     user_request: TimeSpecPtr,
     user_remaining: TimeSpecPtr,
@@ -372,26 +372,21 @@ pub fn sys_nanosleep(
 /// Returns the cpu time for the task with the given `pid`.
 ///
 /// Returns EINVAL if no such task can be found.
-fn get_thread_cpu_time(current_task: &CurrentTask, pid: pid_t) -> Result<i64, Errno> {
-    let weak_task = current_task.get_task(pid);
+fn get_thread_cpu_time(current_task: &CurrentTask, tid: tid_t) -> Result<i64, Errno> {
+    let weak_task = current_task.get_task(tid);
     let task = weak_task.upgrade().ok_or_else(|| errno!(EINVAL))?;
     Ok(task.thread_runtime_info()?.cpu_time)
 }
 
 /// Returns the cpu time for the process associated with the given `pid`. `pid`
 /// can be the `pid` for any task in the thread_group (so the caller can get the
-/// process cpu time for any `task` by simply using `task.pid`).
+/// process cpu time for any `task` by simply using `task.get_pid()`).
 ///
 /// Returns EINVAL if no such process can be found.
 fn get_process_cpu_time(current_task: &CurrentTask, pid: pid_t) -> Result<i64, Errno> {
-    let weak_task = current_task.get_task(pid);
-    let task = weak_task.upgrade().ok_or_else(|| errno!(EINVAL))?;
-    Ok(task
-        .thread_group()
-        .process
-        .get_runtime_info()
-        .map_err(|status| from_status_like_fdio!(status))?
-        .cpu_time)
+    let pids = current_task.kernel().pids.read();
+    let tg = pids.get_thread_group(pid).ok_or_else(|| errno!(EINVAL))?;
+    Ok(tg.process.get_runtime_info().map_err(|status| from_status_like_fdio!(status))?.cpu_time)
 }
 
 /// Returns the type of cpu clock that `clock` encodes.
@@ -449,7 +444,7 @@ fn get_dynamic_clock(current_task: &CurrentTask, which_clock: i32) -> Result<i64
 }
 
 pub fn sys_timer_create(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     clock_id: ClockId,
     event: MultiArchUserRef<uapi::sigevent, uapi::arch32::sigevent>,
@@ -510,7 +505,7 @@ pub fn sys_timer_create(
 }
 
 pub fn sys_timer_delete(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     id: TimerId,
 ) -> Result<(), Errno> {
@@ -519,7 +514,7 @@ pub fn sys_timer_delete(
 }
 
 pub fn sys_timer_gettime(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     id: TimerId,
     curr_value: ITimerSpecPtr,
@@ -530,7 +525,7 @@ pub fn sys_timer_gettime(
 }
 
 pub fn sys_timer_getoverrun(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     id: TimerId,
 ) -> Result<i32, Errno> {
@@ -539,7 +534,7 @@ pub fn sys_timer_getoverrun(
 }
 
 pub fn sys_timer_settime(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     id: TimerId,
     flags: i32,
@@ -567,7 +562,7 @@ pub fn sys_timer_settime(
 }
 
 pub fn sys_getitimer(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     which: u32,
     user_curr_value: ITimerValPtr,
@@ -578,7 +573,7 @@ pub fn sys_getitimer(
 }
 
 pub fn sys_setitimer(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     which: u32,
     user_new_value: ITimerValPtr,
@@ -596,7 +591,7 @@ pub fn sys_setitimer(
 }
 
 pub fn sys_times(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     buf: UserRef<tms>,
 ) -> Result<i64, Errno> {
@@ -627,7 +622,7 @@ mod arch32 {
     use static_assertions::const_assert;
 
     pub fn sys_arch32_clock_gettime64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         which_clock: i32,
         tp_addr: UserRef<uapi::timespec>,
@@ -640,7 +635,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_timer_gettime64(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         id: TimerId,
         curr_value: UserRef<uapi::itimerspec>,

@@ -12,6 +12,7 @@
 #include "sdhci.h"
 
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.sdmmc/cpp/driver/fidl.h>
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <fuchsia/hardware/block/driver/c/banjo.h>
@@ -26,6 +27,8 @@
 #include <bind/fuchsia/hardware/sdmmc/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
+
+#include "src/devices/block/drivers/sdhci/sdhci_config.h"
 
 namespace {
 
@@ -1230,6 +1233,7 @@ zx_status_t Sdhci::Init() {
     metadata.enable_cache() = existing_metadata->enable_cache();
     metadata.removable() = existing_metadata->removable();
     metadata.max_command_packing() = existing_metadata->max_command_packing();
+    metadata.vccq_off_with_controller_off() = existing_metadata->vccq_off_with_controller_off();
 
     const auto& speed_capabilities = existing_metadata->speed_capabilities();
     if (speed_capabilities.has_value()) {
@@ -1370,12 +1374,40 @@ zx::result<> Sdhci::Start() {
     return zx::error(status);
   }
 
+  std::vector<fuchsia_driver_framework::Offer> offers = compat_server_.CreateOffers2();
+  offers.emplace_back(metadata_server_.MakeOffer());
+
+  // The SDHCI core driver does not have to take any action when the SDMMC device or controller
+  // power elements change state. Therefore we can simply forward PowerTokenService from our parent
+  // to our child so that we are not in the loop for state changes.
+  if (take_config<sdhci_config::Config>().enable_suspend()) {
+    fuchsia_hardware_power::PowerTokenService::InstanceHandler handler({
+        .token_provider =
+            [this](fidl::ServerEnd<fuchsia_hardware_power::PowerTokenProvider> server) {
+              zx::result<> result =
+                  incoming()->Connect<fuchsia_hardware_power::PowerTokenService::TokenProvider>(
+                      std::move(server));
+              if (result.is_error()) {
+                FDF_LOG(WARNING, "Failed to connect to power token service: %s",
+                        result.status_string());
+              }
+            },
+    });
+
+    zx::result result =
+        outgoing()->AddService<fuchsia_hardware_power::PowerTokenService>(std::move(handler));
+    if (result.is_error()) {
+      FDF_LOG(ERROR, "Failed to add power token service: %s", result.status_string());
+      return result.take_error();
+    }
+
+    offers.emplace_back(fdf::MakeOffer2<fuchsia_hardware_power::PowerTokenService>());
+  }
+
   const auto kChildNodeName = name();
   const std::vector<fuchsia_driver_framework::NodeProperty> kProperties{
       fdf::MakeProperty(bind_fuchsia_hardware_sdmmc::SDMMCSERVICE,
                         bind_fuchsia_hardware_sdmmc::SDMMCSERVICE_DRIVERTRANSPORT)};
-  std::vector<fuchsia_driver_framework::Offer> offers = compat_server_.CreateOffers2();
-  offers.emplace_back(metadata_server_.MakeOffer());
   zx::result result = AddChild(kChildNodeName, kProperties, offers);
   if (result.is_error()) {
     FDF_LOG(ERROR, "Failed to add child: %s", result.status_string());

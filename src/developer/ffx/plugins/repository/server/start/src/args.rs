@@ -7,7 +7,7 @@ use camino::Utf8PathBuf;
 use core::net::Ipv6Addr;
 use ffx_core::ffx_command;
 use fidl_fuchsia_pkg_ext::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
-use std::net::SocketAddr;
+use std::net::{Ipv4Addr, SocketAddr};
 use std::path::PathBuf;
 
 #[ffx_command()]
@@ -86,6 +86,10 @@ pub struct StartCommand {
     #[argh(option)]
     pub port_path: Option<PathBuf>,
 
+    /// the address used to listen on target-side when tunneling is used.
+    #[argh(option)]
+    pub tunnel_addr: Option<SocketAddr>,
+
     /// if true, will not register repositories to device.
     /// Default is `false`.
     #[argh(switch)]
@@ -108,6 +112,10 @@ pub struct StartCommand {
 
 pub fn default_address() -> SocketAddr {
     (Ipv6Addr::UNSPECIFIED, 8083).into()
+}
+
+pub fn default_tunnel_addr() -> SocketAddr {
+    (Ipv4Addr::LOCALHOST, 0).into()
 }
 
 pub fn parse_storage_type(arg: &str) -> Result<RepositoryStorageType, String> {

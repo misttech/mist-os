@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::LibContext;
-use anyhow::{format_err, Result};
+use crate::{logging, LibContext};
+use anyhow::Result;
 use async_lock::Mutex;
 use camino::Utf8PathBuf;
 use errors::ffx_error;
 use ffx_config::environment::ExecutableKind;
-use ffx_config::logging::LogDestination;
 use ffx_config::EnvironmentContext;
 use ffx_target::connection::Connection;
 use ffx_target::ssh_connector::SshConnector;
@@ -16,8 +15,7 @@ use fidl::endpoints::Proxy;
 use fidl::AsHandleRef;
 use fidl_fuchsia_device::ControllerMarker;
 use std::path::PathBuf;
-use std::str::FromStr;
-use std::sync::{Arc, OnceLock, Weak};
+use std::sync::{Arc, Weak};
 use std::time::Duration;
 use zx_types;
 
@@ -54,8 +52,6 @@ async fn new_device_connection(
     let connector = SshConnector::new(netext::ScopedSocketAddr::from_socket_addr(addr)?, ctx)?;
     Ok(Connection::new(connector).await?)
 }
-
-static INITIALIZATION_RESULT: OnceLock<Result<()>> = OnceLock::new();
 
 impl EnvContext {
     pub(crate) fn write_err<T: std::fmt::Debug>(&self, err: T) {
@@ -107,39 +103,9 @@ impl EnvContext {
             .map_err(fxe)?,
         };
         let target_spec = ffx_target::get_target_specifier(&context).await?;
-
-        // Don't attempt initialization without a target specifier because doing so would likely
-        // cause unexpected downstream effects on subsequent calls that provide a target specifier.
-        //
-        // TODO(https://fxbug.dev/376290078): This is a hack that allows for use cases that merely
-        // need some part of the configuration but don't wish to trigger initialization. Those use
-        // cases currently don't specify a target while all others do.
-        if target_spec.is_some() {
-            // A failed first attempt through this initialization will cause all subsequent
-            // attempts to fail.
-            INITIALIZATION_RESULT
-                .get_or_init(|| {
-                    ffx_config::init(&context)?;
-                    let mut log_dir: PathBuf = context.query("log.dir").get()?;
-                    std::fs::create_dir_all(log_dir.clone())?;
-                    log_dir.push("fuchsia-controller");
-                    log_dir.set_extension("log");
-                    ffx_config::logging::init(
-                        &context,
-                        false,
-                        &Some(LogDestination::from_str(
-                            log_dir.as_os_str().to_str().expect("converting path to str"),
-                        )?),
-                    )?;
-                    Ok(())
-                })
-                // `OnceLock::get_or_init` returns a reference so we can't simply
-                // use `.context(..)?` here.
-                .as_ref()
-                .map_err(|e| {
-                    format_err!("{:?}", e).context("Failed to initialize configuration and logging")
-                })?;
-        }
+        logging::init_logging(&context);
+        logging::LOG_SINK.add_log_output(&context)?;
+        log::info!("Logging setup for EnvContext instance: {}", logging::log_id(&context));
         let cache_path = context.get_cache_path()?;
         std::fs::create_dir_all(&cache_path)?;
         let device_connection = Mutex::new(None);
@@ -195,5 +161,12 @@ impl EnvContext {
             waiter: ffx_wait::DeviceWaiterImpl,
         };
         tool.wait_impl().await.map_err(Into::into)
+    }
+}
+
+impl Drop for EnvContext {
+    fn drop(&mut self) {
+        log::info!("Dropping EnvContext {}", logging::log_id(&self.context));
+        logging::LOG_SINK.remove_log_output(&self.context).expect("remove logger safely");
     }
 }

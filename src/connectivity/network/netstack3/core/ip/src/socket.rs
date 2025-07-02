@@ -14,7 +14,7 @@ use net_types::{MulticastAddress, ScopeableAddress, SpecifiedAddr};
 use netstack3_base::socket::{SocketIpAddr, SocketIpAddrExt as _};
 use netstack3_base::{
     AnyDevice, CounterContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId, InstantContext,
-    IpDeviceAddr, IpExt, Marks, Mms, SendFrameErrorReason, StrongDeviceIdentifier,
+    IpDeviceAddr, IpExt, Marks, Mms, SendFrameErrorReason, StrongDeviceIdentifier, TxMetadata as _,
     TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
 use netstack3_filter::{
@@ -206,7 +206,7 @@ pub enum IpSockSendError {
     #[error("illegal loopback address")]
     IllegalLoopbackAddress,
     /// Broadcast send is not allowed.
-    #[error("Broadcast send is not enabled for the socket")]
+    #[error("broadcast send is not enabled for the socket")]
     BroadcastNotAllowed,
 }
 
@@ -944,21 +944,24 @@ where
         InternalForwarding::NotUsed => {}
     }
 
-    let egress_filter_result = bindings_ctx.socket_ops_filter().on_egress(
-        &packet,
-        &egress_device,
-        packet_metadata.tx_metadata(),
-        packet_metadata.marks(),
-    );
-    // TODO(https://fxbug.dev/412426836): Implement congestion signal handling.
-    match egress_filter_result {
-        SocketEgressFilterResult::Pass { congestion: _ } => (),
-        SocketEgressFilterResult::Drop { congestion: _ } => {
-            core_ctx.counters().socket_egress_filter_dropped.increment();
-            packet_metadata.acknowledge_drop();
-            return Ok(());
+    if let Some(socket_cookie) = packet_metadata.tx_metadata().socket_cookie() {
+        let egress_filter_result = bindings_ctx.socket_ops_filter().on_egress(
+            &packet,
+            &egress_device,
+            socket_cookie,
+            packet_metadata.marks(),
+        );
+
+        // TODO(https://fxbug.dev/412426836): Implement congestion signal handling.
+        match egress_filter_result {
+            SocketEgressFilterResult::Pass { congestion: _ } => (),
+            SocketEgressFilterResult::Drop { congestion: _ } => {
+                core_ctx.counters().socket_egress_filter_dropped.increment();
+                packet_metadata.acknowledge_drop();
+                return Ok(());
+            }
         }
-    };
+    }
 
     // The packet needs to be delivered locally if it's sent to a broadcast
     // or multicast address. For multicast packets this feature can be disabled

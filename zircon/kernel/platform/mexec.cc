@@ -30,43 +30,14 @@
 
 namespace {
 
-// TODO(https://fxbug.dev/42164859): Later this will arrive in a whole page from the
-// physboot handoff so it can be stuffed into a VMO and extended there.
-
 // Mexec data as gleaned from the physboot hand-off.
-zbitl::Image<fbl::Array<ktl::byte>> gImageAtHandoff;
+zbitl::View<ktl::span<const ktl::byte>> gImageAtHandoff;
 
-void ConstructMexecDataZbi(uint level) {
-  constexpr size_t kInitialBuffSize = PAGE_SIZE;
-
-  ZX_ASSERT(!gImageAtHandoff.storage());
-  {
-    fbl::AllocChecker ac;
-    auto* buff = new (&ac) ktl::byte[kInitialBuffSize];
-    ZX_ASSERT(ac.check());
-    ZX_ASSERT(buff != nullptr);
-    gImageAtHandoff.storage() = fbl::Array<ktl::byte>(buff, kInitialBuffSize);
-  }
-
-  if (auto result = gImageAtHandoff.clear(); result.is_error()) {
-    zbitl::PrintViewError(result.error_value());
-    abort();
-  }
-
-  // Transfer initial data from the physboot handoff.
-  zbitl::View handoff(gPhysHandoff->mexec_data.get());
-  if (auto result = gImageAtHandoff.Extend(handoff.begin(), handoff.end()); result.is_error()) {
-    zbitl::PrintViewCopyError(result.error_value());
-    abort();
-  }
-
-  ZX_ASSERT(handoff.take_error().is_ok());
-}
+void SetMexecDataZbi(uint level) { gImageAtHandoff = zbitl::View(gPhysHandoff->mexec_data.get()); }
 
 }  // namespace
 
-// After the VM is initialized so that we can allocate.
-LK_INIT_HOOK(construct_mexec_data_zbi, ConstructMexecDataZbi, LK_INIT_LEVEL_VM)
+LK_INIT_HOOK(set_mexec_data_zbi, SetMexecDataZbi, LK_INIT_LEVEL_EARLIEST)
 
 zx::result<size_t> WriteMexecData(ktl::span<ktl::byte> buffer) {
   // Storage or write errors resulting from a span-backed Image imply buffer

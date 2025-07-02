@@ -161,7 +161,7 @@ enum RefKey<'a> {
 /// All checks are local to this Component.
 pub fn validate(decl: &fdecl::Component) -> Result<(), ErrorList> {
     let ctx = ValidationContext::default();
-    ctx.validate(decl, None).map_err(|errs| ErrorList::new(errs))
+    ctx.validate(decl, &vec![]).map_err(|errs| ErrorList::new(errs))
 }
 
 /// Validates a list of namespace or builtin Capabilities.
@@ -259,7 +259,7 @@ pub fn validate_dynamic_offers<'a>(
 ) -> Result<(), ErrorList> {
     let mut ctx = ValidationContext::default();
     ctx.dynamic_children = dynamic_children;
-    ctx.validate(decl, Some(offers)).map_err(|errs| ErrorList::new(errs))
+    ctx.validate(decl, offers).map_err(|errs| ErrorList::new(errs))
 }
 
 fn check_offer_name(
@@ -323,7 +323,7 @@ impl<'a> ValidationContext<'a> {
     fn validate(
         mut self,
         decl: &'a fdecl::Component,
-        dynamic_offers: Option<&'a Vec<fdecl::Offer>>,
+        dynamic_offers: &'a Vec<fdecl::Offer>,
     ) -> Result<(), Vec<Error>> {
         // Collect all environment names first, so that references to them can be checked.
         if let Some(envs) = &decl.environments {
@@ -390,12 +390,10 @@ impl<'a> ValidationContext<'a> {
             self.validate_offer_group(&offers, OfferType::Static);
         }
 
-        if let Some(dynamic_offers) = dynamic_offers.as_ref() {
-            for dynamic_offer in dynamic_offers.iter() {
-                self.validate_offer_decl(&dynamic_offer, OfferType::Dynamic);
-            }
-            self.validate_offer_group(&dynamic_offers, OfferType::Dynamic);
+        for dynamic_offer in dynamic_offers.iter() {
+            self.validate_offer_decl(&dynamic_offer, OfferType::Dynamic);
         }
+        self.validate_offer_group(&dynamic_offers, OfferType::Dynamic);
 
         // Validate "environments" after all other declarations are processed.
         if let Some(environment) = decl.environments.as_ref() {

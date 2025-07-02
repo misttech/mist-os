@@ -822,6 +822,7 @@ mod tests {
 
         // Check the root Inspect node for MetricsLogger is created.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -849,6 +850,7 @@ mod tests {
 
         // Check the Inspect nodes for the loggers are created.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -872,6 +874,7 @@ mod tests {
 
         // Check data is logged to Inspect.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -908,6 +911,7 @@ mod tests {
 
         // Check data is logged to Inspect.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -944,6 +948,7 @@ mod tests {
 
         // Check Inspect node for the client is removed.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1086,6 +1091,7 @@ mod tests {
 
         // Check logger added to client before first temperature poll.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1107,6 +1113,7 @@ mod tests {
 
         // Checked data populated to Inspect node.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1133,6 +1140,7 @@ mod tests {
 
         // Check temperature logger removed in Inspect.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {}
@@ -1183,6 +1191,7 @@ mod tests {
 
         // Check TemperatureLogger added before first temperature poll.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1208,6 +1217,7 @@ mod tests {
 
         // Check temperature data in Inspect.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1240,6 +1250,7 @@ mod tests {
 
         // Check `test1` data remaining the same, `test2` data updated.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1275,6 +1286,7 @@ mod tests {
 
         // Check `test2` data remaining the same, `test1` data updated.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1319,6 +1331,7 @@ mod tests {
 
         // Check `test1` data updated, `test2` data remaining the same.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1366,6 +1379,7 @@ mod tests {
         assert_eq!(runner.iterate_logging_task(), false);
 
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {}
@@ -1953,6 +1967,7 @@ mod tests {
 
         // Check that inspect data is updated.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {

@@ -11,11 +11,12 @@ use fuchsia_async::TimeoutExt;
 use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::lock::Mutex as MutexAsync;
-use futures::{select, FutureExt, TryStreamExt};
+use futures::{select, FutureExt, TryFutureExt, TryStreamExt};
 use ieee80211::Bssid;
 use log::{error, info, warn};
 use std::collections::HashMap;
 use std::convert::TryFrom;
+use std::pin::pin;
 use std::sync::Arc;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
@@ -29,6 +30,15 @@ use {
     fidl_fuchsia_wlan_sme as fidl_sme, power_broker_client as pbclient,
 };
 
+// A long amount of time that a scan should be able to finish within. If a scan takes longer than
+// this is indicates something is wrong.
+const SCAN_TIMEOUT: fuchsia_async::MonotonicDuration =
+    fuchsia_async::MonotonicDuration::from_seconds(60);
+const CONNECT_TIMEOUT: fuchsia_async::MonotonicDuration =
+    fuchsia_async::MonotonicDuration::from_seconds(30);
+const DISCONNECT_TIMEOUT: fuchsia_async::MonotonicDuration =
+    fuchsia_async::MonotonicDuration::from_seconds(10);
+
 #[async_trait]
 pub(crate) trait IfaceManager: Send + Sync {
     type Client: ClientIface;
@@ -37,6 +47,9 @@ pub(crate) trait IfaceManager: Send + Sync {
     fn list_ifaces(&self) -> Vec<u16>;
     async fn get_country(&self, phy_id: u16) -> Result<[u8; 2], Error>;
     async fn set_country(&self, phy_id: u16, country: [u8; 2]) -> Result<(), Error>;
+    async fn power_down(&self, phy_id: u16) -> Result<(), Error>;
+    async fn power_up(&self, phy_id: u16) -> Result<(), Error>;
+    async fn get_power_state(&self, phy_id: u16) -> Result<bool, Error>;
     async fn query_iface(
         &self,
         iface_id: u16,
@@ -103,6 +116,39 @@ impl IfaceManager for DeviceMonitorIfaceManager {
         match zx::Status::ok(result) {
             Ok(()) => Ok(()),
             Err(e) => Err(e.into()),
+        }
+    }
+
+    async fn power_down(&self, phy_id: u16) -> Result<(), Error> {
+        let result = self.monitor_svc.power_down(phy_id).await.map_err(Into::<Error>::into)?;
+        match result {
+            Ok(()) => Ok(()),
+            Err(e) => match zx::Status::ok(e) {
+                Ok(()) => Ok(()),
+                Err(e) => Err(e.into()),
+            },
+        }
+    }
+
+    async fn power_up(&self, phy_id: u16) -> Result<(), Error> {
+        let result = self.monitor_svc.power_up(phy_id).await.map_err(Into::<Error>::into)?;
+        match result {
+            Ok(()) => Ok(()),
+            Err(e) => match zx::Status::ok(e) {
+                Ok(()) => Ok(()),
+                Err(e) => Err(e.into()),
+            },
+        }
+    }
+
+    async fn get_power_state(&self, phy_id: u16) -> Result<bool, Error> {
+        let result = self.monitor_svc.get_power_state(phy_id).await.map_err(Into::<Error>::into)?;
+        match result {
+            Ok(power_state) => Ok(power_state),
+            Err(e) => match zx::Status::ok(e) {
+                Err(e) => Err(e.into()),
+                Ok(()) => Err(format_err!("get_power_state returned error with ok status")),
+            },
         }
     }
 
@@ -393,11 +439,18 @@ impl ClientIface for SmeClientIface {
         let scan_request = fidl_sme::ScanRequest::Passive(fidl_sme::PassiveScanRequest);
         let (abort_sender, mut abort_receiver) = oneshot::channel();
         self.scan_abort_signal.lock().replace(abort_sender);
-        let mut fut = self.sme_proxy.scan(&scan_request);
+        let mut fut = pin!(self
+            .sme_proxy
+            .scan(&scan_request)
+            .map_err(|e| format_err!("Failed to request scan: {:?}", e))
+            .on_timeout(SCAN_TIMEOUT, || {
+                self.telemetry_sender.send(TelemetryEvent::SmeTimeout);
+                Err(format_err!("Timed out waiting on scan response from SME"))
+            })
+            .fuse());
         select! {
             scan_results = fut => {
-                let scan_result_vmo = scan_results
-                    .context("Failed to request scan")?
+                let scan_result_vmo = scan_results?
                     .map_err(|e| format_err!("Scan ended with error: {:?}", e))?;
                 info!("Got scan results from SME.");
                 *self.last_scan_results.lock() = Some(wlan_common::scan::read_vmo(scan_result_vmo)?);
@@ -500,7 +553,9 @@ impl ClientIface for SmeClientIface {
         let mut stream = connect_txn.take_event_stream();
         let (sme_result, timed_out) = wait_for_connect_result(&mut stream)
             .map(|res| (res, false))
-            .on_timeout(zx::MonotonicDuration::from_seconds(30), || {
+            .on_timeout(CONNECT_TIMEOUT, || {
+                warn!("Timed out waiting for connect result");
+                self.telemetry_sender.send(TelemetryEvent::SmeTimeout);
                 (
                     Ok(fidl_sme::ConnectResult {
                         code: fidl_ieee80211::StatusCode::RejectedSequenceTimeout,
@@ -533,7 +588,14 @@ impl ClientIface for SmeClientIface {
         // Note: we are forwarding disconnect request to SME, but we are not clearing
         //       any connected network state here because we expect this struct's `on_disconnect`
         //       to be called later.
-        self.sme_proxy.disconnect(fidl_sme::UserDisconnectReason::Unknown).await?;
+        self.sme_proxy
+            .disconnect(fidl_sme::UserDisconnectReason::Unknown)
+            .map_err(|e| format_err!("Failed to request disconnect: {:?}", e))
+            .on_timeout(DISCONNECT_TIMEOUT, || {
+                self.telemetry_sender.send(TelemetryEvent::SmeTimeout);
+                Err(format_err!("Timed out waiting for disconnect"))
+            })
+            .await?;
         Ok(())
     }
 
@@ -840,12 +902,16 @@ pub mod test_utils {
         CreateClientIface(u16),
         GetClientIface(u16),
         DestroyIface(u16),
+        PowerDown(u16),
+        PowerUp(u16),
+        GetPowerState(u16),
     }
 
     pub struct TestIfaceManager {
         pub client_iface: Mutex<Option<Arc<TestClientIface>>>,
         pub calls: Arc<Mutex<Vec<IfaceManagerCall>>>,
         country: Arc<Mutex<[u8; 2]>>,
+        power_state: Arc<Mutex<bool>>,
     }
 
     impl TestIfaceManager {
@@ -854,6 +920,7 @@ pub mod test_utils {
                 client_iface: Mutex::new(None),
                 calls: Arc::new(Mutex::new(vec![])),
                 country: Arc::new(Mutex::new(*b"WW")),
+                power_state: Arc::new(Mutex::new(true)),
             }
         }
 
@@ -862,6 +929,7 @@ pub mod test_utils {
                 client_iface: Mutex::new(Some(Arc::new(TestClientIface::new()))),
                 calls: Arc::new(Mutex::new(vec![])),
                 country: Arc::new(Mutex::new(*b"WW")),
+                power_state: Arc::new(Mutex::new(true)),
             }
         }
 
@@ -876,6 +944,7 @@ pub mod test_utils {
                     }))),
                     calls: Arc::new(Mutex::new(vec![])),
                     country: Arc::new(Mutex::new(*b"WW")),
+                    power_state: Arc::new(Mutex::new(true)),
                 },
                 sender,
             )
@@ -960,6 +1029,23 @@ pub mod test_utils {
             *self.client_iface.lock() = None;
             Ok(())
         }
+
+        async fn power_down(&self, phy_id: u16) -> Result<(), Error> {
+            self.calls.lock().push(IfaceManagerCall::PowerDown(phy_id));
+            *self.power_state.lock() = false;
+            Ok(())
+        }
+
+        async fn power_up(&self, phy_id: u16) -> Result<(), Error> {
+            self.calls.lock().push(IfaceManagerCall::PowerUp(phy_id));
+            *self.power_state.lock() = true;
+            Ok(())
+        }
+
+        async fn get_power_state(&self, phy_id: u16) -> Result<bool, Error> {
+            self.calls.lock().push(IfaceManagerCall::GetPowerState(phy_id));
+            Ok(*self.power_state.lock())
+        }
     }
 }
 
@@ -1043,6 +1129,51 @@ mod tests {
         manager.ifaces.lock().insert(TEST_IFACE_ID, Arc::new(iface));
         let mut client_fut = manager.get_client_iface(TEST_IFACE_ID);
         let iface = exec.run_singlethreaded(&mut client_fut).expect("Failed to get client iface");
+        drop(client_fut);
+        (exec, monitor_stream, sme_stream, telemetry_receiver, manager, iface)
+    }
+
+    fn setup_test_manager_with_iface_and_fake_time() -> (
+        fasync::TestExecutor,
+        fidl_device_service::DeviceMonitorRequestStream,
+        fidl_sme::ClientSmeRequestStream,
+        mpsc::Receiver<TelemetryEvent>,
+        DeviceMonitorIfaceManager,
+        Arc<SmeClientIface>,
+    ) {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
+        let (monitor_svc, monitor_stream) =
+            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>();
+        let (sme_proxy, sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>();
+        let (telemetry_sender, telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
+        let manager = DeviceMonitorIfaceManager {
+            monitor_svc: monitor_svc.clone(),
+            pb_topology_svc: None,
+            ifaces: Mutex::new(HashMap::new()),
+            telemetry_sender: TelemetrySender::new(telemetry_sender.clone()),
+        };
+        let iface = SmeClientIface {
+            iface_id: 13,
+            phy_id: 42,
+            sme_proxy,
+            monitor_svc,
+            last_scan_results: Arc::new(Mutex::new(None)),
+            scan_abort_signal: Arc::new(Mutex::new(None)),
+            connected_network_rssi: Arc::new(Mutex::new(None)),
+            wlanix_provisioned: true,
+            bss_scorer: BssScorer::new(),
+            power_state: Arc::new(MutexAsync::new(PowerState {
+                power_element_context: None,
+                suspend_mode_enabled: false,
+                power_save_enabled: false,
+            })),
+            telemetry_sender: TelemetrySender::new(telemetry_sender),
+        };
+
+        manager.ifaces.lock().insert(1, Arc::new(iface));
+        let mut client_fut = manager.get_client_iface(1);
+        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
         drop(client_fut);
         (exec, monitor_stream, sme_stream, telemetry_receiver, manager, iface)
     }
@@ -1404,6 +1535,24 @@ mod tests {
         assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(Ok(ScanEnd::Cancelled)));
     }
 
+    #[test]
+    fn test_trigger_scan_timeout() {
+        let (mut exec, _monitor_stream, mut sme_stream, mut telemetry_receiver, _manager, iface) =
+            setup_test_manager_with_iface_and_fake_time();
+        assert!(iface.get_last_scan_results().is_empty());
+        let mut scan_fut = iface.trigger_scan();
+        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Pending);
+        let (_req, _responder) = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Scan { req, responder }))) => (req, responder));
+
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(61_000_000_000));
+        assert_variant!(exec.run_until_stalled(&mut scan_fut), Poll::Ready(Err(_)));
+
+        let event = assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
+        assert_variant!(event, TelemetryEvent::SmeTimeout);
+    }
+
     #[test_case(
         FakeProtectionCfg::Open,
         vec![fidl_security::Protocol::Open],
@@ -1643,40 +1792,8 @@ mod tests {
 
     #[test]
     fn test_connect_fails_with_timeout() {
-        // Create the manager here instead of using setup_test_manager(), since we need fake time
-        let mut exec = fasync::TestExecutor::new_with_fake_time();
-        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(0));
-        let (monitor_svc, _monitor_stream) =
-            create_proxy_and_stream::<fidl_device_service::DeviceMonitorMarker>();
-        let (sme_proxy, mut sme_stream) = create_proxy_and_stream::<fidl_sme::ClientSmeMarker>();
-        let (telemetry_sender, _telemetry_receiver) = mpsc::channel::<TelemetryEvent>(100);
-        let manager = DeviceMonitorIfaceManager {
-            monitor_svc: monitor_svc.clone(),
-            pb_topology_svc: None,
-            ifaces: Mutex::new(HashMap::new()),
-            telemetry_sender: TelemetrySender::new(telemetry_sender.clone()),
-        };
-        let iface = SmeClientIface {
-            iface_id: 13,
-            phy_id: 42,
-            sme_proxy,
-            monitor_svc,
-            last_scan_results: Arc::new(Mutex::new(None)),
-            scan_abort_signal: Arc::new(Mutex::new(None)),
-            connected_network_rssi: Arc::new(Mutex::new(None)),
-            wlanix_provisioned: true,
-            bss_scorer: BssScorer::new(),
-            power_state: Arc::new(MutexAsync::new(PowerState {
-                power_element_context: None,
-                suspend_mode_enabled: false,
-                power_save_enabled: false,
-            })),
-            telemetry_sender: TelemetrySender::new(telemetry_sender),
-        };
-
-        manager.ifaces.lock().insert(1, Arc::new(iface));
-        let mut client_fut = manager.get_client_iface(1);
-        let iface = assert_variant!(exec.run_until_stalled(&mut client_fut), Poll::Ready(Ok(iface)) => iface);
+        let (mut exec, _monitor_stream, mut sme_stream, mut telemetry_receiver, _manager, iface) =
+            setup_test_manager_with_iface_and_fake_time();
 
         let bss_description = fake_fidl_bss_description!(Open,
             ssid: Ssid::try_from("foo").unwrap(),
@@ -1701,6 +1818,9 @@ mod tests {
             assert_variant!(exec.run_until_stalled(&mut connect_fut), Poll::Ready(Ok(r)) => r);
         let failure = assert_variant!(connect_result, ConnectResult::Fail(failure) => failure);
         assert!(failure.timed_out);
+
+        let event = assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
+        assert_variant!(event, TelemetryEvent::SmeTimeout);
     }
 
     #[test_case(
@@ -1830,6 +1950,24 @@ mod tests {
 
         assert_variant!(disconnect_responder.send(), Ok(()));
         assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Ok(())));
+    }
+
+    #[test]
+    fn test_disconnect_timeout() {
+        let (mut exec, _monitor_stream, mut sme_stream, mut telemetry_receiver, _manager, iface) =
+            setup_test_manager_with_iface_and_fake_time();
+
+        let mut disconnect_fut = iface.disconnect();
+        assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Pending);
+        let (_disconnect_reason, _disconnect_responder) = assert_variant!(
+            exec.run_until_stalled(&mut sme_stream.next()),
+            Poll::Ready(Some(Ok(fidl_sme::ClientSmeRequest::Disconnect { reason, responder }))) => (reason, responder));
+
+        exec.set_fake_time(fasync::MonotonicInstant::from_nanos(11_000_000_000));
+        assert_variant!(exec.run_until_stalled(&mut disconnect_fut), Poll::Ready(Err(_)));
+
+        let event = assert_variant!(telemetry_receiver.try_next(), Ok(Some(event)) => event);
+        assert_variant!(event, TelemetryEvent::SmeTimeout);
     }
 
     #[test]

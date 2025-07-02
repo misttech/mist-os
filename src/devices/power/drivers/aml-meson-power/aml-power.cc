@@ -383,11 +383,26 @@ zx_status_t AmlPower::PowerImplGetCurrentVoltage(uint32_t index, uint32_t* curre
 }
 
 zx::result<> AmlPower::Start() {
+  zx::result pdev = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
+  if (pdev.is_error()) {
+    fdf::error("Failed to connect to platform device: {}", pdev);
+    return pdev.take_error();
+  }
+  if (zx::result result = metadata_server.SetMetadataFromPDevIfExists(pdev.value());
+      result.is_error()) {
+    fdf::error("Failed to set metadata: {}", result);
+    return result.take_error();
+  }
+  if (zx::result result = metadata_server.Serve(*outgoing(), dispatcher()); result.is_error()) {
+    fdf::error("Failed to serve  metadata: {}", result);
+    return result.take_error();
+  }
+
   compat::DeviceServer::BanjoConfig banjo_config{.default_proto_id = ZX_PROTOCOL_POWER_IMPL};
   banjo_config.callbacks[ZX_PROTOCOL_POWER_IMPL] = banjo_server_.callback();
-  zx::result<> result = compat_server_.Initialize(
-      incoming(), outgoing(), node_name(), kChildNodeName,
-      compat::ForwardMetadata::Some({DEVICE_METADATA_POWER_DOMAINS}), std::move(banjo_config));
+  zx::result<> result =
+      compat_server_.Initialize(incoming(), outgoing(), node_name(), kChildNodeName,
+                                compat::ForwardMetadata::None(), std::move(banjo_config));
   if (result.is_error()) {
     fdf::error("Failed to initialize compat server: {}", result);
     return result.take_error();
@@ -458,6 +473,7 @@ zx::result<> AmlPower::Start() {
   }
 
   std::vector offers = compat_server_.CreateOffers2();
+  offers.push_back(metadata_server.MakeOffer());
   std::vector<fuchsia_driver_framework::NodeProperty2> properties = {
       fdf::MakeProperty2(bind_fuchsia::PROTOCOL, static_cast<uint32_t>(ZX_PROTOCOL_POWER_IMPL))};
   zx::result child = AddChild(kChildNodeName, properties, offers);

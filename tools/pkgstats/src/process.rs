@@ -52,7 +52,7 @@ pub struct ProcessCommand {
 
 impl ProcessCommand {
     pub async fn execute(self) -> Result<()> {
-        let manifest = AssembledSystem::try_load_from(&self.assembly_manifest)?;
+        let manifest = AssembledSystem::from_relative_config_path(&self.assembly_manifest)?;
 
         if self.debug_no_parallel {
             ThreadPoolBuilder::new().num_threads(1).build_global().expect("make thread pool");
@@ -75,18 +75,18 @@ impl ProcessCommand {
                     | Image::FVM(_)
                     | Image::FVMSparse(_)
                     | Image::FVMFastboot(_)
+                    | Image::Fxfs(_)
                     | Image::QemuKernel(_)
                     | Image::VBMeta(_)
                     | Image::ZBI { path: _, signed: _ } => return Box::new(std::iter::empty()),
                     // We skip this one, its contents are listed in the blobfs and fxfs contents.
                     Image::BasePackage(_) => return Box::new(std::iter::empty()),
                     Image::BlobFS { path: _, contents }
-                    | Image::Fxfs { path: _, contents }
                     | Image::FxfsSparse { path: _, contents } => contents.packages,
                 };
                 let PackagesMetadata {
-                    base: PackageSetMetadata(base_packages),
-                    cache: PackageSetMetadata(cache_packages),
+                    base: PackageSetMetadata { metadata: base_packages },
+                    cache: PackageSetMetadata { metadata: cache_packages },
                 } = packages;
                 Box::new(base_packages.into_iter().chain(cache_packages.into_iter()).map(
                     |metadata| {

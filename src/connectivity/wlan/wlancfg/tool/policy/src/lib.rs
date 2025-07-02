@@ -1417,7 +1417,7 @@ mod tests {
         false
     )]
     #[test_case("otherssid", None, None, false)]
-    #[fuchsia::test]
+    #[fuchsia::test(add_test_attr = false)]
     fn test_config_matches_config(
         ssid: &str,
         security: Option<wlan_policy::SecurityType>,

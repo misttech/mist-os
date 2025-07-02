@@ -125,7 +125,7 @@ Add coverage to:
 [bindings-tutorials]: /docs/development/languages/fidl/tutorials/overview.md
 [client suite]: /src/tests/fidl/dynsuite/client_suite/
 [dangerous identifiers suite]: /src/tests/fidl/dangerous_identifiers/
-[debugdata]: /zircon/system/ulib/c/sanitizers/debugdata.cc
+[debugdata]: /sdk/lib/c/sanitizers/debugdata.cc
 [dynamic compatibility suite]: /src/tests/fidl/compatibility/
 [editors]: /docs/development/languages/fidl/guides/editors.md
 [fidl-codec]: /src/lib/fidl_codec

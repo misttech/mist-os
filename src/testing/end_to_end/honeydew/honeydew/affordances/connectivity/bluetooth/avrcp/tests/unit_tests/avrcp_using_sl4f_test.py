@@ -62,6 +62,10 @@ class BluetoothAvrcpSL4FTests(unittest.TestCase):
         self.sl4f_obj.run.assert_called()
         self.sl4f_obj.reset_mock()
 
+    def test_verify_supported(self) -> None:
+        """Test if verify_supported works."""
+        # TODO(http://b/409622631): Implement the test method logic
+
     def test_avrcp_init(self) -> None:
         """Test for Bluetooth.avrcp_init() method."""
         self.bluetooth_obj.init_avrcp(target_id="0")

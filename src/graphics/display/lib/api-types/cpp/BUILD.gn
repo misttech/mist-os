@@ -9,6 +9,7 @@ source_set("cpp") {
   sources = [
     "alpha-mode.cc",
     "alpha-mode.h",
+    "backlight-state.h",
     "buffer-collection-id.h",
     "buffer-id.h",
     "color.cc",
@@ -37,8 +38,6 @@ source_set("cpp") {
     "image-metadata.h",
     "image-tiling-type.cc",
     "image-tiling-type.h",
-    "layer-composition-operations.cc",
-    "layer-composition-operations.h",
     "layer-id.h",
     "mode-and-id.h",
     "mode.h",
@@ -48,6 +47,7 @@ source_set("cpp") {
   ]
   public_deps = [
     "//sdk/banjo/fuchsia.hardware.display.controller:fuchsia.hardware.display.controller_banjo_cpp",
+    "//sdk/fidl/fuchsia.hardware.backlight:fuchsia.hardware.backlight_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.display.engine:fuchsia.hardware.display.engine_cpp",
     "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
@@ -60,6 +60,7 @@ source_set("cpp") {
 
 test_sources = [
   "alpha-mode-test.cc",
+  "backlight-state-test.cc",
   "buffer-collection-id-test.cc",
   "buffer-id-test.cc",
   "color-test.cc",
@@ -82,7 +83,6 @@ test_sources = [
   "image-id-test.cc",
   "image-metadata-test.cc",
   "image-tiling-type-test.cc",
-  "layer-composition-operations-test.cc",
   "layer-id-test.cc",
   "mode-and-id-test.cc",
   "mode-test.cc",

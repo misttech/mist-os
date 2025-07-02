@@ -13,7 +13,7 @@ use std::num::NonZeroU8;
 
 use fidl::endpoints::RequestStream as _;
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
-use futures::{Future, FutureExt as _, StreamExt as _};
+use futures::{Future, StreamExt as _};
 use log::{error, info};
 use {fidl_fuchsia_process_lifecycle as fprocess_lifecycle, fuchsia_async as fasync};
 
@@ -116,14 +116,11 @@ fn get_lifecycle_stop_fut() -> impl Future<Output = ()> {
     // Lifecycle handle takes no args, must be set to zero.
     // See zircon/processargs.h.
     const LIFECYCLE_HANDLE_ARG: u16 = 0;
-    let Some(handle) = fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleInfo::new(
+    let handle = fuchsia_runtime::take_startup_handle(fuchsia_runtime::HandleInfo::new(
         fuchsia_runtime::HandleType::Lifecycle,
         LIFECYCLE_HANDLE_ARG,
-    )) else {
-        // If we haven't received a lifecycle handle, don't ever stop the
-        // request streams.
-        return futures::future::pending::<()>().left_future();
-    };
+    ))
+    .expect("missing lifecycle handle");
 
     async move {
         let mut request_stream = fprocess_lifecycle::LifecycleRequestStream::from_channel(
@@ -160,5 +157,4 @@ fn get_lifecycle_stop_fut() -> impl Future<Output = ()> {
             }
         }
     }
-    .right_future()
 }

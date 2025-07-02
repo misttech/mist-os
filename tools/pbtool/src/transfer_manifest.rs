@@ -9,7 +9,8 @@ use argh::FromArgs;
 use assembled_system::Image;
 use camino::{Utf8Path, Utf8PathBuf};
 use pathdiff::diff_utf8_paths;
-use sdk_metadata::{ProductBundle, VirtualDeviceManifest};
+use product_bundle::ProductBundle;
+use sdk_metadata::VirtualDeviceManifest;
 use std::fs::File;
 use transfer_manifest::{
     ArtifactEntry, ArtifactType, TransferEntry, TransferManifest, TransferManifestV1,
@@ -185,8 +186,9 @@ mod tests {
 
     use assembly_partitions_config::PartitionsConfig;
     use fuchsia_repo::test_utils;
+    use product_bundle::{ProductBundleV2, Repository};
     use sdk_metadata::virtual_device::Hardware;
-    use sdk_metadata::{ProductBundleV2, Repository, VirtualDevice, VirtualDeviceV1};
+    use sdk_metadata::{VirtualDevice, VirtualDeviceV1};
     use std::io::Write;
     use tempfile::tempdir;
 
@@ -254,6 +256,7 @@ mod tests {
             }],
             update_package_hash: None,
             virtual_devices_path: Some(vd_manifest_path),
+            release_info: None,
         });
         pb.write(&pb_path).unwrap();
 

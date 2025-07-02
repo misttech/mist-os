@@ -16,7 +16,7 @@ pub mod __backend {
     pub use crate::noop::*;
 }
 
-pub use __backend::{Id, TraceFutureExt};
+pub use __backend::{Id, Scope, TraceFutureExt};
 
 /// Convenience macro for creating a trace duration event from this macro invocation to the end of
 /// the current scope.
@@ -38,6 +38,22 @@ macro_rules! duration {
             }
         };
     }
+}
+
+/// Convenience macro for creating an instant event.
+///
+/// See `fuchsia_trace::instant!` for more details.
+#[macro_export]
+macro_rules! instant {
+    ($category:expr, $name:expr, $scope:expr $(, $key:expr => $val:expr)*) => {{
+        static CACHE: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        if let Some(context) =
+            $crate::__backend::TraceCategoryContext::acquire_cached($category, &CACHE)
+        {
+            $crate::__backend::instant(&context, $name, $scope,
+                                        &[$($crate::__backend::ArgValue::of($key, $val)),*])
+        }
+    }}
 }
 
 /// Writes a flow begin event with the specified id.
@@ -107,7 +123,7 @@ macro_rules! trace_future_args {
 
 #[cfg(test)]
 mod tests {
-    use crate::TraceFutureExt;
+    use crate::{Scope, TraceFutureExt};
 
     #[fuchsia::test]
     fn test_duration() {
@@ -115,6 +131,14 @@ mod tests {
         duration!(c"category", c"name");
         duration!(c"category", c"name", "arg" => 5);
         duration!(c"category", c"name", "arg" => 5, "arg2" => trace_only_var);
+    }
+
+    #[fuchsia::test]
+    fn test_instant() {
+        let trace_only_var = 6;
+        instant!(c"category", c"name", Scope::Thread);
+        instant!(c"category", c"name", Scope::Thread, "arg" => 5);
+        instant!(c"category", c"name", Scope::Thread, "arg" => 5, "arg2" => trace_only_var);
     }
 
     #[fuchsia::test]

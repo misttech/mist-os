@@ -270,13 +270,6 @@ macro_rules! impl_partial_eq_and_eq {
             }
         }
 
-        impl PartialEq<$name> for $prim {
-            #[inline]
-            fn eq(&self, other: &$name) -> bool {
-                self.eq(&other.0)
-            }
-        }
-
         impl Eq for $name {}
     };
 }

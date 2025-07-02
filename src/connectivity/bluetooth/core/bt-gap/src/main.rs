@@ -294,6 +294,14 @@ async fn serve_fidl(hd: HostDispatcher, inspect: fuchsia_inspect::Inspector) -> 
                     .unwrap_or_else(|e| warn!("Receiver service failed: {:?}", e)),
             )
             .detach();
+        })
+        .add_fidl_service(|request_stream| {
+            let hd = hd.clone();
+            fasync::Task::spawn(
+                services::address_lookup::run(hd, request_stream)
+                    .unwrap_or_else(|e| warn!("Address lookup service failed: {:?}", e)),
+            )
+            .detach();
         });
     let _ = fs.take_and_serve_directory_handle()?;
     fs.collect::<()>().await;

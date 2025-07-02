@@ -3,96 +3,9 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
 use io_conformance_util::test_harness::TestHarness;
 use io_conformance_util::*;
-
-#[fuchsia::test]
-async fn create_directory_with_create_if_absent_flag() {
-    let harness = TestHarness::new().await;
-    if !harness.config.supports_modify_directory {
-        return;
-    }
-
-    let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
-
-    let mnt_dir = deprecated_open_dir_with_flags(
-        &dir,
-        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE_IF_ABSENT | fio::OpenFlags::CREATE,
-        "mnt",
-    )
-    .await;
-    let _tmp_dir = deprecated_open_dir_with_flags(
-        &mnt_dir,
-        fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::CREATE_IF_ABSENT | fio::OpenFlags::CREATE,
-        "tmp",
-    )
-    .await;
-
-    let (client, server) = create_proxy::<fio::NodeMarker>();
-
-    dir.deprecated_open(
-        fio::OpenFlags::CREATE_IF_ABSENT
-            | fio::OpenFlags::CREATE
-            | fio::OpenFlags::DESCRIBE
-            | fio::OpenFlags::DIRECTORY,
-        fio::ModeType::empty(),
-        "mnt/tmp/foo",
-        server,
-    )
-    .expect("Cannot open file");
-
-    assert_eq!(get_open_status(&client).await, zx::Status::OK);
-}
-
-#[fuchsia::test]
-async fn create_file_with_sufficient_rights() {
-    let harness = TestHarness::new().await;
-    if !harness.config.supports_modify_directory {
-        return;
-    }
-
-    for flags in harness.file_rights.combinations_containing_deprecated(fio::Rights::WRITE_BYTES) {
-        let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
-        // Create a new file inside `dir` with a connection that only has the rights in `flags`.
-        {
-            let dir = deprecated_open_dir_with_flags(&dir, flags, ".").await;
-            deprecated_open_node::<fio::FileMarker>(
-                &dir,
-                flags | fio::OpenFlags::CREATE,
-                TEST_FILE,
-            )
-            .await;
-        }
-        // Ensure that the file was created and is accessible.
-        assert_eq!(read_file(&dir, TEST_FILE).await, &[]);
-    }
-}
-
-#[fuchsia::test]
-async fn create_file_with_insufficient_rights() {
-    let harness = TestHarness::new().await;
-    if !harness.config.supports_modify_directory {
-        return;
-    }
-
-    for flags in harness.file_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
-        let dir = harness.get_directory(vec![], harness.dir_rights.all_flags());
-        // Try to create a new file inside `dir` with a connection that lacks writable rights.
-        {
-            let dir = deprecated_open_dir_with_flags(&dir, flags, ".").await;
-            let result = deprecated_open_node_status::<fio::FileMarker>(
-                &dir,
-                flags | fio::OpenFlags::CREATE,
-                TEST_FILE,
-            )
-            .await;
-            assert_matches!(result, Err(zx::Status::ACCESS_DENIED));
-        }
-        assert_file_not_found(&dir, TEST_FILE).await;
-    }
-}
 
 #[fuchsia::test]
 async fn create_directory() {
@@ -115,12 +28,18 @@ async fn create_directory() {
         .await
         .expect("open failed.");
 
-    assert_matches!(
-        dir_with_sufficient_rights
-            .open_node::<fio::DirectoryMarker>("dir", fio::Flags::FLAG_MAYBE_CREATE, None,)
-            .await
-            .expect_err("open should fail when creating directory without specifiying a protocol."),
-        zx::Status::INVALID_ARGS
+    // Trying to create the file again with MUST_CREATE should fail with ALREADY_EXISTS.
+    assert_eq!(
+        dir.open_node::<fio::DirectoryMarker>(
+            "dir",
+            fio::Flags::PROTOCOL_DIRECTORY
+                | fio::Flags::FLAG_MUST_CREATE
+                | fio::Flags::PERM_MODIFY_DIRECTORY,
+            None,
+        )
+        .await
+        .unwrap_err(),
+        zx::Status::ALREADY_EXISTS
     );
 
     let (_, representation) = dir_with_sufficient_rights
@@ -135,17 +54,13 @@ async fn create_directory() {
         .expect("open with directory protocol failed.");
     assert_matches!(representation, fio::Representation::Directory(_));
 
-    let (_, representation) = dir_with_sufficient_rights
-        .open_node_repr::<fio::FileMarker>(
-            TEST_FILE,
-            fio::Flags::FLAG_SEND_REPRESENTATION
-                | fio::Flags::PROTOCOL_FILE
-                | fio::Flags::FLAG_MAYBE_CREATE,
-            None,
-        )
-        .await
-        .expect("open with with file protocol failed.");
-    assert_matches!(representation, fio::Representation::File(_));
+    assert_matches!(
+        dir_with_sufficient_rights
+            .open_node::<fio::DirectoryMarker>("dir", fio::Flags::FLAG_MAYBE_CREATE, None,)
+            .await
+            .expect_err("open should fail when creating directory without specifiying a protocol."),
+        zx::Status::INVALID_ARGS
+    );
 }
 
 #[fuchsia::test]
@@ -308,7 +223,7 @@ async fn create_file() {
 }
 
 #[fuchsia::test]
-async fn create_file_with_insufficient_rights_open3() {
+async fn create_file_with_insufficient_rights() {
     let harness = TestHarness::new().await;
     if !harness.config.supports_modify_directory {
         return;

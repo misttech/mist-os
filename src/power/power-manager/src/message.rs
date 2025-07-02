@@ -12,8 +12,8 @@ pub enum Message {
     /// Read the temperature
     ReadTemperature,
 
-    /// Command a system reboot due to high temperature
-    HighTemperatureReboot,
+    /// Command a system shutdown due to high temperature
+    HighTemperatureShutdown,
 
     /// Communicate a new thermal load value for the given sensor
     /// Arg0: a ThermalLoad value which represents the severity of thermal load on the given sensor

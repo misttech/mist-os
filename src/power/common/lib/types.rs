@@ -220,6 +220,7 @@ impl ops::Div<Hertz> for f64 {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/421408825)
 /// Describes a processor operating point.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct OperatingPoint {

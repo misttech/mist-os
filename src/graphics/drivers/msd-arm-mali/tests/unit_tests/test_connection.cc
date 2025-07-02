@@ -55,18 +55,20 @@ class FakeConnectionOwner : public FakeConnectionOwnerBase {
  public:
   FakeConnectionOwner() {}
 
-  void ScheduleAtom(std::shared_ptr<MsdArmAtom> atom) override { atoms_list_.push_back(atom); }
-  void CancelAtoms(std::shared_ptr<MsdArmConnection> connection) override {
+  void NdtPostScheduleAtom(std::shared_ptr<MsdArmAtom> atom) override {
+    atoms_list_.push_back(atom);
+  }
+  void NdtPostCancelAtoms(std::shared_ptr<MsdArmConnection> connection) override {
     cancel_atoms_list_.push_back(connection.get());
   }
-  AddressSpaceObserver* GetAddressSpaceObserver() override { return &observer_; }
+  AddressSpaceObserver* NdtGetAddressSpaceObserver() override { return &observer_; }
   TestAddressSpaceObserver* GetTestAddressSpaceObserver() { return &observer_; }
   magma::PlatformBusMapper* GetBusMapper() override { return &bus_mapper_; }
-  ArmMaliCacheCoherencyStatus cache_coherency_status() override {
+  ArmMaliCacheCoherencyStatus NdtGetCacheCoherencyStatus() override {
     return kArmMaliCacheCoherencyAce;
   }
-  void SetCurrentThreadToDefaultPriority() override { got_set_to_default_priority_ = true; }
-  virtual msd::MagmaMemoryPressureLevel GetCurrentMemoryPressureLevel() override {
+  void NdtSetCurrentThreadToDefaultPriority() override { got_set_to_default_priority_ = true; }
+  virtual msd::MagmaMemoryPressureLevel NdtGetCurrentMemoryPressureLevel() override {
     return memory_pressure_level_;
   }
 
@@ -89,7 +91,7 @@ class FakeConnectionOwner : public FakeConnectionOwnerBase {
 class DeregisterConnectionOwner : public FakeConnectionOwner {
  public:
   void set_connection(std::weak_ptr<MsdArmConnection> connection) { connection_ = connection; }
-  void DeregisterConnection() override { EXPECT_TRUE(connection_.expired()); }
+  void NdtDeregisterConnection() override { EXPECT_TRUE(connection_.expired()); }
 
  private:
   std::weak_ptr<MsdArmConnection> connection_;
@@ -121,10 +123,18 @@ class FailAllocateConnectionOwner : public FakeConnectionOwner {
 std::vector<std::vector<uint8_t>> g_status;
 
 class TestNotificationHandler : public msd::testing::StubNotificationHandler {
+ public:
+  bool is_killed() { return is_killed_; }
+
   // msd::NotificationHandler implementation.
   void NotificationChannelSend(cpp20::span<uint8_t> data) override {
     g_status.push_back(std::vector<uint8_t>(data.begin(), data.end()));
   }
+
+  void ContextKilled() override { is_killed_ = true; }
+
+ private:
+  bool is_killed_ = false;
 };
 }  // namespace
 
@@ -1343,6 +1353,41 @@ class TestConnection {
     auto connection = MsdArmConnection::Create(0, &owner);
     EXPECT_FALSE(connection);
   }
+
+  void TwoTerminatedAtomsAreKilled() {
+    FakeConnectionOwner owner;
+    auto connection = MsdArmConnection::Create(0, &owner);
+    EXPECT_TRUE(connection);
+
+    TestNotificationHandler handler;
+    connection->SetNotificationCallback(&handler);
+
+    MsdArmAtom atom(connection, 0, 1, 5, magma_arm_mali_user_data{7, 8}, 0);
+    atom.set_result_code(kArmMaliResultAtomTerminated);
+    connection->SendNotificationData(&atom);
+    ASSERT_EQ(1u, connection->terminated_atoms_);
+    ASSERT_EQ(false, handler.is_killed());
+
+    MsdArmAtom atom2(connection, 0, 1, 5, magma_arm_mali_user_data{7, 8}, 0);
+    atom2.set_result_code(kArmMaliResultAtomTerminated);
+    connection->SendNotificationData(&atom2);
+    ASSERT_EQ(2u, connection->terminated_atoms_);
+    ASSERT_EQ(true, handler.is_killed());
+  }
+
+  void TerminatedCoalescedAtomSent() {
+    FakeConnectionOwner owner;
+    auto connection = MsdArmConnection::Create(0, &owner);
+    EXPECT_TRUE(connection);
+
+    TestNotificationHandler handler;
+    connection->SetNotificationCallback(&handler);
+
+    MsdArmAtom atom(connection, 0, 1, 5, magma_arm_mali_user_data{7, 8}, 0, kAtomFlagCoalesce);
+    atom.set_result_code(kArmMaliResultAtomTerminated);
+    connection->SendNotificationData(&atom);
+    ASSERT_EQ(1u, g_status.size());
+  }
 };
 
 class ConnectionTest : public testing::Test {
@@ -1377,7 +1422,7 @@ TEST_F(ConnectionTest, Notification) {
 
 TEST_F(ConnectionTest, CoalescedNotification) {
   TestConnection test;
-  test.DestructionNotification();
+  test.CoalescedNotification();
 }
 
 TEST_F(ConnectionTest, DestructionNotification) {
@@ -1447,7 +1492,7 @@ TEST_F(ConnectionTest, JitAllocateWriteCombining) {
 
 TEST_F(ConnectionTest, JitAllocateReuseChoice) {
   TestConnection test;
-  test.JitAllocateWriteCombining();
+  test.JitAllocateReuseChoice();
 }
 
 TEST_F(ConnectionTest, JitAllocateInvalidCommitSize) {
@@ -1468,4 +1513,14 @@ TEST_F(ConnectionTest, MemoryPressure) {
 TEST_F(ConnectionTest, FailAllAllocation) {
   TestConnection test;
   test.FailAllAllocation();
+}
+
+TEST_F(ConnectionTest, TwoTerminatedAtomsAreKilled) {
+  TestConnection test;
+  test.TwoTerminatedAtomsAreKilled();
+}
+
+TEST_F(ConnectionTest, TerminatedCoalescedAtomSent) {
+  TestConnection test;
+  test.TerminatedCoalescedAtomSent();
 }

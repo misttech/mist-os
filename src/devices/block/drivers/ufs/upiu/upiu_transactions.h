@@ -29,7 +29,7 @@ class UfsMockDevice;
 }  // namespace ufs_mock_device
 
 // UFS Specification Version 3.1, section 10.5 "UPIU Transactions".
-enum UpiuTransactionCodes {
+enum UpiuTransactionCodes : uint8_t {
   kNopOut = 0x00,
   kCommand = 0x01,
   kDataOut = 0x02,
@@ -50,7 +50,7 @@ enum UpiuCommandSetType {
   kVendorSpecificSet = 0x08,
 };
 
-enum UpiuHeaderResponse {
+enum UpiuHeaderResponseCode {
   kTargetSuccess = 0x00,
   kTargetFailure = 0x01,
 };
@@ -66,7 +66,7 @@ struct UpiuHeader {
   // dword 1
   uint8_t cmd_set_type_and_initiator_id = 0;
   uint8_t function = 0;
-  uint8_t response = UpiuHeaderResponse::kTargetSuccess;
+  uint8_t response = UpiuHeaderResponseCode::kTargetSuccess;
   uint8_t status = 0;
 
   // dword 2
@@ -81,7 +81,7 @@ struct UpiuHeader {
   DEF_SUBBIT(flags, 2, cp);
   DEF_SUBFIELD(flags, 1, 0, task_attribute);
 
-  DEF_SUBFIELD(cmd_set_type_and_initiator_id, 3, 0, command_set_type);
+  DEF_ENUM_SUBFIELD(cmd_set_type_and_initiator_id, UpiuCommandSetType, 3, 0, command_set_type);
   DEF_SUBFIELD(cmd_set_type_and_initiator_id, 7, 4, initiator_id);
 
   DEF_SUBBIT(device_infomation, 0, event_alert);
@@ -354,6 +354,20 @@ inline const char* QueryOpcodeToString(QueryOpcode opcode) {
       return "(UNKNOWN)";
   }
 }
+
+enum class QueryResponseCode {
+  kSuccess = 0x00,
+  kParameterNotReadable = 0xf6,
+  kParameterNotWriteable = 0xf7,
+  kParameterAlreadyWritten = 0xf8,
+  kInvalidLength = 0xf9,
+  kInvalidValue = 0xfa,
+  kInvalidSelector = 0xfb,
+  kInvalidIndex = 0xfc,
+  kInvalidIdn = 0xfd,
+  kInvalidOpcode = 0xfe,
+  kGeneralFailure = 0xff,
+};
 
 struct QueryResponseUpiuData {
   // dword 0 ~ 2

@@ -62,7 +62,8 @@ bool ResumeIfBacktraceRequest(const zx::thread& thread, const zx::exception& exc
 }
 
 void HandOffException(async_dispatcher_t* dispatcher, zx::exception exception,
-                      const zx_exception_info_t& info, ExceptionHandler& handler) {
+                      const zx_exception_info_t& info, ExceptionHandler& handler,
+                      bool& early_bailout) {
   zx::process process;
   if (const zx_status_t status = exception.get_process(&process); status != ZX_OK) {
     LogError("failed to get exception process when receiving exception", info, status);
@@ -93,10 +94,18 @@ void HandOffException(async_dispatcher_t* dispatcher, zx::exception exception,
   }
 
   // Dump the crash info to the logs whether we have a FIDL handler or not.
-  fprintf(stdout, "crashsvc: exception received, processing\n");
-  inspector_print_debug_info(stdout, process.get(), thread.get());
-
   const std::string process_name = fsl::GetObjectName(process.get());
+  if (early_bailout) {
+    fprintf(
+        stdout,
+        "crashsvc: component manager already crashed, won't process exception for process \"%s\"\n",
+        process_name.c_str());
+    return;
+  }
+
+  fprintf(stdout, "crashsvc: exception received for process \"%s\", processing\n",
+          process_name.c_str());
+  inspector_print_debug_info(stdout, process.get(), thread.get());
 
   // If the process serving fuchsia.exception.Handler crashes, the system will send future requests
   // for the protocol to the crashes server because it isn't techically terminated. As a result, the
@@ -136,6 +145,9 @@ void HandOffException(async_dispatcher_t* dispatcher, zx::exception exception,
         dispatcher, [exception = std::move(exception)]() mutable { exception.reset(); },
         zx::sec(5));
 
+    // Once component manager has crashed, any subsequent crashes are likely just noise and fill up
+    // the DLOG.
+    early_bailout = true;
     return;
   }
 
@@ -180,9 +192,9 @@ zx::result<std::unique_ptr<async::Wait>> start_crashsvc(
       exception_channel.get(), ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED, /*options=*/0u,
       [exception_channel = std::move(exception_channel),
        handler = std::make_unique<ExceptionHandler>(dispatcher, std::move(exception_handler_svc),
-                                                    kExceptionHandlerTimeout)](
-          async_dispatcher_t* dispatcher, async::Wait* wait, zx_status_t status,
-          const zx_packet_signal_t* signal) {
+                                                    kExceptionHandlerTimeout),
+       early_bailout = false](async_dispatcher_t* dispatcher, async::Wait* wait, zx_status_t status,
+                              const zx_packet_signal_t* signal) mutable {
         if (status == ZX_ERR_CANCELED) {
           return;
         }
@@ -202,7 +214,7 @@ zx::result<std::unique_ptr<async::Wait>> start_crashsvc(
           return;
         }
 
-        HandOffException(dispatcher, std::move(exception), info, *handler);
+        HandOffException(dispatcher, std::move(exception), info, *handler, early_bailout);
 
         if (const zx_status_t status = wait->Begin(dispatcher); status != ZX_OK) {
           LogError("Failed to restart wait, crashsvc won't continue", status);
@@ -211,7 +223,7 @@ zx::result<std::unique_ptr<async::Wait>> start_crashsvc(
       });
 
   if (const zx_status_t status = wait->Begin(dispatcher); status != ZX_OK) {
-    LogError("Failed to being wait, crashsvc won't start", status);
+    LogError("Failed to begin wait, crashsvc won't start", status);
     return zx::error(status);
   }
 

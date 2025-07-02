@@ -472,5 +472,13 @@
             from: "parent",
             to: [ "#system-tests" ],
         },
+
+        // Proprietary TEE manager's session capabilitites for system tests.
+        {
+            dictionary: "tee_session",
+            from: "parent",
+            to: [ "#system-tests" ],
+            availability: "optional",
+        },
     ],
 }

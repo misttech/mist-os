@@ -21,7 +21,7 @@ def label_to_crate_name(label: str):
     This function is not robust, but in the context of
     //third_party/rust_crates it is fine (ethanws@)
     """
-    match = re.match(r"^:(.+?)-v\d+_\d+_\d+$", label)
+    match = re.match(r"^:(.+?)-v\d+_\d+_\d+\.actual$", label)
     assert (
         match is not None
     ), f"rustdoc_wrapper: the crate name could not be extacted from {label}"

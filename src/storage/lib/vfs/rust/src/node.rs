@@ -187,6 +187,13 @@ impl<N: Node> Connection<N> {
             fio::NodeRequest::Sync { responder } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::NodeRequest::DeprecatedGetAttr { responder } => {
+                let (status, attrs) =
+                    crate::common::io2_to_io1_attrs(self.node.as_ref(), self.options.rights).await;
+                responder.send(status.into_raw(), &attrs)?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::NodeRequest::GetAttr { responder } => {
                 let (status, attrs) =
                     crate::common::io2_to_io1_attrs(self.node.as_ref(), self.options.rights).await;

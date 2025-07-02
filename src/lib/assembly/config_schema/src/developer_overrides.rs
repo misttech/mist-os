@@ -22,7 +22,7 @@ pub enum FeedbackBuildTypeConfig {
     User,
 }
 
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct ForensicsOptions {
     /// The build type config Feedback should use.
@@ -97,7 +97,7 @@ pub struct DeveloperOverrides {
 
 /// Special flags for assembly that can only be used in the context of developer
 /// overrides.
-#[derive(Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct DeveloperOnlyOptions {
     /// Force all non-bootfs packages known to assembly to be in the base package

@@ -664,6 +664,15 @@ class AsyncMain:
             recorder.emit_end()
             return 0
 
+        if flags.list_runtime_deps:
+            recorder.emit_info_message("Listing runtime_deps for all tests...")
+            recorder.emit_instruction_message(
+                "Will not run any tests, --list-host-test-data specified"
+            )
+            self._list_runtime_deps(selections)
+            recorder.emit_end()
+            return 0
+
         # From this point on, separately handle exit requests so that tests can
         # close cleanly.
         _immediate_exit_task.cancel()
@@ -762,6 +771,8 @@ class AsyncMain:
                     exec_env.out_dir,
                     "--input",
                     exec_env.test_json_file,
+                    "--disabled-ctf-tests",
+                    exec_env.disabled_ctf_tests_file,
                     "--output",
                     out_path,
                     "--test-components",
@@ -1283,11 +1294,21 @@ class AsyncMain:
 
         device_environment: environment.DeviceEnvironment | None = None
         if tests.has_device_test():
-            device_environment = (
-                await execution.get_device_environment_from_exec_env(
-                    exec_env, recorder=recorder
+            try:
+                device_environment = (
+                    await execution.get_device_environment_from_exec_env(
+                        exec_env, recorder=recorder
+                    )
                 )
-            )
+            except execution.DeviceConfigError as e:
+                # Allow missing device configuration error if we don't have end
+                # to end tests. This allows us to run against devices that don't
+                # have an SSH address (like USB and vsock).
+                # TODO(https://fxbug.dev/417777659): Remove this allowance once
+                # we have a good strategy for how to forward non-ssh-connected
+                # devices.
+                if tests.has_e2e_test():
+                    raise e
 
         test_group = recorder.emit_test_group(len(tests.selected) * flags.count)
 
@@ -1520,6 +1541,36 @@ class AsyncMain:
             not test_failure_observed
             and not self._end_execution_request_event.is_set()
         )
+
+    def _list_runtime_deps(
+        self,
+        tests: selection_types.TestSelections,
+    ) -> None:
+        flags = self._flags
+        recorder = self._recorder
+        exec_env = self._exec_env
+        assert exec_env is not None
+        for t in tests.selected:
+            recorder.emit_verbatim_message(
+                statusinfo.green_highlight(f"{t.name()}:", style=flags.style)
+            )
+            runtime_deps = t.build.test.runtime_deps
+            if runtime_deps is not None:
+                runtime_deps_path = os.path.join(exec_env.out_dir, runtime_deps)
+                with open(runtime_deps_path, "r") as deps_file:
+                    deps: list[str] = json.load(deps_file)
+                    recorder.emit_instruction_message(
+                        f"  Runtime deps file at: {runtime_deps_path}"
+                    )
+                    if len(deps) > 0:
+                        for dep in deps:
+                            recorder.emit_verbatim_message(f"  {dep}")
+                    else:
+                        recorder.emit_instruction_message(f"  File is empty")
+            else:
+                recorder.emit_verbatim_message(
+                    "  No runtime deps found for this test"
+                )
 
     async def _enumerate_test_cases(
         self,

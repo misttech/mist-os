@@ -5,9 +5,11 @@
 use crate::device::kobject::KObject;
 use crate::fs::tmpfs::TmpfsDirectory;
 use crate::task::CurrentTask;
+use crate::vfs::pseudo::simple_file::BytesFile;
+use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use crate::vfs::{
-    fs_node_impl_dir_readonly, BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
+    fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr,
 };
 
 use starnix_sync::{FileOpsCore, Locked};
@@ -21,12 +23,11 @@ use std::sync::Weak;
 
 // Matches file names and creates corresponding files with specified content.
 macro_rules! file_match_and_create {
-    ($node:expr, $current_task:expr, $name:expr, $files:expr) => {
+    ($node:expr, $name:expr, $files:expr) => {
         if let Some(content) = $files.get(&std::str::from_utf8(&**$name).unwrap()) {
-            Ok($node.fs().create_node(
-                $current_task,
+            Ok($node.fs().create_node_and_allocate_node_id(
                 BytesFile::new_node(content.as_bytes().to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ))
         } else {
             error!(ENOENT)
@@ -55,9 +56,7 @@ impl VulnerabilitiesClassDirectory {
         files.insert("spectre_v2", "Not affected\n");
         files.insert("srbds", "Not affected\n");
         files.insert("tsx_async_abort", "Not affected\n");
-        Self {
-            vulnerability_files: files,
-        }
+        Self { vulnerability_files: files }
     }
 }
 
@@ -66,39 +65,38 @@ impl FsNodeOps for VulnerabilitiesClassDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
         let entries = self
-          .vulnerability_files
-          .keys()
-          .map(|name| VecDirectoryEntry {
+            .vulnerability_files
+            .keys()
+            .map(|name| VecDirectoryEntry {
                 entry_type: DirectoryEntryType::REG,
                 name: (*name).into(),
                 inode: None,
             })
-          .collect::<Vec<_>>();
+            .collect::<Vec<_>>();
 
         Ok(VecDirectory::new_file(entries))
     }
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         if name.starts_with(b"vulnerabilities") {
-            Ok(node.fs().create_node(
-                current_task,
+            Ok(node.fs().create_node_and_allocate_node_id(
                 TmpfsDirectory::new(),
-                FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             ))
         } else {
-            file_match_and_create!(node, current_task, name, self.vulnerability_files)
+            file_match_and_create!(node, name, self.vulnerability_files)
         }
     }
 }

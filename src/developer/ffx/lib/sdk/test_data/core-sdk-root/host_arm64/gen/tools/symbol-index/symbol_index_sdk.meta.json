@@ -1,8 +1,0 @@
-{
-    "files": [
-        "tools/arm64/symbol-index"
-    ],
-    "name": "symbol-index",
-    "root": "tools",
-    "type": "host_tool"
-}

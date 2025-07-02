@@ -10,9 +10,9 @@ use crate::object_handle::INVALID_OBJECT_ID;
 use crate::object_store::allocator::{self, AllocatorKey, AllocatorValue};
 use crate::object_store::graveyard::Graveyard;
 use crate::object_store::{
-    AttributeKey, ChildValue, EncryptionKeys, ExtendedAttributeValue, ExtentKey, ExtentMode,
-    ExtentValue, ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind,
-    ObjectStore, ObjectValue, ProjectProperty, RootDigest, DEFAULT_DATA_ATTRIBUTE_ID,
+    AttributeKey, ChildValue, ExtendedAttributeValue, ExtentKey, ExtentMode, ExtentValue,
+    ObjectAttributes, ObjectDescriptor, ObjectKey, ObjectKeyData, ObjectKind, ObjectStore,
+    ObjectValue, ProjectProperty, RootDigest, DEFAULT_DATA_ATTRIBUTE_ID,
     EXTENDED_ATTRIBUTE_RANGE_END, EXTENDED_ATTRIBUTE_RANGE_START, FSVERITY_MERKLE_ATTRIBUTE_ID,
 };
 use crate::range::RangeExt;
@@ -341,29 +341,22 @@ impl<'a> ScannedStore<'a> {
             }
             ObjectKeyData::Keys => {
                 if let ObjectValue::Keys(keys) = value {
-                    match keys {
-                        EncryptionKeys::AES256XTS(keys) => {
-                            let keys = &**keys;
-                            if let Some(current_file) = &mut self.current_object {
-                                // Duplicates items should have already been checked, but not
-                                // duplicate key IDs.
-                                assert!(current_file.key_ids.is_empty());
-                                for (key_id, _) in keys {
-                                    if !current_file.key_ids.insert(*key_id) {
-                                        self.fsck.error(FsckError::DuplicateKey(
-                                            self.store_id,
-                                            key.object_id,
-                                            *key_id,
-                                        ))?;
-                                    }
-                                }
-                            } else {
-                                self.fsck.warning(FsckWarning::OrphanedKeys(
+                    if let Some(current_file) = &mut self.current_object {
+                        // Duplicates items should have already been checked, but not
+                        // duplicate key IDs.
+                        assert!(current_file.key_ids.is_empty());
+                        for (key_id, _) in keys.iter() {
+                            if !current_file.key_ids.insert(*key_id) {
+                                self.fsck.error(FsckError::DuplicateKey(
                                     self.store_id,
                                     key.object_id,
+                                    *key_id,
                                 ))?;
                             }
                         }
+                    } else {
+                        self.fsck
+                            .warning(FsckWarning::OrphanedKeys(self.store_id, key.object_id))?;
                     }
                 } else {
                     self.fsck.error(FsckError::MalformedObjectRecord(

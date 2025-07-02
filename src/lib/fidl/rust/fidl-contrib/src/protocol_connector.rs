@@ -317,7 +317,7 @@ mod test {
     use super::*;
     use anyhow::{format_err, Context};
     use fidl_test_protocol_connector::{
-        ProtocolFactoryMarker, ProtocolFactoryRequest, ProtocolFactoryRequestStream, ProtocolProxy,
+        ProtocolFactoryProxy, ProtocolFactoryRequest, ProtocolFactoryRequestStream, ProtocolProxy,
         ProtocolRequest, ProtocolRequestStream,
     };
     use fuchsia_async as fasync;
@@ -341,10 +341,10 @@ mod test {
         ) -> BoxFuture<'a, Result<Self::Protocol, Self::ConnectError>> {
             async move {
                 let (protocol_proxy, server_end) = fidl::endpoints::create_proxy();
-                let protocol_factory = self
+                let protocol_factory: ProtocolFactoryProxy = self
                     .0
                     .root
-                    .connect_to_protocol_at_exposed_dir::<ProtocolFactoryMarker>()
+                    .connect_to_protocol_at_exposed_dir()
                     .context("Connecting to test.protocol.ProtocolFactory failed")?;
 
                 protocol_factory

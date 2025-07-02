@@ -98,14 +98,14 @@ void Ramdisk::Wake(WakeCompleter::Sync& completer) {
 
     if (flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardNotFlushedOnWake) {
       // Fill all blocks with a fill pattern.
-      for (uint64_t block : blocks_written_since_last_flush_) {
+      for (uint64_t block : blocks_written_since_last_barrier_) {
         void* addr = reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(mapping_.start()) +
                                              block * block_size_);
         memset(addr, 0xaf, block_size_);
       }
       FDF_LOGL(INFO, controller_->logger(), "Discarded blocks: %lu",
-               blocks_written_since_last_flush_.size());
-      blocks_written_since_last_flush_.clear();
+               blocks_written_since_last_barrier_.size());
+      blocks_written_since_last_barrier_.clear();
     }
 
     memset(&block_counts_, 0, sizeof(block_counts_));
@@ -222,7 +222,7 @@ void Ramdisk::OnRequests(cpp20::span<block_server::Request> requests) TA_NO_THRE
         if (ShouldFailRequests()) {
           status = ZX_ERR_UNAVAILABLE;
         } else {
-          blocks_written_since_last_flush_.clear();
+          blocks_written_since_last_barrier_.clear();
         }
       } break;
       case block_server::Operation::Tag::Trim:
@@ -247,12 +247,15 @@ zx_status_t Ramdisk::ReadWrite(const block_server::Request& request, uint64_t re
 
   zx_status_t status = ZX_OK;
   if (is_write) {
+    std::lock_guard<std::mutex> lock(lock_);
+    if (request.operation.write.options.is_pre_barrier()) {
+      blocks_written_since_last_barrier_.clear();
+    }
+
     status = request.vmo->read(addr, vmo_offset, length);
 
     // Update the ramdisk block counts. Since we aren't failing read transactions, only include
-    // write transaction counts.
-    std::lock_guard<std::mutex> lock(lock_);
-    // Increment the count based on the result of the last transaction.
+    // write transaction counts. Increment the count based on the result of the last transaction.
     if (status == ZX_OK) {
       block_counts_.successful += block_count;
       if (pre_sleep_write_block_count_) {
@@ -268,7 +271,7 @@ zx_status_t Ramdisk::ReadWrite(const block_server::Request& request, uint64_t re
           for (uint64_t block = block_offset, count = block_count; count > 0; ++block, --count) {
             if (!(flags_ & fuchsia_hardware_ramdisk::wire::RamdiskFlag::kDiscardRandom) ||
                 distribution(random)) {
-              blocks_written_since_last_flush_.push_back(block);
+              blocks_written_since_last_barrier_.push_back(block);
             }
           }
         }

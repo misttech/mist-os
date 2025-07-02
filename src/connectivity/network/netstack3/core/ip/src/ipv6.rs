@@ -183,7 +183,7 @@ mod tests {
     use alloc::vec;
 
     use netstack3_base::testutil::{FakeDeviceId, TEST_ADDRS_V6};
-    use packet::serialize::{Buf, Serializer};
+    use packet::serialize::{Buf, PacketBuilder, Serializer};
     use packet::ParseBuffer;
     use packet_formats::ip::IpProto;
     use packet_formats::ipv6::Ipv6PacketBuilder;
@@ -204,7 +204,7 @@ mod tests {
         );
         let frame_dst = FrameDestination::Individual { local: true };
         let mut buffer =
-            Buf::new(vec![1, 2, 3, 4, 5], ..).encapsulate(builder).serialize_vec_outer().unwrap();
+            builder.wrap_body(Buf::new(vec![1, 2, 3, 4, 5], ..)).serialize_vec_outer().unwrap();
         let packet = buffer.parse::<Ipv6Packet<_>>().unwrap();
 
         assert_eq!(

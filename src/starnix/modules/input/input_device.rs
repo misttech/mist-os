@@ -227,7 +227,7 @@ impl InputDevice {
 
     pub fn register<L>(
         self: Arc<Self>,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         system_task: &CurrentTask,
         device_id: DeviceId,
     ) where
@@ -297,7 +297,7 @@ impl InputDevice {
     #[cfg(test)]
     pub fn open_test(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
     ) -> Result<starnix_core::vfs::FileHandle, Errno> {
         let input_file = self.open_internal();
@@ -317,7 +317,7 @@ impl InputDevice {
 impl DeviceOps for InputDevice {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         _current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -363,7 +363,7 @@ mod test {
     const INPUT_EVENT_SIZE: usize = std::mem::size_of::<uapi::input_event>();
 
     fn start_touch_input(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
     ) -> (Arc<InputDevice>, FileHandle, fuipointer::TouchSourceRequestStream) {
         let inspector = fuchsia_inspect::Inspector::default();
@@ -371,7 +371,7 @@ mod test {
     }
 
     fn start_touch_input_inspect(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         inspector: &fuchsia_inspect::Inspector,
     ) -> (Arc<InputDevice>, FileHandle, fuipointer::TouchSourceRequestStream) {
@@ -379,7 +379,7 @@ mod test {
     }
 
     fn start_touch_input_inspect_and_dimensions(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         x_max: i32,
         y_max: i32,
@@ -425,7 +425,7 @@ mod test {
     }
 
     fn start_keyboard_input(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
     ) -> (Arc<InputDevice>, FileHandle, fuiinput::KeyboardRequestStream) {
         let inspector = fuchsia_inspect::Inspector::default();
@@ -468,7 +468,7 @@ mod test {
     }
 
     fn start_button_input(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
     ) -> (Arc<InputDevice>, FileHandle, fuipolicy::DeviceListenerRegistryRequestStream) {
         let inspector = fuchsia_inspect::Inspector::default();
@@ -476,7 +476,7 @@ mod test {
     }
 
     fn start_button_input_inspect(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         inspector: &fuchsia_inspect::Inspector,
     ) -> (Arc<InputDevice>, FileHandle, fuipolicy::DeviceListenerRegistryRequestStream) {
@@ -516,7 +516,7 @@ mod test {
     }
 
     fn start_mouse_input(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
     ) -> (Arc<InputDevice>, FileHandle, fuipointer::MouseSourceRequestStream) {
         let inspector = fuchsia_inspect::Inspector::default();
@@ -524,7 +524,7 @@ mod test {
     }
 
     fn start_mouse_input_inspect(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         inspector: &fuchsia_inspect::Inspector,
     ) -> (Arc<InputDevice>, FileHandle, fuipointer::MouseSourceRequestStream) {
@@ -653,7 +653,7 @@ mod test {
     }
 
     fn read_uapi_events<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         file: &FileHandle,
         current_task: &CurrentTask,
     ) -> Vec<uapi::input_event>

@@ -219,6 +219,25 @@ TEST(SnapshotAnnotationsTest, GetReportAnnotations_Product) {
                                        }));
 }
 
+TEST(MakeReport, AddsWeight) {
+  fuchsia::feedback::CrashReport crash_report;
+  crash_report.set_program_name("program_name");
+  crash_report.set_weight(5);
+
+  Product product{
+      .name = "product_name",
+      .version = ErrorOrString("product_version"),
+      .channel = ErrorOrString("product_channel"),
+  };
+
+  const auto report = MakeReport(std::move(crash_report), /*report_id=*/0, "snapshot_uuid",
+                                 /*snapshot_annotations=*/{},
+                                 /*current_time=*/std::nullopt, std::move(product),
+                                 /*is_hourly_report=*/false);
+  ASSERT_TRUE(report.is_ok());
+  EXPECT_EQ(report.value().Annotations().Get("weight"), "5");
+}
+
 }  // namespace
 }  // namespace crash_reports
 }  // namespace forensics

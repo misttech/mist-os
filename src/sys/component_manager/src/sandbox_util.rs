@@ -9,7 +9,7 @@ use ::routing::capability_source::CapabilitySource;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::{ComponentInstanceError, RoutingError};
 use ::routing::policy::GlobalPolicyChecker;
-use ::routing::{WeakInstanceTokenExt, WithDefault};
+use ::routing::WeakInstanceTokenExt;
 use async_trait::async_trait;
 use cm_rust::CapabilityTypeName;
 use cm_util::WeakTaskGroup;
@@ -238,7 +238,32 @@ impl<T: Routable<Connector> + 'static> RoutableExt for T {
                 else {
                     return Err(cm_unexpected());
                 };
-                let router = self.router.clone().with_default(request);
+                #[derive(Debug)]
+                struct DefaultRoutable<F: Send + Sync + 'static> {
+                    router: Router<Connector>,
+                    default_fn: F,
+                }
+                #[async_trait]
+                impl<F: Fn() -> Result<Request, RouterError> + Send + Sync + 'static>
+                    Routable<Connector> for DefaultRoutable<F>
+                {
+                    async fn route(
+                        &self,
+                        request: Option<Request>,
+                        debug: bool,
+                    ) -> Result<RouterResponse<Connector>, RouterError> {
+                        let request = match request {
+                            request @ Some(_) => request,
+                            None => Some((self.default_fn)()?),
+                        };
+                        self.router.route(request, debug).await
+                    }
+                }
+
+                let router = Router::new(DefaultRoutable {
+                    router: self.router.clone(),
+                    default_fn: move || request.try_clone(),
+                });
 
                 // Wrap the router in something that will wait until the channel is readable.
                 #[derive(Debug)]
@@ -332,7 +357,7 @@ impl<T: Routable<Connector> + 'static> RoutableExt for T {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 pub mod tests {
     use crate::model::context::ModelContext;
     use crate::model::environment::Environment;

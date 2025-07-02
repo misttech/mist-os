@@ -49,6 +49,9 @@
 #define VM_KTRACE_FLOW_END(level, string, flow_id, args...) \
   KTRACE_FLOW_END_ENABLE(VM_KTRACE_LEVEL_ENABLED(level), "kernel:vm", string, flow_id, ##args)
 
+#define VM_KTRACE_INSTANT(level, string, args...) \
+  KTRACE_INSTANT_ENABLE(VM_KTRACE_LEVEL_ENABLED(level), "kernel:vm", string, ##args)
+
 class VmAspace;
 
 // kernel address space
@@ -72,6 +75,10 @@ extern char _end[];
 
 extern paddr_t zero_page_paddr;
 extern vm_page_t* zero_page;
+
+// Ends the VM's role within the context of phys handoff: it destroys the VMAR
+// containing the mappings backing temporary hand-off data.
+void vm_end_handoff();
 
 // return a pointer to the zero page
 static inline vm_page_t* vm_get_zero_page(void) { return zero_page; }

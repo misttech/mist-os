@@ -52,7 +52,8 @@ class MainServiceTest : public UnitTestFixture {
                               .snapshot_collector_window_duration = zx::sec(0),
                           },
                           FeedbackData::Options{
-                              .config{},
+                              .snapshot_config{},
+                              .snapshot_exclusion_config{},
                               .is_first_instance = kIsFirstInstance,
                               .limit_inspect_data = false,
                               .delete_previous_boot_logs_time = std::nullopt,

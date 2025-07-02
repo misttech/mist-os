@@ -32,61 +32,66 @@ struct DeviceHandle;
 // This represents the driver for a device. It's a singleton that can't access device registers.
 class Driver {
  public:
-  static std::unique_ptr<Driver> Create();
+  static std::unique_ptr<Driver> MsdCreate();
 
   virtual ~Driver() = 0;
 
   // Configures the driver according to |flags|.
-  virtual void Configure(uint32_t flags) {}
+  virtual void MsdConfigure(uint32_t flags) {}
   // Returns a buffer handle that contains inspect data for the driver.  Returns
   // ZX_HANDLE_INVALID if driver doesn't support inspect.
-  virtual std::optional<inspect::Inspector> DuplicateInspector() { return std::nullopt; }
+  virtual std::optional<inspect::Inspector> MsdDuplicateInspector() { return std::nullopt; }
 
   // Creates a device at system startup. `device_data` is a pointer to a platform-specific device
   // object which is guaranteed to outlive the returned Device.
-  virtual std::unique_ptr<Device> CreateDevice(DeviceHandle* device_data) { return {}; }
+  virtual std::unique_ptr<Device> MsdCreateDevice(DeviceHandle* device_data) { return {}; }
 
   // Creates a buffer that owns the provided handle. Can be called on any thread.
-  virtual std::unique_ptr<Buffer> ImportBuffer(zx::vmo vmo, uint64_t client_id) { return {}; }
+  virtual std::unique_ptr<Buffer> MsdImportBuffer(zx::vmo vmo, uint64_t client_id) { return {}; }
+  // TODO(b/417848695) - remove when unused
+  std::unique_ptr<Buffer> ImportBuffer(zx::vmo vmo, uint64_t client_id) {
+    return MsdImportBuffer(std::move(vmo), client_id);
+  }
 
   // Creates a semaphore that owns the provided handle. Can be called on any thread.
-  virtual magma_status_t ImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
-                                         std::unique_ptr<Semaphore>* out) {
+  virtual magma_status_t MsdImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
+                                            std::unique_ptr<Semaphore>* out) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 };
 
 // This represents a single hardware device. Unless otherwise specified, all calls into this class
-// are serialized.
+// are serialized, and are made on a driver framework thread.
 class Device {
  public:
   virtual ~Device() = 0;
 
   // Signals the current memory pressure level for the system. May be called on any thread.
-  virtual void SetMemoryPressureLevel(MagmaMemoryPressureLevel level) {}
+  virtual void MsdSetMemoryPressureLevel(MagmaMemoryPressureLevel level) {}
 
   // Returns a value associated with the given id. On MAGMA_STATUS_OK, a given query `id` will
   // return either a buffer in `result_buffer_out`, or a value in `result_out`. nullptr may be
   // provided for whichever result parameter is not needed.
-  virtual magma_status_t Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) {
+  virtual magma_status_t MsdQuery(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 
   // Outputs a list of ICD components.
-  virtual magma_status_t GetIcdList(std::vector<MsdIcdInfo>* icd_info_out) {
+  virtual magma_status_t MsdGetIcdList(std::vector<MsdIcdInfo>* icd_info_out) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 
   // Sets the power state of the device. The given |completer| will be invoked asynchronously
   // when a power change is completed.
-  virtual void SetPowerState(int64_t power_state, fit::callback<void(magma_status_t)> completer) {
+  virtual void MsdSetPowerState(int64_t power_state,
+                                fit::callback<void(magma_status_t)> completer) {
     completer(MAGMA_STATUS_UNIMPLEMENTED);
   }
 
-  virtual void DumpStatus(uint32_t dump_flags) {}
+  virtual void MsdDumpStatus(uint32_t dump_flags) {}
 
   // Opens a device for the given client. Returns nullptr on failure
-  virtual std::unique_ptr<Connection> Open(msd_client_id_t client_id) { return {}; }
+  virtual std::unique_ptr<Connection> MsdOpen(msd_client_id_t client_id) { return {}; }
 };
 
 struct PerfCounterResult {
@@ -116,19 +121,22 @@ class PerfCountPool {
   virtual ~PerfCountPool() = 0;
 };
 
-// This represents a single connection from a client. All method calls on this class are serialized.
+// This represents a single connection from a client. All method calls on this class are serialized,
+// and are made on a dedicated connection thread.
 class Connection {
  public:
   virtual ~Connection() = 0;
-  virtual magma_status_t MapBuffer(Buffer& buffer, uint64_t gpu_va, uint64_t offset,
-                                   uint64_t length, uint64_t flags) {
+
+  virtual magma_status_t MsdMapBuffer(Buffer& buffer, uint64_t gpu_va, uint64_t offset,
+                                      uint64_t length, uint64_t flags) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
-  virtual magma_status_t UnmapBuffer(Buffer& buffer, uint64_t gpu_va) {
+
+  virtual magma_status_t MsdUnmapBuffer(Buffer& buffer, uint64_t gpu_va) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
-  virtual magma_status_t BufferRangeOp(Buffer& buffer, uint32_t options, uint64_t start_offset,
-                                       uint64_t length) {
+  virtual magma_status_t MsdBufferRangeOp(Buffer& buffer, uint32_t options, uint64_t start_offset,
+                                          uint64_t length) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
   // Signals that the given |buffer| is no longer in use on the given |connection|. This must be
@@ -136,54 +144,61 @@ class Connection {
   // every buffer associated with a connection before the connection is destroyed.
   // In addition to handling client requests, this may be called when a connection is released,
   // in which case |shutting_down| is true and the implementation should not block.
-  virtual void ReleaseBuffer(Buffer& buffer, bool shutting_down = false) {}
+  virtual void MsdReleaseBuffer(Buffer& buffer, bool shutting_down = false) {}
 
   // Sets the callback to be used by a connection for various notifications.
   // This is called when a connection is created, and also called to unset
   // the callback before a connection is destroyed.  A multithreaded
   // implementation must be careful to guard use of this callback to avoid
   // collision with possible concurrent destruction.
-  virtual void SetNotificationCallback(NotificationHandler* handler) {}
-  virtual std::unique_ptr<Context> CreateContext() { return {}; }
-  virtual std::unique_ptr<Context> CreateContext2(uint64_t priority) { return CreateContext(); }
+  virtual void MsdSetNotificationCallback(NotificationHandler* handler) {}
 
-  virtual magma_status_t EnablePerformanceCounters(cpp20::span<const uint64_t> counters) {
+  virtual std::unique_ptr<Context> MsdCreateContext() { return {}; }
+
+  virtual std::unique_ptr<Context> MsdCreateContext2(uint64_t priority) {
+    return MsdCreateContext();
+  }
+
+  virtual magma_status_t MsdEnablePerformanceCounters(cpp20::span<const uint64_t> counters) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 
-  virtual magma_status_t CreatePerformanceCounterBufferPool(
+  virtual magma_status_t MsdCreatePerformanceCounterBufferPool(
       uint64_t pool_id, std::unique_ptr<PerfCountPool>* pool_out) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 
   // Releases the performance counter buffer pool. This driver must not send any notification with
   // the pool ID of this pool after it returns from this method.
-  virtual magma_status_t ReleasePerformanceCounterBufferPool(std::unique_ptr<PerfCountPool> pool) {
+  virtual magma_status_t MsdReleasePerformanceCounterBufferPool(
+      std::unique_ptr<PerfCountPool> pool) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 
-  virtual magma_status_t AddPerformanceCounterBufferOffsetToPool(PerfCountPool& pool,
-                                                                 Buffer& buffer, uint64_t buffer_id,
-                                                                 uint64_t buffer_offset,
-                                                                 uint64_t buffer_size) {
+  virtual magma_status_t MsdAddPerformanceCounterBufferOffsetToPool(PerfCountPool& pool,
+                                                                    Buffer& buffer,
+                                                                    uint64_t buffer_id,
+                                                                    uint64_t buffer_offset,
+                                                                    uint64_t buffer_size) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 
-  virtual magma_status_t RemovePerformanceCounterBufferFromPool(PerfCountPool& pool,
-                                                                Buffer& buffer) {
+  virtual magma_status_t MsdRemovePerformanceCounterBufferFromPool(PerfCountPool& pool,
+                                                                   Buffer& buffer) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 
-  virtual magma_status_t DumpPerformanceCounters(PerfCountPool& pool, uint32_t trigger_id) {
+  virtual magma_status_t MsdDumpPerformanceCounters(PerfCountPool& pool, uint32_t trigger_id) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 
-  virtual magma_status_t ClearPerformanceCounters(cpp20::span<const uint64_t> counters) {
+  virtual magma_status_t MsdClearPerformanceCounters(cpp20::span<const uint64_t> counters) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 };
 
-// This represents a single hardware context that may execute commands.
+// This represents a single hardware context that may execute commands.  Calls are made on the
+// context's connection thread.
 class Context {
  public:
   virtual ~Context() = 0;
@@ -196,15 +211,15 @@ class Context {
   // |wait_semaphores| are the semaphores that must be signaled before starting command buffer
   // execution
   // |signal_semaphores| are the semaphores to be signaled upon completion of the command buffer
-  virtual magma_status_t ExecuteCommandBufferWithResources(magma_command_buffer* command_buffer,
-                                                           magma_exec_resource* exec_resources,
-                                                           Buffer** buffers,
-                                                           Semaphore** wait_semaphores,
-                                                           Semaphore** signal_semaphores) {
+  virtual magma_status_t MsdExecuteCommandBufferWithResources(magma_command_buffer* command_buffer,
+                                                              magma_exec_resource* exec_resources,
+                                                              Buffer** buffers,
+                                                              Semaphore** wait_semaphores,
+                                                              Semaphore** signal_semaphores) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 
-  virtual magma_status_t ExecuteCommandBuffers(
+  virtual magma_status_t MsdExecuteCommandBuffers(
       std::vector<magma_exec_command_buffer>& command_buffers,
       std::vector<magma_exec_resource>& resources, std::vector<Buffer*>& buffers,
       std::vector<Semaphore*>& wait_semaphores, std::vector<Semaphore*>& signal_semaphores) {
@@ -213,8 +228,8 @@ class Context {
 
   // Executes a buffer of commands. `semaphores` is a set of semaphores that may be used by the
   // commands; the exact usage is driver-dependent.
-  virtual magma_status_t ExecuteInlineCommand(magma_inline_command_buffer* command,
-                                              Semaphore** semaphores) {
+  virtual magma_status_t MsdExecuteInlineCommand(magma_inline_command_buffer* command,
+                                                 Semaphore** semaphores) {
     return MAGMA_STATUS_UNIMPLEMENTED;
   }
 };

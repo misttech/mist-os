@@ -38,7 +38,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_union::Tes
 ::fidl::WireResult<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>::WireResult(
     ::fidl::UnownedClientEnd<::test_union::TestProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>* request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -102,7 +102,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_union::Tes
 ::fidl::WireResult<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>::WireResult(
     ::fidl::UnownedClientEnd<::test_union::TestProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>* request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -282,7 +282,7 @@ void fidl::internal::WireCompleterImpl<::test_union::TestProtocol::StrictUnionHe
 
 void fidl::internal::WireCompleterImpl<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>::MakeReply(::test_union::wire::StrictBoundedUnion xu) {
   ::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated> _response{xu};
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_union::TestProtocol::StrictUnionHenceResponseMayBeStackAllocated>, ::fidl::internal::ChannelTransport>
       _response_message{
@@ -330,7 +330,7 @@ void fidl::internal::WireCompleterImpl<::test_union::TestProtocol::FlexibleUnion
 
 void fidl::internal::WireCompleterImpl<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>::MakeReply(::test_union::wire::OlderSimpleUnion xu) {
   ::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated> _response{xu};
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_union::TestProtocol::FlexibleUnionHenceResponseMustBeHeapAllocated>, ::fidl::internal::ChannelTransport>
       _response_message{

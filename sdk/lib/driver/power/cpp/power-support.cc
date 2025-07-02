@@ -539,7 +539,8 @@ fit::result<Error> AddElement(
     std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor,
     std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control,
     std::optional<fidl::UnownedClientEnd<fuchsia_power_broker::ElementControl>>
-        element_control_client) {
+        element_control_client,
+    std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementRunner>> element_runner) {
   // Get the power levels we should have
   std::vector<fuchsia_power_broker::PowerLevel> levels = PowerLevelsFromConfig(config);
   if (levels.size() == 0) {
@@ -593,8 +594,9 @@ fit::result<Error> AddElement(
     }
   }
 
+  // Level control is deprecated. Only use if element_runner not supplied.
   std::optional<fuchsia_power_broker::LevelControlChannels> lvl_ctrl;
-  if (level_control.has_value()) {
+  if (!element_runner.has_value() && level_control.has_value()) {
     lvl_ctrl = {std::move(level_control->first), std::move(level_control->second)};
   } else {
     level_control = std::nullopt;
@@ -606,6 +608,7 @@ fit::result<Error> AddElement(
       .valid_levels = std::move(levels),
       .dependencies = std::move(level_deps),
       .level_control_channels = std::move(lvl_ctrl),
+      .element_runner = std::move(element_runner),
   }};
   if (lessor.has_value()) {
     schema.lessor_channel() = std::move(lessor.value());
@@ -661,7 +664,8 @@ fit::result<Error> AddElement(fidl::ClientEnd<fuchsia_power_broker::Topology>& p
                     description.assertive_token.borrow(), description.opportunistic_token.borrow(),
                     std::move(description.level_control_servers),
                     std::move(description.lessor_server),
-                    std::move(description.element_control_server), element_control_client);
+                    std::move(description.element_control_server), element_control_client,
+                    std::move(description.element_runner_client));
 }
 
 void LeaseHelper::AcquireLease(
@@ -732,7 +736,8 @@ CreateLeaseHelper(const fidl::ClientEnd<fuchsia_power_broker::Topology>& topolog
 }
 
 fit::result<Error, std::vector<ElementDesc>> ApplyPowerConfiguration(
-    const fdf::Namespace& ns, cpp20::span<PowerElementConfiguration> power_configs) {
+    const fdf::Namespace& ns, cpp20::span<PowerElementConfiguration> power_configs,
+    bool use_element_runner) {
   if (power_configs.empty()) {
     return fit::success(std::vector<ElementDesc>{});
   }
@@ -749,7 +754,23 @@ fit::result<Error, std::vector<ElementDesc>> ApplyPowerConfiguration(
     if (token_request.is_error()) {
       return fit::error(token_request.error_value());
     }
-    ElementDesc description = ElementDescBuilder(config, std::move(token_request.value())).Build();
+    ElementDescBuilder builder = ElementDescBuilder(config, std::move(token_request.value()));
+
+    // If specified, use ElementRunner instead of CurrentLevel and RequiredLevel
+    std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementRunner>> runner_server;
+    if (use_element_runner) {
+      fidl::Endpoints<fuchsia_power_broker::ElementRunner> runner_endpoints =
+          fidl::Endpoints<fuchsia_power_broker::ElementRunner>::Create();
+      runner_server.emplace(std::move(runner_endpoints.server));
+      builder.SetElementRunner(std::move(runner_endpoints.client));
+    }
+
+    ElementDesc description = builder.Build();
+
+    if (runner_server.has_value()) {
+      description.element_runner_server.emplace(std::move(runner_server.value()));
+    }
+
     fit::result<Error> add_result = AddElement(topology_connection.value(), description);
     if (add_result.is_error()) {
       return fit::error(add_result.error_value());

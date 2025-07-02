@@ -72,6 +72,11 @@ void Engine::InitializeInspectObjects() {
     inspector.GetRoot().CreateString(kSceneDump, output.str(), &inspector);
     return fpromise::make_ok_promise(std::move(inspector));
   });
+
+  inspect_frame_results_ = inspect_node_.CreateChild("Frame result counts");
+  inspect_direct_display_frame_count_ = inspect_frame_results_.CreateUint("Direct to display", 0);
+  inspect_gpu_composition_frame_count_ = inspect_frame_results_.CreateUint("GPU composition", 0);
+  inspect_failed_frame_count_ = inspect_frame_results_.CreateUint("Failed", 0);
 }
 
 void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_time,
@@ -153,11 +158,27 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
     first_frame_with_image_is_rendered_ = true;
   }
 
-  flatland_compositor_->RenderFrame(frame_number, presentation_time,
-                                    {{.rectangles = std::move(scene_state.image_rectangles),
-                                      .images = std::move(scene_state.images),
-                                      .display_id = hw_display->display_id()}},
-                                    flatland_presenter_->TakeReleaseFences(), std::move(callback));
+  auto frame_result = flatland_compositor_->RenderFrame(
+      frame_number, presentation_time,
+      {{.rectangles = std::move(scene_state.image_rectangles),
+        .images = std::move(scene_state.images),
+        .display_id = hw_display->display_id()}},
+      flatland_presenter_->TakeReleaseFences(), std::move(callback));
+  RecordFrameResult(frame_result);
+}
+
+void Engine::RecordFrameResult(DisplayCompositor::RenderFrameResult result) {
+  switch (result) {
+    case DisplayCompositor::RenderFrameResult::kDirectToDisplay:
+      inspect_direct_display_frame_count_.Add(1);
+      break;
+    case DisplayCompositor::RenderFrameResult::kGpuComposition:
+      inspect_gpu_composition_frame_count_.Add(1);
+      break;
+    case DisplayCompositor::RenderFrameResult::kFailure:
+      inspect_failed_frame_count_.Add(1);
+      break;
+  }
 }
 
 view_tree::SubtreeSnapshot Engine::GenerateViewTreeSnapshot(

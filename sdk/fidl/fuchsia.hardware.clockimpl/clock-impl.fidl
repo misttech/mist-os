@@ -6,11 +6,21 @@ library fuchsia.hardware.clockimpl;
 
 using zx;
 
+@available(added=HEAD)
+type ClockNodeDescriptor = table {
+    // The hardware clock id. May be duplicated if multiple clients have a reference to this clock.
+    // This must be present.
+    1: clock_id uint32;
+
+    // The unique node ID that uniqely identifies this node. This is optional.
+    2: node_id uint32;
+};
+
 /// Metadata containing the IDs of the available clocks.
 @available(added=HEAD)
 @serializable
 type ClockIdsMetadata = table {
-    1: clock_ids vector<uint32>:MAX;
+    1: clock_nodes vector<ClockNodeDescriptor>:MAX;
 };
 
 /// Each method in this protocol has a corresponding method in clock.fidl

@@ -19,6 +19,8 @@ rustc_test("ergonomic_inspect_tests") {
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
   ]
 
+  test_deps = [ "//src/lib/fuchsia" ]
+
   sources = [ "src/main.rs" ]
 }
 

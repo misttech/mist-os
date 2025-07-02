@@ -4,9 +4,6 @@
 
 #include "simulator_impl.h"
 
-#include <fidl/fuchsia.hardware.powersource/cpp/wire.h>
-#include <lib/driver/logging/cpp/structured_logger.h>
-
 #include "power_source_state.h"
 
 namespace fake_powersource {
@@ -18,9 +15,7 @@ SimulatorImpl::~SimulatorImpl() = default;
 
 // TODO(b/289224085): this will be implemented later when a cli is being developed.
 void SimulatorImpl::SetPowerInfo(SetPowerInfoRequest& request,
-                                 SetPowerInfoCompleter::Sync& completer) {
-  auto info = request.info();
-}
+                                 SetPowerInfoCompleter::Sync& completer) {}
 
 void SimulatorImpl::SetBatteryInfo(SetBatteryInfoRequest& request,
                                    SetBatteryInfoCompleter::Sync& completer) {

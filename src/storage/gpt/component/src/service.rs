@@ -204,7 +204,10 @@ impl StorageHostService {
         *state = match GptManager::new(device.clone(), self.partitions_dir.clone()).await {
             Ok(runner) => State::Running(runner),
             Err(err) => {
-                log::error!(err:?; "Failed to load GPT.  Reformatting may be required.");
+                // This is a warning because, as described above, we can't return an error from
+                // here, so there are normal flows that can print this error message that don't
+                // indicate a bug or incorrect behavior.
+                log::warn!(err:?; "Failed to load GPT.  Reformatting may be required.");
                 State::NeedsFormatting(device)
             }
         };
@@ -418,13 +421,13 @@ impl StorageHostService {
 mod tests {
     use super::StorageHostService;
     use block_client::RemoteBlockClient;
-    use fake_block_server::FakeServer;
     use fidl::endpoints::Proxy as _;
     use fidl_fuchsia_process_lifecycle::LifecycleMarker;
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use futures::FutureExt as _;
     use gpt::{Gpt, Guid, PartitionInfo};
     use std::sync::Arc;
+    use vmo_backed_block_server::{VmoBackedServer, VmoBackedServerTestingExt as _};
     use {
         fidl_fuchsia_fs as ffs, fidl_fuchsia_fs_startup as fstartup,
         fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
@@ -436,9 +439,9 @@ mod tests {
         block_size: u32,
         block_count: u64,
         partitions: Vec<PartitionInfo>,
-    ) -> Arc<FakeServer> {
+    ) -> Arc<VmoBackedServer> {
         let vmo = zx::Vmo::create(block_size as u64 * block_count).unwrap();
-        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let server = Arc::new(VmoBackedServer::from_vmo(512, vmo));
         {
             let (block_client, block_server) =
                 fidl::endpoints::create_proxy::<fblock::BlockMarker>();
@@ -473,19 +476,7 @@ mod tests {
                     connect_to_protocol_at_dir_svc::<fstartup::StartupMarker>(&outgoing_dir)
                         .unwrap();
                 client
-                    .start(
-                        block_client,
-                        fstartup::StartOptions {
-                            read_only: false,
-                            verbose: false,
-                            fsck_after_every_transaction: false,
-                            write_compression_algorithm:
-                                fstartup::CompressionAlgorithm::ZstdChunked,
-                            write_compression_level: 0,
-                            cache_eviction_policy_override: fstartup::EvictionPolicyOverride::None,
-                            startup_profiling_seconds: 0,
-                        },
-                    )
+                    .start(block_client, &fstartup::StartOptions::default())
                     .await
                     .expect("FIDL error")
                     .expect("Start failed");
@@ -545,19 +536,7 @@ mod tests {
                 let admin_client =
                     connect_to_protocol_at_dir_svc::<ffs::AdminMarker>(&outgoing_dir).unwrap();
                 client
-                    .start(
-                        block_client,
-                        fstartup::StartOptions {
-                            read_only: false,
-                            verbose: false,
-                            fsck_after_every_transaction: false,
-                            write_compression_algorithm:
-                                fstartup::CompressionAlgorithm::ZstdChunked,
-                            write_compression_level: 0,
-                            cache_eviction_policy_override: fstartup::EvictionPolicyOverride::None,
-                            startup_profiling_seconds: 0,
-                        },
-                    )
+                    .start(block_client, &fstartup::StartOptions::default())
                     .await
                     .expect("FIDL error")
                     .expect("Start failed");
@@ -612,19 +591,7 @@ mod tests {
                 // Client
                 connect_to_protocol_at_dir_svc::<fstartup::StartupMarker>(&outgoing_dir)
                     .unwrap()
-                    .start(
-                        block_client,
-                        fstartup::StartOptions {
-                            read_only: false,
-                            verbose: false,
-                            fsck_after_every_transaction: false,
-                            write_compression_algorithm:
-                                fstartup::CompressionAlgorithm::ZstdChunked,
-                            write_compression_level: 0,
-                            cache_eviction_policy_override: fstartup::EvictionPolicyOverride::None,
-                            startup_profiling_seconds: 0,
-                        },
-                    )
+                    .start(block_client, &fstartup::StartOptions::default())
                     .await
                     .expect("FIDL error")
                     .expect("Start failed");

@@ -110,6 +110,7 @@ class PlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_device:
       fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override {}
 
   bool HasInterruptVector(uint32_t vector) const { return interrupt_vectors_.contains(vector); }
+  bool HasInterruptKoid(zx_koid_t koid) const { return interrupt_koids_.contains(koid); }
 
   zx::event node_token() const {
     if (node_token_.has_value()) {
@@ -154,6 +155,7 @@ class PlatformDevice : public fidl::WireServer<fuchsia_hardware_platform_device:
   // not destructed before `inspector_` is destructed. When `inspector_`
   // destructs, it executes a callback that references `interrupt_vectors_`.
   std::unordered_set<uint32_t> interrupt_vectors_;
+  std::unordered_set<zx_koid_t> interrupt_koids_;
 
   // When the node is bound, a node_token_ representing the driver component which bound to the node
   // is generated. This can be used to for introspection.

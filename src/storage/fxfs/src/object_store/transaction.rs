@@ -11,9 +11,10 @@ use crate::object_handle::INVALID_OBJECT_ID;
 use crate::object_store::allocator::{AllocatorItem, Reservation};
 use crate::object_store::object_manager::{reserved_space_from_journal_usage, ObjectManager};
 use crate::object_store::object_record::{
-    ObjectItem, ObjectItemV40, ObjectItemV41, ObjectItemV43, ObjectItemV46, ObjectKey,
-    ObjectKeyData, ObjectValue, ProjectProperty,
+    ObjectItem, ObjectItemV40, ObjectItemV41, ObjectItemV43, ObjectItemV46, ObjectItemV47,
+    ObjectKey, ObjectKeyData, ObjectValue, ProjectProperty,
 };
+use crate::object_store::AttributeKey;
 use crate::serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned};
 use anyhow::Error;
 use either::{Either, Left, Right};
@@ -21,7 +22,7 @@ use fprint::TypeFingerprint;
 use fuchsia_sync::Mutex;
 use futures::future::poll_fn;
 use futures::pin_mut;
-use fxfs_crypto::{WrappedKey, WrappedKeyV32, WrappedKeyV40};
+use fxfs_crypto::{FxfsKey, FxfsKeyV32, FxfsKeyV40};
 use rustc_hash::FxHashMap as HashMap;
 use scopeguard::ScopeGuard;
 use serde::{Deserialize, Serialize};
@@ -77,12 +78,30 @@ pub struct TransactionLocks<'a>(pub WriteGuard<'a>);
 /// transaction, these are stored as a set which allows some mutations to be deduplicated and found
 /// (and we require custom comparison functions below).  For example, we need to be able to find
 /// object size changes.
-pub type Mutation = MutationV46;
+pub type Mutation = MutationV47;
 
 #[derive(
     Clone, Debug, Eq, Ord, PartialEq, PartialOrd, Serialize, Deserialize, TypeFingerprint, Versioned,
 )]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub enum MutationV47 {
+    ObjectStore(ObjectStoreMutationV47),
+    EncryptedObjectStore(Box<[u8]>),
+    Allocator(AllocatorMutationV32),
+    // Indicates the beginning of a flush.  This would typically involve sealing a tree.
+    BeginFlush,
+    // Indicates the end of a flush.  This would typically involve replacing the immutable layers
+    // with compacted ones.
+    EndFlush,
+    // Volume has been deleted.  Requires we remove it from the set of managed ObjectStore.
+    DeleteVolume,
+    UpdateBorrowed(u64),
+    UpdateMutationsKey(UpdateMutationsKeyV40),
+    CreateInternalDir(u64),
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(MutationV47)]
 pub enum MutationV46 {
     ObjectStore(ObjectStoreMutationV46),
     EncryptedObjectStore(Box<[u8]>),
@@ -167,7 +186,7 @@ impl Mutation {
         })
     }
 
-    pub fn update_mutations_key(key: WrappedKey) -> Self {
+    pub fn update_mutations_key(key: FxfsKey) -> Self {
         Mutation::UpdateMutationsKey(key.into())
     }
 }
@@ -175,17 +194,25 @@ impl Mutation {
 // We have custom comparison functions for mutations that just use the key, rather than the key and
 // value that would be used by default so that we can deduplicate and find mutations (see
 // get_object_mutation below).
-pub type ObjectStoreMutation = ObjectStoreMutationV46;
+pub type ObjectStoreMutation = ObjectStoreMutationV47;
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
-#[migrate_nodefault]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub struct ObjectStoreMutationV47 {
+    pub item: ObjectItemV47,
+    pub op: OperationV32,
+}
+
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(ObjectStoreMutationV47)]
+#[migrate_nodefault]
 pub struct ObjectStoreMutationV46 {
     pub item: ObjectItemV46,
     pub op: OperationV32,
 }
 
 #[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(ObjectStoreMutationV46)]
 #[migrate_nodefault]
 pub struct ObjectStoreMutationV43 {
     pub item: ObjectItemV43,
@@ -325,10 +352,10 @@ pub enum AllocatorMutationV32 {
 pub type UpdateMutationsKey = UpdateMutationsKeyV40;
 
 #[derive(Clone, Debug, Serialize, Deserialize, TypeFingerprint)]
-pub struct UpdateMutationsKeyV40(pub WrappedKeyV40);
+pub struct UpdateMutationsKeyV40(pub FxfsKeyV40);
 
 #[derive(Serialize, Deserialize, TypeFingerprint)]
-pub struct UpdateMutationsKeyV32(pub WrappedKeyV32);
+pub struct UpdateMutationsKeyV32(pub FxfsKeyV32);
 
 impl From<UpdateMutationsKeyV32> for UpdateMutationsKeyV40 {
     fn from(value: UpdateMutationsKeyV32) -> Self {
@@ -336,14 +363,14 @@ impl From<UpdateMutationsKeyV32> for UpdateMutationsKeyV40 {
     }
 }
 
-impl From<UpdateMutationsKey> for WrappedKey {
+impl From<UpdateMutationsKey> for FxfsKey {
     fn from(outer: UpdateMutationsKey) -> Self {
         outer.0
     }
 }
 
-impl From<WrappedKey> for UpdateMutationsKey {
-    fn from(inner: WrappedKey) -> Self {
+impl From<FxfsKey> for UpdateMutationsKey {
+    fn from(inner: FxfsKey) -> Self {
         Self(inner)
     }
 }
@@ -351,13 +378,7 @@ impl From<WrappedKey> for UpdateMutationsKey {
 #[cfg(fuzz)]
 impl<'a> arbitrary::Arbitrary<'a> for UpdateMutationsKey {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        <u128>::arbitrary(u).map(|wrapping_key_id| {
-            UpdateMutationsKey::from(WrappedKey {
-                wrapping_key_id,
-                // There doesn't seem to be much point to randomly generate crypto keys.
-                key: fxfs_crypto::WrappedKeyBytes::default(),
-            })
-        })
+        Ok(UpdateMutationsKey::from(FxfsKey::arbitrary(u).unwrap()))
     }
 }
 
@@ -668,6 +689,9 @@ pub struct Transaction<'a> {
 
     /// Any data checksums which should be evaluated when replaying this transaction.
     checksums: Vec<(Range<u64>, Vec<Checksum>, bool)>,
+
+    /// Set if this transaction contains data (i.e. includes any extent mutations).
+    includes_write: bool,
 }
 
 impl<'a> Transaction<'a> {
@@ -697,6 +721,7 @@ impl<'a> Transaction<'a> {
             metadata_reservation,
             new_objects: BTreeSet::new(),
             checksums: Vec::new(),
+            includes_write: false,
         };
 
         ScopeGuard::into_inner(guard);
@@ -751,6 +776,18 @@ impl<'a> Transaction<'a> {
         associated_object: AssocObj<'a>,
     ) -> Option<Mutation> {
         assert!(object_id != INVALID_OBJECT_ID);
+        if let Mutation::ObjectStore(ObjectStoreMutation {
+            item:
+                Item {
+                    key:
+                        ObjectKey { data: ObjectKeyData::Attribute(_, AttributeKey::Extent(_)), .. },
+                    ..
+                },
+            ..
+        }) = &mutation
+        {
+            self.includes_write = true;
+        }
         let txn_mutation = TxnMutation { object_id, mutation, associated_object };
         self.verify_locks(&txn_mutation);
         self.mutations.replace(txn_mutation).map(|m| m.mutation)
@@ -758,6 +795,10 @@ impl<'a> Transaction<'a> {
 
     pub fn add_checksum(&mut self, range: Range<u64>, checksums: Vec<Checksum>, first_write: bool) {
         self.checksums.push((range, checksums, first_write));
+    }
+
+    pub fn includes_write(&self) -> bool {
+        self.includes_write
     }
 
     pub fn checksums(&self) -> &[(Range<u64>, Vec<Checksum>, bool)] {

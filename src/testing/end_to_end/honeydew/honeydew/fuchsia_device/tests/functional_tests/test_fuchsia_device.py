@@ -115,6 +115,10 @@ class FuchsiaDeviceTests(fuchsia_base_test.FuchsiaBaseTest):
         else:
             asserts.assert_is_instance(self.device.firmware_version, str)
 
+    def test_is_starnix_device(self) -> None:
+        """Test case for is_starnix_device"""
+        asserts.assert_is_instance(self.device.is_starnix_device(), bool)
+
     def test_health_check(self) -> None:
         """Test case for health_check()"""
         self.device.health_check()

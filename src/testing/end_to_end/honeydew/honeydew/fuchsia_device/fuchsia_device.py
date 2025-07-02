@@ -15,15 +15,19 @@ from honeydew.affordances.connectivity.netstack import netstack
 from honeydew.affordances.connectivity.wlan.wlan import wlan
 from honeydew.affordances.connectivity.wlan.wlan_policy import wlan_policy
 from honeydew.affordances.connectivity.wlan.wlan_policy_ap import wlan_policy_ap
+from honeydew.affordances.hello_world import hello_world
 from honeydew.affordances.location import location
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller,
 )
 from honeydew.affordances.rtc import rtc
 from honeydew.affordances.session import session
+from honeydew.affordances.starnix import starnix
 from honeydew.affordances.tracing import tracing
+from honeydew.affordances.ui.scenic import scenic
 from honeydew.affordances.ui.screenshot import screenshot
 from honeydew.affordances.ui.user_input import user_input
+from honeydew.affordances.virtual_audio import audio
 from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
@@ -209,11 +213,29 @@ class FuchsiaDevice(abc.ABC):
 
     @properties.Affordance
     @abc.abstractmethod
+    def hello_world(self) -> hello_world.HelloWorld:
+        """Returns a HelloWorld affordance object.
+
+        Returns:
+            hello_world.HelloWorld object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
     def rtc(self) -> rtc.Rtc:
         """Returns an RTC affordance object.
 
         Returns:
             rtc.Rtc object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def scenic(self) -> scenic.Scenic:
+        """Returns a scenic affordance object.
+
+        Returns:
+            scenic.Scenic object
         """
 
     @properties.Affordance
@@ -227,11 +249,29 @@ class FuchsiaDevice(abc.ABC):
 
     @properties.Affordance
     @abc.abstractmethod
+    def virtual_audio(self) -> audio.VirtualAudio:
+        """Returns an audio affordance object.
+
+        Returns:
+            audio.Audio object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
     def session(self) -> session.Session:
         """Returns a session affordance object.
 
         Returns:
             session.Session object
+        """
+
+    @properties.Affordance
+    @abc.abstractmethod
+    def starnix(self) -> starnix.Starnix:
+        """Returns a starnix affordance object.
+
+        Returns:
+            starnix.Starnix object
         """
 
     @properties.Affordance
@@ -423,3 +463,14 @@ class FuchsiaDevice(abc.ABC):
     @abc.abstractmethod
     def wait_for_online(self) -> None:
         """Wait for Fuchsia device to go online."""
+
+    @abc.abstractmethod
+    def is_starnix_device(self) -> bool:
+        """Check if the device under test is a starnix device.
+
+        Some operation maybe heavy on starnix device, allow caller to find if running on starnix
+        device.
+
+        Raises:
+            FuchsiaDeviceError: failed to check the device.
+        """

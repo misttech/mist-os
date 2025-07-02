@@ -111,9 +111,9 @@ async fn test_replace_target() -> Result<()> {
     };
     instance.driver_test_realm_start(args).await?;
 
-    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
-    let driver_registrar =
-        instance.root.connect_to_protocol_at_exposed_dir::<fdr::DriverRegistrarMarker>()?;
+    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir()?;
+    let driver_registrar: fdr::DriverRegistrarProxy =
+        instance.root.connect_to_protocol_at_exposed_dir()?;
 
     // This maps nodes to Option<Option<u64>>. The outer option is whether the node has been seen
     // yet (if composite parent we start with `Some` for this since we don't receive acks

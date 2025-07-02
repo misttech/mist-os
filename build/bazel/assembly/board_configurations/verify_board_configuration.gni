@@ -47,7 +47,7 @@ template("verify_board_configuration") {
       "--generated_board_config",
       rebase_path(inputs[0], root_build_dir),
       "--generated_root_dir",
-      bazel_main_top_dir_rebased + "/workspace",
+      bazel_top_dir_rebased + "/workspace",
       "--golden_json5",
       rebase_path(inputs[1], root_build_dir),
       "--golden_root_dir",

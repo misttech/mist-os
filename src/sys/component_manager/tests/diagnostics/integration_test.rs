@@ -26,10 +26,8 @@ async fn start_nested_cm_and_wait_for_clean_stop(root_url: &str, moniker_to_wait
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
 
-    let proxy = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
-        .unwrap();
+    let proxy: fcomponent::EventStreamProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     proxy.wait_for_ready().await.unwrap();
 

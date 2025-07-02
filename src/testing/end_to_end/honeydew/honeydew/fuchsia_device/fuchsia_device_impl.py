@@ -47,6 +47,7 @@ from honeydew.affordances.connectivity.wlan.wlan_policy_ap import (
     wlan_policy_ap,
     wlan_policy_ap_using_fc,
 )
+from honeydew.affordances.hello_world import hello_world, hello_world_using_ffx
 from honeydew.affordances.location import location, location_using_fc
 from honeydew.affordances.power.system_power_state_controller import (
     system_power_state_controller as system_power_state_controller_interface,
@@ -56,9 +57,16 @@ from honeydew.affordances.power.system_power_state_controller import (
 )
 from honeydew.affordances.rtc import rtc, rtc_using_fc
 from honeydew.affordances.session import session, session_using_ffx
+from honeydew.affordances.starnix import errors as starnix_errors
+from honeydew.affordances.starnix import starnix, starnix_using_ffx
 from honeydew.affordances.tracing import tracing, tracing_using_fc
+from honeydew.affordances.ui.scenic import scenic, scenic_using_ffx
 from honeydew.affordances.ui.screenshot import screenshot, screenshot_using_ffx
 from honeydew.affordances.ui.user_input import user_input, user_input_using_fc
+from honeydew.affordances.virtual_audio import (
+    audio,
+    audio_using_fuchsia_controller,
+)
 from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
@@ -379,6 +387,15 @@ class FuchsiaDeviceImpl(
 
     # List all the affordances
     @properties.Affordance
+    def scenic(self) -> scenic.Scenic:
+        """Returns a scenic affordance object.
+
+        Returns:
+            scenic.Scenic object
+        """
+        return scenic_using_ffx.ScenicUsingFfx(self.ffx)
+
+    @properties.Affordance
     def session(self) -> session.Session:
         """Returns a session affordance object.
 
@@ -386,7 +403,9 @@ class FuchsiaDeviceImpl(
             session.Session object
         """
         return session_using_ffx.SessionUsingFfx(
-            device_name=self.device_name, ffx=self.ffx
+            device_name=self.device_name,
+            ffx=self.ffx,
+            fuchsia_device_close=self,
         )
 
     @properties.Affordance
@@ -397,6 +416,39 @@ class FuchsiaDeviceImpl(
             screenshot.Screenshot object
         """
         return screenshot_using_ffx.ScreenshotUsingFfx(self.ffx)
+
+    @properties.Affordance
+    def virtual_audio(self) -> audio.VirtualAudio:
+        """Returns a virtual audio affordance object.
+
+        Connecting to the protocols this connects to on startup will inject
+        the virtual audio device which does the following things:
+
+        - Input audio will only come from the virtual device. Actual microphones are disabled.
+        - Output audio will only go to the virtual device. Actual speakers are disabled.
+
+        TODO(https://fxbug.dev/417759272): There is currently no way to disable this
+        behavior other than rebooting the device.
+
+        Returns:
+            audio.VirtualAudio object
+        """
+        return (
+            audio_using_fuchsia_controller.VirtualAudioUsingFuchsiaController(
+                fuchsia_controller=self.fuchsia_controller,
+            )
+        )
+
+    @properties.Affordance
+    def starnix(self) -> starnix.Starnix:
+        """Returns a starnix affordance object.
+
+        Returns:
+            starnix.Starnix object
+        """
+        return starnix_using_ffx.StarnixUsingFfx(
+            device_name=self.device_name, ffx=self.ffx
+        )
 
     @properties.Affordance
     def system_power_state_controller(
@@ -415,6 +467,7 @@ class FuchsiaDeviceImpl(
             ffx=self.ffx,
             inspect=self,
             device_logger=self,
+            starnix=self.starnix,
         )
 
     @properties.Affordance
@@ -572,6 +625,18 @@ class FuchsiaDeviceImpl(
             reboot_affordance=self,
         )
 
+    @properties.Affordance
+    def hello_world(self) -> hello_world.HelloWorld:
+        """Returns a HelloWorld affordance object.
+
+        Returns:
+            hello_world.HelloWorld object
+        """
+        return hello_world_using_ffx.HelloWorldUsingFfx(
+            device_name=self.device_name,
+            ffx=self.ffx,
+        )
+
     # List all the public methods
     def close(self) -> None:
         """Clean up method."""
@@ -586,8 +651,13 @@ class FuchsiaDeviceImpl(
             errors.HealthCheckError
         """
         try:
+            # TODO(b/421476805): Reduce the timeout back to 60 seconds once
+            # we're able to supply a configuration value for this. The timeout
+            # of 180 is picked to give a sufficiently large amount of time for
+            # devices in infrastructure that currently experience stalls during
+            # boot but eventually settle.
             with common.time_limit(
-                timeout=60,
+                timeout=180,
                 exception_message=f"Timeout occurred during the health check of '{self._device_info.name}'",
             ):
                 _LOGGER.info(
@@ -888,6 +958,24 @@ class FuchsiaDeviceImpl(
                 f"'{self.device_name}' failed to go online."
             ) from err
 
+    def is_starnix_device(self) -> bool:
+        """Check if the device under test is a starnix device.
+
+        Some operation maybe heavy on starnix device, allow caller to find if running on starnix
+        device.
+
+        Raises:
+            FuchsiaDeviceError: failed to check the device.
+        """
+
+        try:
+            self.starnix
+            return True
+        except errors.NotSupportedError:
+            return False
+        except starnix_errors.StarnixError as err:
+            raise errors.FuchsiaDeviceError(err)
+
     # List all private properties
     @property
     def _build_info(self) -> f_buildinfo.BuildInfo:
@@ -1034,17 +1122,20 @@ class FuchsiaDeviceImpl(
 
         # Get file size for verification later.
         try:
-            attr_resp: f_io.NodeGetAttrResponse = asyncio.run(
-                file_proxy.get_attr()
-            )
-            if attr_resp.s != fcp.ZxStatus.ZX_OK:
-                raise fc_errors.FuchsiaControllerError(
-                    f"get_attr() returned status: {attr_resp.s}"
+            attr_resp: f_io.NodeAttributes2 = asyncio.run(
+                file_proxy.get_attributes(
+                    query=f_io.NodeAttributesQuery.CONTENT_SIZE
                 )
-        except fcp.ZxStatus as status:
+            ).unwrap()
+        except (AssertionError, fcp.ZxStatus) as e:
             raise fc_errors.FuchsiaControllerError(
-                "get_attr() failed"
-            ) from status
+                "get_attributes() failed"
+            ) from e
+        if attr_resp.immutable_attributes.content_size is None:
+            raise fc_errors.FuchsiaControllerError(
+                "get_attributes() returned empty content size"
+            )
+        expected_size: int = attr_resp.immutable_attributes.content_size
 
         # Read until channel is empty.
         ret: bytearray = bytearray()
@@ -1060,7 +1151,6 @@ class FuchsiaDeviceImpl(
             raise fc_errors.FuchsiaControllerError("read() failed") from e
 
         # Verify transfer.
-        expected_size: int = attr_resp.attributes.content_size
         if len(ret) != expected_size:
             raise fc_errors.FuchsiaControllerError(
                 f"Expected {expected_size} bytes, but read {len(ret)} bytes"

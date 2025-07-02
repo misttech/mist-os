@@ -10,7 +10,6 @@
 use async_trait::async_trait;
 use fidl::endpoints::{create_proxy, ClientEnd, ProtocolMarker, Proxy};
 use fidl::prelude::*;
-use fuchsia_async::{DurationExt, TimeoutExt};
 use futures::{StreamExt as _, TryStreamExt as _};
 use {fidl_fuchsia_io as fio, fidl_fuchsia_io_test as io_test};
 
@@ -55,96 +54,10 @@ pub async fn get_open_status(node_proxy: &fio::NodeProxy) -> zx::Status {
     }
 }
 
-/// Asserts that no [`fio::NodeEvent::OnOpen_`] event is sent on an opened proxy.
-pub async fn assert_on_open_not_received(node_proxy: &fio::NodeProxy) {
-    let mut events = Clone::clone(node_proxy).take_event_stream();
-    // Wait at most 200ms for an OnOpen event to appear.
-    let event = events
-        .next()
-        .on_timeout(zx::MonotonicDuration::from_millis(200).after_now(), || Option::None)
-        .await;
-    assert!(event.is_none(), "Unexpected OnOpen event received");
-}
-
 /// Converts a generic [`fio::NodeProxy`] to either [`fio::FileProxy`] or [`fio::DirectoryProxy`].
 /// **WARNING**: This function does _not_ verify that the conversion is valid.
 pub fn convert_node_proxy<T: Proxy>(proxy: fio::NodeProxy) -> T {
     T::from_channel(proxy.into_channel().expect("Cannot convert node proxy to channel"))
-}
-
-/// Helper function to open the desired node in the root folder.
-/// Asserts that deprecated_open_node_status succeeds.
-pub async fn deprecated_open_node<T: ProtocolMarker>(
-    dir: &fio::DirectoryProxy,
-    flags: fio::OpenFlags,
-    path: &str,
-) -> T::Proxy {
-    deprecated_open_node_status::<T>(dir, flags, path).await.unwrap_or_else(|e| {
-        panic!("deprecated_open_node_status failed for {path} (flags={flags:?}): {e:?}")
-    })
-}
-
-/// Helper function to open the desired node in the root folder.
-pub async fn deprecated_open_node_status<T: ProtocolMarker>(
-    dir: &fio::DirectoryProxy,
-    flags: fio::OpenFlags,
-    path: &str,
-) -> Result<T::Proxy, zx::Status> {
-    let flags = flags | fio::OpenFlags::DESCRIBE;
-    let (node_proxy, node_server) = create_proxy::<fio::NodeMarker>();
-    dir.deprecated_open(flags, fio::ModeType::empty(), path, node_server)
-        .expect("Cannot open node");
-    let status = get_open_status(&node_proxy).await;
-
-    if status != zx::Status::OK {
-        Err(status)
-    } else {
-        Ok(convert_node_proxy(node_proxy))
-    }
-}
-
-/// Helper function to open a file with the given flags. Only use this if testing something other
-/// than the open call directly.
-pub async fn deprecated_open_file_with_flags(
-    parent_dir: &fio::DirectoryProxy,
-    flags: fio::OpenFlags,
-    path: &str,
-) -> fio::FileProxy {
-    deprecated_open_node::<fio::FileMarker>(
-        &parent_dir,
-        flags | fio::OpenFlags::NOT_DIRECTORY,
-        path,
-    )
-    .await
-}
-
-/// Helper function to open a sub-directory with the given flags. Only use this if testing
-/// something other than the open call directly.
-pub async fn deprecated_open_dir_with_flags(
-    parent_dir: &fio::DirectoryProxy,
-    flags: fio::OpenFlags,
-    path: &str,
-) -> fio::DirectoryProxy {
-    deprecated_open_node::<fio::DirectoryMarker>(
-        &parent_dir,
-        flags | fio::OpenFlags::DIRECTORY,
-        path,
-    )
-    .await
-}
-
-/// Helper function to open a sub-directory as readable and writable. Only use this if testing
-/// something other than the open call directly.
-pub async fn deprecated_open_rw_dir(
-    parent_dir: &fio::DirectoryProxy,
-    path: &str,
-) -> fio::DirectoryProxy {
-    deprecated_open_dir_with_flags(
-        parent_dir,
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        path,
-    )
-    .await
 }
 
 /// Helper function to call `get_token` on a directory. Only use this if testing something
@@ -158,21 +71,9 @@ pub async fn get_token(dir: &fio::DirectoryProxy) -> fidl::Handle {
 /// Helper function to read a file and return its contents. Only use this if testing something other
 /// than the read call directly.
 pub async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Vec<u8> {
-    let file = deprecated_open_file_with_flags(dir, fio::OpenFlags::RIGHT_READABLE, path).await;
+    let file =
+        dir.open_node::<fio::FileMarker>(path, fio::Flags::PERM_READ_BYTES, None).await.unwrap();
     file.read(100).await.expect("read failed").map_err(zx::Status::from_raw).expect("read error")
-}
-
-/// Attempts to open the given file, and checks the status is `NOT_FOUND`.
-pub async fn assert_file_not_found(dir: &fio::DirectoryProxy, path: &str) {
-    let (file_proxy, file_server) = create_proxy::<fio::NodeMarker>();
-    dir.deprecated_open(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY | fio::OpenFlags::DESCRIBE,
-        fio::ModeType::empty(),
-        path,
-        file_server,
-    )
-    .expect("Cannot open file");
-    assert_eq!(get_open_status(&file_proxy).await, zx::Status::NOT_FOUND);
 }
 
 /// Returns the .name field from a given DirectoryEntry, otherwise panics.

@@ -18,11 +18,13 @@ class FuzzyMatcher {
   explicit FuzzyMatcher(const std::string& content) : content_(content) {}
 
   // The content should contain a line that matches the given substrings.
+  // |allow_out_of_order| indicates that |pattern| may appear anywhere in |content_|.
   // Note that this method will consume the content, so a subsequent call may return differently.
-  bool MatchesLine(const std::vector<std::string_view>& substrs);
+  bool MatchesLine(const std::vector<std::string_view>& substrs, bool allow_out_of_order);
 
   // This variant takes a pattern string, which contains "??" that can match everything.
-  bool MatchesLine(std::string_view pattern);
+  // |allow_out_of_order| indicates that |pattern| may appear anywhere in |content_|.
+  bool MatchesLine(std::string_view pattern, bool allow_out_of_order);
 
  private:
   std::stringstream content_;

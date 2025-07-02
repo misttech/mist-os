@@ -4,8 +4,8 @@
 
 use component_events::events::*;
 use component_events::matcher::*;
+use fuchsia_async as fasync;
 use fuchsia_component_test::*;
-use {fidl_fuchsia_component as fcomponent, fuchsia_async as fasync};
 
 #[fasync::run_singlethreaded(test)]
 async fn component_manager_namespace() {
@@ -48,10 +48,7 @@ async fn component_manager_namespace() {
 
     let instance = component_manager_realm.build().await.unwrap();
 
-    let proxy = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
-        .unwrap();
+    let proxy = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let mut event_stream = component_events::events::EventStream::new(proxy);
 

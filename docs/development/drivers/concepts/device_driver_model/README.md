@@ -12,6 +12,5 @@ legacy version of the driver framework (DFv1).
 - [Device protocol](protocol.md)
 - [Platform bus](platform-bus.md)
 - [FIDL](fidl.md)
-- [Banjo](banjo.md)
 - [Composite devices](composite.md)
 - [Device firmware](firmware.md)

@@ -8,6 +8,7 @@
 #![recursion_limit = "256"]
 
 use core::convert::{Infallible as Never, TryInto as _};
+use core::fmt::Debug;
 use core::time::Duration;
 
 use arbitrary::{Arbitrary, Unstructured};
@@ -177,7 +178,7 @@ impl FrameType {
 }
 
 impl EthernetFrameType {
-    fn arbitrary_buf<O: PacketBuilder + core::fmt::Debug>(
+    fn arbitrary_buf<O: PacketBuilder + Debug>(
         &self,
         outer: O,
         u: &mut Unstructured<'_>,
@@ -195,12 +196,7 @@ impl EthernetFrameType {
 }
 
 impl IpFrameType {
-    fn arbitrary_buf<
-        'a,
-        A: IpAddress,
-        IPB: IpPacketBuilder<A::Version>,
-        O: PacketBuilder + core::fmt::Debug,
-    >(
+    fn arbitrary_buf<'a, A: IpAddress, IPB: IpPacketBuilder<A::Version>, O: PacketBuilder + Debug>(
         &self,
         outer: O,
         u: &mut Unstructured<'a>,
@@ -303,7 +299,8 @@ impl<B: PacketBuilder> FuzzablePacket for (B,) {
     }
 
     fn serialize(self, buf: Buf<Vec<u8>>) -> Result<Buf<Vec<u8>>, SerializeError<Never>> {
-        buf.encapsulate(self.0)
+        self.0
+            .wrap_body(buf)
             .serialize_vec_outer()
             .map(Either::into_inner)
             .map_err(|(err, _ser)| err)
@@ -320,16 +317,16 @@ impl<BA: PacketBuilder, BB: PacketBuilder, BC: PacketBuilder> FuzzablePacket for
 
     fn serialize(self, buf: Buf<Vec<u8>>) -> Result<Buf<Vec<u8>>, SerializeError<Never>> {
         let (a, b, c) = self;
-        buf.encapsulate(a)
-            .encapsulate(b)
-            .encapsulate(c)
+        buf.wrap_in(a)
+            .wrap_in(b)
+            .wrap_in(c)
             .serialize_vec_outer()
             .map(Either::into_inner)
             .map_err(|(err, _ser)| err)
     }
 }
 
-fn arbitrary_packet<P: FuzzablePacket + std::fmt::Debug>(
+fn arbitrary_packet<P: FuzzablePacket + Debug>(
     packet: P,
     u: &mut Unstructured<'_>,
 ) -> arbitrary::Result<(Buf<Vec<u8>>, String)> {

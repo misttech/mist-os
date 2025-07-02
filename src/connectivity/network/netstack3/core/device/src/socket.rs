@@ -13,6 +13,7 @@ use derivative::Derivative;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use net_types::ethernet::Mac;
 use net_types::ip::IpVersion;
+use netstack3_base::socket::SocketCookie;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, ContextPair, Counter, Device, DeviceIdContext, FrameDestination, Inspectable,
@@ -112,6 +113,14 @@ impl<D: Send + Sync + Debug, BT: DeviceSocketTypes> PrimaryDeviceSocketId<D, BT>
 pub struct DeviceSocketId<D: Send + Sync + Debug, BT: DeviceSocketTypes>(
     StrongRc<SocketState<D, BT>>,
 );
+
+impl<D: Send + Sync + Debug, BT: DeviceSocketTypes> DeviceSocketId<D, BT> {
+    /// Returns [`SocketCookie`] for this socket.
+    pub fn socket_cookie(&self) -> SocketCookie {
+        let Self(rc) = self;
+        SocketCookie::new(rc.resource_token())
+    }
+}
 
 impl<D: Send + Sync + Debug, BT: DeviceSocketTypes> Debug for DeviceSocketId<D, BT> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {

@@ -9,8 +9,10 @@ rustc_library("router_error") {
   with_unit_tests = false
 
   deps = [
+    "//sdk/fidl/fuchsia.component.runtime:fuchsia.component.runtime_rust",
     "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_rust",
     "//sdk/rust/zx-status",
+    "//src/sys/lib/moniker",
     "//third_party/rust_crates:thiserror",
   ]
 

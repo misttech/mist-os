@@ -28,13 +28,13 @@ use starnix_uapi::signals::{SigSet, SIGCHLD};
 use starnix_uapi::user_address::{UserAddress, UserCString, UserRef};
 use starnix_uapi::vfs::EpollEvent;
 use starnix_uapi::{
-    __kernel_time_t, clone_args, errno, error, gid_t, itimerval, pid_t, pollfd, uapi, uid_t,
+    __kernel_time_t, clone_args, errno, error, gid_t, itimerval, pid_t, pollfd, tid_t, uapi, uid_t,
     ARCH_SET_FS, ARCH_SET_GS, AT_REMOVEDIR, AT_SYMLINK_NOFOLLOW, CLONE_VFORK, CLONE_VM, CSIGNAL,
     ITIMER_REAL,
 };
 
 pub fn sys_access(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     mode: u32,
@@ -43,7 +43,7 @@ pub fn sys_access(
 }
 
 pub fn sys_alarm(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     duration: u32,
 ) -> Result<u32, Errno> {
@@ -67,7 +67,7 @@ pub fn sys_alarm(
 }
 
 pub fn sys_arch_prctl(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     code: u32,
     addr: UserAddress,
@@ -89,7 +89,7 @@ pub fn sys_arch_prctl(
 }
 
 pub fn sys_chmod(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     mode: FileMode,
@@ -98,7 +98,7 @@ pub fn sys_chmod(
 }
 
 pub fn sys_chown(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     owner: uid_t,
@@ -109,14 +109,14 @@ pub fn sys_chown(
 
 /// The parameter order for `clone` varies by architecture.
 pub fn sys_clone(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     flags: u64,
     user_stack: UserAddress,
-    user_parent_tid: UserRef<pid_t>,
-    user_child_tid: UserRef<pid_t>,
+    user_parent_tid: UserRef<tid_t>,
+    user_child_tid: UserRef<tid_t>,
     user_tls: UserAddress,
-) -> Result<pid_t, Errno> {
+) -> Result<tid_t, Errno> {
     // Our flags parameter uses the low 8 bits (CSIGNAL mask) of flags to indicate the exit
     // signal. The CloneArgs struct separates these as `flags` and `exit_signal`.
     do_clone(
@@ -135,9 +135,9 @@ pub fn sys_clone(
 }
 
 pub fn sys_fork(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
-) -> Result<pid_t, Errno> {
+) -> Result<tid_t, Errno> {
     do_clone(
         locked,
         current_task,
@@ -147,7 +147,7 @@ pub fn sys_fork(
 
 // https://pubs.opengroup.org/onlinepubs/9699919799/functions/creat.html
 pub fn sys_creat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     mode: FileMode,
@@ -162,7 +162,7 @@ pub fn sys_creat(
 }
 
 pub fn sys_dup2(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     oldfd: FdNumber,
     newfd: FdNumber,
@@ -181,7 +181,7 @@ pub fn sys_dup2(
 }
 
 pub fn sys_epoll_create(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     size: i32,
 ) -> Result<FdNumber, Errno> {
@@ -195,7 +195,7 @@ pub fn sys_epoll_create(
 }
 
 pub fn sys_epoll_wait(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
@@ -214,7 +214,7 @@ pub fn sys_epoll_wait(
 }
 
 pub fn sys_eventfd(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     value: u32,
 ) -> Result<FdNumber, Errno> {
@@ -222,7 +222,7 @@ pub fn sys_eventfd(
 }
 
 pub fn sys_getdents(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     user_buffer: UserAddress,
@@ -236,21 +236,21 @@ pub fn sys_getdents(
 }
 
 pub fn sys_getpgrp(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<pid_t, Errno> {
     Ok(current_task.thread_group().read().process_group.leader)
 }
 
 pub fn sys_inotify_init(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> Result<FdNumber, Errno> {
     sys_inotify_init1(locked, current_task, 0)
 }
 
 pub fn sys_lchown(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     owner: uid_t,
@@ -268,7 +268,7 @@ pub fn sys_lchown(
 }
 
 pub fn sys_link(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     old_user_path: UserCString,
     new_user_path: UserCString,
@@ -285,7 +285,7 @@ pub fn sys_link(
 }
 
 pub fn sys_lstat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     buffer: UserRef<uapi::stat>,
@@ -303,7 +303,7 @@ pub fn sys_lstat(
 }
 
 pub fn sys_mkdir(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     mode: FileMode,
@@ -312,7 +312,7 @@ pub fn sys_mkdir(
 }
 
 pub fn sys_mknod(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     mode: FileMode,
@@ -322,7 +322,7 @@ pub fn sys_mknod(
 }
 
 pub fn sys_open(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     flags: u32,
@@ -331,10 +331,7 @@ pub fn sys_open(
     sys_openat(locked, current_task, FdNumber::AT_FDCWD, user_path, flags, mode)
 }
 
-pub fn sys_pause(
-    _locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
-) -> Result<(), Errno> {
+pub fn sys_pause(_locked: &mut Locked<Unlocked>, current_task: &CurrentTask) -> Result<(), Errno> {
     let event = InterruptibleEvent::new();
     let guard = event.begin_wait();
     let result = current_task.run_in_state(RunState::Event(event.clone()), || {
@@ -348,7 +345,7 @@ pub fn sys_pause(
 }
 
 pub fn sys_pipe(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_pipe: UserRef<FdNumber>,
 ) -> Result<(), Errno> {
@@ -356,7 +353,7 @@ pub fn sys_pipe(
 }
 
 pub fn sys_poll(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     user_fds: UserRef<pollfd>,
     num_fds: i32,
@@ -367,7 +364,7 @@ pub fn sys_poll(
 }
 
 pub fn sys_readlink(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     buffer: UserAddress,
@@ -377,7 +374,7 @@ pub fn sys_readlink(
 }
 
 pub fn sys_rmdir(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
 ) -> Result<(), Errno> {
@@ -385,7 +382,7 @@ pub fn sys_rmdir(
 }
 
 pub fn sys_rename(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     old_user_path: UserCString,
     new_user_path: UserCString,
@@ -402,7 +399,7 @@ pub fn sys_rename(
 }
 
 pub fn sys_renameat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     old_dir_fd: FdNumber,
     old_user_path: UserCString,
@@ -413,7 +410,7 @@ pub fn sys_renameat(
 }
 
 pub fn sys_stat(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
     buffer: UserRef<uapi::stat>,
@@ -425,7 +422,7 @@ pub fn sys_stat(
 
 // https://man7.org/linux/man-pages/man2/symlink.2.html
 pub fn sys_symlink(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_target: UserCString,
     user_path: UserCString,
@@ -434,7 +431,7 @@ pub fn sys_symlink(
 }
 
 pub fn sys_time(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     time_addr: UserRef<__kernel_time_t>,
 ) -> Result<__kernel_time_t, Errno> {
@@ -447,7 +444,7 @@ pub fn sys_time(
 }
 
 pub fn sys_unlink(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_path: UserCString,
 ) -> Result<(), Errno> {
@@ -455,7 +452,7 @@ pub fn sys_unlink(
 }
 
 pub fn sys_signalfd(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     fd: FdNumber,
     mask_addr: UserRef<SigSet>,
@@ -465,9 +462,9 @@ pub fn sys_signalfd(
 }
 
 pub fn sys_vfork(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
-) -> Result<pid_t, Errno> {
+) -> Result<tid_t, Errno> {
     do_clone(
         locked,
         current_task,

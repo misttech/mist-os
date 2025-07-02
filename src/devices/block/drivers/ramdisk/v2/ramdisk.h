@@ -74,7 +74,7 @@ class Ramdisk : public fidl::WireServer<fuchsia_hardware_ramdisk::Ramdisk>,
 
   fuchsia_hardware_ramdisk::wire::BlockWriteCounts block_counts_ TA_GUARDED(lock_);
   std::optional<uint64_t> pre_sleep_write_block_count_ TA_GUARDED(lock_);
-  std::vector<uint64_t> blocks_written_since_last_flush_ TA_GUARDED(lock_);
+  std::vector<uint64_t> blocks_written_since_last_barrier_ TA_GUARDED(lock_);
 
   // Flags modified by SetFlags.
   fuchsia_hardware_ramdisk::RamdiskFlag flags_ TA_GUARDED(lock_);

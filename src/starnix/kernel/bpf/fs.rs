@@ -120,7 +120,7 @@ impl FileOps for BpfHandle {
     fileops_impl_noop_sync!();
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
@@ -131,7 +131,7 @@ impl FileOps for BpfHandle {
     }
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &crate::task::CurrentTask,
         _offset: usize,
@@ -143,7 +143,7 @@ impl FileOps for BpfHandle {
 
     fn get_memory(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         length: Option<usize>,
@@ -210,7 +210,7 @@ impl FileOps for BpfHandle {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -252,7 +252,7 @@ impl FileOps for BpfHandle {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -271,22 +271,24 @@ impl FileOps for BpfHandle {
 }
 
 pub fn get_bpf_object(task: &Task, fd: FdNumber) -> Result<BpfHandle, Errno> {
-    Ok(task.files.get(fd)?.downcast_file::<BpfHandle>().ok_or_else(|| errno!(EBADF))?.clone())
+    Ok((*task.files.get(fd)?.downcast_file::<BpfHandle>().ok_or_else(|| errno!(EBADF))?).clone())
 }
 
 pub struct BpfFs;
 impl BpfFs {
     pub fn new_fs(
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
         let fs = FileSystem::new(kernel, CacheMode::Permanent, BpfFs, options)?;
-        let node = FsNode::new_root_with_properties(BpfFsDir::new(), |info| {
-            info.mode |= FileMode::ISVTX;
-        });
-        fs.set_root_node(node);
+        let root_ino = fs.allocate_ino();
+        fs.create_root_with_info(
+            root_ino,
+            BpfFsDir::new(),
+            FsNodeInfo::new(mode!(IFDIR, 0o777) | FileMode::ISVTX, FsCred::root()),
+        );
         Ok(fs)
     }
 }
@@ -294,7 +296,7 @@ impl BpfFs {
 impl FileSystemOps for BpfFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -306,7 +308,7 @@ impl FileSystemOps for BpfFs {
 
     fn rename(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
         _old_parent: &FsNodeHandle,
@@ -331,7 +333,7 @@ impl BpfFsDir {
 
     pub fn register_pin<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         node: &NamespaceNode,
         name: &FsStr,
@@ -346,10 +348,9 @@ impl BpfFsDir {
             &node.mount,
             name,
             |_locked, dir, _mount, _name| {
-                Ok(dir.fs().create_node(
-                    current_task,
+                Ok(dir.fs().create_node_and_allocate_node_id(
                     BpfFsObject::new(object),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o600), current_task.as_fscred()),
+                    FsNodeInfo::new(mode!(IFREG, 0o600), current_task.as_fscred()),
                 ))
             },
         )?;
@@ -362,7 +363,7 @@ impl FsNodeOps for BpfFsDir {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -372,23 +373,22 @@ impl FsNodeOps for BpfFsDir {
 
     fn mkdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         _name: &FsStr,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        Ok(node.fs().create_node(
-            current_task,
+        Ok(node.fs().create_node_and_allocate_node_id(
             BpfFsDir::new(),
-            FsNodeInfo::new_factory(mode | FileMode::ISVTX, owner),
+            FsNodeInfo::new(mode | FileMode::ISVTX, owner),
         ))
     }
 
     fn mknod(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -401,7 +401,7 @@ impl FsNodeOps for BpfFsDir {
 
     fn create_symlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -413,7 +413,7 @@ impl FsNodeOps for BpfFsDir {
 
     fn link(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -424,7 +424,7 @@ impl FsNodeOps for BpfFsDir {
 
     fn unlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -451,7 +451,7 @@ impl FsNodeOps for BpfFsObject {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,

@@ -48,3 +48,10 @@ per-file create-pb-zip,sdk-deps = lijiaming@google.com,awolter@google.com, chase
 per-file local-publish-platform = lijiaming@google.com, chaselatta@google.com, chandarren@google.com
 
 per-file run-script = claytonmccray@google.com,crjohns@google.com
+
+per-file lib/bazel_utils.sh = file:/build/OWNERS
+per-file build = file:/build/OWNERS
+
+per-file atomic-commit = lijiaming@google.com, olivernewman@google.com
+
+per-file set-device,unset-device,use,tests/subcommands/fx_set_device_test,tests/subcommands/fx_unset_device_test,tests/subcommands/fx_use_test = file: /src/developer/ffx/plugins/target/default/OWNERS

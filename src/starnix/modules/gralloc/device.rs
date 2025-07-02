@@ -18,7 +18,7 @@ struct GrallocDevice;
 impl DeviceOps for GrallocDevice {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -28,7 +28,7 @@ impl DeviceOps for GrallocDevice {
     }
 }
 
-pub fn gralloc_device_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
+pub fn gralloc_device_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
 where
     L: LockBefore<FileOpsCore>,
 {

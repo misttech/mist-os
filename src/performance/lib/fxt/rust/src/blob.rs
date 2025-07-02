@@ -65,10 +65,11 @@ impl<'a> RawBlobRecord<'a> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+#[repr(u8)]
 pub enum BlobType {
-    Data,
-    LastBranch,
-    Perfetto,
+    Data = BLOB_TYPE_DATA,
+    LastBranch = BLOB_TYPE_LAST_BRANCH,
+    Perfetto = BLOB_TYPE_PERFETTO,
     Unknown { raw: u8 },
 }
 
@@ -83,10 +84,21 @@ impl From<u8> for BlobType {
     }
 }
 
+impl Into<u8> for BlobType {
+    fn into(self) -> u8 {
+        match self {
+            BlobType::Data => BLOB_TYPE_DATA,
+            BlobType::LastBranch => BLOB_TYPE_LAST_BRANCH,
+            BlobType::Perfetto => BLOB_TYPE_PERFETTO,
+            BlobType::Unknown { raw } => raw,
+        }
+    }
+}
+
 trace_header! {
     BlobHeader (BLOB_RECORD_TYPE) {
         u16, name_ref: 16, 31;
-        u16, payload_len: 32, 36;
+        u16, payload_len: 32, 46;
         u8, blob_format_type: 48, 55;
     }
 }
@@ -241,6 +253,25 @@ mod tests {
         let payload = &[
             1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
         ][..];
+
+        let mut header = BlobHeader::empty();
+        header.set_name_ref(15);
+        header.set_payload_len(payload.len() as u16);
+        header.set_blob_format_type(BLOB_TYPE_DATA);
+
+        assert_parses_to_record!(
+            FxtBuilder::new(header).atom(payload).build(),
+            RawTraceRecord::Blob(RawBlobRecord {
+                name: StringRef::Index(NonZeroU16::new(15).unwrap()),
+                ty: BlobType::Data,
+                bytes: &payload,
+            }),
+        );
+    }
+
+    #[test]
+    fn blob_long_blob() {
+        let payload = &[0xEFu8; 1024][..];
 
         let mut header = BlobHeader::empty();
         header.set_name_ref(15);

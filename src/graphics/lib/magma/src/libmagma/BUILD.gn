@@ -33,9 +33,14 @@ static_library("libmagma_static") {
   # This allows the library to be used as a dependency by rust build rules.
   public_configs = [ "//build/config/fuchsia:static_cpp_standard_library" ]
 
-  sources = [ "magma.cc" ]
+  sources = [
+    "enumerator.cc",
+    "enumerator.h",
+    "magma.cc",
+  ]
 
   deps = [
+    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//src/graphics/magma/lib/magma/platform:buffer",
     "//src/graphics/magma/lib/magma/platform:connection_client",
     "//src/graphics/magma/lib/magma/platform:device_client",
@@ -107,7 +112,10 @@ config("libmagma_lib") {
 # --localize-hidden to hide all the unwanted symbols.
 hermetic_static_library("magma_client") {
   deps = [ ":libmagma_static" ]
-  localize_symbols = [ "trace_generate_nonce" ]
+  localize_symbols = [
+    "trace_generate_nonce",
+    "trace_time_based_id",
+  ]
 }
 
 # Targets can depend on this to link in the hermetic magma client library.

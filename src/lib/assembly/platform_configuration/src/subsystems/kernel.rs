@@ -58,6 +58,15 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         if let Some(warning_mb) = kernel_config.oom.warning_mb {
             builder.kernel_arg(KernelArg::OomWarningMib(warning_mb));
         }
+        if let Some(imminent_oom_delta_mb) = kernel_config.oom.imminent_oom_delta_mb {
+            builder.kernel_arg(KernelArg::OomImminentOomDeltaMib(imminent_oom_delta_mb));
+        }
+        if let Some(debounce_mb) = kernel_config.oom.debounce_mb {
+            builder.kernel_arg(KernelArg::OomDebounceMib(debounce_mb));
+        }
+        if let Some(hysteresis_sec) = kernel_config.oom.hysteresis_seconds {
+            builder.kernel_arg(KernelArg::OomHysteresisSeconds(hysteresis_sec));
+        }
         match (&context.board_info.kernel.serial_mode, &context.build_type) {
             (SerialMode::NoOutput, &BuildType::User) => {
                 builder.kernel_arg(KernelArg::Serial("none".to_string()))

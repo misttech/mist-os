@@ -5,6 +5,7 @@
 
 import("//build/config/clang/clang.gni")
 import("//build/config/clang/crash_diagnostics.gni")
+import("//build/config/clang/stack_clash_protection.gni")
 import("//build/config/clang/stack_size_section.gni")
 import("//build/config/clang/time_trace.gni")
 import("//build/config/compiler.gni")
@@ -16,7 +17,6 @@ import("//build/toolchain/ccache.gni")
 import("//build/toolchain/concurrent_jobs.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/rbe.gni")
-import("//build/toolchain/rbe_modes.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/variant.gni")
 
@@ -106,6 +106,25 @@ config("stack-size-section") {
   }
 }
 
+config("stack-clash-protection") {
+  # see https://gcc.gnu.org/onlinedocs/gcc/Instrumentation-Options.html#index-fstack-clash-protection
+  #
+  # NOTE: PAGE_SIZE used in probing is a compile-time constant, controlled by
+  # -mstack-probe-size, and defaults to 4096. Advanced probing can be
+  # controlled with a function attribute, "probe-stack" to use a function to do
+  # the probing. Otherwise, the compiler will emit the probing instructions
+  # directly in the prologue. Rust code always emits these checks via
+  # __rust_probestack in all functions that require probing.
+  #
+  # stack-clash-protection is only enabled for Fuchsia and Linux targets on
+  # x64, arm64, and riscv64 architectures.
+  if (stack_clash_protection && (is_linux || is_fuchsia) &&
+      (current_cpu == "arm64" || current_cpu == "riscv64" ||
+       current_cpu == "x64")) {
+    cflags = [ "-fstack-clash-protection" ]
+  }
+}
+
 config("time-trace") {
   if (!is_gcc && time_trace) {
     cflags = [ "-ftime-trace" ]
@@ -124,6 +143,7 @@ config("compiler") {
     ":time-trace",
     ":toolchain_version_stamp",
     ":stack-size-section",
+    ":stack-clash-protection",
   ]
 
   if (is_gcc) {
@@ -425,64 +445,9 @@ config("linker_string_merging") {
   }
 }
 
-# Disable remote linking for C++ executables.
-# This can be useful on large targets that OOM remotely.
-# Alternatively, try a bigger worker, following the instructions
-# in build/toolchain/concurrent_jobs.gni for "link_highmem".
+# Temporary placeholder to allow for a soft-transition.
 config("no_remote_link") {
-  if (link_rbe_enable) {
-    ldflags = [ "--remote-flag=--local" ]
-  }
-}
-
-# This option enables a workaround that finds linker inputs
-# where reclient fails to do so.  See b/346439263, b/349448459.
-config("remote_link_scandeps_workaround") {
-  if (link_rbe_enable) {
-    ldflags = [ "--remote-flag=--scandeps" ]
-  }
-}
-
-# Use a bigger remote worker machine type than the default one
-# in build/rbe/fuchsia-rewrapper.cfg.
-# There are generally far fewer of these bigger machines available.
-# Reserve use of this for only the largest jobs that need it.
-# Note: this does not impact the machine type used for C++ compilation.
-# See also :compile_big_rbe_machine.
-config("big_rbe_machine") {
-  _remote_flag = "--remote-flag=--platform=gceMachineType=n2-standard-8"
-
-  if (link_rbe_enable) {
-    ldflags = [ _remote_flag ]
-  }
-  if (rust_rbe_enable) {
-    rustflags = [ _remote_flag ]
-  }
-  not_needed([ "_remote_flag" ])
-}
-
-# Use a bigger remote worker to compile C++ translation units.
-# Note: this does not automatically apply to downstream link jobs.
-config("compile_big_rbe_machine") {
-  _remote_flag = "--remote-flag=--platform=gceMachineType=n2-standard-8"
-  if (cxx_rbe_enable) {
-    cflags = [ _remote_flag ]
-  }
-  not_needed([ "_remote_flag" ])
-}
-
-config("download_outputs") {
-  # Override global settings that may disable downloading of outputs.
-  # This is useful for targets that are known to be needed for local actions.
-  if (rust_rbe_enable) {
-    rustflags = [ "--remote-flag=--download_regex=.*" ]
-  }
-  if (cxx_rbe_enable) {
-    cflags = [ "--remote-flag=--download_regex=.*" ]
-  }
-  if (link_rbe_enable) {
-    ldflags = [ "--remote-flag=--download_regex=.*" ]
-  }
+  configs = [ "//build/config/rbe:no_remote_link" ]
 }
 
 # Each optimize_$optimize config below corresponds to a single setting that's
@@ -817,6 +782,12 @@ config("default_warnings") {
   }
 
   if (is_gcc) {
+    # Just elide any [[clang::...]] attributes when compiling with GCC, so they
+    # don't have to be guarded with `#ifdef __clang__`.  Cases where the GCC
+    # version should do something other will still need an `#ifdef` but that
+    # won't be necessarily flagged by seeing compilation errors under GCC.
+    cflags_cc += [ "-Wno-attributes=clang::" ]
+
     # GCC is pedantic about which flags apply to which language.
     cflags -= [
       "-Wstrict-prototypes",
@@ -926,7 +897,10 @@ config("Wno-undef") {
 
 config("Wno-character-conversion") {
   cflags = [ "-Wno-character-conversion" ]
-  visibility = [ "//src/lib/android/aidl:*" ]
+  visibility = [
+    "//src/lib/android/aidl:*",
+    "//third_party/googletest:*",
+  ]
 }
 
 config("Wno-bitfield-conversion") {
@@ -946,7 +920,6 @@ config("Wno-vla-cxx-extension") {
   visibility = [
     "//sdk/lib/fdio:*",
     "//sdk/lib/fdio/tests:*",
-    "//sdk/lib/ld:*",
     "//sdk/lib/zxio:*",
     "//src/bringup/bin/console:*",
     "//src/bringup/bin/console-launcher:*",
@@ -1217,7 +1190,6 @@ config("Wno-conversion") {
     "//tools/symbolizer:*",
     "//tools/vboot_reference:*",
     "//vendor/*",
-    "//zircon/system/ulib/c/*",
     "//zircon/system/ulib/image-format:*",
     "//zircon/system/ulib/tftp:*",
     "//zircon/third_party/dev/ethernet/e1000:*",
@@ -1349,6 +1321,7 @@ config("symbol_visibility_hidden") {
   # outside of our build since not every user uses hidden visibility by default.
   defines = [ "_LIBCPP_DISABLE_VISIBILITY_ANNOTATIONS" ]
   cflags = [ "-fvisibility=hidden" ]
+  asmflags = cflags
   if (zircon_toolchain != false) {
     cflags_cc = [ "-fvisibility-inlines-hidden" ]
   }
@@ -1426,6 +1399,9 @@ config("werror") {
 
   rustflags += [
     "-Aunknown_lints",
+
+    # TODO(https://fxbug.dev/423021172) Allow renamed lints until after the next toolchain roll.
+    "-Arenamed_and_removed_lints",
 
     # TODO(https://fxbug.dev/327271893) Remove blanket allow once lint is actionable.
     "-Anon_local_definitions",
@@ -1582,11 +1558,10 @@ tlsdesc = {
   } else if (current_cpu == "riscv64") {
     enable_dialect = "desc"
     disable_dialect = "trad"
-    have_tlsdesc = !is_gcc
+    have_tlsdesc = 1
 
-    # On riscv64 TLSDESC is opt-in or opt-out via -mtls-dialect=... under Clang, but is not currently supported in GCC.
-    can_enable = !is_gcc
-    can_disable = !is_gcc
+    can_enable = true
+    can_disable = true
     compiler_default = !is_gcc
   } else if (current_cpu == "x64") {
     enable_dialect = "gnu2"

@@ -169,6 +169,30 @@ pub enum PhyCmd {
         /// id of the phy to query
         phy_id: u16,
     },
+    #[structopt(name = "power-down")]
+    PowerDown {
+        #[structopt(required = true)]
+        /// id of the phy to power down
+        phy_id: u16,
+    },
+    #[structopt(name = "power-up")]
+    PowerUp {
+        #[structopt(required = true)]
+        /// id of the phy to power up
+        phy_id: u16,
+    },
+    #[structopt(name = "reset")]
+    Reset {
+        #[structopt(required = true)]
+        /// id of the phy to reset
+        phy_id: u16,
+    },
+    #[structopt(name = "get-power-state")]
+    GetPowerState {
+        #[structopt(required = true)]
+        /// id of the phy to get its power state
+        phy_id: u16,
+    },
 }
 
 #[derive(StructOpt, Clone, Debug, PartialEq)]

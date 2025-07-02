@@ -52,7 +52,7 @@ use instance::{
 };
 use log::{debug, error, warn};
 use manager::ComponentManagerInstance;
-use moniker::{ChildName, Moniker};
+use moniker::{BorrowedChildName, ChildName, Moniker};
 use router_error::{Explain, RouterError};
 use runner::component::StopInfo;
 use sandbox::{
@@ -596,21 +596,21 @@ impl ComponentInstance {
     /// destroy action.
     pub async fn remove_dynamic_child(
         self: &Arc<Self>,
-        child_moniker: &ChildName,
+        child_moniker: &BorrowedChildName,
     ) -> Result<(), ActionError> {
         let incarnation = {
             let state = self.lock_state().await;
             let resolved_state = state
                 .get_resolved_state()
                 .ok_or(DestroyActionError::InstanceNotResolved { moniker: self.moniker.clone() })?;
-            if let Some(c) = resolved_state.get_child(&child_moniker) {
+            if let Some(c) = resolved_state.get_child(child_moniker) {
                 c.incarnation_id()
             } else {
-                let moniker = self.moniker.child(child_moniker.clone());
+                let moniker = self.moniker.child(child_moniker.into());
                 return Err(DestroyActionError::InstanceNotFound { moniker }.into());
             }
         };
-        self.destroy_child(child_moniker.clone(), incarnation).await
+        self.destroy_child(child_moniker.into(), incarnation).await
     }
 
     /// Stops this component.
@@ -753,7 +753,7 @@ impl ComponentInstance {
         {
             parent
                 .destroy_child_if_single_run(
-                    self.child_moniker().expect("child is root instance?"),
+                    self.child_moniker().expect("child is root instance?").into(),
                     self.incarnation_id(),
                 )
                 .await;
@@ -828,7 +828,7 @@ impl ComponentInstance {
 
     async fn destroy_child_if_single_run(
         self: &Arc<Self>,
-        child_moniker: &ChildName,
+        child_moniker: ChildName,
         incarnation: IncarnationId,
     ) {
         let single_run_colls = {
@@ -851,12 +851,11 @@ impl ComponentInstance {
         if let Some(coll) = child_moniker.collection() {
             if single_run_colls.contains(coll) {
                 let self_clone = self.clone();
-                let child_moniker = child_moniker.clone();
                 fasync::Task::spawn(async move {
                     if let Err(error) =
                         self_clone.destroy_child(child_moniker.clone(), incarnation).await
                     {
-                        let moniker = self_clone.moniker.child(child_moniker);
+                        let moniker = self_clone.moniker.child(child_moniker.clone());
                         warn!(
                             moniker:%,
                             error:%;
@@ -921,7 +920,7 @@ impl ComponentInstance {
         // Destroy all children that belong to a collection.
         for (m, id) in moniker_incarnations {
             if m.collection().is_some() {
-                let nf = self.destroy_child(m, id);
+                let nf = self.destroy_child(m.into(), id);
                 futures.push(nf);
             }
         }
@@ -1218,7 +1217,8 @@ impl ComponentInstance {
         self: &Arc<Self>,
         look_up_moniker: &Moniker,
     ) -> Result<Arc<ComponentInstance>, ModelError> {
-        let mut name_iterator = look_up_moniker.path().iter();
+        let path = look_up_moniker.path();
+        let mut name_iterator = path.iter();
         let mut component = self.clone();
         loop {
             // Check the resolved state directly instead of calling `lock_resolve_state`
@@ -1252,7 +1252,7 @@ impl ComponentInstance {
         look_up_moniker: &Moniker,
     ) -> Option<Arc<ComponentInstance>> {
         let mut cur = self.clone();
-        for moniker in look_up_moniker.path().iter() {
+        for moniker in look_up_moniker.path() {
             let next = cur
                 .lock_state()
                 .await
@@ -1266,13 +1266,13 @@ impl ComponentInstance {
 
     /// Finds a resolved component matching the moniker, if such a component exists.
     /// This function has no side-effects.
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "src_model_tests")))]
     pub async fn find_resolved(
         self: &Arc<Self>,
         find_moniker: &Moniker,
     ) -> Option<Arc<ComponentInstance>> {
         let mut cur = self.clone();
-        for moniker in find_moniker.path().iter() {
+        for moniker in find_moniker.path() {
             let next = cur
                 .lock_state()
                 .await
@@ -1449,7 +1449,7 @@ impl ComponentInstanceInterface for ComponentInstance {
         &self.moniker
     }
 
-    fn child_moniker(&self) -> Option<&ChildName> {
+    fn child_moniker(&self) -> Option<&BorrowedChildName> {
         self.moniker.leaf()
     }
 
@@ -1513,7 +1513,7 @@ impl std::fmt::Debug for ComponentInstance {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "src_model_tests"))]
 pub mod testing {
     use fidl_fuchsia_component as fcomponent;
     use hooks::EventType;
@@ -1538,7 +1538,7 @@ pub mod testing {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 pub mod tests {
     use super::*;
     use crate::model::actions::test_utils::is_discovered;

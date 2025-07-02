@@ -8,7 +8,8 @@
 
 use anyhow::{format_err, Context as _, Error};
 use fidl::endpoints::{
-    DiscoverableProtocolMarker, MemberOpener, ProtocolMarker, ServiceMarker, ServiceProxy,
+    DiscoverableProtocolMarker, FromClient, MemberOpener, ProtocolMarker, ServiceMarker,
+    ServiceProxy,
 };
 use fidl_fuchsia_component::{RealmMarker, RealmProxy};
 use fidl_fuchsia_component_decl::ChildRef;
@@ -22,6 +23,92 @@ use std::borrow::Borrow;
 use std::marker::PhantomData;
 use std::pin::pin;
 use std::task::Poll;
+
+/// Trait that for types that can be returned when you connect to protocols.
+pub trait Connect: Sized + FromClient<Protocol: DiscoverableProtocolMarker> {
+    /// Connect to a FIDL protocol in the `/svc` directory of the application's root namespace.
+    fn connect() -> Result<Self, Error> {
+        Self::connect_at(SVC_DIR)
+    }
+
+    /// Connect to a FIDL protocol using the provided namespace prefix.
+    fn connect_at(service_prefix: impl AsRef<str>) -> Result<Self, Error> {
+        let (client, server_end) = fidl::endpoints::create_endpoints::<Self::Protocol>();
+        let () = connect_channel_to_protocol_at::<Self::Protocol>(
+            server_end.into_channel(),
+            service_prefix.as_ref(),
+        )?;
+        Ok(Self::from_client(client))
+    }
+
+    /// Connect to an instance of a FIDL protocol hosted in `directory`, in the `/svc/` subdir.
+    fn connect_at_dir_svc(directory: &impl AsRefDirectory) -> Result<Self, Error> {
+        let protocol_path = format!("{}/{}", SVC_DIR, Self::Protocol::PROTOCOL_NAME);
+        Self::connect_at_dir_root_with_name(directory, &protocol_path)
+    }
+
+    /// Connect to an instance of a FIDL protocol hosted in `directory`.
+    fn connect_at_dir_root(directory: &impl AsRefDirectory) -> Result<Self, Error> {
+        Self::connect_at_dir_root_with_name(directory, Self::Protocol::PROTOCOL_NAME)
+    }
+
+    /// Connect to an instance of a FIDL protocol hosted in `directory` using the given `filename`.
+    fn connect_at_dir_root_with_name(
+        directory: &impl AsRefDirectory,
+        filename: &str,
+    ) -> Result<Self, Error> {
+        let (client, server) = fidl::endpoints::create_endpoints::<Self::Protocol>();
+        directory.as_ref_directory().open(
+            filename,
+            fio::Flags::PROTOCOL_SERVICE,
+            server.into_channel().into(),
+        )?;
+        Ok(Self::from_client(client))
+    }
+}
+
+impl<T: FromClient<Protocol: DiscoverableProtocolMarker>> Connect for T {}
+
+/// The connect module provides connect methods where the generic argument is the return type rather
+/// than the marker type. This allows them to work for different return types; the same method can
+/// be used for asynchronous proxies, synchronous proxies, client ends, etc.  This also makes it
+/// possible to elide the type where the compiler can infer the type, which is not the case when
+/// using the marker types.
+pub mod connect {
+    use super::*;
+
+    /// Connect to a FIDL protocol in the `/svc` directory of the application's root namespace.
+    pub fn connect_to_protocol<T: Connect>() -> Result<T, Error> {
+        T::connect()
+    }
+
+    /// Connect to a FIDL protocol using the provided namespace prefix.
+    pub fn connect_to_protocol_at<T: Connect>(service_prefix: impl AsRef<str>) -> Result<T, Error> {
+        T::connect_at(service_prefix)
+    }
+
+    /// Connect to an instance of a FIDL protocol hosted in `directory`, in the `/svc/` subdir.
+    pub fn connect_to_protocol_at_dir_svc<T: Connect>(
+        directory: &impl AsRefDirectory,
+    ) -> Result<T, Error> {
+        T::connect_at_dir_svc(directory)
+    }
+
+    /// Connect to an instance of a FIDL protocol hosted in `directory`.
+    pub fn connect_to_protocol_at_dir_root<T: Connect>(
+        directory: &impl AsRefDirectory,
+    ) -> Result<T, Error> {
+        T::connect_at_dir_root(directory)
+    }
+
+    /// Connect to an instance of a FIDL protocol hosted in `directory` using the given `filename`.
+    pub fn connect_to_named_protocol_at_dir_root<T: Connect>(
+        directory: &impl AsRefDirectory,
+        filename: &str,
+    ) -> Result<T, Error> {
+        T::connect_at_dir_root_with_name(directory, filename)
+    }
+}
 
 /// Path to the service directory in an application's root namespace.
 pub const SVC_DIR: &'static str = "/svc";
@@ -155,7 +242,7 @@ pub fn connect_channel_to_protocol_at_path(
         .with_context(|| format!("Error connecting to protocol path: {}", protocol_path))
 }
 
-/// Connect to a FIDL protocol using the application root namespace.
+/// Connect to a FIDL protocol in the `/svc` directory of the application's root namespace.
 pub fn connect_to_protocol<P: DiscoverableProtocolMarker>() -> Result<P::Proxy, Error> {
     connect_to_protocol_at::<P>(SVC_DIR)
 }

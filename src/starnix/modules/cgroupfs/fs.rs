@@ -27,21 +27,19 @@ pub struct CgroupV1Fs {
 
 impl CgroupV1Fs {
     pub fn new_fs(
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
+        let kernel = current_task.kernel();
         let root = CgroupRoot::new();
         let dir_nodes = DirectoryNodes::new(Arc::downgrade(&root));
         let root_dir = dir_nodes.root.clone();
-        let fs = FileSystem::new(
-            current_task.kernel(),
-            CacheMode::Uncached,
-            CgroupV1Fs { dir_nodes, root },
-            options,
-        )?;
-        root_dir.create_root_interface_files(current_task, &fs);
-        fs.set_root(root_dir);
+        let fs =
+            FileSystem::new(kernel, CacheMode::Uncached, CgroupV1Fs { dir_nodes, root }, options)?;
+        root_dir.create_root_interface_files(&fs);
+        let root_ino = fs.allocate_ino();
+        fs.create_root(root_ino, root_dir);
         Ok(fs)
     }
 }
@@ -51,7 +49,7 @@ impl FileSystemOps for CgroupV1Fs {
     }
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -66,7 +64,7 @@ pub struct CgroupV2Fs {
 
 struct CgroupV2FsHandle(FileSystemHandle);
 pub fn cgroup2_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -86,14 +84,10 @@ impl CgroupV2Fs {
         let kernel = current_task.kernel();
         let dir_nodes = DirectoryNodes::new(Arc::downgrade(&kernel.cgroups.cgroup2));
         let root = dir_nodes.root.clone();
-        let fs = FileSystem::new(
-            current_task.kernel(),
-            CacheMode::Uncached,
-            CgroupV2Fs { dir_nodes },
-            options,
-        )?;
-        root.create_root_interface_files(current_task, &fs);
-        fs.set_root(root);
+        let fs = FileSystem::new(kernel, CacheMode::Uncached, CgroupV2Fs { dir_nodes }, options)?;
+        root.create_root_interface_files(&fs);
+        let root_ino = fs.allocate_ino();
+        fs.create_root(root_ino, root);
         Ok(fs)
     }
 }
@@ -104,7 +98,7 @@ impl FileSystemOps for CgroupV2Fs {
     }
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -148,14 +142,12 @@ impl DirectoryNodes {
         &self,
         cgroup: &Arc<Cgroup>,
         directory: CgroupDirectoryHandle,
-        current_task: &CurrentTask,
         fs: &FileSystemHandle,
     ) -> FsNodeHandle {
         let id = cgroup.id();
-        let node = fs.create_node(
-            current_task,
+        let node = fs.create_node_and_allocate_node_id(
             directory,
-            FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+            FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
         );
         let mut nodes = self.nodes.lock();
         nodes.insert(id, node.clone());

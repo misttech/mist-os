@@ -25,4 +25,7 @@ pub struct ComponentsCommand {
 
     #[argh(switch, description = "outputs data in csv format.")]
     pub csv: bool,
+
+    #[argh(switch, description = "prints a bucketized digest of the memory usage.")]
+    pub buckets: bool,
 }

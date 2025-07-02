@@ -104,7 +104,7 @@ impl FsContext {
     /// Change the current working directory.
     pub fn chdir<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: NamespaceNode,
     ) -> Result<(), Errno>
@@ -120,7 +120,7 @@ impl FsContext {
     /// Change the root.
     pub fn chroot<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: NamespaceNode,
     ) -> Result<(), Errno>

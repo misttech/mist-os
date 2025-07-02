@@ -16,6 +16,7 @@ use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersionMarker, Ipv4, Ipv6};
 use net_types::{
     AddrAndZone, MulticastAddress, ScopeableAddress, SpecifiedAddr, Witness, ZonedAddr,
 };
+use thiserror::Error;
 
 use crate::data_structures::socketmap::{
     Entry, IterShadows, OccupiedEntry as SocketMapOccupiedEntry, SocketMap, Tagged,
@@ -224,20 +225,22 @@ impl<I: DualStackIpExt, DS: GenericOverIp<I>, NDS: GenericOverIp<I>> GenericOver
 }
 
 /// An error encountered while enabling or disabling dual-stack operation.
-#[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq, Error)]
 #[generic_over_ip()]
 pub enum SetDualStackEnabledError {
     /// A socket can only have dual stack enabled or disabled while unbound.
+    #[error("a socket can only have dual stack enabled or disabled while unbound")]
     SocketIsBound,
-    /// Similar to [`NotDualStackCapableError`]; the socket's protocol is not
-    /// dual stack capable.
-    NotCapable,
+    /// The socket's protocol is not dual stack capable.
+    #[error(transparent)]
+    NotCapable(#[from] NotDualStackCapableError),
 }
 
 /// An error encountered when attempting to perform dual stack operations on
 /// socket with a non dual stack capable protocol.
-#[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq)]
+#[derive(Copy, Clone, Debug, Eq, GenericOverIp, PartialEq, Error)]
 #[generic_over_ip()]
+#[error("socket's protocol is not dual-stack capable")]
 pub struct NotDualStackCapableError;
 
 /// Describes which direction(s) of the data path should be shut down.

@@ -305,7 +305,7 @@ implementation, we call that _hermetic C++_.
 
  * The kernel itself could be said to be implemented in hermetic C++.
  * The [vDSO](/docs/concepts/kernel/vdso.md) is a shared library implemented in hermetic C++.
- * Fuchsia's [standard C library](/zircon/system/ulib/c), while largely implemented
+ * Fuchsia's [standard C library](/sdk/lib/c), while largely implemented
    in C, also uses hermetic C++ in its implementation.
  * Most Fuchsia device drivers are implemented in hermetic C++.
 

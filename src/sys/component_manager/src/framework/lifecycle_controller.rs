@@ -311,7 +311,7 @@ fn join_monikers(scope_moniker: &Moniker, moniker_str: &str) -> Result<Moniker, 
     Ok(scope_moniker.concat(&moniker))
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::model::actions::test_utils::{is_discovered, is_resolved, is_shutdown};

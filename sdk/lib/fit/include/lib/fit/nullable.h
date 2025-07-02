@@ -5,7 +5,6 @@
 #ifndef LIB_FIT_NULLABLE_H_
 #define LIB_FIT_NULLABLE_H_
 
-#include <assert.h>
 #include <lib/stdcompat/optional.h>
 
 #include <type_traits>
@@ -24,6 +23,9 @@ struct is_comparable_with_null<T, decltype(std::declval<const T&>() == nullptr)>
 // never equal to nullptr.
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Waddress"
+#ifndef __clang__
+#pragma GCC diagnostic ignored "-Wnonnull-compare"
+#endif
 template <typename T, std::enable_if_t<is_comparable_with_null<T>::value, bool> = true>
 constexpr inline bool is_null(T&& value) {
   return std::forward<T>(value) == nullptr;

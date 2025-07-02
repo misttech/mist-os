@@ -5,23 +5,23 @@
 use crate::security;
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::fs_args::MountParams;
+use crate::vfs::fs_node_cache::FsNodeCache;
 use crate::vfs::{
     DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    WeakFsNodeHandle,
 };
 use linked_hash_map::LinkedHashMap;
 use ref_cast::RefCast;
 use smallvec::SmallVec;
-use starnix_lifecycle::AtomicU64Counter;
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex};
 use starnix_uapi::arc_key::ArcKey;
 use starnix_uapi::as_any::AsAny;
+use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::file_mode::mode;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::{error, ino_t, statfs};
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::ops::Range;
 use std::sync::{Arc, OnceLock, Weak};
 
@@ -31,7 +31,6 @@ pub const DEFAULT_LRU_CAPACITY: usize = 32;
 pub struct FileSystem {
     pub kernel: Weak<Kernel>,
     root: OnceLock<DirEntryHandle>,
-    next_node_id: AtomicU64Counter,
     ops: Box<dyn FileSystemOps>,
 
     /// The options specified when mounting the filesystem. Saved here for display in
@@ -61,7 +60,7 @@ pub struct FileSystem {
     /// Rather than calling FsNode::new directly, file systems should call
     /// FileSystem::get_or_create_node to see if the FsNode already exists in
     /// the cache.
-    nodes: Mutex<HashMap<ino_t, WeakFsNodeHandle>>,
+    node_cache: Arc<FsNodeCache>,
 
     /// DirEntryHandle cache for the filesystem. Holds strong references to DirEntry objects. For
     /// filesystems with permanent entries, this will hold a strong reference to every node to make
@@ -133,20 +132,33 @@ impl FileSystem {
         kernel: &Arc<Kernel>,
         cache_mode: CacheMode,
         ops: impl FileSystemOps,
-        mut options: FileSystemOptions,
+        options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
+        let uses_external_node_ids = ops.uses_external_node_ids();
+        let node_cache = Arc::new(FsNodeCache::new(uses_external_node_ids));
+        Self::new_with_node_cache(kernel, cache_mode, ops, options, node_cache)
+    }
+
+    pub fn new_with_node_cache(
+        kernel: &Arc<Kernel>,
+        cache_mode: CacheMode,
+        ops: impl FileSystemOps,
+        mut options: FileSystemOptions,
+        node_cache: Arc<FsNodeCache>,
+    ) -> Result<FileSystemHandle, Errno> {
+        assert_eq!(ops.uses_external_node_ids(), node_cache.uses_external_node_ids());
+
         let mount_options = security::sb_eat_lsm_opts(&kernel, &mut options.params)?;
         let security_state = security::file_system_init_security(ops.name(), &mount_options)?;
 
         let file_system = Arc::new(FileSystem {
             kernel: Arc::downgrade(kernel),
             root: OnceLock::new(),
-            next_node_id: AtomicU64Counter::new(1),
             ops: Box::new(ops),
             options,
             dev_id: kernel.device_registry.next_anonymous_dev_id(),
             rename_mutex: Mutex::new(()),
-            nodes: Mutex::new(HashMap::new()),
+            node_cache,
             entries: match cache_mode {
                 CacheMode::Permanent => Entries::Permanent(Mutex::new(HashSet::new())),
                 CacheMode::Cached(CacheConfig { capacity }) => {
@@ -164,25 +176,12 @@ impl FileSystem {
         Ok(file_system)
     }
 
-    pub fn set_root(self: &FileSystemHandle, root: impl FsNodeOps) {
-        self.set_root_node(FsNode::new_root(root));
-    }
-
-    /// Set up the root of the filesystem. Must not be called more than once.
-    pub fn set_root_node(self: &FileSystemHandle, root: FsNode) {
-        let root = self.insert_node(root);
-        assert!(self.root.set(root).is_ok(), "FileSystem::set_root can't be called more than once");
-    }
-
-    /// Inserts a node in the FsNode cache.
-    pub fn insert_node(self: &FileSystemHandle, mut node: FsNode) -> DirEntryHandle {
-        if node.node_id == 0 {
-            node.set_id(self.next_node_id());
-        }
-        node.set_fs(self);
-        let handle: FsNodeHandle = node.into_handle();
-        self.nodes.lock().insert(handle.node_id, Arc::downgrade(&handle));
-        DirEntry::new(handle, None, FsString::default())
+    fn set_root(self: &FileSystemHandle, root: FsNodeHandle) {
+        let root_dir = DirEntry::new(root, None, FsString::default());
+        assert!(
+            self.root.set(root_dir).is_ok(),
+            "FileSystem::set_root can't be called more than once"
+        );
     }
 
     pub fn has_permanent_entries(&self) -> bool {
@@ -203,13 +202,13 @@ impl FileSystem {
 
     pub fn get_or_create_node<F>(
         &self,
-        node_id: Option<ino_t>,
+        node_key: ino_t,
         create_fn: F,
     ) -> Result<FsNodeHandle, Errno>
     where
-        F: FnOnce(ino_t) -> Result<FsNodeHandle, Errno>,
+        F: FnOnce() -> Result<FsNodeHandle, Errno>,
     {
-        self.get_and_validate_or_create_node(node_id, |_| true, create_fn)
+        self.get_and_validate_or_create_node(node_key, |_| true, create_fn)
     }
 
     /// Get a node that is validated with the callback, or create an FsNode for
@@ -228,86 +227,90 @@ impl FileSystem {
     /// Returns Err only if create_fn returns Err.
     pub fn get_and_validate_or_create_node<V, C>(
         &self,
-        node_id: Option<ino_t>,
+        node_key: ino_t,
         validate_fn: V,
         create_fn: C,
     ) -> Result<FsNodeHandle, Errno>
     where
         V: FnOnce(&FsNodeHandle) -> bool,
-        C: FnOnce(ino_t) -> Result<FsNodeHandle, Errno>,
+        C: FnOnce() -> Result<FsNodeHandle, Errno>,
     {
-        let node_id = node_id.unwrap_or_else(|| self.next_node_id());
-        let mut nodes = self.nodes.lock();
-        match nodes.entry(node_id) {
-            Entry::Vacant(entry) => {
-                let node = create_fn(node_id)?;
-                entry.insert(Arc::downgrade(&node));
-                Ok(node)
-            }
-            Entry::Occupied(mut entry) => {
-                if let Some(node) = entry.get().upgrade() {
-                    if validate_fn(&node) {
-                        return Ok(node);
-                    }
-                }
-                let node = create_fn(node_id)?;
-                entry.insert(Arc::downgrade(&node));
-                Ok(node)
-            }
-        }
+        self.node_cache.get_and_validate_or_create_node(node_key, validate_fn, create_fn)
     }
 
     /// File systems that produce their own IDs for nodes should invoke this
     /// function. The ones who leave to this object to assign the IDs should
-    /// call |create_node|.
-    pub fn create_node_with_id(
+    /// call |create_node_and_allocate_node_id|.
+    pub fn create_node(
         self: &Arc<Self>,
-        current_task: &CurrentTask,
+        ino: ino_t,
         ops: impl Into<Box<dyn FsNodeOps>>,
-        id: ino_t,
         info: FsNodeInfo,
     ) -> FsNodeHandle {
-        let ops = ops.into();
-        let node = FsNode::new_uncached(current_task, ops, self, id, info);
-        self.nodes.lock().insert(node.node_id, Arc::downgrade(&node));
+        let node = FsNode::new_uncached(ino, ops, self, info);
+        self.node_cache.insert_node(&node);
         node
     }
 
-    pub fn create_node(
+    pub fn create_node_and_allocate_node_id(
         self: &Arc<Self>,
-        current_task: &CurrentTask,
         ops: impl Into<Box<dyn FsNodeOps>>,
-        info: impl FnOnce(ino_t) -> FsNodeInfo,
+        info: FsNodeInfo,
     ) -> FsNodeHandle {
-        let ops = ops.into();
-        let node_id = self.next_node_id();
-        self.create_node_with_id(current_task, ops, node_id, info(node_id))
+        let ino = self.allocate_ino();
+        self.create_node(ino, ops, info)
+    }
+
+    /// Create a node for a directory that has no parent.
+    pub fn create_detached_node(
+        self: &Arc<Self>,
+        ino: ino_t,
+        ops: impl Into<Box<dyn FsNodeOps>>,
+        info: FsNodeInfo,
+    ) -> FsNodeHandle {
+        assert!(info.mode.is_dir());
+        let node = FsNode::new_uncached(ino, ops, self, info);
+        self.node_cache.insert_node(&node);
+        node
+    }
+
+    /// Create a root node for the filesystem.
+    ///
+    /// This is a convenience function that creates a root node with the default
+    /// directory mode and root credentials.
+    pub fn create_root(self: &Arc<Self>, ino: ino_t, ops: impl Into<Box<dyn FsNodeOps>>) {
+        let info = FsNodeInfo::new(mode!(IFDIR, 0o777), FsCred::root());
+        self.create_root_with_info(ino, ops, info);
+    }
+
+    pub fn create_root_with_info(
+        self: &Arc<Self>,
+        ino: ino_t,
+        ops: impl Into<Box<dyn FsNodeOps>>,
+        info: FsNodeInfo,
+    ) {
+        let node = self.create_detached_node(ino, ops, info);
+        self.set_root(node);
     }
 
     /// Remove the given FsNode from the node cache.
     ///
     /// Called from the Release trait of FsNode.
     pub fn remove_node(&self, node: &FsNode) {
-        let mut nodes = self.nodes.lock();
-        if let Some(weak_node) = nodes.get(&node.node_id) {
-            if weak_node.strong_count() == 0 {
-                nodes.remove(&node.node_id);
-            }
-        }
+        self.node_cache.remove_node(node);
     }
 
-    pub fn next_node_id(&self) -> ino_t {
-        assert!(!self.ops.generate_node_ids());
-        self.next_node_id.next()
+    pub fn allocate_ino(&self) -> ino_t {
+        self.node_cache
+            .allocate_ino()
+            .expect("allocate_ino called on a filesystem that uses external node IDs")
     }
 
     /// Allocate a contiguous block of node ids.
-    pub fn allocate_node_id(&self, size: usize) -> Range<ino_t> {
-        assert!(!self.ops.generate_node_ids());
-        assert!(size > 0);
-
-        let start = self.next_node_id.add(size as u64);
-        Range { start: start as ino_t, end: start + size as ino_t }
+    pub fn allocate_ino_range(&self, size: usize) -> Range<ino_t> {
+        self.node_cache
+            .allocate_ino_range(size)
+            .expect("allocate_ino_range called on a filesystem that uses external node IDs")
     }
 
     /// Move |renamed| that is at |old_name| in |old_parent| to |new_name| in |new_parent|
@@ -316,7 +319,7 @@ impl FileSystem {
     /// directory and that |replaced| is empty.
     pub fn rename<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
         old_name: &FsStr,
@@ -372,7 +375,7 @@ impl FileSystem {
     /// Returns `ENOSYS` if the `FileSystemOps` don't implement `stat`.
     pub fn statfs<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<statfs, Errno>
     where
@@ -467,15 +470,18 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
     /// ```
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno>;
 
     fn name(&self) -> &'static FsStr;
 
-    /// Whether this file system generates its own node IDs.
-    fn generate_node_ids(&self) -> bool {
+    /// Whether this file system uses external node IDs.
+    ///
+    /// If this is true, then the file system is responsible for assigning node IDs to its nodes.
+    /// Otherwise, the VFS will assign node IDs to the nodes.
+    fn uses_external_node_ids(&self) -> bool {
         false
     }
 
@@ -495,7 +501,7 @@ pub trait FileSystemOps: AsAny + Send + Sync + 'static {
     /// not in the DirEntry cache).
     fn rename(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
         _old_parent: &FsNodeHandle,

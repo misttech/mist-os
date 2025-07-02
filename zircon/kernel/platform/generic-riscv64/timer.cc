@@ -14,13 +14,47 @@
 arch::EarlyTicks kernel_entry_ticks;
 arch::EarlyTicks kernel_virtual_entry_ticks;
 
-// call through to the pdev timer interface
 template <GetTicksSyncFlag Flags>
 inline zx_ticks_t platform_current_raw_ticks_synchronized() {
-  // TODO(johngro): Research what is required in order to properly sync
-  // observations of the riscv system timer against the instruction pipeline and
-  // apply any needed barriers here.
-  return timer_current_ticks();
+  // If the caller requested that the read of the current raw ticks be synchronized with respect to
+  // previous loads and/or stores, ensure that we emit a fence instruction guaranteeing this as
+  // described in section 6.1.1 ("CSR Access Ordering") in "The RISC-V Instruction Set Manual,
+  // Volume I, Unprivileged Architecture" Version 20250508. The specification provides more detail
+  // on this approach, but in summary:
+  // * The timer is read via a CSR, which is modeled as a device input operation in the RISC-V
+  //   memory model. As such, the successor set must consist of the "i" operand.
+  // * Depending on the GetTicksSyncFlag, the predecessor set must be "r", "w", or "rw".
+  constexpr GetTicksSyncFlag AfterPreviousLoadsAndStores =
+      GetTicksSyncFlag::kAfterPreviousLoads | GetTicksSyncFlag::kAfterPreviousStores;
+  if constexpr ((Flags & AfterPreviousLoadsAndStores) == AfterPreviousLoadsAndStores) {
+    __asm__ volatile("fence rw, i" ::: "memory");
+  } else if constexpr ((Flags & GetTicksSyncFlag::kAfterPreviousLoads) != GetTicksSyncFlag::kNone) {
+    __asm__ volatile("fence r, i" ::: "memory");
+  } else if constexpr ((Flags & GetTicksSyncFlag::kAfterPreviousStores) !=
+                       GetTicksSyncFlag::kNone) {
+    __asm__ volatile("fence w, i" ::: "memory");
+  }
+
+  // Redirect the current ticks call to the pdev layer.
+  const zx_ticks_t ticks = timer_current_ticks();
+
+  // If the caller requested that the read of the current raw ticks be synchronized with respect
+  // to subsequent loads and/or stores, then once again ensure that we emit a fence instruction.
+  // Once again, timer reads are modeled as a device input operation, so:
+  // * The predecessor set must consist of the "i" operand.
+  // * Depending on the GetTicksSyncFlag, the successor set must be "r", "w", or "rw".
+  constexpr GetTicksSyncFlag BeforeSubsequentLoadsAndStores =
+      GetTicksSyncFlag::kBeforeSubsequentLoads | GetTicksSyncFlag::kBeforeSubsequentStores;
+  if constexpr ((Flags & BeforeSubsequentLoadsAndStores) == BeforeSubsequentLoadsAndStores) {
+    __asm__ volatile("fence i, rw" ::: "memory");
+  } else if constexpr ((Flags & GetTicksSyncFlag::kBeforeSubsequentLoads) !=
+                       GetTicksSyncFlag::kNone) {
+    __asm__ volatile("fence i, r" ::: "memory");
+  } else if constexpr ((Flags & GetTicksSyncFlag::kBeforeSubsequentStores) !=
+                       GetTicksSyncFlag::kNone) {
+    __asm__ volatile("fence i, w" ::: "memory");
+  }
+  return ticks;
 }
 
 zx_instant_mono_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
@@ -34,6 +68,10 @@ zx_status_t platform_set_oneshot_timer(zx_ticks_t deadline) {
 void platform_stop_timer() { timer_stop(); }
 
 void platform_shutdown_timer() { timer_shutdown(); }
+
+zx_status_t platform_suspend_timer_curr_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
+zx_status_t platform_resume_timer_curr_cpu() { return ZX_ERR_NOT_SUPPORTED; }
 
 bool platform_usermode_can_access_tick_registers() {
   // If the cpu claims to have Zicntr support, then it's relatively cheap for user

@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.driver.compat/cpp/wire.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/driver_export.h>
+#include <lib/driver/platform-device/cpp/pdev.h>
 
 namespace audio::aml_g12 {
 
@@ -17,45 +18,28 @@ zx::result<> Driver::CreateDevfsNode() {
     return connector.take_error();
   }
 
-  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
-                   .connector(std::move(connector.value()))
-                   .class_name("audio-composite");
+  fuchsia_driver_framework::DevfsAddArgs devfs{{
+      .connector{std::move(connector.value())},
+      .class_name{"audio-composite"},
+  }};
 
-  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                  .name(arena, kDriverName)
-                  .devfs_args(devfs.Build())
-                  .Build();
-
-  // Create endpoints of the `NodeController` for the node.
-  auto controller_endpoints = fidl::Endpoints<fuchsia_driver_framework::NodeController>::Create();
-
-  zx::result node_endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::Node>();
-  ZX_ASSERT_MSG(node_endpoints.is_ok(), "Node end point creation failed: %s",
-                node_endpoints.status_string());
-
-  fidl::WireResult result = fidl::WireCall(node())->AddChild(
-      args, std::move(controller_endpoints.server), std::move(node_endpoints->server));
-  if (!result.ok()) {
-    FDF_SLOG(ERROR, "Call to add child failed", KV("status", result.status_string()));
-    return zx::error(result.status());
+  zx::result child = AddOwnedChild(kDriverName, devfs);
+  if (child.is_error()) {
+    fdf::error("Failed to add child: {}", child);
+    return child.take_error();
   }
-  if (!result->is_ok()) {
-    FDF_SLOG(ERROR, "Failed to add child", KV("error", result.FormatDescription().c_str()));
-    return zx::error(ZX_ERR_INTERNAL);
-  }
-  controller_.Bind(std::move(controller_endpoints.client));
-  node_.Bind(std::move(node_endpoints->client));
+  child_ = std::move(child.value());
 
   return zx::ok();
 }
 
 zx::result<> Driver::Start() {
-  zx::result pdev = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
-  if (pdev.is_error() || !pdev->is_valid()) {
-    FDF_LOG(ERROR, "Failed to connect to platform device: %s", pdev.status_string());
-    return pdev.take_error();
+  zx::result pdev_client = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
+  if (pdev_client.is_error() || !pdev_client->is_valid()) {
+    fdf::error("Failed to connect to platform device: {}", pdev_client);
+    return pdev_client.take_error();
   }
-  pdev_.Bind(std::move(pdev.value()));
+  fdf::PDev pdev{std::move(pdev_client.value())};
   // We get one MMIO per engine.
   // TODO(https://fxbug.dev/42082341): If we change the engines underlying AmlTdmDevice objects such
   // that they take an MmioView, then we can get only one MmioBuffer here, own it in this driver and
@@ -63,81 +47,57 @@ zx::result<> Driver::Start() {
   std::array<std::optional<fdf::MmioBuffer>, kNumberOfTdmEngines> mmios;
   for (size_t i = 0; i < kNumberOfTdmEngines; ++i) {
     // There is one MMIO region with index 0 used by this driver.
-    auto get_mmio_result = pdev_->GetMmioById(0);
-    if (!get_mmio_result.ok()) {
-      FDF_LOG(ERROR, "Call to get MMIO failed: %s", get_mmio_result.status_string());
-      return zx::error(get_mmio_result.status());
-    }
-    if (!get_mmio_result->is_ok()) {
-      FDF_LOG(ERROR, "Platform device returned error for get MMIO: %s",
-              zx_status_get_string(get_mmio_result->error_value()));
-      return zx::error(get_mmio_result->error_value());
-    }
-
-    const auto& mmio_params = get_mmio_result->value();
-    if (!mmio_params->has_offset() || !mmio_params->has_size() || !mmio_params->has_vmo()) {
-      FDF_LOG(ERROR, "Platform device provided invalid MMIO");
-      return zx::error(ZX_ERR_BAD_STATE);
-    };
-
-    auto mmio =
-        fdf::MmioBuffer::Create(mmio_params->offset(), mmio_params->size(),
-                                std::move(mmio_params->vmo()), ZX_CACHE_POLICY_UNCACHED_DEVICE);
+    zx::result mmio = pdev.MapMmio(0);
     if (mmio.is_error()) {
-      FDF_LOG(ERROR, "Failed to map MMIO: %s", mmio.status_string());
-      return zx::error(mmio.error_value());
+      fdf::error("Failed to map MMIO: {}", mmio);
+      return zx::error(mmio.status_value());
     }
-    mmios[i] = std::make_optional(std::move(*mmio));
+    mmios[i] = std::make_optional(std::move(mmio.value()));
   }
 
   // There is one BTI with index 0 used by this driver.
-  auto get_bti_result = pdev_->GetBtiById(0);
-  if (!get_bti_result.ok()) {
-    FDF_LOG(ERROR, "Call to get BTI failed: %s", get_bti_result.status_string());
-    return zx::error(get_bti_result.status());
-  }
-  if (!get_bti_result->is_ok()) {
-    FDF_LOG(ERROR, "Platform device returned error for get BTI: %s",
-            zx_status_get_string(get_bti_result->error_value()));
-    return zx::error(get_bti_result->error_value());
+  zx::result bti = pdev.GetBti(0);
+  if (bti.is_error()) {
+    fdf::error("Failed to get BTI: {}", bti);
+    return zx::error(bti.status_value());
   }
 
   zx::result clock_gate_result =
-      incoming()->Connect<fuchsia_hardware_clock::Service::Clock>("clock-gate");
+      incoming()->Connect<fuchsia_hardware_clock::Service::Clock>(kClockGateParentName);
   if (clock_gate_result.is_error() || !clock_gate_result->is_valid()) {
-    FDF_LOG(ERROR, "Connect to clock-gate failed: %s", clock_gate_result.status_string());
+    fdf::error("Connect to clock-gate failed: {}", clock_gate_result);
     return zx::error(clock_gate_result.error_value());
   }
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> gate_client(
       std::move(clock_gate_result.value()));
 
   zx::result clock_pll_result =
-      incoming()->Connect<fuchsia_hardware_clock::Service::Clock>("clock-pll");
+      incoming()->Connect<fuchsia_hardware_clock::Service::Clock>(kClockPllParentName);
   if (clock_pll_result.is_error() || !clock_pll_result->is_valid()) {
-    FDF_LOG(ERROR, "Connect to clock-pll failed: %s", clock_pll_result.status_string());
+    fdf::error("Connect to clock-pll failed: {}", clock_pll_result);
     return zx::error(clock_pll_result.error_value());
   }
   fidl::WireSyncClient<fuchsia_hardware_clock::Clock> pll_client(
       std::move(clock_pll_result.value()));
 
-  std::array<const char*, kNumberOfPipelines> sclk_gpio_names = {
-      "gpio-tdm-a-sclk",
-      "gpio-tdm-b-sclk",
-      "gpio-tdm-c-sclk",
+  std::array<std::string_view, kNumberOfPipelines> sclk_gpio_names = {
+      kGpioTdmASclkParentName,
+      kGpioTdmBSclkParentName,
+      kGpioTdmCSclkParentName,
   };
   std::vector<SclkPin> sclk_clients;
   for (auto& sclk_gpio_name : sclk_gpio_names) {
     zx::result gpio_result =
         incoming()->Connect<fuchsia_hardware_gpio::Service::Device>(sclk_gpio_name);
     if (gpio_result.is_error() || !gpio_result->is_valid()) {
-      FDF_LOG(ERROR, "Connect to GPIO %s failed: %s", sclk_gpio_name, gpio_result.status_string());
+      fdf::error("Connect to GPIO {} failed: {}", sclk_gpio_name, gpio_result);
       return zx::error(gpio_result.error_value());
     }
 
     zx::result pin_result =
         incoming()->Connect<fuchsia_hardware_pin::Service::Device>(sclk_gpio_name);
     if (pin_result.is_error() || !pin_result->is_valid()) {
-      FDF_LOG(ERROR, "Connect to Pin %s failed: %s", sclk_gpio_name, pin_result.status_string());
+      fdf::error("Connect to Pin {} failed: {}", sclk_gpio_name, pin_result);
       return zx::error(pin_result.error_value());
     }
 
@@ -152,46 +112,38 @@ zx::result<> Driver::Start() {
     }
   }
 
-  auto device_info_result = pdev_->GetNodeDeviceInfo();
-  if (!device_info_result.ok()) {
-    FDF_LOG(ERROR, "Call to get node device info failed: %s", device_info_result.status_string());
-    return zx::error(device_info_result.status());
-  }
-  if (!device_info_result->is_ok()) {
-    FDF_LOG(ERROR, "Failed to get node device info: %s",
-            zx_status_get_string(device_info_result->error_value()));
-    return zx::error(device_info_result->error_value());
+  zx::result device_info = pdev.GetDeviceInfo();
+  if (device_info.is_error()) {
+    fdf::error("Failed to get device info: {}", device_info);
+    return device_info.take_error();
   }
 
-  if ((*device_info_result)->vid() == PDEV_VID_GENERIC &&
-      (*device_info_result)->pid() == PDEV_PID_GENERIC &&
-      (*device_info_result)->did() == PDEV_DID_DEVICETREE_NODE) {
+  if (device_info->vid == PDEV_VID_GENERIC && device_info->pid == PDEV_PID_GENERIC &&
+      device_info->did == PDEV_DID_DEVICETREE_NODE) {
     // TODO(https://fxbug.dev/318736574) : Remove and rely only on GetDeviceInfo.
-    auto board_info_result = pdev_->GetBoardInfo();
-    if (!board_info_result.ok()) {
-      FDF_LOG(ERROR, "GetBoardInfo failed: %s",
-              zx_status_get_string(board_info_result->error_value()));
-      return zx::error(board_info_result->error_value());
+    zx::result board_info = pdev.GetBoardInfo();
+    if (board_info.is_error()) {
+      fdf::error("Failed to get board info: {}", board_info);
+      return board_info.take_error();
     }
 
-    if ((*board_info_result)->vid() == PDEV_VID_KHADAS) {
-      switch ((*board_info_result)->pid()) {
+    if (board_info->vid == PDEV_VID_KHADAS) {
+      switch (board_info->pid) {
         case PDEV_PID_VIM3:
-          (*device_info_result)->pid() = PDEV_PID_AMLOGIC_A311D;
+          device_info->pid = PDEV_PID_AMLOGIC_A311D;
           break;
         default:
-          FDF_LOG(ERROR, "Unsupported PID 0x%x for VID 0x%x", (*board_info_result)->pid(),
-                  (*board_info_result)->vid());
+          fdf::error("Unsupported PID {:#x} for VID {:#x}", board_info->pid, board_info->vid);
           return zx::error(ZX_ERR_NOT_SUPPORTED);
       }
     } else {
-      FDF_LOG(ERROR, "Unsupported VID 0x%x", (*board_info_result)->vid());
+      fdf::error("Unsupported VID {:#x}", board_info->vid);
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
   }
 
   metadata::AmlVersion aml_version = {};
-  switch ((*device_info_result)->pid()) {
+  switch (device_info->pid) {
     case PDEV_PID_AMLOGIC_A311D:
       aml_version = metadata::AmlVersion::kA311D;
       break;
@@ -210,30 +162,31 @@ zx::result<> Driver::Start() {
       aml_version = metadata::AmlVersion::kA1;
       break;
     default:
-      FDF_LOG(ERROR, "Unsupported PID 0x%X", (*device_info_result)->pid());
+      fdf::error("Unsupported PID {:#x}", device_info->pid);
       return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
   auto recorder = std::make_unique<Recorder>(inspector().root());
 
   server_ = std::make_unique<AudioCompositeServer>(
-      std::move(mmios), std::move((*get_bti_result)->bti), dispatcher(), aml_version,
-      std::move(gate_client), std::move(pll_client), std::move(sclk_clients), std::move(recorder));
+      std::move(mmios), std::move(bti.value()), dispatcher(), aml_version, std::move(gate_client),
+      std::move(pll_client), std::move(sclk_clients), std::move(recorder));
 
-  auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_audio::Composite>(
-      bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),
-      kDriverName);
+  zx::result result =
+      outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_audio::Composite>(
+          bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),
+          kDriverName);
   if (result.is_error()) {
-    FDF_LOG(ERROR, "Failed to add Device service %s", result.status_string());
+    fdf::error("Failed to add composite protocol: {}", result);
     return result.take_error();
   }
 
   if (zx::result result = CreateDevfsNode(); result.is_error()) {
-    FDF_LOG(ERROR, "Failed to export to devfs %s", result.status_string());
+    fdf::error("Failed to export to devfs: {}", result);
     return result.take_error();
   }
 
-  FDF_SLOG(INFO, "Driver started");
+  fdf::info("Driver started");
 
   return zx::ok();
 }

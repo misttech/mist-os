@@ -275,7 +275,7 @@ zx::result<> SyncInitializedDeviceServer::Initialize(
   // First connect to all the parents.
   auto parent_devices = ConnectToParentDevices(incoming.get());
   if (parent_devices.is_error()) {
-    FDF_LOG(WARNING, "Failed to get parent devices: %s. Assuming root.",
+    FDF_LOG(DEBUG, "Failed to get parent devices: %s. Assuming root.",
             parent_devices.status_string());
 
     // In case that there are no parents, assume we are the root and create
@@ -426,7 +426,7 @@ void AsyncInitializedDeviceServer::OnParentDevices(
   }
 
   if (parent_devices.is_error()) {
-    FDF_LOG(WARNING, "Failed to get parent devices: %s. Assuming root.",
+    FDF_LOG(DEBUG, "Failed to get parent devices: %s. Assuming root.",
             parent_devices.status_string());
 
     // In case that there are no parents, assume we are the root and create

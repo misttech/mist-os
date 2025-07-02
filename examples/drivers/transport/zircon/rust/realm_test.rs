@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use fidl::endpoints::create_endpoints;
-use fidl_fuchsia_driver_development::ManagerMarker;
+use fidl_fuchsia_driver_development::ManagerProxy;
 use fidl_fuchsia_driver_framework::{NodePropertyKey, NodePropertyValue};
 use fidl_fuchsia_driver_test::RealmArgs;
 use fidl_fuchsia_hardware_i2c as i2c;
@@ -34,7 +34,7 @@ async fn test_sample_driver() -> Result<()> {
 
     println!("device name: {device_name}");
 
-    let manager = instance.root.connect_to_protocol_at_exposed_dir::<ManagerMarker>()?;
+    let manager: ManagerProxy = instance.root.connect_to_protocol_at_exposed_dir()?;
     let (node_iter, node_iter_server) = create_endpoints();
     manager.get_node_info(
         &["dev.sys.test.zircon_transport_rust_child.transport-child".to_owned()],

@@ -138,7 +138,7 @@ fn router_advertisement_buf(
     (
         OptionSequenceBuilder::new(options.iter())
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+            .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpZeroCode,
@@ -151,7 +151,7 @@ fn router_advertisement_buf(
                     0, /* retransmit_timer */
                 ),
             ))
-            .encapsulate(Ipv6PacketBuilder::new(
+            .wrap_in(Ipv6PacketBuilder::new(
                 src_ip,
                 dst_ip,
                 ip::icmp::REQUIRED_NDP_IP_PACKET_HOP_LIMIT,

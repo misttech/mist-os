@@ -7,10 +7,10 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_macro.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/toolchain/concurrent_jobs.gni")
+import("//src/starnix/build/args.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/lib/gzip/gzip.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
-import("args.gni")
 
 group("kernel") {
   deps = [ ":starnix_kernel_package" ]
@@ -43,6 +43,7 @@ rustc_binary("starnix_kernel_bin") {
     ":android_5.10_kernel_config",
     ":starnix_core",
     ":starnix_kernel_runner",
+    ":starnix_kernel_structured_config",
     ":starnix_logging",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
@@ -105,7 +106,6 @@ rustc_library("starnix_core") {
 
   sources = [
     "arch/${current_cpu}/execution.rs",
-    "arch/${current_cpu}/loader.rs",
     "arch/${current_cpu}/mod.rs",
     "arch/${current_cpu}/registers.rs",
     "arch/${current_cpu}/signal_handling.rs",
@@ -118,20 +118,16 @@ rustc_library("starnix_core") {
     "bpf/mod.rs",
     "bpf/program.rs",
     "bpf/syscalls.rs",
-    "container_namespace.rs",
     "device/android/bootloader_message_store.rs",
     "device/android/mod.rs",
-    "device/binder.rs",
     "device/kobject.rs",
     "device/kobject_store.rs",
     "device/mem.rs",
     "device/mod.rs",
     "device/registry.rs",
-    "device/remote_binder.rs",
     "device/remote_block_device.rs",
     "device/serial.rs",
     "device/terminal.rs",
-    "dynamic_thread_spawner.rs",
     "execution/crash_reporter.rs",
     "execution/executor.rs",
     "execution/mod.rs",
@@ -164,8 +160,6 @@ rustc_library("starnix_core") {
     "fs/sysfs/vulnerabilities_class_directory.rs",
     "fs/tmpfs.rs",
     "lib.rs",
-    "loader.rs",
-    "memory_attribution/mod.rs",
     "mm/debugger.rs",
     "mm/futex_table.rs",
     "mm/mapping.rs",
@@ -209,7 +203,9 @@ rustc_library("starnix_core") {
     "syscalls/time.rs",
     "task/abstract_socket_namespace.rs",
     "task/cgroup.rs",
+    "task/container_namespace.rs",
     "task/current_task.rs",
+    "task/dynamic_thread_spawner.rs",
     "task/hr_timer_manager.rs",
     "task/interval_timer.rs",
     "task/iptables.rs",
@@ -217,6 +213,8 @@ rustc_library("starnix_core") {
     "task/kernel_stats.rs",
     "task/kernel_threads.rs",
     "task/limits.rs",
+    "task/loader.rs",
+    "task/memory_attribution.rs",
     "task/mod.rs",
     "task/net.rs",
     "task/pid_table.rs",
@@ -249,7 +247,6 @@ rustc_library("starnix_core") {
     "vfs/crypt_service.rs",
     "vfs/dir_entry.rs",
     "vfs/dirent_sink.rs",
-    "vfs/dynamic_file.rs",
     "vfs/epoll.rs",
     "vfs/eventfd.rs",
     "vfs/fd_number.rs",
@@ -261,6 +258,7 @@ rustc_library("starnix_core") {
     "vfs/fs_args.rs",
     "vfs/fs_context.rs",
     "vfs/fs_node.rs",
+    "vfs/fs_node_cache.rs",
     "vfs/fs_registry.rs",
     "vfs/fsverity.rs",
     "vfs/inotify.rs",
@@ -272,9 +270,18 @@ rustc_library("starnix_core") {
     "vfs/path.rs",
     "vfs/pidfd.rs",
     "vfs/pipe.rs",
+    "vfs/pseudo/dynamic_file.rs",
+    "vfs/pseudo/mod.rs",
+    "vfs/pseudo/pseudo_directory.rs",
+    "vfs/pseudo/pseudo_directory_builder.rs",
+    "vfs/pseudo/simple_directory.rs",
+    "vfs/pseudo/simple_file.rs",
+    "vfs/pseudo/static_directory.rs",
+    "vfs/pseudo/stub_bytes_file.rs",
+    "vfs/pseudo/stub_empty_file.rs",
+    "vfs/pseudo/vec_directory.rs",
     "vfs/record_locks.rs",
     "vfs/rw_queue.rs",
-    "vfs/simple_file.rs",
     "vfs/socket/iptables_utils.rs",
     "vfs/socket/mod.rs",
     "vfs/socket/socket.rs",
@@ -291,14 +298,10 @@ rustc_library("starnix_core") {
     "vfs/socket/socket_vsock.rs",
     "vfs/socket/syscalls.rs",
     "vfs/splice.rs",
-    "vfs/static_directory.rs",
-    "vfs/stub_bytes_file.rs",
-    "vfs/stub_empty_file.rs",
     "vfs/symlink_node.rs",
     "vfs/syscalls.rs",
     "vfs/timer.rs",
     "vfs/userfault_file.rs",
-    "vfs/vec_directory.rs",
     "vfs/wd_number.rs",
     "vfs/xattr.rs",
   ]
@@ -340,7 +343,6 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
     "//sdk/fidl/fuchsia.net.policy.socketproxy:fuchsia.net.policy.socketproxy_rust",
-    "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
     "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
@@ -380,7 +382,6 @@ rustc_library("starnix_core") {
     "//src/lib/network/fidl_fuchsia_net_filter_ext",
     "//src/lib/process_builder",
     "//src/lib/trace/rust:trace",
-    "//src/lib/vulkan",
     "//src/performance/memory/attribution/server",
     "//src/starnix/lib/ebpf",
     "//src/starnix/lib/ebpf_api",
@@ -437,7 +438,6 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:sha2",
-    "//third_party/rust_crates:slab",
     "//third_party/rust_crates:smallvec",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:thiserror",
@@ -576,6 +576,7 @@ rustc_library("starnix_kernel_runner") {
     "//src/lib/ui/fuchsia-scenic",
     "//src/performance/memory/attribution/server",
     "//src/starnix/lib/bootreason",
+    "//src/starnix/lib/features:starnix_features",
     "//src/starnix/lib/starnix_sync",
     "//src/starnix/lib/starnix_types",
     "//src/starnix/lib/starnix_uapi",
@@ -807,6 +808,10 @@ fuchsia_component_manifest("empty_container_manifest") {
 
 fuchsia_structured_config_rust_lib("starnix_container_structured_config") {
   cm_label = ":empty_container_manifest"
+}
+
+fuchsia_structured_config_rust_lib("starnix_kernel_structured_config") {
+  cm_label = ":starnix_kernel_manifest"
 }
 
 fuchsia_component("starnix_kernel") {

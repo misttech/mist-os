@@ -38,6 +38,7 @@ rustc_library_with_features("netstack3-base") {
     "src/rng.rs",
     "src/socket/address.rs",
     "src/socket/base.rs",
+    "src/socket/cookie.rs",
     "src/socket/sndbuf.rs",
     "src/tcp.rs",
     "src/tcp/base.rs",

@@ -20,6 +20,7 @@ use {
     fidl_fuchsia_net_masquerade as fnet_masquerade,
     fidl_fuchsia_net_multicast_admin as fnet_multicast_admin, fidl_fuchsia_net_name as fnet_name,
     fidl_fuchsia_net_ndp as fnet_ndp, fidl_fuchsia_net_neighbor as fnet_neighbor,
+    fidl_fuchsia_net_policy_properties as fnp_properties,
     fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy,
     fidl_fuchsia_net_reachability as fnet_reachability, fidl_fuchsia_net_root as fnet_root,
     fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin,
@@ -177,12 +178,16 @@ impl ManagementAgent {
                 fnet_dhcpv6::PrefixProviderMarker::PROTOCOL_NAME,
                 fnet_masquerade::FactoryMarker::PROTOCOL_NAME,
                 fnet_name::DnsServerWatcherMarker::PROTOCOL_NAME,
+                fnp_properties::DefaultNetworkMarker::PROTOCOL_NAME,
+                fnp_properties::NetworksMarker::PROTOCOL_NAME,
             ],
             Self::NetCfg(NetCfgVersion::Advanced) => &[
                 fnet_dhcpv6::PrefixProviderMarker::PROTOCOL_NAME,
-                fnet_virtualization::ControlMarker::PROTOCOL_NAME,
                 fnet_masquerade::FactoryMarker::PROTOCOL_NAME,
                 fnet_name::DnsServerWatcherMarker::PROTOCOL_NAME,
+                fnet_virtualization::ControlMarker::PROTOCOL_NAME,
+                fnp_properties::DefaultNetworkMarker::PROTOCOL_NAME,
+                fnp_properties::NetworksMarker::PROTOCOL_NAME,
             ],
         }
     }

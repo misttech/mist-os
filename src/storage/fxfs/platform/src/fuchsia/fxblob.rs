@@ -7,6 +7,7 @@
 pub mod blob;
 mod directory;
 pub mod reader;
+pub(crate) mod volume_writer;
 mod writer;
 
 #[cfg(test)]

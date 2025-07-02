@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Error, Result};
-use assembly_config_schema::BoardDriverArguments;
 use assembly_constants::BootfsDestination;
 use assembly_tool::Tool;
 use camino::{Utf8Path, Utf8PathBuf};
+use image_assembly_config::BoardDriverArguments;
 use log::debug;
 use std::collections::BTreeMap;
 use std::fs::File;

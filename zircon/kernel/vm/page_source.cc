@@ -400,8 +400,9 @@ void PageSource::SendRequestToProviderLocked(PageRequest* request) {
 }
 
 void PageSource::CompleteRequestLocked(PageRequest* request) {
-  VM_KTRACE_DURATION(1, "page_request_complete", ("offset", request->offset_),
-                     ("len", request->len_));
+  VM_KTRACE_DURATION(1, "page_request_complete", ("vmo_id", request->vmo_debug_info_.vmo_id),
+                     ("offset", request->offset_), ("length", request->len_),
+                     ("type", request->type_ == ZX_PAGER_VMO_READ ? "Read" : "Dirty"));
   DEBUG_ASSERT(request->type_ < page_request_type::COUNT);
   DEBUG_ASSERT(page_provider_->SupportsPageRequestType(request->type_));
 
@@ -549,7 +550,9 @@ ktl::pair<uint64_t, uint64_t> PageRequest::TrimRangeToRequestSpace(uint64_t star
 
 zx_status_t PageRequest::Wait(bool suspendable) {
   lockdep::AssertNoLocksHeld();
-  VM_KTRACE_DURATION(1, "page_request_wait", ("offset", offset_), ("len", len_));
+  VM_KTRACE_DURATION(1, "page_request_wait", ("vmo_id", vmo_debug_info_.vmo_id),
+                     ("offset", offset_), ("length", len_),
+                     ("type", type_ == ZX_PAGER_VMO_READ ? "Read" : "Dirty"));
   zx_status_t status = src_->WaitOnRequest(this, suspendable);
   VM_KTRACE_FLOW_END(1, "page_request_signal", reinterpret_cast<uintptr_t>(this));
   if (status != ZX_OK && !PageSource::IsValidInternalFailureCode(status)) {

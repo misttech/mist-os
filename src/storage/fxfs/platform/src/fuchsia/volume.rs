@@ -14,9 +14,11 @@ use crate::fuchsia::symlink::FxSymlink;
 use crate::fuchsia::volumes_directory::VolumesDirectory;
 use anyhow::{bail, ensure, Error};
 use async_trait::async_trait;
+use fidl::endpoints::ServerEnd;
 use fidl::AsHandleRef;
 use fidl_fuchsia_fxfs::{
-    BytesAndNodes, ProjectIdRequest, ProjectIdRequestStream, ProjectIterToken,
+    BytesAndNodes, FileBackedVolumeProviderRequest, FileBackedVolumeProviderRequestStream,
+    ProjectIdRequest, ProjectIdRequestStream, ProjectIterToken,
 };
 use fs_inspect::{FsInspectVolume, VolumeData};
 use fuchsia_sync::Mutex;
@@ -33,19 +35,25 @@ use fxfs::object_store::{HandleOptions, HandleOwner, ObjectDescriptor, ObjectSto
 use std::future::Future;
 use std::pin::pin;
 #[cfg(any(test, feature = "testing"))]
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 use vfs::directory::entry::DirectoryEntry;
-use vfs::directory::entry_container::Directory as VfsDirectory;
 use vfs::directory::simple::Simple;
 use vfs::execution_scope::ExecutionScope;
+
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 // LINT.IfChange
 // TODO:(b/299919008) Fix this number to something reasonable, or maybe just for fxblob.
 const DIRENT_CACHE_LIMIT: usize = 2000;
 // LINT.ThenChange(//src/storage/stressor/src/aggressive.rs)
+
+/// The smallest read-ahead size. All other read-ahead sizes will be a multiple of this read-ahead
+/// size. Having this property allows for chunking metadata at this granularity.
+pub const BASE_READ_AHEAD_SIZE: u64 = 32 * 1024;
+pub const MAX_READ_AHEAD_SIZE: u64 = BASE_READ_AHEAD_SIZE * 4;
 
 const PROFILE_DIRECTORY: &str = "profiles";
 
@@ -54,12 +62,29 @@ pub struct MemoryPressureLevelConfig {
     /// The period to wait between flushes, as well as perform other background maintenance tasks
     /// (e.g. purging caches).
     pub background_task_period: Duration,
+
     /// The limit of cached nodes.
     pub cache_size_limit: usize,
 
-    // The initial delay before the background task runs. The background task has a longer initial
-    // delay to avoid running the task during boot.
+    /// The initial delay before the background task runs. The background task has a longer initial
+    /// delay to avoid running the task during boot.
     pub background_task_initial_delay: Duration,
+
+    /// The amount of read-ahead to do. The read-ahead size is reduce when under memory pressure.
+    /// The kernel starts evicting pages when under memory pressure so over supplied pages are less
+    /// likely to be used before being evicted.
+    pub read_ahead_size: u64,
+}
+
+impl Default for MemoryPressureLevelConfig {
+    fn default() -> Self {
+        Self {
+            background_task_period: Duration::from_secs(20),
+            cache_size_limit: DIRENT_CACHE_LIMIT,
+            background_task_initial_delay: Duration::from_secs(70),
+            read_ahead_size: MAX_READ_AHEAD_SIZE,
+        }
+    }
 }
 
 #[derive(Clone)]
@@ -93,16 +118,19 @@ impl Default for MemoryPressureConfig {
                 background_task_period: Duration::from_secs(20),
                 cache_size_limit: DIRENT_CACHE_LIMIT,
                 background_task_initial_delay: Duration::from_secs(70),
+                read_ahead_size: MAX_READ_AHEAD_SIZE,
             },
             mem_warning: MemoryPressureLevelConfig {
                 background_task_period: Duration::from_secs(5),
                 cache_size_limit: 100,
                 background_task_initial_delay: Duration::from_secs(5),
+                read_ahead_size: BASE_READ_AHEAD_SIZE * 2,
             },
             mem_critical: MemoryPressureLevelConfig {
                 background_task_period: Duration::from_millis(1500),
                 cache_size_limit: 20,
                 background_task_initial_delay: Duration::from_millis(1500),
+                read_ahead_size: BASE_READ_AHEAD_SIZE,
             },
         }
     }
@@ -130,8 +158,14 @@ pub struct FxVolume {
 
     profile_state: Mutex<Option<Box<dyn ProfileState>>>,
 
+    /// This is updated based on the memory-pressure level.
+    read_ahead_size: AtomicU64,
+
     #[cfg(any(test, feature = "testing"))]
     poisoned: AtomicBool,
+
+    #[cfg(any(test, feature = "refault-tracking"))]
+    refault_tracker: RefaultTracker,
 }
 
 #[fxfs_trace::trace]
@@ -153,8 +187,13 @@ impl FxVolume {
             scope,
             dirent_cache: DirentCache::new(DIRENT_CACHE_LIMIT),
             profile_state: Mutex::new(None),
+            read_ahead_size: AtomicU64::new(
+                MemoryPressureConfig::default().mem_normal.read_ahead_size,
+            ),
             #[cfg(any(test, feature = "testing"))]
             poisoned: AtomicBool::new(false),
+            #[cfg(any(test, feature = "refault-tracking"))]
+            refault_tracker: RefaultTracker::default(),
         })
     }
 
@@ -299,8 +338,15 @@ impl FxVolume {
         // tasks that insert entries into the cache.
         self.dirent_cache.clear();
 
-        self.flush_all_files(true).await;
+        if self.store.filesystem().options().read_only {
+            // If the filesystem is read only, we don't need to flush/sync anything.
+            if self.store.is_unlocked() {
+                self.store.lock_read_only();
+            }
+            return;
+        }
 
+        self.flush_all_files(true).await;
         self.store.filesystem().graveyard().flush().await;
         if self.store.crypt().is_some() {
             if let Err(e) = self.store.lock().await {
@@ -446,8 +492,10 @@ impl FxVolume {
                     if new_level != level {
                         level = new_level;
                         should_update_cache_limit = true;
+                        let level_config = config.for_level(&level);
+                        self.read_ahead_size.store(level_config.read_ahead_size, Ordering::Relaxed);
                         timer.as_mut().reset(fasync::MonotonicInstant::after(
-                            config.for_level(&level).background_task_period.into())
+                            level_config.background_task_period.into())
                         );
                         debug!(
                             "Background task period changed to {:?} due to new memory pressure \
@@ -463,6 +511,9 @@ impl FxVolume {
                     should_flush = true;
                     // Only purge layer file caches once we have elevated memory pressure.
                     should_purge_layer_files = !matches!(level, MemoryPressureLevel::Normal);
+
+                    #[cfg(feature = "refault-tracking")]
+                    self.refault_tracker.output_stats();
                 }
             };
             if should_terminate {
@@ -538,6 +589,12 @@ impl FxVolume {
         }
     }
 
+    /// Returns the current read-ahead size that should be used based on the current memory-pressure
+    /// level.
+    pub fn read_ahead_size(&self) -> u64 {
+        self.read_ahead_size.load(Ordering::Relaxed)
+    }
+
     /// Tries to unwrap this volume.  If it fails, it will poison the volume so that when it is
     /// dropped, you get a backtrace.
     #[cfg(any(test, feature = "testing"))]
@@ -569,6 +626,11 @@ impl FxVolume {
                 None
             }
         }
+    }
+
+    #[cfg(any(test, feature = "refault-tracking"))]
+    pub fn refault_tracker(&self) -> &RefaultTracker {
+        &self.refault_tracker
     }
 }
 
@@ -603,7 +665,7 @@ impl FsInspectVolume for FxVolume {
 pub trait RootDir: FxNode + DirectoryEntry {
     fn as_directory_entry(self: Arc<Self>) -> Arc<dyn DirectoryEntry>;
 
-    fn as_directory(self: Arc<Self>) -> Arc<dyn VfsDirectory>;
+    fn serve(self: Arc<Self>, flags: fio::Flags, server_end: ServerEnd<fio::DirectoryMarker>);
 
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode>;
 
@@ -722,6 +784,44 @@ impl FxVolumeAndRoot {
         Ok(())
     }
 
+    pub async fn handle_file_backed_volume_provider_requests(
+        &self,
+        mut requests: FileBackedVolumeProviderRequestStream,
+    ) -> Result<(), Error> {
+        while let Some(request) = requests.try_next().await? {
+            match request {
+                FileBackedVolumeProviderRequest::Open {
+                    parent_directory_token,
+                    name,
+                    server_end,
+                    control_handle: _,
+                } => match self
+                    .volume
+                    .scope
+                    .token_registry()
+                    // NB: For now, we only expect these calls in a regular (non-blob) volume.
+                    // Hard-code the type for simplicity; attempts to call on a blob volume will
+                    // get an error.
+                    .get_owner(parent_directory_token)
+                    .and_then(|dir| {
+                        dir.ok_or(zx::Status::BAD_HANDLE).and_then(|dir| {
+                            dir.into_any()
+                                .downcast::<FxDirectory>()
+                                .map_err(|_| zx::Status::BAD_HANDLE)
+                        })
+                    }) {
+                    Ok(dir) => {
+                        dir.open_block_file(&name, server_end).await;
+                    }
+                    Err(status) => {
+                        let _ = server_end.close_with_epitaph(status)?;
+                    }
+                },
+            }
+        }
+        Ok(())
+    }
+
     pub fn into_volume(self) -> Arc<FxVolume> {
         self.volume
     }
@@ -802,9 +902,63 @@ pub fn info_to_filesystem_info(
     }
 }
 
+#[cfg(any(test, feature = "refault-tracking"))]
+#[derive(Default)]
+pub struct RefaultTracker(Mutex<RefaultTrackerInner>);
+
+#[cfg(any(test, feature = "refault-tracking"))]
+#[derive(Default)]
+pub struct RefaultTrackerInner {
+    count: u64,
+    bytes: u64,
+    histogram: [u64; 8],
+}
+
+#[cfg(any(test, feature = "refault-tracking"))]
+impl RefaultTracker {
+    pub fn record_refault(&self, bytes: u64, chunk_refault_count: u8) {
+        let mut this = self.0.lock();
+        this.count += 1;
+        this.bytes += bytes;
+        if chunk_refault_count == 1 {
+            this.histogram[0] = this.histogram[0].wrapping_add(1);
+        } else {
+            let old_bucket = (chunk_refault_count - 1).ilog2();
+            let new_bucket = (chunk_refault_count).ilog2();
+            if old_bucket != new_bucket {
+                this.histogram[old_bucket as usize] =
+                    this.histogram[old_bucket as usize].wrapping_sub(1);
+                this.histogram[new_bucket as usize] =
+                    this.histogram[new_bucket as usize].wrapping_add(1);
+            }
+        }
+    }
+
+    #[cfg(feature = "refault-tracking")]
+    fn output_stats(&self) {
+        let this = self.0.lock();
+        if this.count > 0 {
+            info!(
+                "blob refault stats: count={:?} bytes={:?} hist={:?}",
+                this.count, this.bytes, this.histogram,
+            );
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn count(&self) -> u64 {
+        self.0.lock().count
+    }
+
+    #[cfg(test)]
+    pub(crate) fn bytes(&self) -> u64 {
+        self.0.lock().bytes
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::DIRENT_CACHE_LIMIT;
+    use super::{RefaultTracker, DIRENT_CACHE_LIMIT};
     use crate::fuchsia::directory::FxDirectory;
     use crate::fuchsia::file::FxFile;
     use crate::fuchsia::fxblob::testing::{self as blob_testing, BlobFixture};
@@ -817,15 +971,17 @@ mod tests {
         open_file_checked, write_at, TestFixture,
     };
     use crate::fuchsia::volume::{
-        FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig,
+        FxVolume, FxVolumeAndRoot, MemoryPressureConfig, MemoryPressureLevelConfig,
+        BASE_READ_AHEAD_SIZE,
     };
     use crate::fuchsia::volumes_directory::VolumesDirectory;
+    use crate::volume::MAX_READ_AHEAD_SIZE;
     use delivery_blob::CompressionMode;
     use fidl_fuchsia_fs_startup::VolumeMarker;
     use fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker};
     use fuchsia_component_client::connect_to_protocol_at_dir_svc;
     use fuchsia_fs::file;
-    use fxfs::filesystem::FxFilesystem;
+    use fxfs::filesystem::{FxFilesystem, FxFilesystemBuilder};
     use fxfs::fsck::{fsck, fsck_volume};
     use fxfs::object_handle::ObjectHandle;
     use fxfs::object_store::directory::replace_child;
@@ -1178,19 +1334,11 @@ mod tests {
                 MemoryPressureConfig {
                     mem_normal: MemoryPressureLevelConfig {
                         background_task_period: Duration::from_millis(100),
-                        cache_size_limit: 100,
                         background_task_initial_delay: Duration::from_millis(100),
+                        ..Default::default()
                     },
-                    mem_warning: MemoryPressureLevelConfig {
-                        background_task_period: Duration::from_millis(100),
-                        cache_size_limit: 100,
-                        background_task_initial_delay: Duration::from_millis(100),
-                    },
-                    mem_critical: MemoryPressureLevelConfig {
-                        background_task_period: Duration::from_millis(100),
-                        cache_size_limit: 100,
-                        background_task_initial_delay: Duration::from_millis(100),
-                    },
+                    mem_warning: Default::default(),
+                    mem_critical: Default::default(),
                 },
                 None,
             );
@@ -1279,17 +1427,18 @@ mod tests {
                 mem_normal: MemoryPressureLevelConfig {
                     background_task_period: Duration::from_secs(20),
                     cache_size_limit: DIRENT_CACHE_LIMIT,
-                    background_task_initial_delay: Duration::from_secs(20),
+                    ..Default::default()
                 },
                 mem_warning: MemoryPressureLevelConfig {
                     background_task_period: Duration::from_millis(100),
                     cache_size_limit: 100,
                     background_task_initial_delay: Duration::from_millis(100),
+                    ..Default::default()
                 },
                 mem_critical: MemoryPressureLevelConfig {
                     background_task_period: Duration::from_secs(20),
                     cache_size_limit: 50,
-                    background_task_initial_delay: Duration::from_secs(20),
+                    ..Default::default()
                 },
             };
             vol.volume().start_background_task(flush_config, Some(&mem_pressure));
@@ -1388,22 +1537,18 @@ mod tests {
             let mem_pressure = MemoryPressureMonitor::try_from(watcher_server)
                 .expect("Failed to create MemoryPressureMonitor");
 
-            // Configure the flush task to only flush quickly on warning.
             let flush_config = MemoryPressureConfig {
                 mem_normal: MemoryPressureLevelConfig {
-                    background_task_period: Duration::from_secs(20),
                     cache_size_limit: DIRENT_CACHE_LIMIT,
-                    background_task_initial_delay: Duration::from_secs(20),
+                    ..Default::default()
                 },
                 mem_warning: MemoryPressureLevelConfig {
-                    background_task_period: Duration::from_secs(20),
                     cache_size_limit: 100,
-                    background_task_initial_delay: Duration::from_secs(20),
+                    ..Default::default()
                 },
                 mem_critical: MemoryPressureLevelConfig {
-                    background_task_period: Duration::from_secs(20),
                     cache_size_limit: 50,
-                    background_task_initial_delay: Duration::from_secs(20),
+                    ..Default::default()
                 },
             };
             vol.volume().start_background_task(flush_config, Some(&mem_pressure));
@@ -1438,6 +1583,56 @@ mod tests {
         filesystem.close().await.expect("close filesystem failed");
         let device = filesystem.take_device().await;
         device.ensure_unique();
+    }
+
+    #[fuchsia::test(threads = 2)]
+    async fn test_memory_pressure_signal_updates_read_ahead_size() {
+        let fixture = TestFixture::new().await;
+        {
+            let (watcher_proxy, watcher_server) = fidl::endpoints::create_proxy();
+            let mem_pressure = MemoryPressureMonitor::try_from(watcher_server)
+                .expect("Failed to create MemoryPressureMonitor");
+
+            let flush_config = MemoryPressureConfig {
+                mem_normal: MemoryPressureLevelConfig {
+                    read_ahead_size: 12 * 1024,
+                    ..Default::default()
+                },
+                mem_warning: MemoryPressureLevelConfig {
+                    read_ahead_size: 8 * 1024,
+                    ..Default::default()
+                },
+                mem_critical: MemoryPressureLevelConfig {
+                    read_ahead_size: 4 * 1024,
+                    ..Default::default()
+                },
+            };
+            let volume = fixture.volume().volume().clone();
+            volume.start_background_task(flush_config, Some(&mem_pressure));
+            let wait_for_read_ahead_to_change =
+                async move |level: MemoryPressureLevel, expected: u64| {
+                    watcher_proxy
+                        .on_level_changed(level)
+                        .await
+                        .expect("Failed to send memory pressure level change");
+                    const MAX_WAIT: Duration = Duration::from_secs(2);
+                    let wait_increments = Duration::from_millis(400);
+                    let mut total_waited = Duration::ZERO;
+                    while total_waited < MAX_WAIT {
+                        if volume.read_ahead_size() == expected {
+                            break;
+                        }
+                        fasync::Timer::new(wait_increments).await;
+                        total_waited += wait_increments;
+                    }
+                    assert_eq!(volume.read_ahead_size(), expected);
+                };
+            wait_for_read_ahead_to_change(MemoryPressureLevel::Critical, 4 * 1024).await;
+            wait_for_read_ahead_to_change(MemoryPressureLevel::Warning, 8 * 1024).await;
+            wait_for_read_ahead_to_change(MemoryPressureLevel::Normal, 12 * 1024).await;
+            wait_for_read_ahead_to_change(MemoryPressureLevel::Critical, 4 * 1024).await;
+        }
+        fixture.close().await;
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -1530,7 +1725,9 @@ mod tests {
                 .await
             };
 
-            node_id = file_proxy.get_attr().await.unwrap().1.id;
+            let (_, immutable_attributes) =
+                file_proxy.get_attributes(fio::NodeAttributesQuery::ID).await.unwrap().unwrap();
+            node_id = immutable_attributes.id.unwrap();
 
             project_proxy
                 .set_for_node(node_id, 0)
@@ -1775,7 +1972,10 @@ mod tests {
                 assert_eq!(nodes, 0);
             }
 
-            let node_id = file_proxy.get_attr().await.unwrap().1.id;
+            let (_, immutable_attributes) =
+                file_proxy.get_attributes(fio::NodeAttributesQuery::ID).await.unwrap().unwrap();
+            let node_id = immutable_attributes.id.unwrap();
+
             first_object_id = node_id;
             project_proxy
                 .set_for_node(node_id, PROJECT_ID)
@@ -1906,7 +2106,10 @@ mod tests {
             )
             .await;
 
-            let node_id = file_proxy.get_attr().await.unwrap().1.id;
+            let (_, immutable_attributes) =
+                file_proxy.get_attributes(fio::NodeAttributesQuery::ID).await.unwrap().unwrap();
+            let node_id = immutable_attributes.id.unwrap();
+
             project_proxy
                 .set_for_node(node_id, PROJECT_ID)
                 .await
@@ -2055,7 +2258,10 @@ mod tests {
                 .await
             };
             {
-                let node_id = dir_proxy.get_attr().await.unwrap().1.id;
+                let (_, immutable_attributes) =
+                    dir_proxy.get_attributes(fio::NodeAttributesQuery::ID).await.unwrap().unwrap();
+                let node_id = immutable_attributes.id.unwrap();
+
                 project_proxy
                     .set_for_node(node_id, PROJECT_ID)
                     .await
@@ -2074,7 +2280,13 @@ mod tests {
             )
             .await;
             {
-                let node_id = subdir_proxy.get_attr().await.unwrap().1.id;
+                let (_, immutable_attributes) = subdir_proxy
+                    .get_attributes(fio::NodeAttributesQuery::ID)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let node_id = immutable_attributes.id.unwrap();
+
                 assert_eq!(
                     project_proxy
                         .get_for_node(node_id)
@@ -2093,7 +2305,10 @@ mod tests {
             )
             .await;
             {
-                let node_id = file_proxy.get_attr().await.unwrap().1.id;
+                let (_, immutable_attributes) =
+                    file_proxy.get_attributes(fio::NodeAttributesQuery::ID).await.unwrap().unwrap();
+                let node_id = immutable_attributes.id.unwrap();
+
                 assert_eq!(
                     project_proxy
                         .get_for_node(node_id)
@@ -2116,7 +2331,12 @@ mod tests {
             )
             .await;
             {
-                let node_id = tmpfile_proxy.get_attr().await.unwrap().1.id;
+                let (_, immutable_attributes) = tmpfile_proxy
+                    .get_attributes(fio::NodeAttributesQuery::ID)
+                    .await
+                    .unwrap()
+                    .unwrap();
+                let node_id: u64 = immutable_attributes.id.unwrap();
                 assert_eq!(
                     project_proxy
                         .get_for_node(node_id)
@@ -2214,7 +2434,9 @@ mod tests {
                 )
                 .await
             };
-            let node_id = file_proxy.get_attr().await.unwrap().1.id;
+            let (_, immutable_attributes) =
+                file_proxy.get_attributes(fio::NodeAttributesQuery::ID).await.unwrap().unwrap();
+            let node_id = immutable_attributes.id.unwrap();
             project_proxy
                 .set_for_node(node_id, NON_ZERO_PROJECT_ID)
                 .await
@@ -2562,5 +2784,108 @@ mod tests {
         close_file_checked(f).await;
 
         fixture.close().await;
+    }
+
+    #[fuchsia::test]
+    async fn test_read_only_unencrypted_volume() {
+        // Make a new Fxfs filesystem with an unencrypted volume named "vol".
+        let fs = {
+            let device = fxfs::filesystem::mkfs_with_volume(
+                DeviceHolder::new(FakeDevice::new(8192, 512)),
+                "vol",
+                None,
+            )
+            .await
+            .unwrap();
+            // Re-open the device as read-only and mount the filesystem as read-only.
+            device.reopen(true);
+            FxFilesystemBuilder::new().read_only(true).open(device).await.unwrap()
+        };
+        // Ensure we can access the volume and gracefully terminate any tasks.
+        {
+            let root_volume = root_volume(fs.clone()).await.unwrap();
+            let store = root_volume.volume("vol", NO_OWNER, None).await.unwrap();
+            let unique_id = store.store_object_id();
+            let volume = FxVolume::new(Weak::new(), store, unique_id).unwrap();
+            volume.terminate().await;
+        }
+        // Close the filesystem, and make sure we don't have any dangling references.
+        fs.close().await.unwrap();
+        let device = fs.take_device().await;
+        device.ensure_unique();
+    }
+
+    #[fuchsia::test]
+    async fn test_read_only_encrypted_volume() {
+        let crypt: Arc<InsecureCrypt> = Arc::new(InsecureCrypt::new());
+        // Make a new Fxfs filesystem with an encrypted volume named "vol".
+        let fs = {
+            let device = fxfs::filesystem::mkfs_with_volume(
+                DeviceHolder::new(FakeDevice::new(8192, 512)),
+                "vol",
+                Some(crypt.clone()),
+            )
+            .await
+            .unwrap();
+            // Re-open the device as read-only and mount the filesystem as read-only.
+            device.reopen(true);
+            FxFilesystemBuilder::new().read_only(true).open(device).await.unwrap()
+        };
+        // Ensure we can access the volume and gracefully terminate any tasks.
+        {
+            let root_volume = root_volume(fs.clone()).await.unwrap();
+            let store = root_volume.volume("vol", NO_OWNER, Some(crypt)).await.unwrap();
+            let unique_id = store.store_object_id();
+            let volume = FxVolume::new(Weak::new(), store, unique_id).unwrap();
+            volume.terminate().await;
+        }
+        // Close the filesystem, and make sure we don't have any dangling references.
+        fs.close().await.unwrap();
+        let device = fs.take_device().await;
+        device.ensure_unique();
+    }
+
+    #[fuchsia::test]
+    fn test_read_ahead_sizes() {
+        let config = MemoryPressureConfig::default();
+        assert!(config.mem_normal.read_ahead_size % BASE_READ_AHEAD_SIZE == 0);
+        assert_eq!(config.mem_normal.read_ahead_size, MAX_READ_AHEAD_SIZE);
+
+        assert!(config.mem_warning.read_ahead_size % BASE_READ_AHEAD_SIZE == 0);
+
+        assert_eq!(config.mem_critical.read_ahead_size, BASE_READ_AHEAD_SIZE);
+    }
+
+    #[fuchsia::test]
+    fn test_refault_tracker() {
+        fn get_stats(tracker: &RefaultTracker) -> (u64, u64, [u64; 8]) {
+            let tracker = tracker.0.lock();
+            (tracker.count, tracker.bytes, tracker.histogram)
+        }
+
+        let refault_tracker = RefaultTracker::default();
+        refault_tracker.record_refault(10, 1);
+        assert_eq!(get_stats(&refault_tracker), (1, 10, [1, 0, 0, 0, 0, 0, 0, 0]));
+        refault_tracker.record_refault(10, 1);
+        assert_eq!(get_stats(&refault_tracker), (2, 20, [2, 0, 0, 0, 0, 0, 0, 0]));
+        refault_tracker.record_refault(10, 2);
+        assert_eq!(get_stats(&refault_tracker), (3, 30, [1, 1, 0, 0, 0, 0, 0, 0]));
+        refault_tracker.record_refault(10, 3);
+        assert_eq!(get_stats(&refault_tracker), (4, 40, [1, 1, 0, 0, 0, 0, 0, 0]));
+        refault_tracker.record_refault(10, 4);
+        assert_eq!(get_stats(&refault_tracker), (5, 50, [1, 0, 1, 0, 0, 0, 0, 0]));
+
+        let refault_tracker = RefaultTracker::default();
+        // The refault-tracker should see every chunk counter increase but it's possible they could
+        // arrive out of order. The operations wrap on overflow so it should eventually become
+        // consistent.
+        refault_tracker.record_refault(10, 2);
+        assert_eq!(get_stats(&refault_tracker), (1, 10, [u64::MAX, 1, 0, 0, 0, 0, 0, 0]));
+        refault_tracker.record_refault(10, 1);
+        assert_eq!(get_stats(&refault_tracker), (2, 20, [0, 1, 0, 0, 0, 0, 0, 0]));
+        refault_tracker.record_refault(10, 4);
+        assert_eq!(get_stats(&refault_tracker), (3, 30, [0, 0, 1, 0, 0, 0, 0, 0]));
+        refault_tracker.record_refault(10, 3);
+        assert_eq!(get_stats(&refault_tracker), (4, 40, [0, 0, 1, 0, 0, 0, 0, 0]));
     }
 }

@@ -5,9 +5,9 @@
 use crate::device::kobject::{KObject, KObjectHandle};
 use crate::fs::sysfs::sysfs_create_link;
 use crate::task::CurrentTask;
+use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use crate::vfs::{
     fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeOps, FsStr,
-    VecDirectory, VecDirectoryEntry,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
@@ -47,7 +47,7 @@ impl FsNodeOps for KObjectSymlinkDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -57,16 +57,16 @@ impl FsNodeOps for KObjectSymlinkDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let kobject = self.kobject();
         match kobject.get_child(name) {
             Some(child_kobject) => {
                 let (link, info) = sysfs_create_link(kobject, child_kobject, FsCred::root());
-                Ok(node.fs().create_node(current_task, link, info))
+                Ok(node.fs().create_node_and_allocate_node_id(link, info))
             }
             None => error!(ENOENT),
         }
@@ -78,14 +78,15 @@ mod tests {
     use crate::device::kobject::KObject;
     use crate::fs::sysfs::{KObjectDirectory, KObjectSymlinkDirectory};
     use crate::task::CurrentTask;
-    use crate::testing::{create_fs, create_kernel_task_and_unlocked};
+    use crate::testing::{create_kernel_task_and_unlocked, create_testfs_with_root};
+    use crate::vfs::fs_node_cache::FsNodeCache;
     use crate::vfs::{FileSystemHandle, FsStr, LookupContext, NamespaceNode, SymlinkMode};
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::errors::Errno;
     use std::sync::Arc;
 
     fn lookup_node(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         task: &CurrentTask,
         fs: &FileSystemHandle,
         name: &FsStr,
@@ -97,11 +98,14 @@ mod tests {
     #[::fuchsia::test]
     async fn kobject_symlink_directory_contains_device_links() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let root_kobject = KObject::new_root(Default::default());
+        let node_cache = Arc::new(FsNodeCache::default());
+        let root_kobject = KObject::new_root(Default::default(), node_cache);
         root_kobject.get_or_create_child("0".into(), KObjectDirectory::new);
         root_kobject.get_or_create_child("0".into(), KObjectDirectory::new);
-        let test_fs =
-            create_fs(&kernel, KObjectSymlinkDirectory::new(Arc::downgrade(&root_kobject)));
+        let test_fs = create_testfs_with_root(
+            &kernel,
+            KObjectSymlinkDirectory::new(Arc::downgrade(&root_kobject)),
+        );
 
         let device_entry = lookup_node(&mut locked, &current_task, &test_fs, "0".into())
             .expect("device 0 directory");

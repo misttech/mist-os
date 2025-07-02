@@ -7,7 +7,7 @@ use cm_types::Name;
 use component_events::events::{Destroyed, Event, EventStream, Started};
 use component_events::matcher::EventMatcher;
 use component_events::sequence::{EventSequence, Ordering};
-use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::new::{
     Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
@@ -29,7 +29,7 @@ async fn echo_server_mock(handles: LocalComponentHandles) -> Result<(), Error> {
     // testing if a worker component launched by the dispatcher can connect to a protocol. To avoid
     // needing to pull in a different FIDL protocol, we use the same protocol name for both what
     // the worker is expected to provide to the system and what it attempts to connect to.
-    let _ = handles.connect_to_protocol::<fecho::EchoMarker>();
+    let _: Result<ClientEnd<fecho::EchoMarker>, _> = handles.connect_to_protocol();
 
     let (exit_sender, mut exit_receiver) = mpsc::unbounded();
     fs.dir("svc").add_fidl_service(move |mut stream: fecho::EchoRequestStream| {
@@ -162,7 +162,7 @@ async fn setup_test_with_extra(
             move |handles| {
                 let events_sender = events_sender.clone();
                 async move {
-                    let proxy = handles.connect_to_protocol::<fcomponent::EventStreamMarker>()?;
+                    let proxy: fcomponent::EventStreamProxy = handles.connect_to_protocol()?;
                     events_sender.unbounded_send(proxy).unwrap();
                     Ok(())
                 }
@@ -206,8 +206,8 @@ async fn setup_test_with_extra(
 async fn dispatches_to_one_worker() {
     let Test { realm_instance, event_stream, _worker_task } = setup_test().await;
 
-    let echo_proxy =
-        realm_instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>().unwrap();
+    let echo_proxy: fecho::EchoProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     assert_eq!(Some("hello".to_string()), echo_proxy.echo_string(Some("hello")).await.unwrap());
 
     let worker_started = EventMatcher::ok()
@@ -237,12 +237,12 @@ async fn dispatches_to_one_worker() {
 async fn dispatches_to_two_workers() {
     let Test { realm_instance, event_stream, _worker_task } = setup_test().await;
 
-    let echo_proxy_1 =
-        realm_instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>().unwrap();
+    let echo_proxy_1: fecho::EchoProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     assert_eq!(Some("hello".to_string()), echo_proxy_1.echo_string(Some("hello")).await.unwrap());
 
-    let echo_proxy_2 =
-        realm_instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>().unwrap();
+    let echo_proxy_2: fecho::EchoProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     assert_eq!(Some("hello".to_string()), echo_proxy_2.echo_string(Some("hello")).await.unwrap());
 
     let worker_started = EventMatcher::ok()
@@ -306,8 +306,8 @@ async fn offer_passthrough_works() {
         })
         .await;
 
-    let echo_proxy =
-        realm_instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>().unwrap();
+    let echo_proxy: fecho::EchoProxy =
+        realm_instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     assert_eq!(Some("hello".to_string()), echo_proxy.echo_string(Some("hello")).await.unwrap());
 
     let static_mock_started =

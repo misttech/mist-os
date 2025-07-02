@@ -81,7 +81,7 @@ async fn test_restart_on_crash() -> Result<()> {
     // Find an instance of the `Device` service.
     wait_for_instance(&realm).await?;
 
-    let driver_dev = realm.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
+    let driver_dev = realm.root.connect_to_protocol_at_exposed_dir()?;
     let device_infos = get_device_info(&driver_dev, &[], /* exact_match= */ true).await?;
     assert_eq!(1, device_infos.len());
     let driver_host_koid_1 = device_infos[0].driver_host_koid;

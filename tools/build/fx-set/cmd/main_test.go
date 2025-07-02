@@ -40,7 +40,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
-				buildDir:      "out/core.x64",
+				buildDir:      "out/core.x64-balanced",
 				includeClippy: true,
 			},
 		},
@@ -60,7 +60,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
-				buildDir:      "out/core.x64",
+				buildDir:      "out/core.x64-balanced",
 				includeClippy: true,
 				verbose:       true,
 			},
@@ -71,7 +71,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:          "core",
 				board:            "x64",
-				buildDir:         "out/core.x64",
+				buildDir:         "out/core.x64-balanced",
 				includeClippy:    true,
 				universePackages: []string{"u1", "u2", "u3", "u4"},
 			},
@@ -92,7 +92,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
-				buildDir:      "out/core.x64",
+				buildDir:      "out/core.x64-balanced",
 				includeClippy: true,
 				testLabels:    []string{"b1", "b2", "b3", "b4"},
 			},
@@ -103,7 +103,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
-				buildDir:      "out/core.x64",
+				buildDir:      "out/core.x64-balanced",
 				includeClippy: true,
 				hostLabels:    []string{"h1", "h2", "h3", "h4"},
 			},
@@ -114,7 +114,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:        "core",
 				board:          "x64",
-				buildDir:       "out/core.x64",
+				buildDir:       "out/core.x64-balanced",
 				includeClippy:  true,
 				fuzzSanitizers: []string{"asan", "ubsan", "kasan"},
 			},
@@ -125,7 +125,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
-				buildDir:      "out/core.x64",
+				buildDir:      "out/core.x64-balanced",
 				includeClippy: true,
 				// --args values shouldn't be split at commas, since commas can
 				// be part of the args themselves.
@@ -207,7 +207,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 				product:       "bringup",
 				board:         "arm64",
 				includeClippy: true,
-				buildDir:      "out/bringup.arm64",
+				buildDir:      "out/bringup.arm64-balanced",
 			},
 		},
 		{
@@ -217,7 +217,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 				product:       "core",
 				board:         "x64",
 				includeClippy: true,
-				buildDir:      "out/core.x64-profile-kasan-ubsan",
+				buildDir:      "out/core.x64-profile-kasan-ubsan-balanced",
 				variants:      []string{"profile", "kasan", "ubsan"},
 			},
 		},
@@ -244,7 +244,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
-				buildDir:      "out/core.x64",
+				buildDir:      "out/core.x64-balanced",
 				includeClippy: false,
 				cargoTOMLGen:  true,
 			},
@@ -255,7 +255,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
-				buildDir:      "out/core.x64",
+				buildDir:      "out/core.x64-balanced",
 				includeClippy: true,
 				ideFiles:      []string{"json", "vs"},
 			},
@@ -266,7 +266,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:        "core",
 				board:          "x64",
-				buildDir:       "out/core.x64",
+				buildDir:       "out/core.x64-balanced",
 				jsonIDEScripts: []string{"//foo.py", "//bar.py"},
 				includeClippy:  true,
 			},
@@ -277,7 +277,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
-				buildDir:      "out/core.x64",
+				buildDir:      "out/core.x64-balanced",
 				includeClippy: true,
 				rbeMode:       "auto",
 			},
@@ -288,7 +288,7 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
-				buildDir:      "out/core.x64",
+				buildDir:      "out/core.x64-balanced",
 				includeClippy: true,
 				rbeMode:       "off",
 			},
@@ -299,9 +299,20 @@ func TestParseArgsAndEnv(t *testing.T) {
 			expected: setArgs{
 				product:       "core",
 				board:         "x64",
-				buildDir:      "out/core.x64",
+				buildDir:      "out/core.x64-balanced",
 				includeClippy: true,
 				rbeMode:       "cloudtop",
+			},
+		},
+		{
+			name: "Debug compilation mode",
+			args: []string{"core.x64", "--debug"},
+			expected: setArgs{
+				product:       "core",
+				board:         "x64",
+				buildDir:      "out/core.x64-debug",
+				includeClippy: true,
+				isDebug:       true,
 			},
 		},
 	}
@@ -533,7 +544,7 @@ func TestConstructStaticSpec(t *testing.T) {
 			expected := &fintpb.Static{
 				Board:             "boards/x64.gni",
 				Product:           "products/core.gni",
-				CompilationMode:   fintpb.Static_COMPILATION_MODE_DEBUG,
+				CompilationMode:   fintpb.Static_COMPILATION_MODE_BALANCED,
 				ExportRustProject: true,
 			}
 			proto.Merge(expected, tc.expected)

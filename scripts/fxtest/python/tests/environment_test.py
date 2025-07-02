@@ -32,6 +32,10 @@ class TestExecutionEnvironment(unittest.TestCase):
         open(os.path.join(out_dir, "test-list.json"), "a").close()
         open(os.path.join(out_dir, "package-repositories.json"), "a").close()
 
+        sdk_ctf_dir = os.path.join(tmp, "sdk", "ctf")
+        os.makedirs(sdk_ctf_dir)
+        open(os.path.join(sdk_ctf_dir, "disabled_tests.json"), "a").close()
+
     def test_process_environment(self) -> None:
         """Test that we can load and use an environment."""
         with tempfile.TemporaryDirectory() as tmp:

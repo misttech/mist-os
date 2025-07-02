@@ -469,8 +469,8 @@ async fn define_msg_handling_loop_future<DS: DataStore>(
             );
             let packet = response
                 .into_serializer()
-                .encapsulate(udp_builder)
-                .encapsulate(ipv4_builder)
+                .wrap_in(udp_builder)
+                .wrap_in(ipv4_builder)
                 .serialize_vec_outer()
                 .expect("serialize packet failed")
                 .unwrap_b();

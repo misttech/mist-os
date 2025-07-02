@@ -11,7 +11,7 @@ type Compression = table {
     /// The type of compression applied to the stream.
     1: type CompressionType;
 
-    /// Opaque ‘out-of-band’ parameters describing the compression of the stream. The format of
+    /// Opaque 'out-of-band' parameters describing the compression of the stream. The format of
     /// this field is a function of the `CompressionType`. It communicates to decoders parameters
     /// that are required to decompress the described stream. Many compression types do not require
     /// this field.

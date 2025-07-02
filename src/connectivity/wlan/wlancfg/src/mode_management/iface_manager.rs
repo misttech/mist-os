@@ -6029,7 +6029,7 @@ mod tests {
         let read_fut = reader::read(&test_values.inspector);
         let mut read_fut = pin!(read_fut);
         assert_variant!(exec.run_until_stalled(&mut read_fut), Poll::Ready(Ok(hierarchy)) => {
-            assert_data_tree!(hierarchy, root: contains {
+            assert_data_tree!(@executor exec, hierarchy, root: contains {
                 node: contains {
                     recovery_record: contains {
                         "0": contains {

@@ -45,9 +45,25 @@ _COMPOSITE_POLICY_PATHS = [
     (
         [
             "base_policy.conf",
+            "new_file/test_policy.conf",
+            "new_file/binder.conf",
+        ],
+        "binder.pp",
+    ),
+    (
+        [
+            "base_policy.conf",
             "new_file/bounded_transition_policy.conf",
         ],
         "bounded_transition_policy.pp",
+    ),
+    (
+        [
+            "base_policy.conf",
+            "new_file/test_policy.conf",
+            "new_file/inherit_policy.conf",
+        ],
+        "inherit_policy.pp",
     ),
     (
         [
@@ -63,6 +79,14 @@ _COMPOSITE_POLICY_PATHS = [
             "new_file/minimal_policy.conf",
         ],
         "minimal_policy.pp",
+    ),
+    (
+        [
+            "base_policy.conf",
+            "new_file/test_policy.conf",
+            "new_file/mprotect.conf",
+        ],
+        "mprotect.pp",
     ),
     (
         [
@@ -102,6 +126,7 @@ _COMPOSITE_POLICY_PATHS = [
     (
         [
             "base_policy.conf",
+            "new_file/test_policy.conf",
             "new_file/memfd_transition.conf",
         ],
         "memfd_transition.pp",
@@ -190,6 +215,7 @@ _LEGACY_POLICIES = [
     "allow_a_t_b_attr_class0_perm0_policy",
     "allow_a_t_b_t_class0_perm0_policy",
     "allow_with_constraints_policy",
+    "allowxperm_policy",
     "constraints_policy",
     "file_no_defaults_policy",
     "file_range_source_high_policy",

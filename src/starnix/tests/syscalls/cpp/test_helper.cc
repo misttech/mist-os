@@ -6,6 +6,7 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <lib/fit/function.h>
 #include <sched.h>
 #include <signal.h>
 #include <stdio.h>
@@ -33,7 +34,7 @@
 
 namespace test_helper {
 
-::testing::AssertionResult ForkHelper::WaitForChildrenInternal(int death_signum) {
+::testing::AssertionResult ForkHelper::WaitForChildrenInternal(int exit_value, int death_signum) {
   ::testing::AssertionResult result = ::testing::AssertionSuccess();
   while (wait_for_all_children_ || !child_pids_.empty()) {
     int wstatus;
@@ -61,7 +62,7 @@ namespace test_helper {
 
     if (check_result) {
       if (death_signum == 0) {
-        if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != 0) {
+        if (!WIFEXITED(wstatus) || WEXITSTATUS(wstatus) != exit_value) {
           result = ::testing::AssertionFailure()
                    << "wait_status: WIFEXITED(wstatus) = " << WIFEXITED(wstatus)
                    << ", WEXITSTATUS(wstatus) = " << WEXITSTATUS(wstatus)
@@ -80,7 +81,7 @@ namespace test_helper {
   return result;
 }
 
-ForkHelper::ForkHelper() : wait_for_all_children_(true), death_signum_(0) {
+ForkHelper::ForkHelper() : wait_for_all_children_(true), death_signum_(0), exit_value_(0) {
   // Ensure that all children will ends up being parented to the process that
   // created the helper.
   prctl(PR_SET_CHILD_SUBREAPER, 1);
@@ -88,18 +89,21 @@ ForkHelper::ForkHelper() : wait_for_all_children_(true), death_signum_(0) {
 
 ForkHelper::~ForkHelper() {
   // Wait for all remaining children, and ensure none failed.
-  EXPECT_TRUE(WaitForChildrenInternal(death_signum_)) << ": at least a child had a failure";
+  EXPECT_TRUE(WaitForChildrenInternal(exit_value_, death_signum_))
+      << ": at least a child had a failure";
 }
 
 void ForkHelper::OnlyWaitForForkedChildren() { wait_for_all_children_ = false; }
 
 void ForkHelper::ExpectSignal(int signum) { death_signum_ = signum; }
 
+void ForkHelper::ExpectExitValue(int value) { exit_value_ = value; }
+
 testing::AssertionResult ForkHelper::WaitForChildren() {
-  return WaitForChildrenInternal(death_signum_);
+  return WaitForChildrenInternal(exit_value_, death_signum_);
 }
 
-pid_t ForkHelper::RunInForkedProcess(std::function<void()> action) {
+pid_t ForkHelper::RunInForkedProcess(fit::function<void()> action) {
   pid_t pid = SAFE_SYSCALL(fork());
   if (pid != 0) {
     child_pids_.push_back(pid);

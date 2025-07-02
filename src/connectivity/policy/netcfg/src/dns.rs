@@ -22,11 +22,14 @@ use packet_formats::icmp::ndp as packet_formats_ndp;
 
 const DNS_PORT: u16 = 53;
 
+use crate::network;
+
 /// Updates the DNS servers used by the DNS resolver.
 pub(super) async fn update_servers(
     lookup_admin: &fnet_name::LookupAdminProxy,
     dns_servers: &mut DnsServers,
     dns_server_watch_responders: &mut DnsServerWatchResponders,
+    networks_service: &mut network::NetpolNetworksService,
     source: DnsServersUpdateSource,
     servers: Vec<fnet_name::DnsServer_>,
 ) {
@@ -48,6 +51,8 @@ pub(super) async fn update_servers(
     }
 
     dns_server_watch_responders.send(dns_servers.consolidated_dns_servers());
+
+    networks_service.update(network::PropertyUpdate::default().dns(dns_servers)).await;
 }
 
 /// Creates a stream of RDNSS DNS updates to conform to the output of
@@ -180,6 +185,7 @@ pub(super) async fn remove_rdnss_watcher(
     lookup_admin: &fnet_name::LookupAdminProxy,
     dns_servers: &mut DnsServers,
     dns_server_watch_responders: &mut DnsServerWatchResponders,
+    netpol_networks_service: &mut network::NetpolNetworksService,
     interface_id: crate::InterfaceId,
     watchers: &mut crate::DnsServerWatchers<'_>,
 ) {
@@ -196,7 +202,15 @@ pub(super) async fn remove_rdnss_watcher(
         );
     }
 
-    update_servers(lookup_admin, dns_servers, dns_server_watch_responders, source, vec![]).await
+    update_servers(
+        lookup_admin,
+        dns_servers,
+        dns_server_watch_responders,
+        netpol_networks_service,
+        source,
+        vec![],
+    )
+    .await
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -369,7 +383,7 @@ mod tests {
         handles: LocalComponentHandles,
         mut receiver: mpsc::Receiver<(crate::DnsServersUpdateSource, Vec<fnet_name::DnsServer_>)>,
     ) -> Result<(), anyhow::Error> {
-        let connection = handles.connect_to_protocol::<fnet_name::LookupAdminMarker>()?;
+        let connection = handles.connect_to_protocol()?;
 
         let mut fs = ServiceFs::new();
         let _: &mut ServiceFsDir<'_, _> =
@@ -379,6 +393,7 @@ mod tests {
         let mut dns_server_watcher_incoming_requests = DnsServerWatcherRequestStreams::default();
         let mut dns_servers = DnsServers::default();
         let mut dns_server_watch_responders = DnsServerWatchResponders::default();
+        let mut netpol_networks_service = network::NetpolNetworksService::default();
 
         let mut fs = futures::StreamExt::fuse(fs);
 
@@ -405,6 +420,7 @@ mod tests {
                         &connection,
                         &mut dns_servers,
                         &mut dns_server_watch_responders,
+                        &mut netpol_networks_service,
                         source,
                         servers,
                     ).await
@@ -476,13 +492,13 @@ mod tests {
     async fn test_dns_server_watcher() -> Result<(), anyhow::Error> {
         let (realm, mut tx) = setup_test().await?;
 
-        let watcher1 = realm
+        let watcher1: fnet_name::DnsServerWatcherProxy = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnet_name::DnsServerWatcherMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to DnsServerWatcher")?;
-        let watcher2 = realm
+        let watcher2: fnet_name::DnsServerWatcherProxy = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<fnet_name::DnsServerWatcherMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("While connecting to DnsServerWatcher")?;
 
         assert_eq!(watcher1.watch_servers().await?, vec![]);

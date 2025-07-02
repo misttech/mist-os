@@ -12,6 +12,7 @@ use std::time::Duration;
 
 use crate::connect_to_rcs;
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/421409514)
 /// The implementation of the decorator returned by [`moniker`].
 pub struct WithMoniker<P, D> {
     moniker: String,

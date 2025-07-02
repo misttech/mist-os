@@ -187,6 +187,13 @@
             max_size: 64,
         },
         {
+            // Enables inline encryption and barriers. Tests can enable barriers without inline
+            // encryption via StartupOptions.
+            config: "fuchsia.fshost.InlineCrypto",
+            key: "inline_crypto",
+            type: "bool",
+        },
+        {
             config: "fuchsia.blobfs.WriteCompressionAlgorithm",
             key: "blobfs_write_compression_algorithm",
             type: "string",

@@ -30,12 +30,13 @@ use crate::lsm_tree::{LSMTree, LayerSet, Query};
 use crate::metrics;
 use crate::object_handle::ObjectHandle as _;
 use crate::object_store::allocator::Reservation;
+use crate::object_store::data_object_handle::OverwriteOptions;
 use crate::object_store::journal::bootstrap_handle::BootstrapObjectHandle;
 use crate::object_store::journal::reader::{JournalReader, ReadResult};
 use crate::object_store::journal::writer::JournalWriter;
 use crate::object_store::journal::{JournalCheckpoint, JournalCheckpointV32, BLOCK_SIZE};
 use crate::object_store::object_record::{
-    ObjectItem, ObjectItemV40, ObjectItemV41, ObjectItemV43, ObjectItemV46,
+    ObjectItem, ObjectItemV40, ObjectItemV41, ObjectItemV43, ObjectItemV46, ObjectItemV47,
 };
 use crate::object_store::transaction::{AssocObj, Options};
 use crate::object_store::tree::MajorCompactable;
@@ -129,7 +130,7 @@ pub type SuperBlockHeader = SuperBlockHeaderV32;
 )]
 pub struct SuperBlockHeaderV32 {
     /// The globally unique identifier for the filesystem.
-    guid: UuidWrapperV32,
+    pub guid: UuidWrapperV32,
 
     /// There are two super-blocks which are used in an A/B configuration. The super-block with the
     /// greatest generation number is what is used when mounting an Fxfs image; the other is
@@ -178,7 +179,7 @@ pub struct SuperBlockHeaderV32 {
 
 type UuidWrapper = UuidWrapperV32;
 #[derive(Clone, Default, Eq, PartialEq)]
-struct UuidWrapperV32(Uuid);
+pub struct UuidWrapperV32(pub Uuid);
 
 impl UuidWrapper {
     fn new() -> Self {
@@ -218,20 +219,29 @@ impl<'de> Deserialize<'de> for UuidWrapper {
     }
 }
 
-pub type SuperBlockRecord = SuperBlockRecordV46;
+pub type SuperBlockRecord = SuperBlockRecordV47;
 
 #[allow(clippy::large_enum_variant)]
 #[derive(Debug, Serialize, Deserialize, TypeFingerprint, Versioned)]
-pub enum SuperBlockRecordV46 {
+pub enum SuperBlockRecordV47 {
     // When reading the super-block we know the initial extent, but not subsequent extents, so these
     // records need to exist to allow us to completely read the super-block.
     Extent(Range<u64>),
 
     // Following the super-block header are ObjectItem records that are to be replayed into the root
     // parent object store.
-    ObjectItem(ObjectItemV46),
+    ObjectItem(ObjectItemV47),
 
     // Marks the end of the full super-block.
+    End,
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Migrate, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[migrate_to_version(SuperBlockRecordV47)]
+pub enum SuperBlockRecordV46 {
+    Extent(Range<u64>),
+    ObjectItem(ObjectItemV46),
     End,
 }
 
@@ -637,7 +647,7 @@ impl<'a, S: HandleOwner> SuperBlockWriter<'a, S> {
         self.writer.pad_to_block()?;
         let mut buf = self.handle.allocate_buffer(self.writer.flushable_bytes()).await;
         let offset = self.writer.take_flushable(buf.as_mut());
-        self.handle.overwrite(offset, buf.as_mut(), false).await?;
+        self.handle.overwrite(offset, buf.as_mut(), OverwriteOptions::default()).await?;
         let len =
             std::cmp::max(MIN_SUPER_BLOCK_SIZE, self.writer.journal_file_checkpoint().file_offset)
                 + SUPER_BLOCK_CHUNK_SIZE;

@@ -29,9 +29,9 @@ icu_rustc_staticlib("lib") {
   public = [ "lookup.h" ]
   icu_deps = [
     "//src/lib/icu_data/rust/icu_data",
-    "//third_party/rust_crates:rust_icu_common",
-    "//third_party/rust_crates:rust_icu_sys",
-    "//third_party/rust_crates:rust_icu_uloc",
+    "//third_party/rust_crates:rust_icu_common-v5_0_0",
+    "//third_party/rust_crates:rust_icu_sys-v5_0_0",
+    "//third_party/rust_crates:rust_icu_uloc-v5_0_0",
   ]
   deps = [
     "//src/lib/intl/model:lib",

@@ -127,7 +127,7 @@ mod tests {
             );
         }
 
-        let hierarchy = inspector.get_diagnostics_hierarchy();
+        let hierarchy = inspector.get_diagnostics_hierarchy().await;
         let node = &hierarchy.children[0];
         let early = node.children.iter().find_or_first(|c| c.name == "early").unwrap();
         assert_eq!(early.children.len(), MAX_NUMBER_OF_LIFECYCLE_EVENTS);
@@ -150,7 +150,7 @@ mod tests {
             );
         }
 
-        let hierarchy = inspector.get_diagnostics_hierarchy();
+        let hierarchy = inspector.get_diagnostics_hierarchy().await;
         let node = &hierarchy.children[0];
         let early = node.children.iter().find_or_first(|c| c.name == "early").unwrap();
         let late = node.children.iter().find_or_first(|c| c.name == "late").unwrap();
@@ -181,7 +181,7 @@ mod tests {
             );
         }
 
-        let hierarchy = inspector.get_diagnostics_hierarchy();
+        let hierarchy = inspector.get_diagnostics_hierarchy().await;
         let node = &hierarchy.children[0];
         let early = node.children.iter().find_or_first(|c| c.name == "early").unwrap();
         let late = node.children.iter().find_or_first(|c| c.name == "late").unwrap();

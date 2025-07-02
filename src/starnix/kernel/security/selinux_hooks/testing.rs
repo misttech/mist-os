@@ -21,7 +21,7 @@ pub const TEST_FILE_NAME: &str = "file";
 /// Note that this will exercise the file-labeling scheme specified for the root
 /// filesystem by the current policy.
 pub fn create_test_file(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> NamespaceNode {
     current_task
@@ -42,7 +42,7 @@ pub fn create_test_file(
 /// root filesystem by the current policy.
 pub fn create_directory_with_parents(
     dir_names: Vec<&FsStr>,
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) -> NamespaceNode {
     let mut current_dir = current_task.fs().root();
@@ -65,7 +65,7 @@ const HOOKS_TESTS_BINARY_POLICY: &[u8] =
 // must generally exercise hooks via public entrypoints.
 pub fn spawn_kernel_with_selinux_hooks_test_policy_and_run<F>(callback: F)
 where
-    F: FnOnce(&mut Locked<'_, Unlocked>, &mut CurrentTask, &Arc<SecurityServer>)
+    F: FnOnce(&mut Locked<Unlocked>, &mut CurrentTask, &Arc<SecurityServer>)
         + Send
         + Sync
         + 'static,
@@ -80,7 +80,7 @@ where
 }
 
 pub fn create_test_executable(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     security_context: &[u8],
 ) -> NamespaceNode {

@@ -139,7 +139,11 @@ impl<T: AsyncRead + AsyncWrite + Unpin + Debug> Fastboot for FastbootProxy<T> {
         let command = Command::GetVar(ClientVariable::Oem(name.to_string()));
         match send(self.ctx.clone(), command.clone(), self.interface().await?).await {
             Ok(r) => match r {
-                Reply::Okay(v) => Ok(v),
+                Reply::Okay(v) => {
+                    log::trace!("Got var {}. Content: '{:?}", name, v);
+                    let retval = v.trim_end_matches('\0');
+                    Ok(retval.to_string())
+                }
                 Reply::Fail(message) => {
                     Err(FastbootError::GetVariableError { variable: name.to_string(), message })
                 }
@@ -547,7 +551,7 @@ mod test {
     async fn test_get_var() -> Result<()> {
         {
             let mut test_transport = TestTransport::new();
-            test_transport.push(Reply::Okay("0.4".to_string()));
+            test_transport.push(Reply::Okay("0.4\0\0".to_string()));
             let mut fastboot_client = FastbootProxy::<TestTransport> {
                 target_id: "foo".to_string(),
                 interface: Some(test_transport),

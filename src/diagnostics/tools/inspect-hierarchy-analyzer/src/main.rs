@@ -170,8 +170,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_writer() {
+    #[fuchsia::test]
+    async fn test_writer() {
         let mut expected = hierarchy! {
             root: {
                 foo: 0u64,
@@ -194,7 +194,7 @@ mod tests {
 
         let inspector = Inspector::default();
         write(inspector.root(), &expected);
-        let mut actual = inspector.get_diagnostics_hierarchy().into_owned();
+        let mut actual = inspector.get_diagnostics_hierarchy().await.into_owned();
         actual.sort();
 
         assert_eq!(actual, expected)

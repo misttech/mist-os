@@ -284,7 +284,7 @@
     ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayComposed>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayComposed>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -322,7 +322,7 @@
     ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayComposed>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayComposed>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -390,7 +390,7 @@
     ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -458,7 +458,7 @@
     ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayLocal>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayLocal>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -496,7 +496,7 @@
     ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayLocal>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayLocal>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -564,7 +564,7 @@
     ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -632,7 +632,7 @@
     ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayImport>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayImport>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -670,7 +670,7 @@
     ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayImport>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayImport>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -738,7 +738,7 @@
     ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -806,7 +806,7 @@
     ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayAnon>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayAnon>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -844,7 +844,7 @@
     ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayAnon>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayAnon>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -912,7 +912,7 @@
     ::fidl::UnownedClientEnd<::test_protocolpayloads::MainProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>* request
 ) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -977,28 +977,28 @@
   ::fidl::WireUnownedResult<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>(result) {}
 
   ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocolpayloads::MainProtocol>::OneWayComposed(int32_t a) {
-    FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+    __UNINITIALIZED
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayComposed> _request_object{ a };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayComposed>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
   ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocolpayloads::MainProtocol>::OneWayLocal(uint32_t a, uint32_t b) {
-    FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+    __UNINITIALIZED
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayLocal> _request_object{ a, b };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayLocal>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
   ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocolpayloads::MainProtocol>::OneWayImport(int32_t a) {
-    FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+    __UNINITIALIZED
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayImport> _request_object{ a };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayImport>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
     return _client_base()->SendOneWay(_request_message.GetOutgoingMessage());
   }
   ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_protocolpayloads::MainProtocol>::OneWayAnon(uint32_t a, uint32_t b) {
-    FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+    __UNINITIALIZED
     ::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayAnon> _request_object{ a, b };
     ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_protocolpayloads::MainProtocol::OneWayAnon>, ::fidl::internal::ChannelTransport> _request_message(
         ::fidl::internal::AllowUnownedInputRef{}, &_request_object);
@@ -1532,7 +1532,7 @@ fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayC
 void
 fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayComposed>::MakeReply(int32_t a) {
   ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayComposed> _response{ a };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -1585,7 +1585,7 @@ fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayC
 void
 fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>::MakeReply(::test_protocolpayloads_imported::wire::ComposedProtocolTwoWayComposedWithErrorResult ComposedProtocolTwoWayComposedWithErrorResult) {
   ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError> _response{ ComposedProtocolTwoWayComposedWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayComposedWithError>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -1662,7 +1662,7 @@ fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayL
 void
 fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayLocal>::MakeReply(uint32_t a, uint32_t b) {
   ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayLocal> _response{ a, b };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayLocal>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -1715,7 +1715,7 @@ fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayL
 void
 fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>::MakeReply(::test_protocolpayloads::wire::MainProtocolTwoWayLocalWithErrorResult MainProtocolTwoWayLocalWithErrorResult) {
   ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError> _response{ MainProtocolTwoWayLocalWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayLocalWithError>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -1794,7 +1794,7 @@ fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayI
 void
 fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayImport>::MakeReply(int32_t a) {
   ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayImport> _response{ a };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayImport>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -1847,7 +1847,7 @@ fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayI
 void
 fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>::MakeReply(::test_protocolpayloads::wire::MainProtocolTwoWayImportWithErrorResult MainProtocolTwoWayImportWithErrorResult) {
   ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayImportWithError> _response{ MainProtocolTwoWayImportWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayImportWithError>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -1924,7 +1924,7 @@ fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayA
 void
 fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayAnon>::MakeReply(uint32_t a, uint32_t b) {
   ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayAnon> _response{ a, b };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayAnon>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -1977,7 +1977,7 @@ fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayA
 void
 fidl::internal::WireCompleterImpl<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>::MakeReply(::test_protocolpayloads::wire::MainProtocolTwoWayAnonWithErrorResult MainProtocolTwoWayAnonWithErrorResult) {
   ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError> _response{ MainProtocolTwoWayAnonWithErrorResult };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_protocolpayloads::MainProtocol::TwoWayAnonWithError>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response};
@@ -3019,7 +3019,7 @@ return MakeReply(::test_protocolpayloads::wire::MainProtocolTwoWayAnonWithErrorR
 
 ::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocolpayloads::MainProtocol>::OnComposed(int32_t a) {
   ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnComposed> _response{a };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -3043,7 +3043,7 @@ fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocolpayl
 
 fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocolpayloads::MainProtocol>::OnComposed(int32_t a) {
   ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnComposed> _response{a };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnComposed>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -3070,7 +3070,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocolpayloads
 
 ::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocolpayloads::MainProtocol>::OnLocal(uint32_t a, uint32_t b) {
   ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnLocal> _response{a, b };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnLocal>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -3094,7 +3094,7 @@ fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocolpayl
 
 fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocolpayloads::MainProtocol>::OnLocal(uint32_t a, uint32_t b) {
   ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnLocal> _response{a, b };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnLocal>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -3121,7 +3121,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocolpayloads
 
 ::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocolpayloads::MainProtocol>::OnImport(int32_t a) {
   ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnImport> _response{a };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnImport>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -3145,7 +3145,7 @@ fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocolpayl
 
 fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocolpayloads::MainProtocol>::OnImport(int32_t a) {
   ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnImport> _response{a };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnImport>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -3172,7 +3172,7 @@ fidl::OneWayStatus fidl::internal::WireBufferEventSender<::test_protocolpayloads
 
 ::fidl::OneWayStatus fidl::internal::WireWeakEventSender<::test_protocolpayloads::MainProtocol>::OnAnon(uint32_t a, uint32_t b) {
   ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnAnon> _response{a, b };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnAnon>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -3196,7 +3196,7 @@ fidl::OneWayStatus fidl::internal::WireWeakBufferEventSender<::test_protocolpayl
 
 fidl::OneWayStatus fidl::internal::WireEventSender<::test_protocolpayloads::MainProtocol>::OnAnon(uint32_t a, uint32_t b) {
   ::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnAnon> _response{a, b };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalEvent<::test_protocolpayloads::MainProtocol::OnAnon>, ::fidl::internal::ChannelTransport> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };

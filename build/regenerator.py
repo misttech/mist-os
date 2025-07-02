@@ -351,12 +351,13 @@ def main() -> int:
         log("Generating @fuchsia_in_tree_idk repository content.")
         # LINT.IfChange
         _idk_repository_name = "fuchsia_in_tree_idk"
+        _canonical_idk_repository_name = "+fuchsia_idk+fuchsia_in_tree_idk"
         idk_repository_path = Path(
             f"{build_dir}/regenerator_outputs/fuchsia_in_tree_idk"
         )
-        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bzlmod)
         generate_repository.GenerateIdkRepository(
-            _idk_repository_name,
+            _canonical_idk_repository_name,
             idk_repository_path,
             idk_export_dir_path,
             build_dir,
@@ -457,7 +458,9 @@ def main() -> int:
         workspace_utils.GnBuildArgs.generate_fuchsia_build_info(
             fuchsia_dir=fuchsia_dir,
             build_dir=build_dir,
+            # LINT.IfChange
             repository_dir=regenerator_outputs_dir / "fuchsia_build_info",
+            # LINT.ThenChange(//build/bazel/scripts/workspace_utils.py)
         )
 
         # Generate the bazel launcher and Bazel workspace files.

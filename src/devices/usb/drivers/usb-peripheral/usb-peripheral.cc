@@ -399,10 +399,12 @@ zx_status_t UsbPeripheral::FunctionRegistered() {
   }
   lock.release();
 
-  if (fidl::Status status = fidl::WireCall(listener_)->FunctionRegistered(); !status.ok()) {
-    // If you expected a call here, the listener_ might have been closed before it got called. This
-    // shouldn't crash the driver though.
-    fdf::debug("Failed to send FunctionRegistered request: {}", status.status_string());
+  if (listener_.is_valid()) {
+    if (fidl::Status status = fidl::WireCall(listener_)->FunctionRegistered(); !status.ok()) {
+      // If you expected a call here, the listener_ might have been closed before it got called.
+      // This shouldn't crash the driver though.
+      fdf::debug("Failed to send FunctionRegistered request: {}", status);
+    }
   }
   return ZX_OK;
 }
@@ -591,6 +593,17 @@ zx_status_t UsbPeripheral::GetDescriptor(uint8_t request_type, uint16_t value, u
     qualifier->b_descriptor_type = USB_DT_DEVICE_QUALIFIER;
     qualifier->b_num_configurations = 0;
     qualifier->b_reserved = 0;
+    *out_actual = length;
+    return ZX_OK;
+  } else if (desc_type == USB_DT_BOS) {
+    usb_bos_descriptor_t bos{
+      .b_length = sizeof(usb_bos_descriptor_t),
+      .b_descriptor_type = USB_DT_BOS,
+      .w_total_length = sizeof(usb_bos_descriptor_t),
+      .b_num_device_caps = 0,  // No device capabilities.
+    };
+    length = std::min(length, sizeof(usb_bos_descriptor_t));
+    memcpy(buffer, &bos, length);
     *out_actual = length;
     return ZX_OK;
   }

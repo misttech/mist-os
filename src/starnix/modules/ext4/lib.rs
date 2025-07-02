@@ -46,7 +46,7 @@ impl FileSystemOps for ExtFilesystem {
 
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -62,7 +62,7 @@ struct ExtNode {
 
 impl ExtFilesystem {
     pub fn new_fs(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
@@ -104,10 +104,7 @@ impl ExtFilesystem {
             fs,
             options,
         )?;
-        let mut root = FsNode::new_root(ops);
-        root.node_id = ROOT_INODE_NUM as ino_t;
-        fs.set_root_node(root);
-
+        fs.create_root(ROOT_INODE_NUM as ino_t, ops);
         Ok(fs)
     }
 }
@@ -147,7 +144,7 @@ impl FsNodeOps for ExtDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -157,9 +154,9 @@ impl FsNodeOps for ExtDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let fs = node.fs();
@@ -172,7 +169,7 @@ impl FsNodeOps for ExtDirectory {
             .ok_or_else(|| errno!(ENOENT, name))?;
         let ext_node = ExtNode::new(fs_ops, entry.e2d_ino.into())?;
         let inode_num = ext_node.inode_num as ino_t;
-        fs.get_or_create_node(Some(inode_num as ino_t), |inode_num| {
+        fs.get_or_create_node(inode_num, || {
             let entry_type = EntryType::from_u8(entry.e2d_type).map_err(|e| errno!(EIO, e))?;
             let mode = FileMode::from_bits(ext_node.inode.e2di_mode.into());
             let owner =
@@ -207,17 +204,10 @@ impl FsNodeOps for ExtDirectory {
             };
 
             let child = FsNode::new_uncached(
-                current_task,
+                inode_num,
                 ops,
                 &fs,
-                inode_num,
-                FsNodeInfo {
-                    ino: inode_num,
-                    mode,
-                    uid: owner.uid,
-                    gid: owner.gid,
-                    ..Default::default()
-                },
+                FsNodeInfo { mode, uid: owner.uid, gid: owner.gid, ..Default::default() },
             );
             child.update_info(|info| {
                 info.size = size;
@@ -252,7 +242,7 @@ impl FsNodeOps for ExtFile {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -307,7 +297,7 @@ impl FsNodeOps for ExtSymlink {
 
     fn readlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
@@ -328,18 +318,18 @@ impl FileOps for ExtDirFileObject {
 
     fn seek(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        Ok(default_seek(current_offset, target, |_| error!(EINVAL))?)
+        Ok(default_seek(current_offset, target, || error!(EINVAL))?)
     }
 
     fn readdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,

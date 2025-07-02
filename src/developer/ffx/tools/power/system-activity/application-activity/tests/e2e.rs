@@ -18,8 +18,6 @@ async fn taking_lease_adds_lease_to_broker_inspect() {
         }
         std::thread::sleep(std::time::Duration::from_secs(1));
     }
-
-    emu.stop().await;
 }
 
 async fn get_application_activity_level(emu: &IsolatedEmulator) -> i64 {

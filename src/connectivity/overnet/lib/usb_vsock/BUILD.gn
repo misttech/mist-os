@@ -26,6 +26,7 @@ rustc_library("usb_vsock") {
 
   sources = [
     "src/connection.rs",
+    "src/connection/overflow_writer.rs",
     "src/lib.rs",
     "src/packet.rs",
   ]

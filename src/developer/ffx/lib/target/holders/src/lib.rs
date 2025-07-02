@@ -5,9 +5,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use daemon_proxy::Injection;
 use ffx_command_error::Result;
 use ffx_config::EnvironmentContext;
-use ffx_daemon_proxy::{DaemonVersionCheck, Injection};
 use ffx_target::fho::FhoConnectionBehavior;
 use fho::{FhoEnvironment, TryFromEnv as _};
 use fidl::encoding::DefaultFuchsiaResourceDialect;
@@ -43,12 +43,8 @@ pub async fn init_connection_behavior(
         Ok(FhoConnectionBehavior::DirectConnector(Arc::new(connector)))
     } else {
         let build_info = context.build_info();
-        let overnet_injector = Injection::initialize_overnet(
-            context.clone(),
-            None,
-            DaemonVersionCheck::SameVersionInfo(build_info),
-        )
-        .await?;
+        let overnet_injector =
+            Injection::initialize_overnet(context.clone(), None, build_info).await?;
         log::info!("Initializing FhoConnectionBehavior::DaemonConnector");
         Ok(FhoConnectionBehavior::DaemonConnector(Arc::new(overnet_injector)))
     }

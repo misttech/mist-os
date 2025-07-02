@@ -7,12 +7,13 @@ use super::fs_node::compute_new_fs_node_sid;
 use super::{
     check_permission, fs_node_effective_sid_and_class, task_effective_sid, todo_check_permission,
 };
+use crate::security::selinux_hooks::superblock;
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::socket::{
-    NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketPeer, SocketProtocol,
-    SocketShutdownFlags, SocketType,
+    socket_fs, NetlinkFamily, Socket, SocketAddress, SocketDomain, SocketFile, SocketPeer,
+    SocketProtocol, SocketShutdownFlags, SocketType,
 };
-use crate::vfs::{Anon, FileSystemHandle, FsNode};
+use crate::vfs::{Anon, DowncastedFile, FsNode};
 use crate::TODO_DENY;
 use selinux::permission_check::PermissionCheck;
 use selinux::{
@@ -20,6 +21,7 @@ use selinux::{
     SecurityId, SecurityServer, SocketClass, UnixStreamSocketPermission,
 };
 use starnix_logging::{track_stub, BugRef};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked};
 use starnix_uapi::errors::Errno;
 
 /// Checks that `current_task` has the specified `permission` for the `socket_node`.
@@ -60,9 +62,7 @@ fn has_socket_permission_for_sid(
     // If the socket is for kernel-internal use we can return success immediately.
     // TODO: https://fxbug.dev/364569010 - check if there are additional cases when the socket is
     // for kernel-internal use.
-    if subject_sid == SecurityId::initial(InitialSid::Kernel)
-        || socket_sid == SecurityId::initial(InitialSid::Kernel)
-    {
+    if subject_sid == InitialSid::Kernel.into() || socket_sid == InitialSid::Kernel.into() {
         return Ok(());
     }
     check_permission(permission_check, kernel, subject_sid, socket_sid, permission, audit_context)
@@ -85,8 +85,8 @@ fn todo_has_socket_permission(
     // TODO: https://fxbug.dev/364569010 - check if there are additional cases when the socket is
     // for kernel-internal use.
     if Anon::is_private(socket_node)
-        || subject_sid == SecurityId::initial(InitialSid::Kernel)
-        || socket_sid == SecurityId::initial(InitialSid::Kernel)
+        || subject_sid == InitialSid::Kernel.into()
+        || socket_sid == InitialSid::Kernel.into()
     {
         return Ok(());
     }
@@ -165,20 +165,27 @@ fn compute_socket_security_class(
 
 /// Checks that `current_task` has permission to create a socket with `domain`, `socket_type` and
 /// `protocol`.
-pub(in crate::security) fn check_socket_create_access(
+pub(in crate::security) fn check_socket_create_access<L>(
+    locked: &mut Locked<L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     domain: SocketDomain,
     socket_type: SocketType,
     protocol: SocketProtocol,
-    sockfs: &FileSystemHandle,
     kernel_private: bool,
-) -> Result<(), Errno> {
+) -> Result<(), Errno>
+where
+    L: LockEqualOrBefore<FileOpsCore>,
+{
     // Creating kernel sockets is allowed.
     if kernel_private {
         return Ok(());
     }
 
+    let sockfs = socket_fs(current_task.kernel());
+    // Ensure sockfs gets labeled, in case it was mounted after the SELinux policy has been loaded.
+    superblock::file_system_resolve_security(locked, security_server, &current_task, &sockfs)
+        .expect("resolve fs security");
     let effective_sid = task_effective_sid(current_task);
     let new_socket_class = compute_socket_security_class(domain, socket_type, protocol);
     let new_socket_sid = compute_new_fs_node_sid(
@@ -191,7 +198,7 @@ pub(in crate::security) fn check_socket_create_access(
     )?
     .map(|(sid, _)| sid)
     // TODO: https://fxbug.dev/364569053 - default to socket-related initial SIDs.
-    .unwrap_or_else(|| SecurityId::initial(InitialSid::Unlabeled));
+    .unwrap_or_else(|| InitialSid::Unlabeled.into());
 
     has_socket_permission_for_sid(
         &security_server.as_permission_check(),
@@ -245,19 +252,11 @@ pub(in crate::security) fn check_socket_bind_access(
 pub(in crate::security) fn check_socket_connect_access(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
-    socket: &Socket,
+    socket: DowncastedFile<'_, SocketFile>,
     _socket_peer: &SocketPeer,
 ) -> Result<(), Errno> {
-    let Some(socket_node) = socket.fs_node() else {
-        track_stub!(
-            TODO("https://fxbug.dev/414583985"),
-            "check_socket_connect_access without FsNode"
-        );
-        return Ok(());
-    };
-
     let current_sid = task_effective_sid(current_task);
-    let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
+    let FsNodeClass::Socket(socket_class) = socket.file().node().security_state.lock().class else {
         panic!("check_socket_connect_access called for non-Socket class")
     };
 
@@ -267,7 +266,7 @@ pub(in crate::security) fn check_socket_connect_access(
         &security_server.as_permission_check(),
         current_task.kernel(),
         current_sid,
-        &socket_node,
+        &socket.file().node(),
         CommonSocketPermission::Connect.for_class(socket_class),
         current_task.into(),
     )
@@ -366,6 +365,99 @@ pub(in crate::security) fn check_socket_setsockopt_access(
     )
 }
 
+/// Checks that `current_task` has permission to send a message on `socket`.
+pub(in crate::security) fn check_socket_sendmsg_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    socket: &Socket,
+) -> Result<(), Errno> {
+    let Some(socket_node) = socket.fs_node() else {
+        track_stub!(
+            TODO("https://fxbug.dev/414583985"),
+            "check_socket_sendmsg_access without FsNode"
+        );
+        return Ok(());
+    };
+    let current_sid = current_task.security_state.lock().current_sid;
+    let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
+        panic!(
+            "check_socket_sendmsg_access called for non-Socket class {:?}",
+            socket_node.security_state.lock().class
+        )
+    };
+
+    todo_has_socket_permission(
+        TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_sendmsg checks."),
+        &security_server.as_permission_check(),
+        current_task.kernel(),
+        current_sid,
+        &socket_node,
+        CommonFsNodePermission::Write.for_class(socket_class),
+        current_task.into(),
+    )
+}
+
+/// Checks that `current_task` has permission to receive a message on `socket`.
+pub(in crate::security) fn check_socket_recvmsg_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    socket: &Socket,
+) -> Result<(), Errno> {
+    let Some(socket_node) = socket.fs_node() else {
+        track_stub!(
+            TODO("https://fxbug.dev/414583985"),
+            "check_socket_recvmsg_access without FsNode"
+        );
+        return Ok(());
+    };
+    let current_sid = current_task.security_state.lock().current_sid;
+    let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
+        panic!(
+            "check_socket_recvmsg_access called for non-Socket class {:?}",
+            socket_node.security_state.lock().class
+        )
+    };
+
+    todo_has_socket_permission(
+        TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_recvmsg checks."),
+        &security_server.as_permission_check(),
+        current_task.kernel(),
+        current_sid,
+        &socket_node,
+        CommonFsNodePermission::Read.for_class(socket_class),
+        current_task.into(),
+    )
+}
+
+/// Checks that `current_task` has permission to get the name of `socket`.
+pub(in crate::security) fn check_socket_getname_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    socket: &Socket,
+) -> Result<(), Errno> {
+    let Some(socket_node) = socket.fs_node() else {
+        track_stub!(
+            TODO("https://fxbug.dev/414583985"),
+            "check_socket_getname_access without FsNode"
+        );
+        return Ok(());
+    };
+    let current_sid = task_effective_sid(current_task);
+    let FsNodeClass::Socket(socket_class) = socket_node.security_state.lock().class else {
+        panic!("check_socket_getname_access called for non-Socket class")
+    };
+
+    todo_has_socket_permission(
+        TODO_DENY!("https://fxbug.dev/411396154", "Enforce socket_getname checks."),
+        &security_server.as_permission_check(),
+        current_task.kernel(),
+        current_sid,
+        &socket_node,
+        CommonFsNodePermission::GetAttr.for_class(socket_class),
+        current_task.into(),
+    )
+}
+
 /// Checks that `current_task` has permission to shutdown `socket`.
 pub(in crate::security) fn check_socket_shutdown_access(
     security_server: &SecurityServer,
@@ -403,8 +495,7 @@ pub(in crate::security) fn socket_getpeersec_stream(
     _current_task: &CurrentTask,
     socket: &Socket,
 ) -> Result<Vec<u8>, Errno> {
-    let peer_sid =
-        socket.security.state.peer_sid.lock().unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
+    let peer_sid = socket.security.state.peer_sid.lock().unwrap_or(InitialSid::Unlabeled.into());
     Ok(security_server.sid_to_security_context(peer_sid).unwrap())
 }
 

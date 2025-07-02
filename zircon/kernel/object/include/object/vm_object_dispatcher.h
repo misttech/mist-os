@@ -75,11 +75,10 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
   zx::result<fbl::RefPtr<ContentSizeManager>> content_size_manager() TA_EXCL(get_lock());
 
   // VmObjectDispatcher own methods.
-  zx_status_t Read(user_out_ptr<char> user_data, uint64_t offset, size_t length,
-                   size_t* out_actual);
-  zx_status_t Write(user_in_ptr<const char> user_data, uint64_t offset, size_t length,
-                    size_t* out_actual,
-                    VmObject::OnWriteBytesTransferredCallback on_bytes_transferred = nullptr);
+  ktl::pair<zx_status_t, size_t> Read(user_out_ptr<char> user_data, uint64_t offset, size_t length);
+  ktl::pair<zx_status_t, size_t> Write(
+      user_in_ptr<const char> user_data, uint64_t offset, size_t length,
+      VmObject::OnWriteBytesTransferredCallback on_bytes_transferred = nullptr);
   zx_status_t SetSize(uint64_t);
   zx_status_t GetSize(uint64_t* size);
   zx_status_t RangeOp(uint32_t op, uint64_t offset, uint64_t size, user_inout_ptr<void> buffer,

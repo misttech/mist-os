@@ -41,6 +41,10 @@ class RtcFcTests(unittest.TestCase):
         self.transport.connect_device_proxy.assert_called_once()
         self.reboot_af.register_for_on_device_boot.assert_called_once()
 
+    def test_verify_supported(self) -> None:
+        """Test if verify_supported works."""
+        # TODO(http://b/409624089): Implement the test method logic
+
     def test_rtc_setup_fallback(self) -> None:
         self.transport.reset_mock()
         self.reboot_af.reset_mock()

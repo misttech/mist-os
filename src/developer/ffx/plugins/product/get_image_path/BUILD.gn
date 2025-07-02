@@ -20,11 +20,11 @@ ffx_plugin("ffx_product_get_image_path") {
     "//third_party/rust_crates:camino",
   ]
   deps = [
-    "//build/sdk/meta:rust",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/writer:lib",
     "//src/lib/assembly/assembled_system",
+    "//src/lib/assembly/product_bundle",
     "//src/lib/utf8_path",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:camino",

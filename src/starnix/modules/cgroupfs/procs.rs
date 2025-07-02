@@ -10,10 +10,8 @@
 //! Full details at https://docs.kernel.org/admin-guide/cgroup-v2.html#core-interface-files
 
 use starnix_core::task::{CgroupOps, CurrentTask, Kernel, ProcessEntryRef};
-use starnix_core::vfs::{
-    AppendLockGuard, DynamicFile, DynamicFileBuf, DynamicFileSource, FileObject, FileOps, FsNode,
-    FsNodeOps, InputBuffer,
-};
+use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::{AppendLockGuard, FileObject, FileOps, FsNode, FsNodeOps, InputBuffer};
 use starnix_core::{
     fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, fs_node_impl_not_dir,
 };
@@ -39,7 +37,7 @@ impl FsNodeOps for ControlGroupNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -49,7 +47,7 @@ impl FsNodeOps for ControlGroupNode {
 
     fn truncate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         _node: &FsNode,
         _current_task: &CurrentTask,
@@ -113,7 +111,7 @@ impl FileOps for ControlGroupFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,

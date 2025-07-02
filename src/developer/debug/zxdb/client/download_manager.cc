@@ -207,6 +207,9 @@ void DownloadManager::OnSymbolServerStatusChanged(SymbolServer* server) {
     case SymbolServer::State::kAuth:
       servers_failed_auth_++;
       break;
+    case SymbolServer::State::kUnreachable:
+      servers_unreachable_++;
+      break;
     default:
       break;
   }
@@ -278,10 +281,9 @@ Download* DownloadManager::GetDownload(std::string build_id, DebugSymbolFileType
     return it->second.get();
   }
 
-  // This condition is mostly for test cases where they may not be any
-  // registered symbol servers in the initial configuration that don't read from
-  // the symbol-index.
-  if (!system_->GetSymbolServers().empty()) {
+  // Avoid starting a download if all symbol servers are in a state where they will
+  // never become ready. Otherwise, the download could never complete.
+  if (servers_failed_auth_ + servers_unreachable_ < system_->GetSymbolServers().size()) {
     auto unique_download = MakeDownload(build_id, file_type);
     download = unique_download.get();
     downloads_[download_id] = std::move(unique_download);

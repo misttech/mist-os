@@ -34,7 +34,7 @@ bool ZirconPlatformSemaphore::duplicate_handle(zx::handle* handle_out) const {
 magma::Status ZirconPlatformSemaphore::WaitNoReset(uint64_t timeout_ms) {
   TRACE_DURATION("magma:sync", "semaphore wait", "id", koid_);
   zx_status_t status = event_.wait_one(
-      zx_signal(), zx::deadline_after(zx::duration(magma::ms_to_signed_ns(timeout_ms))), nullptr);
+      GetZxSignal(), zx::deadline_after(zx::duration(magma::ms_to_signed_ns(timeout_ms))), nullptr);
   switch (status) {
     case ZX_OK:
       return MAGMA_STATUS_OK;
@@ -61,7 +61,7 @@ bool ZirconPlatformSemaphore::WaitAsync(PlatformPort* port, uint64_t key) {
 
   auto zircon_port = static_cast<ZirconPlatformPort*>(port);
 
-  zx_status_t status = event_.wait_async(zircon_port->zx_port(), key, zx_signal(), 0);
+  zx_status_t status = event_.wait_async(zircon_port->zx_port(), key, GetZxSignal(), 0);
   if (status != ZX_OK)
     return DRETF(false, "wait_async failed: %d", status);
 

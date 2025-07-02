@@ -58,19 +58,42 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
             r"(?m)^\s*Memory stalls \(full\): \d+(\.\d+)? .?s\s*$", profile
         )
 
-    def test_ffx_profile_memory_component_with_json_output(self) -> None:
+    def test_ffx_profile_memory_component_stdin_cycle(self) -> None:
+        debug_json = self.dut.ffx.run(
+            ["profile", "memory", "components", "--debug-json"],
+            log_output=False,
+        )
+        import subprocess
+
+        process = self.dut.ffx.popen(
+            [
+                "profile",
+                "memory",
+                "components",
+                "--stdin-input",
+                "--debug-json",
+            ],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout_data, stderr_data = process.communicate(input=debug_json)
+        asserts.assert_equal(debug_json.strip(), stdout_data.strip())
+
+    def test_ffx_profile_memory_component_with_machine_json_output(
+        self,
+    ) -> None:
         cmd_output = self.dut.ffx.run(
             ["--machine", "json-pretty", "profile", "memory", "components"],
             log_output=False,
         )
-        self.write_output(cmd_output, "profile_memory_components.json")
-        # Remove `Resource %d not found` line from the output.
-        # TODO(b/409272413): simplify this code when stdio and stderr are no longer aggregated.
-        cmd_output = "\n".join(
-            l for l in cmd_output.split("\n") if not l.startswith("Resource ")
+        self.write_output(
+            cmd_output, "profile_memory_components_machine_json.json"
         )
 
         profile = json.loads(cmd_output)
+        asserts.assert_in("performance", set(profile))
+
         (mm2,) = [
             p
             for p in profile["principals"]
@@ -78,6 +101,19 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         ]
         asserts.assert_in("processes", mm2)
         asserts.assert_in("vmos", mm2)
+
+    def test_ffx_profile_memory_component_with_debug_json_output(self) -> None:
+        cmd_output = self.dut.ffx.run(
+            ["profile", "memory", "components", "--debug-json"],
+            log_output=False,
+        )
+        self.write_output(
+            cmd_output, "profile_memory_components_debug_json.json"
+        )
+
+        profile = json.loads(cmd_output)
+        asserts.assert_in("bucket_definitions", set(profile.keys()))
+        asserts.assert_greater(len(profile["bucket_definitions"]), 0)
 
     def test_memory_monitor2_inspect(self) -> None:
         inspect_json = self.dut.ffx.run(
@@ -154,6 +190,8 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
         )
         # Assert that this is a ComponentDigest
         profile = json.loads(cmd_output)["ComponentDigest"]
+        asserts.assert_in("digest", set(profile.keys()))
+
         # Assert that is has a principal for memory monitor 2.
         (principal,) = [
             p
@@ -168,7 +206,6 @@ class MemoryMonitor2EndToEndTest(fuchsia_base_test.FuchsiaBaseTest):
             ["--process_koids", "123"],
             ["--process_names", "123"],
             ["--interval", "123"],
-            ["--buckets"],
             ["--undigested"],
             ["--exact_sizes"],
         ]

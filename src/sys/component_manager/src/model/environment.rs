@@ -11,7 +11,7 @@ use fidl_fuchsia_component_decl as fdecl;
 use std::sync::Arc;
 use std::time::Duration;
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 use std::sync::Weak;
 
 /// A realm's environment, populated from a component's [`EnvironmentDecl`].
@@ -32,7 +32,7 @@ pub const DEFAULT_STOP_TIMEOUT: Duration = Duration::from_secs(5);
 
 impl Environment {
     /// Creates a new empty environment parented to component manager.
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "src_model_tests")))]
     pub fn empty() -> Environment {
         Environment {
             env: routing::environment::Environment::new(
@@ -120,7 +120,7 @@ impl Environment {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::builtin_environment::RootComponentInputBuilder;

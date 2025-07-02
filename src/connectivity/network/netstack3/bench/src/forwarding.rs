@@ -51,7 +51,7 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
     const TTL: u8 = 64;
     let mut buf = body
         .into_serializer()
-        .encapsulate(Ipv4PacketBuilder::new(
+        .wrap_in(Ipv4PacketBuilder::new(
             // Use the remote IP as the destination so that we decide to
             // forward.
             TEST_ADDRS_V4.remote_ip,
@@ -59,7 +59,7 @@ fn bench_forward_minimum<B: Bencher>(b: &mut B, frame_size: usize) {
             TTL,
             IpProto::Udp.into(),
         ))
-        .encapsulate(EthernetFrameBuilder::new(
+        .wrap_in(EthernetFrameBuilder::new(
             TEST_ADDRS_V4.remote_mac.get(),
             TEST_ADDRS_V4.local_mac.get(),
             EtherType::Ipv4,

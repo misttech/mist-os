@@ -72,9 +72,6 @@ impl InputTest {
     }
 
     pub fn connect_to_inputmarker(instance: &RealmInstance) -> InputProxy {
-        return instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<InputMarker>()
-            .expect("connecting to Input");
+        return instance.root.connect_to_protocol_at_exposed_dir().expect("connecting to Input");
     }
 }

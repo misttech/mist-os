@@ -36,7 +36,6 @@ class FuchsiaDevice(object):
         log_dir = test.log_path
         isolation_path = None
         ctx_config = {
-            "sdk.root": "./sdk/exported/core",
             "log.level": "trace",
             "log.enabled": "true",
         }

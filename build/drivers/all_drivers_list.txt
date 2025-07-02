@@ -1,4 +1,4 @@
-//examples/drivers/driver_test_realm/sample-driver:driver
+//examples/drivers/driver_test_realm/sample_driver:driver
 //examples/drivers/metadata/forwarder:driver
 //examples/drivers/metadata/retriever:driver
 //examples/drivers/metadata/sender:driver

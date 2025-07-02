@@ -13,10 +13,12 @@ use starnix_core::task::{
     CurrentTask, EventHandler, Kernel, SignalHandler, SignalHandlerInner, WaitCanceler, Waiter,
 };
 use starnix_core::vfs::buffers::InputBuffer;
+use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::pseudo::simple_file::SimpleFileNode;
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::{
-    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FileObject, FileOps, FileSystemHandle, FsNodeHandle, FsNodeOps,
-    SimpleFileNode, StaticDirectoryBuilder,
+    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, FileObject, FileOps,
+    FileSystemHandle, FsNodeHandle, FsNodeOps,
 };
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
@@ -42,25 +44,10 @@ pub fn pressure_directory(
     };
 
     let mut dir = StaticDirectoryBuilder::new(fs);
-    dir.entry(
-        current_task,
-        "memory",
-        MemoryPressureFile::new_node(psi_provider),
-        mode!(IFREG, 0o666),
-    );
-    dir.entry(
-        current_task,
-        "cpu",
-        StubPressureFile::new_node(StubPressureFileKind::CPU),
-        mode!(IFREG, 0o666),
-    );
-    dir.entry(
-        current_task,
-        "io",
-        StubPressureFile::new_node(StubPressureFileKind::IO),
-        mode!(IFREG, 0o666),
-    );
-    Some(dir.build(current_task))
+    dir.entry("memory", MemoryPressureFile::new_node(psi_provider), mode!(IFREG, 0o666));
+    dir.entry("cpu", StubPressureFile::new_node(StubPressureFileKind::CPU), mode!(IFREG, 0o666));
+    dir.entry("io", StubPressureFile::new_node(StubPressureFileKind::IO), mode!(IFREG, 0o666));
+    Some(dir.build())
 }
 
 struct PsiProvider {
@@ -147,7 +134,7 @@ impl FileOps for MemoryPressureFile {
 
     fn close(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -159,7 +146,7 @@ impl FileOps for MemoryPressureFile {
     /// Pressure notifications are configured by writing to the file.
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
@@ -225,7 +212,7 @@ impl FileOps for MemoryPressureFile {
 
     fn wait_async(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -270,7 +257,7 @@ impl FileOps for MemoryPressureFile {
 
     fn query_events(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -475,7 +462,7 @@ impl FileOps for StubPressureFile {
     /// Pressure notifications are configured by writing to the file.
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -495,7 +482,7 @@ impl FileOps for StubPressureFile {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -507,7 +494,7 @@ impl FileOps for StubPressureFile {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {

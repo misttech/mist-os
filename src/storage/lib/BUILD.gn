@@ -27,7 +27,6 @@ group("tests") {
     "ramdevice_client:tests",
     "sparse/c:tests",
     "sparse/rust:tests",
-    "storage-metrics:tests",
     "storage_device:tests",
     "super_parser:tests",
     "trace:tests",

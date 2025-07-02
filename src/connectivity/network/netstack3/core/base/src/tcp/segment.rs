@@ -866,25 +866,51 @@ impl Flags {
     }
 }
 
-impl<'a> TryFrom<TcpSegment<&'a [u8]>> for Segment<&'a [u8]> {
+/// A TCP segment that has been verified to have valid flags. Can be converted
+/// to a `Segment`.
+pub struct VerifiedTcpSegment<'a> {
+    segment: TcpSegment<&'a [u8]>,
+    control: Option<Control>,
+}
+
+impl<'a> VerifiedTcpSegment<'a> {
+    /// Returns the underlying [`TcpSegment`].
+    pub fn tcp_segment(&self) -> &TcpSegment<&'a [u8]> {
+        &self.segment
+    }
+
+    /// Returns the control flag of the segment.
+    pub fn control(&self) -> Option<Control> {
+        self.control
+    }
+}
+
+impl<'a> TryFrom<TcpSegment<&'a [u8]>> for VerifiedTcpSegment<'a> {
     type Error = MalformedFlags;
 
-    fn try_from(from: TcpSegment<&'a [u8]>) -> Result<Self, Self::Error> {
-        let syn = from.syn();
-        let options = Options::from_iter(syn, from.iter_options());
+    fn try_from(segment: TcpSegment<&'a [u8]>) -> Result<Self, Self::Error> {
+        let control =
+            Flags { syn: segment.syn(), fin: segment.fin(), rst: segment.rst() }.control()?;
+        Ok(VerifiedTcpSegment { segment, control })
+    }
+}
+
+impl<'a> From<&'a VerifiedTcpSegment<'a>> for Segment<&'a [u8]> {
+    fn from(from: &'a VerifiedTcpSegment<'a>) -> Segment<&'a [u8]> {
+        let options = Options::from_iter(from.segment.syn(), from.segment.iter_options());
         let (to, discarded) = Segment::new(
             SegmentHeader {
-                seq: from.seq_num().into(),
-                ack: from.ack_num().map(Into::into),
-                wnd: UnscaledWindowSize::from(from.window_size()),
-                control: Flags { syn, fin: from.fin(), rst: from.rst() }.control()?,
-                push: from.psh(),
+                seq: from.segment.seq_num().into(),
+                ack: from.segment.ack_num().map(Into::into),
+                wnd: UnscaledWindowSize::from(from.segment.window_size()),
+                control: from.control,
+                push: from.segment.psh(),
                 options,
             },
-            from.into_body(),
+            from.segment.body(),
         );
         debug_assert_eq!(discarded, 0);
-        Ok(to)
+        to
     }
 }
 
@@ -1316,14 +1342,14 @@ mod test {
         control: None,
         data_len: 10,
         rcv_nxt: 1,
-        rcv_wnd: 1 << 30 - 1,
+        rcv_wnd: WindowSize::MAX.into(),
     } => Some((SeqNum::new(1), None, 0..10)))]
     #[test_case(OverlapTestArgs{
         seg_seq: 10,
         control: None,
         data_len: 10,
         rcv_nxt: 1,
-        rcv_wnd: 1 << 30 - 1,
+        rcv_wnd: WindowSize::MAX.into(),
     } => Some((SeqNum::new(10), None, 0..10)))]
     #[test_case(OverlapTestArgs{
         seg_seq: 1,

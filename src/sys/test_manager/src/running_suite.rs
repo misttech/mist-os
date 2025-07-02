@@ -43,9 +43,8 @@ use std::sync::Arc;
 use thiserror::Error;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_diagnostics_host as fhost,
-    fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys, fidl_fuchsia_test as ftest,
-    fidl_fuchsia_test_manager as ftest_manager,
+    fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_io as fio, fidl_fuchsia_sys2 as fsys,
+    fidl_fuchsia_test as ftest, fidl_fuchsia_test_manager as ftest_manager,
 };
 
 const DEBUG_DATA_REALM_NAME: &'static str = "debug-data";
@@ -119,9 +118,9 @@ impl RunningSuite {
         .await
         .map_err(LaunchTestError::InitializeTestRealm)?;
         let instance = builder.build().await.map_err(LaunchTestError::CreateTestRealm)?;
-        let test_realm_proxy = instance
+        let test_realm_proxy: fcomponent::RealmProxy = instance
             .root
-            .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .map_err(|e| LaunchTestError::ConnectToTestSuite(e))?;
         let collection_ref = fdecl::CollectionRef { name: TEST_ROOT_COLLECTION.into() };
         let child_decl = fdecl::Child {
@@ -195,21 +194,18 @@ impl RunningSuite {
         sender.send(Ok(SuiteEvents::suite_syslog(syslog).into())).await.unwrap();
 
         if let Some(log_interest) = options.log_interest.take() {
-            let log_settings = match self
-                .instance
-                .root
-                .connect_to_protocol_at_exposed_dir::<fdiagnostics::LogSettingsMarker>()
-            {
-                Ok(proxy) => proxy,
-                Err(e) => {
-                    warn!("Error connecting to LogSettings");
-                    sender
-                        .send(Err(LaunchTestError::ConnectToLogSettings(e.into()).into()))
-                        .await
-                        .unwrap();
-                    return;
-                }
-            };
+            let log_settings: fdiagnostics::LogSettingsProxy =
+                match self.instance.root.connect_to_protocol_at_exposed_dir() {
+                    Ok(proxy) => proxy,
+                    Err(e) => {
+                        warn!("Error connecting to LogSettings");
+                        sender
+                            .send(Err(LaunchTestError::ConnectToLogSettings(e.into()).into()))
+                            .await
+                            .unwrap();
+                        return;
+                    }
+                };
 
             let fut = log_settings.set_interest(&log_interest);
             if let Err(e) = fut.await {
@@ -223,7 +219,7 @@ impl RunningSuite {
         let archive_accessor = match self
             .instance
             .root
-            .connect_to_protocol_at_exposed_dir::<fdiagnostics::ArchiveAccessorMarker>()
+            .connect_to_protocol_at_exposed_dir::<fdiagnostics::ArchiveAccessorProxy>()
         {
             Ok(accessor) => match accessor.wait_for_ready().await {
                 Ok(()) => accessor,
@@ -245,11 +241,7 @@ impl RunningSuite {
                 return;
             }
         };
-        let host_archive_accessor = match self
-            .instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<fhost::ArchiveAccessorMarker>()
-        {
+        let host_archive_accessor = match self.instance.root.connect_to_protocol_at_exposed_dir() {
             Ok(accessor) => accessor,
             Err(e) => {
                 warn!("Error connecting to ArchiveAccessor");
@@ -425,7 +417,7 @@ impl RunningSuite {
             let moniker_relative_to_test_root = if moniker_parsed.is_root() {
                 moniker_parsed
             } else {
-                Moniker::new(&moniker_parsed.path()[1..])
+                Moniker::new_from_borrowed(&moniker_parsed.path()[1..])
             };
             sender
                 .send(Ok(SuiteEvents::suite_custom_artifact(ftest_manager::CustomArtifact {
@@ -451,7 +443,7 @@ impl RunningSuite {
     fn connect_to_storage_admin(&self) -> Result<fsys::StorageAdminProxy, LaunchTestError> {
         self.instance
             .root
-            .connect_to_protocol_at_exposed_dir::<fsys::StorageAdminMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .map_err(|e| LaunchTestError::ConnectToStorageAdmin(e))
     }
 

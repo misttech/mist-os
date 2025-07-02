@@ -36,6 +36,16 @@
 
 namespace dwc3 {
 
+// An extension class to extend the driver with SoC specific behavior for things such as power
+// management.
+class PlatformExtension {
+ public:
+  virtual ~PlatformExtension() = default;
+  virtual zx::result<> Start() = 0;
+  virtual zx::result<> Suspend() = 0;
+  virtual zx::result<> Resume() = 0;
+};
+
 // A dma_buffer::ContiguousBuffer is cached, but leaves cache management to the user. These methods
 // wrap zx_cache_flush with sensible boundary checking and validation.
 zx_status_t CacheFlush(dma_buffer::ContiguousBuffer* buffer, zx_off_t offset, size_t length);
@@ -44,6 +54,8 @@ zx_status_t CacheFlushInvalidate(dma_buffer::ContiguousBuffer* buffer, zx_off_t 
 
 class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dci::UsbDci> {
  public:
+  using fdf::DriverBase::incoming;
+
   Dwc3(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher dispatcher)
       : fdf::DriverBase{"dwc3", std::move(start_args), std::move(dispatcher)} {}
 
@@ -406,6 +418,7 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
   // The IRQ thread and its two top level event decoders.
   int IrqThread();
+  zx::result<> SetIrqThreadSchedulerRole();
   void HandleEvent(uint32_t event);
   void HandleEpEvent(uint32_t event);
 
@@ -522,6 +535,8 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   // TODO(johngro): What lock protects this?  Right now, it is effectively
   // endpoints_[0].lock(), but how do we express this?
   bool configured_ = false;
+
+  std::unique_ptr<PlatformExtension> platform_extension_;
 
   fidl::ServerBindingGroup<fuchsia_hardware_usb_dci::UsbDci> bindings_;
   fidl::SyncClient<fuchsia_driver_framework::NodeController> child_;

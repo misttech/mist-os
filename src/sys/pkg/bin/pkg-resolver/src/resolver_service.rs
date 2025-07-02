@@ -8,6 +8,7 @@ use crate::cache::{
     BasePackageIndex, BlobFetcher, MerkleForError, ToResolveError, ToResolveStatus as _,
 };
 use crate::eager_package_manager::EagerPackageManager;
+use crate::error::to_resolve_tool_error;
 use crate::repository_manager::GetPackageError::*;
 use crate::repository_manager::{GetPackageError, GetPackageHashError, RepositoryManager};
 use crate::rewrite_manager::RewriteManager;
@@ -15,10 +16,12 @@ use anyhow::{anyhow, Context as _, Error};
 use async_lock::RwLock as AsyncRwLock;
 use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
+use fidl::marker::SourceBreaking;
 use fidl_contrib::protocol_connector::ProtocolSender;
 use fidl_fuchsia_metrics::MetricEvent;
 use fidl_fuchsia_pkg::{self as fpkg, PackageResolverRequest, PackageResolverRequestStream};
 use fidl_fuchsia_pkg_ext::{self as pkg, BlobId};
+use fidl_fuchsia_pkg_resolution::{self as fpkg_resolution};
 use fuchsia_cobalt_builders::MetricEventExt as _;
 use fuchsia_pkg::PackageDirectory;
 use fuchsia_url::{AbsolutePackageUrl, ParseError};
@@ -521,6 +524,49 @@ pub async fn run_resolver_service(
                     }
                     Ok(())
                 }
+            }
+        })
+        .await
+}
+
+pub async fn run_resolver_toolbox_service(
+    package_resolver: QueuedResolver,
+    stream: fpkg_resolution::PackageResolverRequestStream,
+    gc_protection: fpkg::GcProtection,
+    cobalt_sender: ProtocolSender<MetricEvent>,
+    eager_package_manager: Arc<Option<AsyncRwLock<EagerPackageManager<QueuedResolver>>>>,
+) -> Result<(), Error> {
+    stream
+        .map_err(anyhow::Error::new)
+        .try_for_each_concurrent(None, |event| async {
+            match event {
+                fpkg_resolution::PackageResolverRequest::Resolve { payload, responder } => {
+                    let package_url = payload.package_url.ok_or_else(|| anyhow!("No package URL given"))?;
+                    let (_dir, dir_server_end) = fidl::endpoints::create_proxy();
+                    let response = resolve_unparsed_absolute_url_and_send_cobalt_metrics(
+                        &package_url,
+                        gc_protection,
+                        dir_server_end,
+                        &package_resolver,
+                        eager_package_manager.as_ref().as_ref(),
+                        cobalt_sender.clone(),
+                    )
+                    .await
+                    .map(|_| { fpkg_resolution::ResolveResult {
+                        __source_breaking: SourceBreaking
+                    }});
+                    let () =
+                        responder.send(response.map_err(to_resolve_tool_error)).with_context(|| {
+                            format!(
+                                "sending fuchsia.pkg/PackageResolverToolbox.Resolve response for {package_url:?}"
+                            )
+                        })?;
+                    Ok(())
+                },
+                fpkg_resolution::PackageResolverRequest::_UnknownMethod { ordinal, .. } => {
+                    warn!(ordinal:?; "Unknown PackageResolverRequest method");
+                    Ok(())
+                },
             }
         })
         .await

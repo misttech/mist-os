@@ -14,9 +14,11 @@ use std::ops::Deref;
 use std::sync::{Arc, Weak};
 
 use starnix_core::task::{CgroupOps, CgroupRoot, CurrentTask};
+use starnix_core::vfs::pseudo::simple_file::BytesFile;
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
-    BytesFile, DirectoryEntryType, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, FsString, VecDirectory, VecDirectoryEntry,
+    DirectoryEntryType, FileOps, FileSystemHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps,
+    FsStr, FsString,
 };
 use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::auth::FsCred;
@@ -69,73 +71,65 @@ impl CgroupDirectory {
     /// Can only be called on a newly initialized root directory created by `new_root`, and can only
     /// be called once. Creates interface files for the root directory, which can only be done after
     /// the `FileSystem` is initialized.
-    pub fn create_root_interface_files(&self, current_task: &CurrentTask, fs: &FileSystemHandle) {
+    pub fn create_root_interface_files(&self, fs: &FileSystemHandle) {
         let mut interface_files = self.interface_files.lock();
         assert!(interface_files.is_empty(), "init is only called once");
         interface_files.insert(
             PROCS_FILE.into(),
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 ControlGroupNode::new(self.cgroup.clone()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             ),
         );
         interface_files.insert(
             CONTROLLERS_FILE.into(),
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 BytesFile::new_node(b"".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
     }
 
     /// Creates a new non-root directory, along with its core interface files.
-    pub fn new(
+    fn new(
         cgroup: Weak<dyn CgroupOps>,
-        current_task: &CurrentTask,
         fs: &FileSystemHandle,
         dir_nodes: Weak<DirectoryNodes>,
     ) -> CgroupDirectoryHandle {
         let interface_files = BTreeMap::from([
             (
                 PROCS_FILE.into(),
-                fs.create_node(
-                    current_task,
+                fs.create_node_and_allocate_node_id(
                     ControlGroupNode::new(cgroup.clone()),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
                 ),
             ),
             (
                 CONTROLLERS_FILE.into(),
-                fs.create_node(
-                    current_task,
+                fs.create_node_and_allocate_node_id(
                     BytesFile::new_node(b"".to_vec()),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                 ),
             ),
             (
                 FREEZE_FILE.into(),
-                fs.create_node(
-                    current_task,
+                fs.create_node_and_allocate_node_id(
                     FreezeFile::new_node(cgroup.clone()),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
                 ),
             ),
             (
                 EVENTS_FILE.into(),
-                fs.create_node(
-                    current_task,
+                fs.create_node_and_allocate_node_id(
                     EventsFile::new_node(cgroup.clone()),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                 ),
             ),
             (
                 KILL_FILE.into(),
-                fs.create_node(
-                    current_task,
+                fs.create_node_and_allocate_node_id(
                     KillFile::new_node(cgroup.clone()),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o200), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o200), FsCred::root()),
                 ),
             ),
         ]);
@@ -175,7 +169,7 @@ impl Deref for CgroupDirectoryHandle {
 impl FsNodeOps for CgroupDirectoryHandle {
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -190,11 +184,10 @@ impl FsNodeOps for CgroupDirectoryHandle {
                 let Some(node) = maybe_node else {
                     return None;
                 };
-                let ino = node.info().ino;
                 Some(VecDirectoryEntry {
                     entry_type: DirectoryEntryType::DIR,
                     name: cgroup.name().into(),
-                    inode: Some(ino),
+                    inode: Some(node.ino),
                 })
             });
 
@@ -202,7 +195,7 @@ impl FsNodeOps for CgroupDirectoryHandle {
         let interface_entries = interface_files.iter().map(|(name, child)| VecDirectoryEntry {
             entry_type: DirectoryEntryType::REG,
             name: name.clone(),
-            inode: Some(child.info().ino),
+            inode: Some(child.ino),
         });
 
         Ok(VecDirectory::new_file(children_entries.chain(interface_entries).collect()))
@@ -210,9 +203,9 @@ impl FsNodeOps for CgroupDirectoryHandle {
 
     fn mkdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
         _mode: FileMode,
         _owner: FsCred,
@@ -221,11 +214,10 @@ impl FsNodeOps for CgroupDirectoryHandle {
         let cgroup = self.cgroup()?.new_child(name)?;
         let directory = CgroupDirectory::new(
             Arc::downgrade(&cgroup) as Weak<dyn CgroupOps>,
-            current_task,
             &node.fs(),
             self.dir_nodes.clone(),
         );
-        let child = dir_nodes.add_node(&cgroup, directory, current_task, &node.fs());
+        let child = dir_nodes.add_node(&cgroup, directory, &node.fs());
 
         node.update_info(|info| {
             info.link_count += 1;
@@ -236,7 +228,7 @@ impl FsNodeOps for CgroupDirectoryHandle {
 
     fn mknod(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -249,7 +241,7 @@ impl FsNodeOps for CgroupDirectoryHandle {
 
     fn unlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -276,7 +268,7 @@ impl FsNodeOps for CgroupDirectoryHandle {
 
     fn create_symlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -288,7 +280,7 @@ impl FsNodeOps for CgroupDirectoryHandle {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,

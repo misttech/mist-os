@@ -98,7 +98,7 @@ impl AndroidBootloaderMessageStore {
 /// for Android, we need to be able to peek into these messages.
 /// Note that this might never be initialized (if the "misc" device never gets registered).
 pub fn android_bootloader_message_store_init(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
 ) {
     let kernel = current_task.kernel().clone();

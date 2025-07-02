@@ -24,7 +24,7 @@ impl<T> OneOrMany<T> {
         }
     }
 
-    /// Returns an iterator over the values of `OneOrMany<T>`.
+    /// Returns an [`Iter`] over the values of `OneOrMany<T>`.
     pub fn iter(&self) -> Iter<'_, T> {
         match self {
             Self::One(item) => Iter { inner_one: Some(item), inner_many: None },
@@ -41,10 +41,14 @@ impl<T> OneOrMany<T> {
     }
 
     /// Returns a `OneOrMany<&T>` that references this `OneOrMany<T>`.
-    pub fn as_ref(&self) -> OneOrMany<&T> {
+    pub fn as_ref<S>(&self) -> OneOrMany<&S>
+    where
+        T: AsRef<S>,
+        S: ?Sized,
+    {
         match self {
-            Self::One(o) => OneOrMany::<&T>::One(o),
-            Self::Many(v) => OneOrMany::<&T>::Many(v.iter().collect()),
+            Self::One(o) => OneOrMany::<&S>::One(o.as_ref()),
+            Self::Many(v) => OneOrMany::<&S>::Many(v.iter().map(|o| o.as_ref()).collect()),
         }
     }
 }

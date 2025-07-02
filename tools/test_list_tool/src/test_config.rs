@@ -66,6 +66,12 @@ pub struct Execution {
     ///  Arguments for the test
     pub test_args: Vec<String>,
 
+    // Optional filters of which test cases to include from the component.
+    pub test_filters: Option<Vec<String>>,
+
+    // Whether an empty set of test cases counts as success or failure
+    pub no_cases_equals_success: Option<bool>,
+
     /// Weather to run disabled tests
     pub run_disabled_tests: bool,
 
@@ -101,6 +107,8 @@ pub fn create_test_config_entry(
         execution: Execution {
             test_url: execution_entry.component_url.clone(),
             test_args: execution_entry.test_args.clone(),
+            test_filters: execution_entry.test_filters.clone(),
+            no_cases_equals_success: execution_entry.no_cases_equals_success,
             run_disabled_tests: execution_entry.also_run_disabled_tests,
             max_severity_logs: execution_entry.max_severity_logs.clone(),
             realm: execution_entry.realm.clone(),
@@ -146,6 +154,7 @@ mod tests {
             realm: "test_realm".to_string().into(),
             timeout_seconds: None,
             test_filters: None,
+            no_cases_equals_success: None,
             parallel: Some(10),
             min_severity_logs: None,
             create_no_exception_channel: false,
@@ -167,6 +176,8 @@ mod tests {
                 test_url: "test_component_url".to_string(),
                 test_args: vec!["arg1".to_string(), "arg2".to_string()],
                 run_disabled_tests: true,
+                test_filters: None,
+                no_cases_equals_success: None,
                 max_severity_logs: Severity::Info.into(),
                 realm: "test_realm".to_string().into(),
                 parallel: Some(10),

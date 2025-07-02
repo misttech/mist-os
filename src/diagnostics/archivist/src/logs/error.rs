@@ -19,6 +19,18 @@ pub enum LogsError {
         source: EventError,
     },
 
+    #[error("FIDL internal error: `{source}`")]
+    FidlError {
+        #[from]
+        source: fidl::Error,
+    },
+
+    #[error("Error duplicating handle: `{source}`")]
+    DuplicateHandleError {
+        #[from]
+        source: fidl::Status,
+    },
+
     #[error("error while handling {protocol} requests: {source}")]
     HandlingRequests { protocol: &'static str, source: fidl::Error },
 

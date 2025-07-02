@@ -27,7 +27,6 @@ source_set("display") {
     "//sdk/lib/async:async-cpp",
     "//sdk/lib/fidl/cpp:hlcpp_conversion",
     "//sdk/lib/fit",
-    "//sdk/lib/inspect/contrib/cpp:bounded_list_node",
     "//sdk/lib/sys/cpp",
     "//src/lib/fsl",
     "//src/lib/fxl",

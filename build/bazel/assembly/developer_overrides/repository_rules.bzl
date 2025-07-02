@@ -67,7 +67,6 @@ def _generate_developer_overrides_repository_impl(repo_ctx):
         "",
     ])
 
-    repo_ctx.file("WORKSPACE.bazel", "")
     repo_ctx.file("BUILD.bazel", "\n".join(buildfile_lines))
 
 assembly_developer_overrides_repository = repository_rule(

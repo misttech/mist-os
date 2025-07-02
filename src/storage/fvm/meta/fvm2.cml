@@ -32,6 +32,12 @@
             ],
         },
     ],
+    use: [
+        {
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            availability: "optional",
+        },
+    ],
     offer: [
         {
             protocol: [

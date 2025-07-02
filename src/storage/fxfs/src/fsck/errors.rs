@@ -736,6 +736,7 @@ pub enum FsckFatal {
     MisOrderedLayerFile(u64, u64),
     MisOrderedObjectStore(u64),
     OverlappingKeysInLayerFile(u64, u64, Key, Key),
+    InvalidBloomFilter(u64, u64, Key),
 }
 
 impl FsckFatal {
@@ -762,7 +763,14 @@ impl FsckFatal {
             FsckFatal::OverlappingKeysInLayerFile(store_id, layer_file_id, key1, key2) => {
                 format!(
                     "Layer file {} for store/allocator {} contains overlapping keys {:?} and {:?}",
-                    store_id, layer_file_id, key1, key2
+                    layer_file_id, store_id, key1, key2
+                )
+            }
+            FsckFatal::InvalidBloomFilter(store_id, layer_file_id, key) => {
+                format!(
+                    "Filter for layer files is invalid: reported that key {:?} in layer file {} \
+                    for store/allocator {} does not exist",
+                    key, layer_file_id, store_id
                 )
             }
         }
@@ -793,6 +801,9 @@ impl FsckFatal {
             FsckFatal::OverlappingKeysInLayerFile(store_id, layer_file_id, key1, key2) => {
                 // This can be for stores or the allocator.
                 error!(oid = store_id, layer_file_id, key1:?, key2:?; "Overlapping keys");
+            }
+            FsckFatal::InvalidBloomFilter(store_id, layer_file_id, key) => {
+                error!(oid = store_id, layer_file_id, key:?; "Filter for layer files invalid");
             }
         }
     }

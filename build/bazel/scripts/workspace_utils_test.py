@@ -111,7 +111,7 @@ class TestFindBazelPaths(unittest.TestCase):
         self.fuchsia_dir = Path(self._td.name)
         config_dir = self.fuchsia_dir / "build" / "bazel" / "config"
         config_dir.mkdir(parents=True)
-        (config_dir / "main_workspace_top_dir").write_text("some/top/dir\n")
+        (config_dir / "bazel_top_dir").write_text("some/top/dir\n")
 
         self.build_dir = self.fuchsia_dir / "out" / "build_dir"
         self.launcher_path = self.build_dir / "some/top/dir/bazel"
@@ -160,7 +160,7 @@ class TestFindBazelWorkspacePath(unittest.TestCase):
             fuchsia_dir = Path(tmp_dir)
             config_dir = fuchsia_dir / "build" / "bazel" / "config"
             config_dir.mkdir(parents=True)
-            (config_dir / "main_workspace_top_dir").write_text("some/top/dir\n")
+            (config_dir / "bazel_top_dir").write_text("some/top/dir\n")
 
             build_dir = fuchsia_dir / "out" / "build_dir"
             launcher_path = build_dir / "some/top/dir/bazel"
@@ -189,29 +189,20 @@ class TestGetBazelRelativeTopDir(unittest.TestCase):
             config_dir = fuchsia_dir / "build" / "bazel" / "config"
             config_dir.mkdir(parents=True)
 
-            main_config = config_dir / "main_workspace_top_dir"
+            main_config = config_dir / "bazel_top_dir"
             main_config.write_text("gen/test/bazel_workspace\n")
 
-            alt_config = config_dir / "alt_workspace_top_dir"
-            alt_config.write_text(" alternative_workspace \n")
-
             topdir, input_files = workspace_utils.get_bazel_relative_topdir(
-                fuchsia_dir, "main"
+                fuchsia_dir
             )
             self.assertEqual(topdir, "gen/test/bazel_workspace")
             self.assertListEqual(list(input_files), [main_config])
 
             topdir, input_files = workspace_utils.get_bazel_relative_topdir(
-                str(fuchsia_dir), "main"
+                str(fuchsia_dir)
             )
             self.assertEqual(topdir, "gen/test/bazel_workspace")
             self.assertListEqual(list(input_files), [main_config])
-
-            topdir, input_files = workspace_utils.get_bazel_relative_topdir(
-                str(fuchsia_dir), "alt"
-            )
-            self.assertEqual(topdir, "alternative_workspace")
-            self.assertListEqual(list(input_files), [alt_config])
 
 
 class TestWorkspaceShouldExcludeFile(unittest.TestCase):
@@ -575,7 +566,7 @@ absolute_fizz = "/path/to/prebuilt/third_party/fuzz"
 ''',
         )
 
-    def test_record_fuchsia_build_config_dir(self) -> None:
+    def test_record_fuchsia_build_info_dir(self) -> None:
         generated = workspace_utils.GeneratedWorkspaceFiles()
 
         main_args_path = self._build_root / "gn_build_variables_for_bazel.json"
@@ -622,7 +613,7 @@ absolute_fizz = "/path/to/prebuilt/third_party/fuzz"
             )
         )
 
-        GnBuildArgs.record_fuchsia_build_config_dir(
+        GnBuildArgs.record_fuchsia_build_info_dir(
             self._root, self._build_root, generated
         )
 
@@ -667,8 +658,8 @@ zoo2 = "non-false string"
                     "content": "",
                     "type": "file",
                 },
-                "WORKSPACE.bazel": {
-                    "content": "",
+                "MODULE.bazel": {
+                    "content": 'module(name = "fuchsia_build_info", version = "1")',
                     "type": "file",
                 },
                 "args.bzl": {
@@ -731,7 +722,6 @@ class GnTargetsDirTest(unittest.TestCase):
             [
                 "BUILD.bazel",
                 "MODULE.bazel",
-                "WORKSPACE.bazel",
                 "_files/obj/bundles/assembly/eng/platform_artifacts",
                 "_files/obj/src/drivers/virtio/package.far",
                 "all_licenses.spdx.json",
@@ -763,12 +753,11 @@ license(
 
         self.assertEqual(
             generated_json["MODULE.bazel"]["content"],
-            'module(name = "gn_targets", version = "1")\n',
-        )
+            """# AUTO-GENERATED - DO NOT EDIT
 
-        self.assertEqual(
-            generated_json["WORKSPACE.bazel"]["content"],
-            'workspace(name = "gn_targets")\n',
+module(name = "gn_targets", version = "1")
+
+bazel_dep(name = "rules_license", version = "1.0.0")""",
         )
 
         self.assertDictEqual(
@@ -928,151 +917,34 @@ class CheckRegeneratorInputsUpdatesTest(unittest.TestCase):
         self.assertSetEqual(updates, set())
 
 
-class RootFilesVariantGeneratorTest(unittest.TestCase):
-    def setUp(self) -> None:
-        self._td = tempfile.TemporaryDirectory()
-        self._root = Path(self._td.name)
-
-    def tearDown(self) -> None:
-        self._td.cleanup()
-
-    def test_variants(self) -> None:
-        generated = workspace_utils.GeneratedWorkspaceFiles()
-        root_variants = workspace_utils.RootBazelFilesVariantsGenerator(
-            generated
-        )
-
-        self.maxDiff = None
-        self.assertEqual(
-            generated.to_json(),
-            r"""{
-  "workspace/fuchsia_build_generated/bazel_root_files": {
-    "target": "bazel_root_files.fuchsia",
-    "type": "raw_symlink"
-  }
-}""",
-        )
-
-        workspace_bazel_fuchsia = """# Example workspace
-workspace(name = "my_project")
-
-### FUCHSIA_SDK_CUTOFF
-local_repository(
-    name = "fuchsia_idk",
-    path = "ninja_build_dir/sdk/exported/bazel_in_tree_idk"
-)
-"""
-        workspace_bazel_path = self._root / "WORKSPACE.bazel"
-        workspace_bazel_path.write_text(workspace_bazel_fuchsia)
-        root_variants.add_file("WORKSPACE.bazel", workspace_bazel_path)
-
-        build_bazel_fuchsia = """# Example build file
-
-package(visibility = ["//visibility:public"])
-
-### FUCHSIA_SDK_CUTOFF
-load("@rules_fuchsia//fuchsia:defs.bzl", "fuchsia_debug_symbols")
-
-fuchsia_debug_symbols(
-   name = "debug_symbols",
-   source_search_root = "//:BUILD.bazel",
-   build_id_dirs = [ "//:.build-id" ]
-)
-"""
-        root_variants.add_content(
-            "BUILD.bazel",
-            build_bazel_fuchsia,
-            self._root / "toplevel.BUILD.bazel",
-        )
-
-        bazelrc_template = """# A test .bazelrc file
-build --platforms=//build/bazel/platforms:{platform}
-
-### FUCHSIA_SDK_CUTOFF
-build --@rules_sdk//fuchsia:fuchsia_sdk_toolchain=@fuchsia_sdk//:fuchsia_sdk_toolchain
-"""
-        bazelrc_template_path = self._root / "template.bazelrc"
-        bazelrc_template_path.write_text(bazelrc_template)
-        root_variants.add_template_expansion(
-            ".bazelrc", bazelrc_template_path, platform="host"
-        )
-
-        entries = json.loads(generated.to_json())
-
-        def check_entry(name: str, expected: dict[str, str]) -> None:
-            self.assertDictEqual(entries[name], expected)
-
-        EXPECTED_ENTRIES = {
-            # First the root symlinks that go through the bazel_root_files symlinks.
-            "workspace/.bazelrc": {
-                "target": "fuchsia_build_generated/bazel_root_files/.bazelrc",
-                "type": "raw_symlink",
-            },
-            "workspace/BUILD.bazel": {
-                "target": "fuchsia_build_generated/bazel_root_files/BUILD.bazel",
-                "type": "raw_symlink",
-            },
-            "workspace/WORKSPACE.bazel": {
-                "target": "fuchsia_build_generated/bazel_root_files/WORKSPACE.bazel",
-                "type": "raw_symlink",
-            },
-            # Second, the bazel_root_files symlink.
-            "workspace/fuchsia_build_generated/bazel_root_files": {
-                "target": "bazel_root_files.fuchsia",
-                "type": "raw_symlink",
-            },
-            # Third, the Fuchsia-specific variants
-            "workspace/fuchsia_build_generated/bazel_root_files.fuchsia/.bazelrc": {
-                "content": """# A test .bazelrc file
-build --platforms=//build/bazel/platforms:host
-
-### FUCHSIA_SDK_CUTOFF
-build --@rules_sdk//fuchsia:fuchsia_sdk_toolchain=@fuchsia_sdk//:fuchsia_sdk_toolchain
-""",
-                "type": "file",
-            },
-            "workspace/fuchsia_build_generated/bazel_root_files.fuchsia/BUILD.bazel": {
-                "content": build_bazel_fuchsia,
-                "type": "file",
-            },
-            "workspace/fuchsia_build_generated/bazel_root_files.fuchsia/WORKSPACE.bazel": {
-                "target": f"{workspace_bazel_path}",
-                "type": "symlink",
-            },
-            # Fourth, the no-sdk variants.
-            "workspace/fuchsia_build_generated/bazel_root_files.no_sdk/.bazelrc": {
-                "content": """# A test .bazelrc file
-build --platforms=//build/bazel/platforms:host
-
-""",
-                "type": "file",
-            },
-            "workspace/fuchsia_build_generated/bazel_root_files.no_sdk/BUILD.bazel": {
-                "content": """# Example build file
-
-package(visibility = ["//visibility:public"])
-
-""",
-                "type": "file",
-            },
-            "workspace/fuchsia_build_generated/bazel_root_files.no_sdk/WORKSPACE.bazel": {
-                "content": """# Example workspace
-workspace(name = "my_project")
-
-""",
-                "type": "file",
-            },
-        }
-
-        for entry_name, expected_value in EXPECTED_ENTRIES.items():
-            self.assertTrue(
-                entry_name in entries,
-                msg=f"Missing entry {entry_name}, got {entries.keys()} instead!",
+class RepositoryNameTest(unittest.TestCase):
+    def test_repository_name(self):
+        for label, expected_repo_name in [
+            ("@foo//path/to:target", "foo"),
+            ("@@bar//:root", "bar"),
+            ("@@rules_python+//path:to/target", "rules_python+"),
+            ("@@rules_rust+1.3//:root", "rules_rust+1.3"),
+            ("@@foo+bar+baz//extension:target", "foo+bar+baz"),
+        ]:
+            self.assertEqual(
+                workspace_utils.repository_name(label), expected_repo_name
             )
-            self.assertDictEqual(
-                entries[entry_name],
-                expected_value,
-                msg=f"Invalid value for entry {entry_name}",
+
+    def test_innermost_repository_name(self):
+        for label, expected_repo_name in [
+            ("@foo//path/to:target", "foo"),
+            ("@@bar//:root", "bar"),
+            ("@@rules_python+//path:to/target", "rules_python+"),
+            ("@@rules_rust+1.3//:root", "rules_rust+1.3"),
+            ("@@rules_java++toolchains+local_jdk//some:path", "local_jdk"),
+            (
+                "@@bazel_tools+remote_coverage_tools_extension+remote_coverage_tools//:root",
+                "remote_coverage_tools",
+            ),
+        ]:
+            self.assertEqual(
+                workspace_utils.innermost_repository_name(label),
+                expected_repo_name,
             )
 
 

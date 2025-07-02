@@ -4,7 +4,10 @@
 {
     offer: [
         {
-            protocol: [ "fuchsia.sys2.RealmQuery.root" ],
+            protocol: [
+                "fuchsia.sys2.LifecycleController.root",
+                "fuchsia.sys2.RealmQuery.root",
+            ],
             from: "parent",
             to: "#adb-services",
         },

@@ -5,16 +5,17 @@
 # The subpackages a Starnix test including `starnix_test_common.shard.cml` needs to boot a
 # container.
 starnix_test_subpackages = [
+  "//src/connectivity/network/tun/network-tun",
+  "//src/devices/haptics/testing/fake_haptics_service:package",
+  "//src/media/audio/services/device_registry/testing:stub_adr_pkg",
+  "//src/power/broker:package",
+  "//src/power/system-activity-governor:config-no-suspender",
+  "//src/power/system-activity-governor:config-use-suspender",
+  "//src/power/system-activity-governor:package",
   "//src/starnix/kernel:starnix_kernel_package",
   "//src/starnix/runner:starnix_package",
   "//src/starnix/tests:netstack_package",
   "//src/storage/fxfs/test-fxfs:test-fxfs-package",
-  "//src/connectivity/network/tun/network-tun",
-  "//src/media/audio/services/device_registry/testing:stub_adr_pkg",
-  "//src/power/testing/fake-hrtimer:package",
-  "//src/power/broker:package",
-  "//src/power/system-activity-governor:package",
-  "//src/power/system-activity-governor:config-no-suspender",
-  "//src/power/system-activity-governor:config-use-suspender",
+  "//src/sys/time/testing/fake-hrtimer:pkg",
   "//src/sys/time/testing/wake-alarms:pkg",
 ]

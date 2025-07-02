@@ -40,7 +40,7 @@ use std::ops::Deref;
 use std::pin::Pin;
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
-use zx::HandleBased;
+use zx::{AsHandleRef, HandleBased};
 
 /// Counter for map identifiers.
 static MAP_IDS: AtomicU32 = AtomicU32::new(1);
@@ -127,6 +127,20 @@ impl MapReference for PinnedMap {
 // Avoid allocation for eBPF keys smaller than 16 bytes.
 pub type MapKey = smallvec::SmallVec<[u8; 16]>;
 
+// Access rights required for a map VMO handle. Should be consistent with the
+// rights specified in FIDL. READ, WRITE and MAP rights are required to access
+// the map contents. SIGNAL and WAIT rights are used for synchronization.
+// LINT.IfChange
+const BASE_MAP_RIGHTS: zx::Rights = zx::Rights::READ
+    .union(zx::Rights::WRITE)
+    .union(zx::Rights::MAP)
+    .union(zx::Rights::SIGNAL)
+    .union(zx::Rights::WAIT);
+// LINT.ThenChange(//sdk/fidl/fuchsia.ebpf/ebpf.fidl)
+
+// Rights for the VMO handle when sharing a map.
+const SHARED_MAP_RIGHTS: zx::Rights = BASE_MAP_RIGHTS.union(zx::Rights::TRANSFER);
+
 impl Map {
     pub fn new(schema: MapSchema, flags: u32) -> Result<PinnedMap, MapError> {
         let map_impl = create_map_impl(&schema, None)?;
@@ -137,6 +151,12 @@ impl Map {
         let febpf::Map { schema: Some(fidl_schema), vmo: Some(vmo), .. } = shared else {
             return Err(MapError::InvalidParam);
         };
+
+        // Check VMO rights.
+        let vmo_info = vmo.basic_info().map_err(|_| MapError::InvalidVmo)?;
+        if !vmo_info.rights.contains(BASE_MAP_RIGHTS) {
+            return Err(MapError::InvalidVmo);
+        }
 
         let schema = MapSchema {
             map_type: fidl_map_type_to_bpf_map_type(fidl_schema.type_),
@@ -160,7 +180,7 @@ impl Map {
             vmo: Some(
                 self.map_impl
                     .vmo()
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)
+                    .duplicate_handle(SHARED_MAP_RIGHTS)
                     .map_err(|_| MapError::Internal)?,
             ),
             ..Default::default()

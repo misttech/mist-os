@@ -6928,6 +6928,11 @@ where
 #[derive(Debug)]
 pub struct OnlyHlcpp;
 
+impl ::fidl_next::Service for OnlyHlcpp {
+    const SERVICE_NAME: &'static str = "test.bindingsdenylist.OnlyHlcpp";
+    const MEMBER_NAMES: &'static [&'static str] = &[];
+}
+
 /// A helper trait for instances of the `OnlyHlcpp` service.
 pub trait OnlyHlcppInstance {
     /// The error type for the instance.

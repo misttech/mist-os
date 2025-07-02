@@ -265,7 +265,7 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
 
     #[fuchsia::test]
-    fn test_reparent_from_state() {
+    async fn test_reparent_from_state() {
         let insp = Inspector::default();
         let root = insp.root();
         let a = root.create_child("a");

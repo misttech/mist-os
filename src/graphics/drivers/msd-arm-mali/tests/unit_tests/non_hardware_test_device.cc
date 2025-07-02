@@ -425,15 +425,15 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void Inspect() {
-    auto driver = MsdArmDriver::Create();
+    auto driver = MsdArmDriver::MsdCreate();
     auto parent = std::make_unique<FakeParentDevice>();
     auto device = driver->CreateDeviceForTesting(parent.get(), std::make_unique<MockBusMapper>());
     ASSERT_TRUE(device);
 
     constexpr uint64_t kClientId = 123456;
-    auto connection = device->Open(kClientId);
+    auto connection = device->MsdOpen(kClientId);
     ASSERT_TRUE(connection);
-    auto hierarchy = inspect::ReadFromVmo(driver->DuplicateInspector()->DuplicateVmo());
+    auto hierarchy = inspect::ReadFromVmo(driver->MsdDuplicateInspector()->DuplicateVmo());
     auto* dev_node = hierarchy.value().GetByPath({"msd-arm-mali", "device"});
     ASSERT_TRUE(dev_node);
     const auto& children = dev_node->children();
@@ -452,11 +452,11 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void MaliProtocol() {
-    auto driver = MsdArmDriver::Create();
+    auto driver = MsdArmDriver::MsdCreate();
     auto parent = std::make_unique<FakeParentDevice>();
     auto device = driver->CreateDeviceForTesting(parent.get(), std::make_unique<MockBusMapper>());
     ASSERT_TRUE(device);
-    EXPECT_FALSE(device->IsProtectedModeSupported());
+    EXPECT_FALSE(device->NdtIsProtectedModeSupported());
 
     ArmMaliServer server;
     libsync::Completion server_completion;
@@ -468,14 +468,14 @@ class TestNonHardwareMsdArmDevice {
         std::make_unique<FakeParentDeviceWithProtocol>(dispatcher->get(), &server);
     device = driver->CreateDeviceForTesting(parent_with_protocol.get(),
                                             std::make_unique<MockBusMapper>());
-    EXPECT_TRUE(device->IsProtectedModeSupported());
+    EXPECT_TRUE(device->NdtIsProtectedModeSupported());
     dispatcher->ShutdownAsync();
     server_completion.Wait();
     device.reset();
   }
 
   void ResetOnStart() {
-    auto driver = MsdArmDriver::Create();
+    auto driver = MsdArmDriver::MsdCreate();
     auto parent = std::make_unique<FakeParentDevice>();
     auto device = driver->CreateDeviceForTesting(parent.get(), std::make_unique<MockBusMapper>());
     ASSERT_TRUE(device);
@@ -485,7 +485,7 @@ class TestNonHardwareMsdArmDevice {
   }
 
   void ProtectedCallbacks() {
-    auto driver = MsdArmDriver::Create();
+    auto driver = MsdArmDriver::MsdCreate();
     ArmMaliServer server;
     server.use_protected_mode_callbacks_ = true;
     libsync::Completion server_completion;
@@ -498,7 +498,7 @@ class TestNonHardwareMsdArmDevice {
     auto device = driver->CreateDeviceForTesting(parent_with_protocol.get(),
                                                  std::make_unique<MockBusMapper>());
     ASSERT_TRUE(device);
-    EXPECT_TRUE(device->IsProtectedModeSupported());
+    EXPECT_TRUE(device->NdtIsProtectedModeSupported());
     EXPECT_TRUE(server.got_start_exit_protected_mode_);
     EXPECT_TRUE(device->exiting_protected_mode_flag_);
     device->HandleResetInterrupt();
@@ -513,7 +513,7 @@ class TestNonHardwareMsdArmDevice {
   void DevicePropertiesQuery() {
     auto [device, parent] = MakeTestDevice();
     uint32_t handle;
-    auto result = device->QueryReturnsBuffer(kMsdArmVendorQueryDeviceProperties, &handle);
+    auto result = device->NdtQueryReturnsBuffer(kMsdArmVendorQueryDeviceProperties, &handle);
     EXPECT_EQ(MAGMA_STATUS_OK, result);
 
     zx::vmo vmo(handle);

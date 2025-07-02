@@ -20,8 +20,8 @@ using std::invoke;
 #else  // Provide invoke() polyfill
 
 template <typename F, typename... Args>
-constexpr cpp17::invoke_result_t<F, Args...> invoke(F&& f, Args&&... args) noexcept(
-    cpp17::is_nothrow_invocable_v<F, Args...>) {
+constexpr std::invoke_result_t<F, Args...> invoke(F&& f, Args&&... args) noexcept(
+    std::is_nothrow_invocable_v<F, Args...>) {
   return ::cpp17::internal::invoke(std::forward<F>(f), std::forward<Args>(args)...);
 }
 
@@ -37,9 +37,9 @@ using std::bind_front;
 
 template <typename F, typename... Args>
 constexpr ::cpp20::internal::front_binder_t<F, Args...> bind_front(F&& f, Args&&... args) noexcept(
-    cpp17::is_nothrow_constructible_v<::cpp20::internal::front_binder_t<F, Args...>,
-                                      cpp17::in_place_t, F, Args...>) {
-  return ::cpp20::internal::front_binder_t<F, Args...>(cpp17::in_place, std::forward<F>(f),
+    std::is_nothrow_constructible_v<::cpp20::internal::front_binder_t<F, Args...>, std::in_place_t,
+                                    F, Args...>) {
+  return ::cpp20::internal::front_binder_t<F, Args...>(std::in_place, std::forward<F>(f),
                                                        std::forward<Args>(args)...);
 }
 

@@ -12,6 +12,10 @@
             url: "fuchsia-pkg://fuchsia.com/forensics#meta/feedback.cm",
             startup: "eager",
         },
+        {
+            name: "feedback-config",
+            url: "fuchsia-pkg://fuchsia.com/feedback-config#meta/feedback-config.cm",
+        },
     ],
     offer: [
         {
@@ -114,6 +118,12 @@
                 "#feedback",
             ],
             subdir: "forensics",
+        },
+        {
+            directory: "feedback-config",
+            from: "#feedback-config",
+            to: [ "#feedback" ],
+            rights: [ "r*" ],
         },
         {
             directory: "build-info",

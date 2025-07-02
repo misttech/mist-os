@@ -173,11 +173,9 @@ void ScreenCapture::GetNextFrame(
 
   const auto& rotated_rects = RotateRenderables(rects, stream_rotation_, image_width, image_height);
 
-  std::vector<zx::event> events;
-  events.emplace_back(args.event()->release());
-
   // Render content into user-provided buffer, which will signal the user-provided event.
-  renderer_->Render(metadata, rotated_rects, image_metadatas, events);
+  std::span release_fences(&args.event().value(), 1);
+  renderer_->Render(metadata, rotated_rects, image_metadatas, {.release_fences = release_fences});
 
   FrameInfo frame_info;
   frame_info.buffer_id(buffer_id);

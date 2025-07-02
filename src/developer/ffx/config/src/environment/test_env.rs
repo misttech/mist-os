@@ -7,14 +7,14 @@ use crate::nested::nested_set;
 use crate::{ConfigMap, Environment, EnvironmentContext};
 use anyhow::{Context, Result};
 use serde_json::Value;
-use std::cell::Cell;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tempfile::{NamedTempFile, TempDir};
-use tracing::level_filters::LevelFilter;
 
 use super::{EnvVars, EnvironmentKind, ExecutableKind};
+
+static LOG_INIT: std::sync::Once = std::sync::Once::new();
 
 /// A structure that holds information about the test config environment for the duration
 /// of a test. This object must continue to exist for the duration of the test, or the test
@@ -27,7 +27,6 @@ pub struct TestEnv {
     pub user_file: NamedTempFile,
     pub build_file: Option<NamedTempFile>,
     pub global_file: NamedTempFile,
-    pub log_subscriber: Arc<dyn tracing::Subscriber + Send + Sync>,
     _guard: async_lock::MutexGuardArc<()>,
 }
 
@@ -88,25 +87,19 @@ impl TestEnv {
         let build_file =
             context.build_dir().and(Some(NamedTempFile::new().context("tmp access failed")?));
 
-        let log_subscriber: Arc<dyn tracing::Subscriber + Send + Sync> =
-            Arc::new(crate::logging::configure_subscribers(
+        LOG_INIT.call_once(|| {
+            let logging = crate::logging::build_logger_with_destinations(
                 &context,
                 vec![LogDestination::TestWriter],
-                LevelFilter::DEBUG,
-            ));
+            );
+            let logger = Box::new(logging.unwrap());
 
-        // Dropping the subscriber guard causes test flakes as the tracing library panics when
-        // closing an instrumentation span on a different subscriber.
-        // To mitigate this, only drop the guards at thread exit.
-        // See https://github.com/tokio-rs/tracing/issues/1656 for more details.
-        let log_guard = tracing::subscriber::set_default(Arc::clone(&log_subscriber));
-
-        thread_local! {
-            static GUARD_STASH: Cell<Option<tracing::subscriber::DefaultGuard>> =
-                const { Cell::new(None) };
-        }
-
-        GUARD_STASH.with(move |guard| guard.set(Some(log_guard)));
+            let res =
+                log::set_boxed_logger(logger).map(|()| log::set_max_level(log::LevelFilter::Trace));
+            if res.is_err() {
+                log::warn!("build_test_env: Logging already initialized");
+            }
+        });
 
         let test_env = TestEnv {
             env_file,
@@ -115,7 +108,6 @@ impl TestEnv {
             build_file,
             global_file,
             isolate_root,
-            log_subscriber,
             _guard: guard,
         };
 

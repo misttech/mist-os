@@ -170,9 +170,9 @@ TEST(BindFrontTest, BindMoveOnly) {
   auto call_with_ptr = cpp20::bind_front(deref, std::move(ptr));
   auto test_if_movable = std::move(call_with_ptr);
 
-  static_assert(cpp17::is_copy_constructible_v<decltype(ptr)> == false, "");
-  static_assert(cpp17::is_copy_constructible_v<decltype(call_with_ptr)> == false, "");
-  static_assert(cpp17::is_copy_constructible_v<decltype(test_if_movable)> == false, "");
+  static_assert(std::is_copy_constructible_v<decltype(ptr)> == false, "");
+  static_assert(std::is_copy_constructible_v<decltype(call_with_ptr)> == false, "");
+  static_assert(std::is_copy_constructible_v<decltype(test_if_movable)> == false, "");
 
   EXPECT_EQ(test_if_movable(), 3);
 }

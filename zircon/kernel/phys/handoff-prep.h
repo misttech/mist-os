@@ -23,6 +23,7 @@
 #include <ktl/span.h>
 #include <ktl/tuple.h>
 #include <ktl/utility.h>
+#include <phys/elf-image.h>
 #include <phys/handoff-ptr.h>
 #include <phys/handoff.h>
 #include <phys/kernel-package.h>
@@ -38,40 +39,47 @@ class Log;
 
 class HandoffPrep {
  public:
-  // This must be called first.
-  void Init();
+  explicit HandoffPrep(ElfImage kernel);
 
-  // This is the main structure.  After Init has been called the pointer is
-  // valid but the data is in default-constructed state.
+  // This is the main structure.
   PhysHandoff* handoff() { return handoff_; }
 
   // This returns new T(args...) using the temporary handoff allocator and
   // fills in the handoff_ptr to point to it.
-  template <typename T, typename... Args>
-  T* New(PhysHandoffTemporaryPtr<const T>& handoff_ptr, fbl::AllocChecker& ac, Args&&... args) {
-    T* ptr = new (temporary_allocator_, ac) T(ktl::forward<Args>(args)...);
+  template <typename T, PhysHandoffPtrLifetime Lifetime, typename... Args>
+  T* New(PhysHandoffPtr<const T, Lifetime>& handoff_ptr, fbl::AllocChecker& ac, Args&&... args) {
+    T* ptr;
+    if constexpr (Lifetime == PhysHandoffPtrLifetime::Temporary) {
+      ptr = new (temporary_data_allocator_, ac) T(ktl::forward<Args>(args)...);
+    } else {
+      ptr = new (permanent_data_allocator_, ac) T(ktl::forward<Args>(args)...);
+    }
     if (ptr) {
-      void* generic_ptr = static_cast<void*>(ptr);
-      handoff_ptr.ptr_ = reinterpret_cast<uintptr_t>(generic_ptr);
+      handoff_ptr.ptr_ = ptr;
     }
     return ptr;
   }
 
   // Similar but for new T[n] using spans instead of pointers.
-  template <typename T>
-  ktl::span<T> New(PhysHandoffTemporarySpan<const T>& handoff_span, fbl::AllocChecker& ac,
+  template <typename T, PhysHandoffPtrLifetime Lifetime>
+  ktl::span<T> New(PhysHandoffSpan<const T, Lifetime>& handoff_span, fbl::AllocChecker& ac,
                    size_t n) {
-    T* ptr = new (temporary_allocator_, ac) T[n];
+    T* ptr;
+    if constexpr (Lifetime == PhysHandoffPtrLifetime::Temporary) {
+      ptr = new (temporary_data_allocator_, ac) T[n];
+    } else {
+      ptr = new (permanent_data_allocator_, ac) T[n];
+    }
     if (ptr) {
-      void* generic_ptr = static_cast<void*>(ptr);
-      handoff_span.ptr_.ptr_ = reinterpret_cast<uintptr_t>(generic_ptr);
+      handoff_span.ptr_.ptr_ = ptr;
       handoff_span.size_ = n;
       return {ptr, n};
     }
     return {};
   }
 
-  ktl::string_view New(PhysHandoffTemporaryString& handoff_string, fbl::AllocChecker& ac,
+  template <PhysHandoffPtrLifetime Lifetime>
+  ktl::string_view New(PhysHandoffString<Lifetime>& handoff_string, fbl::AllocChecker& ac,
                        ktl::string_view str) {
     ktl::span chars = New(handoff_string, ac, str.size());
     if (chars.empty()) {
@@ -85,9 +93,8 @@ class HandoffPrep {
   // `boot` to transfer control to the kernel entry point with the handoff()
   // pointer as its argument. The `boot` function should do nothing but hand
   // off to the kernel; in particular, state has already been captured from
-  // `uart` so no additional printing should be done at this stage.  Init()
-  // must have been called first.
-  [[noreturn]] void DoHandoff(const ElfImage& kernel, UartDriver& uart, ktl::span<ktl::byte> zbi,
+  // `uart` so no additional printing should be done at this stage.
+  [[noreturn]] void DoHandoff(UartDriver& uart, ktl::span<ktl::byte> zbi,
                               const KernelStorage::Bootfs& kernel_package,
                               const ArchPatchInfo& patch_info);
 
@@ -125,10 +132,56 @@ class HandoffPrep {
   using HandoffMapping = HandoffVmObject<PhysMapping>;
   using HandoffMappingList = HandoffVmObjectList<PhysMapping>;
 
+  // Defined in handoff-prep-vm.cc.
+  class VirtualAddressAllocator {
+   public:
+    enum class Strategy : bool { kDown, kUp };
+
+    // The allocator for temporary hand-off data.
+    static VirtualAddressAllocator TemporaryHandoffDataAllocator(const ElfImage& kernel);
+
+    // The allocator for permanent hand-off data.
+    static VirtualAddressAllocator PermanentHandoffDataAllocator(const ElfImage& kernel);
+
+    // The allocator for first-class hand-off mappings (i.e., for important,
+    // one-off things, likely to be packaged in their own VMARs).
+    static VirtualAddressAllocator FirstClassMappingAllocator(const ElfImage& kernel);
+
+    VirtualAddressAllocator(uintptr_t start, Strategy strategy,
+                            ktl::optional<uintptr_t> boundary = ktl::nullopt)
+        : start_{start}, strategy_{strategy}, boundary_{boundary} {
+      if (boundary) {
+        switch (strategy) {
+          case Strategy::kDown:
+            ZX_DEBUG_ASSERT(start >= *boundary);
+            break;
+          case Strategy::kUp:
+            ZX_DEBUG_ASSERT(start <= *boundary);
+            break;
+        }
+      }
+    }
+
+    uintptr_t AllocatePages(size_t size);
+
+   private:
+    uintptr_t start_;
+    Strategy strategy_;
+    ktl::optional<uintptr_t> boundary_;
+  };
+
   template <memalloc::Type Type>
   class PhysPages {
    public:
-    using Capability = Allocation;
+    struct Capability {
+      Allocation phys;
+      void* virt;
+    };
+
+    template <typename... Args>
+    explicit PhysPages(Args&&... args) : va_allocator_(ktl::forward<Args>(args)...) {}
+
+    HandoffMappingList&& TakeMappings() { return ktl::move(mappings_); }
 
     size_t page_size() const { return ZX_PAGE_SIZE; }
 
@@ -138,22 +191,43 @@ class HandoffPrep {
       if (!ac.check()) {
         return {};
       }
-      return {pages.get(), ktl::move(pages)};
+
+      const char* mapping_name;
+      if constexpr (Type == memalloc::Type::kTemporaryPhysHandoff) {
+        mapping_name = "temporary hand-off data";
+      } else {
+        static_assert(Type == memalloc::Type::kPermanentPhysHandoff);
+        mapping_name = "permanent hand-off data";
+      }
+
+      uintptr_t vaddr = va_allocator_.AllocatePages(size);
+      uintptr_t paddr = reinterpret_cast<uintptr_t>(pages.get());
+      PhysMapping mapping(mapping_name, PhysMapping::Type::kNormal, vaddr, size, paddr,
+                          PhysMapping::Permissions::Rw());
+      void* ptr = CreateMapping(mapping);
+      mappings_.push_front(HandoffMapping::New(ktl::move(mapping)));
+
+      return {ptr, Capability{ktl::move(pages), ptr}};
     }
 
     void Deallocate(Capability allocation, void* ptr, size_t size) {
-      ZX_DEBUG_ASSERT(ptr == allocation.get());
-      ZX_DEBUG_ASSERT(size == allocation.size_bytes());
-      allocation.reset();
+      ZX_DEBUG_ASSERT(ptr == allocation.virt);
+      ZX_DEBUG_ASSERT(size == allocation.phys.size_bytes());
+      // Note: `allocation.phys` will free itself when it goes out of scope
+      // on returning.
     }
 
     void Release(Capability allocation, void* ptr, size_t size) {
-      ZX_DEBUG_ASSERT(ptr == allocation.get());
-      ZX_DEBUG_ASSERT(size == allocation.size_bytes());
-      ktl::ignore = allocation.release();
+      ZX_DEBUG_ASSERT(ptr == allocation.virt);
+      ZX_DEBUG_ASSERT(size == allocation.phys.size_bytes());
+      ktl::ignore = allocation.phys.release();
     }
 
     void Seal(Capability, void*, size_t) { ZX_PANIC("Unexpected call to Seal::Capability"); }
+
+   private:
+    VirtualAddressAllocator va_allocator_;
+    HandoffMappingList mappings_;
   };
 
   template <memalloc::Type Type>
@@ -162,10 +236,8 @@ class HandoffPrep {
   template <memalloc::Type Type>
   using Allocator = trivial_allocator::BasicLeakyAllocator<PageAllocationFunction<Type>>;
 
-  using TemporaryAllocator = Allocator<memalloc::Type::kTemporaryPhysHandoff>;
-
-  // TODO(https://fxbug.dev/42164859): kMmio too.
-  enum class MappingType { kNormal };
+  using TemporaryDataAllocator = Allocator<memalloc::Type::kTemporaryPhysHandoff>;
+  using PermanentDataAllocator = Allocator<memalloc::Type::kPermanentPhysHandoff>;
 
   // A convenience class for building up a PhysVmar.
   class PhysVmarPrep {
@@ -174,11 +246,12 @@ class HandoffPrep {
 
     // Creates the provided mapping and publishes it within the associated VMAR
     // being built up.
-    void PublishMapping(PhysMapping mapping, MappingType type) {
+    void* PublishMapping(PhysMapping mapping) {
       ZX_DEBUG_ASSERT(vmar_.base <= mapping.vaddr);
       ZX_DEBUG_ASSERT(mapping.vaddr_end() <= vmar_.end());
-      CreateMapping(mapping, type);
+      void* addr = CreateMapping(mapping);
       mappings_.push_front(HandoffMapping::New(ktl::move(mapping)));
+      return addr;
     }
 
     // Publishes the PhysVmar in the hand-off.
@@ -206,15 +279,13 @@ class HandoffPrep {
     size_t size_bytes = 0;
   };
 
-  inline static TemporaryAllocator temporary_allocator_;
-
   // Constructs a PhysVmo from the provided information, enforcing that `data`
   // is page-aligned and that page-rounding `content_size` up yields
   // `data.size_bytes()`.
   static PhysVmo MakePhysVmo(ktl::span<const ktl::byte> data, ktl::string_view name,
                              size_t content_size);
 
-  static void CreateMapping(const PhysMapping& mapping, MappingType type);
+  static void* CreateMapping(const PhysMapping& mapping);
 
   // Packs a list of pending VM objects into a single hand-off span in sorted
   // order.
@@ -275,8 +346,9 @@ class HandoffPrep {
     return prep;
   }
 
-  // Publishes a PhysVmar with a single mapping covering its extent.
-  void PublishSingleMappingVmar(PhysMapping mapping, MappingType type);
+  // Publishes a PhysVmar with a single mapping covering its extent, returning
+  // its mapped virtual address.
+  void* PublishSingleMappingVmar(PhysMapping mapping);
 
   // This constructs a PhysElfImage from an ELF file in the KernelStorage.
   PhysElfImage MakePhysElfImage(KernelStorage::Bootfs::iterator file, ktl::string_view name);
@@ -291,9 +363,13 @@ class HandoffPrep {
   // This must be the very last set-up routine called within DoHandoff().
   void SetMemory();
 
-  void ConstructKernelAddressSpace(const ElfImage& kernel);
+  void ConstructKernelAddressSpace(const UartDriver& uart);
 
+  const ElfImage kernel_;
   PhysHandoff* handoff_ = nullptr;
+  TemporaryDataAllocator temporary_data_allocator_;
+  PermanentDataAllocator permanent_data_allocator_;
+  VirtualAddressAllocator first_class_mapping_allocator_;
   zbitl::Image<Allocation> mexec_image_;
   HandoffVmarList vmars_;
   HandoffVmoList extra_vmos_;

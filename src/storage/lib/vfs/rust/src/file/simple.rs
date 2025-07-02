@@ -103,11 +103,6 @@ impl File for SimpleFile {
         Ok(self.data.len().try_into().unwrap())
     }
 
-    #[cfg(target_os = "fuchsia")]
-    async fn get_backing_memory(&self, _flags: fio::VmoFlags) -> Result<fidl::Vmo, Status> {
-        Err(Status::NOT_SUPPORTED)
-    }
-
     async fn update_attributes(
         &self,
         _attributes: fio::MutableNodeAttributes,

@@ -31,7 +31,7 @@ use starnix_uapi::{ashmem_pin, device_type, errno, error, off_t, uapi, ASHMEM_NA
 use std::sync::Arc;
 
 /// Initializes the ashmem device.
-pub fn ashmem_device_init(locked: &mut Locked<'_, Unlocked>, system_task: &CurrentTask) {
+pub fn ashmem_device_init(locked: &mut Locked<Unlocked>, system_task: &CurrentTask) {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
@@ -67,7 +67,7 @@ impl AshmemDevice {
 impl DeviceOps for AshmemDevice {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         _current_task: &CurrentTask,
         _id: device_type::DeviceType,
         _node: &FsNode,
@@ -109,7 +109,7 @@ impl FileOps for Ashmem {
 
     fn seek(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
@@ -119,14 +119,12 @@ impl FileOps for Ashmem {
             return error!(EBADF);
         }
         let eof_offset = self.state.lock().size;
-        default_seek(current_offset, target, |offset| {
-            offset.checked_add(eof_offset.try_into().unwrap()).ok_or_else(|| errno!(EINVAL))
-        })
+        default_seek(current_offset, target, || Ok(eof_offset.try_into().unwrap()))
     }
 
     fn read(
         &self,
-        _locked: &mut starnix_sync::Locked<'_, FileOpsCore>,
+        _locked: &mut starnix_sync::Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -152,7 +150,7 @@ impl FileOps for Ashmem {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -163,7 +161,7 @@ impl FileOps for Ashmem {
 
     fn mmap(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,
@@ -215,7 +213,7 @@ impl FileOps for Ashmem {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

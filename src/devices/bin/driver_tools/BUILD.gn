@@ -14,15 +14,6 @@ group("tests") {
   ]
 }
 
-_host_or_test = [
-  "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_rust",
-  "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_rust",
-  "//sdk/lib/device-watcher/rust",
-  "//src/lib/fuchsia-async",
-  "//src/lib/fuchsia-fs",
-  "//third_party/rust_crates:log",
-]
-
 rustc_library("lib") {
   edition = "2021"
   name = "driver_tools"
@@ -31,63 +22,35 @@ rustc_library("lib") {
     "common:lib",
     "connector:lib",
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_rust",
-    "//sdk/fidl/fuchsia.device:fuchsia.device_rust",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_rust",
     "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_rust",
     "//sdk/rust/zx-status",
     "//src/devices/lib/bind",
     "//src/lib/fidl/rust/fidl",
+    "//third_party/rust_crates:ansi_term",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:itertools",
+    "//third_party/rust_crates:prettytable-rs",
+    "//third_party/rust_crates:termion",
   ]
   if (is_host) {
-    deps +=
-        [
-          "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground_rust",
-          "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_rust",
-          "//src/developer/ffx/lib/errors:lib",
-          "//src/devices/lib/driver-conformance:lib",
-          "//src/devices/lib/driver-static-checks:lib",
-          "//src/devices/pci/bin/lspci:lib",
-          "//src/devices/usb/bin/lsusb:lib",
-          "//src/lib/fuchsia-fs",
-          "//third_party/rust_crates:blocking",
-          "//third_party/rust_crates:zstd",
-          "//third_party/zstd",
-        ] + _host_or_test
+    deps += [ "//src/devices/lib/driver-static-checks:lib" ]
   }
   test_deps = [
-                "//sdk/fidl/fuchsia.input:fuchsia.input_rust",
-                "//src/lib/fuchsia",
-                "//src/lib/fuchsia-async",
-                "//src/lib/fuchsia-component",
-              ] + _host_or_test
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-async",
+  ]
   sources = [
     "src/args.rs",
     "src/common.rs",
     "src/lib.rs",
-    "src/subcommands/device/args.rs",
-    "src/subcommands/device/mod.rs",
     "src/subcommands/disable/args.rs",
     "src/subcommands/disable/mod.rs",
     "src/subcommands/dump/args.rs",
     "src/subcommands/dump/mod.rs",
-    "src/subcommands/i2c/args.rs",
-    "src/subcommands/i2c/mod.rs",
-    "src/subcommands/i2c/subcommands/mod.rs",
-    "src/subcommands/i2c/subcommands/ping/args.rs",
-    "src/subcommands/i2c/subcommands/ping/mod.rs",
-    "src/subcommands/i2c/subcommands/read/args.rs",
-    "src/subcommands/i2c/subcommands/read/mod.rs",
-    "src/subcommands/i2c/subcommands/transact/args.rs",
-    "src/subcommands/i2c/subcommands/transact/mod.rs",
-    "src/subcommands/i2c/subcommands/write/args.rs",
-    "src/subcommands/i2c/subcommands/write/mod.rs",
     "src/subcommands/list/args.rs",
     "src/subcommands/list/mod.rs",
     "src/subcommands/list_composite_node_specs/args.rs",
@@ -99,17 +62,20 @@ rustc_library("lib") {
     "src/subcommands/list_hosts/args.rs",
     "src/subcommands/list_hosts/mod.rs",
     "src/subcommands/mod.rs",
-    "src/subcommands/print_input_report/args.rs",
-    "src/subcommands/print_input_report/mod.rs",
-    "src/subcommands/print_input_report/subcommands/descriptor/args.rs",
-    "src/subcommands/print_input_report/subcommands/descriptor/mod.rs",
-    "src/subcommands/print_input_report/subcommands/feature/args.rs",
-    "src/subcommands/print_input_report/subcommands/feature/mod.rs",
-    "src/subcommands/print_input_report/subcommands/get/args.rs",
-    "src/subcommands/print_input_report/subcommands/get/mod.rs",
-    "src/subcommands/print_input_report/subcommands/mod.rs",
-    "src/subcommands/print_input_report/subcommands/read/args.rs",
-    "src/subcommands/print_input_report/subcommands/read/mod.rs",
+    "src/subcommands/node/args.rs",
+    "src/subcommands/node/common.rs",
+    "src/subcommands/node/mod.rs",
+    "src/subcommands/node/subcommands/add/args.rs",
+    "src/subcommands/node/subcommands/add/mod.rs",
+    "src/subcommands/node/subcommands/graph/args.rs",
+    "src/subcommands/node/subcommands/graph/mod.rs",
+    "src/subcommands/node/subcommands/list/args.rs",
+    "src/subcommands/node/subcommands/list/mod.rs",
+    "src/subcommands/node/subcommands/mod.rs",
+    "src/subcommands/node/subcommands/remove/args.rs",
+    "src/subcommands/node/subcommands/remove/mod.rs",
+    "src/subcommands/node/subcommands/show/args.rs",
+    "src/subcommands/node/subcommands/show/mod.rs",
     "src/subcommands/register/args.rs",
     "src/subcommands/register/mod.rs",
     "src/subcommands/restart/args.rs",
@@ -122,18 +88,7 @@ rustc_library("lib") {
     "src/subcommands/test_node/subcommands/remove/args.rs",
     "src/subcommands/test_node/subcommands/remove/mod.rs",
   ]
-  if (is_host) {
-    sources += [
-      "src/subcommands/lspci/args.rs",
-      "src/subcommands/lspci/mod.rs",
-      "src/subcommands/lsusb/args.rs",
-      "src/subcommands/lsusb/mod.rs",
-      "src/subcommands/runtool/args.rs",
-      "src/subcommands/runtool/mod.rs",
-    ]
-  }
   inputs = [
-    "//third_party/pciids/pci.ids.zst",
     "tests/golden/list_composites_verbose",
     "tests/golden/list_composites_verbose_empty_fields",
   ]
@@ -152,13 +107,10 @@ rustc_binary("driver_tools") {
     ":lib",
     "connector:lib",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
-    "//sdk/fidl/fuchsia.driver.playground:fuchsia.driver.playground_rust",
     "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_rust",
-    "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_rust",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-fs",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-trait",

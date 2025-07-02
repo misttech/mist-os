@@ -1,10 +1,19 @@
 #ifndef ZIRCON_THIRD_PARTY_ULIB_MUSL_SRC_INTERNAL_STDIO_IMPL_H_
 #define ZIRCON_THIRD_PARTY_ULIB_MUSL_SRC_INTERNAL_STDIO_IMPL_H_
 
-#include <stdatomic.h>
 #include <stdio.h>
 
 #include "libc.h"
+
+#ifdef __cplusplus
+#include <atomic>
+using std::atomic_int;
+
+extern "C" {
+
+#else
+#include <stdatomic.h>
+#endif
 
 #define UNGET 8
 
@@ -70,9 +79,8 @@ zx_status_t _mmap_on_mapped(void* context, void* ptr);
 #if defined(__PIC__) && (100 * __GNUC__ + __GNUC_MINOR__ >= 303)
 __attribute__((visibility("protected")))
 #endif
-int
-__overflow(FILE *, int),
-    __uflow(FILE *);
+int __overflow(FILE*, int),
+    __uflow(FILE*);
 
 int __fseeko(FILE*, off_t, int) ATTR_LIBC_VISIBILITY;
 int __fseeko_unlocked(FILE*, off_t, int) ATTR_LIBC_VISIBILITY;
@@ -102,5 +110,9 @@ void __stdio_exit(void) ATTR_LIBC_VISIBILITY;
 /* Caller-allocated FILE * operations */
 FILE* __fopen_rb_ca(const char*, FILE*, unsigned char*, size_t) ATTR_LIBC_VISIBILITY;
 int __fclose_ca(FILE*) ATTR_LIBC_VISIBILITY;
+
+#ifdef __cplusplus
+}  // extern "C"
+#endif
 
 #endif  // ZIRCON_THIRD_PARTY_ULIB_MUSL_SRC_INTERNAL_STDIO_IMPL_H_

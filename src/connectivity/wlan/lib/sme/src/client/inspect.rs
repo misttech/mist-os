@@ -523,8 +523,8 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_inspect::Inspector;
 
-    #[test]
-    fn test_inspect_update_pulse_connect_disconnect() {
+    #[fuchsia::test]
+    async fn test_inspect_update_pulse_connect_disconnect() {
         let inspector = Inspector::default();
         let root = inspector.root();
         let mut pulse = PulseNode::new(root.create_child("last_pulse"));
@@ -595,8 +595,8 @@ mod tests {
         });
     }
 
-    #[test]
-    fn test_inspect_update_pulse_wmm_status_changed() {
+    #[fuchsia::test]
+    async fn test_inspect_update_pulse_wmm_status_changed() {
         let inspector = Inspector::default();
         let root = inspector.root();
         let mut pulse = PulseNode::new(root.create_child("last_pulse"));

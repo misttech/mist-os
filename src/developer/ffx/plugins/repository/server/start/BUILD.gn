@@ -25,7 +25,6 @@ ffx_plugin("ffx_repository_server_start") {
   ]
 
   deps = [
-    "//build/sdk/meta:rust",
     "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
     "//sdk/fidl/fuchsia.pkg:fuchsia.pkg_rust",
     "//sdk/fidl/fuchsia.pkg.rewrite:fuchsia.pkg.rewrite_rust",
@@ -41,8 +40,10 @@ ffx_plugin("ffx_repository_server_start") {
     "//src/developer/ffx/lib/target/connector:lib",
     "//src/developer/ffx/lib/target/holders:lib",
     "//src/developer/ffx/lib/target_errors:lib",
+    "//src/developer/ffx/lib/target_net:lib",
     "//src/developer/ffx/lib/timeout:lib",
     "//src/developer/ffx/lib/writer:lib",
+    "//src/lib/assembly/product_bundle",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-url",
     "//src/sys/lib/fidl-fuchsia-pkg-ext",
@@ -63,10 +64,12 @@ ffx_plugin("ffx_repository_server_start") {
   ]
   test_deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
+    "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//src/developer/ffx/config:lib",
     "//src/developer/ffx/lib/pkg:empty-repo-keys",
     "//src/developer/ffx/lib/pkg:empty-repo-metadata",
     "//src/developer/ffx/lib/target:lib",
+    "//src/developer/ffx/lib/target_net:testutil",
     "//src/lib/assembly/partitions_config",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
@@ -76,6 +79,7 @@ ffx_plugin("ffx_repository_server_start") {
     "//third_party/rust_crates:camino",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tempfile",
+    "//third_party/rust_crates:test-case",
     "//third_party/rust_crates:url",
   ]
 }

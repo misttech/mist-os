@@ -7,6 +7,7 @@
 use assert_matches::assert_matches;
 use diagnostics_assertions::AnyUintProperty;
 use fidl::endpoints;
+use fidl::endpoints::Responder as _;
 use fidl_fuchsia_net_dhcp::{
     self as fnet_dhcp, ClientEvent, ClientExitReason, ClientMarker, ClientProviderMarker,
     NewClientParams,
@@ -26,7 +27,8 @@ use netstack_testing_macros::netstack_test;
 use std::pin::pin;
 use test_case::test_case;
 use {
-    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces as fnet_interfaces,
+    fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_netemul_network as fnetemul_network, fuchsia_async as fasync,
 };
 
@@ -457,6 +459,28 @@ async fn assert_client_shutdown(
     let ((), ()) = join!(asp_server_fut, client_fut);
 }
 
+async fn get_watch_address_assignment_state(
+    request_stream: &mut fnet_interfaces_admin::AddressStateProviderRequestStream,
+) -> fnet_interfaces_admin::AddressStateProviderWatchAddressAssignmentStateResponder {
+    assert_matches!(
+        request_stream.try_next().await.expect("should succeed").expect("should not have ended"),
+        fnet_interfaces_admin::AddressStateProviderRequest::WatchAddressAssignmentState {
+            responder
+        } => responder,
+        "client should watch address assignment state"
+    )
+}
+
+/// Pull a `WatchAddressAssignmentState` request out of the request stream.
+/// Don't respond, but also don't shutdown the responder. This mimics the server
+/// side of the protocol "stashing the request".
+async fn swallow_watch_address_assignment_state_request(
+    request_stream: &mut fnet_interfaces_admin::AddressStateProviderRequestStream,
+) {
+    let responder = get_watch_address_assignment_state(request_stream).await;
+    responder.drop_without_shutdown();
+}
+
 #[netstack_test]
 #[variant(N, Netstack)]
 async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &str) {
@@ -491,7 +515,7 @@ async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &
     assert_eq!(dns_servers, Vec::new());
     assert_eq!(routers, Vec::new());
 
-    let fnet_dhcp_ext::Address { address, address_parameters: _, address_state_provider } =
+    let fnet_dhcp_ext::Address { address, address_parameters, address_state_provider } =
         address.expect("address should be present in response");
     assert_eq!(
         address,
@@ -503,7 +527,20 @@ async fn client_provider_watch_configuration_acquires_lease<N: Netstack>(name: &
             prefix_len: dhcpv4_helper::DEFAULT_TEST_ADDRESS_POOL_PREFIX_LENGTH.get(),
         }
     );
+    let fnet_interfaces_admin::AddressParameters {
+        add_subnet_route,
+        perform_dad,
+        temporary: _,
+        initial_properties: _,
+        __source_breaking,
+    } = address_parameters;
+    // DHCP addresses should be added with the corresponding subnet route.
+    assert_eq!(add_subnet_route, Some(true));
+    // DHCP addresses should have DAD performed before being assigned.
+    assert_eq!(perform_dad, Some(true));
 
+    let mut address_state_provider = address_state_provider.into_stream();
+    swallow_watch_address_assignment_state_request(&mut address_state_provider).await;
     assert_client_shutdown(client, address_state_provider).await;
 }
 
@@ -572,12 +609,22 @@ async fn client_explicitly_removes_address_when_lease_expires<N: Netstack>(name:
         .await
         .expect("should succeed");
 
+    // Inform the client that the address has become assigned. Otherwise it
+    // won't try to renew.
+    let mut request_stream = address_state_provider.into_stream();
+    let responder = get_watch_address_assignment_state(&mut request_stream).await;
+    responder
+        .send(fnet_interfaces::AddressAssignmentState::Assigned)
+        .expect("responding should succeed");
+    // Note: the client will have tried to watch the address assignment state
+    // again. We don't need to respond, but we can't drop the responder.
+    let _responder = get_watch_address_assignment_state(&mut request_stream).await;
+
     // Stop the DHCP server to prevent it from renewing the lease.
     test_realm.stop_dhcp_server(DhcpServerAddress::Primary).await;
 
     // The client should fail to renew and have the lease expire, causing it to
     // remove the address.
-    let request_stream = address_state_provider.into_stream();
     let mut request_stream = pin!(request_stream);
 
     let control_handle = assert_matches!(
@@ -672,6 +719,17 @@ async fn client_rebinds_same_lease_to_other_server<N: Netstack>(name: &str) {
         .await
         .expect("should succeed");
 
+    // Inform the client that the address has become assigned. Otherwise it
+    // won't try to renew.
+    let mut request_stream = address_state_provider.into_stream();
+    let responder = get_watch_address_assignment_state(&mut request_stream).await;
+    responder
+        .send(fnet_interfaces::AddressAssignmentState::Assigned)
+        .expect("responding should succeed");
+    // Note: the client will have tried to watch the address assignment state
+    // again. We don't need to respond, but we can't drop the responder.
+    let _responder = get_watch_address_assignment_state(&mut request_stream).await;
+
     // Switch the DHCP server to a different address so that the client can't
     // find it at the old one.
     test_realm
@@ -679,7 +737,6 @@ async fn client_rebinds_same_lease_to_other_server<N: Netstack>(name: &str) {
         .await;
 
     // The client should successfully renew without ever removing the address.
-    let mut request_stream = address_state_provider.into_stream();
     let mut watch_fut = pin!(config_stream.try_for_each(|_config| ready(Ok(()))).fuse());
 
     let mut renewal_fut = pin!({
@@ -949,6 +1006,8 @@ async fn client_handles_address_removal<N: Netstack>(
         }
     );
 
+    let mut address_state_provider = address_state_provider.into_stream();
+    swallow_watch_address_assignment_state_request(&mut address_state_provider).await;
     assert_client_shutdown(client, address_state_provider).await;
 }
 
@@ -1057,6 +1116,7 @@ async fn inspect_with_lease_acquired() {
                     },
                     Bound: {
                         Entered: 1u64,
+                        Assigned: 0u64,
                     },
                     Renewing: {
                         DuplicateOption: 0u64,
@@ -1118,7 +1178,7 @@ async fn inspect_with_lease_acquired() {
                 CurrentState: {
                     "Entered@time": AnyUintProperty,
                     State: {
-                        Kind: "Bound",
+                        Kind: "Bound and awaiting assignment",
                         IpAddressLeaseTimeSecs: 86400u64,
                         ServerIdentifier: "192.168.0.1",
                         "Start@time": AnyUintProperty,
@@ -1147,5 +1207,7 @@ async fn inspect_with_lease_acquired() {
         }
     });
 
+    let mut address_state_provider = address_state_provider.into_stream();
+    swallow_watch_address_assignment_state_request(&mut address_state_provider).await;
     assert_client_shutdown(client, address_state_provider).await;
 }

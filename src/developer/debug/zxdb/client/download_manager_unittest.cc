@@ -62,6 +62,11 @@ class DownloadManagerTest : public DownloadObserver, public RemoteAPITest {
     process_impl->OnModules(modules);
   }
 
+  void MakeServersUnreachable() {
+    mock_public_server_->ForceUnreachable();
+    mock_private_server_->ForceUnreachable();
+  }
+
  private:
   void SetUp() override {
     RemoteAPITest::SetUp();
@@ -316,6 +321,33 @@ TEST_F(DownloadManagerTest, SomeSucceedSomeFail) {
   ASSERT_NE(mod.get(), nullptr);
   EXPECT_STREQ(mod->GetStatus().name.c_str(), "deadbeef_mock.so");
   EXPECT_TRUE(mod->GetStatus().symbols_loaded);
+}
+
+// Download a buildid from a non-authenticated server.
+TEST_F(DownloadManagerTest, DownloadUnreachable) {
+  auto sym1 = fxl::MakeRefCounted<MockModuleSymbols>("abc123_mock.so");
+
+  // Mark all the symbol servers as unreachable, preventing them from being used
+  // for downloads.
+  MakeServersUnreachable();
+
+  std::map<std::string, std::pair<uint64_t, fxl::RefPtr<ModuleSymbols>>> module_map = {
+      {kPublicBuildId1, {0x1000, std::move(sym1)}},
+  };
+
+  // Inject the module to the process, but not the system.
+  InjectModulesToProcess(module_map);
+
+  // No downloads will be started, because all symbol servers are unreachable
+  EXPECT_FALSE(DownloadManager()->HasDownload(kPublicBuildId1));
+
+  loop().RunUntilNoTasks();  // loop().Run() will hang because OnDownloadsStopped() is never called
+
+  EXPECT_FALSE(DownloadManager()->HasDownload(kPublicBuildId1));
+
+  fxl::RefPtr<ModuleSymbols> mod;
+  session().system().GetSymbols()->GetModule("", "abc123_mock.so", false, &mod);
+  EXPECT_EQ(mod.get(), nullptr);
 }
 
 }  // namespace zxdb

@@ -130,7 +130,7 @@ constexpr void TlsModuleInit(const Module& module, std::span<std::byte> segment,
 // (which may be at the end of the span for x86 negative TLS offsets).
 template <class Elf, class AbiTraits>
 inline void TlsInitialExecDataInit(const typename abi::Abi<Elf, AbiTraits>& abi,
-                                   std::span<std::byte> block, ptrdiff_t tp_offset,
+                                   std::span<std::byte> block, size_t tp_offset,
                                    bool known_zero = false) {
   using size_type = typename Elf::size_type;
   for (size_t i = 0; i < abi.static_tls_modules.size(); ++i) {

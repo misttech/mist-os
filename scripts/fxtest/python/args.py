@@ -58,6 +58,7 @@ class Flags:
 
     dry: bool
     list: bool
+    list_runtime_deps: bool
     previous: PrevOption | None
 
     build: bool
@@ -271,6 +272,11 @@ def parse_args(
         "--list",
         action="store_true",
         help="Do not actually run tests. Instead print out the list of test cases each test contains.",
+    )
+    utility.add_argument(
+        "--list-runtime-deps",
+        action="store_true",
+        help="Do not actually run tests. Instead print out the contents of the `runtime_deps` for each test. This can be useful for debugging whether the correct artifacts are being uploaded to test runners",
     )
     utility.add_argument(
         "-pr",

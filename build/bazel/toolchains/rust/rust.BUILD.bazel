@@ -32,8 +32,8 @@ rust_toolchain(
     rust_doc = "//:bin/rustdoc",
     binary_ext = "",
     staticlib_ext = ".a",
-    dylib_ext = ".so",
-    stdlib_linkflags = ["-lpthread", "-ldl"],
+    dylib_ext = ".dylib" if host_os == "mac" else ".so",
+    stdlib_linkflags = ["-lpthread", "-ldl"] if host_os == "linux" else [],
     exec_triple = host_triple,  # e.g. "x86_64-unknown-linux-gnu",
     target_triple = host_triple,  # e.g. "x86_64-unknown-linux-gnu",
 )

@@ -42,10 +42,6 @@ void scanner_disable_page_table_reclaim();
 // return, otherwise it will wait for a new scan to complete.
 void scanner_wait_for_accessed_scan(zx_instant_mono_t update_time);
 
-// This is guaranteed to return live ActiveInactiveCounts from the page queue blocking until any
-// current accessed scan completes.
-PageQueues::ActiveInactiveCounts scanner_synchronized_active_inactive_counts();
-
 // AutoVmScannerDisable is an RAII helper for disabling scanning using the
 // scanner_push_disable_count()/scanner_pop_disable_count(). Disabling the scanner is useful in test
 // code where it is not possible or practical to hold locks to prevent the scanner from taking

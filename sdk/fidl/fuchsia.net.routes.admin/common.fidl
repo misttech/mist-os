@@ -21,6 +21,21 @@ type AuthenticateForInterfaceError = flexible enum {
     INVALID_AUTHENTICATION = 1;
 };
 
+/// Error type returned when failing to get a local route table for an interface.
+type GetInterfaceLocalTableError = flexible enum {
+    /// The provided
+    /// [`fuchsia.net.interfaces.admin/ProofOfinterfaceAuthorization`] was
+    /// invalid. This may happen if:
+    ///   - the provided proof's `interface_id' is unknown to the system,
+    ///   - the provided proof's `token` is unknown to the system, or
+    ///   - the provided proof`s `token` is not associated with the proof's
+    ///     `interface_id` (e.g., the `token` authenticates a different
+    ///     interface).
+    INVALID_AUTHENTICATION = 1;
+    /// The interface does not have a local route table.
+    NO_LOCAL_ROUTE_TABLE = 2;
+};
+
 /// Error type returned when failing to authenticate a route table for a
 /// rules set.
 type AuthenticateForRouteTableError = flexible enum {

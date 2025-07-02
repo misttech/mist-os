@@ -282,12 +282,11 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
   // FormatNodes can't accommodate non-string values here and text formatting complex structures is
   // done at a higher level (the "console" library) than this code. It also creates a formatting
   // problem as it's not clear how to present a complex nested struct as a "key".
-  cpp_.emplace_back(
-      InternalGlob("std::__2::map<*>"),
-      std::make_unique<PrettyGenericContainer>(
-          tree_before_emit + "$zxdb::AppendNameValueRow(\"\", cur_node.__value_.__cc_);\n" +
-              tree_after_emit,
-          tree_getter_list));
+  cpp_.emplace_back(InternalGlob("std::__2::map<*>"),
+                    std::make_unique<PrettyGenericContainer>(
+                        tree_before_emit + "$zxdb::AppendNameValueRow(\"\", cur_node.__value_);\n" +
+                            tree_after_emit,
+                        tree_getter_list));
 
   // Set (tree) and map iterators.
   std::string tree_iterator_dereference = "static_cast<__node_pointer>(__ptr_)->__value_";
@@ -297,7 +296,7 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
                     std::make_unique<PrettyIterator>(tree_iterator_dereference));
 
   std::string map_iterator_dereference =
-      "static_cast<_TreeIterator::__node_pointer>(__i_.__ptr_)->__value_.__cc_";
+      "static_cast<_TreeIterator::__node_pointer>(__i_.__ptr_)->__value_";
   cpp_.emplace_back(InternalGlob("std::__2::__map_iterator<*>"),
                     std::make_unique<PrettyIterator>(map_iterator_dereference));
   cpp_.emplace_back(InternalGlob("std::__2::__map_const_iterator<*>"),
@@ -334,7 +333,7 @@ void PrettyTypeManager::AddDefaultCppPrettyTypes() {
   cpp_.emplace_back(
       InternalGlob("std::__2::unordered_map<*>"),
       std::make_unique<PrettyGenericContainer>(
-          hash_table_before_emit + "$zxdb::AppendNameValueRow(\"\", cur_node.__value_.__cc_);" +
+          hash_table_before_emit + "$zxdb::AppendNameValueRow(\"\", cur_node.__value_);" +
               hash_table_after_emit,
           hash_table_getter_list));
 

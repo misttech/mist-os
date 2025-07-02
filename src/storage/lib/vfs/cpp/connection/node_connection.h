@@ -50,11 +50,12 @@ class NodeConnection final : public Connection, public fidl::WireServer<fuchsia_
   void Close(CloseCompleter::Sync& completer) final;
   void Query(QueryCompleter::Sync& completer) final;
   void Sync(SyncCompleter::Sync& completer) final;
-  void GetAttr(GetAttrCompleter::Sync& completer) final;
 #if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+  void DeprecatedGetAttr(DeprecatedGetAttrCompleter::Sync& completer) final;
   void DeprecatedSetAttr(DeprecatedSetAttrRequestView request,
                          DeprecatedSetAttrCompleter::Sync& completer) final;
 #else
+  void GetAttr(GetAttrCompleter::Sync& completer) final;
   void SetAttr(SetAttrRequestView request, SetAttrCompleter::Sync& completer) final;
 #endif
   void GetFlags(GetFlagsCompleter::Sync& completer) final;

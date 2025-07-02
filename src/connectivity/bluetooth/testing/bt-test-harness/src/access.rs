@@ -4,8 +4,8 @@
 
 use anyhow::{Context, Error};
 use fidl_fuchsia_bluetooth_sys::{
-    AccessConnectResult, AccessDisconnectResult, AccessMakeDiscoverableResult, AccessMarker,
-    AccessProxy, AccessStartDiscoveryResult, ProcedureTokenMarker,
+    AccessConnectResult, AccessDisconnectResult, AccessMakeDiscoverableResult, AccessProxy,
+    AccessStartDiscoveryResult, ProcedureTokenMarker,
 };
 use fuchsia_bluetooth::expectation::asynchronous::{
     expectable, Expectable, ExpectableExt, ExpectableState,
@@ -125,7 +125,7 @@ impl TestHarness for AccessHarness {
             let realm = shared_state.get_or_insert_with(SHARED_STATE_INDEX, inserter).await?;
             let access = realm
                 .instance()
-                .connect_to_protocol_at_exposed_dir::<AccessMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .context("Failed to connect to access service")?;
 
             let harness = AccessHarness(expectable(Default::default(), AccessWrapper(access)));

@@ -3,17 +3,16 @@
 // found in the LICENSE file.
 
 use crate::bpf::attachments::EbpfAttachments;
-use crate::container_namespace::ContainerNamespace;
-use crate::device::binder::BinderDevice;
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
 use crate::device::{DeviceMode, DeviceRegistry};
 use crate::execution::CrashReporter;
 use crate::fs::fuchsia::nmfs::NetworkManagerHandle;
-use crate::memory_attribution::MemoryAttributionManager;
 use crate::mm::{FutexTable, MappingSummary, MlockPinFlavor, MlockShadowProcess, SharedFutexKey};
 use crate::power::SuspendResumeManagerHandle;
 use crate::security;
+use crate::task::container_namespace::ContainerNamespace;
 use crate::task::limits::SystemLimits;
+use crate::task::memory_attribution::MemoryAttributionManager;
 use crate::task::net::NetstackDevices;
 use crate::task::{
     AbstractUnixSocketNamespace, AbstractVsockSocketNamespace, CurrentTask, HrTimerManager,
@@ -22,13 +21,12 @@ use crate::task::{
 };
 use crate::vdso::vdso_loader::Vdso;
 use crate::vfs::crypt_service::CryptService;
+use crate::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use crate::vfs::socket::{
     GenericMessage, GenericNetlink, NetlinkSenderReceiverProvider, NetlinkToClientSender,
     SocketAddress,
 };
-use crate::vfs::{
-    DelayedReleaser, FileHandle, FileOps, FsNode, FsString, Mounts, StaticDirectoryBuilder,
-};
+use crate::vfs::{DelayedReleaser, FileHandle, FileOps, FsNode, FsString, Mounts};
 use bstr::BString;
 use expando::Expando;
 use fidl::endpoints::{
@@ -54,7 +52,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::from_status_like_fdio;
 use starnix_uapi::open_flags::OpenFlags;
 use std::borrow::Cow;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU8, Ordering};
 use std::sync::{Arc, OnceLock, Weak};
@@ -115,6 +113,10 @@ pub struct KernelFeatures {
 
     /// Allows the netstack to mark packets/sockets.
     pub netstack_mark: bool,
+
+    /// Allows the rtnetlink worker to rely on an `ifb0` interface being present instead of faking
+    /// the existence of one itself.
+    pub rtnetlink_assume_ifb0_existence: bool,
 }
 
 /// Contains an fscrypt wrapping key id.
@@ -184,9 +186,6 @@ pub struct Kernel {
 
     /// The registry of block devices backed by a remote fuchsia.io file.
     pub remote_block_device_registry: Arc<RemoteBlockDeviceRegistry>,
-
-    /// The binder driver registered for this container, indexed by their device type.
-    pub binders: RwLock<BTreeMap<DeviceType, BinderDevice>>,
 
     /// The iptables used for filtering network packets.
     pub iptables: OrderedRwLock<IpTables, KernelIpTables>,
@@ -386,7 +385,6 @@ impl Kernel {
             device_registry: Default::default(),
             container_namespace,
             remote_block_device_registry: Default::default(),
-            binders: Default::default(),
             iptables,
             shared_futexes: FutexTable::<SharedFutexKey>::default(),
             root_uts_ns: Arc::new(RwLock::new(UtsNamespace::default())),
@@ -595,7 +593,14 @@ impl Kernel {
 
         // Step 8: exiting this process.
         log_info!("All tasks killed, exiting Starnix kernel root process.");
-        std::process::exit(0);
+        // Normally a Rust program exits its process by calling `std::process::exit()` which goes
+        // through libc to exit the program. This runs drop impls on any thread-local variables
+        // which can cause issues during Starnix shutdown when we haven't yet integrated every
+        // subsystem with the shutdown flow. While those issues are indicative of underlying
+        // problems, we can't solve them without finishing the implementation of graceful shutdown.
+        // Instead, ask Zircon to exit our process directly, bypassing any libc atexit handlers.
+        // TODO(https://fxbug.dev/295073633) return from main instead of avoiding atexit handlers
+        zx::Process::exit(0);
     }
 
     pub fn is_shutting_down(&self) -> bool {
@@ -605,7 +610,7 @@ impl Kernel {
     /// Opens a device file (driver) identified by `dev`.
     pub fn open_device<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         node: &FsNode,
         flags: OpenFlags,
@@ -643,7 +648,9 @@ impl Kernel {
         self.network_netlink.get_or_init(|| {
             let (network_netlink, network_netlink_async_worker) = Netlink::new(
                 InterfacesHandlerImpl(Arc::downgrade(self)),
-                netlink::FeatureFlags::prod(),
+                netlink::FeatureFlags {
+                    assume_ifb0_existence: self.features.rtnetlink_assume_ifb0_existence,
+                },
             );
             self.kthreads.spawn(move |_, _| {
                 fasync::LocalExecutor::new().run_singlethreaded(network_netlink_async_worker);
@@ -731,10 +738,10 @@ impl Kernel {
                         });
                     }
                 };
-                if task.id == thread_group.leader {
+                if task.tid == thread_group.leader {
                     set_properties(&tg_node);
                 } else {
-                    tasks_node.record_child(task.id.to_string(), |task_node| {
+                    tasks_node.record_child(task.tid.to_string(), |task_node| {
                         set_properties(task_node);
                     });
                 };

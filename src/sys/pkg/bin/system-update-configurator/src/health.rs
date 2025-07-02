@@ -62,7 +62,7 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_inspect::Inspector;
 
-    fn verify_healthy(inspector: &Inspector) {
+    async fn verify_healthy(inspector: &Inspector) {
         assert_data_tree!(
             inspector,
             root: {
@@ -74,7 +74,7 @@ mod tests {
         );
     }
 
-    fn verify_unhealthy(inspector: &Inspector) {
+    async fn verify_unhealthy(inspector: &Inspector) {
         assert_data_tree!(
             inspector,
             root: {
@@ -94,7 +94,7 @@ mod tests {
         let storage = bridge::testing::Fake::new(OptOutPreference::AllowAllUpdates);
         let _storage = HealthStatus::new(inspector.root()).wrap_bridge(storage);
 
-        verify_healthy(&inspector);
+        verify_healthy(&inspector).await;
     }
 
     #[fuchsia::test]
@@ -105,12 +105,12 @@ mod tests {
             bridge::testing::Fake::new_with_error_toggle(OptOutPreference::AllowAllUpdates);
         let storage = HealthStatus::new(inspector.root()).wrap_bridge(storage);
 
-        verify_healthy(&inspector);
+        verify_healthy(&inspector).await;
 
         fail_requests.set(true);
         storage.get_opt_out().await.unwrap_err();
 
-        verify_unhealthy(&inspector);
+        verify_unhealthy(&inspector).await;
     }
 
     #[fuchsia::test]
@@ -127,6 +127,6 @@ mod tests {
         fail_requests.set(false);
         storage.get_opt_out().await.unwrap();
 
-        verify_healthy(&inspector);
+        verify_healthy(&inspector).await;
     }
 }

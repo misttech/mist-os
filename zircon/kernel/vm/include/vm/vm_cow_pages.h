@@ -114,14 +114,12 @@ class VmCowPages final : public VmHierarchyBase,
                          public fbl::ContainableBaseClasses<
                              fbl::TaggedDoublyLinkedListable<VmCowPages*, internal::ChildListTag>> {
  public:
-  static zx_status_t Create(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
-                            uint32_t pmm_alloc_flags, uint64_t size,
+  static zx_status_t Create(VmCowPagesOptions options, uint32_t pmm_alloc_flags, uint64_t size,
                             ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker,
                             fbl::RefPtr<VmCowPages>* cow_pages);
 
   static zx_status_t CreateExternal(fbl::RefPtr<PageSource> src, VmCowPagesOptions options,
-                                    fbl::RefPtr<VmHierarchyState> root_lock, uint64_t size,
-                                    fbl::RefPtr<VmCowPages>* cow_pages);
+                                    uint64_t size, fbl::RefPtr<VmCowPages>* cow_pages);
 
   // Define the lock retrieval functions differently depending on whether we should be returning a
   // local lock instance, or the common one in the hierarchy_state_ptr. Due to the TA_RET_CAP
@@ -130,17 +128,8 @@ class VmCowPages final : public VmHierarchyBase,
   // In the absence of a local lock it is assumed, and enforced in vm_object_lock.h, that there is a
   // shared lock in the hierarchy state. If there is both a local and a shared lock then the local
   // lock is to be used for the improved lock tracking.
-#if VMO_USE_LOCAL_LOCK
-  Lock<VmoLockType>* lock() const TA_RET_CAP(lock_) { return &lock_; }
-  Lock<VmoLockType>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
-#else
-  Lock<VmoLockType>* lock() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
-    return hierarchy_state_ptr_->lock();
-  }
-  Lock<VmoLockType>& lock_ref() const TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
-    return hierarchy_state_ptr_->lock_ref();
-  }
-#endif
+  Lock<CriticalMutex>* lock() const TA_RET_CAP(lock_) { return &lock_; }
+  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
 
   uint64_t lock_order() const {
 #if (LOCK_DEP_ENABLED_FEATURE_LEVEL > 0)
@@ -157,12 +146,12 @@ class VmCowPages final : public VmHierarchyBase,
     LockedRefPtr() = default;
     ~LockedRefPtr() { release(); }
     LockedRefPtr(LockedRefPtr&& l) = default;
-    LockedRefPtr(const fbl::RefPtr<VmCowPages>& object, VmLockAcquireMode mode)
-        : LockedRefPtr(object, object->lock_order(), mode) {}
-    LockedRefPtr(fbl::RefPtr<VmCowPages> object, uint64_t lock_order, VmLockAcquireMode mode)
+    explicit LockedRefPtr(const fbl::RefPtr<VmCowPages>& object)
+        : LockedRefPtr(object, object->lock_order()) {}
+    LockedRefPtr(fbl::RefPtr<VmCowPages> object, uint64_t lock_order)
         : ptr_(ktl::move(object)),
-          lock_(Guard<VmoLockType>(AssertOrderedLock, ptr_->lock(), lock_order, mode).take()) {}
-    ktl::pair<fbl::RefPtr<VmCowPages>, Guard<VmoLockType>::Adoptable> take() {
+          lock_(Guard<CriticalMutex>(AssertOrderedLock, ptr_->lock(), lock_order).take()) {}
+    ktl::pair<fbl::RefPtr<VmCowPages>, Guard<CriticalMutex>::Adoptable> take() {
       return {ktl::move(ptr_), ktl::move(lock_)};
     }
 
@@ -170,7 +159,7 @@ class VmCowPages final : public VmHierarchyBase,
 
     fbl::RefPtr<VmCowPages>&& release() {
       if (ptr_) {
-        Guard<VmoLockType> guard{AdoptLock, ptr_->lock(), ktl::move(lock_)};
+        Guard<CriticalMutex> guard{AdoptLock, ptr_->lock(), ktl::move(lock_)};
       }
       return ktl::move(ptr_);
     }
@@ -189,7 +178,7 @@ class VmCowPages final : public VmHierarchyBase,
 
    private:
     fbl::RefPtr<VmCowPages> ptr_;
-    Guard<VmoLockType>::Adoptable lock_;
+    Guard<CriticalMutex>::Adoptable lock_;
   };
   class DeferredOps;
 
@@ -899,8 +888,8 @@ class VmCowPages final : public VmHierarchyBase,
 
  private:
   // private constructor (use Create...())
-  VmCowPages(fbl::RefPtr<VmHierarchyState> root_lock, VmCowPagesOptions options,
-             uint32_t pmm_alloc_flags, uint64_t size, fbl::RefPtr<PageSource> page_source,
+  VmCowPages(VmCowPagesOptions options, uint32_t pmm_alloc_flags, uint64_t size,
+             fbl::RefPtr<PageSource> page_source,
              ktl::unique_ptr<DiscardableVmoTracker> discardable_tracker, uint64_t lock_order);
 
   ~VmCowPages() override;
@@ -925,13 +914,13 @@ class VmCowPages final : public VmHierarchyBase,
     LockedPtr() = default;
     ~LockedPtr() { release(); }
     LockedPtr(LockedPtr&& other) : ptr_(other.ptr_), lock_(other.take_lock()) {}
-    LockedPtr(VmCowPages* ptr, VmLockAcquireMode mode) : LockedPtr(ptr, ptr->lock_order(), mode) {}
-    LockedPtr(VmCowPages* ptr, uint64_t lock_order, VmLockAcquireMode mode) TA_EXCL(ptr->lock())
+    explicit LockedPtr(VmCowPages* ptr) : LockedPtr(ptr, ptr->lock_order()) {}
+    LockedPtr(VmCowPages* ptr, uint64_t lock_order) TA_EXCL(ptr->lock())
         : ptr_(ptr),
-          lock_(Guard<VmoLockType>{AssertOrderedLock, ptr->lock(), lock_order, mode}.take()) {}
+          lock_(Guard<CriticalMutex>{AssertOrderedLock, ptr->lock(), lock_order}.take()) {}
     // Take both the pointer and the lock, leaving the LockedPtr empty. Caller must take ownership
     // of the returned lock and release it.
-    ktl::pair<VmCowPages*, Guard<VmoLockType>::Adoptable> take() {
+    ktl::pair<VmCowPages*, Guard<CriticalMutex>::Adoptable> take() {
       VmCowPages* ret = ptr_;
       return {ret, take_lock()};
     }
@@ -957,7 +946,7 @@ class VmCowPages final : public VmHierarchyBase,
     VmCowPages* release() {
       auto [ret, lock] = take();
       if (ret) {
-        Guard<VmoLockType> guard{AdoptLock, ret->lock(), ktl::move(lock)};
+        Guard<CriticalMutex> guard{AdoptLock, ret->lock(), ktl::move(lock)};
       }
       return ret;
     }
@@ -979,7 +968,7 @@ class VmCowPages final : public VmHierarchyBase,
 
    private:
     // Helper for moving out the lock_ and clearing the ptr_ at the same time.
-    Guard<VmoLockType>::Adoptable&& take_lock() {
+    Guard<CriticalMutex>::Adoptable&& take_lock() {
       ptr_ = nullptr;
       return ktl::move(lock_);
     }
@@ -987,7 +976,7 @@ class VmCowPages final : public VmHierarchyBase,
     // is null, then lock_ is invalid, otherwise if ptr_ is non-null then lock_ holds the adoptable
     // lock acquisition of that object.
     VmCowPages* ptr_ = nullptr;
-    Guard<VmoLockType>::Adoptable lock_;
+    Guard<CriticalMutex>::Adoptable lock_;
   };
 
   // Helper for determining whether the current node should perform a dead transition or not.
@@ -1338,31 +1327,39 @@ class VmCowPages final : public VmHierarchyBase,
                                  AnonymousPageRequest* page_request, vm_page_t** out_page)
       TA_REQ(lock()) TA_REQ(page_owner->lock());
 
-  // Helper function that 'forks' the page into |offset| of the current node, which must be a
+  // Helper function that 'forks' the content into |offset| of the current node, which must be a
   // visible node. This function is similar to |CloneCowPageLocked|, but instead handles the case
-  // where the forked page would be immediately overwritten with zeros after forking. It inserts a
-  // marker into |offset| of the current node rather than actually forking or migrating the page. If
-  // this function successfully inserts the marker, it returns ZX_OK.
+  // where the forked content would be immediately overwritten with zeros after forking. It inserts
+  // a marker into |offset| of the current node rather than actually forking or migrating the
+  // content. If this function successfully inserts the marker, it returns ZX_OK.
   //
-  // The source page that is being forked has already been calculated - it is |page|, which
-  // is currently in |page_owner| at offset |owner_offset|. |page_owner| must be a hidden node.
+  // The source content that is being forked has already been calculated - it is |owner_content|,
+  // which must be a page, reference or an existing zero marker, and is currently in |page_owner|
+  // at offset |owner_offset|. |page_owner| must be a hidden node.
   //
   // This function is responsible for ensuring that COW clones never result in worse memory
-  // consumption than simply creating a new VMO and memcpying the content. If |page| is not shared
-  // at all, then this function assumes it is only accessible to this node. In that case |page| is
-  // removed from |page_owner| and placed in the |freed_list|. Forking the page in that case would
-  // just make |page| inaccessible, leaving |page| committed for no benefit.
+  // consumption than simply creating a new VMO and memcpying the content. If |owner_content| is not
+  // shared at all, then this function assumes it is only accessible to this node. In that cas
+  // |owner_content| is removed from |page_owner| and placed in the |list|. Forking the content in
+  // that case would just make |owner_content| inaccessible, leaving |owner_content| committed for
+  // no benefit.
   //
   // To handle memory allocation failure, this function allocates a slot in this node for the marker
   // before modifying the source page or page list in |page_owner|. If that allocation fails, then
   // these are not altered.
+  zx_status_t CloneCowContentAsZeroLocked(uint64_t offset, ScopedPageFreedList& list,
+                                          VmCowPages* content_owner,
+                                          VmPageOrMarkerRef owner_content, uint64_t owner_offset)
+      TA_REQ(lock()) TA_REQ(content_owner->lock());
+
+  // Helper function for reducing the share count of content in a hidden node, and freeing it if it
+  // is no longer referenced.
   //
-  // |page| must not be the zero-page, as there is no need to do the complex page fork logic to
-  // reduce memory consumption in that case.
-  zx_status_t CloneCowPageAsZeroLocked(uint64_t offset, list_node_t* freed_list,
-                                       VmCowPages* page_owner, vm_page_t* page,
-                                       uint64_t owner_offset, AnonymousPageRequest* page_request)
-      TA_REQ(lock()) TA_REQ(page_owner->lock());
+  // This method assumes that the caller is overriding the slot in a child and that it will perform
+  // any necessary range change updates etc.
+  void DecrementCowContentShareCount(VmPageOrMarkerRef content, uint64_t offset,
+                                     ScopedPageFreedList& list, VmCompression* compression)
+      TA_REQ(lock());
 
   // Helper struct which encapsulates a parent node along with a range and limit relative to it.
   struct ParentAndRange {
@@ -1571,10 +1568,7 @@ class VmCowPages final : public VmHierarchyBase,
   // length of children_list_
   uint32_t children_list_len_ TA_GUARDED(lock()) = 0;
 
-#if VMO_USE_LOCAL_LOCK
-  mutable LOCK_DEP_INSTRUMENT(VmCowPages, VmoLockTraits::LocalLockType,
-                              VmoLockTraits::LocalLockFlags) lock_;
-#endif
+  mutable LOCK_DEP_INSTRUMENT(VmCowPages, CriticalMutex, lockdep::LockFlagsNestable) lock_;
 
   // When acquiring multiple locks they must be acquired in order from lowest to highest. To support
   // unidirectional clones, where nodes gain new children, and bidirectional clones, where nodes
@@ -1846,8 +1840,8 @@ class VmCowPages::LookupCursor {
   void DisableMarkAccessed() { mark_accessed_ = false; }
 
   // Exposed for lock assertions.
-  Lock<VmoLockType>* lock() const TA_RET_CAP(target_->lock_ref()) { return target_->lock(); }
-  Lock<VmoLockType>& lock_ref() const TA_RET_CAP(target_->lock_ref()) {
+  Lock<CriticalMutex>* lock() const TA_RET_CAP(target_->lock_ref()) { return target_->lock(); }
+  Lock<CriticalMutex>& lock_ref() const TA_RET_CAP(target_->lock_ref()) {
     return target_->lock_ref();
   }
 
@@ -2112,7 +2106,7 @@ class ScopedPageFreedList {
 // stack allocated using the __UNINITIALIZED tag in a sequence like this:
 //
 //     __UNINITIALIZED VmCowPages::DeferredOps deferred(cow_object_);
-//     Guard<VmoLockType> guard{cow_object_->lock()};
+//     Guard<CriticalMutex> guard{cow_object_->lock()};
 //     cow_object_->DoOperationLocked(&deferred);
 //
 // The destruction order will then allow |deferred| to perform its actions after |guard| is

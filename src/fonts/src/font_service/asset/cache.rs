@@ -296,7 +296,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_inspect_data() {
+    async fn test_inspect_data() {
         let inspector = finspect::Inspector::default();
         let capacity = 3000;
         let mut cache = Cache::new(capacity, inspector.root());

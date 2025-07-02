@@ -91,8 +91,8 @@ fn exit_code_to_status(exit_code: i64) -> i32 {
 #[fuchsia::test]
 async fn exit_code_event_stream(exit_code: i64) {
     let realm = build_program(exit_code).await;
-    let proxy =
-        realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>().unwrap();
+    let proxy: fcomponent::EventStreamProxy =
+        realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     proxy.wait_for_ready().await.unwrap();
     let mut event_stream = EventStream::new(proxy);
     realm.start_component_tree().await.unwrap();
@@ -123,8 +123,8 @@ async fn exit_code_execution_controller(exit_code: i64) {
     let realm = build_program(exit_code).await;
     realm.start_component_tree().await.unwrap();
 
-    let realm_proxy =
-        realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
+    let realm_proxy: fcomponent::RealmProxy =
+        realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (controller, controller_server_end) =
         fidl::endpoints::create_proxy::<fcomponent::ControllerMarker>();
     let () = realm_proxy

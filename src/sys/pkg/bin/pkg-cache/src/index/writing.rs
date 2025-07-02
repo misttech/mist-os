@@ -215,8 +215,8 @@ mod tests {
         let () = index.stop(guard).unwrap();
     }
 
-    #[test]
-    fn inspect() {
+    #[fuchsia::test]
+    async fn inspect() {
         let mut index = WritingIndex::new();
         let guard = index.start(hash(0));
         let () = index.add_blobs(&hash(0), &HashSet::from_iter([hash(1), hash(2)])).unwrap();

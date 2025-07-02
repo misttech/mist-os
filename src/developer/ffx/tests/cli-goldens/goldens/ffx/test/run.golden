@@ -200,6 +200,14 @@
       "short": null,
       "description": "when set, prevents test_manager from creating exception channels that may confilict with those created by the test.",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--no-cases-equals-success",
+      "short": null,
+      "description": "when set, the test_filter selecting an empty set of cases to run is treated as success rather than failure.",
+      "hidden": false
     }
   ],
   "notes": [

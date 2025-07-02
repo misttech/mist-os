@@ -58,7 +58,6 @@ You should see output similar to the (truncated) list below:
 /core/system-update-committer
 /core/temperature-logger
 /core/test_manager
-/core/full-resolver
 /startup
 ```
 

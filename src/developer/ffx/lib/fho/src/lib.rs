@@ -38,6 +38,5 @@ pub mod macro_deps {
         bug, check_strict_constraints, return_bug, return_user_error, Ffx, ToolRunner,
     };
     pub use ffx_config::{global_env_context, EnvironmentContext};
-    pub use ffx_core::Injector;
     pub use {crate as fho, anyhow, argh, async_lock, futures, serde, writer};
 }

@@ -546,7 +546,7 @@ assembly_input_bundle("xhci_driver") {
 assembly_input_bundle("fake_battery_driver") {
   base_driver_packages = [
     {
-      package_target = "//src/power/testing/fake-powersource:fake-battery"
+      package_target = "//src/power/testing/fake-powersource:fake_battery"
       driver_components = [ "meta/fake_battery.cm" ]
     },
   ]
@@ -2049,8 +2049,8 @@ assembly_input_bundle("standard_userdebug") {
 assembly_input_bundle("standard_eng") {
   testonly = true
   base_packages = [
-    # Used to resolve ephemeral components.
-    "//src/sys/full-resolver:full-resolver-pkg",
+    # Needed to resolve driver components from "full" packages
+    "//src/sys/loopback_resolver:loopback_resolver_pkg",
   ]
   cache_packages = [
     # Backend for ffx process command.
@@ -3599,7 +3599,7 @@ assembly_input_bundle("netstack3_packages_gub") {
 # feature_set_levels: minimal
 # build-types: all
 #
-# To be used in conjunction with socket_proxy_packages or socket_proxy_packages_gub.
+# To be used in conjunction with socket_proxy_packages.
 #
 assembly_input_bundle("socket-proxy-enabled") {
   compiled_packages = [
@@ -3641,18 +3641,9 @@ assembly_input_bundle("socket-proxy-disabled") {
 
 # Netpol socket-proxy packages without unified binary.
 #
-# This AIB provides packages for the socket-proxy-enabled configuration. It is mutually
-# exclusive with socket_proxy_packages_gub.
+# This AIB provides packages for the socket-proxy-enabled configuration.
 assembly_input_bundle("socket_proxy_packages") {
   base_packages = [ "//src/connectivity/policy/socket-proxy:package" ]
-}
-
-# Netpol socket-proxy packages with unified binary.
-#
-# This AIB provides packages for the socket-proxy-enabled configuration. It is mutually
-# exclusive with socket_proxy_packages.
-assembly_input_bundle("socket_proxy_packages_gub") {
-  base_packages = [ "//src/connectivity/policy/socket-proxy:package_gub" ]
 }
 
 # Netstack-migration as the netstack for use by base networking.

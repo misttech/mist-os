@@ -29,7 +29,7 @@ async fn create_blackhole_interface() {
     let () = installer
         .install_blackhole_interface(
             control_server_end,
-            &fidl_fuchsia_net_interfaces_admin::Options {
+            fidl_fuchsia_net_interfaces_admin::Options {
                 name: Some(IF_NAME.to_string()),
                 metric: None,
                 ..Default::default()
@@ -154,7 +154,7 @@ async fn install_blackhole_interface_failure() {
     installer
         .install_blackhole_interface(
             control_server_end1,
-            &fidl_fuchsia_net_interfaces_admin::Options {
+            fidl_fuchsia_net_interfaces_admin::Options {
                 name: Some(IF_NAME.to_string()),
                 ..fidl_fuchsia_net_interfaces_admin::Options::default()
             },
@@ -170,7 +170,7 @@ async fn install_blackhole_interface_failure() {
     installer
         .install_blackhole_interface(
             control_server_end2,
-            &fidl_fuchsia_net_interfaces_admin::Options {
+            fidl_fuchsia_net_interfaces_admin::Options {
                 name: Some(IF_NAME.to_string()),
                 ..fidl_fuchsia_net_interfaces_admin::Options::default()
             },

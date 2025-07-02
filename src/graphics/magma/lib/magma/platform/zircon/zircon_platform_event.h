@@ -18,13 +18,14 @@ class ZirconPlatformEvent : public PlatformEvent {
   ZirconPlatformEvent(zx::event event) : zx_event_(std::move(event)) {}
 
   void Signal() override {
-    zx_status_t status = zx_event_.signal(0u, zx_signal());
+    zx_status_t status = zx_event_.signal(0u, GetZxSignal());
     DASSERT(status == ZX_OK);
   }
 
   magma::Status Wait(uint64_t timeout_ms) override {
     zx_status_t status = zx_event_.wait_one(
-        zx_signal(), zx::deadline_after(zx::duration(magma::ms_to_signed_ns(timeout_ms))), nullptr);
+        GetZxSignal(), zx::deadline_after(zx::duration(magma::ms_to_signed_ns(timeout_ms))),
+        nullptr);
     switch (status) {
       case ZX_OK:
         return MAGMA_STATUS_OK;
@@ -37,9 +38,7 @@ class ZirconPlatformEvent : public PlatformEvent {
     }
   }
 
-  zx_handle_t zx_handle() const { return zx_event_.get(); }
-
-  zx_signals_t zx_signal() const { return ZX_EVENT_SIGNALED; }
+  static zx_signals_t GetZxSignal() { return ZX_EVENT_SIGNALED; }
 
  private:
   zx::event zx_event_;

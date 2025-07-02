@@ -4,6 +4,8 @@
 
 #include "scene_dumper.h"
 
+#include <lib/async/default.h>
+
 #include <stack>
 
 #include <sdk/lib/syslog/cpp/macros.h>
@@ -43,7 +45,7 @@ void DumpTopology(const flatland::UberStruct::InstanceMap& snapshot,
                   const flatland::GlobalTopologyData& topology_data, std::ostream& output) {
   output << "Topology:\n";
   std::stack<size_t> indentation_levels;
-  std::stack<uint64_t> parent_instance_ids;
+  std::stack<uint64_t> parent_session_ids;
   for (size_t transform_index = 0; transform_index < topology_data.topology_vector.size();
        transform_index++) {
     auto& transform = topology_data.topology_vector[transform_index];
@@ -60,10 +62,10 @@ void DumpTopology(const flatland::UberStruct::InstanceMap& snapshot,
     }
 
     // Every time we cross a viewport/view boundary, print out the `debug_name` of the view's
-    // Flatland instance.
+    // Flatland session.
     const auto uber_struct_it = snapshot.find(transform.GetInstanceId());
-    if (uber_struct_it != snapshot.end() && !parent_instance_ids.empty() &&
-        transform.GetInstanceId() != parent_instance_ids.top() &&
+    if (uber_struct_it != snapshot.end() && !parent_session_ids.empty() &&
+        transform.GetInstanceId() != parent_session_ids.top() &&
         !uber_struct_it->second->debug_name.empty()) {
       const auto& view_ref = uber_struct_it->second->view_ref;
       output << " <-- (" << uber_struct_it->second->debug_name
@@ -76,14 +78,14 @@ void DumpTopology(const flatland::UberStruct::InstanceMap& snapshot,
     // Adjust indentation for newline.
     if (children > 0) {
       indentation_levels.push(children);
-      parent_instance_ids.push(transform.GetInstanceId());
+      parent_session_ids.push(transform.GetInstanceId());
     } else {
       while (!indentation_levels.empty()) {
         auto& current_indentation_level_children = indentation_levels.top();
         current_indentation_level_children--;
         if (current_indentation_level_children == 0) {
           indentation_levels.pop();
-          parent_instance_ids.pop();
+          parent_session_ids.pop();
         } else {
           break;
         }
@@ -95,16 +97,26 @@ void DumpTopology(const flatland::UberStruct::InstanceMap& snapshot,
 // Dumps the complete topology by outputting information on the current node and then iteratively
 // dumping for direct children nodes.
 //
-// Instances which are not present in the main topology will still appear in this dump.
-void DumpAllInstances(const flatland::UberStruct::InstanceMap& snapshot, std::ostream& output) {
-  output << "All Instances:\n";
-  for (auto& [instance_id, uber_struct] : snapshot) {
-    // Output instance ID and the instance debug name if available.
-    output << "Instance " << instance_id;
+// Sessions which are not present in the main topology will still appear in this dump.
+void DumpAllSessions(const flatland::UberStruct::InstanceMap& snapshot, std::ostream& output) {
+  std::optional<zx::time_monotonic> now;
+  if (auto* dispatcher = async_get_default_dispatcher()) {
+    now = zx::time_monotonic(async_now(dispatcher));
+  }
+
+  output << "All Flatland Sessions:\n";
+  for (auto& [session_id, uber_struct] : snapshot) {
+    // Output session ID and the session debug name if available.
+    output << "Session " << session_id;
     if (!uber_struct->debug_name.empty()) {
       output << " (" << uber_struct->debug_name << ")";
     }
-    output << ":\n";
+    output << ":\nlast uberstruct ";
+    if (now.has_value()) {
+      output << "age: " << ((now.value() - uber_struct->creation_time) / 1000000).get() << "ms\n";
+    } else {
+      output << "creation time: " << uber_struct->creation_time.get() << "\n";
+    }
 
     std::stack<size_t> indentation_levels;
     for (size_t transform_index = 0; transform_index < uber_struct->local_topology.size();
@@ -160,7 +172,7 @@ void DumpImages(const flatland::GlobalTopologyData& topology_data,
 
 void DumpHitRegions(const flatland::UberStruct::InstanceMap& snapshot, std::ostream& output) {
   output << "\nHit Regions:\n";
-  for (const auto& [instance_id, uber_struct] : snapshot) {
+  for (const auto& [session_id, uber_struct] : snapshot) {
     for (const auto& [transform_handle, hit_regions] : uber_struct->local_hit_regions_map) {
       if (hit_regions.empty())
         continue;
@@ -189,7 +201,7 @@ void DumpScene(const UberStruct::InstanceMap& snapshot,
   output << "\n========== BEGIN SCENE DUMP ======================\n";
   DumpTopology(snapshot, topology_data, output);
   output << '\n';
-  DumpAllInstances(snapshot, output);
+  DumpAllSessions(snapshot, output);
   output << '\n';
   DumpImages(topology_data, images, image_indices, image_rectangles, output);
   output << '\n';

@@ -1338,7 +1338,7 @@ TEST_P(DriverRunnerTest, StartAndInspect) {
                             .str_properties = {
                                 {"offers", "fuchsia.package.RenamedA, fuchsia.package.RenamedB"},
                                 {"symbols", "symbol-A, symbol-B"},
-                                {"driver", "owned by parent"},
+                                {"driver", "unbound"},
                             }}));
 
   ASSERT_NO_FATAL_FAILURE(CheckNode(hierarchy, {

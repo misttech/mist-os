@@ -45,7 +45,7 @@ async fn echo_client_mock(
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
     const DEFAULT_ECHO_STR: &'static str = "Hello Fuchsia!";
-    let echo = handles.connect_to_protocol::<fecho::EchoMarker>()?;
+    let echo: fecho::EchoProxy = handles.connect_to_protocol()?;
     let out = echo.echo_string(Some(DEFAULT_ECHO_STR)).await?;
     if Some(DEFAULT_ECHO_STR.to_string()) != out {
         return Err(format_err!("unexpected echo result: {:?}", out));

@@ -12,7 +12,9 @@ use futures::TryStreamExt;
 use starnix_core::device::serial::SerialDevice;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::{CurrentTask, Kernel};
-use starnix_core::vfs::{BytesFile, FsString, StaticDirectoryBuilder};
+use starnix_core::vfs::pseudo::simple_file::BytesFile;
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::FsString;
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::mode;
@@ -22,19 +24,14 @@ const SERIAL_DIRECTORY: &str = "/dev/class/serial";
 /// Function to be invoked by ProcDirectory while constructing /proc/device-tree
 pub fn nanohub_procfs_builder(
     builder: &'_ mut StaticDirectoryBuilder<'_>,
-    current_task: &CurrentTask,
+    _current_task: &CurrentTask,
 ) {
-    builder.subdir(current_task, "mcu", 0o555, |dir| {
-        dir.entry(
-            current_task,
-            "board_type",
-            BytesFile::new_node(b"starnix".to_vec()),
-            mode!(IFREG, 0o444),
-        );
+    builder.subdir("mcu", 0o555, |dir| {
+        dir.entry("board_type", BytesFile::new_node(b"starnix".to_vec()), mode!(IFREG, 0o444));
     });
 }
 
-pub fn nanohub_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTask) {
+pub fn nanohub_device_init(locked: &mut Locked<Unlocked>, current_task: &CurrentTask) {
     struct Descriptor {
         socket_label: FsString,
         dev_node_name: FsString,
@@ -62,6 +59,10 @@ pub fn nanohub_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &Cur
         Descriptor {
             socket_label: b"/dev/nanohub_display".into(),
             dev_node_name: b"nanohub_display".into(),
+        },
+        Descriptor {
+            socket_label: b"/dev/nanohub_logs".into(),
+            dev_node_name: b"nanohub_logs".into(),
         },
         Descriptor {
             socket_label: b"/dev/nanohub_metrics".into(),

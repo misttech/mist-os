@@ -377,8 +377,8 @@ mod test_inspect {
         }
     }
 
-    #[test]
-    fn test_inspect_initial_state() {
+    #[fuchsia::test]
+    async fn test_inspect_initial_state() {
         let inspector = fuchsia_inspect::Inspector::default();
         let _update_monitor =
             UpdateMonitor::<FakeStateNotifier, FakeAttemptNotifier>::from_inspect_node(
@@ -419,8 +419,8 @@ mod test_inspect {
         );
     }
 
-    #[test]
-    fn test_inspect_version_available() {
+    #[fuchsia::test]
+    async fn test_inspect_version_available() {
         let inspector = fuchsia_inspect::Inspector::default();
         let (_fut, _att_fut, mut update_monitor) =
             UpdateMonitor::<FakeStateNotifier, FakeAttemptNotifier>::from_inspect_node(

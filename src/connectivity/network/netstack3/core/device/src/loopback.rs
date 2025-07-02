@@ -21,7 +21,7 @@ use netstack3_base::{
     TxMetadataBindingsTypes, WeakDeviceIdentifier,
 };
 use netstack3_ip::{DeviceIpLayerMetadata, IpPacketDestination};
-use packet::{Buf, Buffer as _, BufferMut, Serializer};
+use packet::{Buf, Buffer as _, BufferMut, PacketBuilder, Serializer};
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt,
 };
@@ -432,12 +432,8 @@ where
     /// doesn't matter if they are shorter than would be required.
     const MIN_BODY_LEN: usize = 0;
 
-    let frame = packet.encapsulate(EthernetFrameBuilder::new(
-        LOOPBACK_MAC,
-        dst_mac,
-        protocol,
-        MIN_BODY_LEN,
-    ));
+    let frame =
+        EthernetFrameBuilder::new(LOOPBACK_MAC, dst_mac, protocol, MIN_BODY_LEN).wrap_body(packet);
 
     send_ethernet_frame(core_ctx, bindings_ctx, device_id, frame, meta)
         .map_err(|err| err.into_inner())

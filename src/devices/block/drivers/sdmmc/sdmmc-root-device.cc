@@ -117,7 +117,8 @@ zx::result<fuchsia_hardware_sdmmc::SdmmcMetadata> SdmmcRootDevice::GetMetadata()
          .enable_cache = true,
          .removable = false,
          .max_command_packing = kMaxCommandPacking,
-         .use_fidl = true}});
+         .use_fidl = true,
+         .vccq_off_with_controller_off = false}});
   }
 
   // Default to trim and cache enabled, non-removable.
@@ -128,13 +129,17 @@ zx::result<fuchsia_hardware_sdmmc::SdmmcMetadata> SdmmcRootDevice::GetMetadata()
   bool removable = metadata->removable().value_or(false);
   uint32_t max_command_packing = metadata->max_command_packing().value_or(kMaxCommandPacking);
   bool use_fidl = metadata->use_fidl().value_or(true);
+  bool vccq_off_with_controller_off = metadata->vccq_off_with_controller_off().value_or(false);
 
-  return zx::ok(fuchsia_hardware_sdmmc::SdmmcMetadata{{.max_frequency = max_frequency,
-                                                       .speed_capabilities = speed_capabilities,
-                                                       .enable_cache = enable_cache,
-                                                       .removable = removable,
-                                                       .max_command_packing = max_command_packing,
-                                                       .use_fidl = use_fidl}});
+  return zx::ok(fuchsia_hardware_sdmmc::SdmmcMetadata{{
+      .max_frequency = max_frequency,
+      .speed_capabilities = speed_capabilities,
+      .enable_cache = enable_cache,
+      .removable = removable,
+      .max_command_packing = max_command_packing,
+      .use_fidl = use_fidl,
+      .vccq_off_with_controller_off = vccq_off_with_controller_off,
+  }});
 }
 
 zx_status_t SdmmcRootDevice::Init(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) {

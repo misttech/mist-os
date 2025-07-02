@@ -68,7 +68,9 @@ rust_library(
         "norustfmt",
     ],
     target_compatible_with = select({
+        "@rules_rust//rust/platform:aarch64-apple-darwin": [],
         "@rules_rust//rust/platform:aarch64-unknown-fuchsia": [],
+        "@rules_rust//rust/platform:x86_64-apple-darwin": [],
         "@rules_rust//rust/platform:x86_64-unknown-fuchsia": [],
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -77,7 +79,13 @@ rust_library(
     deps = [
         "//third_party/rust_crates/vendor/log-0.4.22:log",
     ] + select({
+        "@rules_rust//rust/platform:aarch64-apple-darwin": [
+            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(unix)
+        ],
         "@rules_rust//rust/platform:aarch64-unknown-fuchsia": [
+            "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(unix)
+        ],
+        "@rules_rust//rust/platform:x86_64-apple-darwin": [
             "//third_party/rust_crates/vendor/libc-0.2.171:libc",  # cfg(unix)
         ],
         "@rules_rust//rust/platform:x86_64-unknown-fuchsia": [

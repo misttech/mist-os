@@ -194,15 +194,21 @@ To install a package:
    You should see a repository configured, listing (among other configuration
    variables) its repository url `"repo_url": "fuchsia-pkg://<REPO_NAME>"`.
 
-1. (On the target device) Download the package:
+1. Download the package:
 
-   ```
-   pkgctl resolve fuchsia-pkg://{{ '<var>' }}REPO_NAME{{ '</var>' }}/{{ '<var>' }}PACKAGE_NAME{{ '</var>' }}
+   ```posix-terminal
+   ffx target package resolve fuchsia-pkg://{{ '<var>' }}REPO_NAME{{ '</var>' }}/{{ '<var>' }}PACKAGE_NAME{{ '</var>' }}
    ```
 
-   If the component is not already present on the system, `pkgctl` downloads the
-   package and places the blobs in the blobFS in the process of resolving. If
-   the package already exists, the updates will be downloaded.
+   If the component is not already present on the system, the package resolver
+   on the target device downloads the package and places the blobs in the
+   blobFS. If the package already exists but a newer package is available on the
+   package server, the updates will be downloaded.
+
+   Note: If you work on an older version of Fuchsia, `ffx target package` might
+   not be available, and the above command will error out. If this is the case,
+   run the following command **on the target device shell** as a fallback:
+   `pkgctl resolve fuchsia-pkg://{{ '<var>' }}REPO_NAME{{ '</var>' }}/{{ '<var>' }}PACKAGE_NAME{{ '</var>' }}`
 
 You have successfully installed or updated the package. You are now ready to
 run a component from the installed package.

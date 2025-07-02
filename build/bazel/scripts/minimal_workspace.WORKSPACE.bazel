@@ -17,7 +17,7 @@ load("@bazel_skylib//:workspace.bzl", "bazel_skylib_workspace")
 bazel_skylib_workspace()
 
 # The repository containing common definitions for the Fuchsia platform build
-# and cthe Fuchsia Bazel SDK rules.
+# and the Fuchsia Bazel SDK rules.
 # This is needed for remote execution parameters.
 local_repository(
     name = "rules_fuchsia",

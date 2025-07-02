@@ -99,6 +99,7 @@ cc_test_executable("audio_driver_tests_bin") {
     "basic_test.h",
     "device_host.cc",
     "device_host.h",
+    "durations.h",
     "main.cc",
     "position_test.cc",
     "position_test.h",

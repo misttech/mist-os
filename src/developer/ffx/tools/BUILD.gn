@@ -11,9 +11,9 @@ _tools = [
   "//src/developer/ffx/plugins/audio",
   "//src/developer/ffx/plugins/component",
   "//src/developer/ffx/plugins/coverage",
-  "//src/developer/ffx/plugins/driver",
   "//src/developer/ffx/plugins/debug",
   "//src/developer/ffx/plugins/emulator",
+  "//src/developer/ffx/plugins/forward",
   "//src/developer/ffx/plugins/fuzz",
   "//src/developer/ffx/plugins/inspect",
   "//src/developer/ffx/plugins/log",
@@ -31,14 +31,15 @@ _tools = [
   "//src/developer/ffx/plugins/wlan",
   "auth",
   "bluetooth",
+  "driver",
   "echo",
   "efi",
   "power",
   "profiler",
   "starnix",
   "storage",
-  "target-package",
   "triage",
+  "wm",
 ]
 
 group("tools") {
@@ -80,8 +81,5 @@ group("tests") {
 
 group("host_tests") {
   testonly = true
-  deps = [
-    "power:host_tests",
-    "target-package:host_tests",
-  ]
+  deps = [ "power:host_tests" ]
 }

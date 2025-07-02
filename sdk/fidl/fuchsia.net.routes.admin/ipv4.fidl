@@ -44,6 +44,21 @@ closed protocol RouteTableProviderV4 {
             1: name fuchsia.net.routes.TableName;
         };
     });
+
+    /// Gets the interface-local route table for this interface.
+    ///
+    /// + request credential of the interface to get local route table.
+    /// - response client end of the `RouteTableV4` protocol if successfully.
+    ///
+    /// This table is only removed after the interface is removed AND all
+    /// outstanding `RouteTableV4` channels are closed.
+    ///
+    /// Calling detach on the route table is a no-op.
+    strict GetInterfaceLocalTable(resource struct {
+        credential fuchsia.net.interfaces.admin.ProofOfInterfaceAuthorization;
+    }) -> (resource struct {
+        route_table client_end:RouteTableV4;
+    }) error GetInterfaceLocalTableError;
 };
 
 /// Provides mutable access over a set of system's IPv4 routes.

@@ -46,7 +46,7 @@ pub(in crate::security) fn file_system_init_security(
 
 /// Resolves the labeling scheme and arguments for the `file_system`, based on the loaded policy.
 pub(in crate::security) fn file_system_resolve_security<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     security_server: &SecurityServer,
     current_task: &CurrentTask,
     file_system: &FileSystemHandle,

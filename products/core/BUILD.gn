@@ -98,6 +98,9 @@ _storage_f2fs = {
 _storage_minfs = {
   storage = {
     mutable_storage_garbage_collection = true
+
+    # TODO(https://fxbug.dev/423673855): Remove to enable.
+    storage_host_enabled = false
     filesystems = {
       volume = {
         fvm = {

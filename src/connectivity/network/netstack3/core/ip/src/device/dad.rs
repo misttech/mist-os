@@ -4,20 +4,25 @@
 
 //! Duplicate Address Detection.
 
+use core::convert::Infallible as Never;
 use core::fmt::Debug;
+use core::mem;
 use core::num::{NonZero, NonZeroU16};
 use core::ops::RangeInclusive;
 use core::time::Duration;
 
 use arrayvec::ArrayVec;
+use assert_matches::assert_matches;
 use derivative::Derivative;
 use log::debug;
-use net_types::ip::{Ip, IpVersion, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr};
+use net_types::ip::{
+    GenericOverIp, Ip, IpVersion, IpVersionMarker, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr,
+};
 use net_types::MulticastAddr;
 use netstack3_base::{
-    AnyDevice, CoreEventContext, CoreTimerContext, DeviceIdContext, EventContext, HandleableTimer,
-    IpAddressId as _, IpDeviceAddressIdContext, RngContext, StrongDeviceIdentifier as _,
-    TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
+    AnyDevice, CoreTimerContext, DeviceIdContext, EventContext, HandleableTimer,
+    InstantBindingsTypes, IpAddressId as _, IpDeviceAddressIdContext, RngContext,
+    StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, WeakDeviceIdentifier,
 };
 use packet_formats::icmp::ndp::options::{NdpNonce, MIN_NONCE_LENGTH};
 use packet_formats::icmp::ndp::NeighborSolicitation;
@@ -25,7 +30,7 @@ use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
 
 use crate::internal::device::nud::DEFAULT_MAX_MULTICAST_SOLICIT;
-use crate::internal::device::{IpAddressState, IpDeviceIpExt, WeakIpAddressId};
+use crate::internal::device::{IpAddressState, IpDeviceEvent, IpDeviceIpExt, WeakIpAddressId};
 
 /// An IP Extension trait supporting Duplicate Address Detection.
 pub trait DadIpExt: Ip {
@@ -33,12 +38,14 @@ pub trait DadIpExt: Ip {
     /// address.
     const DEFAULT_DAD_ENABLED: bool;
 
-    /// Data that accompanies a sent DAD probe.
-    type SentProbeData: Debug;
+    /// Data that accompanies a sent DAD probe/announcement.
+    type SendData: Debug;
     /// Data that accompanies a received DAD packet.
     type ReceivedPacketData<'a>;
     /// State held for tentative addresses.
     type TentativeState: Debug + Default + Send + Sync;
+    /// State held for announcing addresses.
+    type AnnouncingState: Debug + Send + Sync;
     /// Metadata associated with the result of handling and incoming DAD packet.
     type IncomingPacketResultMeta;
     /// Data used to determine the interval to wait between DAD probes.
@@ -49,12 +56,13 @@ pub trait DadIpExt: Ip {
         state: &mut Self::TentativeState,
         addr: Self::Addr,
         bindings_ctx: &mut BC,
-    ) -> Self::SentProbeData;
+    ) -> Self::SendData;
 
     /// Generate the delay to wait before the next DAD probe.
     fn get_retransmission_interval<BC: RngContext>(
         data: &Self::RetransmitTimerData,
         bindings_ctx: &mut BC,
+        probes_remaining: &Option<NonZeroU16>,
     ) -> NonZeroDuration;
 
     /// Handles an incoming DAD packet while in the tentative state.
@@ -82,9 +90,10 @@ impl DadIpExt for Ipv4 {
     /// dhclient, a common DHCP client on Linux).
     const DEFAULT_DAD_ENABLED: bool = false;
 
-    type SentProbeData = Ipv4DadSentProbeData;
+    type SendData = Ipv4DadSendData;
     type ReceivedPacketData<'a> = ();
     type TentativeState = ();
+    type AnnouncingState = Ipv4AnnouncingDadState;
     type IncomingPacketResultMeta = ();
     type RetransmitTimerData = ();
 
@@ -92,15 +101,21 @@ impl DadIpExt for Ipv4 {
         _state: &mut (),
         addr: Ipv4Addr,
         _bindings_ctx: &mut BC,
-    ) -> Self::SentProbeData {
-        Ipv4DadSentProbeData { target_ip: addr }
+    ) -> Self::SendData {
+        Ipv4DadSendData { target_ip: addr, probe_type: Ipv4SentProbeType::Probe }
     }
 
     fn get_retransmission_interval<BC: RngContext>(
         _data: &(),
         bindings_ctx: &mut BC,
+        probes_remaining: &Option<NonZeroU16>,
     ) -> NonZeroDuration {
-        ipv4_dad_probe_interval(bindings_ctx)
+        match probes_remaining {
+            // If we have more probes to send, use the delay *between* probes.
+            Some(_) => ipv4_dad_probe_interval(bindings_ctx),
+            // Otherwise, use the delay before the announcing period.
+            None => IPV4_ANNOUNCE_WAIT,
+        }
     }
 
     fn handle_incoming_packet_while_tentative<'a>(
@@ -122,9 +137,11 @@ impl DadIpExt for Ipv6 {
     ///   DHCPv6, or manual configuration.
     const DEFAULT_DAD_ENABLED: bool = true;
 
-    type SentProbeData = Ipv6DadSentProbeData;
+    type SendData = Ipv6DadSendData;
     type ReceivedPacketData<'a> = Option<NdpNonce<&'a [u8]>>;
     type TentativeState = Ipv6TentativeDadState;
+    // Dad for IPv6 addresses does not have an announcing period.
+    type AnnouncingState = Never;
     type IncomingPacketResultMeta = Ipv6PacketResultMetadata;
     type RetransmitTimerData = NonZeroDuration;
 
@@ -132,12 +149,12 @@ impl DadIpExt for Ipv6 {
         state: &mut Ipv6TentativeDadState,
         addr: Ipv6Addr,
         bindings_ctx: &mut BC,
-    ) -> Self::SentProbeData {
+    ) -> Self::SendData {
         let Ipv6TentativeDadState {
             nonces,
             added_extra_transmits_after_detecting_looped_back_ns: _,
         } = state;
-        Ipv6DadSentProbeData {
+        Ipv6DadSendData {
             dst_ip: addr.to_solicited_node_address(),
             message: NeighborSolicitation::new(addr),
             nonce: nonces.evicting_create_and_store_nonce(bindings_ctx.rng()),
@@ -147,6 +164,7 @@ impl DadIpExt for Ipv6 {
     fn get_retransmission_interval<BC: RngContext>(
         data: &NonZeroDuration,
         _bindings_ctx: &mut BC,
+        _probes_remaining: &Option<NonZeroU16>,
     ) -> NonZeroDuration {
         *data
     }
@@ -174,16 +192,47 @@ impl DadIpExt for Ipv6 {
     }
 }
 
-/// The data needed to send an IPv4 DAD probe.
+/// The type of IPv4 DAD probe to send.
+#[derive(Debug, PartialEq)]
+pub enum Ipv4SentProbeType {
+    /// An "ARP Probe" as specified in RFC 5227 Section 1.1.
+    Probe,
+    /// An "ARP Announcement" as specified in RFC 5227 Section 1.1.
+    Announcement,
+}
+
+/// The data needed to send an IPv4 DAD probe/announcement.
 #[derive(Debug)]
-pub struct Ipv4DadSentProbeData {
+pub struct Ipv4DadSendData {
     /// The Ipv4Addr to probe.
-    pub target_ip: Ipv4Addr,
+    target_ip: Ipv4Addr,
+    /// The type of DAD probe to send
+    probe_type: Ipv4SentProbeType,
+}
+
+impl Ipv4DadSendData {
+    /// Returns the sender and target IP addresses to send in the ARP request.
+    pub fn into_sender_and_target_addr(self) -> (Ipv4Addr, Ipv4Addr) {
+        let Self { target_ip, probe_type } = self;
+        let sender_ip = match probe_type {
+            // As per RFC 5227 section 2.1.1 for "ARP probes":
+            //   The 'sender IP address' field MUST be set to all zeroes.
+            Ipv4SentProbeType::Probe => Ipv4::UNSPECIFIED_ADDRESS,
+            // As per RFC 5227 section 2.3 for "ARP announcements":
+            //   The sender and target IP addresses are both set to the
+            //   host's newly selected IPv4 address
+            Ipv4SentProbeType::Announcement => target_ip.clone(),
+        };
+        // As per RFC 5227 section 2.1.1:
+        //   The 'target IP address' field MUST be set to the address
+        //   being probed.
+        (sender_ip, target_ip)
+    }
 }
 
 /// The data needed to send an IPv6 DAD probe.
 #[derive(Debug)]
-pub struct Ipv6DadSentProbeData {
+pub struct Ipv6DadSendData {
     /// The destination address of the probe.
     pub dst_ip: MulticastAddr<Ipv6Addr>,
     /// The Neighbor Solicication to send.
@@ -271,7 +320,6 @@ pub trait DadContext<I: IpDeviceIpExt, BC: DadBindingsTypes>:
     IpDeviceAddressIdContext<I>
     + DeviceIdContext<AnyDevice>
     + CoreTimerContext<DadTimerId<I, Self::WeakDeviceId, Self::WeakAddressId>, BC>
-    + CoreEventContext<DadEvent<I, Self::DeviceId>>
 {
     /// The inner address context.
     type DadAddressCtx<'a>: DadAddressContext<
@@ -294,7 +342,7 @@ pub trait DadContext<I: IpDeviceIpExt, BC: DadBindingsTypes>:
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &Self::DeviceId,
-        data: I::SentProbeData,
+        data: I::SendData,
     );
 }
 
@@ -305,6 +353,20 @@ pub enum DadState<I: DadIpExt, BT: DadBindingsTypes> {
     /// The address is assigned to an interface and can be considered bound to
     /// it (all packets destined to the address will be accepted).
     Assigned,
+
+    /// Like [`Self::Assigned`], but the DAD engine is announcing to the network
+    /// that we are using this address.
+    ///
+    /// This state corresponds to the announcing described in RFC 5227 section
+    /// 2.3 and as such only applies to IPv4 addresses. The IPv6 DAD
+    /// specification (RFC 4862 section 5.4) does not define an announcement
+    /// period.
+    Announcing {
+        /// The timer used to schedule DAD operations in the future.
+        timer: BT::Timer,
+        /// Announcing state specific to the given IP version.
+        ip_specific_state: I::AnnouncingState,
+    },
 
     /// The address is considered unassigned to an interface for normal
     /// operations, but has the intention of being assigned in the future (e.g.
@@ -329,9 +391,22 @@ impl<I: DadIpExt, BT: DadBindingsTypes> DadState<I, BT> {
     pub(crate) fn is_assigned(&self) -> bool {
         match self {
             DadState::Assigned => true,
+            // As per RFC 5227 section 2.3:
+            //   The host may begin legitimately using the IP address
+            //   immediately after sending the first of the two ARP
+            //   Announcements.
+            // As such, consider an address in Announcing to be assigned.
+            DadState::Announcing { .. } => true,
             DadState::Tentative { .. } | DadState::Uninitialized => false,
         }
     }
+}
+
+/// Dad state specific to announcing IPv4 addresses.
+#[derive(Debug)]
+pub struct Ipv4AnnouncingDadState {
+    /// The number of announcements that still need to be sent.
+    pub announcements_remaining: NonZeroU16,
 }
 
 /// DAD state specific to tentative IPv6 addresses.
@@ -391,32 +466,20 @@ impl NonceCollection {
     }
 }
 
-#[derive(Debug, Eq, Hash, PartialEq)]
-/// Events generated by duplicate address detection.
-pub enum DadEvent<I: IpDeviceIpExt, DeviceId> {
-    /// Duplicate address detection completed and the address is assigned.
-    AddressAssigned {
-        /// Device the address belongs to.
-        device: DeviceId,
-        /// The address that moved to the assigned state.
-        addr: I::AssignedWitness,
-    },
-}
-
 /// The bindings types for DAD.
-pub trait DadBindingsTypes: TimerBindingsTypes {}
-impl<BT> DadBindingsTypes for BT where BT: TimerBindingsTypes {}
+pub trait DadBindingsTypes: TimerBindingsTypes + InstantBindingsTypes {}
+impl<BT> DadBindingsTypes for BT where BT: TimerBindingsTypes + InstantBindingsTypes {}
 
 /// The bindings execution context for DAD.
-///
-/// The type parameter `E` is tied by [`DadContext`] so that [`DadEvent`] can be
-/// transformed into an event that is more meaningful to bindings.
-pub trait DadBindingsContext<E>:
-    DadBindingsTypes + TimerContext + EventContext<E> + RngContext
+pub trait DadBindingsContext<I: Ip, D>:
+    DadBindingsTypes + TimerContext + EventContext<IpDeviceEvent<D, I, Self::Instant>> + RngContext
 {
 }
-impl<E, BC> DadBindingsContext<E> for BC where
-    BC: DadBindingsTypes + TimerContext + EventContext<E> + RngContext
+impl<I: Ip, D, BC> DadBindingsContext<I, D> for BC where
+    BC: DadBindingsTypes
+        + TimerContext
+        + EventContext<IpDeviceEvent<D, I, Self::Instant>>
+        + RngContext
 {
 }
 
@@ -443,18 +506,22 @@ pub struct Ipv6PacketResultMetadata {
 }
 
 /// An implementation for Duplicate Address Detection.
-pub trait DadHandler<I: IpDeviceIpExt, BC>:
+pub trait DadHandler<I: IpDeviceIpExt, BC: DadBindingsTypes>:
     DeviceIdContext<AnyDevice> + IpDeviceAddressIdContext<I>
 {
     /// Initializes the DAD state for the given device and address.
     ///
     /// If DAD is required, the return value holds a [`StartDad`] token that
     /// can be used to start the DAD algorithm.
-    fn initialize_duplicate_address_detection<'a>(
+    fn initialize_duplicate_address_detection<
+        'a,
+        F: FnOnce(IpAddressState) -> IpDeviceEvent<Self::DeviceId, I, BC::Instant>,
+    >(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &'a Self::DeviceId,
         addr: &'a Self::AddressId,
+        into_bindings_event: F,
     ) -> NeedsDad<'a, Self::AddressId, Self::DeviceId>;
 
     /// Starts duplicate address detection.
@@ -499,19 +566,6 @@ pub enum NeedsDad<'a, A, D> {
     Yes(StartDad<'a, A, D>),
 }
 
-impl<'a, A, D> NeedsDad<'a, A, D> {
-    // Returns the address's current state, and whether DAD needs to be started.
-    pub(crate) fn into_address_state_and_start_dad(
-        self,
-    ) -> (IpAddressState, Option<StartDad<'a, A, D>>) {
-        match self {
-            // Addresses proceed directly to assigned when DAD is disabled.
-            NeedsDad::No => (IpAddressState::Assigned, None),
-            NeedsDad::Yes(start_dad) => (IpAddressState::Tentative, Some(start_dad)),
-        }
-    }
-}
-
 /// Signals that DAD is allowed to run for the given address & device.
 ///
 /// Inner members are private to ensure the type can only be constructed in the
@@ -527,15 +581,17 @@ pub struct StartDad<'a, A, D> {
 fn initialize_duplicate_address_detection<
     'a,
     I: IpDeviceIpExt,
-    BC: DadBindingsContext<CC::OuterEvent>,
+    BC: DadBindingsContext<I, CC::DeviceId>,
     CC: DadContext<I, BC>,
-    F: FnOnce(&mut CC::DadAddressCtx<'_>, &mut BC, &CC::DeviceId, &CC::AddressId),
+    F1: FnOnce(IpAddressState) -> IpDeviceEvent<CC::DeviceId, I, BC::Instant>,
+    F2: FnOnce(&mut CC::DadAddressCtx<'_>, &mut BC, &CC::DeviceId, &CC::AddressId),
 >(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &'a CC::DeviceId,
     addr: &'a CC::AddressId,
-    on_initialized_cb: F,
+    into_bindings_event: F1,
+    on_initialized_cb: F2,
 ) -> NeedsDad<'a, CC::AddressId, CC::DeviceId> {
     core_ctx.with_dad_state(
         device_id,
@@ -582,6 +638,14 @@ fn initialize_duplicate_address_detection<
             // state lock.
             on_initialized_cb(core_ctx, bindings_ctx, device_id, addr);
 
+            // Dispatch the appropriate event to bindings while holding the dad
+            // state lock.
+            let address_state = match &needs_dad {
+                NeedsDad::No => IpAddressState::Assigned,
+                NeedsDad::Yes(_) => IpAddressState::Tentative,
+            };
+            bindings_ctx.on_event(into_bindings_event(address_state));
+
             needs_dad
         },
     )
@@ -589,7 +653,7 @@ fn initialize_duplicate_address_detection<
 
 fn do_duplicate_address_detection<
     I: IpDeviceIpExt,
-    BC: DadBindingsContext<CC::OuterEvent>,
+    BC: DadBindingsContext<I, CC::DeviceId>,
     CC: DadContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -602,87 +666,72 @@ fn do_duplicate_address_detection<
         addr,
         |DadStateRef { state, retrans_timer_data, max_dad_transmits: _ }| {
             let DadAddressStateRef { dad_state, core_ctx } = state;
-
-            let (remaining, timer, ip_specific_state, probe_wait) = match dad_state {
+            match dad_state {
+                DadState::Uninitialized | DadState::Assigned => {
+                    panic!("expected address to be tentative or announcing; addr={addr:?}")
+                }
                 DadState::Tentative {
                     dad_transmits_remaining,
                     timer,
                     ip_specific_state,
                     probe_wait,
-                } => (dad_transmits_remaining, timer, ip_specific_state, probe_wait),
-                DadState::Uninitialized | DadState::Assigned => {
-                    panic!("expected address to be tentative; addr={addr:?}")
-                }
-            };
-
-            if let Some(probe_wait) = probe_wait.take() {
-                // Schedule a timer and short circuit, deferring the first probe
-                // until after the timer fires.
-                assert_eq!(
-                    bindings_ctx.schedule_timer(probe_wait, timer),
-                    None,
-                    "Unexpected DAD timer; addr={}, device_id={:?}",
-                    addr.addr(),
-                    device_id
-                );
-                return None;
-            }
-
-            match remaining {
-                None => {
-                    // TODO(https://fxbug.dev/42077260): For IPv4 addresses,
-                    // perform the announcement procedure specified in RFC 5227
-                    // section 2.3 before assigning the address.
-                    *dad_state = DadState::Assigned;
-                    core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = true);
-                    CC::on_event(
+                } => {
+                    let (should_send_probe, state_change) = run_tentative_step::<I, CC, BC>(
+                        core_ctx,
                         bindings_ctx,
-                        DadEvent::AddressAssigned {
-                            device: device_id.clone(),
-                            addr: addr.addr_sub().addr(),
-                        },
-                    );
-                    None
-                }
-                Some(non_zero_remaining) => {
-                    *remaining = NonZeroU16::new(non_zero_remaining.get() - 1);
-
-                    // Delay sending subsequent DAD probes.
-                    //
-                    // For IPv4, per RFC 5227 Section 2.1.1
-                    //   each of these probe packets spaced randomly and
-                    //   uniformly, PROBE_MIN to PROBE_MAX seconds apart.
-                    //
-                    // And for IPv6, per RFC 4862 section 5.1,
-                    //   DupAddrDetectTransmits ...
-                    //      Autoconfiguration also assumes the presence of the variable
-                    //      RetransTimer as defined in [RFC4861]. For autoconfiguration
-                    //      purposes, RetransTimer specifies the delay between
-                    //      consecutive Neighbor Solicitation transmissions performed
-                    //      during Duplicate Address Detection (if
-                    //      DupAddrDetectTransmits is greater than 1), as well as the
-                    //      time a node waits after sending the last Neighbor
-                    //      Solicitation before ending the Duplicate Address Detection
-                    //      process.
-                    let retrans_interval =
-                        I::get_retransmission_interval(retrans_timer_data, bindings_ctx);
-                    assert_eq!(
-                        bindings_ctx.schedule_timer(retrans_interval.get(), timer),
-                        None,
-                        "Unexpected DAD timer; addr={}, device_id={:?}",
-                        addr.addr(),
-                        device_id
-                    );
-                    debug!(
-                        "performing DAD for {}; {} tries left",
-                        addr.addr(),
-                        remaining.map_or(0, NonZeroU16::get)
-                    );
-                    Some(I::generate_sent_probe_data(
+                        device_id,
+                        addr,
+                        retrans_timer_data,
+                        dad_transmits_remaining,
+                        timer,
                         ip_specific_state,
-                        addr.addr().addr(),
-                        bindings_ctx,
-                    ))
+                        probe_wait,
+                    );
+                    match state_change {
+                        DadStateChangeFromTentative::None => {}
+                        DadStateChangeFromTentative::ToAssigned => *dad_state = DadState::Assigned,
+                        DadStateChangeFromTentative::ToAnnouncing { ip_specific_state } => {
+                            // Note: Because of Rust semantics, we cannot
+                            // convert directly from tentative to announcing.
+                            // Instead we use uninitialized as an intermediary
+                            // step to gain access to an owned `timer`.
+                            let orig = mem::replace(dad_state, DadState::Uninitialized);
+                            let timer = assert_matches!(
+                                orig,
+                                DadState::Tentative{timer, ..} => timer,
+                                "state must be tentative"
+                            );
+                            *dad_state = DadState::Announcing { ip_specific_state, timer }
+                        }
+                    }
+                    should_send_probe
+                }
+                DadState::Announcing { ip_specific_state, timer } => {
+                    #[derive(GenericOverIp)]
+                    #[generic_over_ip(I, Ip)]
+                    struct WrapIn<'a, I: DadIpExt>(&'a mut I::AnnouncingState, I::Addr);
+                    #[derive(GenericOverIp)]
+                    #[generic_over_ip(I, Ip)]
+                    struct WrapOut<I: DadIpExt>(I::SendData, DadStateChangeFromAnnouncing);
+                    let WrapOut(send_data, state_change) = I::map_ip(
+                        WrapIn(ip_specific_state, addr.addr().addr()),
+                        |WrapIn(ipv4_state, ipv4_addr)| {
+                            let (send_data, state_change) = run_ipv4_announcing_step(
+                                bindings_ctx,
+                                device_id,
+                                ipv4_addr,
+                                ipv4_state,
+                                timer,
+                            );
+                            WrapOut(send_data, state_change)
+                        },
+                        |WrapIn(ipv6_state, _ipv6_addr)| match *ipv6_state {},
+                    );
+                    match state_change {
+                        DadStateChangeFromAnnouncing::None => {}
+                        DadStateChangeFromAnnouncing::ToAssigned => *dad_state = DadState::Assigned,
+                    }
+                    Some(send_data)
                 }
             }
         },
@@ -693,11 +742,208 @@ fn do_duplicate_address_detection<
     }
 }
 
+/// A change in [`DadState`] variant that occurs from [`run_tentative_step()`].
+enum DadStateChangeFromTentative<I: DadIpExt> {
+    None,
+    ToAssigned,
+    ToAnnouncing { ip_specific_state: I::AnnouncingState },
+}
+
+/// Runs a single step of the DAD algorithm for an address in [`DadState::Tentative`].
+///
+/// Returns `Some(I::SendData)` if a DAD probe should be sent, and
+/// [`DadStateChangeFromTentative`] if the state machine needs to transition
+/// into a new state.
+fn run_tentative_step<
+    I: IpDeviceIpExt,
+    CC: DadContext<I, BC>,
+    BC: DadBindingsContext<I, CC::DeviceId>,
+>(
+    core_ctx: &mut CC::DadAddressCtx<'_>,
+    bindings_ctx: &mut BC,
+    device_id: &CC::DeviceId,
+    addr: &CC::AddressId,
+    retrans_timer_data: &I::RetransmitTimerData,
+    dad_transmits_remaining: &mut Option<NonZeroU16>,
+    timer: &mut BC::Timer,
+    ip_specific_state: &mut I::TentativeState,
+    probe_wait: &mut Option<Duration>,
+) -> (Option<I::SendData>, DadStateChangeFromTentative<I>) {
+    if let Some(probe_wait) = probe_wait.take() {
+        // Schedule a timer and short circuit, deferring the first probe
+        // until after the timer fires.
+        schedule_dad_timer(bindings_ctx, timer, probe_wait, addr.addr(), device_id);
+        return (None, DadStateChangeFromTentative::None);
+    }
+
+    match dad_transmits_remaining {
+        None => {
+            #[derive(GenericOverIp)]
+            #[generic_over_ip(I, Ip)]
+            struct WrapOut<I: DadIpExt>(Option<I::SendData>, DadStateChangeFromTentative<I>);
+            let WrapOut(send_data, state_change) = I::map_ip(
+                addr.addr().addr(),
+                // When there are no more probes to be sent, IPv4 addresses
+                // should enter the announcing state, see RFC 5227, section 2.3.
+                //   Having probed to determine that a desired address may be
+                //   used safely, a host implementing this specification MUST
+                //   then announce that it is commencing to use this address by
+                //   broadcasting ANNOUNCE_NUM ARP Announcements, spaced
+                //   ANNOUNCE_INTERVAL seconds apart.
+                |ipv4_addr| {
+                    let mut state =
+                        Ipv4AnnouncingDadState { announcements_remaining: IPV4_DAD_ANNOUNCE_NUM };
+                    let (send_data, state_change) = run_ipv4_announcing_step(
+                        bindings_ctx,
+                        device_id,
+                        ipv4_addr,
+                        &mut state,
+                        timer,
+                    );
+                    // Generate the associated "FromTentative" state change,
+                    // based on the "FromAnnouncing" state change.
+                    let state_change = match state_change {
+                        DadStateChangeFromAnnouncing::None => {
+                            // Announcing did not finish. Record that the
+                            // state is now Announcing.
+                            DadStateChangeFromTentative::ToAnnouncing { ip_specific_state: state }
+                        }
+                        DadStateChangeFromAnnouncing::ToAssigned => {
+                            // Announcing finished on the first step. Skip it
+                            // and go directly to Assigned. In practice we
+                            // should never hit this case as it only happens
+                            // when `IPV4_DAD_ANNOUNCE_NUM` <= 1.
+                            DadStateChangeFromTentative::ToAssigned
+                        }
+                    };
+                    WrapOut(Some(send_data), state_change)
+                },
+                // IPv6 does not have any announcing period. Transition
+                // directly to `DadState::Assigned` without sending any probes.
+                |_ipv6_addr| WrapOut(None, DadStateChangeFromTentative::ToAssigned),
+            );
+
+            // Regardless of which state we're transitioning to (Announcing or
+            // Assigned), the address should be considered assigned.
+            // See RFC 5227's commentary on Announcing from section 2.3:
+            //   The host may begin legitimately using the IP address
+            //   immediately after sending the first of the two ARP
+            //   Announcements.
+            core_ctx.with_address_assigned(device_id, addr, |assigned| *assigned = true);
+            bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
+                device: device_id.clone(),
+                addr: addr.addr_sub().addr().into(),
+                state: IpAddressState::Assigned,
+            });
+            return (send_data, state_change);
+        }
+        Some(non_zero_remaining) => {
+            *dad_transmits_remaining = NonZeroU16::new(non_zero_remaining.get() - 1);
+
+            // Delay sending subsequent DAD probes.
+            //
+            // For IPv4, per RFC 5227 Section 2.1.1
+            //   each of these probe packets spaced randomly and
+            //   uniformly, PROBE_MIN to PROBE_MAX seconds apart.
+            //
+            // And for IPv6, per RFC 4862 section 5.1,
+            //   DupAddrDetectTransmits ...
+            //      Autoconfiguration also assumes the presence of the variable
+            //      RetransTimer as defined in [RFC4861]. For autoconfiguration
+            //      purposes, RetransTimer specifies the delay between
+            //      consecutive Neighbor Solicitation transmissions performed
+            //      during Duplicate Address Detection (if
+            //      DupAddrDetectTransmits is greater than 1), as well as the
+            //      time a node waits after sending the last Neighbor
+            //      Solicitation before ending the Duplicate Address Detection
+            //      process.
+            let retrans_interval = I::get_retransmission_interval(
+                retrans_timer_data,
+                bindings_ctx,
+                dad_transmits_remaining,
+            );
+            schedule_dad_timer(bindings_ctx, timer, retrans_interval.get(), addr.addr(), device_id);
+            debug!(
+                "sending DAD probe for {}; {} remaining",
+                addr.addr(),
+                dad_transmits_remaining.map_or(0, NonZeroU16::get)
+            );
+            let send_data =
+                I::generate_sent_probe_data(ip_specific_state, addr.addr().addr(), bindings_ctx);
+            return (Some(send_data), DadStateChangeFromTentative::None);
+        }
+    }
+}
+
+/// A change in [`DadState`] variant that occurs from [`run_ipv4_announcing_step()`].
+enum DadStateChangeFromAnnouncing {
+    None,
+    ToAssigned,
+}
+
+/// Runs a single step of the DAD algorithm for an address in [`DadState::Announcing`].
+///
+/// Implemented concretely for `Ipv4` rather than any `I` because IPv6 does not
+/// support announcing.
+///
+/// Returns the `Ipv4DadSendData` for the announcement that should be sent, and
+/// [`DadStateChangeFromAnnouncing`] if the state machine needs to transition
+/// into a new new state.
+fn run_ipv4_announcing_step<BC: TimerContext>(
+    bindings_ctx: &mut BC,
+    device_id: impl Debug,
+    addr: Ipv4Addr,
+    ip_specific_state: &mut Ipv4AnnouncingDadState,
+    timer: &mut BC::Timer,
+) -> (Ipv4DadSendData, DadStateChangeFromAnnouncing) {
+    let Ipv4AnnouncingDadState { announcements_remaining } = ip_specific_state;
+
+    let new_announcements_remaining = NonZeroU16::new(announcements_remaining.get() - 1);
+    debug!(
+        "sending DAD announcement for {}; {} remaining",
+        addr,
+        new_announcements_remaining.map_or(0, NonZeroU16::get)
+    );
+
+    let send_data =
+        Ipv4DadSendData { target_ip: addr, probe_type: Ipv4SentProbeType::Announcement };
+
+    let state_change = match new_announcements_remaining {
+        // This is the final announcement, change to assigned
+        None => DadStateChangeFromAnnouncing::ToAssigned,
+        Some(non_zero_announcements_remaining) => {
+            // There are more announcements to send after this one. Schedule
+            // another timer.
+            *announcements_remaining = non_zero_announcements_remaining;
+            schedule_dad_timer(bindings_ctx, timer, IPV4_ANNOUNCE_INTERVAL.get(), addr, device_id);
+            DadStateChangeFromAnnouncing::None
+        }
+    };
+    (send_data, state_change)
+}
+
+/// Schedules a [`DadTimer`], panicking if it was already scheduled.
+fn schedule_dad_timer<BC: TimerContext>(
+    bindings_ctx: &mut BC,
+    timer: &mut BC::Timer,
+    duration: Duration,
+    addr: impl Debug,
+    device_id: impl Debug,
+) {
+    assert_eq!(
+        bindings_ctx.schedule_timer(duration, timer),
+        None,
+        "Unexpected DAD timer; addr={:?}, device_id={:?}",
+        addr,
+        device_id
+    );
+}
+
 /// Stop DAD for the given device and address.
 fn stop_duplicate_address_detection<
     'a,
     I: IpDeviceIpExt,
-    BC: DadBindingsContext<CC::OuterEvent>,
+    BC: DadBindingsContext<I, CC::DeviceId>,
     CC: DadContext<I, BC>,
     F: FnOnce(&mut CC::DadAddressCtx<'_>, &mut BC, &CC::DeviceId, &CC::AddressId),
 >(
@@ -715,10 +961,10 @@ fn stop_duplicate_address_detection<
 
             match dad_state {
                 DadState::Assigned => {}
-                DadState::Tentative { timer, .. } => {
+                DadState::Announcing { timer, .. } | DadState::Tentative { timer, .. } => {
                     // Generally we should have a timer installed in the
-                    // tentative state, but we could be racing with the
-                    // timer firing in bindings so we can't assert that it's
+                    // tentative/announcing state, but we could be racing with
+                    // the timer firing in bindings so we can't assert that it's
                     // installed here.
                     let _: Option<_> = bindings_ctx.cancel_timer(timer);
                 }
@@ -743,7 +989,7 @@ fn stop_duplicate_address_detection<
 fn handle_incoming_packet<
     'a,
     I: IpDeviceIpExt,
-    BC: DadBindingsContext<CC::OuterEvent>,
+    BC: DadBindingsContext<I, CC::DeviceId>,
     CC: DadContext<I, BC>,
 >(
     core_ctx: &mut CC,
@@ -759,7 +1005,9 @@ fn handle_incoming_packet<
             let DadAddressStateRef { dad_state, core_ctx: _ } = state;
             match dad_state {
                 DadState::Uninitialized => DadIncomingPacketResult::Uninitialized,
-                DadState::Assigned => DadIncomingPacketResult::Assigned,
+                DadState::Assigned | DadState::Announcing { .. } => {
+                    DadIncomingPacketResult::Assigned
+                }
                 DadState::Tentative {
                     dad_transmits_remaining,
                     timer: _,
@@ -777,18 +1025,25 @@ fn handle_incoming_packet<
     )
 }
 
-impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<Ipv4, BC>> DadHandler<Ipv4, BC> for CC {
-    fn initialize_duplicate_address_detection<'a>(
+impl<BC: DadBindingsContext<Ipv4, Self::DeviceId>, CC: DadContext<Ipv4, BC>> DadHandler<Ipv4, BC>
+    for CC
+{
+    fn initialize_duplicate_address_detection<
+        'a,
+        F: FnOnce(IpAddressState) -> IpDeviceEvent<Self::DeviceId, Ipv4, BC::Instant>,
+    >(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &'a Self::DeviceId,
         addr: &'a Self::AddressId,
+        into_bindings_event: F,
     ) -> NeedsDad<'a, Self::AddressId, Self::DeviceId> {
         initialize_duplicate_address_detection(
             self,
             bindings_ctx,
             device_id,
             addr,
+            into_bindings_event,
             // on_initialized_cb
             |_core_ctx, _bindings_ctx, _device_id, _addr| {},
         )
@@ -831,21 +1086,27 @@ impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<Ipv4, BC>> DadHandle
     }
 }
 
-impl<BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<Ipv6, BC>> DadHandler<Ipv6, BC> for CC
+impl<BC: DadBindingsContext<Ipv6, Self::DeviceId>, CC: DadContext<Ipv6, BC>> DadHandler<Ipv6, BC>
+    for CC
 where
     for<'a> CC::DadAddressCtx<'a>: Ipv6DadAddressContext<BC>,
 {
-    fn initialize_duplicate_address_detection<'a>(
+    fn initialize_duplicate_address_detection<
+        'a,
+        F: FnOnce(IpAddressState) -> IpDeviceEvent<Self::DeviceId, Ipv6, BC::Instant>,
+    >(
         &mut self,
         bindings_ctx: &mut BC,
         device_id: &'a Self::DeviceId,
         addr: &'a Self::AddressId,
+        into_bindings_event: F,
     ) -> NeedsDad<'a, Self::AddressId, Self::DeviceId> {
         initialize_duplicate_address_detection(
             self,
             bindings_ctx,
             device_id,
             addr,
+            into_bindings_event,
             // on_initialized_cb
             |core_ctx, bindings_ctx, device_id, addr| {
                 // As per RFC 4862 section 5.4.2,
@@ -920,7 +1181,7 @@ where
     }
 }
 
-impl<I: IpDeviceIpExt, BC: DadBindingsContext<CC::OuterEvent>, CC: DadContext<I, BC>>
+impl<I: IpDeviceIpExt, BC: DadBindingsContext<I, CC::DeviceId>, CC: DadContext<I, BC>>
     HandleableTimer<CC, BC> for DadTimerId<I, CC::WeakDeviceId, CC::WeakAddressId>
 {
     fn handle(self, core_ctx: &mut CC, bindings_ctx: &mut BC, _: BC::UniqueTimerId) {
@@ -965,6 +1226,19 @@ pub fn ipv4_dad_probe_wait<BC: RngContext>(bindings_ctx: &mut BC) -> Duration {
     bindings_ctx.rng().gen_range(IPV4_PROBE_WAIT_RANGE)
 }
 
+/// As defined in RFC 5227, section 1.1:
+///   ANNOUNCE_WAIT        2 seconds  (delay before announcing)
+const IPV4_ANNOUNCE_WAIT: NonZeroDuration = NonZeroDuration::new(Duration::from_secs(2)).unwrap();
+
+/// As defined in RFC 5227, section 1.1:
+///   ANNOUNCE_INTERVAL    2 seconds  (time between Announcement packets)
+const IPV4_ANNOUNCE_INTERVAL: NonZeroDuration =
+    NonZeroDuration::new(Duration::from_secs(2)).unwrap();
+
+/// As per RFC 5227, section 1.1:
+///   ANNOUNCE_NUM         2          (number of Announcement packets)
+pub const IPV4_DAD_ANNOUNCE_NUM: NonZeroU16 = NonZeroU16::new(2).unwrap();
+
 #[cfg(test)]
 mod tests {
     use alloc::collections::hash_map::{Entry, HashMap};
@@ -1001,6 +1275,8 @@ mod tests {
 
         const DEFAULT_RETRANS_TIMER_DATA: Self::RetransmitTimerData;
 
+        const EXPECTED_NUM_ANNOUNCEMENTS: u16;
+
         // Returns the range of `FakeInstant` that a timer is expected
         // to be installed within.
         fn expected_timer_range(now: FakeInstant) -> impl RangeBounds<FakeInstant> + Debug;
@@ -1031,6 +1307,8 @@ mod tests {
 
         const DEFAULT_RETRANS_TIMER_DATA: () = ();
 
+        const EXPECTED_NUM_ANNOUNCEMENTS: u16 = IPV4_DAD_ANNOUNCE_NUM.get();
+
         fn expected_timer_range(now: FakeInstant) -> impl RangeBounds<FakeInstant> + Debug {
             let FakeInstant { offset } = now;
             FakeInstant::from(offset + *IPV4_PROBE_RANGE.start())
@@ -1056,6 +1334,9 @@ mod tests {
 
         const DEFAULT_RETRANS_TIMER_DATA: NonZeroDuration =
             NonZeroDuration::new(Duration::from_secs(1)).unwrap();
+
+        // NB: Announcing isn't supported for IPv6.
+        const EXPECTED_NUM_ANNOUNCEMENTS: u16 = 0;
 
         fn expected_timer_range(now: FakeInstant) -> impl RangeBounds<FakeInstant> + Debug {
             let FakeInstant { offset } = now;
@@ -1153,10 +1434,10 @@ mod tests {
     >;
 
     type FakeBindingsCtxImpl<I> =
-        FakeBindingsCtx<TestDadTimerId<I>, DadEvent<I, FakeDeviceId>, (), ()>;
+        FakeBindingsCtx<TestDadTimerId<I>, IpDeviceEvent<FakeDeviceId, I, FakeInstant>, (), ()>;
 
     type FakeCoreCtxImpl<I> =
-        FakeCoreCtx<FakeDadContext<I>, <I as DadIpExt>::SentProbeData, FakeDeviceId>;
+        FakeCoreCtx<FakeDadContext<I>, <I as DadIpExt>::SendData, FakeDeviceId>;
 
     fn get_address_id<I: IpDeviceIpExt>(
         addr: I::AssignedWitness,
@@ -1169,13 +1450,6 @@ mod tests {
     {
         fn convert_timer(dispatch_id: TestDadTimerId<I>) -> TestDadTimerId<I> {
             dispatch_id
-        }
-    }
-
-    impl<I: IpDeviceIpExt> CoreEventContext<DadEvent<I, FakeDeviceId>> for FakeCoreCtxImpl<I> {
-        type OuterEvent = DadEvent<I, FakeDeviceId>;
-        fn convert_event(event: DadEvent<I, FakeDeviceId>) -> DadEvent<I, FakeDeviceId> {
-            event
         }
     }
 
@@ -1209,13 +1483,25 @@ mod tests {
             &mut self,
             bindings_ctx: &mut FakeBindingsCtxImpl<I>,
             &FakeDeviceId: &FakeDeviceId,
-            data: I::SentProbeData,
+            data: I::SendData,
         ) {
             self.send_frame(bindings_ctx, data, EmptyBuf).unwrap()
         }
     }
 
     type FakeCtx<I> = CtxPair<FakeCoreCtxImpl<I>, FakeBindingsCtxImpl<I>>;
+
+    // An example `into_bindings_event` callback to be provided to
+    // `initialize_duplicate_address_detection()`.
+    fn into_state_change_event<I: TestDadIpExt>(
+        state: IpAddressState,
+    ) -> IpDeviceEvent<FakeDeviceId, I, FakeInstant> {
+        IpDeviceEvent::AddressStateChanged {
+            state,
+            addr: I::DAD_ADDRESS.into(),
+            device: FakeDeviceId,
+        }
+    }
 
     #[ip_test(I)]
     #[should_panic(expected = "expected address to be tentative")]
@@ -1248,6 +1534,7 @@ mod tests {
                 &mut bindings_ctx,
                 &FakeDeviceId,
                 &address_id,
+                into_state_change_event::<I>,
             )
         });
         assert_matches!(start_dad, NeedsDad::No);
@@ -1256,7 +1543,14 @@ mod tests {
         let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(*assigned);
         check_multicast_groups(I::VERSION, groups);
-        assert_eq!(bindings_ctx.take_events(), &[][..]);
+        assert_eq!(
+            bindings_ctx.take_events(),
+            &[IpDeviceEvent::AddressStateChanged {
+                state: IpAddressState::Assigned,
+                device: FakeDeviceId,
+                addr: I::DAD_ADDRESS.into(),
+            }][..]
+        );
     }
 
     fn dad_timer_id<I: TestDadIpExt>() -> TestDadTimerId<I> {
@@ -1285,7 +1579,8 @@ mod tests {
         }
     }
 
-    fn check_dad<I: TestDadIpExt>(
+    /// Verify the expected probe was sent while in [`DadState::Tentative`].
+    fn check_probe_while_tentative<I: TestDadIpExt>(
         core_ctx: &FakeCoreCtxImpl<I>,
         bindings_ctx: &FakeBindingsCtxImpl<I>,
         frames_len: usize,
@@ -1317,7 +1612,7 @@ mod tests {
         #[derive(GenericOverIp)]
         #[generic_over_ip(I, Ip)]
         struct Wrap<'a, I: TestDadIpExt> {
-            meta: &'a I::SentProbeData,
+            meta: &'a I::SendData,
             ip_specific_state: &'a I::TentativeState,
         }
 
@@ -1327,11 +1622,12 @@ mod tests {
         // Perform IP specific validation of the sent probe.
         I::map_ip::<_, ()>(
             Wrap { meta, ip_specific_state },
-            |Wrap { meta: Ipv4DadSentProbeData { target_ip }, ip_specific_state: () }| {
+            |Wrap { meta: Ipv4DadSendData { target_ip, probe_type }, ip_specific_state: () }| {
                 assert_eq!(*target_ip, Ipv4::DAD_ADDRESS.get());
+                assert_eq!(*probe_type, Ipv4SentProbeType::Probe);
             },
             |Wrap {
-                 meta: Ipv6DadSentProbeData { dst_ip, message, nonce },
+                 meta: Ipv6DadSendData { dst_ip, message, nonce },
                  ip_specific_state:
                      Ipv6TentativeDadState {
                          nonces,
@@ -1379,6 +1675,69 @@ mod tests {
         }
     }
 
+    // Verify the expected announcement was sent while in [`DadState::Announcing`].
+    fn check_announcement<I: TestDadIpExt>(
+        core_ctx: &FakeCoreCtxImpl<I>,
+        frames_len: usize,
+        announcements_remaining: Option<NonZeroU16>,
+    ) {
+        let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
+        match announcements_remaining {
+            // If we have no more outstanding announcements, we should have
+            // entered `DadState::Assigned`.
+            None => assert_matches!(state, DadState::Assigned),
+            // Otherwise, we should still be in `DadState::Announcing`.
+            Some(announcements_remaining) => {
+                let state = assert_matches!(
+                    state,
+                    DadState::Announcing {
+                        timer: _,
+                        ip_specific_state,
+                    } => ip_specific_state
+                );
+                #[derive(GenericOverIp)]
+                #[generic_over_ip(I, Ip)]
+                struct Wrap<'a, I: DadIpExt>(&'a I::AnnouncingState);
+                let got_announcements_remaining = I::map_ip_in(
+                    Wrap(state),
+                    |Wrap(Ipv4AnnouncingDadState { announcements_remaining })| {
+                        *announcements_remaining
+                    },
+                    |Wrap(never)| match *never {},
+                );
+                assert_eq!(
+                    got_announcements_remaining, announcements_remaining,
+                    "got announcements_remaining = {got_announcements_remaining:?},
+                        want announcements_remaining = {announcements_remaining:?}"
+                );
+            }
+        }
+
+        let FakeDadAddressContext { assigned, .. } = &address_ctx.state;
+        assert!(*assigned);
+
+        let frames = core_ctx.frames();
+        assert_eq!(frames.len(), frames_len, "frames = {:?}", frames);
+        let (meta, frame) = frames.last().expect("should have transmitted a frame");
+        assert_eq!(&frame[..], EmptyBuf.as_ref());
+
+        #[derive(GenericOverIp)]
+        #[generic_over_ip(I, Ip)]
+        struct Wrap<'a, I: TestDadIpExt> {
+            meta: &'a I::SendData,
+        }
+
+        // Perform IP specific validation of the sent probe.
+        I::map_ip::<_, ()>(
+            Wrap { meta },
+            |Wrap { meta: Ipv4DadSendData { target_ip, probe_type } }| {
+                assert_eq!(*target_ip, Ipv4::DAD_ADDRESS.get());
+                assert_eq!(*probe_type, Ipv4SentProbeType::Announcement);
+            },
+            |_| unreachable!("DAD shouldn't send announcements for IPv6 addresses."),
+        );
+    }
+
     #[ip_test(I)]
     fn perform_dad<I: TestDadIpExt>() {
         const DAD_TRANSMITS_REQUIRED: u16 = 5;
@@ -1395,6 +1754,15 @@ mod tests {
                 bindings_ctx,
                 &FakeDeviceId,
                 &address_id,
+                into_state_change_event::<I>,
+            );
+            assert_eq!(
+                bindings_ctx.take_events(),
+                &[IpDeviceEvent::AddressStateChanged {
+                    device: FakeDeviceId,
+                    addr: I::DAD_ADDRESS.into(),
+                    state: IpAddressState::Tentative,
+                }][..]
             );
             let token = assert_matches!(start_dad, NeedsDad::Yes(token) => token);
             check_probe_wait::<I>(core_ctx.as_ref());
@@ -1404,7 +1772,7 @@ mod tests {
         skip_probe_wait::<I>(core_ctx, bindings_ctx);
 
         for count in 0..=(DAD_TRANSMITS_REQUIRED - 1) {
-            check_dad(
+            check_probe_while_tentative(
                 core_ctx,
                 bindings_ctx,
                 usize::from(count + 1),
@@ -1412,19 +1780,45 @@ mod tests {
             );
             assert_eq!(bindings_ctx.trigger_next_timer(core_ctx), Some(dad_timer_id()));
         }
-        let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
-        assert_matches!(*state, DadState::Assigned);
+
+        // The address should be considered assigned once tentative phase
+        // finishes.
+        let FakeDadContext { address_ctx, .. } = &core_ctx.state;
         let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(*assigned);
         check_multicast_groups(I::VERSION, groups);
         assert_eq!(
             bindings_ctx.take_events(),
-            &[DadEvent::AddressAssigned { device: FakeDeviceId, addr: I::DAD_ADDRESS }][..]
+            &[IpDeviceEvent::AddressStateChanged {
+                device: FakeDeviceId,
+                addr: I::DAD_ADDRESS.into(),
+                state: IpAddressState::Assigned
+            }][..]
         );
+
+        for count in 1..=I::EXPECTED_NUM_ANNOUNCEMENTS {
+            check_announcement(
+                core_ctx,
+                usize::from(DAD_TRANSMITS_REQUIRED + count),
+                NonZeroU16::new(I::EXPECTED_NUM_ANNOUNCEMENTS - count),
+            );
+            // There should be a timer installed after all but the final
+            // announcement.
+            if count == I::EXPECTED_NUM_ANNOUNCEMENTS {
+                bindings_ctx.timers.assert_no_timers_installed();
+            } else {
+                assert_eq!(bindings_ctx.trigger_next_timer(core_ctx), Some(dad_timer_id()));
+            }
+        }
+
+        let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
+        let FakeDadAddressContext { assigned, .. } = &address_ctx.state;
+        assert_matches!(*state, DadState::Assigned);
+        assert!(*assigned);
     }
 
     #[ip_test(I)]
-    fn stop_dad<I: TestDadIpExt>() {
+    fn stop_dad_while_tentative<I: TestDadIpExt>() {
         const DAD_TRANSMITS_REQUIRED: u16 = 2;
 
         let FakeCtx { mut core_ctx, mut bindings_ctx } =
@@ -1439,6 +1833,7 @@ mod tests {
                 &mut bindings_ctx,
                 &FakeDeviceId,
                 &address_id,
+                into_state_change_event::<I>,
             );
             let token = assert_matches!(start_dad, NeedsDad::Yes(token) => token);
             core_ctx.start_duplicate_address_detection(&mut bindings_ctx, token);
@@ -1446,7 +1841,12 @@ mod tests {
 
         skip_probe_wait::<I>(&mut core_ctx, &mut bindings_ctx);
 
-        check_dad(&core_ctx, &bindings_ctx, 1, NonZeroU16::new(DAD_TRANSMITS_REQUIRED - 1));
+        check_probe_while_tentative(
+            &core_ctx,
+            &bindings_ctx,
+            1,
+            NonZeroU16::new(DAD_TRANSMITS_REQUIRED - 1),
+        );
 
         I::with_dad_handler(&mut core_ctx, |core_ctx| {
             core_ctx.stop_duplicate_address_detection(
@@ -1462,6 +1862,52 @@ mod tests {
         let FakeDadAddressContext { assigned, groups, .. } = &address_ctx.state;
         assert!(!*assigned);
         assert_eq!(groups, &HashMap::new());
+    }
+
+    #[test]
+    fn stop_dad_while_announcing() {
+        // Verify that DAD can be properly canceled from the Announcing state.
+        // Announcing is only supported for IPv4.
+        let FakeCtx { mut core_ctx, mut bindings_ctx } =
+            FakeCtx::with_core_ctx(FakeCoreCtxImpl::with_state(FakeDadContext {
+                state: DadState::Uninitialized,
+                max_dad_transmits: NonZeroU16::new(1),
+                address_ctx: FakeAddressCtxImpl::with_state(FakeDadAddressContext::default()),
+            }));
+        let address_id = get_address_id::<Ipv4>(Ipv4::DAD_ADDRESS);
+
+        // Initialize DAD and fully run through the Tentative state.
+        let start_dad = core_ctx.initialize_duplicate_address_detection(
+            &mut bindings_ctx,
+            &FakeDeviceId,
+            &address_id,
+            into_state_change_event::<Ipv4>,
+        );
+        let token = assert_matches!(start_dad, NeedsDad::Yes(token) => token);
+        core_ctx.start_duplicate_address_detection(&mut bindings_ctx, token);
+        skip_probe_wait::<Ipv4>(&mut core_ctx, &mut bindings_ctx);
+        check_probe_while_tentative(
+            &core_ctx,
+            &bindings_ctx,
+            1,
+            None, /* dad_transmits_remaining */
+        );
+        assert_eq!(bindings_ctx.trigger_next_timer(&mut core_ctx), Some(dad_timer_id()));
+
+        // Verify we're in the Announcing state.
+        let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
+        let FakeDadAddressContext { assigned, .. } = &address_ctx.state;
+        assert_matches!(*state, DadState::Announcing { .. });
+        bindings_ctx.timers.assert_timers_installed_range([(dad_timer_id(), ..)]);
+        assert!(*assigned);
+
+        // Stop DAD and verify everything was cleaned up properly.
+        core_ctx.stop_duplicate_address_detection(&mut bindings_ctx, &FakeDeviceId, &address_id);
+        bindings_ctx.timers.assert_no_timers_installed();
+        let FakeDadContext { state, address_ctx, .. } = &core_ctx.state;
+        let FakeDadAddressContext { assigned, .. } = &address_ctx.state;
+        assert_matches!(*state, DadState::Uninitialized);
+        assert!(!*assigned);
     }
 
     #[test_case(IpAddressState::Unavailable; "uninitialized")]
@@ -1563,14 +2009,23 @@ mod tests {
             bindings_ctx,
             &FakeDeviceId,
             &address_id,
+            into_state_change_event::<Ipv6>,
+        );
+        assert_eq!(
+            bindings_ctx.take_events(),
+            &[IpDeviceEvent::AddressStateChanged {
+                device: FakeDeviceId,
+                addr: Ipv6::DAD_ADDRESS.into(),
+                state: IpAddressState::Tentative,
+            }][..]
         );
         let token = assert_matches!(start_dad, NeedsDad::Yes(token) => token);
         DadHandler::<Ipv6, _>::start_duplicate_address_detection(core_ctx, bindings_ctx, token);
 
-        check_dad(core_ctx, bindings_ctx, 1, None);
+        check_probe_while_tentative(core_ctx, bindings_ctx, 1, None);
 
         let sent_nonce: OwnedNdpNonce = {
-            let (Ipv6DadSentProbeData { dst_ip: _, message: _, nonce }, _frame) =
+            let (Ipv6DadSendData { dst_ip: _, message: _, nonce }, _frame) =
                 core_ctx.frames().last().expect("should have transmitted a frame");
             *nonce
         };
@@ -1631,7 +2086,7 @@ mod tests {
         // Even though we originally required only 1 DAD transmit, MAX_MULTICAST_SOLICIT more
         // should be required as a result of the looped back solicitation.
         for count in 0..extra_dad_transmits_required {
-            check_dad(
+            check_probe_while_tentative(
                 core_ctx,
                 bindings_ctx,
                 usize::from(count) + frames_len_before_extra_transmits + 1,
@@ -1646,7 +2101,11 @@ mod tests {
         assert_eq!(groups, &HashMap::from([(Ipv6::DAD_ADDRESS.to_solicited_node_address(), 1)]));
         assert_eq!(
             bindings_ctx.take_events(),
-            &[DadEvent::AddressAssigned { device: FakeDeviceId, addr: Ipv6::DAD_ADDRESS }][..]
+            &[IpDeviceEvent::AddressStateChanged {
+                device: FakeDeviceId,
+                addr: Ipv6::DAD_ADDRESS.into(),
+                state: IpAddressState::Assigned
+            }][..]
         );
     }
 

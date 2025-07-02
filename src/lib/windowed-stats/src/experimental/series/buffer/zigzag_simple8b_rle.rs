@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use std::io;
+use std::num::NonZeroUsize;
 
 use crate::experimental::series::buffer::encoding;
 use crate::experimental::series::buffer::simple8b_rle::{
@@ -43,6 +44,12 @@ impl ZigzagSimple8bRleRingBuffer {
     /// one or more oldest values in the process.
     pub fn push(&mut self, value: i64) -> Vec<Simple8bRleBlock> {
         self.buffer.push(zigzag_encode(value))
+    }
+
+    /// Push |count| counts of the new value onto the ZigzagSimple8bRleRingBuffer.
+    /// This might evict one or more oldest values in the process.
+    pub fn push_multiple(&mut self, value: i64, count: NonZeroUsize) -> Vec<Simple8bRleBlock> {
+        self.buffer.push_multiple(zigzag_encode(value), count)
     }
 
     pub(crate) fn metadata(&self) -> Simple8bRleBufferMetadata {
@@ -111,6 +118,24 @@ mod tests {
             0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // third block
             1, 0, 0, 0, 0, 0, // fourth block: value (-1 is encoded as 1)
             1, 0, // fourth block: length
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+    }
+
+    #[test]
+    fn test_zigzag_simple8b_rle_ring_buffer_push_multiple() {
+        let mut ring_buffer = ZigzagSimple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
+        ring_buffer.push_multiple(1, NonZeroUsize::new(10).unwrap());
+
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            1, 0, // length
+            0, 0,    // selector head index
+            10,   // last block's # of values
+            0x0f, // first block: RLE selector
+            2, 0, 0, 0, 0, 0, // first block: value (1 is encoded as 2)
+            10, 0, // first block: length
         ];
         assert_eq!(&buffer[..], expected_bytes);
     }

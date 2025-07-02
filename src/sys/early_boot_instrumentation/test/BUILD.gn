@@ -21,7 +21,9 @@ executable("provider") {
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/vfs/cpp",
+    "//sdk/lib/zbi-format",
     "//src/lib/fxl:fxl_cli",
+    "//src/lib/zbitl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]

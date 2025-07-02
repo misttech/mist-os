@@ -349,8 +349,8 @@ mod tests {
         assert_eq!(windowed_stats.windowed_stat(Some(2)), 3u32);
     }
 
-    #[test]
-    fn windowed_stats_log_inspect_uint_array() {
+    #[fuchsia::test]
+    async fn windowed_stats_log_inspect_uint_array() {
         let inspector = Inspector::default();
         let mut windowed_stats = WindowedStats::<u32>::new(3, create_saturating_add_fn());
         windowed_stats.log_value(&1u32);
@@ -364,8 +364,8 @@ mod tests {
         });
     }
 
-    #[test]
-    fn windowed_stats_log_inspect_int_array() {
+    #[fuchsia::test]
+    async fn windowed_stats_log_inspect_int_array() {
         let inspector = Inspector::default();
         let mut windowed_stats = WindowedStats::<i32>::new(3, create_saturating_add_fn());
         windowed_stats.log_value(&1i32);
@@ -379,8 +379,8 @@ mod tests {
         });
     }
 
-    #[test]
-    fn windowed_stats_sum_and_count_log_avg_inspect_double_array() {
+    #[fuchsia::test]
+    async fn windowed_stats_sum_and_count_log_avg_inspect_double_array() {
         let inspector = Inspector::default();
         let mut windowed_stats = WindowedStats::<SumAndCount>::new(3, create_saturating_add_fn());
         windowed_stats.log_value(&SumAndCount { sum: 1u32, count: 1 });
@@ -393,8 +393,8 @@ mod tests {
         });
     }
 
-    #[test]
-    fn windowed_stats_sum_and_count_log_avg_inspect_double_array_with_nan() {
+    #[fuchsia::test]
+    async fn windowed_stats_sum_and_count_log_avg_inspect_double_array_with_nan() {
         let inspector = Inspector::default();
         let windowed_stats = WindowedStats::<SumAndCount>::new(3, create_saturating_add_fn());
 
@@ -407,7 +407,7 @@ mod tests {
 
     #[test]
     fn time_series_window_transition() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(3599_000_000_000));
         let inspector = Inspector::default();
 
@@ -420,7 +420,7 @@ mod tests {
         time_series.log_value(&2u32);
 
         time_series.log_inspect_uint_array(inspector.root(), "stats");
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             stats: {
                 "1m": vec![1u64, 2],
                 "15m": vec![1u64, 2],
@@ -437,7 +437,7 @@ mod tests {
         time_series.log_inspect_uint_array(inspector.root(), "stats2");
 
         // No new window transition because we have not crossed the 3660th second mark
-        assert_data_tree!(inspector, root: contains {
+        assert_data_tree!(@executor exec, inspector, root: contains {
             stats2: {
                 "1m": vec![1u64, 5],
                 "15m": vec![1u64, 5],
@@ -455,7 +455,7 @@ mod tests {
 
         // Only the `1m` window has a new transition because 3660th second marks a new
         // minutely threshold, but not hourly or fifteen-minutely threshold.
-        assert_data_tree!(inspector, root: contains {
+        assert_data_tree!(@executor exec, inspector, root: contains {
             stats3: {
                 "1m": vec![1u64, 5, 4],
                 "15m": vec![1u64, 9],
@@ -474,7 +474,7 @@ mod tests {
         // Now the `15m` window has a new transition, too, because 3900th second marks a new
         // fifteen-minutely threshold (but not hourly threshold).
         // Also, the `1m` window has multiple transitions.
-        assert_data_tree!(inspector, root: contains {
+        assert_data_tree!(@executor exec, inspector, root: contains {
             stats4: {
                 "1m": vec![1u64, 5, 4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 5],
                 "15m": vec![1u64, 9, 5],
@@ -510,9 +510,9 @@ mod tests {
         assert_eq!(time_series.get_aggregated_value(), 3);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn time_series_log_inspect_uint_array() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(961_000_000_000));
         let inspector = Inspector::default();
 
@@ -521,7 +521,7 @@ mod tests {
 
         time_series.log_inspect_uint_array(inspector.root(), "stats");
 
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             stats: {
                 "1m": vec![1u64],
                 "15m": vec![1u64],
@@ -536,7 +536,7 @@ mod tests {
 
     #[test]
     fn time_series_log_inspect_uint_array_automatically_update_windows() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(961_000_000_000));
         let inspector = Inspector::default();
 
@@ -546,7 +546,7 @@ mod tests {
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1021_000_000_000));
         time_series.log_inspect_uint_array(inspector.root(), "stats");
 
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             stats: {
                 "1m": vec![1u64, 0],
                 "15m": vec![1u64],
@@ -561,7 +561,7 @@ mod tests {
 
     #[test]
     fn time_series_stats_log_inspect_int_array() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(961_000_000_000));
         let inspector = Inspector::default();
 
@@ -570,7 +570,7 @@ mod tests {
 
         time_series.log_inspect_int_array(inspector.root(), "stats");
 
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             stats: {
                 "1m": vec![1i64],
                 "15m": vec![1i64],
@@ -585,7 +585,7 @@ mod tests {
 
     #[test]
     fn time_series_log_inspect_int_array_automatically_update_windows() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(961_000_000_000));
         let inspector = Inspector::default();
 
@@ -595,7 +595,7 @@ mod tests {
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1021_000_000_000));
         time_series.log_inspect_int_array(inspector.root(), "stats");
 
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             stats: {
                 "1m": vec![1i64, 0],
                 "15m": vec![1i64],
@@ -610,7 +610,7 @@ mod tests {
 
     #[test]
     fn time_series_sum_and_count_log_avg_inspect_double_array() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(961_000_000_000));
         let inspector = Inspector::default();
         let mut time_series = TimeSeries::<SumAndCount>::new(create_saturating_add_fn);
@@ -619,7 +619,7 @@ mod tests {
 
         time_series.log_avg_inspect_double_array(inspector.root(), "stats");
 
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             stats: {
                 "1m": vec![3f64 / 2f64],
                 "15m": vec![3f64 / 2f64],
@@ -634,7 +634,7 @@ mod tests {
 
     #[test]
     fn time_series_sum_and_count_log_avg_inspect_double_array_automatically_update_windows() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(961_000_000_000));
         let inspector = Inspector::default();
         let mut time_series = TimeSeries::<SumAndCount>::new(create_saturating_add_fn);
@@ -644,7 +644,7 @@ mod tests {
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1021_000_000_000));
         time_series.log_avg_inspect_double_array(inspector.root(), "stats");
 
-        assert_data_tree!(inspector, root: {
+        assert_data_tree!(@executor exec, inspector, root: {
             stats: {
                 "1m": vec![3f64 / 2f64, 0f64],
                 "15m": vec![3f64 / 2f64],

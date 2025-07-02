@@ -22,28 +22,10 @@
 #define RED_REGISTERS_OFFSET 32
 
 #ifndef __ASSEMBLER__
-#include <assert.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
 #include <vm/vm_aspace.h>
-
-// Implemented in assembly.
-extern "C" {
-
-// Markers for the application processor bootstrap code region
-extern void x86_bootstrap16_start();
-extern void x86_bootstrap16_end();
-
-// 64-bit entry points that bootstrap might transition to
-
-// Entry point used for secondary CPU initialization
-extern void _x86_secondary_cpu_long_mode_entry();
-
-// High entry point in the above routine.
-extern void _x86_secondary_cpu_long_mode_high_entry();
-
-}  // extern "C"
 
 struct x86_bootstrap16_data {
   // Physical address of identity PML4
@@ -114,37 +96,29 @@ zx_status_t x86_bootstrap16_acquire(uintptr_t entry64, void** bootstrap_aperture
 // To be called once the caller is done using the bootstrap16 module
 void x86_bootstrap16_release(void* bootstrap_aperture);
 
-static_assert(sizeof(struct x86_ap_bootstrap_data) <= PAGE_SIZE, "");
-static_assert(sizeof(struct x86_realmode_entry_data) <= PAGE_SIZE, "");
+static_assert(sizeof(struct x86_ap_bootstrap_data) <= PAGE_SIZE);
+static_assert(sizeof(struct x86_realmode_entry_data) <= PAGE_SIZE);
 
 static_assert(__offsetof(struct x86_bootstrap16_data, phys_bootstrap_pml4) ==
-                  BCD_PHYS_BOOTSTRAP_PML4_OFFSET,
-              "");
+              BCD_PHYS_BOOTSTRAP_PML4_OFFSET);
 static_assert(__offsetof(struct x86_bootstrap16_data, phys_kernel_pml4) ==
-                  BCD_PHYS_KERNEL_PML4_OFFSET,
-              "");
-static_assert(__offsetof(struct x86_bootstrap16_data, phys_gdtr_limit) == BCD_PHYS_GDTR_OFFSET, "");
-static_assert(__offsetof(struct x86_bootstrap16_data, phys_gdtr_base) == BCD_PHYS_GDTR_OFFSET + 2,
-              "");
+              BCD_PHYS_KERNEL_PML4_OFFSET);
+static_assert(__offsetof(struct x86_bootstrap16_data, phys_gdtr_limit) == BCD_PHYS_GDTR_OFFSET);
+static_assert(__offsetof(struct x86_bootstrap16_data, phys_gdtr_base) == BCD_PHYS_GDTR_OFFSET + 2);
 static_assert(__offsetof(struct x86_bootstrap16_data, phys_long_mode_entry) ==
-                  BCD_PHYS_LM_ENTRY_OFFSET,
-              "");
-static_assert(__offsetof(struct x86_bootstrap16_data, long_mode_cs) == BCD_LM_CS_OFFSET, "");
+              BCD_PHYS_LM_ENTRY_OFFSET);
+static_assert(__offsetof(struct x86_bootstrap16_data, long_mode_cs) == BCD_LM_CS_OFFSET);
 
 static_assert(offsetof(struct x86_bootstrap16_data, virt_long_mode_high_entry) ==
-                  BCD_VIRT_LM_HIGH_ENTRY_OFFSET,
-              "");
+              BCD_VIRT_LM_HIGH_ENTRY_OFFSET);
 
-static_assert(__offsetof(struct x86_ap_bootstrap_data, hdr) == 0, "");
-static_assert(__offsetof(struct x86_ap_bootstrap_data, cpu_id_counter) == BCD_CPU_COUNTER_OFFSET,
-              "");
-static_assert(__offsetof(struct x86_ap_bootstrap_data, cpu_waiting_mask) == BCD_CPU_WAITING_OFFSET,
-              "");
-static_assert(__offsetof(struct x86_ap_bootstrap_data, per_cpu) == BCD_PER_CPU_BASE_OFFSET, "");
+static_assert(__offsetof(struct x86_ap_bootstrap_data, hdr) == 0);
+static_assert(__offsetof(struct x86_ap_bootstrap_data, cpu_id_counter) == BCD_CPU_COUNTER_OFFSET);
+static_assert(__offsetof(struct x86_ap_bootstrap_data, cpu_waiting_mask) == BCD_CPU_WAITING_OFFSET);
+static_assert(__offsetof(struct x86_ap_bootstrap_data, per_cpu) == BCD_PER_CPU_BASE_OFFSET);
 
-static_assert(__offsetof(struct x86_realmode_entry_data, hdr) == 0, "");
-static_assert(__offsetof(struct x86_realmode_entry_data, registers_ptr) == RED_REGISTERS_OFFSET,
-              "");
+static_assert(__offsetof(struct x86_realmode_entry_data, hdr) == 0);
+static_assert(__offsetof(struct x86_realmode_entry_data, registers_ptr) == RED_REGISTERS_OFFSET);
 
 #endif  // __ASSEMBLER__
 

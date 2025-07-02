@@ -15,10 +15,10 @@ pub async fn create_child(collection: &str, url: &str) -> Result<Child, Error> {
     let instance = ScopedInstance::new(collection.to_string(), url.to_string())
         .await
         .context(format_err!("Cannot create child for '{}:{}'", collection, url))?;
-    let realm =
-        instance.connect_to_protocol_at_exposed_dir::<fstresstests::ChildRealmMarker>().context(
-            format_err!("Cannot connect to child realm service for '{}'", instance.child_name()),
-        )?;
+    let realm = instance.connect_to_protocol_at_exposed_dir().context(format_err!(
+        "Cannot connect to child realm service for '{}'",
+        instance.child_name()
+    ))?;
     Ok(Child { instance, realm })
 }
 

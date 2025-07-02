@@ -4,8 +4,8 @@
 
 use component_events::events::*;
 use component_events::matcher::*;
+use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
-use {fidl_fuchsia_component as fcomponent, fuchsia_async as fasync};
 
 /// Starts a nested component manager with a given root component URL using Realm Builer.
 /// Routes some capabilities like LogSink and EventSource to the root.
@@ -30,8 +30,7 @@ async fn start_nested_cm(cm_url: &str, root_url: &str) -> RealmInstance {
 /// Connects to the EventSource protocol from the nested component manager, starts the component
 /// topology and waits for a clean stop of the specified component instance
 async fn wait_for_clean_stop(cm: RealmInstance, moniker_to_wait_on: &str) {
-    let proxy =
-        cm.root.connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>().unwrap();
+    let proxy = cm.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let mut event_stream = EventStream::new(proxy);
 

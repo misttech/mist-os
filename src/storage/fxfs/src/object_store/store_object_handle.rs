@@ -11,7 +11,7 @@ use crate::object_handle::ObjectHandle;
 use crate::object_store::extent_record::{ExtentKey, ExtentMode, ExtentValue};
 use crate::object_store::object_manager::ObjectManager;
 use crate::object_store::object_record::{
-    AttributeKey, EncryptionKeys, ExtendedAttributeValue, ObjectAttributes, ObjectItem, ObjectKey,
+    AttributeKey, EncryptionKey, ExtendedAttributeValue, ObjectAttributes, ObjectItem, ObjectKey,
     ObjectKeyData, ObjectValue, Timestamp,
 };
 use crate::object_store::transaction::{
@@ -28,7 +28,7 @@ use assert_matches::assert_matches;
 use bit_vec::BitVec;
 use futures::stream::{FuturesOrdered, FuturesUnordered};
 use futures::{try_join, TryStreamExt};
-use fxfs_crypto::{Cipher, CipherSet, FindKeyResult, Key, KeyPurpose};
+use fxfs_crypto::{Cipher, CipherSet, FindKeyResult, FxfsCipher, KeyPurpose};
 use fxfs_trace::trace;
 use static_assertions::const_assert;
 use std::cmp::min;
@@ -37,6 +37,7 @@ use std::ops::Range;
 use std::sync::atomic::{self, AtomicBool, Ordering};
 use std::sync::Arc;
 use storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef};
+
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Maximum size for an extended attribute name.
@@ -343,7 +344,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         owner: Arc<S>,
         object_id: u64,
         permanent_keys: bool,
-        options: HandleOptions,
+        mut options: HandleOptions,
         trace: bool,
     ) -> Self {
         let encryption = if permanent_keys {
@@ -353,6 +354,10 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         } else {
             Encryption::None
         };
+        let store: &ObjectStore = owner.as_ref().as_ref();
+        if store.is_encrypted() && store.filesystem().options().inline_crypto_enabled {
+            options.skip_checksums = true;
+        }
         Self { owner, object_id, encryption, options, trace: AtomicBool::new(trace) }
     }
 
@@ -716,7 +721,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     ) -> Result<(), Error> {
         let store = self.store();
         store.device_read_ops.fetch_add(1, Ordering::Relaxed);
-        let ((), key) = {
+        let ((), (_key_id, key)) = {
             let _watchdog = Watchdog::new(10, |count| {
                 warn!("Read has been stalled for {} seconds", count * 10);
             });
@@ -727,7 +732,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             .await?
         };
         if let Some(key) = key {
-            key.decrypt(file_offset, buffer.as_mut_slice())?;
+            key.decrypt(self.object_id, device_offset, file_offset, buffer.as_mut_slice())?;
         }
         Ok(())
     }
@@ -736,39 +741,43 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     /// it is present, or the volume key if it isn't. If the fscrypt key is present, but the key
     /// cannot be unwrapped, then this will return `FxfsError::NoKey`. If the volume is not
     /// encrypted, this returns None.
-    pub async fn get_key(&self, key_id: Option<u64>) -> Result<Option<Key>, Error> {
+    pub async fn get_key(
+        &self,
+        key_id: Option<u64>,
+    ) -> Result<(u64, Option<Arc<dyn Cipher>>), Error> {
         let store = self.store();
         Ok(match self.encryption {
-            Encryption::None => None,
+            Encryption::None => (VOLUME_DATA_KEY_ID, None),
             Encryption::CachedKeys => {
                 if let Some(key_id) = key_id {
-                    Some(
-                        store
-                            .key_manager
-                            .get_key(
-                                self.object_id,
-                                store.crypt().ok_or_else(|| anyhow!("No crypt!"))?.as_ref(),
-                                async || store.get_keys(self.object_id).await,
-                                key_id,
-                            )
-                            .await?
-                            .ok_or(FxfsError::NotFound)?,
+                    (
+                        key_id,
+                        Some(
+                            store
+                                .key_manager
+                                .get_key(
+                                    self.object_id,
+                                    store.crypt().ok_or_else(|| anyhow!("No crypt!"))?.as_ref(),
+                                    async || store.get_keys(self.object_id).await,
+                                    key_id,
+                                )
+                                .await?,
+                        ),
                     )
                 } else {
-                    Some(
-                        store
-                            .key_manager
-                            .get_fscrypt_key_if_present(
-                                self.object_id,
-                                store.crypt().ok_or_else(|| anyhow!("No crypt!"))?.as_ref(),
-                                async || store.get_keys(self.object_id).await,
-                            )
-                            .await?,
-                    )
+                    let (key_id, key) = store
+                        .key_manager
+                        .get_fscrypt_key_if_present(
+                            self.object_id,
+                            store.crypt().ok_or_else(|| anyhow!("No crypt!"))?.as_ref(),
+                            async || store.get_keys(self.object_id).await,
+                        )
+                        .await?;
+                    (key_id, Some(key))
                 }
             }
             Encryption::PermanentKeys => {
-                Some(store.key_manager.get(self.object_id).await?.unwrap())
+                (VOLUME_DATA_KEY_ID, Some(store.key_manager.get(self.object_id).await?.unwrap()))
             }
         })
     }
@@ -776,7 +785,10 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     /// This will only work for a non-permanent volume data key. This is designed to be used with
     /// extended attributes where we'll only create the key on demand for directories and encrypted
     /// files.
-    async fn get_or_create_key(&self, transaction: &mut Transaction<'_>) -> Result<Key, Error> {
+    async fn get_or_create_key(
+        &self,
+        transaction: &mut Transaction<'_>,
+    ) -> Result<Arc<dyn Cipher>, Error> {
         let store = self.store();
 
         // Fast path: try and get keys from the cache.
@@ -787,27 +799,27 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let crypt = store.crypt().ok_or_else(|| anyhow!("No crypt!"))?;
 
         // Next, see if the keys are already created.
-        let (mut wrapped_keys, mut unwrapped_keys) = if let Some(item) =
+        let (mut encryption_keys, mut cipher_set) = if let Some(item) =
             store.tree.find(&ObjectKey::keys(self.object_id)).await.context("find failed")?
         {
-            if let ObjectValue::Keys(EncryptionKeys::AES256XTS(wrapped_keys)) = item.value {
-                let unwrapped_keys = store
+            if let ObjectValue::Keys(encryption_keys) = item.value {
+                let cipher_set = store
                     .key_manager
                     .get_keys(
                         self.object_id,
                         crypt.as_ref(),
-                        &mut Some(async || Ok(wrapped_keys.clone())),
+                        &mut Some(async || Ok(encryption_keys.clone())),
                         /* permanent= */ false,
                         /* force= */ false,
                     )
                     .await
                     .context("get_keys failed")?;
-                match unwrapped_keys.find_key(VOLUME_DATA_KEY_ID) {
+                match cipher_set.find_key(VOLUME_DATA_KEY_ID) {
                     FindKeyResult::NotFound => {}
                     FindKeyResult::Unavailable => return Err(FxfsError::NoKey.into()),
                     FindKeyResult::Key(key) => return Ok(key),
                 }
-                (wrapped_keys, unwrapped_keys.ciphers().to_vec())
+                (encryption_keys, (*cipher_set).clone())
             } else {
                 return Err(anyhow!(FxfsError::Inconsistent));
             }
@@ -817,12 +829,14 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
 
         // Proceed to create the key.  The transaction holds the required locks.
         let (key, unwrapped_key) = crypt.create_key(self.object_id, KeyPurpose::Data).await?;
+        let cipher: Arc<dyn Cipher> = Arc::new(FxfsCipher::new(&unwrapped_key));
 
-        // Merge in unwrapped_key.
-        unwrapped_keys.push(Cipher::new(VOLUME_DATA_KEY_ID, &unwrapped_key));
-        let unwrapped_keys = Arc::new(CipherSet::from(unwrapped_keys));
+        // Add new cipher to cloned cipher set. This will replace existing one
+        // if transaction is successful.
+        cipher_set.add_key(VOLUME_DATA_KEY_ID, Some(cipher.clone()));
+        let cipher_set = Arc::new(cipher_set);
 
-        // Arrange for the key to be added to the cache when (and if) the transaction
+        // Arrange for the CipherSet to be added to the cache when (and if) the transaction
         // commits.
         struct UnwrappedKeys {
             object_id: u64,
@@ -844,24 +858,21 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             }
         }
 
-        wrapped_keys.push((VOLUME_DATA_KEY_ID, key));
+        encryption_keys.insert(VOLUME_DATA_KEY_ID, EncryptionKey::Fxfs(key));
 
         transaction.add_with_object(
             store.store_object_id(),
             Mutation::replace_or_insert_object(
                 ObjectKey::keys(self.object_id),
-                ObjectValue::keys(EncryptionKeys::AES256XTS(wrapped_keys)),
+                ObjectValue::keys(encryption_keys),
             ),
             AssocObj::Owned(Box::new(UnwrappedKeys {
                 object_id: self.object_id,
-                new_keys: unwrapped_keys.clone(),
+                new_keys: cipher_set,
             })),
         );
 
-        let FindKeyResult::Key(key) = unwrapped_keys.find_key(VOLUME_DATA_KEY_ID) else {
-            unreachable!()
-        };
-        Ok(key)
+        Ok(cipher)
     }
 
     pub async fn read(
@@ -998,8 +1009,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                         _ => None,
                     };
                     reads.push(async move {
-                        self
-                            .read_and_decrypt(device_offset, offset, head.reborrow(), key_id)
+                        self.read_and_decrypt(device_offset, offset, head.reborrow(), key_id)
                             .await?;
                         if let Some(bitmap) = maybe_bitmap {
                             apply_bitmap_zeroing(self.block_size() as usize, &bitmap, head);
@@ -1150,7 +1160,7 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         offset: u64,
         buf: MutableBufferRef<'_>,
         key_id: Option<u64>,
-        device_offset: u64,
+        mut device_offset: u64,
     ) -> Result<MaybeChecksums, Error> {
         let mut transfer_buf;
         let block_size = self.block_size();
@@ -1160,14 +1170,20 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
             } else {
                 let (range, buf) = self.align_buffer(attribute_id, offset, buf.as_ref()).await?;
                 transfer_buf = buf;
+                device_offset -= offset - range.start;
                 (range, transfer_buf.as_mut())
             };
 
-        if let Some(key) = self.get_key(key_id).await? {
-            key.encrypt(range.start, transfer_buf_ref.as_mut_slice())?;
+        if let (_, Some(key)) = self.get_key(key_id).await? {
+            key.encrypt(
+                self.object_id,
+                device_offset,
+                range.start,
+                transfer_buf_ref.as_mut_slice(),
+            )?;
         }
 
-        self.write_aligned(transfer_buf_ref.as_ref(), device_offset - (offset - range.start)).await
+        self.write_aligned(transfer_buf_ref.as_ref(), device_offset).await
     }
 
     /// Writes to multiple ranges with data provided in `buf`.  The buffer can be modified in place
@@ -1192,25 +1208,34 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
 
         // The only key we allow to be created on-the-fly is a non permanent key wrapped with the
         // volume data key.
-        let key = if key_id == Some(VOLUME_DATA_KEY_ID)
+        let (key_id, key) = if key_id == Some(VOLUME_DATA_KEY_ID)
             && matches!(self.encryption, Encryption::CachedKeys)
         {
-            Some(self.get_or_create_key(transaction).await.context("get_or_create_key failed")?)
+            (
+                VOLUME_DATA_KEY_ID,
+                Some(
+                    self.get_or_create_key(transaction)
+                        .await
+                        .context("get_or_create_key failed")?,
+                ),
+            )
         } else {
             self.get_key(key_id).await?
         };
-        let key_id = if let Some(key) = key {
+        if let Some(key) = key {
             let mut slice = buf.as_mut_slice();
             for r in ranges {
                 let l = r.end - r.start;
                 let (head, tail) = slice.split_at_mut(l as usize);
-                key.encrypt(r.start, head)?;
+                key.encrypt(
+                    self.object_id,
+                    0, /* TODO(https://fxbug.dev/421269588): plumb through device_offset. */
+                    r.start,
+                    head,
+                )?;
                 slice = tail;
             }
-            key.key_id()
-        } else {
-            0
-        };
+        }
 
         let mut allocated = 0;
         let allocator = store.allocator();
@@ -1297,12 +1322,18 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
                 Result::<_, Error>::Ok(deallocated)
             }
         )?;
+
         for m in mutations {
             transaction.add(store_id, m);
         }
-        for (r, c) in checksums {
-            transaction.add_checksum(r, c, true);
+
+        // Only store checksums in the journal if barriers are not enabled.
+        if !store.filesystem().options().barriers_enabled {
+            for (r, c) in checksums {
+                transaction.add_checksum(r, c, true);
+            }
         }
+
         self.update_allocated_size(transaction, allocated, deallocated).await
     }
 
@@ -1325,19 +1356,21 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let tree = store.tree();
         let store_id = store.store_object_id();
 
-        let key = self.get_key(None).await?;
-        let key_id = if let Some(key) = &key {
+        let (key_id, key) = self.get_key(None).await?;
+        if let Some(key) = &key {
             let mut slice = buf.as_mut_slice();
             for r in ranges {
                 let l = r.end - r.start;
                 let (head, tail) = slice.split_at_mut(l as usize);
-                key.encrypt(r.start, head)?;
+                key.encrypt(
+                    self.object_id,
+                    0, /* TODO(https://fxbug.dev/421269588): plumb through device_offset. */
+                    r.start,
+                    head,
+                )?;
                 slice = tail;
             }
-            key.key_id()
-        } else {
-            0
-        };
+        }
 
         let mut range_iter = ranges.into_iter();
         // There should be at least one range if the buffer has data in it
@@ -1499,8 +1532,11 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         }
 
         let checksums = writes.try_collect::<Vec<_>>().await?;
-        for (r, c, first_write) in checksums.into_iter().flatten() {
-            transaction.add_checksum(r, c, first_write);
+        // Only store checksums in the journal if barriers are not enabled.
+        if !store.filesystem().options().barriers_enabled {
+            for (r, c, first_write) in checksums.into_iter().flatten() {
+                transaction.add_checksum(r, c, first_write);
+            }
         }
 
         for m in mutations {

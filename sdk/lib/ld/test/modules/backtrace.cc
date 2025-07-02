@@ -4,9 +4,11 @@
 
 #include "backtrace.h"
 
+#include <lib/arch/asm.h>
+
 #include "test-start.h"
 
-extern "C" [[noreturn, gnu::visibility("hidden")]] void _start(), _start_end();
+[[gnu::visibility("hidden")]] extern arch::AsmLabel _start, _start_end;
 
 extern "C" [[gnu::noinline]] int64_t TestStart() {
   const uintptr_t ra = reinterpret_cast<uintptr_t>(__builtin_return_address(0));
@@ -20,8 +22,8 @@ extern "C" [[gnu::noinline]] int64_t TestStart() {
     return 2;
   }
 
-  const uintptr_t start = reinterpret_cast<uintptr_t>(_start);
-  const uintptr_t end = reinterpret_cast<uintptr_t>(_start_end);
+  const uintptr_t start = arch::kAsmLabelAddress<_start>;
+  const uintptr_t end = arch::kAsmLabelAddress<_start_end>;
   if (ra <= start) {
     return 3;
   }

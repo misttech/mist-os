@@ -325,6 +325,49 @@ pub struct EbpfHelperImpl<C: EbpfProgramContext>(
     ) -> BpfValue,
 );
 
+/// Stores set of helpers for an eBPF program. The helpers are stored packed
+/// in a vector for fast access in the interpreter.
+#[derive(Derivative)]
+#[derivative(Clone(bound = ""), Default(bound = ""))]
+pub struct HelperSet<C: EbpfProgramContext> {
+    helpers: Vec<EbpfHelperImpl<C>>,
+
+    // Maps helper IDs used in eBPF to location of the helper in `helpers`.
+    indices: HashMap<u32, u32>,
+}
+
+impl<C: EbpfProgramContext> FromIterator<(u32, EbpfHelperImpl<C>)> for HelperSet<C> {
+    fn from_iter<T>(iter: T) -> Self
+    where
+        T: IntoIterator<Item = (u32, EbpfHelperImpl<C>)>,
+    {
+        let mut helpers = Vec::new();
+        let mut indices = HashMap::new();
+        for (helper_id, helper) in iter {
+            let helper_index = helpers.len();
+            helpers.push(helper);
+            indices.insert(helper_id, helper_index as u32);
+        }
+        Self { helpers, indices }
+    }
+}
+
+impl<C: EbpfProgramContext> HelperSet<C> {
+    pub fn new(iter: impl IntoIterator<Item = (u32, EbpfHelperImpl<C>)>) -> Self {
+        Self::from_iter(iter)
+    }
+
+    /// Looks up a helper by ID, returns helper `index`.
+    pub fn get_index_by_id(&self, id: u32) -> Option<u32> {
+        self.indices.get(&id).cloned()
+    }
+
+    /// Returns the helper with the specified index.
+    pub fn get_by_index(&self, index: u32) -> Option<&EbpfHelperImpl<C>> {
+        self.helpers.get(index as usize)
+    }
+}
+
 /// A mapping for a field in a struct where the original ebpf program knows a different offset and
 /// data size than the one it receives from the kernel.
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -446,7 +489,8 @@ pub struct EbpfProgram<C: EbpfProgramContext, T: ArgumentTypeChecker<C> = Static
     #[allow(dead_code)]
     pub(crate) maps: Vec<C::Map>,
 
-    pub(crate) helpers: HashMap<u32, EbpfHelperImpl<C>>,
+    pub(crate) helpers: HelperSet<C>,
+
     type_checker: T,
 }
 
@@ -517,7 +561,7 @@ pub fn link_program_internal<C: EbpfProgramContext, T: ArgumentTypeChecker<C>>(
     program: &VerifiedEbpfProgram,
     struct_mappings: &[StructMapping],
     maps: Vec<C::Map>,
-    helpers: HashMap<u32, EbpfHelperImpl<C>>,
+    helpers: HelperSet<C>,
 ) -> Result<EbpfProgram<C, T>, EbpfError> {
     let type_checker = T::link(program)?;
 
@@ -566,15 +610,17 @@ pub fn link_program_internal<C: EbpfProgramContext, T: ArgumentTypeChecker<C>>(
     for pc in 0..code.len() {
         let instruction = &mut code[pc];
 
-        // Check that we have implementations for all helper calls.
+        // Replace helper IDs with helper indices in call instructions.
         if instruction.code() == (BPF_JMP | BPF_CALL) {
+            assert!(instruction.src_reg() == 0);
             let helper_id = instruction.imm() as u32;
-            if helpers.get(&helper_id).is_none() {
+            let Some(index) = helpers.get_index_by_id(helper_id) else {
                 return Err(EbpfError::ProgramLinkError(format!(
                     "Missing implementation for helper with id={}",
                     helper_id,
                 )));
-            }
+            };
+            instruction.set_imm(index as i32);
         }
 
         // Link maps.
@@ -619,7 +665,7 @@ pub fn link_program<C: EbpfProgramContext>(
     program: &VerifiedEbpfProgram,
     struct_mappings: &[StructMapping],
     maps: Vec<C::Map>,
-    helpers: HashMap<u32, EbpfHelperImpl<C>>,
+    helpers: HelperSet<C>,
 ) -> Result<EbpfProgram<C>, EbpfError> {
     link_program_internal::<C, StaticTypeChecker>(program, struct_mappings, maps, helpers)
 }
@@ -629,7 +675,7 @@ pub fn link_program_dynamic<C: EbpfProgramContext>(
     program: &VerifiedEbpfProgram,
     struct_mappings: &[StructMapping],
     maps: Vec<C::Map>,
-    helpers: HashMap<u32, EbpfHelperImpl<C>>,
+    helpers: HelperSet<C>,
 ) -> Result<EbpfProgram<C, DynamicTypeChecker>, EbpfError> {
     link_program_internal::<C, DynamicTypeChecker>(program, struct_mappings, maps, helpers)
 }
@@ -821,7 +867,7 @@ mod test {
             CallingContext { args: vec![TEST_ARG_TYPE.clone()], ..Default::default() },
             &mut NullVerifierLogger,
         )?;
-        link_program(&verified_program, &[], vec![], HashMap::default())
+        link_program(&verified_program, &[], vec![], HelperSet::default())
     }
 
     struct TestEbpfProgramContext32BitMapped {}
@@ -851,7 +897,7 @@ mod test {
             &verified_program,
             &[TestArgument32BitMapped::get_mapping()],
             vec![],
-            HashMap::default(),
+            HelperSet::default(),
         )
     }
 

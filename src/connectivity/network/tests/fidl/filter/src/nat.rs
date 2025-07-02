@@ -595,19 +595,19 @@ async fn masquerade_icmp_error<
                 assert_eq!(src_ip, expected);
 
                 let icmp_error = packet::Buf::new(&mut eth.body().to_vec(), ..)
-                    .encapsulate(IcmpPacketBuilder::<I, _>::new(
+                    .wrap_in(IcmpPacketBuilder::<I, _>::new(
                         ip.dst_ip(),
                         ip.src_ip(),
                         code,
                         message,
                     ))
-                    .encapsulate(I::PacketBuilder::new(
+                    .wrap_in(I::PacketBuilder::new(
                         ip.dst_ip(),
                         ip.src_ip(),
                         u8::MAX,
                         I::map_ip_out((), |()| Ipv4Proto::Icmp, |()| Ipv6Proto::Icmpv6),
                     ))
-                    .encapsulate(EthernetFrameBuilder::new(
+                    .wrap_in(EthernetFrameBuilder::new(
                         eth.dst_mac(),
                         eth.src_mac(),
                         EtherType::from_ip_version(I::VERSION),

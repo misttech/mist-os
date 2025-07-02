@@ -5,12 +5,9 @@
 use assert_matches::assert_matches;
 use diagnostics_assertions::assert_data_tree;
 use diagnostics_reader::ArchiveReader;
-use disk_builder::{Disk, DEFAULT_DATA_VOLUME_SIZE};
+use disk_builder::Disk;
 use fidl::endpoints::{create_proxy, ServiceMarker as _};
-use fidl_fuchsia_fxfs::{
-    BlobReaderMarker, CryptManagementMarker, CryptManagementProxy, CryptMarker, CryptProxy,
-    KeyPurpose,
-};
+use fidl_fuchsia_fxfs::{BlobReaderMarker, CryptManagementProxy, CryptProxy, KeyPurpose};
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route};
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
@@ -36,8 +33,6 @@ pub const VFS_TYPE_MINFS: u32 = 0x6e694d21;
 pub const VFS_TYPE_MEMFS: u32 = 0x3e694d21;
 pub const VFS_TYPE_FXFS: u32 = 0x73667866;
 pub const VFS_TYPE_F2FS: u32 = 0xfe694d21;
-pub const BLOBFS_MAX_BYTES: u64 = 8765432;
-pub const DATA_MAX_BYTES: u64 = DEFAULT_DATA_VOLUME_SIZE;
 pub const STARNIX_VOLUME_NAME: &str = "starnix_volume";
 
 pub fn round_down<
@@ -181,7 +176,6 @@ impl TestFixtureBuilder {
             .add_route(
                 Route::new()
                     .capability(Capability::directory("dev-topological").rights(fio::R_STAR_DIR))
-                    .capability(Capability::service::<framdisk::ServiceMarker>())
                     .capability(Capability::service::<fvolume::ServiceMarker>())
                     .from(Ref::child(fuchsia_driver_test::COMPONENT_NAME))
                     .to(&fshost),
@@ -342,7 +336,10 @@ impl TestFixture {
         self.dir("data", fio::PERM_READABLE)
             .open(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
             .expect("open failed");
-        file.get_attr().await.expect("get_attr failed - data was probably deleted!");
+        file.get_attributes(fio::NodeAttributesQuery::empty())
+            .await
+            .expect("Fidl transport error on get_attributes()")
+            .expect("get_attr failed - data was probably deleted!");
 
         let data = self.dir("data", fio::PERM_READABLE);
         fuchsia_fs::directory::open_file(&data, ".testdata", fio::PERM_READABLE).await.unwrap();
@@ -366,11 +363,14 @@ impl TestFixture {
     /// Checks for the absence of the .testdata marker file, indicating the data filesystem was
     /// reformatted.
     pub async fn check_test_data_file_absent(&self) {
-        let (file, server) = create_proxy::<fio::NodeMarker>();
-        self.dir("data", fio::PERM_READABLE)
-            .open(".testdata", fio::PERM_READABLE, &fio::Options::default(), server.into_channel())
-            .expect("open failed");
-        file.get_attr().await.expect_err(".testdata should be absent");
+        let err = fuchsia_fs::directory::open_file(
+            &self.dir("data", fio::PERM_READABLE),
+            ".testdata",
+            fio::PERM_READABLE,
+        )
+        .await
+        .expect_err("open_file failed");
+        assert!(err.is_not_found_error());
     }
 
     async fn add_ramdisk(&mut self, vmo: zx::Vmo, type_guid: Option<[u8; 16]>) {
@@ -399,19 +399,19 @@ impl TestFixture {
     pub fn connect_to_crypt(&self) -> CryptProxy {
         self.realm
             .root
-            .connect_to_protocol_at_exposed_dir::<CryptMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect_to_protocol_at_exposed_dir failed for the Crypt protocol")
     }
 
     pub async fn setup_starnix_crypt(&self) -> (CryptProxy, CryptManagementProxy) {
-        let crypt_management =
-            self.realm.root.connect_to_protocol_at_exposed_dir::<CryptManagementMarker>().expect(
+        let crypt_management: CryptManagementProxy =
+            self.realm.root.connect_to_protocol_at_exposed_dir().expect(
                 "connect_to_protocol_at_exposed_dir failed for the CryptManagement protocol",
             );
         let crypt = self
             .realm
             .root
-            .connect_to_protocol_at_exposed_dir::<CryptMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect_to_protocol_at_exposed_dir failed for the Crypt protocol");
         let key = vec![0xABu8; 32];
         crypt_management

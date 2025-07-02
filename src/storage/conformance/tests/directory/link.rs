@@ -15,22 +15,26 @@ async fn link_with_sufficient_rights() {
     }
     let contents = "abcdef".as_bytes();
 
-    for dir_flags in harness
-        .dir_rights
-        .combinations_containing_deprecated(fio::Rights::WRITE_BYTES | fio::Rights::READ_BYTES)
-    {
+    for flags in harness.dir_rights.combinations_containing(fio::R_STAR_DIR | fio::W_STAR_DIR) {
         let entries = vec![
             directory("src", vec![file("old.txt", contents.to_vec())]),
             directory("dest", vec![]),
         ];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let src_dir = deprecated_open_dir_with_flags(&dir, dir_flags, "src").await;
-        let dest_dir = deprecated_open_rw_dir(&dir, "dest").await;
+        let src_dir = dir.open_node::<fio::DirectoryMarker>("src", flags, None).await.unwrap();
+        let dest_dir = dir
+            .open_node::<fio::DirectoryMarker>(
+                "dest",
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
+                None,
+            )
+            .await
+            .unwrap();
         let dest_token = get_token(&dest_dir).await;
 
         // Link src/old.txt -> dest/new.txt.
         let status = src_dir.link("old.txt", dest_token, "new.txt").await.expect("link failed");
-        assert_eq!(zx::Status::from_raw(status), zx::Status::OK, "dir_flags={dir_flags:?}");
+        assert_eq!(zx::Status::from_raw(status), zx::Status::OK, "flags={flags:?}");
 
         // Check dest/new.txt was created and has correct contents.
         assert_eq!(read_file(&dir, "dest/new.txt").await, contents);
@@ -48,14 +52,21 @@ async fn link_with_insufficient_rights() {
     }
     let contents = "abcdef".as_bytes();
 
-    for dir_flags in harness.dir_rights.combinations_without_deprecated(fio::Rights::WRITE_BYTES) {
+    for flags in harness.dir_rights.combinations_without(fio::W_STAR_DIR) {
         let entries = vec![
             directory("src", vec![file("old.txt", contents.to_vec())]),
             directory("dest", vec![]),
         ];
         let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-        let src_dir = deprecated_open_dir_with_flags(&dir, dir_flags, "src").await;
-        let dest_dir = deprecated_open_rw_dir(&dir, "dest").await;
+        let src_dir = dir.open_node::<fio::DirectoryMarker>("src", flags, None).await.unwrap();
+        let dest_dir = dir
+            .open_node::<fio::DirectoryMarker>(
+                "dest",
+                fio::PERM_READABLE | fio::PERM_WRITABLE,
+                None,
+            )
+            .await
+            .unwrap();
         let dest_token = get_token(&dest_dir).await;
 
         // Link src/old.txt -> dest/new.txt.
@@ -63,7 +74,12 @@ async fn link_with_insufficient_rights() {
         assert_eq!(zx::Status::from_raw(status), zx::Status::BAD_HANDLE);
 
         // Check dest/new.txt was not created.
-        assert_file_not_found(&dir, "dest/new.txt").await;
+        assert_eq!(
+            dir.open_node::<fio::FileMarker>("dest/new.txt", fio::PERM_READABLE, None)
+                .await
+                .unwrap_err(),
+            zx::Status::NOT_FOUND
+        );
 
         // Check src/old.txt still exists.
         assert_eq!(read_file(&dir, "src/old.txt").await, contents);

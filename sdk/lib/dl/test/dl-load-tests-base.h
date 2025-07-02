@@ -67,7 +67,7 @@ class DlLoadTestsBase : public DlTestsBase {
                                                              std::string_view filename);
 
   // This is called when a test fixture DlOpens a file module.
-  void TrackModule(void* file, std::string filename);
+  void TrackModule(void* file, const char* filename);
 
   // This is called when a test fixture DlCloses a file module.
   void UntrackModule(void* file);

@@ -71,6 +71,10 @@ zx_status_t SdioControllerDevice::Create(SdmmcRootDevice* parent,
 }
 
 zx_status_t SdioControllerDevice::Probe(const fuchsia_hardware_sdmmc::SdmmcMetadata& metadata) {
+  if (metadata.vccq_off_with_controller_off()) {
+    vccq_off_with_controller_off_ = *metadata.vccq_off_with_controller_off();
+  }
+
   std::lock_guard<std::mutex> lock(lock_);
   return ProbeLocked();
 }
@@ -256,8 +260,13 @@ zx_status_t SdioControllerDevice::AddDevice() {
     }
   }
 
-  for (uint32_t i = 0; i < hw_info_.num_funcs - 1; i++) {
-    if ((st = child_sdio_function_devices_[i]->AddDevice(funcs_[i + 1].hw_info)) != ZX_OK) {
+  // Clear all bits except for function 0, then selectively set the rest depending on which
+  // functions are actually present.
+  function_power_on_.reset();
+  function_power_on_.set(0);
+  for (uint32_t i = 1; i < hw_info_.num_funcs; i++) {
+    function_power_on_.set(i);
+    if ((st = child_sdio_function_devices_[i - 1]->AddDevice(funcs_[i].hw_info)) != ZX_OK) {
       return st;
     }
   }
@@ -489,6 +498,10 @@ zx_status_t SdioControllerDevice::SdioUpdateBlockSize(uint8_t fn_idx, uint16_t b
 
 zx_status_t SdioControllerDevice::SdioUpdateBlockSizeLocked(uint8_t fn_idx, uint16_t blk_sz,
                                                             bool deflt) {
+  if (!SdioFnIdxValid(fn_idx)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   SdioFunction* func = &funcs_[fn_idx];
   if (deflt) {
     blk_sz = static_cast<uint16_t>(func->hw_info.max_blk_size);
@@ -520,6 +533,10 @@ zx_status_t SdioControllerDevice::SdioUpdateBlockSizeLocked(uint8_t fn_idx, uint
 }
 
 zx_status_t SdioControllerDevice::SdioGetBlockSize(uint8_t fn_idx, uint16_t* out_cur_blk_size) {
+  if (!SdioFnIdxValid(fn_idx)) {
+    return ZX_ERR_INVALID_ARGS;
+  }
+
   std::lock_guard<std::mutex> lock(lock_);
 
   if (hw_info_.caps & SDIO_CARD_MULTI_BLOCK) {
@@ -545,6 +562,9 @@ zx_status_t SdioControllerDevice::SdioDoRwByteLocked(bool write, uint8_t fn_idx,
                                                      uint8_t write_byte, uint8_t* out_read_byte) {
   if (!SdioFnIdxValid(fn_idx)) {
     return ZX_ERR_INVALID_ARGS;
+  }
+  if (!function_power_on_[fn_idx]) {
+    return ZX_ERR_BAD_STATE;
   }
   if (shutdown_) {
     return ZX_ERR_CANCELED;
@@ -582,6 +602,37 @@ void SdioControllerDevice::SdioAckInBandIntr(uint8_t fn_idx) {
 
 void SdioControllerDevice::InBandInterruptCallback() {
   async::PostTask(irq_dispatcher_.async_dispatcher(), [this] { SdioIrqHandler(); });
+}
+
+void SdioControllerDevice::FunctionPowerOn(uint8_t fn_idx) {
+  if (!SdioFnIdxValid(fn_idx)) {
+    return;
+  }
+
+  const std::bitset old_function_power_on = function_power_on_;
+  function_power_on_.set(fn_idx);
+  function_power_on_.set(0);  // Function 0 is always on if at least one other function is on.
+  if (old_function_power_on.none() && vccq_off_with_controller_off_) {
+    // The controller driver has already transitioned from OFF to ON, now it's our turn. If the
+    // controller driver has not powered down the chip then there is nothing to do here.
+    PowerOnReset();
+  }
+
+  // TODO(421962648): Unmask in-band interrupts, if needed.
+}
+
+void SdioControllerDevice::FunctionPowerOff(uint8_t fn_idx) {
+  if (!SdioFnIdxValid(fn_idx)) {
+    return;
+  }
+
+  // All requests are handled synchronously on the default dispatcher, so we don't need to wait for
+  // anything to complete before letting the controller driver power down.
+  function_power_on_.reset(fn_idx);
+  // Clear the bit for function 0 if the last I/O function just powered down.
+  if (function_power_on_ == 1) {
+    function_power_on_.reset();
+  }
 }
 
 void SdioControllerDevice::SdioIrqHandler() {
@@ -677,19 +728,13 @@ zx_status_t SdioControllerDevice::SdioUnregisterVmo(uint8_t fn_idx, uint32_t vmo
 }
 
 zx_status_t SdioControllerDevice::SdioRequestCardReset() {
-  if (shutdown_) {
-    return ZX_ERR_CANCELED;
+  if (function_power_on_.none()) {
+    return ZX_ERR_BAD_STATE;
   }
-
-  std::lock_guard<std::mutex> lock(lock_);
-
-  tuned_ = false;
-  funcs_ = {};
-  hw_info_ = {};
 
   sdmmc_->HwReset();
 
-  zx_status_t status = ProbeLocked();
+  zx_status_t status = PowerOnReset();
   if (status == ZX_OK) {
     FDF_LOGL(INFO, logger(), "Reset card successfully");
   } else {
@@ -700,6 +745,9 @@ zx_status_t SdioControllerDevice::SdioRequestCardReset() {
 }
 
 zx_status_t SdioControllerDevice::SdioPerformTuning() {
+  if (function_power_on_.none()) {
+    return ZX_ERR_BAD_STATE;
+  }
   if (shutdown_) {
     return ZX_ERR_CANCELED;
   }
@@ -725,6 +773,20 @@ zx::result<uint8_t> SdioControllerDevice::ReadCccrByte(uint32_t addr) {
     return zx::error(status);
   }
   return zx::ok(byte);
+}
+
+zx_status_t SdioControllerDevice::PowerOnReset() {
+  if (shutdown_) {
+    return ZX_ERR_CANCELED;
+  }
+
+  std::lock_guard<std::mutex> lock(lock_);
+
+  tuned_ = false;
+  funcs_ = {};
+  hw_info_ = {};
+
+  return ProbeLocked();
 }
 
 // Use function overloads to convert the buffer depending on whether this is a Banjo or a FIDL call.
@@ -849,6 +911,9 @@ template <typename T>
 zx_status_t SdioControllerDevice::SdioDoRwTxn(uint8_t fn_idx, const SdioRwTxn<T>& txn) {
   if (!SdioFnIdxValid(fn_idx)) {
     return ZX_ERR_INVALID_ARGS;
+  }
+  if (!function_power_on_[fn_idx]) {
+    return ZX_ERR_BAD_STATE;
   }
   if (shutdown_) {
     return ZX_ERR_CANCELED;

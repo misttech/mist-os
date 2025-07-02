@@ -59,10 +59,9 @@ zx::result<const void *> ZirconPhysmemReader::PhysToPtr(uintptr_t phys, size_t l
     return zx::success(paddr_to_physmap(phys));
   }
 
-  size_t mapped = 0;
   zx_status_t status = VmAspace::kernel_aspace()->arch_aspace().MapContiguous(
       vaddr_base, paddr_base, (ROUNDUP(phys_end, PAGE_SIZE) - paddr_base) / PAGE_SIZE,
-      ARCH_MMU_FLAG_PERM_READ, &mapped);
+      ARCH_MMU_FLAG_PERM_READ);
   if (status != ZX_OK) {
     return zx::error(status);
   }

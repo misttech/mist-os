@@ -12,7 +12,7 @@
 
 void MsdVsiDriver::Destroy(MsdVsiDriver* drv) { delete drv; }
 
-std::unique_ptr<msd::Device> MsdVsiDriver::CreateDevice(msd::DeviceHandle* device_handle) {
+std::unique_ptr<msd::Device> MsdVsiDriver::MsdCreateDevice(msd::DeviceHandle* device_handle) {
   bool start_device_thread = (configure_flags() & MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD) == 0;
 
   std::unique_ptr<MsdVsiDevice> device = MsdVsiDevice::Create(device_handle, start_device_thread);
@@ -23,7 +23,7 @@ std::unique_ptr<msd::Device> MsdVsiDriver::CreateDevice(msd::DeviceHandle* devic
   return device;
 }
 
-std::unique_ptr<msd::Buffer> MsdVsiDriver::ImportBuffer(zx::vmo vmo, uint64_t client_id) {
+std::unique_ptr<msd::Buffer> MsdVsiDriver::MsdImportBuffer(zx::vmo vmo, uint64_t client_id) {
   auto buffer = MsdVsiBuffer::Import(std::move(vmo), client_id);
 
   if (!buffer) {
@@ -33,8 +33,9 @@ std::unique_ptr<msd::Buffer> MsdVsiDriver::ImportBuffer(zx::vmo vmo, uint64_t cl
   return std::make_unique<MsdVsiAbiBuffer>(std::move(buffer));
 }
 
-magma_status_t MsdVsiDriver::ImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
-                                             std::unique_ptr<msd::Semaphore>* semaphore_out) {
+magma_status_t MsdVsiDriver::MsdImportSemaphore(zx::handle handle, uint64_t client_id,
+                                                uint64_t flags,
+                                                std::unique_ptr<msd::Semaphore>* semaphore_out) {
   auto semaphore = magma::PlatformSemaphore::Import(std::move(handle), flags);
   if (!semaphore)
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "couldn't import semaphore handle");
@@ -48,4 +49,4 @@ magma_status_t MsdVsiDriver::ImportSemaphore(zx::handle handle, uint64_t client_
 }
 
 // static
-std::unique_ptr<msd::Driver> msd::Driver::Create() { return std::make_unique<MsdVsiDriver>(); }
+std::unique_ptr<msd::Driver> msd::Driver::MsdCreate() { return std::make_unique<MsdVsiDriver>(); }

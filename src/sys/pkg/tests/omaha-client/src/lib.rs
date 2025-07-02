@@ -609,15 +609,15 @@ impl TestEnvBuilder {
         let realm_instance = builder.build().await.unwrap();
         let channel_control = realm_instance
             .root
-            .connect_to_protocol_at_exposed_dir::<ChannelControlMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect to channel control provider");
         let update_manager = realm_instance
             .root
-            .connect_to_protocol_at_exposed_dir::<ManagerMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect to update manager");
         let commit_status_provider = realm_instance
             .root
-            .connect_to_protocol_at_exposed_dir::<CommitStatusProviderMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect to commit status provider");
 
         TestEnv {
@@ -2042,7 +2042,7 @@ async fn test_omaha_client_persists_cohort() {
     env.proxies.update_manager = env
         .realm_instance
         .root
-        .connect_to_protocol_at_exposed_dir::<ManagerMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect to update manager");
 
     env.server.lock().set_all_cohort_assertions(Some("1:1:".to_string()));

@@ -76,61 +76,61 @@ async fn mock_client(
     mut sender: mpsc::Sender<Event>,
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
-    let profile_svc = handles.connect_to_protocol::<ProfileMarker>()?;
+    let profile_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::Profile { _profile: Some(profile_svc) })
         .await
         .expect("failed sending ack to test");
 
-    let gatt_server_svc = handles.connect_to_protocol::<fbgatt::Server_Marker>()?;
+    let gatt_server_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::GattServer { _gatt_server: Some(gatt_server_svc) })
         .await
         .expect("failed sending ack to test");
 
-    let gatt2_server_svc = handles.connect_to_protocol::<fbgatt2::Server_Marker>()?;
+    let gatt2_server_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::Gatt2Server { _gatt2_server: Some(gatt2_server_svc) })
         .await
         .expect("failed sending ack to test");
 
-    let le_central_svc = handles.connect_to_protocol::<fble::CentralMarker>()?;
+    let le_central_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::LeCentral { _le_central: Some(le_central_svc) })
         .await
         .expect("failed sending ack to test");
 
-    let le_peripheral_svc = handles.connect_to_protocol::<fble::PeripheralMarker>()?;
+    let le_peripheral_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::LePeripheral { _le_peripheral: Some(le_peripheral_svc) })
         .await
         .expect("failed sending ack to test");
 
-    let access_svc = handles.connect_to_protocol::<AccessMarker>()?;
+    let access_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::Access { _access: Some(access_svc) })
         .await
         .expect("failed sending ack to test");
 
-    let bootstrap_svc = handles.connect_to_protocol::<BootstrapMarker>()?;
+    let bootstrap_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::Bootstrap { _bootstrap: Some(bootstrap_svc) })
         .await
         .expect("failed sending ack to test");
 
-    let configuration_svc = handles.connect_to_protocol::<ConfigurationMarker>()?;
+    let configuration_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::Config { _config: Some(configuration_svc) })
         .await
         .expect("failed sending ack to test");
 
-    let host_watcher_svc = handles.connect_to_protocol::<HostWatcherMarker>()?;
+    let host_watcher_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::HostWatcher { _host_watcher: Some(host_watcher_svc) })
         .await
         .expect("failed sending ack to test");
 
-    let pairing_svc = handles.connect_to_protocol::<PairingMarker>()?;
+    let pairing_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::Pairing { _pairing: Some(pairing_svc) })
         .await

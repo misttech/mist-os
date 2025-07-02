@@ -5,10 +5,10 @@
 #include <lib/elfldltl/note.h>
 #include <lib/elfldltl/self.h>
 #include <lib/llvm-profdata/llvm-profdata.h>
-#include <lib/stdcompat/span.h>
 
 #include <cstdint>
 #include <memory>
+#include <span>
 
 #include <gtest/gtest.h>
 
@@ -23,7 +23,7 @@ constexpr bool kRelocatableCounters = false;
 constexpr bool kRelocatableCounters = true;
 #endif
 
-cpp20::span<const std::byte> MyBuildId() {
+std::span<const std::byte> MyBuildId() {
   // TODO(mcgrathr): For these unit tests, it doesn't matter what the ID is.
   // For end-to-end tests using the offline tools, this will need to be the
   // real build ID of the test module.
@@ -53,7 +53,7 @@ TEST(LlvmProfdataTests, FixedData) {
   const size_t buffer_size = data.size_bytes();
   ASSERT_GT(buffer_size, size_t{0});
   std::unique_ptr<std::byte[]> buffer(new std::byte[buffer_size]);
-  const cpp20::span buffer_span(buffer.get(), buffer_size);
+  const std::span buffer_span(buffer.get(), buffer_size);
 
   auto live_data = data.WriteFixedData(buffer_span);
   ASSERT_FALSE(live_data.counters.empty());
@@ -75,12 +75,12 @@ TEST(LlvmProfdataTests, CopyLiveData) {
   const size_t buffer_size = data.size_bytes();
   ASSERT_GT(buffer_size, size_t{0});
   std::unique_ptr<std::byte[]> buffer(new std::byte[buffer_size]);
-  const cpp20::span buffer_span(buffer.get(), buffer_size);
+  const std::span buffer_span(buffer.get(), buffer_size);
 
   auto live_data = data.WriteFixedData(buffer_span);
   ASSERT_FALSE(live_data.counters.empty());
 
-  const cpp20::span<uint64_t> counters{
+  const std::span<uint64_t> counters{
       reinterpret_cast<uint64_t*>(live_data.counters.data()),
       live_data.counters.size_bytes() / sizeof(uint64_t),
   };
@@ -90,7 +90,7 @@ TEST(LlvmProfdataTests, CopyLiveData) {
 
   // Now copy out the current values.
   data.CopyLiveData({
-      .counters = cpp20::as_writable_bytes(counters),
+      .counters = std::as_writable_bytes(counters),
       .bitmap = live_data.bitmap,
   });
 
@@ -106,14 +106,14 @@ TEST(LlvmProfdataTests, CopyLiveData) {
   RunTimeCoveredFunction();
 
   std::unique_ptr<uint64_t[]> new_buffer(new uint64_t[counters.size()]);
-  const cpp20::span new_counters(new_buffer.get(), counters.size());
+  const std::span new_counters(new_buffer.get(), counters.size());
 
   // Fill the buffer with unreasonable counter values.
   std::fill(new_counters.begin(), new_counters.end(), ~uint64_t{});
 
   // Now copy out the new values after running covered code.
   data.CopyLiveData({
-      .counters = cpp20::as_writable_bytes(new_counters),
+      .counters = std::as_writable_bytes(new_counters),
       .bitmap = live_data.bitmap,
   });
 
@@ -143,12 +143,12 @@ TEST(LlvmProfdataTests, CopyLiveDataSingleByteCounters) {
   const size_t buffer_size = data.size_bytes();
   ASSERT_GT(buffer_size, size_t{0});
   std::unique_ptr<std::byte[]> buffer(new std::byte[buffer_size]);
-  const cpp20::span buffer_span(buffer.get(), buffer_size);
+  const std::span buffer_span(buffer.get(), buffer_size);
 
   auto live_data = data.WriteFixedData(buffer_span);
   ASSERT_FALSE(live_data.counters.empty());
 
-  const cpp20::span<uint8_t> counters{
+  const std::span<uint8_t> counters{
       reinterpret_cast<uint8_t*>(live_data.counters.data()),
       live_data.counters.size_bytes() / sizeof(uint8_t),
   };
@@ -160,7 +160,7 @@ TEST(LlvmProfdataTests, CopyLiveDataSingleByteCounters) {
 
   // Now copy out the current values.
   data.CopyLiveData({
-      .counters = cpp20::as_writable_bytes(counters),
+      .counters = std::as_writable_bytes(counters),
       .bitmap = live_data.bitmap,
   });
 
@@ -176,14 +176,14 @@ TEST(LlvmProfdataTests, CopyLiveDataSingleByteCounters) {
   RunTimeCoveredFunction();
 
   std::unique_ptr<uint8_t[]> new_buffer(new uint8_t[counters.size()]);
-  const cpp20::span new_counters(new_buffer.get(), counters.size());
+  const std::span new_counters(new_buffer.get(), counters.size());
 
   // Fill the buffer with unreasonable counter values.
   std::fill(new_counters.begin(), new_counters.end(), 1);
 
   // Now copy out the new values after running covered code.
   data.CopyLiveData({
-      .counters = cpp20::as_writable_bytes(new_counters),
+      .counters = std::as_writable_bytes(new_counters),
       .bitmap = live_data.bitmap,
   });
 
@@ -215,8 +215,8 @@ TEST(LlvmProfdataTests, MergeLiveData) {
   uint8_t new_bitmap[] = {1, 0x11, 0x20, 0x31};
 
   constexpr auto as_falsely_writable = [](auto span) {
-    cpp20::span<const std::byte> bytes = cpp20::as_bytes(span);
-    return cpp20::span<std::byte>{
+    std::span<const std::byte> bytes = std::as_bytes(span);
+    return std::span<std::byte>{
         const_cast<std::byte*>(bytes.data()),
         bytes.size(),
     };
@@ -224,12 +224,12 @@ TEST(LlvmProfdataTests, MergeLiveData) {
 
   LlvmProfdata::MergeLiveData(
       {
-          .counters = cpp20::as_writable_bytes(cpp20::span(new_counters)),
-          .bitmap = cpp20::as_writable_bytes(cpp20::span(new_bitmap)),
+          .counters = std::as_writable_bytes(std::span(new_counters)),
+          .bitmap = std::as_writable_bytes(std::span(new_bitmap)),
       },
       {
-          .counters = as_falsely_writable(cpp20::span(kOldCounters)),
-          .bitmap = as_falsely_writable(cpp20::span(kOldBitmap)),
+          .counters = as_falsely_writable(std::span(kOldCounters)),
+          .bitmap = as_falsely_writable(std::span(kOldBitmap)),
       });
 
   EXPECT_EQ(new_counters[0], 6u);
@@ -248,12 +248,12 @@ TEST(LlvmProfdataTests, MergeLiveData) {
   const size_t buffer_size = data.size_bytes();
   ASSERT_GT(buffer_size, size_t{0});
   std::unique_ptr<std::byte[]> buffer(new std::byte[buffer_size]);
-  const cpp20::span buffer_span(buffer.get(), buffer_size);
+  const std::span buffer_span(buffer.get(), buffer_size);
 
   auto live_data = data.WriteFixedData(buffer_span);
   ASSERT_FALSE(live_data.counters.empty());
 
-  const cpp20::span<uint64_t> counters{
+  const std::span<uint64_t> counters{
       reinterpret_cast<uint64_t*>(live_data.counters.data()),
       live_data.counters.size_bytes() / sizeof(uint64_t),
   };
@@ -270,7 +270,7 @@ TEST(LlvmProfdataTests, MergeLiveData) {
   }
 
   // Now merge the current data into our synthetic starting data.
-  data.MergeLiveData({.counters = cpp20::as_writable_bytes(counters), .bitmap = live_data.bitmap});
+  data.MergeLiveData({.counters = std::as_writable_bytes(counters), .bitmap = live_data.bitmap});
 
   uint64_t increase = 0;
   for (size_t i = 0; i < counters.size(); ++i) {
@@ -297,8 +297,8 @@ TEST(LlvmProfdataTests, MergeLiveDataSingleByteCounters) {
   uint8_t new_bitmap[] = {1, 0x11, 0x20, 0x31};
 
   constexpr auto as_falsely_writable = [](auto span) {
-    cpp20::span<const std::byte> bytes = cpp20::as_bytes(span);
-    return cpp20::span<std::byte>{
+    std::span<const std::byte> bytes = std::as_bytes(span);
+    return std::span<std::byte>{
         const_cast<std::byte*>(bytes.data()),
         bytes.size(),
     };
@@ -306,12 +306,12 @@ TEST(LlvmProfdataTests, MergeLiveDataSingleByteCounters) {
 
   LlvmProfdata::MergeLiveData(
       {
-          .counters = cpp20::as_writable_bytes(cpp20::span(new_counters)),
-          .bitmap = cpp20::as_writable_bytes(cpp20::span(new_bitmap)),
+          .counters = std::as_writable_bytes(std::span(new_counters)),
+          .bitmap = std::as_writable_bytes(std::span(new_bitmap)),
       },
       {
-          .counters = as_falsely_writable(cpp20::span(kOldCounters)),
-          .bitmap = as_falsely_writable(cpp20::span(kOldBitmap)),
+          .counters = as_falsely_writable(std::span(kOldCounters)),
+          .bitmap = as_falsely_writable(std::span(kOldBitmap)),
       });
 
   EXPECT_EQ(new_counters[0], uint8_t{0});
@@ -330,12 +330,12 @@ TEST(LlvmProfdataTests, MergeLiveDataSingleByteCounters) {
   const size_t buffer_size = data.size_bytes();
   ASSERT_GT(buffer_size, size_t{0});
   std::unique_ptr<std::byte[]> buffer(new std::byte[buffer_size]);
-  const cpp20::span buffer_span(buffer.get(), buffer_size);
+  const std::span buffer_span(buffer.get(), buffer_size);
 
   auto live_data = data.WriteFixedData(buffer_span);
   ASSERT_FALSE(live_data.counters.empty());
 
-  const cpp20::span<uint8_t> counters{
+  const std::span<uint8_t> counters{
       reinterpret_cast<uint8_t*>(live_data.counters.data()),
       live_data.counters.size_bytes() / sizeof(uint8_t),
   };
@@ -352,7 +352,7 @@ TEST(LlvmProfdataTests, MergeLiveDataSingleByteCounters) {
   }
 
   // Now merge the current data into our synthetic starting data.
-  data.MergeLiveData({.counters = cpp20::as_writable_bytes(counters), .bitmap = live_data.bitmap});
+  data.MergeLiveData({.counters = std::as_writable_bytes(counters), .bitmap = live_data.bitmap});
 
   uint8_t covered = 1;
   for (size_t i = 0; i < counters.size(); ++i) {
@@ -374,12 +374,12 @@ TEST(LlvmProfdataTests, UseLiveData) {
   const size_t buffer_size = data.size_bytes();
   ASSERT_GT(buffer_size, size_t{0});
   std::unique_ptr<std::byte[]> buffer(new std::byte[buffer_size]);
-  const cpp20::span buffer_span(buffer.get(), buffer_size);
+  const std::span buffer_span(buffer.get(), buffer_size);
 
   auto live_data = data.WriteFixedData(buffer_span);
   ASSERT_FALSE(live_data.counters.empty());
 
-  const cpp20::span<uint64_t> counters{
+  const std::span<uint64_t> counters{
       reinterpret_cast<uint64_t*>(live_data.counters.data()),
       live_data.counters.size_bytes() / sizeof(uint64_t),
   };
@@ -419,12 +419,12 @@ TEST(LlvmProfdataTests, UseLiveDataSingleByteCounters) {
   const size_t buffer_size = data.size_bytes();
   ASSERT_GT(buffer_size, size_t{0});
   std::unique_ptr<std::byte[]> buffer(new std::byte[buffer_size]);
-  const cpp20::span buffer_span(buffer.get(), buffer_size);
+  const std::span buffer_span(buffer.get(), buffer_size);
 
   auto live_data = data.WriteFixedData(buffer_span);
   ASSERT_FALSE(live_data.counters.empty());
 
-  const cpp20::span<uint8_t> counters{
+  const std::span<uint8_t> counters{
       reinterpret_cast<uint8_t*>(live_data.counters.data()),
       live_data.counters.size_bytes() / sizeof(uint8_t),
   };

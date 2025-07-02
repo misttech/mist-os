@@ -704,11 +704,24 @@ TEST_F(CrashReporterTest, Succeed_OnInputCrashReportWithSignature) {
   CheckAttachmentsOnServer({kDefaultAttachmentBundleKey});
 }
 
-TEST_F(CrashReporterTest, Fail_OnInvalidInputCrashReport) {
+TEST_F(CrashReporterTest, FailOnInvalidInputNoProgramName) {
   SetUpDataProviderServer(std::make_unique<stubs::DataProviderReturnsEmptySnapshot>());
   SetUpCrashReporterDefaultConfig();
 
   const CrashReporter_FileReport_Result result = FileOneEmptyCrashReport();
+  EXPECT_TRUE(result.is_err());
+  EXPECT_EQ(result.err(), FilingError::INVALID_ARGS_ERROR);
+}
+
+TEST_F(CrashReporterTest, FailOnInvalidInputZeroWeight) {
+  SetUpDataProviderServer(std::make_unique<stubs::DataProviderReturnsEmptySnapshot>());
+  SetUpCrashReporterDefaultConfig();
+
+  CrashReport report;
+  report.set_program_name("crashing_program_generic");
+  report.set_weight(0);
+  const CrashReporter_FileReport_Result result = FileOneCrashReport(std::move(report));
+
   EXPECT_TRUE(result.is_err());
   EXPECT_EQ(result.err(), FilingError::INVALID_ARGS_ERROR);
 }
@@ -952,11 +965,26 @@ TEST_F(CrashReporterTest, Check_CobaltAfterQuotaReached) {
                                       }));
 }
 
-TEST_F(CrashReporterTest, Check_CobaltAfterInvalidInputCrashReport) {
+TEST_F(CrashReporterTest, CheckCobaltAfterInvalidInputNoProgramName) {
   SetUpDataProviderServer(std::make_unique<stubs::DataProviderReturnsEmptySnapshot>());
   SetUpCrashReporterDefaultConfig();
 
   EXPECT_TRUE(FileOneEmptyCrashReport().is_err());
+  EXPECT_THAT(ReceivedCobaltEvents(), UnorderedElementsAreArray({
+                                          cobalt::Event(cobalt::CrashState::kDropped),
+                                      }));
+}
+
+TEST_F(CrashReporterTest, CheckCobaltAfterInvalidInputZeroWeight) {
+  SetUpDataProviderServer(std::make_unique<stubs::DataProviderReturnsEmptySnapshot>());
+  SetUpCrashReporterDefaultConfig();
+
+  CrashReport report;
+  report.set_program_name("crashing_program_generic");
+  report.set_weight(0);
+  const CrashReporter_FileReport_Result result = FileOneCrashReport(std::move(report));
+
+  EXPECT_TRUE(result.is_err());
   EXPECT_THAT(ReceivedCobaltEvents(), UnorderedElementsAreArray({
                                           cobalt::Event(cobalt::CrashState::kDropped),
                                       }));

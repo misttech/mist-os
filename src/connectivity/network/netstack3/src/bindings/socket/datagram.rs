@@ -30,7 +30,7 @@ use netstack3_core::socket::{
     self as core_socket, ConnInfo, ConnectError, ExpectedConnError, ExpectedUnboundError,
     ListenerInfo, MulticastInterfaceSelector, MulticastMembershipInterfaceSelector,
     NotDualStackCapableError, SetDualStackEnabledError, SetMulticastMembershipError, ShutdownType,
-    SocketInfo,
+    SocketCookie, SocketInfo,
 };
 use netstack3_core::sync::Mutex as CoreMutex;
 use netstack3_core::trace::trace_duration;
@@ -38,15 +38,18 @@ use netstack3_core::udp::UdpPacketMeta;
 use netstack3_core::{icmp, udp, IpExt};
 use packet::{Buf, BufferMut};
 use packet_formats::ip::DscpAndEcn;
+use thiserror::Error;
 use zx::prelude::HandleBased as _;
 
+use crate::bindings::errno::ErrnoError;
+use crate::bindings::error::Error;
 use crate::bindings::socket::event_pair::SocketEventPair;
 use crate::bindings::socket::queue::{BodyLen, MessageQueue, QueueReadableListener as _};
 use crate::bindings::socket::worker::{self, SocketWorker};
 use crate::bindings::util::{
-    DeviceNotFoundError, IntoCore as _, IntoFidl, RemoveResourceResultExt as _, ResultExt as _,
-    ScopeExt as _, TryFromFidlWithContext, TryIntoCore, TryIntoCoreWithContext, TryIntoFidl,
-    TryIntoFidlWithContext,
+    DeviceNotFoundError, ErrnoResultExt as _, IntoCore as _, IntoFidl,
+    RemoveResourceResultExt as _, ResultExt as _, ScopeExt as _, TryFromFidlWithContext,
+    TryIntoCore, TryIntoCoreWithContext, TryIntoFidl, TryIntoFidlWithContext,
 };
 use crate::bindings::{BindingId, BindingsCtx, Ctx};
 
@@ -74,7 +77,7 @@ pub(crate) trait Transport<I: Ip>: Debug + Sized + Send + Sync + 'static {
                 let port = v4_addr.port();
                 let address = v4_addr.addr().to_ipv6_mapped();
                 fnet::SocketAddress::Ipv6(fnet::Ipv6SocketAddress::new(
-                    Some(ZonedAddr::Unzoned(address).into()),
+                    Some(ZonedAddr::Unzoned(address)),
                     port,
                 ))
             }
@@ -125,7 +128,7 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
     type LocalIdentifier: OptionFromU16 + Into<u16> + Send;
     type RemoteIdentifier: From<u16> + Into<u16> + Send;
     type SocketInfo: IntoFidl<LocalAddress<I, WeakDeviceId<BindingsCtx>, Self::LocalIdentifier>>
-        + TryIntoFidl<RemoteAddress<I, WeakDeviceId<BindingsCtx>, u16>, Error = fposix::Errno>;
+        + TryIntoFidl<RemoteAddress<I, WeakDeviceId<BindingsCtx>, u16>, Error = ErrnoError>;
     type SendError: IntoErrno;
     type SendToError: IntoErrno;
     type DscpAndEcnError: IntoErrno;
@@ -308,6 +311,8 @@ pub(crate) trait TransportState<I: Ip>: Transport<I> + Send + Sync + 'static {
 
     fn get_mark(ctx: &mut Ctx, id: &Self::SocketId, domain: MarkDomain) -> Mark;
 
+    fn get_cookie(ctx: &mut Ctx, id: &Self::SocketId) -> SocketCookie;
+
     fn set_send_buffer(ctx: &mut Ctx, id: &Self::SocketId, send_buffer: usize);
     fn get_send_buffer(ctx: &mut Ctx, id: &Self::SocketId) -> usize;
 }
@@ -341,6 +346,18 @@ impl OptionFromU16 for NonZeroU16 {
     }
 }
 
+#[derive(Debug, Error)]
+#[error("cannot send on non-connected UDP socket")]
+pub(crate) struct UdpSendNotConnectedError;
+
+impl IntoErrno for UdpSendNotConnectedError {
+    fn to_errno(&self) -> fposix::Errno {
+        match self {
+            UdpSendNotConnectedError => fposix::Errno::Edestaddrreq,
+        }
+    }
+}
+
 #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
 impl<I> TransportState<I> for Udp
 where
@@ -361,7 +378,7 @@ where
     type LocalIdentifier = NonZeroU16;
     type RemoteIdentifier = udp::UdpRemotePort;
     type SocketInfo = SocketInfo<I::Addr, WeakDeviceId<BindingsCtx>>;
-    type SendError = Either<udp::SendError, fposix::Errno>;
+    type SendError = Either<udp::SendError, UdpSendNotConnectedError>;
     type SendToError = Either<LocalAddressError, udp::SendToError>;
     type DscpAndEcnError = NotDualStackCapableError;
 
@@ -604,7 +621,7 @@ where
         ctx.api()
             .udp()
             .send(id, body)
-            .map_err(|e| e.map_right(|ExpectedConnError| fposix::Errno::Edestaddrreq))
+            .map_err(|e| e.map_right(|ExpectedConnError| UdpSendNotConnectedError))
     }
 
     fn send_to<B: BufferMut>(
@@ -627,6 +644,10 @@ where
         ctx.api().udp().get_mark(id, domain)
     }
 
+    fn get_cookie(_ctx: &mut Ctx, id: &Self::SocketId) -> SocketCookie {
+        id.socket_cookie()
+    }
+
     fn set_send_buffer(ctx: &mut Ctx, id: &Self::SocketId, send_buffer: usize) {
         ctx.api().udp().set_send_buffer(id, send_buffer)
     }
@@ -637,11 +658,11 @@ where
 }
 
 impl<I: IpExt> DatagramSocketExternalData<I> {
-    pub(crate) fn receive_udp<B: BufferMut>(
+    pub(crate) fn receive_udp(
         &self,
         device_id: &DeviceId<BindingsCtx>,
         meta: UdpPacketMeta<I>,
-        body: &B,
+        body: &[u8],
     ) {
         // TODO(https://fxbug.dev/326102014): Store `UdpPacketMeta` in `AvailableMessage`.
         let UdpPacketMeta { src_ip, src_port, dst_ip, dst_port, .. } = meta;
@@ -654,7 +675,7 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
             destination_addr: dst_ip,
             destination_port: dst_port.get(),
             timestamp: fasync::MonotonicInstant::now(),
-            data: body.as_ref().to_vec(),
+            data: body.to_vec(),
             dscp_and_ecn: meta.dscp_and_ecn,
         };
 
@@ -796,7 +817,7 @@ where
         // allows the `IPV6_V6ONLY` socket option to be set/unset. Here we
         // disallow setting the option, which more accurately reflects that ICMP
         // sockets do not support dual stack operations.
-        return Err(SetDualStackEnabledError::NotCapable);
+        return Err(NotDualStackCapableError.into());
     }
 
     fn get_dual_stack_enabled(
@@ -1033,6 +1054,10 @@ where
         ctx.api().icmp_echo().get_mark(id, domain)
     }
 
+    fn get_cookie(_ctx: &mut Ctx, id: &Self::SocketId) -> SocketCookie {
+        id.socket_cookie()
+    }
+
     fn set_send_buffer(ctx: &mut Ctx, id: &Self::SocketId, send_buffer: usize) {
         ctx.api().icmp_echo().set_send_buffer(id, send_buffer)
     }
@@ -1042,26 +1067,32 @@ where
     }
 }
 
-impl<E> IntoErrno for core_socket::SendError<E> {
-    fn into_errno(self) -> fposix::Errno {
+impl<E: std::error::Error> IntoErrno for core_socket::SendError<E>
+where
+    Self: Into<Error>,
+{
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             core_socket::SendError::NotConnected => fposix::Errno::Edestaddrreq,
             core_socket::SendError::NotWriteable => fposix::Errno::Epipe,
             core_socket::SendError::SendBufferFull => fposix::Errno::Eagain,
             core_socket::SendError::InvalidLength => fposix::Errno::Emsgsize,
-            core_socket::SendError::IpSock(err) => err.into_errno(),
+            core_socket::SendError::IpSock(err) => err.to_errno(),
             core_socket::SendError::SerializeError(_e) => fposix::Errno::Einval,
         }
     }
 }
 
-impl<E> IntoErrno for core_socket::SendToError<E> {
-    fn into_errno(self) -> fposix::Errno {
+impl<E: std::error::Error> IntoErrno for core_socket::SendToError<E>
+where
+    Self: Into<Error>,
+{
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             core_socket::SendToError::NotWriteable => fposix::Errno::Epipe,
             core_socket::SendToError::SendBufferFull => fposix::Errno::Eagain,
             core_socket::SendToError::InvalidLength => fposix::Errno::Emsgsize,
-            core_socket::SendToError::Zone(err) => err.into_errno(),
+            core_socket::SendToError::Zone(err) => err.to_errno(),
             // NB: Mapping MTU to EMSGSIZE is different from the impl on
             // `IpSockSendError` which maps to EINVAL instead.
             core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Send(
@@ -1075,9 +1106,9 @@ impl<E> IntoErrno for core_socket::SendToError<E> {
             )) => fposix::Errno::Eacces,
             core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Send(
                 IpSockSendError::Unroutable(err),
-            )) => err.into_errno(),
+            )) => err.to_errno(),
             core_socket::SendToError::CreateAndSend(IpSockCreateAndSendError::Create(err)) => {
-                err.into_errno()
+                err.to_errno()
             }
             core_socket::SendToError::RemoteUnexpectedlyMapped => fposix::Errno::Enetunreach,
             core_socket::SendToError::RemoteUnexpectedlyNonMapped => fposix::Errno::Eafnosupport,
@@ -1247,7 +1278,7 @@ pub(super) fn spawn_worker(
     request_stream: fposix_socket::SynchronousDatagramSocketRequestStream,
     properties: SocketWorkerProperties,
     creation_opts: fposix_socket::SocketCreationOptions,
-) -> Result<(), fposix::Errno> {
+) {
     match (domain, proto) {
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::Udp) => {
             fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
@@ -1258,8 +1289,7 @@ pub(super) fn spawn_worker(
                     rs,
                     creation_opts,
                 )
-            });
-            Ok(())
+            })
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::Udp) => {
             fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
@@ -1270,8 +1300,7 @@ pub(super) fn spawn_worker(
                     rs,
                     creation_opts,
                 )
-            });
-            Ok(())
+            })
         }
         (fposix_socket::Domain::Ipv4, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
             fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
@@ -1282,8 +1311,7 @@ pub(super) fn spawn_worker(
                     rs,
                     creation_opts,
                 )
-            });
-            Ok(())
+            })
         }
         (fposix_socket::Domain::Ipv6, fposix_socket::DatagramSocketProtocol::IcmpEcho) => {
             fasync::Scope::current().spawn_request_stream_handler(request_stream, |rs| {
@@ -1294,8 +1322,7 @@ pub(super) fn spawn_worker(
                     rs,
                     creation_opts,
                 )
-            });
-            Ok(())
+            })
         }
     }
 }
@@ -1365,20 +1392,6 @@ where
         fposix_socket::SynchronousDatagramSocketCloseResponder,
         Option<fposix_socket::SynchronousDatagramSocketRequestStream>,
     > {
-        // On Error, logs the `Errno` with additional debugging context.
-        //
-        // Implemented as a macro to avoid erasing the callsite information.
-        macro_rules! maybe_log_error {
-            ($operation:expr, $result:expr) => {
-                $result.inspect_log_error(std::format_args!(
-                    "{:?} {} {}",
-                    <T as Transport<I>>::PROTOCOL,
-                    I::NAME,
-                    $operation,
-                ))
-            };
-        }
-
         type Request = fposix_socket::SynchronousDatagramSocketRequest;
 
         match request {
@@ -1387,13 +1400,15 @@ where
             }
             Request::Connect { addr, responder } => {
                 let result = self.connect(addr);
-                maybe_log_error!("connect", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("connect"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::Disconnect { responder } => {
                 let result = self.disconnect();
-                maybe_log_error!("disconnect", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("disconnect"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::Clone { request, control_handle: _ } => {
                 let channel = fidl::AsyncChannel::from_channel(request.into_channel());
@@ -1406,8 +1421,7 @@ where
             }
             Request::Bind { addr, responder } => {
                 let result = self.bind(addr);
-                maybe_log_error!("bind", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder.send(result.log_errno_error("bind")).unwrap_or_log("failed to respond");
             }
             Request::Query { responder } => {
                 responder
@@ -1416,24 +1430,26 @@ where
             }
             Request::GetSockName { responder } => {
                 let result = self.get_sock_name();
-                maybe_log_error!("get_sock_name", &result);
-                responder.send(result.as_ref().map_err(|e| *e)).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("get_sock_name").as_ref().map_err(|e| *e))
+                    .unwrap_or_log("failed to respond");
             }
             Request::GetPeerName { responder } => {
                 let result = self.get_peer_name();
-                maybe_log_error!("get_peer_name", &result);
-                responder.send(result.as_ref().map_err(|e| *e)).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("get_peer_name").as_ref().map_err(|e| *e))
+                    .unwrap_or_log("failed to respond");
             }
             Request::Shutdown { mode, responder } => {
                 let result = self.shutdown(mode);
-                maybe_log_error!("shutdown", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("shutdown"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::RecvMsg { want_addr, data_len, want_control, flags, responder } => {
                 let result = self.recv_msg(want_addr, data_len as usize, want_control, flags);
-                maybe_log_error!("recvmsg", &result);
                 responder
-                    .send(match result {
+                    .send(match result.log_errno_error("recvmsg") {
                         Ok((ref addr, ref data, ref control, truncated)) => {
                             Ok((addr.as_ref(), data.as_slice(), control, truncated))
                         }
@@ -1444,24 +1460,22 @@ where
             Request::SendMsg { addr, data, control: _, flags: _, responder } => {
                 // TODO(https://fxbug.dev/42094933): handle control.
                 let result = self.send_msg(addr.map(|addr| *addr), data);
-                maybe_log_error!("sendmsg", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("sendmsg"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::GetInfo { responder } => {
                 let result = self.get_sock_info();
-                maybe_log_error!("get_info", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("get_info"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::GetTimestamp { responder } => {
-                let result = self.get_timestamp_option();
-                maybe_log_error!("get_timestamp", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder.send(Ok(self.get_timestamp_option())).unwrap_or_log("failed to respond")
             }
-            Request::SetTimestamp { value, responder } => {
-                let result = self.set_timestamp_option(value);
-                maybe_log_error!("set_timestamp", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
-            }
+            Request::SetTimestamp { value, responder } => responder
+                .send(Ok(self.set_timestamp_option(value)))
+                .unwrap_or_log("failed to respond"),
             Request::GetOriginalDestination { responder } => {
                 responder.send(Err(fposix::Errno::Enoprotoopt)).unwrap_or_log("failed to respond");
             }
@@ -1494,16 +1508,18 @@ where
             }
             Request::SetReuseAddress { value, responder } => {
                 let result = self.set_reuse_addr(value);
-                maybe_log_error!("set_reuse_addr", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("set_reuse_addr"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::GetReuseAddress { responder } => {
                 responder.send(Ok(self.get_reuse_addr())).unwrap_or_log("failed to respond");
             }
             Request::SetReusePort { value, responder } => {
                 let result = self.set_reuse_port(value);
-                maybe_log_error!("set_reuse_port", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("set_reuse_port"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::GetReusePort { responder } => {
                 responder.send(Ok(self.get_reuse_port())).unwrap_or_log("failed to respond");
@@ -1513,13 +1529,11 @@ where
             }
             Request::SetBindToDevice { value, responder } => {
                 let identifier = (!value.is_empty()).then_some(value.as_str());
-                let result = self.bind_to_device(identifier);
-                maybe_log_error!("set_bind_to_device", &result);
+                let result = self.bind_to_device(identifier).log_errno_error("set_bind_to_device");
                 responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::GetBindToDevice { responder } => {
-                let result = self.get_bound_device();
-                maybe_log_error!("get_bind_to_device", &result);
+                let result = self.get_bound_device().log_errno_error("get_bind_to_device");
                 responder
                     .send(match result {
                         Ok(ref d) => Ok(d.as_deref().unwrap_or("")),
@@ -1528,13 +1542,12 @@ where
                     .unwrap_or_log("failed to respond")
             }
             Request::SetBindToInterfaceIndex { value, responder } => {
-                let result = self.bind_to_device_index(value);
-                maybe_log_error!("set_bind_to_if_index", &result);
+                let result =
+                    self.bind_to_device_index(value).log_errno_error("set_bind_to_if_index");
                 responder.send(result).unwrap_or_log("failed to respond");
             }
             Request::GetBindToInterfaceIndex { responder } => {
-                let result = self.get_bound_device_index();
-                maybe_log_error!("get_bind_to_if_index", &result);
+                let result = self.get_bound_device_index().log_errno_error("get_bind_to_if_index");
                 responder
                     .send(match result {
                         Ok(d) => Ok(d.map(|d| d.get()).unwrap_or(0)),
@@ -1543,9 +1556,10 @@ where
                     .unwrap_or_log("failed to respond")
             }
             Request::SetBroadcast { value, responder } => {
-                let result = self.set_broadcast(value).map_err(IntoErrno::into_errno);
-                maybe_log_error!("set_broadcast", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                let result = self.set_broadcast(value).map_err(IntoErrno::into_errno_error);
+                responder
+                    .send(result.log_errno_error("syncudp::SetBroadcast"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::GetBroadcast { responder } => {
                 responder.send(Ok(self.get_broadcast())).unwrap_or_log("failed to respond");
@@ -1577,133 +1591,161 @@ where
             }
             Request::SetIpv6Only { value, responder } => {
                 let result = self.set_dual_stack_enabled(!value);
-                maybe_log_error!("set_ipv6_only", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("set_ipv6_only"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::GetIpv6Only { responder } => {
                 let result = self.get_dual_stack_enabled().map(|enabled| !enabled);
-                maybe_log_error!("get_ipv6_only", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("get_ipv6_only"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::SetIpv6TrafficClass { value, responder } => {
                 let value: Option<u8> = value.into_core();
                 let result = self.set_traffic_class(Ipv6::VERSION, value.unwrap_or(0));
-                maybe_log_error!("set_ipv6_traffic_class", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("set_ipv6_traffic_class"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::GetIpv6TrafficClass { responder } => {
                 let result = self.get_traffic_class(Ipv6::VERSION);
-                maybe_log_error!("get_ipv6_traffic_class", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("get_ipv6_traffic_class"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::SetIpv6MulticastInterface { value, responder } => {
                 let result = self.set_multicast_interface_ipv6(NonZeroU64::new(value));
-                maybe_log_error!("set_ipv6_multicast_interface", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("set_ipv6_multicast_interface"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::GetIpv6MulticastInterface { responder } => {
                 let result = self
                     .get_multicast_interface_ipv6()
                     .map(|v| v.map(NonZeroU64::get).unwrap_or(0));
-                maybe_log_error!("get_ipv6_multicast_interface", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("get_ipv6_multicast_interface"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::SetIpv6UnicastHops { value, responder } => {
                 let result = self.set_unicast_hop_limit(Ipv6::VERSION, value);
-                maybe_log_error!("set_ipv6_unicast_hops", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("set_ipv6_unicast_hops"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::GetIpv6UnicastHops { responder } => {
                 let result = self.get_unicast_hop_limit(Ipv6::VERSION);
-                maybe_log_error!("get_ipv6_unicast_hops", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("get_ipv6_unicast_hops"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::SetIpv6MulticastHops { value, responder } => {
                 let result = self.set_multicast_hop_limit(Ipv6::VERSION, value);
-                maybe_log_error!("set_ipv6_multicast_hops", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("set_ipv6_multicast_hops"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::GetIpv6MulticastHops { responder } => {
                 let result = self.get_multicast_hop_limit(Ipv6::VERSION);
-                maybe_log_error!("get_ipv6_multicast_hops", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("get_ipv6_multicast_hops"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::SetIpv6MulticastLoopback { value, responder } => {
                 let result = self.set_multicast_loop(Ipv6::VERSION, value);
-                maybe_log_error!("set_ipv6_multicast_loop", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("set_ipv6_multicast_loop"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::GetIpv6MulticastLoopback { responder } => {
                 let result = self.get_multicast_loop(Ipv6::VERSION);
-                maybe_log_error!("get_ipv6_multicast_loop", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("get_ipv6_multicast_loop"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::SetIpTtl { value, responder } => {
                 let result = self.set_unicast_hop_limit(Ipv4::VERSION, value);
-                maybe_log_error!("set_ip_ttl", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("set_ip_ttl"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::GetIpTtl { responder } => {
                 let result = self.get_unicast_hop_limit(Ipv4::VERSION);
-                maybe_log_error!("get_ip_ttl", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("get_ip_ttl"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::SetIpMulticastTtl { value, responder } => {
                 let result = self.set_multicast_hop_limit(Ipv4::VERSION, value);
-                maybe_log_error!("set_ip_multicast_ttl", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("set_ip_multicast_ttl"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::GetIpMulticastTtl { responder } => {
                 let result = self.get_multicast_hop_limit(Ipv4::VERSION);
-                maybe_log_error!("get_ip_multicast_ttl", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("get_ip_multicast_ttl"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::SetIpMulticastInterface { iface, address, responder } => {
                 let result = self.set_multicast_interface_ipv4(NonZeroU64::new(iface), address);
-                maybe_log_error!("set_multicast_interface", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("set_multicast_interface"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::GetIpMulticastInterface { responder } => {
                 let result = self.get_multicast_interface_ipv4();
-                maybe_log_error!("get_ip_multicast_interface", &result);
                 responder
-                    .send(result.as_ref().map_err(|e| e.clone()))
+                    .send(
+                        result
+                            .log_errno_error("get_ip_multicast_interface")
+                            .as_ref()
+                            .map_err(|e| *e),
+                    )
                     .unwrap_or_log("failed to respond")
             }
             Request::SetIpMulticastLoopback { value, responder } => {
                 let result = self.set_multicast_loop(Ipv4::VERSION, value);
-                maybe_log_error!("set_ip_multicast_loop", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("set_ip_multicast_loop"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::GetIpMulticastLoopback { responder } => {
                 let result = self.get_multicast_loop(Ipv4::VERSION);
-                maybe_log_error!("get_ip_multicast_loop", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("get_ip_multicast_loop"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::SetIpTypeOfService { value, responder } => {
                 let result = self.set_traffic_class(Ipv4::VERSION, value);
-                maybe_log_error!("set_ip_type_of_service", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("set_ip_type_of_service"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::GetIpTypeOfService { responder } => {
                 let result = self.get_traffic_class(Ipv4::VERSION);
-                maybe_log_error!("get_ip_type_of_service", &result);
-                responder.send(result).unwrap_or_log("failed to respond")
+                responder
+                    .send(result.log_errno_error("get_ip_type_of_service"))
+                    .unwrap_or_log("failed to respond")
             }
             Request::AddIpMembership { membership, responder } => {
                 let result = self.set_multicast_membership(membership, true);
-                maybe_log_error!("add_ip_membership", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("add_ip_membership"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::DropIpMembership { membership, responder } => {
                 let result = self.set_multicast_membership(membership, false);
-                maybe_log_error!("drop_ip_membership", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("drop_ip_membership"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::SetIpTransparent { value, responder } => {
-                let result = self.set_ip_transparent(value).map_err(IntoErrno::into_errno);
-                maybe_log_error!("set_ip_transparent", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                let result = self.set_ip_transparent(value).map_err(IntoErrno::into_errno_error);
+                responder
+                    .send(result.log_errno_error("set_ip_transparent"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::GetIpTransparent { responder } => {
                 responder.send(Ok(self.get_ip_transparent())).unwrap_or_log("failed to respond");
@@ -1719,23 +1761,27 @@ where
             }
             Request::AddIpv6Membership { membership, responder } => {
                 let result = self.set_multicast_membership(membership, true);
-                maybe_log_error!("add_ipv6_membership", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("add_ipv6_membership"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::DropIpv6Membership { membership, responder } => {
                 let result = self.set_multicast_membership(membership, false);
-                maybe_log_error!("drop_ipv6_membership", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("drop_ipv6_membership"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::SetIpv6ReceiveTrafficClass { value, responder } => {
                 let result = self.set_ipv6_receive_traffic_class(value);
-                maybe_log_error!("set_ipv6_receive_traffic_class", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("set_ipv6_receive_traffic_class"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::GetIpv6ReceiveTrafficClass { responder } => {
                 let result = self.get_ipv6_receive_traffic_class();
-                maybe_log_error!("get_ipv6_receive_traffic_class", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("get_ipv6_receive_traffic_class"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::SetIpv6ReceiveHopLimit { value, responder } => {
                 debug!("syncudp::SetIpv6ReceiveHopLimit({value}) is not implemented, returning Ok");
@@ -1745,24 +1791,26 @@ where
                 respond_not_supported!("syncudp::GetIpv6ReceiveHopLimit", responder)
             }
             Request::SetIpReceiveTypeOfService { value, responder } => {
-                let result = self.ip_set_receive_type_of_service(value);
-                maybe_log_error!("ip_set_ip_recv_tos", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(Ok(self.ip_set_receive_type_of_service(value)))
+                    .unwrap_or_log("failed to respond");
             }
             Request::GetIpReceiveTypeOfService { responder } => {
-                let result = self.ip_get_receive_type_of_service();
-                maybe_log_error!("ip_get_ip_recv_tos", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(Ok(self.ip_get_receive_type_of_service()))
+                    .unwrap_or_log("failed to respond");
             }
             Request::SetIpv6ReceivePacketInfo { value, responder } => {
                 let result = self.set_ipv6_recv_pkt_info(value);
-                maybe_log_error!("set_ipv6_recv_pkt_info", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("set_ipv6_recv_pkt_info"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::GetIpv6ReceivePacketInfo { responder } => {
                 let result = self.get_ipv6_recv_pkt_info();
-                maybe_log_error!("get_ipv6_recv_pkt_info", &result);
-                responder.send(result).unwrap_or_log("failed to respond");
+                responder
+                    .send(result.log_errno_error("get_ipv6_recv_pkt_info"))
+                    .unwrap_or_log("failed to respond");
             }
             Request::SetIpReceiveTtl { value: _, responder } => {
                 respond_not_supported!("syncudp::SetIpReceiveTtl", responder)
@@ -1784,6 +1832,9 @@ where
             Request::GetMark { domain, responder } => {
                 responder.send(Ok(&self.get_mark(domain))).unwrap_or_log("failed to respond")
             }
+            Request::GetCookie { responder } => responder
+                .send(Ok(self.get_cookie().export_value()))
+                .unwrap_or_log("failed to respond"),
         }
         ControlFlow::Continue(None)
     }
@@ -1826,15 +1877,17 @@ where
     /// Handles a [POSIX socket connect request].
     ///
     /// [POSIX socket connect request]: fposix_socket::SynchronousDatagramSocketRequest::Connect
-    fn connect(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
+    fn connect(self, addr: fnet::SocketAddress) -> Result<(), ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         let sockaddr =
             I::SocketAddress::from_sock_addr(<T as Transport<I>>::maybe_map_sock_addr(addr))?;
         trace!("connect sockaddr: {:?}", sockaddr);
-        let (remote_addr, remote_port) =
-            sockaddr.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?;
+        let (remote_addr, remote_port) = sockaddr
+            .try_into_core_with_ctx(ctx.bindings_ctx())
+            .map_err(IntoErrno::into_errno_error)?;
 
-        T::connect(ctx, id, remote_addr, remote_port.into()).map_err(IntoErrno::into_errno)?;
+        T::connect(ctx, id, remote_addr, remote_port.into())
+            .map_err(IntoErrno::into_errno_error)?;
 
         Ok(())
     }
@@ -1842,11 +1895,14 @@ where
     /// Handles a [POSIX socket bind request].
     ///
     /// [POSIX socket bind request]: fposix_socket::SynchronousDatagramSocketRequest::Bind
-    fn bind(self, addr: fnet::SocketAddress) -> Result<(), fposix::Errno> {
+    fn bind(self, addr: fnet::SocketAddress) -> Result<(), ErrnoError> {
         // Match Linux and return `Einval` when asked to bind an IPv6 socket to
         // an Ipv4 address. This Errno is unique to bind.
         let sockaddr = match (I::VERSION, &addr) {
-            (IpVersion::V6, fnet::SocketAddress::Ipv4(_)) => Err(fposix::Errno::Einval),
+            (IpVersion::V6, fnet::SocketAddress::Ipv4(_)) => Err(ErrnoError::new(
+                fposix::Errno::Einval,
+                "cannot bind IPv6 socket to IPv4 address",
+            )),
             (_, _) => I::SocketAddress::from_sock_addr(addr),
         }?;
         trace!("bind sockaddr: {:?}", sockaddr);
@@ -1854,28 +1910,28 @@ where
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         let (sockaddr, port) =
             TryFromFidlWithContext::try_from_fidl_with_ctx(ctx.bindings_ctx(), sockaddr)
-                .map_err(IntoErrno::into_errno)?;
+                .map_err(IntoErrno::into_errno_error)?;
         let local_port = T::LocalIdentifier::from_u16(port);
 
-        T::bind(ctx, id, sockaddr, local_port).map_err(IntoErrno::into_errno)?;
+        T::bind(ctx, id, sockaddr, local_port).map_err(IntoErrno::into_errno_error)?;
         Ok(())
     }
 
     /// Handles a [POSIX socket disconnect request].
     ///
     /// [POSIX socket connect request]: fposix_socket::SynchronousDatagramSocketRequest::Disconnect
-    fn disconnect(self) -> Result<(), fposix::Errno> {
+    fn disconnect(self) -> Result<(), ErrnoError> {
         trace!("disconnect socket");
 
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
-        T::disconnect(ctx, id).map_err(IntoErrno::into_errno)?;
+        T::disconnect(ctx, id).map_err(IntoErrno::into_errno_error)?;
         Ok(())
     }
 
     /// Handles a [POSIX socket get_sock_name request].
     ///
     /// [POSIX socket get_sock_name request]: fposix_socket::SynchronousDatagramSocketRequest::GetSockName
-    fn get_sock_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
+    fn get_sock_name(self) -> Result<fnet::SocketAddress, ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         let l: LocalAddress<_, _, _> = T::get_socket_info(ctx, id).into_fidl();
         l.try_into_fidl_with_ctx(ctx.bindings_ctx()).map(SockAddr::into_sock_addr)
@@ -1886,7 +1942,7 @@ where
     /// [POSIX socket get_info request]: fposix_socket::SynchronousDatagramSocketRequest::GetInfo
     fn get_sock_info(
         self,
-    ) -> Result<(fposix_socket::Domain, fposix_socket::DatagramSocketProtocol), fposix::Errno> {
+    ) -> Result<(fposix_socket::Domain, fposix_socket::DatagramSocketProtocol), ErrnoError> {
         let domain = match I::VERSION {
             IpVersion::V4 => fposix_socket::Domain::Ipv4,
             IpVersion::V6 => fposix_socket::Domain::Ipv6,
@@ -1902,7 +1958,7 @@ where
     /// Handles a [POSIX socket get_peer_name request].
     ///
     /// [POSIX socket get_peer_name request]: fposix_socket::SynchronousDatagramSocketRequest::GetPeerName
-    fn get_peer_name(self) -> Result<fnet::SocketAddress, fposix::Errno> {
+    fn get_peer_name(self) -> Result<fnet::SocketAddress, ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_socket_info(ctx, id).try_into_fidl().and_then(|r: RemoteAddress<_, _, _>| {
             r.try_into_fidl_with_ctx(ctx.bindings_ctx()).map(SockAddr::into_sock_addr)
@@ -1917,7 +1973,7 @@ where
         recv_flags: fposix_socket::RecvMsgFlags,
     ) -> Result<
         (Option<fnet::SocketAddress>, Vec<u8>, fposix_socket::DatagramSocketRecvControlData, u32),
-        fposix::Errno,
+        ErrnoError,
     > {
         trace_duration!(c"datagram::recv_msg");
 
@@ -1970,7 +2026,10 @@ where
                             0,
                         ))
                     }
-                    None | Some(ShutdownType::Send) => Err(fposix::Errno::Eagain),
+                    None | Some(ShutdownType::Send) => Err(ErrnoError::new(
+                        fposix::Errno::Eagain,
+                        "no available message and receive side not shut down",
+                    )),
                 };
             }
             Some(front) => front,
@@ -2070,11 +2129,7 @@ where
         Ok((addr, data, control_data, truncated.try_into().unwrap_or(u32::MAX)))
     }
 
-    fn send_msg(
-        self,
-        addr: Option<fnet::SocketAddress>,
-        data: Vec<u8>,
-    ) -> Result<i64, fposix::Errno> {
+    fn send_msg(self, addr: Option<fnet::SocketAddress>, data: Vec<u8>) -> Result<i64, ErrnoError> {
         trace_duration!(c"datagram::send_msg");
         let remote_addr = addr
             .map(|addr| {
@@ -2086,48 +2141,56 @@ where
             .map(|remote_addr| {
                 let (remote_addr, port) =
                     TryFromFidlWithContext::try_from_fidl_with_ctx(ctx.bindings_ctx(), remote_addr)
-                        .map_err(IntoErrno::into_errno)?;
+                        .map_err(IntoErrno::into_errno_error)?;
                 Ok((remote_addr, port.into()))
             })
             .transpose()?;
         let len = data.len() as i64;
         let body = Buf::new(data, ..);
         match remote {
-            Some(remote) => T::send_to(ctx, id, remote, body).map_err(|e| e.into_errno()),
-            None => T::send(ctx, id, body).map_err(|e| e.into_errno()),
+            Some(remote) => T::send_to(ctx, id, remote, body).map_err(|e| e.into_errno_error()),
+            None => T::send(ctx, id, body).map_err(|e| e.into_errno_error()),
         }
         .map(|()| len)
     }
 
-    fn bind_to_device_id(self, device: Option<DeviceId<BindingsCtx>>) -> Result<(), fposix::Errno> {
+    fn bind_to_device_id(self, device: Option<DeviceId<BindingsCtx>>) -> Result<(), ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
 
-        T::set_socket_device(ctx, id, device.as_ref()).map_err(IntoErrno::into_errno)
+        T::set_socket_device(ctx, id, device.as_ref()).map_err(IntoErrno::into_errno_error)
     }
 
-    fn bind_to_device(self, device: Option<&str>) -> Result<(), fposix::Errno> {
+    fn bind_to_device(self, device: Option<&str>) -> Result<(), ErrnoError> {
         let Self { ctx, .. } = &self;
         let device = device
             .map(|name| {
-                ctx.bindings_ctx().devices.get_device_by_name(name).ok_or(fposix::Errno::Enodev)
+                ctx.bindings_ctx()
+                    .devices
+                    .get_device_by_name(name)
+                    .ok_or_else(|| DeviceNotFoundError.into_errno_error())
             })
             .transpose()?;
 
         self.bind_to_device_id(device)
     }
 
-    fn bind_to_device_index(self, device: u64) -> Result<(), fposix::Errno> {
+    fn bind_to_device_index(self, device: u64) -> Result<(), ErrnoError> {
         let Self { ctx, .. } = &self;
 
         // If `device` is 0, then this will clear the bound device.
         let device = NonZeroU64::new(device)
-            .map(|index| ctx.bindings_ctx().devices.get_core_id(index).ok_or(fposix::Errno::Enodev))
+            .map(|index| {
+                ctx.bindings_ctx()
+                    .devices
+                    .get_core_id(index)
+                    .ok_or_else(|| DeviceNotFoundError.into_errno_error())
+            })
             .transpose()?;
 
         self.bind_to_device_id(device)
     }
 
-    fn get_bound_device_id(self) -> Result<Option<DeviceId<BindingsCtx>>, fposix::Errno> {
+    fn get_bound_device_id(self) -> Result<Option<DeviceId<BindingsCtx>>, ErrnoError> {
         // NB: Ensure that we do not return a device that was removed from the
         // stack. This matches Linux behavior.
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
@@ -2136,28 +2199,31 @@ where
             Some(d) => d,
         };
 
-        device.upgrade().ok_or(fposix::Errno::Enodev).map(Some)
+        device
+            .upgrade()
+            .ok_or_else(|| ErrnoError::new(fposix::Errno::Enodev, "bound device was removed"))
+            .map(Some)
     }
 
-    fn get_bound_device(self) -> Result<Option<String>, fposix::Errno> {
+    fn get_bound_device(self) -> Result<Option<String>, ErrnoError> {
         Ok(self.get_bound_device_id()?.map(|core_id| core_id.bindings_id().name.clone()))
     }
 
-    fn get_bound_device_index(self) -> Result<Option<NonZeroU64>, fposix::Errno> {
+    fn get_bound_device_index(self) -> Result<Option<NonZeroU64>, ErrnoError> {
         Ok(self.get_bound_device_id()?.map(|core_id| core_id.bindings_id().id))
     }
 
-    fn set_dual_stack_enabled(self, enabled: bool) -> Result<(), fposix::Errno> {
+    fn set_dual_stack_enabled(self, enabled: bool) -> Result<(), ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
-        T::set_dual_stack_enabled(ctx, id, enabled).map_err(IntoErrno::into_errno)
+        T::set_dual_stack_enabled(ctx, id, enabled).map_err(IntoErrno::into_errno_error)
     }
 
-    fn get_dual_stack_enabled(self) -> Result<bool, fposix::Errno> {
+    fn get_dual_stack_enabled(self) -> Result<bool, ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
-        T::get_dual_stack_enabled(ctx, id).map_err(IntoErrno::into_errno)
+        T::get_dual_stack_enabled(ctx, id).map_err(IntoErrno::into_errno_error)
     }
 
-    fn set_ipv6_recv_pkt_info(self, new: bool) -> Result<(), fposix::Errno> {
+    fn set_ipv6_recv_pkt_info(self, new: bool) -> Result<(), ErrnoError> {
         let correct_ip_version: Option<()> = I::map_ip(
             &mut self.data.version_specific_data,
             |_v4_data| None,
@@ -2166,21 +2232,31 @@ where
                 Some(())
             },
         );
-        correct_ip_version.ok_or(fposix::Errno::Enoprotoopt)
+        correct_ip_version.ok_or_else(|| {
+            ErrnoError::new(
+                fposix::Errno::Enoprotoopt,
+                "cannot set_ipv6_recv_pkt_info on IPv4 socket",
+            )
+        })
     }
 
-    fn get_ipv6_recv_pkt_info(self) -> Result<bool, fposix::Errno> {
+    fn get_ipv6_recv_pkt_info(self) -> Result<bool, ErrnoError> {
         let correct_ip_version: Option<bool> = I::map_ip(
             &self.data.version_specific_data,
             |_v4_data| None,
             |v6_data| Some(v6_data.recv_pkt_info),
         );
-        correct_ip_version.ok_or(fposix::Errno::Eopnotsupp)
+        correct_ip_version.ok_or_else(|| {
+            ErrnoError::new(
+                fposix::Errno::Eopnotsupp,
+                "cannot get_ipv6_recv_pkt_info on IPv4 socket",
+            )
+        })
     }
 
-    fn set_reuse_addr(self, reuse_addr: bool) -> Result<(), fposix::Errno> {
+    fn set_reuse_addr(self, reuse_addr: bool) -> Result<(), ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
-        T::set_reuse_addr(ctx, id, reuse_addr).map_err(IntoErrno::into_errno)
+        T::set_reuse_addr(ctx, id, reuse_addr).map_err(IntoErrno::into_errno_error)
     }
 
     fn get_reuse_addr(self) -> bool {
@@ -2188,9 +2264,9 @@ where
         T::get_reuse_addr(ctx, id)
     }
 
-    fn set_reuse_port(self, reuse_port: bool) -> Result<(), fposix::Errno> {
+    fn set_reuse_port(self, reuse_port: bool) -> Result<(), ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
-        T::set_reuse_port(ctx, id, reuse_port).map_err(IntoErrno::into_errno)
+        T::set_reuse_port(ctx, id, reuse_port).map_err(IntoErrno::into_errno_error)
     }
 
     fn get_reuse_port(self) -> bool {
@@ -2198,14 +2274,19 @@ where
         T::get_reuse_port(ctx, id)
     }
 
-    fn shutdown(self, how: fposix_socket::ShutdownMode) -> Result<(), fposix::Errno> {
+    fn shutdown(self, how: fposix_socket::ShutdownMode) -> Result<(), ErrnoError> {
         let Self { data: BindingData { info: SocketControlInfo { id, .. }, .. }, ctx } = self;
         let how = ShutdownType::from_send_receive(
             how.contains(fposix_socket::ShutdownMode::WRITE),
             how.contains(fposix_socket::ShutdownMode::READ),
         )
-        .ok_or(fposix::Errno::Einval)?;
-        T::shutdown(ctx, id, how).map_err(IntoErrno::into_errno)?;
+        .ok_or_else(|| {
+            ErrnoError::new(
+                fposix::Errno::Einval,
+                "shutdown must shutdown at least one of {read, write}",
+            )
+        })?;
+        T::shutdown(ctx, id, how).map_err(IntoErrno::into_errno_error)?;
         match how {
             ShutdownType::Receive | ShutdownType::SendAndReceive => {
                 // Make sure to signal the peer so any ongoing call to
@@ -2231,71 +2312,84 @@ where
         self,
         membership: M,
         want_membership: bool,
-    ) -> Result<(), fposix::Errno>
+    ) -> Result<(), ErrnoError>
     where
         M::Error: IntoErrno,
     {
         let (multicast_group, interface) =
-            membership.try_into_core().map_err(IntoErrno::into_errno)?;
+            membership.try_into_core().map_err(IntoErrno::into_errno_error)?;
         let interface = interface
             .map_or(MulticastMembershipInterfaceSelector::AnyInterfaceWithRoute, Into::into);
 
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
 
-        let interface =
-            interface.try_into_core_with_ctx(ctx.bindings_ctx()).map_err(IntoErrno::into_errno)?;
+        let interface = interface
+            .try_into_core_with_ctx(ctx.bindings_ctx())
+            .map_err(IntoErrno::into_errno_error)?;
 
         T::set_multicast_membership(ctx, id, multicast_group, interface, want_membership)
-            .map_err(IntoErrno::into_errno)
+            .map_err(IntoErrno::into_errno_error)
     }
 
     fn set_unicast_hop_limit(
         self,
         ip_version: IpVersion,
         hop_limit: fposix_socket::OptionalUint8,
-    ) -> Result<(), fposix::Errno> {
+    ) -> Result<(), ErrnoError> {
         let hop_limit: Option<u8> = hop_limit.into_core();
-        let hop_limit =
-            hop_limit.map(|u| NonZeroU8::new(u).ok_or(fposix::Errno::Einval)).transpose()?;
+        let hop_limit = hop_limit
+            .map(|u| {
+                NonZeroU8::new(u).ok_or_else(|| {
+                    ErrnoError::new(fposix::Errno::Einval, "unicast hop limit must be nonzero")
+                })
+            })
+            .transpose()?;
 
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
-        T::set_unicast_hop_limit(ctx, id, hop_limit, ip_version).map_err(IntoErrno::into_errno)
+        T::set_unicast_hop_limit(ctx, id, hop_limit, ip_version)
+            .map_err(IntoErrno::into_errno_error)
     }
 
     fn set_multicast_hop_limit(
         self,
         ip_version: IpVersion,
         hop_limit: fposix_socket::OptionalUint8,
-    ) -> Result<(), fposix::Errno> {
+    ) -> Result<(), ErrnoError> {
         let hop_limit: Option<u8> = hop_limit.into_core();
         // TODO(https://fxbug.dev/42059735): Support setting a multicast hop limit
         // of 0.
-        let hop_limit =
-            hop_limit.map(|u| NonZeroU8::new(u).ok_or(fposix::Errno::Einval)).transpose()?;
+        let hop_limit = hop_limit
+            .map(|u| {
+                NonZeroU8::new(u).ok_or_else(|| {
+                    ErrnoError::new(fposix::Errno::Einval, "multicast hop limit must be nonzero")
+                })
+            })
+            .transpose()?;
 
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
-        T::set_multicast_hop_limit(ctx, id, hop_limit, ip_version).map_err(IntoErrno::into_errno)
+        T::set_multicast_hop_limit(ctx, id, hop_limit, ip_version)
+            .map_err(IntoErrno::into_errno_error)
     }
 
-    fn get_unicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {
+    fn get_unicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_unicast_hop_limit(ctx, id, ip_version)
             .map(NonZeroU8::get)
-            .map_err(IntoErrno::into_errno)
+            .map_err(IntoErrno::into_errno_error)
     }
 
-    fn get_multicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {
+    fn get_multicast_hop_limit(self, ip_version: IpVersion) -> Result<u8, ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_multicast_hop_limit(ctx, id, ip_version)
             .map(NonZeroU8::get)
-            .map_err(IntoErrno::into_errno)
+            .map_err(IntoErrno::into_errno_error)
     }
 
     fn set_multicast_interface_ipv4(
         self,
         interface: Option<NonZeroU64>,
         addr: fnet::Ipv4Address,
-    ) -> Result<(), fposix::Errno> {
+    ) -> Result<(), ErrnoError> {
         // Multicast interface for IPv4 multicast packets can be selected by
         // the IP address. Linux also uses the specified address as the source
         // address for outgoing multicast packets. Our implementation of
@@ -2317,7 +2411,7 @@ where
                 // `EADDRNOTAVAIL` when the IP or the interface index is invalid. This is
                 // different from `IPV6_MULTICAST_IF`.
                 TryFromFidlWithContext::try_from_fidl_with_ctx(ctx.bindings_ctx(), index)
-                    .map_err(|_| fposix::Errno::Eaddrnotavail)?,
+                    .map_err(|e| ErrnoError::new(fposix::Errno::Eaddrnotavail, e))?,
             ),
             (None, Some(addr)) => {
                 let device = ctx
@@ -2337,57 +2431,62 @@ where
                         );
                         ip_found
                     })
-                    .ok_or(fposix::Errno::Eaddrnotavail)?;
+                    .ok_or_else(|| {
+                        ErrnoError::new(
+                            fposix::Errno::Eaddrnotavail,
+                            "address used to specify MULTICAST_IF \
+                            not found on any interface",
+                        )
+                    })?;
                 Some(device)
             }
             (None, None) => None,
         };
 
         T::set_multicast_interface(ctx, id, device_id.as_ref(), Ipv4::VERSION)
-            .map_err(IntoErrno::into_errno)
+            .map_err(IntoErrno::into_errno_error)
             .inspect(|_| *ipv4_multicast_if_addr = addr)
     }
 
-    fn get_multicast_interface_ipv4(self) -> Result<fnet::Ipv4Address, fposix::Errno> {
+    fn get_multicast_interface_ipv4(self) -> Result<fnet::Ipv4Address, ErrnoError> {
         let Self { data: BindingData { ipv4_multicast_if_addr, .. }, .. } = self;
         Ok(ipv4_multicast_if_addr.map(Into::into).unwrap_or(Ipv4::UNSPECIFIED_ADDRESS).into_fidl())
     }
 
-    fn set_multicast_interface_ipv6(
-        self,
-        interface: Option<NonZeroU64>,
-    ) -> Result<(), fposix::Errno> {
+    fn set_multicast_interface_ipv6(self, interface: Option<NonZeroU64>) -> Result<(), ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         let interface = interface
             .map(|index| TryFromFidlWithContext::try_from_fidl_with_ctx(ctx.bindings_ctx(), index))
             .transpose()
-            .map_err(IntoErrno::into_errno)?;
+            .map_err(IntoErrno::into_errno_error)?;
         T::set_multicast_interface(ctx, id, interface.as_ref(), Ipv6::VERSION)
-            .map_err(IntoErrno::into_errno)
+            .map_err(IntoErrno::into_errno_error)
     }
 
-    fn get_multicast_interface_ipv6(self) -> Result<Option<NonZeroU64>, fposix::Errno> {
+    fn get_multicast_interface_ipv6(self) -> Result<Option<NonZeroU64>, ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_multicast_interface(ctx, id, Ipv6::VERSION)
-            .map_err(IntoErrno::into_errno)
-            .map_err(|e| match e {
-                // `getsockopt()` should fail with `EOPNOTSUPP` instead of `ENOPROTOOPT`.
-                fposix::Errno::Enoprotoopt => fposix::Errno::Eopnotsupp,
-                e => e,
+            .map_err(IntoErrno::into_errno_error)
+            .map_err(|e| {
+                e.map_errno(|e| match e {
+                    // `getsockopt()` should fail with `EOPNOTSUPP` instead of `ENOPROTOOPT`.
+                    fposix::Errno::Enoprotoopt => fposix::Errno::Eopnotsupp,
+                    e => e,
+                })
             })?
             .map(|id| id.try_into_fidl_with_ctx(ctx.bindings_ctx()))
             .transpose()
-            .map_err(IntoErrno::into_errno)
+            .map_err(IntoErrno::into_errno_error)
     }
 
-    fn set_multicast_loop(self, ip_version: IpVersion, loop_: bool) -> Result<(), fposix::Errno> {
+    fn set_multicast_loop(self, ip_version: IpVersion, loop_: bool) -> Result<(), ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
-        T::set_multicast_loop(ctx, id, loop_, ip_version).map_err(IntoErrno::into_errno)
+        T::set_multicast_loop(ctx, id, loop_, ip_version).map_err(IntoErrno::into_errno_error)
     }
 
-    fn get_multicast_loop(self, ip_version: IpVersion) -> Result<bool, fposix::Errno> {
+    fn get_multicast_loop(self, ip_version: IpVersion) -> Result<bool, ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
-        T::get_multicast_loop(ctx, id, ip_version).map_err(IntoErrno::into_errno)
+        T::get_multicast_loop(ctx, id, ip_version).map_err(IntoErrno::into_errno_error)
     }
 
     fn set_ip_transparent(self, value: bool) -> Result<(), T::SetIpTransparentError> {
@@ -2410,44 +2509,43 @@ where
         T::get_broadcast(ctx, id)
     }
 
-    fn get_timestamp_option(self) -> Result<fposix_socket::TimestampOption, fposix::Errno> {
-        Ok(self.data.timestamp_option)
+    fn get_timestamp_option(self) -> fposix_socket::TimestampOption {
+        self.data.timestamp_option
     }
 
-    fn set_timestamp_option(
-        self,
-        value: fposix_socket::TimestampOption,
-    ) -> Result<(), fposix::Errno> {
+    fn set_timestamp_option(self, value: fposix_socket::TimestampOption) {
         self.data.timestamp_option = value;
-        Ok(())
     }
 
-    fn set_traffic_class(
-        self,
-        ip_version: IpVersion,
-        traffic_class: u8,
-    ) -> Result<(), fposix::Errno> {
+    fn set_traffic_class(self, ip_version: IpVersion, traffic_class: u8) -> Result<(), ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::set_dscp_and_ecn(ctx, id, traffic_class.into(), ip_version)
-            .map_err(IntoErrno::into_errno)
+            .map_err(IntoErrno::into_errno_error)
     }
 
-    fn get_traffic_class(self, ip_version: IpVersion) -> Result<u8, fposix::Errno> {
+    fn get_traffic_class(self, ip_version: IpVersion) -> Result<u8, ErrnoError> {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_dscp_and_ecn(ctx, id, ip_version)
-            .map_err(IntoErrno::into_errno)
-            .map_err(|e| match e.into_errno() {
-                // fail with `EOPNOTSUPP` instead of `ENOPROTOOPT`.
-                fposix::Errno::Enoprotoopt => fposix::Errno::Eopnotsupp,
-                e => e,
+            .map_err(IntoErrno::into_errno_error)
+            .map_err(|e| {
+                e.map_errno(|e| match e {
+                    // fail with `EOPNOTSUPP` instead of `ENOPROTOOPT`.
+                    fposix::Errno::Enoprotoopt => fposix::Errno::Eopnotsupp,
+                    e => e,
+                })
             })
             .map(DscpAndEcn::raw)
     }
 
-    fn set_ipv6_receive_traffic_class(self, value: bool) -> Result<(), fposix::Errno> {
+    fn set_ipv6_receive_traffic_class(self, value: bool) -> Result<(), ErrnoError> {
         I::map_ip_in(
             &mut self.data.version_specific_data,
-            |_v4_data| Err(fposix::Errno::Enoprotoopt),
+            |_v4_data| {
+                Err(ErrnoError::new(
+                    fposix::Errno::Enoprotoopt,
+                    "cannot set_ipv6_receive_traffic_class on IPv4 socket",
+                ))
+            },
             |v6_data| {
                 v6_data.recv_tclass = value;
                 Ok(())
@@ -2455,21 +2553,25 @@ where
         )
     }
 
-    fn get_ipv6_receive_traffic_class(self) -> Result<bool, fposix::Errno> {
+    fn get_ipv6_receive_traffic_class(self) -> Result<bool, ErrnoError> {
         I::map_ip_in(
             &self.data.version_specific_data,
-            |_v4_data| Err(fposix::Errno::Eopnotsupp),
+            |_v4_data| {
+                Err(ErrnoError::new(
+                    fposix::Errno::Eopnotsupp,
+                    "cannot get_ipv6_receive_traffic_class on IPv4 socket",
+                ))
+            },
             |v6_data| Ok(v6_data.recv_tclass),
         )
     }
 
-    fn ip_set_receive_type_of_service(self, value: bool) -> Result<(), fposix::Errno> {
+    fn ip_set_receive_type_of_service(self, value: bool) {
         self.data.ip_recv_tos = value;
-        Ok(())
     }
 
-    fn ip_get_receive_type_of_service(self) -> Result<bool, fposix::Errno> {
-        Ok(self.data.ip_recv_tos)
+    fn ip_get_receive_type_of_service(self) -> bool {
+        self.data.ip_recv_tos
     }
 
     fn set_mark(self, domain: fnet::MarkDomain, mark: fposix_socket::OptionalUint32) {
@@ -2480,6 +2582,11 @@ where
     fn get_mark(self, domain: fnet::MarkDomain) -> fposix_socket::OptionalUint32 {
         let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
         T::get_mark(ctx, id, domain.into_core()).into_fidl()
+    }
+
+    fn get_cookie(self) -> SocketCookie {
+        let Self { ctx, data: BindingData { info: SocketControlInfo { id, .. }, .. } } = self;
+        T::get_cookie(ctx, id)
     }
 
     fn set_send_buffer(self, send_buffer: u64) {
@@ -2494,21 +2601,21 @@ where
 }
 
 impl IntoErrno for ExpectedUnboundError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         let ExpectedUnboundError = self;
         fposix::Errno::Einval
     }
 }
 
 impl IntoErrno for ExpectedConnError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         let ExpectedConnError = self;
         fposix::Errno::Enotconn
     }
 }
 
 impl IntoErrno for NotSupportedError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         fposix::Errno::Eopnotsupp
     }
 }
@@ -2532,10 +2639,13 @@ impl<I: Ip, D> IntoFidl<LocalAddress<I, D, NonZeroU16>> for SocketInfo<I::Addr, 
 }
 
 impl<I: Ip, D> TryIntoFidl<RemoteAddress<I, D, u16>> for SocketInfo<I::Addr, D> {
-    type Error = fposix::Errno;
+    type Error = ErrnoError;
     fn try_into_fidl(self) -> Result<RemoteAddress<I, D, u16>, Self::Error> {
         match self {
-            Self::Unbound | Self::Listener(_) => Err(fposix::Errno::Enotconn),
+            Self::Unbound | Self::Listener(_) => Err(ErrnoError::new(
+                fposix::Errno::Enotconn,
+                "cannot get remote address of unconnected socket",
+            )),
             Self::Connected(ConnInfo {
                 local_ip: _,
                 local_identifier: _,
@@ -2546,7 +2656,7 @@ impl<I: Ip, D> TryIntoFidl<RemoteAddress<I, D, u16>> for SocketInfo<I::Addr, D> 
                     // Match Linux and report `ENOTCONN` for requests to
                     // 'get_peername` when the connection's remote port is 0 for
                     // both UDP and ICMP Echo sockets.
-                    Err(fposix::Errno::Enotconn)
+                    Err(ErrnoError::new(fposix::Errno::Enotconn, "remote port is 0"))
                 } else {
                     Ok(RemoteAddress { address: remote_ip, identifier: remote_identifier })
                 }
@@ -2560,7 +2670,7 @@ impl<I: IpSockAddrExt, D, L: Into<u16>> TryIntoFidlWithContext<I::SocketAddress>
 where
     D: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
-    type Error = fposix::Errno;
+    type Error = ErrnoError;
 
     fn try_into_fidl_with_ctx<Ctx: crate::bindings::util::ConversionContext>(
         self,
@@ -2569,7 +2679,7 @@ where
         let Self { address, identifier } = self;
         (address, identifier.map_or(0, Into::into))
             .try_into_fidl_with_ctx(ctx)
-            .map_err(IntoErrno::into_errno)
+            .map_err(IntoErrno::into_errno_error)
     }
 }
 
@@ -2578,7 +2688,7 @@ impl<I: IpSockAddrExt, D, R: Into<u16>> TryIntoFidlWithContext<I::SocketAddress>
 where
     D: TryIntoFidlWithContext<NonZeroU64, Error = DeviceNotFoundError>,
 {
-    type Error = fposix::Errno;
+    type Error = ErrnoError;
 
     fn try_into_fidl_with_ctx<Ctx: crate::bindings::util::ConversionContext>(
         self,
@@ -2587,7 +2697,7 @@ where
         let Self { address, identifier } = self;
         (Some(address), identifier.into())
             .try_into_fidl_with_ctx(ctx)
-            .map_err(IntoErrno::into_errno)
+            .map_err(IntoErrno::into_errno_error)
     }
 }
 
@@ -2599,7 +2709,7 @@ mod tests {
     use fidl::endpoints::{Proxy, ServerEnd};
     use fuchsia_async as fasync;
     use futures::StreamExt;
-    use packet::Serializer as _;
+    use packet::{PacketBuilder as _, Serializer as _};
     use packet_formats::icmp::IcmpIpExt;
     use zx::{self as zx, AsHandleRef};
 
@@ -2894,8 +3004,8 @@ mod tests {
     {
         match proto {
             fposix_socket::DatagramSocketProtocol::Udp => buf,
-            fposix_socket::DatagramSocketProtocol::IcmpEcho => Buf::new(buf, ..)
-                .encapsulate(packet_formats::icmp::IcmpPacketBuilder::<
+            fposix_socket::DatagramSocketProtocol::IcmpEcho => {
+                packet_formats::icmp::IcmpPacketBuilder::<
                     <A::AddrType as IpAddress>::Version,
                     _,
                 >::new(
@@ -2903,11 +3013,13 @@ mod tests {
                     <<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(),
                     packet_formats::icmp::IcmpZeroCode,
                     packet_formats::icmp::IcmpEchoRequest::new(0, 1),
-                ))
+                )
+                .wrap_body(Buf::new(buf, ..))
                 .serialize_vec_outer()
                 .unwrap()
                 .into_inner()
-                .into_inner(),
+                .into_inner()
+            }
         }
     }
 
@@ -2926,8 +3038,8 @@ mod tests {
     {
         match proto {
             fposix_socket::DatagramSocketProtocol::Udp => buf,
-            fposix_socket::DatagramSocketProtocol::IcmpEcho => Buf::new(buf, ..)
-                .encapsulate(packet_formats::icmp::IcmpPacketBuilder::<
+            fposix_socket::DatagramSocketProtocol::IcmpEcho => {
+                packet_formats::icmp::IcmpPacketBuilder::<
                     <A::AddrType as IpAddress>::Version,
                     _,
                 >::new(
@@ -2935,11 +3047,13 @@ mod tests {
                     dst_ip,
                     packet_formats::icmp::IcmpZeroCode,
                     packet_formats::icmp::IcmpEchoReply::new(id, 1),
-                ))
+                )
+                .wrap_body(Buf::new(buf, ..))
                 .serialize_vec_outer()
                 .unwrap()
                 .into_inner()
-                .into_inner(),
+                .into_inner()
+            }
         }
     }
 

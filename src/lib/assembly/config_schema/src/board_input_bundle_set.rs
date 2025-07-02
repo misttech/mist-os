@@ -4,8 +4,8 @@
 
 #![deny(missing_docs)]
 
-use crate::release_info::ReleaseInfo;
 use assembly_container::{assembly_container, AssemblyContainer, DirectoryPathBuf, WalkPaths};
+use assembly_release_info::ReleaseInfo;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 

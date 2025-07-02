@@ -67,9 +67,9 @@ async fn test_replace_failed_driver() -> Result<()> {
     };
     instance.driver_test_realm_start(args).await?;
 
-    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
-    let driver_registrar =
-        instance.root.connect_to_protocol_at_exposed_dir::<fdr::DriverRegistrarMarker>()?;
+    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir()?;
+    let driver_registrar: fdr::DriverRegistrarProxy =
+        instance.root.connect_to_protocol_at_exposed_dir()?;
 
     // Check that it's quarantined.
     let device_infos = get_device_info(&driver_dev, &node_filter, /* exact_match= */ true).await?;
@@ -96,7 +96,7 @@ async fn test_replace_failed_driver() -> Result<()> {
         let device_infos =
             get_device_info(&driver_dev, &node_filter, /* exact_match= */ true).await?;
         match device_infos.first().expect("one node entry").bound_driver_url.as_deref() {
-            Some("unbound") | Some("owned by parent") => break,
+            Some("unbound") => break,
             _ => {}
         }
     }

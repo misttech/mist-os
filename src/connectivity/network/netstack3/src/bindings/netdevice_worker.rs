@@ -27,6 +27,7 @@ use netstack3_core::ip::{
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::RwLock as CoreRwLock;
 use netstack3_core::trace::trace_duration;
+use thiserror::Error;
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
     fuchsia_async as fasync,
@@ -77,7 +78,7 @@ pub(crate) struct NetdeviceWorker {
     watch_rx_leases: bool,
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub(crate) enum Error {
     #[error("client error: {0}")]
     Client(#[from] netdevice_client::Error),
@@ -561,8 +562,7 @@ impl DeviceHandler {
                             netdevice: dynamic_netdevice_info_builder(max_frame_size.as_mtu()),
                             neighbor_event_sink: neighbor_event_sink.clone(),
                         }),
-                    }
-                    .into();
+                    };
                     let core_ethernet_id = ctx.api().device::<EthernetLinkDevice>().add_device(
                         devices::DeviceIdAndName { id: binding_id, name: name.clone() },
                         EthernetCreationProperties { mac, max_frame_size },
@@ -579,8 +579,7 @@ impl DeviceHandler {
                         dynamic_info: CoreRwLock::new(dynamic_netdevice_info_builder(
                             max_frame_size,
                         )),
-                    }
-                    .into();
+                    };
                     let core_pure_ip_id = ctx.api().device::<PureIpDevice>().add_device(
                         devices::DeviceIdAndName { id: binding_id, name: name.clone() },
                         PureIpDeviceCreationProperties { mtu: max_frame_size },

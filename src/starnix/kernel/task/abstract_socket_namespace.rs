@@ -41,7 +41,7 @@ where
 
     pub fn bind<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         address: K,
         socket: &SocketHandle,

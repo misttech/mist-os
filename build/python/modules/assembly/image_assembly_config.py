@@ -22,6 +22,32 @@ ExtendsImageAssemblyConfig = TypeVar(
 
 
 @dataclass
+class ReleaseInfo:
+    name: str
+    repository: str
+    version: str
+
+
+@dataclass
+class ProductReleaseInfo:
+    info: ReleaseInfo
+    pibs: list[ReleaseInfo]
+
+
+@dataclass
+class BoardReleaseInfo:
+    info: ReleaseInfo
+    bib_sets: list[ReleaseInfo]
+
+
+@dataclass
+class SystemReleaseInfo:
+    platform: Optional[ReleaseInfo]
+    product: Optional[ProductReleaseInfo]
+    board: Optional[BoardReleaseInfo]
+
+
+@dataclass
 class KernelInfo:
     """Information about the kernel"""
 
@@ -60,6 +86,8 @@ class ImageAssemblyConfig:
     netboot_mode: bool = False
     board_name: None | str = None
     image_mode: None | str = None
+    system_release_info: Optional[SystemReleaseInfo] = None
+    partitions_config: Optional[FilePath] = None
 
     # TODO:  Flesh out the images_config with the actual types, if it's needed.
     images_config: dict[str, list[str]] = field(default_factory=dict)

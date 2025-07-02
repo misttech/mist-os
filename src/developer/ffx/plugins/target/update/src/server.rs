@@ -94,6 +94,7 @@ pub(crate) async fn package_server_task(
         no_device: false,
         refresh_metadata: false,
         auto_publish: None,
+        tunnel_addr: None,
     };
 
     // Check that there is not an update source that has the same prefix. This is extremely

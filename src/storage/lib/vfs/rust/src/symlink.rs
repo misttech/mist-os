@@ -127,6 +127,17 @@ impl<T: Symlink> Connection<T> {
             fio::SymlinkRequest::Sync { responder } => {
                 responder.send(Ok(()))?;
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fio::SymlinkRequest::DeprecatedGetAttr { responder } => {
+                // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
+                let (status, attrs) = crate::common::io2_to_io1_attrs(
+                    self.symlink.as_ref(),
+                    fio::Rights::GET_ATTRIBUTES,
+                )
+                .await;
+                responder.send(status.into_raw(), &attrs)?;
+            }
+            #[cfg(not(fuchsia_api_level_at_least = "NEXT"))]
             fio::SymlinkRequest::GetAttr { responder } => {
                 // TODO(https://fxbug.dev/293947862): Restrict GET_ATTRIBUTES.
                 let (status, attrs) = crate::common::io2_to_io1_attrs(
@@ -502,48 +513,45 @@ mod tests {
     async fn test_validate_flags() {
         let scope = ExecutionScope::new();
 
-        let check = |mut flags: fio::OpenFlags| {
+        let check = |mut flags: fio::Flags| {
             let (client_end, server_end) = create_proxy::<fio::SymlinkMarker>();
-            flags |= fio::OpenFlags::DESCRIBE;
+            flags |= fio::Flags::FLAG_SEND_REPRESENTATION;
             flags.to_object_request(server_end).create_connection_sync::<Connection<_>, _>(
                 scope.clone(),
                 Arc::new(TestSymlink::new()),
                 flags,
             );
 
-            async move {
-                Status::from_raw(
-                    client_end
-                        .take_event_stream()
-                        .next()
-                        .await
-                        .expect("no event")
-                        .expect("next failed")
-                        .into_on_open_()
-                        .expect("expected OnOpen")
-                        .0,
-                )
-            }
+            async move { client_end.take_event_stream().next().await.expect("no event") }
         };
 
         for flags in [
-            fio::OpenFlags::RIGHT_WRITABLE,
-            fio::OpenFlags::RIGHT_EXECUTABLE,
-            fio::OpenFlags::CREATE,
-            fio::OpenFlags::CREATE_IF_ABSENT,
-            fio::OpenFlags::TRUNCATE,
-            fio::OpenFlags::APPEND,
-            fio::OpenFlags::POSIX_WRITABLE,
-            fio::OpenFlags::POSIX_EXECUTABLE,
-            fio::OpenFlags::CLONE_SAME_RIGHTS,
-            fio::OpenFlags::BLOCK_DEVICE,
+            fio::Flags::PROTOCOL_DIRECTORY,
+            fio::Flags::PROTOCOL_FILE,
+            fio::Flags::PROTOCOL_SERVICE,
         ] {
-            assert_eq!(check(flags).await, Status::INVALID_ARGS, "{flags:?}");
+            assert_matches!(
+                check(fio::PERM_READABLE | flags).await,
+                Err(fidl::Error::ClientChannelClosed { status: Status::WRONG_TYPE, .. }),
+                "{flags:?}"
+            );
         }
 
-        assert_eq!(
-            check(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::NOT_DIRECTORY).await,
-            Status::OK
+        assert_matches!(
+            check(fio::PERM_READABLE | fio::Flags::PROTOCOL_SYMLINK)
+                .await
+                .expect("error from next")
+                .into_on_representation()
+                .expect("expected on representation"),
+            fio::Representation::Symlink(fio::SymlinkInfo { .. })
+        );
+        assert_matches!(
+            check(fio::PERM_READABLE)
+                .await
+                .expect("error from next")
+                .into_on_representation()
+                .expect("expected on representation"),
+            fio::Representation::Symlink(fio::SymlinkInfo { .. })
         );
     }
 

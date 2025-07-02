@@ -78,7 +78,7 @@ impl TryFromEnv for RemoteControlProxyHolder {
     }
 }
 
-pub(crate) async fn open_moniker_fdomain<P>(
+pub async fn open_moniker_fdomain<P>(
     rcs: &RemoteControlProxy,
     capability_set: rcs_fdomain::OpenDirType,
     moniker: &str,

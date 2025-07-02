@@ -1237,6 +1237,10 @@ func (ep *endpoint) GetMark(_ fidl.Context, domain fnet.MarkDomain) (socket.Base
 	return socket.BaseSocketGetMarkResultWithErr(posix.ErrnoEopnotsupp), nil
 }
 
+func (ep *endpoint) GetCookie(_ fidl.Context) (socket.BaseSocketGetCookieResult, error) {
+	return socket.BaseSocketGetCookieResultWithErr(posix.ErrnoEopnotsupp), nil
+}
+
 // endpointWithSocket implements a network socket that uses a zircon socket for
 // its data plane. This structure creates a pair of goroutines which are
 // responsible for moving data and signals between the underlying
@@ -1534,8 +1538,9 @@ func (eps *endpointWithSocket) startReadWriteLoops(loopRead, loopWrite func(chan
 }
 
 func (eps *endpointWithSocket) describe() (zx.Handle, error) {
-	// TODO(https://fxbug.dev/42157659): The rights on this handle should be capped at the connection's.
-	socket, err := eps.peer.Handle().Duplicate(zx.RightTransfer | zx.RightsIO | zx.RightWait | zx.RightInspect)
+	// TODO(https://fxbug.dev/417777189): Remove signal rights when no longer
+	// necessary for ffx support.
+	socket, err := eps.peer.Handle().Duplicate(zx.RightTransfer | zx.RightsIO | zx.RightWait | zx.RightInspect | zx.RightSignal)
 	_ = syslog.DebugTf("Describe", "%p: err=%v", eps, err)
 	return socket, err
 }

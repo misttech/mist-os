@@ -33,6 +33,9 @@ pub union WireEnvelope {
     decoded_out_of_line: *mut (),
 }
 
+unsafe impl Send for WireEnvelope {}
+unsafe impl Sync for WireEnvelope {}
+
 unsafe impl Wire for WireEnvelope {
     type Decoded<'de> = WireEnvelope;
 

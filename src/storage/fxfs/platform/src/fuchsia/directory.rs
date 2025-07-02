@@ -11,6 +11,7 @@ use crate::fuchsia::volume::{info_to_filesystem_info, FxVolume, RootDir};
 use anyhow::{bail, Error};
 use either::{Left, Right};
 use fidl::endpoints::ServerEnd;
+use fidl_fuchsia_hardware_block_volume::VolumeMarker;
 use fidl_fuchsia_io as fio;
 use fuchsia_sync::Mutex;
 use futures::future::BoxFuture;
@@ -50,8 +51,9 @@ impl RootDir for FxDirectory {
         self
     }
 
-    fn as_directory(self: Arc<Self>) -> Arc<dyn VfsDirectory> {
-        self
+    fn serve(self: Arc<Self>, flags: fio::Flags, server_end: ServerEnd<fio::DirectoryMarker>) {
+        let scope = self.volume().scope().clone();
+        vfs::directory::serve_on(self, flags, scope, server_end);
     }
 
     fn as_node(self: Arc<Self>) -> Arc<dyn FxNode> {
@@ -290,7 +292,7 @@ impl FxDirectory {
         }
     }
 
-    async fn create_unnamed_temporary_file(
+    pub(crate) async fn create_unnamed_temporary_file(
         self: &Arc<Self>,
         create_attributes: Option<&fio::MutableNodeAttributes>,
     ) -> Result<OpenedNode<dyn FxNode>, Error> {
@@ -585,6 +587,47 @@ impl FxDirectory {
             self.volume().maybe_purge_file(id).await.map_err(map_to_status)?;
         }
         Ok(())
+    }
+
+    pub(crate) async fn open_block_file(
+        self: &Arc<Self>,
+        name: &str,
+        server_end: ServerEnd<VolumeMarker>,
+    ) {
+        let request = ObjectRequest::new(
+            fio::Flags::empty(),
+            &fio::Options::default(),
+            server_end.into_channel(),
+        );
+        let scope = self.volume().scope().clone();
+        let this = self.clone();
+        request
+            .handle_async(async move |request| {
+                let path = Path::validate_and_split(name).and_then(|p| {
+                    if p.is_single_component() {
+                        Ok(p)
+                    } else {
+                        Err(zx::Status::INVALID_ARGS)
+                    }
+                })?;
+                let node = this
+                    .lookup(&fio::Flags::empty(), path, request)
+                    .await
+                    .map_err(map_to_status)?;
+                if node.is::<FxFile>() {
+                    let file = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
+                    if file.is_verified_file() {
+                        log::error!("Tried to expose a verified file as a block device.");
+                        return Err(zx::Status::NOT_SUPPORTED);
+                    }
+                    let server = BlockServer::new(file, request.take().into_channel());
+                    scope.spawn(server.run());
+                    Ok(())
+                } else {
+                    Err(zx::Status::NOT_FILE)
+                }
+            })
+            .await
     }
 }
 
@@ -900,9 +943,6 @@ impl VfsDirectory for FxDirectory {
                         .await
                 } else if node.is::<FxFile>() {
                     let node = node.downcast::<FxFile>().unwrap_or_else(|_| unreachable!());
-                    // TODO(https://fxbug.dev/397501864): Support opening block devices with the new
-                    // fuchsia.io/Directory.Open signature (e.g. via the `open3` impl below), or add
-                    // a separate protocol for this purpose.
                     if flags.contains(fio::OpenFlags::BLOCK_DEVICE) {
                         if node.is_verified_file() {
                             log::error!("Tried to expose a verified file as a block device.");
@@ -914,11 +954,7 @@ impl VfsDirectory for FxDirectory {
                             );
                             return Err(zx::Status::ACCESS_DENIED);
                         }
-                        let server = BlockServer::new(
-                            node,
-                            /*read_only=*/ !flags.contains(fio::OpenFlags::RIGHT_WRITABLE),
-                            object_request.take().into_channel(),
-                        );
+                        let server = BlockServer::new(node, object_request.take().into_channel());
                         scope.spawn(server.run());
                         Ok(())
                     } else {
@@ -1862,7 +1898,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -1991,7 +2027,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2088,7 +2124,7 @@ mod tests {
 
         close_file_checked(Arc::try_unwrap(encrypted_file).unwrap()).await;
 
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
 
         let file = Arc::new(
             open_file_checked(
@@ -2170,7 +2206,7 @@ mod tests {
             .expect("Failed to set xattr with create");
 
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2287,7 +2323,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2346,7 +2382,7 @@ mod tests {
                 assert!(entry.kind == DirentKind::Directory)
             }
         }
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         let unencrypted_entries = readdir(Arc::clone(&parent)).await;
         for entry in unencrypted_entries {
             if entry.name == ".".to_owned() {
@@ -2380,7 +2416,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2510,7 +2546,7 @@ mod tests {
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
 
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent_1
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2637,10 +2673,10 @@ mod tests {
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
 
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
 
         let wrapping_key_id_2 = 3;
-        crypt.add_wrapping_key(wrapping_key_id_2, [2; 32]);
+        crypt.add_wrapping_key(wrapping_key_id_2, [2; 32].into());
 
         parent_1
             .update_attributes(&fio::MutableNodeAttributes {
@@ -2718,7 +2754,7 @@ mod tests {
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
 
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
 
         parent_1
             .update_attributes(&fio::MutableNodeAttributes {
@@ -2788,7 +2824,7 @@ mod tests {
         let parent_2: Arc<fio::DirectoryProxy> = Arc::new(open_dir_2().await);
 
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent_1
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2926,7 +2962,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3009,7 +3045,7 @@ mod tests {
         };
         let parent = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3102,7 +3138,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3200,7 +3236,7 @@ mod tests {
 
         let parent: Arc<fio::DirectoryProxy> = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3268,7 +3304,7 @@ mod tests {
             .expect_err("rename should fail on a locked directory");
         let (status, dst_token) = parent.get_token().await.expect("FIDL call failed");
         zx::Status::ok(status).expect("get_token failed");
-        crypt.add_wrapping_key(2, [1; 32]);
+        crypt.add_wrapping_key(2, [1; 32].into());
         parent
             .rename("fee", zx::Event::from(dst_token.unwrap()), "new_fee")
             .await
@@ -3284,63 +3320,6 @@ mod tests {
         .await;
         close_dir_checked(Arc::try_unwrap(parent).unwrap()).await;
         new_fixture.close().await;
-    }
-
-    #[fuchsia::test]
-    async fn test_deprecated_set_attrs() {
-        let fixture = TestFixture::new().await;
-        let root = fixture.root();
-
-        let dir = open_dir_checked(
-            &root,
-            "foo",
-            fio::Flags::FLAG_MAYBE_CREATE
-                | fio::PERM_READABLE
-                | fio::PERM_WRITABLE
-                | fio::Flags::PROTOCOL_DIRECTORY,
-            Default::default(),
-        )
-        .await;
-
-        let (status, initial_attrs) = dir.get_attr().await.expect("FIDL call failed");
-        zx::Status::ok(status).expect("get_attr failed");
-
-        let crtime = initial_attrs.creation_time ^ 1u64;
-        let mtime = initial_attrs.modification_time ^ 1u64;
-
-        let mut attrs = initial_attrs.clone();
-        attrs.creation_time = crtime;
-        attrs.modification_time = mtime;
-        let status = dir
-            .deprecated_set_attr(fio::NodeAttributeFlags::CREATION_TIME, &attrs)
-            .await
-            .expect("FIDL call failed");
-        zx::Status::ok(status).expect("set_attr failed");
-
-        let mut expected_attrs = initial_attrs.clone();
-        expected_attrs.creation_time = crtime; // Only crtime is updated so far.
-        let (status, attrs) = dir.get_attr().await.expect("FIDL call failed");
-        zx::Status::ok(status).expect("get_attr failed");
-        assert_eq!(expected_attrs, attrs);
-
-        let mut attrs = initial_attrs.clone();
-        attrs.creation_time = 0u64; // This should be ignored since we don't set the flag.
-        attrs.modification_time = mtime;
-        let status = dir
-            .deprecated_set_attr(fio::NodeAttributeFlags::MODIFICATION_TIME, &attrs)
-            .await
-            .expect("FIDL call failed");
-        zx::Status::ok(status).expect("set_attr failed");
-
-        let mut expected_attrs = initial_attrs.clone();
-        expected_attrs.creation_time = crtime;
-        expected_attrs.modification_time = mtime;
-        let (status, attrs) = dir.get_attr().await.expect("FIDL call failed");
-        zx::Status::ok(status).expect("get_attr failed");
-        assert_eq!(expected_attrs, attrs);
-
-        close_dir_checked(dir).await;
-        fixture.close().await;
     }
 
     #[fuchsia::test]
@@ -3361,7 +3340,7 @@ mod tests {
         };
         let parent = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3440,7 +3419,7 @@ mod tests {
         };
         let parent = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3530,7 +3509,7 @@ mod tests {
         };
         let parent = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3634,7 +3613,7 @@ mod tests {
         };
         let parent = Arc::new(open_dir().await);
         let wrapping_key_id = 2;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         parent
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -3740,8 +3719,11 @@ mod tests {
                 .expect("FIDL call failed")
                 .expect("rename failed");
 
-            let (status, _) = proxy.get_attr().await.expect("FIDL call failed");
-            assert_eq!(zx::Status::from_raw(status), zx::Status::NOT_FOUND);
+            let result = proxy
+                .get_attributes(fio::NodeAttributesQuery::empty())
+                .await
+                .expect("FIDL call failed");
+            assert_eq!(result.err(), Some(zx::Status::NOT_FOUND.into_raw()));
             assert_matches!(
                 proxy.describe().await,
                 Err(fidl::Error::ClientChannelClosed { status: zx::Status::NOT_FOUND, .. })

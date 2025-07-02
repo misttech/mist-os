@@ -1,0 +1,21 @@
+[package]
+name = "fastrand"
+version = "1.4.0"
+authors = ["Stjepan Glavina <stjepang@gmail.com>"]
+edition = "2018"
+description = "A simple and fast random number generator"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/stjepang/fastrand"
+homepage = "https://github.com/stjepang/fastrand"
+documentation = "https://docs.rs/fastrand"
+keywords = ["simple", "fast", "rand", "random", "pcg"]
+categories = ["algorithms"]
+readme = "README.md"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+instant = "0.1"
+
+[dev-dependencies]
+rand = "0.7.3"
+rand_pcg = "0.2.1"
+getrandom = "0.1.14"

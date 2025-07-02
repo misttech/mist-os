@@ -930,7 +930,7 @@ mod tests {
         TEST_ADDRS_V6,
     };
     use netstack3_base::{CtxPair, IntoCoreTimerCtx};
-    use packet::{Buf, ParsablePacket, ParseBuffer, Serializer};
+    use packet::{Buf, PacketBuilder, ParsablePacket, ParseBuffer, Serializer};
     use packet_formats::ip::{FragmentOffset, IpProto, Ipv6Proto};
     use packet_formats::ipv4::Ipv4PacketBuilder;
     use packet_formats::ipv6::{Ipv6PacketBuilder, Ipv6PacketBuilderWithFragmentHeader};
@@ -1053,7 +1053,7 @@ mod tests {
             usize::from(size) * usize::from(FRAGMENT_BLOCK_SIZE),
         );
 
-        let mut buffer = Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap();
+        let mut buffer = builder.wrap_body(Buf::new(body, ..)).serialize_vec_outer().unwrap();
         let packet = buffer.parse::<Ipv4Packet<_>>().unwrap();
 
         let actual_result =
@@ -1102,7 +1102,7 @@ mod tests {
             usize::from(size) * usize::from(FRAGMENT_BLOCK_SIZE),
         );
 
-        let mut buffer = Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap();
+        let mut buffer = builder.wrap_body(Buf::new(body, ..)).serialize_vec_outer().unwrap();
         let packet = buffer.parse::<Ipv6Packet<_>>().unwrap();
 
         let actual_result =
@@ -1250,7 +1250,7 @@ mod tests {
         let builder = get_ipv4_builder();
         let body = [1, 2, 3, 4, 5];
         let mut buffer =
-            Buf::new(body.to_vec(), ..).encapsulate(builder).serialize_vec_outer().unwrap();
+            builder.wrap_body(Buf::new(body.to_vec(), ..)).serialize_vec_outer().unwrap();
         let packet = buffer.parse::<Ipv4Packet<_>>().unwrap();
         assert_matches!(
             FragmentHandler::process_fragment::<&[u8]>(&mut core_ctx, &mut bindings_ctx, packet),
@@ -1270,7 +1270,7 @@ mod tests {
 
         let builder = get_ipv6_builder();
         let mut buffer =
-            Buf::new(vec![1, 2, 3, 4, 5], ..).encapsulate(builder).serialize_vec_outer().unwrap();
+            builder.wrap_body(Buf::new(vec![1, 2, 3, 4, 5], ..)).serialize_vec_outer().unwrap();
         let packet = buffer.parse::<Ipv6Packet<_>>().unwrap();
         assert_matches!(
             FragmentHandler::process_fragment::<&[u8]>(&mut core_ctx, &mut bindings_ctx, packet),
@@ -1804,7 +1804,7 @@ mod tests {
         // multiple of `FRAGMENT_BLOCK_SIZE`.
         let mut body: Vec<u8> = Vec::new();
         body.extend(FRAGMENT_BLOCK_SIZE..FRAGMENT_BLOCK_SIZE * 2 - 1);
-        let mut buffer = Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap();
+        let mut buffer = builder.wrap_body(Buf::new(body, ..)).serialize_vec_outer().unwrap();
         let packet = buffer.parse::<Ipv4Packet<_>>().unwrap();
         assert_matches!(
             FragmentHandler::process_fragment::<&[u8]>(&mut core_ctx, &mut bindings_ctx, packet),
@@ -1822,7 +1822,7 @@ mod tests {
         // multiple of `FRAGMENT_BLOCK_SIZE`.
         let mut body: Vec<u8> = Vec::new();
         body.extend(FRAGMENT_BLOCK_SIZE..FRAGMENT_BLOCK_SIZE * 2 - 1);
-        let mut buffer = Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap();
+        let mut buffer = builder.wrap_body(Buf::new(body, ..)).serialize_vec_outer().unwrap();
         let packet = buffer.parse::<Ipv4Packet<_>>().unwrap();
         let (key, packet_len) = assert_matches!(
             FragmentHandler::process_fragment::<&[u8]>(&mut core_ctx, &mut bindings_ctx, packet),
@@ -1871,7 +1871,7 @@ mod tests {
             id.into(),
         );
         let body = generate_body_fragment(id, offset, body_size);
-        let mut buffer = Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap();
+        let mut buffer = builder.wrap_body(Buf::new(body, ..)).serialize_vec_outer().unwrap();
         let packet = buffer.parse::<Ipv6Packet<_>>().unwrap();
         assert_matches!(
             FragmentHandler::process_fragment::<&[u8]>(&mut core_ctx, &mut bindings_ctx, packet),
@@ -1888,7 +1888,7 @@ mod tests {
             id.into(),
         );
         let body = generate_body_fragment(id, offset, body_size);
-        let mut buffer = Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap();
+        let mut buffer = builder.wrap_body(Buf::new(body, ..)).serialize_vec_outer().unwrap();
         let packet = buffer.parse::<Ipv6Packet<_>>().unwrap();
         let (key, packet_len) = assert_matches!(
             FragmentHandler::process_fragment::<&[u8]>(&mut core_ctx, &mut bindings_ctx, packet),

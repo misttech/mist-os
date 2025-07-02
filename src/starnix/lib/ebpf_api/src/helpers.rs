@@ -13,8 +13,9 @@ use linux_uapi::{
     bpf_func_id_BPF_FUNC_map_update_elem, bpf_func_id_BPF_FUNC_probe_read_str,
     bpf_func_id_BPF_FUNC_probe_read_user, bpf_func_id_BPF_FUNC_probe_read_user_str,
     bpf_func_id_BPF_FUNC_ringbuf_discard, bpf_func_id_BPF_FUNC_ringbuf_reserve,
-    bpf_func_id_BPF_FUNC_ringbuf_submit, bpf_func_id_BPF_FUNC_sk_storage_get,
-    bpf_func_id_BPF_FUNC_skb_load_bytes_relative, bpf_func_id_BPF_FUNC_trace_printk, uid_t,
+    bpf_func_id_BPF_FUNC_ringbuf_submit, bpf_func_id_BPF_FUNC_sk_fullsock,
+    bpf_func_id_BPF_FUNC_sk_storage_get, bpf_func_id_BPF_FUNC_skb_load_bytes_relative,
+    bpf_func_id_BPF_FUNC_trace_printk, uid_t,
 };
 use std::slice;
 
@@ -81,14 +82,20 @@ fn bpf_map_update_elem<C: EbpfProgramContext>(
 
 fn bpf_map_delete_elem<C: EbpfProgramContext>(
     _context: &mut C::RunContext<'_>,
-    _map: BpfValue,
-    _key: BpfValue,
+    map: BpfValue,
+    key: BpfValue,
     _: BpfValue,
     _: BpfValue,
     _: BpfValue,
 ) -> BpfValue {
-    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_map_delete_elem");
-    u64::MAX.into()
+    // SAFETY
+    //
+    // The safety of the operation is ensured by the bpf verifier. The `map` must be a reference to
+    // a `Map` object kept alive by the program itself.
+    let map: &Map = unsafe { &*map.as_ptr::<Map>() };
+    let key =
+        unsafe { std::slice::from_raw_parts(key.as_ptr::<u8>(), map.schema.key_size as usize) };
+    map.delete(key).map(|_| 0).unwrap_or(u64::MAX).into()
 }
 
 fn bpf_trace_printk<C: EbpfProgramContext>(
@@ -111,8 +118,7 @@ fn bpf_ktime_get_ns<C: EbpfProgramContext>(
     _: BpfValue,
     _: BpfValue,
 ) -> BpfValue {
-    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_ktime_get_ns");
-    42.into()
+    zx::MonotonicInstant::get().into_nanos().into()
 }
 
 fn bpf_ringbuf_reserve<C: EbpfProgramContext>(
@@ -267,6 +273,7 @@ where
     ]
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum LoadBytesBase {
     MacHeader,
     NetworkHeader,
@@ -364,6 +371,18 @@ fn bpf_sk_storage_get<C: EbpfProgramContext>(
     0.into()
 }
 
+fn bpf_sk_fullsock<C: EbpfProgramContext>(
+    _context: &mut C::RunContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_sk_fullsock");
+    0.into()
+}
+
 // Helpers that are supplied to socket filter programs in addition to the common helpers.
 pub fn get_socket_filter_helpers<C: EbpfProgramContext>() -> Vec<(u32, EbpfHelperImpl<C>)>
 where
@@ -374,5 +393,6 @@ where
         (bpf_func_id_BPF_FUNC_get_socket_cookie, EbpfHelperImpl(bpf_get_socket_cookie)),
         (bpf_func_id_BPF_FUNC_skb_load_bytes_relative, EbpfHelperImpl(bpf_skb_load_bytes_relative)),
         (bpf_func_id_BPF_FUNC_sk_storage_get, EbpfHelperImpl(bpf_sk_storage_get)),
+        (bpf_func_id_BPF_FUNC_sk_fullsock, EbpfHelperImpl(bpf_sk_fullsock)),
     ]
 }

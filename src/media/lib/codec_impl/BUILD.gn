@@ -71,13 +71,13 @@ source_set("codec_impl") {
   deps = [
     "//sdk/fidl/fuchsia.media:fuchsia.media_hlcpp",
     "//sdk/lib/fidl/hlcpp",
+    "//sdk/lib/memory_barriers",
     "//sdk/lib/sys/cpp:cpp",
     "//sdk/lib/vfs/cpp",
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
 
     # Only for <ddk/debug.h>'s severity levels.
     "//src/lib/ddk",
-    "//src/lib/memory_barriers",
   ]
 }
 

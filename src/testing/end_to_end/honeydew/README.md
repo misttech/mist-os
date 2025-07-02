@@ -44,33 +44,10 @@ if users wish to override with custom data dependencies, the following
 environment variables can be specified:
 *  `HONEYDEW_FASTBOOT_OVERRIDE`: Absolute path to `fastboot` binary.
 
-### Best Practices
+### Create a new user affordance
 
-Here are some of the best practices that should be followed while contributing
-to Honeydew:
-* Ensure there is [unit tests][unit tests] and
-  [functional tests][functional tests] coverage and that you have run the
-  impacted [functional tests][functional tests] (either locally or in infra) to
-  make sure contributions are working.
-* If a new unit test module is added,
-  * ensure this new test is included in `group("tests")` section in the
-    `BUILD.gn` file (located in the same directory as unit test).
-  * ensure this new test is included in `group("tests")` section in the
-    [top level Honeydew unit tests BUILD][top level Honeydew unit tests BUILD]
-    file.
-  * ensure instructions specified in [unit tests README][unit tests README]
-    are sufficient to run this new test locally.
-* If a new functional test module is added,
-  * ensure instructions specified in
-    [functional tests README][functional tests README] are sufficient to
-    run this new test locally.
-  * ensure this new test is included in `group("tests")` section in the
-    [top level Honeydew functional tests BUILD][top level Honeydew functional tests BUILD]
-    file.
-  * follow
-    [how to add a new test to run in infra][how to add a new test to run in infra].
-* If contribution involves adding a new host target interaction method or class,
-  you would need to update the corresponding interface.
+Please refer to the [Affordance](markdowns/affordance.md) doc on instructions
+for creating a new affordance in Honeydew code base.
 
 ### Honeydew code guidelines
 

@@ -23,6 +23,9 @@
             protocol: [ "fuchsia.vulkan.loader.Loader" ],
         },
         {
+            service: [ "fuchsia.vulkan.loader.TrustedService" ],
+        },
+        {
             runner: "icd_runner",
             path: "/svc/fuchsia.component.runner.ComponentRunner",
         },
@@ -37,7 +40,10 @@
         },
         {
             // This service replaces the directory capability above.
-            service: "fuchsia.gpu.magma.Service",
+            service: [
+                "fuchsia.gpu.magma.Service",
+                "fuchsia.gpu.magma.TrustedService",
+            ],
         },
         {
             // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
@@ -112,6 +118,10 @@
     expose: [
         {
             protocol: "fuchsia.vulkan.loader.Loader",
+            from: "self",
+        },
+        {
+            service: "fuchsia.vulkan.loader.TrustedService",
             from: "self",
         },
     ],

@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 /// This module tests the diagnostics code with the actual component hierarchy.
-#[cfg(test)]
 mod tests {
     use crate::model::component::testing::wait_until_event_get_timestamp;
     use crate::model::component::{ComponentInstance, StartReason};
@@ -87,7 +86,7 @@ mod tests {
         let koid =
             fuchsia_runtime::job_default().basic_info().expect("got basic info").koid.raw_koid();
 
-        let hierarchy = test.builtin_environment.inspector().get_diagnostics_hierarchy();
+        let hierarchy = test.builtin_environment.inspector().get_diagnostics_hierarchy().await;
         let (timestamps, cpu_times, queue_times) =
             get_data(&hierarchy, "<component_manager>", Some(&koid.to_string()));
         assert_eq!(timestamps.len(), 1);

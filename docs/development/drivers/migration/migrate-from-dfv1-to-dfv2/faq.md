@@ -13,7 +13,7 @@ Fuchsia's driver framework team created a compatibility shim to enable
 DFv1 drivers to live in DFv2.
 
 If your target driver talks to other DFv1 drivers that still use
-[Banjo][banjo] and those drivers won't be migrated to DFv2 all at once,
+Banjo and those drivers won't be migrated to DFv2 all at once,
 you need to use this compatibility shim (by manually creating
 `compat::DeviceServer`) for enabling the drivers in different framework
 versions to talk to each other.
@@ -214,7 +214,6 @@ contains most of the new APIs).
 <!-- Reference links -->
 
 [migrate-from-banjo-to-fidl]: /docs/development/drivers/migration/migrate-from-banjo-to-fidl.md
-[banjo]: /docs/development/drivers/concepts/device_driver_model/banjo.md
 [driver-dispatcher]: /docs/concepts/drivers/driver-dispatcher-and-threads.md
 [driver-communication]: /docs/concepts/drivers/driver_communication.md
 [driver-node]: /docs/concepts/drivers/drivers_and_nodes.md

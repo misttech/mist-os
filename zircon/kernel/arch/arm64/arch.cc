@@ -405,7 +405,25 @@ void arch_late_init_percpu(void) {
   }
 }
 
-void ArchIdlePowerThread::EnterIdleState(zx_duration_t max_latency) { __asm__ volatile("wfi"); }
+void ArchIdlePowerThread::EnterIdleState(zx_duration_t max_latency) {
+  // section K14.2.3 of the ARM ARM (DDI 0487K.a) says:
+  //
+  // ```
+  // The Wait For Event and Wait For Interrupt instructions permit the PE to
+  // suspend execution and enter a low-power state. An explicit DSB barrier
+  // instruction is required if it is necessary to ensure memory accesses made
+  // before the WFI or WFE are visible to other observers, unless some other
+  // mechanism has ensured this visibility.
+  // ```
+  //
+  // Our PE is entering the idle/suspend state; don't take any chances.  Make
+  // certain that all of the writes we have performed (such as reporting that we
+  // are entering the idle state) are visible to all other PEs by executing an
+  // explicit DSB.
+  //
+  __dsb(ARM_MB_SY);
+  __asm__ volatile("wfi");
+}
 
 void arch_setup_uspace_iframe(iframe_t* iframe, uintptr_t entry_point, uintptr_t sp, uintptr_t arg1,
                               uintptr_t arg2) {

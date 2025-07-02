@@ -1139,11 +1139,18 @@ pub struct LinearHistogramParams<T: Clone> {
 /// A type which can function as a "view" into a diagnostics hierarchy, optionally allocating a new
 /// instance to service a request.
 pub trait DiagnosticsHierarchyGetter<K: Clone> {
-    fn get_diagnostics_hierarchy(&self) -> Cow<'_, DiagnosticsHierarchy<K>>;
+    fn get_diagnostics_hierarchy<'a>(
+        &'a self,
+    ) -> impl std::future::Future<Output = Cow<'_, DiagnosticsHierarchy<K>>>
+    where
+        K: 'a;
 }
 
 impl<K: Clone> DiagnosticsHierarchyGetter<K> for DiagnosticsHierarchy<K> {
-    fn get_diagnostics_hierarchy(&self) -> Cow<'_, DiagnosticsHierarchy<K>> {
+    async fn get_diagnostics_hierarchy<'a>(&'a self) -> Cow<'_, DiagnosticsHierarchy<K>>
+    where
+        K: 'a,
+    {
         Cow::Borrowed(self)
     }
 }

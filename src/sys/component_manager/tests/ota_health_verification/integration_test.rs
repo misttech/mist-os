@@ -18,9 +18,8 @@ async fn verifier_client(
     expected_res: i32,
     mut success_reporter: mpsc::Sender<()>,
 ) -> Result<(), Error> {
-    let verifier = handles
-        .connect_to_protocol::<fupdate::HealthVerificationMarker>()
-        .expect("error connecting to health check verification");
+    let verifier: fupdate::HealthVerificationProxy =
+        handles.connect_to_protocol().expect("error connecting to health check verification");
     let res = verifier.query_health_checks().await.unwrap();
 
     assert_eq!(res, expected_res);

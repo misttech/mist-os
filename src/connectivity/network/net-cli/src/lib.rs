@@ -878,7 +878,7 @@ async fn do_if<C: NetCliDepsConnector>(
             installer
                 .install_blackhole_interface(
                     server_end,
-                    &finterfaces_admin::Options { name: Some(name), ..Default::default() },
+                    finterfaces_admin::Options { name: Some(name), ..Default::default() },
                 )
                 .expect("install blackhole interface should succeed");
             control.detach().expect("detach should succeed");

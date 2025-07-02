@@ -645,7 +645,7 @@ async fn create_scoped_logger(
     Ok(ScopedLogger::create(logsink)?)
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::model::actions::{ActionsManager, ShutdownAction, ShutdownType, StopAction};

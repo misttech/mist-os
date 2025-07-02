@@ -5,7 +5,7 @@
   "root": "dart/sl4f",
   "sources": [
     "dart/sl4f/lib/sl4f.dart",
-    "@test_idk//dart/sl4f/lib:generated.dart"
+    "@@test_idk//dart/sl4f/lib:generated.dart"
   ],
   "third_party_deps": [
     {

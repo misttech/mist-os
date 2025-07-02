@@ -7,6 +7,7 @@ import("//build/config/fuchsia/platform_version.gni")
 import("//build/config/jobserver.gni")
 import("//build/sdk/config.gni")
 import("//build/testing/config.gni")
+import("//build/tracer/tracer.gni")
 import("//sdk/config.gni")
 
 # Create a GN directory, and build a target label for a particular
@@ -149,6 +150,10 @@ template("subbuild") {
 
     if (update_goldens) {
       args += [ "--update-goldens" ]
+    }
+
+    if (build_should_trace_actions) {
+      args += [ "--trace-build-actions" ]
     }
 
     # If jobserver mode is not enabled, limit the number of concurrent

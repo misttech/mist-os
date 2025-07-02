@@ -130,15 +130,15 @@ zx::result<> PowerDomainVisitor::FinalizeNode(fdf_devicetree::Node& node) {
   auto controller = power_controllers_.at(*node.phandle());
 
   if (controller.domain_info.domains()) {
-    const fit::result encoded_domain_info = fidl::Persist(controller.domain_info);
-    if (!encoded_domain_info.is_ok()) {
-      FDF_LOG(ERROR, "Failed to encode Power domain metadata for node %s: %s", node.name().c_str(),
-              encoded_domain_info.error_value().FormatDescription().c_str());
-      return zx::error(encoded_domain_info.error_value().status());
+    const fit::result persisted_domain_info = fidl::Persist(controller.domain_info);
+    if (!persisted_domain_info.is_ok()) {
+      FDF_LOG(ERROR, "Failed to persist Power domain metadata for node %s: %s", node.name().c_str(),
+              persisted_domain_info.error_value().FormatDescription().c_str());
+      return zx::error(persisted_domain_info.error_value().status());
     }
     fuchsia_hardware_platform_bus::Metadata controller_metadata = {{
-        .id = std::to_string(DEVICE_METADATA_POWER_DOMAINS),
-        .data = encoded_domain_info.value(),
+        .id = fuchsia_hardware_power::DomainMetadata::kSerializableName,
+        .data = persisted_domain_info.value(),
     }};
     node.AddMetadata(std::move(controller_metadata));
     FDF_LOG(INFO, "Power domain metadata added to node '%s'", node.name().c_str());

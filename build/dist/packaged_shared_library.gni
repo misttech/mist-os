@@ -111,6 +111,7 @@ template("packaged_shared_library") {
 
   _select = {
     host = is_host
+    kernel = is_kernel
     testonly = testonly
     target_type = [ "shared_library" ]
     output_name = [ _output_name ]
@@ -143,6 +144,10 @@ template("packaged_shared_library") {
         _selected = true
         if (_selected && defined(_selector.host)) {
           _selected = _selector.host == _select.host
+        }
+
+        if (_selected && defined(_selector.kernel)) {
+          _selected = _selector.kernel == _select.kernel
         }
 
         if (_selected && defined(_selector.testonly)) {

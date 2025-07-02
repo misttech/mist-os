@@ -6,20 +6,20 @@ use crate::task::syscalls::do_clone;
 use crate::task::CurrentTask;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::user_address::{UserAddress, UserRef};
-use starnix_uapi::{clone_args, pid_t, CSIGNAL};
+use starnix_uapi::{clone_args, tid_t, CSIGNAL};
 
 use starnix_sync::{Locked, Unlocked};
 
 /// The parameter order for `clone` varies by architecture.
 pub fn sys_clone(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     flags: u64,
     user_stack: UserAddress,
-    user_parent_tid: UserRef<pid_t>,
+    user_parent_tid: UserRef<tid_t>,
     user_tls: UserAddress,
-    user_child_tid: UserRef<pid_t>,
-) -> Result<pid_t, Errno> {
+    user_child_tid: UserRef<tid_t>,
+) -> Result<tid_t, Errno> {
     // Our flags parameter uses the low 8 bits (CSIGNAL mask) of flags to indicate the exit
     // signal. The CloneArgs struct separates these as `flags` and `exit_signal`.
     do_clone(

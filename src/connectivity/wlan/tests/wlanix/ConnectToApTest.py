@@ -117,16 +117,16 @@ class ConnectToApTest(AsyncAdapter, base_test.ConnectionBaseTestClass):
         # TODO(https://fxbug.dev/369151951): Implement a Nl80211Multicast server to
         # wait for the scan to complete.
         logger.info(
-            "Waiting 5 seconds for scan to complete. See https://fxbug.dev/369151951"
+            "Waiting 10 seconds for scan to complete. See https://fxbug.dev/369151951"
         )
-        time.sleep(5)
+        time.sleep(10)
 
         with SupplicantStaIfaceCallbackServer() as ctx:
             state_change_queue = ctx.state_change_queue
-            callback_proxy = ctx.callback_proxy
+            callback_channel = ctx.callback_channel
 
             self.supplicant_sta_iface_proxy.register_callback(
-                callback=callback_proxy.channel.take()
+                callback=callback_channel.take()
             )
 
             proxy, server = Channel.create()
@@ -173,7 +173,7 @@ class SupplicantStaIfaceCallbackContext:
         | fidl_wlanix.SupplicantStaIfaceCallbackOnDisconnectedRequest
         | fidl_wlanix.SupplicantStaIfaceCallbackOnAssociationRejectedRequest
     ]
-    callback_proxy: fidl_wlanix.SupplicantStaIfaceCallbackClient
+    callback_channel: Channel
 
 
 class SupplicantStaIfaceCallbackServer(
@@ -215,12 +215,12 @@ class SupplicantStaIfaceCallbackServer(
         self.state_change_queue.put_nowait(request)
 
     def __enter__(self) -> SupplicantStaIfaceCallbackContext:
-        proxy, server = Channel.create()
+        client, server = Channel.create()
         super().__init__(channel=server)
         self.server_task = asyncio.get_running_loop().create_task(self.serve())
         return SupplicantStaIfaceCallbackContext(
             state_change_queue=self.state_change_queue,
-            callback_proxy=fidl_wlanix.SupplicantStaIfaceCallbackClient(proxy),
+            callback_channel=client,
         )
 
     def __exit__(self, *args: Any, **kwargs: Any) -> None:

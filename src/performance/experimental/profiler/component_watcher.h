@@ -16,7 +16,8 @@ class ComponentWatcher {
   explicit ComponentWatcher(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
 
   zx::result<> Watch();
-  zx::result<> Reset();
+  // Remove all watches for urls and monikers
+  void Clear();
   void HandleEvent(fidl::Result<fuchsia_component::EventStream::GetNext>& res);
 
   using ComponentEventHandler = fit::function<void(std::string moniker, std::string url)>;

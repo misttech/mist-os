@@ -12,6 +12,10 @@ pub struct Opt {
     // Path to the tests.json file.
     pub input: Utf8PathBuf,
 
+    #[structopt(long = "disabled-ctf-tests")]
+    // Path to the disabled_tests.json file.
+    pub disabled_ctf_tests: Option<Utf8PathBuf>,
+
     #[structopt(short = "t", long = "test-components")]
     // Path to the test_components.json file.
     pub test_components_list: Utf8PathBuf,

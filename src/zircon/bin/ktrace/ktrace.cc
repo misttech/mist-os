@@ -18,12 +18,6 @@
 #include <fbl/string.h>
 #include <fbl/unique_fd.h>
 
-#ifdef EXPERIMENTAL_KTRACE_STREAMING_ENABLED
-constexpr bool kKernelStreamingSupport = EXPERIMENTAL_KTRACE_STREAMING_ENABLED;
-#else
-constexpr bool kKernelStreamingSupport = false;
-#endif
-
 namespace {
 
 constexpr char kUsage[] =
@@ -77,10 +71,6 @@ int DoRewind(const zx::resource& tracing_resource) {
 
 int DoStream(const zx::resource& tracing_resource, uint32_t group_mask,
              std::chrono::seconds duration, const char* path) {
-  if constexpr (!kKernelStreamingSupport) {
-    fprintf(stderr, "Streaming ktrace not supported\n");
-    return EXIT_FAILURE;
-  }
   fbl::unique_fd out_fd(open(path, O_CREAT | O_TRUNC | O_WRONLY, 0666));
   if (!out_fd.is_valid()) {
     fprintf(stderr, "Unable to open file for writing: %s, %s\n", path, strerror(errno));

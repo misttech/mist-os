@@ -2,15 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![recursion_limit = "256"]
+
 use starnix_core::device::kobject::{Device, DeviceMetadata};
 use starnix_core::device::{DeviceMode, DeviceOps};
 use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
 use starnix_core::task::{CurrentTask, KernelStats};
-use starnix_core::vfs::stub_empty_file::StubEmptyFile;
+use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::pseudo::stub_empty_file::StubEmptyFile;
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekless,
-    fs_node_impl_dir_readonly, DirectoryEntryType, DynamicFile, DynamicFileBuf, DynamicFileSource,
-    FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
+    fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr,
 };
 use starnix_logging::{bug_ref, log_error};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
@@ -42,7 +46,7 @@ impl ZramDevice {
 impl DeviceOps for ZramDevice {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         _current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -81,7 +85,7 @@ impl FsNodeOps for ZramDeviceDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -102,23 +106,21 @@ impl FsNodeOps for ZramDeviceDirectory {
 
     fn lookup(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
-            b"idle" => Ok(node.fs().create_node(
-                current_task,
+            b"idle" => Ok(node.fs().create_node_and_allocate_node_id(
                 StubEmptyFile::new_node("zram idle file", bug_ref!("https://fxbug.dev/322892951")),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o664), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o664), FsCred::root()),
             )),
             b"mm_stat" => {
                 let device = self.device.upgrade().ok_or_else(|| errno!(EINVAL))?;
-                Ok(node.fs().create_node(
-                    current_task,
+                Ok(node.fs().create_node_and_allocate_node_id(
                     MmStatFile::new_node(device),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                 ))
             }
             _ => self.base_dir.lookup(locked, node, current_task, name),
@@ -164,7 +166,7 @@ impl DynamicFileSource for MmStatFile {
     }
 }
 
-pub fn zram_device_init<L>(locked: &mut Locked<'_, L>, system_task: &CurrentTask)
+pub fn zram_device_init<L>(locked: &mut Locked<L>, system_task: &CurrentTask)
 where
     L: LockBefore<FileOpsCore>,
 {

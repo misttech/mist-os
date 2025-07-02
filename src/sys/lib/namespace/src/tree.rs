@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::NamespaceError;
-use cm_types::{IterablePath, Name, NamespacePath};
+use cm_types::{BorrowedName, IterablePath, Name, NamespacePath};
 use std::collections::BTreeMap;
 
 /// A tree representation of a namespace.
@@ -77,13 +77,18 @@ enum AddError {
 }
 
 impl<T> Node<T> {
-    fn add(&mut self, mut path: std::vec::IntoIter<Name>, thing: T) -> Result<&mut T, AddError> {
+    fn add(
+        &mut self,
+        mut path: std::vec::IntoIter<&BorrowedName>,
+        thing: T,
+    ) -> Result<&mut T, AddError> {
         match path.next() {
             Some(name) => match self {
                 Node::Leaf(_) => Err(AddError::Shadow),
                 Node::Internal(children) => {
-                    let entry =
-                        children.entry(name).or_insert_with(|| Node::Internal(BTreeMap::new()));
+                    let entry = children
+                        .entry(name.into())
+                        .or_insert_with(|| Node::Internal(BTreeMap::new()));
                     entry.add(path, thing)
                 }
             },
@@ -109,7 +114,7 @@ impl<T> Node<T> {
 
     fn get_mut<'a, 'b, I>(&'a mut self, mut path: I) -> Option<&'a mut T>
     where
-        I: Iterator<Item = &'b Name>,
+        I: Iterator<Item = &'b BorrowedName>,
     {
         match path.next() {
             Some(name) => match self {
@@ -128,7 +133,7 @@ impl<T> Node<T> {
 
     fn get<'a, 'b, I>(&'a self, mut path: I) -> Option<&'a T>
     where
-        I: Iterator<Item = &'b Name>,
+        I: Iterator<Item = &'b BorrowedName>,
     {
         match path.next() {
             Some(name) => match self {
@@ -147,7 +152,7 @@ impl<T> Node<T> {
 
     fn remove<'a, I>(&mut self, mut path: std::iter::Peekable<I>) -> Option<T>
     where
-        I: Iterator<Item = &'a Name>,
+        I: Iterator<Item = &'a BorrowedName>,
     {
         match path.next() {
             Some(name) => match self {
@@ -157,7 +162,7 @@ impl<T> Node<T> {
                         match children.remove(name) {
                             Some(Node::Leaf(n)) => Some(n),
                             Some(Node::Internal(c)) => {
-                                children.insert(name.clone(), Node::Internal(c));
+                                children.insert(name.into(), Node::Internal(c));
                                 return None;
                             }
                             None => None,

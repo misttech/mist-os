@@ -30,9 +30,6 @@ impl IntlTest {
     }
 
     pub fn connect_to_intl_marker(instance: &RealmInstance) -> IntlProxy {
-        return instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<IntlMarker>()
-            .expect("connecting to Intl");
+        return instance.root.connect_to_protocol_at_exposed_dir().expect("connecting to Intl");
     }
 }

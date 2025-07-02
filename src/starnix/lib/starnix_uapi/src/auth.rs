@@ -592,7 +592,7 @@ pub struct FsCred {
 }
 
 impl FsCred {
-    pub fn root() -> Self {
+    pub const fn root() -> Self {
         Self { uid: 0, gid: 0 }
     }
 }

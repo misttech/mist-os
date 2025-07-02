@@ -60,6 +60,9 @@ pub(crate) fn to_argv(cmd: &StartCommand) -> Vec<String> {
     if let Some(manifest) = &cmd.auto_publish {
         argv.extend_from_slice(&["--auto-publish".into(), manifest.as_str().to_string()]);
     }
+    if let Some(tunnel_addr) = &cmd.tunnel_addr {
+        argv.extend_from_slice(&["--tunnel-addr".into(), tunnel_addr.to_string()]);
+    }
     argv
 }
 
@@ -155,6 +158,7 @@ mod test {
             storage_type: Some(RepositoryStorageType::Ephemeral),
             alias_conflict_mode: RepositoryRegistrationAliasConflictMode::Replace,
             port_path: Some("/path/port/file".into()),
+            tunnel_addr: Some(([127, 0, 0, 1], 1313).into()),
             no_device: false,
             refresh_metadata: true,
             auto_publish: Some(Utf8PathBuf::from_str("/auto/publish/list").expect("UTF8 path")),
@@ -182,6 +186,8 @@ mod test {
             "--refresh-metadata",
             "--auto-publish",
             "/auto/publish/list",
+            "--tunnel-addr",
+            "127.0.0.1:1313",
         ]
         .iter()
         .map(ToString::to_string)

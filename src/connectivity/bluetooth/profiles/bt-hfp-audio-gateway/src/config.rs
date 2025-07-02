@@ -122,7 +122,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn expected_inspect_tree() {
+    async fn expected_inspect_tree() {
         let inspector = inspect::Inspector::default();
         assert_data_tree!(inspector, root: {});
 

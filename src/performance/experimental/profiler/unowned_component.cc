@@ -11,8 +11,8 @@
 #include "component.h"
 
 zx::result<std::unique_ptr<profiler::UnownedComponent>> profiler::UnownedComponent::Create(
-    async_dispatcher_t* dispatcher, const std::optional<std::string>& moniker,
-    const std::optional<std::string>& url) {
+    const std::optional<std::string>& moniker, const std::optional<std::string>& url,
+    ComponentWatcher& component_watcher) {
   std::optional<Moniker> parsed_moniker;
   if (moniker.has_value()) {
     zx::result parsed = profiler::Moniker::Parse(moniker.value_or(""));
@@ -21,7 +21,7 @@ zx::result<std::unique_ptr<profiler::UnownedComponent>> profiler::UnownedCompone
     }
     parsed_moniker = *parsed;
   }
-  return zx::ok(std::make_unique<UnownedComponent>(dispatcher, url, parsed_moniker));
+  return zx::ok(std::make_unique<UnownedComponent>(url, parsed_moniker, component_watcher));
 }
 
 zx::result<> profiler::UnownedComponent::Attach(
@@ -54,9 +54,6 @@ zx::result<> profiler::UnownedComponent::Attach(
 zx::result<> profiler::UnownedComponent::Start(fxl::WeakPtr<Sampler> notify) {
   TRACE_DURATION("cpu_profiler", __PRETTY_FUNCTION__);
   on_start_ = profiler::MakeOnStartHandler(std::move(notify));
-  if (zx::result res = component_watcher_.Watch(); res.is_error()) {
-    return res;
-  }
 
   zx::result<fidl::ClientEnd<fuchsia_sys2::RealmQuery>> client_end =
       component::Connect<fuchsia_sys2::RealmQuery>("/svc/fuchsia.sys2.RealmQuery.root");
@@ -116,6 +113,6 @@ zx::result<> profiler::UnownedComponent::Start(fxl::WeakPtr<Sampler> notify) {
                                  });
 }
 
-zx::result<> profiler::UnownedComponent::Stop() { return component_watcher_.Reset(); }
+zx::result<> profiler::UnownedComponent::Stop() { return zx::ok(); }
 
 zx::result<> profiler::UnownedComponent::Destroy() { return zx::ok(); }

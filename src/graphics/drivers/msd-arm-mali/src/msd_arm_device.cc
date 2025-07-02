@@ -329,8 +329,8 @@ void MsdArmDevice::InitInspect() {
   memory_pressure_level_property_ = inspect_.CreateUint("memory_pressure_level", 0);
   dump_node_ = inspect_.CreateLazyNode("dump", [this]() -> fpromise::promise<inspect::Inspector> {
     fpromise::bridge<inspect::Inspector> bridge;
-    RunTaskOnDeviceThread([this, completer = std::move(bridge.completer)](
-                              MsdArmDevice* device) mutable -> magma::Status {
+    NdtPostTask([this, completer = std::move(bridge.completer)](
+                    MsdArmDevice* device) mutable -> magma::Status {
       std::vector<std::string> dump;
       DumpToString(&dump, true);
 
@@ -366,8 +366,8 @@ void MsdArmDevice::InitInspect() {
 }
 
 void MsdArmDevice::UpdateProtectedModeSupported() {
-  MAGMA_LOG(INFO, "Protected mode supported: %d", IsProtectedModeSupported());
-  protected_mode_supported_property_.Set(IsProtectedModeSupported());
+  MAGMA_LOG(INFO, "Protected mode supported: %d", NdtIsProtectedModeSupported());
+  protected_mode_supported_property_.Set(NdtIsProtectedModeSupported());
 }
 
 bool MsdArmDevice::InitializeHardware() {
@@ -413,7 +413,7 @@ bool MsdArmDevice::InitializeDevicePropertiesBuffer() {
   auto entries = reinterpret_cast<magma_arm_mali_device_properties_return_entry*>(header + 1);
   for (size_t i = 0; i < std::size(properties); i++) {
     entries[i].id = properties[i];
-    if (QueryInfo(entries[i].id, &entries[i].value) != MAGMA_STATUS_OK) {
+    if (NdtQueryInfo(entries[i].id, &entries[i].value) != MAGMA_STATUS_OK) {
       return DRETF(false, "Failed to query property %lu", entries[i].id);
     }
   }
@@ -424,7 +424,8 @@ bool MsdArmDevice::InitializeDevicePropertiesBuffer() {
 
 void MsdArmDevice::EnableAllCores() { power_manager_->EnableDefaultCores(); }
 
-std::shared_ptr<MsdArmConnection> MsdArmDevice::OpenArmConnection(msd::msd_client_id_t client_id) {
+std::shared_ptr<MsdArmConnection> MsdArmDevice::NdtOpenArmConnection(
+    msd::msd_client_id_t client_id) {
   auto connection = MsdArmConnection::Create(client_id, this);
   if (connection) {
     connection->InitializeInspectNode(&inspect_);
@@ -434,18 +435,18 @@ std::shared_ptr<MsdArmConnection> MsdArmDevice::OpenArmConnection(msd::msd_clien
   return connection;
 }
 
-std::unique_ptr<msd::Connection> MsdArmDevice::Open(msd::msd_client_id_t client_id) {
-  return std::make_unique<MsdArmAbiConnection>(OpenArmConnection(client_id));
+std::unique_ptr<msd::Connection> MsdArmDevice::MsdOpen(msd::msd_client_id_t client_id) {
+  return std::make_unique<MsdArmAbiConnection>(NdtOpenArmConnection(client_id));
 }
 
-void MsdArmDevice::DeregisterConnection() {
+void MsdArmDevice::NdtDeregisterConnection() {
   std::lock_guard<std::mutex> lock(connection_list_mutex_);
   connection_list_.erase(std::remove_if(connection_list_.begin(), connection_list_.end(),
                                         [](auto& connection) { return connection.expired(); }),
                          connection_list_.end());
 }
 
-void MsdArmDevice::SetMemoryPressureLevel(msd::MagmaMemoryPressureLevel level) {
+void MsdArmDevice::MsdSetMemoryPressureLevel(msd::MagmaMemoryPressureLevel level) {
   {
     std::lock_guard<std::mutex> lock(connection_list_mutex_);
     current_memory_pressure_level_ = level;
@@ -501,9 +502,11 @@ void MsdArmDevice::PeriodicCriticalMemoryPressureCallback(bool force_instant) {
   }
 }
 
-void MsdArmDevice::DumpStatusToLog() { EnqueueDeviceRequest(std::make_unique<DumpRequest>()); }
+void MsdArmDevice::NdtPostDumpStatusToLog() {
+  EnqueueDeviceRequest(std::make_unique<DumpRequest>());
+}
 
-magma::Status MsdArmDevice::QueryTimestamp(std::unique_ptr<magma::PlatformBuffer> buffer) {
+magma::Status MsdArmDevice::NdtPostTimestampQuery(std::unique_ptr<magma::PlatformBuffer> buffer) {
   auto request = std::make_unique<TimestampRequest>(std::move(buffer));
   auto reply = request->GetReply();
 
@@ -1043,7 +1046,7 @@ void MsdArmDevice::EnqueueDeviceRequest(std::unique_ptr<DeviceRequest> request,
   device_request_semaphore_->Signal();
 }
 
-void MsdArmDevice::ScheduleAtom(std::shared_ptr<MsdArmAtom> atom) {
+void MsdArmDevice::NdtPostScheduleAtom(std::shared_ptr<MsdArmAtom> atom) {
   bool need_schedule;
   {
     std::lock_guard<std::mutex> lock(schedule_mutex_);
@@ -1054,7 +1057,7 @@ void MsdArmDevice::ScheduleAtom(std::shared_ptr<MsdArmAtom> atom) {
     EnqueueDeviceRequest(std::make_unique<ScheduleAtomRequest>());
 }
 
-void MsdArmDevice::CancelAtoms(std::shared_ptr<MsdArmConnection> connection) {
+void MsdArmDevice::NdtPostCancelAtoms(std::shared_ptr<MsdArmConnection> connection) {
   EnqueueDeviceRequest(std::make_unique<CancelAtomsRequest>(connection));
 }
 
@@ -1456,7 +1459,7 @@ void MsdArmDevice::DerefCycleCounter() {
   }
 }
 
-magma_status_t MsdArmDevice::QueryInfo(uint64_t id, uint64_t* value_out) {
+magma_status_t MsdArmDevice::NdtQueryInfo(uint64_t id, uint64_t* value_out) {
   switch (id) {
     case MAGMA_QUERY_VENDOR_ID:
       *value_out = MAGMA_VENDOR_ID_MALI;
@@ -1523,7 +1526,7 @@ magma_status_t MsdArmDevice::QueryInfo(uint64_t id, uint64_t* value_out) {
       return MAGMA_STATUS_OK;
 
     case kMsdArmVendorQuerySupportsProtectedMode:
-      *value_out = IsProtectedModeSupported();
+      *value_out = NdtIsProtectedModeSupported();
       return MAGMA_STATUS_OK;
 
     default:
@@ -1531,7 +1534,7 @@ magma_status_t MsdArmDevice::QueryInfo(uint64_t id, uint64_t* value_out) {
   }
 }
 
-magma_status_t MsdArmDevice::QueryReturnsBuffer(uint64_t id, uint32_t* buffer_out) {
+magma_status_t MsdArmDevice::NdtQueryReturnsBuffer(uint64_t id, uint32_t* buffer_out) {
   switch (id) {
     case MAGMA_QUERY_TOTAL_TIME:
       return power_manager_->GetTotalTime(buffer_out) ? MAGMA_STATUS_OK
@@ -1544,8 +1547,9 @@ magma_status_t MsdArmDevice::QueryReturnsBuffer(uint64_t id, uint32_t* buffer_ou
       if (!buffer->duplicate_handle(buffer_out))
         return DRET_MSG(MAGMA_STATUS_INTERNAL_ERROR, "failed to dupe timestamp buffer");
 
-      return QueryTimestamp(std::move(buffer)).get();
+      return NdtPostTimestampQuery(std::move(buffer)).get();
     }
+
     case kMsdArmVendorQueryDeviceProperties: {
       DASSERT(device_properties_buffer_);
       zx::handle handle;
@@ -1562,6 +1566,7 @@ magma_status_t MsdArmDevice::QueryReturnsBuffer(uint64_t id, uint32_t* buffer_ou
       *buffer_out = read_only_handle.release();
       return MAGMA_STATUS_OK;
     }
+
     default:
       return MAGMA_STATUS_INVALID_ARGS;
   }
@@ -1587,7 +1592,7 @@ void MsdArmDevice::InitializeHardwareQuirks(GpuFeatures* features, mali::Registe
   shader_config.WriteTo(reg);
 }
 
-bool MsdArmDevice::IsProtectedModeSupported() {
+bool MsdArmDevice::NdtIsProtectedModeSupported() {
   if (!mali_properties_.supports_protected_mode)
     return false;
   uint32_t gpu_product_id = gpu_features_.gpu_id.product_id();
@@ -1745,14 +1750,14 @@ bool MsdArmDevice::IsInProtectedMode() {
   return registers::GpuStatus::Get().ReadFrom(register_io_.get()).protected_mode_active();
 }
 
-std::shared_ptr<DeviceRequest::Reply> MsdArmDevice::RunTaskOnDeviceThread(FitCallbackTask task) {
+std::shared_ptr<DeviceRequest::Reply> MsdArmDevice::NdtPostTask(FitCallbackTask task) {
   auto request = std::make_unique<TaskRequest>(std::move(task));
   auto reply = request->GetReply();
   EnqueueDeviceRequest(std::move(request));
   return reply;
 }
 
-void MsdArmDevice::SetCurrentThreadToDefaultPriority() {
+void MsdArmDevice::NdtSetCurrentThreadToDefaultPriority() {
   parent_device_->SetThreadRole("fuchsia.default");
 }
 
@@ -1773,16 +1778,20 @@ void MsdArmDevice::AppendInspectEvent(InspectEvent event) {
 
 //////////////////////////////////////////////////////////////////////////////////////////////////
 
-magma_status_t MsdArmDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) {
-  uint32_t result_buffer;
-  magma_status_t status = QueryReturnsBuffer(id, &result_buffer);
-  *result_buffer_out = zx::vmo(result_buffer);
+magma_status_t MsdArmDevice::MsdQuery(uint64_t id, zx::vmo* result_buffer_out,
+                                      uint64_t* result_out) {
+  zx::vmo result_buffer;
+  magma_status_t status = NdtQueryReturnsBuffer(id, result_buffer.reset_and_get_address());
 
   if (status == MAGMA_STATUS_INVALID_ARGS) {
-    status = QueryInfo(id, result_out);
+    status = NdtQueryInfo(id, result_out);
 
-    if (status == MAGMA_STATUS_OK && result_buffer_out)
-      result_buffer_out->reset();
+    if (status == MAGMA_STATUS_OK) {
+      result_buffer.reset();
+    }
+  }
+  if (result_buffer_out) {
+    *result_buffer_out = std::move(result_buffer);
   }
 
   if (status == MAGMA_STATUS_INVALID_ARGS) {
@@ -1795,7 +1804,7 @@ magma_status_t MsdArmDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint
 void MsdArmDevice::ReportPowerChangeComplete(bool powered_on, bool success) {
   if (!success) {
     // Post a task to dump status because the GPU active lock may be held at this point.
-    DumpStatusToLog();
+    NdtPostDumpStatusToLog();
   }
   auto complete_callbacks = std::move(callbacks_on_power_change_complete_);
   callbacks_on_power_change_complete_.clear();
@@ -1805,22 +1814,21 @@ void MsdArmDevice::ReportPowerChangeComplete(bool powered_on, bool success) {
 }
 
 void MsdArmDevice::PostPowerStateChange(bool enabled, PowerStateCallback completer) {
-  RunTaskOnDeviceThread(
-      [this, enabled, completer = std::move(completer)](MsdArmDevice* device) mutable {
-        callbacks_on_power_change_complete_.emplace_back(std::move(completer));
-        if (!enabled) {
-          power_manager_->PowerDownOnIdle();
-        } else {
-          power_manager_->PowerUpAfterIdle();
-        }
-        scheduler_->SetSchedulingEnabled(enabled);
-        return MAGMA_STATUS_OK;
-      });
+  NdtPostTask([this, enabled, completer = std::move(completer)](MsdArmDevice* device) mutable {
+    callbacks_on_power_change_complete_.emplace_back(std::move(completer));
+    if (!enabled) {
+      power_manager_->PowerDownOnIdle();
+    } else {
+      power_manager_->PowerUpAfterIdle();
+    }
+    scheduler_->SetSchedulingEnabled(enabled);
+    return MAGMA_STATUS_OK;
+  });
 }
 
-void MsdArmDevice::DumpStatus(uint32_t dump_flags) { DumpStatusToLog(); }
+void MsdArmDevice::MsdDumpStatus(uint32_t dump_flags) { NdtPostDumpStatusToLog(); }
 
-magma_status_t MsdArmDevice::GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {
+magma_status_t MsdArmDevice::MsdGetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {
   struct variant {
     const char* suffix;
     const char* url;

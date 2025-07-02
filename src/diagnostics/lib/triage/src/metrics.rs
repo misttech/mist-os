@@ -1755,7 +1755,7 @@ mod test {
                     .err()
                     .unwrap()
             ),
-            concat!("Expression Error: \n0: at line 1, in Eof:\n1 *\n  ^\n\n")
+            "Expression Error: \n0: at line 1, in Eof:\n1 *\n  ^\n\n"
         );
 
         // Check expression correctly built from valid expression

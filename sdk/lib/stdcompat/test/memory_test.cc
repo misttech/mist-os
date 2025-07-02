@@ -47,15 +47,15 @@ TEST(MemoryTest, ToAddressWithFancyReturnsRightPointer) {
 }
 
 TEST(MemoryTest, ToAddressWithArrowReturnsRightPointer) {
-  cpp17::optional<const int> a(13);
+  std::optional<const int> a(13);
   EXPECT_EQ(&*a, cpp20::to_address(a));
 
   arrow b;
   EXPECT_EQ(&b.value, cpp20::to_address(b));
 
-  // We only go one level because cpp17::optional<T>::operator->() returns T*, which goes to the
+  // We only go one level because std::optional<T>::operator->() returns T*, which goes to the
   // first overload of cpp20::to_address and there is no recursion.
-  cpp17::optional<const arrow> c;
+  std::optional<const arrow> c;
   EXPECT_EQ(&*c, cpp20::to_address(c));
 
   // TODO(https://fxbug.dev/42149777): libc++ and libstdc++ currently both have broken
@@ -66,7 +66,7 @@ TEST(MemoryTest, ToAddressWithArrowReturnsRightPointer) {
   //
   // Here we do go two levels because weird_ptr<T>::operator->() returns const T&, which goes back
   // to the overload for operator->() and then we get a raw pointer.
-  // weird_ptr<cpp17::optional<const int>> e;
+  // weird_ptr<std::optional<const int>> e;
   // EXPECT_EQ(&*e.value, cpp20::to_address(e));
 }
 
@@ -91,11 +91,11 @@ TEST(MemoryTest, BannedUses) {
   // EXPECT_EQ(&b.value, cpp20::to_address(b));
 
   // Incorrect attempt at chaining
-  // cpp17::optional<const cpp17::optional<int>> c(13);
+  // std::optional<const std::optional<int>> c(13);
   // EXPECT_EQ(&**c, cpp20::to_address(c));
 
   // No chaining
-  // weird_ptr<cpp17::optional<const int>> d;
+  // weird_ptr<std::optional<const int>> d;
   // EXPECT_EQ(&*d.value, cpp20::to_address(d));
 }
 

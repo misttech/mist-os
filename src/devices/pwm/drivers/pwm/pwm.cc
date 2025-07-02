@@ -4,126 +4,116 @@
 
 #include "pwm.h"
 
-#include <lib/ddk/binding_driver.h>
-#include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
+#include <lib/driver/compat/cpp/metadata.h>
+#include <lib/driver/component/cpp/driver_export.h>
 
 #include <bind/fuchsia/cpp/bind.h>
-#include <fbl/alloc_checker.h>
 
 namespace pwm {
 
 constexpr size_t kMaxConfigBufferSize = 256;
 
-zx_status_t PwmDevice::Create(void* ctx, zx_device_t* parent) {
-  pwm_impl_protocol_t pwm_proto;
-  auto status = device_get_protocol(parent, ZX_PROTOCOL_PWM_IMPL, &pwm_proto);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "%s: device_get_protocol failed %d", __FILE__, status);
-    return status;
+zx::result<> Pwm::Start() {
+  zx::result pwm_impl = compat::ConnectBanjo<ddk::PwmImplProtocolClient>(incoming());
+  if (pwm_impl.is_error()) {
+    fdf::error("Failed to connect to pwm-impl: {}", pwm_impl);
+    return pwm_impl.take_error();
   }
 
-  auto metadata = ddk::GetEncodedMetadata<fuchsia_hardware_pwm::wire::PwmChannelsMetadata>(
-      parent, DEVICE_METADATA_PWM_CHANNELS);
-  if (!metadata.is_ok()) {
-    return metadata.error_value();
+  zx::result metadata = compat::GetMetadata<fuchsia_hardware_pwm::PwmChannelsMetadata>(
+      incoming(), DEVICE_METADATA_PWM_CHANNELS);
+  if (metadata.is_error()) {
+    fdf::error("Failed to get metadata: {}", metadata);
+    return metadata.take_error();
   }
+  if (!metadata.value().channels().has_value()) {
+    fdf::error("Metadata missing `channels` field");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  const auto& pwm_channels = metadata.value().channels().value();
 
-  auto pwm_channels = fidl::ToNatural(*metadata.value());
-  for (auto pwm_channel : *pwm_channels.channels()) {
-    fbl::AllocChecker ac;
-    std::unique_ptr<PwmDevice> dev(new (&ac) PwmDevice(parent, &pwm_proto, pwm_channel));
-    if (!ac.check()) {
-      return ZX_ERR_NO_MEMORY;
+  for (size_t i = 0; i < pwm_channels.size(); ++i) {
+    const auto& pwm_channel_info = pwm_channels[i];
+    if (!pwm_channel_info.id().has_value()) {
+      fdf::error("PWM channel info {} missing `id` field", i);
+      return zx::error(ZX_ERR_INTERNAL);
     }
+    auto pwm_channel_id = pwm_channel_info.id().value();
 
-    char name[20];
-    snprintf(name, sizeof(name), "pwm-%u", *pwm_channel.id());
-    zx_device_str_prop_t props[] = {
-        ddk::MakeStrProperty(bind_fuchsia::PWM_ID, *pwm_channel.id()),
-    };
-
-    auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    if (endpoints.is_error()) {
-      return endpoints.status_value();
+    auto& pwm_channel = *pwm_channels_.emplace_back(
+        std::make_unique<PwmChannel>(pwm_channel_id, dispatcher(), pwm_impl.value()));
+    zx::result result = pwm_channel.Init(incoming(), outgoing(), node());
+    if (result.is_error()) {
+      fdf::error("Failed to initialize pwm channel {}: {}", i, result);
+      return result.take_error();
     }
+  }
 
-    std::array offers = {
-        fuchsia_hardware_pwm::Service::Name,
-    };
+  return zx::ok();
+}
 
-    dev->outgoing_server_end_ = std::move(endpoints->server);
+zx::result<> PwmChannel::Init(const std::shared_ptr<fdf::Namespace>& incoming,
+                              std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
+                              fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent) {
+  std::string child_node_name = std::format("pwm-{}", id_);
 
-    status = dev->DdkAdd(ddk::DeviceAddArgs(name)
-                             .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
-                             .set_str_props(props)
-                             .set_fidl_service_offers(offers)
-                             .set_outgoing_dir(endpoints->client.TakeChannel()));
-    if (status != ZX_OK) {
-      return status;
+  {
+    zx::result result = outgoing->AddService<fuchsia_hardware_pwm::Service>(
+        fuchsia_hardware_pwm::Service::InstanceHandler{
+            {.pwm = bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure)}},
+        child_node_name);
+    if (result.is_error()) {
+      fdf::error("Failed to add pwm service to outgoing directory: {}", result);
+      return result.take_error();
     }
-
-    // dev is now owned by devmgr.
-    [[maybe_unused]] auto ptr = dev.release();
   }
 
-  return ZX_OK;
-}
-
-void PwmDevice::DdkInit(ddk::InitTxn txn) {
-  fdf_dispatcher_t* fdf_dispatcher = fdf_dispatcher_get_current_dispatcher();
-  ZX_ASSERT(fdf_dispatcher);
-  async_dispatcher_t* dispatcher = fdf_dispatcher_get_async_dispatcher(fdf_dispatcher);
-  outgoing_ = component::OutgoingDirectory(dispatcher);
-
-  fuchsia_hardware_pwm::Service::InstanceHandler handler({
-      .pwm = bindings_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
-  });
-  auto result = outgoing_->AddService<fuchsia_hardware_pwm::Service>(std::move(handler));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to add service to the outgoing directory");
-    txn.Reply(result.status_value());
-    return;
+  {
+    zx::result result =
+        compat_server_.Initialize(incoming, outgoing, std::nullopt, child_node_name);
+    if (result.is_error()) {
+      fdf::error("Failed to initialize compat server: {}", result);
+      return result.take_error();
+    }
   }
 
-  result = outgoing_->Serve(std::move(outgoing_server_end_));
-  if (result.is_error()) {
-    zxlogf(ERROR, "Failed to serve the outgoing directory");
-    txn.Reply(result.status_value());
-    return;
+  zx::result connector = devfs_connector_.Bind(dispatcher_);
+  if (connector.is_error()) {
+    fdf::error("Failed to bind devfs connector: {}", connector);
+    return connector.take_error();
   }
 
-  txn.Reply(ZX_OK);
+  fuchsia_driver_framework::DevfsAddArgs devfs_args{
+      {.connector = std::move(connector.value()),
+       .class_name{kClassName},
+       .connector_supports{fuchsia_device_fs::ConnectionType::kController}}};
+
+  std::vector offers = compat_server_.CreateOffers2();
+  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_pwm::Service>(child_node_name));
+
+  std::vector properties = {fdf::MakeProperty2(bind_fuchsia::PWM_ID, id_)};
+
+  zx::result child = fdf::AddChild(parent, *fdf::Logger::GlobalInstance(), child_node_name,
+                                   devfs_args, properties, offers);
+  if (child.is_error()) {
+    fdf::error("Failed to add child: {}", child);
+    return child.take_error();
+  }
+  child_ = std::move(child.value());
+
+  return zx::ok();
 }
 
-zx_status_t PwmDevice::PwmGetConfig(pwm_config_t* out_config) {
-  std::scoped_lock lock(lock_);
-  return pwm_.GetConfig(*channel_.id(), out_config);
-}
-
-zx_status_t PwmDevice::PwmSetConfig(const pwm_config_t* config) {
-  std::scoped_lock lock(lock_);
-  return pwm_.SetConfig(*channel_.id(), config);
-}
-
-zx_status_t PwmDevice::PwmEnable() {
-  std::scoped_lock lock(lock_);
-  return pwm_.Enable(*channel_.id());
-}
-
-zx_status_t PwmDevice::PwmDisable() {
-  std::scoped_lock lock(lock_);
-  return pwm_.Disable(*channel_.id());
-}
-
-void PwmDevice::GetConfig(GetConfigCompleter::Sync& completer) {
+void PwmChannel::GetConfig(GetConfigCompleter::Sync& completer) {
   std::unique_ptr<uint8_t[]> buffer = std::make_unique<uint8_t[]>(kMaxConfigBufferSize);
   pwm_config_t config;
   config.mode_config_buffer = buffer.get();
   config.mode_config_size = kMaxConfigBufferSize;
 
-  zx_status_t status = PwmGetConfig(&config);
+  zx_status_t status = pwm_impl_.GetConfig(id_, &config);
   if (status != ZX_OK) {
+    fdf::error("Failed to get config for pwm {}: {}", id_, zx_status_get_string(status));
     completer.ReplyError(status);
     return;
   }
@@ -138,7 +128,7 @@ void PwmDevice::GetConfig(GetConfigCompleter::Sync& completer) {
   completer.ReplySuccess(result);
 }
 
-void PwmDevice::SetConfig(SetConfigRequestView request, SetConfigCompleter::Sync& completer) {
+void PwmChannel::SetConfig(SetConfigRequestView request, SetConfigCompleter::Sync& completer) {
   pwm_config_t new_config;
 
   new_config.polarity = request->config.polarity;
@@ -147,42 +137,42 @@ void PwmDevice::SetConfig(SetConfigRequestView request, SetConfigCompleter::Sync
   new_config.mode_config_buffer = request->config.mode_config.data();
   new_config.mode_config_size = request->config.mode_config.count();
 
-  zx_status_t result = PwmSetConfig(&new_config);
-
-  if (result != ZX_OK) {
-    completer.ReplyError(result);
-  } else {
-    completer.ReplySuccess();
+  zx_status_t status = pwm_impl_.SetConfig(id_, &new_config);
+  if (status != ZX_OK) {
+    fdf::error("Failed to set config for pwm {}: {}", id_, zx_status_get_string(status));
+    completer.ReplyError(status);
+    return;
   }
+
+  completer.ReplySuccess();
 }
 
-void PwmDevice::Enable(EnableCompleter::Sync& completer) {
-  zx_status_t result = PwmEnable();
-
-  if (result == ZX_OK) {
-    completer.ReplySuccess();
-  } else {
-    completer.ReplyError(result);
+void PwmChannel::Enable(EnableCompleter::Sync& completer) {
+  zx_status_t status = pwm_impl_.Enable(id_);
+  if (status != ZX_OK) {
+    fdf::error("Failed to enable pwm {}: {}", id_, zx_status_get_string(status));
+    completer.ReplyError(status);
+    return;
   }
+
+  completer.ReplySuccess();
 }
 
-void PwmDevice::Disable(DisableCompleter::Sync& completer) {
-  zx_status_t result = PwmDisable();
-
-  if (result == ZX_OK) {
-    completer.ReplySuccess();
-  } else {
-    completer.ReplyError(result);
+void PwmChannel::Disable(DisableCompleter::Sync& completer) {
+  zx_status_t status = pwm_impl_.Disable(id_);
+  if (status != ZX_OK) {
+    fdf::error("Failed to disable pwm {}: {}", id_, zx_status_get_string(status));
+    completer.ReplyError(status);
+    return;
   }
+
+  completer.ReplySuccess();
 }
 
-static constexpr zx_driver_ops_t driver_ops = []() {
-  zx_driver_ops_t ops = {};
-  ops.version = DRIVER_OPS_VERSION;
-  ops.bind = PwmDevice::Create;
-  return ops;
-}();
+void PwmChannel::Connect(fidl::ServerEnd<fuchsia_hardware_pwm::Pwm> request) {
+  bindings_.AddBinding(dispatcher_, std::move(request), this, fidl::kIgnoreBindingClosure);
+}
 
 }  // namespace pwm
 
-ZIRCON_DRIVER(pwm, pwm::driver_ops, "zircon", "0.1");
+FUCHSIA_DRIVER_EXPORT(pwm::Pwm);

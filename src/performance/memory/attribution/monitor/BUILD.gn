@@ -22,15 +22,14 @@ rustc_binary("bin") {
     "src/attribution_data.rs",
     "src/common.rs",
     "src/main.rs",
-    "src/metrics.rs",
     "src/resources.rs",
     "src/snapshot.rs",
   ]
 
   deps = [
+    ":cobalt",
     ":inspect_nodes",
     ":memory-monitor2-config",
-    ":memory_metrics_registry",
     ":stalls",
     ":traces",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
@@ -50,7 +49,6 @@ rustc_binary("bin") {
     "//src/lib/trace/rust:trace",
     "//src/performance/memory/attribution/processing",
     "//src/performance/memory/index_table_builder",
-    "//third_party/cobalt/src/lib/client/rust:cobalt-client",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
@@ -115,7 +113,6 @@ rustc_library("traces") {
   sources = [
     "src/traces/kernel.rs",
     "src/traces/lib.rs",
-    "src/traces/watcher.rs",
   ]
   deps = [
     ":stalls",
@@ -127,7 +124,6 @@ rustc_library("traces") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
-    "//third_party/rust_crates:tokio",
   ]
 }
 
@@ -140,13 +136,39 @@ rustc_library("stalls") {
 
   deps = [
     "//sdk/rust/zx",
-    "//src/lib/fuchsia-async",
-    "//src/lib/fuchsia-sync",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:futures-util",
   ]
 
   test_deps = []
+}
+
+rustc_library("cobalt") {
+  edition = "2021"
+  with_unit_tests = true
+  source_root = "src/cobalt/lib.rs"
+
+  sources = [
+    "src/cobalt/buckets.rs",
+    "src/cobalt/lib.rs",
+    "src/cobalt/stalls.rs",
+  ]
+
+  deps = [
+    ":memory_metrics_registry",
+    ":stalls",
+    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
+    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
+    "//sdk/rust/zx",
+    "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia-async",
+    "//src/performance/memory/attribution/processing",
+    "//third_party/cobalt/src/lib/client/rust:cobalt-client",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:log",
+  ]
+
+  test_deps = [ "//sdk/fidl/fuchsia.memory.attribution.plugin:fuchsia.memory.attribution.plugin_rust" ]
 }
 
 fuchsia_component_manifest("memory-monitor2-manifest") {
@@ -187,6 +209,11 @@ fuchsia_unittest_package("memory-monitor2-stalls-tests") {
   deps = [ ":stalls_test" ]
 }
 
+fuchsia_unittest_package("memory-monitor2-cobalt-tests") {
+  package_name = "memory-monitor2-cobalt-tests"
+  deps = [ ":cobalt_test" ]
+}
+
 rustc_staticlib("memory-monitor2-trace-rust-cpp-lib") {
   name = "rust_cpp_test_lib"
   version = "0.1.0"
@@ -197,12 +224,10 @@ rustc_staticlib("memory-monitor2-trace-rust-cpp-lib") {
     ":stalls",
     ":traces",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_rust",
-    "//sdk/rust/zx",
     "//src/lib/diagnostics/log/rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:anyhow",
-    "//third_party/rust_crates:tokio",
   ]
 
   public = [ "tests/traces/lib.h" ]
@@ -248,6 +273,7 @@ fuchsia_test_package("memory-monitor2-trace-test-pkg") {
 group("tests") {
   testonly = true
   deps = [
+    ":memory-monitor2-cobalt-tests",
     ":memory-monitor2-inspect-tests",
     ":memory-monitor2-stalls-tests",
     ":memory-monitor2-tests",

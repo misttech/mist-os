@@ -10,7 +10,7 @@
 #     The label of the aliased element.
 #
 #   type
-#     The type of the target, either "atom" or "molecule".
+#     The type of the target. Must be "atom".
 #
 #   non_sdk_deps (optional)
 #     List of GN labels which this target needs built.
@@ -18,9 +18,7 @@
 template("sdk_alias") {
   assert(defined(invoker.target), "Must define a target to alias")
   assert(defined(invoker.type), "Must define a target type")
-  assert(invoker.type == "atom" || invoker.type == "molecule", "Unknown type")
-
-  is_atom = invoker.type == "atom"
+  assert(invoker.type == "atom", "Unexpected type")
 
   # This template simply copies the output files of the sdk_* templates to the
   # correct location.
@@ -32,18 +30,16 @@ template("sdk_alias") {
 
   group_deps = []
 
-  if (is_atom) {
-    copy_meta_target_name = "${target_name}_copy_meta"
-    group_deps += [ ":$copy_meta_target_name" ]
-    copy(copy_meta_target_name) {
-      forward_variables_from(invoker, [ "testonly" ])
+  copy_meta_target_name = "${target_name}_copy_meta"
+  group_deps += [ ":$copy_meta_target_name" ]
+  copy(copy_meta_target_name) {
+    forward_variables_from(invoker, [ "testonly" ])
 
-      sources = [ "$sdk_target_gen_dir/$sdk_target_name.meta.json" ]
+    sources = [ "$sdk_target_gen_dir/$sdk_target_name.meta.json" ]
 
-      outputs = [ "$target_gen_dir/$meta_json_name" ]
+    outputs = [ "$target_gen_dir/$meta_json_name" ]
 
-      deps = [ invoker.target ]
-    }
+    deps = [ invoker.target ]
   }
 
   copy_manifest_target_name = "${target_name}_copy_manifest"
@@ -67,17 +63,15 @@ template("sdk_alias") {
       public_deps += invoker.non_sdk_deps
     }
 
-    if (is_atom) {
-      metadata = {
-        # Used by idk_prebuild_manifest() template.
-        idk_atom_prebuild_info = [
-          {
-            atom_type = "alias"
-            atom_label = get_label_info(":${target_name}", "label_no_toolchain")
-            atom_actual = get_label_info(invoker.target, "label_no_toolchain")
-          },
-        ]
-      }
+    metadata = {
+      # Used by idk_prebuild_manifest() template.
+      idk_atom_prebuild_info = [
+        {
+          atom_type = "alias"
+          atom_label = get_label_info(":${target_name}", "label_no_toolchain")
+          atom_actual = get_label_info(invoker.target, "label_no_toolchain")
+        },
+      ]
     }
   }
 }

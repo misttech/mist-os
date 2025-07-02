@@ -595,14 +595,14 @@ class ArmArchVmAspace::ConsistencyManager {
   // The aspace we are invalidating TLBs for.
   const ArmArchVmAspace& aspace_;
 
-  // Pending ISB
-  bool isb_pending_ = false;
-
   // vm_page_t's to release to the PMM after the TLB invalidation occurs.
   list_node to_free_ = LIST_INITIAL_VALUE(to_free_);
 
+  // Pending ISB
+  bool isb_pending_ = false;
+
   // The main list of pending TLBs.
-  size_t num_pending_tlbs_ = 0;
+  uint32_t num_pending_tlbs_ = 0;
   PendingTlbs pending_tlbs_[kMaxPendingTlbs];
 };
 
@@ -1309,7 +1309,7 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
       // Mappings for physical VMOs do not have pages associated with them and so there's no state
       // to update on an access.
       if (likely(page)) {
-        pmm_page_queues()->MarkAccessedDeferredCount(page);
+        Pmm::Node().GetPageQueues()->MarkAccessed(page);
 
         if (terminal_action == TerminalAction::UpdateAgeAndHarvest) {
           // Modifying the access flag does not require break-before-make for correctness and as we
@@ -1353,8 +1353,7 @@ size_t ArmArchVmAspace::HarvestAccessedPageTable(
 }
 
 void ArmArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel_in, size_t size,
-                                            const uint index_shift, volatile pte_t* page_table,
-                                            ConsistencyManager& cm) {
+                                            const uint index_shift, volatile pte_t* page_table) {
   const vaddr_t block_size = 1UL << index_shift;
   const vaddr_t block_mask = block_size - 1;
 
@@ -1384,7 +1383,7 @@ void ArmArchVmAspace::MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel_in,
       volatile pte_t* next_page_table =
           static_cast<volatile pte_t*>(paddr_to_physmap(page_table_paddr));
       MarkAccessedPageTable(vaddr, vaddr_rem, chunk_size, index_shift - (page_size_shift_ - 3),
-                            next_page_table, cm);
+                            next_page_table);
     } else if (is_pte_valid(pte) && (pte & MMU_PTE_ATTR_AF) == 0) {
       pte |= MMU_PTE_ATTR_AF;
       update_pte(&page_table[index], pte);
@@ -1440,7 +1439,7 @@ pte_t ArmArchVmAspace::MmuParamsFromFlags(uint mmu_flags) {
 }
 
 zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count,
-                                           uint mmu_flags, size_t* mapped) {
+                                           uint mmu_flags) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " paddr %#" PRIxPTR " count %zu flags %#x\n", vaddr, paddr, count,
           mmu_flags);
@@ -1487,7 +1486,7 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
     }
     pte_t attrs = MmuParamsFromFlags(mmu_flags);
 
-    ConsistencyManager cm(*this);
+    __UNINITIALIZED ConsistencyManager cm(*this);
     MappingCursor cursor(/*paddrs=*/&paddr, /*paddr_count=*/1, /*page_size=*/count * PAGE_SIZE,
                          /*vaddr=*/vaddr);
     if (!cursor.SetVaddrRelativeOffset(vaddr_base_, 1ull << top_size_shift_)) {
@@ -1512,10 +1511,6 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
     DEBUG_ASSERT(cursor.size() == 0);
   }
 
-  if (mapped) {
-    *mapped = count;
-  }
-
 #if __has_feature(address_sanitizer)
   if (type_ == ArmAspaceType::kKernel) {
     asan_map_shadow_for(vaddr, count * PAGE_SIZE);
@@ -1526,7 +1521,7 @@ zx_status_t ArmArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t 
 }
 
 zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
-                                 ExistingEntryAction existing_action, size_t* mapped) {
+                                 ExistingEntryAction existing_action) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu flags %#x\n", vaddr, count, mmu_flags);
 
@@ -1575,7 +1570,7 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
     }
     pte_t attrs = MmuParamsFromFlags(mmu_flags);
 
-    ConsistencyManager cm(*this);
+    __UNINITIALIZED ConsistencyManager cm(*this);
     MappingCursor cursor(/*paddrs=*/phys, /*paddr_count=*/count, /*page_size=*/PAGE_SIZE,
                          /*vaddr=*/vaddr);
     if (!cursor.SetVaddrRelativeOffset(vaddr_base_, 1ull << top_size_shift_)) {
@@ -1600,13 +1595,6 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
     DEBUG_ASSERT(cursor.size() == 0);
   }
 
-  if (mapped) {
-    // For ExistingEntryAction::Error, we should have mapped all the addresses we were asked to.
-    // For ExistingEntryAction::Skip, we might have mapped less if we encountered existing entries,
-    // but skipped entries contribute towards the total as well.
-    *mapped = count;
-  }
-
 #if __has_feature(address_sanitizer)
   if (type_ == ArmAspaceType::kKernel) {
     asan_map_shadow_for(vaddr, count * PAGE_SIZE);
@@ -1616,8 +1604,7 @@ zx_status_t ArmArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uin
   return ZX_OK;
 }
 
-zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions unmap_options,
-                                   size_t* unmapped) {
+zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions unmap_options) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
 
@@ -1637,7 +1624,7 @@ zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions
   Guard<CriticalMutex> a{&lock_};
 
   ASSERT(updates_enabled_);
-  ConsistencyManager cm(*this);
+  __UNINITIALIZED ConsistencyManager cm(*this);
   VirtualAddressCursor cursor(vaddr, count * PAGE_SIZE);
   if (!cursor.SetVaddrRelativeOffset(vaddr_base_, 1ull << top_size_shift_)) {
     return ZX_ERR_OUT_OF_RANGE;
@@ -1647,10 +1634,6 @@ zx_status_t ArmArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions
   tt_page_->mmu.num_mappings -= lower_unmapped;
 
   DEBUG_ASSERT(cursor.size() == 0 || ret != ZX_OK);
-
-  if (unmapped) {
-    *unmapped = (ret == ZX_OK) ? count : 0u;
-  }
 
   return ret;
 }
@@ -1679,7 +1662,7 @@ zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags
   // safely perform protections and instead upgrade any protect to a complete unmap, therefore
   // causing a regular translation fault that we can handle to repopulate the correct mapping.
   if (type_ == ArmAspaceType::kGuest) {
-    return Unmap(vaddr, count, ArchUnmapOptions::Enlarge, nullptr);
+    return Unmap(vaddr, count, ArchUnmapOptions::Enlarge);
   }
 
   Guard<CriticalMutex> a{&lock_};
@@ -1710,7 +1693,7 @@ zx_status_t ArmArchVmAspace::Protect(vaddr_t vaddr, size_t count, uint mmu_flags
   {
     pte_t attrs = MmuParamsFromFlags(mmu_flags);
 
-    ConsistencyManager cm(*this);
+    __UNINITIALIZED ConsistencyManager cm(*this);
     ret = ProtectPages(vaddr, count * PAGE_SIZE, attrs, enlarge, vaddr_base_, cm);
   }
 
@@ -1764,7 +1747,7 @@ zx_status_t ArmArchVmAspace::HarvestAccessed(vaddr_t vaddr, size_t count,
     ktrace::Scope trace = KTRACE_BEGIN_SCOPE_ENABLE(
         LOCAL_KTRACE_ENABLE, "kernel:vm", "harvest_loop", ("remaining_size", remaining_size));
     size_t entry_limit = kHarvestEntriesBetweenUnlocks;
-    ConsistencyManager cm(*this);
+    __UNINITIALIZED ConsistencyManager cm(*this);
     const size_t harvested_size = HarvestAccessedPageTable(
         &entry_limit, current_vaddr, current_vaddr_rel, remaining_size, top_index_shift_,
         non_terminal_action, terminal_action, tt_virt_, cm);
@@ -1803,9 +1786,7 @@ zx_status_t ArmArchVmAspace::MarkAccessed(vaddr_t vaddr, size_t count) {
 
   LOCAL_KTRACE("mmu mark accessed", ("vaddr", vaddr), ("size", size));
 
-  ConsistencyManager cm(*this);
-
-  MarkAccessedPageTable(vaddr, vaddr_rel, size, top_index_shift_, tt_virt_, cm);
+  MarkAccessedPageTable(vaddr, vaddr_rel, size, top_index_shift_, tt_virt_);
   accessed_since_last_check_ = true;
 
   return ZX_OK;

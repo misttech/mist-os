@@ -75,7 +75,7 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
 
     #[fuchsia::test]
-    fn test_listener_logger() {
+    async fn test_listener_logger() {
         let inspector = inspect::Inspector::default();
 
         let mut logger = ListenerInspectLogger::with_inspector(&inspector);

@@ -9,6 +9,8 @@ To use:
 
 1) Migrate to your fuchsia root directory.
 
-2) fx set terminal.x64 --with //src/ui/examples/escher
+2) fx set workbench_eng.x64 --with //src/ui/tools:scenic
 
-3) fx build host_x64/paper_shader_compiler && out/default/host_x64/paper_shader_compiler
+3) fx build --host //src/ui/tools/paper_shader_compiler
+
+4) fx host-tool paper_shader_compiler

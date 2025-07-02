@@ -51,14 +51,12 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
 
   // main methods
   zx_status_t Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
-                  ExistingEntryAction existing_action, size_t* mapped) override;
-  zx_status_t MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count, uint mmu_flags,
-                            size_t* mapped) override;
+                  ExistingEntryAction existing_action) override;
+  zx_status_t MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count, uint mmu_flags) override;
 
   using ArchUnmapOptions = ArchVmAspaceInterface::ArchUnmapOptions;
 
-  zx_status_t Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
-                    size_t* unmapped) override;
+  zx_status_t Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge) override;
 
   // ARM states that we must perform a break-before-make when changing the block size used by the
   // translation system (unless ARMv8.4-TTRem is supported) and so an unmap that needs to split a
@@ -147,7 +145,7 @@ class ArmArchVmAspace final : public ArchVmAspaceInterface {
                                   ConsistencyManager& cm) TA_REQ(lock_);
 
   void MarkAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_rel_in, size_t size, uint index_shift,
-                             volatile pte_t* page_table, ConsistencyManager& cm) TA_REQ(lock_);
+                             volatile pte_t* page_table) TA_REQ(lock_);
 
   // Splits a descriptor block into a set of next-level-down page blocks/pages.
   //

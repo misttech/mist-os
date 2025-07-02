@@ -6,22 +6,25 @@
 #define SRC_MEDIA_AUDIO_DRIVERS_AML_G12_TDM_COMPOSITE_H_
 
 #include <fidl/fuchsia.hardware.audio/cpp/wire.h>
-#include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 
-#include <algorithm>
 #include <memory>
 
 #include "src/media/audio/drivers/aml-g12-tdm/composite-server.h"
 
 namespace audio::aml_g12 {
 
-constexpr char kDriverName[] = "aml-g12-audio-composite";
-
 class Driver : public fdf::DriverBase {
  public:
+  static constexpr std::string_view kDriverName = "aml-g12-audio-composite";
+  static constexpr std::string_view kClockGateParentName = "clock-gate";
+  static constexpr std::string_view kClockPllParentName = "clock-pll";
+  static constexpr std::string_view kGpioTdmASclkParentName = "gpio-tdm-a-sclk";
+  static constexpr std::string_view kGpioTdmBSclkParentName = "gpio-tdm-b-sclk";
+  static constexpr std::string_view kGpioTdmCSclkParentName = "gpio-tdm-c-sclk";
+
   Driver(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : fdf::DriverBase(kDriverName, std::move(start_args), std::move(driver_dispatcher)),
         devfs_connector_(fit::bind_member<&Driver::Serve>(this)) {}
@@ -39,9 +42,7 @@ class Driver : public fdf::DriverBase {
 
   std::unique_ptr<AudioCompositeServer> server_;
   fidl::ServerBindingGroup<fuchsia_hardware_audio::Composite> bindings_;
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
-  fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
+  fdf::OwnedChildNode child_;
   driver_devfs::Connector<fuchsia_hardware_audio::Composite> devfs_connector_;
 };
 

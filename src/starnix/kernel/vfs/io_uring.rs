@@ -599,7 +599,7 @@ impl IoUringFileObject {
 
     pub fn enter(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         to_submit: u32,
         _min_complete: u32,
@@ -639,7 +639,7 @@ impl IoUringFileObject {
 
     fn execute(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         entry: &SqEntry,
     ) -> Result<SyscallResult, Errno> {
@@ -771,7 +771,7 @@ impl IoUringFileObject {
 }
 
 fn do_read(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     entry: &SqEntry,
 ) -> Result<SyscallResult, Errno> {
@@ -785,7 +785,7 @@ fn do_read(
 }
 
 fn do_write(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     entry: &SqEntry,
 ) -> Result<SyscallResult, Errno> {
@@ -812,7 +812,7 @@ impl FileOps for IoUringFileObject {
 
     fn mmap(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         addr: DesiredAddress,

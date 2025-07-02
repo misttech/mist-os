@@ -22,15 +22,6 @@
     use: [
         { protocol: "fuchsia.boot.FactoryItems" },
         {
-            protocol: "fuchsia.storage.ext4.Server",
-            availability: "optional",
-        },
-        {
-            directory: "dev-class-block",
-            rights: [ "r*" ],
-            path: "/dev/class/block",
-        },
-        {
             directory: "config-data",
             rights: [ "r*" ],
             path: "/config/data",

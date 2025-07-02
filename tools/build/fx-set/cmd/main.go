@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -202,8 +203,9 @@ type setArgs struct {
 
 	includeClippy bool
 
-	isRelease        bool
 	isBalanced       bool
+	isRelease        bool
+	isDebug          bool
 	netboot          bool
 	cargoTOMLGen     bool
 	jsonIDEScripts   []string
@@ -274,6 +276,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	flagSet.StringVar(&cmd.mainPbLabel, "main-pb", "", "")
 
 	flagSet.BoolVar(&cmd.isRelease, "release", false, "")
+	flagSet.BoolVar(&cmd.isDebug, "debug", false, "")
 	flagSet.BoolVar(&cmd.isBalanced, "balanced", false, "")
 	flagSet.BoolVar(&cmd.cargoTOMLGen, "cargo-toml-gen", false, "")
 	flagSet.StringSliceVar(&cmd.jsonIDEScripts, "json-ide-script", []string{}, "")
@@ -370,12 +373,19 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 		nameComponents = append(nameComponents, cmd.variants...)
 		if cmd.isRelease {
 			nameComponents = append(nameComponents, "release")
-		} else if cmd.isBalanced {
+		} else if cmd.isDebug {
+			nameComponents = append(nameComponents, "debug")
+		} else {
 			nameComponents = append(nameComponents, "balanced")
 		}
 		cmd.buildDir = filepath.Join("out", strings.Join(nameComponents, "-"))
 	}
 	message := "The build directory for this build is " + cmd.buildDir + "\n"
+	nudge, _ := isNudgeOn(env, "balanced")
+	if cmd.isRelease && nudge {
+		message += "[Nudge] You have set --release, consider --balanced: https://fuchsia.dev/fuchsia-src/development/build/build_system/fuchsia_build_system_overview#quick_comparison\n"
+		message += "(Silence nudge with `ffx config set ffx.ui.nudges.balanced false`)\n"
+	}
 	fmt.Printf(message)
 	return cmd, nil
 }
@@ -410,13 +420,15 @@ func constructStaticSpec(checkoutDir string, args *setArgs, canUseRbe bool) (*fi
 		return nil, fmt.Errorf("no such board: %q", args.board)
 	}
 
-	compilationMode := fintpb.Static_COMPILATION_MODE_DEBUG
-	if args.isRelease {
-		if args.isBalanced {
-			return nil, fmt.Errorf("Only one of --release and --balanced can be specified.")
-		}
-		compilationMode = fintpb.Static_COMPILATION_MODE_RELEASE
+	compilationMode := fintpb.Static_COMPILATION_MODE_BALANCED
+	if args.isRelease && args.isDebug || args.isRelease && args.isBalanced || args.isBalanced && args.isDebug {
 
+		return nil, fmt.Errorf("Only one of --release, --debug and --balanced can be specified.")
+	}
+	if args.isRelease {
+		compilationMode = fintpb.Static_COMPILATION_MODE_RELEASE
+	} else if args.isDebug {
+		compilationMode = fintpb.Static_COMPILATION_MODE_DEBUG
 	} else if args.isBalanced {
 		compilationMode = fintpb.Static_COMPILATION_MODE_BALANCED
 	}
@@ -631,4 +643,16 @@ func isSymlink(path string) (bool, error) {
 	}
 	isLink := fileInfo.Mode()&os.ModeSymlink != 0
 	return isLink, nil
+}
+
+func isNudgeOn(env map[string]string, nudge string) (bool, error) {
+	nudge_string := "ffx.ui.nudges." + nudge
+	cmd := exec.Command("ffx", "config", "get", nudge_string)
+	cmd.Dir = env[checkoutDirEnvVar]
+	out, err := cmd.Output()
+	if err == nil {
+		return strconv.ParseBool(strings.TrimSpace(string(out)))
+	} else {
+		return true, err
+	}
 }

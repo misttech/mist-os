@@ -1,0 +1,27 @@
+[package]
+name = "serde_yaml"
+version = "0.9.14" # remember to update html_root_url, and readme for major versions
+authors = ["David Tolnay <dtolnay@gmail.com>"]
+categories = ["encoding", "parser-implementations"]
+description = "YAML data format for Serde"
+documentation = "https://docs.rs/serde_yaml/"
+edition = "2021"
+keywords = ["yaml", "serde", "serialization"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/dtolnay/serde-yaml"
+rust-version = "1.58"
+
+[dependencies]
+indexmap = { version = "1.9", features = ["std"] }
+itoa = "1.0"
+ryu = "1.0"
+serde = "1.0.139"
+unsafe-libyaml = "0.2.4"
+
+[dev-dependencies]
+anyhow = "1.0"
+indoc = "1.0"
+serde_derive = "1.0"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]

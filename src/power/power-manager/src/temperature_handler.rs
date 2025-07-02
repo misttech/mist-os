@@ -375,6 +375,7 @@ pub mod tests {
     use async_utils::PollExt as _;
     use diagnostics_assertions::{assert_data_tree, TreeAssertion};
     use futures::{poll, TryStreamExt};
+    use std::sync::Arc;
     use std::task::Poll;
 
     /// Spawns a new task that acts as a fake temperature driver for testing purposes. Each
@@ -521,9 +522,9 @@ pub mod tests {
         // samples.
         for i in 10..InspectData::NUM_INSPECT_TEMPERATURE_SAMPLES + 10 {
             let mut sample_child = TreeAssertion::new(&i.to_string(), true);
-            sample_child.add_property_assertion("temperature", Box::new(30.0));
+            sample_child.add_property_assertion("temperature", Arc::new(30.0));
             sample_child
-                .add_property_assertion("@time", Box::new(diagnostics_assertions::AnyProperty));
+                .add_property_assertion("@time", Arc::new(diagnostics_assertions::AnyProperty));
             temperature_readings.add_child_assertion(sample_child);
         }
 

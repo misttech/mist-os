@@ -4,6 +4,10 @@
 
 #include "src/graphics/display/lib/api-protocols/cpp/display-engine-interface.h"
 
+#include <zircon/assert.h>
+
+#include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
+
 namespace display {
 
 zx::result<> DisplayEngineInterface::SetDisplayPower(display::DisplayId display_id, bool power_on) {

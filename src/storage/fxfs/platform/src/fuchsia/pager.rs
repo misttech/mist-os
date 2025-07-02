@@ -25,7 +25,6 @@ use vfs::execution_scope::ExecutionScope;
 use zx::sys::zx_page_request_command_t::{ZX_PAGER_VMO_DIRTY, ZX_PAGER_VMO_READ};
 use zx::{self as zx, AsHandleRef, PacketContents, PagerPacket, SignalPacket};
 
-pub const READ_AHEAD_SIZE: u64 = 128 * 1024;
 pub static STRONG_FILE_REFS: AtomicU64 = AtomicU64::new(0);
 
 fn watch_for_zero_children(file: &impl PagerBacked) -> Result<(), zx::Status> {
@@ -325,7 +324,10 @@ impl Pager {
     /// page request. See `ZX_PAGER_OP_DIRTY` for more information.
     fn dirty_pages(&self, vmo: &zx::Vmo, range: Range<u64>) {
         if let Err(e) = self.pager.op_range(zx::PagerOp::Dirty, vmo, range) {
-            // TODO(https://fxbug.dev/42086069): The kernel can spuriously return ZX_ERR_NOT_FOUND.
+            // It is possible for `ZX_ERR_NOT_FOUND` to be returned on a clean page that has been
+            // evicted. In this case, the  kernel will retry if necessary. Unfortunately, this will
+            // cause a mismatch in the accounting between Fxfs and the kernel but there is nothing
+            // we can do about that right now. See https://fxubg.dev/42086069 for more information.
             if e != zx::Status::NOT_FOUND {
                 error!(error:? = e; "dirty_pages failed");
             }
@@ -446,13 +448,9 @@ pub trait PagerBacked: FxNode + Sync + Send + Sized + 'static {
     /// Total bytes readable. Anything reads over this will be zero padded in the VMO.
     fn byte_size(&self) -> u64;
 
-    /// The alignment (in bytes) at which block aligned reads must be performed.
-    /// This may be larger than the system page size (e.g. for compressed chunks).
-    fn read_alignment(&self) -> u64;
-
-    /// Reads one or more blocks into a buffer and returns it. `aligned_byte_range` will always
-    /// start at a multiple of `self.read_alignment()` and will end at a multiple of
-    /// `self.read_alignment()` unless that would extend beyond `self.byte_size()`, in which case,
+    /// Reads one or more blocks into a buffer and returns it. This method is called by
+    /// `default_page_in` and `aligned_byte_range` will always be aligned to the `read_ahead_size`
+    /// past to `default_page_in` unless that would extend beyond `self.byte_size()`, in which case,
     /// `aligned_byte_range` will end at `self.byte_size()`'s next page multiple. The returned
     /// buffer must be at least as large as the requested range. Only the requested range will be
     /// supplied to the pager.
@@ -462,17 +460,12 @@ pub trait PagerBacked: FxNode + Sync + Send + Sized + 'static {
     ) -> impl Future<Output = Result<buffer::Buffer<'_>, Error>> + Send;
 }
 
-/// Returns the size of reads with read-ahead that will be issued by `default_page_in`.
-pub fn default_read_size(read_alignment: u64) -> u64 {
-    if read_alignment > READ_AHEAD_SIZE {
-        read_alignment
-    } else {
-        round_down(READ_AHEAD_SIZE, read_alignment)
-    }
-}
-
 /// A generic page_in implementation that supplies pages using block-aligned reads.
-pub fn default_page_in<P: PagerBacked>(this: Arc<P>, pager_range: PageInRange<P>) {
+pub fn default_page_in<P: PagerBacked>(
+    this: Arc<P>,
+    pager_range: PageInRange<P>,
+    read_ahead_size: u64,
+) {
     fxfs_trace::duration!(
         c"start-page-in",
         "offset" => pager_range.start(),
@@ -488,8 +481,6 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, pager_range: PageInRange<P>
         std::sync::LazyLock::new(|| zx::Vmo::create(ZERO_VMO_SIZE).unwrap());
 
     assert!(pager_range.end() < i64::MAX as u64);
-
-    let readahead_alignment = default_read_size(this.read_alignment());
 
     // Two important subtleties to consider in this space:
     //
@@ -519,13 +510,13 @@ pub fn default_page_in<P: PagerBacked>(this: Arc<P>, pager_range: PageInRange<P>
     }
 
     if let Some(read_range) = read_range {
-        let expanded_range_for_readahead = round_down(read_range.start(), readahead_alignment)
+        let expanded_range_for_readahead = round_down(read_range.start(), read_ahead_size)
             ..std::cmp::min(
-                round_up(read_range.end(), readahead_alignment).unwrap(),
+                round_up(read_range.end(), read_ahead_size).unwrap(),
                 page_aligned_size,
             );
         let read_range = read_range.expand(expanded_range_for_readahead);
-        for range in read_range.chunks(readahead_alignment) {
+        for range in read_range.chunks(read_ahead_size) {
             let recorded_range = range.range.clone();
             this.pager().spawn(page_in_chunk(this.clone(), range, ref_guard.clone()));
             this.pager().record_page_in(this.clone(), recorded_range);
@@ -652,7 +643,7 @@ pub struct PagerRange<T: PagerBacked, U: PagerRequestType> {
 
 impl<T: PagerBacked, U: PagerRequestType> PagerRange<T, U> {
     /// Constructs a new `PagerRange<T, U>`. `range` must be page aligned.
-    fn new(range: Range<u64>, file: Arc<T>) -> Self {
+    pub fn new(range: Range<u64>, file: Arc<T>) -> Self {
         debug_assert!(
             range.start % page_size() == 0 && range.end % page_size() == 0,
             "{:?} is not page aligned",
@@ -954,9 +945,6 @@ mod tests {
         fn byte_size(&self) -> u64 {
             unimplemented!();
         }
-        fn read_alignment(&self) -> u64 {
-            unimplemented!();
-        }
         async fn aligned_read(
             &self,
             _aligned_byte_range: std::ops::Range<u64>,
@@ -1034,9 +1022,6 @@ mod tests {
             self.sender.lock().unbounded_send(()).unwrap();
         }
         fn byte_size(&self) -> u64 {
-            unreachable!();
-        }
-        fn read_alignment(&self) -> u64 {
             unreachable!();
         }
         async fn aligned_read(
@@ -1163,9 +1148,6 @@ mod tests {
             }
 
             fn byte_size(&self) -> u64 {
-                unreachable!();
-            }
-            fn read_alignment(&self) -> u64 {
                 unreachable!();
             }
             async fn aligned_read(
@@ -1500,10 +1482,6 @@ mod tests {
         fn on_zero_children(self: Arc<Self>) {}
 
         fn byte_size(&self) -> u64 {
-            unimplemented!();
-        }
-
-        fn read_alignment(&self) -> u64 {
             unimplemented!();
         }
 
@@ -1886,16 +1864,5 @@ mod tests {
         );
 
         scope.wait().await;
-    }
-
-    #[fuchsia::test]
-    fn test_default_read_size() {
-        assert_eq!(default_read_size(4 * 1024), READ_AHEAD_SIZE);
-        assert_eq!(default_read_size(8 * 1024), READ_AHEAD_SIZE);
-        assert_eq!(default_read_size(32 * 1024), READ_AHEAD_SIZE);
-        assert_eq!(default_read_size(40 * 1024), 120 * 1024);
-        assert_eq!(default_read_size(64 * 1024), READ_AHEAD_SIZE);
-        assert_eq!(default_read_size(88 * 1024), 88 * 1024);
-        assert_eq!(default_read_size(132 * 1024), 132 * 1024);
     }
 }

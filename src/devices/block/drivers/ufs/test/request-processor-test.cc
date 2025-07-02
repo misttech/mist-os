@@ -122,7 +122,7 @@ TEST_F(RequestProcessorTest, SendQueryUpiu) {
   ASSERT_EQ(response->GetHeader().trans_code(), UpiuTransactionCodes::kQueryResponse);
   ASSERT_EQ(response->GetHeader().function,
             static_cast<uint8_t>(QueryFunction::kStandardReadRequest));
-  ASSERT_EQ(response->GetHeader().response, UpiuHeaderResponse::kTargetSuccess);
+  ASSERT_EQ(response->GetHeader().response, UpiuHeaderResponseCode::kTargetSuccess);
   ASSERT_EQ(response->GetHeader().data_segment_length, 0);
   ASSERT_EQ(response->GetHeader().flags, 0);
   ASSERT_EQ(response->GetOpcode(), static_cast<uint8_t>(QueryOpcode::kReadAttribute));
@@ -164,7 +164,7 @@ TEST_F(RequestProcessorTest, SendQueryUpiuException) {
         response_upiu->selector = request_upiu->selector;
 
         // Set response error
-        response_upiu->header.response = UpiuHeaderResponse::kTargetFailure;
+        response_upiu->header.response = UpiuHeaderResponseCode::kTargetFailure;
 
         return mock_device.GetQueryRequestProcessor().HandleQueryRequest(*request_upiu,
                                                                          *response_upiu);
@@ -191,7 +191,7 @@ TEST_F(RequestProcessorTest, SendNopUpiu) {
   // Check response
   ASSERT_EQ(nop_in->GetHeader().trans_code(), UpiuTransactionCodes::kNopIn);
   ASSERT_EQ(nop_in->GetHeader().function, 0);
-  ASSERT_EQ(nop_in->GetHeader().response, UpiuHeaderResponse::kTargetSuccess);
+  ASSERT_EQ(nop_in->GetHeader().response, UpiuHeaderResponseCode::kTargetSuccess);
   ASSERT_EQ(nop_in->GetHeader().data_segment_length, 0);
   ASSERT_EQ(nop_in->GetHeader().flags, 0);
 }
@@ -224,7 +224,7 @@ TEST_F(RequestProcessorTest, SendNopUpiuException) {
             reinterpret_cast<NopInUpiuData *>(command_descriptor_data.response_upiu_base_addr);
         nop_in_upiu->header.data_segment_length = 0;
         nop_in_upiu->header.flags = 0;
-        nop_in_upiu->header.response = UpiuHeaderResponse::kTargetFailure;
+        nop_in_upiu->header.response = UpiuHeaderResponseCode::kTargetFailure;
         return ZX_OK;
       });
 
@@ -270,7 +270,7 @@ TEST_F(RequestProcessorTest, SendRequestUsingSlot) {
   ResponseUpiu response(response_or.value());
   EXPECT_EQ(response.GetHeader().trans_code(), UpiuTransactionCodes::kResponse);
   EXPECT_EQ(response.GetHeader().status, static_cast<uint8_t>(scsi::StatusCode::GOOD));
-  EXPECT_EQ(response.GetHeader().response, UpiuHeaderResponse::kTargetSuccess);
+  EXPECT_EQ(response.GetHeader().response, UpiuHeaderResponseCode::kTargetSuccess);
 }
 
 TEST_F(RequestProcessorTest, SendRequestUsingSlotTimeout) {
@@ -320,7 +320,7 @@ TEST_F(RequestProcessorTest, SendScsiUpiu) {
   ResponseUpiu response(response_or->GetData());
   EXPECT_EQ(response.GetHeader().trans_code(), UpiuTransactionCodes::kResponse);
   EXPECT_EQ(response.GetHeader().status, static_cast<uint8_t>(scsi::StatusCode::GOOD));
-  EXPECT_EQ(response.GetHeader().response, UpiuHeaderResponse::kTargetSuccess);
+  EXPECT_EQ(response.GetHeader().response, UpiuHeaderResponseCode::kTargetSuccess);
 }
 
 TEST_F(RequestProcessorTest, SendScsiUpiuTimeout) {

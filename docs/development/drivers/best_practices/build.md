@@ -1,9 +1,9 @@
 # Building drivers
 
-Caution: This page may contain information that is specific to the legacy
-version of the driver framework (DFv1). Also the workflows documented on
-this page may only be specific to the Fuchsia source checkout
-(`fuchsia.git`) environment.
+Note: The workflows documented on this page are specific to the Fuchsia source
+checkout (`fuchsia.git`) environment and assume the GN build system. If you are
+building a driver against the SDK or using bazel instead of GN, please look at
+[these instructions](/docs/development/sdk/index.md) instead.
 
 This document demonstrates how to build a driver, highlighting best
 practices for defining packages, components, and drivers.
@@ -47,7 +47,8 @@ fuchsia_driver_component("component") {
   ]
 }
 
-fuchsia_driver_package("my_package") {
+fuchsia_driver_package("package") {
+  package_name = "my-driver"
   deps = [ ":component" ]
 }
 ```
@@ -133,27 +134,52 @@ For the `drivers-build-only` target, you need to be sure that you're including
 the path to your `fuchsia_driver_components()` target, and not point to your
 `fuchsia_cc_driver()` target directly.
 
-## Including your driver on a device
+## Including your driver in an image
 
-If you want to include your driver on an actual device there are two options:
-you can include the driver in the bootfs or as a base package.
+If you want to include your driver in an image to be flashed onto a device, there
+are two options:
 
-### Including your driver in bootfs
+1) include your driver via an assembly input bundle (AIB)
+2) include your driver via a board input bundle (BIB)
 
-You can include your driver in bootfs depending on the product, the board, or
-just your local environment. You're going to want to add the path to your
-`fuchsia_driver_component` target to one of these three locations:
+In both cases you can place the driver in either a boot package or a base package.
 
-* product: `product_bootfs_labels` in the relevant `.gni` file in `//products`
-* board: `board_bootfs_labels` in the relevant `.gni` file in `//boards`
-* locally: `board_bootfs_labels` in `fx args`
+### Including your driver via an Assembly Input Bundle
 
-### Including your driver in a base package
+If the driver is part of the platform, this is the correct approach to take. Add a new
+`assembly_input_bundle` target in [`//bundles/assembly/BUILD.gn`](/bundles/assembly/BUILD.gn).
+An example is as follows:
 
-You can include your driver in a base package depending on the product, the board, or
-just your local environment. You're going to want to add the path to your
-`fuchsia_package` target to one of these three locations:
+```
+assembly_input_bundle("my_driver") {
+  boot_driver_packages = [
+    {
+      package_target = "//path/to/my/driver:package"
+      driver_components = [ "meta/my_driver.cm" ]
+    },
+  ]
+}
+```
 
-* product: `product_driver_package_labels` in the relevant `.gni` file in `//products`
-* board: `board_driver_package_labels` in the relevant `.gni` file in `//boards`
-* locally: `base_driver_package_labels` in `fx args`
+If you would like to include your driver as a base package instead of boot package, replace
+`boot_driver_packages` in the snippet with `base_driver_packages`.
+
+Next, add some logic to the relevant subsystem file under
+[`//src/lib/assembly/platform_configuration/src/subsystems/`](/src/lib/assembly/platform_configuration/src/subsystems/)
+which to include the AIB only when necessary.
+
+```
+if context.board_info.provides_feature("fuchsia::my_driver") {
+    builder.platform_bundle("my_driver");
+}
+```
+
+Lastly for boards which should include this driver, add `fuchsia::my_driver` to the
+`provided_features` section of it's `board_input_bundle`. This can be found under
+`//boards/${board_name}/BUILD.bazel`.
+
+### Including your via a Board Input Bundle
+
+Generally drivers that are to be included in a board input directly should use the bazel
+build rules rather than GN. As such this guide does not provide instructions on how to
+accomplish this task. Consider porting your driver to use Bazel instead for this situation.

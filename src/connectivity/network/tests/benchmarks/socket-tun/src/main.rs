@@ -150,7 +150,7 @@ async fn setup<'a>(
             let (control, server_end) =
                 fnet_interfaces_ext::admin::Control::create_endpoints().expect("create endpoints");
             let () = device_control
-                .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
+                .create_interface(&port_id, server_end, fnet_interfaces_admin::Options::default())
                 .expect("create interface");
             control
         };

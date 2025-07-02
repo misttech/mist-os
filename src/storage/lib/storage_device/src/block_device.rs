@@ -49,10 +49,10 @@ impl Device for BlockDevice {
         if buffer.len() == 0 {
             return Ok(());
         }
-        ensure!(self.vmoid.is_valid(), "Device is closed");
-        assert_eq!(offset % self.block_size() as u64, 0);
-        assert_eq!(buffer.range().start % self.block_size() as usize, 0);
-        assert_eq!((offset + buffer.len() as u64) % self.block_size() as u64, 0);
+        ensure!(self.vmoid.is_valid(), Status::INVALID_ARGS);
+        ensure!(offset % (self.block_size() as u64) == 0, Status::INVALID_ARGS);
+        ensure!(buffer.range().start % (self.block_size() as usize) == 0, Status::INVALID_ARGS);
+        ensure!(buffer.range().end % (self.block_size() as usize) == 0, Status::INVALID_ARGS);
         Ok(self
             .remote
             .read_at(
@@ -79,9 +79,9 @@ impl Device for BlockDevice {
             return Ok(());
         }
         ensure!(self.vmoid.is_valid(), "Device is closed");
-        assert_eq!(offset % self.block_size() as u64, 0);
-        assert_eq!(buffer.range().start % self.block_size() as usize, 0);
-        assert_eq!((offset + buffer.len() as u64) % self.block_size() as u64, 0);
+        ensure!(offset % (self.block_size() as u64) == 0, Status::INVALID_ARGS);
+        ensure!(buffer.range().start % (self.block_size() as usize) == 0, Status::INVALID_ARGS);
+        ensure!(buffer.range().end % (self.block_size() as usize) == 0, Status::INVALID_ARGS);
         Ok(self
             .remote
             .write_at_with_opts(
@@ -100,8 +100,8 @@ impl Device for BlockDevice {
         if self.read_only {
             bail!(Status::ACCESS_DENIED);
         }
-        assert_eq!(range.start % self.block_size() as u64, 0);
-        assert_eq!(range.end % self.block_size() as u64, 0);
+        ensure!(range.start % (self.block_size() as u64) == 0, Status::INVALID_ARGS);
+        ensure!(range.end % (self.block_size() as u64) == 0, Status::INVALID_ARGS);
         Ok(self.remote.trim(range).await?)
     }
 
@@ -113,6 +113,10 @@ impl Device for BlockDevice {
 
     async fn flush(&self) -> Result<(), Error> {
         Ok(self.remote.flush().await?)
+    }
+
+    fn barrier(&self) {
+        self.remote.barrier()
     }
 
     fn is_read_only(&self) -> bool {
@@ -185,5 +189,84 @@ mod tests {
         buf1.as_mut_slice().fill(0xaa as u8);
         let err = device.write(65536, buf1.as_ref()).await.expect_err("Write succeeded");
         assert_eq!(err.root_cause().downcast_ref::<Status>().unwrap(), &Status::ACCESS_DENIED);
+    }
+
+    #[fuchsia::test]
+    async fn test_unaligned_access() {
+        let device = BlockDevice::new(Box::new(FakeBlockClient::new(1024, 1024)), false)
+            .await
+            .expect("new failed");
+        let mut buf1 = device.allocate_buffer(device.block_size() as usize * 2).await;
+        buf1.as_mut_slice().fill(0xaa as u8);
+
+        // Write checks
+        {
+            let err = device.write(1, buf1.as_ref()).await.expect_err("Write succeeded");
+            assert_eq!(err.root_cause().downcast_ref::<Status>().unwrap(), &Status::INVALID_ARGS);
+        }
+        {
+            let err = device
+                .write(0, buf1.subslice(1..(device.block_size() as usize + 1)))
+                .await
+                .expect_err("Write succeeded");
+            assert_eq!(err.root_cause().downcast_ref::<Status>().unwrap(), &Status::INVALID_ARGS);
+        }
+        {
+            let err = device
+                .write(0, buf1.subslice(1..device.block_size() as usize))
+                .await
+                .expect_err("Write succeeded");
+            assert_eq!(err.root_cause().downcast_ref::<Status>().unwrap(), &Status::INVALID_ARGS);
+        }
+        {
+            let err = device
+                .write(0, buf1.subslice(0..(device.block_size() as usize + 1)))
+                .await
+                .expect_err("Write succeeded");
+            assert_eq!(err.root_cause().downcast_ref::<Status>().unwrap(), &Status::INVALID_ARGS);
+        }
+
+        // Read checks
+        {
+            let err = device.read(1, buf1.as_mut()).await.expect_err("Read succeeded");
+            assert_eq!(err.root_cause().downcast_ref::<Status>().unwrap(), &Status::INVALID_ARGS);
+        }
+        {
+            let err = device
+                .read(0, buf1.subslice_mut(1..(device.block_size() as usize + 1)))
+                .await
+                .expect_err("Read succeeded");
+            assert_eq!(err.root_cause().downcast_ref::<Status>().unwrap(), &Status::INVALID_ARGS);
+        }
+        {
+            let err = device
+                .read(0, buf1.subslice_mut(1..device.block_size() as usize))
+                .await
+                .expect_err("Read succeeded");
+            assert_eq!(err.root_cause().downcast_ref::<Status>().unwrap(), &Status::INVALID_ARGS);
+        }
+        {
+            let err = device
+                .read(0, buf1.subslice_mut(0..(device.block_size() as usize + 1)))
+                .await
+                .expect_err("Read succeeded");
+            assert_eq!(err.root_cause().downcast_ref::<Status>().unwrap(), &Status::INVALID_ARGS);
+        }
+
+        // Trim
+        {
+            let err = device.trim(1..device.block_size() as u64).await.expect_err("Read succeeded");
+            assert_eq!(err.root_cause().downcast_ref::<Status>().unwrap(), &Status::INVALID_ARGS);
+        }
+        {
+            let err =
+                device.trim(1..(device.block_size() as u64 + 1)).await.expect_err("Read succeeded");
+            assert_eq!(err.root_cause().downcast_ref::<Status>().unwrap(), &Status::INVALID_ARGS);
+        }
+        {
+            let err =
+                device.trim(0..(device.block_size() as u64 + 1)).await.expect_err("Read succeeded");
+            assert_eq!(err.root_cause().downcast_ref::<Status>().unwrap(), &Status::INVALID_ARGS);
+        }
     }
 }

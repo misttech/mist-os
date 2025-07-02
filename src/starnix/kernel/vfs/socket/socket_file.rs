@@ -11,19 +11,19 @@ use crate::vfs::socket::{
     SocketType,
 };
 use crate::vfs::{
-    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, FileHandle, FileObject, FileOps,
-    FsNodeInfo,
+    fileops_impl_nonseekable, fileops_impl_noop_sync, Anon, DowncastedFile, FileHandle, FileObject,
+    FileOps, FsNodeInfo,
 };
 use starnix_sync::{FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::error;
-use starnix_uapi::errors::Errno;
+use starnix_uapi::errors::{errno, Errno};
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
 use zx::HandleBased;
 
-use super::socket_fs;
+use super::{socket_fs, SocketPeer};
 
 pub struct SocketFile {
     pub(super) socket: SocketHandle,
@@ -38,33 +38,17 @@ impl SocketFile {
     /// - `open_flags`: The `OpenFlags` which are used to create the `FileObject`.
     /// - `kernel_private`: `true` if the socket will be used internally by the kernel, and should
     ///   therefore not be security labeled nor access-checked.
-    pub fn from_socket<L>(
-        locked: &mut Locked<'_, L>,
+    pub fn from_socket(
         current_task: &CurrentTask,
         socket: SocketHandle,
         open_flags: OpenFlags,
         kernel_private: bool,
-    ) -> Result<FileHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-    {
+    ) -> Result<FileHandle, Errno> {
         let fs = socket_fs(current_task.kernel());
-        // Ensure sockfs gets labeled if mounted after the SELinux policy has been loaded.
-        security::file_system_resolve_security(locked, &current_task, &fs)
-            .expect("resolve fs security");
-        security::check_socket_create_access(
-            current_task,
-            socket.domain,
-            socket.socket_type,
-            socket.protocol,
-            &fs,
-            kernel_private,
-        )?;
         let mode = mode!(IFSOCK, 0o777);
-        let node = fs.create_node(
-            current_task,
+        let node = fs.create_node_and_allocate_node_id(
             Anon::new_for_socket(kernel_private),
-            FsNodeInfo::new_factory(mode, current_task.as_fscred()),
+            FsNodeInfo::new(mode, current_task.as_fscred()),
         );
         socket.set_fs_node(&node);
         security::socket_post_create(&socket);
@@ -73,7 +57,7 @@ impl SocketFile {
 
     /// Shortcut for Socket::new plus SocketFile::from_socket.
     pub fn new_socket<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         domain: SocketDomain,
         socket_type: SocketType,
@@ -85,12 +69,15 @@ impl SocketFile {
         L: LockBefore<FileOpsCore>,
     {
         SocketFile::from_socket(
-            locked,
             current_task,
-            Socket::new(current_task, domain, socket_type, protocol)?,
+            Socket::new(locked, current_task, domain, socket_type, protocol, kernel_private)?,
             open_flags,
             kernel_private,
         )
+    }
+
+    pub fn get_from_file(file: &FileHandle) -> Result<DowncastedFile<'_, Self>, Errno> {
+        file.downcast_file::<SocketFile>().ok_or_else(|| errno!(ENOTSOCK))
     }
 }
 
@@ -100,7 +87,7 @@ impl FileOps for SocketFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -119,7 +106,7 @@ impl FileOps for SocketFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -131,7 +118,7 @@ impl FileOps for SocketFile {
 
     fn wait_async(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -143,7 +130,7 @@ impl FileOps for SocketFile {
 
     fn query_events(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -152,7 +139,7 @@ impl FileOps for SocketFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -163,7 +150,7 @@ impl FileOps for SocketFile {
 
     fn close(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -202,7 +189,7 @@ impl SocketFile {
     /// - `control_bytes`: Control message bytes to write to the socket.
     pub fn sendmsg<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         file: &FileObject,
         data: &mut dyn InputBuffer,
@@ -216,7 +203,7 @@ impl SocketFile {
         debug_assert!(data.bytes_read() == 0);
 
         // TODO: Implement more `flags`.
-        let mut op = |locked: &mut Locked<'_, L>| {
+        let mut op = |locked: &mut Locked<L>| {
             let offset_before = data.bytes_read();
             let sent_bytes = self.socket.write(
                 locked,
@@ -264,7 +251,7 @@ impl SocketFile {
     /// Returns the number of bytes read, as well as any control message that was encountered.
     pub fn recvmsg<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         file: &FileObject,
         data: &mut dyn OutputBuffer,
@@ -277,7 +264,7 @@ impl SocketFile {
         // TODO: Implement more `flags`.
         let mut read_info = MessageReadInfo::default();
 
-        let mut op = |locked: &mut Locked<'_, L>| {
+        let mut op = |locked: &mut Locked<L>| {
             let mut info = self.socket.read(locked, current_task, data, flags)?;
             read_info.append(&mut info);
             read_info.address = info.address;
@@ -313,5 +300,20 @@ impl SocketFile {
             result?;
         }
         Ok(read_info)
+    }
+}
+
+impl DowncastedFile<'_, SocketFile> {
+    pub fn connect<L>(
+        self,
+        locked: &mut Locked<L>,
+        current_task: &CurrentTask,
+        peer: SocketPeer,
+    ) -> Result<(), Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
+        security::check_socket_connect_access(current_task, self, &peer)?;
+        self.socket.ops.connect(&mut locked.cast_locked(), &self.socket, current_task, peer)
     }
 }

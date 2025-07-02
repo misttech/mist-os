@@ -16,6 +16,7 @@
 
 namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
+namespace fclkimpl = fuchsia_hardware_clockimpl;
 
 static const std::vector<fpbus::Mmio> clk_mmios{
     {{
@@ -46,25 +47,24 @@ zx_status_t Sherlock::ClkInit() {
   }
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  const fuchsia_hardware_clockimpl::ClockIdsMetadata kClockIdsMetadata{{
-      .clock_ids{{
-          // For Camera Sensor.
-          g12b_clk::G12B_CLK_CAM_INCK_24M,
+  const fuchsia_hardware_clockimpl::ClockIdsMetadata kClockIdsMetadata{
+      {.clock_nodes = std::vector<fuchsia_hardware_clockimpl::ClockNodeDescriptor>{
+           // For Camera Sensor.
+           fclkimpl::ClockNodeDescriptor{{.clock_id = g12b_clk::G12B_CLK_CAM_INCK_24M}},
 
-          // For cpu driver.
-          g12b_clk::G12B_CLK_SYS_PLL_DIV16,
-          g12b_clk::G12B_CLK_SYS_CPU_CLK_DIV16,
-          g12b_clk::G12B_CLK_SYS_PLLB_DIV16,
-          g12b_clk::G12B_CLK_SYS_CPUB_CLK_DIV16,
-          g12b_clk::CLK_SYS_CPU_BIG_CLK,
-          g12b_clk::CLK_SYS_CPU_LITTLE_CLK,
+           // For cpu driver.
+           fclkimpl::ClockNodeDescriptor{{.clock_id = g12b_clk::G12B_CLK_SYS_PLL_DIV16}},
+           fclkimpl::ClockNodeDescriptor{{.clock_id = g12b_clk::G12B_CLK_SYS_CPU_CLK_DIV16}},
+           fclkimpl::ClockNodeDescriptor{{.clock_id = g12b_clk::G12B_CLK_SYS_PLLB_DIV16}},
+           fclkimpl::ClockNodeDescriptor{{.clock_id = g12b_clk::G12B_CLK_SYS_CPUB_CLK_DIV16}},
+           fclkimpl::ClockNodeDescriptor{{.clock_id = g12b_clk::CLK_SYS_CPU_BIG_CLK}},
+           fclkimpl::ClockNodeDescriptor{{.clock_id = g12b_clk::CLK_SYS_CPU_LITTLE_CLK}},
 
-          // For video decoder/encoder
-          g12b_clk::G12B_CLK_DOS_GCLK_VDEC,
-          g12b_clk::G12B_CLK_DOS_GCLK_HCODEC,
-          g12b_clk::G12B_CLK_DOS,
-      }},
-  }};
+           // For video decoder/encoder
+           fclkimpl::ClockNodeDescriptor{{.clock_id = g12b_clk::G12B_CLK_DOS_GCLK_VDEC}},
+           fclkimpl::ClockNodeDescriptor{{.clock_id = g12b_clk::G12B_CLK_DOS_GCLK_HCODEC}},
+           fclkimpl::ClockNodeDescriptor{{.clock_id = g12b_clk::G12B_CLK_DOS}},
+       }}};
   const fit::result encoded_clock_ids_metadata = fidl::Persist(kClockIdsMetadata);
   if (!encoded_clock_ids_metadata.is_ok()) {
     zxlogf(ERROR, "Failed to encode clock ID's: %s",

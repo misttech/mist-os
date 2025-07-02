@@ -93,7 +93,6 @@ section.
 - Testing
 
   - [Driver testing][driver-testing-overview]
-  - [Mock DDK][mock-ddk]
 
 - Debugging
 
@@ -115,7 +114,6 @@ section.
   - [Device power management][device-power-management]
   - [Protocols in drivers][protocols-in-drivers]
   - [FIDL in drivers][fidl-in-drivers]
-  - [Banjo in drivers][banjo-in-drivers]
   - [Composite devices][composite-devices]
   - [Device firmware][device-firmware]
 
@@ -170,7 +168,6 @@ section.
 [lifecycle-of-a-usb-request]: driver_guides/usb/concepts/request-lifecycle.md
 [usb-mass-storage-driver]: driver_guides/usb/concepts/usb-mass-storage.md
 [driver-testing-overview]: testing/overview.md
-[mock-ddk]: testing/mock_ddk.md
 [driver-test-realm]: testing/driver_test_realm.md
 [threading-tips-in-tests]: testing/threading-tips-in-tests.md
 [using-inspect]: diagnostics/inspect.md
@@ -195,7 +192,6 @@ section.
 [protocols-in-drivers]: concepts/device_driver_model/protocol.md
 [platform-bus]: concepts/device_driver_model/platform-bus.md
 [fidl-in-drivers]: concepts/device_driver_model/fidl.md
-[banjo-in-drivers]: concepts/device_driver_model/banjo.md
 [composite-devices]: concepts/device_driver_model/composite.md
 [device-firmware]: concepts/device_driver_model/firmware.md
 [driver-architectures-overview]: concepts/driver_architectures/README.md

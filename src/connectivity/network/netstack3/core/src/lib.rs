@@ -11,7 +11,13 @@
 // In case we roll the toolchain and something we're using as a feature has been
 // stabilized.
 #![allow(stable_features)]
-#![warn(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
+#![warn(
+    missing_docs,
+    unreachable_patterns,
+    clippy::useless_conversion,
+    clippy::redundant_clone,
+    clippy::precedence
+)]
 
 // TODO(https://github.com/rust-lang-nursery/portability-wg/issues/11): remove
 // this module.
@@ -98,9 +104,9 @@ pub mod filter {
         Action, AddressMatcher, AddressMatcherType, FilterApi, FilterBindingsContext,
         FilterBindingsTypes, FilterIpExt, Hook, InterfaceMatcher, InterfaceProperties, IpPacket,
         IpRoutines, MarkAction, NatRoutines, PacketMatcher, PortMatcher, ProofOfEgressCheck,
-        Routine, Routines, Rule, SocketEgressFilterResult, SocketOpsFilter,
-        SocketOpsFilterBindingContext, TransparentProxy, TransportProtocolMatcher, Tuple,
-        UninstalledRoutine, ValidationError,
+        Routine, Routines, Rule, SocketEgressFilterResult, SocketIngressFilterResult,
+        SocketOpsFilter, SocketOpsFilterBindingContext, TransparentProxy, TransportProtocolMatcher,
+        Tuple, UninstalledRoutine, ValidationError,
     };
 }
 
@@ -188,7 +194,7 @@ pub mod socket {
 
     pub use netstack3_base::socket::{
         AddrIsMappedError, NotDualStackCapableError, SetDualStackEnabledError, ShutdownType,
-        SocketWritableListener, StrictlyZonedAddr,
+        SocketCookie, SocketWritableListener, StrictlyZonedAddr,
     };
 }
 
@@ -202,7 +208,8 @@ pub mod sync {
 
     pub use netstack3_base::sync::{
         DebugReferences, DynDebugReferences, LockGuard, MapRcNotifier, Mutex, PrimaryRc,
-        RcNotifier, RwLock, RwLockReadGuard, RwLockWriteGuard, StrongRc, WeakRc,
+        RcNotifier, ResourceToken, ResourceTokenValue, RwLock, RwLockReadGuard, RwLockWriteGuard,
+        StrongRc, WeakRc,
     };
     pub use netstack3_base::{RemoveResourceResult, RemoveResourceResultWithContext};
 }
@@ -244,11 +251,12 @@ pub use inspect::Inspector;
 pub use marker::{BindingsContext, BindingsTypes, CoreContext, IpBindingsContext, IpExt};
 pub use netstack3_base::{
     CtxPair, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TxMetadataBindingsTypes,
+    ReferenceNotifiers, RngContext, TimerBindingsTypes, TimerContext, TxMetadata,
+    TxMetadataBindingsTypes,
 };
 pub use state::{StackState, StackStateBuilder};
 pub use time::{AtomicInstant, Instant, TimerId};
-pub use transport::TxMetadata;
+pub use transport::CoreTxMetadata;
 
 // Re-export useful macros.
 pub use netstack3_device::for_any_device_id;

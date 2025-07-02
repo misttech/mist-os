@@ -44,6 +44,11 @@ group("per_test_timeout_allowlist") {
     "//src/storage/blackout/host/tests:*",
     "//src/storage/lib/paver/test:*",
     "//src/virtualization/tests:termina_container_tests_pkg_test_termina_container_tests_cmp",
+    "//third_party/antlion/tests/wlan/compliance:vape_interop_test",
+    "//third_party/antlion/tests/wlan/compliance:wlan_phy_compliance_abg_test",
+    "//third_party/antlion/tests/wlan/compliance:wlan_security_compliance_11a_test",
+    "//third_party/antlion/tests/wlan/compliance:wlan_security_compliance_11bg_test",
+    "//third_party/antlion/tests/wlan/functional:beacon_loss_test",
 
     # TODO(https://issues.fuchsia.dev/318529127): Shard syscall tests so that
     # we can remove the following line.

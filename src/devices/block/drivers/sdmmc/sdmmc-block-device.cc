@@ -56,8 +56,8 @@ zx::result<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion> GetBufferRegion(zx_h
 
 zx::result<fuchsia_hardware_power::ComponentPowerConfiguration> GetAllPowerConfigs(
     const fdf::Namespace& ns) {
-  zx::result open_result =
-      ns.Open<fuchsia_io::File>("/pkg/data/power_config.fidl", fuchsia_io::Flags::kPermReadBytes);
+  zx::result open_result = ns.Open<fuchsia_io::File>("/pkg/data/sdmmc_power_config.fidl",
+                                                     fuchsia_io::Flags::kPermReadBytes);
   if (!open_result.is_ok() || !open_result->is_valid()) {
     return zx::error(ZX_ERR_INTERNAL);
   }
@@ -163,13 +163,12 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
     return st;
   }
 
-  if (!is_sd_) {
+  if (!is_sd_ && parent_->config().storage_power_management_enabled()) {
     zx::result result = ConfigurePowerManagement();
 
     if (result.is_ok()) {
       FDF_LOGL(INFO, logger(), "Configured power management successfully.");
-    } else if (parent_->config().enable_suspend() &&
-               parent_->config().storage_power_management_enabled()) {
+    } else if (parent_->config().enable_suspend()) {
       // Only log and return error on a failed power configuration if enable_suspend and
       // storage_power_management_enabled were true.
       FDF_LOGL(ERROR, logger(), "Failed to configure power management: %s", result.status_string());
@@ -718,6 +717,31 @@ zx_status_t SdmmcBlockDevice::Flush() {
   return st;
 }
 
+zx_status_t SdmmcBlockDevice::Barrier() {
+  if (!cache_enabled_) {
+    return ZX_OK;
+  }
+
+  // TODO(https://fxbug.dev/42075502): Enable the cache and add barrier support for SD.
+  ZX_ASSERT(!is_sd_);
+
+  // If the device uses a FIFO cache policy, barriers do nothing so return early.
+  if (cache_flush_fifo_) {
+    return ZX_OK;
+  }
+
+  // If the device does not have barriers enabled, flush the device instead.
+  if (!barrier_enabled_) {
+    return Flush();
+  }
+
+  zx_status_t st = MmcDoSwitch(MMC_EXT_CSD_FLUSH_CACHE, MMC_EXT_CSD_BARRIER_MASK);
+  if (st != ZX_OK) {
+    FDF_LOGL(ERROR, logger(), "Failed to set a barrier: %s", zx_status_get_string(st));
+  }
+  return st;
+}
+
 zx_status_t SdmmcBlockDevice::Trim(const block_trim_t& txn, const EmmcPartition partition) {
   // TODO(b/312236221): Add trim support for SD.
   if (is_sd_) {
@@ -904,6 +928,11 @@ void SdmmcBlockDevice::Queue(BlockOperation txn) {
       }
       // MMC supports FUA writes, but not FUA reads. SD does not support FUA.
       if (btxn->command.flags & BLOCK_IO_FLAG_FORCE_ACCESS) {
+        BlockComplete(txn, ZX_ERR_NOT_SUPPORTED);
+        return;
+      }
+      // The legacy driver does not support barriers.
+      if (btxn->command.flags & BLOCK_IO_FLAG_PRE_BARRIER) {
         BlockComplete(txn, ZX_ERR_NOT_SUPPORTED);
         return;
       }
@@ -1130,15 +1159,20 @@ zx_status_t SdmmcBlockDevice::SuspendPower() {
     return status;
   }
 
-  if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/false); status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to (de-)SelectCard before sleep: %s",
-             zx_status_get_string(status));
-    return status;
-  }
+  if (vccq_off_with_controller_off_) {
+    // TODO(388815124): We can't use the sleep state in this case, send a power off notification
+    // instead.
+  } else {
+    if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/false); status != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "Failed to (de-)SelectCard before sleep: %s",
+               zx_status_get_string(status));
+      return status;
+    }
 
-  if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/true); status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to sleep: %s", zx_status_get_string(status));
-    return status;
+    if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/true); status != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "Failed to sleep: %s", zx_status_get_string(status));
+      return status;
+    }
   }
 
   trace_async_id_ = TRACE_NONCE();
@@ -1154,14 +1188,19 @@ zx_status_t SdmmcBlockDevice::ResumePower() {
     return ZX_OK;
   }
 
-  if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/false); status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to awake: %s", zx_status_get_string(status));
-    return status;
-  }
+  if (vccq_off_with_controller_off_) {
+    // TODO(388815124): Re-initialize the device.
+  } else {
+    if (zx_status_t status = sdmmc_->MmcSleepOrAwake(/*sleep=*/false); status != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "Failed to awake: %s", zx_status_get_string(status));
+      return status;
+    }
 
-  if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/true); status != ZX_OK) {
-    FDF_LOGL(ERROR, logger(), "Failed to SelectCard after awake: %s", zx_status_get_string(status));
-    return status;
+    if (zx_status_t status = sdmmc_->MmcSelectCard(/*select=*/true); status != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "Failed to SelectCard after awake: %s",
+               zx_status_get_string(status));
+      return status;
+    }
   }
 
   TRACE_ASYNC_END("sdmmc", "suspend", trace_async_id_);
@@ -1324,6 +1363,19 @@ void SdmmcBlockDevice::OnRequests(PartitionDevice& partition,
         read_packer.Push(request);
         break;
       case block_server::Operation::Tag::Write:
+        if (request.operation.write.options.is_pre_barrier()) {
+          TRACE_DURATION_BEGIN("sdmmc", "barrier");
+
+          if (status = Barrier(); status != ZX_OK) {
+            partition.SendReply(request.request_id, zx::make_result(status));
+          }
+          TRACE_DURATION_END("sdmmc", "barrier", "opcode",
+                             TA_INT32(static_cast<int32_t>(request.operation.tag)), "txn_status",
+                             TA_INT32(status));
+          if (status != ZX_OK) {
+            break;
+          }
+        }
         write_packer.Push(request);
         break;
 

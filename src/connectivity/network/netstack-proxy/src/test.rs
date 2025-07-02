@@ -46,9 +46,14 @@ async fn run_with_proxy_realm<
         })
     });
 
+    let version = match netstack_version {
+        fnet_migration::NetstackVersion::Netstack2 => "ns2",
+        fnet_migration::NetstackVersion::Netstack3 => "ns3",
+    };
+
     let realm = sandbox
         .create_realm(
-            "netstack-proxy",
+            format!("netstack-proxy_{version}"),
             [
                 fidl_fuchsia_netemul::ChildDef {
                     source: Some(fidl_fuchsia_netemul::ChildSource::Component(

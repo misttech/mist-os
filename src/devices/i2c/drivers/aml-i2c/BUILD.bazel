@@ -98,6 +98,7 @@ fuchsia_cc_test(
         "//sdk/lib/driver/compat/cpp:logging",
         "//src/devices/lib/amlogic",
         "//src/lib/ddk:ddk_metadata",
+        "//src/lib/testing/predicates",
         "@com_google_googletest//:gtest_main",
         "@fuchsia_sdk//fidl/fuchsia.hardware.i2c.businfo:fuchsia.hardware.i2c.businfo_cpp",
         "@fuchsia_sdk//fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",

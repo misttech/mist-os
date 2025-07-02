@@ -33,7 +33,8 @@ rustc_library("processing") {
 
   sources = [
     "src/digest.rs",
-    "src/kernel_statistics.rs",
+    "src/fkernel_serde.rs",
+    "src/fplugin_serde.rs",
     "src/lib.rs",
     "src/name.rs",
     "src/summary.rs",

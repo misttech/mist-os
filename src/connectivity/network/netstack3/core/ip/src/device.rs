@@ -48,7 +48,7 @@ use crate::internal::device::config::{
     IpDeviceConfigurationUpdate, Ipv4DeviceConfigurationUpdate, Ipv6DeviceConfigurationUpdate,
 };
 use crate::internal::device::dad::{
-    DadHandler, DadIncomingPacketResult, DadIpExt, DadTimerId, Ipv6PacketResultMetadata,
+    DadHandler, DadIncomingPacketResult, DadIpExt, DadTimerId, Ipv6PacketResultMetadata, NeedsDad,
 };
 use crate::internal::device::nud::NudIpHandler;
 use crate::internal::device::route_discovery::{
@@ -57,10 +57,10 @@ use crate::internal::device::route_discovery::{
 use crate::internal::device::router_solicitation::{RsHandler, RsTimerId};
 use crate::internal::device::slaac::{SlaacHandler, SlaacTimerId};
 use crate::internal::device::state::{
-    IpAddressData, IpDeviceConfiguration, IpDeviceFlags, IpDeviceState, IpDeviceStateBindingsTypes,
-    IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4DeviceConfiguration, Ipv4DeviceState, Ipv6AddrConfig,
-    Ipv6AddrManualConfig, Ipv6DeviceConfiguration, Ipv6DeviceState, Ipv6NetworkLearnedParameters,
-    Lifetime, PreferredLifetime, WeakAddressId,
+    IpAddressData, IpAddressFlags, IpDeviceConfiguration, IpDeviceFlags, IpDeviceState,
+    IpDeviceStateBindingsTypes, IpDeviceStateIpExt, Ipv4AddrConfig, Ipv4DeviceConfiguration,
+    Ipv4DeviceState, Ipv6AddrConfig, Ipv6AddrManualConfig, Ipv6DeviceConfiguration,
+    Ipv6DeviceState, Ipv6NetworkLearnedParameters, Lifetime, PreferredLifetime, WeakAddressId,
 };
 use crate::internal::gmp::igmp::{IgmpPacketHandler, IgmpTimerId};
 use crate::internal::gmp::mld::{MldPacketHandler, MldTimerId};
@@ -1173,20 +1173,22 @@ fn enable_ipv6_device_with_config<
         .with_address_ids(device_id, |addrs, _core_ctx| addrs.collect::<Vec<_>>())
         .into_iter()
         .for_each(|addr_id| {
-            let (state, start_dad) = DadHandler::initialize_duplicate_address_detection(
+            let needs_dad = DadHandler::initialize_duplicate_address_detection(
                 core_ctx,
                 bindings_ctx,
                 device_id,
                 &addr_id,
-            )
-            .into_address_state_and_start_dad();
-            bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
-                device: device_id.clone(),
-                addr: addr_id.addr().into(),
-                state,
-            });
-            if let Some(token) = start_dad {
-                core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+                |state| IpDeviceEvent::AddressStateChanged {
+                    device: device_id.clone(),
+                    addr: addr_id.addr().into(),
+                    state,
+                },
+            );
+            match needs_dad {
+                NeedsDad::Yes(token) => {
+                    core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+                }
+                NeedsDad::No => {}
             }
         });
 
@@ -1308,20 +1310,22 @@ fn enable_ipv4_device_with_config<
         .with_address_ids(device_id, |addrs, _core_ctx| addrs.collect::<Vec<_>>())
         .into_iter()
         .for_each(|addr_id| {
-            let (state, start_dad) = DadHandler::initialize_duplicate_address_detection(
+            let needs_dad = DadHandler::initialize_duplicate_address_detection(
                 core_ctx,
                 bindings_ctx,
                 device_id,
                 &addr_id,
-            )
-            .into_address_state_and_start_dad();
-            bindings_ctx.on_event(IpDeviceEvent::AddressStateChanged {
-                device: device_id.clone(),
-                addr: addr_id.addr().into(),
-                state,
-            });
-            if let Some(token) = start_dad {
-                core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+                |state| IpDeviceEvent::AddressStateChanged {
+                    device: device_id.clone(),
+                    addr: addr_id.addr().into(),
+                    state,
+                },
+            );
+            match needs_dad {
+                NeedsDad::Yes(token) => {
+                    core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+                }
+                NeedsDad::No => {}
             }
         })
 }
@@ -1546,30 +1550,42 @@ pub fn add_ip_addr_subnet_with_config<
     let ip_enabled =
         core_ctx.with_ip_device_flags(device_id, |IpDeviceFlags { ip_enabled }| *ip_enabled);
 
-    let (state, start_dad) = if ip_enabled {
+    let needs_dad = if ip_enabled {
         DadHandler::initialize_duplicate_address_detection(
             core_ctx,
             bindings_ctx,
             device_id,
             &addr_id,
+            |state| IpDeviceEvent::AddressAdded {
+                device: device_id.clone(),
+                addr: addr_sub.to_witness(),
+                state,
+                valid_until,
+                preferred_lifetime,
+            },
         )
-        .into_address_state_and_start_dad()
     } else {
         // NB: We don't start DAD if the device is disabled. DAD will be
         // performed when the device is enabled for all addresses.
-        (IpAddressState::Unavailable, None)
+        //
+        // Typically, the `AddressAdded` event would be dispatched by the DAD
+        // engine, but because we're not calling into the DAD engine we need
+        // to dispatch the event here.
+        bindings_ctx.on_event(IpDeviceEvent::AddressAdded {
+            device: device_id.clone(),
+            addr: addr_sub.to_witness(),
+            state: IpAddressState::Unavailable,
+            valid_until,
+            preferred_lifetime,
+        });
+        NeedsDad::No
     };
 
-    bindings_ctx.on_event(IpDeviceEvent::AddressAdded {
-        device: device_id.clone(),
-        addr: addr_sub.to_witness(),
-        state,
-        valid_until,
-        preferred_lifetime,
-    });
-
-    if let Some(token) = start_dad {
-        core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+    match needs_dad {
+        NeedsDad::Yes(token) => {
+            core_ctx.start_duplicate_address_detection(bindings_ctx, token);
+        }
+        NeedsDad::No => {}
     }
 
     Ok(addr_id)
@@ -1807,16 +1823,18 @@ pub fn clear_ipv6_device_state<
 
 /// Dispatches a received ARP packet (Request or Reply) to the IP layer.
 ///
-/// Returns the `IpAddressState` of `target_addr` on `device`.
+/// Returns whether the `target_addr` is assigned on the device.
 pub fn on_arp_packet<CC, BC>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     device_id: &CC::DeviceId,
     sender_addr: Ipv4Addr,
     target_addr: Ipv4Addr,
-) -> IpAddressState
+    is_arp_probe: bool,
+) -> bool
 where
-    CC: IpDeviceHandler<Ipv4, BC>,
+    CC: IpDeviceHandler<Ipv4, BC> + IpDeviceStateContext<Ipv4, BC>,
+    BC: IpDeviceStateBindingsTypes,
 {
     // As Per RFC 5227, section 2.1.1
     //   If [...] the host receives any ARP packet (Request *or* Reply) on the
@@ -1852,31 +1870,48 @@ where
         }
     }
 
+    let Some(target_addr) = SpecifiedAddr::new(target_addr) else {
+        return false;
+    };
+
     // As Per RFC 5227, section 2.1.1
     //  In addition, if during this period the host receives any ARP Probe
     //  where the packet's 'target IP address' is the address being probed
     //  for, [... ] then the host SHOULD similarly treat this as an address
     //  conflict.
-    let Some(target_addr) = SpecifiedAddr::new(target_addr) else {
-        return IpAddressState::Unavailable;
-    };
-    let target_addr_state = IpDeviceHandler::<Ipv4, _>::handle_received_dad_packet(
-        core_ctx,
-        bindings_ctx,
-        &device_id,
-        target_addr,
-        (),
-    );
-    match target_addr_state {
-        // Unlike the sender_addr, it's not concerning to receive an ARP
-        // packet whose target_addr is assigned to us.
-        IpAddressState::Assigned => {}
-        IpAddressState::Tentative => {
-            debug!("DAD received conflicting ARP packet for tentative addr=({sender_addr})");
-        }
-        IpAddressState::Unavailable => {}
+    if is_arp_probe {
+        let target_addr_state = IpDeviceHandler::<Ipv4, _>::handle_received_dad_packet(
+            core_ctx,
+            bindings_ctx,
+            &device_id,
+            target_addr,
+            (),
+        );
+        let assigned = match target_addr_state {
+            // Unlike the sender_addr, it's not concerning to receive an ARP
+            // packet whose target_addr is assigned to us.
+            IpAddressState::Assigned => true,
+            IpAddressState::Tentative => {
+                debug!("DAD received conflicting ARP packet for tentative addr=({sender_addr})");
+                false
+            }
+            IpAddressState::Unavailable => false,
+        };
+        assigned
+    } else {
+        // Otherwise, don't dispatch the probe to DAD. Instead just return the
+        // target address' assignment state.
+        let addr_id = match core_ctx.get_address_id(device_id, target_addr) {
+            Ok(o) => o,
+            Err(NotFoundError) => return false,
+        };
+
+        core_ctx.with_ip_address_data(
+            device_id,
+            &addr_id,
+            |IpAddressData { flags: IpAddressFlags { assigned }, config: _ }| *assigned,
+        )
     }
-    target_addr_state
 }
 
 #[cfg(any(test, feature = "testutils"))]

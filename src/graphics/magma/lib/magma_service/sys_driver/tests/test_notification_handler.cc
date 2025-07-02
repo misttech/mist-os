@@ -19,7 +19,7 @@ class TestMsdConnection : public MsdMockConnection {
  public:
   ~TestMsdConnection() override { *connection_torn_down_ = true; }
 
-  void SetNotificationCallback(msd::NotificationHandler* handler) override {
+  void MsdSetNotificationCallback(msd::NotificationHandler* handler) override {
     handler_ = handler;
     if (handler) {
       initialization_completion_->Signal();
@@ -56,7 +56,7 @@ class TestMsdDevice : public MsdMockDevice {
  public:
   explicit TestMsdDevice(std::unique_ptr<msd::Connection> connection)
       : connection_(std::move(connection)) {}
-  std::unique_ptr<msd::Connection> Open(msd_client_id_t client_id) override {
+  std::unique_ptr<msd::Connection> MsdOpen(msd_client_id_t client_id) override {
     return std::move(connection_);
   }
 

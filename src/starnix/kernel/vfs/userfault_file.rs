@@ -101,7 +101,7 @@ impl UserFaultFile {
 
     fn api_handshake<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         _current_task: &CurrentTask,
         request: uffdio_api,
     ) -> Result<uffdio_api, Errno>
@@ -140,7 +140,7 @@ impl FileOps for UserFaultFile {
     fileops_impl_noop_sync!();
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -152,7 +152,7 @@ impl FileOps for UserFaultFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -163,7 +163,7 @@ impl FileOps for UserFaultFile {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -173,7 +173,7 @@ impl FileOps for UserFaultFile {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _waiter: &Waiter,
@@ -186,7 +186,7 @@ impl FileOps for UserFaultFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -255,7 +255,7 @@ impl FileOps for UserFaultFile {
     // On closing, clear all the registrations pointing to this userfault object.
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) {

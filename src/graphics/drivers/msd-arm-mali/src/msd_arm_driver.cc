@@ -14,15 +14,15 @@ MsdArmDriver::MsdArmDriver() {
   root_node_ = inspector_.GetRoot().CreateChild("msd-arm-mali");
 }
 
-std::unique_ptr<MsdArmDriver> MsdArmDriver::Create() {
+std::unique_ptr<MsdArmDriver> MsdArmDriver::MsdCreate() {
   return std::unique_ptr<MsdArmDriver>(new MsdArmDriver());
 }
 
 void MsdArmDriver::Destroy(MsdArmDriver* drv) { delete drv; }
 
-std::optional<inspect::Inspector> MsdArmDriver::DuplicateInspector() { return inspector_; }
+std::optional<inspect::Inspector> MsdArmDriver::MsdDuplicateInspector() { return inspector_; }
 
-std::unique_ptr<msd::Device> MsdArmDriver::CreateDevice(msd::DeviceHandle* device_handle) {
+std::unique_ptr<msd::Device> MsdArmDriver::MsdCreateDevice(msd::DeviceHandle* device_handle) {
   bool start_device_thread = (configure_flags() & MSD_DRIVER_CONFIG_TEST_NO_DEVICE_THREAD) == 0;
 
   std::unique_ptr<MsdArmDevice> device =
@@ -32,15 +32,16 @@ std::unique_ptr<msd::Device> MsdArmDriver::CreateDevice(msd::DeviceHandle* devic
   return device;
 }
 
-std::unique_ptr<msd::Buffer> MsdArmDriver::ImportBuffer(zx::vmo vmo, uint64_t client_id) {
+std::unique_ptr<msd::Buffer> MsdArmDriver::MsdImportBuffer(zx::vmo vmo, uint64_t client_id) {
   auto buffer = MsdArmBuffer::Import(std::move(vmo), client_id);
   if (!buffer)
     return DRETP(nullptr, "MsdArmBuffer::Create failed");
   return std::make_unique<MsdArmAbiBuffer>(std::move(buffer));
 }
 
-magma_status_t MsdArmDriver::ImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
-                                             std::unique_ptr<msd::Semaphore>* semaphore_out) {
+magma_status_t MsdArmDriver::MsdImportSemaphore(zx::handle handle, uint64_t client_id,
+                                                uint64_t flags,
+                                                std::unique_ptr<msd::Semaphore>* semaphore_out) {
   auto semaphore = magma::PlatformSemaphore::Import(std::move(handle), flags);
   if (!semaphore)
     return DRET_MSG(MAGMA_STATUS_INVALID_ARGS, "couldn't import semaphore handle");
@@ -65,4 +66,4 @@ std::unique_ptr<MsdArmDevice> MsdArmDriver::CreateDeviceForTesting(
 }
 
 // static
-std::unique_ptr<msd::Driver> msd::Driver::Create() { return std::make_unique<MsdArmDriver>(); }
+std::unique_ptr<msd::Driver> msd::Driver::MsdCreate() { return std::make_unique<MsdArmDriver>(); }

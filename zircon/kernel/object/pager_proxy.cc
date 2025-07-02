@@ -94,7 +94,9 @@ void PagerProxy::QueuePacketLocked(PageRequest* request) {
     DEBUG_ASSERT(!add_overflow(offset, length, &unused));
 
     // Trace flow events require an enclosing duration.
-    VM_KTRACE_DURATION(1, "page_request_queue", ("offset", offset), ("length", length));
+    VM_KTRACE_DURATION(1, "page_request_queue", ("vmo_id", GetRequestVmoId(request)),
+                       ("offset", offset), ("length", length),
+                       ("type", GetRequestType(request) == ZX_PAGER_VMO_READ ? "Read" : "Dirty"));
     VM_KTRACE_FLOW_BEGIN(1, "page_request_queue", reinterpret_cast<uintptr_t>(&packet_));
   } else {
     offset = length = 0;
@@ -125,10 +127,12 @@ void PagerProxy::ClearAsyncRequest(PageRequest* request) {
       // Trace flow events require an enclosing duration.
       VM_KTRACE_DURATION(
           1, "page_request_queue",
-          ("request offset",
-           KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestOffset(active_request_))),
-          ("request len",
-           KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestLen(active_request_))));
+          ("vmo_id", KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestVmoId(active_request_))),
+          ("offset", KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestOffset(active_request_))),
+          ("length", KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestLen(active_request_))),
+          ("type", KTRACE_ANNOTATED_VALUE(
+                       AssertHeld(mtx_),
+                       GetRequestType(active_request_) == ZX_PAGER_VMO_READ ? "Read" : "Dirty")));
       VM_KTRACE_FLOW_END(1, "page_request_queue", reinterpret_cast<uintptr_t>(&packet_));
     }
     // This request is being taken back by the PageSource, so we can't hold a reference to it
@@ -254,10 +258,12 @@ void PagerProxy::Free(PortPacket* packet) {
       // Trace flow events require an enclosing duration.
       VM_KTRACE_DURATION(
           1, "page_request_queue",
-          ("request offset",
-           KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestOffset(active_request_))),
-          ("request len",
-           KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestLen(active_request_))));
+          ("vmo_id", KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestVmoId(active_request_))),
+          ("offset", KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestOffset(active_request_))),
+          ("length", KTRACE_ANNOTATED_VALUE(AssertHeld(mtx_), GetRequestLen(active_request_))),
+          ("type", KTRACE_ANNOTATED_VALUE(
+                       AssertHeld(mtx_),
+                       GetRequestType(active_request_) == ZX_PAGER_VMO_READ ? "Read" : "Dirty")));
       VM_KTRACE_FLOW_END(1, "page_request_queue", reinterpret_cast<uintptr_t>(packet));
       active_request_ = nullptr;
     }

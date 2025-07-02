@@ -5,17 +5,6 @@
 #ifndef LIB_STDCOMPAT_TUPLE_H_
 #define LIB_STDCOMPAT_TUPLE_H_
 
-#include <cstddef>
 #include <tuple>
-
-#include "functional.h"
-
-namespace cpp17 {
-
-using std::tuple_size_v;
-
-using std::apply;
-
-}  // namespace cpp17
 
 #endif  // LIB_STDCOMPAT_TUPLE_H_

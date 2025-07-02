@@ -31,7 +31,7 @@ impl SysRqNode {
 impl FsNodeOps for SysRqNode {
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -41,7 +41,7 @@ impl FsNodeOps for SysRqNode {
 
     fn mknod(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -54,7 +54,7 @@ impl FsNodeOps for SysRqNode {
 
     fn mkdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -66,7 +66,7 @@ impl FsNodeOps for SysRqNode {
 
     fn create_symlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -78,7 +78,7 @@ impl FsNodeOps for SysRqNode {
 
     fn unlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -89,7 +89,7 @@ impl FsNodeOps for SysRqNode {
 
     fn truncate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         _node: &FsNode,
         _current_task: &CurrentTask,
@@ -111,7 +111,7 @@ impl FileOps for SysRqFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -122,7 +122,7 @@ impl FileOps for SysRqFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
@@ -223,7 +223,7 @@ impl FileOps for SysRqFile {
 
     fn seek(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _current_offset: off_t,

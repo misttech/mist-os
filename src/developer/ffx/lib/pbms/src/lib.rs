@@ -30,7 +30,7 @@ use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 // Re-export for convenience.
-pub use sdk_metadata::{LoadedProductBundle, ProductBundle};
+pub use product_bundle::{LoadedProductBundle, ProductBundle};
 
 mod gcs;
 mod pbms;

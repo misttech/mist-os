@@ -1216,6 +1216,17 @@ impl From<fidl::Channel> for UnknownInteractionsAjarProtocolSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for UnknownInteractionsAjarProtocolSynchronousProxy {
+    type Protocol = UnknownInteractionsAjarProtocolMarker;
+
+    fn from_client(
+        value: fidl::endpoints::ClientEnd<UnknownInteractionsAjarProtocolMarker>,
+    ) -> Self {
+        Self::new(value.into_channel())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct UnknownInteractionsAjarProtocolProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -4009,6 +4020,17 @@ impl From<UnknownInteractionsClosedProtocolSynchronousProxy> for zx::Handle {
 impl From<fidl::Channel> for UnknownInteractionsClosedProtocolSynchronousProxy {
     fn from(value: fidl::Channel) -> Self {
         Self::new(value)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for UnknownInteractionsClosedProtocolSynchronousProxy {
+    type Protocol = UnknownInteractionsClosedProtocolMarker;
+
+    fn from_client(
+        value: fidl::endpoints::ClientEnd<UnknownInteractionsClosedProtocolMarker>,
+    ) -> Self {
+        Self::new(value.into_channel())
     }
 }
 
@@ -7609,6 +7631,15 @@ impl From<UnknownInteractionsProtocolSynchronousProxy> for zx::Handle {
 impl From<fidl::Channel> for UnknownInteractionsProtocolSynchronousProxy {
     fn from(value: fidl::Channel) -> Self {
         Self::new(value)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for UnknownInteractionsProtocolSynchronousProxy {
+    type Protocol = UnknownInteractionsProtocolMarker;
+
+    fn from_client(value: fidl::endpoints::ClientEnd<UnknownInteractionsProtocolMarker>) -> Self {
+        Self::new(value.into_channel())
     }
 }
 

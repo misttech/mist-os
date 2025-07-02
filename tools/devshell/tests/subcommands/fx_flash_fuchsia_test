@@ -28,11 +28,6 @@ BT_SET_UP() {
   fx="$(btf::setup_fx)"
   fx-config-read
   ffx="$(btf::make_installed_hosttools_mock ffx)"
-  flash_script="${BT_TEMP_DIR}/out/default/flash.sh"
-  flash_manifest="${BT_TEMP_DIR}/out/default/flash.json"
-
-  btf::make_mock "$flash_script"
-  btf::make_mock "$flash_manifest"
   btf::make_mock "${BT_TEMP_DIR}/tools/devshell/get-flash-source"
   btf::make_mock "${BT_TEMP_DIR}/tools/devshell/host-tool"
 
@@ -65,40 +60,6 @@ EOF
 
 }
 
-TEST_fx_flash_ssh() {
-  cat >"${fastboot_mock}.mock_side_effects" <<INPUT
-if [[ "\$1" == "devices" ]]; then
-  echo "97300YCABZZ5AA	fastboot"
-  echo " "
-fi
-INPUT
-  cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$7" == "ssh.pub" ]]; then
-  echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-fi
-INPUT
-  BT_EXPECT ${fx} --enable=legacy_fastboot flash --no-build
-  source "${flash_script}.mock_state"
-  BT_EXPECT [[ "${BT_MOCK_ARGS[1]}" == "--ssh-key="*".ssh/fuchsia_authorized_keys" ]]
-}
-
-TEST_fx_flash_ssh_with_ffx() {
-  cat >"${fastboot_mock}.mock_side_effects" <<INPUT
-if [[ "\$1" == "devices" ]]; then
-  echo "97300YCABZZ5AA	fastboot"
-  echo " "
-fi
-INPUT
-  cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$7" == "ssh.pub" ]]; then
-  echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-fi
-INPUT
-
-  BT_EXPECT ${fx} flash --no-build
-  btf::expect-mock-args "${ffx}.mock_state.7" "ffx" "--config" "fuchsia.analytics.ffx_invoker=fx" "target" "flash" "--manifest" "${BT_TEMP_DIR}/out/default/flash.json" "--authorized-keys" "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-}
-
 TEST_fx_flash_ssh_with_ffx_product_bundle() {
   cat >"${fastboot_mock}.mock_side_effects" <<INPUT
 if [[ "\$1" == "devices" ]]; then
@@ -119,78 +80,6 @@ INPUT
 
   BT_EXPECT ${fx} flash --no-build
   btf::expect-mock-args "${ffx}.mock_state.7" "ffx" "--config" "fuchsia.analytics.ffx_invoker=fx" "target" "flash" "--product-bundle" "${BT_TEMP_DIR}/out/default/obj/build/images/fuchsia/product_bundle" "--authorized-keys" "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-}
-
-TEST_fx_flash_with_serial() {
-  cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$7" == "ssh.pub" ]]; then
-  echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-fi
-INPUT
-  BT_EXPECT ${fx} --enable=legacy_fastboot flash -s 12345
-  source "${flash_script}.mock_state"
-  btf::expect-mock-args "${flash_script}" \
-    "--ssh-key=${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys" \
-    -s 12345
-}
-
-TEST_fx_flash_with_serial_with_ffx() {
-  cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$7" == "ssh.pub" ]]; then
-  echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-fi
-INPUT
- BT_EXPECT ${fx} flash -s 12345
- btf::expect-mock-args "${ffx}.mock_state.7" "ffx" "--config" "fuchsia.analytics.ffx_invoker=fx" -t 12345 "target" "flash" "--manifest" "${BT_TEMP_DIR}/out/default/flash.json" "--authorized-keys" "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-}
-
-TEST_fx_flash_with_discoverable_default_device_with_ffx() {
-  cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$4" == "list" ]]; then
-  echo "default-device 1:2:3:4::8"
-elif [[ "\$4" == "default" ]]; then
-  echo "default-device"
-elif [[ "\$7" == "ssh.pub" ]]; then
-  echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-fi
-INPUT
-  BT_EXPECT ${fx} flash
-  btf::expect-mock-args "${ffx}.mock_state.8" "ffx" "--config" "fuchsia.analytics.ffx_invoker=fx" "target" "flash" "--manifest" "${BT_TEMP_DIR}/out/default/flash.json" "--authorized-keys" "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-}
-
-TEST_fx_flash_with_undiscoverable_default_device_with_ffx() {
-  cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$4" == "list" ]]; then
-  echo "some-other-device 4:3:2:1::2"
-elif [[ "\$4" == "default" ]]; then
-  echo "default-device"
-elif [[ "\$7" == "ssh.pub" ]]; then
-  echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-fi
-INPUT
-
-  BT_EXPECT ${fx} flash
-  btf::expect-mock-args "${ffx}.mock_state.8" "ffx" "--config" "fuchsia.analytics.ffx_invoker=fx" "-c" "target.default=" "target" "flash" "--manifest" "${BT_TEMP_DIR}/out/default/flash.json" "--authorized-keys" "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-}
-
-TEST_fx_flash_skip_verify_with_ffx() {
-   cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$7" == "ssh.pub" ]]; then
-  echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-fi
-INPUT
-  BT_EXPECT ${fx} flash --skip-verify
-  btf::expect-mock-args "${ffx}.mock_state.7" "ffx" "--config" "fuchsia.analytics.ffx_invoker=fx" "target" "flash" "--manifest" "${BT_TEMP_DIR}/out/default/flash.json" "--authorized-keys" "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys" "--skip-verify"
-}
-
-TEST_fx_flash_no_bootloader_reboot_with_ffx() {
-   cat >"${ffx}.mock_side_effects" <<INPUT
-if [[ "\$7" == "ssh.pub" ]]; then
-  echo  "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys"
-fi
-INPUT
-  BT_EXPECT ${fx} flash --no-bootloader-reboot
-  btf::expect-mock-args "${ffx}.mock_state.7" "ffx" "--config" "fuchsia.analytics.ffx_invoker=fx" "target" "flash" "--manifest" "${BT_TEMP_DIR}/out/default/flash.json" "--authorized-keys" "${BT_TEMP_DIR}/.ssh/fuchsia_authorized_keys" "--no-bootloader-reboot"
 }
 
 BT_RUN_TESTS "$@"

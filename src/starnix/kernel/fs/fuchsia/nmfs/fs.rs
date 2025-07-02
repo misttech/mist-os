@@ -8,9 +8,10 @@
 
 use crate::task::{CurrentTask, Kernel};
 use crate::vfs::fs_args::parse;
+use crate::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
 use crate::vfs::{
-    BytesFile, BytesFileOps, CacheMode, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
+    CacheMode, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode,
+    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
 };
 use serde::{Deserialize, Serialize};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
@@ -57,9 +58,8 @@ impl FuchsiaNetworkMonitorFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, FuchsiaNetworkMonitorFs, options)?;
-
-        let node = FsNode::new_root(NetworkDirectoryNode::new());
-        fs.set_root_node(node);
+        let root_ino = fs.allocate_ino();
+        fs.create_root(root_ino, NetworkDirectoryNode::new());
         Ok(fs)
     }
 }
@@ -70,7 +70,7 @@ const FUCHSIA_NETWORK_MONITOR_FS_MAGIC: u32 = u32::from_be_bytes(*b"nmfs");
 impl FileSystemOps for FuchsiaNetworkMonitorFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -83,7 +83,7 @@ impl FileSystemOps for FuchsiaNetworkMonitorFs {
 }
 
 pub fn fuchsia_network_monitor_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -111,7 +111,7 @@ impl NetworkDirectoryNode {
 impl FsNodeOps for NetworkDirectoryNode {
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -121,7 +121,7 @@ impl FsNodeOps for NetworkDirectoryNode {
 
     fn mkdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,
@@ -133,7 +133,7 @@ impl FsNodeOps for NetworkDirectoryNode {
 
     fn mknod(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -159,18 +159,16 @@ impl FsNodeOps for NetworkDirectoryNode {
             Box::new(NetworkFile::new_node(id))
         };
 
-        let child = node.fs().create_node(
-            current_task,
-            ops,
-            FsNodeInfo::new_factory(mode, current_task.as_fscred()),
-        );
+        let child = node
+            .fs()
+            .create_node_and_allocate_node_id(ops, FsNodeInfo::new(mode, current_task.as_fscred()));
 
         Ok(child)
     }
 
     fn unlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -194,7 +192,7 @@ impl FsNodeOps for NetworkDirectoryNode {
 
     fn create_symlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _name: &FsStr,

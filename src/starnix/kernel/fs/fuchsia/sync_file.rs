@@ -84,7 +84,7 @@ struct FenceState {
 }
 
 impl SyncFile {
-    const SIGNALS: zx::Signals = zx::Signals::COUNTER_SIGNALED.union(zx::Signals::USER_0);
+    const SIGNALS: zx::Signals = zx::Signals::COUNTER_SIGNALED;
 
     pub fn new(name: [u8; 32], fence: SyncFence) -> SyncFile {
         SyncFile { name, fence }
@@ -128,7 +128,7 @@ impl FileOps for SyncFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -278,7 +278,7 @@ impl FileOps for SyncFile {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -342,7 +342,7 @@ impl FileOps for SyncFile {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -359,7 +359,7 @@ impl FileOps for SyncFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -370,7 +370,7 @@ impl FileOps for SyncFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

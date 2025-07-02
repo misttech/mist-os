@@ -16,7 +16,7 @@ assert(!bootfs_only)
 
 if (!use_bazel_images_only) {
   _assembly_manifest =
-      "$root_build_dir/obj/build/images/fuchsia/fuchsia/images.json"
+      "$root_build_dir/obj/build/images/fuchsia/fuchsia/assembled_system.json"
 
   ffx_action("run_product_size_checker") {
     inputs = [ _assembly_manifest ]

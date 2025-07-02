@@ -556,3 +556,5 @@ toc:
     path: /docs/contribute/governance/rfcs/0269_measuring_memory_stalls.md
   - title: "RFC-0270: Zircon Virtual Interrupt Signals"
     path: /docs/contribute/governance/rfcs/0270_zircon_virtual_interrupt_signals.md
+  - title: "RFC-0271: Anchored Packages"
+    path: /docs/contribute/governance/rfcs/0271_anchored_packages.md

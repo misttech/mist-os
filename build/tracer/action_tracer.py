@@ -98,17 +98,17 @@ class ToolCommand(object):
         return _find_first_index(self.tokens, lambda x: "=" not in x)
 
     @property
-    def env_tokens(self):
+    def env_tokens(self) -> Sequence[str]:
         """Returns the environment overrides (X=Y) of a shell command."""
         return self.tokens[: self._tool_index]
 
     @property
-    def tool(self):
+    def tool(self) -> str:
         """Returns the tool/script of the command."""
         return self.tokens[self._tool_index]
 
     @property
-    def args(self):
+    def args(self) -> Sequence[str]:
         """Returns all options and arguments after the tool of the command."""
         return self.tokens[self._tool_index + 1 :]
 
@@ -141,7 +141,7 @@ class FSAccess(object):
     # TODO(fangism): for diagnostic purposes, we may want a copy of the fsatrace
     # line from which this access came.
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"({self.op} {self.path})"
 
     def should_check(
@@ -185,15 +185,15 @@ class FSAccess(object):
 
 
 # Factory functions for making FSAccess objects.
-def Read(path: str):
+def Read(path: str) -> FSAccess:
     return FSAccess(FileAccessType.READ, path)
 
 
-def Write(path: str):
+def Write(path: str) -> FSAccess:
     return FSAccess(FileAccessType.WRITE, path)
 
 
-def Delete(path: str):
+def Delete(path: str) -> FSAccess:
     return FSAccess(FileAccessType.DELETE, path)
 
 
@@ -257,7 +257,7 @@ class AccessConstraints(object):
     # TODO(fangism): forbidden_deletes should probably include declared inputs
 
     @property
-    def inputs(self):
+    def inputs(self) -> FrozenSet[str]:
         # allowed_reads includes allowed_writes (and required_writes), so consider
         # "inputs" as their set-difference.
         return self.allowed_reads - self.allowed_writes - self.required_writes
@@ -397,7 +397,7 @@ class Action(object):
     parsed_depfile: Optional[DepFile] = None
 
     def access_constraints(
-        self, writeable_depfile_inputs=False
+        self, writeable_depfile_inputs: bool = False
     ) -> AccessConstraints:
         """Build AccessConstraints from action attributes."""
         # Action is required to write outputs and depfile, if provided.
@@ -440,7 +440,7 @@ class Action(object):
         )
 
 
-def _sorted_join(elements: Iterable[str], joiner: str):
+def _sorted_join(elements: Iterable[str], joiner: str) -> str:
     return joiner.join(sorted(elements))
 
 
@@ -451,10 +451,10 @@ class FSAccessSet(object):
     deletes: FrozenSet[str] = dataclasses.field(default_factory=set)
 
     @property
-    def all_accesses(self):
+    def all_accesses(self) -> FrozenSet[str]:
         return self.reads | self.writes | self.deletes
 
-    def __str__(self):
+    def __str__(self) -> str:
         if not self.all_accesses:
             return "[empty accesses]"
         text = ""
@@ -587,10 +587,10 @@ class StalenessDiagnostics(object):
     stale_outputs: FrozenSet[str] = dataclasses.field(default_factory=set)
 
     @property
-    def has_findings(self):
+    def has_findings(self) -> FrozenSet[str]:
         return self.nonexistent_outputs or self.stale_outputs
 
-    def print_findings(self, stream: TextIO):
+    def print_findings(self, stream: TextIO) -> None:
         """Prints human-readable diagnostics.
 
         Args:
@@ -860,7 +860,7 @@ def detect_all_dirs(paths: Iterable[str]) -> AbstractSet[str]:
     return dirs
 
 
-def main():
+def main() -> int:
     parser = main_arg_parser()
     args = parser.parse_args()
 
@@ -869,30 +869,6 @@ def main():
     # Unwrap certain command wrapper scripts.
     while is_known_wrapper(command):
         command = command.unwrap()
-
-    # Identify the intended tool from the original command.
-    tool = get_intended_tool(command)
-
-    # Tools with known issues
-    ignored_tools = {
-        # Because the clippy linter is effectively the same as the rust compiler,
-        # and we don't enforce hemeticity on rustc, we also exempt clippy.
-        "clippy_wrapper.sh",
-        # rustdoc writes and reads from an arbitrary tree of files.
-        "rustdoc_wrapper.py",
-        "copy_crimes.sh",
-        # When recursively copying a directory, shutil.copy_tree first recursively
-        # deletes the old files. It has to read directories to delete all the files
-        # in them, and those files arent listed in the generated depfile.
-        "copy_tree.py",
-        # fsatrace hangs on Go binaries, so avoid wrapping Go binaries with it.
-        # See https://fxbug.dev/402649338.
-        "bazel2gn",
-    }
-    # Skip tracing for ignored scripts, making it possible to skip binaries that
-    # are incompatible with fsatrace. For example: https://fxbug.dev/402649338.
-    if os.path.basename(tool) in ignored_tools:
-        return subprocess.call(command.tokens)
 
     # Ensure trace_output directory exists
     trace_output_dir = os.path.dirname(args.trace_output)

@@ -7,8 +7,6 @@
 
 #include <fidl/fuchsia.hardware.powersource.test/cpp/fidl.h>
 
-#include "fidl/fuchsia.hardware.powersource.test/cpp/natural_types.h"
-
 namespace fake_powersource {
 
 class PowerSourceProtocolServer;

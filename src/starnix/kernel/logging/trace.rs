@@ -91,19 +91,18 @@ macro_rules! firehose_trace_instant {
 #[macro_export]
 macro_rules! trace_duration {
     ($category:expr, $name:expr $(, $key:expr => $val:expr)*) => {
-        let _args = if $crate::regular_tracing_enabled() {
-            Some([$($crate::__fuchsia_trace::ArgValue::of($key, $val)),*])
-        } else {
+        let mut args;
+        let _scope = if !$crate::regular_tracing_enabled() {
             None
-        };
-        let _scope = if $crate::regular_tracing_enabled() {
-            Some($crate::__fuchsia_trace::duration(
-                $category,
-                $name,
-                _args.as_ref().unwrap()
-            ))
         } else {
-            None
+            static CACHE: $crate::__fuchsia_trace::trace_site_t = $crate::__fuchsia_trace::trace_site_t::new(0);
+            if let Some(_context) =
+                    $crate::__fuchsia_trace::TraceCategoryContext::acquire_cached($category, &CACHE) {
+                args = [$($crate::__fuchsia_trace::ArgValue::of($key, $val)),*];
+                Some($crate::__fuchsia_trace::duration($category, $name, &args))
+            } else {
+                None
+            }
         };
     }
 }
@@ -187,8 +186,8 @@ macro_rules! trace_flow_end {
 macro_rules! trace_instaflow_begin {
     (
         $category:expr,
-        $event_name:expr,
         $flow_name:expr,
+        $step_name:expr,
         $flow_id:expr
         $(, $key:expr => $val:expr)*
     ) => {
@@ -196,8 +195,8 @@ macro_rules! trace_instaflow_begin {
         if $crate::regular_tracing_enabled() {
             $crate::__fuchsia_trace::instaflow_begin!(
                 $category,
-                $event_name,
                 $flow_name,
+                $step_name,
                 _flow_id
                 $(, $key => $val)*
             );
@@ -209,8 +208,8 @@ macro_rules! trace_instaflow_begin {
 macro_rules! trace_instaflow_end {
     (
         $category:expr,
-        $event_name:expr,
         $flow_name:expr,
+        $step_name:expr,
         $flow_id:expr
         $(, $key:expr => $val:expr)*
     ) => {
@@ -218,8 +217,8 @@ macro_rules! trace_instaflow_end {
         if $crate::regular_tracing_enabled() {
             $crate::__fuchsia_trace::instaflow_end!(
                 $category,
-                $event_name,
                 $flow_name,
+                $step_name,
                 _flow_id
                 $(, $key => $val)*
             );
@@ -231,8 +230,8 @@ macro_rules! trace_instaflow_end {
 macro_rules! trace_instaflow_step {
     (
         $category:expr,
-        $event_name:expr,
         $flow_name:expr,
+        $step_name:expr,
         $flow_id:expr
         $(, $key:expr => $val:expr)*
     ) => {
@@ -240,8 +239,8 @@ macro_rules! trace_instaflow_step {
         if $crate::regular_tracing_enabled() {
             $crate::__fuchsia_trace::instaflow_step!(
                 $category,
-                $event_name,
                 $flow_name,
+                $step_name,
                 _flow_id
                 $(, $key => $val)*
             );

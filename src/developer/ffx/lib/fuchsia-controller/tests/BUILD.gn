@@ -23,13 +23,6 @@ host_test_data("fuchsia_controller_host_test_data") {
   ]
 }
 
-host_test_data("core_sdk_host_test_data") {
-  _sdk_label = "//sdk:exported_idk_for_ffx_tests($default_toolchain)"
-  sources = [ get_label_info(":anything($default_toolchain)", "root_out_dir") +
-              "/sdk/exported/core" ]
-  deps = [ _sdk_label ]
-}
-
 group("fuchsia_controller_test_data") {
   # Needed for SDK inclusion
   testonly = false
@@ -97,10 +90,7 @@ python_host_test("fuchsia_controller_e2e_test") {
     "//src/developer/ffx/lib/fuchsia-controller:fidl_bindings",
     "//src/developer/ffx/lib/fuchsia-controller:fuchsia_controller_py",
   ]
-  test_data_deps = [
-    ":core_sdk_host_test_data",
-    ":fuchsia_controller_test_data",
-  ]
+  test_data_deps = [ ":fuchsia_controller_test_data" ]
 }
 
 python_host_test("fuchsia_controller_fidl_channel_test") {

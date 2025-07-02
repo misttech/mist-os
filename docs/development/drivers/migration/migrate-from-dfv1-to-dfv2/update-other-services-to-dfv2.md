@@ -495,7 +495,6 @@ All the **source code files** mentioned in this section:
 
 All the **documentation pages** mentioned in this section:
 
-- [Banjo][banjo]
 - [Drivers and nodes][driver-node]
 - [Driver communication][driver-communication]
 - [Drivers and nodes][driver-node]
@@ -515,7 +514,6 @@ All the **documentation pages** mentioned in this section:
 <!-- Reference links -->
 
 [migrate-from-banjo-to-fidl]: /docs/development/drivers/migration/migrate-from-banjo-to-fidl/overview.md
-[banjo]: /docs/development/drivers/concepts/device_driver_model/banjo.md
 [driver-dispatcher]: /docs/concepts/drivers/driver-dispatcher-and-threads.md
 [driver-node]: /docs/concepts/drivers/drivers_and_nodes.md
 [fake-pdev-h]: https://cs.opensource.google/fuchsia/fuchsia/+/main:src/devices/bus/testing/fake-pdev/fake-pdev.h

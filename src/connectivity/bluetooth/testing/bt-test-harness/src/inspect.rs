@@ -4,7 +4,7 @@
 
 use anyhow::{Context, Error};
 use diagnostics_reader::{ArchiveReader, ComponentSelector, DiagnosticsHierarchy};
-use fidl_fuchsia_bluetooth_sys::{AccessMarker, AccessProxy};
+use fidl_fuchsia_bluetooth_sys::AccessProxy;
 use fuchsia_async::DurationExt;
 use fuchsia_bluetooth::expectation::asynchronous::{
     expectable, Expectable, ExpectableExt, ExpectableState, ExpectableStateExt,
@@ -112,7 +112,7 @@ impl TestHarness for InspectHarness {
 
             let access_proxy = realm
                 .instance()
-                .connect_to_protocol_at_exposed_dir::<AccessMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .context("Failed to connect to Access service")?;
             let state = InspectState {
                 moniker_to_track: Vec::new(),

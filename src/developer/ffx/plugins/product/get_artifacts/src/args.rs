@@ -5,7 +5,7 @@
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_core::ffx_command;
-use sdk_metadata::Type;
+use product_bundle::Type;
 
 /// Get the paths of a group of artifacts inside a Product Bundle.
 #[ffx_command()]

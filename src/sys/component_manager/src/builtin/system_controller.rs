@@ -106,7 +106,7 @@ async fn num_still_running(root: &Arc<ComponentInstance>) -> usize {
     ctr
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::model::testing::test_helpers::{

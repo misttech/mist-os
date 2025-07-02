@@ -40,7 +40,7 @@ directly to each other.
 
 ## Banjo vs. FIDL {:#banjo-vs-fidl}
 
-In DFv1, drivers speak [Banjo][banjo] to each other. To get the Banjo protocol, a
+In DFv1, drivers speak Banjo to each other. To get the Banjo protocol, a
 driver requests it from its bound device.
 
 In DFv2, drivers speak [FIDL][fidl] to each other, like any other component in a
@@ -54,6 +54,5 @@ Fuchsia system. A driver gets a FIDL channel from its incoming component namespa
 [device-driver-lifecycle]: /docs/development/drivers/concepts/device_driver_model/device-lifecycle.md
 [driver-services]: /docs/concepts/drivers/driver_communication.md
 [components]: /docs/concepts/components/v2/README.md
-[banjo]: /docs/development/drivers/concepts/device_driver_model/banjo.md
 [fidl]: /docs/concepts/fidl/overview.md
 

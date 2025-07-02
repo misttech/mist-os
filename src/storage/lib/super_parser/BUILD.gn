@@ -9,6 +9,7 @@ import("//build/rust/rustc_test.gni")
 lib_srcs = [
   "src/lib.rs",
   "src/format.rs",
+  "src/metadata.rs",
 ]
 
 lib_deps = [

@@ -12,7 +12,7 @@ use fidl_fuchsia_component::{self as fcomponent, RealmMarker};
 use fidl_fuchsia_fs::AdminMarker;
 use fidl_fuchsia_fs_startup::{CheckOptions, CreateOptions, MountOptions, StartupMarker};
 use fidl_fuchsia_hardware_block_volume::VolumeMarker;
-use fuchsia_component::client::{
+use fuchsia_component_client::{
     connect_to_named_protocol_at_dir_root, connect_to_protocol, connect_to_protocol_at_dir_root,
     connect_to_protocol_at_dir_svc, open_childs_exposed_directory,
 };
@@ -285,7 +285,7 @@ impl Filesystem {
         let exposed_dir = self.get_component_exposed_dir().await?;
         let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
         proxy
-            .start(self.block_connector.connect_block()?, start_options)
+            .start(self.block_connector.connect_block()?, &start_options)
             .await?
             .map_err(Status::from_raw)?;
 
@@ -323,7 +323,7 @@ impl Filesystem {
         let exposed_dir = self.get_component_exposed_dir().await?;
         let proxy = connect_to_protocol_at_dir_root::<StartupMarker>(&exposed_dir)?;
         proxy
-            .start(self.block_connector.connect_block()?, self.config.options().start_options)
+            .start(self.block_connector.connect_block()?, &self.config.options().start_options)
             .await?
             .map_err(Status::from_raw)?;
 

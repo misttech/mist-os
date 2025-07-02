@@ -55,8 +55,7 @@
             "host_x64/ffx",
             "images.json",
             "product_bundle/zbi",
-            "product_bundles.json",
-            "sdk/manifest/core"
+            "product_bundles.json"
         ],
         "timeout_secs": 604,
         "summary": {
@@ -76,6 +75,14 @@
                 "subdir": "edk2"
             }
         ],
+        "bot_dimensions": {
+            "cores": "8",
+            "cpu": "x64",
+            "gce": "1",
+            "kvm": "1",
+            "os": "Debian",
+            "pool": ""
+        },
         "build_metadata": {}
     },
     {
@@ -134,8 +141,7 @@
             "host_x64/ffx",
             "images.json",
             "product_bundle/zbi",
-            "product_bundles.json",
-            "sdk/manifest/core"
+            "product_bundles.json"
         ],
         "timeout_secs": 604,
         "summary": {
@@ -155,6 +161,14 @@
                 "subdir": "edk2"
             }
         ],
+        "bot_dimensions": {
+            "cores": "8",
+            "cpu": "x64",
+            "gce": "1",
+            "kvm": "1",
+            "os": "Debian",
+            "pool": ""
+        },
         "build_metadata": {}
     }
 ]

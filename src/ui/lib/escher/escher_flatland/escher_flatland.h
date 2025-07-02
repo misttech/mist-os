@@ -5,8 +5,8 @@
 #ifndef SRC_UI_LIB_ESCHER_ESCHER_FLATLAND_ESCHER_FLATLAND_H_
 #define SRC_UI_LIB_ESCHER_ESCHER_FLATLAND_ESCHER_FLATLAND_H_
 
-#include <fidl/fuchsia.hardware.hrtimer/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
+#include <fidl/fuchsia.time.alarms/cpp/fidl.h>
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.views/cpp/fidl.h>
 
@@ -85,20 +85,21 @@ class EscherFlatland {
 
   zx::eventpair GetWakeLease();
 
-  // Cancels RenderLoopWithWakingDelay.
-  void StopTimer();
+  // Enables or interrupts RenderLoopWithWakingDelay.
+  void EnableWakeAlarms(bool enable);
 
   DebugFont debug_font() { return *debug_font_.get(); };
 
-  void set_delay_until_next_render(zx::duration delay) { delay_until_next_render_ = delay; };
+  void set_next_render_time(zx::time_boot time) { next_render_time_ = time; };
 
  private:
   async_dispatcher_t* dispatcher_;
-  zx::duration delay_until_next_render_;
+  zx::time_boot next_render_time_;
   std::unique_ptr<Escher> escher_;
   std::unique_ptr<DebugFont> debug_font_;
   fidl::SyncClient<fuchsia_ui_composition::Flatland> flatland_;
-  fidl::Client<fuchsia_hardware_hrtimer::Device> hrtimer_device_;
+  fidl::SyncClient<fuchsia_time_alarms::Wake> wake_alarms_;
+  bool enable_wake_alarms_ = false;
   vk::Extent2D image_extent_;
   std::string name_;
   fidl::WireClient<fuchsia_ui_composition::ParentViewportWatcher> parent_viewport_watcher_;

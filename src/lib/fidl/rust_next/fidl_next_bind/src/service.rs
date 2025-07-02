@@ -4,6 +4,14 @@
 
 use core::marker::PhantomData;
 
+/// A FIDL service.
+pub trait Service {
+    /// The name of this service.
+    const SERVICE_NAME: &'static str;
+    /// The members of this service.
+    const MEMBER_NAMES: &'static [&'static str];
+}
+
 /// A strongly typed service instance.
 #[derive(Debug)]
 #[repr(transparent)]
@@ -18,13 +26,8 @@ impl<I, S> ServiceInstance<I, S> {
         Self { instance, _service: PhantomData }
     }
 
-    /// Returns the underlying instance.
-    pub fn into_untyped(self) -> I {
-        self.instance
-    }
-
     /// Returns a reference to the underlying instance.
-    pub fn as_untyped_mut(&mut self) -> &mut I {
-        &mut self.instance
+    pub fn as_untyped(&self) -> &I {
+        &self.instance
     }
 }

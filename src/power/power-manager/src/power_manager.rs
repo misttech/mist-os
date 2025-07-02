@@ -171,7 +171,8 @@ impl PowerManager {
                 .build()?
             }
             "SystemShutdownHandler" => {
-                system_shutdown_handler::SystemShutdownHandlerBuilder::new().build()?
+                system_shutdown_handler::SystemShutdownHandlerBuilder::new_from_json(json_data)
+                    .build()?
             }
             "TemperatureHandler" => temperature_handler::TemperatureHandlerBuilder::new_from_json(
                 json_data,

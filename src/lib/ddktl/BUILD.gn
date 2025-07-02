@@ -109,7 +109,7 @@ source_set("ddktl") {
   # Please allowlist entire directories rather than individual targets as it
   # requires less allowlist churn over time.
   visibility = [
-    "//examples/drivers/driver_test_realm/sample-driver:*",
+    "//examples/drivers/driver_test_realm/sample_driver:*",
     "//examples/drivers/simple/dfv1:*",
     "//examples/drivers/transport/banjo:*",
     "//examples/drivers/transport/banjo/v1:*",

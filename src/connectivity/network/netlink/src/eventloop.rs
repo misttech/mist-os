@@ -345,6 +345,7 @@ impl<
                             route_clients.get_ref().clone(),
                             interfaces_proxy.get_ref().clone(),
                             interfaces_state_proxy.get(),
+                            &feature_flags,
                         )
                         .await
                         .context("create interfaces worker")?;
@@ -676,7 +677,7 @@ impl<
                 match request.expect("request stream cannot end") {
                     UnifiedRequest::InterfacesRequest(request) => {
                         let request = interfaces_worker.get_mut()
-                            .handle_request(request).await;
+                            .handle_request(request, &feature_flags).await;
                         *unified_pending_request = request.map(UnifiedPendingRequest::Interfaces);
                         Cleanup::None
                     }

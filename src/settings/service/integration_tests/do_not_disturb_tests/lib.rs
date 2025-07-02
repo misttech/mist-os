@@ -30,7 +30,7 @@ impl DoNotDisturbTest {
     pub fn connect_to_do_not_disturb_marker(instance: &RealmInstance) -> DoNotDisturbProxy {
         return instance
             .root
-            .connect_to_protocol_at_exposed_dir::<DoNotDisturbMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("Could not connect to DoNotDisturb");
     }
 }

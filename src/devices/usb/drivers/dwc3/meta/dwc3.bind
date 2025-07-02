@@ -6,6 +6,8 @@ composite dwc3;
 
 using fuchsia.designware.platform;
 using fuchsia.devicetree;
+using fuchsia.interconnect;
+using fuchsia.hardware.interconnect;
 using fuchsia.hardware.usb.phy;
 using fuchsia.platform;
 
@@ -29,4 +31,19 @@ node "pdev" {
     fuchsia.BIND_PLATFORM_DEV_PID == fuchsia.platform.BIND_PLATFORM_DEV_PID.GENERIC;
     fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.designware.platform.BIND_PLATFORM_DEV_DID.DWC3;
   }
+}
+
+optional node "interconnect-usb-ddr" {
+  fuchsia.hardware.interconnect.PathService == fuchsia.hardware.interconnect.PathService.ZirconTransport;
+  fuchsia.interconnect.PATH_NAME == "usb-ddr";
+}
+
+optional node "interconnect-usb-ipa" {
+  fuchsia.hardware.interconnect.PathService == fuchsia.hardware.interconnect.PathService.ZirconTransport;
+  fuchsia.interconnect.PATH_NAME == "usb-ipa";
+}
+
+optional node "interconnect-ddr-usb" {
+  fuchsia.hardware.interconnect.PathService == fuchsia.hardware.interconnect.PathService.ZirconTransport;
+  fuchsia.interconnect.PATH_NAME == "ddr-usb";
 }

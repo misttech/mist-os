@@ -4,10 +4,7 @@
 {
     use: [
         {
-            service: [
-                "fuchsia.hardware.block.volume.Service",
-                "fuchsia.hardware.ramdisk.Service",
-            ],
+            service: [ "fuchsia.hardware.block.volume.Service" ],
         },
     ],
 }

@@ -51,7 +51,7 @@ mod tests {
 
     // Verify that the StashInspectLogger accumulates failure counts to inspect.
     #[fuchsia::test]
-    fn test_stash_logger() {
+    async fn test_stash_logger() {
         let inspector = component::inspector();
         let mut logger = StashInspectLogger::new(inspector.root());
 

@@ -21,6 +21,7 @@ zx_library("platform") {
     "ram_mappable_crashlog.cc",
   ]
   deps = [
+    ":tests",
     "//sdk/lib/zbi-format",
     "//src/lib/zbitl",
     "//zircon/kernel/dev/interrupt",
@@ -50,4 +51,10 @@ zx_library("platform") {
     # <platform/efi.h> has #include <efi/runtime_services.h>
     "//zircon/kernel/lib/efi:headers",
   ]
+}
+
+source_set("tests") {
+  # TODO: testonly = true
+  sources = [ "suspend_cpu_tests.cc" ]
+  deps = [ "//zircon/kernel/lib/unittest" ]
 }

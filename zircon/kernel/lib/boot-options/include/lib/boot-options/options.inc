@@ -313,6 +313,8 @@ at the OOM might not be possible.
 For example, if `kernel.oom.outofmemory-mb` is set to 50 and `kernel.oom.imminent-oom-delta-mb`
 is set to 20, an imminent-out-of-memory event will be signaled at 70MB (i.e. 50MB + 20MB)
 free memory, while out-of-memory will be signaled at 50MB free memory.
+
+Setting this value to 0 will disable the imminent-out-of-memory event.
 )""")
 
 DEFINE_OPTION("kernel.oom.trigger-on-alloc-failure", bool, oom_trigger_on_alloc_failure, {true},
@@ -714,7 +716,6 @@ DEFINE_OPTION("kernel.compression.storage-strategy", CompressionStorageStrategy,
               compression_storage_strategy, {CompressionStorageStrategy::kNone}, R"""(
 Supported compression storage strategies are:
 - `none`
-- `tri_page`
 - `slot`
 
 This option selects the desired storage strategy to be used for storing data that has been

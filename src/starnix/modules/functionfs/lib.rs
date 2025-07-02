@@ -6,15 +6,17 @@ use fidl::endpoints::SynchronousProxy;
 use futures_util::StreamExt;
 use starnix_core::power::{create_proxy_for_wake_events_counter_zero, mark_proxy_message_handled};
 use starnix_core::task::{CurrentTask, Kernel};
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, fs_args, fs_node_impl_dir_readonly,
     fs_node_impl_not_dir, CacheMode, DirectoryEntryType, FileObject, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
-    InputBuffer, OutputBuffer, VecDirectory, VecDirectoryEntry,
+    InputBuffer, OutputBuffer,
 };
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_types::vfs::default_statfs;
+use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
@@ -200,7 +202,7 @@ async fn handle_adb(
 pub struct FunctionFs;
 impl FunctionFs {
     pub fn new_fs(
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
@@ -232,14 +234,9 @@ impl FunctionFs {
 
         let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FunctionFs, options)?;
 
-        let mut root = FsNode::new_root_with_properties(FunctionFsRootDir::default(), |info| {
-            info.ino = ROOT_NODE_ID;
-            info.uid = uid;
-            info.gid = gid;
-        });
-        root.node_id = ROOT_NODE_ID;
-        fs.set_root_node(root);
-
+        let creds = FsCred { uid, gid };
+        let info = FsNodeInfo::new(mode!(IFDIR, 0o777), creds);
+        fs.create_root_with_info(ROOT_NODE_ID, FunctionFsRootDir::default(), info);
         Ok(fs)
     }
 }
@@ -247,7 +244,7 @@ impl FunctionFs {
 impl FileSystemOps for FunctionFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -456,7 +453,7 @@ impl FsNodeOps for FunctionFsRootDir {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -487,30 +484,27 @@ impl FsNodeOps for FunctionFsRootDir {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<starnix_core::vfs::FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| errno!(ENOENT))?;
         match name {
-            CONTROL_ENDPOINT => Ok(node.fs().create_node_with_id(
-                current_task,
-                FunctionFsControlEndpoint,
+            CONTROL_ENDPOINT => Ok(node.fs().create_node(
                 CONTROL_ENDPOINT_NODE_ID,
-                FsNodeInfo::new(CONTROL_ENDPOINT_NODE_ID, mode!(IFREG, 0o600), node.info().cred()),
+                FunctionFsControlEndpoint,
+                FsNodeInfo::new(mode!(IFREG, 0o600), node.info().cred()),
             )),
-            OUTPUT_ENDPOINT => Ok(node.fs().create_node_with_id(
-                current_task,
-                FunctionFsOutputEndpoint,
+            OUTPUT_ENDPOINT => Ok(node.fs().create_node(
                 OUTPUT_ENDPOINT_NODE_ID,
-                FsNodeInfo::new(OUTPUT_ENDPOINT_NODE_ID, mode!(IFREG, 0o600), node.info().cred()),
+                FunctionFsOutputEndpoint,
+                FsNodeInfo::new(mode!(IFREG, 0o600), node.info().cred()),
             )),
-            INPUT_ENDPOINT => Ok(node.fs().create_node_with_id(
-                current_task,
-                FunctionFsInputEndpoint,
+            INPUT_ENDPOINT => Ok(node.fs().create_node(
                 INPUT_ENDPOINT_NODE_ID,
-                FsNodeInfo::new(INPUT_ENDPOINT_NODE_ID, mode!(IFREG, 0o600), node.info().cred()),
+                FunctionFsInputEndpoint,
+                FsNodeInfo::new(mode!(IFREG, 0o600), node.info().cred()),
             )),
             _ => error!(ENOENT),
         }
@@ -526,7 +520,7 @@ impl FsNodeOps for FunctionFsControlEndpoint {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -548,7 +542,7 @@ impl FileOps for FunctionFsControlEndpoint {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -558,7 +552,7 @@ impl FileOps for FunctionFsControlEndpoint {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -587,7 +581,7 @@ impl FileOps for FunctionFsControlEndpoint {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
@@ -606,7 +600,7 @@ impl FileOps for FunctionFsControlEndpoint {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -627,7 +621,7 @@ impl FsNodeOps for FunctionFsInputEndpoint {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -642,7 +636,7 @@ impl FileOps for FunctionFsInputEndpoint {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -653,7 +647,7 @@ impl FileOps for FunctionFsInputEndpoint {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -673,7 +667,7 @@ impl FsNodeOps for FunctionFsOutputEndpoint {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -690,7 +684,7 @@ impl FileOps for FunctionFsOutputFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -709,7 +703,7 @@ impl FileOps for FunctionFsOutputFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

@@ -110,6 +110,7 @@ void arm64_fpu_exception(iframe_t* iframe, uint exception_flags);
 void arm64_fpu_context_switch(Thread* oldthread, Thread* newthread);
 void arm64_fpu_save_state(Thread* t);
 void arm64_fpu_restore_state(Thread* t);
+bool arm64_fpu_is_enabled();
 
 // TODO(https://fxbug.dev/393619961): Identically 1 today, but should one day
 // be dynamic.

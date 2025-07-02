@@ -7,18 +7,9 @@ use async_trait::async_trait;
 use ffx_assembly_args::*;
 use ffx_writer::SimpleWriter;
 use fho::{FfxMain, FfxTool, Result};
-mod base_package;
-mod blobfs;
-mod compiled_package;
-mod extra_hash_descriptor;
-mod fvm;
-mod fxfs;
 mod operations;
 mod subpackage_blobs_package;
-mod zbi;
 use assembly_components as _;
-pub mod vbmeta;
-pub mod vfs;
 
 #[derive(FfxTool)]
 pub struct AssemblyTool {

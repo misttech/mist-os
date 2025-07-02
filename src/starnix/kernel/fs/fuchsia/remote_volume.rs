@@ -8,7 +8,7 @@ use starnix_core::fs::fuchsia::{RemoteFs, RemoteNode};
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::{
     derive_wrapping_key, CacheConfig, CacheMode, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsNode, FsNodeHandle, FsStr,
+    FileSystemOptions, FsNodeHandle, FsStr,
 };
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
@@ -38,7 +38,7 @@ impl RemoteVolume {
 impl FileSystemOps for RemoteVolume {
     fn statfs(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         fs: &FileSystem,
         current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -46,16 +46,16 @@ impl FileSystemOps for RemoteVolume {
     }
 
     fn name(&self) -> &'static FsStr {
-        self.remotefs.name()
+        "remotevol".into()
     }
 
-    fn generate_node_ids(&self) -> bool {
-        self.remotefs.generate_node_ids()
+    fn uses_external_node_ids(&self) -> bool {
+        self.remotefs.uses_external_node_ids()
     }
 
     fn rename(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         fs: &FileSystem,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
@@ -165,7 +165,7 @@ fn get_or_create_volume_keys(
 }
 
 pub fn new_remote_vol(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -263,11 +263,12 @@ pub fn new_remote_vol(
     let use_remote_ids = remotefs.use_remote_ids();
     let remotevol = RemoteVolume { remotefs, volume_provider };
     let fs =
-        FileSystem::new(&kernel, CacheMode::Cached(CacheConfig::default()), remotevol, options)?;
-    let mut root_node = FsNode::new_root(remote_node);
+        FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), remotevol, options)?;
     if use_remote_ids {
-        root_node.node_id = node_id;
+        fs.create_root(node_id, remote_node);
+    } else {
+        let root_ino = fs.allocate_ino();
+        fs.create_root(root_ino, remote_node);
     }
-    fs.set_root_node(root_node);
     Ok(fs)
 }

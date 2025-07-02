@@ -178,6 +178,14 @@ impl ElfRunner {
             .map_err(JobError::SetPolicy)?;
         }
 
+        if program_config.deny_bad_handles {
+            job.set_policy(zx::JobPolicy::Basic(
+                zx::JobPolicyOption::Absolute,
+                vec![(zx::JobCondition::BadHandle, zx::JobAction::DenyException)],
+            ))
+            .map_err(JobError::SetPolicy)?;
+        }
+
         Ok(if program_config.job_with_available_exception_channel {
             // Create a new job to hold the process because the component wants
             // the process to be a direct child of a job that has its exception

@@ -71,7 +71,7 @@ static DISPATCHER_CM_BYTES: &'static [u8] =
 #[error("{0} does not reference a known manifest. Try fuchsia-builtin://#elf_runner.cm or fuchsia-builtin://#dispatcher.cm")]
 struct ManifestNotFoundError(pub BuiltinUrl);
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
 

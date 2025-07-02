@@ -445,6 +445,7 @@ mod tests {
         );
 
         assert_data_tree!(
+            @executor exec,
             inspector,
             root: {
                 "RppmHandler": {

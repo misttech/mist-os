@@ -12,7 +12,7 @@ use crate::api::{
     BPF_MISC, BPF_MOV, BPF_MSH, BPF_MUL, BPF_NEG, BPF_OR, BPF_RET, BPF_RSH, BPF_ST, BPF_STX,
     BPF_SUB, BPF_TAX, BPF_TXA, BPF_W, BPF_X, BPF_XOR,
 };
-use crate::program::{link_program, BpfProgramContext, EbpfProgram, ProgramArgument};
+use crate::program::{link_program, BpfProgramContext, EbpfProgram, HelperSet, ProgramArgument};
 use crate::verifier::{
     verify_program, CallingContext, NullVerifierLogger, Type, VerifiedEbpfProgram,
 };
@@ -415,7 +415,7 @@ pub fn convert_and_link_cbpf<C: BpfProgramContext>(
 ) -> Result<EbpfProgram<C>, EbpfError> {
     let verified =
         convert_and_verify_cbpf(bpf_code, C::Packet::get_type().clone(), C::CBPF_CONFIG)?;
-    link_program(&verified, &[], vec![], HashMap::new())
+    link_program(&verified, &[], vec![], HelperSet::default())
 }
 
 #[cfg(test)]

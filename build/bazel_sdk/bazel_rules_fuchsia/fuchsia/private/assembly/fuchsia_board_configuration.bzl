@@ -4,6 +4,8 @@
 
 """Rules for defining assembly board configuration."""
 
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
+load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 load(
     "//fuchsia/private/licenses:common.bzl",
     "check_type",
@@ -13,6 +15,7 @@ load(
     "FuchsiaBoardConfigInfo",
     "FuchsiaBoardInputBundleInfo",
     "FuchsiaBoardInputBundleSetInfo",
+    "FuchsiaPartitionsConfigInfo",
     "FuchsiaPostProcessingScriptInfo",
 )
 load(
@@ -22,7 +25,6 @@ load(
     "replace_labels_with_files",
     "select_root_dir_with_file",
 )
-load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
 
 def _fuchsia_board_configuration_impl(ctx):
     sdk = get_fuchsia_sdk_toolchain(ctx)
@@ -83,17 +85,28 @@ def _fuchsia_board_configuration_impl(ctx):
     replace_labels_with_files(filesystems, ctx.attr.filesystems_labels)
     board_config["filesystems"] = filesystems
 
-    if ctx.attr.version and ctx.attr.version_file:
-        fail("Only one of \"version\" or \"version_file\" can be set.")
-        # TODO(https://fxbug.dev/397489730):
-        # Make it required to have exactly one of these set
-        # once these changes have rolled into all downstream repositories.
+    # Ensure that exactly one of "version" and "version_file" is set.
+    # Note: an empty string "" is acceptable: non-official builds may not
+    # have access to a version number.
+    if ((ctx.attr.version != "__unset") == (ctx.attr.version_file != None)):
+        fail("Exactly one of \"version\" or \"version_file\" must be set.")
 
-    if ctx.attr.version:
+    # If version is "__unset", the target hasn't set it.
+    if ctx.attr.version != "__unset":
         creation_args += ["--version", ctx.attr.version]
     if ctx.file.version_file:
         creation_args += ["--version-file", ctx.file.version_file.path]
         input_files.append(ctx.file.version_file)
+
+    if ctx.attr.repo:
+        repo = ctx.attr.repo
+    else:
+        repo = ctx.attr._release_repository_flag[BuildSettingInfo].value
+
+    # TODO(https://b.corp.google.com/issues/416239346): Make "repo" field
+    # required.
+    if repo:
+        creation_args += ["--repo", repo]
 
     if ctx.attr.post_processing_script:
         script = ctx.attr.post_processing_script[FuchsiaPostProcessingScriptInfo]
@@ -112,10 +125,11 @@ def _fuchsia_board_configuration_impl(ctx):
             script_input = ctx.actions.declare_file(dest)
             ctx.actions.symlink(output = script_input, target_file = source_file)
             input_files.extend([source_file, script_input])
-            paths_map[dest] = script_input.path
 
             if dest == script.post_processing_script_path:
                 board_script_path = script_input.path
+            else:
+                paths_map[dest] = script_input.path
 
         if not board_script_path:
             fail("board_script_path must be present in the inputs.")
@@ -130,6 +144,12 @@ def _fuchsia_board_configuration_impl(ctx):
             "inputs": paths_map,
         }
         board_config["filesystems"]["zbi"] = zbi
+
+    if ctx.attr.partitions_configuration:
+        creation_args += [
+            "--partitions-config",
+            ctx.attr.partitions_configuration[FuchsiaPartitionsConfigInfo].directory,
+        ]
 
     content = json.encode_indent(board_config, indent = "  ")
     ctx.actions.write(board_config_file, content)
@@ -147,7 +167,7 @@ def _fuchsia_board_configuration_impl(ctx):
     ctx.actions.run(
         executable = sdk.assembly_config,
         arguments = args,
-        inputs = input_files + ctx.files.filesystems_labels,
+        inputs = input_files + ctx.files.filesystems_labels + ctx.files.partitions_configuration,
         outputs = [board_config_dir],
         progress_message = "Creating board config for %s" % ctx.label,
         **LOCAL_ONLY_ACTION_KWARGS
@@ -174,13 +194,6 @@ _fuchsia_board_configuration = rule(
         "board_name": attr.string(
             doc = "Name of this board.",
             mandatory = True,
-        ),
-        "version": attr.string(
-            doc = "Release version of this board.",
-        ),
-        "version_file": attr.label(
-            doc = "Path to a file containing the current release version.",
-            allow_single_file = True,
         ),
         "hardware_info": attr.string(
             doc = "Data provided via the 'fuchsia.hwinfo.Board' protocol.",
@@ -229,6 +242,25 @@ _fuchsia_board_configuration = rule(
         "tee_trusted_app_guids": attr.string_list(
             doc = "GUIDs for the TAs provided by this board's TEE driver.",
             default = [],
+        ),
+        "version": attr.string(
+            doc = "Release version of this board.",
+            default = "__unset",
+        ),
+        "version_file": attr.label(
+            doc = "Path to a file containing the current release version.",
+            allow_single_file = True,
+        ),
+        "repo": attr.string(
+            doc = "Name of the release repository. Overrides _release_repository_flag when set.",
+        ),
+        "_release_repository_flag": attr.label(
+            doc = "String flag used to set the name of the release repository.",
+            default = "@rules_fuchsia//fuchsia/flags:fuchsia_release_repository",
+        ),
+        "partitions_configuration": attr.label(
+            doc = "The partitions config to include into the board configuration",
+            providers = [FuchsiaPartitionsConfigInfo],
         ),
     },
 )

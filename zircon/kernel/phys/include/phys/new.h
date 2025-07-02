@@ -9,6 +9,7 @@
 
 #include <lib/trivial-allocator/basic-leaky-allocator.h>
 #include <lib/trivial-allocator/new.h>
+#include <lib/trivial-allocator/page-allocator.h>
 #include <zircon/assert.h>
 
 #include "allocation.h"
@@ -20,15 +21,7 @@
 // handoff purpose, depending on its memalloc::Type.
 
 template <memalloc::Type Type>
-inline trivial_allocator::BasicLeakyAllocator gPhysNew([](size_t size, size_t alignment) {
-  fbl::AllocChecker ac;
-  Allocation result = Allocation::New(ac, Type, size, alignment);
-  if (ac.check()) {
-    ZX_DEBUG_ASSERT(result);
-  } else {
-    ZX_DEBUG_ASSERT(!result);
-  }
-  return result;
-});
+inline trivial_allocator::BasicLeakyAllocator gPhysNew(
+    trivial_allocator::PageAllocator<TypedMemoryAllocation<Type>>{});
 
 #endif  // ZIRCON_KERNEL_PHYS_INCLUDE_PHYS_NEW_H_

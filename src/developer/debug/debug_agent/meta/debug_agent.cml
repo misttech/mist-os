@@ -29,8 +29,8 @@
                 "fuchsia.sys2.RealmQuery.root",
 
                 // To launch tests.
-                "fuchsia.test.manager.Query",
-                "fuchsia.test.manager.RunBuilder",
+                "fuchsia.test.manager.SuiteRunner",
+                "fuchsia.test.manager.TestCaseEnumerator",
             ],
             from: "parent",
         },

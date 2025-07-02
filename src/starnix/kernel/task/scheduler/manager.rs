@@ -157,16 +157,7 @@ pub enum SchedulerPolicyKind {
 
 impl PartialOrd for SchedulerPolicyKind {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        let o1 = self.ordering();
-        let o2 = other.ordering();
-        if o1 != o2 {
-            o1.partial_cmp(&o2)
-        } else if self == other {
-            Some(Ordering::Equal)
-        } else {
-            // FIFO and RR are not comparable
-            None
-        }
+        self.ordering().partial_cmp(&other.ordering())
     }
 }
 
@@ -179,6 +170,10 @@ impl std::default::Default for SchedulerPolicyKind {
 impl SchedulerPolicy {
     pub fn is_default(&self) -> bool {
         self == &Self::default()
+    }
+
+    pub fn kind(&self) -> SchedulerPolicyKind {
+        self.kind
     }
 
     fn from_raw(mut policy: u32, priority: u8) -> Result<Self, Errno> {
@@ -196,33 +191,43 @@ impl SchedulerPolicy {
             SCHED_NORMAL => SchedulerPolicyKind::Normal { priority },
             SCHED_BATCH => SchedulerPolicyKind::Batch { priority },
             SCHED_IDLE => SchedulerPolicyKind::Idle { priority },
+            SCHED_DEADLINE => {
+                track_stub!(TODO("https://fxbug.dev/409349496"), "SCHED_DEADLINE");
+                return error!(EINVAL);
+            }
             _ => return error!(EINVAL),
         };
 
         Ok(Self { kind, reset_on_fork })
     }
 
-    pub fn from_binder(policy: u32, priority: u32) -> Result<Option<Self>, Errno> {
-        if priority == 0 && policy == 0 {
-            Ok(None)
-        } else {
-            if policy != SCHED_NORMAL && policy != SCHED_RR && policy != SCHED_FIFO {
-                return error!(EINVAL);
-            }
-            let priority: u8 = if policy == SCHED_NORMAL {
-                let signed_priority = (priority as u8) as i8;
-                if signed_priority < -20 || signed_priority > 19 {
-                    return error!(EINVAL);
-                }
-                (20 - signed_priority) as u8
-            } else {
-                if priority < 1 || priority > 99 {
-                    return error!(EINVAL);
-                }
-                priority as u8
-            };
-            Self::from_raw(policy, priority).map(Some)
+    /// Create a policy according to the "sched_policy" and "priority" bits of
+    /// a flat_binder_object_flags bitmask (see uapi/linux/android/binder.h).
+    ///
+    /// It would be very strange for this to need to be called anywhere outside
+    /// of our Binder implementation.
+    pub fn from_binder(policy: u8, priority_or_niceness: u8) -> Result<Self, Errno> {
+        if policy != (SCHED_NORMAL as u8)
+            && policy != (SCHED_RR as u8)
+            && policy != (SCHED_FIFO as u8)
+            && policy != (SCHED_BATCH as u8)
+        {
+            return error!(EINVAL);
         }
+        let priority_or_nonnegative_niceness =
+            if policy == (SCHED_NORMAL as u8) || policy == (SCHED_BATCH as u8) {
+                let signed_niceness = priority_or_niceness as i8;
+                if signed_niceness < -20 || signed_niceness > 19 {
+                    return error!(EINVAL);
+                }
+                (20 - signed_niceness) as u8
+            } else {
+                if priority_or_niceness < 1 || priority_or_niceness > 99 {
+                    return error!(EINVAL);
+                }
+                priority_or_niceness
+            };
+        Self::from_raw(policy as u32, priority_or_nonnegative_niceness)
     }
 
     pub fn from_sched_params(policy: u32, params: sched_param, rlimit: u64) -> Result<Self, Errno> {
@@ -317,7 +322,7 @@ impl SchedulerPolicy {
 }
 
 impl SchedulerPolicyKind {
-    fn is_realtime(&self) -> bool {
+    pub fn is_realtime(&self) -> bool {
         matches!(self, Self::Fifo { .. } | Self::RoundRobin { .. })
     }
 
@@ -327,7 +332,8 @@ impl SchedulerPolicyKind {
             Self::RoundRobin { priority } | Self::Fifo { priority } => (3, *priority),
             Self::Normal { priority } => (2, *priority),
             Self::Batch { priority } => (1, *priority),
-            Self::Idle { priority } => (0, *priority),
+            // see "the [...] nice value has no influence for [the SCHED_IDLE] policy" at sched(7).
+            Self::Idle { .. } => (0, 0),
         }
     }
 
@@ -337,7 +343,7 @@ impl SchedulerPolicyKind {
     /// The range of 32 Zircon priorities is divided into a region for each flavor of Linux
     /// scheduling:
     ///
-    /// 1. 0-3 (inclusive) is used for SCHED_IDLE, the lowest priority Linux tasks.
+    /// 1. 0 is used for SCHED_IDLE, the lowest priority Linux tasks.
     /// 2. 6-15 (inclusive) is used for lower-than-default-priority SCHED_OTHER/SCHED_BATCH tasks.
     /// 3. 16 is used for the default priority SCHED_OTHER/SCHED_BATCH, the same as Zircon's
     ///    default for Fuchsia processes.
@@ -345,8 +351,9 @@ impl SchedulerPolicyKind {
     /// 5. Realtime tasks receive their own profile name.
     fn role_name(&self) -> &'static str {
         match self {
-            // Configured with nice 0-40, mapped to 0-3.
-            Self::Idle { priority } => FAIR_PRIORITY_ROLE_NAMES[*priority as usize / 11],
+            // Mapped to 0; see "the [...] nice value has no influence for [the SCHED_IDLE] policy"
+            // at sched(7).
+            Self::Idle { .. } => FAIR_PRIORITY_ROLE_NAMES[0],
 
             // Configured with nice 0-40 and mapped to 6-26. 20 is the default nice which we want to
             // map to 16.
@@ -462,6 +469,19 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn idle_role_name() {
+        assert_eq!(SchedulerPolicyKind::Idle { priority: 1 }.role_name(), "fuchsia.starnix.fair.0");
+        assert_eq!(
+            SchedulerPolicyKind::Idle { priority: 20 }.role_name(),
+            "fuchsia.starnix.fair.0"
+        );
+        assert_eq!(
+            SchedulerPolicyKind::Idle { priority: 40 }.role_name(),
+            "fuchsia.starnix.fair.0"
+        );
+    }
+
+    #[fuchsia::test]
     fn build_policy_from_sched_params() {
         assert_matches!(
             SchedulerPolicy::from_sched_params(SCHED_NORMAL, sched_param { sched_priority: 0 }, 20),
@@ -495,26 +515,27 @@ mod tests {
 
     #[fuchsia::test]
     fn build_policy_from_binder() {
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL, 0), Ok(None));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL as u8, 0), Ok(_));
         assert_matches!(
-            SchedulerPolicy::from_binder(SCHED_NORMAL, (((-21) as i8) as u8).into()),
+            SchedulerPolicy::from_binder(SCHED_NORMAL as u8, (((-21) as i8) as u8).into()),
             Err(_)
         );
         assert_matches!(
-            SchedulerPolicy::from_binder(SCHED_NORMAL, (((-20) as i8) as u8).into()),
-            Ok(Some(_))
+            SchedulerPolicy::from_binder(SCHED_NORMAL as u8, (((-20) as i8) as u8).into()),
+            Ok(_)
         );
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL, 1), Ok(Some(_)));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL, 19), Ok(Some(_)));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL, 20), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO, 0), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO, 1), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO, 99), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO, 100), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR, 0), Err(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR, 1), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR, 99), Ok(_));
-        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR, 100), Err(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL as u8, 1), Ok(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL as u8, 19), Ok(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_NORMAL as u8, 20), Err(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO as u8, 0), Err(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO as u8, 1), Ok(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO as u8, 99), Ok(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_FIFO as u8, 100), Err(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR as u8, 0), Err(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR as u8, 1), Ok(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR as u8, 99), Ok(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_RR as u8, 100), Err(_));
+        assert_matches!(SchedulerPolicy::from_binder(SCHED_BATCH as u8, 11), Ok(_));
         assert_matches!(SchedulerPolicy::from_binder(42, 0), Err(_));
         assert_matches!(SchedulerPolicy::from_binder(42, 0), Err(_));
     }

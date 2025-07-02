@@ -311,7 +311,9 @@ mod helpers {
     use fidl::endpoints::Proxy as _;
     use net_types::ethernet::Mac;
     use net_types::ip::{Ipv4, Ipv4Addr};
-    use packet::{InnerPacketBuilder as _, ParsablePacket as _, Serializer as _};
+    use packet::{
+        InnerPacketBuilder as _, PacketBuilder as _, ParsablePacket as _, Serializer as _,
+    };
     use packet_formats::arp::{ArpOp, ArpPacket, ArpPacketBuilder};
     use packet_formats::ethernet::{
         EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
@@ -354,7 +356,7 @@ mod helpers {
     /// examples.
     pub(super) fn bob_pings_alice_for_tap_like(config: &super::EthernetLayerConfig) -> Vec<u8> {
         packet::Buf::new(&mut bob_pings_alice_for_tun_like(&config.ip_layer)[..], ..)
-            .encapsulate(EthernetFrameBuilder::new(
+            .wrap_in(EthernetFrameBuilder::new(
                 mac(config.bob_mac),
                 mac(config.alice_mac),
                 EtherType::Ipv4,
@@ -372,13 +374,13 @@ mod helpers {
         let alice_ip = ip_v4(config.alice_subnet.addr);
         let bob_ip = ip_v4(config.bob_ip);
         packet::Buf::new(&mut ECHO_PAYLOAD.to_vec()[..], ..)
-            .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
+            .wrap_in(IcmpPacketBuilder::<Ipv4, _>::new(
                 bob_ip,
                 alice_ip,
                 IcmpZeroCode,
                 IcmpEchoRequest::new(ICMP_ID, ICMP_SEQNUM),
             ))
-            .encapsulate(Ipv4PacketBuilder::new(bob_ip, alice_ip, 1, Ipv4Proto::Icmp))
+            .wrap_in(Ipv4PacketBuilder::new(bob_ip, alice_ip, 1, Ipv4Proto::Icmp))
             .serialize_vec_outer()
             .expect("serialization failed")
             .as_ref()
@@ -476,20 +478,22 @@ mod helpers {
 
     /// Creates an ARP response from bob to alice for use in tap-like tests.
     pub(super) fn build_bob_arp_response(config: &super::EthernetLayerConfig) -> Vec<u8> {
-        ArpPacketBuilder::new(
-            ArpOp::Response,
-            mac(config.bob_mac),
-            ip_v4(config.ip_layer.bob_ip),
-            mac(config.alice_mac),
-            ip_v4(config.ip_layer.alice_subnet.addr),
-        )
-        .into_serializer()
-        .encapsulate(EthernetFrameBuilder::new(
+        EthernetFrameBuilder::new(
             mac(config.bob_mac),
             mac(config.alice_mac),
             EtherType::Arp,
             ETHERNET_MIN_BODY_LEN_NO_TAG,
-        ))
+        )
+        .wrap_body(
+            ArpPacketBuilder::new(
+                ArpOp::Response,
+                mac(config.bob_mac),
+                ip_v4(config.ip_layer.bob_ip),
+                mac(config.alice_mac),
+                ip_v4(config.ip_layer.alice_subnet.addr),
+            )
+            .into_serializer(),
+        )
         .serialize_vec_outer()
         .expect("serialization failed")
         .as_ref()
@@ -565,7 +569,7 @@ mod helpers {
                 .create_interface(
                     &port_id,
                     server_end,
-                    &fidl_fuchsia_net_interfaces_admin::Options::default(),
+                    fidl_fuchsia_net_interfaces_admin::Options::default(),
                 )
                 .expect("create_interface failed");
             control

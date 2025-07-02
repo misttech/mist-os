@@ -49,10 +49,17 @@ library zbi;
 ///     (i.e., the ZBI_TYPE_CONTAINER header before the ZBI_TYPE_KERNEL_ARM64
 ///     header) to the PC location in the image where the kernel will
 ///     start.  The processor is in physical address mode at EL1 or
-///     above.  The kernel image and the bootloader-constructed ZBI each
-///     can be loaded anywhere in physical memory.  The x0 register
+///     above (i.e., SCTLR_ELx.M = 0), which in turn necessitates that its
+///     instruction and data caches are also disabled (i.e.,
+///     SCTLR_ELx.{I, D} = 0).  The kernel image and the bootloader-constructed
+///     ZBI each can be loaded anywhere in physical memory.  The x0 register
 ///     holds the physical address of the bootloader-constructed ZBI.
 ///     All other registers are unspecified.
+///
+///     The address range corresponding to the loaded kernel image must be
+///     cleaned - but not necessarily invalidated - to the point of coherency
+///     in the data cache (reserve memory included) and invalidated in the
+///     instruction cache (reserve memory not necessarily included).
 ///
 ///  RISCV64
 ///

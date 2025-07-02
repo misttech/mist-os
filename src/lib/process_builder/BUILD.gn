@@ -106,9 +106,9 @@ if (toolchain_environment == "user.basic") {
     # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
     configs += [ "//build/config:Wno-conversion" ]
     deps = [
+      "//sdk/lib/c/string:minimal-str",
       "//src/lib/elfldltl/test:static-pie",
       "//src/zircon/lib/zircon",
-      "//zircon/system/ulib/c/string:minimal-str",
       "//zircon/system/ulib/zircon-internal",
     ]
 

@@ -3,7 +3,6 @@ Gumshoe (On-Device Diagnostics)
 How To Build
 
 $ fx set core.sherlock \
-  --auto-dir \
   --release \
   --with //src/recovery/diagnostics/gumshoe:tests \
   --with-base //src/recovery/diagnostics/gumshoe:gumshoe \

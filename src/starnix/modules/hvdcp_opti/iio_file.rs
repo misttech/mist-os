@@ -7,9 +7,11 @@ use fidl_fuchsia_hardware_qcom_hvdcpopti as fhvdcpopti;
 use starnix_core::device::kobject::Device;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
+use starnix_core::vfs::pseudo::simple_file::BytesFile;
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
-    fs_node_impl_dir_readonly, BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
+    fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr,
 };
 use starnix_logging::log_error;
 use starnix_sync::{FileOpsCore, Locked};
@@ -59,7 +61,7 @@ impl FsNodeOps for IioDirectory0 {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -69,16 +71,15 @@ impl FsNodeOps for IioDirectory0 {
 
     fn lookup(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let iio_create_file = |value| {
-            Ok(node.fs().create_node(
-                current_task,
+            Ok(node.fs().create_node_and_allocate_node_id(
                 BytesFile::new_node(value),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ))
         };
         let iio_create_file_int =
@@ -100,10 +101,9 @@ impl FsNodeOps for IioDirectory0 {
         };
 
         let create_invalid = || {
-            Ok(node.fs().create_node(
-                current_task,
+            Ok(node.fs().create_node_and_allocate_node_id(
                 InvalidFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ))
         };
 
@@ -166,7 +166,7 @@ impl FsNodeOps for IioDirectory1 {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -176,16 +176,15 @@ impl FsNodeOps for IioDirectory1 {
 
     fn lookup(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let iio_create_file = |value| {
-            Ok(node.fs().create_node(
-                current_task,
+            Ok(node.fs().create_node_and_allocate_node_id(
                 BytesFile::new_node(value),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ))
         };
         let iio_create_file_int =

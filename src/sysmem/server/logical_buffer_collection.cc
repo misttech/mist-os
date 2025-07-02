@@ -16,6 +16,7 @@
 #include <lib/fit/defer.h>
 #include <lib/fpromise/result.h>
 #include <lib/image-format/image_format.h>
+#include <lib/memory_barriers/memory_barriers.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/trace/event.h>
 #include <lib/zx/channel.h>
@@ -48,7 +49,6 @@
 #include "macros.h"
 #include "node_properties.h"
 #include "orphaned_node.h"
-#include "src/lib/memory_barriers/memory_barriers.h"
 #include "sysmem.h"
 #include "usage_pixel_format_cost.h"
 

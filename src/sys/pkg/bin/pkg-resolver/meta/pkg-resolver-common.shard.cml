@@ -14,12 +14,18 @@
     capabilities: [
         {
             protocol: [
+                "fuchsia.component.resolution.Resolver",
                 "fuchsia.pkg.Cup",
                 "fuchsia.pkg.PackageResolver",
                 "fuchsia.pkg.PackageResolver-ota",
                 "fuchsia.pkg.RepositoryManager",
+                "fuchsia.pkg.resolution.PackageResolver",
                 "fuchsia.pkg.rewrite.Engine",
             ],
+        },
+        {
+            resolver: "full-resolver",
+            path: "/svc/fuchsia.component.resolution.Resolver",
         },
     ],
     use: [
@@ -29,6 +35,12 @@
                 "fuchsia.pkg.PackageCache",
             ],
             from: "parent",
+        },
+
+        // used by component resolver
+        {
+            protocol: "fuchsia.pkg.PackageResolver",
+            from: "self",
         },
         {
             protocol: [ "fuchsia.tracing.provider.Registry" ],
@@ -62,12 +74,18 @@
     expose: [
         {
             protocol: [
+                "fuchsia.component.resolution.Resolver",
                 "fuchsia.pkg.Cup",
                 "fuchsia.pkg.PackageResolver",
                 "fuchsia.pkg.PackageResolver-ota",
                 "fuchsia.pkg.RepositoryManager",
+                "fuchsia.pkg.resolution.PackageResolver",
                 "fuchsia.pkg.rewrite.Engine",
             ],
+            from: "self",
+        },
+        {
+            resolver: "full-resolver",
             from: "self",
         },
     ],

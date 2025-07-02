@@ -1752,10 +1752,10 @@ mod tests {
         }
     }
 
-    async fn expect_single_inspect_node(
+    async fn expect_single_inspect_node<Fut: futures::Future<Output = ()>>(
         realm: &TestRealm,
         component_moniker: &str,
-        f: impl Fn(&diagnostics_hierarchy::DiagnosticsHierarchy),
+        f: impl Fn(diagnostics_hierarchy::DiagnosticsHierarchy) -> Fut,
     ) {
         let TestRealm { realm } = realm;
         let realm_moniker = realm.get_moniker().await.expect("failed to get moniker");
@@ -1779,7 +1779,7 @@ mod tests {
             )
             .collect::<Vec<_>>();
         match &data[..] {
-            [Some(datum)] => f(datum),
+            [Some(datum)] => f(datum.clone()).await,
             data => panic!("there should be exactly one matching inspect node; found {:?}", data),
         }
     }
@@ -1817,14 +1817,15 @@ mod tests {
                     j,
                 );
             }
-            let () = expect_single_inspect_node(&realm, COUNTER_COMPONENT_NAME, |data| {
-                assert_data_tree!(data, root: {
-                    counter: {
-                        count: u64::from(i),
-                    }
-                });
-            })
-            .await;
+            let () =
+                expect_single_inspect_node(&realm, COUNTER_COMPONENT_NAME, |data| async move {
+                    assert_data_tree!(data, root: {
+                        counter: {
+                            count: u64::from(i),
+                        }
+                    });
+                })
+                .await;
         }
     }
 
@@ -1855,7 +1856,7 @@ mod tests {
         let mut assert_fut = pin!(
             // Without binding to the child by connecting to its exposed protocol, we should be able to
             // see its inspect data since it has been started eagerly.
-            expect_single_inspect_node(&realm, COUNTER_COMPONENT_NAME, |data| {
+            expect_single_inspect_node(&realm, COUNTER_COMPONENT_NAME, |data| async move {
                 assert_data_tree!(data, root: {
                     counter: {
                         count: 0u64,
@@ -2752,13 +2753,17 @@ mod tests {
         // Without connecting to a protocol exposed by the child, and without
         // enabling eager startup, we should be able to see its inspect data
         // since it has been started explicitly.
-        expect_single_inspect_node(&TestRealm { realm }, COUNTER_COMPONENT_NAME, |data| {
-            assert_data_tree!(data, root: {
-                counter: {
-                    count: 0u64,
-                }
-            });
-        })
+        expect_single_inspect_node(
+            &TestRealm { realm },
+            COUNTER_COMPONENT_NAME,
+            |data| async move {
+                assert_data_tree!(data, root: {
+                    counter: {
+                        count: 0u64,
+                    }
+                });
+            },
+        )
         .await;
     }
 

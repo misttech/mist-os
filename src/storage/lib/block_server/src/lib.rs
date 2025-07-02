@@ -36,7 +36,7 @@ pub enum DeviceInfo {
 }
 
 impl DeviceInfo {
-    fn block_count(&self) -> Option<u64> {
+    pub fn block_count(&self) -> Option<u64> {
         match self {
             Self::Block(BlockInfo { block_count, .. }) => Some(*block_count),
             Self::Partition(PartitionInfo { block_range, .. }) => {
@@ -45,7 +45,7 @@ impl DeviceInfo {
         }
     }
 
-    fn max_transfer_blocks(&self) -> Option<NonZero<u32>> {
+    pub fn max_transfer_blocks(&self) -> Option<NonZero<u32>> {
         match self {
             Self::Block(BlockInfo { max_transfer_blocks, .. }) => max_transfer_blocks.clone(),
             Self::Partition(PartitionInfo { max_transfer_blocks, .. }) => {
@@ -64,7 +64,7 @@ impl DeviceInfo {
 }
 
 /// Information associated with non-partition block devices.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct BlockInfo {
     pub device_flags: fblock::Flag,
     pub block_count: u64,
@@ -72,7 +72,7 @@ pub struct BlockInfo {
 }
 
 /// Information associated with a block device that is also a partition.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct PartitionInfo {
     /// The device flags reported by the underlying device.
     pub device_flags: fblock::Flag,
@@ -240,7 +240,7 @@ impl OffsetMap {
     }
 
     pub fn is_empty(&self) -> bool {
-        self.mapping.is_some()
+        self.mapping.is_none()
     }
 
     fn mapping(&self) -> Option<&BlockOffsetMapping> {
@@ -376,10 +376,6 @@ impl<SM: SessionManager> BlockServer<SM> {
                 }
                 Err(status) => responder.send(Err(status.into_raw()))?,
             },
-            fvolume::VolumeRequest::GetStats { clear: _, responder } => {
-                // TODO(https://fxbug.dev/348077960): Implement this
-                responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?;
-            }
             fvolume::VolumeRequest::OpenSession { session, control_handle: _ } => {
                 match self.device_info().await {
                     Ok(info) => {
@@ -418,6 +414,9 @@ impl<SM: SessionManager> BlockServer<SM> {
                         };
                     if let Some(max) = info.block_count() {
                         if initial_mapping.target_block_offset + initial_mapping.length > max {
+                            log::warn!(
+                                "Invalid mapping for session: {initial_mapping:?} (max {max})"
+                            );
                             session.close_with_epitaph(zx::Status::INVALID_ARGS)?;
                             return Ok(None);
                         }
@@ -660,19 +659,24 @@ impl<SM: SessionManager> SessionHelper<SM> {
                             .checked_mul(self.block_size as u64)
                             .ok_or(zx::Status::OUT_OF_RANGE)?,
                     },
-                    BlockOpcode::Write => Operation::Write {
-                        device_block_offset: request.dev_offset,
-                        block_count: request.length,
-                        options: if flags.contains(BlockIoFlag::FORCE_ACCESS) {
-                            WriteOptions::FORCE_ACCESS
-                        } else {
-                            WriteOptions::empty()
-                        },
-                        vmo_offset: request
-                            .vmo_offset
-                            .checked_mul(self.block_size as u64)
-                            .ok_or(zx::Status::OUT_OF_RANGE)?,
-                    },
+                    BlockOpcode::Write => {
+                        let mut options = WriteOptions::empty();
+                        if flags.contains(BlockIoFlag::FORCE_ACCESS) {
+                            options |= WriteOptions::FORCE_ACCESS;
+                        }
+                        if flags.contains(BlockIoFlag::PRE_BARRIER) {
+                            options |= WriteOptions::PRE_BARRIER;
+                        }
+                        Operation::Write {
+                            device_block_offset: request.dev_offset,
+                            block_count: request.length,
+                            options: options,
+                            vmo_offset: request
+                                .vmo_offset
+                                .checked_mul(self.block_size as u64)
+                                .ok_or(zx::Status::OUT_OF_RANGE)?,
+                        }
+                    }
                     BlockOpcode::Flush => Operation::Flush,
                     BlockOpcode::Trim => Operation::Trim {
                         device_block_offset: request.dev_offset,
@@ -866,7 +870,7 @@ struct DecodedRequest {
 pub type WriteOptions = block_protocol::WriteOptions;
 
 #[repr(C)]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Operation {
     // NOTE: On the C++ side, this ends up as a union and, for efficiency reasons, there is code
     // that assumes that some fields for reads and writes (and possibly trim) line-up (e.g. common
@@ -941,6 +945,7 @@ impl Operation {
             _ => None,
         };
         let (offset, length) = self.blocks_mut()?;
+        let orig_offset = *offset;
         if let Some(mapping) = mapping {
             let delta = *offset - mapping.source_block_offset;
             debug_assert!(*offset - mapping.source_block_offset < mapping.length);
@@ -957,31 +962,34 @@ impl Operation {
                 *length = max as u32;
                 return Some(match self {
                     Operation::Read {
-                        device_block_offset,
+                        device_block_offset: _,
                         block_count: _,
                         vmo_offset,
                         _unused,
                     } => Operation::Read {
-                        device_block_offset: *device_block_offset + max,
+                        device_block_offset: orig_offset + max,
                         block_count: rem,
                         vmo_offset: *vmo_offset + max * block_size as u64,
                         _unused: *_unused,
                     },
                     Operation::Write {
-                        device_block_offset,
+                        device_block_offset: _,
                         block_count: _,
                         vmo_offset,
                         options,
-                    } => Operation::Write {
-                        device_block_offset: *device_block_offset + max,
-                        block_count: rem,
-                        vmo_offset: *vmo_offset + max * block_size as u64,
-                        options: *options,
-                    },
-                    Operation::Trim { device_block_offset, block_count: _ } => Operation::Trim {
-                        device_block_offset: *device_block_offset,
-                        block_count: rem,
-                    },
+                    } => {
+                        // Only send the barrier flag once per write request.
+                        let options = *options & !WriteOptions::PRE_BARRIER;
+                        Operation::Write {
+                            device_block_offset: orig_offset + max,
+                            block_count: rem,
+                            vmo_offset: *vmo_offset + max * block_size as u64,
+                            options,
+                        }
+                    }
+                    Operation::Trim { device_block_offset: _, block_count: _ } => {
+                        Operation::Trim { device_block_offset: orig_offset + max, block_count: rem }
+                    }
                     _ => unreachable!(),
                 });
             }
@@ -1011,7 +1019,10 @@ impl GroupOrRequest {
 
 #[cfg(test)]
 mod tests {
-    use super::{BlockServer, DeviceInfo, PartitionInfo, TraceFlowId, FIFO_MAX_REQUESTS};
+    use super::{
+        BlockOffsetMapping, BlockServer, DeviceInfo, Operation, PartitionInfo, TraceFlowId,
+        FIFO_MAX_REQUESTS,
+    };
     use assert_matches::assert_matches;
     use block_protocol::{BlockFifoCommand, BlockFifoRequest, BlockFifoResponse, WriteOptions};
     use fidl_fuchsia_hardware_block_driver::{BlockIoFlag, BlockOpcode};
@@ -1021,8 +1032,9 @@ mod tests {
     use futures::FutureExt as _;
     use std::borrow::Cow;
     use std::future::poll_fn;
+    use std::num::NonZero;
     use std::pin::pin;
-    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+    use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
     use std::sync::Arc;
     use std::task::{Context, Poll};
     use zx::{AsHandleRef as _, HandleBased as _};
@@ -1040,6 +1052,9 @@ mod tests {
                     + Sync,
             >,
         >,
+        write_hook:
+            Option<Box<dyn Fn(u64) -> BoxFuture<'static, Result<(), zx::Status>> + Send + Sync>>,
+        barrier_hook: Option<Box<dyn Fn() -> Result<(), zx::Status> + Send + Sync>>,
     }
 
     impl super::async_interface::Interface for MockInterface {
@@ -1068,18 +1083,30 @@ mod tests {
 
         async fn write(
             &self,
-            _device_block_offset: u64,
+            device_block_offset: u64,
             _block_count: u32,
             _vmo: &Arc<zx::Vmo>,
             _vmo_offset: u64,
             _opts: WriteOptions,
             _trace_flow_id: TraceFlowId,
         ) -> Result<(), zx::Status> {
-            unreachable!();
+            if let Some(write_hook) = &self.write_hook {
+                write_hook(device_block_offset).await
+            } else {
+                unimplemented!();
+            }
         }
 
         async fn flush(&self, _trace_flow_id: TraceFlowId) -> Result<(), zx::Status> {
             unreachable!();
+        }
+
+        fn barrier(&self) -> Result<(), zx::Status> {
+            if let Some(barrier_hook) = &self.barrier_hook {
+                barrier_hook()
+            } else {
+                unimplemented!();
+            }
         }
 
         async fn trim(
@@ -1101,17 +1128,242 @@ mod tests {
     }
 
     const BLOCK_SIZE: u32 = 512;
+    const MAX_TRANSFER_BLOCKS: u32 = 10;
 
     fn test_device_info() -> DeviceInfo {
         DeviceInfo::Partition(PartitionInfo {
             device_flags: fblock::Flag::READONLY,
-            max_transfer_blocks: None,
+            max_transfer_blocks: NonZero::new(MAX_TRANSFER_BLOCKS),
             block_range: Some(0..100),
             type_guid: [1; 16],
             instance_guid: [2; 16],
             name: "foo".to_string(),
             flags: 0xabcd,
         })
+    }
+
+    #[fuchsia::test]
+    async fn test_split_request_only_issues_single_barrier() {
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
+        let vmo = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
+        let barrier_called = Arc::new(AtomicU32::new(0));
+        let barrier_called_clone = barrier_called.clone();
+
+        futures::join!(
+            async move {
+                let block_server = BlockServer::new(
+                    BLOCK_SIZE,
+                    Arc::new(MockInterface {
+                        barrier_hook: Some(Box::new(move || {
+                            barrier_called_clone.fetch_add(1, Ordering::Relaxed);
+                            Ok(())
+                        })),
+                        write_hook: Some(Box::new(move |_device_block_offset| {
+                            Box::pin(async move { Ok(()) })
+                        })),
+                        ..MockInterface::default()
+                    }),
+                );
+                block_server.handle_requests(stream).await.unwrap();
+            },
+            async move {
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
+
+                proxy.open_session(server).unwrap();
+
+                let vmo_id = session_proxy
+                    .attach_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_ne!(vmo_id.id, 0);
+
+                let mut fifo =
+                    fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
+                // Set length to MAX_TRANSFER_BLOCKS + 1 to ensure the write is split across two
+                // sub requests.
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Write.into_primitive(),
+                            flags: BlockIoFlag::PRE_BARRIER.bits(),
+                            ..Default::default()
+                        },
+                        vmoid: vmo_id.id,
+                        dev_offset: 0,
+                        length: MAX_TRANSFER_BLOCKS + 1,
+                        vmo_offset: 6,
+                        ..Default::default()
+                    })
+                    .await
+                    .unwrap();
+
+                let mut response = BlockFifoResponse::default();
+                reader.read_entries(&mut response).await.unwrap();
+                assert_eq!(response.status, zx::sys::ZX_OK);
+
+                assert_eq!(barrier_called.load(Ordering::Relaxed), 1);
+
+                std::mem::drop(proxy);
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_barriers_not_supported() {
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
+        let vmo = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
+
+        futures::join!(
+            async move {
+                let block_server = BlockServer::new(
+                    BLOCK_SIZE,
+                    Arc::new(MockInterface {
+                        barrier_hook: Some(Box::new(move || Err(zx::Status::NOT_SUPPORTED))),
+                        write_hook: Some(Box::new(move |_device_block_offset| {
+                            Box::pin(async move { Ok(()) })
+                        })),
+                        ..MockInterface::default()
+                    }),
+                );
+                block_server.handle_requests(stream).await.unwrap();
+            },
+            async move {
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
+
+                proxy.open_session(server).unwrap();
+
+                let vmo_id = session_proxy
+                    .attach_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_ne!(vmo_id.id, 0);
+
+                let mut fifo =
+                    fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
+
+                // Set length to MAX_TRANSFER_BLOCKS + 1 to ensure the write is split across two
+                // sub requests.
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Write.into_primitive(),
+                            flags: BlockIoFlag::PRE_BARRIER.bits(),
+                            ..Default::default()
+                        },
+                        vmoid: vmo_id.id,
+                        dev_offset: 0,
+                        length: MAX_TRANSFER_BLOCKS + 1,
+                        vmo_offset: 6,
+                        ..Default::default()
+                    })
+                    .await
+                    .unwrap();
+
+                let mut response = BlockFifoResponse::default();
+                reader.read_entries(&mut response).await.unwrap();
+                assert_eq!(response.status, zx::sys::ZX_ERR_NOT_SUPPORTED);
+
+                std::mem::drop(proxy);
+            }
+        );
+    }
+
+    #[fuchsia::test]
+    async fn test_barriers_ordering() {
+        let (proxy, stream) = fidl::endpoints::create_proxy_and_stream::<fvolume::VolumeMarker>();
+        let vmo = zx::Vmo::create(zx::system_get_page_size() as u64).unwrap();
+        let barrier_called = Arc::new(AtomicBool::new(false));
+
+        futures::join!(
+            async move {
+                let barrier_called_clone = barrier_called.clone();
+                let block_server = BlockServer::new(
+                    BLOCK_SIZE,
+                    Arc::new(MockInterface {
+                        barrier_hook: Some(Box::new(move || {
+                            barrier_called.store(true, Ordering::Relaxed);
+                            Ok(())
+                        })),
+                        write_hook: Some(Box::new(move |device_block_offset| {
+                            let barrier_called = barrier_called_clone.clone();
+                            Box::pin(async move {
+                                // The sleep allows the server to reorder the fifo requests.
+                                if device_block_offset % 2 == 0 {
+                                    fasync::Timer::new(fasync::MonotonicInstant::after(
+                                        zx::MonotonicDuration::from_millis(200),
+                                    ))
+                                    .await;
+                                }
+                                assert!(barrier_called.load(Ordering::Relaxed));
+                                Ok(())
+                            })
+                        })),
+                        ..MockInterface::default()
+                    }),
+                );
+                block_server.handle_requests(stream).await.unwrap();
+            },
+            async move {
+                let (session_proxy, server) = fidl::endpoints::create_proxy();
+
+                proxy.open_session(server).unwrap();
+
+                let vmo_id = session_proxy
+                    .attach_vmo(vmo.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap())
+                    .await
+                    .unwrap()
+                    .unwrap();
+                assert_ne!(vmo_id.id, 0);
+
+                let mut fifo =
+                    fasync::Fifo::from_fifo(session_proxy.get_fifo().await.unwrap().unwrap());
+                let (mut reader, mut writer) = fifo.async_io();
+
+                writer
+                    .write_entries(&BlockFifoRequest {
+                        command: BlockFifoCommand {
+                            opcode: BlockOpcode::Write.into_primitive(),
+                            flags: BlockIoFlag::PRE_BARRIER.bits(),
+                            ..Default::default()
+                        },
+                        vmoid: vmo_id.id,
+                        dev_offset: 0,
+                        length: 5,
+                        vmo_offset: 6,
+                        ..Default::default()
+                    })
+                    .await
+                    .unwrap();
+
+                for i in 0..10 {
+                    writer
+                        .write_entries(&BlockFifoRequest {
+                            command: BlockFifoCommand {
+                                opcode: BlockOpcode::Write.into_primitive(),
+                                ..Default::default()
+                            },
+                            vmoid: vmo_id.id,
+                            dev_offset: i + 1,
+                            length: 5,
+                            vmo_offset: 6,
+                            ..Default::default()
+                        })
+                        .await
+                        .unwrap();
+                }
+                for _ in 0..11 {
+                    let mut response = BlockFifoResponse::default();
+                    reader.read_entries(&mut response).await.unwrap();
+                    assert_eq!(response.status, zx::sys::ZX_OK);
+                }
+
+                std::mem::drop(proxy);
+            }
+        );
     }
 
     #[fuchsia::test]
@@ -1139,7 +1391,7 @@ mod tests {
                 );
                 assert_eq!(block_info.flags, fblock::Flag::READONLY);
 
-                // TODO(https://fxbug.dev/348077960): Check max_transfer_size
+                assert_eq!(block_info.max_transfer_size, MAX_TRANSFER_BLOCKS * BLOCK_SIZE);
 
                 let (status, type_guid) = proxy.get_type_guid().await.unwrap();
                 assert_eq!(status, zx::sys::ZX_OK);
@@ -1388,6 +1640,10 @@ mod tests {
                 }
                 Ok(())
             }
+        }
+
+        fn barrier(&self) -> Result<(), zx::Status> {
+            unreachable!()
         }
 
         async fn trim(
@@ -1797,6 +2053,7 @@ mod tests {
                                 Ok(())
                             })
                         })),
+                        ..MockInterface::default()
                     }),
                 );
                 block_server.handle_requests(stream).await.unwrap();
@@ -1891,6 +2148,7 @@ mod tests {
                     BLOCK_SIZE,
                     Arc::new(MockInterface {
                         read_hook: Some(Box::new(move |_, _, _, _| Box::pin(async { Ok(()) }))),
+                        ..MockInterface::default()
                     }),
                 );
                 block_server.handle_requests(stream).await.unwrap();
@@ -1967,6 +2225,7 @@ mod tests {
                             counter_clone.fetch_add(1, Ordering::Relaxed);
                             Box::pin(async { Err(zx::Status::BAD_STATE) })
                         })),
+                        ..MockInterface::default()
                     }),
                 );
                 block_server.handle_requests(stream).await.unwrap();
@@ -2080,6 +2339,7 @@ mod tests {
                                 Ok(())
                             })
                         })),
+                        ..MockInterface::default()
                     }),
                 );
                 block_server.handle_requests(stream).await.unwrap();
@@ -2184,6 +2444,7 @@ mod tests {
                             Ok(())
                         })
                     })),
+                    ..MockInterface::default()
                 }),
             );
             block_server.handle_requests(stream).await.unwrap();
@@ -2265,6 +2526,7 @@ mod tests {
                                 Ok(())
                             })
                         })),
+                        ..MockInterface::default()
                     }),
                 );
                 block_server.handle_requests(stream).await.unwrap();
@@ -2493,6 +2755,166 @@ mod tests {
 
                 std::mem::drop(proxy);
             }
+        );
+    }
+
+    #[fuchsia::test]
+    fn operation_map() {
+        fn expect_map_result(
+            mut operation: Operation,
+            mapping: Option<BlockOffsetMapping>,
+            max_blocks: Option<NonZero<u32>>,
+            expected_operations: Vec<Operation>,
+        ) {
+            let mut ops = vec![];
+            while let Some(remainder) = operation.map(mapping.as_ref(), max_blocks.clone(), 512) {
+                ops.push(operation);
+                operation = remainder;
+            }
+            ops.push(operation);
+            assert_eq!(ops, expected_operations);
+        }
+
+        // No limits
+        expect_map_result(
+            Operation::Read {
+                device_block_offset: 10,
+                block_count: 200,
+                _unused: 0,
+                vmo_offset: 0,
+            },
+            None,
+            None,
+            vec![Operation::Read {
+                device_block_offset: 10,
+                block_count: 200,
+                _unused: 0,
+                vmo_offset: 0,
+            }],
+        );
+
+        // Max block count
+        expect_map_result(
+            Operation::Read {
+                device_block_offset: 10,
+                block_count: 200,
+                _unused: 0,
+                vmo_offset: 0,
+            },
+            None,
+            NonZero::new(120),
+            vec![
+                Operation::Read {
+                    device_block_offset: 10,
+                    block_count: 120,
+                    _unused: 0,
+                    vmo_offset: 0,
+                },
+                Operation::Read {
+                    device_block_offset: 130,
+                    block_count: 80,
+                    _unused: 0,
+                    vmo_offset: 120 * 512,
+                },
+            ],
+        );
+        expect_map_result(
+            Operation::Write {
+                device_block_offset: 10,
+                block_count: 200,
+                options: WriteOptions::PRE_BARRIER,
+                vmo_offset: 0,
+            },
+            None,
+            NonZero::new(120),
+            vec![
+                Operation::Write {
+                    device_block_offset: 10,
+                    block_count: 120,
+                    options: WriteOptions::PRE_BARRIER,
+                    vmo_offset: 0,
+                },
+                Operation::Write {
+                    device_block_offset: 130,
+                    block_count: 80,
+                    options: WriteOptions::empty(),
+                    vmo_offset: 120 * 512,
+                },
+            ],
+        );
+        expect_map_result(
+            Operation::Trim { device_block_offset: 10, block_count: 200 },
+            None,
+            NonZero::new(120),
+            vec![Operation::Trim { device_block_offset: 10, block_count: 200 }],
+        );
+
+        // Remapping + Max block count
+        expect_map_result(
+            Operation::Read {
+                device_block_offset: 10,
+                block_count: 200,
+                _unused: 0,
+                vmo_offset: 0,
+            },
+            Some(BlockOffsetMapping {
+                source_block_offset: 10,
+                target_block_offset: 100,
+                length: 200,
+            }),
+            NonZero::new(120),
+            vec![
+                Operation::Read {
+                    device_block_offset: 100,
+                    block_count: 120,
+                    _unused: 0,
+                    vmo_offset: 0,
+                },
+                Operation::Read {
+                    device_block_offset: 220,
+                    block_count: 80,
+                    _unused: 0,
+                    vmo_offset: 120 * 512,
+                },
+            ],
+        );
+        expect_map_result(
+            Operation::Write {
+                device_block_offset: 10,
+                block_count: 200,
+                options: WriteOptions::PRE_BARRIER,
+                vmo_offset: 0,
+            },
+            Some(BlockOffsetMapping {
+                source_block_offset: 10,
+                target_block_offset: 100,
+                length: 200,
+            }),
+            NonZero::new(120),
+            vec![
+                Operation::Write {
+                    device_block_offset: 100,
+                    block_count: 120,
+                    options: WriteOptions::PRE_BARRIER,
+                    vmo_offset: 0,
+                },
+                Operation::Write {
+                    device_block_offset: 220,
+                    block_count: 80,
+                    options: WriteOptions::empty(),
+                    vmo_offset: 120 * 512,
+                },
+            ],
+        );
+        expect_map_result(
+            Operation::Trim { device_block_offset: 10, block_count: 200 },
+            Some(BlockOffsetMapping {
+                source_block_offset: 10,
+                target_block_offset: 100,
+                length: 200,
+            }),
+            NonZero::new(120),
+            vec![Operation::Trim { device_block_offset: 100, block_count: 200 }],
         );
     }
 }

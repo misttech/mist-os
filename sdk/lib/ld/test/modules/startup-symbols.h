@@ -20,6 +20,8 @@ extern "C" {
 [[gnu::visibility("default")]] int64_t foo_v1_StartupModulesPriorityOverGlobal();
 [[gnu::visibility("default")]] int64_t call_foo_v1_StartupModulesPriorityOverGlobal();
 
+[[gnu::visibility("default")]] int64_t call_foo_v1_StartupModulesDep();
+
 [[gnu::visibility("default")]] int* get_static_tls_var();
 
 [[gnu::visibility("default"),

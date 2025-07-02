@@ -84,7 +84,7 @@ class FakePDev : public fidl::testing::WireTestBase<fuchsia_hardware_platform_de
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
     if (metadata_id == fuchsia_hardware_clockimpl::ClockIdsMetadata::kSerializableName) {
-      fuchsia_hardware_clockimpl::ClockIdsMetadata metadata{{.clock_ids{}}};
+      fuchsia_hardware_clockimpl::ClockIdsMetadata metadata{{.clock_nodes{}}};
       fit::result encoded_metadata = fidl::Persist(metadata);
       if (encoded_metadata.is_error()) {
         completer.ReplyError(encoded_metadata.error_value().status());

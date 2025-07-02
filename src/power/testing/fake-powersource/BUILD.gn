@@ -5,78 +5,69 @@
 import("//build/components.gni")
 import("//build/drivers.gni")
 import("//build/test.gni")
-import("//build/testing/cc_test_executable.gni")
 
 driver_bind_rules("fake_battery_bind") {
-  rules = "meta/fake-battery-driver.bind"
-  bind_output = "fake-battery-driver.bindbc"
+  rules = "meta/fake_battery_driver.bind"
+  bind_output = "fake_battery_driver.bindbc"
   deps = [ "//src/devices/bind/fuchsia.test" ]
   deps += [ "//src/devices/bind/fuchsia.platform" ]
 }
 
-source_set("fake_battery_driver_lib") {
+source_set("common") {
   sources = [
     "driver.cc",
+    "driver.h",
     "power_source_protocol_server.cc",
+    "power_source_protocol_server.h",
     "power_source_state.cc",
+    "power_source_state.h",
     "simulator_impl.cc",
+    "simulator_impl.h",
   ]
 
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.powersource:fuchsia.hardware.powersource_cpp",
     "//sdk/fidl/fuchsia.hardware.powersource.test:fuchsia.hardware.powersource.test_cpp",
     "//sdk/fidl/fuchsia.power.battery:fuchsia.power.battery_cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",
+    "//src/devices/lib/driver:driver_runtime",
   ]
 }
 
 fuchsia_cc_driver("fake_battery_driver") {
   output_name = "fake_battery"
-
-  deps = [
-    ":fake_battery_bind",
-    ":fake_battery_driver_lib",
-    "//src/devices/lib/driver:driver_runtime",
-  ]
+  deps = [ ":common" ]
 }
 
 fuchsia_driver_component("fake_battery_component") {
   component_name = "fake_battery"
   manifest = "meta/fake_battery_driver.cml"
-  deps = [ ":fake_battery_driver" ]
-  info = "meta/component-info.json"
+  deps = [
+    ":fake_battery_bind",
+    ":fake_battery_driver",
+  ]
+  info = "meta/component_info.json"
 }
 
-fuchsia_driver_package("fake-battery") {
+fuchsia_driver_package("fake_battery") {
   driver_components = [ ":fake_battery_component" ]
 }
 
-cc_test_executable("cpp_test") {
-  testonly = true
-  output_name = "fake-battery-driver-unittests"
-  sources = [ "fake-battery-driver-unittest.cc" ]
-
-  metadata = {
-    test_component_manifest_cml = [
-      {
-        include = [ "//sdk/lib/syslog/use.shard.cml" ]
-      },
-    ]
-  }
+test("fake_battery_test_bin") {
+  output_name = "fake_battery_driver_unittests"
+  sources = [ "fake_battery_driver_unittest.cc" ]
 
   deps = [
-    ":fake_battery_driver_lib",
-    "//sdk/lib/async-loop:async-loop",
-    "//sdk/lib/async_patterns/testing/cpp",
+    ":common",
     "//sdk/lib/driver/testing/cpp",
-    "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
   ]
 }
 
-fuchsia_unittest_package("fake-battery-driver-tests") {
-  deps = [ ":cpp_test" ]
+fuchsia_unittest_package("fake_battery_driver_tests") {
+  deps = [ ":fake_battery_test_bin" ]
 }
 
 test("driver_integration_test") {
@@ -113,7 +104,7 @@ fuchsia_unittest_package("integration_tests") {
 group("tests") {
   testonly = true
   deps = [
-    ":fake-battery-driver-tests",
+    ":fake_battery_driver_tests",
     ":integration_tests",
   ]
 }

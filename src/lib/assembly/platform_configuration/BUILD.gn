@@ -72,6 +72,7 @@ rustc_library("platform_configuration") {
     "//src/lib/assembly/util",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-url",
+    "//src/starnix/lib/features:starnix_features",
     "//src/sys/lib/cm_types",
     "//src/tee/manager-config",
     "//third_party/rust_crates:anyhow",

@@ -200,6 +200,15 @@
         {
             event_codes: [
                 0, // LE
+                0, // OpenL2capChannelRequest
+            ],
+            metric_id: 9,
+            metric_type: "Occurrence",
+            selector: "core/bluetooth-core/bt-host-collection\\:bt-host_*:root/adapter/metrics/le:open_l2cap_channel_requests",
+        },
+        {
+            event_codes: [
+                0, // LE
                 1, // OutgoingConnectionRequest
             ],
             metric_id: 9,

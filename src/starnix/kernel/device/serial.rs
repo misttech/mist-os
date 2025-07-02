@@ -121,7 +121,7 @@ impl SerialDevice {
 impl DeviceOps for Arc<SerialDevice> {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         _current_task: &CurrentTask,
         _id: DeviceType,
         _node: &FsNode,
@@ -136,7 +136,7 @@ impl DeviceOps for Arc<SerialDevice> {
 /// The `index` should be the numerical value associated with the device. For example, if you want
 /// to register /dev/ttyS<n>, then `index` should be `n`.
 pub fn register_serial_device(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     index: u32,
     serial_device: Arc<SerialDevice>,

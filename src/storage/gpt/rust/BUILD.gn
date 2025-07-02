@@ -30,7 +30,7 @@ rustc_library("gpt") {
     "//src/lib/fuchsia-async",
     "//src/storage/gpt:golden_images",
     "//src/storage/lib/block_server",
-    "//src/storage/lib/block_server:fake_block_server",
+    "//src/storage/lib/block_server:vmo_backed_block_server",
   ]
   sources = [
     "src/format.rs",

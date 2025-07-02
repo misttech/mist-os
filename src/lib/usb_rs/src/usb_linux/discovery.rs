@@ -11,7 +11,7 @@ use std::pin::Pin;
 use std::task::{ready, Context, Poll};
 
 use super::DeviceHandleInner;
-use crate::{DeviceEvent, Error, Result};
+use crate::{DeviceEvent, DeviceHandle, Error, Result};
 
 /// Root of the Linux devfs
 static DEV_DIR: &str = "/dev";
@@ -64,6 +64,25 @@ fn read_dir_path_no_dots<P: AsRef<Path>>(
 /// [`std::fs::Permissions`] specifically suggest using `libc::access` if we need more.
 fn readable<P: AsRef<Path>>(path: P) -> bool {
     nix::unistd::access(path.as_ref(), nix::unistd::AccessFlags::R_OK).is_ok()
+}
+
+/// Lists all USB devices currently on the bus.
+pub fn enumerate_devices() -> Result<Vec<DeviceHandle>> {
+    let mut devices: Vec<DeviceHandle> = vec![];
+    for path in read_dir_path_no_dots(USB_FS_DIR)? {
+        let path = path?;
+        if path.is_dir() {
+            for path in read_dir_path_no_dots(path)? {
+                let path = path?;
+                let full_path = path
+                    .to_str()
+                    .ok_or_else(|| Error::BadDeviceName(path.to_string_lossy().to_string()))?
+                    .to_owned();
+                devices.push(DeviceHandleInner::new(full_path).into());
+            }
+        }
+    }
+    Ok(devices)
 }
 
 /// Waits for USB devices to appear on the bus.

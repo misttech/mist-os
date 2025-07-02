@@ -64,7 +64,7 @@ use {
 };
 
 pub fn new_remote_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -138,7 +138,7 @@ const SYNC_IOC_MERGE: u8 = 3;
 impl FileSystemOps for RemoteFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -194,13 +194,13 @@ impl FileSystemOps for RemoteFs {
         "remotefs".into()
     }
 
-    fn generate_node_ids(&self) -> bool {
+    fn uses_external_node_ids(&self) -> bool {
         self.use_remote_ids
     }
 
     fn rename(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
@@ -290,11 +290,12 @@ impl RemoteFs {
         let use_remote_ids = remotefs.use_remote_ids;
         let fs =
             FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), remotefs, options)?;
-        let mut root_node = FsNode::new_root(remote_node);
         if use_remote_ids {
-            root_node.node_id = node_id;
+            fs.create_root(node_id, remote_node);
+        } else {
+            let root_ino = fs.allocate_ino();
+            fs.create_root(root_ino, remote_node);
         }
-        fs.set_root_node(root_node);
         Ok(fs)
     }
 
@@ -343,13 +344,9 @@ pub fn new_remote_file(
         mode = (mode & !FileMode::IFMT) | FileMode::IFSOCK;
     }
     // TODO: https://fxbug.dev/407611229 - Give these nodes valid labels.
-    let file_handle =
-        Anon::new_private_file_extended(current_task, ops, flags, "[fuchsia:remote]", |id| {
-            let mut info = FsNodeInfo::new(id, mode, FsCred::root());
-            update_info_from_attrs(&mut info, &attrs);
-            info
-        });
-    Ok(file_handle)
+    let mut info = FsNodeInfo::new(mode, FsCred::root());
+    update_info_from_attrs(&mut info, &attrs);
+    Ok(Anon::new_private_file_extended(current_task, ops, flags, "[fuchsia:remote]", info))
 }
 
 // Create a FileOps from a zx::Handle.
@@ -557,7 +554,7 @@ impl FsNodeOps for RemoteNode {
 
     fn create_file_ops(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         flags: OpenFlags,
@@ -599,7 +596,7 @@ impl FsNodeOps for RemoteNode {
 
     fn mknod(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -661,20 +658,16 @@ impl FsNodeOps for RemoteNode {
         };
 
         if !fs_ops.use_remote_ids {
-            node_id = fs.next_node_id();
+            node_id = fs.allocate_ino();
         }
-        let child = fs.create_node_with_id(
-            current_task,
-            ops,
-            node_id,
-            FsNodeInfo { rdev: dev, ..FsNodeInfo::new(node_id, mode, owner) },
-        );
+        let child =
+            fs.create_node(node_id, ops, FsNodeInfo { rdev: dev, ..FsNodeInfo::new(mode, owner) });
         Ok(child)
     }
 
     fn mkdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -722,20 +715,15 @@ impl FsNodeOps for RemoteNode {
 
         let ops = RemoteNode { zxio, rights: self.rights };
         if !fs_ops.use_remote_ids {
-            node_id = fs.next_node_id();
+            node_id = fs.allocate_ino();
         }
-        let child = fs.create_node_with_id(
-            current_task,
-            ops,
-            node_id,
-            FsNodeInfo::new(node_id, mode, owner),
-        );
+        let child = fs.create_node(node_id, ops, FsNodeInfo::new(mode, owner));
         Ok(child)
     }
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -745,15 +733,6 @@ impl FsNodeOps for RemoteNode {
         let fs = node.fs();
         let fs_ops = RemoteFs::from_fs(&fs);
 
-        let zxio;
-        let mode;
-        let node_id;
-        let owner;
-        let rdev;
-        let fsverity_enabled;
-        let time_modify;
-        let time_status_change;
-        let time_access;
         let mut attrs = zxio_node_attributes_t {
             has: zxio_node_attr_has_t {
                 protocols: true,
@@ -780,72 +759,69 @@ impl FsNodeOps for RemoteNode {
         if let Some(buffer) = &mut cached_context {
             options = options.with_selinux_context_read(buffer).unwrap();
         }
-        zxio = self
+        let zxio = self
             .zxio
             .open(name, self.rights, options)
             .map_err(|status| from_status_like_fdio!(status, name))?;
         let symlink_zxio = zxio.clone();
-        mode = get_mode(&attrs);
-        node_id = attrs.id;
-        rdev = DeviceType::from_bits(attrs.rdev);
-        owner = FsCred { uid: attrs.uid, gid: attrs.gid };
-        fsverity_enabled = attrs.fsverity_enabled;
+        let mode = get_mode(&attrs);
+        let node_id = if fs_ops.use_remote_ids {
+            if attrs.id == fio::INO_UNKNOWN {
+                return error!(ENOTSUP);
+            }
+            attrs.id
+        } else {
+            fs.allocate_ino()
+        };
+        let owner = FsCred { uid: attrs.uid, gid: attrs.gid };
+        let rdev = DeviceType::from_bits(attrs.rdev);
+        let fsverity_enabled = attrs.fsverity_enabled;
         // fsverity should not be enabled for non-file nodes.
         if fsverity_enabled && (attrs.protocols & ZXIO_NODE_PROTOCOL_FILE == 0) {
             return error!(EINVAL);
         }
         let casefold = attrs.casefold;
-        time_modify =
+        let time_modify =
             UtcInstant::from_nanos(attrs.modification_time.try_into().unwrap_or(i64::MAX));
-        time_status_change =
+        let time_status_change =
             UtcInstant::from_nanos(attrs.change_time.try_into().unwrap_or(i64::MAX));
-        time_access = UtcInstant::from_nanos(attrs.access_time.try_into().unwrap_or(i64::MAX));
-        let node = fs.get_or_create_node(
-            if fs_ops.use_remote_ids {
-                if node_id == fio::INO_UNKNOWN {
-                    return error!(ENOTSUP);
-                }
-                Some(node_id)
+        let time_access = UtcInstant::from_nanos(attrs.access_time.try_into().unwrap_or(i64::MAX));
+
+        let node = fs.get_or_create_node(node_id, || {
+            let ops = if mode.is_lnk() {
+                Box::new(RemoteSymlink { zxio: Mutex::new(zxio) }) as Box<dyn FsNodeOps>
+            } else if mode.is_reg() || mode.is_dir() {
+                Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>
             } else {
-                None
-            },
-            |node_id| {
-                let ops = if mode.is_lnk() {
-                    Box::new(RemoteSymlink { zxio: Mutex::new(zxio) }) as Box<dyn FsNodeOps>
-                } else if mode.is_reg() || mode.is_dir() {
-                    Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>
-                } else {
-                    Box::new(RemoteSpecialNode { zxio }) as Box<dyn FsNodeOps>
-                };
-                let child = FsNode::new_uncached(
+                Box::new(RemoteSpecialNode { zxio }) as Box<dyn FsNodeOps>
+            };
+            let child = FsNode::new_uncached(
+                node_id,
+                ops,
+                &fs,
+                FsNodeInfo {
+                    rdev,
+                    casefold,
+                    time_status_change,
+                    time_modify,
+                    time_access,
+                    ..FsNodeInfo::new(mode, owner)
+                },
+            );
+            if fsverity_enabled {
+                *child.fsverity.lock() = FsVerityState::FsVerity;
+            }
+            if let Some(buffer) = cached_context.as_ref().and_then(|buffer| buffer.get()) {
+                // This is valid to fail if we're using mount point labelling or the
+                // provided context string is invalid.
+                let _ = security::fs_node_notify_security_context(
                     current_task,
-                    ops,
-                    &fs,
-                    node_id,
-                    FsNodeInfo {
-                        rdev,
-                        casefold,
-                        time_status_change,
-                        time_modify,
-                        time_access,
-                        ..FsNodeInfo::new(node_id, mode, owner)
-                    },
+                    &child,
+                    FsStr::new(buffer),
                 );
-                if fsverity_enabled {
-                    *child.fsverity.lock() = FsVerityState::FsVerity;
-                }
-                if let Some(buffer) = cached_context.as_ref().and_then(|buffer| buffer.get()) {
-                    // This is valid to fail if we're using mount point labelling or the
-                    // provided context string is invalid.
-                    let _ = security::fs_node_notify_security_context(
-                        current_task,
-                        &child,
-                        FsStr::new(buffer),
-                    );
-                }
-                Ok(child)
-            },
-        )?;
+            }
+            Ok(child)
+        })?;
         if let Some(symlink) = node.downcast_ops::<RemoteSymlink>() {
             let mut zxio_guard = symlink.zxio.lock();
             *zxio_guard = symlink_zxio;
@@ -855,7 +831,7 @@ impl FsNodeOps for RemoteNode {
 
     fn truncate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         current_task: &CurrentTask,
@@ -867,7 +843,7 @@ impl FsNodeOps for RemoteNode {
 
     fn allocate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         current_task: &CurrentTask,
@@ -889,7 +865,7 @@ impl FsNodeOps for RemoteNode {
 
     fn fetch_and_refresh_info<'a>(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -899,7 +875,7 @@ impl FsNodeOps for RemoteNode {
 
     fn update_attributes(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         info: &FsNodeInfo,
         has: zxio_node_attr_has_t,
@@ -926,7 +902,7 @@ impl FsNodeOps for RemoteNode {
 
     fn unlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -943,7 +919,7 @@ impl FsNodeOps for RemoteNode {
 
     fn create_symlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -967,15 +943,14 @@ impl FsNodeOps for RemoteNode {
                 .map_err(|status| from_status_like_fdio!(status))?;
             attrs.id
         } else {
-            fs.next_node_id()
+            fs.allocate_ino()
         };
-        let symlink = fs.create_node_with_id(
-            current_task,
-            RemoteSymlink { zxio: Mutex::new(zxio) },
+        let symlink = fs.create_node(
             node_id,
+            RemoteSymlink { zxio: Mutex::new(zxio) },
             FsNodeInfo {
                 size: target.len(),
-                ..FsNodeInfo::new(node_id, FileMode::IFLNK | FileMode::ALLOW_ALL, owner)
+                ..FsNodeInfo::new(FileMode::IFLNK | FileMode::ALLOW_ALL, owner)
             },
         );
         Ok(symlink)
@@ -988,7 +963,7 @@ impl FsNodeOps for RemoteNode {
     fn create_tmpfile(
         &self,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         mode: FileMode,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
@@ -1039,21 +1014,16 @@ impl FsNodeOps for RemoteNode {
         let ops = Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>;
 
         if !fs_ops.use_remote_ids {
-            node_id = fs.next_node_id();
+            node_id = fs.allocate_ino();
         }
-        let child = fs.create_node_with_id(
-            current_task,
-            ops,
-            node_id,
-            FsNodeInfo::new(node_id, mode, owner),
-        );
+        let child = fs.create_node(node_id, ops, FsNodeInfo::new(mode, owner));
 
         Ok(child)
     }
 
     fn link(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -1081,7 +1051,7 @@ impl FsNodeOps for RemoteNode {
 
     fn forget(
         self: Box<Self>,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         info: FsNodeInfo,
     ) -> Result<(), Errno> {
@@ -1144,7 +1114,7 @@ impl FsNodeOps for RemoteSpecialNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -1355,14 +1325,14 @@ impl FileOps for RemoteDirectoryObject {
 
     fn seek(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
         let mut iterator = self.iterator.lock();
-        let new_offset = default_seek(current_offset, target, |_| error!(EINVAL))?;
+        let new_offset = default_seek(current_offset, target, || error!(EINVAL))?;
         let mut iterator_position = current_offset;
 
         if new_offset < iterator_position {
@@ -1398,7 +1368,7 @@ impl FileOps for RemoteDirectoryObject {
 
     fn readdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -1425,10 +1395,10 @@ impl FileOps for RemoteDirectoryObject {
                 }
                 Entry::DotDot => {
                     let inode_num = if let Some(parent) = file.name.parent_within_mount() {
-                        parent.node.node_id
+                        parent.node.ino
                     } else {
                         // For the root .. should have the same inode number as .
-                        file.name.entry.node.node_id
+                        file.name.entry.node.ino
                     };
                     sink.add(inode_num, sink.offset() + 1, DirectoryEntryType::DIR, "..".into())
                 }
@@ -1507,7 +1477,7 @@ impl FileOps for RemoteFileObject {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -1518,7 +1488,7 @@ impl FileOps for RemoteFileObject {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1529,7 +1499,7 @@ impl FileOps for RemoteFileObject {
 
     fn get_memory(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
@@ -1576,7 +1546,7 @@ impl FileOps for RemoteFileObject {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -1602,7 +1572,7 @@ impl FsNodeOps for RemoteSymlink {
 
     fn readlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
@@ -1613,7 +1583,7 @@ impl FsNodeOps for RemoteSymlink {
 
     fn fetch_and_refresh_info<'a>(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -1623,7 +1593,7 @@ impl FsNodeOps for RemoteSymlink {
 
     fn forget(
         self: Box<Self>,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         info: FsNodeInfo,
     ) -> Result<(), Errno> {
@@ -1657,7 +1627,7 @@ impl FileOps for RemoteCounter {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -1668,7 +1638,7 @@ impl FileOps for RemoteCounter {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -1679,7 +1649,7 @@ impl FileOps for RemoteCounter {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -1885,7 +1855,7 @@ mod test {
     #[fasync::run_singlethreaded(test)]
     async fn test_new_remote_counter() {
         let (_kernel, current_task, _) = create_kernel_task_and_unlocked();
-        let counter = zx::Counter::create().expect("Counter::create");
+        let counter = zx::Counter::create();
 
         let fd = new_remote_file(&current_task, counter.into(), OpenFlags::RDONLY)
             .expect("new_remote_file");
@@ -2188,7 +2158,7 @@ mod test {
                     dir_handle.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
                     // inode_num for .. for the root should be the same as root.
-                    assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
+                    assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.ino);
 
                     let dir_handle = sub_dir1
                         .entry
@@ -2198,7 +2168,7 @@ mod test {
                     dir_handle.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
                     // inode_num for .. for the first sub directory should be the same as root.
-                    assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.node_id);
+                    assert_eq!(sink.dot_dot_inode_num, ns.root().entry.node.ino);
 
                     let dir_handle = sub_dir2
                         .entry
@@ -2208,7 +2178,7 @@ mod test {
                     dir_handle.readdir(locked, &current_task, &mut sink).expect("readdir failed");
 
                     // inode_num for .. for the second sub directory should be the first sub directory.
-                    assert_eq!(sink.dot_dot_inode_num, sub_dir1.entry.node.node_id);
+                    assert_eq!(sink.dot_dot_inode_num, sub_dir1.entry.node.ino);
                 }
             })
             .await

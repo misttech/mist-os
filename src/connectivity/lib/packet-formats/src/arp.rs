@@ -321,7 +321,7 @@ impl<B, HwAddr, ProtoAddr> Debug for ArpPacket<B, HwAddr, ProtoAddr> {
 
 #[cfg(test)]
 mod tests {
-    use packet::{ParseBuffer, Serializer};
+    use packet::{PacketBuilder, ParseBuffer, Serializer};
 
     use super::*;
     use crate::ethernet::{EthernetFrame, EthernetFrameLengthCheck};
@@ -349,10 +349,9 @@ mod tests {
         assert_eq!(arp.operation(), ARP_OPERATION);
         assert_eq!(frame.src_mac(), arp.sender_hardware_address());
 
-        let frame_bytes = arp
+        let frame_bytes = frame
             .builder()
-            .into_serializer()
-            .encapsulate(frame.builder())
+            .wrap_body(arp.builder().into_serializer())
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(frame_bytes.as_ref(), ETHERNET_FRAME.bytes);

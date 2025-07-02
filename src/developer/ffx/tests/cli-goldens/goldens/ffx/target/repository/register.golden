@@ -38,6 +38,18 @@
     {
       "kind": {
         "Option": {
+          "arg_name": "address-override"
+        }
+      },
+      "optionality": "optional",
+      "long": "--address-override",
+      "short": null,
+      "description": "repository server address override. When provided, overrides the server address registered on the target. Required when the server's listening address is not directly reachable by the target.",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
           "arg_name": "storage-type"
         }
       },

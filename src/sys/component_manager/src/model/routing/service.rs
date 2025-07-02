@@ -77,12 +77,12 @@ impl AnonymizedServiceRoute {
             return false;
         }
 
-        if let Some(collection) = component_leaf_name.collection.as_ref() {
+        if let Some(collection) = component_leaf_name.collection().as_ref() {
             self.members
                 .iter()
-                .any(|m| matches!(m, AggregateMember::Collection(c) if c == collection))
+                .any(|m| matches!(m, AggregateMember::Collection(c) if c == *collection))
         } else {
-            let component_leaf_name: ChildRef = component_leaf_name.clone().into();
+            let component_leaf_name: ChildRef = component_leaf_name.into();
             self.members
                 .iter()
                 .any(|m| matches!(m, AggregateMember::Child(c) if c == &component_leaf_name))
@@ -453,7 +453,13 @@ impl AnonymizedAggregateServiceDir {
 
                     match result {
                         Err(StreamErrorType::Found) => {
-                            cur_path.push(segment.clone());
+                            if !cur_path.push(segment.into()) {
+                                return Err(RoutingError::PathTooLong {
+                                    moniker: moniker.clone().into(),
+                                    path: format!("{cur_path}/{segment}"),
+                                    keyword: "source_path from service watcher (this should be impossible)".into(),
+                                }.into());
+                            }
                             continue;
                         }
                         Err(StreamErrorType::StreamError(err)) => {
@@ -708,7 +714,7 @@ impl AnonymizedAggregateServiceDir {
             && self.route.matches_exposed_service(component_decl)
         {
             let child_moniker = component_moniker.leaf().unwrap(); // checked in `matches_child_component`
-            let instance = AggregateInstance::Child(child_moniker.clone());
+            let instance = AggregateInstance::Child(child_moniker.into());
             let (router, capability_source) =
                 self.aggregate_capability_provider.route_instance(&instance).await?;
 
@@ -742,7 +748,7 @@ impl AnonymizedAggregateServiceDir {
                 }
             }
             inner.entries.retain(|key, _| !matches!(&key.source_id, AggregateInstance::Child(n) if n == target_child_moniker));
-            inner.watchers_spawned.remove(&AggregateInstance::Child(target_child_moniker.clone()));
+            inner.watchers_spawned.remove(&AggregateInstance::Child(target_child_moniker.into()));
         }
         Ok(())
     }
@@ -849,7 +855,7 @@ impl MutableDirectory for Arc<SimpleImmutableDir> {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::model::component::StartReason;

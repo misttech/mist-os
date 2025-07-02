@@ -6,7 +6,7 @@ use std::fmt::{self, Debug, Display};
 use std::time::Duration;
 
 /// Internal representation keeps a value in bits per second (bps).
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, PartialOrd)]
 pub struct Throughput(f64);
 impl Throughput {
     pub fn from_len_and_duration(len: u32, duration: Duration) -> Self {
@@ -14,6 +14,10 @@ impl Throughput {
         let secs = duration.as_secs_f64();
 
         Self(len * 8f64 / secs)
+    }
+
+    pub fn as_f64(&self) -> f64 {
+        self.0
     }
 }
 

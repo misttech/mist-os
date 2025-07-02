@@ -5,12 +5,14 @@
 use crate::device::kobject::{Device, KObjectBased, KObjectHandle, UEventFsNode};
 use crate::task::CurrentTask;
 use crate::vfs::buffers::InputBuffer;
-use crate::vfs::stub_empty_file::StubEmptyFile;
+use crate::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use crate::vfs::pseudo::simple_file::BytesFile;
+use crate::vfs::pseudo::stub_empty_file::StubEmptyFile;
+use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use crate::vfs::{
     fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
-    fs_node_impl_not_dir, BytesFile, DirectoryEntryType, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FileObject, FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    VecDirectory, VecDirectoryEntry, DEFAULT_BYTES_PER_BLOCK,
+    fs_node_impl_not_dir, DirectoryEntryType, FileObject, FileOps, FsNode, FsNodeHandle,
+    FsNodeInfo, FsNodeOps, FsStr, DEFAULT_BYTES_PER_BLOCK,
 };
 use starnix_logging::{bug_ref, track_stub};
 use starnix_sync::{FileOpsCore, Locked};
@@ -66,7 +68,7 @@ impl FsNodeOps for DeviceDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -76,27 +78,25 @@ impl FsNodeOps for DeviceDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
             b"dev" => {
                 if let Some(device_type) = self.device_type() {
-                    Ok(node.fs().create_node(
-                        current_task,
+                    Ok(node.fs().create_node_and_allocate_node_id(
                         BytesFile::new_node(format!("{}\n", device_type).into_bytes()),
-                        FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                        FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                     ))
                 } else {
                     error!(ENOENT)
                 }
             }
-            b"uevent" => Ok(node.fs().create_node(
-                current_task,
+            b"uevent" => Ok(node.fs().create_node_and_allocate_node_id(
                 UEventFsNode::new(self.device.clone()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             )),
             _ => error!(ENOENT),
         }
@@ -145,7 +145,7 @@ impl FsNodeOps for BlockDeviceDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -155,21 +155,19 @@ impl FsNodeOps for BlockDeviceDirectory {
 
     fn lookup(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
-            b"queue" => Ok(node.fs().create_node(
-                current_task,
+            b"queue" => Ok(node.fs().create_node_and_allocate_node_id(
                 BlockDeviceQueueDirectory::new(self.kobject()),
-                FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             )),
-            b"size" => Ok(node.fs().create_node(
-                current_task,
+            b"size" => Ok(node.fs().create_node_and_allocate_node_id(
                 BlockDeviceSizeFile::new_node(self.block_info.clone()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             )),
             _ => self.base_dir.lookup(locked, node, current_task, name),
         }
@@ -191,7 +189,7 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -217,32 +215,29 @@ impl FsNodeOps for BlockDeviceQueueDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
-            b"nr_requests" => Ok(node.fs().create_node(
-                current_task,
+            b"nr_requests" => Ok(node.fs().create_node_and_allocate_node_id(
                 StubEmptyFile::new_node(
                     "/sys/block/DEVICE/queue/nr_requests",
                     bug_ref!("https://fxbug.dev/322906857"),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             )),
-            b"read_ahead_kb" => Ok(node.fs().create_node(
-                current_task,
+            b"read_ahead_kb" => Ok(node.fs().create_node_and_allocate_node_id(
                 ReadAheadKbNode,
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             )),
-            b"scheduler" => Ok(node.fs().create_node(
-                current_task,
+            b"scheduler" => Ok(node.fs().create_node_and_allocate_node_id(
                 StubEmptyFile::new_node(
                     "/sys/block/DEVICE/queue/scheduler",
                     bug_ref!("https://fxbug.dev/322907749"),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), FsCred::root()),
             )),
             _ => {
                 error!(ENOENT)
@@ -287,7 +282,7 @@ impl FsNodeOps for ReadAheadKbNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -306,7 +301,7 @@ impl FileOps for ReadAheadKbFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

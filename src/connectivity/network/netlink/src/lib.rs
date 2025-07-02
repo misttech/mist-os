@@ -53,17 +53,20 @@ pub const NETLINK_LOG_TAG: &'static str = "netlink";
 
 /// Flags to enable/disable certain features to allow for convenient rollbacks.
 #[derive(Copy, Clone, Debug)]
-pub struct FeatureFlags {}
+pub struct FeatureFlags {
+    /// Assume the existence of an `ifb0` interface instead of faking the existence of one.
+    ///
+    /// If true, don't fake the existence of the ifb0 interface (treat requests regarding it like
+    /// any other interface). If false, fake the interface's existence.
+    // TODO(https://fxbug.dev/387998791): Remove this once blackhole interfaces are
+    // implemented.
+    pub assume_ifb0_existence: bool,
+}
 
 impl FeatureFlags {
-    /// Flags to use in "real" binaries.
-    pub fn prod() -> Self {
-        FeatureFlags {}
-    }
-
     /// Flags to use in unit and integration tests.
     pub fn test() -> Self {
-        FeatureFlags {}
+        FeatureFlags { assume_ifb0_existence: false }
     }
 }
 

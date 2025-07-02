@@ -22,7 +22,7 @@ use net_types::ip::Ipv4;
 use netstack_testing_common::realms::{Netstack, TestSandboxExt as _};
 use netstack_testing_common::ASYNC_EVENT_POSITIVE_CHECK_TIMEOUT;
 use netstack_testing_macros::netstack_test;
-use packet::{Buf, ParsablePacket as _, Serializer};
+use packet::{Buf, PacketBuilder as _, ParsablePacket as _, Serializer as _};
 use packet_formats::error::ParseError;
 use packet_formats::ethernet::{
     EtherType, EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck,
@@ -350,7 +350,7 @@ async fn starts_device_in_multicast_promiscuous<N: Netstack>(name: &str) {
     let (control, server_end) =
         fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
     device_control
-        .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
+        .create_interface(&port_id, server_end, fnet_interfaces_admin::Options::default())
         .expect("create interface");
 
     // Read the interface ID to make sure device install succeeded.
@@ -407,7 +407,7 @@ async fn device_minimum_tx_frame_size<N: Netstack>(
     let (control, server_end) =
         fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
     device_control
-        .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
+        .create_interface(&port_id, server_end, fnet_interfaces_admin::Options::default())
         .expect("create interface");
     assert_eq!(control.enable().await.expect("can enabled"), Ok(true));
     tun_port.set_online(true).await.expect("can set online");
@@ -424,16 +424,16 @@ async fn device_minimum_tx_frame_size<N: Netstack>(
     let id = NonZeroU64::new(id).unwrap();
 
     fn expected_frame(body_len: usize) -> Buf<Vec<u8>> {
-        Buf::new(vec![0; body_len], ..)
-            .encapsulate(EthernetFrameBuilder::new(
-                SOURCE_MAC_ADDRESS.into_ext(),
-                TARGET_MAC_ADDRESS.into_ext(),
-                ARBITRARY_ETHERTYPE.into(),
-                0,
-            ))
-            .serialize_vec_outer()
-            .unwrap()
-            .into_inner()
+        EthernetFrameBuilder::new(
+            SOURCE_MAC_ADDRESS.into_ext(),
+            TARGET_MAC_ADDRESS.into_ext(),
+            ARBITRARY_ETHERTYPE.into(),
+            0,
+        )
+        .wrap_body(Buf::new(vec![0; body_len], ..))
+        .serialize_vec_outer()
+        .unwrap()
+        .into_inner()
     }
 
     // Send an ethernet frame with an empty body from a packet socket to see how
@@ -511,7 +511,7 @@ async fn tx_queue_drops<N: Netstack>(name: &str) {
     let (control, server_end) =
         fidl::endpoints::create_proxy::<fnet_interfaces_admin::ControlMarker>();
     device_control
-        .create_interface(&port_id, server_end, &fnet_interfaces_admin::Options::default())
+        .create_interface(&port_id, server_end, fnet_interfaces_admin::Options::default())
         .expect("create interface");
     assert_eq!(control.enable().await.expect("can enabled"), Ok(true));
     tun_port.set_online(true).await.expect("can set online");
@@ -528,16 +528,16 @@ async fn tx_queue_drops<N: Netstack>(name: &str) {
     let socket =
         realm.packet_socket(fposix_socket_packet::Kind::Link).await.expect("can create socket");
 
-    let message = Buf::new(vec![0; 20], ..)
-        .encapsulate(EthernetFrameBuilder::new(
-            SOURCE_MAC_ADDRESS.into_ext(),
-            TARGET_MAC_ADDRESS.into_ext(),
-            ARBITRARY_ETHERTYPE.into(),
-            0,
-        ))
-        .serialize_vec_outer()
-        .unwrap()
-        .into_inner();
+    let message = EthernetFrameBuilder::new(
+        SOURCE_MAC_ADDRESS.into_ext(),
+        TARGET_MAC_ADDRESS.into_ext(),
+        ARBITRARY_ETHERTYPE.into(),
+        0,
+    )
+    .wrap_body(Buf::new(vec![0; 20], ..))
+    .serialize_vec_outer()
+    .unwrap()
+    .into_inner();
 
     // Send more packets than the underlying device can handle at once, so we're
     // certain to exercise netstack waiting for tx buffers to be available

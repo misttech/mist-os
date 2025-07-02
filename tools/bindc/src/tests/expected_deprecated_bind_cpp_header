@@ -108,6 +108,8 @@ static const std::string POWER_DOMAIN_COMPOSITE = "fuchsia.BIND_POWER_DOMAIN_COM
 
 static const std::string CLOCK_ID = "fuchsia.BIND_CLOCK_ID";
 
+static const std::string CLOCK_NODE_ID = "fuchsia.BIND_CLOCK_NODE_ID";
+
 static const std::string SPI_BUS_ID = "fuchsia.BIND_SPI_BUS_ID";
 
 static const std::string SPI_CHIP_SELECT = "fuchsia.BIND_SPI_CHIP_SELECT";

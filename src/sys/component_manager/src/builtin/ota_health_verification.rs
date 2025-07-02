@@ -213,14 +213,14 @@ fn write_to_inspect(node: &fuchsia_inspect::Node, errors: &OtaHealthVerification
     node.record(errors_node);
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use diagnostics_assertions::assert_json_diff;
     use fuchsia_inspect::Inspector;
 
-    #[test]
-    fn success() {
+    #[fuchsia::test]
+    async fn success() {
         let inspector = Inspector::default();
         let errors = OtaHealthVerificationErrors::new();
 
@@ -234,8 +234,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn fail_router() {
+    #[fuchsia::test]
+    async fn fail_router() {
         let inspector = Inspector::default();
         let mut errors = OtaHealthVerificationErrors::new();
         errors.router.push("/bad/route".to_string());
@@ -254,8 +254,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn fail_all_types() {
+    #[fuchsia::test]
+    async fn fail_all_types() {
         let inspector = Inspector::default();
         let mut errors = OtaHealthVerificationErrors::new();
         errors.router.push("/bad/route".to_string());

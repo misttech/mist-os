@@ -21,18 +21,23 @@ use std::fmt::{Debug, Display, Formatter, Result as FmtResult};
 use std::ops::{Add, AddAssign, MulAssign};
 
 pub use diagnostics_hierarchy::{hierarchy, DiagnosticsHierarchy, DiagnosticsHierarchyGetter};
+pub use std::sync::Arc;
 
 pub trait JsonGetter<K: Clone + AsRef<str>>: DiagnosticsHierarchyGetter<K> {
-    fn get_pretty_json(&self) -> String {
-        let mut tree = self.get_diagnostics_hierarchy();
-        tree.to_mut().sort();
-        serde_json::to_string_pretty(&tree).expect("pretty json string")
+    fn get_pretty_json(&self) -> impl std::future::Future<Output = String> {
+        async {
+            let mut tree = self.get_diagnostics_hierarchy().await;
+            tree.to_mut().sort();
+            serde_json::to_string_pretty(&tree).expect("pretty json string")
+        }
     }
 
-    fn get_json(&self) -> String {
-        let mut tree = self.get_diagnostics_hierarchy();
-        tree.to_mut().sort();
-        serde_json::to_string(&tree).expect("json string")
+    fn get_json(&self) -> impl std::future::Future<Output = String> {
+        async {
+            let mut tree = self.get_diagnostics_hierarchy().await;
+            tree.to_mut().sort();
+            serde_json::to_string(&tree).expect("json string")
+        }
     }
 }
 
@@ -47,9 +52,9 @@ impl<K: Clone + AsRef<str>, T: DiagnosticsHierarchyGetter<K>> JsonGetter<K> for 
 /// ```
 /// // Manual creation of `TreeAssertion`.
 /// let mut root = TreeAssertion::new("root", true);
-/// root.add_property_assertion("a-string-property", Box::new("expected-string-value"));
+/// root.add_property_assertion("a-string-property", Arc::new("expected-string-value"));
 /// let mut child = TreeAssertion::new("child", true);
-/// child.add_property_assertion("any-property", Box::new(AnyProperty));
+/// child.add_property_assertion("any-property", Arc::new(AnyProperty));
 /// root.add_child_assertion(child);
 /// root.add_child_assertion(opaque_child);
 ///
@@ -96,7 +101,7 @@ macro_rules! tree_assertion {
 
     // Matching properties of a tree
     (@build $tree_assertion:expr, var $key:ident: $assertion:expr) => {{
-        $tree_assertion.add_property_assertion($key, Box::new($assertion))
+        $tree_assertion.add_property_assertion($key, $crate::Arc::new($assertion))
     }};
     (@build $tree_assertion:expr, var $key:ident: $assertion:expr, $($rest:tt)*) => {{
         $crate::tree_assertion!(@build $tree_assertion, var $key: $assertion);
@@ -248,11 +253,53 @@ macro_rules! tree_assertion {
 /// behavior for reading properties or children with duplicate names is not well defined.
 #[macro_export]
 macro_rules! assert_data_tree {
+    (@executor $exec:expr, $diagnostics_hierarchy:expr, $($rest:tt)+) => {{
+        use $crate::DiagnosticsHierarchyGetter as _;
+        let tree_assertion = $crate::tree_assertion!($($rest)+);
+
+        let mut fut = core::pin::pin!($diagnostics_hierarchy.get_diagnostics_hierarchy());
+        let hierarchy = loop {
+            if let core::task::Poll::Ready(h) = $exec.run_until_stalled(&mut fut) {
+                break h;
+            }
+
+            $exec.wake_next_timer();
+        };
+
+        if let Err(e) = tree_assertion.run(hierarchy.as_ref()) {
+            panic!("tree assertion fails: {}", e);
+        }
+    }};
+    (@retry $times:expr, $diagnostics_hierarchy:expr, $($rest:tt)+) => {{
+        use $crate::DiagnosticsHierarchyGetter as _;
+        use fuchsia_async as fasync;
+        use zx::MonotonicDuration;
+
+        let tree_assertion = $crate::tree_assertion!($($rest)+);
+        let max_retries = $times;
+
+        for i in 0..max_retries {
+            let result = tree_assertion.run(
+                $diagnostics_hierarchy.get_diagnostics_hierarchy().await.as_ref()
+            );
+
+            if result.is_ok() {
+                break;
+            } else if i == (max_retries - 1) && result.is_err() {
+                panic!("tree assertion fails: {}", result.unwrap_err());
+            }
+
+            fasync::Timer::new(MonotonicDuration::from_seconds(1)).await;
+        }
+
+    }};
     ($diagnostics_hierarchy:expr, $($rest:tt)+) => {{
         use $crate::DiagnosticsHierarchyGetter as _;
         let tree_assertion = $crate::tree_assertion!($($rest)+);
 
-        if let Err(e) = tree_assertion.run($diagnostics_hierarchy.get_diagnostics_hierarchy().as_ref()) {
+        if let Err(e) = tree_assertion.run(
+            $diagnostics_hierarchy.get_diagnostics_hierarchy().await.as_ref()
+        ) {
             panic!("tree assertion fails: {}", e);
         }
     }};
@@ -266,9 +313,9 @@ macro_rules! assert_data_tree {
 macro_rules! assert_json_diff {
     ($diagnostics_hierarchy:expr, $($rest:tt)+) => {{
         use $crate::JsonGetter as _;
-        let expected = $diagnostics_hierarchy.get_pretty_json();
+        let expected = $diagnostics_hierarchy.get_pretty_json().await;
         let actual_hierarchy: $crate::DiagnosticsHierarchy = $crate::hierarchy!{$($rest)+};
-        let actual = actual_hierarchy.get_pretty_json();
+        let actual = actual_hierarchy.get_pretty_json().await;
 
         if actual != expected {
             panic!("{}", $crate::Diff::from_text(&expected, &actual));
@@ -332,7 +379,7 @@ pub struct TreeAssertion<K = String> {
     /// in error message
     path: String,
     /// Expected property names and assertions to match the actual properties against
-    properties: Vec<(String, Box<dyn PropertyAssertion<K>>)>,
+    properties: Vec<(String, Arc<dyn PropertyAssertion<K>>)>,
     /// Assertions to match against child trees
     children: Vec<TreeAssertion<K>>,
     /// Whether all properties and children of the tree should be checked
@@ -357,7 +404,7 @@ where
     }
 
     /// Adds a property assertion to this tree assertion.
-    pub fn add_property_assertion(&mut self, key: &str, assertion: Box<dyn PropertyAssertion<K>>) {
+    pub fn add_property_assertion(&mut self, key: &str, assertion: Arc<dyn PropertyAssertion<K>>) {
         self.properties.push((key.to_owned(), assertion));
     }
 
@@ -423,7 +470,7 @@ where
 }
 
 /// Trait implemented by types that can act as properies for assertion.
-pub trait PropertyAssertion<K = String> {
+pub trait PropertyAssertion<K = String>: Send + Sync {
     /// Check whether |actual| property satisfies criteria. Return `Ok` if assertion passes and
     /// `Error` if assertion fails.
     fn run(&self, actual: &Property<K>) -> Result<(), Error>;
@@ -846,7 +893,13 @@ mod tests {
     static TEST_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new("a").unwrap());
 
     #[fuchsia::test]
-    fn test_assert_json_diff() {
+    fn keep_tree_assertion_send_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<TreeAssertion>();
+    }
+
+    #[fuchsia::test]
+    async fn test_assert_json_diff() {
         assert_json_diff!(
             simple_tree(),
              key: {
@@ -870,7 +923,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_panicking_assert_json_diff() {
+    async fn test_panicking_assert_json_diff() {
         assert_json_diff!(
             simple_tree(),
              key: {
@@ -893,7 +946,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_exact_match_simple() {
+    async fn test_exact_match_simple() {
         let diagnostics_hierarchy = simple_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             sub: "sub_value",
@@ -902,7 +955,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_exact_match_complex() {
+    async fn test_exact_match_complex() {
         let diagnostics_hierarchy = complex_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             sub: "sub_value",
@@ -918,7 +971,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_exact_match_mismatched_property_name() {
+    async fn test_exact_match_mismatched_property_name() {
         let diagnostics_hierarchy = simple_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             sub: "sub_value",
@@ -928,7 +981,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_exact_match_mismatched_child_name() {
+    async fn test_exact_match_mismatched_child_name() {
         let diagnostics_hierarchy = complex_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             sub: "sub_value",
@@ -944,7 +997,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_exact_match_mismatched_property_name_in_child() {
+    async fn test_exact_match_mismatched_property_name_in_child() {
         let diagnostics_hierarchy = complex_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             sub: "sub_value",
@@ -960,7 +1013,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_exact_match_mismatched_property_value() {
+    async fn test_exact_match_mismatched_property_value() {
         let diagnostics_hierarchy = simple_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             sub: "sub2_value",
@@ -970,7 +1023,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_exact_match_missing_property() {
+    async fn test_exact_match_missing_property() {
         let diagnostics_hierarchy = simple_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             sub: "sub_value",
@@ -979,7 +1032,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_exact_match_missing_child() {
+    async fn test_exact_match_missing_child() {
         let diagnostics_hierarchy = complex_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             sub: "sub_value",
@@ -991,7 +1044,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_partial_match_success() {
+    async fn test_partial_match_success() {
         let diagnostics_hierarchy = complex_tree();
 
         // only verify the top tree name
@@ -1006,7 +1059,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_partial_match_nonexistent_property() {
+    async fn test_partial_match_nonexistent_property() {
         let diagnostics_hierarchy = simple_tree();
         assert_data_tree!(diagnostics_hierarchy, key: contains {
             sub3: AnyProperty,
@@ -1014,7 +1067,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_ignore_property_value() {
+    async fn test_ignore_property_value() {
         let diagnostics_hierarchy = simple_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             sub: AnyProperty,
@@ -1024,7 +1077,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_ignore_property_value_property_name_is_still_checked() {
+    async fn test_ignore_property_value_property_name_is_still_checked() {
         let diagnostics_hierarchy = simple_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             sub1: AnyProperty,
@@ -1033,7 +1086,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_expr_key_syntax() {
+    async fn test_expr_key_syntax() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::String("@time".to_string(), "1.000".to_string())],
@@ -1045,7 +1098,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_var_key_syntax() {
+    async fn test_var_key_syntax() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::String("@time".to_string(), "1.000".to_string())],
@@ -1061,7 +1114,7 @@ mod tests {
 
     // Similar to above, except the key is stored in a constant.
     #[fuchsia::test]
-    fn test_path_key_syntax() {
+    async fn test_path_key_syntax() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::String("@time".to_string(), "1.000".to_string())],
@@ -1074,7 +1127,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_arrays() {
+    async fn test_arrays() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![
@@ -1095,7 +1148,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_histograms() {
+    async fn test_histograms() {
         let mut condensed_int_histogram =
             ArrayContent::new(vec![6, 7, 0, 9, 0], ArrayFormat::LinearHistogram).unwrap();
         condensed_int_histogram.condense_histogram();
@@ -1197,7 +1250,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_matching_tree_assertion_expression() {
+    async fn test_matching_tree_assertion_expression() {
         let diagnostics_hierarchy = complex_tree();
         let child1 = tree_assertion!(
             child1: {
@@ -1218,21 +1271,21 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_matching_non_unique_property_fails() {
+    async fn test_matching_non_unique_property_fails() {
         let diagnostics_hierarchy = non_unique_prop_tree();
         assert_data_tree!(diagnostics_hierarchy, key: { prop: "prop_value#0" });
     }
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_matching_non_unique_property_fails_2() {
+    async fn test_matching_non_unique_property_fails_2() {
         let diagnostics_hierarchy = non_unique_prop_tree();
         assert_data_tree!(diagnostics_hierarchy, key: { prop: "prop_value#1" });
     }
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_matching_non_unique_property_fails_3() {
+    async fn test_matching_non_unique_property_fails_3() {
         let diagnostics_hierarchy = non_unique_prop_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             prop: "prop_value#0",
@@ -1242,7 +1295,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_matching_non_unique_child_fails() {
+    async fn test_matching_non_unique_child_fails() {
         let diagnostics_hierarchy = non_unique_child_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             child: {
@@ -1253,7 +1306,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_matching_non_unique_child_fails_2() {
+    async fn test_matching_non_unique_child_fails_2() {
         let diagnostics_hierarchy = non_unique_child_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             child: {
@@ -1264,7 +1317,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_matching_non_unique_child_fails_3() {
+    async fn test_matching_non_unique_child_fails_3() {
         let diagnostics_hierarchy = non_unique_child_tree();
         assert_data_tree!(diagnostics_hierarchy, key: {
             child: {
@@ -1277,7 +1330,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_any_string_property_passes() {
+    async fn test_any_string_property_passes() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![
@@ -1294,7 +1347,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_any_string_property_fails() {
+    async fn test_any_string_property_fails() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::Int("value1".to_string(), 10i64)],
@@ -1306,7 +1359,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_string_property_regex_passes() {
+    async fn test_string_property_regex_passes() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::String("value1".to_string(), "aaaabbbb".to_string())],
@@ -1331,7 +1384,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_string_property_regex_no_match() {
+    async fn test_string_property_regex_no_match() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::String("value1".to_string(), "bbbbcccc".to_string())],
@@ -1344,7 +1397,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_string_property_regex_wrong_type() {
+    async fn test_string_property_regex_wrong_type() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::Int("value1".to_string(), 10i64)],
@@ -1356,7 +1409,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_any_bytes_property_passes() {
+    async fn test_any_bytes_property_passes() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![
@@ -1373,7 +1426,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_any_bytes_property_fails() {
+    async fn test_any_bytes_property_fails() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::Int("value1".to_string(), 10i64)],
@@ -1385,7 +1438,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_nonzero_uint_property_passes() {
+    async fn test_nonzero_uint_property_passes() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![
@@ -1402,7 +1455,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_nonzero_uint_property_fails_on_zero() {
+    async fn test_nonzero_uint_property_fails_on_zero() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::Uint("value1".to_string(), 0u64)],
@@ -1415,7 +1468,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_nonzero_uint_property_fails() {
+    async fn test_nonzero_uint_property_fails() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::Int("value1".to_string(), 10i64)],
@@ -1427,7 +1480,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_nonzero_int_property_passes() {
+    async fn test_nonzero_int_property_passes() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::Int("value1".to_string(), 10), Property::Int("value2".to_string(), 20)],
@@ -1441,7 +1494,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_nonzero_int_property_fails_on_zero() {
+    async fn test_nonzero_int_property_fails_on_zero() {
         let diagnostics_hierarchy =
             DiagnosticsHierarchy::new("key", vec![Property::Int("value1".to_string(), 0)], vec![]);
         assert_data_tree!(diagnostics_hierarchy, key: {
@@ -1451,7 +1504,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_nonzero_int_property_fails() {
+    async fn test_nonzero_int_property_fails() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::Uint("value1".to_string(), 10u64)],
@@ -1463,7 +1516,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_uint_property_passes() {
+    async fn test_uint_property_passes() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![
@@ -1480,7 +1533,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_uint_property_fails() {
+    async fn test_uint_property_fails() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::Int("value1".to_string(), 10i64)],
@@ -1492,7 +1545,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_int_property_passes() {
+    async fn test_int_property_passes() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![
@@ -1509,7 +1562,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_int_property_fails() {
+    async fn test_int_property_fails() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::Uint("value1".to_string(), 0u64)],
@@ -1521,7 +1574,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_double_property_passes() {
+    async fn test_double_property_passes() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![
@@ -1538,7 +1591,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_double_property_fails() {
+    async fn test_double_property_fails() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::Uint("value1".to_string(), 0u64)],
@@ -1550,7 +1603,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_numeric_property_passes() {
+    async fn test_numeric_property_passes() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![
@@ -1569,7 +1622,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_numeric_property_fails() {
+    async fn test_numeric_property_fails() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::String("value1".to_string(), "a".to_string())],
@@ -1581,7 +1634,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_bool_property_passes() {
+    async fn test_bool_property_passes() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![
@@ -1598,7 +1651,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_bool_property_fails() {
+    async fn test_bool_property_fails() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::Uint("value1".to_string(), 0u64)],
@@ -1610,7 +1663,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_string_list() {
+    async fn test_string_list() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![
@@ -1627,7 +1680,7 @@ mod tests {
 
     #[fuchsia::test]
     #[should_panic]
-    fn test_string_list_failure() {
+    async fn test_string_list_failure() {
         let diagnostics_hierarchy = DiagnosticsHierarchy::new(
             "key",
             vec![Property::StringList(

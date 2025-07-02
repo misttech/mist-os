@@ -18,6 +18,11 @@ import("//build/toolchain/rbe.gni")
 #     Name of the crate as passed to rustc. All dashes will be replaced
 #     with underscores in the crate name: <name_underscored>
 #
+#   crate_type
+#     Usually GN handles this internally for rust targets, but we have to set it explicitly
+#     for targets that generate a corresponding auxiliary target so that clippy and rustdoc have
+#     access to it. See https://doc.rust-lang.org/reference/linkage.html for possible values
+#
 #   crate_root
 #     Location of the crate root (e.g. `src/main.rs` or `src/lib.rs`).
 #
@@ -77,11 +82,6 @@ import("//build/toolchain/rbe.gni")
 #     target based on clippy's success. Intended for use when testing clippy itself, use in normal
 #     build targets will hide lint warnings from developers and tools while still paying the
 #     overhead of running clippy.
-#
-#   rust_crate_type
-#     Usually GN handles this internally for rust targets, but we have to set it explicitly
-#     for targets that generate a corresponding auxiliary target so that clippy and rustdoc have
-#     access to it. See https://doc.rust-lang.org/reference/linkage.html for possible values
 #
 #   original_target_name
 #     The name of the target as it appears in the BUILD file. Enables tooling
@@ -171,8 +171,8 @@ template("rustc_artifact") {
     }
 
     # These do not have aux targets (yet).
-    _should_define_rust_aux = invoker.rust_crate_type != "cdylib" &&
-                              (invoker.rust_crate_type != "proc-macro" ||
+    _should_define_rust_aux = invoker.crate_type != "cdylib" &&
+                              (invoker.crate_type != "proc-macro" ||
                                current_toolchain == toolchain_variant.base)
 
     if (_should_define_rust_aux) {
@@ -195,12 +195,10 @@ template("rustc_artifact") {
                                  "define_rustdoc_test_override",
                                  "disable_clippy",
                                  "disable_rustdoc",
-                                 "enable_clippy_first_party",
                                  "include_rustdoc_first_party",
                                  "original_target_name",
                                  "quiet_clippy",
                                  "quiet_rustdoc",
-                                 "rust_crate_type",
                                  "rustdoc_args",
                                  "rustdoc_merge",
                                  "rustdoc_out_dir",
@@ -240,12 +238,12 @@ template("rustc_artifact") {
         enable_clippy_first_party =
             !defined(invoker.disable_clippy) || !invoker.disable_clippy
 
-        if (rust_crate_type == "bin") {
+        if (crate_type == "bin") {
           # search index size, mostly.
           disable_rustdoc_binary = true
         }
 
-        if (rust_crate_type == "rlib" || rust_crate_type == "proc-macro") {
+        if (crate_type == "rlib" || crate_type == "proc-macro") {
           if (defined(invoker.output_dir)) {
             searchdir_path = invoker.output_dir
           } else {
@@ -255,11 +253,20 @@ template("rustc_artifact") {
               searchdir_path += "/" + _actual_target_name
             }
           }
-          rlib_path = "${searchdir_path}/lib${crate_name}.rlib"
+
+          _output_name = invoker.crate_name
+          if (defined(invoker.output_name)) {
+            _output_name = invoker.output_name
+          }
+          rlib_path = "${searchdir_path}/lib${_output_name}.rlib"
         }
       }
     } else {
-      not_needed(invoker, [ "original_target_name" ])
+      not_needed(invoker,
+                 [
+                   "original_target_name",
+                   "disable_clippy",
+                 ])
     }
 
     # Every first party Rust target is actually a group of both target_name.actual
@@ -288,20 +295,27 @@ template("rustc_artifact") {
     target(invoker.target_type, _actual_target_name) {
       forward_variables_from(invoker,
                              [
+                               "aliased_deps",
                                "all_dependent_configs",
                                "applicable_licenses",
                                "assert_no_deps",
+                               "crate_type",
                                "data_deps",
                                "deps",
                                "emit_tool_path",
+                               "exclude_toolchain_tags",
                                "metadata",
+                               "output_dir",
+                               "output_extension",
                                "output_name",
                                "output_prefix_override",
                                "pool",
                                "public_configs",
                                "public_deps",
+                               "runtime_deps",
                                "rustenv",
                                "testonly",
+                               "variant_selector_target_type",
                                "visibility",
                              ])
 
@@ -362,14 +376,6 @@ template("rustc_artifact") {
           rustflags += [ "-Clink-args=" + link_arg ]
         }
       }
-
-      # _pass_through and not_needed are to workaround https://crbug.com/gn/10
-      _pass_through = invoker.pass_through
-      assert(!defined(_pass_through.metadata))
-      not_needed([ "_pass_through" ])
-
-      # Pass through these variables unmodified.
-      forward_variables_from(invoker.pass_through, "*")
 
     # The Fuchsia standard library has an implicit #[link] directive
     # pointing to libfdio.so

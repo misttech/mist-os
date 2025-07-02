@@ -46,9 +46,6 @@ async fn data_reformatted_when_corrupt() {
 
 // Verify that WipeStorage can handle a completely corrupted FVM.
 #[fuchsia::test]
-// TODO(https://fxbug.dev/394970436): this test is flaky on devfs. Once we are fully on storage
-// host we can remove this todo and the not(storage-host) section of this ignore, because the flaky
-// configuration will no longer exist.
 // TODO(https://fxbug.dev/388533231): this test doesn't work on storage-host+minfs
 #[cfg_attr(all(feature = "storage-host", feature = "minfs"), ignore)]
 async fn wipe_storage_handles_corrupt_fvm() {
@@ -82,8 +79,8 @@ async fn wipe_storage_handles_corrupt_fvm() {
     let (blob_creator_proxy, blob_creator_server_end) = fidl::endpoints::create_proxy();
 
     // Invoke WipeStorage, which will unbind the FVM, reprovision it, and format/mount Blobfs.
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (_blobfs_root, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
     admin
         .wipe_storage(Some(blobfs_server), Some(blob_creator_server_end))

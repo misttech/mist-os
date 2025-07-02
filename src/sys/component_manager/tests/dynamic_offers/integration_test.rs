@@ -178,7 +178,7 @@ async fn realm_user(
     child_realm_url: String,
     dynamic_offers: Vec<fdecl::Offer>,
 ) -> Result<(), Error> {
-    let realm_proxy = handles.connect_to_protocol::<fcomponent::RealmMarker>().unwrap();
+    let realm_proxy: fcomponent::RealmProxy = handles.connect_to_protocol().unwrap();
     let collection_ref = fdecl::CollectionRef { name: "dynamic_children".to_string() };
     realm_proxy
         .create_child(
@@ -243,7 +243,7 @@ async fn echo_client_mock(
     mut send_echo_client_results: mpsc::Sender<bool>,
 ) -> Result<(), Error> {
     let echo_str = "Hello, hippos!";
-    let echo = handles.connect_to_protocol::<fecho::EchoMarker>()?;
+    let echo: fecho::EchoProxy = handles.connect_to_protocol()?;
     match echo.echo_string(Some(echo_str)).await {
         Ok(response) if response == Some(echo_str.to_string()) => {
             send_echo_client_results.send(true).await.expect("failed to send results");

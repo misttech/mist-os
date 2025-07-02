@@ -34,10 +34,10 @@ Now that you've been warned, here's how this is supposed to work:
     file you should modify to add new top-level targets in the Bazel build
     graph.
 
-  - A top-level `WORKSPACE.bazel` which is by default a symlink to
-    `//build/bazel/toplevel.WORKSPACE.bazel` in the source tree.
-    This is the file you should modify to add new external repositories to
-    the Bazel project.
+  - Top-level `MODULE.bazel` and `WORKSPACE.bzlmod` which are by default
+    symlinks to `//build/bazel/toplevel.[MODULE.bazel|WORKSPACE.bzlmod]` in the
+    source tree. These are the files you should modify to add new external
+    repositories to the Bazel project.
 
   - A top-level auto-generated `.bazelrc` file to configure Bazel.
     Note that this does not support `--config=fuchsia_x64` and

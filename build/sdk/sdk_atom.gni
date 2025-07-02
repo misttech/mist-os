@@ -10,8 +10,11 @@ import("//build/testing/golden_files.gni")
 import("config.gni")
 
 _types_supporting_unstable_atoms = [
+  # LINT.IfChange(unstable_atom_types)
   "cc_source_library",
   "fidl_library",
+
+  # LINT.ThenChange(//build/sdk/generate_idk/__init__.py:unstable_atom_types, //build/sdk/generate_prebuild_idk/generate_prebuild_idk.py)
 ]
 _types_not_requiring_compatibility = [
   "bind_library",
@@ -33,7 +36,14 @@ _valid_data_atom_types = [
   "component_manifest",
   "config",
 
-  # LINT.ThenChange(//build/sdk/generate_idk/__init__.py)
+  # LINT.ThenChange(//build/sdk/generate_idk/validate_idk.py)
+]
+
+# Atom types that may be cross-compiled in a single build directory (as opposed
+# to built for another CPU architecture in a sub-build).
+_cross_compiled_atom_types = [
+  "ffx_tool",
+  "host_tool",
 ]
 
 # Defines an IDK element.
@@ -41,8 +51,8 @@ _valid_data_atom_types = [
 # Outputs
 #
 #   $target_gen_dir/$target_name.sdk
-#     A manifest describing what files pertain to the atom and which other atoms
-#     are required by this atom.
+#     An IDK build manifest describing what files pertain to the atom and which
+#     other atoms are required by this atom.
 #
 #   $target_gen_dir/$target_name.meta.json
 #     A metadata file describing the atom.
@@ -259,8 +269,6 @@ template("sdk_atom") {
   # For support unstable atoms, ensure that `meta.stable`is always
   # specified and either it is true and an `api` file was specified or the
   # category supports unstable atoms.
-  # `add_stable_true_to_meta_json` represents whether the meta.json
-  # generation script would have written "stable" to the file.
   is_type_supporting_unstable = _types_supporting_unstable_atoms + [ type ] -
                                 [ type ] != _types_supporting_unstable_atoms
   assert(
@@ -280,7 +288,6 @@ template("sdk_atom") {
       assert(category != "internal",
              "Atoms in SDK category '${category}' cannot be `stable`.")
       is_stable = true
-      add_stable_true_to_meta_json = true
 
       # For types that specify stable, ensure the `api` file was specified for stable atoms.
       assert(defined(invoker.api))
@@ -294,13 +301,11 @@ template("sdk_atom") {
               category == "internal",
           "`meta.stable` must be true unless the SDK category ('${category}') is 'partner'.")
       is_stable = false
-      add_stable_true_to_meta_json = false
     }
   } else {
     # Atom types that do not support unstable are always stable, but this is not
     # reported in their `meta.json` file.
     is_stable = true
-    add_stable_true_to_meta_json = false
   }
 
   # Handle types that are not in _types_not_requiring_compatibility. Their
@@ -409,7 +414,14 @@ template("sdk_atom") {
       ]
     }
     is_stable = is_stable
-    write_stable_true_to_meta_json = add_stable_true_to_meta_json
+    category = category
+
+    # Ensure tools that may be built multiple times in the same build directory
+    # have unique labels.
+    if (_cross_compiled_atom_types + [ atom_type ] - [ atom_type ] !=
+        _cross_compiled_atom_types) {
+      atom_label += "-${current_cpu}"
+    }
   }
 
   assert(defined(meta.source) != defined(meta.value),
@@ -524,15 +536,15 @@ template("sdk_atom") {
     }
   }
 
-  # Builds a manifest representing this atom.
+  # Generates an IDK build manifest representing this atom.
   # This manifest is only used at build time to generate the IDK. The actual
   # manifest for this atom in the IDK is `meta_file_for_idk`.
   python_action(target_name) {
     forward_variables_from(invoker, _default_forward_from_invoker)
 
-    manifest = "$target_gen_dir/$target_name.sdk"
+    build_manifest = "$target_gen_dir/$target_name.sdk"
     areas_file = "//docs/contribute/governance/areas/_areas.yaml"
-    depfile = "$manifest.d"
+    depfile = "$build_manifest.d"
 
     binary_label = "//build/sdk:create_atom_manifest"
 
@@ -543,13 +555,13 @@ template("sdk_atom") {
 
     inputs = dep_manifests + file_inputs + [ areas_file ]
 
-    outputs = [ manifest ]
+    outputs = [ build_manifest ]
 
     args = [
              "--id",
              invoker.id,
              "--out",
-             rebase_path(manifest, root_build_dir),
+             rebase_path(build_manifest, root_build_dir),
              "--depfile",
              rebase_path(depfile, root_build_dir),
              "--gn-label",
@@ -593,12 +605,8 @@ template("sdk_atom") {
                                [ "idk_atom_prebuild_info" ])
       }
 
-      if (category == "partner") {
-        # Used by idk_prebuild_manifest() template.
-        idk_atom_prebuild_info = [ _idk_atom_prebuild_info ]
-      } else {
-        not_needed([ "_idk_atom_prebuild_info" ])
-      }
+      # Used by idk_prebuild_manifest() template.
+      idk_atom_prebuild_info = [ _idk_atom_prebuild_info ]
     }
 
     # The manifest output contains the output directory.

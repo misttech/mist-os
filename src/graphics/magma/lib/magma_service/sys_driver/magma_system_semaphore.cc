@@ -22,7 +22,7 @@ std::unique_ptr<MagmaSystemSemaphore> MagmaSystemSemaphore::Create(msd::Driver* 
 
   std::unique_ptr<msd::Semaphore> msd_semaphore;
   magma_status_t status =
-      driver->ImportSemaphore(std::move(handle), client_id, flags, &msd_semaphore);
+      driver->MsdImportSemaphore(std::move(handle), client_id, flags, &msd_semaphore);
 
   if (status != MAGMA_STATUS_OK)
     return MAGMA_DRETP(nullptr, "ImportSemaphore failed: %d", status);

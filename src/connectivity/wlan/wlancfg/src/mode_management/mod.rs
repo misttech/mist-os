@@ -157,6 +157,7 @@ impl<T: PartialEq> Event<T> {
     }
 }
 
+#[derive(Debug)]
 pub struct EventHistory<T: PartialEq> {
     events: Vec<Event<T>>,
     retention_time: zx::MonotonicDuration,

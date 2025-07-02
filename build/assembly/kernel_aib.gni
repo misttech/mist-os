@@ -21,15 +21,10 @@ import("//build/python/python_action.gni")
 # Parameters:
 #
 #   kernel_zbi (optional; default: "//zircon/kernel")
-#     [label] Label of the zircon kernel to use.  This needs to use the `images`
-#     metadata key to provide the `path` and `name` fields (see the
-#     build_api_module("images")` in `//BUILD.gn`).  The default value is most likely
-#     the correct one.  This should only be overridden in special circumstances.
-#
-#   kernel_image_name (optional; default: "kernel")
-#     [string] The image name of the 'kernel_zbi' as seen in images.json. This is used
-#     as an override, that in conjunction with 'kernel_zbi' allows selecting a custom zbi
-#     image as the kernel zbi.
+#     [label] Label of the zircon kernel to use.  This needs to use the
+#     `kernel_aib_input` metadata key to provide the `zbi` path from the root
+#     build directory. The default value is most likely the correct one.  This
+#     should only be overridden in special circumstances.
 #
 #   bundle_name [optional; default: legacy]
 #     [string] A different name for the bundle, if not the name of the target.
@@ -60,10 +55,6 @@ template("kernel_assembly_input_bundle") {
     kernel_zbi = "//zircon/kernel"
   }
 
-  if (!defined(kernel_image_name)) {
-    kernel_image_name = "kernel"
-  }
-
   if (!defined(bundles_dir)) {
     bundles_dir = target_out_dir
   }
@@ -79,12 +70,12 @@ template("kernel_assembly_input_bundle") {
     bazel_inputs = "${target_name}_bazel_inputs"
     gn_targets_name = target_name
 
-    kernel_image_metadata = "${target_name}_kernel_image_metadata"
+    kernel_aib_input_metadata = "${target_name}_kernel_aib_input_metadata"
   }
 
   files = {
-    kernel_image_metadata =
-        "$target_out_dir/${target_name}_kernel_image.gn_meta.json"
+    kernel_aib_input_metadata =
+        "$target_out_dir/${target_name}_kernel_aib_input.gn_meta.json"
 
     # Outputs
 
@@ -102,16 +93,16 @@ template("kernel_assembly_input_bundle") {
 
   # Write the kernel image metadata to a file, as this is the only way to get
   # the path to the kernel ZBI.
-  generated_file(labels.kernel_image_metadata) {
+  generated_file(labels.kernel_aib_input_metadata) {
     forward_variables_from(invoker,
                            [
                              "testonly",
                              "visibility",
                            ])
 
-    data_keys = [ "images" ]
-    walk_keys = [ "images_barrier" ]
-    outputs = [ files.kernel_image_metadata ]
+    data_keys = [ "kernel_aib_input" ]
+    walk_keys = [ "kernel_aib_input_barrier" ]
+    outputs = [ files.kernel_aib_input_metadata ]
     output_conversion = "json"
     deps = [ kernel_zbi ]
   }
@@ -127,16 +118,14 @@ template("kernel_assembly_input_bundle") {
 
     outputs = [ files.assembly_input_bundle_config ]
     args = [
-      "--kernel-image-metadata",
-      rebase_path(files.kernel_image_metadata, root_build_dir),
-      "--kernel-image-name",
-      kernel_image_name,
+      "--kernel-aib-input-metadata",
+      rebase_path(files.kernel_aib_input_metadata, root_build_dir),
       "--outdir",
       rebase_path(files.assembly_input_bundle_dir, root_build_dir),
     ]
 
-    inputs = [ files.kernel_image_metadata ]
-    deps = [ ":${labels.kernel_image_metadata}" ]
+    inputs = [ files.kernel_aib_input_metadata ]
+    deps = [ ":${labels.kernel_aib_input_metadata}" ]
 
     metadata = {
       images_barrier = []

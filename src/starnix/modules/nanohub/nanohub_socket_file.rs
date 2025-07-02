@@ -25,7 +25,7 @@ impl FileOps for NanohubSocketFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -44,7 +44,7 @@ impl FileOps for NanohubSocketFile {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -60,7 +60,7 @@ impl FileOps for NanohubSocketFile {
 
     fn wait_async(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -72,7 +72,7 @@ impl FileOps for NanohubSocketFile {
 
     fn query_events(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -81,7 +81,7 @@ impl FileOps for NanohubSocketFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -92,7 +92,7 @@ impl FileOps for NanohubSocketFile {
 
     fn close(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) {

@@ -6,6 +6,7 @@ use anyhow::{Context, Error};
 use attribution_data::AttributionDataProviderImpl;
 use attribution_processing::digest::BucketDefinition;
 use attribution_processing::AttributionDataProvider;
+use cobalt::{collect_metrics_forever, collect_stalls_forever, create_metric_event_logger};
 use fidl::endpoints::{ControlHandle, RequestStream};
 use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_at_path};
 use fuchsia_component::server::ServiceFs;
@@ -14,13 +15,11 @@ use fuchsia_trace::duration;
 use futures::StreamExt;
 use log::{error, warn};
 use memory_monitor2_config::Config;
-use metrics::{collect_metrics_forever, create_metric_event_logger};
 use resources::Job;
 use snapshot::AttributionSnapshot;
 use stalls::StallProvider;
 use std::sync::Arc;
 use traces::CATEGORY_MEMORY_CAPTURE;
-use zx::MonotonicDuration;
 
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_kernel as fkernel,
@@ -32,7 +31,6 @@ use {
 mod attribution_client;
 mod attribution_data;
 mod common;
-mod metrics;
 mod resources;
 mod snapshot;
 
@@ -74,22 +72,20 @@ async fn main() -> Result<(), Error> {
     let kernel_stats = connect_to_protocol::<fkernel::StatsMarker>()
         .context("Failed to connect to the kernel stats provider")?;
 
-    let stall_provider = Arc::new(stalls::StallProviderImpl::new(
-        MonotonicDuration::from_hours(1),
-        Arc::new(connect_to_protocol::<fkernel::StallResourceMarker>()?.get().await?),
-    )?);
+    let stall_provider = Arc::new(stalls::StallProviderImpl::new(Arc::new(
+        connect_to_protocol::<fkernel::StallResourceMarker>()?.get().await?,
+    ))?);
 
     // Serves Fuchsia performance trace system.
     // https://fuchsia.dev/fuchsia-src/concepts/kernel/tracing-system
     // Watch trace category and trace kernel memory stats, until this variable goes out of scope.
     let _kernel_trace_service = fuchsia_async::Task::spawn(traces::kernel::serve_forever(
-        traces::watcher::subscribe(),
         kernel_stats.clone(),
         stall_provider.clone(),
     ));
 
     let attribution_data_provider = AttributionDataProviderImpl::new(attribution_client, root_job);
-    let bucket_definitions = read_bucket_definitions();
+    let bucket_definitions: Arc<[BucketDefinition]> = read_bucket_definitions().into();
     // Serves Fuchsia component inspection protocol
     // https://fuchsia.dev/fuchsia-src/development/diagnostics/inspect
     let _inspect_nodes_service = inspect_nodes::start_service(
@@ -107,8 +103,12 @@ async fn main() -> Result<(), Error> {
     let _collect_metrics_task = fuchsia_async::Task::spawn(collect_metrics_forever(
         attribution_data_provider.clone(),
         kernel_stats.clone(),
+        create_metric_event_logger(metric_event_logger_factory.clone()).await?,
+        bucket_definitions.clone(),
+    ));
+    let _collect_stalls_task = fuchsia_async::Task::spawn(collect_stalls_forever(
+        stall_provider.clone(),
         create_metric_event_logger(metric_event_logger_factory).await?,
-        bucket_definitions,
     ));
 
     service_fs
@@ -117,6 +117,7 @@ async fn main() -> Result<(), Error> {
                 Service::MemoryMonitor(stream) => {
                     if let Err(error) = serve_client_stream(
                         stream,
+                        bucket_definitions.clone(),
                         attribution_data_provider.clone(),
                         kernel_stats.clone(),
                         stall_provider.clone(),
@@ -135,6 +136,7 @@ async fn main() -> Result<(), Error> {
 
 async fn serve_client_stream(
     mut stream: fattribution_plugin::MemoryMonitorRequestStream,
+    bucket_definitions: Arc<[BucketDefinition]>,
     attribution_data_provider: Arc<AttributionDataProviderImpl>,
     kernel_stats_proxy: fkernel::StatsProxy,
     stall_provider: Arc<impl StallProvider>,
@@ -146,6 +148,7 @@ async fn serve_client_stream(
                     attribution_data_provider.clone(),
                     kernel_stats_proxy.clone(),
                     stall_provider.clone(),
+                    bucket_definitions.clone(),
                     snapshot,
                 )
                 .await
@@ -168,6 +171,7 @@ async fn provide_snapshot(
     attribution_data_provider: Arc<AttributionDataProviderImpl>,
     kernel_stats_proxy: fkernel::StatsProxy,
     stall_provider: Arc<impl StallProvider>,
+    bucket_definitions: Arc<[BucketDefinition]>,
     snapshot: zx::Socket,
 ) -> Result<(), Error> {
     duration!(CATEGORY_MEMORY_CAPTURE, c"provide_snapshot");
@@ -181,8 +185,12 @@ async fn provide_snapshot(
 
     let memory_stalls = stall_provider.get_stall_info()?;
 
-    let attribution_snapshot =
-        AttributionSnapshot::new(attribution_data, kernel_stats, memory_stalls);
+    let attribution_snapshot = AttributionSnapshot::new(
+        attribution_data,
+        kernel_stats,
+        memory_stalls,
+        &*bucket_definitions,
+    );
     attribution_snapshot.serve(snapshot).await;
     Ok(())
 }

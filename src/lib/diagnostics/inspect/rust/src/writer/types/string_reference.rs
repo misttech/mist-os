@@ -84,7 +84,7 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
 
     #[fuchsia::test]
-    fn string_references_as_names() {
+    async fn string_references_as_names() {
         let inspector = Inspector::default();
         inspector.root().record_int("foo", 0);
         let child = inspector.root().create_child("bar");

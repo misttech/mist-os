@@ -367,7 +367,7 @@ bool virtual_alloc_arch_alloc_failure_test() {
   EXPECT_OK(VmAspace::kernel_aspace()->arch_aspace().Map(
       vaddr + 240ul * PAGE_SIZE, &page_paddr, 1,
       ARCH_MMU_FLAG_CACHED | ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
-      ArchVmAspace::ExistingEntryAction::Error, nullptr));
+      ArchVmAspace::ExistingEntryAction::Error));
 
   // Attempting our allocation again should fail.
   result = alloc.AllocPages(250);
@@ -379,7 +379,7 @@ bool virtual_alloc_arch_alloc_failure_test() {
 
   // Once we unmap our page we should successfully allocate the original mapping.
   EXPECT_OK(VmAspace::kernel_aspace()->arch_aspace().Unmap(
-      vaddr + 240ul * PAGE_SIZE, 1, ArchVmAspaceInterface::ArchUnmapOptions::None, nullptr));
+      vaddr + 240ul * PAGE_SIZE, 1, ArchVmAspaceInterface::ArchUnmapOptions::None));
 
   result = alloc.AllocPages(250);
   ASSERT_TRUE(result.is_ok());

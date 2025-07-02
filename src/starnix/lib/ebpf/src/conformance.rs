@@ -6,7 +6,7 @@
 pub mod test {
     use crate::{
         link_program_dynamic, verify_program, BpfValue, CallingContext, DataWidth, EbpfHelperImpl,
-        EbpfInstruction, EbpfProgramContext, FromBpfValue, FunctionSignature, MemoryId,
+        EbpfInstruction, EbpfProgramContext, FromBpfValue, FunctionSignature, HelperSet, MemoryId,
         MemoryParameterSize, NoMap, NullVerifierLogger, Packet, ProgramArgument, Type, BPF_ABS,
         BPF_ADD, BPF_ALU, BPF_ALU64, BPF_AND, BPF_ARSH, BPF_ATOMIC, BPF_B, BPF_CALL, BPF_CMPXCHG,
         BPF_DIV, BPF_DW, BPF_END, BPF_EXIT, BPF_FETCH, BPF_H, BPF_IMM, BPF_IND, BPF_JA, BPF_JEQ,
@@ -906,10 +906,10 @@ pub mod test {
 
         let malloc_id = MemoryId::new();
         let mut helpers = HashMap::<u32, FunctionSignature>::new();
-        let mut helper_impls = HashMap::<u32, EbpfHelperImpl<TestEbpfProgramContext>>::new();
+        let mut helper_impls = Vec::<(u32, EbpfHelperImpl<TestEbpfProgramContext>)>::new();
         let mut add_helper = |id, signature, impl_| {
             helpers.insert(id, signature);
-            helper_impls.insert(id, EbpfHelperImpl(impl_));
+            helper_impls.push((id, EbpfHelperImpl(impl_)));
         };
 
         add_helper(
@@ -1048,7 +1048,7 @@ pub mod test {
                 &verified_program,
                 &[],
                 vec![],
-                helper_impls,
+                HelperSet::new(helper_impls),
             )
             .expect("failed to link a test program");
 

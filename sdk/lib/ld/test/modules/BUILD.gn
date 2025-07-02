@@ -20,9 +20,10 @@ import("//sdk/lib/ld/testing/test_elf_object.gni")
 per_test_modules = [
   ":multiple-foo-deps",
   ":transitive-foo-dep",
-  ":multiple-transitive-foo-deps",
   ":root-precedence-in-dep-resolution",
   ":precedence-in-dep-resolution",
+  ":soname-filename-loaded-dep",
+  ":soname-filename-dep",
 ]
 
 per_test_executables = [
@@ -40,6 +41,8 @@ per_test_executables = [
   ":cyclic-dep-parent",
 ]
 
+per_test_shlibs = [ ":multiple-transitive-foo-deps" ]
+
 per_test_suffices = [
   "NotFound",
   "InvalidMode",
@@ -56,6 +59,9 @@ per_test_suffices = [
   "MissingTransitiveDependency",
   "BasicModuleReuse",
   "UniqueModules",
+  "SonameFilenameMatch",
+  "SonameFilenameDep",
+  "SonameFilenameLoadedDep",
   "DepOrder",
   "TransitiveDepOrder",
   "CyclicalDependency",
@@ -75,7 +81,13 @@ per_test_suffices = [
   "PrecedenceInDepResolution",
   "StartupModulesBasic",
   "StartupModulesPriorityOverGlobal",
+  "StartupModulesDep",
+  "StartupModulesDepOrder",
   "RtldNoLoadBasic",
+  "RtldNoDeleteBasic",
+  "RtldNoDeletePromotion",
+  "RtldNoDeleteDep",
+  "RtldNoDeleteDepPromotion",
   "DlIteratePhdrBasic",
   "ModuleNameOwnership",
 ]
@@ -103,6 +115,9 @@ group("dl-test-data.deps") {
     ":tls-ld-dep-module",
   ]
   foreach(suffix, per_test_suffices) {
+    foreach(test, per_test_shlibs) {
+      deps += [ "$test.$suffix" ]
+    }
     foreach(test, per_test_modules + per_test_executables) {
       # Note this isn't the .test-data subtarget, it's just the main target.
       # The .test-data subtarget places the module and its runtime deps into a
@@ -121,10 +136,12 @@ group("dl-unittest.deps") {
   visibility = [ "//sdk/lib/dl/test:*" ]
   testonly = true
   deps = [
+    ":has-foo-v1.StartupModulesDep",
     ":has-foo-v1.StartupModulesPriorityOverGlobal",
     ":init-fini-var",
     ":ld-dep-foo-v1.StartupModulesBasic",
     ":ld-dep-foo-v2.StartupModulesBasic",
+    ":multiple-transitive-foo-deps.StartupModulesDepOrder",
     ":static-tls-var",
   ]
 }
@@ -636,8 +653,8 @@ source_set("test-ubsan") {
       "test-ubsan.h",
     ]
     deps = [
+      "//sdk/lib/c/stdio/printf_core:wrapper",
       "//src/lib/ubsan-custom:handlers",
-      "//zircon/system/ulib/c/stdio/printf_core:wrapper",
     ]
     if (is_fuchsia) {
       sources += [ "test-ubsan-zircon.cc" ]
@@ -851,7 +868,7 @@ test_executable("tls-exec-only") {
   ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs = [ "//build/config:remote_link_scandeps_workaround" ]
+  configs = [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 test_executable("tls-shlib-only") {
@@ -903,8 +920,8 @@ test_loadable_module("tls-dep-module") {
 test_shared_library("tls-desc-dep") {
   visibility = [
     ":*",
+    "//sdk/lib/c/*",
     "//sdk/lib/dl/test/*",
-    "//zircon/system/ulib/c/*",
   ]
 
   public = [ "tls-dep.h" ]
@@ -1103,7 +1120,7 @@ test_executable("fixed-load-address") {
   deps = [ "//src/lib/elfldltl" ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs = [ "//build/config:remote_link_scandeps_workaround" ]
+  configs = [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 test_executable("second-session") {
@@ -1524,7 +1541,7 @@ foreach(test, [ "" ] + per_test_suffices) {
   #     - foo-v1 -> foo() returns 2
   #   - has-foo-v2:
   #    - foo-v2 -> foo() returns 7
-  test_loadable_module("multiple-transitive-foo-deps$suffix.module") {
+  test_shared_library("multiple-transitive-foo-deps$suffix") {
     deps = [
       ":has-foo-v1$suffix",
       ":has-foo-v2$suffix",
@@ -1592,6 +1609,66 @@ foreach(test, [ "" ] + per_test_suffices) {
     defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     sources = [ "foo.cc" ]
     deps = [ ":ld-dep-foo-v1$suffix" ]
+  }
+
+  # soname-filename-match:
+  #   - libbar-soname
+  test_shared_library("soname-filename-match$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "ret17.cc" ]
+    deps = [ ":bar-soname$suffix" ]
+  }
+
+  test_shared_library("bar-soname$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "ret17.cc" ]
+  }
+
+  test_shared_library("foo-filename$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
+    sources = [ "ret17.cc" ]
+    ldflags = [ "-Wl,-soname=libbar-soname$suffix.so" ]
+  }
+
+  # A stub for foo-filename, to guarantee that GN will insert libfoo-filename as
+  # a DT_NEEDED.
+  test_ifs_shared_library("foo-filename$suffix.ifs") {
+    soname = "libfoo-filename$suffix.so"
+    symbols = []
+
+    # Pull in the actual target so that it can be loaded by tests directly.
+    data_deps = [ ":foo-filename$suffix" ]
+  }
+
+  # soname-filename-dep:
+  #  - soname-filename-match
+  #    - libbar-soname
+  #  - libfoo-filename (with DT_SONAME libbar-soname)
+  test_loadable_module("soname-filename-dep$suffix.module") {
+    deps = [
+      # This inserts a DT_NEEDED entry for "foo-filename". When the test looks
+      # for this file, it will fetch the shlib belonging to :foo-filename.
+      ":soname-filename-match$suffix",
+    ]
+
+    # Prevent formatting from re-ordering deps, this dependency must come second
+    # in this list.
+    deps += [ ":foo-filename$suffix.ifs" ]
+  }
+
+  # soname-filename-loaded-dep:
+  #  - libfoo-filename (with DT_SONAME libbar-soname)
+  #  - soname-filename-match
+  #    - libbar-soname
+  test_loadable_module("soname-filename-loaded-dep$suffix.module") {
+    deps = [
+      # This inserts a DT_NEEDED entry for "foo-filename". When the test looks
+      # for this file, it will fetch the shlib belonging to :foo-filename.
+      ":foo-filename$suffix.ifs",
+
+      # This dependency must come second in this list.
+      ":soname-filename-match$suffix",
+    ]
   }
 }
 
@@ -1926,7 +2003,7 @@ test_shared_library("static-tls-var") {
   sources = [ "static-tls-var.cc" ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs = [ "//build/config:remote_link_scandeps_workaround" ]
+  configs = [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 # This resolves a static TLS symbol with tls-desc.
@@ -1961,7 +2038,7 @@ test_loadable_module("static-tls-module") {
   configs += [ "//build/config/lto:no-lto" ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs += [ "//build/config:remote_link_scandeps_workaround" ]
+  configs += [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 source_set("mock-tls-get-addr") {
@@ -1991,7 +2068,7 @@ test_loadable_module("tls-get-addr-global-dynamic-reloc") {
   configs += [ "//build/config:no-tlsdesc" ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs += [ "//build/config:remote_link_scandeps_workaround" ]
+  configs += [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 test_loadable_module("tls-get-addr-local-dynamic-reloc") {
@@ -2012,7 +2089,7 @@ test_loadable_module("tls-get-addr-local-dynamic-reloc") {
   configs += [ "//build/config/lto:no-lto" ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs += [ "//build/config:remote_link_scandeps_workaround" ]
+  configs += [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 test_executable("llvm-profdata") {
@@ -2024,12 +2101,15 @@ test_executable("llvm-profdata") {
   ]
 
   # workaround for b/349448459 to remote-link successfully
-  configs = [ "//build/config:remote_link_scandeps_workaround" ]
+  configs = [ "//build/config/rbe:remote_link_scandeps_workaround" ]
 }
 
 test_executable("backtrace") {
   sources = [ "backtrace.cc" ]
-  deps = [ "//zircon/system/public" ]
+  deps = [
+    "//zircon/kernel/lib/arch",
+    "//zircon/system/public",
+  ]
 }
 
 # Each dep module exports first(), second(), and third() return that multiplier

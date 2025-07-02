@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![recursion_limit = "256"]
+
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_hardware_temperature as ftemperature;
 use fuchsia_async::TimeoutExt;
@@ -11,9 +13,11 @@ use once_cell::sync::OnceCell;
 use starnix_core::device::kobject::Device;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
+use starnix_core::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
-    fs_node_impl_dir_readonly, BytesFile, BytesFileOps, DirectoryEntryType, FileOps, FsNode,
-    FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, VecDirectory, VecDirectoryEntry,
+    fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr,
 };
 use starnix_logging::{log_error, log_warn};
 use starnix_sync::{FileOpsCore, Locked, Unlocked};
@@ -50,7 +54,7 @@ impl FsNodeOps for ThermalZoneDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -81,31 +85,27 @@ impl FsNodeOps for ThermalZoneDirectory {
 
     fn lookup(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
-            b"temp" => Ok(node.fs().create_node(
-                current_task,
+            b"temp" => Ok(node.fs().create_node_and_allocate_node_id(
                 TemperatureFile::new_node(self.proxy.clone()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o664), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o664), FsCred::root()),
             )),
-            b"type" => Ok(node.fs().create_node(
-                current_task,
+            b"type" => Ok(node.fs().create_node_and_allocate_node_id(
                 BytesFile::new_node(format!("{}\n", self.device_type).into_bytes()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             )),
-            b"policy" => Ok(node.fs().create_node(
-                current_task,
+            b"policy" => Ok(node.fs().create_node_and_allocate_node_id(
                 BytesFile::new_node(format!("{}\n", "step_wise").into_bytes()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             )),
-            b"available_policies" => Ok(node.fs().create_node(
-                current_task,
+            b"available_policies" => Ok(node.fs().create_node_and_allocate_node_id(
                 BytesFile::new_node(format!("{}\n", "step_wise").into_bytes()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             )),
             _ => self.base_dir.lookup(locked, node, current_task, name),
         }
@@ -140,7 +140,7 @@ impl BytesFileOps for TemperatureFile {
 }
 
 pub fn thermal_device_init(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     devices: Vec<String>,
 ) {

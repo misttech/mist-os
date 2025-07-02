@@ -2110,6 +2110,42 @@ INSTANTIATE_TEST_SUITE_P(NetSocket, IcmpSocketTest,
                          testing::Values(std::make_pair(SocketDomain::IPv4(), IPPROTO_ICMP),
                                          std::make_pair(SocketDomain::IPv6(), IPPROTO_ICMPV6)));
 
+class SocketCookieTest : public SocketOptionTestBase,
+                         public testing::WithParamInterface<SocketKind> {
+ protected:
+  SocketCookieTest() : SocketOptionTestBase(std::get<0>(GetParam()), std::get<1>(GetParam())) {}
+};
+
+TEST_P(SocketCookieTest, GetCookie) {
+  uint64_t cookie1 = 0;
+  socklen_t optlen = sizeof(cookie1);
+  ASSERT_EQ(getsockopt(sock().get(), SOL_SOCKET, SO_COOKIE, &cookie1, &optlen), 0)
+      << strerror(errno);
+  ASSERT_EQ(optlen, sizeof(cookie1));
+
+  // Create another socket and verify it gets a different cookie.
+  fbl::unique_fd fd;
+  EXPECT_TRUE(
+      fd = fbl::unique_fd(socket(std::get<0>(GetParam()).Get(), std::get<1>(GetParam()).Get(), 0)))
+      << strerror(errno);
+  uint64_t cookie2 = 0;
+  ASSERT_EQ(getsockopt(fd.get(), SOL_SOCKET, SO_COOKIE, &cookie2, &optlen), 0) << strerror(errno);
+  EXPECT_EQ(optlen, sizeof(cookie2));
+
+  EXPECT_NE(cookie1, cookie2);
+}
+
+TEST_P(SocketCookieTest, SetCookie) {
+  uint64_t cookie = 5;
+  ASSERT_EQ(setsockopt(sock().get(), SOL_SOCKET, SO_COOKIE, &cookie, sizeof(cookie)), -1);
+  ASSERT_EQ(errno, ENOPROTOOPT);
+}
+
+INSTANTIATE_TEST_SUITE_P(
+    SocketCookieTest, SocketCookieTest,
+    testing::Combine(testing::Values(SocketDomain::IPv4(), SocketDomain::IPv6()),
+                     testing::Values(SocketType::Stream(), SocketType::Dgram())));
+
 #if defined(__Fuchsia__)
 
 using SocketKindAndMarkDomain = std::tuple<SocketDomain, SocketType, uint8_t>;

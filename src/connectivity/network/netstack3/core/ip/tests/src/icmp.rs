@@ -12,7 +12,7 @@ use ip_test_macro::ip_test;
 use net_declare::{net_ip_v4, net_ip_v6};
 use net_types::ip::{IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Subnet};
 use net_types::{SpecifiedAddr, Witness};
-use packet::{Buf, Serializer};
+use packet::{Buf, PacketBuilder, Serializer};
 use packet_formats::ethernet::EthernetFrameLengthCheck;
 use packet_formats::icmp::{
     IcmpDestUnreachable, IcmpEchoReply, IcmpEchoRequest, IcmpMessage, IcmpPacket,
@@ -86,7 +86,7 @@ fn test_receive_ip_packet<
         proto,
     );
     modify_packet_builder(&mut pb);
-    let buffer = Buf::new(body, ..).encapsulate(pb).serialize_vec_outer().unwrap();
+    let buffer = pb.wrap_body(Buf::new(body, ..)).serialize_vec_outer().unwrap();
 
     let (mut ctx, device_ids) = FakeCtxBuilder::with_addrs(I::TEST_ADDRS)
         .build_with_modifications(modify_stack_state_builder);
@@ -185,7 +185,7 @@ fn test_receive_echo(test_mark_reflection: bool) {
         let req = IcmpEchoRequest::new(0, 0);
         let req_body = &[1, 2, 3, 4];
         let mut buffer = Buf::new(req_body.to_vec(), ..)
-            .encapsulate(IcmpPacketBuilder::<I, _>::new(
+            .wrap_in(IcmpPacketBuilder::<I, _>::new(
                 I::TEST_ADDRS.remote_ip.get(),
                 I::TEST_ADDRS.local_ip.get(),
                 IcmpZeroCode,
@@ -222,7 +222,7 @@ fn test_receive_timestamp(test_mark_reflection: bool) {
 
     let req = Icmpv4TimestampRequest::new(1, 2, 3);
     let mut buffer = Buf::new(Vec::new(), ..)
-        .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
+        .wrap_in(IcmpPacketBuilder::<Ipv4, _>::new(
             TEST_ADDRS_V4.remote_ip,
             TEST_ADDRS_V4.local_ip,
             IcmpZeroCode,
@@ -323,7 +323,7 @@ fn test_port_unreachable(test_mark_reflection: bool) {
             for<'a> IcmpMessage<I, Code = C, Body<&'a [u8]> = OriginalPacket<&'a [u8]>>,
     {
         let mut buffer = Buf::new(vec![0; 128], ..)
-            .encapsulate(UdpPacketBuilder::new(
+            .wrap_in(UdpPacketBuilder::new(
                 I::TEST_ADDRS.remote_ip.get(),
                 I::TEST_ADDRS.local_ip.get(),
                 None,
@@ -470,13 +470,13 @@ fn icmp_reply_follows_request_interface<I: TestIpExt + IpExt>() {
         I::map_ip_out((), |()| net_ip_v4!("224.0.0.1"), |()| net_ip_v6!("ff02::1"));
 
     let buffer = Buf::new(req_body, ..)
-        .encapsulate(IcmpPacketBuilder::<I, _>::new(
+        .wrap_in(IcmpPacketBuilder::<I, _>::new(
             I::TEST_ADDRS.remote_ip.get(),
             multicast_addr,
             IcmpZeroCode,
             IcmpEchoRequest::new(0, 0),
         ))
-        .encapsulate(<I as packet_formats::ip::IpExt>::PacketBuilder::new(
+        .wrap_in(<I as packet_formats::ip::IpExt>::PacketBuilder::new(
             I::TEST_ADDRS.remote_ip.get(),
             multicast_addr,
             TTL,

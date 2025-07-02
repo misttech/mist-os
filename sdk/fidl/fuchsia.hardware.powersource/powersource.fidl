@@ -33,7 +33,7 @@ type BatterySpec = table {
     1: max_charging_current_ua int32;
 
     /// Represent the battery's charging voltage spec in micro volt
-    2: max_charnging_voltage_uv int32;
+    2: max_charging_voltage_uv int32;
 
     /// Battery Full Charge Design Capacity in micro amp hour
     3: design_capacity_uah int32;

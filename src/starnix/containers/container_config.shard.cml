@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 {
     use: [
+        // LINT.IfChange
         {
             config: "fuchsia.starnix.config.container.ExtraFeatures",
             key: "extra_features",
@@ -17,6 +18,8 @@
             // See https://fxbug.dev/379782290 for context.
             availability: "transitional",
         },
+
+        // LINT.ThenChange(//src/starnix/kernel/meta/starnix_kernel.cml)
         {
             config: "fuchsia.starnix.config.container.MlockAlwaysOnFault",
             key: "mlock_always_onfault",
@@ -57,16 +60,6 @@
             default: false,
 
             // See https://fxbug.dev/379782290 for context.
-            availability: "transitional",
-        },
-        {
-            config: "fuchsia.time.config.HasWakeAlarms",
-            key: "enable_wake_alarms",
-            type: "bool",
-
-            // TODO: b/416081776 - set to false once actual config is deployed.
-            // Current behavior is equivalent to having this set to `true`.
-            default: true,
             availability: "transitional",
         },
         {

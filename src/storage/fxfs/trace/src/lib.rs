@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 pub use fxfs_trace_macros::*;
-pub use storage_trace::{self, TraceFutureExt};
+pub use storage_trace::{self, Scope, TraceFutureExt};
 
 #[doc(hidden)]
 pub mod __reexport {
@@ -14,6 +14,13 @@ pub mod __reexport {
 macro_rules! duration {
     ($name:expr $(, $key:expr => $val:expr)*) => {
         $crate::storage_trace::duration!(c"fxfs", $name $(,$key => $val)*);
+    }
+}
+
+#[macro_export]
+macro_rules! instant {
+    ($name:expr, $scope:expr $(, $key:expr => $val:expr)*) => {
+        $crate::storage_trace::instant!(c"fxfs", $name, $scope $(,$key => $val)*);
     }
 }
 

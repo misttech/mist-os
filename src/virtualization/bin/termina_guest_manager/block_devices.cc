@@ -6,7 +6,9 @@
 
 #include <dirent.h>
 #include <fcntl.h>
+#include <fidl/fuchsia.fxfs/cpp/wire.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/fd.h>
@@ -107,14 +109,8 @@ zx::result<fidl::InterfaceHandle<fuchsia::hardware::block::Block>> GetFxfsPartit
 
   /// Now we can try to reopen the file, but in block device mode
 
-  /// First we have to open the parent directory...
-  auto dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  if (dir_endpoints.status_value() != ZX_OK) {
-    FX_PLOGS(ERROR, dir_endpoints.status_value())
-        << "CreateEndpoints() for Fxfs parent directory failed";
-    return zx::error(dir_endpoints.status_value());
-  }
-  auto [dir_client, dir_server] = *std::move(dir_endpoints);
+  /// First we have to open the parent directory and get a token...
+  auto [dir_client, dir_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
   std::filesystem::path image_path(image.path);
   uint64_t dir_flags = static_cast<uint64_t>(fio::wire::kPermReadable | fio::wire::kPermWritable |
                                              fio::Flags::kProtocolDirectory);
@@ -124,30 +120,34 @@ zx::result<fidl::InterfaceHandle<fuchsia::hardware::block::Block>> GetFxfsPartit
     FX_PLOGS(ERROR, dir_open_status) << "fdio_open3(Fxfs image.path.parent) failed";
     return zx::error(dir_open_status);
   }
+  fidl::WireResult token = fidl::WireCall(dir_client)->GetToken();
+  if (!token.ok()) {
+    FX_LOGS(ERROR) << "Failed to GetToken" << token.FormatDescription();
+    return zx::error(token.error().status());
+  }
 
-  // We want to open the "file" at image.path, but as a block device (i.e. fuchsia.hardware.block).
-  fio::OpenFlags flags = fio::OpenFlags::kRightReadable;
-  if (!image.read_only) {
-    flags |= fio::OpenFlags::kRightWritable;
+  /// Then, we can open the file in block mode.
+  auto [device_client, device_server] =
+      fidl::Endpoints<fuchsia_hardware_block_volume::Volume>::Create();
+  auto [provider_client, provider_server] =
+      fidl::Endpoints<fuchsia_fxfs::FileBackedVolumeProvider>::Create();
+  if (zx::result result = component::Connect(std::move(provider_server)); result.is_error()) {
+    return result.take_error();
   }
-  auto device_endpoints = fidl::CreateEndpoints<fuchsia_io::Node>();
-  if (device_endpoints.status_value() != ZX_OK) {
-    FX_PLOGS(ERROR, device_endpoints.status_value())
-        << "CreateEndpoints() for Fxfs block device file failed";
-    return zx::error(device_endpoints.status_value());
+  if (fidl::OneWayStatus status =
+          fidl::WireCall(provider_client)
+              ->Open(std::move(token->token),
+                     fidl::StringView::FromExternal(image_path.filename().c_str()),
+                     std::move(device_server));
+      !status.ok()) {
+    FX_LOGS(ERROR) << "FileBackedVolumeProvider::Open failed: " << status.FormatDescription();
+    return zx::error(status.status());
   }
-  auto [device_client, device_server] = *std::move(device_endpoints);
-  flags |= fio::OpenFlags::kBlockDevice;
-  // TODO(https://fxbug.dev/397501864): Support opening block devices with the new
-  // fuchsia.io/Directory.Open signature, or add a separate protocol for this purpose.
-  auto device_open_result =
-      fidl::WireCall(dir_client)
-          ->DeprecatedOpen(flags, {}, fidl::StringView::FromExternal(image_path.filename().c_str()),
-                           std::move(device_server));
-  if (!device_open_result.ok()) {
-    FX_PLOGS(ERROR, device_open_result.status())
-        << "WireCall->DeprecatedOpen(image.path) as Fxfs block device failed";
-    return zx::error(device_open_result.status());
+
+  if (fidl::WireResult info = fidl::WireCall(device_client)->GetInfo();
+      !info.ok() || info->is_error()) {
+    FX_LOGS(ERROR) << "Failed to GetInfo on block device: " << info.FormatDescription();
+    return zx::error(info->error_value());
   }
 
   return zx::ok(fuchsia::hardware::block::BlockHandle(device_client.TakeChannel()));

@@ -570,10 +570,10 @@ TEST_F(PowerLibTest, AddElementNoDep) {
   fidl::Endpoints<fuchsia_power_broker::ElementControl> element_control =
       fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
   zx::event invalid1, invalid2;
-  auto call_result =
-      fdf_power::AddElement(endpoints.client, df_config, std::move(tokens), invalid1.borrow(),
-                            invalid2.borrow(), std::nullopt, std::nullopt,
-                            std::move(element_control.server), element_control.client.borrow());
+  auto call_result = fdf_power::AddElement(endpoints.client, df_config, std::move(tokens),
+                                           invalid1.borrow(), invalid2.borrow(), std::nullopt,
+                                           std::nullopt, std::move(element_control.server),
+                                           element_control.client.borrow(), std::nullopt);
   ASSERT_TRUE(call_result.is_ok());
 
   RunLoopUntil([&fake_element_control] { return fake_element_control != nullptr; });
@@ -666,10 +666,71 @@ TEST_F(PowerLibTest, AddElementSingleDep) {
   zx::event invalid1, invalid2;
   fidl::Endpoints<fuchsia_power_broker::ElementControl> element_control =
       fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
+  auto call_result = fdf_power::AddElement(endpoints.client, df_config, std::move(tokens),
+                                           invalid1.borrow(), invalid2.borrow(), std::nullopt,
+                                           std::nullopt, std::move(element_control.server),
+                                           element_control.client.borrow(), std::nullopt);
+  ASSERT_TRUE(call_result.is_ok());
+
+  RunLoopUntil([&fake_element_control] { return fake_element_control != nullptr; });
+}
+
+/// Add an element using the ElementRunner protocol
+TEST_F(PowerLibTest, AddElementWithElementRunner) {
+  // Create the dependency configuration and create a
+  // map<parent_name, vec<level_deps> used for call validation later.
+  fdf_power::PowerLevel one = {.level = 0, .name = "one", .transitions{}};
+  fdf_power::PowerLevel two = {.level = 1, .name = "two", .transitions{}};
+  fdf_power::PowerLevel three = {.level = 2, .name = "three", .transitions{}};
+
+  fdf_power::PowerElement pe{
+      .name = "the_element",
+      .levels = {one, two, three},
+  };
+
+  fdf_power::PowerElementConfiguration df_config{.element = pe};
+
+  // Make ElementRunner endpoints and save zx info.
+  fidl::Endpoints<fuchsia_power_broker::ElementRunner> element_runner =
+      fidl::Endpoints<fuchsia_power_broker::ElementRunner>::Create();
+  zx_info_handle_basic_t sent_info;
+  element_runner.client.channel().get_info(ZX_INFO_HANDLE_BASIC, &sent_info,
+                                           sizeof(zx_info_handle_basic_t), nullptr, nullptr);
+  zx_koid_t sent_koid = sent_info.koid;
+
+  // Make the fake power broker
+  fdf_power::testing::ScopedBackgroundLoop loop;
+  fidl::Endpoints<fuchsia_power_broker::Topology> endpoints =
+      fidl::Endpoints<fuchsia_power_broker::Topology>::Create();
+  std::unique_ptr<FakeElementControl> fake_element_control(nullptr);
+  FakeTopology fake_power_broker(loop.dispatcher(), std::move(endpoints.server));
+  loop.executor().schedule_task(fake_power_broker.TakeSchemaPromise().then(
+      [&loop, &fake_element_control,
+       &sent_koid](fpromise::result<fuchsia_power_broker::ElementSchema, void>& result) mutable {
+        EXPECT_TRUE(result.is_ok());
+        EXPECT_TRUE(result.value().dependencies().has_value());
+        ASSERT_EQ(result.value().dependencies()->size(), static_cast<size_t>(0));
+
+        // Confirm koid matches what should have been sent.
+        zx_info_handle_basic_t rcvd_info;
+        result.value().element_runner()->channel().get_info(
+            ZX_INFO_HANDLE_BASIC, &rcvd_info, sizeof(zx_info_handle_basic_t), nullptr, nullptr);
+        ASSERT_EQ(sent_koid, rcvd_info.koid);
+
+        std::optional<fidl::ServerEnd<ElementControl>>& ec = result.value().element_control();
+        EXPECT_TRUE(ec.has_value());
+        fake_element_control =
+            std::make_unique<FakeElementControl>(loop.dispatcher(), std::move(ec.value()));
+      }));
+
+  // Call add element
+  zx::event invalid1, invalid2;
+  fidl::Endpoints<fuchsia_power_broker::ElementControl> element_control =
+      fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
   auto call_result =
-      fdf_power::AddElement(endpoints.client, df_config, std::move(tokens), invalid1.borrow(),
-                            invalid2.borrow(), std::nullopt, std::nullopt,
-                            std::move(element_control.server), element_control.client.borrow());
+      fdf_power::AddElement(endpoints.client, df_config, {}, invalid1.borrow(), invalid2.borrow(),
+                            std::nullopt, std::nullopt, std::move(element_control.server),
+                            element_control.client.borrow(), std::move(element_runner.client));
   ASSERT_TRUE(call_result.is_ok());
 
   RunLoopUntil([&fake_element_control] { return fake_element_control != nullptr; });
@@ -797,10 +858,10 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
   zx::event invalid1, invalid2;
   fidl::Endpoints<fuchsia_power_broker::ElementControl> element_control =
       fidl::Endpoints<fuchsia_power_broker::ElementControl>::Create();
-  auto call_result =
-      fdf_power::AddElement(endpoints.client, df_config, std::move(tokens), invalid1.borrow(),
-                            invalid2.borrow(), std::nullopt, std::nullopt,
-                            std::move(element_control.server), element_control.client.borrow());
+  auto call_result = fdf_power::AddElement(endpoints.client, df_config, std::move(tokens),
+                                           invalid1.borrow(), invalid2.borrow(), std::nullopt,
+                                           std::nullopt, std::move(element_control.server),
+                                           element_control.client.borrow(), std::nullopt);
   ASSERT_TRUE(call_result.is_ok());
 
   RunLoopUntil([&fake_element_control] { return fake_element_control != nullptr; });
@@ -1321,14 +1382,23 @@ TEST_F(PowerLibTest, ApplyPowerConfiguration) {
   std::vector<fdf_power::PowerElementConfiguration> configs{df_config};
 
   // Now we've done all that, do the call and check that we get one thing back
-  ASSERT_EQ(fdf_power::ApplyPowerConfiguration(ns, configs).value().size(), static_cast<size_t>(1));
+  std::vector<fdf_power::ElementDesc> applied_configs =
+      fdf_power::ApplyPowerConfiguration(ns, configs, true).value();
+  ASSERT_EQ(applied_configs.size(), static_cast<size_t>(1));
+  ASSERT_NE(applied_configs[0].element_runner_server, std::nullopt);
+  ASSERT_TRUE(applied_configs[0].element_runner_server->is_valid());
 
   RunLoopUntil([&fake_element_control] { return fake_element_control != nullptr; });
+
+  applied_configs = fdf_power::ApplyPowerConfiguration(ns, configs, false).value();
+  ASSERT_EQ(applied_configs.size(), static_cast<size_t>(1));
+  ASSERT_EQ(applied_configs[0].element_runner_server, std::nullopt);
+
   loop.Shutdown();
   loop.JoinThreads();
 
   // Only one power broker topology instance should exist.
-  ASSERT_EQ(fake_power_brokers.size(), static_cast<size_t>(1));
+  ASSERT_EQ(fake_power_brokers.size(), static_cast<size_t>(2));
 }
 
 /// Check GetTokens with a power elements with a single level which depends

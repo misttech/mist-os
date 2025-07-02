@@ -9,26 +9,20 @@ import (
 	"runtime"
 
 	"go.fuchsia.dev/fuchsia/tools/build"
-	"go.fuchsia.dev/fuchsia/tools/lib/ffxutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/hostplatform"
 )
 
 // AddFFXDeps selects and adds the files needed by ffx to provision a device
 // or launch an emulator to the shard's list of dependencies.
-func AddFFXDeps(s *Shard, buildDir string, tools build.Tools, flash bool) error {
+func AddFFXDeps(s *Shard, buildDir string, tools build.Tools, useTCG bool) error {
 	if len(s.Tests) == 0 {
 		return fmt.Errorf("shard %s has no tests", s.Name)
 	}
 	subtools := []string{"package", "product", "test", "log", "assembly"}
 	if s.Env.TargetsEmulator() {
 		subtools = append(subtools, "emu")
-		deps, err := ffxutil.GetEmuDeps(buildDir, s.TargetCPU(), []string{})
-		if err != nil {
-			return err
-		}
-		s.AddDeps(deps)
 	}
-	platform := hostplatform.MakeName(runtime.GOOS, s.HostCPU())
+	platform := hostplatform.MakeName(runtime.GOOS, s.HostCPU(useTCG))
 	s.AddDeps(getSubtoolDeps(s, tools, platform, subtools))
 	ffxTool, err := tools.LookupTool(platform, "ffx")
 	if err != nil {

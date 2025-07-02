@@ -80,4 +80,15 @@ message Params {
   // This should only be used to avoid running on physical devices where
   // there are capacity concerns.
   repeated string disabled_device_types = 15;
+
+  // Swarming pool from which a test task will be drawn.
+  string pool = 16;
+
+  // Whether to run emulators using TCG (QEMU's Tiny Code Generator) rather
+  // than kvm.
+  //
+  // This is necessary when the emulator emulates a machine with a different
+  // CPU architecture than the host machine, but should be avoided otherwise
+  // because it brings a major performance hit.
+  bool use_tcg = 17;
 }

@@ -926,3 +926,37 @@ TEST(Task, ForkPreservesEnviron) {
   });
   ASSERT_TRUE(helper.WaitForChildren());
 }
+
+TEST(Task, KillESRCH) {
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([]() {
+    pid_t pid = getpid();
+
+    // A pid after fork is guaranteed to not collide with process group ids.
+    EXPECT_THAT(kill(-pid, SIGCHLD), SyscallFailsWithErrno(ESRCH));
+  });
+}
+
+TEST(Task, CantReadLowAddresses) {
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP();
+  }
+
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  constexpr uintptr_t kLowMemoryLimit = 16 * 1024 * 1024;
+  for (uintptr_t addr = 0x0; addr < kLowMemoryLimit; addr += page_size) {
+    EXPECT_FALSE(test_helper::TryRead(addr));
+  }
+}
+
+TEST(Task, CantWriteLowAddresses) {
+  if (!test_helper::IsStarnix()) {
+    GTEST_SKIP();
+  }
+
+  const size_t page_size = SAFE_SYSCALL(sysconf(_SC_PAGE_SIZE));
+  constexpr uintptr_t kLowMemoryLimit = 16 * 1024 * 1024;
+  for (uintptr_t addr = 0x0; addr < kLowMemoryLimit; addr += page_size) {
+    EXPECT_FALSE(test_helper::TryWrite(addr));
+  }
+}

@@ -23,17 +23,18 @@ class TestComponent : public fidl::AsyncEventHandler<fuchsia_test_manager::Suite
   using OnStartedHandler = fit::function<void(zx_koid_t job_id, std::string name)>;
 
   explicit TestComponent(async_dispatcher_t* dispatcher, std::string url,
-                         std::optional<fuchsia_test_manager::RunSuiteOptions> options)
+                         std::optional<fuchsia_test_manager::RunSuiteOptions> options,
+                         ComponentWatcher& component_watcher)
       : dispatcher_{dispatcher},
         options_{std::move(options)},
         url_{std::move(url)},
-        component_watcher_{dispatcher} {}
+        component_watcher_{component_watcher} {}
   TestComponent(TestComponent&&) = delete;
   TestComponent(const TestComponent&) = delete;
 
   static zx::result<std::unique_ptr<TestComponent>> Create(
       async_dispatcher_t* dispatcher, std::string url,
-      std::optional<fuchsia_test_manager::RunSuiteOptions> options);
+      std::optional<fuchsia_test_manager::RunSuiteOptions> options, ComponentWatcher& event_stream);
 
   zx::result<> Start(fxl::WeakPtr<Sampler> notify) override;
   zx::result<> Stop() override;
@@ -50,7 +51,9 @@ class TestComponent : public fidl::AsyncEventHandler<fuchsia_test_manager::Suite
   std::optional<fuchsia_test_manager::RunSuiteOptions> options_;
   std::string url_;
 
-  ComponentWatcher component_watcher_;
+  // LIFETIME: Reference is to a ComponentWatcher created in main() which lives for the life of the
+  // program.
+  ComponentWatcher& component_watcher_;
   std::optional<ComponentWatcher::ComponentEventHandler> on_start_;
 };
 }  // namespace profiler

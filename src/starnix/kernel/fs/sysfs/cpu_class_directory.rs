@@ -5,9 +5,11 @@
 use crate::device::kobject::{KObject, KObjectHandle};
 use crate::fs::tmpfs::TmpfsDirectory;
 use crate::task::CurrentTask;
+use crate::vfs::pseudo::simple_file::BytesFile;
+use crate::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use crate::vfs::{
-    fs_node_impl_dir_readonly, BytesFile, DirectoryEntryType, FileOps, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, VecDirectory, VecDirectoryEntry,
+    fs_node_impl_dir_readonly, DirectoryEntryType, FileOps, FsNode, FsNodeHandle, FsNodeInfo,
+    FsNodeOps, FsStr, FsString,
 };
 
 use starnix_sync::{FileOpsCore, Locked};
@@ -37,7 +39,7 @@ impl FsNodeOps for CpuClassDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -81,40 +83,36 @@ impl FsNodeOps for CpuClassDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         match &**name {
-            name if name.starts_with(b"cpu") => Ok(node.fs().create_node(
-                current_task,
+            name if name.starts_with(b"cpu") => Ok(node.fs().create_node_and_allocate_node_id(
                 TmpfsDirectory::new(),
-                FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
             )),
-            b"online" => Ok(node.fs().create_node(
-                current_task,
+            b"online" => Ok(node.fs().create_node_and_allocate_node_id(
                 BytesFile::new_node(format!("0-{}\n", zx::system_get_num_cpus() - 1).into_bytes()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             )),
-            b"possible" => Ok(node.fs().create_node(
-                current_task,
+            b"possible" => Ok(node.fs().create_node_and_allocate_node_id(
                 BytesFile::new_node(format!("0-{}\n", zx::system_get_num_cpus() - 1).into_bytes()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             )),
             b"vulnerabilities" => {
                 let mut child_kobject: Option<std::sync::Arc<KObject>> =
                     self.kobject().get_child(name);
                 if let Some(kobject) = child_kobject.take() {
-                    Ok(node.fs().create_node(
-                        current_task,
+                    Ok(node.fs().create_node_and_allocate_node_id(
                         kobject.ops(),
-                        FsNodeInfo::new_factory(mode!(IFDIR, 0o755), FsCred::root()),
+                        FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
                     ))
                 } else {
                     error!(ENOENT)
                 }
-            },
+            }
             _ => error!(ENOENT),
         }
     }

@@ -707,7 +707,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn after_initialization() {
+    async fn after_initialization() {
         let inspector = &Inspector::default();
         let (_inspect_diagnostics, _) = create_test_object(&inspector, false);
         assert_data_tree!(
@@ -742,7 +742,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn after_update() {
+    async fn after_update() {
         let inspector = &Inspector::default();
         let (inspect_diagnostics, clock) = create_test_object(&inspector, false);
 
@@ -799,7 +799,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn real_time_clock() {
+    async fn real_time_clock() {
         let inspector = &Inspector::default();
         let (inspect_diagnostics, _) = create_test_object(&inspector, false);
         inspect_diagnostics.record(Event::InitializeRtc {
@@ -835,7 +835,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn time_sources() {
+    async fn time_sources() {
         let inspector = &Inspector::default();
         let (test, _) = create_test_object(&inspector, true);
         assert_data_tree!(
@@ -882,7 +882,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn tracks() {
+    async fn tracks() {
         let inspector = &Inspector::default();
         let (test, _) = create_test_object(&inspector, true);
         assert_data_tree!(

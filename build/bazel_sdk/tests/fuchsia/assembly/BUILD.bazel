@@ -97,6 +97,7 @@ fuchsia_board_input_bundle_set(
     board_input_bundles = [
         ":testing_board_input_bundle",
     ],
+    version = "fake_version_123",
 )
 
 fuchsia_board_input_bundle_test(
@@ -118,6 +119,7 @@ fuchsia_board_configuration(
     kernel = {
         "contiguous_physical_pages": True,
     },
+    partitions_configuration = ":my_partitions_config",
     platform = {
         "connectivity": {
             "network": {
@@ -142,6 +144,7 @@ fuchsia_board_configuration(
         "67e55044-10b1-426f-9247-bb680e5fe0c8",
         "67e55044-10b1-426f-9247-bb680e5fe0c8",
     ],
+    version = "fake_version_123",
 )
 
 fuchsia_post_processing_script(
@@ -390,7 +393,7 @@ fuchsia_partitions_configuration(
         ":bootstrap_partition_3776",
         ":bootstrap_partition_3728",
     ],
-    hardware_revision = "workstation",
+    hardware_revision = "x64",
     partitions = [
         ":zbi_partition",
         ":vbmeta_partition",

@@ -17,14 +17,27 @@
         fallback: "false",
     },
     capabilities: [
+        { service: "fuchsia.hardware.power.PowerTokenService" },
         { service: "fuchsia.hardware.sdmmc.SdmmcMetadata" },
     ],
     use: [
+        {
+            config: "fuchsia.power.SuspendEnabled",
+            key: "enable_suspend",
+            type: "bool",
+            availability: "optional",
+            default: false,
+        },
         { protocol: "fuchsia.scheduler.RoleManager" },
+        { service: "fuchsia.hardware.power.PowerTokenService" },
         { service: "fuchsia.hardware.sdmmc.SdmmcMetadata" },
         { service: "fuchsia.hardware.sdhci.Service" },
     ],
     expose: [
+        {
+            service: "fuchsia.hardware.power.PowerTokenService",
+            from: "self",
+        },
         {
             service: "fuchsia.hardware.sdmmc.SdmmcMetadata",
             from: "self",

@@ -30,6 +30,9 @@ rustc_library("lib") {
     # Reference doc generation based on JSON
     "//tools/clidoc:*",
 
+    # Ability to call subcommands from doctor
+    "//src/developer/ffx/plugins/doctor:*",
+
     # ffx-target-list depends on the FfxCommandLine directly
     "//src/developer/ffx/plugins/target/list:*",
   ]

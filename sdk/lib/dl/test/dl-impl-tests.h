@@ -65,6 +65,16 @@ class DlImplTests : public Base {
   static constexpr bool kDlCloseCanRunFinalizers = false;
   // TODO(https://fxbug.dev/342028933): Have dlclose() unload modules
   static constexpr bool kDlCloseUnloadsModules = false;
+  // TODO(https://fxbug.dev/368112176): enable DT_SONAME lookup among pending
+  // modules waiting to be loaded in a LinkingSession. See
+  // DlTests.SonameFilenameLoadedDep for current vs expected behavior.
+  static constexpr bool kSonameLookupInPendingDeps = false;
+
+#ifndef __Fuchsia__
+  // TODO(https://fxbug.dev/419872720): Disable a DT_SONAME lookup test on host
+  // because the DT_NEEDED order in the module is generated in the wrong order.
+  static constexpr bool kSonameLookupInLoadedDeps = false;
+#endif
 
   class DynamicTlsHelper {
    public:
@@ -114,7 +124,7 @@ class DlImplTests : public Base {
       // TODO(https://fxbug.dev/382527519): RuntimeDynamicLinker should have a
       // `RunInitializers` method that will run this with proper synchronization.
       static_cast<RuntimeModule*>(result.value())->InitializeModuleTree();
-      Base::TrackModule(result.value(), std::string{file});
+      Base::TrackModule(result.value(), file);
     }
     return result;
   }
@@ -150,6 +160,13 @@ class DlImplTests : public Base {
   // variable. This function will allocate and initialize TLS data on the
   // thread so the thread can access that data.
   void PrepareForTlsAccess() { DlImplTestsTls::Prepare(*dynamic_linker_); }
+
+  // Return the `link_map` data structure associated with a module. `handle`
+  // should be a valid pointer returned by a successful dlopen() call.
+  const link_map* ModuleLinkMap(const void* handle) {
+    return reinterpret_cast<const link_map*>(
+        &static_cast<const RuntimeModule*>(handle)->module().link_map);
+  }
 
  private:
   std::unique_ptr<RuntimeDynamicLinker> dynamic_linker_;

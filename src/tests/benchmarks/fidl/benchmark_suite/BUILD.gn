@@ -16,7 +16,7 @@ fidl("benchmark_suite_fidl") {
   contains_drivers = true
 
   # benchmark libraries can get large.
-  additional_cpp_configs = [ "//build/config:compile_big_rbe_machine" ]
+  additional_cpp_configs = [ "//build/config/rbe:compile_big_rbe_machine" ]
 }
 
 template("benchmark_fidl") {
@@ -48,7 +48,7 @@ template("benchmark_fidl") {
     forward_variables_from(invoker, [ "contains_drivers" ])
 
     # benchmark libraries can get large.
-    additional_cpp_configs = [ "//build/config:compile_big_rbe_machine" ]
+    additional_cpp_configs = [ "//build/config/rbe:compile_big_rbe_machine" ]
   }
 }
 

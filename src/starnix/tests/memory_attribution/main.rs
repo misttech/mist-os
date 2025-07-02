@@ -145,8 +145,6 @@ async fn mmap_anonymous() {
 }
 
 #[fuchsia::test]
-// TODO(https://fxbug.dev/406364292): Test disabled due to a flake.
-#[ignore]
 async fn leader_killed() {
     const PROGRAM_URL: &str =
         "thread_group_leader_killed_package#meta/thread_group_leader_killed.cm";
@@ -327,8 +325,8 @@ async fn init_attribution_test() -> AttributionTest {
     // Start the container and obtain its execution controller.
     let (container_controller, server_end) =
         fidl::endpoints::create_proxy::<fcomponent::ControllerMarker>();
-    let realm_proxy =
-        realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
+    let realm_proxy: fcomponent::RealmProxy =
+        realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     realm_proxy
         .open_controller(
             &fdecl::ChildRef { name: "debian_container".to_string(), collection: None },
@@ -345,13 +343,11 @@ async fn init_attribution_test() -> AttributionTest {
         .unwrap()
         .expect("start debian container");
 
-    let introspector =
-        realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::IntrospectorMarker>().unwrap();
+    let introspector = realm.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     // Connect to the attribution protocol of the starnix kernel. We need to use a RealmQuery as the
     // exact name of the starnix kernel moniker is random, so unknown to the test at this point.
-    let realm_query =
-        realm.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
+    let realm_query = realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let starnix_kernel_moniker = loop {
         std::thread::sleep(std::time::Duration::from_secs(1));
         match find_starnix_kernel_moniker(&realm_query).await {
@@ -399,8 +395,7 @@ async fn wait_for_log(realm: &RealmInstance, expected_log: &str) {
 
 async fn get_process_handle_by_name(realm: &RealmInstance, name: &str) -> zx::Process {
     // Get the job of the starnix kernel.
-    let realm_query =
-        realm.root.connect_to_protocol_at_exposed_dir::<fsys2::RealmQueryMarker>().unwrap();
+    let realm_query = realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let starnix_kernel_moniker = find_starnix_kernel_moniker(&realm_query).await.unwrap();
     let starnix_controller = connect_to_service_in_exposed_dir::<fcontainer::ControllerMarker>(
         &realm_query,

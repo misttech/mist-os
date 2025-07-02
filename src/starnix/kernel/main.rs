@@ -21,6 +21,7 @@ use starnix_kernel_runner::{
     create_component_from_stream, serve_component_runner, serve_container_controller,
     serve_memory_attribution_provider_elfkernel, Container, ContainerServiceConfig,
 };
+use starnix_kernel_structured_config::Config as KernelStructuredConfig;
 use starnix_logging::{
     log_debug, log_error, log_warn, trace_instant, CATEGORY_STARNIX, NAME_START_KERNEL,
 };
@@ -132,6 +133,9 @@ async fn main() -> Result<(), Error> {
         .set_critical(zx::JobCriticalOptions::RETCODE_NONZERO, &fruntime::process_self())
         .context("ensuring main process panics kill whole kernel")?;
 
+    let kernel_structured_config = KernelStructuredConfig::take_from_startup_handle();
+    let KernelStructuredConfig { extra_features: kernel_extra_features } = kernel_structured_config;
+
     let _inspect_server_task = inspect_runtime::publish(
         fuchsia_inspect::component::init_inspector_with_size(1_000_000),
         inspect_runtime::PublishOptions::default(),
@@ -177,11 +181,12 @@ async fn main() -> Result<(), Error> {
         match request {
             KernelServices::ContainerRunner(stream) => {
                 let container = container.clone();
+                let kernel_extra_features = kernel_extra_features.clone();
                 fuchsia_async::Task::local(async move {
                     let mut config: Option<ContainerServiceConfig> = None;
                     let container = container
                         .get_or_try_init(|| async {
-                            create_component_from_stream(stream).await.map(
+                            create_component_from_stream(stream, kernel_extra_features).await.map(
                                 |(container, new_config)| {
                                     config = Some(new_config);
                                     container

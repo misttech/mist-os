@@ -1346,7 +1346,7 @@ mod tests {
         );
 
         // Check the network selections were logged
-        assert_data_tree!(test_values.inspector, root: {
+        assert_data_tree!(@executor exec, test_values.inspector, root: {
             connection_selection_test: {
                 connection_selection: {
                     "0": {
@@ -1526,7 +1526,7 @@ mod tests {
         );
 
         // Check the network selections were logged
-        assert_data_tree!(test_values.inspector, root: {
+        assert_data_tree!(@executor exec, test_values.inspector, root: {
             connection_selection_test: {
                 connection_selection: {
                     "0": {

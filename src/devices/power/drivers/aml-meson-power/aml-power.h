@@ -5,11 +5,13 @@
 #ifndef SRC_DEVICES_POWER_DRIVERS_AML_MESON_POWER_AML_POWER_H_
 #define SRC_DEVICES_POWER_DRIVERS_AML_MESON_POWER_AML_POWER_H_
 
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.pwm/cpp/wire.h>
 #include <fidl/fuchsia.hardware.vreg/cpp/wire.h>
 #include <fuchsia/hardware/powerimpl/cpp/banjo.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/driver/metadata/cpp/metadata_server.h>
 #include <lib/zx/result.h>
 #include <threads.h>
 
@@ -81,6 +83,7 @@ class AmlPower : public fdf::DriverBase, public ddk::PowerImplProtocol<AmlPower>
   compat::SyncInitializedDeviceServer compat_server_;
   fidl::ClientEnd<fuchsia_driver_framework::NodeController> child_;
   compat::BanjoServer banjo_server_{ZX_PROTOCOL_POWER_IMPL, this, &power_impl_protocol_ops_};
+  fdf_metadata::MetadataServer<fuchsia_hardware_power::DomainMetadata> metadata_server;
 };
 
 }  // namespace power

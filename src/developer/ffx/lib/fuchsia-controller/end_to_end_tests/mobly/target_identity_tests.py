@@ -10,7 +10,7 @@ import fidl_fuchsia_device as device
 import fidl_fuchsia_feedback as feedback
 import fidl_fuchsia_hwinfo as hwinfo
 import fidl_fuchsia_io as io
-from fuchsia_controller_py import Channel, ZxStatus
+from fuchsia_controller_py import Channel
 from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
 from mobly import asserts, base_test, test_runner
 from mobly_controller import fuchsia_device
@@ -113,8 +113,12 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         )
         provider = feedback.DataProviderClient(ch)
         await provider.get_snapshot(params=params)
-        attr_res = await file.get_attr()
-        asserts.assert_equal(attr_res.s, ZxStatus.ZX_OK)
+        # `unwrap()` will return `NodeAttributes2` if the the result does not contain any error.
+        # Otherwise, an exception is raised.
+        attr = (
+            await file.get_attributes(query=io.NodeAttributesQuery.CONTENT_SIZE)
+        ).unwrap()
+        assert attr.immutable_attributes.content_size is not None
         data = bytearray()
         while True:
             response = (await file.read(count=io.MAX_BUF)).unwrap()
@@ -122,7 +126,7 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
                 break
             data.extend(response.data)
         # [END snapshot_example]
-        asserts.assert_equal(len(data), attr_res.attributes.content_size)
+        asserts.assert_equal(len(data), attr.immutable_attributes.content_size)
 
 
 if __name__ == "__main__":

@@ -92,43 +92,42 @@ class span {
   template <size_t N, size_type Extent_ = Extent,
             std::enable_if_t<Extent_ == dynamic_extent || N == Extent_, bool> = true>
   // NOLINTNEXTLINE(google-explicit-constructor) Intentionally implicit
-  constexpr span(element_type (&arr)[N]) noexcept : extent_(cpp17::data(arr), cpp17::size(arr)) {}
+  constexpr span(element_type (&arr)[N]) noexcept : extent_(std::data(arr), std::size(arr)) {}
 
   template <typename U, size_t N, size_type Extent_ = Extent,
             std::enable_if_t<(Extent_ == dynamic_extent || N == Extent_) &&
                                  internal::is_qualification_conversion<U, element_type>::value,
                              bool> = true>
   // NOLINTNEXTLINE(google-explicit-constructor) Intentionally implicit
-  constexpr span(U (&arr)[N]) noexcept : extent_(cpp17::data(arr), cpp17::size(arr)) {}
+  constexpr span(U (&arr)[N]) noexcept : extent_(std::data(arr), std::size(arr)) {}
 
   template <typename U, size_t N, size_type Extent_ = Extent,
             std::enable_if_t<(Extent_ == dynamic_extent || N == Extent_) &&
                                  internal::is_qualification_conversion<U, element_type>::value,
                              bool> = true>
   // NOLINTNEXTLINE(google-explicit-constructor) Intentionally implicit
-  constexpr span(std::array<U, N>& arr) noexcept : extent_(cpp17::data(arr), cpp17::size(arr)) {}
+  constexpr span(std::array<U, N>& arr) noexcept : extent_(std::data(arr), std::size(arr)) {}
 
   template <typename U, size_t N, size_type Extent_ = Extent,
             std::enable_if_t<(Extent_ == dynamic_extent || N == Extent_) &&
                                  internal::is_qualification_conversion<U, element_type>::value,
                              bool> = true>
   // NOLINTNEXTLINE(google-explicit-constructor) Intentionally implicit
-  constexpr span(const std::array<U, N>& arr) noexcept
-      : extent_(cpp17::data(arr), cpp17::size(arr)) {}
+  constexpr span(const std::array<U, N>& arr) noexcept : extent_(std::data(arr), std::size(arr)) {}
 
   template <typename R, size_type Extent_ = Extent,
             std::enable_if_t<Extent_ != dynamic_extent && internal::is_span_compatible_v<R, T>,
                              bool> = true>
-  explicit constexpr span(R&& r) : extent_(cpp17::data(r), cpp17::size(r)) {
-    assert((cpp17::size(r) == size() || Extent_ == dynamic_extent));
+  explicit constexpr span(R&& r) : extent_(std::data(r), std::size(r)) {
+    assert((std::size(r) == size() || Extent_ == dynamic_extent));
   }
 
   template <typename R, size_type Extent_ = Extent,
             std::enable_if_t<Extent_ == dynamic_extent && internal::is_span_compatible_v<R, T>,
                              bool> = true>
   // NOLINTNEXTLINE(google-explicit-constructor) Intentionally implicit
-  constexpr span(R&& r) : extent_(cpp17::data(r), cpp17::size(r)) {
-    assert((cpp17::size(r) == size() || extent == dynamic_extent));
+  constexpr span(R&& r) : extent_(std::data(r), std::size(r)) {
+    assert((std::size(r) == size() || extent == dynamic_extent));
   }
 
   template <typename U, size_t N, size_type Extent_ = Extent,
@@ -241,19 +240,19 @@ template <typename T, size_t N>
 span(const std::array<T, N>&) -> span<const T, N>;
 
 template <class R>
-span(R&&) -> span<std::remove_reference_t<decltype(*cpp17::data(std::declval<R>()))>>;
+span(R&&) -> span<std::remove_reference_t<decltype(*std::data(std::declval<R>()))>>;
 
 #endif  // __cpp_deduction_guides >= 201703L
 
 template <typename T, size_t N, size_t S = internal::byte_span_size<T, N>::value>
-cpp20::span<cpp17::byte, S> as_writable_bytes(cpp20::span<T, N> s) noexcept {
-  return cpp20::span<cpp17::byte, S>(reinterpret_cast<cpp17::byte*>(s.data()), s.size_bytes());
+cpp20::span<std::byte, S> as_writable_bytes(cpp20::span<T, N> s) noexcept {
+  return cpp20::span<std::byte, S>(reinterpret_cast<std::byte*>(s.data()), s.size_bytes());
 }
 
 template <typename T, size_t N, size_t S = internal::byte_span_size<T, N>::value>
-cpp20::span<const cpp17::byte, S> as_bytes(cpp20::span<T, N> s) noexcept {
-  return cpp20::span<const cpp17::byte, S>(reinterpret_cast<const cpp17::byte*>(s.data()),
-                                           s.size_bytes());
+cpp20::span<const std::byte, S> as_bytes(cpp20::span<T, N> s) noexcept {
+  return cpp20::span<const std::byte, S>(reinterpret_cast<const std::byte*>(s.data()),
+                                         s.size_bytes());
 }
 
 }  // namespace cpp20

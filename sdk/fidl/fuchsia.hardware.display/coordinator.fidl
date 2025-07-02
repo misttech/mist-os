@@ -429,9 +429,6 @@ closed protocol Coordinator {
         discard bool;
     }) -> (struct {
         res fuchsia.hardware.display.types.ConfigResult;
-
-        /// Non-empty iff `res` is UNSUPPORTED_CONFIG.
-        ops vector<ClientCompositionOp>:MAX;
     });
 
     /// Discard all draft configuration changes.

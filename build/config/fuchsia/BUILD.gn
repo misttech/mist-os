@@ -68,6 +68,8 @@ config("compiler") {
       # Enforce one codegen unit only when we really care about
       # size (release builds).
       configs += [ "//build/config/rust:one_codegen_unit" ]
+    } else {
+      configs += [ "//build/config/rust:codegen_units_16" ]
     }
 
     _clang_resource_dir =

@@ -10,13 +10,9 @@ use {async_utils as _, fidl_fuchsia_power_suspend as _};
 pub mod arch;
 #[cfg(not(feature = "starnix_lite"))]
 pub mod bpf;
-pub mod container_namespace;
 pub mod device;
-pub mod dynamic_thread_spawner;
 pub mod execution;
 pub mod fs;
-pub mod loader;
-pub mod memory_attribution;
 pub mod mm;
 pub mod mutable_state;
 pub mod perf;

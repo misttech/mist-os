@@ -1,9 +1,11 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-use crate::task::CurrentTask;
-use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 
+use crate::power::LockSource;
+use crate::task::CurrentTask;
+use crate::vfs::pseudo::simple_file::{BytesFile, BytesFileOps};
+use crate::vfs::FsNodeOps;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
@@ -45,7 +47,10 @@ impl BytesFileOps for PowerWakeLockFile {
             None => None,
         };
 
-        current_task.kernel().suspend_resume_manager.add_lock(clean_lock_str);
+        current_task
+            .kernel()
+            .suspend_resume_manager
+            .add_lock(clean_lock_str, LockSource::WakeLockFile);
 
         // Set a timer to disable the wake lock when expired.
         if let Some(target_monotonic) = target_monotonic {

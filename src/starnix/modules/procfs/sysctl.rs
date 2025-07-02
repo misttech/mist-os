@@ -7,10 +7,11 @@ use crate::sys_net::{
 };
 use starnix_core::security;
 use starnix_core::task::{ptrace_get_scope, ptrace_set_scope, CurrentTask, SeccompAction};
-use starnix_core::vfs::stub_bytes_file::StubBytesFile;
+use starnix_core::vfs::pseudo::simple_file::{parse_unsigned_file, BytesFile, BytesFileOps};
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::pseudo::stub_bytes_file::StubBytesFile;
 use starnix_core::vfs::{
-    fs_args, inotify, parse_unsigned_file, BytesFile, BytesFileOps, FileSystemHandle, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsString, StaticDirectoryBuilder,
+    fs_args, inotify, FileSystemHandle, FsNodeHandle, FsNodeInfo, FsNodeOps, FsString,
 };
 use starnix_logging::bug_ref;
 use starnix_uapi::auth::{FsCred, CAP_LAST_CAP, CAP_NET_ADMIN, CAP_SYS_ADMIN, CAP_SYS_RESOURCE};
@@ -22,20 +23,18 @@ use std::borrow::Cow;
 use std::sync::atomic::Ordering;
 use uuid::Uuid;
 
-pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
+pub fn sysctl_directory(fs: &FileSystemHandle) -> FsNodeHandle {
     let mode = mode!(IFREG, 0o644);
     let mut dir = StaticDirectoryBuilder::new(fs);
-    dir.subdir(current_task, "abi", 0o555, |_dir| {
+    dir.subdir("abi", 0o555, |_dir| {
         #[cfg(target_arch = "aarch64")]
         _dir.entry(
-            current_task,
             "swp",
             StubBytesFile::new_node("/proc/sys/abi/swp", bug_ref!("https://fxbug.dev/322873460")),
             mode,
         );
         #[cfg(target_arch = "aarch64")]
         _dir.entry(
-            current_task,
             "tagged_addr_disabled",
             StubBytesFile::new_node(
                 "/proc/sys/abi/tagged_addr_disabled",
@@ -44,52 +43,46 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
     });
-    dir.subdir(current_task, "crypto", 0o555, |dir| {
+    dir.subdir("crypto", 0o555, |dir| {
         dir.node(
             "fips_enabled",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 BytesFile::new_node(b"0\n".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
         dir.node(
             "fips_name",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 BytesFile::new_node(b"Linux Kernel Cryptographic API\n".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
         dir.node(
             "fips_version",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_VERSION))),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
     });
-    dir.subdir(current_task, "kernel", 0o555, |dir| {
+    dir.subdir("kernel", 0o555, |dir| {
         dir.node(
             "cap_last_cap",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 BytesFile::new_node(|| Ok(format!("{}\n", CAP_LAST_CAP))),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
         dir.node(
             "core_pattern",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 // TODO(https://fxbug.dev/322873960): Use the core pattern when generating a core dump.
                 BytesFile::new_node(b"core".to_vec()),
-                FsNodeInfo::new_factory(mode, FsCred::root()),
+                FsNodeInfo::new(mode, FsCred::root()),
             ),
         );
         dir.entry(
-            current_task,
             "core_pipe_limit",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/core_pipe_limit",
@@ -98,7 +91,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "dmsg_restrict",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/dmsg_restrict",
@@ -107,7 +99,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "domainname",
             StubBytesFile::new_node_with_data(
                 "/proc/sys/kernel/domainname",
@@ -117,7 +108,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "hostname",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/hostname",
@@ -126,7 +116,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "hung_task_check_count",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/hung_task_check_count",
@@ -135,7 +124,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "hung_task_panic",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/hung_task_panic",
@@ -143,9 +131,7 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             ),
             mode,
         );
-        //
         dir.entry(
-            current_task,
             "hung_task_timeout_secs",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/hung_task_timeout_secs",
@@ -154,7 +140,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "hung_task_warnings",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/hung_task_warnings",
@@ -162,20 +147,9 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             ),
             mode,
         );
+        dir.entry("io_uring_disabled", SystemLimitFile::<IoUringDisabled>::new_node(), mode);
+        dir.entry("io_uring_group", SystemLimitFile::<IoUringGroup>::new_node(), mode);
         dir.entry(
-            current_task,
-            "io_uring_disabled",
-            SystemLimitFile::<IoUringDisabled>::new_node(),
-            mode,
-        );
-        dir.entry(
-            current_task,
-            "io_uring_group",
-            SystemLimitFile::<IoUringGroup>::new_node(),
-            mode,
-        );
-        dir.entry(
-            current_task,
             "modprobe",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/modprobe",
@@ -184,7 +158,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "modules_disabled",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/modules_disabled",
@@ -192,14 +165,8 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             ),
             mode,
         );
+        dir.entry("ngroups_max", BytesFile::new_node(b"65536\n".to_vec()), mode!(IFREG, 0o444));
         dir.entry(
-            current_task,
-            "ngroups_max",
-            BytesFile::new_node(b"65536\n".to_vec()),
-            mode!(IFREG, 0o444),
-        );
-        dir.entry(
-            current_task,
             "panic_on_oops",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/panic_on_oops",
@@ -208,7 +175,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "perf_cpu_time_max_percent",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/perf_cpu_time_max_percent",
@@ -217,7 +183,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "perf_event_max_sample_rate",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/perf_event_max_sample_rate",
@@ -226,7 +191,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "perf_event_mlock_kb",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/perf_event_mlock_kb",
@@ -235,7 +199,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "perf_event_paranoid",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/perf_event_paranoid",
@@ -244,7 +207,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "randomize_va_space",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/randomize_va_space",
@@ -253,7 +215,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "sched_child_runs_first",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/sched_child_runs_first",
@@ -262,7 +223,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "sched_latency_ns",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/sched_latency_ns",
@@ -271,7 +231,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "sched_rt_period_us",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/sched_rt_period_us",
@@ -280,7 +239,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "sched_rt_runtime_us",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/sched_rt_runtime_us",
@@ -289,7 +247,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "sched_schedstats",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/sched_schedstats",
@@ -298,7 +255,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "sched_tunable_scaling",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/sched_tunable_scaling",
@@ -307,7 +263,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "sched_wakeup_granularity_ns",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/sched_wakeup_granularity_ns",
@@ -316,7 +271,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "sysrq",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/sysrq",
@@ -324,15 +278,9 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             ),
             mode,
         );
+        dir.entry("unprivileged_bpf_disabled", UnprivilegedBpfDisabled::new_node(), mode);
+        dir.entry("dmesg_restrict", DmesgRestrict::new_node(), mode);
         dir.entry(
-            current_task,
-            "unprivileged_bpf_disabled",
-            UnprivilegedBpfDisabled::new_node(),
-            mode,
-        );
-        dir.entry(current_task, "dmesg_restrict", DmesgRestrict::new_node(), mode);
-        dir.entry(
-            current_task,
             "kptr_restrict",
             StubBytesFile::new_node(
                 "/proc/sys/kernel/kptr_restrict",
@@ -342,94 +290,75 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
         );
         dir.node(
             "osrelease",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_RELEASE))),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
         dir.node(
             "ostype",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 BytesFile::new_node(b"Linux\n".to_vec()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
             ),
         );
         dir.node(
             "overflowuid",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 BytesFile::new_node(b"65534".to_vec()),
-                FsNodeInfo::new_factory(mode, FsCred::root()),
+                FsNodeInfo::new(mode, FsCred::root()),
             ),
         );
         dir.node(
             "overflowgid",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 BytesFile::new_node(b"65534".to_vec()),
-                FsNodeInfo::new_factory(mode, FsCred::root()),
+                FsNodeInfo::new(mode, FsCred::root()),
             ),
         );
         dir.node(
             "printk",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 BytesFile::new_node(b"4\t4\t1\t7\n".to_vec()),
-                FsNodeInfo::new_factory(mode, FsCred::root()),
+                FsNodeInfo::new(mode, FsCred::root()),
             ),
         );
         dir.node(
             "pid_max",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 BytesFile::new_node(b"4194304".to_vec()),
-                FsNodeInfo::new_factory(mode, FsCred::root()),
+                FsNodeInfo::new(mode, FsCred::root()),
             ),
         );
-        dir.subdir(current_task, "random", 0o555, |dir| {
+        dir.subdir("random", 0o555, |dir| {
             // Generate random UUID
             let boot_id = Uuid::new_v4().hyphenated().to_string();
-            dir.entry(
-                current_task,
-                "boot_id",
-                BytesFile::new_node(boot_id.as_bytes().to_vec()),
-                mode,
-            );
-            dir.entry(
-                current_task,
-                "entropy_avail",
-                BytesFile::new_node(b"256".to_vec()),
-                mode!(IFREG, 0o444),
-            );
+            dir.entry("boot_id", BytesFile::new_node(boot_id.as_bytes().to_vec()), mode);
+            dir.entry("entropy_avail", BytesFile::new_node(b"256".to_vec()), mode!(IFREG, 0o444));
         });
-        dir.entry(current_task, "tainted", KernelTaintedFile::new_node(), mode);
-        dir.subdir(current_task, "seccomp", 0o555, |dir| {
+        dir.entry("tainted", KernelTaintedFile::new_node(), mode);
+        dir.subdir("seccomp", 0o555, |dir| {
             dir.entry(
-                current_task,
                 "actions_avail",
                 BytesFile::new_node(SeccompAction::get_actions_avail_file()),
                 mode!(IFREG, 0o444),
             );
-            dir.entry(current_task, "actions_logged", SeccompActionsLogged::new_node(), mode);
+            dir.entry("actions_logged", SeccompActionsLogged::new_node(), mode);
         });
-        dir.subdir(current_task, "yama", 0o555, |dir| {
-            dir.entry(current_task, "ptrace_scope", PtraceYamaScope::new_node(), mode);
+        dir.subdir("yama", 0o555, |dir| {
+            dir.entry("ptrace_scope", PtraceYamaScope::new_node(), mode);
         });
     });
-    dir.node("net", sysctl_net_diretory(current_task, fs));
+    dir.node("net", sysctl_net_diretory(fs));
     dir.node(
         "version",
-        fs.create_node(
-            current_task,
+        fs.create_node_and_allocate_node_id(
             BytesFile::new_node(|| Ok(format!("{}\n", KERNEL_VERSION))),
-            FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+            FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
         ),
     );
-    dir.subdir(current_task, "vm", 0o555, |dir| {
+    dir.subdir("vm", 0o555, |dir| {
         dir.entry(
-            current_task,
             "dirty_background_ratio",
             StubBytesFile::new_node(
                 "/proc/sys/vm/dirty_background_ratio",
@@ -438,7 +367,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "dirty_expire_centisecs",
             StubBytesFile::new_node(
                 "/proc/sys/vm/dirty_expire_centisecs",
@@ -447,7 +375,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "drop_caches",
             StubBytesFile::new_node(
                 "/proc/sys/vm/drop_caches",
@@ -456,7 +383,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "extra_free_kbytes",
             StubBytesFile::new_node(
                 "/proc/sys/vm/extra_free_kbytes",
@@ -465,7 +391,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "max_map_count",
             StubBytesFile::new_node(
                 "/proc/sys/vm/max_map_count",
@@ -474,7 +399,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "mmap_min_addr",
             StubBytesFile::new_node(
                 "/proc/sys/vm/mmap_min_addr",
@@ -483,7 +407,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "mmap_rnd_bits",
             StubBytesFile::new_node(
                 "/proc/sys/vm/mmap_rnd_bits",
@@ -492,7 +415,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "mmap_rnd_compat_bits",
             StubBytesFile::new_node(
                 "/proc/sys/vm/mmap_rnd_compat_bits",
@@ -501,7 +423,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "overcommit_memory",
             StubBytesFile::new_node(
                 "/proc/sys/vm/overcommit_memory",
@@ -510,7 +431,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "page-cluster",
             StubBytesFile::new_node(
                 "/proc/sys/vm/page-cluster",
@@ -519,7 +439,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "watermark_scale_factor",
             StubBytesFile::new_node(
                 "/proc/sys/vm/watermark_scale_factor",
@@ -528,30 +447,14 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
     });
-    dir.subdir(current_task, "fs", 0o555, |dir| {
-        dir.subdir(current_task, "inotify", 0o555, |dir| {
-            dir.entry(
-                current_task,
-                "max_queued_events",
-                inotify::InotifyMaxQueuedEvents::new_node(),
-                mode,
-            );
-            dir.entry(
-                current_task,
-                "max_user_instances",
-                inotify::InotifyMaxUserInstances::new_node(),
-                mode,
-            );
-            dir.entry(
-                current_task,
-                "max_user_watches",
-                inotify::InotifyMaxUserWatches::new_node(),
-                mode,
-            );
+    dir.subdir("fs", 0o555, |dir| {
+        dir.subdir("inotify", 0o555, |dir| {
+            dir.entry("max_queued_events", inotify::InotifyMaxQueuedEvents::new_node(), mode);
+            dir.entry("max_user_instances", inotify::InotifyMaxUserInstances::new_node(), mode);
+            dir.entry("max_user_watches", inotify::InotifyMaxUserWatches::new_node(), mode);
         });
-        dir.entry(current_task, "pipe-max-size", SystemLimitFile::<PipeMaxSize>::new_node(), mode);
+        dir.entry("pipe-max-size", SystemLimitFile::<PipeMaxSize>::new_node(), mode);
         dir.entry(
-            current_task,
             "protected_hardlinks",
             StubBytesFile::new_node(
                 "/proc/sys/fs/protected_hardlinks",
@@ -560,7 +463,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "protected_symlinks",
             StubBytesFile::new_node(
                 "/proc/sys/fs/protected_symlinks",
@@ -569,7 +471,6 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             mode,
         );
         dir.entry(
-            current_task,
             "suid_dumpable",
             StubBytesFile::new_node(
                 "/proc/sys/fs/suid_dumpable",
@@ -577,16 +478,11 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             ),
             mode,
         );
-        dir.subdir(current_task, "verity", 0o555, |dir| {
-            dir.entry(
-                current_task,
-                "require_signatures",
-                VerityRequireSignaturesFile::new_node(),
-                mode,
-            );
+        dir.subdir("verity", 0o555, |dir| {
+            dir.entry("require_signatures", VerityRequireSignaturesFile::new_node(), mode);
         });
     });
-    dir.build(current_task)
+    dir.build()
 }
 
 struct VerityRequireSignaturesFile;
@@ -611,47 +507,40 @@ impl BytesFileOps for VerityRequireSignaturesFile {
     }
 }
 
-pub fn net_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
+pub fn net_directory(fs: &FileSystemHandle) -> FsNodeHandle {
     let mut dir = StaticDirectoryBuilder::new(fs);
     dir.entry(
-        current_task,
         "fib_trie",
         StubBytesFile::new_node("/proc/net/fib_trie", bug_ref!("https://fxbug.dev/322873635")),
         mode!(IFREG, 0o400),
     );
     dir.entry(
-        current_task,
         "if_inet6",
         StubBytesFile::new_node("/proc/net/if_inet6", bug_ref!("https://fxbug.dev/322874669")),
         mode!(IFREG, 0o444),
     );
     dir.entry(
-        current_task,
         "ip_tables_names",
         BytesFile::new_node(b"nat\nfilter\nmangle\nraw\n".to_vec()),
         mode!(IFREG, 0o644),
     );
     dir.entry(
-        current_task,
         "ip6_tables_names",
         BytesFile::new_node(b"filter\nmangle\nraw\n".to_vec()),
         mode!(IFREG, 0o644),
     );
     dir.entry(
-        current_task,
         "psched",
         StubBytesFile::new_node("/proc/net/psched", bug_ref!("https://fxbug.dev/322874710")),
         mode!(IFREG, 0o444),
     );
     dir.entry(
-        current_task,
         "xt_qtaguid",
         StubBytesFile::new_node("/proc/net/xt_qtaguid", bug_ref!("https://fxbug.dev/322874322")),
         mode!(IFREG, 0o644),
     );
-    dir.subdir(current_task, "xt_quota", 0o555, |dir| {
+    dir.subdir("xt_quota", 0o555, |dir| {
         dir.entry(
-            current_task,
             "globalAlert",
             StubBytesFile::new_node(
                 "/proc/net/xt_quota/globalAlert",
@@ -660,7 +549,7 @@ pub fn net_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNod
             mode!(IFREG, 0o444),
         );
     });
-    dir.build(current_task)
+    dir.build()
 }
 
 struct KernelTaintedFile;
@@ -680,14 +569,13 @@ impl BytesFileOps for KernelTaintedFile {
     }
 }
 
-fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
+fn sysctl_net_diretory(fs: &FileSystemHandle) -> FsNodeHandle {
     let mut dir = StaticDirectoryBuilder::new(fs);
     let file_mode = mode!(IFREG, 0o644);
     let dir_mode = mode!(IFDIR, 0o644);
 
-    dir.subdir(current_task, "core", 0o555, |dir| {
+    dir.subdir("core", 0o555, |dir| {
         dir.entry(
-            current_task,
             "bpf_jit_enable",
             StubBytesFile::new_node_with_capabilities(
                 "/proc/sys/net/core/bpf_jit_enable",
@@ -697,7 +585,6 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             file_mode,
         );
         dir.entry(
-            current_task,
             "bpf_jit_kallsyms",
             StubBytesFile::new_node_with_capabilities(
                 "/proc/sys/net/core/bpf_jit_kallsyms",
@@ -707,7 +594,6 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             file_mode,
         );
         dir.entry(
-            current_task,
             "rmem_max",
             StubBytesFile::new_node(
                 "/proc/sys/net/core/rmem_max",
@@ -715,9 +601,8 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             ),
             file_mode,
         );
-        dir.entry(current_task, "somaxconn", SystemLimitFile::<SoMaxConn>::new_node(), file_mode);
+        dir.entry("somaxconn", SystemLimitFile::<SoMaxConn>::new_node(), file_mode);
         dir.entry(
-            current_task,
             "wmem_max",
             StubBytesFile::new_node(
                 "/proc/sys/net/core/wmem_max",
@@ -726,7 +611,6 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             file_mode,
         );
         dir.entry(
-            current_task,
             "xfrm_acq_expires",
             StubBytesFile::new_node(
                 "/proc/sys/net/core/xfrm_acq_expires",
@@ -735,10 +619,9 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             file_mode,
         );
     });
-    dir.subdir(current_task, "ipv4", 0o555, |dir| {
-        dir.entry(current_task, "conf", ProcSysNetIpv4Conf, dir_mode);
+    dir.subdir("ipv4", 0o555, |dir| {
+        dir.entry("conf", ProcSysNetIpv4Conf, dir_mode);
         dir.entry(
-            current_task,
             "fwmark_reflect",
             StubBytesFile::new_node(
                 "/proc/sys/net/ipv4/fwmark_reflect",
@@ -747,7 +630,6 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             file_mode,
         );
         dir.entry(
-            current_task,
             "ip_forward",
             StubBytesFile::new_node(
                 "/proc/sys/net/ipv4/ip_forward",
@@ -755,9 +637,8 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             ),
             file_mode,
         );
-        dir.entry(current_task, "neigh", ProcSysNetIpv4Neigh, dir_mode);
+        dir.entry("neigh", ProcSysNetIpv4Neigh, dir_mode);
         dir.entry(
-            current_task,
             "ping_group_range",
             StubBytesFile::new_node(
                 "/proc/sys/net/ipv4/ping_group_range",
@@ -766,7 +647,6 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             file_mode,
         );
         dir.entry(
-            current_task,
             "tcp_default_init_rwnd",
             StubBytesFile::new_node(
                 "/proc/sys/net/ipv4/tcp_default_init_rwnd",
@@ -775,7 +655,6 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             file_mode,
         );
         dir.entry(
-            current_task,
             "tcp_fwmark_accept",
             StubBytesFile::new_node(
                 "/proc/sys/net/ipv4/tcp_fwmark_accept",
@@ -784,7 +663,6 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             file_mode,
         );
         dir.entry(
-            current_task,
             "tcp_rmem",
             StubBytesFile::new_node(
                 "/proc/sys/net/ipv4/tcp_rmem",
@@ -793,10 +671,9 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             file_mode,
         );
     });
-    dir.subdir(current_task, "ipv6", 0o555, |dir| {
-        dir.entry(current_task, "conf", ProcSysNetIpv6Conf, dir_mode);
+    dir.subdir("ipv6", 0o555, |dir| {
+        dir.entry("conf", ProcSysNetIpv6Conf, dir_mode);
         dir.entry(
-            current_task,
             "fwmark_reflect",
             StubBytesFile::new_node(
                 "/proc/sys/net/ipv6/fwmark_reflect",
@@ -804,11 +681,10 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             ),
             file_mode,
         );
-        dir.entry(current_task, "neigh", ProcSysNetIpv6Neigh, dir_mode);
+        dir.entry("neigh", ProcSysNetIpv6Neigh, dir_mode);
     });
-    dir.subdir(current_task, "unix", 0o555, |dir| {
+    dir.subdir("unix", 0o555, |dir| {
         dir.entry(
-            current_task,
             "max_dgram_qlen",
             StubBytesFile::new_node(
                 "/proc/sys/net/unix/max_dgram_qlen",
@@ -817,7 +693,7 @@ fn sysctl_net_diretory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsN
             file_mode,
         );
     });
-    dir.build(current_task)
+    dir.build()
 }
 
 struct DmesgRestrict {}

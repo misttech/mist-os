@@ -40,6 +40,41 @@ The above line resulted in
 [this comment](https://issues.fuchsia.dev/issues/297456438#comment3)
 and status change on the issue.
 
+## Dependent changes options
+
+### Depends-on
+
+`Depends-on: <other-change-id>` marks the change as depending on another change,
+possibly in a separate repository.
+
+The change with the `Depends-on` footer will
+not be submittable until all dependencies have been submitted, and any
+dependencies will also be patched in during presubmit testing.
+
+For example:
+
+```none {:.devsite-disable-click-to-copy}
+Depends-on: Idc82d1483b4be8480aaa87bb48af8d03cfa45858
+```
+
+{% dynamic if user.is_googler %}
+
+To make a change in turquoise-internal-review.googlesource.com depend on a
+change in fuchsia-review.googlesource.com:
+
+```none {:.devsite-disable-click-to-copy}
+Depends-on: fuchsia:I9916ccaa4b95b6e9babdee33014fa6bd3d478f2e
+```
+
+To make a change in fuchsia-review.googlesource.com depend on a
+change in turquoise-internal-review.googlesource.com:
+
+```none {:.devsite-disable-click-to-copy}
+Depends-on: turquoise-internal:I9916ccaa4b95b6e9babdee33014fa6bd3d478f2e
+```
+
+{% dynamic endif %}
+
 ## Test options
 
 These options control how tests are executed.

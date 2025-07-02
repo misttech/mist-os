@@ -481,7 +481,7 @@ impl Peer {
         mut reservations_receiver: mpsc::UnboundedReceiver<BoxFuture<'static, StreamPermit>>,
     ) {
         let lock = self.inner.lock();
-        let mut request_stream = lock.peer.take_request_stream().fuse();
+        let mut request_stream = lock.peer.take_request_stream();
         let id = self.id.clone();
         let peer = Arc::downgrade(&self.inner);
         let mut stream_reservations = FuturesUnordered::new();
@@ -535,7 +535,7 @@ impl Peer {
     }
 }
 
-/// Future which completes when the A2DP peer has closed the control conection.
+/// Future which completes when the A2DP peer has closed the control connection.
 /// See `Peer::closed`
 #[must_use = "futures do nothing unless you `.await` or poll them"]
 pub struct ClosedPeer {
@@ -739,7 +739,7 @@ impl PeerInner {
         remote_id: &StreamEndpointId,
     ) -> avdtp::Result<()> {
         trace!(permit:?, local_id:?, remote_id:?; "Making outgoing start request");
-        let to_start = &[remote_id.clone()];
+        let to_start = std::slice::from_ref(remote_id);
         avdtp.start(to_start).await?;
         trace!("Start response received: {permit:?}");
         let peer = Self::upgrade(weak.clone())?;
@@ -842,7 +842,7 @@ impl PeerInner {
     }
 
     /// Suspend a stream on the local side. Returns the remote StreamEndpointId if the stream was suspended,
-    /// or a RequestInvalid error eith the error code otherwise.
+    /// or a RequestInvalid error with the error code otherwise.
     fn suspend_local_stream(
         &mut self,
         local_id: &StreamEndpointId,
@@ -1579,7 +1579,7 @@ mod tests {
 
         let txlabel_raw = received[0] & 0xF0;
 
-        // Respond with an eror.
+        // Respond with an error.
         let response: &[u8] = &[
             txlabel_raw | 0x0 << 2 | 0x3, // txlabel (same), Single (0b00), Response Reject (0b11)
             0x01,                         // Discover

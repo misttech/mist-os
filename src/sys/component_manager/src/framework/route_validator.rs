@@ -167,7 +167,7 @@ impl RouteValidatorCapabilityProvider {
             }
 
             let exposes = routing::aggregate_exposes(resolved.decl().exposes.iter());
-            requests.extend(exposes.into_iter().map(|(target_name, e)| {
+            requests.extend(exposes.into_iter().map(|((target_name, _target), e)| {
                 let target = fsys::RouteTarget {
                     name: target_name.to_string(),
                     decl_type: fsys::DeclType::Expose,
@@ -236,7 +236,7 @@ impl RouteValidatorCapabilityProvider {
                         #[allow(clippy::needless_collect)] // aligns the iterator type w/ above
                         let matching_requests: Vec<_> = exposes
                             .into_iter()
-                            .filter_map(|(target_name, e)| {
+                            .filter_map(|((target_name, _target), e)| {
                                 if !target_name.as_str().contains(&target.name) {
                                     return None;
                                 }
@@ -591,7 +591,7 @@ async fn validate_exposes(
     let mut reports = vec![];
 
     let exposes = routing::aggregate_exposes(exposes.iter());
-    for (target_name, e) in exposes {
+    for ((target_name, _target), e) in exposes {
         let capability = Some(target_name.to_string());
         let decl_type = Some(fsys::DeclType::Expose);
         let report = match RouteRequest::from_expose_decls(&instance.moniker, e) {
@@ -644,7 +644,7 @@ async fn validate_exposes(
     reports
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::capability;

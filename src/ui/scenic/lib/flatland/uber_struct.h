@@ -65,6 +65,9 @@ struct UberStruct {
 
   // Set from SetDebugName(). Can be empty if the client does not calls SetDebugName().
   std::string debug_name;
+
+  // The time the UberStruct was created.
+  zx::time_monotonic creation_time;
 };
 
 }  // namespace flatland

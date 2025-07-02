@@ -763,12 +763,12 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use diagnostics_log::{Publisher, PublisherOptions};
     use fidl::endpoints::ServerEnd;
+    use fidl_fuchsia_diagnostics as fdiagnostics;
     use fuchsia_component_test::{
         Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route,
     };
     use futures::TryStreamExt;
     use log::{error, info};
-    use {fidl_fuchsia_diagnostics as fdiagnostics, fidl_fuchsia_logger as flogger};
 
     const TEST_COMPONENT_URL: &str = "#meta/inspect_test_component.cm";
 
@@ -1126,17 +1126,13 @@ mod tests {
 
     async fn init_isolated_logging() -> (RealmInstance, Publisher, ArchiveReader<Logs>) {
         let instance = create_realm().await.build().await.unwrap();
-        let log_sink_proxy =
-            instance.root.connect_to_protocol_at_exposed_dir::<flogger::LogSinkMarker>().unwrap();
-        let accessor_proxy = instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<fdiagnostics::ArchiveAccessorMarker>()
-            .unwrap();
+        let log_sink_client = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
+        let accessor_proxy = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
         let mut reader = ArchiveReader::logs();
         reader.with_archive(accessor_proxy);
         let options = PublisherOptions::default()
             .wait_for_initial_interest(false)
-            .use_log_sink(log_sink_proxy);
+            .use_log_sink(log_sink_client);
         let publisher = Publisher::new(options).unwrap();
         (instance, publisher, reader)
     }

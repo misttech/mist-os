@@ -39,8 +39,8 @@ async fn unformatted() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     call_write_data_file(&admin).await.expect("write_data_file failed");
     let disk = fixture.tear_down().await.unwrap();
 
@@ -72,8 +72,8 @@ async fn no_existing_data_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     call_write_data_file(&admin).await.expect("write_data_file failed");
     let disk = fixture.tear_down().await.unwrap();
 
@@ -104,8 +104,8 @@ async fn unformatted_netboot() {
     builder.with_disk().with_gpt().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     call_write_data_file(&admin).await.expect("write_data_file failed");
     let disk = fixture.tear_down().await.unwrap();
 
@@ -147,8 +147,8 @@ async fn unformatted_small_disk() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     call_write_data_file(&admin).await.expect("write_data_file failed");
     let disk = fixture.tear_down().await.unwrap();
 
@@ -183,8 +183,8 @@ async fn formatted() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     call_write_data_file(&admin).await.expect("write_data_file failed");
     let disk = fixture.tear_down().await.unwrap();
 
@@ -222,8 +222,8 @@ async fn formatted_file_in_root() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let vmo = zx::Vmo::create(1024).unwrap();
     vmo.write(PAYLOAD, 0).unwrap();
@@ -266,8 +266,8 @@ async fn formatted_netboot() {
     builder.with_disk().with_gpt().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     call_write_data_file(&admin).await.expect("write_data_file failed");
     let disk = fixture.tear_down().await.unwrap();
 

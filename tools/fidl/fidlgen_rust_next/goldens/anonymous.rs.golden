@@ -561,16 +561,16 @@ pub struct FunctionApplication {
 
 impl FunctionApplication {
     fn __max_ordinal(&self) -> usize {
-        if self.func.is_some() {
-            return 1;
+        if self.flags.is_some() {
+            return 4;
         }
 
         if self.args.is_some() {
             return 3;
         }
 
-        if self.flags.is_some() {
-            return 4;
+        if self.func.is_some() {
+            return 1;
         }
 
         0

@@ -50,7 +50,6 @@ use crate::peer::procedure::{CommandFromHf, ProcedureInput};
 use shutdown_state::ShutdownState;
 
 /// Information sent to the responder method for the WatchNextCall hanging get matcher.
-#[derive(Debug)]
 struct WatchCallResponderInfo {
     #[allow(unused)]
     peer_id: PeerId, // For logging
@@ -58,6 +57,17 @@ struct WatchCallResponderInfo {
     call_index: Option<CallIndex>, // For logging
     call_state: CallState,                     // Sent to the hanging get
     shutdown_state: Arc<Mutex<ShutdownState>>, // For updating whether the Terminated state has been sent
+}
+
+impl std::fmt::Debug for WatchCallResponderInfo {
+    fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt.debug_struct("WatchCallResponderInfo")
+            .field("peer_id", &self.peer_id)
+            .field("call_index", &self.call_index)
+            .field("call_state", &self.call_state)
+            .field("shutdown_state", &"<lock>")
+            .finish()
+    }
 }
 
 type ResponderResult = Result<(), fidl::Error>;
@@ -145,7 +155,7 @@ fn respond_to_watch_call_state(
     if info.call_state == CallState::Terminated {
         info.shutdown_state.lock().sent_terminated();
     }
-    debug!("Sending {:?}", info);
+    debug!("Sending {:?}, shutdown_state {:?}", info, info.shutdown_state.lock());
     responder.send(info.call_state)
 }
 
@@ -189,10 +199,7 @@ impl Call {
     }
 
     pub fn set_state(&mut self, new_state: CallState) {
-        info!(
-            "Setting call state {:?} for peer {:} for call {:?}.",
-            new_state, self.peer_id, self.call_index
-        );
+        info!("Setting call state {:?} for peer {:} for call {:?}.", new_state, self.peer_id, self);
 
         self.state = Some(new_state);
         let watch_call_responder_info = WatchCallResponderInfo {
@@ -210,10 +217,7 @@ impl Call {
     // The watch_state_hanging_get_matcher stream should be drained affer calling this method, as
     // it does not set store the waker so no client will poll the stream and do so for us.
     fn handle_watch_state(&mut self, responder: CallWatchStateResponder) {
-        info!(
-            "Handling Call::WatchState for peer {:} for call {:?}.",
-            self.peer_id, self.call_index
-        );
+        info!("Handling Call::WatchState for peer {:} for call {:?}.", self.peer_id, self);
 
         // Enqueue the WatchState responder.  This will match with any current or future enqueued
         // call states changes and respond to the hanging get.
@@ -227,18 +231,21 @@ impl Call {
         let mut shutdown_state = self.shutdown_state.lock();
         if !shutdown_state.can_send_hang_up() {
             debug!(
-                "Not sending hang up for peer {:} for call {:?}.",
-                self.peer_id, self.call_index
+                "Not sending hang up for peer {:} for call {:?}, shutdown state {:?}",
+                self.peer_id, self, shutdown_state
             );
             Poll::Pending
         } else {
-            info!("Sending hang up for peer {:} for call {:?}.", self.peer_id, self.call_index);
+            info!(
+                "Sending hang up for peer {:} for call {:?}, shutdown state {:?}.",
+                self.peer_id, self, shutdown_state
+            );
             shutdown_state.sent_hang_up();
             Poll::Ready(Some(Ok(ProcedureInput::CommandFromHf(CommandFromHf::HangUpCall))))
         }
     }
 
-    // Must not be called with a WatchState or a SendDtmfCode request.
+    // Must not be called with a WatchStater or a SendDtmfCode request.
     fn call_request_to_procedure_input(
         &mut self,
         call_request: CallRequest,
@@ -247,7 +254,9 @@ impl Call {
             // TODO(https://fxbug.dev/135119) Handle multiple calls
             CallRequest::RequestHold { control_handle: _ } => unimplemented!(),
             // TODO(https://fxbug.dev/135119) Handle multiple calls
-            CallRequest::RequestActive { control_handle: _ } => unimplemented!(),
+            CallRequest::RequestActive { control_handle: _ } => {
+                Poll::Ready(Some(Ok(ProcedureInput::CommandFromHf(CommandFromHf::AnswerIncoming))))
+            }
             CallRequest::RequestTerminate { control_handle: _ } => self.maybe_hang_up(),
             // TODO(https://fxbug.dev/134161) Implement transfers.
             CallRequest::RequestTransferAudio { control_handle: _ } => unimplemented!(),
@@ -271,7 +280,7 @@ impl Call {
             (true, false, _) => Err(format_err!("Call {:?} does not yet have a number.", self)),
             (true, true, false) =>
                 Err(format_err!(
-                    "Call {:?} is missing client_end, indicating that this call has already been converted to a NextCall",
+                    "(Not an error) Call {:?} already has a request stream, indicating that this call has already been converted to a NextCall",
                     self)),
             (true, true, true) => {
                 let (client_end, server_end) = fidl::endpoints::create_endpoints::<CallMarker>();
@@ -303,6 +312,7 @@ impl fmt::Debug for Call {
             .field("number", &self.number)
             .field("direction", &self.direction)
             .field("request_stream.is_some()", &self.request_stream.is_some())
+            .field("shutdown_state", &"<lock>")
             .finish_non_exhaustive()
     }
 }
@@ -331,7 +341,7 @@ impl Stream for Call {
             {
                 info!(
                     "FIDL error on Call request stream for call {:?} with peer {:}: {:?}",
-                    self.call_index, self.peer_id, error
+                    self, self.peer_id, error
                 );
                 self.shutdown_state.lock().received_fidl_error();
                 self.maybe_hang_up()
@@ -442,6 +452,10 @@ impl Calls {
         self.possibly_respond_to_watch_next_call(call_index);
 
         call_index
+
+        // TODO(https://fxbug.dev/135158) Cause the stream to yield a phone
+        // number fetch procedure input if no number is known. Or do that at the
+        // call site for this method
     }
 
     pub fn set_call_state_by_indicator(&mut self, indicator: CallIndicator) {
@@ -483,8 +497,10 @@ impl Calls {
         };
 
         debug!(
-            "Setting call state for peer {:} for call {:} to {:?}",
-            self.peer_id, call_index, call_state_option
+            "Setting call state for peer {:} for call {:?} to {:?}",
+            self.peer_id,
+            self.call_list.get(call_index),
+            call_state_option
         );
         call_state_option.into_iter().for_each(|s| self.set_state_for_call(call_index, s));
     }
@@ -499,14 +515,22 @@ impl Calls {
             Some(call) => {
                 call.set_state(new_state);
                 self.possibly_respond_to_watch_next_call(call_index);
-                if new_state == CallState::Terminated {
-                    self.handle_state_terminated(call_index);
-                }
             }
-            None => warn!(
-                "No call found for for peer {:} at index {:} while setting state to {:?}",
-                self.peer_id, call_index, new_state
-            ),
+            None => {
+                info!(
+                    "No call found for for peer {:} at index {:} while setting state to {:?}",
+                    self.peer_id, call_index, new_state
+                );
+                let _index = self.insert_new_call(
+                    Some(new_state),
+                    None, // Number
+                    Direction::MobileOriginated,
+                );
+            }
+        }
+
+        if new_state == CallState::Terminated {
+            self.handle_state_terminated(call_index);
         }
     }
 

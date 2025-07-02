@@ -6,6 +6,7 @@
 import abc
 from typing import Any
 
+from honeydew.affordances import affordance
 from honeydew.affordances.ui.user_input import types
 
 DEFAULTS: dict[str, Any] = {
@@ -87,7 +88,7 @@ class KeyboardDevice(abc.ABC):
         """
 
 
-class UserInput(abc.ABC):
+class UserInput(affordance.Affordance):
     """Abstract base class for UserInput affordance."""
 
     @abc.abstractmethod

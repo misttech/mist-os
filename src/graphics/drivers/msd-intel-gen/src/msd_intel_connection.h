@@ -147,13 +147,13 @@ class MsdIntelAbiConnection : public msd::Connection {
   explicit MsdIntelAbiConnection(std::shared_ptr<MsdIntelConnection> ptr) : ptr_(std::move(ptr)) {}
 
   // msd::Connection impl
-  magma_status_t MapBuffer(msd::Buffer& buffer, uint64_t gpu_va, uint64_t offset, uint64_t length,
-                           uint64_t flags) override;
-  void ReleaseBuffer(msd::Buffer& buffer, bool shutting_down) override;
+  magma_status_t MsdMapBuffer(msd::Buffer& buffer, uint64_t gpu_va, uint64_t offset,
+                              uint64_t length, uint64_t flags) override;
+  void MsdReleaseBuffer(msd::Buffer& buffer, bool shutting_down) override;
 
-  void SetNotificationCallback(msd::NotificationHandler* handler) override;
+  void MsdSetNotificationCallback(msd::NotificationHandler* handler) override;
 
-  std::unique_ptr<msd::Context> CreateContext() override;
+  std::unique_ptr<msd::Context> MsdCreateContext() override;
 
   std::shared_ptr<MsdIntelConnection> ptr() { return ptr_; }
 

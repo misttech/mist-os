@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![recursion_limit = "256"]
+
 mod device;
 mod iio_file;
 mod power_supply_file;

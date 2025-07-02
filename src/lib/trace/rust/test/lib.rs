@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_trace as trace;
 use std::future::poll_fn;
+use std::sync::{Barrier, Condvar, Mutex};
 use std::task::Poll;
+use {fuchsia_async as fasync, fuchsia_trace as trace, fuchsia_trace_observer as trace_observer};
 
 #[no_mangle]
 pub extern "C" fn rs_test_trace_enabled() -> bool {
@@ -143,4 +144,39 @@ pub extern "C" fn rs_test_trace_future_disabled_with_arg() {
             ()
         }
     ));
+}
+
+static STATE_CV: Condvar = Condvar::new();
+static TRACE_STATE: Mutex<fuchsia_trace::TraceState> =
+    Mutex::new(fuchsia_trace::TraceState::Stopped);
+#[no_mangle]
+pub extern "C" fn rs_check_trace_state() -> u32 {
+    *TRACE_STATE.lock().unwrap() as u32
+}
+#[no_mangle]
+pub extern "C" fn rs_wait_trace_state_is(expected: u32) {
+    let mut state = TRACE_STATE.lock().unwrap();
+    while *state as u32 != expected {
+        state = STATE_CV.wait(state).unwrap();
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn rs_setup_trace_observer() {
+    static BARRIER: Barrier = Barrier::new(2);
+    std::thread::spawn(|| {
+        let mut executor = fasync::LocalExecutor::new();
+        executor.run_singlethreaded(async move {
+            let observer = trace_observer::TraceObserver::new();
+            BARRIER.wait();
+            while let Ok(new_state) = observer.on_state_changed().await {
+                let mut state = TRACE_STATE.lock().unwrap();
+                *state = new_state;
+                STATE_CV.notify_all();
+            }
+        });
+    });
+    // Ensure that we've registered our trace_observer in the spawned thread before continuing on
+    // and potentially starting the trace session.
+    BARRIER.wait();
 }

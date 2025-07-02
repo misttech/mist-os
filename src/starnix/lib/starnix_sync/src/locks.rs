@@ -9,38 +9,38 @@ use crate::{LockAfter, LockBefore, LockFor, Locked, RwLockFor, UninterruptibleLo
 use core::marker::PhantomData;
 use std::{any, fmt};
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(detect_lock_cycles))]
 pub type Mutex<T> = fuchsia_sync::Mutex<T>;
-#[cfg(not(debug_assertions))]
+#[cfg(not(detect_lock_cycles))]
 pub type MutexGuard<'a, T> = fuchsia_sync::MutexGuard<'a, T>;
 #[allow(unused)]
-#[cfg(not(debug_assertions))]
+#[cfg(not(detect_lock_cycles))]
 pub type MappedMutexGuard<'a, T> = fuchsia_sync::MappedMutexGuard<'a, T>;
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(detect_lock_cycles))]
 pub type RwLock<T> = fuchsia_sync::RwLock<T>;
-#[cfg(not(debug_assertions))]
+#[cfg(not(detect_lock_cycles))]
 pub type RwLockReadGuard<'a, T> = fuchsia_sync::RwLockReadGuard<'a, T>;
-#[cfg(not(debug_assertions))]
+#[cfg(not(detect_lock_cycles))]
 pub type RwLockWriteGuard<'a, T> = fuchsia_sync::RwLockWriteGuard<'a, T>;
 
-#[cfg(debug_assertions)]
+#[cfg(detect_lock_cycles)]
 type RawTracingMutex = tracing_mutex::lockapi::TracingWrapper<fuchsia_sync::RawSyncMutex>;
-#[cfg(debug_assertions)]
+#[cfg(detect_lock_cycles)]
 pub type Mutex<T> = lock_api::Mutex<RawTracingMutex, T>;
-#[cfg(debug_assertions)]
+#[cfg(detect_lock_cycles)]
 pub type MutexGuard<'a, T> = lock_api::MutexGuard<'a, RawTracingMutex, T>;
 #[allow(unused)]
-#[cfg(debug_assertions)]
+#[cfg(detect_lock_cycles)]
 pub type MappedMutexGuard<'a, T> = lock_api::MappedMutexGuard<'a, RawTracingMutex, T>;
 
-#[cfg(debug_assertions)]
+#[cfg(detect_lock_cycles)]
 type RawTracingRwLock = tracing_mutex::lockapi::TracingWrapper<fuchsia_sync::RawSyncRwLock>;
-#[cfg(debug_assertions)]
+#[cfg(detect_lock_cycles)]
 pub type RwLock<T> = lock_api::RwLock<RawTracingRwLock, T>;
-#[cfg(debug_assertions)]
+#[cfg(detect_lock_cycles)]
 pub type RwLockReadGuard<'a, T> = lock_api::RwLockReadGuard<'a, RawTracingRwLock, T>;
-#[cfg(debug_assertions)]
+#[cfg(detect_lock_cycles)]
 pub type RwLockWriteGuard<'a, T> = lock_api::RwLockWriteGuard<'a, RawTracingRwLock, T>;
 
 /// Lock `m1` and `m2` in a consistent order (using the memory address of m1 and m2 and returns the
@@ -119,7 +119,7 @@ impl<T, L: LockAfter<UninterruptibleLock>> OrderedMutex<T, L> {
         Self { mutex: Mutex::new(t), _phantom: PhantomData }
     }
 
-    pub fn lock<'a, P>(&'a self, locked: &'a mut Locked<'_, P>) -> <Self as LockFor<L>>::Guard<'a>
+    pub fn lock<'a, P>(&'a self, locked: &'a mut Locked<P>) -> <Self as LockFor<L>>::Guard<'a>
     where
         P: LockBefore<L>,
     {
@@ -128,8 +128,8 @@ impl<T, L: LockAfter<UninterruptibleLock>> OrderedMutex<T, L> {
 
     pub fn lock_and<'a, P>(
         &'a self,
-        locked: &'a mut Locked<'_, P>,
-    ) -> (<Self as LockFor<L>>::Guard<'a>, Locked<'a, L>)
+        locked: &'a mut Locked<P>,
+    ) -> (<Self as LockFor<L>>::Guard<'a>, &'a mut Locked<L>)
     where
         P: LockBefore<L>,
     {
@@ -140,10 +140,10 @@ impl<T, L: LockAfter<UninterruptibleLock>> OrderedMutex<T, L> {
 /// Lock two OrderedMutex of the same level in the consistent order. Returns both
 /// guards and a new locked context.
 pub fn lock_both<'a, T, L: LockAfter<UninterruptibleLock>, P>(
-    locked: &'a mut Locked<'_, P>,
+    locked: &'a mut Locked<P>,
     m1: &'a OrderedMutex<T, L>,
     m2: &'a OrderedMutex<T, L>,
-) -> (MutexGuard<'a, T>, MutexGuard<'a, T>, Locked<'a, L>)
+) -> (MutexGuard<'a, T>, MutexGuard<'a, T>, &'a mut Locked<L>)
 where
     P: LockBefore<L>,
 {
@@ -195,10 +195,7 @@ impl<T, L: LockAfter<UninterruptibleLock>> OrderedRwLock<T, L> {
         Self { rwlock: RwLock::new(t), _phantom: PhantomData }
     }
 
-    pub fn read<'a, P>(
-        &'a self,
-        locked: &'a mut Locked<'_, P>,
-    ) -> <Self as RwLockFor<L>>::ReadGuard<'a>
+    pub fn read<'a, P>(&'a self, locked: &'a mut Locked<P>) -> <Self as RwLockFor<L>>::ReadGuard<'a>
     where
         P: LockBefore<L>,
     {
@@ -207,7 +204,7 @@ impl<T, L: LockAfter<UninterruptibleLock>> OrderedRwLock<T, L> {
 
     pub fn write<'a, P>(
         &'a self,
-        locked: &'a mut Locked<'_, P>,
+        locked: &'a mut Locked<P>,
     ) -> <Self as RwLockFor<L>>::WriteGuard<'a>
     where
         P: LockBefore<L>,
@@ -217,8 +214,8 @@ impl<T, L: LockAfter<UninterruptibleLock>> OrderedRwLock<T, L> {
 
     pub fn read_and<'a, P>(
         &'a self,
-        locked: &'a mut Locked<'_, P>,
-    ) -> (<Self as RwLockFor<L>>::ReadGuard<'a>, Locked<'a, L>)
+        locked: &'a mut Locked<P>,
+    ) -> (<Self as RwLockFor<L>>::ReadGuard<'a>, &'a mut Locked<L>)
     where
         P: LockBefore<L>,
     {
@@ -227,8 +224,8 @@ impl<T, L: LockAfter<UninterruptibleLock>> OrderedRwLock<T, L> {
 
     pub fn write_and<'a, P>(
         &'a self,
-        locked: &'a mut Locked<'_, P>,
-    ) -> (<Self as RwLockFor<L>>::WriteGuard<'a>, Locked<'a, L>)
+        locked: &'a mut Locked<P>,
+    ) -> (<Self as RwLockFor<L>>::WriteGuard<'a>, &'a mut Locked<L>)
     where
         P: LockBefore<L>,
     {

@@ -133,7 +133,8 @@ mod tests {
     #[test_case(vec![0, 0, 0, 0, 1, 2, 3, 4], Some(0x01020304), 0x01020305; "valid")]
     #[test_case(vec![255, 255, 255, 255, 255, 255, 255, 255], Some(u64::MAX), 0x0; "rollover")]
     #[test_case(vec![0, 0, 0, 0, 1, 2], None, DEFAULT_VALUE; "content too short")]
-    fn test_process_existing_file(content: Vec<u8>, read: Option<u64>, write: u64) {
+    #[fuchsia::test]
+    async fn test_process_existing_file(content: Vec<u8>, read: Option<u64>, write: u64) {
         let (_tempdir, path) = make_file(content);
         let inspector = &Inspector::default();
         process_file(&path, inspector.root());
@@ -154,8 +155,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_process_missing_file() {
+    #[fuchsia::test]
+    async fn test_process_missing_file() {
         let (_tempdir, path) = make_path();
         let inspector = &Inspector::default();
         process_file(&path, inspector.root());
@@ -168,8 +169,8 @@ mod tests {
         });
     }
 
-    #[test]
-    fn test_process_invalid_directory() {
+    #[fuchsia::test]
+    async fn test_process_invalid_directory() {
         let inspector = &Inspector::default();
         process_file(&PathBuf::from("/i_dont_exist"), inspector.root());
         assert_data_tree!(

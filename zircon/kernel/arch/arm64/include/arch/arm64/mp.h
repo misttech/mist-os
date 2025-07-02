@@ -79,9 +79,14 @@ void arch_init_cpu_map(uint cluster_count, const uint* cluster_cpus);
 void arch_register_mpid(uint cpu_id, uint64_t mpid);
 void arm64_init_percpu_early();
 
-// The start-up routine for secondary CPUs, which in turn calls the kernel
-// entrypoint of arm64_secondary_entry().
-extern "C" void arm64_secondary_start();
+// The start-up routine for secondary CPUs and for resuming primary or secondary
+// CPUs from a PSCI CPU_SUSPEND power down state.
+//
+// |resume_context| is a pointer to a platform-specific type.  When null,
+// control is passed to |arm64_secondary_entry| to finish the boot up sequence
+// for the calling secondary CPU.  When non-null, control is passed to
+// |psci_do_resume|, which will restore the supplied CPU context.
+extern "C" void arm64_secondary_start(void* resume_context);
 
 extern uint arm_num_cpus;
 

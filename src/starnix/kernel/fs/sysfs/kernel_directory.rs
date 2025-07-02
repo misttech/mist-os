@@ -3,22 +3,22 @@
 // found in the LICENSE file.
 
 use crate::task::CurrentTask;
-use crate::vfs::stub_empty_file::StubEmptyFile;
-use crate::vfs::{create_bytes_file_with_handler, StaticDirectoryBuilder};
+use crate::vfs::pseudo::simple_directory::SimpleDirectoryMutator;
+use crate::vfs::pseudo::simple_file::create_bytes_file_with_handler;
+use crate::vfs::pseudo::stub_empty_file::StubEmptyFile;
 use starnix_logging::bug_ref;
 use starnix_uapi::file_mode::mode;
 use std::sync::Arc;
 
 /// This directory contains various files and subdirectories that provide information about
 /// the running kernel.
-pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirectoryBuilder<'_>) {
+pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &SimpleDirectoryMutator) {
     let kernel = current_task.kernel();
-    dir.subdir(current_task, "kernel", 0o755, |dir| {
-        dir.subdir(current_task, "tracing", 0o755, |_| ());
-        dir.subdir(current_task, "mm", 0o755, |dir| {
-            dir.subdir(current_task, "transparent_hugepage", 0o755, |dir| {
+    dir.subdir("kernel", 0o755, |dir| {
+        dir.subdir("tracing", 0o755, |_| ());
+        dir.subdir("mm", 0o755, |dir| {
+            dir.subdir("transparent_hugepage", 0o755, |dir| {
                 dir.entry(
-                    current_task,
                     "enabled",
                     StubEmptyFile::new_node(
                         "/sys/kernel/mm/transparent_hugepage/enabled",
@@ -28,10 +28,9 @@ pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirect
                 );
             });
         });
-        dir.subdir(current_task, "wakeup_reasons", 0o755, |dir| {
+        dir.subdir("wakeup_reasons", 0o755, |dir| {
             let read_only_file_mode = mode!(IFREG, 0o444);
             dir.entry(
-                current_task,
                 "last_resume_reason",
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     kernel
@@ -43,7 +42,6 @@ pub fn sysfs_kernel_directory(current_task: &CurrentTask, dir: &mut StaticDirect
                 read_only_file_mode,
             );
             dir.entry(
-                current_task,
                 "last_suspend_time",
                 create_bytes_file_with_handler(Arc::downgrade(kernel), |kernel| {
                     let suspend_stats = kernel.suspend_resume_manager.suspend_stats();

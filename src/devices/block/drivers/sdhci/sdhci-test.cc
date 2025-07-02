@@ -18,6 +18,7 @@
 
 #include <gtest/gtest.h>
 
+#include "src/devices/block/drivers/sdhci/sdhci_config.h"
 #include "src/devices/lib/mmio/test-helper.h"
 #include "src/lib/testing/predicates/status.h"
 
@@ -270,7 +271,10 @@ class SdhciTest : public ::testing::Test {
       env.sdhci().set_dma_boundary_alignment(dma_boundary_alignment);
     });
 
-    return driver_test().StartDriver();
+    return driver_test().StartDriverWithCustomStartArgs([](fdf::DriverStartArgs& args) {
+      sdhci_config::Config config{{.enable_suspend = true}};
+      args.config(config.ToVmo());
+    });
   }
 
   zx::result<> StartDriver(fuchsia_hardware_sdhci::Quirk quirks = {},

@@ -4,13 +4,17 @@
 
 mod abstract_socket_namespace;
 mod cgroup;
+pub mod container_namespace;
 mod current_task;
+mod dynamic_thread_spawner;
 mod hr_timer_manager;
 mod interval_timer;
 mod iptables;
 mod kernel;
 mod kernel_stats;
 mod kernel_threads;
+mod loader;
+mod memory_attribution;
 pub mod net;
 mod pid_table;
 mod process_group;

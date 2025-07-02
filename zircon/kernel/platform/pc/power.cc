@@ -13,6 +13,7 @@
 #include <platform.h>
 #include <stdio.h>
 #include <string.h>
+#include <zircon/errors.h>
 
 #include <arch/mp.h>
 #include <arch/x86.h>
@@ -100,6 +101,10 @@ void platform_halt_cpu(void) {
   // Signal that this CPU is in its halt loop
   halted_cpus.fetch_or(cpu_num_to_mask(arch_curr_cpu_num()));
 }
+
+bool platform_supports_suspend_cpu() { return false; }
+
+zx_status_t platform_suspend_cpu() { return ZX_ERR_NOT_SUPPORTED; }
 
 // TODO(https://fxbug.dev/42180675): Refactor platform_panic_start.
 void platform_panic_start(PanicStartHaltOtherCpus option) {

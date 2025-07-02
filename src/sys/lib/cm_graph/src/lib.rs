@@ -244,6 +244,7 @@ fn get_dependencies_from_children<'a>(
 fn get_dependencies_from_collections<'a>(
     strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
     decl: &'a fdecl::Component,
+    dynamic_children: &Vec<(&'a str, &'a str)>,
 ) {
     if let Some(collections) = decl.collections.as_ref() {
         for collection in collections {
@@ -252,6 +253,11 @@ fn get_dependencies_from_collections<'a>(
                     let source = DependencyNode::Environment(env.as_str());
                     let target = DependencyNode::Collection(name.as_str());
                     strong_dependencies.add_edge(source, target);
+
+                    for child_name in dynamic_children_in_collection(dynamic_children, &name) {
+                        strong_dependencies
+                            .add_edge(source, DependencyNode::Child(child_name, Some(&name)));
+                    }
                 }
             }
         }
@@ -352,14 +358,12 @@ fn get_dependencies_from_offers<'a>(
     strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
     decl: &'a fdecl::Component,
     dynamic_children: &Vec<(&'a str, &'a str)>,
-    dynamic_offers: Option<&'a Vec<fdecl::Offer>>,
+    dynamic_offers: &'a Vec<fdecl::Offer>,
 ) {
     let mut all_offers: Vec<&fdecl::Offer> = vec![];
 
-    if let Some(dynamic_offers) = dynamic_offers.as_ref() {
-        for dynamic_offer in dynamic_offers.iter() {
-            all_offers.push(dynamic_offer);
-        }
+    for dynamic_offer in dynamic_offers.iter() {
+        all_offers.push(dynamic_offer);
     }
 
     if let Some(offers) = decl.offers.as_ref() {
@@ -501,12 +505,12 @@ pub fn generate_dependency_graph<'a>(
     strong_dependencies: &mut DirectedGraph<DependencyNode<'a>>,
     decl: &'a fdecl::Component,
     dynamic_children: &Vec<(&'a str, &'a str)>,
-    dynamic_offers: Option<&'a Vec<fdecl::Offer>>,
+    dynamic_offers: &'a Vec<fdecl::Offer>,
 ) {
     get_dependencies_from_uses(strong_dependencies, decl);
     get_dependencies_from_offers(strong_dependencies, decl, dynamic_children, dynamic_offers);
     get_dependencies_from_capabilities(strong_dependencies, decl);
     get_dependencies_from_environments(strong_dependencies, decl);
     get_dependencies_from_children(strong_dependencies, decl);
-    get_dependencies_from_collections(strong_dependencies, decl);
+    get_dependencies_from_collections(strong_dependencies, decl, dynamic_children);
 }

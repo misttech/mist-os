@@ -4,11 +4,20 @@
 
 #![deny(missing_docs)]
 
-//! Reading and writing a manifest specifying all the images generated as part
-//! of Image Assembly.
+//! Constructing and parsing an assembled system, which contains all the
+//! images necessary to boot Fuchsia.
 
 mod assembled_system;
+mod base_package;
+mod blobfs;
+mod extra_hash_descriptor;
+mod fvm;
+mod fxfs;
+mod image;
+pub mod vbmeta;
+pub mod vfs;
+mod zbi;
 
-pub use assembled_system::{
-    AssembledSystem, BlobfsContents, Image, PackageMetadata, PackageSetMetadata, PackagesMetadata,
-};
+pub use assembled_system::AssembledSystem;
+pub use assembly_release_info::ProductBundleReleaseInfo;
+pub use image::{BlobfsContents, Image, PackageMetadata, PackageSetMetadata, PackagesMetadata};

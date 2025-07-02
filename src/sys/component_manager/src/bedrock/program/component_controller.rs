@@ -154,7 +154,7 @@ impl<'a> ComponentController {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use assert_matches::assert_matches;

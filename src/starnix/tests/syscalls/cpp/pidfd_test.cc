@@ -102,7 +102,7 @@ TEST(PidFdTest, CanPollProcessExit) {
   EXPECT_EQ(pfd.revents, POLLIN);
 
   close(pid_fd);
-  helper.WaitForChildren();
+  ASSERT_TRUE(helper.WaitForChildren());
 }
 
 TEST(PidFdTest, PollWaitsForSecondaryThreadsToo) {
@@ -150,7 +150,7 @@ TEST(PidFdTest, PollWaitsForSecondaryThreadsToo) {
   }
 
   close(pid_fd);
-  helper.WaitForChildren();
+  ASSERT_TRUE(helper.WaitForChildren());
 }
 
 }  // namespace

@@ -6,17 +6,24 @@
 
 """Generates a bash completion script for `ffx` tool.
 
-Usage:
+Usage to generate from ffx output:
   source <(python3 scripts/ffx_complete/ffx_gen_complete.py --ffx_help_json_file_path=<(fx ffx --machine json --help))
+
+Usage to generate from ffx golden files:
+  source <(python3 scripts/ffx_complete/ffx_gen_complete.py --ffx_golden_dir_path=src/developer/ffx/tests/cli-goldens/goldens)
 """
 import argparse
 import dataclasses
 import json
 import os
+import pathlib
 import sys
 import textwrap
 import typing
-from typing import Any, Sequence
+from typing import Any, Iterable, Sequence, TypeAlias
+
+JSONObject: TypeAlias = dict[str, "JSONValue"]
+JSONValue: TypeAlias = JSONObject | str | int | float | list["JSONValue"]
 
 try:
     import dataclasses_json_lite
@@ -167,26 +174,80 @@ def print_script(root_command: Command, file: typing.TextIO) -> None:
     print("""complete -F _ffx_completions ffx""", file=file)
 
 
+def find_sub_command_list(
+    sub_commands_root: list[JSONObject], path_elements: Iterable[str]
+) -> list[JSONObject]:
+    current_sub_commands = sub_commands_root
+    for element in path_elements:
+        for command in current_sub_commands:
+            if command["name"] == element:
+                assert isinstance(command["command"], dict)
+                assert isinstance(command["command"]["commands"], list)
+                current_sub_commands = command["command"]["commands"]  # type: ignore
+                break
+        else:
+            raise ValueError(
+                f"No command {element} found as part of {path_elements} integration."
+            )
+    return current_sub_commands
+
+
+def load_help_json_from_golden(golden_dir_root: pathlib.Path) -> JSONObject:
+    """Build the command hierarchy from the .golden JSON files.
+
+    Golden files contains a single command, and are laid out in
+    a directory structure matching the command hierarchy."""
+    command_jsons: list[JSONObject] = []
+    for golden_file in golden_dir_root.rglob("*.golden"):
+        sub_command_list = find_sub_command_list(
+            command_jsons, golden_file.parent.relative_to(golden_dir_root).parts
+        )
+        json_data = json.load(open(golden_file, "r"))
+        if golden_file.stem != json_data["name"].lower():
+            raise ValueError(
+                f"file stem is {golden_file.stem} and command name is {json_data['name'].lower()}"
+            )
+        sub_command_list.append(
+            {"name": golden_file.stem, "command": json_data}
+        )
+
+    if len(command_jsons) != 1:
+        raise ValueError(
+            f"more than one root command found which is unexpected."
+        )
+    result = command_jsons[0]["command"]
+    assert isinstance(result, dict)
+    return result
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         prog="ffx_gen_complete",
         description="Generate a bash complete script for ffx tool",
         epilog="Try: source <(python3 scripts/ffx_complete/ffx_gen_complete.py --ffx_help_json_file_path=<(ffx --machine json --help))",
     )
-
+    parser.add_argument(
+        "--ffx_golden_dir_path",
+        default=os.environ.get("FUCHSIA_DIR", ".")
+        + "/src/developer/ffx/tests/cli-goldens/goldens",
+        type=pathlib.Path,
+        help="path to ffx/tests/cli-golden files",
+        metavar="DIR",
+    )
     parser.add_argument(
         "--ffx_help_json_file_path",
         type=argparse.FileType("r", encoding="UTF-8"),
-        required=True,
         help="path to JSON machine output of ffx help",
         metavar="FILE",
     )
-    if len(sys.argv) == 1:
-        parser.print_help(sys.stderr)
-        sys.exit(1)
     args = parser.parse_args()
 
-    root_command = Command.from_dict(json.load(args.ffx_help_json_file_path))  # type: ignore[attr-defined]
+    if args.ffx_help_json_file_path:
+        command_json = json.load(args.ffx_help_json_file_path)
+    else:
+        command_json = load_help_json_from_golden(args.ffx_golden_dir_path)
+
+    root_command = Command.from_dict(command_json)  # type: ignore[attr-defined]
     print_script(root_command, file=sys.stdout)
 
 

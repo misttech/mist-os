@@ -245,20 +245,20 @@ pub struct ComplexInstants {
 
 impl ComplexInstants {
     fn __max_ordinal(&self) -> usize {
-        if self.monotonic.is_some() {
-            return 1;
-        }
-
-        if self.boot.is_some() {
-            return 2;
+        if self.boot_ticks.is_some() {
+            return 4;
         }
 
         if self.monotonic_ticks.is_some() {
             return 3;
         }
 
-        if self.boot_ticks.is_some() {
-            return 4;
+        if self.boot.is_some() {
+            return 2;
+        }
+
+        if self.monotonic.is_some() {
+            return 1;
         }
 
         0

@@ -72,7 +72,8 @@ pub trait Interface: Send + Sync + Unpin + 'static {
         trace_flow_id: TraceFlowId,
     ) -> impl Future<Output = Result<(), zx::Status>> + Send;
 
-    /// Called for a request to write bytes.
+    /// Called for a request to write bytes. WriteOptions::PRE_BARRIER should never be seen
+    /// for this call. See barrier().
     fn write(
         &self,
         device_block_offset: u64,
@@ -82,6 +83,14 @@ pub trait Interface: Send + Sync + Unpin + 'static {
         opts: WriteOptions,
         trace_flow_id: TraceFlowId,
     ) -> impl Future<Output = Result<(), zx::Status>> + Send;
+
+    /// Indicates that all previously completed write operations should be made persistent prior to
+    /// any write operations issued after this call. It is not specified how the barrier affects
+    /// currently in-flight write operations. This corresponds to the use of the PRE_BARRIER flag
+    /// that can be used on a write request. Requests with that flag will be converted into
+    /// separate barrier and write calls, and the write call above will not ever include the
+    /// WriteOptions::PRE_BARRIER within opts.
+    fn barrier(&self) -> Result<(), zx::Status>;
 
     /// Called to flush the device.
     fn flush(
@@ -258,7 +267,7 @@ impl<I: Interface + ?Sized> Session<I> {
         // make updating mapping caches simpler.  If this proves to be a performance issue, we can
         // optimise it.
         let mut map_future = pin!(Fuse::terminated());
-        let mut pending_mappings = VecDeque::new();
+        let mut pending_mappings: VecDeque<DecodedRequest> = VecDeque::new();
 
         loop {
             let new_requests = {
@@ -338,8 +347,19 @@ impl<I: Interface + ?Sized> Session<I> {
                                 .map(|(_, response)| response),
                         );
                     }
-                    Ok(request) => {
-                        if map_future.is_terminated() {
+                    Ok(mut request) => {
+                        // If `request` contains WriteOptions::PRE_BARRIER, issue the barrier
+                        // prior to mapping the request. If the barrier fails, we can
+                        // immediately respond to the request without splitting it up.
+                        if let Err(status) = self.maybe_issue_barrier(&mut request) {
+                            let response = self
+                                .helper
+                                .session_manager
+                                .active_requests
+                                .complete_and_take_response(request.request_id, status)
+                                .map(|(_, r)| r);
+                            responses.extend(response);
+                        } else if map_future.is_terminated() {
                             map_future.set(self.map_request(request).fuse());
                         } else {
                             pending_mappings.push_back(request);
@@ -350,6 +370,22 @@ impl<I: Interface + ?Sized> Session<I> {
                 }
             }
         }
+    }
+
+    fn maybe_issue_barrier(&self, request: &mut DecodedRequest) -> Result<(), zx::Status> {
+        if let Operation::Write {
+            device_block_offset: _,
+            block_count: _,
+            mut options,
+            vmo_offset: _,
+        } = &request.operation
+        {
+            if options.contains(WriteOptions::PRE_BARRIER) {
+                self.interface.barrier()?;
+                options &= !WriteOptions::PRE_BARRIER;
+            }
+        }
+        Ok(())
     }
 
     // This is currently async when it doesn't need to be to allow for upcoming changes.

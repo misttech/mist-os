@@ -25,9 +25,6 @@ non_sharded_tests = [
     label = "ndp"
   },
   {
-    label = "neighbor"
-  },
-  {
     label = "routes"
     err_logs = true
   },
@@ -180,7 +177,27 @@ fuchsia_sharded_test_package("netstack-filter-fidl-tests") {
   ]
 }
 
+fuchsia_sharded_test_package("netstack-neighbor-fidl-tests") {
+  test_components = [
+    {
+      name = "netstack-neighbor-fidl-test"
+      manifest = "meta/netstack-neighbor-fidl-test.cml"
+      deps = _common_test_package_deps + _non_log_less_package_deps +
+             [ "neighbor" ]
+      expectations = "expectations/neighbor.json5"
+      num_shards = 4
+
+      # Matches up to the first ':', which for our purposes is the same as until
+      # the first "::".
+      shard_part_regex = "([^:]+)"
+    },
+  ]
+}
+
 group("tests") {
   testonly = true
-  deps = all_non_sharded_test_packages + [ ":netstack-filter-fidl-tests" ]
+  deps = all_non_sharded_test_packages + [
+           ":netstack-filter-fidl-tests",
+           ":netstack-neighbor-fidl-tests",
+         ]
 }

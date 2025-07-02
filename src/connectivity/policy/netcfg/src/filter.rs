@@ -696,7 +696,14 @@ async fn update_nat_rules_deprecated(
                 .await;
             }
             Err(fnet_filter_deprecated::FilterUpdateNatRulesError::BadRule) => {
-                panic!("Generated Nat rule was invalid. This should never happen: {rules:?}");
+                // This can sometimes be triggered if the NIC is deleted before
+                // the call to `update_nat_rules`.
+                error!(
+                    "Generated Nat rule was invalid. Perhaps the requested \
+                     NIC has been removed {rules:?}"
+                );
+                // There is no point in retrying in this case.
+                return Err(fnet_masquerade::Error::BadRule);
             }
         }
     }

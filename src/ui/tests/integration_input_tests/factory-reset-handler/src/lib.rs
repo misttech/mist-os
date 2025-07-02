@@ -162,8 +162,9 @@ async fn assemble_realm(
 }
 
 async fn perform_factory_reset(realm: &RealmInstance) {
-    let injection_registry = realm.root
-        .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_input_injection::InputDeviceRegistryMarker>()
+    let injection_registry = realm
+        .root
+        .connect_to_protocol_at_exposed_dir()
         .expect("Failed to connect to InputDeviceRegistry");
     let mut device_registry = modern_backend::InputDeviceRegistry::new(injection_registry);
     synthesizer::media_button_event([synthesizer::MediaButton::FactoryReset], &mut device_registry)

@@ -4,9 +4,9 @@
 
 use crate::security::selinux_hooks::{
     check_permission, check_self_permission, fs_node_effective_sid_and_class, fs_node_ensure_class,
-    fs_node_set_label_with_task, has_file_permissions, task_consistent_attrs, task_effective_sid,
-    todo_check_permission, KernelPermission, PermissionCheck, ProcessPermission, TaskAttrs,
-    TaskAttrsOverride,
+    fs_node_set_label_with_task, has_file_permissions, permissions_from_flags,
+    task_consistent_attrs, task_effective_sid, todo_check_permission, todo_has_fs_node_permissions,
+    Auditable, KernelPermission, PermissionCheck, ProcessPermission, TaskAttrs, TaskAttrsOverride,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
@@ -17,6 +17,7 @@ use selinux::{
     KernelClass, NullessByteStr,
 };
 use starnix_types::ownership::TempRef;
+use starnix_uapi::auth::CAP_DAC_OVERRIDE;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
@@ -75,20 +76,40 @@ fn close_inaccessible_file_descriptors(
     let null_file_handle =
         kernel_state.selinuxfs_null.get().expect("selinuxfs_init_null() has been called").clone();
 
-    let audit_context = current_task.into();
+    let audit_context: Auditable<'_> = current_task.into();
     let source_sid = new_sid;
     let permission_check = security_server.as_permission_check();
     // Remap-to-null any fds that failed a check for allowing
     // `[child-process] [fd-from-child-fd-table]:fd { use }`.
     current_task.files.remap_fds(|file| {
+        let permissions =
+            permissions_from_flags(file.flags().into(), file.node().security_state.lock().class);
         let fd_use_result = has_file_permissions(
             &permission_check,
             current_task.kernel(),
             source_sid,
             file,
             &[],
-            audit_context,
+            audit_context.into(),
         );
+        if !permissions.is_empty() {
+            let audit_context = &[audit_context, file.as_ref().as_ref().into()];
+            // Check FsNode permissions, but don't enforce them for now.
+            // TODO (https://fxbug.dev/322843830) - Enforce this check and remap the file descriptor
+            // to the null file node if the check fails.
+            let _ = todo_has_fs_node_permissions(
+                TODO_DENY!(
+                    "https://fxbug.dev/322843830",
+                    "Check FsNode permissions for open files upon exec."
+                ),
+                current_task.kernel(),
+                &permission_check,
+                source_sid,
+                file.node(),
+                &permissions,
+                audit_context.into(),
+            );
+        }
         fd_use_result.map_or_else(|_| Some(null_file_handle.clone()), |_| None)
     });
 }
@@ -152,7 +173,7 @@ pub(in crate::security) fn task_alloc_from_context(
     let sid = if context.starts_with(INITIAL_PREFIX) {
         let name = &*context[INITIAL_PREFIX.len()..];
         let initial_sid = InitialSid::all_variants().iter().find(|x| x.name().as_bytes() == name);
-        SecurityId::initial(*initial_sid.ok_or_else(|| errno!(EINVAL))?)
+        (*initial_sid.ok_or_else(|| errno!(EINVAL))?).into()
     } else {
         security_server
             .security_context_to_sid(context.into())
@@ -562,6 +583,12 @@ pub(in crate::security) fn check_task_capable(
     capabilities: starnix_uapi::auth::Capabilities,
 ) -> Result<(), Errno> {
     let sid = task_effective_sid(current_task);
+
+    // TODO: https://fxbug.dev/401196505 - Use "kernel act as" to eliminate this.
+    if sid == InitialSid::Kernel.into() && capabilities == CAP_DAC_OVERRIDE {
+        return Ok(());
+    }
+
     let permission = permission_from_capability(capabilities);
     check_self_permission(
         &permission_check,
@@ -808,7 +835,6 @@ mod tests {
     use crate::security::selinux_hooks::{testing, InitialSid, TaskAttrs};
     use crate::security::update_state_on_exec;
     use crate::testing::create_task;
-    use selinux::SecurityId;
     use starnix_uapi::signals::SIGTERM;
     use starnix_uapi::{error, CLONE_SIGHAND, CLONE_THREAD, CLONE_VM};
     use testing::spawn_kernel_with_selinux_hooks_test_policy_and_run;
@@ -819,13 +845,13 @@ mod tests {
             |_locked, current_task, _security_server| {
                 // Create a fake parent state, with values for some fields, to check for.
                 let parent_security_state = TaskAttrs {
-                    current_sid: SecurityId::initial(InitialSid::Unlabeled),
-                    effective_sid: SecurityId::initial(InitialSid::Unlabeled),
-                    previous_sid: SecurityId::initial(InitialSid::Kernel),
-                    exec_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
-                    fscreate_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
-                    keycreate_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
-                    sockcreate_sid: Some(SecurityId::initial(InitialSid::Unlabeled)),
+                    current_sid: InitialSid::Unlabeled.into(),
+                    effective_sid: InitialSid::Unlabeled.into(),
+                    previous_sid: InitialSid::Kernel.into(),
+                    exec_sid: Some(InitialSid::Unlabeled.into()),
+                    fscreate_sid: Some(InitialSid::Unlabeled.into()),
+                    keycreate_sid: Some(InitialSid::Unlabeled.into()),
+                    sockcreate_sid: Some(InitialSid::Unlabeled.into()),
                 };
 
                 *current_task.security_state.lock() = parent_security_state.clone();
@@ -839,7 +865,7 @@ mod tests {
     #[fuchsia::test]
     fn task_alloc_for() {
         let for_kernel = TaskAttrs::for_kernel();
-        assert_eq!(for_kernel.current_sid, SecurityId::initial(InitialSid::Kernel));
+        assert_eq!(for_kernel.current_sid, InitialSid::Kernel.into());
         assert_eq!(for_kernel.effective_sid, for_kernel.current_sid);
         assert_eq!(for_kernel.previous_sid, for_kernel.current_sid);
         assert_eq!(for_kernel.exec_sid, None);
@@ -1044,12 +1070,12 @@ mod tests {
 
                     // Set previous SID to a different value from current, to allow verification
                     // of the pre-exec "current" being moved into "previous".
-                    state.previous_sid = SecurityId::initial(InitialSid::Unlabeled);
+                    state.previous_sid = InitialSid::Unlabeled.into();
 
                     // Set the other optional SIDs to a value, to verify that it is cleared on exec update.
-                    state.sockcreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
-                    state.fscreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
-                    state.keycreate_sid = Some(SecurityId::initial(InitialSid::Unlabeled));
+                    state.sockcreate_sid = Some(InitialSid::Unlabeled.into());
+                    state.fscreate_sid = Some(InitialSid::Unlabeled.into());
+                    state.keycreate_sid = Some(InitialSid::Unlabeled.into());
 
                     state.clone()
                 };
@@ -1085,7 +1111,7 @@ mod tests {
             |mut locked, current_task, security_server| {
                 // In this testing context, `current_task` is the initial task.
                 // Set its rlimits to some known values.
-                assert_eq!(current_task.id, 1);
+                assert_eq!(current_task.tid, 1);
                 {
                     let mut initial_limits = current_task.thread_group().limits.lock();
                     (Resource::ALL).iter().for_each(|resource| {

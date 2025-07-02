@@ -4,7 +4,7 @@
   "root": "tools",
   "target_files": {
     "x64": {
-      "executable": "@test_idk//tools/x64/ffx_tools:ffx-agis",
+      "executable": "@@test_idk//tools/x64/ffx_tools:ffx-agis",
       "executable_metadata": "tools/x64/ffx_tools/ffx-agis.json"
     }
   },

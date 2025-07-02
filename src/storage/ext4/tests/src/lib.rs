@@ -3,8 +3,7 @@
 // found in the LICENSE file.
 
 use assert_matches::assert_matches;
-use ext4_metadata::{Metadata, NodeInfo, Symlink, ROOT_INODE_NUM};
-use std::collections::BTreeMap;
+use ext4_metadata::{ExtendedAttributes, Metadata, NodeInfo, Symlink, ROOT_INODE_NUM};
 
 // To generate the test image:
 //
@@ -39,7 +38,7 @@ fn test_read_image() {
     assert_eq!(root.mode, 0o40755);
     assert_eq!(root.uid, UID);
     assert_eq!(root.gid, 0);
-    assert_eq!(root.extended_attributes, [].into());
+    assert!(root.extended_attributes.is_empty());
 
     let dir_inode_num = m.lookup(ROOT_INODE_NUM, "foo").expect("foo not found");
     let node = m.get(dir_inode_num).expect("root not found");
@@ -47,7 +46,7 @@ fn test_read_image() {
     assert_eq!(node.mode, 0o40750);
     assert_eq!(node.uid, UID);
     assert_eq!(node.gid, GID);
-    assert_eq!(node.extended_attributes, [].into());
+    assert!(node.extended_attributes.is_empty());
 
     let inode_num = m.lookup(dir_inode_num, "file").expect("foo not found");
     let node = m.get(inode_num).expect("root not found");
@@ -55,7 +54,7 @@ fn test_read_image() {
     assert_eq!(node.mode, 0o100640);
     assert_eq!(node.uid, UID);
     assert_eq!(node.gid, GID);
-    let xattr: BTreeMap<_, _> =
+    let xattr: ExtendedAttributes =
         [((*b"user.a").into(), (*b"apple").into()), ((*b"user.b").into(), (*b"ball").into())]
             .into();
     assert_eq!(&node.extended_attributes, &xattr);
@@ -71,5 +70,5 @@ fn test_read_image() {
     assert_eq!(node.mode, 0o120777);
     assert_eq!(node.uid, UID);
     assert_eq!(node.gid, GID);
-    assert_eq!(node.extended_attributes, [].into());
+    assert!(node.extended_attributes.is_empty());
 }

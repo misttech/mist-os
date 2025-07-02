@@ -10,8 +10,9 @@ use ffx_config::EnvironmentContext;
 use ffx_product_get_artifacts_args::GetArtifactsCommand;
 use ffx_writer::VerifiedMachineWriter;
 use fho::{bug, return_user_error, Error, FfxMain, FfxTool, Result};
+use product_bundle::{ProductBundle, Type};
 use schemars::JsonSchema;
-use sdk_metadata::{ProductBundle, Type, VirtualDeviceManifest};
+use sdk_metadata::VirtualDeviceManifest;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use utf8_path::path_relative_from;
@@ -170,7 +171,7 @@ impl PbGetArtifactsTool {
                         }
                         Image::BasePackage(_)
                         | Image::BlobFS { .. }
-                        | Image::Fxfs { path: _, contents: _ }
+                        | Image::Fxfs(_)
                         | Image::FVM(_)
                         | Image::FVMSparse(_)
                         | Image::QemuKernel(_) => continue,
@@ -207,7 +208,7 @@ impl PbGetArtifactsTool {
                         Image::BasePackage(_)
                         | Image::Dtbo(_)
                         | Image::BlobFS { .. }
-                        | Image::Fxfs { path: _, contents: _ }
+                        | Image::Fxfs(_)
                         | Image::FVMSparse(_)
                         | Image::FVMFastboot(_) => continue,
                     }
@@ -250,7 +251,7 @@ mod tests {
     use assembly_partitions_config::PartitionsConfig;
     use ffx_config::ConfigLevel;
     use ffx_writer::{Format, TestBuffers};
-    use sdk_metadata::ProductBundleV2;
+    use product_bundle::ProductBundleV2;
     use std::fs::{self, File};
     use std::io::Write;
     use tempfile::tempdir;
@@ -325,10 +326,7 @@ mod tests {
                 Image::FVMFastboot(Utf8PathBuf::from(
                     "/tmp/product_bundle/system_a/fvm_fastboot.blk",
                 )),
-                Image::Fxfs {
-                    path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.blk"),
-                    contents: Default::default(),
-                },
+                Image::Fxfs(Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.blk")),
                 Image::FxfsSparse {
                     path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.sparse.blk"),
                     contents: Default::default(),
@@ -340,6 +338,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         let tool = PbGetArtifactsTool {
             cmd: GetArtifactsCommand {
@@ -432,10 +431,7 @@ mod tests {
                     "/tmp/product_bundle/system_a/fvm_fastboot.blk",
                 )),
                 Image::QemuKernel(Utf8PathBuf::from("qemu/path")),
-                Image::Fxfs {
-                    path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.blk"),
-                    contents: Default::default(),
-                },
+                Image::Fxfs(Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.blk")),
                 Image::FxfsSparse {
                     path: Utf8PathBuf::from("/tmp/product_bundle/system_a/fxfs.sparse.blk"),
                     contents: Default::default(),
@@ -446,6 +442,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: Some(virtual_device.clone()),
+            release_info: None,
         });
         let tool = PbGetArtifactsTool {
             cmd: GetArtifactsCommand {
@@ -521,6 +518,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         let tool = PbGetArtifactsTool {
             cmd: GetArtifactsCommand {
@@ -581,10 +579,7 @@ mod tests {
                 Image::QemuKernel(
                     Utf8PathBuf::from_path_buf(qemu_path.clone()).expect("utf8 path"),
                 ),
-                Image::Fxfs {
-                    path: Utf8PathBuf::from_path_buf(fxfs_path.clone()).expect("utf8 path"),
-                    contents: Default::default(),
-                },
+                Image::Fxfs(Utf8PathBuf::from_path_buf(fxfs_path.clone()).expect("utf8 path")),
                 Image::FxfsSparse {
                     path: Utf8PathBuf::from_path_buf(fxfs_sparse_path.clone()).expect("utf8 path"),
                     contents: Default::default(),
@@ -597,6 +592,7 @@ mod tests {
             virtual_devices_path: Some(
                 Utf8Path::from_path(&virtual_device).expect("utf8 path").into(),
             ),
+            release_info: None,
         });
         pb.write(Utf8Path::from_path(&pb_path).expect("temp dir to utf8 path"))
             .expect("temp test product bundle");
@@ -697,10 +693,7 @@ mod tests {
                 Image::QemuKernel(
                     Utf8PathBuf::from_path_buf(qemu_path.clone()).expect("utf8 path"),
                 ),
-                Image::Fxfs {
-                    path: Utf8PathBuf::from_path_buf(fxfs_path.clone()).expect("utf8 path"),
-                    contents: Default::default(),
-                },
+                Image::Fxfs(Utf8PathBuf::from_path_buf(fxfs_path.clone()).expect("utf8 path")),
                 Image::FxfsSparse {
                     path: Utf8PathBuf::from_path_buf(fxfs_sparse_path.clone()).expect("utf8 path"),
                     contents: Default::default(),
@@ -713,6 +706,7 @@ mod tests {
             virtual_devices_path: Some(
                 Utf8Path::from_path(&virtual_device).expect("utf8 path").into(),
             ),
+            release_info: None,
         });
         pb.write(Utf8Path::from_path(&pb_path).expect("temp dir to utf8 path"))
             .expect("temp test product bundle");

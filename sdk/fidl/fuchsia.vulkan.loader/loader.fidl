@@ -31,7 +31,9 @@ type GetVmexResourceError = flexible enum {
     FAILED_TO_OBTAIN_RESOURCE = 2;
 };
 
-/// Service to provide Vulkan libraries to the loader.
+/// Provides Vulkan ICD (installable client driver) libraries.
+/// Regular clients should access this protocol directly.
+/// Trusted clients should access this protocol using the [`TrustedService`].
 @discoverable(server="platform")
 closed protocol Loader {
     /// Requests a client driver library with the given name from the Vulkan loader
@@ -55,8 +57,8 @@ closed protocol Loader {
     });
 
     /// Connects to a FS serving fuchsia.io containing all device nodes
-    /// potentially relevant to ICDs.  /dev/<devname> will be served under
-    /// <devname> in this directory.
+    /// potentially relevant to ICDs.  Trusted devices are exposed only to trusted
+    /// loader clients (see [`TrustedService`]).
     strict ConnectToDeviceFs(resource struct {
         channel zx.Handle:CHANNEL;
     });
@@ -72,4 +74,10 @@ closed protocol Loader {
     strict GetVmexResource() -> (resource struct {
         resource zx.Handle:<RESOURCE>;
     }) error GetVmexResourceError;
+};
+
+/// Provides expanded device node access to trusted clients.
+@available(added=NEXT)
+service TrustedService {
+    loader client_end:Loader;
 };

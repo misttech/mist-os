@@ -38,7 +38,6 @@ stdcompat_test_sources = [
   # TODO(https://fxbug.dev/352337748): disable test to unblock clang roll.
   # "atomic_test.cc",
   "bit_test.cc",
-  "constructors_internal_test.cc",
   "functional_test.cc",
   "memory_test.cc",
   "queue_test.cc",

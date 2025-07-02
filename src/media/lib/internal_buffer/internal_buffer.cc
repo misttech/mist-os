@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/fpromise/result.h>
+#include <lib/memory_barriers/memory_barriers.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <threads.h>
 
@@ -14,8 +15,6 @@
 #include <bind/fuchsia/amlogic/platform/sysmem/heap/cpp/bind.h>
 #include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 #include <fbl/algorithm.h>
-
-#include "src/lib/memory_barriers/memory_barriers.h"
 
 fpromise::result<InternalBuffer, zx_status_t> InternalBuffer::Create(
     const char* name, fidl::SyncClient<fuchsia_sysmem2::Allocator>* sysmem,

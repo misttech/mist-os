@@ -45,7 +45,10 @@ pub mod net;
 pub use self::handle::{
     fifo::{Fifo, FifoEntry},
     on_signals::OnSignals,
-    rwhandle::{RWHandle, ReadableHandle, ReadableState, WritableHandle, WritableState},
+    rwhandle::{
+        DefaultRWHandleSpec, RWHandle, RWHandleSpec, ReadableHandle, ReadableState, WritableHandle,
+        WritableState,
+    },
 };
 
 /// An emulation library for Zircon handles on non-Fuchsia platforms.

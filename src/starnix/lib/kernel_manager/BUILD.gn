@@ -4,7 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
-import("//src/starnix/kernel/args.gni")
+import("//src/starnix/build/args.gni")
 
 group("tests") {
   testonly = true

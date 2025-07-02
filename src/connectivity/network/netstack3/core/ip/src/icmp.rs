@@ -27,8 +27,8 @@ use netstack3_base::{
 };
 use netstack3_filter::{FilterIpExt, TransportPacketSerializer};
 use packet::{
-    BufferMut, InnerPacketBuilder as _, ParsablePacket as _, ParseBuffer, PartialSerializer,
-    Serializer, TruncateDirection, TruncatingSerializer,
+    BufferMut, InnerPacketBuilder as _, PacketBuilder as _, ParsablePacket as _, ParseBuffer,
+    PartialSerializer, Serializer, TruncateDirection, TruncatingSerializer,
 };
 use packet_formats::icmp::ndp::options::{NdpOption, NdpOptionBuilder};
 use packet_formats::icmp::ndp::{
@@ -877,12 +877,8 @@ impl<
                         SocketIpAddr::new_ipv4_specified(remote_ip.get()),
                         SocketIpAddr::new_ipv4_specified(local_ip),
                         |src_ip| {
-                            buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
-                                src_ip,
-                                *remote_ip,
-                                code,
-                                req.reply(),
-                            ))
+                            IcmpPacketBuilder::<Ipv4, _>::new(src_ip, *remote_ip, code, req.reply())
+                                .wrap_body(buffer)
                         },
                         &WithMarks(marks),
                     );
@@ -957,12 +953,13 @@ impl<
                             SocketIpAddr::new_ipv4_specified(remote_ip.get()),
                             SocketIpAddr::new_ipv4_specified(local_ip),
                             |src_ip| {
-                                buffer.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
+                                IcmpPacketBuilder::<Ipv4, _>::new(
                                     src_ip,
                                     *remote_ip,
                                     IcmpZeroCode,
                                     reply,
-                                ))
+                                )
+                                .wrap_body(buffer)
                             },
                             &WithMarks(marks),
                         );
@@ -1191,12 +1188,13 @@ where
                     mtu: Mtu::no_limit(),
                     dscp_and_ecn: DscpAndEcn::default(),
                 },
-                body.encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+                IcmpPacketBuilder::<Ipv6, _>::new(
                     src_ip.map_or(Ipv6::UNSPECIFIED_ADDRESS, |a| a.get()),
                     dst_ip.get(),
                     $code,
                     $message,
-                )),
+                )
+                .wrap_body(body),
             )
             .map_err(|s| s.into_inner())
         }};
@@ -1792,12 +1790,13 @@ impl<
                                 remote_ip,
                                 local_ip,
                                 |src_ip| {
-                                    buffer.encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+                                    IcmpPacketBuilder::<Ipv6, _>::new(
                                         src_ip,
                                         remote_ip.addr(),
                                         code,
                                         req.reply(),
-                                    ))
+                                    )
+                                    .wrap_body(buffer)
                                 },
                                 &WithMarks(marks),
                             );
@@ -2824,12 +2823,13 @@ fn send_icmpv4_error_message<
                     &WithMarks(marks),
                     tx_metadata,
                     |local_ip| {
-                        original_packet.encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
+                        IcmpPacketBuilder::<Ipv4, _>::new(
                             local_ip.addr(),
                             original_src_ip.addr(),
                             $code,
                             $message,
-                        ))
+                        )
+                        .wrap_body(original_packet)
                     },
                 )
             );
@@ -2934,8 +2934,10 @@ fn send_icmpv6_error_message<
 
                         // Per RFC 4443, body contains as much of the original body as
                         // possible without exceeding IPv6 minimum MTU.
-                        TruncatingSerializer::new(original_packet, TruncateDirection::DiscardBack)
-                            .encapsulate(icmp_builder)
+                        icmp_builder.wrap_body(TruncatingSerializer::new(
+                            original_packet,
+                            TruncateDirection::DiscardBack,
+                        ))
                     },
                 )
             );
@@ -3094,13 +3096,13 @@ pub(crate) mod testutil {
     ) -> Buf<Vec<u8>> {
         OptionSequenceBuilder::new([NdpOptionBuilder::TargetLinkLayerAddress(&mac.bytes())].iter())
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+            .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpZeroCode,
                 NeighborAdvertisement::new(router_flag, solicited_flag, override_flag, src_ip),
             ))
-            .encapsulate(Ipv6PacketBuilder::new(
+            .wrap_in(Ipv6PacketBuilder::new(
                 src_ip,
                 dst_ip,
                 REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
@@ -3121,13 +3123,13 @@ pub(crate) mod testutil {
     ) -> Buf<Vec<u8>> {
         OptionSequenceBuilder::new([NdpOptionBuilder::SourceLinkLayerAddress(&mac.bytes())].iter())
             .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+            .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
                 src_ip,
                 dst_ip,
                 IcmpZeroCode,
                 NeighborSolicitation::new(target_addr),
             ))
-            .encapsulate(Ipv6PacketBuilder::new(
+            .wrap_in(Ipv6PacketBuilder::new(
                 src_ip,
                 dst_ip,
                 REQUIRED_NDP_IP_PACKET_HOP_LIMIT,
@@ -3154,7 +3156,7 @@ mod tests {
         FakeTxMetadata, FakeWeakDeviceId, TestIpExt, TEST_ADDRS_V4, TEST_ADDRS_V6,
     };
     use netstack3_base::{CtxPair, Uninstantiable};
-    use packet::Buf;
+    use packet::{Buf, EmptyBuf};
     use packet_formats::icmp::mld::MldPacket;
     use packet_formats::ip::IpProto;
     use packet_formats::utils::NonZeroDuration;
@@ -3825,13 +3827,8 @@ mod tests {
                 &FakeDeviceId,
                 Ipv4SourceAddr::new(*TEST_ADDRS_V4.remote_ip).unwrap(),
                 TEST_ADDRS_V4.local_ip,
-                Buf::new(original_packet, ..)
-                    .encapsulate(IcmpPacketBuilder::new(
-                        TEST_ADDRS_V4.remote_ip,
-                        TEST_ADDRS_V4.local_ip,
-                        code,
-                        msg,
-                    ))
+                IcmpPacketBuilder::new(TEST_ADDRS_V4.remote_ip, TEST_ADDRS_V4.local_ip, code, msg)
+                    .wrap_body(Buf::new(original_packet, ..))
                     .serialize_vec_outer()
                     .unwrap(),
                 &LocalDeliveryPacketInfo::default(),
@@ -3851,14 +3848,14 @@ mod tests {
         // ICMP error message which contains this as its original packet should
         // be delivered to the socket created in
         // `test_receive_icmpv4_error_helper`.
-        let mut buffer = Buf::new(&mut [], ..)
-            .encapsulate(IcmpPacketBuilder::<Ipv4, _>::new(
+        let mut buffer = EmptyBuf
+            .wrap_in(IcmpPacketBuilder::<Ipv4, _>::new(
                 TEST_ADDRS_V4.local_ip,
                 TEST_ADDRS_V4.remote_ip,
                 IcmpZeroCode,
                 IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
             ))
-            .encapsulate(<Ipv4 as packet_formats::ip::IpExt>::PacketBuilder::new(
+            .wrap_in(<Ipv4 as packet_formats::ip::IpExt>::PacketBuilder::new(
                 TEST_ADDRS_V4.local_ip,
                 TEST_ADDRS_V4.remote_ip,
                 64,
@@ -3917,15 +3914,15 @@ mod tests {
         // `IcmpIpTransportContext::receive_icmp_error`, but we should go no
         // further - in particular, we should not dispatch to the Echo sockets.
 
-        let mut buffer = Buf::new(&mut [], ..)
-            .encapsulate(<Ipv4 as packet_formats::ip::IpExt>::PacketBuilder::new(
-                TEST_ADDRS_V4.local_ip,
-                TEST_ADDRS_V4.remote_ip,
-                64,
-                Ipv4Proto::Icmp,
-            ))
-            .serialize_vec_outer()
-            .unwrap();
+        let mut buffer = <Ipv4 as packet_formats::ip::IpExt>::PacketBuilder::new(
+            TEST_ADDRS_V4.local_ip,
+            TEST_ADDRS_V4.remote_ip,
+            64,
+            Ipv4Proto::Icmp,
+        )
+        .wrap_body(EmptyBuf)
+        .serialize_vec_outer()
+        .unwrap();
 
         test_receive_icmpv4_error_helper(
             buffer.as_mut(),
@@ -3976,15 +3973,15 @@ mod tests {
         // checking that `IcmpIpTransportContext::receive_icmp_error` was NOT
         // called.
 
-        let mut buffer = Buf::new(&mut [], ..)
-            .encapsulate(<Ipv4 as packet_formats::ip::IpExt>::PacketBuilder::new(
-                TEST_ADDRS_V4.local_ip,
-                TEST_ADDRS_V4.remote_ip,
-                64,
-                IpProto::Udp.into(),
-            ))
-            .serialize_vec_outer()
-            .unwrap();
+        let mut buffer = <Ipv4 as packet_formats::ip::IpExt>::PacketBuilder::new(
+            TEST_ADDRS_V4.local_ip,
+            TEST_ADDRS_V4.remote_ip,
+            64,
+            IpProto::Udp.into(),
+        )
+        .wrap_body(EmptyBuf)
+        .serialize_vec_outer()
+        .unwrap();
 
         test_receive_icmpv4_error_helper(
             buffer.as_mut(),
@@ -4072,13 +4069,8 @@ mod tests {
                 &FakeDeviceId,
                 TEST_ADDRS_V6.remote_ip.get().try_into().unwrap(),
                 TEST_ADDRS_V6.local_ip,
-                Buf::new(original_packet, ..)
-                    .encapsulate(IcmpPacketBuilder::new(
-                        TEST_ADDRS_V6.remote_ip,
-                        TEST_ADDRS_V6.local_ip,
-                        code,
-                        msg,
-                    ))
+                IcmpPacketBuilder::new(TEST_ADDRS_V6.remote_ip, TEST_ADDRS_V6.local_ip, code, msg)
+                    .wrap_body(Buf::new(original_packet, ..))
                     .serialize_vec_outer()
                     .unwrap(),
                 &LocalDeliveryPacketInfo::default(),
@@ -4098,14 +4090,14 @@ mod tests {
         // ICMPv6 error message which contains this as its original packet
         // should be delivered to the socket created in
         // `test_receive_icmpv6_error_helper`.
-        let mut buffer = Buf::new(&mut [], ..)
-            .encapsulate(IcmpPacketBuilder::<Ipv6, _>::new(
+        let mut buffer = EmptyBuf
+            .wrap_in(IcmpPacketBuilder::<Ipv6, _>::new(
                 TEST_ADDRS_V6.local_ip,
                 TEST_ADDRS_V6.remote_ip,
                 IcmpZeroCode,
                 IcmpEchoRequest::new(ICMP_ID, SEQ_NUM),
             ))
-            .encapsulate(<Ipv6 as packet_formats::ip::IpExt>::PacketBuilder::new(
+            .wrap_in(<Ipv6 as packet_formats::ip::IpExt>::PacketBuilder::new(
                 TEST_ADDRS_V6.local_ip,
                 TEST_ADDRS_V6.remote_ip,
                 64,
@@ -4161,8 +4153,8 @@ mod tests {
         // `IcmpIpTransportContext::receive_icmp_error`, but we should go no
         // further - in particular, we should not call into Echo sockets.
 
-        let mut buffer = Buf::new(&mut [], ..)
-            .encapsulate(<Ipv6 as packet_formats::ip::IpExt>::PacketBuilder::new(
+        let mut buffer = EmptyBuf
+            .wrap_in(<Ipv6 as packet_formats::ip::IpExt>::PacketBuilder::new(
                 TEST_ADDRS_V6.local_ip,
                 TEST_ADDRS_V6.remote_ip,
                 64,
@@ -4217,15 +4209,15 @@ mod tests {
         // checking that `IcmpIpTransportContext::receive_icmp_error` was NOT
         // called.
 
-        let mut buffer = Buf::new(&mut [], ..)
-            .encapsulate(<Ipv6 as packet_formats::ip::IpExt>::PacketBuilder::new(
-                TEST_ADDRS_V6.local_ip,
-                TEST_ADDRS_V6.remote_ip,
-                64,
-                IpProto::Udp.into(),
-            ))
-            .serialize_vec_outer()
-            .unwrap();
+        let mut buffer = <Ipv6 as packet_formats::ip::IpExt>::PacketBuilder::new(
+            TEST_ADDRS_V6.local_ip,
+            TEST_ADDRS_V6.remote_ip,
+            64,
+            IpProto::Udp.into(),
+        )
+        .wrap_body(EmptyBuf)
+        .serialize_vec_outer()
+        .unwrap();
 
         test_receive_icmpv6_error_helper(
             buffer.as_mut(),
@@ -4285,7 +4277,7 @@ mod tests {
                 TEST_ADDRS_V4.remote_ip.try_into().unwrap(),
                 TEST_ADDRS_V4.local_ip.try_into().unwrap(),
                 IpProto::Udp.into(),
-                Buf::new(&mut [], ..),
+                EmptyBuf,
                 0,
                 Ipv4FragmentType::InitialFragment,
                 &Default::default(),
@@ -4305,7 +4297,7 @@ mod tests {
                 TEST_ADDRS_V4.local_ip.try_into().unwrap(),
                 Icmpv4ParameterProblemCode::PointerIndicatesError,
                 Icmpv4ParameterProblem::new(0),
-                Buf::new(&mut [], ..),
+                EmptyBuf,
                 0,
                 Ipv4FragmentType::InitialFragment,
                 &Default::default(),
@@ -4324,7 +4316,7 @@ mod tests {
                 TEST_ADDRS_V4.remote_ip.try_into().unwrap(),
                 TEST_ADDRS_V4.local_ip.try_into().unwrap(),
                 Icmpv4DestUnreachableCode::DestNetworkUnreachable,
-                Buf::new(&mut [], ..),
+                EmptyBuf,
                 0,
                 Ipv4FragmentType::InitialFragment,
                 &Default::default(),
@@ -4343,7 +4335,7 @@ mod tests {
                 TEST_ADDRS_V6.remote_ip.try_into().unwrap(),
                 TEST_ADDRS_V6.local_ip.try_into().unwrap(),
                 IpProto::Udp.into(),
-                Buf::new(&mut [], ..),
+                EmptyBuf,
                 0,
                 &Default::default(),
             );
@@ -4362,7 +4354,7 @@ mod tests {
                 TEST_ADDRS_V6.local_ip.try_into().unwrap(),
                 IpProto::Udp.into(),
                 Mtu::new(0),
-                Buf::new(&mut [], ..),
+                EmptyBuf,
                 0,
                 &Default::default(),
             );
@@ -4381,7 +4373,7 @@ mod tests {
                 TEST_ADDRS_V6.local_ip.try_into().unwrap(),
                 Icmpv6ParameterProblemCode::ErroneousHeaderField,
                 Icmpv6ParameterProblem::new(0),
-                Buf::new(&mut [], ..),
+                EmptyBuf,
                 false,
                 &Default::default(),
             );
@@ -4399,7 +4391,7 @@ mod tests {
                 TEST_ADDRS_V6.remote_ip.try_into().unwrap(),
                 TEST_ADDRS_V6.local_ip.try_into().unwrap(),
                 Icmpv6DestUnreachableCode::NoRoute,
-                Buf::new(&mut [], ..),
+                EmptyBuf,
                 &Default::default(),
             );
         }

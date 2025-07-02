@@ -110,7 +110,7 @@ fn start_command(
             entries: Some(program_entries),
             ..Default::default()
         }),
-        numbered_handles,
+        numbered_handles: Some(numbered_handles),
         ..clone_start_info(base_start_info)?
     };
 

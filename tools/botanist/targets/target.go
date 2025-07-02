@@ -598,7 +598,7 @@ func remoteScopedLocalHost(ctx context.Context, client *sshutil.Client) (string,
 	// remote address.
 	var stdout bytes.Buffer
 	if err := client.Run(ctx, []string{"echo", "${SSH_CONNECTION}"}, &stdout, nil); err != nil {
-		return "", fmt.Errorf("failed to derive $SSH_CONNECTION: %w", err)
+		return "", fmt.Errorf("%s: %w", constants.FailedToDeriveSshConnectionMsg, err)
 	}
 	val := stdout.String()
 	tokens := strings.Split(val, " ")

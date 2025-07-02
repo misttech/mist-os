@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <fidl/fuchsia.memorypressure/cpp/wire.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/node/cpp/add_child.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/magma/util/macros.h>
 #include <lib/magma_service/msd.h>
@@ -21,11 +22,12 @@ class DependencyInjectionServer : public fidl::WireServer<fuchsia_gpu_magma::Dep
     virtual void SetMemoryPressureLevel(MagmaMemoryPressureLevel level) = 0;
   };
 
-  explicit DependencyInjectionServer(Owner* owner)
+  explicit DependencyInjectionServer(Owner* owner, async_dispatcher_t* dispatcher)
       : owner_(owner),
-        devfs_connector_(fit::bind_member<&DependencyInjectionServer::BindConnector>(this)) {}
+        devfs_connector_(fit::bind_member<&DependencyInjectionServer::BindConnector>(this)),
+        dispatcher_(dispatcher) {}
 
-  zx::result<> Create(fidl::WireSyncClient<fuchsia_driver_framework::Node>& node_client);
+  zx::result<> Create(fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent);
 
   // fuchsia:gpu::magma::DependencyInjection implementation.
   void SetMemoryPressureProvider(
@@ -38,16 +40,16 @@ class DependencyInjectionServer : public fidl::WireServer<fuchsia_gpu_magma::Dep
 
  private:
   void BindConnector(fidl::ServerEnd<fuchsia_gpu_magma::DependencyInjection> server) {
-    fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server), this);
+    fidl::BindServer(dispatcher_, std::move(server), this);
   }
 
   static MagmaMemoryPressureLevel GetMagmaLevel(fuchsia_memorypressure::wire::Level level);
 
   Owner* owner_;
   driver_devfs::Connector<fuchsia_gpu_magma::DependencyInjection> devfs_connector_;
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
+  fdf::OwnedChildNode child_;
   std::optional<fidl::ServerBindingRef<fuchsia_memorypressure::Watcher>> pressure_server_;
+  async_dispatcher_t* dispatcher_;
 };
 
 }  // namespace msd::internal

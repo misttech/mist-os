@@ -39,6 +39,15 @@ int main() {
     return EXIT_FAILURE;
   }
 
+  // Assembly will add an empty snapshot exclusion file even if the product didn't specify a
+  // snapshot exclusion config.
+  const std::optional<SnapshotExclusionConfig> snapshot_exclusion_config =
+      GetSnapshotExclusionConfig();
+  if (!snapshot_config) {
+    FX_LOGS(FATAL) << "Failed to get config for snapshot exclusion";
+    return EXIT_FAILURE;
+  }
+
   const std::optional<BuildTypeConfig> build_type_config = GetBuildTypeConfig();
   if (!build_type_config) {
     FX_LOGS(FATAL) << "Failed to get config for build type";
@@ -127,7 +136,8 @@ int main() {
                                .snapshot_collector_window_duration = kSnapshotSharedRequestWindow,
                            },
                            FeedbackData::Options{
-                               .config = *snapshot_config,
+                               .snapshot_config = *snapshot_config,
+                               .snapshot_exclusion_config = *snapshot_exclusion_config,
                                .is_first_instance = component.IsFirstInstance(),
                                .limit_inspect_data = build_type_config->enable_limit_inspect_data,
                                .run_log_persistence = run_log_persistence,

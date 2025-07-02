@@ -471,7 +471,7 @@ template("sdk_shared_library") {
     ]
     args += [ "--deps" ] + rebase_path(sdk_metas, root_build_dir)
     args += [ "--headers" ] + sdk_metadata_headers
-    args += [ "--ifs" ] + [ ifs_file_name ]
+    args += [ "--ifs" ] + [ packaged_ifs_file ]
     if (current_build_target_api_level != "PLATFORM") {
       args += [
         "--api-level",
@@ -491,20 +491,16 @@ template("sdk_shared_library") {
     library_name = atom_name
     file_base = sdk_root_path
     headers = sdk_metadata_headers
-    binaries = [
-      {
-        api_level = current_build_target_api_level
-        arch = target_cpu
-        dist_lib = dist_lib
-        dist_path = "lib/${lib_name}"
-        link_lib = link_lib
-        debug_lib = debug_lib
-      },
-    ]
-    deps = sdk_deps
-    if (defined(invoker.symbols_api)) {
-      ifs = get_path_info(invoker.symbols_api, "file")
+    binaries = {
+      api_level = current_build_target_api_level
+      arch = target_cpu
+      dist_lib = dist_lib
+      dist_path = "lib/${lib_name}"
+      link_lib = link_lib
+      debug_lib = debug_lib
+      ifs = packaged_ifs_file
     }
+    deps = sdk_deps
   }
 
   # LINT.ThenChange(//build/sdk/idk_prebuild_manifest.gni)

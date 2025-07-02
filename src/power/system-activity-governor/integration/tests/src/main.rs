@@ -6,6 +6,7 @@ use anyhow::Result;
 use diagnostics_assertions::{
     tree_assertion, AnyProperty, AnyStringProperty, NonZeroUintProperty, TreeAssertion,
 };
+use diagnostics_hierarchy::DiagnosticsHierarchy;
 use diagnostics_reader::ArchiveReader;
 use fidl::{AsHandleRef, HandleBased};
 use fidl_fuchsia_power_broker::{self as fbroker, LeaseStatus};
@@ -18,6 +19,7 @@ use realm_proxy_client::RealmProxyClient;
 use std::cell::Cell;
 use std::collections::HashMap;
 use std::sync::Arc;
+use test_util::assert_leq;
 use {
     fidl_fuchsia_hardware_power_suspend as fhsuspend, fidl_fuchsia_power_observability as fobs,
     fidl_fuchsia_power_suspend as fsuspend, fidl_fuchsia_power_system as fsystem,
@@ -143,7 +145,7 @@ const MAX_LOOPS_COUNT: usize = 20;
 const RESTART_DELAY: zx::MonotonicDuration = zx::MonotonicDuration::from_seconds(1);
 
 macro_rules! block_until_inspect_matches {
-    ($sag_moniker:expr, $($tree:tt)+) => {{
+    ($loop_iter:expr, $sag_moniker:expr, $($tree:tt)+) => {{
         let mut reader = ArchiveReader::inspect();
 
         reader
@@ -168,7 +170,7 @@ macro_rules! block_until_inspect_matches {
                     if i == DELAY_NOTIFICATION {
                         log::warn!(error:?; "Still awaiting inspect match after {} tries", DELAY_NOTIFICATION);
                     }
-                    if  i >= MAX_LOOPS_COUNT {  // upper bound, so test terminates on mismatch
+                    if  i >= $loop_iter {  // upper bound, so test terminates on mismatch
                         // Print the actual, so we know why the match failed if it does.
                         return Err(anyhow::anyhow!("err: {}: last observed:\n{}", error, serde_json::to_string_pretty(&data).unwrap()));
                     }
@@ -176,6 +178,9 @@ macro_rules! block_until_inspect_matches {
             }
             fasync::Timer::new(fasync::MonotonicInstant::after(RESTART_DELAY)).await;
         }
+    }};
+    ($sag_moniker:expr, $($tree:tt)+) => {{
+        block_until_inspect_matches!(MAX_LOOPS_COUNT, $sag_moniker, $($tree)+);
     }};
 }
 
@@ -1939,6 +1944,35 @@ async fn test_activity_governor_take_application_activity_lease() -> Result<()> 
     Ok(())
 }
 
+async fn get_diagnostics_hierarchy_for(moniker: &String) -> Result<DiagnosticsHierarchy> {
+    let mut reader = ArchiveReader::inspect();
+
+    reader
+        .select_all_for_component(format!("{}/{}", REALM_FACTORY_CHILD_NAME, &moniker))
+        .with_minimum_schema_count(1);
+
+    let inspect = reader
+        .snapshot()
+        .await?
+        .into_iter()
+        .next()
+        .and_then(|result| result.payload)
+        .ok_or(anyhow::anyhow!("expected one inspect hierarchy"))
+        .unwrap();
+    Ok(inspect)
+}
+
+// Ratio is in per-ten-thousands, valid values are [0, 10000].
+fn get_vmo_util_ratio(inspect: &DiagnosticsHierarchy) -> u64 {
+    let vmo_util_node_path = ["fuchsia.inspect.Stats", "utilization_per_ten_k"];
+    inspect
+        .get_property_by_path(&vmo_util_node_path)
+        .expect("property")
+        .uint()
+        .ok_or(0u64)
+        .expect("u64")
+}
+
 #[fuchsia::test]
 async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
     let (realm, activity_governor_moniker) = create_realm().await?;
@@ -1946,7 +1980,7 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
     set_up_default_suspender(&suspend_device).await;
 
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
-    let mut root = TreeAssertion::new("root", false);
+    let mut root_assertion = TreeAssertion::new("root", false);
     let mut wake_leases_child = TreeAssertion::new("wake_leases", true);
     let mut wake_leases = Vec::new();
 
@@ -1961,44 +1995,30 @@ async fn test_activity_governor_handles_1000_wake_leases() -> Result<()> {
         let mut wake_lease_child = TreeAssertion::new(server_token_koid, false);
         wake_lease_child.add_property_assertion(
             fobs::WAKE_LEASE_ITEM_NODE_CREATED_AT,
-            Box::new(NonZeroUintProperty),
+            Arc::new(NonZeroUintProperty),
         );
         wake_lease_child.add_property_assertion(
             fobs::WAKE_LEASE_ITEM_CLIENT_TOKEN_KOID,
-            Box::new(*client_token_koid),
+            Arc::new(*client_token_koid),
         );
         wake_lease_child
-            .add_property_assertion(fobs::WAKE_LEASE_ITEM_NAME, Box::new(wake_lease_name));
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_NAME, Arc::new(wake_lease_name));
         wake_lease_child
-            .add_property_assertion(fobs::WAKE_LEASE_ITEM_TYPE, Box::new(AnyStringProperty));
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_TYPE, Arc::new(AnyStringProperty));
         wake_lease_child
-            .add_property_assertion(fobs::WAKE_LEASE_ITEM_STATUS, Box::new(AnyStringProperty));
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_STATUS, Arc::new(AnyStringProperty));
         wake_leases_child.add_child_assertion(wake_lease_child);
 
         wake_leases.push(wake_lease);
     }
+    root_assertion.add_child_assertion(wake_leases_child);
 
-    root.add_child_assertion(wake_leases_child);
+    let inspect = get_diagnostics_hierarchy_for(&activity_governor_moniker).await?;
+    let vmo_util = get_vmo_util_ratio(&inspect);
+    log::info!("Current VMO utilization rate is {}/10000", vmo_util);
+    assert_leq!(vmo_util, 9700); // If we reach 100% util, we'll silently lose data.
 
-    let mut reader = ArchiveReader::inspect();
-
-    reader
-        .select_all_for_component(format!(
-            "{}/{}",
-            REALM_FACTORY_CHILD_NAME, &activity_governor_moniker
-        ))
-        .with_minimum_schema_count(1);
-
-    let inspect = reader
-        .snapshot()
-        .await?
-        .into_iter()
-        .next()
-        .and_then(|result| result.payload)
-        .ok_or(anyhow::anyhow!("expected one inspect hierarchy"))
-        .unwrap();
-
-    root.run(&inspect).unwrap();
+    root_assertion.run(&inspect).unwrap(); // Now check all the data.
 
     drop(wake_leases);
 
@@ -2023,7 +2043,7 @@ async fn test_activity_governor_handles_1000_acquired_wake_leases() -> Result<()
     set_up_default_suspender(&suspend_device).await;
 
     let activity_governor = realm.connect_to_protocol::<fsystem::ActivityGovernorMarker>().await?;
-    let mut root = TreeAssertion::new("root", false);
+    let mut root_assertion = TreeAssertion::new("root", false);
     let mut wake_leases_child = TreeAssertion::new("wake_leases", true);
     let mut wake_leases = Vec::new();
 
@@ -2038,44 +2058,30 @@ async fn test_activity_governor_handles_1000_acquired_wake_leases() -> Result<()
         let mut wake_lease_child = TreeAssertion::new(server_token_koid, false);
         wake_lease_child.add_property_assertion(
             fobs::WAKE_LEASE_ITEM_NODE_CREATED_AT,
-            Box::new(NonZeroUintProperty),
+            Arc::new(NonZeroUintProperty),
         );
         wake_lease_child.add_property_assertion(
             fobs::WAKE_LEASE_ITEM_CLIENT_TOKEN_KOID,
-            Box::new(*client_token_koid),
+            Arc::new(*client_token_koid),
         );
         wake_lease_child
-            .add_property_assertion(fobs::WAKE_LEASE_ITEM_NAME, Box::new(wake_lease_name));
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_NAME, Arc::new(wake_lease_name));
         wake_lease_child
-            .add_property_assertion(fobs::WAKE_LEASE_ITEM_TYPE, Box::new(AnyStringProperty));
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_TYPE, Arc::new(AnyStringProperty));
         wake_lease_child
-            .add_property_assertion(fobs::WAKE_LEASE_ITEM_STATUS, Box::new(AnyStringProperty));
+            .add_property_assertion(fobs::WAKE_LEASE_ITEM_STATUS, Arc::new(AnyStringProperty));
         wake_leases_child.add_child_assertion(wake_lease_child);
 
         wake_leases.push(wake_lease);
     }
+    root_assertion.add_child_assertion(wake_leases_child);
 
-    root.add_child_assertion(wake_leases_child);
+    let inspect = get_diagnostics_hierarchy_for(&activity_governor_moniker).await?;
+    let vmo_util = get_vmo_util_ratio(&inspect);
+    log::info!("Current VMO utilization rate is {}/10000", vmo_util);
+    assert_leq!(vmo_util, 9700); // If we reach 100% util, we'll silently lose data.
 
-    let mut reader = ArchiveReader::inspect();
-
-    reader
-        .select_all_for_component(format!(
-            "{}/{}",
-            REALM_FACTORY_CHILD_NAME, &activity_governor_moniker
-        ))
-        .with_minimum_schema_count(1);
-
-    let inspect = reader
-        .snapshot()
-        .await?
-        .into_iter()
-        .next()
-        .and_then(|result| result.payload)
-        .ok_or(anyhow::anyhow!("expected one inspect hierarchy"))
-        .unwrap();
-
-    root.run(&inspect).unwrap();
+    root_assertion.run(&inspect).unwrap(); // Now check all the data.
 
     drop(wake_leases);
 
@@ -3363,14 +3369,16 @@ async fn test_activity_governor_captures_inspect_event_buffer_stats() -> Result<
     // event buffer reaches capacity, at which time we will see the field
     // "at_capacity_history_duration_seconds" appear in the events stats struct.
 
+    let custom_max_loops_count = 70; // Run more times to ensure we fill the event buffer.
     block_until_inspect_matches!(
+        custom_max_loops_count,
         activity_governor_moniker,
         root: contains {
             booting: false,
             "suspend_events_stats": {
-                                event_capacity: 512u64,
-                                history_duration_seconds: AnyProperty,
-                                at_capacity_history_duration_seconds: AnyProperty,
+                event_capacity: 4096u64,
+                history_duration_seconds: AnyProperty,
+                at_capacity_history_duration_seconds: AnyProperty,
             },
             "fuchsia.inspect.Health": contains {
                 status: "OK",

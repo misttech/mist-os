@@ -77,7 +77,7 @@ static_assert(offsetof(::test_driverhandle::wire::HandlesInProtocolSendHandlesRe
 }
 
 ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_driverhandle::HandlesInProtocol>::SendHandles(::test_driverhandle::wire::T t) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::TransactionalRequest<::test_driverhandle::HandlesInProtocol::SendHandles> _request_object{t};
 
   constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<::test_driverhandle::HandlesInProtocol::SendHandles>();

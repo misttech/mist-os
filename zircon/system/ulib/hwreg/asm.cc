@@ -119,9 +119,11 @@ void AsmHeader::FieldMacro(std::string_view prefix, const char* field_name, uint
     // Single bits also get a bit-number macro (rendered in decimal).
     Macro(name + "_BIT", std::to_string(bit_low));
   } else {
-    // Larger fields get a pair of _SHIFT and _MASK macros too.
+    // Larger fields get _SHIFT, _WIDTH, and _MASK macros too.
+    uint32_t width = bit_high_incl - bit_low + 1;
     Macro(name + "_SHIFT", std::to_string(bit_low));
-    Macro(name + "_MASK", internal::ComputeMask<uint64_t>(bit_high_incl - bit_low + 1));
+    Macro(name + "_WIDTH", width);
+    Macro(name + "_MASK", internal::ComputeMask<uint64_t>(width));
 
     // A convenience function-like macro uses the shift and mask macros.
     Macro(name + "_FIELD(x)", "(((x) & " + name + "_MASK) << " + name + "_SHIFT)");

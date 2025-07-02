@@ -45,7 +45,7 @@ use {
 use super::start_component;
 
 pub fn expose_root(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     server_end: ServerEnd<fio::DirectoryMarker>,
 ) -> Result<(), Error> {
@@ -266,6 +266,7 @@ async fn connect_to_vsock(
     let pipe =
         create_fuchsia_pipe(system_task, bridge_socket, OpenFlags::RDWR | OpenFlags::NONBLOCK)?;
     socket.downcast_socket::<VsockSocket>().unwrap().remote_connection(
+        system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
         &socket,
         system_task,
         pipe,

@@ -6,7 +6,13 @@
 //!
 //! This module provides Fuchsia bindings for the [`netstack3_core`] crate.
 
-#![warn(clippy::redundant_clone)]
+#![warn(
+    missing_docs,
+    unreachable_patterns,
+    clippy::useless_conversion,
+    clippy::redundant_clone,
+    clippy::precedence
+)]
 
 #[cfg(test)]
 mod integration_tests;
@@ -15,6 +21,8 @@ mod bpf;
 mod counters;
 mod debug_fidl_worker;
 mod devices;
+mod errno;
+mod error;
 mod filter;
 mod health_check_worker;
 mod inspect;
@@ -68,6 +76,7 @@ use devices::{
 use interfaces_watcher::{InterfaceEventProducer, InterfaceProperties, InterfaceUpdate};
 use multicast_admin::{MulticastAdminEventSinks, MulticastAdminWorkers};
 use ndp_watcher::RouterAdvertisementSinkError;
+use power::{PowerWorker, PowerWorkerSink};
 use resource_removal::{ResourceRemovalSink, ResourceRemovalWorker};
 
 use crate::bindings::bpf::EbpfManager;
@@ -100,9 +109,9 @@ use netstack3_core::udp::{
     UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId,
 };
 use netstack3_core::{
-    neighbor, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
-    IpExt, RngContext, StackState, StackStateBuilder, TimerBindingsTypes, TimerContext, TimerId,
-    TxMetadata, TxMetadataBindingsTypes,
+    neighbor, CoreTxMetadata, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes,
+    InstantContext, IpExt, RngContext, StackState, StackStateBuilder, TimerBindingsTypes,
+    TimerContext, TimerId, TxMetadataBindingsTypes,
 };
 
 pub(crate) use inspect::InspectPublisher;
@@ -151,6 +160,7 @@ mod ctx {
             resource_removal: ResourceRemovalSink,
             multicast_admin: MulticastAdminEventSinks,
             ndp_ra_sink: ndp_watcher::WorkerRouterAdvertisementSink,
+            power: PowerWorkerSink,
         ) -> Self {
             let mut bindings_ctx = BindingsCtx(Arc::new(BindingsCtxInner::new(
                 config,
@@ -158,6 +168,7 @@ mod ctx {
                 resource_removal,
                 multicast_admin,
                 ndp_ra_sink,
+                power,
             )));
             let persistence::State { opaque_iid_secret_key } =
                 persistence::State::load_or_create(&mut bindings_ctx.rng());
@@ -214,6 +225,7 @@ mod ctx {
         pub(crate) neighbor_watcher_sink: mpsc::Sender<neighbor_worker::NewWatcher>,
         pub(crate) resource_removal_worker: ResourceRemovalWorker,
         pub(crate) multicast_admin_workers: MulticastAdminWorkers,
+        pub(crate) power_worker: PowerWorker,
     }
 
     impl NetstackSeed {
@@ -225,12 +237,14 @@ mod ctx {
             let (multicast_admin_workers, multicast_admin_sinks) =
                 multicast_admin::new_workers_and_sinks();
             let (ndp_watcher_worker, ndp_watcher_sink, ndp_ra_sink) = ndp_watcher::Worker::new();
+            let (power_worker, power_sink) = PowerWorker::new();
             let ctx = Ctx::new(
                 config,
                 routes_change_sink,
                 resource_removal_sink,
                 multicast_admin_sinks,
                 ndp_ra_sink,
+                power_sink,
             );
             let (neighbor_worker, neighbor_watcher_sink, neighbor_event_sink) =
                 neighbor_worker::new_worker();
@@ -245,6 +259,7 @@ mod ctx {
                 neighbor_watcher_sink,
                 resource_removal_worker,
                 multicast_admin_workers,
+                power_worker,
             }
         }
     }
@@ -365,6 +380,7 @@ pub(crate) struct BindingsCtxInner {
     config: GlobalConfig,
     counters: BindingsCounters,
     ebpf_manager: EbpfManager,
+    power: PowerWorkerSink,
 }
 
 impl BindingsCtxInner {
@@ -374,6 +390,7 @@ impl BindingsCtxInner {
         resource_removal: ResourceRemovalSink,
         multicast_admin: MulticastAdminEventSinks,
         ndp_ra_sink: ndp_watcher::WorkerRouterAdvertisementSink,
+        power: PowerWorkerSink,
     ) -> Self {
         Self {
             timers: Default::default(),
@@ -385,6 +402,7 @@ impl BindingsCtxInner {
             config,
             counters: Default::default(),
             ebpf_manager: Default::default(),
+            power,
         }
     }
 }
@@ -424,9 +442,7 @@ impl FilterBindingsTypes for BindingsCtx {
 }
 
 impl SocketOpsFilterBindingContext<DeviceId<BindingsCtx>> for BindingsCtx {
-    fn socket_ops_filter(
-        &self,
-    ) -> impl SocketOpsFilter<DeviceId<BindingsCtx>, TxMetadata<BindingsCtx>> {
+    fn socket_ops_filter(&self) -> impl SocketOpsFilter<DeviceId<BindingsCtx>> {
         &self.ebpf_manager
     }
 }
@@ -516,7 +532,7 @@ impl DeviceLayerStateTypes for BindingsCtx {
 }
 
 impl TxMetadataBindingsTypes for BindingsCtx {
-    type TxMetadata = TxMetadata<Self>;
+    type TxMetadata = CoreTxMetadata<Self>;
 }
 
 impl ReceiveQueueBindingsContext<LoopbackDeviceId<Self>> for BindingsCtx {
@@ -643,12 +659,12 @@ impl IcmpEchoBindingsTypes for BindingsCtx {
 }
 
 impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<BindingsCtx>> for BindingsCtx {
-    fn receive_udp<B: BufferMut>(
+    fn receive_udp(
         &mut self,
         id: &UdpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>,
         device_id: &DeviceId<BindingsCtx>,
         meta: UdpPacketMeta<I>,
-        body: &B,
+        body: &[u8],
     ) {
         id.external_data().receive_udp(device_id, meta, body)
     }
@@ -1192,6 +1208,7 @@ impl NetstackSeed {
             neighbor_watcher_sink,
             resource_removal_worker,
             mut multicast_admin_workers,
+            power_worker,
         } = self;
 
         // Declare distinct levels of workers, organized by shutdown order
@@ -1236,6 +1253,11 @@ impl NetstackSeed {
         let resource_removal_task = level2_workers
             .spawn_new_guard_assert_cancelled(resource_removal_worker.run())
             .expect("scope cancelled");
+
+        // We don't need to join the power worker task, it should be resilient
+        // to being dropped alongside the other level2 workers.
+        let _: fasync::JoinHandle<()> = level2_workers
+            .spawn(power_worker.run(netstack.ctx.bindings_ctx().config.suspend_enabled));
 
         netstack.add_default_rule::<Ipv4>().await;
         netstack.add_default_rule::<Ipv6>().await;
@@ -1401,11 +1423,17 @@ impl NetstackSeed {
                 }
                 Service::RouteTableProviderV4(stream) => services_handle
                     .spawn_request_stream_handler(stream, |stream| {
-                        routes::admin::serve_route_table_provider_v4(stream, netstack.ctx.clone())
+                        routes::admin::serve_route_table_provider::<Ipv4>(
+                            stream,
+                            netstack.ctx.clone(),
+                        )
                     }),
                 Service::RouteTableProviderV6(stream) => services_handle
                     .spawn_request_stream_handler(stream, |stream| {
-                        routes::admin::serve_route_table_provider_v6(stream, netstack.ctx.clone())
+                        routes::admin::serve_route_table_provider::<Ipv6>(
+                            stream,
+                            netstack.ctx.clone(),
+                        )
                     }),
                 Service::RuleTableV4(rule_table) => services_handle
                     .spawn_request_stream_handler(rule_table, |rs| {

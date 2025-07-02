@@ -576,8 +576,10 @@ struct InnerState {
     next_unique_link_id: AtomicU64,
     transaction_count: usize,
 
-    // associates a reference with it's block index
-    string_reference_block_indexes: HashMap<Cow<'static, str>, BlockIndex>,
+    // maps a string ref to its block index
+    string_reference_block_indexes: HashMap<Arc<Cow<'static, str>>, BlockIndex>,
+    // maps a block index to its string ref
+    block_index_string_references: HashMap<BlockIndex, Arc<Cow<'static, str>>>,
 
     #[derivative(Debug = "ignore")]
     callbacks: HashMap<String, LazyNodeContextFnArc>,
@@ -617,6 +619,7 @@ impl InnerState {
             callbacks: HashMap::new(),
             transaction_count: 0,
             string_reference_block_indexes: HashMap::new(),
+            block_index_string_references: HashMap::new(),
         }
     }
 
@@ -812,8 +815,9 @@ impl InnerState {
                     .block_at_unchecked_mut::<Reserved>(block_index)
                     .become_string_reference();
                 self.write_string_reference_payload(block_index, &value)?;
-                self.string_reference_block_indexes
-                    .insert(Cow::Owned(value.into_owned()), block_index);
+                let owned_value = Arc::new(value.into_owned().into());
+                self.string_reference_block_indexes.insert(Arc::clone(&owned_value), block_index);
+                self.block_index_string_references.insert(block_index, owned_value);
                 Ok(block_index)
             }
         }
@@ -866,7 +870,8 @@ impl InnerState {
         }
         let first_extent = block.next_extent();
         self.heap.free_block(block_index)?;
-        self.string_reference_block_indexes.retain(|_, vmo_index| *vmo_index != block_index);
+        let str_ref = self.block_index_string_references.remove(&block_index).expect("blk idx key");
+        self.string_reference_block_indexes.remove(&str_ref);
 
         if first_extent == BlockIndex::EMPTY {
             return Ok(());
@@ -1735,7 +1740,8 @@ mod tests {
                 collected.push(state.create_node(sf, 0.into()).unwrap());
             }
 
-            assert!(state.inner_lock.string_reference_block_indexes.contains_key(sf));
+            let acsf = Arc::new(Cow::Borrowed(sf));
+            assert!(state.inner_lock.string_reference_block_indexes.contains_key(&acsf));
 
             assert_eq!(state.stats().allocated_blocks, 102);
             let block = state.get_block::<Node>(collected[0]);
@@ -1743,16 +1749,16 @@ mod tests {
             assert_eq!(sf_block.reference_count(), 100);
 
             collected.into_iter().for_each(|b| {
-                assert!(state.inner_lock.string_reference_block_indexes.contains_key(sf));
+                assert!(state.inner_lock.string_reference_block_indexes.contains_key(&acsf));
                 assert!(state.free_value(b).is_ok())
             });
 
-            assert!(!state.inner_lock.string_reference_block_indexes.contains_key(sf));
+            assert!(!state.inner_lock.string_reference_block_indexes.contains_key(&acsf));
 
             let node_index = state.create_node(sf, 0.into()).unwrap();
-            assert!(state.inner_lock.string_reference_block_indexes.contains_key(sf));
+            assert!(state.inner_lock.string_reference_block_indexes.contains_key(&acsf));
             assert!(state.free_value(node_index).is_ok());
-            assert!(!state.inner_lock.string_reference_block_indexes.contains_key(sf));
+            assert!(!state.inner_lock.string_reference_block_indexes.contains_key(&acsf));
         }
 
         let snapshot = Snapshot::try_from(core_state.copy_vmo_bytes().unwrap()).unwrap();

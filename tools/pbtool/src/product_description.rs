@@ -20,8 +20,8 @@
 use anyhow::{Context, Result};
 use argh::FromArgs;
 use camino::Utf8PathBuf;
+use product_bundle::ProductBundle;
 use product_description::{ProductDescription, ProductDescriptionV1};
-use sdk_metadata::ProductBundle;
 use std::fs::File;
 
 /// Generate a description using the specified `args`.
@@ -77,7 +77,7 @@ mod tests {
 
     use assembly_partitions_config::PartitionsConfig;
     use camino::Utf8Path;
-    use sdk_metadata::ProductBundleV2;
+    use product_bundle::ProductBundleV2;
     use tempfile::tempdir;
 
     #[fuchsia::test]
@@ -99,6 +99,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         pb.write(&pb_path).unwrap();
 

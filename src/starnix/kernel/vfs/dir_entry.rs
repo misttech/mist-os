@@ -88,7 +88,7 @@ pub trait DirEntryOps: Send + Sync + 'static {
     /// or an error.
     fn revalidate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _: &CurrentTask,
         _: &DirEntry,
     ) -> Result<bool, Errno> {
@@ -193,7 +193,7 @@ impl DirEntry {
     /// Returns a file handle to this entry, associated with an anonymous namespace.
     pub fn open_anonymous<L>(
         self: &DirEntryHandle,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         flags: OpenFlags,
     ) -> Result<FileHandle, Errno>
@@ -263,7 +263,7 @@ impl DirEntry {
     /// entry.
     pub fn component_lookup<L>(
         self: &DirEntryHandle,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
@@ -290,12 +290,12 @@ impl DirEntry {
     /// returned.
     pub fn create_entry<L>(
         self: &DirEntryHandle,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         create_node_fn: impl FnOnce(
-            &mut Locked<'_, L>,
+            &mut Locked<L>,
             &FsNodeHandle,
             &MountInfo,
             &FsStr,
@@ -316,12 +316,12 @@ impl DirEntry {
     /// it is returned.
     pub fn get_or_create_entry<L>(
         self: &DirEntryHandle,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         create_node_fn: impl FnOnce(
-            &mut Locked<'_, L>,
+            &mut Locked<L>,
             &FsNodeHandle,
             &MountInfo,
             &FsStr,
@@ -337,12 +337,12 @@ impl DirEntry {
 
     fn create_entry_internal<L>(
         self: &DirEntryHandle,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         create_node_fn: impl FnOnce(
-            &mut Locked<'_, L>,
+            &mut Locked<L>,
             &FsNodeHandle,
             &MountInfo,
             &FsStr,
@@ -376,7 +376,7 @@ impl DirEntry {
     #[cfg(test)]
     pub fn create_dir<L>(
         self: &DirEntryHandle,
-        locked: &mut starnix_sync::Locked<'_, L>,
+        locked: &mut starnix_sync::Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno>
@@ -390,7 +390,7 @@ impl DirEntry {
     // user to save a bit of typing in tests, but this shouldn't happen silently in production.
     pub fn create_dir_for_testing<L>(
         self: &DirEntryHandle,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<DirEntryHandle, Errno>
@@ -424,7 +424,7 @@ impl DirEntry {
     /// Used by O_TMPFILE.
     pub fn create_tmpfile<L>(
         self: &DirEntryHandle,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         mode: FileMode,
@@ -455,13 +455,13 @@ impl DirEntry {
 
         let node =
             self.node.create_tmpfile(locked, current_task, mount, mode, owner, link_behavior)?;
-        let local_name = format!("#{}", node.node_id).into();
+        let local_name = format!("#{}", node.ino).into();
         Ok(DirEntry::new_deleted(node, Some(self.clone()), local_name))
     }
 
     pub fn unlink<L>(
         self: &DirEntryHandle,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
@@ -553,7 +553,7 @@ impl DirEntry {
     ///
     /// old_parent and new_parent must belong to the same file system.
     pub fn rename<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         old_parent: &DirEntryHandle,
         old_mount: &MountInfo,
@@ -821,12 +821,12 @@ impl DirEntry {
 
     fn get_or_create_child<L>(
         self: &DirEntryHandle,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
         create_fn: impl FnOnce(
-            &mut Locked<'_, L>,
+            &mut Locked<L>,
             &FsNodeHandle,
             &MountInfo,
             &FsStr,
@@ -1018,7 +1018,7 @@ enum CreationResult<F> {
 impl<'a> DirEntryLockedChildren<'a> {
     fn component_lookup<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
@@ -1036,15 +1036,10 @@ impl<'a> DirEntryLockedChildren<'a> {
 
     fn get_or_create_child<
         L,
-        F: FnOnce(
-            &mut Locked<'_, L>,
-            &FsNodeHandle,
-            &MountInfo,
-            &FsStr,
-        ) -> Result<FsNodeHandle, Errno>,
+        F: FnOnce(&mut Locked<L>, &FsNodeHandle, &MountInfo, &FsStr) -> Result<FsNodeHandle, Errno>,
     >(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mount: &MountInfo,
         name: &FsStr,
@@ -1053,7 +1048,7 @@ impl<'a> DirEntryLockedChildren<'a> {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
-        let create_child = |locked: &mut Locked<'_, L>, create_fn: F| {
+        let create_child = |locked: &mut Locked<L>, create_fn: F| {
             // Before creating the child, check for existence.
             let (node, create_result) =
                 match self.entry.node.lookup(locked, current_task, mount, name) {
@@ -1148,7 +1143,7 @@ impl<'a> RenameGuard<'a> {
             // biggest.
             if new_parent.is_descendant_of(old_parent)
                 || (!old_parent.is_descendant_of(new_parent)
-                    && old_parent.node.node_id < new_parent.node.node_id)
+                    && old_parent.node.node_key() < new_parent.node.node_key())
             {
                 let old_parent_guard = old_parent.lock_children();
                 let new_parent_guard = new_parent.lock_children();

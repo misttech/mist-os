@@ -41,7 +41,8 @@
 
 // Returns a new unique 64-bit unsigned integer (within this process).
 // Each invocation returns a different non-zero value.
-// Useful for generating identifiers for async and flow events.
+// Useful for generating identifiers for async or flow events within process.
+// Use |TRACE_RANDOM_ID()| instead if the id used in events across components.
 //
 // Usage:
 //
@@ -51,6 +52,22 @@
 //     TRACE_ASYNC_END("category", "name", async_id);
 //
 #define TRACE_NONCE() (trace_generate_nonce())
+
+// Returns a new 64-bit unsigned integer (generally safe for events across components).
+// Useful for generating identifiers for async or flow events across components.
+//
+// It combines timestamp, thread id and a self increasing number (in this process).
+//
+// Usage:
+//
+//     trace_async_id_t async_id = TRACE_RANDOM_ID();
+//     TRACE_ASYNC_BEGIN("category", "name", async_id);
+//     // a little while later...
+//     TRACE_ASYNC_END("category", "name", async_id);
+//
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+#define TRACE_RANDOM_ID() (trace_internal_time_based_id())
+#endif
 
 // Writes an instant event representing a single moment in time (a probe).
 //

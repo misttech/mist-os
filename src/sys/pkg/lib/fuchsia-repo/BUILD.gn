@@ -44,7 +44,7 @@ rustc_library("fuchsia-repo") {
   if (is_host) {
     deps += [
       "//src/developer/ffx/lib/netext:lib",
-      "//src/developer/ffx/lib/rcs:lib",
+      "//src/developer/ffx/lib/target_net:lib",
       "//src/lib/fuchsia-fs",
       "//src/lib/gcs",
       "//src/lib/http-sse:http_sse",

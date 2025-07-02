@@ -37,7 +37,7 @@ mod tests {
             .await?;
 
         let realm = builder.build().await?;
-        let svc = realm.root.connect_to_protocol_at_exposed_dir::<fintl::TimeZonesMarker>()?;
+        let svc = realm.root.connect_to_protocol_at_exposed_dir()?;
         Ok((realm, svc))
     }
 

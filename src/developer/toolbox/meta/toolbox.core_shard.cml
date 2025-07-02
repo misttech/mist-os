@@ -29,6 +29,13 @@
             to: "self/toolbox",
         },
         {
+            protocol: "fuchsia.bluetooth.affordances.PeerController",
+            from: "#bt-affordances-server",
+            to: "self/toolbox",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
             protocol: "fuchsia.bluetooth.pandora.GrpcServerController",
             from: "#bt-pandora-server",
             to: "self/toolbox",
@@ -59,6 +66,13 @@
         {
             protocol: "fuchsia.bluetooth.sys.Access",
             from: "#bluetooth-core",
+            to: "self/toolbox",
+            availability: "optional",
+            source_availability: "unknown",
+        },
+        {
+            protocol: "fuchsia.pkg.resolution.PackageResolver",
+            from: "#pkg-resolver",
             to: "self/toolbox",
             availability: "optional",
             source_availability: "unknown",

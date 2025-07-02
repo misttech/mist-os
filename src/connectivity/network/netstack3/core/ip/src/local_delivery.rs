@@ -73,6 +73,9 @@ pub trait IpHeaderInfo<I> {
     /// Returns true if the router alert option (IPv4) or extension header
     /// (IPv6) is present on the packet.
     fn router_alert(&self) -> bool;
+
+    /// Returns the IP header as bytes.
+    fn as_bytes(&self) -> [&[u8]; 2];
 }
 
 pub(crate) struct Ipv4HeaderInfo<'a> {
@@ -91,6 +94,12 @@ impl IpHeaderInfo<Ipv4> for Ipv4HeaderInfo<'_> {
 
     fn router_alert(&self) -> bool {
         self.options.iter().any(|opt| matches!(opt, Ipv4Option::RouterAlert { .. }))
+    }
+
+    fn as_bytes(&self) -> [&[u8]; 2] {
+        use zerocopy::IntoBytes as _;
+        let Self { prefix, options } = self;
+        [prefix.as_bytes(), options.bytes()]
     }
 }
 
@@ -116,11 +125,18 @@ impl IpHeaderInfo<Ipv6> for Ipv6HeaderInfo<'_> {
             _ => false,
         })
     }
+
+    fn as_bytes(&self) -> [&[u8]; 2] {
+        use zerocopy::IntoBytes as _;
+        let Self { fixed, extension } = self;
+        [fixed.as_bytes(), extension.bytes()]
+    }
 }
 
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use super::*;
+    use alloc::vec::Vec;
 
     /// Handroll a default impl for `ReceiveIpPacketMeta` only for tests to
     /// prevent accidental usage.
@@ -141,7 +157,7 @@ pub(crate) mod testutil {
     }
 
     /// A fake implementation of [`IpHeaderInfo`].
-    #[derive(Debug, Default)]
+    #[derive(Debug, Default, Clone)]
     pub struct FakeIpHeaderInfo {
         /// The value returned by [`IpHeaderInfo::dscp_and_ecn`].
         pub dscp_and_ecn: DscpAndEcn,
@@ -149,6 +165,8 @@ pub(crate) mod testutil {
         pub hop_limit: u8,
         /// The value returned by [`IpHeaderInfo::router_alert`].
         pub router_alert: bool,
+        /// The value returned by [`IpHeaderInfo::as_bytes`].
+        pub as_bytes: [Vec<u8>; 2],
     }
 
     impl<I: IpExt> IpHeaderInfo<I> for FakeIpHeaderInfo {
@@ -162,6 +180,10 @@ pub(crate) mod testutil {
 
         fn router_alert(&self) -> bool {
             self.router_alert
+        }
+
+        fn as_bytes(&self) -> [&[u8]; 2] {
+            [&self.as_bytes[0], &self.as_bytes[1]]
         }
     }
 }

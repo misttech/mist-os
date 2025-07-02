@@ -9,10 +9,11 @@ use starnix_logging::track_stub;
 use starnix_sync::{FileOpsCore, Locked, RwLock, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::arch32::{
-    PERF_EVENT_IOC_DISABLE, PERF_EVENT_IOC_ENABLE, PERF_EVENT_IOC_ID,
-    PERF_EVENT_IOC_MODIFY_ATTRIBUTES, PERF_EVENT_IOC_PAUSE_OUTPUT, PERF_EVENT_IOC_PERIOD,
-    PERF_EVENT_IOC_QUERY_BPF, PERF_EVENT_IOC_REFRESH, PERF_EVENT_IOC_RESET, PERF_EVENT_IOC_SET_BPF,
-    PERF_EVENT_IOC_SET_FILTER, PERF_EVENT_IOC_SET_OUTPUT,
+    perf_event_type_PERF_RECORD_SAMPLE, PERF_EVENT_IOC_DISABLE, PERF_EVENT_IOC_ENABLE,
+    PERF_EVENT_IOC_ID, PERF_EVENT_IOC_MODIFY_ATTRIBUTES, PERF_EVENT_IOC_PAUSE_OUTPUT,
+    PERF_EVENT_IOC_PERIOD, PERF_EVENT_IOC_QUERY_BPF, PERF_EVENT_IOC_REFRESH, PERF_EVENT_IOC_RESET,
+    PERF_EVENT_IOC_SET_BPF, PERF_EVENT_IOC_SET_FILTER, PERF_EVENT_IOC_SET_OUTPUT,
+    PERF_RECORD_MISC_USER,
 };
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
@@ -21,7 +22,7 @@ use starnix_uapi::{
     error, perf_event_attr, perf_event_read_format_PERF_FORMAT_GROUP,
     perf_event_read_format_PERF_FORMAT_ID, perf_event_read_format_PERF_FORMAT_LOST,
     perf_event_read_format_PERF_FORMAT_TOTAL_TIME_ENABLED,
-    perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING, pid_t, uapi,
+    perf_event_read_format_PERF_FORMAT_TOTAL_TIME_RUNNING, tid_t, uapi,
 };
 use zx::sys::zx_system_get_page_size;
 
@@ -73,7 +74,7 @@ struct PerfEventFileState {
 }
 
 struct PerfEventFile {
-    _pid: pid_t,
+    _tid: tid_t,
     _cpu: i32,
     perf_event_file: RwLock<PerfEventFileState>,
 }
@@ -90,7 +91,7 @@ impl FileOps for PerfEventFile {
     // See "Reading results" section of https://man7.org/linux/man-pages/man2/perf_event_open.2.html.
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -159,7 +160,7 @@ impl FileOps for PerfEventFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         op: u32,
@@ -216,7 +217,7 @@ impl FileOps for PerfEventFile {
     // Gets called when mmap() is called.
     fn get_memory(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         length: Option<usize>,
@@ -257,8 +258,8 @@ impl FileOps for PerfEventFile {
         metadata.extend(30_u64.to_ne_bytes());
         // All the fields between pmc_width and reserved (inclusive).
         metadata.extend(vec![0; 976].as_slice());
-        // data_head
-        metadata.extend(0_u64.to_ne_bytes());
+        // data_head (see below comment re: PERF_RECORD_SAMPLE).
+        metadata.extend(40_u64.to_ne_bytes());
         // data_tail
         metadata.extend(0_u64.to_ne_bytes());
         // data_offset. Don't mind the unsafe block.
@@ -270,8 +271,44 @@ impl FileOps for PerfEventFile {
         metadata.extend(((buffer_size - page_size) as u64).to_ne_bytes());
         // The remaining metadata are not defined for now.
 
-        let result = vmo.write(&metadata, 0 /* This is the offset, not the length to write */);
-        match result {
+        match vmo.write(&metadata, 0 /* This is the offset, not the length to write */) {
+            Ok(()) => {}
+            Err(_) => {
+                track_stub!(
+                    TODO("https://fxbug.dev/416323134"),
+                    "[perf_event_open] handle get_memory() errors"
+                );
+                return error!(EINVAL);
+            }
+        };
+
+        // Add 1 example sample of type PERF_RECORD_SAMPLE.
+        // This sample record includes the perf_event_header and the first 5 fields
+        // resulting in a total size of 40 bytes.
+        track_stub!(
+            TODO("https://fxbug.dev/398914921"),
+            "[perf_event_open] incorporate experimental profiler API"
+        );
+        let mut sample = Vec::<u8>::new();
+        // perf_event_header type
+        sample.extend((perf_event_type_PERF_RECORD_SAMPLE as u32).to_ne_bytes());
+        // perf_event_header misc
+        sample.extend((PERF_RECORD_MISC_USER as u16).to_ne_bytes());
+        // perf_event_header size - size of the record including header.
+        sample.extend(40_u16.to_ne_bytes());
+        // perf_record_sample sample_id
+        sample.extend(12_u64.to_ne_bytes());
+        // ip
+        sample.extend(123_u64.to_ne_bytes());
+        // pid
+        sample.extend(1234_u32.to_ne_bytes());
+        // tid
+        sample.extend(12345_u32.to_ne_bytes());
+        // time
+        sample.extend(123456_u64.to_ne_bytes());
+        // The remaining data are not defined for now.
+
+        match vmo.write(&sample, page_size /* offset */) {
             Ok(()) => {
                 let memory = MemoryObject::RingBuf(vmo);
                 return Ok(Arc::new(memory));
@@ -283,12 +320,12 @@ impl FileOps for PerfEventFile {
                 );
                 return error!(EINVAL);
             }
-        }
+        };
     }
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -303,23 +340,23 @@ impl FileOps for PerfEventFile {
 }
 
 pub fn sys_perf_event_open(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     attr: UserRef<perf_event_attr>,
-    pid: pid_t,
+    tid: tid_t,
     cpu: i32,
     group_fd: FdNumber,
     _flags: u64,
 ) -> Result<SyscallResult, Errno> {
-    if pid == -1 && cpu == -1 {
+    if tid == -1 && cpu == -1 {
         return error!(EINVAL);
     }
     if group_fd != FdNumber::from_raw(-1) {
         track_stub!(TODO("https://fxbug.dev/409619971"), "[perf_event_open] implement group_fd");
         return error!(ENOSYS);
     }
-    if pid > 0 {
-        track_stub!(TODO("https://fxbug.dev/409621963"), "[perf_event_open] implement pid > 0");
+    if tid > 0 {
+        track_stub!(TODO("https://fxbug.dev/409621963"), "[perf_event_open] implement tid > 0");
         return error!(ENOSYS);
     }
 
@@ -367,7 +404,7 @@ pub fn sys_perf_event_open(
     }
 
     let file = Box::new(PerfEventFile {
-        _pid: pid,
+        _tid: tid,
         _cpu: cpu,
         perf_event_file: RwLock::new(perf_event_file),
     });

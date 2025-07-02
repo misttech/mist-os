@@ -14,7 +14,7 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 
 fn create_gpu_device(
-    _locked: &mut Locked<'_, DeviceOpen>,
+    _locked: &mut Locked<DeviceOpen>,
     _current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -24,7 +24,7 @@ fn create_gpu_device(
     error!(ENOTSUP)
 }
 
-pub fn gpu_device_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
+pub fn gpu_device_init<L>(locked: &mut Locked<L>, current_task: &CurrentTask)
 where
     L: LockBefore<FileOpsCore>,
 {

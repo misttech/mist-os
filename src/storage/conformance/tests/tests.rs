@@ -4,11 +4,12 @@
 
 mod attributes;
 mod clone;
-mod describe;
+mod deprecated;
 mod directory;
 mod file;
 mod flags;
 mod node;
+mod query;
 mod remote;
 mod service;
 mod unnamed_temporary_file;

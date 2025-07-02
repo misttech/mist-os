@@ -68,7 +68,6 @@ def main() -> int:
     )
     parser.add_argument(
         "--partitions",
-        required=True,
         type=argparse.FileType("r"),
         help="The partitions config that follows this schema: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/developer/ffx/plugins/assembly/#partitions-config",
     )
@@ -79,7 +78,6 @@ def main() -> int:
     )
     parser.add_argument(
         "--system",
-        type=argparse.FileType("r"),
         nargs="*",
         help="A list of system image manifests that follow this schema: https://fuchsia.googlesource.com/fuchsia/+/refs/heads/main/src/developer/ffx/plugins/assembly/#images-manifest",
     )
@@ -89,41 +87,85 @@ def main() -> int:
     )
     args = parser.parse_args()
 
+    # A list of files opened by this script.
+    deps: set[FilePath] = set()
+
     # A list of the implicit inputs.
     inputs = []
 
     # Add all the bootloaders as inputs.
-    inputs.append(args.partitions.name)
-    partitions = json.load(args.partitions)
-    base_dir = os.path.dirname(args.partitions.name)
-    for bootloader in partitions.get("bootloader_partitions", []):
-        inputs.append(os.path.join(base_dir, bootloader["image"]))
-    for bootstrap in partitions.get("bootstrap_partitions", []):
-        inputs.append(os.path.join(base_dir, bootstrap["image"]))
-    for credential in partitions.get("unlock_credentials", []):
-        inputs.append(os.path.join(base_dir, credential))
+    if args.partitions:
+        inputs.append(args.partitions.name)
+        partitions = json.load(args.partitions)
+        base_dir = os.path.dirname(args.partitions.name)
+        for bootloader in partitions.get("bootloader_partitions", []):
+            inputs.append(os.path.join(base_dir, bootloader["image"]))
+        for bootstrap in partitions.get("bootstrap_partitions", []):
+            inputs.append(os.path.join(base_dir, bootstrap["image"]))
+        for credential in partitions.get("unlock_credentials", []):
+            inputs.append(os.path.join(base_dir, credential))
 
     # Add all the system images as inputs.
     package_manifest_paths: set[FilePath] = set()
-    for image_manifest_file in args.system:
-        image_manifest = json.load(image_manifest_file)
-        manifest_path = os.path.dirname(image_manifest_file.name)
-        for image in image_manifest["images"]:
-            inputs.append(os.path.join(manifest_path, image["path"]))
+    for image_manifest_dir in args.system:
+        image_manifest_path = image_manifest_dir + "/assembled_system.json"
+        deps.add(image_manifest_path)
+        with open(image_manifest_path, "r") as f:
+            image_manifest = json.load(f)
+            for image in image_manifest["images"]:
+                inputs.append(os.path.join(image_manifest_dir, image["path"]))
 
-            # Collect the package manifests from the blobfs/Fxblob image.
-            if (image["type"] == "blk" and image["name"] == "blob") or (
-                image["type"] == "fxfs-blk" and image["name"] == "storage-full"
-            ):
-                packages = []
-                packages.extend(image["contents"]["packages"].get("base", []))
-                packages.extend(image["contents"]["packages"].get("cache", []))
-                package_manifest_paths.update(
-                    [
-                        os.path.join(manifest_path, package["manifest"])
-                        for package in packages
-                    ]
+                # Collect the package manifests from the blobfs/Fxblob image.
+                if (image["type"] == "blk" and image["name"] == "blob") or (
+                    image["type"] == "blk" and image["name"] == "fxfs.fastboot"
+                ):
+                    packages = []
+                    packages.extend(
+                        image["contents"]["packages"].get("base", [])
+                    )
+                    packages.extend(
+                        image["contents"]["packages"].get("cache", [])
+                    )
+                    package_manifest_paths.update(
+                        [
+                            os.path.join(
+                                image_manifest_dir, package["manifest"]
+                            )
+                            for package in packages
+                        ]
+                    )
+
+            # Add all the bootloaders as inputs.
+            if "partitions_config" in image_manifest:
+                partitions_config_dir = (
+                    image_manifest_dir
+                    + "/"
+                    + image_manifest["partitions_config"]
                 )
+                partitions_config_path = (
+                    partitions_config_dir + "/partitions_config.json"
+                )
+                deps.add(partitions_config_path)
+                with open(partitions_config_path, "r") as f:
+                    partitions = json.load(f)
+                    for bootloader in partitions.get(
+                        "bootloader_partitions", []
+                    ):
+                        inputs.append(
+                            os.path.join(
+                                partitions_config_dir, bootloader["image"]
+                            )
+                        )
+                    for bootstrap in partitions.get("bootstrap_partitions", []):
+                        inputs.append(
+                            os.path.join(
+                                partitions_config_dir, bootstrap["image"]
+                            )
+                        )
+                    for credential in partitions.get("unlock_credentials", []):
+                        inputs.append(
+                            os.path.join(partitions_config_dir, credential)
+                        )
 
     # If we collected any package manifests, include all the blobs referenced
     # by them.
@@ -133,6 +175,7 @@ def main() -> int:
         all_manifest_paths,
         inputs,
     )
+    deps.update(all_manifest_paths)
 
     # Write the hermetic inputs file.
     with open(args.output, "w") as f:
@@ -141,7 +184,7 @@ def main() -> int:
     # Write the depfile.
     if args.depfile:
         with open(args.depfile, "w") as f:
-            DepFile.from_deps(args.output, all_manifest_paths).write_to(f)
+            DepFile.from_deps(args.output, deps).write_to(f)
 
     return 0
 

@@ -17,6 +17,9 @@ pub union WirePointer<'de, T> {
     _phantom: PhantomData<&'de mut [Chunk]>,
 }
 
+unsafe impl<T: Send> Send for WirePointer<'_, T> {}
+unsafe impl<T: Sync> Sync for WirePointer<'_, T> {}
+
 impl<T> WirePointer<'_, T> {
     /// Returns whether the wire pointer was encoded present.
     pub fn is_encoded_present(slot: Slot<'_, Self>) -> Result<bool, DecodeError> {

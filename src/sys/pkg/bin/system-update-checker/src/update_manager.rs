@@ -779,6 +779,7 @@ pub(crate) mod tests {
         }
     }
 
+    #[allow(dead_code)] // TODO(https://fxbug.dev/421409084)
     #[derive(Clone)]
     pub struct UnreachableUpdateApplier;
     impl UpdateApplier for UnreachableUpdateApplier {
@@ -875,6 +876,7 @@ pub(crate) mod tests {
         }
     }
 
+    #[allow(dead_code)] // TODO(https://fxbug.dev/421409084)
     #[derive(Clone)]
     pub struct UnreachableNotifier;
     impl Notify for UnreachableNotifier {

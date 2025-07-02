@@ -32,7 +32,7 @@ impl AccessibilityTest {
     pub fn connect_to_accessibilitymarker(instance: &RealmInstance) -> AccessibilityProxy {
         return instance
             .root
-            .connect_to_protocol_at_exposed_dir::<AccessibilityMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connecting to Accessibility");
     }
 }

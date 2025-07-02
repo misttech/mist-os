@@ -71,6 +71,9 @@ enum class Type : uint64_t {
   // phase.
   kTemporaryPhysHandoff,
 
+  // Memory intended to remain allocated for the lifetime of the kernel.
+  kPermanentPhysHandoff,
+
   // A vDSO memory image.
   kVdso,
 

@@ -295,8 +295,8 @@ mod tests {
         assert_eq!(expected, info.into());
     }
 
-    #[test]
-    fn inspect() {
+    #[fuchsia::test]
+    async fn inspect() {
         let inspector = inspect::Inspector::default();
         let node = inspector.root().create_child("info");
         let info = HostInfo {

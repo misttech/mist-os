@@ -30,6 +30,7 @@ pub struct PackageBlobSizeInfo {
     pub absolute_share_count: u64,
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/421409514)
 pub struct PackageSizeInfos<'a>(pub &'a Vec<PackageSizeInfo>);
 
 /// Implementing Display to show a easy to comprehend structured output of PackageSizeInfos
@@ -112,6 +113,7 @@ impl fmt::Display for PackageSizeInfos<'_> {
     }
 }
 
+#[allow(dead_code)] // TODO(https://fxbug.dev/421409514)
 fn process_path_str(input_path: String, column_width: usize, is_duplicate: bool) -> String {
     let path_str = if is_duplicate { format!("{input_path}*") } else { input_path };
     if path_str.len() > (column_width - 3) {

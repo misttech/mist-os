@@ -6,9 +6,12 @@ use anyhow::Error;
 use fidl::endpoints::{create_proxy, ServerEnd};
 use fidl_fuchsia_boot::{FactoryItemsMarker, FactoryItemsProxy};
 use fidl_fuchsia_factory::{
-    AlphaFactoryStoreProviderMarker, CastCredentialsFactoryStoreProviderMarker,
-    MiscFactoryStoreProviderMarker, PlayReadyFactoryStoreProviderMarker,
-    WeaveFactoryStoreProviderMarker, WidevineFactoryStoreProviderMarker,
+    AlphaFactoryStoreProviderMarker, AlphaFactoryStoreProviderProxy,
+    CastCredentialsFactoryStoreProviderMarker, CastCredentialsFactoryStoreProviderProxy,
+    MiscFactoryStoreProviderMarker, MiscFactoryStoreProviderProxy,
+    PlayReadyFactoryStoreProviderMarker, PlayReadyFactoryStoreProviderProxy,
+    WeaveFactoryStoreProviderMarker, WeaveFactoryStoreProviderProxy,
+    WidevineFactoryStoreProviderMarker, WidevineFactoryStoreProviderProxy,
 };
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_fs::directory::DirentKind;
@@ -418,8 +421,7 @@ mod tests {
         realm: &RealmInstance,
         cmd: FactoryItemsCmd,
     ) -> Result<Vec<String>, Error> {
-        let factory_items_proxy =
-            realm.root.connect_to_protocol_at_exposed_dir::<FactoryItemsMarker>()?;
+        let factory_items_proxy = realm.root.connect_to_protocol_at_exposed_dir()?;
         process_factory_items_cmd(cmd, factory_items_proxy).await
     }
 
@@ -430,39 +432,33 @@ mod tests {
     ) -> Result<Vec<String>, Error> {
         match marker {
             ServiceMarkers::AlphaFactoryStore => {
-                let proxy = realm
-                    .root
-                    .connect_to_protocol_at_exposed_dir::<AlphaFactoryStoreProviderMarker>()?;
+                let proxy: AlphaFactoryStoreProviderProxy =
+                    realm.root.connect_to_protocol_at_exposed_dir()?;
                 process_cmd(cmd, |server_end| proxy.get_factory_store(server_end).unwrap()).await
             }
             ServiceMarkers::CastCredentialsFactoryStore => {
-                let proxy = realm
-                        .root
-                        .connect_to_protocol_at_exposed_dir::<CastCredentialsFactoryStoreProviderMarker>()?;
+                let proxy: CastCredentialsFactoryStoreProviderProxy =
+                    realm.root.connect_to_protocol_at_exposed_dir()?;
                 process_cmd(cmd, |server_end| proxy.get_factory_store(server_end).unwrap()).await
             }
             ServiceMarkers::MiscFactoryStore => {
-                let proxy = realm
-                    .root
-                    .connect_to_protocol_at_exposed_dir::<MiscFactoryStoreProviderMarker>()?;
+                let proxy: MiscFactoryStoreProviderProxy =
+                    realm.root.connect_to_protocol_at_exposed_dir()?;
                 process_cmd(cmd, |server_end| proxy.get_factory_store(server_end).unwrap()).await
             }
             ServiceMarkers::PlayReadyFactoryStore => {
-                let proxy = realm
-                    .root
-                    .connect_to_protocol_at_exposed_dir::<PlayReadyFactoryStoreProviderMarker>()?;
+                let proxy: PlayReadyFactoryStoreProviderProxy =
+                    realm.root.connect_to_protocol_at_exposed_dir()?;
                 process_cmd(cmd, |server_end| proxy.get_factory_store(server_end).unwrap()).await
             }
             ServiceMarkers::WeaveFactoryStore => {
-                let proxy = realm
-                    .root
-                    .connect_to_protocol_at_exposed_dir::<WeaveFactoryStoreProviderMarker>()?;
+                let proxy: WeaveFactoryStoreProviderProxy =
+                    realm.root.connect_to_protocol_at_exposed_dir()?;
                 process_cmd(cmd, |server_end| proxy.get_factory_store(server_end).unwrap()).await
             }
             ServiceMarkers::WidevineFactoryStore => {
-                let proxy = realm
-                    .root
-                    .connect_to_protocol_at_exposed_dir::<WidevineFactoryStoreProviderMarker>()?;
+                let proxy: WidevineFactoryStoreProviderProxy =
+                    realm.root.connect_to_protocol_at_exposed_dir()?;
                 process_cmd(cmd, |server_end| proxy.get_factory_store(server_end).unwrap()).await
             }
         }

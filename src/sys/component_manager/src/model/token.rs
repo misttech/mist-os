@@ -49,7 +49,7 @@ impl InstanceRegistry {
         InstanceToken(event)
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, not(feature = "src_model_tests")))]
     pub fn add_for_tests(&self, moniker: Moniker) -> InstanceToken {
         self.add(moniker)
     }

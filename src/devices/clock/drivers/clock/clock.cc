@@ -184,7 +184,7 @@ void ClockDevice::handle_unknown_method(
 zx_status_t ClockDevice::Init(const std::shared_ptr<fdf::Namespace>& incoming,
                               const std::shared_ptr<fdf::OutgoingDirectory>& outgoing,
                               const std::optional<std::string>& node_name,
-                              AddChildCallback add_child_callback) {
+                              std::optional<int32_t> node_id, AddChildCallback add_child_callback) {
   zx::result clock_impl = incoming->Connect<fuchsia_hardware_clockimpl::Service::Device>();
   if (clock_impl.is_error()) {
     FDF_LOG(ERROR, "Failed to connect to the clock-impl FIDL protocol: %s",
@@ -194,7 +194,11 @@ zx_status_t ClockDevice::Init(const std::shared_ptr<fdf::Namespace>& incoming,
   clock_impl_.Bind(std::move(clock_impl.value()));
 
   char child_node_name[20];
-  snprintf(child_node_name, sizeof(child_node_name), "clock-%u", id_);
+  if (!node_id.has_value()) {
+    snprintf(child_node_name, sizeof(child_node_name), "clock-%u", id_);
+  } else {
+    snprintf(child_node_name, sizeof(child_node_name), "clock-%u_%u", id_, node_id.value());
+  }
 
   zx::result compat_result =
       compat_server_.Initialize(incoming, outgoing, node_name, child_node_name);
@@ -206,8 +210,13 @@ zx_status_t ClockDevice::Init(const std::shared_ptr<fdf::Namespace>& incoming,
   auto node_offers = compat_server_.CreateOffers2();
   node_offers.emplace_back(fdf::MakeOffer2<fuchsia_hardware_clock::Service>(child_node_name));
 
-  const std::vector<fuchsia_driver_framework::NodeProperty> node_properties{
+  std::vector<fuchsia_driver_framework::NodeProperty> node_properties{
       fdf::MakeProperty(bind_fuchsia::CLOCK_ID, id_)};
+
+  if (node_id.has_value()) {
+    node_properties.push_back(
+        fdf::MakeProperty(bind_fuchsia::CLOCK_NODE_ID, static_cast<uint32_t>(node_id.value())));
+  }
 
   zx_status_t status = add_child_callback(child_node_name, node_properties, node_offers);
   if (status != ZX_OK) {
@@ -276,23 +285,30 @@ zx::result<> ClockDriver::Start() {
 
 zx_status_t ClockDriver::CreateClockDevices() {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  zx::result clock_ids_metadata =
+  zx::result clock_nodes_metadata =
       fdf_metadata::GetMetadata<fuchsia_hardware_clockimpl::ClockIdsMetadata>(*incoming());
-  if (clock_ids_metadata.is_error()) {
-    FDF_LOG(ERROR, "Failed to get clock IDs: %s", clock_ids_metadata.status_string());
-    return clock_ids_metadata.status_value();
+  if (clock_nodes_metadata.is_error()) {
+    FDF_LOG(ERROR, "Failed to get clock IDs: %s", clock_nodes_metadata.status_string());
+    return clock_nodes_metadata.status_value();
   }
 
-  const auto& clock_ids = clock_ids_metadata.value().clock_ids();
-  if (!clock_ids.has_value()) {
+  const auto& clock_nodes = clock_nodes_metadata.value().clock_nodes();
+  if (!clock_nodes.has_value()) {
     return ZX_OK;
   }
-  for (auto clock_id : clock_ids.value()) {
+
+  for (const auto& node : clock_nodes.value()) {
+    if (!node.clock_id().has_value()) {
+      FDF_LOG(ERROR, "Clock ID Metadata has an entry with no clock id");
+      return ZX_ERR_INVALID_ARGS;
+    }
+    const uint32_t clock_id = node.clock_id().value();
+
     // ClockDevice must be dynamically allocated because it has a ServerBindingGroup and compat
     // server property which cannot be moved.
     auto clock_device = std::make_unique<ClockDevice>(clock_id);
     zx_status_t status = clock_device->Init(
-        incoming(), outgoing(), node_name(),
+        incoming(), outgoing(), node_name(), node.node_id(),
         [this](std::string_view child_node_name,
                const fuchsia_driver_framework::NodePropertyVector& node_properties,
                const std::vector<fuchsia_driver_framework::Offer>& node_offers) {

@@ -19,7 +19,7 @@ use ::routing::error::{ErrorReporter, RouteRequestErrorInfo};
 use ::routing::mapper::NoopRouteMapper;
 use ::routing::{RouteRequest, RouteSource};
 use async_trait::async_trait;
-use cm_rust::{ExposeDecl, ExposeDeclCommon, UseStorageDecl};
+use cm_rust::{ExposeDecl, ExposeDeclCommon, ExposeTarget, UseStorageDecl};
 use cm_types::{Availability, Name};
 use errors::ModelError;
 use log::error;
@@ -235,10 +235,10 @@ pub async fn report_routing_failure(
 /// together.
 pub fn aggregate_exposes<'a>(
     exposes: impl Iterator<Item = &'a ExposeDecl>,
-) -> BTreeMap<&'a Name, Vec<&'a ExposeDecl>> {
-    let mut out: BTreeMap<&Name, Vec<&ExposeDecl>> = BTreeMap::new();
+) -> BTreeMap<(&'a Name, &'a ExposeTarget), Vec<&'a ExposeDecl>> {
+    let mut out: BTreeMap<(&Name, &ExposeTarget), Vec<&ExposeDecl>> = BTreeMap::new();
     for expose in exposes {
-        out.entry(&expose.target_name()).or_insert(vec![]).push(expose);
+        out.entry((&expose.target_name(), &expose.target())).or_insert(vec![]).push(expose);
     }
     out
 }

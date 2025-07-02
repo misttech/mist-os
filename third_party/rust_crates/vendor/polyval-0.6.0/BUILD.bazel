@@ -65,7 +65,9 @@ rust_library(
         "norustfmt",
     ],
     target_compatible_with = select({
+        "@rules_rust//rust/platform:aarch64-apple-darwin": [],
         "@rules_rust//rust/platform:aarch64-unknown-fuchsia": [],
+        "@rules_rust//rust/platform:x86_64-apple-darwin": [],
         "@rules_rust//rust/platform:x86_64-unknown-fuchsia": [],
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -76,7 +78,13 @@ rust_library(
         "//third_party/rust_crates/vendor/opaque-debug-0.3.0:opaque_debug",
         "//third_party/rust_crates/vendor/universal-hash-0.5.1:universal_hash",
     ] + select({
+        "@rules_rust//rust/platform:aarch64-apple-darwin": [
+            "//third_party/rust_crates/vendor/cpufeatures-0.2.1:cpufeatures",  # cfg(any(target_arch = "aarch64", target_arch = "x86_64", target_arch = "x86"))
+        ],
         "@rules_rust//rust/platform:aarch64-unknown-fuchsia": [
+            "//third_party/rust_crates/vendor/cpufeatures-0.2.1:cpufeatures",  # cfg(any(target_arch = "aarch64", target_arch = "x86_64", target_arch = "x86"))
+        ],
+        "@rules_rust//rust/platform:x86_64-apple-darwin": [
             "//third_party/rust_crates/vendor/cpufeatures-0.2.1:cpufeatures",  # cfg(any(target_arch = "aarch64", target_arch = "x86_64", target_arch = "x86"))
         ],
         "@rules_rust//rust/platform:x86_64-unknown-fuchsia": [

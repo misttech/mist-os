@@ -6,7 +6,6 @@
 
 #include <lib/elfldltl/machine.h>
 #include <lib/fidl/txn_header.h>
-#include <lib/processargs/processargs.h>
 #include <lib/userabi/userboot.h>
 #include <lib/zircon-internal/default_stack_size.h>
 #include <lib/zx/channel.h>
@@ -195,8 +194,10 @@ std::array<zx_handle_t, kChildHandleCount> ExtractHandles(zx::channel bootstrap)
   // Read the command line and the essential handles from the kernel.
   std::array<zx_handle_t, kChildHandleCount> handles = {};
   uint32_t actual_handles;
-  zx_status_t status =
-      bootstrap.read(0, nullptr, handles.data(), 0, handles.size(), nullptr, &actual_handles);
+  zx_signals_t pending;
+  zx_status_t status = bootstrap.wait_one(ZX_CHANNEL_READABLE, zx::time::infinite(), &pending);
+  check(log, status, "cannot wait for bootstrap channel to be readable");
+  bootstrap.read(0, nullptr, handles.data(), 0, handles.size(), nullptr, &actual_handles);
   check(log, status, "cannot read bootstrap message");
 
   if (actual_handles != kHandleCount) {
@@ -377,6 +378,8 @@ zx::channel StartChildProcess(const zx::debuglog& log, const Options::ProgramInf
   status = to_child.write(0, &child_message, sizeof(child_message), child.handles.data(),
                           static_cast<uint32_t>(handle_count));
   check(log, status, "zx_channel_write to child failed");
+  // Clear child handles so that they're not closed in the ChildContext destructor.
+  child.handles.fill(ZX_HANDLE_INVALID);
 
   // Start the process going.
   status = child.process.start(child.thread, entry, sp, std::move(bootstrap), vdso_base);

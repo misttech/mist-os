@@ -5,6 +5,7 @@
 #include "vdec1.h"
 
 #include <lib/ddk/io-buffer.h>
+#include <lib/memory_barriers/memory_barriers.h>
 #include <lib/trace/event.h>
 
 #include <algorithm>
@@ -12,7 +13,6 @@
 #include "device_type.h"
 #include "macros.h"
 #include "registers.h"
-#include "src/lib/memory_barriers/memory_barriers.h"
 #include "util.h"
 #include "video_decoder.h"
 

@@ -16,7 +16,7 @@ struct ProcFsHandle(FileSystemHandle);
 
 /// Returns `kernel`'s procfs instance, initializing it if needed.
 pub fn proc_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -35,7 +35,7 @@ struct ProcFs;
 impl FileSystemOps for ProcFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -52,7 +52,8 @@ impl ProcFs {
         let kernel = current_task.kernel();
         let fs = FileSystem::new(kernel, CacheMode::Uncached, ProcFs, options)
             .expect("procfs constructed with valid options");
-        fs.set_root(ProcDirectory::new(current_task, &fs));
+        let root_ino = fs.allocate_ino();
+        fs.create_root(root_ino, ProcDirectory::new(current_task, &fs));
         fs
     }
 }

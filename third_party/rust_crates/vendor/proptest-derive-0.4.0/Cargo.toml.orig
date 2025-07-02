@@ -1,0 +1,42 @@
+[package]
+name          = "proptest-derive"
+version       = "0.4.0"
+authors       = ["Mazdak Farrokhzad <twingoow@gmail.com>"]
+license       = "MIT OR Apache-2.0"
+readme        = "README.md"
+
+repository    = "https://github.com/proptest-rs/proptest"
+documentation = "https://proptest-rs.github.io/proptest/proptest-derive/index.html"
+
+keywords      = ["derive", "arbitrary", "proptest", "testing", "quickcheck"]
+categories    = ["development-tools::testing"]
+
+description = """
+Custom-derive for the Arbitrary trait of proptest.
+"""
+
+homepage = "https://proptest-rs.github.io/proptest/proptest-derive/index.html"
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dev-dependencies]
+proptest = { version = "1.0.0", path = "../proptest" }
+# We don't actually run the tests on stable since some of them use nightly
+# features. However, due to
+# https://github.com/laumann/compiletest-rs/issues/166, the default features of
+# compiletest-rs fail to compile, but the stable fallback works fine.
+compiletest_rs = { version = "0.9", features = ["tmp", "stable"] }
+# criterion is used for benchmarks.
+criterion = "0.5"
+
+[dependencies]
+proc-macro2 = "1.0"
+
+syn = { version = "1.0.0", features = ["visit", "extra-traits", "full"] }
+quote = "1.0"
+
+[[bench]]
+name = "large_enum"
+harness = false

@@ -4,7 +4,7 @@
 # found in the LICENSE file.
 """bbtool
 
-Collection of 'bb' (buildbucket) utilities.
+Collection of 'bb' (buildbucket) utilities for working with infra builds.
 See subcommands.
 """
 
@@ -16,6 +16,7 @@ import tempfile
 from pathlib import Path
 from typing import Any, Dict, Optional, Sequence, Tuple
 
+import cas
 import cl_utils
 import fuchsia
 
@@ -31,6 +32,18 @@ _BB_TOOL = PROJECT_ROOT_REL / "prebuilt" / "tools" / "buildbucket" / "bb"
 
 def msg(text: str) -> None:
     print(f"[{_SCRIPT_BASENAME}] {text}")
+
+
+def log_cache_path(build_id: str, log_name: str) -> Path:
+    """Returns the path use for locally caching reproxy logs."""
+    tempdir = Path(tempfile.gettempdir())  # e.g. /tmp
+    return (
+        tempdir
+        / _SCRIPT_BASENAME
+        / "reproxy_logs_cache"
+        / f"b{build_id}"
+        / log_name
+    )
 
 
 class BBError(RuntimeError):
@@ -80,35 +93,6 @@ class BuildBucketTool(object):
             raise BBError(f"Failed to fetch bb reproxy log {reproxy_log_name}.")
         return "\n".join(rpl_log_result.stdout) + "\n"
 
-    def fetch_reproxy_log_cached(
-        self, build_id: str, reproxy_log_name: str, verbose: bool = False
-    ) -> Path:
-        tempdir = Path(tempfile.gettempdir())
-        reproxy_log_cache_path = (
-            tempdir
-            / _SCRIPT_BASENAME
-            / "reproxy_logs_cache"
-            / f"b{build_id}"
-            / reproxy_log_name
-        )
-        reproxy_log_cache_path.parent.mkdir(parents=True, exist_ok=True)
-        if reproxy_log_cache_path.exists():
-            if verbose:
-                msg(f"Re-using cached reproxy log at {reproxy_log_cache_path}")
-        else:
-            if verbose:
-                msg(
-                    f"Downloading reproxy log {reproxy_log_name} from buildbucket.  (This could take a few minutes.)"
-                )
-            rpl_log_contents = self.download_reproxy_log(
-                build_id, reproxy_log_name
-            )
-            reproxy_log_cache_path.write_text(rpl_log_contents)
-            if verbose:
-                msg(f"Reproxy log cached to {reproxy_log_cache_path}")
-
-        return reproxy_log_cache_path
-
     def get_rbe_build_info(
         self, bbid: str, verbose: bool = False
     ) -> Tuple[str, Dict[str, Any]]:
@@ -146,6 +130,11 @@ class BuildBucketTool(object):
         return rbe_build_id, rbe_build_json
 
 
+def _cache_path_exists(path: Path) -> bool:
+    """This is defined for the sake of mocking in tests."""
+    return path.exists()
+
+
 def fetch_reproxy_log_from_bbid(
     bbpath: Path, bbid: str, verbose: bool = False
 ) -> Path | None:
@@ -156,21 +145,60 @@ def fetch_reproxy_log_from_bbid(
     if verbose:
         msg(f"Using build id {rbe_build_id} to look for reproxy logs")
 
-    rpl_files = rbe_build_json["output"]["properties"].get("rpl_files")
+    output_properties = rbe_build_json["output"]["properties"]
 
-    if rpl_files is None:
-        msg(f"Error looking up reproxy log from build {rbe_build_id}")
-        return None
+    # The current way to get reproxy logs is from CAS (uploaded by recipe).
+    rpl_params = output_properties.get("cas_reproxy_log")
 
-    # Assume there is only one.
-    reproxy_log_name = rpl_files[0]
+    if rpl_params:
+        reproxy_log_name = rpl_params["file"]
 
-    # Fetch reproxy log (cached)
-    reproxy_log_cache_path = bb.fetch_reproxy_log_cached(
-        build_id=rbe_build_id,
-        reproxy_log_name=reproxy_log_name,
-        verbose=verbose,
-    )
+    else:
+        # legacy support: older infra builds published reproxy logs to LogDog
+        rpl_files = rbe_build_json["output"]["properties"].get("rpl_files")
+
+        if rpl_files is None:
+            msg(f"Error looking up reproxy log from build {rbe_build_id}")
+            return None
+
+        # Assume there is only one.
+        reproxy_log_name = rpl_files[0]
+
+    # Check if log already exists in local download cache.
+    reproxy_log_cache_path = log_cache_path(rbe_build_id, reproxy_log_name)
+    reproxy_log_cache_path.parent.mkdir(parents=True, exist_ok=True)
+    if _cache_path_exists(reproxy_log_cache_path):
+        if verbose:
+            msg(f"Re-using cached reproxy log at {reproxy_log_cache_path}")
+
+        return reproxy_log_cache_path
+
+    # else not already in cache, so download and cache it.
+    if verbose:
+        msg(
+            f"Downloading reproxy log {reproxy_log_name}.  (This could take a few minutes.)"
+        )
+
+    if rpl_params:
+        file = cas.File(
+            instance=rpl_params["instance"],
+            digest=rpl_params["digest"],
+            filename=reproxy_log_name,
+        )
+        dl_result = file.download(reproxy_log_cache_path)
+        if dl_result.returncode != 0:
+            # An error is already printed.
+            return None
+
+    else:
+        rpl_log_contents = bb.download_reproxy_log(
+            rbe_build_id, reproxy_log_name
+        )
+        reproxy_log_cache_path.write_text(rpl_log_contents)
+
+    if verbose:
+        msg(f"Reproxy log cached to {reproxy_log_cache_path}")
+
     # TODO: writing log out to disk and re-reading/parsing it can be slow.
     # Perhaps add an interface to take a string in-memory.
     return reproxy_log_cache_path

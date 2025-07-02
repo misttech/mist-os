@@ -13,7 +13,7 @@ use {
     fidl_fuchsia_driver_test as fdt, zx_status,
 };
 
-const SAMPLE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/sample-driver.cm";
+const SAMPLE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/sample_driver.cm";
 const PARENT_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/test-parent-sys.cm";
 const FAKE_DRIVER_URL: &str = "fuchsia-boot:///dtr#meta/driver-test-realm-fake-driver.cm";
 
@@ -140,7 +140,7 @@ async fn set_up_test_driver_realm() -> Result<(RealmInstance, fdd::ManagerProxy)
     realm_args.root_driver = Some(ROOT_DRIVER_URL.to_owned());
     instance.driver_test_realm_start(realm_args).await?;
 
-    let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
+    let driver_dev: fdd::ManagerProxy = instance.root.connect_to_protocol_at_exposed_dir()?;
     Ok((instance, driver_dev))
 }
 
@@ -180,7 +180,7 @@ async fn test_get_driver_info_with_filter_dfv1() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_mixed_filter_dfv1() -> Result<()> {
-    const DRIVER_FILTER: [&str; 2] = ["fuchsia-boot:///dtr#driver/sample-driver.so", "foo"];
+    const DRIVER_FILTER: [&str; 2] = ["fuchsia-boot:///dtr#driver/sample_driver.so", "foo"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;
@@ -192,7 +192,7 @@ async fn test_get_driver_info_with_mixed_filter_dfv1() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_incomplete_filter_dfv1() -> Result<()> {
-    const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///dtr#driver/sample-driver"];
+    const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///dtr#driver/sample_driver"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;
@@ -266,7 +266,7 @@ async fn test_get_driver_info_with_mixed_filter() -> Result<()> {
 
 #[fasync::run_singlethreaded(test)]
 async fn test_get_driver_info_with_incomplete_filter() -> Result<()> {
-    const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///dtr#meta/sample-driver"];
+    const DRIVER_FILTER: [&str; 1] = ["fuchsia-boot:///dtr#meta/sample_driver"];
 
     let (_instance, driver_dev) = set_up_test_driver_realm().await?;
     let iterator = send_get_driver_info_request(&driver_dev, &DRIVER_FILTER)?;
@@ -331,7 +331,10 @@ async fn test_get_device_info_no_filter() -> Result<()> {
     let sys = &root.child_nodes[0];
 
     assert_eq!(sys.info.moniker.as_ref().expect("node missing moniker"), "dev.sys");
-    assert_eq!(sys.info.bound_driver_url.as_ref().expect("node missing driver URL"), "unbound");
+    assert_eq!(
+        sys.info.bound_driver_url.as_ref().expect("node missing driver URL"),
+        "owned by parent"
+    );
     assert_eq!(
         sys.info.node_property_list.as_ref().map(|x| x.as_slice()),
         get_no_protocol_property_list().as_ref().map(|x| x.as_slice())

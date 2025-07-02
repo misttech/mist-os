@@ -6,13 +6,13 @@
 
 //! This crate introduces generic ToolProvider and Tool traits that represent executable stages of
 //! Assembly. It also introduces two implementations:
-//!  - SdkToolProvider which facilitates execution of tools from the SDK
+//!  - PlatformToolProvider provides tools from a platform artifacts directory
 //!  - FakeToolProvider which no-ops execution for tests
 
-mod sdk;
+mod platform;
 mod serde_arc;
 pub mod testing;
 mod tool;
 
-pub use sdk::SdkToolProvider;
+pub use platform::PlatformToolProvider;
 pub use tool::{Tool, ToolCommand, ToolCommandLog, ToolProvider};

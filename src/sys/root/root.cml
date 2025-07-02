@@ -62,6 +62,7 @@
                 "fuchsia.fshost.FxfsCryptUrl",
                 "fuchsia.fshost.Gpt",
                 "fuchsia.fshost.GptAll",
+                "fuchsia.fshost.InlineCrypto",
                 "fuchsia.fshost.Mbr",
                 "fuchsia.fshost.Nand",
                 "fuchsia.fshost.Netboot",
@@ -199,6 +200,7 @@
         {
             protocol: [
                 "fuchsia.component.PersistenceBinder",
+                "fuchsia.component.resolution.Resolver-full",
                 "fuchsia.component.SamplerBinder",
                 "fuchsia.exception.Handler",
                 "fuchsia.feedback.ComponentDataRegister",

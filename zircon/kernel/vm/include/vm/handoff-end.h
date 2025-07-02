@@ -10,20 +10,40 @@
 // These functions relate to PhysHandoff but exist only in the kernel proper.
 
 #include <stddef.h>
+#include <zircon/assert.h>
 
 #include <fbl/ref_ptr.h>
 #include <fbl/vector.h>
+#include <ktl/type_traits.h>
 #include <object/handle.h>
 #include <phys/handoff.h>
 
 // Forward declaration; defined in <vm/vm_object.h>
 class VmObject;
 
-// Called as soon as the physmap is available to set the gPhysHandoff pointer.
-void HandoffFromPhys(paddr_t handoff_paddr);
+// Called as soon as the kernel is entered to set the gPhysHandoff pointer.
+void HandoffFromPhys(PhysHandoff* handoff);
 
 // Valid to call only after HandoffFromPhys().
 paddr_t KernelPhysicalLoadAddress();
+
+// This is valid to call only with addresses inside the kernel image itself.
+// The template wrappers below should always be used instead.  They ensure at
+// compile time that only a variable or function in the kernel's image is used.
+paddr_t KernelPhysicalAddressOf(uintptr_t va);
+
+// The template argument can be any global / static function or variable.
+template <auto& Symbol>
+inline paddr_t KernelPhysicalAddressOf() {
+  return KernelPhysicalAddressOf(reinterpret_cast<uintptr_t>(&Symbol));
+}
+
+// This version can be used to index into an array variable.
+template <auto& Symbol>
+  requires(ktl::is_array_v<ktl::remove_reference_t<decltype(Symbol)>>)
+inline paddr_t KernelPhysicalAddressOf(size_t idx) {
+  return KernelPhysicalAddressOf(reinterpret_cast<uintptr_t>(&Symbol[idx]));
+}
 
 // The remaining hand-off data to be consumed at the end of the hand-off phase
 // (see EndHandoff()).

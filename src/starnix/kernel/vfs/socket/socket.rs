@@ -148,7 +148,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// a new socket is created and added to the accept queue.
     fn connect(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &SocketHandle,
         current_task: &CurrentTask,
         peer: SocketPeer,
@@ -157,7 +157,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Start listening at the bound address for `connect` calls.
     fn listen(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         backlog: i32,
         credentials: uapi::ucred,
@@ -167,7 +167,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// listening socket. Returns EAGAIN if the queue is empty.
     fn accept(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
     ) -> Result<SocketHandle, Errno>;
 
@@ -176,7 +176,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Returns an error if the socket could not be bound.
     fn bind(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
         socket_address: SocketAddress,
@@ -193,7 +193,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// data associated with the read messages.
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
@@ -210,7 +210,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Advances the iterator to indicate how much was actually written.
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -230,7 +230,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Returns a WaitCanceler that can be used to cancel the wait.
     fn wait_async(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -241,7 +241,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Return the events that are currently active on the `socket`.
     fn query_events(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno>;
@@ -251,7 +251,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Used by the shutdown syscalls.
     fn shutdown(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         how: SocketShutdownFlags,
     ) -> Result<(), Errno>;
@@ -266,7 +266,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// which changes how read() behaves on that socket. Second, close
     /// transitions the internal state of this socket to Closed, which breaks
     /// the reference cycle that exists in the connected state.
-    fn close(&self, locked: &mut Locked<'_, FileOpsCore>, socket: &Socket);
+    fn close(&self, locked: &mut Locked<FileOpsCore>, socket: &Socket);
 
     /// Returns the name of this socket.
     ///
@@ -274,7 +274,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// will always have a name, even if it is not bound to an address.
     fn getsockname(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
     ) -> Result<SocketAddress, Errno>;
 
@@ -283,14 +283,14 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Returns an error if the socket is not connected.
     fn getpeername(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
     ) -> Result<SocketAddress, Errno>;
 
     /// Sets socket-specific options.
     fn setsockopt(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         _level: u32,
@@ -303,7 +303,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Retrieves socket-specific options.
     fn getsockopt(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         _level: u32,
@@ -316,7 +316,7 @@ pub trait SocketOps: Send + Sync + AsAny {
     /// Implements ioctl.
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         _socket: &Socket,
         file: &FileObject,
         current_task: &CurrentTask,
@@ -340,7 +340,7 @@ pub trait SocketOps: Send + Sync + AsAny {
 
 /// A `Socket` represents one endpoint of a bidirectional communication channel.
 pub struct Socket {
-    ops: Box<dyn SocketOps>,
+    pub(super) ops: Box<dyn SocketOps>,
 
     /// The domain of this socket.
     pub domain: SocketDomain,
@@ -446,13 +446,29 @@ impl Socket {
     ///
     /// # Parameters
     /// - `domain`: The domain of the socket (e.g., `AF_UNIX`).
-    pub fn new(
+    pub fn new<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         domain: SocketDomain,
         socket_type: SocketType,
         protocol: SocketProtocol,
-    ) -> Result<SocketHandle, Errno> {
+        kernel_private: bool,
+    ) -> Result<SocketHandle, Errno>
+    where
+        L: LockEqualOrBefore<FileOpsCore>,
+    {
         let protocol = resolve_protocol(domain, socket_type, protocol);
+        // Checking access in `Socket::new()` prevents creating socket handles when not allowed,
+        // while skipping the "create" permission check for accepted sockets created with
+        // `Socket::new_with_ops()` and `Socket::new_with_ops_and_info()`.
+        security::check_socket_create_access(
+            locked,
+            current_task,
+            domain,
+            socket_type,
+            protocol,
+            kernel_private,
+        )?;
         let ops = create_socket_ops(current_task, domain, socket_type, protocol)?;
         Ok(Self::new_with_ops_and_info(ops, domain, socket_type, protocol))
     }
@@ -499,14 +515,14 @@ impl Socket {
         ops.as_any().downcast_ref::<T>()
     }
 
-    pub fn getsockname<L>(&self, locked: &mut Locked<'_, L>) -> Result<SocketAddress, Errno>
+    pub fn getsockname<L>(&self, locked: &mut Locked<L>) -> Result<SocketAddress, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
         self.ops.getsockname(&mut locked.cast_locked::<FileOpsCore>(), self)
     }
 
-    pub fn getpeername<L>(&self, locked: &mut Locked<'_, L>) -> Result<SocketAddress, Errno>
+    pub fn getpeername<L>(&self, locked: &mut Locked<L>) -> Result<SocketAddress, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
@@ -515,7 +531,7 @@ impl Socket {
 
     pub fn setsockopt<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         level: u32,
         optname: u32,
@@ -559,7 +575,7 @@ impl Socket {
 
     pub fn getsockopt<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         level: u32,
         optname: u32,
@@ -613,7 +629,7 @@ impl Socket {
 
     pub fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -1043,7 +1059,7 @@ impl Socket {
 
     pub fn bind<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         socket_address: SocketAddress,
     ) -> Result<(), Errno>
@@ -1053,22 +1069,9 @@ impl Socket {
         self.ops.bind(&mut locked.cast_locked::<FileOpsCore>(), self, current_task, socket_address)
     }
 
-    pub fn connect<L>(
-        self: &SocketHandle,
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-        peer: SocketPeer,
-    ) -> Result<(), Errno>
-    where
-        L: LockEqualOrBefore<FileOpsCore>,
-    {
-        security::check_socket_connect_access(current_task, self, &peer)?;
-        self.ops.connect(&mut locked.cast_locked::<FileOpsCore>(), self, current_task, peer)
-    }
-
     pub fn listen<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         backlog: i32,
     ) -> Result<(), Errno>
@@ -1083,7 +1086,7 @@ impl Socket {
         self.ops.listen(&mut locked.cast_locked::<FileOpsCore>(), self, backlog, credentials)
     }
 
-    pub fn accept<L>(&self, locked: &mut Locked<'_, L>) -> Result<SocketHandle, Errno>
+    pub fn accept<L>(&self, locked: &mut Locked<L>) -> Result<SocketHandle, Errno>
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
@@ -1092,7 +1095,7 @@ impl Socket {
 
     pub fn read<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
         flags: SocketMessageFlags,
@@ -1100,13 +1103,14 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        security::check_socket_recvmsg_access(current_task, self)?;
         let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops.read(&mut locked, self, current_task, data, flags)
     }
 
     pub fn write<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
         dest_address: &mut Option<SocketAddress>,
@@ -1115,13 +1119,14 @@ impl Socket {
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
+        security::check_socket_sendmsg_access(current_task, self)?;
         let mut locked = locked.cast_locked::<FileOpsCore>();
         self.ops.write(&mut locked, self, current_task, data, dest_address, ancillary_data)
     }
 
     pub fn wait_async<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         waiter: &Waiter,
         events: FdEvents,
@@ -1136,7 +1141,7 @@ impl Socket {
 
     pub fn query_events<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno>
     where
@@ -1147,7 +1152,7 @@ impl Socket {
 
     pub fn shutdown<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         how: SocketShutdownFlags,
     ) -> Result<(), Errno>
@@ -1158,7 +1163,7 @@ impl Socket {
         self.ops.shutdown(&mut locked.cast_locked::<FileOpsCore>(), self, how)
     }
 
-    pub fn close<L>(&self, locked: &mut Locked<'_, L>)
+    pub fn close<L>(&self, locked: &mut Locked<L>)
     where
         L: LockEqualOrBefore<FileOpsCore>,
     {
@@ -1206,7 +1211,7 @@ impl AcceptQueue {
 /// Returns the netlink socket and the interface's information, or an [`Errno`]
 /// if the operation failed.
 fn get_netlink_interface_info<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     in_ifreq: &IfReq,
     read_buf: &mut VecOutputBuffer,
@@ -1264,7 +1269,7 @@ where
 /// Returns the netlink socket, the list of addresses and interface index, or an
 /// [`Errno`] if the operation failed.
 fn get_netlink_ipv4_addresses<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     in_ifreq: &IfReq,
     read_buf: &mut VecOutputBuffer,
@@ -1328,7 +1333,7 @@ where
 
 /// Creates a netlink socket and performs `RTM_SETLINK` to update the flags.
 fn set_netlink_interface_flags<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     in_ifreq: &IfReq,
 ) -> Result<(), Errno>
@@ -1392,7 +1397,7 @@ where
 
 /// Sends the msg on the provided NETLINK ROUTE socket, returning the response.
 fn send_netlink_msg_and_wait_response<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     socket: &FileHandle,
     mut msg: NetlinkMessage<RouteNetlinkMessage>,
@@ -1431,10 +1436,12 @@ mod tests {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let bind_address = SocketAddress::Unix(b"dgram_test".into());
         let rec_dgram = Socket::new(
+            &mut locked,
             &current_task,
             SocketDomain::Unix,
             SocketType::Datagram,
             SocketProtocol::default(),
+            /* kernel_private = */ false,
         )
         .expect("Failed to create socket.");
         let passcred: u32 = 1;
@@ -1454,13 +1461,22 @@ mod tests {
         let xfer_bytes = xfer_value.to_ne_bytes();
 
         let send = Socket::new(
+            &mut locked,
             &current_task,
             SocketDomain::Unix,
             SocketType::Datagram,
             SocketProtocol::default(),
+            /* kernel_private = */ false,
         )
         .expect("Failed to connect socket.");
-        send.connect(&mut locked, &current_task, SocketPeer::Handle(rec_dgram.clone())).unwrap();
+        send.ops
+            .connect(
+                &mut locked.cast_locked(),
+                &send,
+                &current_task,
+                SocketPeer::Handle(rec_dgram.clone()),
+            )
+            .unwrap();
         let mut source_iter = VecInputBuffer::new(&xfer_bytes);
         send.write(&mut locked, &current_task, &mut source_iter, &mut None, &mut vec![]).unwrap();
         assert_eq!(source_iter.available(), 0);

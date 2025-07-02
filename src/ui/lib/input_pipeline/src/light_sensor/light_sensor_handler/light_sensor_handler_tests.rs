@@ -861,7 +861,7 @@ async fn light_sensor_handler_subscriber_queue() {
 }
 
 #[fuchsia::test]
-fn light_sensor_handler_initialized_with_inspect_node() {
+async fn light_sensor_handler_initialized_with_inspect_node() {
     let sensor_configuration = SensorConfiguration {
         vendor_id: VENDOR_ID,
         product_id: PRODUCT_ID,

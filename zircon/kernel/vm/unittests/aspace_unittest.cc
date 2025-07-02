@@ -59,9 +59,7 @@ const ktl::array kernel_regions = {
 static void harvest_access_bits(VmAspace::NonTerminalAction non_terminal_action,
                                 VmAspace::TerminalAction terminal_action) {
   AutoVmScannerDisable scanner_disable;
-  pmm_page_queues()->BeginAccessScan();
   VmAspace::HarvestAllUserAccessedBits(non_terminal_action, terminal_action);
-  pmm_page_queues()->EndAccessScan();
 }
 
 // Consume the (scalar) value, ensuring that the operation to calculate the value can not be
@@ -384,10 +382,9 @@ static bool vmaspace_usercopy_accessed_fault_test() {
                       VmAspace::TerminalAction::UpdateAgeAndHarvest);
 
   // Read from the VMO into the mapping that has been harvested.
-  size_t read_actual = 0;
-  status = vmo->ReadUser(mem->user_out<char>(), 0, sizeof(char), VmObjectReadWriteOptions::None,
-                         &read_actual);
-  ASSERT_EQ(status, ZX_OK);
+  auto [read_status, read_actual] =
+      vmo->ReadUser(mem->user_out<char>(), 0, sizeof(char), VmObjectReadWriteOptions::None);
+  ASSERT_EQ(read_status, ZX_OK);
   ASSERT_EQ(read_actual, sizeof(char));
 
   END_TEST;
@@ -1907,9 +1904,8 @@ static bool vm_mapping_page_fault_range_test() {
 
     ASSERT_TRUE(verify_mapped_page_range(mapping->base(), kAllocSize, 0));
 
-    size_t read_actual = 0;
-    zx_status_t status = vmo->ReadUser(mapping->user_out<char>(), 0, sizeof(char[PAGE_SIZE * 2]),
-                                       VmObjectReadWriteOptions::None, &read_actual);
+    auto [status, read_actual] = vmo->ReadUser(
+        mapping->user_out<char>(), 0, sizeof(char[PAGE_SIZE * 2]), VmObjectReadWriteOptions::None);
     ASSERT_EQ(status, ZX_OK);
     ASSERT_EQ(read_actual, sizeof(char[PAGE_SIZE * 2]));
 
@@ -1947,11 +1943,9 @@ static bool arch_noncontiguous_map() {
     ASSERT_EQ(ZX_OK, status, "failed to init aspace\n");
 
     // Attempt to map a set of vm_page_t
-    size_t mapped = 0u;  // `Map` doesn't set `mapped` when it fails.
     status = aspace.Map(base, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ,
-                        ArchVmAspace::ExistingEntryAction::Error, &mapped);
+                        ArchVmAspace::ExistingEntryAction::Error);
     ASSERT_EQ(ZX_OK, status, "failed first map\n");
-    EXPECT_EQ(ktl::size(phys), mapped, "weird first map\n");
 
     // Expect that the map succeeded
     for (size_t i = 0; i < ktl::size(phys); ++i) {
@@ -1965,15 +1959,15 @@ static bool arch_noncontiguous_map() {
 
     // Attempt to map again, should fail
     status = aspace.Map(base, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ,
-                        ArchVmAspace::ExistingEntryAction::Error, &mapped);
+                        ArchVmAspace::ExistingEntryAction::Error);
     EXPECT_EQ(ZX_ERR_ALREADY_EXISTS, status, "double map\n");
 
     // Attempt to map partially overlapping, should fail
     status = aspace.Map(base + 2 * PAGE_SIZE, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ,
-                        ArchVmAspace::ExistingEntryAction::Error, &mapped);
+                        ArchVmAspace::ExistingEntryAction::Error);
     EXPECT_EQ(ZX_ERR_ALREADY_EXISTS, status, "double map\n");
     status = aspace.Map(base - 2 * PAGE_SIZE, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ,
-                        ArchVmAspace::ExistingEntryAction::Error, &mapped);
+                        ArchVmAspace::ExistingEntryAction::Error);
     EXPECT_EQ(ZX_ERR_ALREADY_EXISTS, status, "double map\n");
 
     // No entries should have been created by the partial failures
@@ -1989,10 +1983,8 @@ static bool arch_noncontiguous_map() {
     // Unmap all remaining entries
     // The partial failures did not create any new entries, so only entries
     // created by the first map should be unmapped.
-    mapped = 0u;  // `Unmap` doesn't set `unmapped` when it fails.
-    status = aspace.Unmap(base, ktl::size(phys), ArchUnmapOptions::Enlarge, &mapped);
+    status = aspace.Unmap(base, ktl::size(phys), ArchUnmapOptions::Enlarge);
     ASSERT_EQ(ZX_OK, status, "failed unmap\n");
-    EXPECT_EQ(ktl::size(phys), mapped, "weird unmap\n");
 
     status = aspace.Destroy();
     EXPECT_EQ(ZX_OK, status, "failed to destroy aspace\n");
@@ -2029,27 +2021,21 @@ static bool arch_noncontiguous_map_with_upgrade() {
     ASSERT_EQ(ZX_OK, status, "failed to init aspace\n");
 
     // Attempt to map a set of vm_page_t
-    size_t mapped = 0u;  // `Map` doesn't set `mapped` when it fails.
     status = aspace.Map(base, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ,
-                        ArchVmAspace::ExistingEntryAction::Error, &mapped);
+                        ArchVmAspace::ExistingEntryAction::Error);
     ASSERT_EQ(ZX_OK, status, "failed first map\n");
-    EXPECT_EQ(ktl::size(phys), mapped, "weird first map\n");
 
     // Attempt to map with upgrades allowed, should succeed
-    mapped = 0u;  // `Map` doesn't set `mapped` when it fails.
     status =
         aspace.Map(base, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
-                   ArchVmAspace::ExistingEntryAction::Upgrade, &mapped);
+                   ArchVmAspace::ExistingEntryAction::Upgrade);
     EXPECT_EQ(ZX_OK, status, "map upgrade failed\n");
-    EXPECT_EQ(ktl::size(phys), mapped, "weird map upgrade\n");
 
     // Attempt to map with upgrades allowed, should succeed but not remap anything
     // b/c downgrade to read not allowed
-    mapped = 0u;  // `Map` doesn't set `mapped` when it fails.
     status = aspace.Map(base, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ,
-                        ArchVmAspace::ExistingEntryAction::Upgrade, &mapped);
+                        ArchVmAspace::ExistingEntryAction::Upgrade);
     EXPECT_EQ(ZX_OK, status, "map upgrade failed\n");
-    EXPECT_EQ(ktl::size(phys), mapped, "weird map upgrade\n");
 
     // Expect that the upgrade maps succeeded
     for (size_t i = 0; i < ktl::size(phys); ++i) {
@@ -2068,17 +2054,13 @@ static bool arch_noncontiguous_map_with_upgrade() {
     }
 
     // Attempt to map partially overlapping with upgrades allowed, should succeed
-    mapped = 0u;  // `Map` doesn't set `mapped` when it fails.
     status = aspace.Map(base + 2 * PAGE_SIZE, phys, ktl::size(phys),
                         ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
-                        ArchVmAspace::ExistingEntryAction::Upgrade, &mapped);
+                        ArchVmAspace::ExistingEntryAction::Upgrade);
     EXPECT_EQ(ZX_OK, status, "map upgrade failed\n");
-    EXPECT_EQ(ktl::size(phys), mapped, "weird map upgrade\n");
-    mapped = 0u;  // `Map` doesn't set `mapped` when it fails.
     status = aspace.Map(base - 2 * PAGE_SIZE, phys, ktl::size(phys), ARCH_MMU_FLAG_PERM_READ,
-                        ArchVmAspace::ExistingEntryAction::Upgrade, &mapped);
+                        ArchVmAspace::ExistingEntryAction::Upgrade);
     EXPECT_EQ(ZX_OK, status, "map upgrade failed\n");
-    EXPECT_EQ(ktl::size(phys), mapped, "weird map upgrade\n");
 
     // Expect that the `Upgrade` maps succeeded
     // We check the entire [base - 2, base + 4] "window" covered by the partial maps
@@ -2103,10 +2085,8 @@ static bool arch_noncontiguous_map_with_upgrade() {
     }
 
     // Unmap any remaining entries
-    mapped = 0u;  // `Unmap` doesn't set `unmapped` when it fails.
-    status = aspace.Unmap(window_base, MAP_WINDOW_SIZE, ArchUnmapOptions::Enlarge, &mapped);
+    status = aspace.Unmap(window_base, MAP_WINDOW_SIZE, ArchUnmapOptions::Enlarge);
     ASSERT_EQ(ZX_OK, status, "failed unmap\n");
-    EXPECT_EQ(MAP_WINDOW_SIZE, mapped, "weird unmap\n");
 
     status = aspace.Destroy();
     EXPECT_EQ(ZX_OK, status, "failed to destroy aspace\n");
@@ -2144,15 +2124,15 @@ static bool arch_vm_aspace_protect_split_pages() {
   ArchVmAspace aspace(0, USER_ASPACE_SIZE, 0);
   ASSERT_OK(aspace.Init());
   auto cleanup = fit::defer([&]() {
-    aspace.Unmap(0, USER_ASPACE_SIZE / PAGE_SIZE, ArchUnmapOptions::Enlarge, nullptr);
+    aspace.Unmap(0, USER_ASPACE_SIZE / PAGE_SIZE, ArchUnmapOptions::Enlarge);
     aspace.Destroy();
   });
 
   // Map in a large contiguous area, which should be mapped by two large pages.
   static_assert(ZX_MAX_PAGE_SIZE > PAGE_SIZE);
   constexpr size_t kRegionSize = 16ul * 1024 * 1024 * 1024;  // 16 GiB.
-  ASSERT_OK(aspace.MapContiguous(/*vaddr=*/0, /*paddr=*/0, /*count=*/kRegionSize / PAGE_SIZE,
-                                 kReadOnly, nullptr));
+  ASSERT_OK(
+      aspace.MapContiguous(/*vaddr=*/0, /*paddr=*/0, /*count=*/kRegionSize / PAGE_SIZE, kReadOnly));
 
   // Attempt to protect a subrange in the middle of the region, which will require splitting
   // pages.
@@ -2195,14 +2175,14 @@ static bool arch_vm_aspace_protect_split_pages_out_of_memory() {
   ArchVmAspace aspace(0, USER_ASPACE_SIZE, 0, allocator);
   ASSERT_OK(aspace.Init());
   auto cleanup = fit::defer([&]() {
-    aspace.Unmap(0, USER_ASPACE_SIZE / PAGE_SIZE, ArchUnmapOptions::Enlarge, nullptr);
+    aspace.Unmap(0, USER_ASPACE_SIZE / PAGE_SIZE, ArchUnmapOptions::Enlarge);
     aspace.Destroy();
   });
 
   // Map in a large contiguous area, large enough to use large pages to fill.
   constexpr size_t kRegionSize = 16ul * 1024 * 1024 * 1024;  // 16 GiB.
-  ASSERT_OK(aspace.MapContiguous(/*vaddr=*/0, /*paddr=*/0, /*count=*/kRegionSize / PAGE_SIZE,
-                                 kReadOnly, nullptr));
+  ASSERT_OK(
+      aspace.MapContiguous(/*vaddr=*/0, /*paddr=*/0, /*count=*/kRegionSize / PAGE_SIZE, kReadOnly));
 
   // Prevent further allocations.
   allow_allocations = false;

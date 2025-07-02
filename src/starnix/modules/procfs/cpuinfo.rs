@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use fuchsia_component::client::connect_to_protocol_sync;
-use starnix_core::vfs::{DynamicFile, DynamicFileBuf, DynamicFileSource, FsNodeOps};
+use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::FsNodeOps;
 use starnix_logging::log_error;
 use starnix_uapi::errors::Errno;
 use std::sync::LazyLock;

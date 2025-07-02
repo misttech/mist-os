@@ -14,9 +14,13 @@
 //! extract out the capabilities that are routed to netstack-proxy that are not
 //! used by netstack itself.
 
-use fidl::endpoints::{DiscoverableProtocolMarker, Proxy as _};
+use fidl::endpoints::{DiscoverableProtocolMarker, Proxy as _, RequestStream as _};
+use futures::{FutureExt as _, StreamExt as _};
 use vfs::directory::helper::DirectlyMutable;
-use {fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_net_stackmigrationdeprecated as fnet_migration,
+    fidl_fuchsia_process_lifecycle as fprocess_lifecycle, fuchsia_async as fasync,
+};
 
 #[fasync::run_singlethreaded]
 pub async fn main() -> std::process::ExitCode {
@@ -68,6 +72,27 @@ pub async fn main() -> std::process::ExitCode {
         fdio::SpawnAction::add_namespace_entry(path.as_c_str(), handle)
     }));
 
+    const LIFECYCLE_HANDLE_INFO: fuchsia_runtime::HandleInfo =
+        fuchsia_runtime::HandleInfo::new(fuchsia_runtime::HandleType::Lifecycle, 0);
+    let process_lifecycle = fuchsia_runtime::take_startup_handle(LIFECYCLE_HANDLE_INFO)
+        .expect("missing lifecycle handle");
+
+    let inner_lifecycle_proxy = match current_boot_version {
+        // Netstack2 doesn't support clean shutdown.
+        fnet_migration::NetstackVersion::Netstack2 => None,
+        fnet_migration::NetstackVersion::Netstack3 => {
+            // Create a proxy lifecycle channel that we'll use to tell netstack3
+            // to stop.
+            let (proxy, server) =
+                fidl::endpoints::create_proxy::<fprocess_lifecycle::LifecycleMarker>();
+            actions.push(fdio::SpawnAction::add_handle(
+                LIFECYCLE_HANDLE_INFO,
+                server.into_channel().into(),
+            ));
+            Some(proxy)
+        }
+    };
+
     let svc = vfs::directory::immutable::simple::simple();
     for s in std::fs::read_dir("/svc").expect("failed to get /svc entries") {
         let entry = s.expect("failed to get directory entry");
@@ -106,7 +131,7 @@ pub async fn main() -> std::process::ExitCode {
         actions.push(fdio::SpawnAction::add_handle(config_vmo_handle_info, config_vmo))
     }
 
-    let proc = fdio::spawn_etc(
+    let netstack_process = fdio::spawn_etc(
         &fuchsia_runtime::job_default(),
         fdio::SpawnOptions::CLONE_ALL - fdio::SpawnOptions::CLONE_NAMESPACE,
         bin_path,
@@ -116,12 +141,60 @@ pub async fn main() -> std::process::ExitCode {
     )
     .expect("failed to spawn netstack");
 
-    let signals = fasync::OnSignals::new(&proc, zx::Signals::PROCESS_TERMINATED)
-        .await
-        .expect("failed to observe process termination signals");
-    println!("netstack exited unexpectedly with {signals:?}");
+    let mut process_lifecycle = fprocess_lifecycle::LifecycleRequestStream::from_channel(
+        fasync::Channel::from_channel(process_lifecycle.into()).into(),
+    )
+    .filter_map(|r| {
+        futures::future::ready(match r {
+            Ok(r) => Some(r),
+            Err(e) => {
+                eprintln!("process lifecycle FIDL error {e:?}");
+                None
+            }
+        })
+    });
 
-    // TODO(https://fxbug.dev/380897722) Inherit the exit code of the proxied netstack process once
-    // netstack supports clean shutdown.
-    std::process::ExitCode::FAILURE
+    let mut wait_signals =
+        fasync::OnSignals::new(&netstack_process, zx::Signals::PROCESS_TERMINATED)
+            .map(|s| s.expect("failed to observe process termination signals"));
+    let request = futures::select! {
+        signals = wait_signals => {
+            println!("netstack exited unexpectedly with {signals:?}");
+            return std::process::ExitCode::FAILURE;
+        },
+        // If the stream terminates just wait for netstack to go away.
+        r = process_lifecycle.select_next_some() => r,
+    };
+
+    let fprocess_lifecycle::LifecycleRequest::Stop { control_handle } = request;
+    // Must drop the control_handle to unwrap the
+    // lifecycle channel.
+    std::mem::drop(control_handle);
+    let (process_lifecycle, _terminated): (_, bool) = process_lifecycle.into_inner().into_inner();
+    let process_lifecycle = std::sync::Arc::try_unwrap(process_lifecycle)
+        .expect("failed to retrieve lifecycle channel");
+    let process_lifecycle: zx::Channel = process_lifecycle.into_channel().into_zx_channel();
+    if let Some(inner) = inner_lifecycle_proxy {
+        inner
+            .stop()
+            .unwrap_or_else(|e| eprintln!("failed to request stop for inner netstack: {e:?}"));
+        // Notify that we're done only on process exit.
+        std::mem::forget(process_lifecycle);
+    } else {
+        // We're not proxying any channels, let component framework take us down
+        // anytime.
+        std::mem::drop(process_lifecycle);
+    }
+
+    let signals = wait_signals.await;
+    assert!(signals.contains(zx::Signals::PROCESS_TERMINATED));
+    // Process is terminated, loosely mimic its exit code.
+    let zx::ProcessInfo { return_code, .. } =
+        netstack_process.info().expect("reading netstack process info");
+    println!("netstack process exited with return code {return_code}");
+    if return_code == 0 {
+        std::process::ExitCode::SUCCESS
+    } else {
+        std::process::ExitCode::FAILURE
+    }
 }

@@ -129,12 +129,7 @@ class Environment : public fdf_testing::Environment {
       return result.take_error();
     }
 
-    if (zx::result result = clock_ids_metadata_server_.SetMetadata({{.clock_ids{}}});
-        result.is_error()) {
-      return result.take_error();
-    }
-    if (zx::result result = clock_ids_metadata_server_.Serve(
-            to_driver_vfs, fdf::Dispatcher::GetCurrent()->async_dispatcher());
+    if (zx::result result = clock_ids_metadata_server_.Serve(to_driver_vfs, dispatcher);
         result.is_error()) {
       return result.take_error();
     }
@@ -142,8 +137,10 @@ class Environment : public fdf_testing::Environment {
     return zx::ok();
   }
 
-  void Init(const fuchsia_hardware_clockimpl::InitMetadata& clock_init_metadata) {
+  void Init(const fuchsia_hardware_clockimpl::InitMetadata& clock_init_metadata,
+            const fuchsia_hardware_clockimpl::ClockIdsMetadata& clock_ids_metadata) {
     ASSERT_OK(clock_init_metadata_server_.SetMetadata(clock_init_metadata));
+    ASSERT_OK(clock_ids_metadata_server_.SetMetadata(clock_ids_metadata));
   }
 
   FakeClockImpl& clock_impl() { return clock_impl_; }
@@ -167,10 +164,12 @@ class ClockTest : public ::testing::Test {
   void TearDown() override { ASSERT_OK(driver_test_.StopDriver()); }
 
  protected:
-  void StartDriver(const fuchsia_hardware_clockimpl::InitMetadata& metadata,
+  void StartDriver(const fuchsia_hardware_clockimpl::InitMetadata& clock_init_metadata,
+                   const fuchsia_hardware_clockimpl::ClockIdsMetadata clock_ids_metadata,
                    zx_status_t expected_start_driver_status = ZX_OK) {
-    driver_test_.RunInEnvironmentTypeContext(
-        [&](Environment& environment) mutable { environment.Init(metadata); });
+    driver_test_.RunInEnvironmentTypeContext([&](Environment& environment) mutable {
+      environment.Init(clock_init_metadata, clock_ids_metadata);
+    });
     ASSERT_EQ(driver_test_.StartDriver().status_value(), expected_start_driver_status);
   }
 
@@ -182,6 +181,8 @@ class ClockTest : public ::testing::Test {
     });
     return clocks;
   }
+
+  fdf_testing::BackgroundDriverTest<ClockTestConfig>& driver_test() { return driver_test_; }
 
  private:
   fdf_testing::BackgroundDriverTest<ClockTestConfig> driver_test_;
@@ -202,7 +203,7 @@ TEST_F(ClockTest, ConfigureClocks) {
                  {{.id = 2, .call = fuchsia_hardware_clockimpl::InitCall::WithInputIdx(1)}},
                  {{.id = 4, .call = fuchsia_hardware_clockimpl::InitCall::WithRateHz(100'000)}}}}};
 
-  StartDriver(metadata);
+  StartDriver(metadata, {});
 
   auto clocks = GetClocks();
   ASSERT_TRUE(clocks[3].enabled.has_value());
@@ -261,7 +262,71 @@ TEST_F(ClockTest, ConfigureClocksError) {
            {{.id = 4, .call = fuchsia_hardware_clockimpl::InitCall::WithRateHz(100'000)}},
        }}};
 
-  StartDriver(metadata, ZX_ERR_OUT_OF_RANGE);
+  StartDriver(metadata, {}, ZX_ERR_OUT_OF_RANGE);
+}
+
+TEST_F(ClockTest, HandleDuplicates) {
+  fuchsia_hardware_clockimpl::ClockIdsMetadata metadata{
+      {.clock_nodes = std::vector<fuchsia_hardware_clockimpl::ClockNodeDescriptor>{}}};
+
+  ASSERT_TRUE(metadata.clock_nodes().has_value());
+
+  metadata.clock_nodes()->emplace_back(
+      fuchsia_hardware_clockimpl::ClockNodeDescriptor{{.clock_id = 2, .node_id = 1}});
+  metadata.clock_nodes()->emplace_back(
+      fuchsia_hardware_clockimpl::ClockNodeDescriptor{{.clock_id = 1}});
+  metadata.clock_nodes()->emplace_back(
+      fuchsia_hardware_clockimpl::ClockNodeDescriptor{{.clock_id = 2, .node_id = 3}});
+
+  StartDriver({}, metadata);
+
+  // No suffix is added if this is the only instance.
+  zx::result clk1_client_end =
+      driver_test().Connect<fuchsia_hardware_clock::Service::Clock>("clock-1");
+  EXPECT_TRUE(clk1_client_end.is_ok());
+
+  // Suffixes added for duplicate entries.
+  zx::result clk2_0_client_end =
+      driver_test().Connect<fuchsia_hardware_clock::Service::Clock>("clock-2_1");
+  zx::result clk2_1_client_end =
+      driver_test().Connect<fuchsia_hardware_clock::Service::Clock>("clock-2_3");
+  EXPECT_TRUE(clk2_0_client_end.is_ok());
+  EXPECT_TRUE(clk2_1_client_end.is_ok());
+
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clk1_client;
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clk2_0_client;
+  fidl::WireSyncClient<fuchsia_hardware_clock::Clock> clk2_1_client;
+
+  clk1_client.Bind(std::move(clk1_client_end.value()));
+  clk2_0_client.Bind(std::move(clk2_0_client_end.value()));
+  clk2_1_client.Bind(std::move(clk2_1_client_end.value()));
+
+  {
+    auto result = clk1_client->SetRate(1000u);
+    ASSERT_TRUE(result.ok());
+  }
+
+  {
+    auto result = clk2_0_client->SetRate(1234u);
+    ASSERT_TRUE(result.ok());
+  }
+
+  driver_test().runtime().RunUntilIdle();
+
+  // Make sure that clk2_0_client and clk2_1_client refer to the same physical clock.
+  {
+    auto result = clk2_0_client->SetRate(4321u);
+    ASSERT_TRUE(result.ok());
+  }
+
+  driver_test().runtime().RunUntilIdle();
+
+  auto clocks = GetClocks();
+  ASSERT_TRUE(clocks[1].rate_hz.has_value());
+  EXPECT_EQ(clocks[1].rate_hz.value(), 1000u);
+
+  ASSERT_TRUE(clocks[2].rate_hz.has_value());
+  EXPECT_EQ(clocks[2].rate_hz.value(), 4321u);
 }
 
 }  // namespace

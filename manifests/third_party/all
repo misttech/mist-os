@@ -93,12 +93,12 @@
     <project name="third_party/crashpad"
              path="third_party/crashpad/src"
              remote="https://fuchsia.googlesource.com/third_party/crashpad"
-             revision="9f189adceb79ef9d23a5d1ca4d59d112d8b4caa8"
+             revision="4346c21cb1039b02803b852eec7c60d3963ada7c"
              gerrithost="https://fuchsia-review.googlesource.com"/>
     <project name="chromium/mini_chromium"
              path="third_party/mini_chromium/src"
              remote="https://chromium.googlesource.com/chromium/mini_chromium"
-             revision="361ef33dcdfb1f2495fe6e44b9887fb9ab1d46af"
+             revision="4e79cec054005026ef28a4c7c3a22ef31740b897"
              gerrithost="https://chromium-review.googlesource.com"/>
     <project name="third_party/google/double-conversion"
              path="third_party/double-conversion"
@@ -191,7 +191,7 @@
     <project name="third_party/go"
              remote="https://fuchsia.googlesource.com/third_party/go"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="f7d2e89741edde812c560a63aefd9091be1e7433"
+             revision="236b72c74af2fa468f20db99355d0ea2d57834ec"
              path="third_party/go"/>
     <project name="third_party/github.com/intel/intel-linux-processor-microcode-data-files"
              path="third_party/github.com/intel/intel-linux-processor-microcode-data-files"
@@ -211,7 +211,7 @@
     <project name="third_party/github.com/google/googletest"
              path="third_party/googletest/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/googletest"
-             revision="9756ee7cbaef1b6652065616ab832810a6032bbf"/>
+             revision="52eb8108c5bdec04579160ae17225d66034bd723"/>
     <project name="third_party/github.com/gperftools/gperftools"
              path="third_party/gperftools"
              remote="https://fuchsia.googlesource.com/third_party/github.com/gperftools/gperftools"
@@ -301,7 +301,7 @@
     <project name="llvm-project/libc"
              path="third_party/llvm-libc/src"
              remote="https://llvm.googlesource.com/llvm-project/libc"
-             revision="f6c3eba6dc958efeb455992153a34bfcbf8567fc"/>
+             revision="3b85232d2026daab41f8ba460e895430ed4c4368"/>
     <project name="third_party/luci-go"
              path="third_party/luci-go"
              revision="fd977bf9e01d199a529f28af6dc10fe0fa35d9e7"
@@ -341,12 +341,12 @@
              path="third_party/mobly/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/mobly"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="68e8ff7918e86beddf5390ecee4ef33f2c683841"/>
+             revision="5db27273e01b1e9b08caa46db0c5d648beaeeee6"/>
     <project name="third_party/github.com/google/snippet-uiautomator"
              path="third_party/snippet-uiautomator/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/snippet-uiautomator"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="9e1cffda574848fa0ab055c1ebb99f5ddd1b9818"/>
+             revision="b64a71f9cdfc6e110c2e26ff5bfe80ecda721992"/>
     <project name="third_party/jellyfish"
              path="third_party/jellyfish/jellyfish"
              remote="https://fuchsia.googlesource.com/third_party/github.com/jamesturk/jellyfish"
@@ -421,7 +421,7 @@
              path="third_party/pigweed/src"
              remote="https://fuchsia.googlesource.com/third_party/pigweed.googlesource.com/pigweed/pigweed"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="e3571f94a6cf1aee4b7b901efeb0f7894e8bdce9"/>
+             revision="899c24a93a7a0c411d374f3bd202489428df2036"/>
     <project name="third_party/github.com/google/python_portpicker"
              path="third_party/python_portpicker/src"
              remote="https://fuchsia.googlesource.com/third_party/github.com/google/python_portpicker"
@@ -533,7 +533,7 @@
              path="third_party/openthread"
              remote="https://fuchsia.googlesource.com/third_party/openthread"
              gerrithost="https://fuchsia-review.googlesource.com"
-             revision="083000835a307054c5d6b8b24ba5b54893fa1950"/>
+             revision="758b260f06fe2e48842db3fe832b9c181b1590b4"/>
     <project name="third_party/openweave-core"
              path="third_party/openweave-core"
              remote="https://fuchsia.googlesource.com/third_party/openweave-core"

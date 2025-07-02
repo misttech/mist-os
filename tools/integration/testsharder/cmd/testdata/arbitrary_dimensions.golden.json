@@ -41,6 +41,15 @@
         "summary": {
             "tests": null
         },
+        "bot_dimensions": {
+            "cores": "8",
+            "cpu": "x64",
+            "gce": "1",
+            "kvm": "1",
+            "os": "Linux",
+            "other_dimension": "bar",
+            "pool": "other.pool"
+        },
         "build_metadata": {}
     },
     {
@@ -84,6 +93,15 @@
         "timeout_secs": 0,
         "summary": {
             "tests": null
+        },
+        "bot_dimensions": {
+            "cores": "8",
+            "cpu": "x64",
+            "gce": "1",
+            "kvm": "1",
+            "os": "Linux",
+            "other_dimension": "foo",
+            "pool": "other.pool"
         },
         "build_metadata": {}
     }

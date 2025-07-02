@@ -13,7 +13,7 @@ group("tests") {
 test("device_controller_fidl") {
   sources = [ "test.cc" ]
   deps = [
-    "//examples/drivers/driver_test_realm/sample-driver:fuchsia.hardware.sample_cpp",
+    "//examples/drivers/driver_test_realm/sample_driver:fuchsia.hardware.sample_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_hlcpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_hlcpp",
@@ -33,7 +33,7 @@ fuchsia_unittest_package("package") {
   package_name = "device_controller_fidl"
   deps = [
     ":device_controller_fidl",
-    "//examples/drivers/driver_test_realm/sample-driver",
+    "//examples/drivers/driver_test_realm/sample_driver",
     "//src/devices/misc/drivers/test-parent",
   ]
 }

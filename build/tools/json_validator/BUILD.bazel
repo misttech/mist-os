@@ -1,0 +1,20 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+load("@rules_rust//rust:defs.bzl", "rust_binary")
+
+rust_binary(
+    name = "json_validator_valico",
+    srcs = ["src/main.rs"],
+    edition = "2021",
+    rustc_flags = [
+        "-Cpanic=abort",
+    ],
+    deps = [
+        "//third_party/rust_crates/vendor:argh",
+        "//third_party/rust_crates/vendor:serde_json",
+        "//third_party/rust_crates/vendor:serde_json5",
+        "//third_party/rust_crates/vendor:valico",
+    ],
+)

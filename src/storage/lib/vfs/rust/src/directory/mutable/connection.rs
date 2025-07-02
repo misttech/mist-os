@@ -395,16 +395,6 @@ mod tests {
     }
 
     impl Directory for MockDirectory {
-        fn deprecated_open(
-            self: Arc<Self>,
-            _scope: ExecutionScope,
-            _flags: fio::OpenFlags,
-            _path: Path,
-            _server_end: ServerEnd<fio::NodeMarker>,
-        ) {
-            unimplemented!("Not implemented!");
-        }
-
         fn open(
             self: Arc<Self>,
             _scope: ExecutionScope,
@@ -515,7 +505,7 @@ mod tests {
 
         pub fn make_connection(
             self: &Arc<Self>,
-            flags: fio::OpenFlags,
+            flags: fio::Flags,
         ) -> (Arc<MockDirectory>, fio::DirectoryProxy) {
             let mut cur_id = self.cur_id.lock();
             let dir = MockDirectory::new(*cur_id, self.clone());
@@ -543,12 +533,8 @@ mod tests {
         let events = Events::new();
         let fs = Arc::new(MockFilesystem::new(&events));
 
-        let (_dir, proxy) = fs
-            .clone()
-            .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
-        let (dir2, proxy2) = fs
-            .clone()
-            .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+        let (_dir, proxy) = fs.clone().make_connection(fio::PERM_READABLE | fio::PERM_WRITABLE);
+        let (dir2, proxy2) = fs.clone().make_connection(fio::PERM_READABLE | fio::PERM_WRITABLE);
 
         let (status, token) = proxy2.get_token().await.unwrap();
         assert_eq!(Status::from_raw(status), Status::OK);
@@ -572,9 +558,7 @@ mod tests {
     async fn test_update_attributes() {
         let events = Events::new();
         let fs = Arc::new(MockFilesystem::new(&events));
-        let (_dir, proxy) = fs
-            .clone()
-            .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+        let (_dir, proxy) = fs.clone().make_connection(fio::PERM_READABLE | fio::PERM_WRITABLE);
         let attributes = fio::MutableNodeAttributes {
             creation_time: Some(30),
             modification_time: Some(100),
@@ -596,12 +580,8 @@ mod tests {
     async fn test_link() {
         let events = Events::new();
         let fs = Arc::new(MockFilesystem::new(&events));
-        let (_dir, proxy) = fs
-            .clone()
-            .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
-        let (_dir2, proxy2) = fs
-            .clone()
-            .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+        let (_dir, proxy) = fs.clone().make_connection(fio::PERM_READABLE | fio::PERM_WRITABLE);
+        let (_dir2, proxy2) = fs.clone().make_connection(fio::PERM_READABLE | fio::PERM_WRITABLE);
 
         let (status, token) = proxy2.get_token().await.unwrap();
         assert_eq!(Status::from_raw(status), Status::OK);
@@ -616,9 +596,7 @@ mod tests {
     async fn test_unlink() {
         let events = Events::new();
         let fs = Arc::new(MockFilesystem::new(&events));
-        let (_dir, proxy) = fs
-            .clone()
-            .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+        let (_dir, proxy) = fs.clone().make_connection(fio::PERM_READABLE | fio::PERM_WRITABLE);
         proxy
             .unlink("test", &fio::UnlinkOptions::default())
             .await
@@ -635,9 +613,7 @@ mod tests {
     async fn test_sync() {
         let events = Events::new();
         let fs = Arc::new(MockFilesystem::new(&events));
-        let (_dir, proxy) = fs
-            .clone()
-            .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+        let (_dir, proxy) = fs.clone().make_connection(fio::PERM_READABLE | fio::PERM_WRITABLE);
         let () = proxy.sync().await.unwrap().map_err(Status::from_raw).unwrap();
         let events = events.0.lock();
         assert_eq!(*events, vec![MutableDirectoryAction::Sync]);
@@ -647,9 +623,7 @@ mod tests {
     async fn test_close() {
         let events = Events::new();
         let fs = Arc::new(MockFilesystem::new(&events));
-        let (_dir, proxy) = fs
-            .clone()
-            .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+        let (_dir, proxy) = fs.clone().make_connection(fio::PERM_READABLE | fio::PERM_WRITABLE);
         let () = proxy.close().await.unwrap().map_err(Status::from_raw).unwrap();
         let events = events.0.lock();
         assert_eq!(*events, vec![MutableDirectoryAction::Close]);
@@ -659,9 +633,7 @@ mod tests {
     async fn test_implicit_close() {
         let events = Events::new();
         let fs = Arc::new(MockFilesystem::new(&events));
-        let (_dir, _proxy) = fs
-            .clone()
-            .make_connection(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+        let (_dir, _proxy) = fs.clone().make_connection(fio::PERM_READABLE | fio::PERM_WRITABLE);
 
         fs.scope.shutdown();
         fs.scope.wait().await;

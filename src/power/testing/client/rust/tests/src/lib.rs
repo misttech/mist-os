@@ -20,7 +20,7 @@ async fn test_connect_and_call_all_protocols() -> Result<()> {
 
     let realm = realm_builder.build().await?;
 
-    let topology = realm.root.connect_to_protocol_at_exposed_dir::<fbroker::TopologyMarker>()?;
+    let topology: fbroker::TopologyProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
     let (_current_level, current_level_server_end) = create_proxy::<fbroker::CurrentLevelMarker>();
     let (_required_level, required_level_server_end) =
         create_proxy::<fbroker::RequiredLevelMarker>();
@@ -44,17 +44,17 @@ async fn test_connect_and_call_all_protocols() -> Result<()> {
         .unwrap()
         .unwrap();
 
-    let governor =
-        realm.root.connect_to_protocol_at_exposed_dir::<fsystem::ActivityGovernorMarker>()?;
+    let governor: fsystem::ActivityGovernorProxy =
+        realm.root.connect_to_protocol_at_exposed_dir()?;
     let _ = governor.get_power_elements().await?;
 
-    let stats = realm.root.connect_to_protocol_at_exposed_dir::<fsuspend::StatsMarker>()?;
+    let stats: fsuspend::StatsProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
     let _ = stats.watch().await?;
 
-    let sag_state = realm.root.connect_to_protocol_at_exposed_dir::<ftsagcontrol::StateMarker>()?;
+    let sag_state: ftsagcontrol::StateProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
     let _ = sag_state.get().await?;
 
-    let suspend_control = realm.root.connect_to_protocol_at_exposed_dir::<tsc::DeviceMarker>()?;
+    let suspend_control: tsc::DeviceProxy = realm.root.connect_to_protocol_at_exposed_dir()?;
     suspend_control
         .set_suspend_states(&tsc::DeviceSetSuspendStatesRequest {
             suspend_states: Some(vec![fhsuspend::SuspendState {

@@ -4,6 +4,10 @@
 
 """Defines a WORKSPACE rule for loading a version of the Fuchsia IDK."""
 
+load(
+    "//fuchsia/workspace:register_fuchsia_sdk_toolchain.bzl",
+    "fuchsia_toolchain_decl",
+)
 load("//fuchsia/workspace:utils.bzl", "symlink_or_copy", "workspace_path")
 load(
     "//fuchsia/workspace/sdk_templates:generate_sdk_build_rules.bzl",
@@ -235,6 +239,9 @@ Loads a particular version of the Fuchsia IDK.
 
 def _fuchsia_sdk_repository_ext(ctx):
     local_paths = None
+    local_sdk_version_file = None
+    buildifier = None
+    visibility_templates = None
 
     for mod in ctx.modules:
         # only the root module can set tags, and only one
@@ -245,9 +252,37 @@ def _fuchsia_sdk_repository_ext(ctx):
                 if p.path:
                     local_paths.append(p.path)
 
+                if local_sdk_version_file and p.local_sdk_version_file:
+                    fail("local_sdk_version_file set multiple times, got:\n{}\n{}".format(
+                        local_sdk_version_file,
+                        p.local_sdk_version_file,
+                    ))
+                local_sdk_version_file = p.local_sdk_version_file
+
+                if buildifier and p.buildifier:
+                    fail("buildifier set multiple times, got:\n{}\n{}".format(
+                        buildifier,
+                        p.buildifier,
+                    ))
+                buildifier = p.buildifier
+
+                if visibility_templates and p.visibility_templates:
+                    fail("visibility_templates set multiple times, got:\n{}\n{}".format(
+                        visibility_templates,
+                        p.visibility_templates,
+                    ))
+
     fuchsia_sdk_repository(
         name = "fuchsia_sdk",
         local_paths = local_paths,
+        local_sdk_version_file = local_sdk_version_file,
+        buildifier = buildifier,
+        visibility_templates = visibility_templates,
+    )
+
+    fuchsia_toolchain_decl(
+        name = "fuchsia_sdk_toolchain_decl",
+        toolchain_path = "@fuchsia_sdk//:fuchsia_toolchain_info",
     )
 
 # A tag used to specify a local Fuchsia SDK repository.
@@ -256,6 +291,17 @@ _local_tag = tag_class(
         "path": attr.string(
             doc = "Path to local SDK directory, relative to the workspace root",
             mandatory = True,
+        ),
+        "local_sdk_version_file": attr.label(
+            doc = "An optional file used to mark the version of the SDK pointed to by local_paths.",
+            allow_single_file = True,
+        ),
+        "buildifier": attr.label(
+            doc = "An optional label to the buildifier tool, used to reformat all generated Bazel files.",
+            allow_single_file = True,
+        ),
+        "visibility_templates": attr.string_list_dict(
+            doc = "Allows for the addition of additional visibility lists. See details in fuchsia_sdk_repository.",
         ),
     },
 )

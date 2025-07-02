@@ -155,8 +155,9 @@ class PythonHandle : public PythonObject {
   }
 
   ~PythonHandle() override {
-    if (handle_) {
+    if (handle() != 0) {
       ffx_close_handle(handle_);
+      handle_ = 0;
     }
   }
 
@@ -192,7 +193,7 @@ class PythonChannel : public PythonObject {
   }
 
   ~PythonChannel() {
-    if (channel_) {
+    if (handle() != 0) {
       ffx_close_handle(channel_);
       channel_ = 0;
     }

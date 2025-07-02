@@ -8,7 +8,7 @@ use ffx_core::ffx_command;
 
 /// Create a Product Bundle using the outputs of Product Assembly.
 #[ffx_command()]
-#[derive(ArgsInfo, FromArgs, Debug, PartialEq)]
+#[derive(Clone, ArgsInfo, FromArgs, Debug, PartialEq)]
 #[argh(subcommand, name = "create")]
 pub struct CreateCommand {
     /// product.board label. e.g. "workstation_eng.x64".
@@ -21,7 +21,7 @@ pub struct CreateCommand {
 
     /// path to a partitions config, which lists the physical partitions of the target.
     #[argh(option)]
-    pub partitions: Utf8PathBuf,
+    pub partitions: Option<Utf8PathBuf>,
 
     /// path to an assembly manifest, which specifies images to put in slot A.
     #[argh(option)]

@@ -12,7 +12,7 @@
 class MsdVirtioDriver : public msd::Driver {
  public:
   // msd::Driver implementation.
-  std::unique_ptr<msd::Device> CreateDevice(msd::DeviceHandle* device_handle) override;
+  std::unique_ptr<msd::Device> MsdCreateDevice(msd::DeviceHandle* device_handle) override;
 };
 
 #endif  // MSD_VIRTIO_DRIVER_H

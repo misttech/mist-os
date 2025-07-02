@@ -1731,14 +1731,14 @@ pub(crate) mod tests {
 
     #[test]
     fn pairing_manager_inspect_tree() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(5_000_000_000));
         let inspect = inspect::Inspector::default();
         let mut pairing_inspect =
             PairingManagerInspect::default().with_inspect(inspect.root(), "pairing").unwrap();
 
         // Default tree
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             pairing: {
                 owner: "",
                 finished_procedures: {}
@@ -1750,7 +1750,7 @@ pub(crate) mod tests {
         let example_procedure_node = pairing_inspect.record_new_procedure(id, "procedure_1");
         example_procedure_node.bredr_id.set("123");
         example_procedure_node.state.set("AccountKeyWritten");
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             pairing: {
                 owner: "Upstream",
                 finished_procedures: {},
@@ -1765,7 +1765,7 @@ pub(crate) mod tests {
         // Procedure finishes some time later.
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(10_000_000_000));
         pairing_inspect.record_finished_procedure(id, fasync::MonotonicInstant::now());
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             pairing: {
                 owner: "Upstream",
                 finished_procedures: {
@@ -1782,7 +1782,7 @@ pub(crate) mod tests {
         });
 
         pairing_inspect.set_owner(&PairingDelegateOwner::FastPair);
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             pairing: {
                 owner: "FastPair",
                 finished_procedures: {

@@ -32,12 +32,10 @@ bool arm64_test_perms() {
 
   auto map_query_test = [&](uint mmu_perms) -> bool {
     paddr_t pa = 0;
-    size_t count;
     vm_page_t* vm_page;
     pmm_alloc_page(/*alloc_flags=*/0, &vm_page, &pa);
     EXPECT_EQ(ZX_OK, aspace.Map(kTestVirtualAddress, &pa, 1, mmu_perms,
-                                ArchVmAspaceInterface::ExistingEntryAction::Error, &count));
-    EXPECT_EQ(1u, count);
+                                ArchVmAspaceInterface::ExistingEntryAction::Error));
 
     paddr_t query_pa;
     uint query_flags;
@@ -48,8 +46,7 @@ bool arm64_test_perms() {
     // FUTURE ENHANCEMENT: use a private api to read the terminal page table entry
     // and validate the bits that were set.
 
-    EXPECT_EQ(ZX_OK, aspace.Unmap(kTestVirtualAddress, 1, ArchUnmapOptions::None, &count));
-    EXPECT_EQ(1u, count);
+    EXPECT_EQ(ZX_OK, aspace.Unmap(kTestVirtualAddress, 1, ArchUnmapOptions::None));
 
     return all_ok;
   };

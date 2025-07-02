@@ -11,15 +11,17 @@ use starnix_core::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQu
 use starnix_core::vfs::buffers::{
     Buffer, InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback,
 };
+use starnix_core::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use starnix_core::vfs::pseudo::simple_file::SimpleFileNode;
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
 use starnix_core::vfs::{
     default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
     fileops_impl_noop_sync, fs_args, fs_node_impl_dir_readonly, AppendLockGuard, CacheConfig,
     CacheMode, CheckAccessReason, DirEntry, DirEntryOps, DirectoryEntryType, DirentSink,
-    DynamicFile, DynamicFileBuf, DynamicFileSource, FallocMode, FdNumber, FileObject, FileOps,
-    FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, PeekBufferSegmentsCallback, SeekTarget, SimpleFileNode,
-    StaticDirectoryBuilder, SymlinkTarget, ValueOrSize, VecDirectory, VecDirectoryEntry,
-    WeakFileHandle, XattrOp,
+    FallocMode, FdNumber, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
+    FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    PeekBufferSegmentsCallback, SeekTarget, SymlinkTarget, ValueOrSize, WeakFileHandle, XattrOp,
 };
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
@@ -37,7 +39,9 @@ use starnix_uapi::file_mode::{Access, FileMode};
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
-use starnix_uapi::{errno, errno_from_code, error, mode, off_t, statfs, uapi, FUSE_SUPER_MAGIC};
+use starnix_uapi::{
+    errno, errno_from_code, error, ino_t, mode, off_t, statfs, uapi, FUSE_SUPER_MAGIC,
+};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::ops::{Deref, DerefMut};
@@ -92,7 +96,7 @@ struct DevFuse {
 }
 
 pub fn open_fuse_device(
-    _locked: &mut Locked<'_, DeviceOpen>,
+    _locked: &mut Locked<DeviceOpen>,
     current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -118,7 +122,7 @@ impl FileOps for DevFuse {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) {
@@ -127,7 +131,7 @@ impl FileOps for DevFuse {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -141,7 +145,7 @@ impl FileOps for DevFuse {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -153,7 +157,7 @@ impl FileOps for DevFuse {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -165,7 +169,7 @@ impl FileOps for DevFuse {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -174,7 +178,7 @@ impl FileOps for DevFuse {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -205,7 +209,7 @@ impl FileOps for DevFuse {
 }
 
 pub fn new_fuse_fs(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -230,9 +234,8 @@ pub fn new_fuse_fs(
     let fuse_node = FuseNode::new(connection.clone(), FUSE_ROOT_ID_U64, 0);
     fuse_node.state.lock().nlookup += 1;
 
-    let mut root_node = FsNode::new_root(fuse_node);
-    root_node.node_id = FUSE_ROOT_ID_U64;
-    fs.set_root_node(root_node);
+    fs.create_root(FUSE_ROOT_ID_U64, fuse_node);
+
     {
         let mut state = connection.lock();
         state.connect();
@@ -251,15 +254,19 @@ fn fuse_connections(kernel: &Arc<Kernel>) -> Arc<FuseConnections> {
 }
 
 pub fn new_fusectl_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
     let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FuseCtlFs, options)?;
-    let root_node = FsNode::new_root_with_properties(FuseCtlConnectionsDirectory {}, |info| {
-        info.chmod(mode!(IFDIR, 0o755));
-    });
-    fs.set_root_node(root_node);
+
+    let root_ino = fs.allocate_ino();
+    fs.create_root_with_info(
+        root_ino,
+        FuseCtlConnectionsDirectory {},
+        FsNodeInfo::new(mode!(IFDIR, 0o755), FsCred::root()),
+    );
+
     Ok(fs)
 }
 
@@ -283,7 +290,7 @@ impl FuseFs {
 impl FileSystemOps for FuseFs {
     fn rename(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         current_task: &CurrentTask,
         old_parent: &FsNodeHandle,
@@ -299,20 +306,20 @@ impl FileSystemOps for FuseFs {
             FuseNode::from_node(&old_parent),
             FuseOperation::Rename {
                 old_name: old_name.to_owned(),
-                new_dir: new_parent.node_id,
+                new_dir: new_parent.node_key(),
                 new_name: new_name.to_owned(),
             },
         )?;
         Ok(())
     }
 
-    fn generate_node_ids(&self) -> bool {
+    fn uses_external_node_ids(&self) -> bool {
         true
     }
 
     fn statfs(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         fs: &FileSystem,
         current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -323,9 +330,7 @@ impl FileSystemOps for FuseFs {
             &node,
             FuseOperation::Statfs,
         )?;
-        let statfs_out = if let FuseResponse::Statfs(statfs_out) = response {
-            statfs_out
-        } else {
+        let FuseResponse::Statfs(statfs_out) = response else {
             return error!(EINVAL);
         };
         Ok(statfs {
@@ -386,7 +391,7 @@ struct FuseCtlFs;
 impl FileSystemOps for FuseCtlFs {
     fn rename(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
         _old_parent: &FsNodeHandle,
@@ -401,7 +406,7 @@ impl FileSystemOps for FuseCtlFs {
 
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -423,7 +428,7 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -442,7 +447,7 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -465,22 +470,20 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
         dir.dir_creds(connection.creds);
         dir.node(
             "abort",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 AbortFile::new_node(connection.clone()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o200), connection.creds),
+                FsNodeInfo::new(mode!(IFREG, 0o200), connection.creds),
             ),
         );
         dir.node(
             "waiting",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 WaitingFile::new_node(connection.clone()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o400), connection.creds),
+                FsNodeInfo::new(mode!(IFREG, 0o400), connection.creds),
             ),
         );
 
-        Ok(dir.build(current_task))
+        Ok(dir.build())
     }
 }
 
@@ -501,7 +504,7 @@ impl FileOps for AbortFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -512,7 +515,7 @@ impl FileOps for AbortFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -557,7 +560,15 @@ struct FuseNodeMutableState {
 #[derive(Debug)]
 struct FuseNode {
     connection: Arc<FuseConnection>,
+
+    /// A unique identifier for this node.
+    ///
+    /// This value might not be the same as the inode number ([`FsNodeInfo::ino`]).
+    ///
+    /// See <https://libfuse.github.io/doxygen/structfuse__operations.html#ac39a0b7125a0e5001eb5ff42e05faa5d>
+    /// for more information.
     nodeid: u64,
+
     generation: u64,
     attributes_valid_until: AtomicMonotonicInstant,
     state: Mutex<FuseNodeMutableState>,
@@ -585,7 +596,7 @@ impl FuseNode {
 
     fn default_check_access_with_valid_node_attributes(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         access: Access,
@@ -598,7 +609,7 @@ impl FuseNode {
 
     fn refresh_expired_node_attributes<'a>(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
@@ -632,7 +643,7 @@ impl FuseNode {
 
     fn fetch_and_refresh_info_impl<'a>(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
@@ -658,13 +669,16 @@ impl FuseNode {
         Ok(RwLockWriteGuard::downgrade(info))
     }
 
+    fn invalidate_attributes(&self) {
+        self.attributes_valid_until.store(zx::MonotonicInstant::INFINITE_PAST, Ordering::Relaxed);
+    }
+
     fn update_node_info_from_attr(
         info: &mut FsNodeInfo,
         attributes: uapi::fuse_attr,
         attr_valid_duration: zx::MonotonicDuration,
         node_attributes_valid_until: &AtomicMonotonicInstant,
     ) -> Result<(), Errno> {
-        info.ino = attributes.ino as uapi::ino_t;
         info.mode = FileMode::from_bits(attributes.mode);
         info.size = attributes.size.try_into().map_err(|_| errno!(EINVAL))?;
         info.blocks = attributes.blocks.try_into().map_err(|_| errno!(EINVAL))?;
@@ -694,7 +708,6 @@ impl FuseNode {
     /// Build a FsNodeHandle from a FuseResponse that is expected to be a FuseResponse::Entry.
     fn fs_node_from_entry(
         &self,
-        current_task: &CurrentTask,
         node: &FsNode,
         name: &FsStr,
         entry: &uapi::fuse_entry_out,
@@ -703,12 +716,12 @@ impl FuseNode {
             return error!(ENOENT);
         }
         let node = node.fs().get_and_validate_or_create_node(
-            Some(entry.nodeid),
+            entry.nodeid,
             |node| {
                 let fuse_node = FuseNode::from_node(&node);
                 fuse_node.generation == entry.generation
             },
-            |id| {
+            || {
                 let fuse_node =
                     FuseNode::new(self.connection.clone(), entry.nodeid, entry.generation);
                 let mut info = FsNodeInfo::default();
@@ -718,7 +731,7 @@ impl FuseNode {
                     attr_valid_to_duration(entry.attr_valid, entry.attr_valid_nsec)?,
                     &fuse_node.attributes_valid_until,
                 )?;
-                Ok(FsNode::new_uncached(current_task, fuse_node, &node.fs(), id, info))
+                Ok(FsNode::new_uncached(entry.attr.ino, fuse_node, &node.fs(), info))
             },
         )?;
         // . and .. do not get their lookup count increased.
@@ -748,7 +761,7 @@ impl FuseFileObject {
 impl FileOps for FuseFileObject {
     fn close(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) {
@@ -774,7 +787,7 @@ impl FileOps for FuseFileObject {
 
     fn flush(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) {
@@ -795,7 +808,7 @@ impl FileOps for FuseFileObject {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -822,9 +835,7 @@ impl FileOps for FuseFileObject {
                 padding: 0,
             }),
         )?;
-        let read_out = if let FuseResponse::Read(read_out) = response {
-            read_out
-        } else {
+        let FuseResponse::Read(read_out) = response else {
             return error!(EINVAL);
         };
         data.write(&read_out)
@@ -832,7 +843,7 @@ impl FileOps for FuseFileObject {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -863,11 +874,10 @@ impl FileOps for FuseFileObject {
                 content,
             },
         )?;
-        let write_out = if let FuseResponse::Write(write_out) = response {
-            write_out
-        } else {
+        let FuseResponse::Write(write_out) = response else {
             return error!(EINVAL);
         };
+        node.invalidate_attributes();
 
         let written = write_out.size as usize;
 
@@ -877,7 +887,7 @@ impl FileOps for FuseFileObject {
 
     fn seek(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         current_offset: off_t,
@@ -899,9 +909,7 @@ impl FileOps for FuseFileObject {
             );
             match response {
                 Ok(response) => {
-                    let seek_out = if let FuseResponse::Seek(seek_out) = response {
-                        seek_out
-                    } else {
+                    let FuseResponse::Seek(seek_out) = response else {
                         return error!(EINVAL);
                     };
                     return seek_out.offset.try_into().map_err(|_| errno!(EINVAL));
@@ -913,10 +921,7 @@ impl FileOps for FuseFileObject {
             };
         }
 
-        default_seek(current_offset, target, |offset| {
-            let eof_offset = default_eof_offset(locked, file, current_task)?;
-            offset.checked_add(eof_offset).ok_or_else(|| errno!(EINVAL))
-        })
+        default_seek(current_offset, target, || default_eof_offset(locked, file, current_task))
     }
 
     fn sync(&self, _file: &FileObject, _current_task: &CurrentTask) -> Result<(), Errno> {
@@ -926,7 +931,7 @@ impl FileOps for FuseFileObject {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _waiter: &Waiter,
@@ -938,7 +943,7 @@ impl FileOps for FuseFileObject {
 
     fn query_events(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -954,9 +959,7 @@ impl FileOps for FuseFileObject {
                 events: FdEvents::all().bits(),
             }),
         )?;
-        let poll_out = if let FuseResponse::Poll(poll_out) = response {
-            poll_out
-        } else {
+        let FuseResponse::Poll(poll_out) = response else {
             return error!(EINVAL);
         };
         FdEvents::from_bits(poll_out.revents).ok_or_else(|| errno!(EINVAL))
@@ -964,7 +967,7 @@ impl FileOps for FuseFileObject {
 
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -1013,9 +1016,7 @@ impl FileOps for FuseFileObject {
             },
         )?;
         std::mem::drop(state);
-        let dirents = if let FuseResponse::Readdir(dirents) = response {
-            dirents
-        } else {
+        let FuseResponse::Readdir(dirents) = response else {
             return error!(EINVAL);
         };
         let mut sink_result = Ok(());
@@ -1023,9 +1024,7 @@ impl FileOps for FuseFileObject {
             if let Some(entry) = entry {
                 // nodeid == 0 means the server doesn't want to send entry info.
                 if entry.nodeid != 0 {
-                    if let Err(e) =
-                        node.fs_node_from_entry(current_task, file.node(), name.as_ref(), &entry)
-                    {
+                    if let Err(e) = node.fs_node_from_entry(file.node(), name.as_ref(), &entry) {
                         log_error!("Unable to prefill entry: {e:?}");
                     }
                 }
@@ -1046,7 +1045,7 @@ impl FileOps for FuseFileObject {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -1081,7 +1080,7 @@ impl Default for FuseDirEntry {
 impl DirEntryOps for FuseDirEntry {
     fn revalidate(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         dir_entry: &DirEntry,
     ) -> Result<bool, Errno> {
@@ -1166,7 +1165,7 @@ const DEFAULT_PERMISSIONS_ATOMIC_ORDERING: Ordering = Ordering::Relaxed;
 impl FsNodeOps for FuseNode {
     fn check_access(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         access: Access,
@@ -1223,7 +1222,7 @@ impl FsNodeOps for FuseNode {
 
     fn create_file_ops(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         flags: OpenFlags,
@@ -1237,14 +1236,15 @@ impl FsNodeOps for FuseNode {
             self,
             FuseOperation::Open { flags, mode },
         )?;
-        let open_out = if let FuseResponse::Open(open_out) = response {
-            open_out
-        } else {
+        let FuseResponse::Open(open_out) = response else {
             return error!(EINVAL);
         };
-        let passthrough_file = if open_out.passthrough_fh != 0 {
+        // SAFETY: The data has been read with zerocopy which ensures every bits have been
+        // initialized.
+        let passthrough_fh = unsafe { open_out.__bindgen_anon_1.passthrough_fh };
+        let passthrough_file = if passthrough_fh != 0 {
             let mut connection = self.connection.lock();
-            let entry = connection.registered_passthrough.entry(open_out.passthrough_fh);
+            let entry = connection.registered_passthrough.entry(passthrough_fh);
             match entry {
                 Entry::Occupied(v) => v.remove(),
                 Entry::Vacant(_) => Default::default(),
@@ -1261,7 +1261,7 @@ impl FsNodeOps for FuseNode {
 
     fn lookup(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1272,17 +1272,12 @@ impl FsNodeOps for FuseNode {
             self,
             FuseOperation::Lookup { name: name.to_owned() },
         )?;
-        self.fs_node_from_entry(
-            current_task,
-            node,
-            name,
-            response.entry().ok_or_else(|| errno!(EINVAL))?,
-        )
+        self.fs_node_from_entry(node, name, response.entry().ok_or_else(|| errno!(EINVAL))?)
     }
 
     fn mknod(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1290,7 +1285,7 @@ impl FsNodeOps for FuseNode {
         dev: DeviceType,
         _owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
-        let get_entry = |locked: &mut Locked<'_, FileOpsCore>| {
+        let get_entry = |locked: &mut Locked<FileOpsCore>| {
             let umask = current_task.fs().umask().bits();
             let mut connection = self.connection.lock();
 
@@ -1365,12 +1360,12 @@ impl FsNodeOps for FuseNode {
         };
 
         let entry = get_entry(locked)?;
-        self.fs_node_from_entry(current_task, node, name, &entry)
+        self.fs_node_from_entry(node, name, &entry)
     }
 
     fn mkdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1389,17 +1384,12 @@ impl FsNodeOps for FuseNode {
                 name: name.to_owned(),
             },
         )?;
-        self.fs_node_from_entry(
-            current_task,
-            node,
-            name,
-            response.entry().ok_or_else(|| errno!(EINVAL))?,
-        )
+        self.fs_node_from_entry(node, name, response.entry().ok_or_else(|| errno!(EINVAL))?)
     }
 
     fn create_symlink(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1412,17 +1402,12 @@ impl FsNodeOps for FuseNode {
             self,
             FuseOperation::Symlink { target: target.to_owned(), name: name.to_owned() },
         )?;
-        self.fs_node_from_entry(
-            current_task,
-            node,
-            name,
-            response.entry().ok_or_else(|| errno!(EINVAL))?,
-        )
+        self.fs_node_from_entry(node, name, response.entry().ok_or_else(|| errno!(EINVAL))?)
     }
 
     fn readlink(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
@@ -1432,9 +1417,7 @@ impl FsNodeOps for FuseNode {
             self,
             FuseOperation::Readlink,
         )?;
-        let read_out = if let FuseResponse::Read(read_out) = response {
-            read_out
-        } else {
+        let FuseResponse::Read(read_out) = response else {
             return error!(EINVAL);
         };
         Ok(SymlinkTarget::Path(read_out.into()))
@@ -1442,7 +1425,7 @@ impl FsNodeOps for FuseNode {
 
     fn link(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1465,7 +1448,7 @@ impl FsNodeOps for FuseNode {
 
     fn unlink(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1489,7 +1472,7 @@ impl FsNodeOps for FuseNode {
 
     fn truncate(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         node: &FsNode,
         current_task: &CurrentTask,
@@ -1527,7 +1510,7 @@ impl FsNodeOps for FuseNode {
 
     fn allocate(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _guard: &AppendLockGuard<'_>,
         _node: &FsNode,
         _current_task: &CurrentTask,
@@ -1541,7 +1524,7 @@ impl FsNodeOps for FuseNode {
 
     fn fetch_and_refresh_info<'a>(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -1554,7 +1537,7 @@ impl FsNodeOps for FuseNode {
 
     fn update_attributes(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         info: &FsNodeInfo,
         has: zxio_node_attr_has_t,
@@ -1606,7 +1589,7 @@ impl FsNodeOps for FuseNode {
 
     fn get_xattr(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1633,7 +1616,7 @@ impl FsNodeOps for FuseNode {
 
     fn set_xattr(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1663,7 +1646,7 @@ impl FsNodeOps for FuseNode {
 
     fn remove_xattr(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -1679,7 +1662,7 @@ impl FsNodeOps for FuseNode {
 
     fn list_xattrs(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         current_task: &CurrentTask,
         max_size: usize,
@@ -1708,7 +1691,7 @@ impl FsNodeOps for FuseNode {
 
     fn forget(
         self: Box<Self>,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         _info: FsNodeInfo,
     ) -> Result<(), Errno> {
@@ -1726,6 +1709,10 @@ impl FsNodeOps for FuseNode {
             )?;
         };
         Ok(())
+    }
+
+    fn node_key(&self, _node: &FsNode) -> ino_t {
+        self.nodeid
     }
 }
 
@@ -1838,7 +1825,7 @@ struct FuseMutableState {
 impl<'a> FuseMutableStateGuard<'a> {
     fn wait_for_configuration<L, T>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         f: impl Fn(&FuseConfiguration) -> T,
     ) -> Result<T, Errno>
@@ -1865,7 +1852,7 @@ impl<'a> FuseMutableStateGuard<'a> {
 
     fn get_configuration<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<FuseConfiguration, Errno>
     where
@@ -1876,7 +1863,7 @@ impl<'a> FuseMutableStateGuard<'a> {
 
     fn wait_for_configuration_ready<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<(), Errno>
     where
@@ -1892,7 +1879,7 @@ impl<'a> FuseMutableStateGuard<'a> {
     /// being unmounted.
     fn execute_operation<L>(
         &mut self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         node: &FuseNode,
         operation: FuseOperation,
@@ -2100,6 +2087,10 @@ impl FuseMutableState {
         if payload_size > data.available() {
             return error!(EINVAL);
         }
+        if header.unique == 0 {
+            track_stub!(TODO("https://fxbug.dev/322873416"), "Fuse notification from userspace");
+            return error!(ENOTSUP);
+        }
         self.waiters.notify_value(header.unique);
         let mut running_operation = match self.operations.entry(header.unique) {
             Entry::Occupied(e) => e,
@@ -2208,7 +2199,7 @@ impl FuseKernelMessage {
                 uid: creds.uid,
                 gid: creds.gid,
                 pid: current_task.get_tid() as u32,
-                error_in: 0,
+                __bindgen_anon_1: Default::default(),
             },
             operation,
         })

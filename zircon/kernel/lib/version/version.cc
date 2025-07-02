@@ -35,8 +35,7 @@ namespace {
 // The kernel is linked at 0, making the bias the load address.
 constexpr uintptr_t kKernelLoadBias = kArchHandoffVirtualAddress;
 
-ktl::unique_ptr<char[]> gVersionStringBuffer;
-size_t gVersionStringSize;
+ktl::string_view gVersionString;
 
 // If the build ID were SHA256, it would be 32 bytes.
 // (The algorithms used for build IDs today actually produce fewer than that.)
@@ -94,37 +93,18 @@ void print_mmap(FILE* f, const void* begin, const void* end, const char* perm) {
 }
 
 void init_version(uint level) {
-  ktl::string_view version = gPhysHandoff->version_string.get();
-  ASSERT(!version.empty());
-  fbl::AllocChecker ac;
-  gVersionStringBuffer.reset(new (ac) char[version.size()]);
-  ASSERT_MSG(ac.check(), "cannot allocate %zu bytes for version string", version.size());
-  gVersionStringSize = version.copy(gVersionStringBuffer.get(), version.size());
+  gVersionString = gPhysHandoff->version_string.get();
+  ASSERT(!gVersionString.empty());
   print_version();
 }
 
-LK_INIT_HOOK(version, init_version, LK_INIT_LEVEL_HEAP)
+LK_INIT_HOOK(version, init_version, LK_INIT_LEVEL_EARLIEST + 1)
 
 }  // namespace
 
-ktl::string_view VersionString() {
-  // If init_version has run, return the heap copy.
-  ktl::string_view version{
-      gVersionStringBuffer.get(),
-      gVersionStringSize,
-  };
-  if (version.empty() && gPhysHandoff) {
-    // Before that, try to use the string from handoff via the physmap.
-    version = gPhysHandoff->version_string.get();
-  }
-  if (version.empty()) {
-    // If all else fails, use a fixed string.
-    version = "early-panic-try-kernel.phys.verbose";
-  }
-  return version;
-}
-
 const char* elf_build_id_string() { return gElfBuildIdString; }
+
+ktl::string_view VersionString() { return gVersionString; }
 
 ktl::span<const ktl::byte> ElfBuildId() {
   const build_id_note* const note = &__build_id_note_start;
@@ -134,8 +114,8 @@ ktl::span<const ktl::byte> ElfBuildId() {
 void print_version() {
   dprintf(ALWAYS, "version:\n");
   dprintf(ALWAYS, "\tarch:     %s\n", ARCH);
-  dprintf(ALWAYS, "\tzx_system_get_version_string: %.*s\n",
-          static_cast<int>(VersionString().size()), VersionString().data());
+  dprintf(ALWAYS, "\tzx_system_get_version_string: %.*s\n", static_cast<int>(gVersionString.size()),
+          gVersionString.data());
   dprintf(ALWAYS, "\tELF build ID: %s\n", gElfBuildIdString);
   dprintf(ALWAYS, "\tLK_DEBUGLEVEL: %d\n", LK_DEBUGLEVEL);
 }
@@ -152,8 +132,8 @@ void PrintSymbolizerContext(FILE* f) {
 }
 
 void print_backtrace_version_info(FILE* f) {
-  fprintf(f, "zx_system_get_version_string %.*s\n\n", static_cast<int>(VersionString().size()),
-          VersionString().data());
+  fprintf(f, "zx_system_get_version_string %.*s\n\n", static_cast<int>(gVersionString.size()),
+          gVersionString.data());
 
   // Log the ELF build ID in the format the symbolizer scripts understand.
   if (gElfBuildIdString[0] != '\0') {

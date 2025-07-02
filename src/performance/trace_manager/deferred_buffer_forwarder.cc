@@ -26,27 +26,34 @@ DeferredBufferForwarder::DeferredBufferForwarder(zx::socket destination)
   }
   std::chrono::time_point now = std::chrono::system_clock::now();
   std::string fname = std::format("trace_{}.fxt", now.time_since_epoch().count());
-  buffer_file_ = dir_path / fname;
+  buffer_path_ = dir_path / fname;
+  buffer_file_ = fopen(buffer_path_.c_str(), "a+");
 }
 
 DeferredBufferForwarder::~DeferredBufferForwarder() {
   Flush();
-  std::filesystem::remove(buffer_file_);
+  if (buffer_file_ != nullptr) {
+    fclose(buffer_file_);
+  }
+  std::filesystem::remove(buffer_path_);
 }
 TransferStatus DeferredBufferForwarder::Flush() {
   if (flushed_) {
     return TransferStatus::kComplete;
   }
-  FILE* f = fopen(buffer_file_.c_str(), "r");
-  if (f == nullptr) {
-    FX_LOGS(ERROR) << "Failed to open trace file: " << buffer_file_ << " for read!";
+  if (buffer_file_ == nullptr) {
+    FX_LOGS(ERROR) << "Failed to open trace file: " << buffer_path_ << " for read!";
+    return TransferStatus::kWriteError;
+  }
+  if (fseek(buffer_file_, 0, SEEK_SET) != 0) {
+    FX_LOGS(ERROR) << "Failed to seek to beginning of: " << buffer_path_ << " for read!";
     return TransferStatus::kWriteError;
   }
 
   const size_t BUFFER_SIZE = 4096;
   uint8_t buffer[BUFFER_SIZE];
   for (;;) {
-    size_t bytes_read = fread(buffer, sizeof(uint8_t), BUFFER_SIZE, f);
+    size_t bytes_read = fread(buffer, sizeof(uint8_t), BUFFER_SIZE, buffer_file_);
     if (bytes_read <= 0) {
       break;
     }
@@ -84,16 +91,14 @@ TransferStatus DeferredBufferForwarder::Flush() {
 }
 
 TransferStatus DeferredBufferForwarder::WriteBuffer(cpp20::span<const uint8_t> data) const {
-  FILE* f = fopen(buffer_file_.c_str(), "a+");
-  if (f == nullptr) {
-    FX_LOGS(ERROR) << "Failed to open trace file for write: " << buffer_file_;
+  if (buffer_file_ == nullptr) {
+    FX_LOGS(ERROR) << "Failed to open trace file for write: " << buffer_path_;
     return TransferStatus::kWriteError;
   }
   while (!data.empty()) {
-    size_t actual = fwrite(data.data(), sizeof(uint8_t), data.size(), f);
+    size_t actual = fwrite(data.data(), sizeof(uint8_t), data.size(), buffer_file_);
     data = data.subspan(actual);
   }
-  fclose(f);
   return TransferStatus::kComplete;
 }
 

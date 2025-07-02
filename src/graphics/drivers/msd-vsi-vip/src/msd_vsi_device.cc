@@ -1342,7 +1342,7 @@ std::unique_ptr<MsdVsiConnection> MsdVsiDevice::OpenVsiConnection(msd::msd_clien
   return std::make_unique<MsdVsiConnection>(this, std::move(address_space), client_id);
 }
 
-std::unique_ptr<msd::Connection> MsdVsiDevice::Open(msd::msd_client_id_t client_id) {
+std::unique_ptr<msd::Connection> MsdVsiDevice::MsdOpen(msd::msd_client_id_t client_id) {
   auto connection = OpenVsiConnection(client_id);
   if (connection) {
     return std::make_unique<MsdVsiAbiConnection>(std::move(connection));
@@ -1463,7 +1463,8 @@ magma_status_t MsdVsiDevice::DataToBuffer(const char* name, void* data, uint64_t
   return MAGMA_STATUS_OK;
 }
 
-magma_status_t MsdVsiDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint64_t* result_out) {
+magma_status_t MsdVsiDevice::MsdQuery(uint64_t id, zx::vmo* result_buffer_out,
+                                      uint64_t* result_out) {
   switch (id) {
     case MAGMA_QUERY_VENDOR_ID:
       *result_out = MAGMA_VENDOR_ID_VSI;
@@ -1520,9 +1521,9 @@ magma_status_t MsdVsiDevice::Query(uint64_t id, zx::vmo* result_buffer_out, uint
   return MAGMA_STATUS_OK;
 }
 
-void MsdVsiDevice::DumpStatus(uint32_t dump_type) { DumpStatusToLog(); }
+void MsdVsiDevice::MsdDumpStatus(uint32_t dump_type) { DumpStatusToLog(); }
 
-magma_status_t MsdVsiDevice::GetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {
+magma_status_t MsdVsiDevice::MsdGetIcdList(std::vector<msd::MsdIcdInfo>* icd_info_out) {
   const char* kSuffixes[] = {"_test", ""};
   auto& icd_info = *icd_info_out;
   icd_info.clear();

@@ -5,7 +5,7 @@
 use crate::bindings::BindingsCtx;
 use ebpf::{
     BpfProgramContext, BpfValue, CbpfConfig, DataWidth, EbpfInstruction, EbpfProgram,
-    EbpfProgramContext, FieldMapping, MapReference, MapSchema, Packet, ProgramArgument,
+    EbpfProgramContext, FieldMapping, HelperSet, MapReference, MapSchema, Packet, ProgramArgument,
     StructMapping, Type, VerifiedEbpfProgram,
 };
 use ebpf_api::{
@@ -14,14 +14,17 @@ use ebpf_api::{
     SOCKET_FILTER_CBPF_CONFIG, SOCKET_FILTER_SK_BUF_TYPE,
 };
 use fidl_table_validation::ValidFidlTable;
-use log::error;
+use log::{error, warn};
 use netstack3_core::device::DeviceId;
 use netstack3_core::device_socket::Frame;
-use netstack3_core::filter::{FilterIpExt, IpPacket, SocketEgressFilterResult, SocketOpsFilter};
-use netstack3_core::routes::Marks;
+use netstack3_core::filter::{
+    FilterIpExt, IpPacket, SocketEgressFilterResult, SocketIngressFilterResult, SocketOpsFilter,
+};
+use netstack3_core::ip::{Mark, MarkDomain, Marks};
+use netstack3_core::socket::SocketCookie;
 use netstack3_core::sync::{Mutex, RwLock};
-use netstack3_core::TxMetadata;
-use packet::PartialSerializer;
+use netstack3_core::trace::trace_duration;
+use packet::{FragmentedByteSlice, PacketConstraints, PartialSerializer};
 use std::collections::{hash_map, HashMap};
 use std::mem::offset_of;
 use std::sync::{Arc, LazyLock, Weak};
@@ -149,7 +152,7 @@ impl SocketFilterProgram {
             vec![],
         );
         let program =
-            ebpf::link_program::<SocketFilterContext>(&program, &[], vec![], HashMap::new())
+            ebpf::link_program::<SocketFilterContext>(&program, &[], vec![], HelperSet::default())
                 .expect("Failed to link SocketFilter program");
 
         Self { program }
@@ -185,11 +188,15 @@ impl SocketFilterProgram {
 /// `BPF_PROG_TYPE_CGROUP_SKB` (attached to `BPF_CGROUP_INET_EGRESS`
 /// and `BPF_CGROUP_INET_INGRESS`).
 #[repr(C)]
-struct IpPacketForCgroupSkb {
+struct IpPacketForCgroupSkb<'a> {
     sk_buff: __sk_buff,
 
-    data: *mut u8,
-    data_end: *mut u8,
+    data_ptr: *const u8,
+    data_end_ptr: *const u8,
+
+    marks: &'a Marks,
+    socket_cookie: u64,
+    data: &'a [u8],
 }
 
 static SK_BUF_MAPPING: LazyLock<StructMapping> = LazyLock::new(|| StructMapping {
@@ -197,16 +204,16 @@ static SK_BUF_MAPPING: LazyLock<StructMapping> = LazyLock::new(|| StructMapping 
     fields: vec![
         FieldMapping {
             source_offset: offset_of!(__sk_buff, data),
-            target_offset: offset_of!(IpPacketForCgroupSkb, data),
+            target_offset: offset_of!(IpPacketForCgroupSkb<'_>, data_ptr),
         },
         FieldMapping {
             source_offset: offset_of!(__sk_buff, data_end),
-            target_offset: offset_of!(IpPacketForCgroupSkb, data_end),
+            target_offset: offset_of!(IpPacketForCgroupSkb<'_>, data_end_ptr),
         },
     ],
 });
 
-impl ProgramArgument for &'_ IpPacketForCgroupSkb {
+impl ProgramArgument for &'_ IpPacketForCgroupSkb<'_> {
     fn get_type() -> &'static Type {
         &*CGROUP_SKB_SK_BUF_TYPE
     }
@@ -221,7 +228,7 @@ impl EbpfProgramContext for CgroupSkbContext {
     type Packet<'a> = ();
     type Map = CachedMapRef;
 
-    type Arg1<'a> = &'a IpPacketForCgroupSkb;
+    type Arg1<'a> = &'a IpPacketForCgroupSkb<'a>;
     type Arg2<'a> = ();
     type Arg3<'a> = ();
     type Arg4<'a> = ();
@@ -234,24 +241,34 @@ struct CgroupSkbRunContext<'a> {
 }
 
 impl<'a> ebpf_api::SocketFilterContext for CgroupSkbRunContext<'a> {
-    type SkBuf<'b> = IpPacketForCgroupSkb;
-    fn get_socket_uid(&self, _sk_buf: &Self::SkBuf<'_>) -> Option<uid_t> {
-        // TODO(https://fxbug.dev/410577537): implement this.
-        None
+    type SkBuf<'b> = IpPacketForCgroupSkb<'b>;
+    fn get_socket_uid(&self, sk_buf: &Self::SkBuf<'_>) -> Option<uid_t> {
+        let Mark(mark_value) = sk_buf.marks.get(MarkDomain::Mark2);
+        *mark_value
     }
-    fn get_socket_cookie(&self, _sk_buf: &Self::SkBuf<'_>) -> u64 {
-        // TODO(https://fxbug.dev/406296773): implement this.
-        0
+
+    fn get_socket_cookie(&self, sk_buf: &Self::SkBuf<'_>) -> u64 {
+        sk_buf.socket_cookie
     }
+
     fn load_bytes_relative(
         &self,
-        _sk_buf: &Self::SkBuf<'_>,
-        _base: ebpf_api::LoadBytesBase,
-        _offset: usize,
-        _buf: &mut [u8],
+        sk_buf: &Self::SkBuf<'_>,
+        base: ebpf_api::LoadBytesBase,
+        offset: usize,
+        buf: &mut [u8],
     ) -> i64 {
-        // TODO(https://fxbug.dev/407809292): implement this.
-        -1
+        if base != ebpf_api::LoadBytesBase::NetworkHeader {
+            warn!("bpf_skb_load_bytes_relative(BPF_HDR_START_MAC) not supported");
+            return -1;
+        }
+
+        let Some(data) = sk_buf.data.get(offset..(offset + buf.len())) else {
+            return -1;
+        };
+
+        buf.copy_from_slice(data);
+        0
     }
 }
 
@@ -344,29 +361,56 @@ impl CgroupSkbProgram {
             parse_verified_program_fidl(program, map_cache, CGROUP_SKB_ARGS.clone())?;
 
         let helpers = ebpf_api::get_common_helpers()
-            .drain(..)
-            .chain(ebpf_api::get_socket_filter_helpers().drain(..))
-            .collect::<HashMap<_, _>>();
+            .into_iter()
+            .chain(ebpf_api::get_socket_filter_helpers())
+            .collect();
 
-        let program = ebpf::link_program(&program, &[SK_BUF_MAPPING.clone()], maps, helpers)
-            .map_err(|e| {
-                error!("Failed to link eBPF program: {:?}", e);
-                EbpfError::LinkFailed
-            })?;
+        let program =
+            ebpf::link_program(&program, std::slice::from_ref(&SK_BUF_MAPPING), maps, helpers)
+                .map_err(|e| {
+                    error!("Failed to link eBPF program: {:?}", e);
+                    EbpfError::LinkFailed
+                })?;
 
         Ok(Self { program })
     }
 
     fn run<I: FilterIpExt, P: IpPacket<I> + PartialSerializer>(
         &self,
-        _packet: &P,
-        _device: &DeviceId<BindingsCtx>,
-        _tx_metadata: &TxMetadata<BindingsCtx>,
-        _marks: &Marks,
+        packet: &P,
+        ifindex: u32,
+        socket_cookie: SocketCookie,
+        marks: &Marks,
     ) -> u64 {
-        // TODO(https://fxbug.dev/407809292): Actually run the programs.
-        let _ = self.program;
-        Self::RESULT_PASS_BIT
+        let mut data = [0u8; 128];
+        let serialize_result = packet
+            .partial_serialize(PacketConstraints::UNCONSTRAINED, &mut data)
+            .expect("Packet serialization failed");
+
+        let mut skb = IpPacketForCgroupSkb {
+            sk_buff: __sk_buff {
+                len: serialize_result.total_size.try_into().unwrap_or(0),
+                protocol: u16::from(I::ETHER_TYPE).to_be().into(),
+                ifindex,
+                ..__sk_buff::default()
+            },
+            data_ptr: data.as_ptr(),
+            // SAFETY: `data_end_ptr` points at the end of the data buffer, but it's never
+            // dereferenced directly.
+            data_end_ptr: unsafe { data.as_ptr().add(serialize_result.bytes_written) },
+            marks,
+            socket_cookie: socket_cookie.export_value(),
+            data: &data,
+        };
+
+        trace_duration!(
+            c"ebpf::cgroup_skb::run",
+            "len" => serialize_result.total_size,
+            "protocol" => skb.sk_buff.protocol
+        );
+
+        let mut run_context = CgroupSkbRunContext::default();
+        self.program.run_with_1_argument(&mut run_context, &mut skb)
     }
 }
 
@@ -524,12 +568,12 @@ impl EbpfManager {
     }
 }
 
-impl SocketOpsFilter<DeviceId<BindingsCtx>, TxMetadata<BindingsCtx>> for &EbpfManager {
+impl SocketOpsFilter<DeviceId<BindingsCtx>> for &EbpfManager {
     fn on_egress<I: FilterIpExt, P: IpPacket<I> + PartialSerializer>(
         &self,
         packet: &P,
         device: &DeviceId<BindingsCtx>,
-        tx_metadata: &TxMetadata<BindingsCtx>,
+        socket_cookie: SocketCookie,
         marks: &Marks,
     ) -> SocketEgressFilterResult {
         let state = self.state.read();
@@ -537,7 +581,11 @@ impl SocketOpsFilter<DeviceId<BindingsCtx>, TxMetadata<BindingsCtx>> for &EbpfMa
             return SocketEgressFilterResult::Pass { congestion: false };
         };
 
-        let result = prog.run(packet, device, tx_metadata, marks);
+        let ifindex = device.bindings_id().id.get().try_into().unwrap_or(0);
+
+        trace_duration!(c"ebpf::egress");
+
+        let result = prog.run(packet, ifindex, socket_cookie, marks);
         if result > CgroupSkbProgram::EGRESS_MAX_RESULT {
             // TODO(https://fxbug.dev/413490751): Change this to panic once
             // result validation is implemented in the verifier.
@@ -552,16 +600,36 @@ impl SocketOpsFilter<DeviceId<BindingsCtx>, TxMetadata<BindingsCtx>> for &EbpfMa
             SocketEgressFilterResult::Drop { congestion }
         }
     }
+
+    fn on_ingress(
+        &self,
+        _packet: &FragmentedByteSlice<'_, &[u8]>,
+        _device: &DeviceId<BindingsCtx>,
+        _cookie: SocketCookie,
+        _marks: &Marks,
+    ) -> SocketIngressFilterResult {
+        // TODO(https://fxbug.dev/407809292): Execute attached program.
+        SocketIngressFilterResult::Accept
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use ebpf::Packet;
-    use ebpf_api::SKF_AD_MAX;
+    use ebpf_api::{AttachType, ProgramType, SKF_AD_MAX};
+    use ip_test_macro::ip_test;
+    use net_types::Witness;
     use netstack3_core::device_socket::SentFrame;
-    use packet::ParsablePacket;
+    use netstack3_core::ip::Mark;
+    use netstack3_core::sync::ResourceTokenValue;
+    use netstack3_core::testutil::{self, TestIpExt};
+    use packet::{InnerPacketBuilder, PacketBuilder, ParsablePacket};
     use packet_formats::ethernet::EthernetFrameLengthCheck;
+    use packet_formats::ip::IpProto;
+    use packet_formats::udp::UdpPacketBuilder;
+    use std::num::NonZeroU16;
+    use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
 
     struct TestData;
     impl TestData {
@@ -747,5 +815,101 @@ mod tests {
 
         std::mem::drop(cache_ref1_dup);
         assert_eq!(num_cached(), 0);
+    }
+
+    #[ip_test(I)]
+    fn run_egress_prog<I: TestIpExt + FilterIpExt>() {
+        let prog =
+            ebpf_loader::load_ebpf_program("/pkg/data/ebpf_test_progs.o", ".text", "egress_prog")
+                .expect("Failed to load test prog");
+        let maps_schema = prog.maps.iter().map(|m| m.schema).collect();
+        let calling_context = ProgramType::CgroupSkb
+            .create_calling_context(AttachType::CgroupInetEgress, maps_schema)
+            .expect("Failed to create CallingContext");
+        let verified =
+            ebpf::verify_program(prog.code, calling_context, &mut ebpf::NullVerifierLogger)
+                .expect("Failed to verify loaded program");
+
+        let maps: Vec<_> = prog
+            .maps
+            .iter()
+            .map(|def| ebpf_api::Map::new(def.schema, def.flags).expect("Failed to create a map"))
+            .collect();
+        let shared_maps =
+            maps.iter().map(|map| map.share().expect("Failed to share a map")).collect();
+
+        let manager = EbpfManager::default();
+
+        let code: Vec<u64> =
+            <[u64]>::ref_from_bytes(verified.code().as_bytes()).unwrap().to_owned();
+        let struct_access_instructions = verified
+            .struct_access_instructions()
+            .iter()
+            .map(|s| febpf::StructAccess {
+                pc: s.pc.try_into().unwrap(),
+                struct_memory_id: s.memory_id.id(),
+                field_offset: s.field_offset.try_into().unwrap(),
+                is_32_bit_ptr_load: s.is_32_bit_ptr_load,
+            })
+            .collect();
+
+        let program = ValidVerifiedProgram { code, struct_access_instructions, maps: shared_maps };
+        let program = CgroupSkbProgram::new(program, manager.maps_cache())
+            .expect("Failed to initialize a program");
+
+        const SRC_PORT: NonZeroU16 = NonZeroU16::new(1234).unwrap();
+        const DST_PORT: NonZeroU16 = NonZeroU16::new(5678).unwrap();
+
+        let data = b"PACKET";
+        let mut udp_packet = UdpPacketBuilder::new(
+            I::TEST_ADDRS.local_ip.get(),
+            I::TEST_ADDRS.remote_ip.get(),
+            Some(SRC_PORT),
+            DST_PORT,
+        )
+        .wrap_body(data.into_serializer());
+        let packet = testutil::new_filter_egress_ip_packet::<I, _>(
+            I::TEST_ADDRS.local_ip.get(),
+            I::TEST_ADDRS.remote_ip.get(),
+            IpProto::Udp.into(),
+            &mut udp_packet,
+        );
+
+        const IFINDEX: u32 = 2;
+        const UID: u32 = 231;
+
+        let socket_resource_token = ResourceTokenValue::default();
+        let socket_cookie = SocketCookie::new(socket_resource_token.token());
+
+        let mut marks = Marks::default();
+        *marks.get_mut(MarkDomain::Mark2) = Mark(Some(UID));
+
+        let r = program.run(&packet, IFINDEX, socket_cookie, &marks);
+        assert_eq!(r, 1);
+
+        // Results struct. Must match the `struct test_result` in
+        // `ebpf_test_progs.c`.
+        #[derive(FromBytes, Immutable, KnownLayout)]
+        #[repr(C)]
+        // LINT.IfChange
+        struct TestResult {
+            cookie: u64,
+            uid: u32,
+            ifindex: u32,
+            proto: u32,
+            ip_proto: u8,
+        }
+        // LINT.ThenChange(//src/connectivity/network/netstack3/tests/ebpf/ebpf_test_progs.c)
+
+        // Check the result.
+        let result = maps[0].load(&[0; 4]).expect("Failed to retrieve test result");
+        let result =
+            TestResult::ref_from_bytes(&result).expect("Failed to convert test results struct");
+
+        assert_eq!(result.cookie, socket_resource_token.token().export_value());
+        assert_eq!(result.uid, UID);
+        assert_eq!(result.ifindex, IFINDEX);
+        assert_eq!(result.proto, u32::from(u16::from(I::ETHER_TYPE)));
+        assert_eq!(result.ip_proto, u8::from(IpProto::Udp));
     }
 }

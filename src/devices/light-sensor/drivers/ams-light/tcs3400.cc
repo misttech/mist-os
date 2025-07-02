@@ -202,8 +202,8 @@ Tcs3400Device::Tcs3400Device(zx_device_t* device, async_dispatcher_t* dispatcher
       dispatcher_(dispatcher),
       i2c_(std::move(i2c)),
       gpio_(std::move(gpio)),
-      inspect_reports_(inspect::contrib::BoundedListNode(
-          inspect_.GetRoot().CreateChild("feature_reports"), kMaxFeatureReports)) {}
+      inspect_reports_(inspect::BoundedListNode(inspect_.GetRoot().CreateChild("feature_reports"),
+                                                kMaxFeatureReports)) {}
 
 zx::result<Tcs3400InputReport> Tcs3400Device::ReadInputRpt() {
   Tcs3400InputReport report{.event_time = zx::clock::get_monotonic()};

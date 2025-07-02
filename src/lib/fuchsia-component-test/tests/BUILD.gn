@@ -71,7 +71,6 @@ rustc_test("scoped-instance-test") {
   edition = "2021"
   source_root = "scoped_instance/lib.rs"
   deps = [
-    "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component-test",
     "//src/sys/lib/component-events",

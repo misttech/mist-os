@@ -26,6 +26,8 @@ toc:
   path: /docs/development/source_code/auto_submit.md
 - title: "Commit message options"
   path: /docs/development/source_code/commit_message_options.md
+- title: "Dependent Changes"
+  path: /docs/development/source_code/dependent_changes.md
 - title: "Fuchsia package information using metadata files"
   path: /docs/development/source_code/metadata.md
 - title: "README.fuchsia file syntax"

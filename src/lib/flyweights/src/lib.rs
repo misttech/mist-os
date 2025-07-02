@@ -442,6 +442,13 @@ impl From<&'_ [u8]> for FlyByteStr {
     }
 }
 
+impl<const N: usize> From<[u8; N]> for FlyByteStr {
+    #[inline]
+    fn from(s: [u8; N]) -> Self {
+        Self::new(&s)
+    }
+}
+
 impl From<&'_ BStr> for FlyByteStr {
     #[inline]
     fn from(s: &BStr) -> Self {

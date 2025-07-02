@@ -912,7 +912,7 @@ impl IdAndSeq {
 #[cfg(test)]
 mod tests {
     use ip_test_macro::ip_test;
-    use packet::{InnerPacketBuilder, ParseBuffer, Serializer, SliceBufViewMut};
+    use packet::{EmptyBuf, ParseBuffer, Serializer, SliceBufViewMut};
     use test_case::test_case;
 
     use super::*;
@@ -972,18 +972,17 @@ mod tests {
     fn test_try_write_checksum<I: IcmpIpExt>(corrupt_checksum: [u8; 2]) {
         // NB: The process of serializing an `IcmpPacketBuilder` will compute a
         // valid checksum.
-        let icmp_message_with_checksum = []
-            .into_serializer()
-            .encapsulate(IcmpPacketBuilder::<I, _>::new(
-                *I::LOOPBACK_ADDRESS,
-                *I::LOOPBACK_ADDRESS,
-                IcmpZeroCode,
-                IcmpEchoRequest::new(1, 1),
-            ))
-            .serialize_vec_outer()
-            .unwrap()
-            .as_ref()
-            .to_vec();
+        let icmp_message_with_checksum = IcmpPacketBuilder::<I, _>::new(
+            *I::LOOPBACK_ADDRESS,
+            *I::LOOPBACK_ADDRESS,
+            IcmpZeroCode,
+            IcmpEchoRequest::new(1, 1),
+        )
+        .wrap_body(EmptyBuf)
+        .serialize_vec_outer()
+        .unwrap()
+        .as_ref()
+        .to_vec();
 
         // Clone the message and corrupt the checksum.
         let mut icmp_message_without_checksum = icmp_message_with_checksum.clone();

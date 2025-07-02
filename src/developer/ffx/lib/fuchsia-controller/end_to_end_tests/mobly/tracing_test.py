@@ -99,7 +99,7 @@ class FuchsiaControllerTests(AsyncAdapter, base_test.BaseTestClass):
         )
 
         # Closing the channel will terminate tracing
-        controller.channel.close()
+        controller.close_cleanly()
 
         raw_trace = await socket_task
         asserts.assert_equal(type(raw_trace), bytearray)

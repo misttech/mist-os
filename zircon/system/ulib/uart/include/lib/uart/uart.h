@@ -403,32 +403,24 @@ class DriverBase {
 // i.e. the zbi_dcfg_*_t type for the ZBI item's format.  This class is responsible
 // for supplying pointers to be passed to hwreg types' ReadFrom and WriteTo.
 //
-// The IoProvider(UartDriver::config_type, uint16_t pio_size) constructor
-// initializes the object.  Then IoProvider::io() is called to yield the
-// pointer to pass to hwreg calls.
-//
-// uart::BasicIoProvider handles the simple case where physical MMIO and PIO
-// base addresses are used directly.  It also provides base classes that can be
-// subclassed with an overridden constructor that does address mapping.
+// The
+// ```
+// IoProvider(UartDriver::config_type, uint16_t pio_size, volatile void* base)
+// ```
+// constructor initializes the object with the provided virtual base address
+// (in the case of MMIO), while the constructor that omits the address
+// initializes things for PIO or identity-mapped MMIO.  Then IoProvider::io()
+// is called to yield the pointer to pass to hwreg calls.
 //
 template <typename Config, IoRegisterType IoType>
 class BasicIoProvider;
-
-// This is the default "identity mapping" callback for BasicIoProvider::Init.
-// A subclass can have an Init function that calls BasicIoProvider::Init with
-// a different callback function.
-//
-// The `size` parameter represents the number of bytes from `phys`, such that
-// the mmio region to be mapped is contained in p[`phys`, `phys` + `size`).
-inline auto DirectMapMmio(uint64_t phys, size_t size) {
-  return reinterpret_cast<volatile void*>(phys);
-}
 
 // Specialization for Stub drivers, such as `null::Driver`.
 template <typename ConfigType>
 class BasicIoProvider<ConfigType, IoRegisterType::kNone> {
  public:
   constexpr BasicIoProvider(const ConfigType& cfg, size_t io_slots) {}
+  constexpr BasicIoProvider(const ConfigType& cfg, size_t io_slots, volatile void* base) {}
   constexpr BasicIoProvider& operator=(BasicIoProvider&& other) {}
 
   auto io() { return nullptr; }
@@ -441,20 +433,19 @@ class BasicIoProvider<zbi_dcfg_simple_t, IoType> {
   // Just install the MMIO base pointer.  The third argument can be passed by
   // a subclass constructor method to map the physical address to a virtual
   // address.
-  template <typename T>
-  BasicIoProvider(const zbi_dcfg_simple_t& cfg, size_t io_slots, T&& map_mmio) {
+  BasicIoProvider(const zbi_dcfg_simple_t& cfg, size_t io_slots, volatile void* base) {
     if constexpr (IoType == IoRegisterType::kMmio8) {
-      io_.emplace<hwreg::RegisterMmio>(map_mmio(cfg.mmio_phys, io_slots));
+      io_.emplace<hwreg::RegisterMmio>(base);
     } else if constexpr (IoType == IoRegisterType::kMmio32) {
-      io_.emplace<hwreg::RegisterMmioScaled<uint32_t>>(map_mmio(cfg.mmio_phys, io_slots * 4));
+      io_.emplace<hwreg::RegisterMmioScaled<uint32_t>>(base);
     } else {
       // Pio uses a different specialization, this should never be reached.
-      static_assert(!std::is_same_v<T, T>);
+      static_assert(!std::is_same_v<IoRegisterType, IoRegisterType>);
     }
   }
 
   BasicIoProvider(const zbi_dcfg_simple_t& cfg, size_t io_slots)
-      : BasicIoProvider(cfg, io_slots, DirectMapMmio) {}
+      : BasicIoProvider(cfg, io_slots, reinterpret_cast<volatile void*>(cfg.mmio_phys)) {}
 
   BasicIoProvider& operator=(BasicIoProvider&& other) {
     io_.swap(other.io_);

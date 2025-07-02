@@ -370,12 +370,7 @@ macro_rules! add_functions {
         ///
         /// Panics if any node has already been added at the given path.
         pub fn add_vmo_file_at(&mut self, path: impl Into<String>, vmo: zx::Vmo) -> &mut Self {
-            self.add_entry_at(
-                path,
-                VmoFile::new(
-                    vmo, /*readable*/ true, /*writable*/ false, /*executable*/ false,
-                ),
-            )
+            self.add_entry_at(path, VmoFile::new(vmo))
         }
 
         /// Adds an entry to the directory at the given path.

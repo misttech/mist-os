@@ -208,7 +208,7 @@ INSTANTIATE_TEST_SUITE_P(
           if (options.filesystem->GetTraits().in_memory) {
             return std::nullopt;
           }
-          if (!options.has_min_volume_size) {
+          if (!options.filesystem->GetTraits().has_min_volume_size) {
             // Run on a smaller ram-disk to keep run-time reasonable.
             options.device_block_count = 8192;
           }

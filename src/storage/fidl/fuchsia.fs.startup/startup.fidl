@@ -25,38 +25,57 @@ type EvictionPolicyOverride = flexible enum {
     EVICT_IMMEDIATELY = 2;
 };
 
+// Ensure that all the fields are supported and tested.
+// LINT.IfChange
 /// Options for starting a filesystem.
-type StartOptions = resource struct {
+type StartOptions = table {
     /// Start the filesystem in read-only mode.
-    @allow_deprecated_struct_defaults
-    read_only bool = false;
+    1: read_only bool;
+
     /// Enable verbose logging.
-    @allow_deprecated_struct_defaults
-    verbose bool = false;
+    2: verbose bool;
+
     /// If true, run fsck after every transaction. This is for testing purposes only - it's very
     /// slow to run a filesystem like this.
-    fsck_after_every_transaction bool;
+    3: fsck_after_every_transaction bool;
 
     /// A compression algorithm specifier for the filesystem to use when storing files (if the
     /// filesystem supports it). Defaults to ZSTD_CHUNKED.
-    write_compression_algorithm CompressionAlgorithm;
+    4: write_compression_algorithm CompressionAlgorithm;
+
     /// An optional compression level for the filesystem to use when storing files (if the
     /// filesystem and the configured |write_compression_algorithm| supports it). Setting to < 0
     /// indicates no value (the filesystem chooses a default if necessary).
-    @allow_deprecated_struct_defaults
-    write_compression_level int32 = -1;
+    5: write_compression_level int32;
 
     /// An optional eviction policy specifier for the filesystem to use for in-memory structures
     /// (if the filesystem supports it), specifically for pager-backed files.
-    cache_eviction_policy_override EvictionPolicyOverride;
+    6: cache_eviction_policy_override EvictionPolicyOverride;
 
-    /// Set greater than zero to use profiling for the first N seconds after filesystem start.
-    /// Records the access patterns of objects for N seconds and if the profile already exists,
-    /// prefetch data and hold the vmos in cache for N seconds. Functionally this means that the
-    /// first launch with this option records the profile and all other launches with this option
-    /// will replay that profile.
-    startup_profiling_seconds uint32;
+    /// Use profiling for the first N seconds after filesystem start. Records the access patterns
+    /// of objects for N seconds and if the profile already exists, prefetch data and hold the vmos
+    /// in cache for N seconds. Functionally this means that the first launch with this option
+    /// records the profile and all other launches with this option will replay that profile.
+    7: startup_profiling_seconds uint32;
+
+    /// If true, configures the filesystem to use the hardware's inline encryption engine when
+    /// writing encrypted data. This allows the filesystem to store user-encrypted data without
+    /// being able to read or write the plaintext contents, which enhances security and privacy.
+    /// Requires the block device to support inline encryption and for `barriers_enabled` to be
+    /// true.
+    /// TODO(https://fxbug.dev/393196849): For now, this flag only prevents the filesystem from
+    /// computing checksums. Update this comment when the filesystem actually uses inline
+    /// encryption.
+    8: inline_crypto_enabled bool;
+
+    /// Configures the filesystem to use barriers instead of checksums to ensure consistency. If
+    /// set, barriers will be used to enforce proper ordering of data and metadata writes, which
+    /// is otherwise provided by computing and verifying data checksums.  Requires filesystem
+    /// support; at the time of writing, only Fxfs uses this argument.
+    /// Must be set to true if `inline_crypto_enabled` is true.
+    9: barriers_enabled bool;
 };
+// LINT.ThenChange(//src/storage/lib/fs_management/cpp/options_test.cc)
 
 /// Options for how to format filesystems.
 type FormatOptions = table {

@@ -108,8 +108,7 @@ const std::vector<fpbus::Bti> display_btis{
 const std::map<uint32_t, uint32_t> kBootloaderPanelTypeToDisplayPanelType = {
     {1, PANEL_KD_KD070D82_FITIPOWER_JD9364},
     {2, PANEL_BOE_TV070WSM_FITIPOWER_JD9364_NELSON},
-    // TODO(https://fxbug.dev/324461617): Remove this.
-    {3, PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364},
+    // 3 was for PANEL_INNOLUX_P070ACB_FITIPOWER_JD9364.
     {4, PANEL_KD_KD070D82_FITIPOWER_JD9365},
     {5, PANEL_BOE_TV070WSM_FITIPOWER_JD9365},
     // 6 was for PANEL_TV070WSM_ST7703I.

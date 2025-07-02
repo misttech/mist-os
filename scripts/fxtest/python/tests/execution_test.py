@@ -29,6 +29,7 @@ def _make_exec_env(
         fuchsia_dir,
         out_dir,
         test_json_file="",
+        disabled_ctf_tests_file="",
         log_file=None,
         test_list_file="",
     )
@@ -179,6 +180,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                         realm="foo_tests",
                         max_severity_logs="INFO",
                         min_severity_logs="TRACE",
+                        test_filters=["-foo", "-bar"],
                     ),
                 ),
             ),
@@ -197,6 +199,15 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 "run",
                 "--realm",
                 "foo_tests",
+            ],
+            command_line,
+        )
+        self.assertContainsSublist(
+            [
+                "--test-filter",
+                "-foo",
+                "--test-filter",
+                "-bar",
             ],
             command_line,
         )
@@ -479,9 +490,11 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
             # We will run ls, but it needs to be relative to the output directory.
             # Find the actual path to the ls binary and symlink it into the
             # output directory.
-            ls_path = subprocess.check_output(["which", "ls"]).decode().strip()
-            self.assertTrue(os.path.isfile, f"{ls_path} is not a file")
-            os.symlink(ls_path, os.path.join(tmp, "ls"))
+            env_path = (
+                subprocess.check_output(["which", "env"]).decode().strip()
+            )
+            self.assertTrue(os.path.isfile, f"{env_path} is not a file")
+            os.symlink(env_path, os.path.join(tmp, "env"))
 
             exec_env = _make_exec_env("/fuchsia", tmp)
 
@@ -491,7 +504,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
                 test_list_file.Test(
                     tests_json_file.TestEntry(
                         tests_json_file.TestSection(
-                            "foo", "//foo", "linux", path="ls"
+                            "foo", "//foo", "linux", path="env"
                         )
                     ),
                     test_list_file.TestListEntry("foo", [], execution=None),
@@ -513,6 +526,19 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
             recorder.emit_end()
 
             assert output is not None
+
+            lines = output.stdout.splitlines()
+            outdir: None | str = None
+            for line in lines:
+                l = line.split("=")
+                if len(l) > 1 and l[0] == "FUCHSIA_TEST_OUTDIR":
+                    outdir = l[1]
+            assert outdir is not None
+            self.assertEqual(
+                outdir[:4],
+                "/tmp",
+                f"Expecting that the output directory is an absolute path into /tmp. Found {outdir}",
+            )
 
             self.assertFalse(
                 any([e.error is not None async for e in recorder.iter()])

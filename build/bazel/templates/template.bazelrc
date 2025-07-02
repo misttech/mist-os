@@ -84,10 +84,6 @@ build --experimental_writable_outputs
 build --java_runtime_version=embedded_jdk
 build --tool_java_runtime_version=embedded_jdk
 
-# Set up DEFINE flags for libraries imported from @internal_sdk at a project
-# level. See https://fxbug.dev/42067010 for more information.
-build --per_file_copt=src/lib/diagnostics/accessor2logger_accessor2logger/log_message.cc@-DRAPIDJSON_HAS_STDSTRING,-DRAPIDJSON_HAS_CXX11_RANGE_FOR,-DRAPIDJSON_HAS_CXX11_RVALUE_REFS,-DRAPIDJSON_HAS_CXX11_TYPETRAITS,-DRAPIDJSON_HAS_CXX11_NOEXCEPT
-
 # Set up Pigweed configuration and module backends.
 import third_party/pigweed/configuration.bazelrc
 
@@ -102,7 +98,7 @@ build --@io_bazel_rules_go//go/config:linkmode=pie
 # Bazel targets built with this option cannot depend on GN target outputs at all,
 # very intentionally.
 common:no_gn_targets \
-  --override_repository=gn_targets=build/bazel/local_repositories/empty
+  --override_repository=gn_targets=build/bazel/local_repositories/empty_gn_targets
 
 # The `--config=host option` is shorthand for
 #`--platforms=//build/bazel/platforms:host`.
@@ -118,11 +114,8 @@ build --@rules_rust//rust/settings:clippy_flag=-Wclippy::all
 
 # Disable bzlmod by default.
 common --enable_bzlmod=true
+common --incompatible_use_plus_in_repo_names
 common --enable_workspace=true
-
-### FUCHSIA_SDK_CUTOFF
-# The line above and anything that follows will be removed from
-# the .bazelrc file used by the --config=no_sdk.
 
 # Pass local developer overrides for assembly to Bazel
 # For now, this needs to set the label_flag() in both @rules_fuchsia
@@ -131,3 +124,9 @@ common --enable_workspace=true
 # removed when the fuchsia.git and vendor/*.git repositories no
 # longer include rules from @fuchsia_sdk.
 common --@rules_fuchsia//fuchsia:assembly_developer_overrides_list=@assembly_developer_overrides//:in-tree_developer_overrides_list
+
+# Set the release repository for assembly config artifacts to "fuchsia".
+# This is necessary so MOS knows where a given assembly artifact came from.
+common --@rules_fuchsia//fuchsia/flags:fuchsia_release_repository="fuchsia"
+
+

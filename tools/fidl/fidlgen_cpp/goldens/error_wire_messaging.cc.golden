@@ -32,7 +32,7 @@ static_assert(offsetof(::fidl::internal::TransactionalResponse<::test_error::Exa
 ::fidl::WireResult<::test_error::Example::Foo>::WireResult(
     ::fidl::UnownedClientEnd<::test_error::Example> client,
     ::fidl::internal::TransactionalRequest<::test_error::Example::Foo>* request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_error::Example::Foo>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -180,7 +180,7 @@ void fidl::internal::WireCompleterImpl<::test_error::Example::Foo>::Reply(::fit:
 
 void fidl::internal::WireCompleterImpl<::test_error::Example::Foo>::MakeReply(::test_error::wire::ExampleFooResult ExampleFooResult) {
   ::fidl::internal::TransactionalResponse<::test_error::Example::Foo> _response{ExampleFooResult};
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<
       ::fidl::internal::TransactionalResponse<::test_error::Example::Foo>, ::fidl::internal::ChannelTransport>
       _response_message{

@@ -228,7 +228,9 @@ void AmlG12TdmDai::Start(StartCallback callback) {
 void AmlG12TdmDai::Stop(StopCallback callback) {
   if (!rb_fetched_) {
     zxlogf(ERROR, "GetVmo must successfully complete before calling Start or Stop");
-    ringbuffer_binding_->Close(ZX_ERR_BAD_STATE);
+    if (ringbuffer_binding_.has_value() && ringbuffer_binding_->is_bound()) {
+      ringbuffer_binding_->Close(ZX_ERR_BAD_STATE);
+    }
     return;
   }
   if (!rb_started_) {

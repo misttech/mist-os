@@ -63,7 +63,7 @@ impl ComponentManagerInstance {
         self.task_group.clone()
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "src_model_tests"))]
     pub fn has_reboot_task(&self) -> bool {
         self.state.lock().unwrap().reboot_task.is_some()
     }

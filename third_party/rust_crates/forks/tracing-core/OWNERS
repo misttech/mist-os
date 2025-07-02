@@ -2,6 +2,3 @@
 # TO MAKE CHANGES HERE, UPDATE //third_party/owners.toml.
 # DOCS: https://fuchsia.dev/reference/tools/fx/cmd/update-3p-owners
 
-include /third_party/rust_crates/vendor/tracing-0.1.40/OWNERS
-include /third_party/rust_crates/vendor/tracing-log-0.2.0/OWNERS
-include /third_party/rust_crates/vendor/tracing-subscriber-0.3.18/OWNERS

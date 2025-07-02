@@ -13,9 +13,10 @@ use fidl_fuchsia_tracing_provider::RegistryMarker;
 use fidl_fuchsia_ui_test_input::{
     KeyboardMarker, KeyboardSimulateKeyEventRequest, MediaButtonsDeviceMarker,
     MediaButtonsDeviceSimulateButtonPressRequest, MouseMarker, MouseSimulateMouseEventRequest,
-    RegistryMarker as InputRegistryMarker, RegistryRegisterKeyboardRequest,
-    RegistryRegisterMediaButtonsDeviceRequest, RegistryRegisterMouseRequest,
-    RegistryRegisterTouchScreenRequest, TouchScreenMarker, TouchScreenSimulateTapRequest,
+    RegistryMarker as InputRegistryMarker, RegistryProxy as InputRegistryProxy,
+    RegistryRegisterKeyboardRequest, RegistryRegisterMediaButtonsDeviceRequest,
+    RegistryRegisterMouseRequest, RegistryRegisterTouchScreenRequest, TouchScreenMarker,
+    TouchScreenSimulateTapRequest,
 };
 use fidl_fuchsia_vulkan_loader::LoaderMarker;
 use fuchsia_async::{MonotonicInstant, Timer};
@@ -93,7 +94,7 @@ async fn enters_idle_state_without_activity(suspend_enabled: bool) {
     // Subscribe to interaction state, which serves "active" initially.
     let notifier_proxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("Failed to connect to fuchsia.input.interaction.Notifier.");
     let mut watch_state_stream = HangingGetStream::new(notifier_proxy, NotifierProxy::watch_state);
     assert_eq!(
@@ -128,7 +129,7 @@ async fn does_not_enter_active_state_with_keyboard(suspend_enabled: bool) {
     // Subscribe to interaction state, which serves "active" initially.
     let notifier_proxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("Failed to connect to fuchsia.input.interaction.Notifier.");
     let mut watch_state_stream = HangingGetStream::new(notifier_proxy, NotifierProxy::watch_state);
     assert_eq!(
@@ -151,9 +152,9 @@ async fn does_not_enter_active_state_with_keyboard(suspend_enabled: bool) {
 
     // Inject keyboard input.
     let (keyboard_proxy, keyboard_server) = create_proxy::<KeyboardMarker>();
-    let input_registry = realm
+    let input_registry: InputRegistryProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<InputRegistryMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("Failed to connect to fuchsia.ui.test.input.Registry.");
     input_registry
         .register_keyboard(RegistryRegisterKeyboardRequest {
@@ -196,7 +197,7 @@ async fn enters_active_state_with_mouse(suspend_enabled: bool) {
     // Subscribe to interaction state, which serves "active" initially.
     let notifier_proxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("Failed to connect to fuchsia.input.interaction.Notifier.");
     let mut watch_state_stream = HangingGetStream::new(notifier_proxy, NotifierProxy::watch_state);
     assert_eq!(
@@ -219,9 +220,9 @@ async fn enters_active_state_with_mouse(suspend_enabled: bool) {
 
     // Inject mouse input.
     let (mouse_proxy, mouse_server) = create_proxy::<MouseMarker>();
-    let input_registry = realm
+    let input_registry: InputRegistryProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<InputRegistryMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("Failed to connect to fuchsia.ui.test.input.Registry.");
     input_registry
         .register_mouse(RegistryRegisterMouseRequest {
@@ -261,9 +262,9 @@ async fn enters_active_state_with_touchscreen(suspend_enabled: bool) {
     let realm = assemble_realm(suspend_enabled).await;
 
     // Subscribe to interaction state, which serves "active" initially.
-    let notifier_proxy = realm
+    let notifier_proxy: NotifierProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("Failed to connect to fuchsia.input.interaction.Notifier.");
     let mut watch_state_stream = HangingGetStream::new(notifier_proxy, NotifierProxy::watch_state);
     assert_eq!(
@@ -286,9 +287,9 @@ async fn enters_active_state_with_touchscreen(suspend_enabled: bool) {
 
     // Inject touch input.
     let (touchscreen_proxy, touchscreen_server) = create_proxy::<TouchScreenMarker>();
-    let input_registry = realm
+    let input_registry: InputRegistryProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<InputRegistryMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("Failed to connect to fuchsia.ui.test.input.Registry.");
     input_registry
         .register_touch_screen(RegistryRegisterTouchScreenRequest {
@@ -329,7 +330,7 @@ async fn enters_active_state_with_media_buttons(suspend_enabled: bool) {
     // Subscribe to interaction state, which serves "active" initially.
     let notifier_proxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<NotifierMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("Failed to connect to fuchsia.input.interaction.Notifier.");
     let mut watch_state_stream = HangingGetStream::new(notifier_proxy, NotifierProxy::watch_state);
     assert_eq!(
@@ -352,9 +353,9 @@ async fn enters_active_state_with_media_buttons(suspend_enabled: bool) {
 
     // Inject media buttons input.
     let (media_buttons_proxy, media_buttons_server) = create_proxy::<MediaButtonsDeviceMarker>();
-    let input_registry = realm
+    let input_registry: InputRegistryProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<InputRegistryMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("Failed to connect to fuchsia.ui.test.input.Registry.");
     input_registry
         .register_media_buttons_device(RegistryRegisterMediaButtonsDeviceRequest {

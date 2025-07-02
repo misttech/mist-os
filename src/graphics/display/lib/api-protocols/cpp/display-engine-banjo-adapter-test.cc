@@ -22,18 +22,17 @@
 #include "src/graphics/display/lib/api-protocols/cpp/mock-banjo-display-engine-listener.h"
 #include "src/graphics/display/lib/api-protocols/cpp/mock-display-engine.h"
 #include "src/graphics/display/lib/api-types/cpp/config-check-result.h"
-#include "src/graphics/display/lib/api-types/cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/coordinate-transformation.h"
 #include "src/graphics/display/lib/api-types/cpp/display-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-capture-image-id.h"
+#include "src/graphics/display/lib/api-types/cpp/driver-config-stamp.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types/cpp/driver-layer.h"
 #include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
-#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 #include "src/graphics/display/lib/api-types/cpp/rectangle.h"
 #include "src/lib/testing/predicates/status.h"
@@ -234,25 +233,16 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationSuccess) {
       .layer_count = 1,
   };
 
-  mock_.ExpectCheckConfiguration(
-      [&](display::DisplayId display_id, display::ModeId display_mode_id,
-          cpp20::span<const display::DriverLayer> layers,
-          cpp20::span<display::LayerCompositionOperations> layer_composition_operations) {
-        EXPECT_EQ(kDisplayId, display_id);
-        EXPECT_EQ(display::ModeId(1), display_mode_id);
-        EXPECT_THAT(layers, ::testing::ElementsAre(kLayer0));
-        EXPECT_THAT(layer_composition_operations,
-                    ::testing::ElementsAre(display::LayerCompositionOperations::kNoOperations));
-        return display::ConfigCheckResult::kOk;
-      });
+  mock_.ExpectCheckConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
+                                     cpp20::span<const display::DriverLayer> layers) {
+    EXPECT_EQ(kDisplayId, display_id);
+    EXPECT_EQ(display::ModeId(1), display_mode_id);
+    EXPECT_THAT(layers, ::testing::ElementsAre(kLayer0));
+    return display::ConfigCheckResult::kOk;
+  });
 
-  std::array<layer_composition_operations_t, 1> banjo_layer_composition_operations;
-  size_t banjo_layer_composition_operations_output_size = 0;
   EXPECT_EQ(display::ConfigCheckResult::kOk.ToBanjo(),
-            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig,
-                                             banjo_layer_composition_operations.data(),
-                                             banjo_layer_composition_operations.size(),
-                                             &banjo_layer_composition_operations_output_size));
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationError) {
@@ -276,20 +266,13 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationError) {
       .layer_count = 1,
   };
 
-  mock_.ExpectCheckConfiguration(
-      [&](display::DisplayId display_id, display::ModeId display_mode_id,
-          cpp20::span<const display::DriverLayer> layers,
-          cpp20::span<display::LayerCompositionOperations> layer_composition_operations) {
-        return display::ConfigCheckResult::kUnsupportedDisplayModes;
-      });
+  mock_.ExpectCheckConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
+                                     cpp20::span<const display::DriverLayer> layers) {
+    return display::ConfigCheckResult::kUnsupportedDisplayModes;
+  });
 
-  std::array<layer_composition_operations_t, 1> banjo_layer_composition_operations;
-  size_t banjo_layer_composition_operations_output_size = 0;
   EXPECT_EQ(display::ConfigCheckResult::kUnsupportedDisplayModes.ToBanjo(),
-            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig,
-                                             banjo_layer_composition_operations.data(),
-                                             banjo_layer_composition_operations.size(),
-                                             &banjo_layer_composition_operations_output_size));
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationUnsupportedConfig) {
@@ -305,8 +288,6 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationUnsupportedConfig) {
            .bytes = std::initializer_list<uint8_t>{0x41, 0x42, 0x43, 0x44, 0, 0, 0, 0}}),
       .image_source_transformation = display::CoordinateTransformation::kIdentity,
   });
-  static constexpr display::LayerCompositionOperations kLayer0Ops =
-      display::LayerCompositionOperations::kFrameScale.WithSrcFrame();
 
   static constexpr layer_t kBanjoLayer0 = kLayer0.ToBanjo();
   static constexpr display_config_t kBanjoDisplayConfig = {
@@ -315,24 +296,13 @@ TEST_F(DisplayEngineBanjoAdapterTest, CheckConfigurationUnsupportedConfig) {
       .layer_count = 1,
   };
 
-  mock_.ExpectCheckConfiguration(
-      [&](display::DisplayId display_id, display::ModeId display_mode_id,
-          cpp20::span<const display::DriverLayer> layers,
-          cpp20::span<display::LayerCompositionOperations> layer_composition_operations) {
-        ZX_ASSERT(layer_composition_operations.size() >= 1);
-        layer_composition_operations[0] = kLayer0Ops;
-        return display::ConfigCheckResult::kUnsupportedConfig;
-      });
+  mock_.ExpectCheckConfiguration([&](display::DisplayId display_id, display::ModeId display_mode_id,
+                                     cpp20::span<const display::DriverLayer> layers) {
+    return display::ConfigCheckResult::kUnsupportedConfig;
+  });
 
-  std::array<layer_composition_operations_t, 1> banjo_layer_composition_operations;
-  size_t banjo_layer_composition_operations_output_size = 0;
   ASSERT_EQ(display::ConfigCheckResult::kUnsupportedConfig.ToBanjo(),
-            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig,
-                                             banjo_layer_composition_operations.data(),
-                                             banjo_layer_composition_operations.size(),
-                                             &banjo_layer_composition_operations_output_size));
-  ASSERT_EQ(1u, banjo_layer_composition_operations_output_size);
-  EXPECT_EQ(kLayer0Ops.ToBanjo(), banjo_layer_composition_operations[0]);
+            engine_banjo_.CheckConfiguration(&kBanjoDisplayConfig));
 }
 
 TEST_F(DisplayEngineBanjoAdapterTest, ApplyConfiguration) {

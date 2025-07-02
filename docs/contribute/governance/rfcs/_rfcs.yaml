@@ -3530,3 +3530,16 @@
   reviewers: ['maniscalco@google.com', 'bradenkell@google.com', 'rudymathu@google.com', 'cpu@google.com']
   submitted: '2025-04-02'
   reviewed: '2025-04-16'
+
+- name: 'RFC-0271'
+  title: 'Anchored Packages'
+  short_description: 'Intent to provide non-monolithic OTA updates leveraging anchored packages.'
+  authors: ['thomasalpinus@google.com']
+  file: '0271_anchored_packages.md'
+  area: ['Software Delivery']
+  issue: ['389892430']
+  gerrit_change_id: ['1250744']
+  status: 'Accepted'
+  reviewers: ['etryzelaar@google.com', 'amituttam@google.com', 'awolter@google.com', 'markdittmer@google.com', 'gtsai@google.com']
+  submitted: '2025-04-11'
+  reviewed: '2025-06-02'

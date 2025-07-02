@@ -6,6 +6,9 @@ systems supported by Fuchsia.
 The [Display hardware overview][display-hardware-overview] document introduces
 many terms needed to understand display code, and is a good background reading.
 
+The [Display configuration states][display-config-states] document covers some
+important terms used throughout the stack.
+
 ## Stack overview
 
 ### The FIDL interface for display clients
@@ -85,6 +88,7 @@ Fuchsia platform source tree.
 [dfv2]: /docs/concepts/drivers/driver_framework.md
 [dfv2-fidl]: /docs/concepts/drivers/driver_framework.md#fidl_interface
 [dfv2-migration]: /docs/development/drivers/migration/migrate-from-dfv1-to-dfv2.md
+[display-config-states]: docs/config-states.md
 [display-hardware-overview]: docs/hardware.md
 [display-controller-banjo]: /sdk/banjo/fuchsia.hardware.display.controller/display-controller.fidl
 [display-coordinator-fidl]: /sdk/fidl/fuchsia.hardware.display/coordinator.fidl

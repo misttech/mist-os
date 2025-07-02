@@ -4,17 +4,36 @@
 
 use crate::{common, BoardArgs, HybridBoardArgs};
 
-use anyhow::Result;
-use assembly_config_schema::release_info::{BoardReleaseInfo, ReleaseInfo};
+use anyhow::{ensure, Context, Result};
 use assembly_config_schema::{BoardInformation, BoardInputBundleSet};
 use assembly_container::{AssemblyContainer, DirectoryPathBuf};
+use assembly_partitions_config::PartitionsConfig;
+use assembly_release_info::{BoardReleaseInfo, ReleaseInfo};
 use std::collections::BTreeMap;
 
 pub fn new(args: &BoardArgs) -> Result<()> {
     let mut config = BoardInformation::from_config_path(&args.config)?;
+    if let Some(partitions_config) = &args.partitions_config {
+        config.partitions_config = Some(DirectoryPathBuf::new(partitions_config.clone()));
+
+        // We must assert that the board name matches the hardware_revision in
+        // the partitions config, otherwise OTAs may not work.
+        let partitions = PartitionsConfig::from_dir(partitions_config)
+            .context("Validating partitions config")?;
+        if partitions.hardware_revision != "" {
+            ensure!(
+                &config.name == &partitions.hardware_revision,
+                format!(
+                    "The board name ({}) does not match the partitions.hardware_revision ({})",
+                    &config.name, &partitions.hardware_revision
+                )
+            );
+        }
+    }
+
     for (i, board_input_bundle) in args.board_input_bundles.iter().enumerate() {
         let key = format!("tmp{}", i);
-        let directory = DirectoryPathBuf(board_input_bundle.clone());
+        let directory = DirectoryPathBuf::new(board_input_bundle.clone());
         config.input_bundles.insert(key, directory);
     }
 
@@ -93,6 +112,11 @@ pub fn hybrid(args: &HybridBoardArgs) -> Result<()> {
         }
     }
 
+    // Replace the partitions config.
+    if let Some(partitions_config) = &args.replace_partitions_config {
+        config.partitions_config = Some(DirectoryPathBuf::new(partitions_config.clone()));
+    }
+
     config.write_to_dir(&args.output, args.depfile.as_ref())?;
     Ok(())
 }
@@ -136,6 +160,7 @@ impl ToString for BibReference {
 mod tests {
     use super::*;
     use assembly_config_schema::{BoardInputBundle, BoardInputBundleEntry};
+    use assembly_partitions_config::{Partition, Slot};
     use camino::Utf8PathBuf;
     use std::collections::BTreeSet;
     use std::fs::File;
@@ -169,7 +194,7 @@ mod tests {
             name: "my_bib_set".to_string(),
             board_input_bundles: [(
                 "my_bib".to_string(),
-                BoardInputBundleEntry { path: DirectoryPathBuf(bib_path) },
+                BoardInputBundleEntry { path: DirectoryPathBuf::new(bib_path) },
             )]
             .into(),
             release_version: None,
@@ -228,7 +253,7 @@ mod tests {
             name: "my_bib_set".to_string(),
             board_input_bundles: [(
                 "my_bib".to_string(),
-                BoardInputBundleEntry { path: DirectoryPathBuf(bib_path) },
+                BoardInputBundleEntry { path: DirectoryPathBuf::new(bib_path) },
             )]
             .into(),
             release_version: None,
@@ -240,6 +265,7 @@ mod tests {
         let board_path = tmp_path.join("my_board");
         let args = BoardArgs {
             config: config_path,
+            partitions_config: None,
             board_input_bundles: vec![],
             board_input_bundle_sets: vec![bib_set_path.clone()],
             output: board_path.clone(),
@@ -375,7 +401,8 @@ mod tests {
             devicetree: Default::default(),
             devicetree_overlay: Default::default(),
             filesystems: Default::default(),
-            input_bundles: [("my_bib_set::my_bib".to_string(), DirectoryPathBuf(bib_path))].into(),
+            input_bundles: [("my_bib_set::my_bib".to_string(), DirectoryPathBuf::new(bib_path))]
+                .into(),
             configuration: Default::default(),
             kernel: Default::default(),
             platform: Default::default(),
@@ -399,13 +426,21 @@ mod tests {
             name: "my_bib_set".to_string(),
             board_input_bundles: [(
                 "my_bib".to_string(),
-                BoardInputBundleEntry { path: DirectoryPathBuf(new_bib_path) },
+                BoardInputBundleEntry { path: DirectoryPathBuf::new(new_bib_path) },
             )]
             .into(),
             release_version: None,
             release_info: None,
         };
         bib_set.write_to_dir(&bib_set_path, None::<Utf8PathBuf>).unwrap();
+
+        // Write a new partitions config.
+        let partitions =
+            vec![Partition::ZBI { name: "my_zbi_part".into(), slot: Slot::A, size: None }];
+        let partitions_path = tmp_path.join("my_partitions");
+        let partitions_config =
+            PartitionsConfig { partitions: partitions.clone(), ..Default::default() };
+        partitions_config.write_to_dir(&partitions_path, None::<Utf8PathBuf>).unwrap();
 
         // Create a hybrid board and replace the BIB using the set.
         let hybrid_board_path = tmp_path.join("my_hybrid_board");
@@ -414,6 +449,7 @@ mod tests {
             output: hybrid_board_path.clone(),
             replace_bibs_from_board: None,
             replace_bib_sets: vec![bib_set_path],
+            replace_partitions_config: Some(partitions_path),
             depfile: None,
         };
         hybrid(&args).unwrap();
@@ -426,5 +462,10 @@ mod tests {
         let bib = BoardInputBundle::from_dir(bib_path).unwrap();
         let expected = BTreeSet::<String>::from(["after".to_string()]);
         assert_eq!(expected, bib.kernel_boot_args);
+
+        // Ensure the board contains the correct partitions config.
+        let new_partitions_path = board.partitions_config.unwrap().as_utf8_path_buf().clone();
+        let new_partitions = PartitionsConfig::from_dir(new_partitions_path).unwrap();
+        assert_eq!(partitions, new_partitions.partitions);
     }
 }

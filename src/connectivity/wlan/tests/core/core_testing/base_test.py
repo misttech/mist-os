@@ -88,6 +88,19 @@ class ConnectionBaseTestClass(AsyncAdapter, base_test.BaseTestClass):
                 f"Found existing ifaces: {list_ifaces_response.iface_list}. Every test suite should start with no ifaces."
             )
 
+        # Set the country code to US, to allow for 2.4 and 5 GHz connections.
+        set_country_request = fidl_svc.SetCountryRequest(
+            phy_id=self.phy_id, alpha2=[ord("U"), ord("S")]
+        )
+        set_country_response = await self.device_monitor_proxy.set_country(
+            req=set_country_request
+        )
+        assert_equal(
+            set_country_response.status,
+            ZxStatus.ZX_OK,
+            "DeviceMonitor.SetCountry() failed",
+        )
+
         create_iface_response = (
             await self.device_monitor_proxy.create_iface(
                 phy_id=self.phy_id,

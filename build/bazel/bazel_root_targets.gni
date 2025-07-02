@@ -68,7 +68,6 @@ template("build_bazel_root_host_targets") {
     }
 
     _build_target = "${target_name}.build"
-    _install_tools_target = "${target_name}.install_tools"
     _copy_host_binaries_target = target_name
 
     bazel_build_group(_build_target) {
@@ -80,6 +79,8 @@ template("build_bazel_root_host_targets") {
     if (_host_binaries != []) {
       if (_install_tools != []) {
         # Copy to host-tools/ to mimic host_install_tools().
+        _install_tools_target = "${target_name}.install_tools"
+
         copy(_install_tools_target) {
           outputs = [ "$host_tools_dir/{{source_file_part}}" ]
           sources = _install_tools

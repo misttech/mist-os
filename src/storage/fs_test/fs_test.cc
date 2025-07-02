@@ -451,10 +451,9 @@ std::vector<TestFilesystemOptions> AllTestFilesystems() {
         options->push_back(TestFilesystemOptions{
             .description = opt["description"].GetString(),
             .use_fvm = opt["use_fvm"].GetBool(),
-            .has_min_volume_size = ConfigGetOrDefault<bool>(opt, "has_min_volume_size", false),
             .device_block_size = ConfigGetOrDefault<uint64_t>(opt, "device_block_size", 512),
             .device_block_count = ConfigGetOrDefault<uint64_t>(opt, "device_block_count", 196'608),
-            .fvm_slice_size = 32'768,
+            .fvm_slice_size = ConfigGetOrDefault<uint64_t>(opt, "fvm_slice_size", 32'768),
             .filesystem = filesystem.get(),
         });
       }

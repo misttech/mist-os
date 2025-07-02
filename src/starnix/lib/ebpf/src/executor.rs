@@ -4,11 +4,10 @@
 
 use crate::visitor::{BpfVisitor, ProgramCounter, Register, Source};
 use crate::{
-    BpfValue, DataWidth, EbpfHelperImpl, EbpfInstruction, EbpfProgramContext, FromBpfValue, Packet,
+    BpfValue, DataWidth, EbpfInstruction, EbpfProgramContext, FromBpfValue, HelperSet, Packet,
     BPF_STACK_SIZE, GENERAL_REGISTER_COUNT,
 };
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
-use std::collections::HashMap;
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
@@ -16,12 +15,13 @@ use zerocopy::IntoBytes;
 
 pub fn execute<C: EbpfProgramContext>(
     code: &[EbpfInstruction],
-    helpers: &HashMap<u32, EbpfHelperImpl<C>>,
+    helpers: &HelperSet<C>,
     run_context: &mut C::RunContext<'_>,
     arguments: &[BpfValue],
 ) -> u64 {
     assert!(arguments.len() < 5);
     let mut context = ComputationContext {
+        code,
         helpers,
         registers: Default::default(),
         stack: vec![MaybeUninit::uninit(); BPF_STACK_SIZE / std::mem::size_of::<BpfValue>()]
@@ -34,17 +34,22 @@ pub fn execute<C: EbpfProgramContext>(
         // Arguments are in registers r1 to r5.
         context.set_reg((i as u8) + 1, *v);
     }
+
+    // R10 points at the stack.
+    context.registers[10] =
+        BpfValue::from((context.stack.as_mut_ptr() as u64) + (BPF_STACK_SIZE as u64));
+
     loop {
         if let Some(result) = context.result {
             return result;
         }
-        context
-            .visit(run_context, &code[context.pc..])
-            .expect("verifier should have found an issue");
+        context.visit(run_context, code[context.pc]).expect("verifier should have found an issue");
+        context.next();
     }
 }
 
 impl BpfValue {
+    #[inline(always)]
     pub fn add(&self, offset: u64) -> Self {
         Self::from(self.as_u64().overflowing_add(offset).0)
     }
@@ -52,10 +57,12 @@ impl BpfValue {
 
 /// The state of the computation as known by the interpreter at a given point in time.
 struct ComputationContext<'a, C: EbpfProgramContext> {
-    /// The program to execute.
-    helpers: &'a HashMap<u32, EbpfHelperImpl<C>>,
-    /// Register 0 to 9.
-    registers: [BpfValue; GENERAL_REGISTER_COUNT as usize],
+    /// The program being executed.
+    code: &'a [EbpfInstruction],
+    /// Helpers.
+    helpers: &'a HelperSet<C>,
+    /// Registers.
+    registers: [BpfValue; GENERAL_REGISTER_COUNT as usize + 1],
     /// The state of the stack.
     stack: Pin<Box<[MaybeUninit<BpfValue>]>>,
     /// The program counter.
@@ -65,31 +72,30 @@ struct ComputationContext<'a, C: EbpfProgramContext> {
 }
 
 impl<C: EbpfProgramContext> ComputationContext<'_, C> {
+    #[inline(always)]
     fn reg(&mut self, index: Register) -> BpfValue {
-        if index < GENERAL_REGISTER_COUNT {
-            self.registers[index as usize]
-        } else {
-            debug_assert!(index == GENERAL_REGISTER_COUNT);
-            BpfValue::from((self.stack.as_mut_ptr() as u64) + (BPF_STACK_SIZE as u64))
-        }
+        self.registers[index as usize]
     }
 
+    #[inline(always)]
     fn set_reg(&mut self, index: Register, value: BpfValue) {
         self.registers[index as usize] = value;
     }
 
+    #[inline(always)]
     fn next(&mut self) {
-        self.jump_with_offset(0)
+        self.advance_pc(1)
     }
 
-    /// Update the `ComputationContext` `pc` to `pc + offset + 1`. In particular, the next
-    /// instruction is reached with `jump_with_offset(0)`.
-    fn jump_with_offset(&mut self, offset: i16) {
+    /// Adds `offset` to the program counter in `ComputationContext`.
+    #[inline(always)]
+    fn advance_pc(&mut self, offset: i16) {
         let mut pc = self.pc as i64;
-        pc += (offset as i64) + 1;
+        pc += offset as i64;
         self.pc = pc as usize;
     }
 
+    #[inline(always)]
     fn store_memory(
         &mut self,
         addr: BpfValue,
@@ -110,6 +116,7 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
         }
     }
 
+    #[inline(always)]
     fn load_memory(&self, addr: BpfValue, instruction_offset: u64, width: DataWidth) -> BpfValue {
         // SAFETY
         //
@@ -132,6 +139,7 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
         }
     }
 
+    #[inline(always)]
     fn compute_source(&mut self, src: Source) -> BpfValue {
         match src {
             Source::Reg(reg) => self.reg(reg),
@@ -139,6 +147,7 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
         }
     }
 
+    #[inline(always)]
     fn alu(
         &mut self,
         dst: Register,
@@ -148,11 +157,11 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
         let op1 = self.reg(dst).as_u64();
         let op2 = self.compute_source(src).as_u64();
         let result = op(op1, op2);
-        self.next();
         self.set_reg(dst, result.into());
         Ok(())
     }
 
+    #[inline(always)]
     fn atomic_operation(
         &mut self,
         fetch: bool,
@@ -176,10 +185,10 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
         if fetch {
             self.set_reg(src, old_value.into());
         }
-        self.next();
         Ok(())
     }
 
+    #[inline(always)]
     fn atomic_operation64(
         &mut self,
         fetch: bool,
@@ -203,10 +212,10 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
         if fetch {
             self.set_reg(src, old_value.into());
         }
-        self.next();
         Ok(())
     }
 
+    #[inline(always)]
     fn endianness<BO: ByteOrder>(&mut self, dst: Register, width: DataWidth) -> Result<(), String> {
         let value = self.reg(dst);
         let new_value = match width {
@@ -217,11 +226,11 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
                 panic!("Unexpected bit width for endianness operation");
             }
         };
-        self.next();
         self.set_reg(dst, new_value.into());
         Ok(())
     }
 
+    #[inline(always)]
     fn conditional_jump(
         &mut self,
         dst: Register,
@@ -232,9 +241,7 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
         let op1 = self.reg(dst).as_u64();
         let op2 = self.compute_source(src.clone()).as_u64();
         if op(op1, op2) {
-            self.jump_with_offset(offset);
-        } else {
-            self.next();
+            self.advance_pc(offset);
         }
         Ok(())
     }
@@ -243,6 +250,7 @@ impl<C: EbpfProgramContext> ComputationContext<'_, C> {
 impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     type Context<'a> = C::RunContext<'a>;
 
+    #[inline(always)]
     fn add<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -251,6 +259,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| alu32(x, y, |x, y| x.overflowing_add(y).0))
     }
+    #[inline(always)]
     fn add64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -259,6 +268,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| x.overflowing_add(y).0)
     }
+    #[inline(always)]
     fn and<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -267,6 +277,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| alu32(x, y, |x, y| x & y))
     }
+    #[inline(always)]
     fn and64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -275,6 +286,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| x & y)
     }
+    #[inline(always)]
     fn arsh<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -288,6 +300,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
             })
         })
     }
+    #[inline(always)]
     fn arsh64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -307,6 +320,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
             }
         })
     }
+    #[inline(always)]
     fn div<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -315,6 +329,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| alu32(x, y, |x, y| if y == 0 { 0 } else { x / y }))
     }
+    #[inline(always)]
     fn div64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -323,6 +338,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| if y == 0 { 0 } else { x / y })
     }
+    #[inline(always)]
     fn lsh<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -331,6 +347,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| alu32(x, y, |x, y| x.overflowing_shl(y).0))
     }
+    #[inline(always)]
     fn lsh64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -339,6 +356,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| x.overflowing_shl(y as u32).0)
     }
+    #[inline(always)]
     fn r#mod<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -347,6 +365,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| alu32(x, y, |x, y| if y == 0 { x } else { x % y }))
     }
+    #[inline(always)]
     fn mod64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -355,6 +374,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| if y == 0 { x } else { x % y })
     }
+    #[inline(always)]
     fn mov<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -363,6 +383,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| alu32(x, y, |_x, y| y))
     }
+    #[inline(always)]
     fn mov64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -371,6 +392,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |_x, y| y)
     }
+    #[inline(always)]
     fn mul<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -379,6 +401,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| alu32(x, y, |x, y| x.overflowing_mul(y).0))
     }
+    #[inline(always)]
     fn mul64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -387,6 +410,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| x.overflowing_mul(y).0)
     }
+    #[inline(always)]
     fn or<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -395,6 +419,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| alu32(x, y, |x, y| x | y))
     }
+    #[inline(always)]
     fn or64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -403,6 +428,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| x | y)
     }
+    #[inline(always)]
     fn rsh<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -411,6 +437,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| alu32(x, y, |x, y| x.overflowing_shr(y).0))
     }
+    #[inline(always)]
     fn rsh64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -419,6 +446,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| x.overflowing_shr(y as u32).0)
     }
+    #[inline(always)]
     fn sub<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -427,6 +455,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| alu32(x, y, |x, y| x.overflowing_sub(y).0))
     }
+    #[inline(always)]
     fn sub64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -435,6 +464,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| x.overflowing_sub(y).0)
     }
+    #[inline(always)]
     fn xor<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -443,6 +473,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.alu(dst, src, |x, y| alu32(x, y, |x, y| x ^ y))
     }
+    #[inline(always)]
     fn xor64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -452,15 +483,18 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.alu(dst, src, |x, y| x ^ y)
     }
 
+    #[inline(always)]
     fn neg<'a>(&mut self, _context: &mut Self::Context<'a>, dst: Register) -> Result<(), String> {
         self.alu(dst, Source::Value(0), |x, y| {
             alu32(x, y, |x, _y| (x as i32).overflowing_neg().0 as u32)
         })
     }
+    #[inline(always)]
     fn neg64<'a>(&mut self, _context: &mut Self::Context<'a>, dst: Register) -> Result<(), String> {
         self.alu(dst, Source::Value(0), |x, _y| (x as i64).overflowing_neg().0 as u64)
     }
 
+    #[inline(always)]
     fn be<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -470,6 +504,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.endianness::<BigEndian>(dst, width)
     }
 
+    #[inline(always)]
     fn le<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -479,29 +514,32 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.endianness::<LittleEndian>(dst, width)
     }
 
+    #[inline(always)]
     fn call_external<'a>(
         &mut self,
         context: &mut Self::Context<'a>,
         index: u32,
     ) -> Result<(), String> {
-        let helper = &self.helpers[&index];
+        let helper = &self.helpers.get_by_index(index).unwrap();
         let result =
             helper.0(context, self.reg(1), self.reg(2), self.reg(3), self.reg(4), self.reg(5));
-        self.next();
         self.set_reg(0, result);
         Ok(())
     }
 
+    #[inline(always)]
     fn exit<'a>(&mut self, _context: &mut Self::Context<'a>) -> Result<(), String> {
         self.result = Some(self.reg(0).as_u64());
         Ok(())
     }
 
+    #[inline(always)]
     fn jump<'a>(&mut self, _context: &mut Self::Context<'a>, offset: i16) -> Result<(), String> {
-        self.jump_with_offset(offset);
+        self.advance_pc(offset);
         Ok(())
     }
 
+    #[inline(always)]
     fn jeq<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -511,6 +549,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| comp32(x, y, |x, y| x == y))
     }
+    #[inline(always)]
     fn jeq64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -520,6 +559,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| x == y)
     }
+    #[inline(always)]
     fn jne<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -529,6 +569,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| comp32(x, y, |x, y| x != y))
     }
+    #[inline(always)]
     fn jne64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -538,6 +579,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| x != y)
     }
+    #[inline(always)]
     fn jge<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -547,6 +589,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| comp32(x, y, |x, y| x >= y))
     }
+    #[inline(always)]
     fn jge64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -556,6 +599,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| x >= y)
     }
+    #[inline(always)]
     fn jgt<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -565,6 +609,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| comp32(x, y, |x, y| x > y))
     }
+    #[inline(always)]
     fn jgt64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -574,6 +619,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| x > y)
     }
+    #[inline(always)]
     fn jle<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -583,6 +629,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| comp32(x, y, |x, y| x <= y))
     }
+    #[inline(always)]
     fn jle64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -592,6 +639,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| x <= y)
     }
+    #[inline(always)]
     fn jlt<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -601,6 +649,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| comp32(x, y, |x, y| x < y))
     }
+    #[inline(always)]
     fn jlt64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -610,6 +659,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| x < y)
     }
+    #[inline(always)]
     fn jsge<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -619,6 +669,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| scomp32(x, y, |x, y| x >= y))
     }
+    #[inline(always)]
     fn jsge64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -628,6 +679,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| scomp64(x, y, |x, y| x >= y))
     }
+    #[inline(always)]
     fn jsgt<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -637,6 +689,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| scomp32(x, y, |x, y| x > y))
     }
+    #[inline(always)]
     fn jsgt64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -646,6 +699,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| scomp64(x, y, |x, y| x > y))
     }
+    #[inline(always)]
     fn jsle<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -655,6 +709,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| scomp32(x, y, |x, y| x <= y))
     }
+    #[inline(always)]
     fn jsle64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -664,6 +719,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| scomp64(x, y, |x, y| x <= y))
     }
+    #[inline(always)]
     fn jslt<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -673,6 +729,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| scomp32(x, y, |x, y| x < y))
     }
+    #[inline(always)]
     fn jslt64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -682,6 +739,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| scomp64(x, y, |x, y| x < y))
     }
+    #[inline(always)]
     fn jset<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -691,6 +749,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         self.conditional_jump(dst, src, offset, |x, y| comp32(x, y, |x, y| x & y != 0))
     }
+    #[inline(always)]
     fn jset64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -701,6 +760,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.conditional_jump(dst, src, offset, |x, y| x & y != 0)
     }
 
+    #[inline(always)]
     fn atomic_add<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -712,6 +772,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.atomic_operation(fetch, dst, offset, src, |_, a, v| a.fetch_add(v, Ordering::SeqCst))
     }
 
+    #[inline(always)]
     fn atomic_add64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -723,6 +784,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.atomic_operation64(fetch, dst, offset, src, |_, a, v| a.fetch_add(v, Ordering::SeqCst))
     }
 
+    #[inline(always)]
     fn atomic_and<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -734,6 +796,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.atomic_operation(fetch, dst, offset, src, |_, a, v| a.fetch_and(v, Ordering::SeqCst))
     }
 
+    #[inline(always)]
     fn atomic_and64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -745,6 +808,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.atomic_operation64(fetch, dst, offset, src, |_, a, v| a.fetch_and(v, Ordering::SeqCst))
     }
 
+    #[inline(always)]
     fn atomic_or<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -756,6 +820,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.atomic_operation(fetch, dst, offset, src, |_, a, v| a.fetch_or(v, Ordering::SeqCst))
     }
 
+    #[inline(always)]
     fn atomic_or64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -767,6 +832,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.atomic_operation64(fetch, dst, offset, src, |_, a, v| a.fetch_or(v, Ordering::SeqCst))
     }
 
+    #[inline(always)]
     fn atomic_xor<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -778,6 +844,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.atomic_operation(fetch, dst, offset, src, |_, a, v| a.fetch_xor(v, Ordering::SeqCst))
     }
 
+    #[inline(always)]
     fn atomic_xor64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -789,6 +856,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.atomic_operation64(fetch, dst, offset, src, |_, a, v| a.fetch_xor(v, Ordering::SeqCst))
     }
 
+    #[inline(always)]
     fn atomic_xchg<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -800,6 +868,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.atomic_operation(fetch, dst, offset, src, |_, a, v| a.swap(v, Ordering::SeqCst))
     }
 
+    #[inline(always)]
     fn atomic_xchg64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -811,6 +880,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         self.atomic_operation64(fetch, dst, offset, src, |_, a, v| a.swap(v, Ordering::SeqCst))
     }
 
+    #[inline(always)]
     fn atomic_cmpxchg<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -828,6 +898,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         })
     }
 
+    #[inline(always)]
     fn atomic_cmpxchg64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -845,6 +916,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         })
     }
 
+    #[inline(always)]
     fn load<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -855,35 +927,25 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         let addr = self.reg(src);
         let loaded = self.load_memory(addr, offset as u64, width);
-        self.next();
         self.set_reg(dst, loaded);
         Ok(())
     }
 
+    #[inline(always)]
     fn load64<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
         dst: Register,
-        value: u64,
-        jump_offset: i16,
+        _src: u8,
+        lower: u32,
     ) -> Result<(), String> {
-        self.jump_with_offset(jump_offset);
+        let value = (lower as u64) | (((self.code[self.pc + 1].imm() as u32) as u64) << 32);
         self.set_reg(dst, value.into());
+        self.advance_pc(1);
         Ok(())
     }
 
-    fn load_map_ptr<'a>(
-        &mut self,
-        _context: &mut Self::Context<'a>,
-        _dst: Register,
-        _map_index: u32,
-        _jump_offset: i16,
-    ) -> Result<(), String> {
-        // ldimm64 instructions with src=BPF_PSEUDO_MAP_IDX should be replaced when the program is
-        // linked.
-        panic!("executing program with BPF_PSEUDO_MAP_IDX")
-    }
-
+    #[inline(always)]
     fn load_from_packet<'a>(
         &mut self,
         context: &mut Self::Context<'a>,
@@ -904,7 +966,6 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         // SAFETY: The verifier checks that the `src_reg` points at packet.
         let packet = unsafe { C::Packet::from_bpf_value(context, src_reg) };
         if let Some(value) = packet.load(offset, width) {
-            self.next();
             self.set_reg(dst_reg, value.into());
         } else {
             self.result = Some(self.reg(0).as_u64());
@@ -912,6 +973,7 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
         Ok(())
     }
 
+    #[inline(always)]
     fn store<'a>(
         &mut self,
         _context: &mut Self::Context<'a>,
@@ -922,24 +984,27 @@ impl<C: EbpfProgramContext> BpfVisitor for ComputationContext<'_, C> {
     ) -> Result<(), String> {
         let src = self.compute_source(src);
         let dst = self.reg(dst);
-        self.next();
         self.store_memory(dst, src, offset as u64, width);
         Ok(())
     }
 }
 
+#[inline(always)]
 fn alu32(x: u64, y: u64, op: impl FnOnce(u32, u32) -> u32) -> u64 {
     op(x as u32, y as u32) as u64
 }
 
+#[inline(always)]
 fn comp32(x: u64, y: u64, op: impl FnOnce(u32, u32) -> bool) -> bool {
     op(x as u32, y as u32)
 }
 
+#[inline(always)]
 fn scomp64(x: u64, y: u64, op: impl FnOnce(i64, i64) -> bool) -> bool {
     op(x as i64, y as i64)
 }
 
+#[inline(always)]
 fn scomp32(x: u64, y: u64, op: impl FnOnce(i32, i32) -> bool) -> bool {
     op(x as i32, y as i32)
 }

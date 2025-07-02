@@ -324,6 +324,14 @@ bool AmlHrtimerServer::IsTimerStarted(size_t id) {
   }
 }
 
+void AmlHrtimerServer::ReadTimer(ReadTimerRequest& request, ReadTimerCompleter::Sync& completer) {
+  completer.Reply(fit::error(fuchsia_hardware_hrtimer::DriverError::kNotSupported));
+}
+
+void AmlHrtimerServer::ReadClock(ReadClockRequest& request, ReadClockCompleter::Sync& completer) {
+  completer.Reply(fit::error(fuchsia_hardware_hrtimer::DriverError::kNotSupported));
+}
+
 void AmlHrtimerServer::Stop(StopRequest& request, StopCompleter::Sync& completer) {
   size_t timer_index = TimerIndexFromId(request.id());
   if (timer_index >= kNumberOfTimers) {
@@ -732,6 +740,7 @@ void AmlHrtimerServer::GetProperties(GetPropertiesCompleter::Sync& completer) {
     timer_properties.supports_event(i.supports_notifications);
     // Only support wait if we can return a lease in StartAndWait.
     timer_properties.supports_wait(sag_ && i.supports_notifications);
+    timer_properties.supports_read(false);
     timers_properties.emplace_back(std::move(timer_properties));
   }
 

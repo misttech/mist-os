@@ -5,6 +5,7 @@
 """Flatland Benchmark."""
 
 import itertools
+import logging
 import os
 import time
 from pathlib import Path
@@ -22,6 +23,7 @@ TILE_URL = (
 )
 BENCHMARK_DURATION_SEC = 10
 TEST_NAME: str = "fuchsia.app_render_latency"
+LOGGER = logging.getLogger(__name__)
 
 
 class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
@@ -40,15 +42,16 @@ class FlatlandBenchmark(fuchsia_base_test.FuchsiaBaseTest):
 
         self.dut: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
-        # Stop the session for a clean state.
-        self.dut.session.stop()
-
-        self.dut.session.start()
-
-    def teardown_test(self) -> None:
-        self.dut.session.stop()
+        self.dut.session.ensure_started()
 
     def test_flatland(self) -> None:
+        # The tile app only works on vulkan renderer.
+        if self.dut.scenic.renderer != "vulkan":
+            LOGGER.info(
+                f"skip flatlan benchmark on {self.dut.scenic.renderer} renderer"
+            )
+            return
+
         # Add flatland-rainbow tile
         self.dut.session.add_component(TILE_URL)
 

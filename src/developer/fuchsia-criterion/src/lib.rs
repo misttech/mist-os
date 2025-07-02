@@ -61,6 +61,17 @@ impl FuchsiaCriterion {
     ///
     /// [Fuchsiaperf file format]: https://fuchsia.dev/fuchsia-src/development/performance/fuchsiaperf_format
     pub fn fuchsia_bench() -> Self {
+        let args: Vec<String> = env::args().collect();
+        let args: Vec<&str> = args.iter().map(|s| &**s).collect();
+        Self::fuchsia_bench_with_args(&args[..])
+    }
+
+    /// Same as `fuchsia_bench()`, but parses the specified args instead of parsing
+    /// `std::env::args`.
+    ///
+    /// This is useful when the benchmarks needs to accept some arguments specified in the CML
+    /// file.
+    pub fn fuchsia_bench_with_args(args: &[&str]) -> Self {
         fn help_and_exit(name: &str, wrong_args: Option<String>) -> ! {
             println!(
                 "fuchsia-criterion benchmark\n\
@@ -80,9 +91,6 @@ impl FuchsiaCriterion {
                 process::exit(0)
             }
         }
-
-        let args: Vec<String> = env::args().collect();
-        let args: Vec<&str> = args.iter().map(|s| &**s).collect();
 
         match &args[..] {
             [_, "--filter", filter, json_output] => {

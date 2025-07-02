@@ -40,8 +40,8 @@ DefaultFrameScheduler::DefaultFrameScheduler(std::unique_ptr<FramePredictor> pre
   inspect_wakeups_without_render_ = inspect_node_.CreateUint("wakeups_without_rendering", 0);
   inspect_last_successful_update_start_time_ =
       inspect_node_.CreateUint("last_successful_update_start_time", 0);
-  inspect_last_successful_render_start_time_ =
-      inspect_node_.CreateUint("last_successful_render_start_time", 0);
+  inspect_last_successful_target_presentation_time_ =
+      inspect_node_.CreateUint("last_successful_target_presentation_time", 0);
 }
 
 DefaultFrameScheduler::~DefaultFrameScheduler() {}
@@ -390,8 +390,8 @@ void DefaultFrameScheduler::HandleFramePresented(uint64_t frame_number, zx::time
     zx::duration duration =
         std::max(timestamps.render_done_time - render_start_time, zx::duration(0));
     frame_predictor_->ReportRenderDuration(zx::duration(duration));
-    inspect_last_successful_render_start_time_.Set(target_presentation_time.get());
-    last_successful_render_start_time_ = target_presentation_time;
+    inspect_last_successful_target_presentation_time_.Set(target_presentation_time.get());
+    last_successful_target_presentation_time_ = target_presentation_time;
   }
 
   if (timestamps.actual_presentation_time == kTimeDropped) {
@@ -622,8 +622,8 @@ void DefaultFrameScheduler::LogPeriodicDebugInfo() {
                 << "\n\t current time: " << async_now(dispatcher_)
                 << "\n\t last successful update start time: "
                 << last_successful_update_start_time_.get()
-                << "\n\t last successful render start time: "
-                << last_successful_render_start_time_.get();
+                << "\n\t last successful target presentation time: "
+                << last_successful_target_presentation_time_.get();
 }
 
 }  // namespace scheduling

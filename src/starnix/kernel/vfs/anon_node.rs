@@ -13,7 +13,7 @@ use starnix_types::vfs::default_statfs;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::{error, ino_t, statfs, ANON_INODE_FS_MAGIC};
+use starnix_uapi::{error, statfs, ANON_INODE_FS_MAGIC};
 use std::sync::Arc;
 
 pub struct Anon {
@@ -29,7 +29,7 @@ impl FsNodeOps for Anon {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -59,10 +59,11 @@ impl Anon {
         ops: Box<dyn FileOps>,
         flags: OpenFlags,
         name: &'static str,
-        info: impl FnOnce(ino_t) -> FsNodeInfo,
+        info: FsNodeInfo,
     ) -> FileHandle {
         let fs = anon_fs(current_task.kernel());
-        let node = fs.create_node(current_task, Anon { name: Some(name), is_private: false }, info);
+        let node =
+            fs.create_node_and_allocate_node_id(Anon { name: Some(name), is_private: false }, info);
         security::fs_node_init_anon(current_task, &node, name);
         FileObject::new_anonymous(current_task, ops, node, flags)
     }
@@ -79,7 +80,7 @@ impl Anon {
             ops,
             flags,
             name,
-            FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
+            FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred()),
         )
     }
 
@@ -96,7 +97,7 @@ impl Anon {
             ops,
             flags,
             name,
-            FsNodeInfo::new_factory(FileMode::from_bits(0o600), current_task.as_fscred()),
+            FsNodeInfo::new(FileMode::from_bits(0o600), current_task.as_fscred()),
         )
     }
 
@@ -106,10 +107,11 @@ impl Anon {
         ops: Box<dyn FileOps>,
         flags: OpenFlags,
         name: &'static str,
-        info: impl FnOnce(ino_t) -> FsNodeInfo,
+        info: FsNodeInfo,
     ) -> FileHandle {
         let fs = anon_fs(current_task.kernel());
-        let node = fs.create_node(current_task, Anon { name: Some(name), is_private: true }, info);
+        let node =
+            fs.create_node_and_allocate_node_id(Anon { name: Some(name), is_private: true }, info);
         security::fs_node_init_anon(current_task, &node, name);
         FileObject::new_anonymous(current_task, ops, node, flags)
     }
@@ -126,7 +128,7 @@ struct AnonFs;
 impl FileSystemOps for AnonFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {

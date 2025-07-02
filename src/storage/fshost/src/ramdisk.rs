@@ -7,9 +7,10 @@
 //! ramdisk_image option, in run modes where we need to operate on the real disk and can't run
 //! filesystems off it, such as recovery.
 
-use crate::device::{BlockDevice, Device, RamdiskDevice};
+use crate::device::{BlockDevice, Device, LocalBlockDevice};
 use anyhow::{ensure, Context, Error};
 use fuchsia_component::client::connect_to_protocol;
+use vmo_backed_block_server::{InitialContents, VmoBackedServerOptions};
 
 use zerocopy::{FromBytes, Immutable, KnownLayout};
 
@@ -69,13 +70,14 @@ async fn create_ramdisk(zbi_vmo: zx::Vmo, storage_host: bool) -> Result<Box<dyn 
     ramdisk_vmo.write(&decompressed_buf, 0).context("writing decompressed contents to vmo")?;
 
     if storage_host {
-        let ramdisk = ramdevice_client::RamdiskClientBuilder::new_with_vmo(ramdisk_vmo, None)
-            .use_v2()
-            .build()
-            .await
-            .context("building ramdisk from vmo")?;
+        let server = VmoBackedServerOptions {
+            initial_contents: InitialContents::FromVmo(ramdisk_vmo),
+            ..Default::default()
+        }
+        .build()
+        .context("building ramdisk from vmo")?;
 
-        Ok(Box::new(RamdiskDevice::new(ramdisk)?))
+        Ok(Box::new(LocalBlockDevice::new(server).await?))
     } else {
         let ramdisk = ramdevice_client::RamdiskClientBuilder::new_with_vmo(ramdisk_vmo, None)
             .build()

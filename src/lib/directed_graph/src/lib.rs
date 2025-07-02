@@ -29,10 +29,40 @@ impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> DirectedGraph<T> {
         self.0.get(&id).as_ref().map(|node| &node.0)
     }
 
+    /// Given a dependency graph represented as a set of `edges`, find the set of
+    /// all nodes that the `start` node depends on, directly or indirectly. This
+    /// includes `start` itself.
+    pub fn get_closure(&self, start: T) -> HashSet<T> {
+        let mut res = HashSet::new();
+        res.insert(start);
+        loop {
+            let mut entries_added = false;
+
+            for source in self.0.keys() {
+                match self.get_targets(*source) {
+                    None => continue,
+                    Some(targets) if targets.is_empty() => continue,
+                    Some(targets) => {
+                        for target in targets {
+                            if !res.contains(target) {
+                                continue;
+                            }
+                            if res.insert(source.clone()) {
+                                entries_added = true
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !entries_added {
+                return res;
+            }
+        }
+    }
+
     /// Returns the nodes of the graph in reverse topological order, or an error if the graph
     /// contains a cycle.
-    ///
-    /// TODO: //src/devices/tools/banjo/srt/ast.rs can be migrated to use this feature.
     pub fn topological_sort(&self) -> Result<Vec<T>, Error<T>> {
         TarjanSCC::new(self).run()
     }
@@ -102,7 +132,7 @@ impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> Default for DirectedGra
 
 /// A graph node. Contents contain the nodes mapped by edges from this node.
 #[derive(Eq, PartialEq)]
-struct DirectedNode<T: PartialEq + Hash + Copy + Ord + Debug + Display>(HashSet<T>);
+pub struct DirectedNode<T: PartialEq + Hash + Copy + Ord + Debug + Display>(HashSet<T>);
 
 impl<T: PartialEq + Hash + Copy + Ord + Debug + Display> DirectedNode<T> {
     /// Create an empty node.

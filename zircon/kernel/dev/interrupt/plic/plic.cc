@@ -21,6 +21,7 @@
 #include <arch/riscv64.h>
 #include <arch/riscv64/mp.h>
 #include <dev/interrupt.h>
+#include <dev/interrupt/plic.h>
 #include <kernel/cpu.h>
 #include <kernel/stats.h>
 #include <kernel/thread.h>

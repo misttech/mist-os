@@ -2,19 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    children: [
-        {
-            name: "full-resolver",
-            url: "fuchsia-pkg://fuchsia.com/full-resolver#meta/full-resolver.cm",
-        },
-    ],
-    offer: [
-        {
-            protocol: "fuchsia.pkg.PackageResolver",
-            from: "#pkg-resolver",
-            to: "#full-resolver",
-        },
-    ],
     environments: [
         {
             name: "core-env",
@@ -22,7 +9,7 @@
             resolvers: [
                 {
                     resolver: "full-resolver",
-                    from: "#full-resolver",
+                    from: "#pkg-resolver",
                     scheme: "fuchsia-pkg",
                 },
             ],
@@ -30,8 +17,8 @@
         {
             name: "session-env",
 
-            // This excludes the boot-resolver and builtin-runner, which the session is not
-            // allowed access to.
+            // This excludes the boot-resolver and most builtin runners, which
+            // the session is not allowed access to.
             extends: "none",
             runners: [
                 {
@@ -42,12 +29,21 @@
                     runner: "elf",
                     from: "parent",
                 },
+                {
+                    runner: "builtin_dispatcher",
+                    from: "parent",
+                },
             ],
             resolvers: [
                 {
                     resolver: "full-resolver",
-                    from: "#full-resolver",
+                    from: "#pkg-resolver",
                     scheme: "fuchsia-pkg",
+                },
+                {
+                    resolver: "fuchsia-builtin",
+                    from: "parent",
+                    scheme: "fuchsia-builtin",
                 },
             ],
 

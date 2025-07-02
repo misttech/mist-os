@@ -4,8 +4,8 @@
 
 use component_events::events::*;
 use component_events::matcher::*;
+use fuchsia_async as fasync;
 use fuchsia_component_test::{Capability, ChildOptions, RealmBuilder, Ref, Route};
-use {fidl_fuchsia_component as fcomponent, fuchsia_async as fasync};
 
 // TODO(https://fxbug.dev/42172627): Deduplicate this function. It is used in other CM integration tests
 async fn start_nested_cm_and_wait_for_clean_stop(root_url: &str, moniker_to_wait_on: &str) {
@@ -27,10 +27,7 @@ async fn start_nested_cm_and_wait_for_clean_stop(root_url: &str, moniker_to_wait
         .unwrap();
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
-    let proxy = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
-        .unwrap();
+    let proxy = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let mut event_stream = EventStream::new(proxy);
 
@@ -66,10 +63,7 @@ async fn from_framework_should_not_work() {
         .unwrap();
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
-    let proxy = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
-        .unwrap();
+    let proxy = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let mut event_stream = EventStream::new(proxy);
 

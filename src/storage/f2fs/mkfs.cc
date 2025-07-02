@@ -13,7 +13,7 @@
 
 #include "src/lib/uuid/uuid.h"
 #include "src/storage/f2fs/bcache.h"
-#include "src/storage/f2fs/segment.h"
+#include "src/storage/f2fs/bitmap.h"
 
 namespace f2fs {
 
@@ -71,16 +71,6 @@ zx_status_t MkfsWorker::GetDeviceInfo() {
   params_.total_sectors = info.block_count;
   params_.start_sector = kSuperblockStart;
 
-  if (info.block_size < kDefaultSectorSize || info.block_size > kBlockSize) {
-    FX_LOGS(ERROR) << info.block_size << " of block size is not supported";
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  if (info.flags & fuchsia_hardware_block::wire::Flag::kReadonly) {
-    FX_LOGS(ERROR) << "cannot format read-only block device";
-    return ZX_ERR_INVALID_ARGS;
-  }
-
   return ZX_OK;
 }
 
@@ -108,7 +98,7 @@ void MkfsWorker::ConfigureExtensionList() {
 
 zx_status_t MkfsWorker::WriteToDisk(void *buf, block_t bno) { return bc_->Writeblk(bno, buf); }
 
-zx::result<> MkfsWorker::SetSpace() {
+zx::result<uint32_t> MkfsWorker::SetSpace() {
   const uint32_t segs_per_sec = params_.segs_per_sec;
   uint32_t main_sections = LeToCpu(super_block_.segment_count_main) / segs_per_sec;
   uint32_t reserved_sections = params_.reserved_segments / segs_per_sec;
@@ -126,11 +116,13 @@ zx::result<> MkfsWorker::SetSpace() {
   if (!op_ratio) {
     op_ratio = kDefaultOpRatio;
   }
+
+  // Find a proper size for op, and check if there is enough space for user.
   size_t op_sections = std::max(1UL, CheckedDivRoundUp(user_sections * op_ratio, 100UL));
   while (op_sections && user_sections <= op_sections) {
     --op_sections;
   }
-  if (!op_sections || user_sections < kNrCursegType) {
+  if (!op_sections || user_sections / params_.secs_per_zone < kNrCursegType) {
     return zx::error(ZX_ERR_NO_SPACE);
   }
   params_.op_segments = safemath::checked_cast<uint32_t>(op_sections * segs_per_sec);
@@ -139,7 +131,7 @@ zx::result<> MkfsWorker::SetSpace() {
   FX_LOGS(INFO) << " user_segments : " << (user_sections - op_sections) * segs_per_sec;
   FX_LOGS(INFO) << " reserved_segments : " << reserved_sections * segs_per_sec;
   FX_LOGS(INFO) << " op_segments : " << op_sections * segs_per_sec << ", " << op_ratio << "%";
-  return zx::ok();
+  return zx::ok(main_sections / params_.secs_per_zone);
 }
 
 zx_status_t MkfsWorker::PrepareSuperblock() {
@@ -316,9 +308,11 @@ zx_status_t MkfsWorker::PrepareSuperblock() {
   super_block_.segment_count_main =
       CpuToLe(LeToCpu(super_block_.section_count) * params_.segs_per_sec);
 
-  if (SetSpace().is_error()) {
-    FX_LOGS(WARNING) << "device size is not sufficient for F2FS volume";
-    return ZX_ERR_NO_SPACE;
+  zx::result total_zones_or = SetSpace();
+  if (total_zones_or.is_error()) {
+    FX_LOGS(WARNING) << "failed to set sections for op and reserved space. "
+                     << total_zones_or.status_string();
+    return total_zones_or.error_value();
   }
 
   memcpy(super_block_.uuid, uuid::Uuid::Generate().bytes(), 16);
@@ -335,18 +329,9 @@ zx_status_t MkfsWorker::PrepareSuperblock() {
   super_block_.meta_ino = CpuToLe(2U);
   super_block_.root_ino = CpuToLe(3U);
 
-  uint32_t total_zones =
-      ((safemath::CheckSub(LeToCpu(super_block_.segment_count_main), 1) / params_.segs_per_sec) /
-       params_.secs_per_zone)
-          .ValueOrDie();
-  if (total_zones <= kNrCursegType) {
-    FX_LOGS(ERROR) << "requires more zones than " << total_zones;
-    return ZX_ERR_NO_SPACE;
-  }
-
   if (params_.heap) {
     params_.cur_seg[static_cast<int>(CursegType::kCursegHotNode)] =
-        (total_zones - 1) * params_.segs_per_sec * params_.secs_per_zone +
+        (*total_zones_or - 1) * params_.segs_per_sec * params_.secs_per_zone +
         ((params_.secs_per_zone - 1) * params_.segs_per_sec);
     params_.cur_seg[static_cast<int>(CursegType::kCursegWarmNode)] =
         params_.cur_seg[static_cast<int>(CursegType::kCursegHotNode)] -
@@ -829,6 +814,11 @@ zx_status_t ParseOptions(const MkfsOptions &options) {
 
 zx::result<std::unique_ptr<BcacheMapper>> Mkfs(const MkfsOptions &options,
                                                std::unique_ptr<BcacheMapper> bc) {
+  if (!bc->IsWritable()) {
+    FX_LOGS(ERROR) << "cannot format read-only block device";
+    return zx::error(ZX_ERR_INVALID_ARGS);
+  }
+
   MkfsWorker mkfs(std::move(bc), options);
   return mkfs.DoMkfs();
 }

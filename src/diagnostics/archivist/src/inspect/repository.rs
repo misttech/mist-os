@@ -496,8 +496,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn repo_fetch_escrow_removes_data() {
-        let _exec = fuchsia_async::LocalExecutor::new();
+    async fn repo_fetch_escrow_removes_data() {
         let repo = Arc::new(InspectRepository::new(vec![], fasync::Scope::new()));
         let moniker = ExtendedMoniker::parse_str("a/b/foo").unwrap();
         let identity = Arc::new(ComponentIdentity::new(moniker, TEST_URL));

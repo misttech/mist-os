@@ -32,6 +32,7 @@ use log::{debug, error, info, warn};
 use net_types::ip::{GenericOverIp, Ip, IpAddress, IpVersion, Ipv4, Ipv6, Subnet};
 use net_types::SpecifiedAddr;
 use netstack3_core::routes::AddableMetric;
+use thiserror::Error;
 use zx::AsHandleRef as _;
 use {fidl_fuchsia_net_routes as fnet_routes, fidl_fuchsia_net_routes_admin as fnet_routes_admin};
 
@@ -150,7 +151,7 @@ impl<I: Ip> From<Change<I>> for ChangeEither {
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Error)]
 pub(crate) enum ChangeError {
     #[error("route's device no longer exists")]
     DeviceRemoved,
@@ -1305,7 +1306,7 @@ mod tests {
     #[netstack3_core::context_ip_bounds(I, BindingsCtx)]
     #[fixture::teardown(TestSetup::shutdown)]
     #[ip_test(I)]
-    #[fasync::run_singlethreaded(test)]
+    #[fasync::run_singlethreaded]
     async fn table_added_in_both_core_and_bindings<I: IpExt>() {
         set_logger_for_test();
         let t = TestSetupBuilder::new()

@@ -5,30 +5,21 @@
 //! FFX plugin for constructing product bundles, which are distributable containers for a product's
 //! images and packages, and can be used to emulate, flash, or update a product.
 
-use anyhow::{ensure, Context, Result};
-use assembled_system::{AssembledSystem, BlobfsContents, Image, PackagesMetadata};
+use anyhow::{Context, Result};
+use assembled_system::AssembledSystem;
 use assembly_container::AssemblyContainer;
-use assembly_partitions_config::{PartitionImageMapper, PartitionsConfig, Slot as PartitionSlot};
-use assembly_tool::{SdkToolProvider, ToolProvider};
-use assembly_update_package::{Slot, UpdatePackageBuilder};
-use assembly_update_packages_manifest::UpdatePackagesManifest;
-use camino::{Utf8Path, Utf8PathBuf};
-use epoch::EpochFile;
+use assembly_partitions_config::{PartitionsConfig, Slot as PartitionSlot};
+use assembly_sdk::SdkToolProvider;
+use assembly_tool::ToolProvider;
 use ffx_config::sdk::{in_tree_sdk_version, SdkVersion};
 use ffx_config::EnvironmentContext;
 use ffx_flash_manifest::FlashManifestVersion;
 use ffx_product_create_args::CreateCommand;
 use ffx_writer::SimpleWriter;
 use fho::{return_bug, FfxMain, FfxTool};
-use fuchsia_pkg::PackageManifest;
-use fuchsia_repo::repo_builder::RepoBuilder;
-use fuchsia_repo::repo_keys::RepoKeys;
-use fuchsia_repo::repository::FileSystemRepository;
-use sdk_metadata::{
-    ProductBundle, ProductBundleV2, Repository, VirtualDevice, VirtualDeviceManifest,
-};
+use product_bundle::ProductBundleBuilder;
+use sdk_metadata::VirtualDevice;
 use std::fs::File;
-use tempfile::TempDir;
 
 /// Default delivery blob type to use for products.
 const DEFAULT_DELIVERY_BLOB_TYPE: u32 = 1;
@@ -74,7 +65,7 @@ pub async fn pb_create_with_sdk_version(
             if cmd.tuf_keys.is_none() {
                 anyhow::bail!("TUF keys must be provided to build an update package");
             }
-            let version = cmd.update_package_version_file.ok_or_else(|| {
+            let version = cmd.update_package_version_file.clone().ok_or_else(|| {
                 anyhow::anyhow!("A version file must be provided to build an update package")
             })?;
             let epoch = cmd.update_package_epoch.ok_or_else(|| {
@@ -85,215 +76,49 @@ pub async fn pb_create_with_sdk_version(
             None
         };
 
-    // Make sure `out_dir` is created and empty.
-    if cmd.out_dir.exists() {
-        if cmd.out_dir == "" || cmd.out_dir == "/" {
-            anyhow::bail!("Avoiding deletion of an unsafe out directory: {}", &cmd.out_dir);
-        }
-        std::fs::remove_dir_all(&cmd.out_dir).context("Deleting the out_dir")?;
+    // Build a product bundle.
+    let mut pb_builder =
+        ProductBundleBuilder::new(cmd.product_name.clone(), cmd.product_version.clone())
+            .sdk_version(sdk_version.to_string());
+    if let Some(path) = &cmd.partitions {
+        let partitions = PartitionsConfig::from_dir(&path)
+            .with_context(|| format!("Parsing partitions config: {}", &path))?;
+        pb_builder = pb_builder.partitions(partitions);
     }
-    std::fs::create_dir_all(&cmd.out_dir).context("Creating the out_dir")?;
-
-    let partitions = load_partitions_config(&cmd.partitions, &cmd.out_dir.join("partitions"))?;
-    let (system_a, packages_a) =
-        load_assembled_system(&cmd.system_a, &cmd.out_dir.join("system_a"))?;
-    let (system_b, _packages_b) =
-        load_assembled_system(&cmd.system_b, &cmd.out_dir.join("system_b"))?;
-    let (system_r, packages_r) =
-        load_assembled_system(&cmd.system_r, &cmd.out_dir.join("system_r"))?;
-
-    // We must assert that the board_name for the system of images matches the hardware_revision in
-    // the partitions config, otherwise OTAs may not work.
-    let ensure_system_board = |system: &AssembledSystem| -> Result<()> {
-        if partitions.hardware_revision != "" {
-            ensure!(
-                &system.board_name == &partitions.hardware_revision,
-                format!(
-                    "The system board_name ({}) must match the partitions.hardware_revision ({})",
-                    &system.board_name, &partitions.hardware_revision
-                )
-            );
-        }
-        Ok(())
-    };
-
-    // Generate a size report for the images after mapping them to partitions.
-    if let Some(size_report) = cmd.gerrit_size_report {
-        let mut mapper = PartitionImageMapper::new(partitions.clone())?;
-        if let Some(system) = &system_a {
-            mapper.map_images_to_slot(&system.images, PartitionSlot::A)?;
-            ensure_system_board(system)?;
-        }
-        if let Some(system) = &system_b {
-            mapper.map_images_to_slot(&system.images, PartitionSlot::B)?;
-            ensure_system_board(system)?;
-        }
-        if let Some(system) = &system_r {
-            mapper.map_images_to_slot(&system.images, PartitionSlot::R)?;
-            ensure_system_board(system)?;
-        }
-        mapper
-            .generate_gerrit_size_report(&size_report, &cmd.product_name)
-            .context("Generating image size report")?;
+    if let Some(system_path) = &cmd.system_a {
+        let system = AssembledSystem::from_dir(system_path)?;
+        pb_builder = pb_builder.system(system, PartitionSlot::A);
     }
-
-    // Generate the update packages if necessary.
-    let (_gen_dir, update_package_hash, update_packages) =
-        if let Some((version, epoch)) = update_details {
-            let epoch: EpochFile = EpochFile::Version1 { epoch };
-            let gen_dir = TempDir::new().context("creating temporary directory")?;
-            let mut builder = UpdatePackageBuilder::new(
-                partitions.clone(),
-                partitions.hardware_revision.clone(),
-                version,
-                epoch,
-                Utf8Path::from_path(gen_dir.path())
-                    .context("checking if temporary directory is UTF-8")?,
-            );
-            let mut all_packages = UpdatePackagesManifest::default();
-            for (_path, package) in &packages_a {
-                all_packages.add_by_manifest(&package)?;
-            }
-            builder.add_packages(all_packages);
-            if let Some(manifest) = &system_a {
-                builder.add_slot_images(Slot::Primary(manifest.clone()));
-            }
-            if let Some(manifest) = &system_r {
-                builder.add_slot_images(Slot::Recovery(manifest.clone()));
-            }
-            let update_package = builder.build(tools)?;
-            (Some(gen_dir), Some(update_package.merkle), update_package.package_manifests)
-        } else {
-            (None, None, vec![])
-        };
-
-    // We always create a blobs directory even if there is no repository, because tools that read
-    // the product bundle inadvertently creates the blobs directory, which dirties the product
-    // bundle, causing hermeticity errors.
-    let repo_path = &cmd.out_dir;
-    let blobs_path = repo_path.join("blobs");
-    std::fs::create_dir(&blobs_path).context("Creating blobs directory")?;
-
-    // When RBE is enabled, Bazel will skip empty directory. This will ensure
-    // blobs directory still appear in the output dir.
-    let ensure_file_path = blobs_path.join(".ensure-one-file");
-    std::fs::File::create(&ensure_file_path).context("Creating ensure file")?;
-
-    let repositories = if let Some(tuf_keys) = &cmd.tuf_keys {
-        let main_metadata_path = repo_path.join("repository");
-        let recovery_metadata_path = repo_path.join("recovery_repository");
-        let keys_path = repo_path.join("keys");
-        let delivery_blob_type = cmd.delivery_blob_type.unwrap_or(DEFAULT_DELIVERY_BLOB_TYPE);
-
-        let repo_keys =
-            RepoKeys::from_dir(tuf_keys.as_std_path()).context("Gathering repo keys")?;
-
-        // Main slot.
-        let repo = FileSystemRepository::builder(
-            main_metadata_path.to_path_buf(),
-            blobs_path.to_path_buf(),
-        )
-        .delivery_blob_type(delivery_blob_type.try_into()?)
-        .build();
-        RepoBuilder::create(&repo, &repo_keys)
-            .add_package_manifests(packages_a.into_iter())
-            .await?
-            .add_package_manifests(update_packages.into_iter().map(|manifest| (None, manifest)))
-            .await?
-            .commit()
-            .await
-            .context("Building the repo")?;
-
-        // Recovery slot.
-        // We currently need this for scrutiny to find the recovery blobs.
-        let recovery_repo = FileSystemRepository::builder(
-            recovery_metadata_path.to_path_buf(),
-            blobs_path.to_path_buf(),
-        )
-        .delivery_blob_type(delivery_blob_type.try_into()?)
-        .build();
-        RepoBuilder::create(&recovery_repo, &repo_keys)
-            .add_package_manifests(packages_r.into_iter())
-            .await?
-            .commit()
-            .await
-            .context("Building the recovery repo")?;
-
-        std::fs::create_dir_all(&keys_path).context("Creating keys directory")?;
-
-        // We intentionally do not add the recovery repository, because no tools currently need
-        // it. Scrutiny needs the recovery blobs to be accessible, but that's it.
-        vec![Repository {
-            name: "fuchsia.com".into(),
-            metadata_path: main_metadata_path,
-            blobs_path: blobs_path,
-            delivery_blob_type,
-            root_private_key_path: copy_file(tuf_keys.join("root.json"), &keys_path).ok(),
-            targets_private_key_path: copy_file(tuf_keys.join("targets.json"), &keys_path).ok(),
-            snapshot_private_key_path: copy_file(tuf_keys.join("snapshot.json"), &keys_path).ok(),
-            timestamp_private_key_path: copy_file(tuf_keys.join("timestamp.json"), &keys_path).ok(),
-        }]
-    } else {
-        vec![]
-    };
-
-    // Add the virtual devices, and determine the path to the manifest.
-    let virtual_devices_path = if cmd.virtual_device.is_empty() {
-        None
-    } else {
-        // Prepare a manifest for the virtual devices.
-        let mut manifest = VirtualDeviceManifest::default();
-
-        // Create the virtual_devices directory.
-        let vd_dir = cmd.out_dir.join("virtual_devices");
-        std::fs::create_dir_all(&vd_dir).context("Creating the virtual_devices directory.")?;
-
-        for path in cmd.virtual_device {
-            let device = VirtualDevice::try_load_from(&path)
-                .with_context(|| format!("Parsing file as virtual device: '{}'", path))?;
-
-            // Write the virtual device to the directory.
-            let device_file_name =
-                path.file_name().unwrap_or_else(|| panic!("Path has no file name: '{}'", path));
-            let device_file_name = Utf8PathBuf::from(device_file_name);
-            let path_in_pb = vd_dir.join(&device_file_name);
-            device
-                .write(&path_in_pb)
-                .with_context(|| format!("Writing virtual device: {}", path_in_pb))?;
-
-            // Add the virtual device to the manifest.
-            let name = device.name().to_string();
-            manifest.device_paths.insert(name, device_file_name);
-        }
-
-        // Write the manifest into the directory.
-        manifest.recommended = cmd.recommended_device;
-        let manifest_path = vd_dir.join("manifest.json");
-        let manifest_file = File::create(&manifest_path)
-            .with_context(|| format!("Couldn't create manifest file '{}'", manifest_path))?;
-        serde_json::to_writer(manifest_file, &manifest)
-            .context("Couldn't serialize manifest to disk.")?;
-
-        Some(manifest_path)
-    };
-
-    let product_name = cmd.product_name.to_owned();
-    let product_version = cmd.product_version.to_owned();
-
-    let product_bundle = ProductBundleV2 {
-        product_name,
-        product_version,
-        partitions,
-        sdk_version: sdk_version.to_string(),
-        system_a: system_a.map(|s| s.images),
-        system_b: system_b.map(|s| s.images),
-        system_r: system_r.map(|s| s.images),
-        repositories,
-        update_package_hash,
-        virtual_devices_path,
-    };
-    let product_bundle = ProductBundle::V2(product_bundle);
-    product_bundle.write(&cmd.out_dir).context("writing product bundle")?;
+    if let Some(system_path) = &cmd.system_b {
+        let system = AssembledSystem::from_dir(system_path)?;
+        pb_builder = pb_builder.system(system, PartitionSlot::B);
+    }
+    if let Some(system_path) = &cmd.system_r {
+        let system = AssembledSystem::from_dir(system_path)?;
+        pb_builder = pb_builder.system(system, PartitionSlot::R);
+    }
+    if let Some((version, epoch)) = &update_details {
+        pb_builder = pb_builder.update_package(version, *epoch);
+    }
+    if let Some(tuf_keys) = &cmd.tuf_keys {
+        let delivery_blob_type =
+            cmd.delivery_blob_type.unwrap_or(DEFAULT_DELIVERY_BLOB_TYPE).try_into()?;
+        pb_builder = pb_builder.repository(delivery_blob_type, tuf_keys);
+    }
+    for path in &cmd.virtual_device {
+        let device = VirtualDevice::try_load_from(&path)
+            .with_context(|| format!("Parsing file as virtual device: '{}'", path))?;
+        let name = path.file_name().unwrap_or_else(|| panic!("Path has no file name: '{}'", path));
+        pb_builder = pb_builder.virtual_device(name, device);
+    }
+    if let Some(recommended_device) = &cmd.recommended_device {
+        pb_builder = pb_builder.recommended_virtual_device(recommended_device.clone());
+    }
+    if let Some(gerrit_size_report) = &cmd.gerrit_size_report {
+        pb_builder = pb_builder.gerrit_size_report(gerrit_size_report);
+    }
+    let product_bundle =
+        pb_builder.build(tools, &cmd.out_dir).await.context("Building the product bundle")?;
 
     if cmd.with_deprecated_flash_manifest {
         let manifest_path = cmd.out_dir.join("flash.json");
@@ -305,199 +130,22 @@ pub async fn pb_create_with_sdk_version(
     Ok(())
 }
 
-/// Open and parse a PartitionsConfig from a path, copying the images into `out_dir`.
-fn load_partitions_config(
-    path: impl AsRef<Utf8Path>,
-    out_dir: impl AsRef<Utf8Path>,
-) -> Result<PartitionsConfig> {
-    let config = PartitionsConfig::from_dir(path)?;
-    config.write_to_dir(out_dir, None::<Utf8PathBuf>)
-}
-
-/// Open and parse an AssembledSystem from a path, copying the images into `out_dir`.
-/// Returns None if the given path is None.
-fn load_assembled_system(
-    path: &Option<Utf8PathBuf>,
-    out_dir: impl AsRef<Utf8Path>,
-) -> Result<(Option<AssembledSystem>, Vec<(Option<Utf8PathBuf>, PackageManifest)>)> {
-    let out_dir = out_dir.as_ref();
-
-    if let Some(path) = path {
-        // Make sure `out_dir` is created.
-        std::fs::create_dir_all(&out_dir).context("Creating the out_dir")?;
-
-        let system = AssembledSystem::try_load_from(path)
-            .with_context(|| format!("Loading assembly manifest: {}", path))?;
-
-        // Filter out the base package, and the blobfs contents.
-        let mut images = Vec::new();
-        let mut packages = Vec::new();
-        let mut extract_packages = |packages_metadata| -> Result<()> {
-            let PackagesMetadata { base, cache } = packages_metadata;
-            let all_packages = [base.0, cache.0].concat();
-            for package in all_packages {
-                let manifest = PackageManifest::try_load_from(&package.manifest)
-                    .with_context(|| format!("reading package manifest: {}", package.manifest))?;
-                packages.push((Some(package.manifest), manifest));
-            }
-            Ok(())
-        };
-        let mut has_zbi = false;
-        let mut has_vbmeta = false;
-        let mut has_dtbo = false;
-        for image in system.images.into_iter() {
-            match image {
-                Image::BasePackage(..) => {}
-                Image::Fxfs { path, contents } => {
-                    extract_packages(contents.packages)?;
-                    images.push(Image::Fxfs { path, contents: BlobfsContents::default() });
-                }
-                Image::BlobFS { path, contents } => {
-                    extract_packages(contents.packages)?;
-                    images.push(Image::BlobFS { path, contents: BlobfsContents::default() });
-                }
-                Image::ZBI { .. } => {
-                    if has_zbi {
-                        anyhow::bail!("Found more than one ZBI");
-                    }
-                    images.push(image);
-                    has_zbi = true;
-                }
-                Image::VBMeta(_) => {
-                    if has_vbmeta {
-                        anyhow::bail!("Found more than one VBMeta");
-                    }
-                    images.push(image);
-                    has_vbmeta = true;
-                }
-                Image::Dtbo(_) => {
-                    if has_dtbo {
-                        anyhow::bail!("Found more than one Dtbo");
-                    }
-                    images.push(image);
-                    has_dtbo = true;
-                }
-
-                // We don't need to extract packages from `FxfsSparse`, since it exists only if
-                // `Fxfs` also exists (and always contains the same set of packages).
-                Image::FxfsSparse { .. }
-                | Image::FVM(_)
-                | Image::FVMSparse(_)
-                | Image::FVMFastboot(_)
-                | Image::QemuKernel(_) => {
-                    images.push(image);
-                }
-            }
-        }
-
-        // Copy the images to the `out_dir`.
-        let mut new_images = Vec::<Image>::new();
-        for mut image in images.into_iter() {
-            let dest = copy_file(image.source(), &out_dir)?;
-            image.set_source(dest);
-            new_images.push(image);
-        }
-
-        Ok((Some(AssembledSystem { images: new_images, board_name: system.board_name }), packages))
-    } else {
-        Ok((None, vec![]))
-    }
-}
-
-/// Copy a file from `source` to `out_dir` preserving the filename.
-/// Returns the destination, which is equal to {out_dir}{filename}.
-fn copy_file(source: impl AsRef<Utf8Path>, out_dir: impl AsRef<Utf8Path>) -> Result<Utf8PathBuf> {
-    let source = source.as_ref();
-    let out_dir = out_dir.as_ref();
-    let filename = source.file_name().context("getting file name")?;
-    let destination = out_dir.join(filename);
-
-    // Attempt to hardlink, if that fails, fall back to copying.
-    if let Err(_) = std::fs::hard_link(source, &destination) {
-        // falling back to copying.
-        std::fs::copy(source, &destination)
-            .with_context(|| format!("copying file '{}'", source))?;
-    }
-    Ok(destination)
-}
-
 #[cfg(test)]
 mod test {
     use super::*;
+    use assembled_system::Image;
+    use assembly_release_info::ProductBundleReleaseInfo;
     use assembly_tool::testing::{blobfs_side_effect, FakeToolProvider};
+    use camino::{Utf8Path, Utf8PathBuf};
     use fuchsia_repo::test_utils;
-    use sdk_metadata::VirtualDeviceV1;
+    use product_bundle::{ProductBundle, ProductBundleV2, Repository};
+    use sdk_metadata::{VirtualDeviceManifest, VirtualDeviceV1};
     use std::fs;
     use std::io::Write;
+    use tempfile::TempDir;
 
     const VIRTUAL_DEVICE_VALID: &str =
         include_str!("../../../../../../../build/sdk/meta/test_data/virtual_device.json");
-
-    #[test]
-    fn test_copy_file() {
-        let temp1 = TempDir::new().unwrap();
-        let tempdir1 = Utf8Path::from_path(temp1.path()).unwrap();
-        let temp2 = TempDir::new().unwrap();
-        let tempdir2 = Utf8Path::from_path(temp2.path()).unwrap();
-
-        let source_path = tempdir1.join("source.txt");
-        let mut source_file = File::create(&source_path).unwrap();
-        write!(source_file, "contents").unwrap();
-        let destination = copy_file(&source_path, tempdir2).unwrap();
-        assert!(destination.exists());
-    }
-
-    #[test]
-    fn test_load_partitions_config() {
-        let temp = TempDir::new().unwrap();
-        let tempdir = Utf8Path::from_path(temp.path()).unwrap();
-        let pb_dir = tempdir.join("pb");
-        fs::create_dir(&pb_dir).unwrap();
-
-        let config_dir = tempdir.join("config");
-        fs::create_dir(&config_dir).unwrap();
-        let config_path = config_dir.join("partitions_config.json");
-        let config_file = File::create(&config_path).unwrap();
-        serde_json::to_writer(&config_file, &PartitionsConfig::default()).unwrap();
-
-        let error_dir = tempdir.join("error");
-        fs::create_dir(&error_dir).unwrap();
-        let error_path = error_dir.join("partitions_config.json");
-        let mut error_file = File::create(&error_path).unwrap();
-        error_file.write_all("error".as_bytes()).unwrap();
-
-        let parsed = load_partitions_config(&config_dir, &pb_dir);
-        assert!(parsed.is_ok());
-
-        let error = load_partitions_config(&error_dir, &pb_dir);
-        assert!(error.is_err());
-    }
-
-    #[test]
-    fn test_load_assembled_system() {
-        let temp = TempDir::new().unwrap();
-        let tempdir = Utf8Path::from_path(temp.path()).unwrap();
-        let pb_dir = tempdir.join("pb");
-
-        let manifest_path = tempdir.join("manifest.json");
-        AssembledSystem { images: Default::default(), board_name: "my_board".into() }
-            .write(&manifest_path)
-            .unwrap();
-
-        let error_path = tempdir.join("error.json");
-        let mut error_file = File::create(&error_path).unwrap();
-        error_file.write_all("error".as_bytes()).unwrap();
-
-        let (parsed, packages) = load_assembled_system(&Some(manifest_path), &pb_dir).unwrap();
-        assert!(parsed.is_some());
-        assert_eq!(packages, Vec::new());
-
-        let error = load_assembled_system(&Some(error_path), &pb_dir);
-        assert!(error.is_err());
-
-        let (none, _) = load_assembled_system(&None, &pb_dir).unwrap();
-        assert!(none.is_none());
-    }
 
     #[fuchsia::test]
     async fn test_pb_create_minimal() {
@@ -517,7 +165,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_dir,
+                partitions: Some(partitions_dir),
                 system_a: None,
                 system_b: None,
                 system_r: None,
@@ -551,6 +199,14 @@ mod test {
                 repositories: vec![],
                 update_package_hash: None,
                 virtual_devices_path: None,
+                release_info: Some(ProductBundleReleaseInfo {
+                    name: String::default(),
+                    version: String::default(),
+                    sdk_version: String::default(),
+                    system_a: None,
+                    system_b: None,
+                    system_r: None
+                })
             })
         );
     }
@@ -567,10 +223,16 @@ mod test {
         let partitions_file = File::create(&partitions_path).unwrap();
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
-        let system_path = tempdir.join("system.json");
-        AssembledSystem { images: Default::default(), board_name: "my_board".into() }
-            .write(&system_path)
-            .unwrap();
+        let system_dir = tempdir.join("system");
+        fs::create_dir(&system_dir).unwrap();
+        AssembledSystem {
+            images: Default::default(),
+            board_name: "my_board".into(),
+            partitions_config: None,
+            system_release_info: None,
+        }
+        .write_to_dir(&system_dir, None::<Utf8PathBuf>)
+        .unwrap();
 
         let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
 
@@ -578,10 +240,10 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_dir,
-                system_a: Some(system_path.clone()),
+                partitions: Some(partitions_dir),
+                system_a: Some(system_dir.clone()),
                 system_b: None,
-                system_r: Some(system_path.clone()),
+                system_r: Some(system_dir.clone()),
                 tuf_keys: None,
                 update_package_version_file: None,
                 update_package_epoch: None,
@@ -612,6 +274,14 @@ mod test {
                 repositories: vec![],
                 update_package_hash: None,
                 virtual_devices_path: None,
+                release_info: Some(ProductBundleReleaseInfo {
+                    name: String::default(),
+                    version: String::default(),
+                    sdk_version: String::default(),
+                    system_a: None,
+                    system_b: None,
+                    system_r: None
+                }),
             })
         );
     }
@@ -628,14 +298,21 @@ mod test {
         let partitions_file = File::create(&partitions_path).unwrap();
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
-        let system_path = tempdir.join("system.json");
-        let mut manifest =
-            AssembledSystem { images: Default::default(), board_name: "my_board".into() };
+        let system_dir = tempdir.join("system");
+        fs::create_dir(&system_dir).unwrap();
+        let mut manifest = AssembledSystem {
+            images: Default::default(),
+            board_name: "my_board".into(),
+            partitions_config: None,
+            system_release_info: None,
+        };
         manifest.images = vec![
-            Image::ZBI { path: Utf8PathBuf::from("path1"), signed: false },
-            Image::ZBI { path: Utf8PathBuf::from("path2"), signed: true },
+            Image::ZBI { path: tempdir.join("path1"), signed: false },
+            Image::ZBI { path: tempdir.join("path2"), signed: true },
         ];
-        manifest.write(&system_path).unwrap();
+        std::fs::write(&tempdir.join("path1"), "").unwrap();
+        std::fs::write(&tempdir.join("path2"), "").unwrap();
+        manifest.write_to_dir(&system_dir, None::<Utf8PathBuf>).unwrap();
 
         let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
 
@@ -643,10 +320,10 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_dir,
-                system_a: Some(system_path.clone()),
+                partitions: Some(partitions_dir),
+                system_a: Some(system_dir.clone()),
                 system_b: None,
-                system_r: Some(system_path.clone()),
+                system_r: Some(system_dir.clone()),
                 tuf_keys: None,
                 update_package_version_file: None,
                 update_package_epoch: None,
@@ -676,10 +353,16 @@ mod test {
         let partitions_file = File::create(&partitions_path).unwrap();
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
-        let system_path = tempdir.join("system.json");
-        AssembledSystem { images: Default::default(), board_name: "my_board".into() }
-            .write(&system_path)
-            .unwrap();
+        let system_dir = tempdir.join("system");
+        fs::create_dir(&system_dir).unwrap();
+        AssembledSystem {
+            images: Default::default(),
+            board_name: "my_board".into(),
+            partitions_config: None,
+            system_release_info: None,
+        }
+        .write_to_dir(&system_dir, None::<Utf8PathBuf>)
+        .unwrap();
 
         let tuf_keys = tempdir.join("keys");
         test_utils::make_repo_keys_dir(&tuf_keys);
@@ -690,10 +373,10 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_dir,
-                system_a: Some(system_path.clone()),
+                partitions: Some(partitions_dir),
+                system_a: Some(system_dir.clone()),
                 system_b: None,
-                system_r: Some(system_path.clone()),
+                system_r: Some(system_dir.clone()),
                 tuf_keys: Some(tuf_keys),
                 update_package_version_file: None,
                 update_package_epoch: None,
@@ -733,6 +416,14 @@ mod test {
                 }],
                 update_package_hash: None,
                 virtual_devices_path: None,
+                release_info: Some(ProductBundleReleaseInfo {
+                    name: String::default(),
+                    version: String::default(),
+                    sdk_version: String::default(),
+                    system_a: None,
+                    system_b: None,
+                    system_r: None
+                }),
             })
         );
     }
@@ -761,7 +452,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_dir,
+                partitions: Some(partitions_dir),
                 system_a: None,
                 system_b: None,
                 system_r: None,
@@ -798,6 +489,7 @@ mod test {
                 repositories,
                 update_package_hash: Some(_),
                 virtual_devices_path: None,
+                release_info: Some(_)
             }) if partitions == Default::default() && repositories == &[Repository {
                 name: "fuchsia.com".into(),
                 metadata_path: pb_dir.join("repository"),
@@ -838,7 +530,7 @@ mod test {
             CreateCommand {
                 product_name: String::default(),
                 product_version: String::default(),
-                partitions: partitions_dir,
+                partitions: Some(partitions_dir),
                 system_a: None,
                 system_b: None,
                 system_r: None,
@@ -872,6 +564,14 @@ mod test {
                 repositories: vec![],
                 update_package_hash: None,
                 virtual_devices_path: Some(pb_dir.join("virtual_devices/manifest.json")),
+                release_info: Some(ProductBundleReleaseInfo {
+                    name: String::default(),
+                    version: String::default(),
+                    sdk_version: String::default(),
+                    system_a: None,
+                    system_b: None,
+                    system_r: None
+                }),
             })
         );
 

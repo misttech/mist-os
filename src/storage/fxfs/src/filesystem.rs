@@ -96,6 +96,20 @@ pub struct Options {
     // If set, journal will not be used for writes. The user must call 'finalize' when finished.
     // The provided superblock instance will be written upon finalize().
     pub image_builder_mode: Option<SuperBlockInstance>,
+
+    // If true, the filesystem will use the hardware's inline crypto engine to write encrypted
+    // data. Requires the block device to support inline encryption and for `barriers_enabled` to
+    // be true.
+    // TODO(https://fxbug.dev/393196849): For now, this flag only prevents the filesystem from
+    // computing checksums. Update this comment when the filesystem actually uses inline
+    // encryption.
+    pub inline_crypto_enabled: bool,
+
+    // Configures the filesystem to use barriers instead of checksums to ensure consistency.
+    // Checksums may be computed and stored in extent records but will no longer be stored in the
+    // journal. The journal will use barriers to enforce proper ordering between data and metadata
+    // writes. Must be true if `inline_crypto_enabled` is true.
+    pub barriers_enabled: bool,
 }
 
 impl Default for Options {
@@ -108,6 +122,8 @@ impl Default for Options {
             skip_initial_reap: false,
             trim_config: Some((TRIM_AFTER_BOOT_TIMER, TRIM_INTERVAL_TIMER)),
             image_builder_mode: None,
+            inline_crypto_enabled: false,
+            barriers_enabled: false,
         }
     }
 }
@@ -356,11 +372,30 @@ impl FxFilesystemBuilder {
         self
     }
 
+    /// Enables or disables inline encryption. Defaults to `false`.
+    pub fn inline_crypto_enabled(mut self, inline_crypto_enabled: bool) -> Self {
+        self.options.inline_crypto_enabled = inline_crypto_enabled;
+        self
+    }
+
+    /// Enables or disables barriers in both the filesystem and journal options.
+    /// Defaults to `false`.
+    pub fn barriers_enabled(mut self, barriers_enabled: bool) -> Self {
+        self.options.barriers_enabled = barriers_enabled;
+        self.journal_options.barriers_enabled = barriers_enabled;
+        self
+    }
+
     /// Constructs an `FxFilesystem` object with the specified settings.
     pub async fn open(self, device: DeviceHolder) -> Result<OpenFxFilesystem, Error> {
         let read_only = self.options.read_only;
         if self.format && read_only {
             bail!("Cannot initialize a filesystem as read-only");
+        }
+
+        // Inline encryption requires barriers to be enabled.
+        if self.options.inline_crypto_enabled && !self.options.barriers_enabled {
+            bail!("A filesystem using inline encryption requires barriers");
         }
 
         let objects = Arc::new(ObjectManager::new(self.on_new_store));
@@ -895,9 +930,10 @@ impl TxnGuard<'_> {
 pub struct TruncateGuard<'a>(WriteGuard<'a>);
 
 /// Helper method for making a new filesystem.
-pub async fn mkfs(device: DeviceHolder) -> Result<(), Error> {
+pub async fn mkfs(device: DeviceHolder) -> Result<DeviceHolder, Error> {
     let fs = FxFilesystem::new_empty(device).await?;
-    fs.close().await
+    fs.close().await?;
+    Ok(fs.take_device().await)
 }
 
 /// Helper method for making a new filesystem with a single named volume.
@@ -907,7 +943,7 @@ pub async fn mkfs_with_volume(
     device: DeviceHolder,
     volume_name: &str,
     crypt: Option<Arc<dyn Crypt>>,
-) -> Result<(), Error> {
+) -> Result<DeviceHolder, Error> {
     let fs = FxFilesystem::new_empty(device).await?;
     {
         // expect instead of propagating errors here, since otherwise we could drop |fs| before
@@ -916,7 +952,7 @@ pub async fn mkfs_with_volume(
         root_volume.new_volume(volume_name, NO_OWNER, crypt).await.expect("Create volume failed");
     }
     fs.close().await?;
-    Ok(())
+    Ok(fs.take_device().await)
 }
 
 struct FsckAfterEveryTransaction {
@@ -978,10 +1014,12 @@ mod tests {
     use fxfs_insecure_crypto::InsecureCrypt;
     use rustc_hash::FxHashMap as HashMap;
     use std::ops::Range;
+    use std::sync::atomic::{self, AtomicU32};
     use std::sync::Arc;
     use std::time::Duration;
-    use storage_device::fake_device::FakeDevice;
+    use storage_device::fake_device::{self, FakeDevice};
     use storage_device::DeviceHolder;
+    use test_case::test_case;
 
     const TEST_DEVICE_BLOCK_SIZE: u32 = 512;
 
@@ -1262,14 +1300,25 @@ mod tests {
         fs.close().await.expect("close failed");
     }
 
+    #[test_case(true; "test power fail with barriers")]
+    #[test_case(false; "test power fail with checksums")]
     #[fuchsia::test]
-    async fn test_power_fail() {
+    async fn test_power_fail(barriers_enabled: bool) {
         // This test randomly discards blocks, so we run it a few times to increase the chances
         // of catching an issue in a single run.
         for _ in 0..10 {
             let (store_id, device, test_file_object_id) = {
                 let device = DeviceHolder::new(FakeDevice::new(8192, 4096));
-                let fs = FxFilesystem::new_empty(device).await.expect("new_empty failed");
+                let fs = if barriers_enabled {
+                    FxFilesystemBuilder::new()
+                        .barriers_enabled(true)
+                        .format(true)
+                        .open(device)
+                        .await
+                        .expect("new filesystem failed")
+                } else {
+                    FxFilesystem::new_empty(device).await.expect("new_empty failed")
+                };
                 let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
 
                 fs.sync(SyncOptions { flush_device: true, ..SyncOptions::default() })
@@ -1498,6 +1547,163 @@ mod tests {
 
             fs.close().await.expect("close failed");
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_barrier_not_emitted_when_transaction_has_no_data() {
+        let barrier_count = Arc::new(AtomicU32::new(0));
+
+        struct Observer(Arc<AtomicU32>);
+
+        impl fake_device::Observer for Observer {
+            fn barrier(&self) {
+                self.0.fetch_add(1, atomic::Ordering::Relaxed);
+            }
+        }
+
+        let mut fake_device = FakeDevice::new(8192, 4096);
+        fake_device.set_observer(Box::new(Observer(barrier_count.clone())));
+        let device = DeviceHolder::new(fake_device);
+        let fs = FxFilesystemBuilder::new()
+            .barriers_enabled(true)
+            .format(true)
+            .open(device)
+            .await
+            .expect("new filesystem failed");
+
+        {
+            let root_vol = root_volume(fs.clone()).await.expect("root_volume failed");
+            root_vol
+                .new_volume("test", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
+                .await
+                .expect("there is no test volume");
+            fs.close().await.expect("close failed");
+        }
+        // Remount the filesystem to ensure that the journal flushes and we can get a reliable
+        // measure of the number of barriers issued during setup.
+        let device = fs.take_device().await;
+        device.reopen(false);
+        let fs = FxFilesystemBuilder::new()
+            .barriers_enabled(true)
+            .open(device)
+            .await
+            .expect("new filesystem failed");
+        let expected_barrier_count = barrier_count.load(atomic::Ordering::Relaxed);
+
+        let root_vol = root_volume(fs.clone()).await.expect("root_volume failed");
+        let store = root_vol
+            .volume("test", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
+            .await
+            .expect("there is no test volume");
+
+        // Create a number of files with the goal of using up more than one journal block.
+        let fs = store.filesystem();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+        for i in 0..100 {
+            let mut transaction = fs
+                .clone()
+                .new_transaction(
+                    lock_keys![LockKey::object(
+                        store.store_object_id(),
+                        store.root_directory_object_id()
+                    )],
+                    Options::default(),
+                )
+                .await
+                .expect("new_transaction failed");
+            root_directory
+                .create_child_file(&mut transaction, &format!("A {i}"))
+                .await
+                .expect("create_child_file failed");
+            transaction.commit().await.expect("commit failed");
+        }
+
+        // Unmount the filesystem to ensure that the journal flushes.
+        fs.close().await.expect("close failed");
+        // Ensure that no barriers were emitted while creating files, as no data was written.
+        assert_eq!(expected_barrier_count, barrier_count.load(atomic::Ordering::Relaxed));
+    }
+
+    #[fuchsia::test]
+    async fn test_barrier_emitted_when_transaction_includes_data() {
+        let barrier_count = Arc::new(AtomicU32::new(0));
+
+        struct Observer(Arc<AtomicU32>);
+
+        impl fake_device::Observer for Observer {
+            fn barrier(&self) {
+                self.0.fetch_add(1, atomic::Ordering::Relaxed);
+            }
+        }
+
+        let mut fake_device = FakeDevice::new(8192, 4096);
+        fake_device.set_observer(Box::new(Observer(barrier_count.clone())));
+        let device = DeviceHolder::new(fake_device);
+        let fs = FxFilesystemBuilder::new()
+            .barriers_enabled(true)
+            .format(true)
+            .open(device)
+            .await
+            .expect("new filesystem failed");
+
+        {
+            let root_vol = root_volume(fs.clone()).await.expect("root_volume failed");
+            root_vol
+                .new_volume("test", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
+                .await
+                .expect("there is no test volume");
+            fs.close().await.expect("close failed");
+        }
+        // Remount the filesystem to ensure that the journal flushes and we can get a reliable
+        // measure of the number of barriers issued during setup.
+        let device = fs.take_device().await;
+        device.reopen(false);
+        let fs = FxFilesystemBuilder::new()
+            .barriers_enabled(true)
+            .open(device)
+            .await
+            .expect("new filesystem failed");
+        let expected_barrier_count = barrier_count.load(atomic::Ordering::Relaxed);
+
+        let root_vol = root_volume(fs.clone()).await.expect("root_volume failed");
+        let store = root_vol
+            .volume("test", NO_OWNER, Some(Arc::new(InsecureCrypt::new())))
+            .await
+            .expect("there is no test volume");
+
+        // Create a file and write something to it. This should cause a barrier to be emitted.
+        let fs: Arc<FxFilesystem> = store.filesystem();
+        let root_directory =
+            Directory::open(&store, store.root_directory_object_id()).await.expect("open failed");
+
+        let mut transaction = fs
+            .clone()
+            .new_transaction(
+                lock_keys![LockKey::object(
+                    store.store_object_id(),
+                    store.root_directory_object_id()
+                )],
+                Options::default(),
+            )
+            .await
+            .expect("new_transaction failed");
+        let object = root_directory
+            .create_child_file(&mut transaction, "test")
+            .await
+            .expect("create_child_file failed");
+        transaction.commit().await.expect("commit failed");
+
+        let mut transaction = object.new_transaction().await.expect("new_transaction failed");
+        let mut buffer = object.allocate_buffer(4096).await;
+        buffer.as_mut_slice().fill(0xed);
+        object.txn_write(&mut transaction, 0, buffer.as_ref()).await.expect("txn_write failed");
+        transaction.commit().await.expect("commit failed");
+
+        // Unmount the filesystem to ensure that the journal flushes.
+        fs.close().await.expect("close failed");
+        // Ensure that a barrier was emitted while writing to the file.
+        assert!(expected_barrier_count < barrier_count.load(atomic::Ordering::Relaxed));
     }
 
     #[fuchsia::test]

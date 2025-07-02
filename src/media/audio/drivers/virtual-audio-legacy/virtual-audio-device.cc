@@ -73,8 +73,10 @@ VirtualAudioDevice::Create(const fuchsia_virtualaudio::Configuration& cfg,
 void VirtualAudioDevice::OnFidlServerUnbound(
     VirtualAudioDevice* device, fidl::UnbindInfo unbind_info,
     fidl::ServerEnd<fuchsia_virtualaudio::Device> server_end) {
-  zxlogf(INFO, "virtualaudio.Device FIDL server unbound: %s",
-         unbind_info.FormatDescription().c_str());
+  if (!unbind_info.is_user_initiated() && !unbind_info.is_peer_closed()) {
+    zxlogf(INFO, "virtualaudio.Device FIDL server unbound: %s",
+           unbind_info.FormatDescription().c_str());
+  }
   device->binding_.reset();
   if (device->driver_ != nullptr) {
     device->driver_->ShutdownAsync();

@@ -15,7 +15,10 @@ rustc_library("alarms") {
   edition = "2021"
   with_unit_tests = true
 
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/emu.rs",
+    "src/lib.rs",
+  ]
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_rust",
@@ -28,15 +31,18 @@ rustc_library("alarms") {
     "//src/lib/trace/rust:trace",
     "//src/sys/time/timekeeper/pretty:time_pretty",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:log",
     "//third_party/rust_crates:scopeguard",
   ]
 
   test_deps = [
+    "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/fuchsia",
     "//src/lib/test_util",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:test-case",
   ]
 }

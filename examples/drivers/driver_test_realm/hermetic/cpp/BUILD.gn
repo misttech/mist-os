@@ -14,7 +14,7 @@ group("hermetic_tests") {
 test("driver_test_realm_example_hermetic_cpp") {
   sources = [ "test.cc" ]
   deps = [
-    "//examples/drivers/driver_test_realm/sample-driver:fuchsia.hardware.sample_cpp",
+    "//examples/drivers/driver_test_realm/sample_driver:fuchsia.hardware.sample_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/lib/async-loop",
     "//sdk/lib/async-loop:async-loop-cpp",
@@ -35,7 +35,7 @@ fuchsia_unittest_package("package") {
     ":driver_test_realm_example_hermetic_cpp",
 
     # Include the driver(s) you will be testing.
-    "//examples/drivers/driver_test_realm/sample-driver",
+    "//examples/drivers/driver_test_realm/sample_driver",
 
     # Include the test parent (if your driver binds to it).
     "//src/devices/misc/drivers/test-parent",

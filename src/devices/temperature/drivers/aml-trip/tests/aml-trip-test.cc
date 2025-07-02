@@ -8,41 +8,23 @@
 #include <fidl/fuchsia.hardware.clock/cpp/wire_test_base.h>
 #include <fidl/fuchsia.hardware.trippoint/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.trippoint/cpp/wire_types.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async/default.h>
-#include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/fake-mmio-reg/cpp/fake-mmio-reg.h>
 #include <lib/driver/fake-platform-device/cpp/fake-pdev.h>
-#include <lib/driver/runtime/testing/cpp/sync_helpers.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/internal/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
-#include <lib/fdf/cpp/arena.h>
-#include <lib/fdf/testing.h>
-#include <lib/fidl/cpp/wire/arena.h>
-#include <lib/mmio/mmio-buffer.h>
-#include <lib/zx/interrupt.h>
-#include <lib/zx/resource.h>
-#include <zircon/errors.h>
+#include <lib/driver/testing/cpp/driver_test.h>
 
 #include <cstdint>
 #include <limits>
-#include <memory>
-#include <optional>
 
+#include <gtest/gtest.h>
 #include <src/devices/temperature/drivers/aml-trip/aml-trip-device.h>
-#include <zxtest/zxtest.h>
 
 #include "../aml-trip-device.h"
 #include "src/devices/lib/mmio/test-helper.h"
+#include "src/lib/testing/predicates/status.h"
 
-namespace temperature {
-
-namespace {
-static constexpr char kTestName[] = "test-trip-device";
+namespace temperature::test {
 
 class FakeSensorMmio {
  public:
@@ -56,7 +38,7 @@ class FakeSensorMmio {
 
   fdf::MmioBuffer mmio() { return mmio_.GetMmioBuffer(); }
 
-  void SetIrqStat(int index, bool stat) {
+  void SetIrqStat(uint32_t index, bool stat) {
     if (stat) {
       tstat1_ |= (1u << index);
     } else {
@@ -74,106 +56,98 @@ class FakeSensorMmio {
   fake_mmio::FakeMmioRegRegion mmio_;
 };
 
-class TestEnvironmentWrapper {
+class AmlTripTestEnvironment : public fdf_testing::Environment {
  public:
-  fdf::DriverStartArgs Setup(fdf_fake::FakePDev::Config pdev_config) {
-    zx::result start_args_result = node_.CreateStartArgsAndServe();
-    EXPECT_OK(start_args_result.status_value());
-
-    EXPECT_OK(
-        env_.Initialize(std::move(start_args_result->incoming_directory_server)).status_value());
-
-    pdev_.SetConfig(std::move(pdev_config));
-
-    async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-
-    auto pdev_result =
-        env_.incoming_directory().AddService<fuchsia_hardware_platform_device::Service>(
-            pdev_.GetInstanceHandler(dispatcher));
-    EXPECT_OK(pdev_result.status_value());
+  void Init(std::string platform_device_name) {
+    static constexpr size_t kTrimRegSize = 0x04;
 
     compat_server_.Initialize("default");
-    // compat_server_.AddMetadata(DEVICE_METADATA_TRIP, &kTestMetadata, sizeof(kTestMetadata));
-    zx_status_t status = compat_server_.Serve(dispatcher, &env_.incoming_directory());
-    ZX_ASSERT(status == ZX_OK);
 
-    return std::move(start_args_result->start_args);
+    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq_));
+    zx::interrupt irq;
+    irq_.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq);
+    std::map<uint32_t, zx::interrupt> irqs;
+    irqs.insert({0, std::move(irq)});
+
+    std::map<uint32_t, fdf_fake::Mmio> mmios;
+    mmios.insert({AmlTrip::kSensorMmioIndex, sensor_mmio_.mmio()});
+    mmios.insert({AmlTrip::kTrimMmioIndex,
+                  fdf_testing::CreateMmioBuffer(kTrimRegSize, ZX_CACHE_POLICY_UNCACHED_DEVICE)});
+
+    pdev_.SetConfig({.mmios = std::move(mmios),
+                     .irqs = std::move(irqs),
+                     .device_info{{.name{std::move(platform_device_name)}}}});
   }
 
-  fdf_testing::TestNode& Node() { return node_; }
+  zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
+    async_dispatcher_t* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+
+    zx_status_t status = compat_server_.Serve(dispatcher, &to_driver_vfs);
+    if (status != ZX_OK) {
+      return zx::error(status);
+    }
+
+    zx::result result = to_driver_vfs.AddService<fuchsia_hardware_platform_device::Service>(
+        pdev_.GetInstanceHandler(dispatcher));
+    if (result.is_error()) {
+      return result.take_error();
+    }
+
+    return zx::ok();
+  }
+
+  zx::interrupt& irq() { return irq_; }
+
+  FakeSensorMmio& sensor_mmio() { return sensor_mmio_; }
 
  private:
-  fdf_testing::TestNode node_{"root"};
-  fdf_testing::internal::TestEnvironment env_;
   fdf_fake::FakePDev pdev_;
   compat::DeviceServer compat_server_;
+  zx::interrupt irq_;
+  FakeSensorMmio sensor_mmio_;
 };
 
-}  // namespace
-
-// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
-// library.
-class AmlTripTest : public zxtest::Test {
+class FixtureConfig final {
  public:
-  AmlTripTest()
-      : env_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        driver_dispatcher_(runtime_.StartBackgroundDispatcher()),
-        dut_(driver_dispatcher_->async_dispatcher(), std::in_place),
-        test_environment_(env_dispatcher_->async_dispatcher(), std::in_place) {}
+  using DriverType = AmlTripDevice;
+  using EnvironmentType = AmlTripTestEnvironment;
+};
+
+class AmlTripTest : public ::testing::Test {
+ public:
+  static constexpr std::string_view kTestName = "test-trip-device";
 
   void SetUp() override {
-    fdf_fake::FakePDev::Config config{.use_fake_irq = true};
-    ASSERT_OK(zx::interrupt::create(zx::resource(), 0, ZX_INTERRUPT_VIRTUAL, &irq_));
-
-    ASSERT_OK(irq_.duplicate(ZX_RIGHT_SAME_RIGHTS, &irq_dupe_));
-    config.irqs[0] = std::move(irq_dupe_);
-
-    constexpr size_t kTrimRegSize = 0x04;
-
-    config.mmios[kSensorMmioIndex] = sensor_mmio_.mmio();
-    config.mmios[kTrimMmioIndex] =
-        fdf_testing::CreateMmioBuffer(kTrimRegSize, ZX_CACHE_POLICY_UNCACHED_DEVICE);
-
-    config.device_info = fdf::PDev::DeviceInfo{
-        .name = kTestName,
-    };
-
-    fdf::DriverStartArgs start_args =
-        test_environment_.SyncCall(&TestEnvironmentWrapper::Setup, std::move(config));
-
-    zx::result start_result = runtime_.RunToCompletion(dut_.SyncCall(
-        &fdf_testing::internal::DriverUnderTest<AmlTrip>::Start, std::move(start_args)));
-    ASSERT_OK(start_result.status_value());
-
-    test_environment_.SyncCall([this](TestEnvironmentWrapper* env_wrapper) {
-      auto client_channel = env_wrapper->Node().children().at("aml-trip-device").ConnectToDevice();
-      client_.Bind(fidl::ClientEnd<fuchsia_hardware_trippoint::TripPoint>(
-          std::move(client_channel.value())));
-      ASSERT_TRUE(client_.is_valid());
-    });
+    driver_test_.RunInEnvironmentTypeContext([](auto& env) { env.Init(std::string{kTestName}); });
+    ASSERT_OK(driver_test_.StartDriver());
+    zx::result client = driver_test_.ConnectThroughDevfs<fuchsia_hardware_trippoint::TripPoint>(
+        AmlTrip::kChildNodeName);
+    ASSERT_OK(client);
+    client_.Bind(std::move(client.value()));
   }
 
-  void TearDown() override {
-    zx::result run_result = runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::internal::DriverUnderTest<AmlTrip>::PrepareStop));
-    ZX_ASSERT(run_result.is_ok());
-  }
+  void TearDown() override { ASSERT_OK(driver_test_.StopDriver()); }
 
  protected:
-  zx::interrupt irq_, irq_dupe_;
-  FakeSensorMmio sensor_mmio_;
-  fidl::WireSyncClient<fuchsia_hardware_trippoint::TripPoint> client_;
+  fidl::WireSyncClient<fuchsia_hardware_trippoint::TripPoint>& client() { return client_; }
+
+  void TriggerIrq() {
+    driver_test_.RunInEnvironmentTypeContext(
+        [](auto& env) { env.irq().trigger(0, zx::clock::get_boot()); });
+  }
+
+  void SetIrqStat(uint32_t index, bool stat) {
+    driver_test_.RunInEnvironmentTypeContext(
+        [index, stat](auto& env) { env.sensor_mmio().SetIrqStat(index, stat); });
+  }
 
  private:
-  fdf_testing::DriverRuntime runtime_;
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_;
-  fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
-  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<AmlTrip>> dut_;
-  async_patterns::TestDispatcherBound<TestEnvironmentWrapper> test_environment_;
+  fdf_testing::BackgroundDriverTest<FixtureConfig> driver_test_;
+  fidl::WireSyncClient<fuchsia_hardware_trippoint::TripPoint> client_;
 };
 
 TEST_F(AmlTripTest, TestReadTemperature) {
-  auto result = client_->GetTemperatureCelsius();
+  auto result = client()->GetTemperatureCelsius();
 
   ASSERT_TRUE(result.ok());
 
@@ -183,7 +157,7 @@ TEST_F(AmlTripTest, TestReadTemperature) {
 }
 
 TEST_F(AmlTripTest, TestGetSensorName) {
-  auto result = client_->GetSensorName();
+  auto result = client()->GetSensorName();
 
   ASSERT_TRUE(result.ok());
 
@@ -193,7 +167,7 @@ TEST_F(AmlTripTest, TestGetSensorName) {
 }
 
 TEST_F(AmlTripTest, TestGetTripPointDescriptors) {
-  auto result = client_->GetTripPointDescriptors();
+  auto result = client()->GetTripPointDescriptors();
 
   ASSERT_TRUE(result.ok());
 
@@ -223,13 +197,13 @@ TEST_F(AmlTripTest, TestSetTripBadIndex) {
   auto descs_view =
       fidl::VectorView<fuchsia_hardware_trippoint::wire::TripPointDescriptor>::FromExternal(descs);
 
-  auto set_result = client_->SetTripPoints(descs_view);
+  auto set_result = client()->SetTripPoints(descs_view);
   EXPECT_TRUE(set_result.ok());
   EXPECT_TRUE(set_result->is_error());
 }
 
 TEST_F(AmlTripTest, TestSetTripBadType) {
-  auto result = client_->GetTripPointDescriptors();
+  auto result = client()->GetTripPointDescriptors();
 
   ASSERT_TRUE(result.ok());
 
@@ -258,13 +232,13 @@ TEST_F(AmlTripTest, TestSetTripBadType) {
   auto set_desc_view =
       fidl::VectorView<fuchsia_hardware_trippoint::wire::TripPointDescriptor>::FromExternal(descs);
 
-  auto set_result = client_->SetTripPoints(set_desc_view);
+  auto set_result = client()->SetTripPoints(set_desc_view);
   EXPECT_TRUE(set_result.ok());
   EXPECT_TRUE(set_result->is_error());
 }
 
 TEST_F(AmlTripTest, TestSetCriticalTempInfinity) {
-  auto result = client_->GetTripPointDescriptors();
+  auto result = client()->GetTripPointDescriptors();
 
   ASSERT_TRUE(result.ok());
 
@@ -292,13 +266,13 @@ TEST_F(AmlTripTest, TestSetCriticalTempInfinity) {
   auto set_desc_view =
       fidl::VectorView<fuchsia_hardware_trippoint::wire::TripPointDescriptor>::FromExternal(descs);
 
-  auto set_result = client_->SetTripPoints(set_desc_view);
+  auto set_result = client()->SetTripPoints(set_desc_view);
   EXPECT_TRUE(set_result.ok());
   EXPECT_TRUE(set_result->is_error());
 }
 
 TEST_F(AmlTripTest, TestTypeConfigMismatch) {
-  auto result = client_->GetTripPointDescriptors();
+  auto result = client()->GetTripPointDescriptors();
 
   ASSERT_TRUE(result.ok());
 
@@ -327,13 +301,13 @@ TEST_F(AmlTripTest, TestTypeConfigMismatch) {
   auto set_desc_view =
       fidl::VectorView<fuchsia_hardware_trippoint::wire::TripPointDescriptor>::FromExternal(descs);
 
-  auto set_result = client_->SetTripPoints(set_desc_view);
+  auto set_result = client()->SetTripPoints(set_desc_view);
   EXPECT_TRUE(set_result.ok());
   EXPECT_TRUE(set_result->is_error());
 }
 
 TEST_F(AmlTripTest, TestTripPointSuccess) {
-  auto result = client_->GetTripPointDescriptors();
+  auto result = client()->GetTripPointDescriptors();
 
   ASSERT_TRUE(result.ok());
 
@@ -359,27 +333,27 @@ TEST_F(AmlTripTest, TestTripPointSuccess) {
   auto set_desc_view =
       fidl::VectorView<fuchsia_hardware_trippoint::wire::TripPointDescriptor>::FromExternal(descs);
 
-  auto set_result = client_->SetTripPoints(set_desc_view);
+  auto set_result = client()->SetTripPoints(set_desc_view);
   EXPECT_TRUE(set_result.ok());
   EXPECT_TRUE(set_result->is_ok());
 
-  auto get_result = client_->GetTripPointDescriptors();
+  auto get_result = client()->GetTripPointDescriptors();
   ASSERT_TRUE(get_result.ok());
 
   // Trigger an interrupt and set the registers to make it look like an
   // interrupt is pending.
-  sensor_mmio_.SetIrqStat(rise_desc->index, true);
+  SetIrqStat(rise_desc->index, true);
 
-  irq_.trigger(0, zx::clock::get_boot());
+  TriggerIrq();
 
-  auto wait_result = client_->WaitForAnyTripPoint();
+  auto wait_result = client()->WaitForAnyTripPoint();
 
   EXPECT_TRUE(wait_result.ok());
   EXPECT_TRUE(wait_result->is_ok());
 }
 
 TEST_F(AmlTripTest, TestTwoTripPointSuccess) {
-  auto result = client_->GetTripPointDescriptors();
+  auto result = client()->GetTripPointDescriptors();
 
   ASSERT_TRUE(result.ok());
 
@@ -419,28 +393,28 @@ TEST_F(AmlTripTest, TestTwoTripPointSuccess) {
   auto set_desc_view =
       fidl::VectorView<fuchsia_hardware_trippoint::wire::TripPointDescriptor>::FromExternal(descs);
 
-  auto set_result = client_->SetTripPoints(set_desc_view);
+  auto set_result = client()->SetTripPoints(set_desc_view);
   EXPECT_TRUE(set_result.ok());
   EXPECT_TRUE(set_result->is_ok());
 
   // Trigger an interrupt and set the registers to make it look like an
   // interrupt is pending.
-  sensor_mmio_.SetIrqStat(rise_desc->index, true);
-  sensor_mmio_.SetIrqStat(fall_desc->index, true);
+  SetIrqStat(rise_desc->index, true);
+  SetIrqStat(fall_desc->index, true);
 
-  irq_.trigger(0, zx::clock::get_boot());
+  TriggerIrq();
 
-  auto first_result = client_->WaitForAnyTripPoint();
+  auto first_result = client()->WaitForAnyTripPoint();
   EXPECT_TRUE(first_result.ok());
   EXPECT_TRUE(first_result->is_ok());
 
-  auto second_result = client_->WaitForAnyTripPoint();
+  auto second_result = client()->WaitForAnyTripPoint();
   EXPECT_TRUE(second_result.ok());
   EXPECT_TRUE(second_result->is_ok());
 }
 
 TEST_F(AmlTripTest, TestWaitNoConfigured) {
-  auto wait_result = client_->WaitForAnyTripPoint();
+  auto wait_result = client()->WaitForAnyTripPoint();
 
   // Waiting without configuring any trips is an error.
   EXPECT_TRUE(wait_result.ok());
@@ -448,7 +422,7 @@ TEST_F(AmlTripTest, TestWaitNoConfigured) {
 }
 
 TEST_F(AmlTripTest, TestClearTripPointAfterFire) {
-  auto result = client_->GetTripPointDescriptors();
+  auto result = client()->GetTripPointDescriptors();
 
   ASSERT_TRUE(result.ok());
 
@@ -474,28 +448,28 @@ TEST_F(AmlTripTest, TestClearTripPointAfterFire) {
   auto set_desc_view =
       fidl::VectorView<fuchsia_hardware_trippoint::wire::TripPointDescriptor>::FromExternal(descs);
 
-  auto set_result = client_->SetTripPoints(set_desc_view);
+  auto set_result = client()->SetTripPoints(set_desc_view);
   EXPECT_TRUE(set_result.ok());
   EXPECT_TRUE(set_result->is_ok());
 
   // Trigger an interrupt and set the registers to make it look like an
   // interrupt is pending.
-  sensor_mmio_.SetIrqStat(rise_desc->index, true);
+  SetIrqStat(rise_desc->index, true);
 
-  irq_.trigger(0, zx::clock::get_boot());
+  TriggerIrq();
 
   // Clear the trip point that just fired.
   fuchsia_hardware_trippoint::wire::ClearedTripPoint cleared;
   descs.at(0).configuration =
       fuchsia_hardware_trippoint::wire::TripPointValue::WithClearedTripPoint(cleared);
-  auto set_clear_result = client_->SetTripPoints(set_desc_view);
+  auto set_clear_result = client()->SetTripPoints(set_desc_view);
   EXPECT_TRUE(set_clear_result.ok());
   EXPECT_TRUE(set_clear_result->is_ok());
 
-  auto wait_result = client_->WaitForAnyTripPoint();
+  auto wait_result = client()->WaitForAnyTripPoint();
 
   EXPECT_TRUE(wait_result.ok());
   EXPECT_FALSE(wait_result->is_ok());  // No trip points should be configured.
 }
 
-}  // namespace temperature
+}  // namespace temperature::test

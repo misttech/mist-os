@@ -360,7 +360,8 @@ impl ThermalLoadDriver {
             "Failed to send ThrottlingResultShutdown metric"
         );
 
-        match self.send_message(&self.system_shutdown_node, &Message::HighTemperatureReboot).await {
+        match self.send_message(&self.system_shutdown_node, &Message::HighTemperatureShutdown).await
+        {
             Ok(_) => Ok(()),
             Err(e) => Err(e.into()),
         }
@@ -409,8 +410,10 @@ struct TemperatureInput {
 
 impl TemperatureInput {
     fn new(config: &TemperatureInputConfig) -> Self {
-        let temperature_filter =
-            TemperatureFilter::new(config.temperature_handler_node.clone(), config.filter_time_constant);
+        let temperature_filter = TemperatureFilter::new(
+            config.temperature_handler_node.clone(),
+            config.filter_time_constant,
+        );
 
         Self {
             temperature_filter,
@@ -806,7 +809,7 @@ mod tests {
         let mock_thermal_load_receiver = mock_maker.make("mock_thermal_load_receiver", vec![]);
         let system_shutdown_node = mock_maker.make(
             "mock_system_shutdown_node",
-            vec![(msg_eq!(HighTemperatureReboot), msg_ok_return!(SystemShutdown))],
+            vec![(msg_eq!(HighTemperatureShutdown), msg_ok_return!(SystemShutdown))],
         );
 
         // The ThermalLoadDriver asks for the driver name of all TemperatureHandler nodes during
@@ -937,6 +940,7 @@ mod tests {
 
         // Verify the expected thermal load values are present for both temperature inputs
         assert_data_tree!(
+            @executor node_runner.executor,
             inspector,
             root: {
                 "ThermalLoadDriver": {
@@ -1038,7 +1042,7 @@ mod tests {
 
         // Verify if a sensor causes thermal shutdown then `ThrottlingResultShutdown` is sent
         mock_system_shutdown_node.add_msg_response_pair((
-            msg_eq!(HighTemperatureReboot),
+            msg_eq!(HighTemperatureShutdown),
             msg_ok_return!(SystemShutdown),
         ));
         mock_platform_metrics.add_msg_response_pair((

@@ -5,6 +5,7 @@
 //! Socket features exposed by netstack3.
 
 use std::convert::Infallible as Never;
+use std::fmt::Debug;
 use std::num::NonZeroU64;
 use std::panic::Location;
 
@@ -29,6 +30,8 @@ use crate::bindings::devices::{
     BindingId, DeviceIdAndName, DeviceSpecificInfo, Devices, DynamicCommonInfo,
     DynamicEthernetInfo, DynamicNetdeviceInfo,
 };
+use crate::bindings::errno::ErrnoError;
+use crate::bindings::error::Error;
 use crate::bindings::util::{
     DeviceNotFoundError, IntoCore as _, IntoFidl as _, ResultExt as _, TryIntoCoreWithContext,
 };
@@ -128,32 +131,31 @@ pub(crate) async fn serve(
             }
             psocket::ProviderRequest::DatagramSocketDeprecated { domain, proto, responder } => {
                 let (client, request_stream) = create_request_stream();
-                let response = datagram::spawn_worker(
+                datagram::spawn_worker(
                     domain,
                     proto,
                     ctx.clone(),
                     request_stream,
                     SocketWorkerProperties {},
                     Default::default(),
-                )
-                .map(|()| client);
-                responder.send(response).unwrap_or_log("failed to respond");
+                );
+                responder.send(Ok(client)).unwrap_or_log("failed to respond");
             }
             psocket::ProviderRequest::DatagramSocket { domain, proto, responder } => {
                 let (client, request_stream) = create_request_stream();
-                let response = datagram::spawn_worker(
+                datagram::spawn_worker(
                     domain,
                     proto,
                     ctx.clone(),
                     request_stream,
                     SocketWorkerProperties {},
                     Default::default(),
-                )
-                .map(|()| {
-                    use psocket::ProviderDatagramSocketResponse;
-                    ProviderDatagramSocketResponse::SynchronousDatagramSocket(client)
-                });
-                responder.send(response).unwrap_or_log("failed to respond");
+                );
+                responder
+                    .send(Ok(psocket::ProviderDatagramSocketResponse::SynchronousDatagramSocket(
+                        client,
+                    )))
+                    .unwrap_or_log("failed to respond");
             }
             psocket::ProviderRequest::DatagramSocketWithOptions {
                 domain,
@@ -162,19 +164,18 @@ pub(crate) async fn serve(
                 opts,
             } => {
                 let (client, request_stream) = create_request_stream();
-                let response = datagram::spawn_worker(
+                datagram::spawn_worker(
                     domain,
                     proto,
                     ctx.clone(),
                     request_stream,
                     SocketWorkerProperties {},
                     opts,
-                )
-                .map(|()| {
-                    use psocket::ProviderDatagramSocketWithOptionsResponse;
-                    ProviderDatagramSocketWithOptionsResponse::SynchronousDatagramSocket(client)
-                });
-                responder.send(response).unwrap_or_log("failed to respond");
+                );
+                use psocket::ProviderDatagramSocketWithOptionsResponse as Response;
+                responder
+                    .send(Ok(Response::SynchronousDatagramSocket(client)))
+                    .unwrap_or_log("failed to respond");
             }
             psocket::ProviderRequest::GetInterfaceAddresses { responder } => {
                 responder
@@ -312,7 +313,7 @@ fn flags_for_device(info: &DeviceSpecificInfo<'_>) -> psocket::InterfaceFlags {
 /// `SockAddr` implementers are typically passed to POSIX socket calls as a blob
 /// of bytes. It represents a type that can be parsed from a C API `struct
 /// sockaddr`, expressed as a stream of bytes.
-pub(crate) trait SockAddr: std::fmt::Debug + Sized + Send {
+pub(crate) trait SockAddr: Debug + Sized + Send {
     /// The concrete address type for this `SockAddr`.
     type AddrType: IpAddress + ScopeableAddress;
 
@@ -348,7 +349,7 @@ pub(crate) trait SockAddr: std::fmt::Debug + Sized + Send {
     fn into_sock_addr(self) -> fnet::SocketAddress;
 
     /// Converts an [`fnet::SocketAddress`] into a `SockAddr`.
-    fn from_sock_addr(addr: fnet::SocketAddress) -> Result<Self, Errno>;
+    fn from_sock_addr(addr: fnet::SocketAddress) -> Result<Self, ErrnoError>;
 }
 
 impl SockAddr for fnet::Ipv6SocketAddress {
@@ -386,10 +387,13 @@ impl SockAddr for fnet::Ipv6SocketAddress {
         fnet::SocketAddress::Ipv6(self)
     }
 
-    fn from_sock_addr(addr: fnet::SocketAddress) -> Result<Self, Errno> {
+    fn from_sock_addr(addr: fnet::SocketAddress) -> Result<Self, ErrnoError> {
         match addr {
             fnet::SocketAddress::Ipv6(a) => Ok(a),
-            fnet::SocketAddress::Ipv4(_) => Err(Errno::Eafnosupport),
+            fnet::SocketAddress::Ipv4(_) => Err(ErrnoError::new(
+                Errno::Eafnosupport,
+                "Tried to get Ipv6SocketAddress from SocketAddress::Ipv4(_)",
+            )),
         }
     }
 }
@@ -423,10 +427,13 @@ impl SockAddr for fnet::Ipv4SocketAddress {
         fnet::SocketAddress::Ipv4(self)
     }
 
-    fn from_sock_addr(addr: fnet::SocketAddress) -> Result<Self, Errno> {
+    fn from_sock_addr(addr: fnet::SocketAddress) -> Result<Self, ErrnoError> {
         match addr {
             fnet::SocketAddress::Ipv4(a) => Ok(a),
-            fnet::SocketAddress::Ipv6(_) => Err(Errno::Eafnosupport),
+            fnet::SocketAddress::Ipv6(_) => Err(ErrnoError::new(
+                Errno::Eafnosupport,
+                "tried to get Ipv4SocketAddress from SocketAddress::Ipv6(_)",
+            )),
         }
     }
 }
@@ -474,7 +481,7 @@ mod testutil {
 
         /// Creates an [`fnet::SocketAddress`] with the given `addr` and `port`.
         fn create(addr: Self::AddrType, port: u16) -> fnet::SocketAddress {
-            Self::new(SpecifiedAddr::new(addr).map(|a| ZonedAddr::Unzoned(a).into()), port)
+            Self::new(SpecifiedAddr::new(addr).map(|a| ZonedAddr::Unzoned(a)), port)
                 .into_sock_addr()
         }
 
@@ -517,47 +524,46 @@ mod testutil {
 
 /// Trait expressing the conversion of error types into
 /// [`fidl_fuchsia_posix::Errno`] errors for the POSIX-lite wrappers.
-pub(crate) trait IntoErrno {
+pub(crate) trait IntoErrno: Sized + Debug + Into<Error> {
     /// Returns the most equivalent POSIX error code for `self`.
-    fn into_errno(self) -> Errno;
-}
+    fn to_errno(&self) -> Errno;
 
-impl IntoErrno for Errno {
-    fn into_errno(self) -> Errno {
-        self
+    #[track_caller]
+    fn into_errno_error(self) -> ErrnoError {
+        ErrnoError::new(self.to_errno(), self)
     }
 }
 
 impl IntoErrno for Never {
-    fn into_errno(self) -> Errno {
-        match self {}
+    fn to_errno(&self) -> Errno {
+        match *self {}
     }
 }
 
 impl<A: IntoErrno, B: IntoErrno> IntoErrno for Either<A, B> {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
-            Either::Left(a) => a.into_errno(),
-            Either::Right(b) => b.into_errno(),
+            Either::Left(a) => a.to_errno(),
+            Either::Right(b) => b.to_errno(),
         }
     }
 }
 
 impl IntoErrno for LocalAddressError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
             LocalAddressError::CannotBindToAddress
             | LocalAddressError::FailedToAllocateLocalPort => Errno::Eaddrnotavail,
             LocalAddressError::AddressMismatch => Errno::Eaddrnotavail,
             LocalAddressError::AddressUnexpectedlyMapped => Errno::Einval,
             LocalAddressError::AddressInUse => Errno::Eaddrinuse,
-            LocalAddressError::Zone(e) => e.into_errno(),
+            LocalAddressError::Zone(e) => e.to_errno(),
         }
     }
 }
 
 impl IntoErrno for RemoteAddressError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
             RemoteAddressError::NoRoute => Errno::Enetunreach,
         }
@@ -565,16 +571,16 @@ impl IntoErrno for RemoteAddressError {
 }
 
 impl IntoErrno for SocketError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
-            SocketError::Remote(e) => e.into_errno(),
-            SocketError::Local(e) => e.into_errno(),
+            SocketError::Remote(e) => e.to_errno(),
+            SocketError::Local(e) => e.to_errno(),
         }
     }
 }
 
 impl IntoErrno for ResolveRouteError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
             ResolveRouteError::NoSrcAddr => Errno::Eaddrnotavail,
             ResolveRouteError::Unreachable => Errno::Enetunreach,
@@ -583,33 +589,33 @@ impl IntoErrno for ResolveRouteError {
 }
 
 impl IntoErrno for IpSockCreationError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
-            IpSockCreationError::Route(e) => e.into_errno(),
+            IpSockCreationError::Route(e) => e.to_errno(),
         }
     }
 }
 
 impl IntoErrno for IpSockSendError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
             IpSockSendError::Mtu | IpSockSendError::IllegalLoopbackAddress => Errno::Einval,
-            IpSockSendError::Unroutable(e) => e.into_errno(),
+            IpSockSendError::Unroutable(e) => e.to_errno(),
             IpSockSendError::BroadcastNotAllowed => Errno::Eacces,
         }
     }
 }
 
 impl IntoErrno for udp::SendToError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
             Self::NotWriteable => Errno::Epipe,
-            Self::CreateSock(err) => err.into_errno(),
-            Self::Zone(err) => err.into_errno(),
+            Self::CreateSock(err) => err.to_errno(),
+            Self::Zone(err) => err.to_errno(),
             // NB: Mapping MTU to EMSGSIZE is different from the impl on
             // `IpSockSendError` which maps to EINVAL instead.
             Self::Send(IpSockSendError::Mtu) => Errno::Emsgsize,
-            Self::Send(err) => err.into_errno(),
+            Self::Send(err) => err.to_errno(),
             Self::RemotePortUnset => Errno::Einval,
             Self::RemoteUnexpectedlyMapped => Errno::Enetunreach,
             Self::RemoteUnexpectedlyNonMapped => Errno::Eafnosupport,
@@ -620,12 +626,12 @@ impl IntoErrno for udp::SendToError {
 }
 
 impl IntoErrno for udp::SendError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
             // NB: Mapping MTU to EMSGSIZE is different from the impl on
             // `IpSockSendError` which maps to EINVAL instead.
             Self::IpSock(IpSockSendError::Mtu) => Errno::Emsgsize,
-            Self::IpSock(err) => err.into_errno(),
+            Self::IpSock(err) => err.to_errno(),
             Self::NotWriteable => Errno::Epipe,
             Self::RemotePortUnset => Errno::Edestaddrreq,
             Self::SendBufferFull => Errno::Eagain,
@@ -635,10 +641,10 @@ impl IntoErrno for udp::SendError {
 }
 
 impl IntoErrno for ConnectError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
-            Self::Ip(err) => err.into_errno(),
-            Self::Zone(err) => err.into_errno(),
+            Self::Ip(err) => err.to_errno(),
+            Self::Zone(err) => err.to_errno(),
             Self::CouldNotAllocateLocalPort => Errno::Eaddrnotavail,
             Self::SockAddrConflict => Errno::Eaddrinuse,
             Self::RemoteUnexpectedlyMapped => Errno::Enetunreach,
@@ -648,7 +654,7 @@ impl IntoErrno for ConnectError {
 }
 
 impl IntoErrno for SetMulticastMembershipError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
             Self::AddressNotAvailable
             | Self::DeviceDoesNotExist
@@ -662,7 +668,7 @@ impl IntoErrno for SetMulticastMembershipError {
 }
 
 impl IntoErrno for ZonedAddressError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
             Self::RequiredZoneNotProvided => Errno::Einval,
             Self::DeviceZoneMismatch => Errno::Einval,
@@ -671,7 +677,7 @@ impl IntoErrno for ZonedAddressError {
 }
 
 impl IntoErrno for tcp::SetDeviceError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
             Self::Conflict => Errno::Eaddrinuse,
             Self::Unroutable => Errno::Ehostunreach,
@@ -681,16 +687,16 @@ impl IntoErrno for tcp::SetDeviceError {
 }
 
 impl IntoErrno for SetDualStackEnabledError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         match self {
             SetDualStackEnabledError::SocketIsBound => Errno::Einval,
-            SetDualStackEnabledError::NotCapable => Errno::Enoprotoopt,
+            SetDualStackEnabledError::NotCapable(e) => e.to_errno(),
         }
     }
 }
 
 impl IntoErrno for NotDualStackCapableError {
-    fn into_errno(self) -> Errno {
+    fn to_errno(&self) -> Errno {
         Errno::Enoprotoopt
     }
 }

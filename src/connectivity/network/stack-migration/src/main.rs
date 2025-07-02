@@ -1200,7 +1200,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn inspect() {
+    async fn inspect() {
         let mut m = Migration::new(
             InMemory::with_persisted(Persisted {
                 user: Some(NetstackVersion::Netstack2),
@@ -1236,7 +1236,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn inspect_rollback() {
+    async fn inspect_rollback() {
         let mut m = Migration::new(
             InMemory::with_persisted(Persisted {
                 user: None,

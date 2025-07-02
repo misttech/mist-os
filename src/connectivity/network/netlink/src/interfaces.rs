@@ -306,8 +306,9 @@ async fn set_link_address(
     interfaces_proxy: &fnet_root::InterfacesProxy,
     id: NonZeroU64,
     link_address: &mut Option<Vec<u8>>,
+    feature_flags: &FeatureFlags,
 ) {
-    if id.get() == fake_ifb0::FAKE_IFB0_LINK_ID {
+    if !feature_flags.assume_ifb0_existence && id.get() == fake_ifb0::FAKE_IFB0_LINK_ID {
         return;
     }
 
@@ -358,6 +359,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
         route_clients: ClientTable<NetlinkRoute, S>,
         interfaces_proxy: fnet_root::InterfacesProxy,
         interfaces_state_proxy: fnet_interfaces::StateProxy,
+        feature_flags: &FeatureFlags,
     ) -> Result<
         (
             Self,
@@ -411,27 +413,29 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             }
         };
 
-        assert_matches!(
-            interface_properties.insert(
-                fake_ifb0::FAKE_IFB0_LINK_ID,
-                fnet_interfaces_ext::PropertiesAndState {
-                    state: InterfaceState {
-                        addresses: Default::default(),
-                        link_address: Some(vec![0, 0, 0, 0, 0, 0]),
-                        control: None,
+        if !feature_flags.assume_ifb0_existence {
+            assert_matches!(
+                interface_properties.insert(
+                    fake_ifb0::FAKE_IFB0_LINK_ID,
+                    fnet_interfaces_ext::PropertiesAndState {
+                        state: InterfaceState {
+                            addresses: Default::default(),
+                            link_address: Some(vec![0, 0, 0, 0, 0, 0]),
+                            control: None,
+                        },
+                        properties: fake_ifb0::fake_ifb0_properties(),
                     },
-                    properties: fake_ifb0::fake_ifb0_properties(),
-                },
-            ),
-            None
-        );
+                ),
+                None
+            );
+        }
 
         for fnet_interfaces_ext::PropertiesAndState {
             properties,
             state: InterfaceState { addresses, link_address, control: _ },
         } in interface_properties.values_mut()
         {
-            set_link_address(&interfaces_proxy, properties.id, link_address).await;
+            set_link_address(&interfaces_proxy, properties.id, link_address, feature_flags).await;
 
             if let Some(interface_addresses) =
                 addresses_optionally_from_interface_properties(properties)
@@ -461,7 +465,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     pub(crate) async fn handle_interface_watcher_event(
         &mut self,
         event: fnet_interfaces_ext::EventWithInterest<fnet_interfaces_ext::AllInterest>,
-        _feature_flags: &FeatureFlags,
+        feature_flags: &FeatureFlags,
     ) -> Result<(), InterfaceEventHandlerError> {
         let update = match self.interface_properties.update(event) {
             Ok(update) => update,
@@ -473,7 +477,13 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 properties,
                 state: InterfaceState { addresses, link_address, control: _ },
             } => {
-                set_link_address(&self.interfaces_proxy, properties.id, link_address).await;
+                set_link_address(
+                    &self.interfaces_proxy,
+                    properties.id,
+                    link_address,
+                    feature_flags,
+                )
+                .await;
 
                 if let Some(message) = NetlinkLinkMessage::optionally_from(properties, link_address)
                 {
@@ -727,10 +737,11 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     async fn handle_set_link_request(
         &mut self,
         args: SetLinkArgs,
+        feature_flags: &FeatureFlags,
     ) -> Result<Option<PendingRequestKind>, RequestError> {
         let SetLinkArgs { link, enable } = args;
         let id = self.get_link(link).ok_or(RequestError::UnrecognizedInterface)?.properties.id;
-        if id.get() == fake_ifb0::FAKE_IFB0_LINK_ID {
+        if !feature_flags.assume_ifb0_existence && id.get() == fake_ifb0::FAKE_IFB0_LINK_ID {
             return Ok(None);
         }
 
@@ -789,8 +800,11 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 address_and_interface_id @ AddressAndInterfaceArgs { address, interface_id },
             add_subnet_route,
         }: NewAddressArgs,
+        feature_flags: &FeatureFlags,
     ) -> Result<Option<AddressAndInterfaceArgs>, RequestError> {
-        if u64::from(interface_id.get()) == fake_ifb0::FAKE_IFB0_LINK_ID {
+        if !feature_flags.assume_ifb0_existence
+            && u64::from(interface_id.get()) == fake_ifb0::FAKE_IFB0_LINK_ID
+        {
             return Ok(None);
         }
         let control = self
@@ -897,8 +911,11 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
             address_and_interface_id:
                 address_and_interface_id @ AddressAndInterfaceArgs { address, interface_id },
         }: DelAddressArgs,
+        feature_flags: &FeatureFlags,
     ) -> Result<AddressAndInterfaceArgs, RequestError> {
-        if u64::from(interface_id.get()) == fake_ifb0::FAKE_IFB0_LINK_ID {
+        if !feature_flags.assume_ifb0_existence
+            && u64::from(interface_id.get()) == fake_ifb0::FAKE_IFB0_LINK_ID
+        {
             return Ok(address_and_interface_id);
         }
 
@@ -943,6 +960,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
     pub(crate) async fn handle_request(
         &mut self,
         Request { args, sequence_number, mut client, completer }: Request<S>,
+        feature_flags: &FeatureFlags,
     ) -> Option<PendingRequest<S>> {
         log_debug!("handling request {args:?} from {client}");
 
@@ -951,7 +969,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                 self.handle_get_link_request(args, sequence_number, &mut client)
             }
             RequestArgs::Link(LinkRequestArgs::Set(args)) => {
-                match self.handle_set_link_request(args).await {
+                match self.handle_set_link_request(args, feature_flags).await {
                     Ok(Some(kind)) => return Some(PendingRequest { kind, client, completer }),
                     Ok(None) => Ok(()),
                     Err(e) => Err(e),
@@ -983,7 +1001,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     }
                 },
                 AddressRequestArgs::New(args) => {
-                    match self.handle_new_address_request(args).await {
+                    match self.handle_new_address_request(args, feature_flags).await {
                         Ok(None) => Ok(()),
                         Ok(Some(address_and_interface_id)) => {
                             return Some(PendingRequest {
@@ -996,7 +1014,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                     }
                 }
                 AddressRequestArgs::Del(args) => {
-                    match self.handle_del_address_request(args).await {
+                    match self.handle_del_address_request(args, feature_flags).await {
                         Ok(address_and_interface_id) => {
                             return Some(PendingRequest {
                                 kind: PendingRequestKind::DelAddress(address_and_interface_id),
@@ -1092,7 +1110,9 @@ mod fake_ifb0 {
 
     pub(super) const FAKE_IFB0_LINK_NAME: &str = "ifb0";
 
-    pub(super) const FAKE_IFB0_LINK_ID: u64 = 255;
+    // Chosen to look super arbitrary and human-allocated, and also large enough
+    // to be very unlikely to collide with another interface in practice.
+    pub(super) const FAKE_IFB0_LINK_ID: u64 = 13371337;
 
     pub(super) fn fake_ifb0_properties(
     ) -> fnet_interfaces_ext::Properties<fnet_interfaces_ext::AllInterest> {

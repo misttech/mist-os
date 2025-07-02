@@ -566,7 +566,8 @@ impl SecurityType {
                     || scanned_type == &client_types::SecurityTypeDetailed::Wpa2Personal
             }
             SecurityType::Wpa2 => {
-                scanned_type == &client_types::SecurityTypeDetailed::Wpa2Personal
+                scanned_type == &client_types::SecurityTypeDetailed::Wpa1Wpa2Personal
+                    || scanned_type == &client_types::SecurityTypeDetailed::Wpa2Personal
                     || scanned_type == &client_types::SecurityTypeDetailed::Wpa2Wpa3Personal
                     || scanned_type == &client_types::SecurityTypeDetailed::Wpa3Personal
             }

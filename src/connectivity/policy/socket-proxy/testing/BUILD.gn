@@ -16,6 +16,9 @@ rustc_library("testing") {
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.policy.socketproxy:fuchsia.net.policy.socketproxy_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
+    "//src/connectivity/policy/socket-proxy:lib",
     "//src/lib/fidl/rust/fidl",
+    "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:futures",
   ]
 }

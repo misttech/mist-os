@@ -30,7 +30,7 @@ class MockRenderer : public Renderer {
 
   MOCK_METHOD(void, Render,
               (const allocation::ImageMetadata&, const std::vector<ImageRect>&,
-               const std::vector<allocation::ImageMetadata>&, const std::vector<zx::event>&, bool));
+               const std::vector<allocation::ImageMetadata>&, const RenderArgs& render_args));
 
   MOCK_METHOD(void, SetColorConversionValues,
               ((const fidl::Array<float, 9>&), (const fidl::Array<float, 3>&),

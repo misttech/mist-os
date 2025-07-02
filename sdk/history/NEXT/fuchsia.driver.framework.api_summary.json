@@ -793,6 +793,11 @@
     },
     {
         "kind": "enum/member",
+        "name": "fuchsia.driver.framework/NodeError.DUPLICATE_PROPERTY_KEYS",
+        "value": "13"
+    },
+    {
+        "kind": "enum/member",
         "name": "fuchsia.driver.framework/NodeError.INTERNAL",
         "value": "1"
     },

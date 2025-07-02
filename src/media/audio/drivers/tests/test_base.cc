@@ -26,6 +26,7 @@
 #include <gtest/gtest.h>
 
 #include "src/media/audio/drivers/tests/audio_device_enumerator_stub.h"
+#include "src/media/audio/drivers/tests/durations.h"
 
 namespace media::audio::drivers::test {
 
@@ -71,17 +72,6 @@ void TestBase::SetUp() {
 
       break;
   }
-}
-
-// Audio drivers can have multiple StreamConfig channels open, but only one can be 'privileged':
-// the one that can in turn create a RingBuffer channel. Each test case starts from scratch,
-// opening and closing channels. If we create a StreamConfig channel before the previous one is
-// cleared, a new StreamConfig channel will not be privileged, and Admin tests will fail.
-//
-// When disconnecting a StreamConfig, there's no signal to wait on before proceeding (potentially
-// immediately executing other tests); insert a 10-ms wait (needing >3.5ms was never observed).
-void TestBase::CooldownAfterDriverDisconnect() {
-  zx::nanosleep(zx::deadline_after(kDriverDisconnectCooldownDuration));
 }
 
 void TestBase::TearDown() {

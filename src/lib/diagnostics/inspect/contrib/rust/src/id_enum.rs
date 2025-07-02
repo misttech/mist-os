@@ -117,8 +117,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_inspect_record_id_enum() {
+    #[fuchsia::test]
+    async fn test_inspect_record_id_enum() {
         let inspector = Inspector::default();
         inspect_record_id_enum::<Enum>(inspector.root(), "enum");
         assert_data_tree!(inspector, root: {
@@ -129,8 +129,8 @@ mod tests {
         });
     }
 
-    #[test]
-    fn test_inspect_record_id_enum_mapped() {
+    #[fuchsia::test]
+    async fn test_inspect_record_id_enum_mapped() {
         let inspector = Inspector::default();
         inspect_record_id_enum_mapped::<Enum, _>(inspector.root(), "highlight", |variant| {
             match variant {

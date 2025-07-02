@@ -54,15 +54,20 @@ Checker::File::File(fidl::UnownedClientEnd<fuchsia_io::File> file) : file_(file)
 Checker::File::~File() = default;
 
 zx::result<size_t> Checker::File::Size() const {
-  const fidl::WireResult result = fidl::WireCall(file_)->GetAttr();
+  const fidl::WireResult result =
+      fidl::WireCall(file_)->GetAttributes(fuchsia_io::NodeAttributesQuery::kContentSize);
   if (!result.ok()) {
     return zx::error(result.status());
   }
-  const fidl::WireResponse response = result.value();
-  if (zx_status_t status = response.s; status != ZX_OK) {
-    return zx::error(status);
+  const fit::result response = result.value();
+  if (response.is_error()) {
+    return zx::error(response.error_value());
   }
-  return zx::ok(response.attributes.content_size);
+  uint64_t content_size = 0;
+  if (response.value()->immutable_attributes.has_content_size()) {
+    content_size = response.value()->immutable_attributes.content_size();
+  }
+  return zx::ok(content_size);
 }
 
 zx::result<size_t> Checker::File::Read(void* buf, size_t count) const {

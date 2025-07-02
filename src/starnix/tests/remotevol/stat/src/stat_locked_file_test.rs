@@ -4,7 +4,7 @@
 
 use component_events::events::{EventStream, ExitStatus, Stopped};
 use component_events::matcher::EventMatcher;
-use fidl_fuchsia_component::{CreateChildArgs, RealmMarker};
+use fidl_fuchsia_component::{CreateChildArgs, RealmProxy};
 use fidl_fuchsia_component_decl::{Child, CollectionRef, StartupMode};
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, RealmInstance};
 use log::info;
@@ -37,7 +37,7 @@ async fn stat_locked_file_then_stat_unlocked_file() {
     wait_for_starnix_volume_to_be_mounted().await;
 
     info!("starting create_encrypted_file");
-    let test_realm = realm.root.connect_to_protocol_at_exposed_dir::<RealmMarker>().unwrap();
+    let test_realm: RealmProxy = realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     test_realm
         .create_child(
             &CollectionRef { name: PROGRAM_COLLECTION.to_string() },
@@ -87,7 +87,7 @@ async fn stat_locked_file_then_stat_unlocked_file() {
     wait_for_starnix_volume_to_be_mounted().await;
 
     info!("starting stat_encrypted_file");
-    let test_realm = realm.root.connect_to_protocol_at_exposed_dir::<RealmMarker>().unwrap();
+    let test_realm: RealmProxy = realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     test_realm
         .create_child(
             &CollectionRef { name: PROGRAM_COLLECTION.to_string() },

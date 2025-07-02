@@ -21,7 +21,7 @@
 ## All arguments are passed to the Bazel binary.
 
 _script_dir="${BASH_SOURCE[0]%/*}";
-if [[ "${_script_dir}" == "${BASH_SOURCE[0]}" ]] then _script_dir="."; fi
+if [[ "${_script_dir}" == "${BASH_SOURCE[0]}" ]]; then _script_dir="."; fi
 readonly _script_dir
 
 source "${_script_dir}/lib/vars.sh" || exit $?

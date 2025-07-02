@@ -82,7 +82,7 @@ class InitTests(unittest.TestCase):
         )
 
         mock_fc_context.assert_called_once_with(
-            config={},
+            config={"log.level": "debug", "log.dir": "/tmp/logs"},
             isolate_dir=_INPUT_ARGS["ffx_config_data"].isolate_dir,
             target=_INPUT_ARGS["target_name"],
         )
@@ -126,7 +126,7 @@ class InitTests(unittest.TestCase):
         )
 
         mock_fc_context.assert_called_once_with(
-            config={},
+            config={"log.level": "debug", "log.dir": "/tmp/logs"},
             isolate_dir=_INPUT_ARGS["ffx_config_data"].isolate_dir,
             target=str(_INPUT_ARGS["target_ip_port"]),
         )

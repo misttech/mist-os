@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use argh::FromArgs;
 use assembled_system::{AssembledSystem, Image};
 use camino::Utf8PathBuf;
-use sdk_metadata::ProductBundle;
+use product_bundle::ProductBundle;
 
 use flate2::read::GzDecoder;
 use std::fs::File;
@@ -169,7 +169,7 @@ impl GenerateBuildArchive {
                     Image::ZBI { path, signed: _ } => Some((path, "zircon-a.zbi")),
                     Image::VBMeta(path) => Some((path, "zircon-a.vbmeta")),
                     Image::FVM(path) => Some((path, "storage-full.blk")),
-                    Image::Fxfs { path, .. } => Some((path, "fxfs.blk")),
+                    Image::Fxfs(path) => Some((path, "fxfs.blk")),
                     Image::QemuKernel(path) => Some((path, "qemu-kernel.kernel")),
                     Image::FVMFastboot(path) => Some((path, "fvm.fastboot.blk")),
                     Image::FxfsSparse { path, .. } => Some((path, "fxfs.sparse.blk")),
@@ -204,6 +204,8 @@ impl GenerateBuildArchive {
         let images_manifest = AssembledSystem {
             images,
             board_name: product_bundle.partitions.hardware_revision.clone(),
+            partitions_config: None,
+            system_release_info: None,
         };
         let images_manifest_path = self.out_dir.join("images.json");
         images_manifest.write_old(images_manifest_path).context("Writing images manifest")?;
@@ -254,7 +256,7 @@ mod tests {
     use assembly_container::AssemblyContainer;
     use assembly_partitions_config::PartitionsConfig;
     use camino::Utf8Path;
-    use sdk_metadata::ProductBundleV2;
+    use product_bundle::ProductBundleV2;
     use serde_json::Value;
     use std::io::Write;
     use tempfile::tempdir;
@@ -361,6 +363,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         let pb_path = tempdir.join("product_bundle");
         std::fs::create_dir_all(&pb_path).unwrap();

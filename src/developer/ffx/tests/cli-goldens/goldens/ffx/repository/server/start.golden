@@ -144,6 +144,18 @@
       "hidden": false
     },
     {
+      "kind": {
+        "Option": {
+          "arg_name": "tunnel-addr"
+        }
+      },
+      "optionality": "optional",
+      "long": "--tunnel-addr",
+      "short": null,
+      "description": "the address used to listen on target-side when tunneling is used.",
+      "hidden": false
+    },
+    {
       "kind": "Switch",
       "optionality": "optional",
       "long": "--no-device",

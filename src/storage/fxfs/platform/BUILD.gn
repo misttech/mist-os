@@ -4,6 +4,12 @@
 
 import("//build/rust/rustc_library.gni")
 
+declare_args() {
+  # Enables the tracking of refaults within blobs. A refault is when a page within a blob that was
+  # previously supplied got evicted by the kernel and needs to supplied again.
+  blob_refault_tracking = false
+}
+
 platform_sources = [
   "src/fuchsia.rs",
   "src/fuchsia/component.rs",
@@ -19,6 +25,7 @@ platform_sources = [
   "src/fuchsia/fxblob/directory.rs",
   "src/fuchsia/fxblob/reader.rs",
   "src/fuchsia/fxblob/testing.rs",
+  "src/fuchsia/fxblob/volume_writer.rs",
   "src/fuchsia/fxblob/writer.rs",
   "src/fuchsia/memory_pressure.rs",
   "src/fuchsia/node.rs",
@@ -37,6 +44,7 @@ platform_deps = [
   "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
   "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
   "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
+  "//sdk/fidl/fuchsia.mem:fuchsia.mem_rust",
   "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_rust",
   "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_rust",
   "//sdk/rust/zx",
@@ -96,7 +104,9 @@ rustc_library("platform") {
       "//src/storage/crypt/fxfs:lib",
       "//src/storage/fxfs:lib",
       "//src/storage/fxfs/crypto/insecure",
+      "//src/storage/fxfs/make-blob-image",
       "//src/storage/lib/blob_writer:blob-writer",
+      "//src/storage/lib/block_protocol",
       "//src/storage/lib/fs_management/rust:fs_management",
       "//src/storage/lib/fsverity-merkle",
       "//src/storage/lib/ramdevice_client/rust:ramdevice_client",
@@ -107,6 +117,10 @@ rustc_library("platform") {
     ]
   }
   visibility = [ "//src/storage/fxfs/*" ]
+
+  if (blob_refault_tracking) {
+    features = [ "refault-tracking" ]
+  }
 }
 
 rustc_library("fxfs-testing") {

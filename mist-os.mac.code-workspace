@@ -226,6 +226,9 @@
       "${workspaceFolder}/pyproject.toml"
     ],
 
+    // Index more than 2k files
+    "python.analysis.languageServerMode": "full",
+
     ////////
     // Markdown
     //
@@ -320,6 +323,7 @@
       "third_party/gperftools/**": true,
       "third_party/grpc/**": true,
       "third_party/gvisor_syscall_tests/**": true,
+      "third_party/half/**": true,
       "third_party/icu/**": true,
       "third_party/imgtec-pvr-rgx-km/**": true,
       "third_party/inih/**": true,

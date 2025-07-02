@@ -5,13 +5,15 @@
 import("//build/components.gni")
 
 group("scenic") {
-  deps = [ ":input" ]
+  deps = [
+    ":input",
+    "paper_shader_compiler($host_toolchain)",
+  ]
 }
 
 group("tools") {
   deps = [
     ":input",
-    "paper_shader_compiler",
     "print-input-report",
   ]
 }

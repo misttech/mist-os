@@ -15,7 +15,10 @@ rustc_library("bounded-node") {
     "//src/lib/diagnostics/inspect/rust",
   ]
 
-  test_deps = [ "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions" ]
+  test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//src/lib/fuchsia",
+  ]
 
   sources = [ "src/lib.rs" ]
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]

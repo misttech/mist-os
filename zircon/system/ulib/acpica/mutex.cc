@@ -23,7 +23,7 @@ struct AcpiSpinLock : public SpinLock {
 /**
  * @brief Create a mutex.
  *
- * @param OutHandle A pointer to a locaton where a handle to the mutex is
+ * @param OutHandle A pointer to a location where a handle to the mutex is
  *        to be returned.
  *
  * @return AE_OK The mutex was successfully created.
@@ -83,7 +83,7 @@ void AcpiOsReleaseMutex(ACPI_MUTEX Handle) TA_REL(Handle) { ((AcpiMutex*)Handle)
 /**
  * @brief Create a spin lock.
  *
- * @param OutHandle A pointer to a locaton where a handle to the lock is
+ * @param OutHandle A pointer to a location where a handle to the lock is
  *        to be returned.
  *
  * @return AE_OK The lock was successfully created.

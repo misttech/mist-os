@@ -22,7 +22,10 @@ rust_binary(
     ],
 
     # TODO(https://fxbug.dev/42065890) make this be included automatically for all rust binaries.
-    deps = ["@fuchsia_sdk//pkg/fdio"],
+    deps = select({
+        "@platforms//os:fuchsia": ["@fuchsia_sdk//pkg/fdio"],
+        "//conditions:default": [],
+    }),
 )
 
 fuchsia_wrap_rust_binary(

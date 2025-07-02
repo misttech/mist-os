@@ -34,11 +34,11 @@ source_set("common") {
     "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//src/devices/lib/amlogic",
     "//zircon/system/ulib/zx",
   ]
   deps = [
-    "//src/lib/ddk:ddk_metadata",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/sync",
@@ -76,6 +76,7 @@ test("aml-meson-power-test-bin") {
     ":common",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp_testing",
     "//sdk/fidl/fuchsia.hardware.vreg:fuchsia.hardware.vreg_cpp_testing",
+    "//sdk/lib/driver/fake-platform-device/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/bind/fuchsia.amlogic.platform:fuchsia.amlogic.platform_cpp",
     "//src/lib/fxl/test:gtest_main",

@@ -140,15 +140,24 @@ fs_test_config("f2fs") {
   supports_mmap = true
   supports_mmap_shared_write = true
 
+  # f2fs requires a minimum of 50mb volume
+  has_min_volume_size = true
+  inode_size = 4096
+
   options = [
     {
       description = "F2fsWithoutFvm"
       use_fvm = false
-      has_min_volume_size = true
-
-      # f2fs requires a minimum of 50mb volume
       device_block_count = 102400
       device_block_size = 512
+    },
+
+    {
+      description = "F2fsWithFvm"
+      use_fvm = true
+      device_block_count = 102400
+      device_block_size = 512
+      fvm_slice_size = 2097152
     },
   ]
 }

@@ -39,7 +39,7 @@
         },
         {
             name: "fake-hrtimer",
-            url: "fake-hrtimer#meta/fake-hrtimer.cm",
+            url: "fake-hrtimer#meta/default.cm",
         },
         {
             name: "wake-alarms",

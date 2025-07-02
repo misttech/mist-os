@@ -55,11 +55,14 @@ enum class Opcode : uint8_t {
   SECURITY_PROTOCOL_OUT = 0xB5,
 };
 
+// SAM-3 Revision 4, section 5.3.1 "Status codes".
 enum class StatusCode : uint8_t {
   GOOD = 0x00,
   CHECK_CONDITION = 0x02,
   CONDITION_MET = 0x04,
   BUSY = 0x08,
+  INTERMEDIATE = 0x10,
+  INTERMEDIATE_CONDITION_MET = 0x14,
   RESERVATION_CONFILCT = 0x18,
   TASK_SET_FULL = 0x28,
   ACA_ACTIVE = 0x30,
@@ -214,6 +217,16 @@ struct SenseDataHeader {
 
 static_assert(sizeof(SenseDataHeader) == 8, "Sense data header must be 8 bytes");
 
+// SPC-4 Revision 37, section 4.5.1 "Sense data introduction".
+enum class SenseDataResponseCodes : uint8_t {
+  kFixedCurrentInformation = 0x70,
+  kFixedDeferredError = 0x71,
+  kDescriptorCurrentInformation = 0x72,
+  kDescriptorDeferredError = 0x73,
+  kVendorSpecific = 0x7f,
+};
+
+// SPC-4 Revision 37, section 4.5.3 "Fixed format sense data".
 struct FixedFormatSenseDataHeader {
   // valid_resp_code (7) is 'valid'
   // valid_resp_code (6 downto 0) is 'response code'
@@ -227,6 +240,7 @@ struct FixedFormatSenseDataHeader {
   uint32_t information;
   uint8_t additional_sense_length;
   uint32_t command_specific_information;
+  // SPC-4 Revision 37, section 4.5.8 "Sense key and additional sense code definitions".
   uint8_t additional_sense_code;
   uint8_t additional_sense_code_qualifier;
   uint8_t field_replaceable_unit_code;
@@ -234,7 +248,7 @@ struct FixedFormatSenseDataHeader {
   uint8_t sense_key_specific[3];
 
   DEF_SUBBIT(valid_resp_code, 7, valid);
-  DEF_SUBFIELD(valid_resp_code, 6, 0, response_code);
+  DEF_ENUM_SUBFIELD(valid_resp_code, SenseDataResponseCodes, 6, 0, response_code);
   DEF_SUBBIT(mark_sense_key, 7, filemark);
   DEF_SUBBIT(mark_sense_key, 6, eom);
   DEF_SUBBIT(mark_sense_key, 5, ili);
@@ -900,6 +914,28 @@ struct SendDiagnosticCDB {
 
 static_assert(sizeof(SendDiagnosticCDB) == 6, "Send Diagnostic CDB must be 6 bytes");
 
+// The HostStatusCode is used by the device driver to communicate the desired behavior to the SCSI
+// library.
+enum class HostStatusCode {
+  kOk = 0,
+  kAbort,
+  kError,
+  kRequeue,
+  kTimeout,
+  kUnknown,
+};
+
+struct StatusMessage {
+  HostStatusCode host_status_code;
+  StatusCode scsi_status_code;
+};
+
+enum class PostProcess {
+  kNone = 0,
+  kNeedsRetry,
+  kNeedsErrorHandling,
+};
+
 struct DeviceOp;
 struct DeviceOptions;
 
@@ -1002,6 +1038,18 @@ class Controller {
                                                uint16_t max_lun, LuCallback lu_callback,
                                                DeviceOptions device_options);
 
+  // This function handles the completion of the SCSI command and runs the ErrorHandler if an error
+  // is found. |StatusMessage| is a struct for passing the HostStatusCode and ScsiStatusCode.
+  // The sequence to check for errors is as follows
+  // - Check HostStatusCode -> Check ScsiStatusCode -> Check SenseData
+  // Currently, the ScsiComplete() does not support retry.
+  zx::result<> ScsiComplete(StatusMessage status_message,
+                            const FixedFormatSenseDataHeader& sense_data);
+
+  void SetExpectCheckConditionOrUnitAttention(bool value) {
+    expect_check_condition_or_unit_attention_ = value;
+  }
+
   // Logical units that were bound using ScanAndBindLogicalUnits().
   const std::unordered_map<uint8_t /*target*/,
                            std::unordered_map<uint16_t /*lun*/, std::unique_ptr<BlockDevice>>>&
@@ -1013,6 +1061,15 @@ class Controller {
   std::unordered_map<uint8_t /*target*/,
                      std::unordered_map<uint16_t /*lun*/, std::unique_ptr<BlockDevice>>>
       block_devs_;
+
+ private:
+  friend class BlockDeviceTest;
+  zx::result<PostProcess> CheckScsiStatus(StatusCode status_code,
+                                          const FixedFormatSenseDataHeader& sense_data);
+  // Currently, it only supports fixed format sense data.
+  zx::result<PostProcess> CheckSenseData(const FixedFormatSenseDataHeader& sense_data);
+
+  bool expect_check_condition_or_unit_attention_ = false;
 };
 
 }  // namespace scsi

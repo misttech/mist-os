@@ -550,24 +550,28 @@ bool newline_replace(std::string_view name) {
 
 zx_status_t daemon_service_connect(std::string_view name, void* adb_ctxt, asocket* s) {
   std::string_view service_name = "UNKNOWN";
-  std::string args = "";
-  if (name.rfind("shell:", 0) == 0) {
+  std::string_view args = "";
+  if (name.starts_with("shell:")) {
     service_name = kShellService;
     args = name.substr(strlen("shell:"));
     if (!args.empty()) {
-      FX_LOGS(DEBUG) << "Requesting shell cmd " << std::string(args).c_str() << "[" << args.size()
-                     << "]";
+      FX_LOGS(DEBUG) << "Requesting shell cmd " << args << "[" << args.size() << "]";
     }
   } else if (name == "local:ffx") {
     service_name = kFfxService;
   } else if (name == "sync:") {
     service_name = kFileSyncService;
-  } else if (name.rfind("reboot:", 0) == 0) {
+  } else if (name.starts_with("reboot:")) {
     service_name = kRebootService;
     args = name.substr(strlen("reboot:"));
     if (!args.empty()) {
-      FX_LOGS(DEBUG) << "Requesting reboot" << std::string(args).c_str() << "[" << args.size()
-                     << "]";
+      FX_LOGS(DEBUG) << "Requesting reboot" << args << "[" << args.size() << "]";
+    }
+  } else if (name.starts_with("sideload-host:")) {
+    service_name = kSideloadService;
+    args = name.substr(strlen("sideload-host:"));
+    if (!args.empty()) {
+      FX_LOGS(DEBUG) << "Requesting sideload " << args << "[" << args.size() << "]";
     }
   } else {
     FX_LOGS(ERROR) << "Service " << name << " not supported";

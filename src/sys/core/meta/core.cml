@@ -455,6 +455,11 @@
             to: [ "#vulkan_loader" ],
         },
         {
+            service: "fuchsia.gpu.magma.TrustedService",
+            from: "parent",
+            to: [ "#vulkan_loader" ],
+        },
+        {
             // TODO(https://fxbug.dev/324273348): Remove this capability once the clients have
             // been migrated to services. The service capability has been added below.
             directory: "dev-class",
@@ -693,9 +698,15 @@
             protocol: [
                 "fuchsia.pkg.PackageResolver",
                 "fuchsia.pkg.RepositoryManager",
+                "fuchsia.pkg.resolution.PackageResolver",
                 "fuchsia.pkg.rewrite.Engine",
             ],
             from: "#pkg-resolver",
+        },
+        {
+            protocol: "fuchsia.component.resolution.Resolver",
+            from: "#pkg-resolver",
+            as: "fuchsia.component.resolution.Resolver-full",
         },
         {
             protocol: [ "fuchsia.ui.activity.Provider" ],

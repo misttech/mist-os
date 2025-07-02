@@ -178,11 +178,11 @@ async fn detect_disk_format_res(block_proxy: impl AsBlockProxy) -> Result<DiskFo
 mod tests {
     use super::{constants, detect_disk_format_res, DiskFormat};
     use anyhow::Error;
-    use fake_block_server::FakeServer;
     use fidl::endpoints::create_proxy_and_stream;
     use fidl_fuchsia_hardware_block_volume::VolumeMarker;
     use futures::{select, FutureExt};
     use std::pin::pin;
+    use vmo_backed_block_server::{VmoBackedServer, VmoBackedServerTestingExt as _};
 
     async fn get_detected_disk_format(
         content: &[u8],
@@ -191,7 +191,7 @@ mod tests {
     ) -> Result<DiskFormat, Error> {
         let (proxy, stream) = create_proxy_and_stream::<VolumeMarker>();
 
-        let fake_server = FakeServer::new(block_count, block_size, content);
+        let fake_server = VmoBackedServer::new(block_count, block_size, content);
         let mut request_handler = pin!(fake_server.serve(stream).fuse());
 
         select! {

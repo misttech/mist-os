@@ -190,6 +190,12 @@ function find_tree_root {
   echo "$parent"
 }
 
+function show_mac_deprecation_warning {
+  if [[ "$(uname -s)" == "Darwin" ]]; then
+    fx-warn "This tool is deprecated per go/fuchsia-on-mac and will be removed on [2025/07/01]: b/419872734"
+  fi
+}
+
 # We walk the parent directories looking for .jiri_root rather than using
 # BASH_SOURCE so that we find the fuchsia_dir enclosing the current working
 # directory instead of the one containing this file in case the user has
@@ -266,7 +272,8 @@ while [[ $# -ne 0 ]]; do
         fx-error $error_message
         exit 1
       fi
-      export _FX_BUILD_DIR="$1"
+      # Remove trailing slash, as it can impede other checks elsewhere in the code.
+      export _FX_BUILD_DIR="${1%/}"
       if [[ "$_FX_BUILD_DIR" == //* ]]; then
         _FX_BUILD_DIR="${fuchsia_dir}/${_FX_BUILD_DIR#//}"
       else
@@ -363,7 +370,7 @@ while [[ $# -ne 0 ]]; do
       ;;
     -*)
       usage
-      fx-error "Unknown global argument $1"
+      fx-error "Missing argument to --enable"
       exit 1
       ;;
     *)
@@ -372,6 +379,9 @@ while [[ $# -ne 0 ]]; do
   esac
   shift
 done
+
+# Show our mac deprecation before any other messages
+show_mac_deprecation_warning
 
 if [[ $# -lt 1 ]]; then
   usage

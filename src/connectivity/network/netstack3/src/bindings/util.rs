@@ -33,6 +33,7 @@ use netstack3_core::socket::{
 };
 use netstack3_core::sync::RemoveResourceResult;
 use packet_formats::utils::NonZeroDuration;
+use thiserror::Error;
 use {
     fidl_fuchsia_net as fidl_net, fidl_fuchsia_net_ext as fnet_ext,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
@@ -476,7 +477,7 @@ where
 
     fn try_into_fidl(self) -> Result<<A::Version as IpSockAddrExt>::SocketAddress, Self::Error> {
         let (addr, port) = self;
-        Ok(SockAddr::new(addr.map(|a| ZonedAddr::Unzoned(a).into()), port.get()))
+        Ok(SockAddr::new(addr.map(|a| ZonedAddr::Unzoned(a)), port.get()))
     }
 }
 
@@ -502,9 +503,23 @@ impl TryFromFidl<fposix_socket::OptionalUint32> for Option<u32> {
     }
 }
 
+#[derive(Debug, Error)]
+#[error("wrong IP version")]
+pub(crate) struct WrongIpVersionError;
+
+impl IntoErrno for WrongIpVersionError {
+    fn to_errno(&self) -> fposix::Errno {
+        let WrongIpVersionError = self;
+        fposix::Errno::Enoprotoopt
+    }
+}
+
+#[derive(Debug, Error)]
 pub(crate) enum MulticastMembershipConversionError {
+    #[error("address is not multicast")]
     AddrNotMulticast,
-    WrongIpVersion,
+    #[error(transparent)]
+    WrongIpVersion(#[from] WrongIpVersionError),
 }
 
 impl<I: Ip> GenericOverIp<I> for MulticastMembershipConversionError {
@@ -512,10 +527,10 @@ impl<I: Ip> GenericOverIp<I> for MulticastMembershipConversionError {
 }
 
 impl IntoErrno for MulticastMembershipConversionError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
             Self::AddrNotMulticast => fposix::Errno::Einval,
-            Self::WrongIpVersion => fposix::Errno::Enoprotoopt,
+            Self::WrongIpVersion(e) => e.to_errno(),
         }
     }
 }
@@ -542,7 +557,7 @@ impl<A: IpAddress> TryFromFidl<fposix_socket::IpMulticastMembership>
                     });
                 Ok((mcast_addr, selector))
             },
-            |_fidl| Err(Self::Error::WrongIpVersion),
+            |_fidl| Err(Self::Error::WrongIpVersion(WrongIpVersionError)),
         )
     }
 }
@@ -555,7 +570,7 @@ impl<A: IpAddress> TryFromFidl<fposix_socket::Ipv6MulticastMembership>
     fn try_from_fidl(fidl: fposix_socket::Ipv6MulticastMembership) -> Result<Self, Self::Error> {
         <A::Version as Ip>::map_ip_out(
             fidl,
-            |_fidl| Err(Self::Error::WrongIpVersion),
+            |_fidl| Err(Self::Error::WrongIpVersion(WrongIpVersionError)),
             |fidl| {
                 let fposix_socket::Ipv6MulticastMembership { iface, mcast_addr } = fidl;
                 let mcast_addr = MulticastAddr::new(mcast_addr.into_core())
@@ -652,18 +667,20 @@ impl<F, C: TryFromFidlWithContext<F>> TryIntoCoreWithContext<C> for F {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
+#[error("device not found")]
 pub(crate) struct DeviceNotFoundError;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
 pub(crate) enum SocketAddressError {
+    #[error(transparent)]
     Device(DeviceNotFoundError),
 }
 
 impl IntoErrno for SocketAddressError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         match self {
-            SocketAddressError::Device(d) => d.into_errno(),
+            SocketAddressError::Device(d) => d.to_errno(),
         }
     }
 }
@@ -693,17 +710,17 @@ where
                         // For conformance with Linux, allow callers to provide
                         // a scope ID for addresses that don't allow zones.
                         debug!("ignoring zone ({zone:?}) provided for address ({specified})");
-                        ZonedAddr::Unzoned(specified).into()
+                        ZonedAddr::Unzoned(specified)
                     }
                     Some(addr_and_zone) => addr_and_zone
                         .try_map_zone(|zone| {
                             TryFromFidlWithContext::try_from_fidl_with_ctx(ctx, zone)
                                 .map_err(SocketAddressError::Device)
                         })
-                        .map(|a| ZonedAddr::Zoned(a).into())?,
+                        .map(|a| ZonedAddr::Zoned(a))?,
                 }
             }
-            None => ZonedAddr::Unzoned(specified).into(),
+            None => ZonedAddr::Unzoned(specified),
         };
         Ok((Some(zoned), port))
     }
@@ -731,8 +748,7 @@ where
                             TryIntoFidlWithContext::try_into_fidl_with_ctx(zone, ctx)
                         })?
                         .into(),
-                }
-                .into())
+                })
             })
             .transpose()?;
         Ok(SockAddr::new(addr, port))
@@ -863,7 +879,7 @@ impl TryIntoFidlWithContext<BindingId> for AllowBindingIdFromWeak {
 }
 
 impl IntoErrno for DeviceNotFoundError {
-    fn into_errno(self) -> fposix::Errno {
+    fn to_errno(&self) -> fposix::Errno {
         fposix::Errno::Enodev
     }
 }
@@ -1588,11 +1604,10 @@ mod tests {
     {
         let ctx = FakeConversionContext::new().await;
         let zoned = zoned.map(|z| match z {
-            ZonedAddr::Unzoned(z) => ZonedAddr::Unzoned(z).into(),
+            ZonedAddr::Unzoned(z) => ZonedAddr::Unzoned(z),
             ZonedAddr::Zoned(z) => ZonedAddr::Zoned(z.map_zone(|ReplaceWithCoreId| {
                 ctx.get_core_id(FakeConversionContext::BINDING_ID1).unwrap()
-            }))
-            .into(),
+            })),
         });
 
         let result: (Option<ZonedAddr<_, _>>, _) =

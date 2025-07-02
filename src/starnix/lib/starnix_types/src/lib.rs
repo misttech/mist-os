@@ -8,6 +8,7 @@ pub mod futex_address;
 pub mod math;
 pub mod ownership;
 pub mod stats;
+pub mod thread_start_info;
 pub mod time;
 pub mod user_buffer;
 pub mod vfs;

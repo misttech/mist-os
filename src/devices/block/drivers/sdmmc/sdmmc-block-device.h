@@ -172,6 +172,7 @@ class SdmmcBlockDevice {
   zx_status_t ReadWriteAttempt(std::vector<Request>& requests, bool suppress_error_messages)
       TA_REQ(worker_lock_);
   zx_status_t Flush() TA_REQ(worker_lock_);
+  zx_status_t Barrier() TA_REQ(worker_lock_);
   zx_status_t Trim(const block_trim_t& txn, const EmmcPartition partition) TA_REQ(worker_lock_);
   zx_status_t SetPartition(const EmmcPartition partition) TA_REQ(worker_lock_);
   zx_status_t RpmbRequest(const RpmbRequestInfo& request) TA_REQ(worker_lock_);
@@ -272,6 +273,8 @@ class SdmmcBlockDevice {
 
   bool is_sd_ = false;
   bool cache_enabled_ = false;
+  bool cache_flush_fifo_ = false;
+  bool barrier_enabled_ = false;
 
   uint32_t max_packed_reads_effective_ = 0;   // Use command packing up to this many reads.
   uint32_t max_packed_writes_effective_ = 0;  // Use command packing up to this many writes.
@@ -307,6 +310,10 @@ class SdmmcBlockDevice {
   std::vector<std::unique_ptr<PartitionDevice>> child_partition_devices_;
   std::unique_ptr<RpmbDevice> child_rpmb_device_;
   EmmcPartition current_partition_ TA_GUARDED(worker_lock_) = EmmcPartition::USER_DATA_PARTITION;
+
+  // This value comes from metadata. If true, the device must be re-initialized after leaving the
+  // OFF state, and we cannot use the MMC sleep state.
+  bool vccq_off_with_controller_off_ = false;
 };
 
 }  // namespace sdmmc

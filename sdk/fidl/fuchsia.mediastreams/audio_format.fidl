@@ -19,7 +19,7 @@ type AudioFormat = struct {
     /// The spatial assignment of each channel.
     channel_layout AudioChannelLayout;
 
-    // TODO: Maybe add bytes_per_frame for convenience. It’s
+    // TODO: Maybe add bytes_per_frame for convenience. It's
     // a function of sample_format and channel_count.
 };
 
@@ -40,7 +40,7 @@ type AudioChannelLayout = strict union {
 // There are essentially four ways to do this:
 // 1) an enum of layouts, which restricts layouts to those represented
 //    in the enum,
-// 2) a ‘bits’ type of individual channel assignments, which allows
+// 2) a 'bits' type of individual channel assignments, which allows
 //    any combination of the represented channel assignments but
 //    restricts their permutation,
 // 3) a vector of enum values of individual channel assignments, which

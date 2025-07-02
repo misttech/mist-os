@@ -9,7 +9,7 @@ use fidl_fuchsia_component_decl::{
     Child, ChildRef, CollectionRef, ConfigOverride, ConfigSingleValue, ConfigValue, StartupMode,
 };
 use fidl_fuchsia_io as fio;
-use fidl_test_config_parentoverrides::ReporterMarker;
+use fidl_test_config_parentoverrides::{ReporterMarker, ReporterProxy};
 use fuchsia_component::client::{
     connect_to_protocol, connect_to_protocol_at_dir_root, open_childs_exposed_directory,
 };
@@ -125,7 +125,7 @@ async fn realm_builder_without_override_returns_default() {
         .unwrap();
     let realm = builder.build().await.unwrap();
 
-    let reporter = realm.root.connect_to_protocol_at_exposed_dir::<ReporterMarker>().unwrap();
+    let reporter: ReporterProxy = realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let value = reporter.get_parent_provided_config_string().await.unwrap();
     assert_eq!(value, expected_value);
 }
@@ -174,7 +174,7 @@ async fn realm_builder_with_override() {
         .unwrap();
     let realm = builder.build().await.unwrap();
 
-    let reporter = realm.root.connect_to_protocol_at_exposed_dir::<ReporterMarker>().unwrap();
+    let reporter: ReporterProxy = realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     let value = reporter.get_parent_provided_config_string().await.unwrap();
     assert_eq!(value, "Realm Builder parent override");
 }

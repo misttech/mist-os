@@ -8,7 +8,13 @@
 //! and is the base dependency for most of them.
 
 #![no_std]
-#![warn(missing_docs, unreachable_patterns, clippy::useless_conversion, clippy::redundant_clone)]
+#![warn(
+    missing_docs,
+    unreachable_patterns,
+    clippy::useless_conversion,
+    clippy::redundant_clone,
+    clippy::precedence
+)]
 
 extern crate fakealloc as alloc;
 
@@ -50,11 +56,11 @@ pub use error::{
     AddressResolutionFailed, ErrorAndSerializer, ExistsError, LocalAddressError, NotFoundError,
     NotSupportedError, RemoteAddressError, SocketError, ZonedAddressError,
 };
-pub use event::{CoreEventContext, EventContext};
+pub use event::EventContext;
 pub use frame::{
     CoreTxMetadataContext, FrameDestination, ReceivableFrameMeta, RecvFrameContext,
     RecvIpFrameMeta, SendFrameContext, SendFrameError, SendFrameErrorReason, SendableFrameMeta,
-    TxMetadataBindingsTypes,
+    TxMetadata, TxMetadataBindingsTypes,
 };
 pub use inspect::{Inspectable, InspectableValue, Inspector, InspectorDeviceExt, InspectorExt};
 pub use ip::{
@@ -72,7 +78,7 @@ pub use rng::RngContext;
 pub use tcp::base::{Control, FragmentedPayload, Mss};
 pub use tcp::segment::{
     HandshakeOptions, Options, Payload, PayloadLen, SackBlock, SackBlocks, Segment, SegmentHeader,
-    SegmentOptions,
+    SegmentOptions, VerifiedTcpSegment,
 };
 pub use tcp::seqnum::{SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 pub use test_only::{TestOnlyFrom, TestOnlyPartialEq};
@@ -96,6 +102,7 @@ pub mod ref_counted_hash_map {
 pub mod socket {
     mod address;
     mod base;
+    mod cookie;
     pub(crate) mod sndbuf;
 
     pub use address::{
@@ -112,6 +119,7 @@ pub mod socket {
         SocketMapAddrStateUpdateSharingSpec, SocketMapConflictPolicy, SocketMapStateSpec,
         SocketMapUpdateSharingPolicy, SocketStateEntry, SocketZonedAddrExt, UpdateSharingError,
     };
+    pub use cookie::SocketCookie;
     pub use sndbuf::{
         SendBufferFullError, SendBufferSpace, SendBufferTracking, SocketWritableListener,
     };
@@ -133,7 +141,8 @@ pub mod sync {
     // Exclusively re-exports from the sync crate.
     pub use netstack3_sync::rc::{
         DebugReferences, DynDebugReferences, MapNotifier as MapRcNotifier, Notifier as RcNotifier,
-        Primary as PrimaryRc, Strong as StrongRc, Weak as WeakRc,
+        Primary as PrimaryRc, ResourceToken, ResourceTokenValue, Strong as StrongRc,
+        Weak as WeakRc,
     };
     pub use netstack3_sync::{LockGuard, Mutex, RwLock, RwLockReadGuard, RwLockWriteGuard};
 }

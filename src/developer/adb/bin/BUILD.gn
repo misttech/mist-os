@@ -15,6 +15,7 @@ group("tests") {
     "adb-file-sync:tests",
     "adb-reboot:tests",
     "adb-shell:tests",
+    "adb-sideload:tests",
   ]
 }
 
@@ -24,6 +25,7 @@ group("adb-components") {
     "adb-file-sync:adb-file-sync-component",
     "adb-reboot:adb-reboot-component",
     "adb-shell:adb-shell-component",
+    "adb-sideload:adb-sideload-component",
   ]
 }
 

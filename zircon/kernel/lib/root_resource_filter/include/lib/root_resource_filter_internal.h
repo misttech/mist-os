@@ -53,19 +53,30 @@ class RootResourceFilter {
   // deny access to. In the event that this range intersects any other
   // pre-existing ranges, the ranges will be merged as appropriate.
   void AddDenyRegion(uintptr_t base, size_t size, zx_rsrc_kind_t kind) {
-    // Currently, we only support enforcement of denied MMIO ranges.  Developers
-    // can still attempt to add non-MMIO denied regions and they will silently
-    // be accepted, but there is no enforcement.  This is checked in the kernel
-    // unit test using IOPORT ranges.
-    if (kind == ZX_RSRC_KIND_MMIO) {
-      // All deny regions should end up getting added early during kernel
-      // startup. Failure to add a region implies heap allocation failure. Not
-      // only should it never happen, _not_ enforcing our deny list is not an
-      // option. Panic if this happens.
-      zx_status_t res =
-          mmio_deny_.AddRegion({.base = base, .size = size}, RegionAllocator::AllowOverlap::Yes);
-      ASSERT(res == ZX_OK);
-    }
+    // Currently, we only support enforcement of denied MMIO/IOPort ranges depending on the
+    // architecture.
+    //
+    // Any unsupported range `kind` is silently accepted.
+    zx_status_t res = ZX_OK;
+    switch (kind) {
+      case ZX_RSRC_KIND_MMIO:
+        res =
+            mmio_deny_.AddRegion({.base = base, .size = size}, RegionAllocator::AllowOverlap::Yes);
+        break;
+#ifdef __x86_64__
+      case ZX_RSRC_KIND_IOPORT:
+        res = ioport_deny_.AddRegion({.base = base, .size = size},
+                                     RegionAllocator::AllowOverlap::Yes);
+        break;
+#endif
+      default:
+        break;
+    };
+    // All deny regions should end up getting added early during kernel
+    // startup. Failure to add a region implies heap allocation failure. Not
+    // only should it never happen, _not_ enforcing our deny list is not an
+    // option. Panic if this happens.
+    ASSERT(res == ZX_OK);
   }
 
   // Test to see if the specified region is permitted or not.
@@ -76,6 +87,9 @@ class RootResourceFilter {
   // so aside from making sure that the scheduler is up and running, we have no
   // additional locking requirements here.
   RegionAllocator mmio_deny_;
+#ifdef __x86_64__
+  RegionAllocator ioport_deny_;
+#endif
 };
 
 #endif  // ZIRCON_KERNEL_LIB_ROOT_RESOURCE_FILTER_INCLUDE_LIB_ROOT_RESOURCE_FILTER_INTERNAL_H_

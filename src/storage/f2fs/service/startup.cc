@@ -36,7 +36,7 @@ void StartupService::Start(StartRequestView request, StartCompleter::Sync& compl
 
 void StartupService::Format(FormatRequestView request, FormatCompleter::Sync& completer) {
   completer.Reply([&]() -> zx::result<> {
-    auto bc_or = f2fs::CreateBcacheMapper(std::move(request->device));
+    auto bc_or = f2fs::CreateBcacheMapper(std::move(request->device), true);
     if (bc_or.is_error()) {
       return bc_or.take_error();
     }
@@ -53,15 +53,14 @@ void StartupService::Format(FormatRequestView request, FormatCompleter::Sync& co
 
 void StartupService::Check(CheckRequestView request, CheckCompleter::Sync& completer) {
   completer.Reply([&]() -> zx::result<> {
-    bool readonly_device = false;
-    auto bc_or = f2fs::CreateBcacheMapper(std::move(request->device), &readonly_device);
+    auto bc_or = f2fs::CreateBcacheMapper(std::move(request->device));
     if (bc_or.is_error()) {
       return bc_or.take_error();
     }
 
     // TODO: parse option from request->options.
     FsckOptions fsck_options;
-    fsck_options.repair = !readonly_device;
+    fsck_options.repair = bc_or->IsWritable();
 
     if (zx_status_t status = Fsck(std::move(*bc_or), fsck_options); status != ZX_OK) {
       FX_PLOGS(ERROR, status) << "Fsck failed";

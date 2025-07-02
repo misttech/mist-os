@@ -25,6 +25,7 @@ constexpr const char kBuildProductVersionKey[] = "build.product.version";
 constexpr const char kBuildProductVersionPreviousBootKey[] = "build.product.version.previous-boot";
 constexpr const char kBuildProductKey[] = "build.product";
 constexpr const char kBuildLatestCommitDateKey[] = "build.latest-commit-date";
+constexpr const char kBuildPlatformBackstopKey[] = "build.platform.utc-backstop";
 constexpr const char kBuildIsDebugKey[] = "build.is_debug";
 constexpr const char kDebugReportUploadBootId[] = "debug.report.upload.boot-id";
 constexpr const char kDebugReportUploadUptime[] = "debug.report.upload.uptime";
@@ -53,6 +54,7 @@ constexpr const char kSnapshotUuid[] = "snapshot.uuid";
 constexpr const char kSystemBootIdCurrentKey[] = "system.boot-id.current";
 constexpr const char kSystemBootIdPreviousKey[] = "system.boot-id.previous";
 constexpr const char kSystemLastRebootReasonKey[] = "system.last-reboot.reason";
+constexpr const char kSystemLastRebootRuntimeKey[] = "system.last-reboot.runtime";
 constexpr const char kSystemLastRebootUptimeKey[] = "system.last-reboot.uptime";
 constexpr const char kSystemLocalePrimaryKey[] = "system.locale.primary";
 constexpr const char kSystemTimezonePrimaryKey[] = "system.timezone.primary";
@@ -66,18 +68,18 @@ constexpr const char kSystemUserActivityCurrentDurationKey[] =
 // RESTRICTIONS
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
-// 36 annotations may be collected by the platform.
-constexpr uint32_t kMaxNumPlatformAnnotations = 36u;
+// 256 annotations may be collected by the platform.
+constexpr uint32_t kMaxNumPlatformAnnotations = 256u;
 
-// 26 non-platform annotations may be registered by non-platform components.
-constexpr uint32_t kMaxNumNonPlatformAnnotations = 26u;
+// 128 non-platform annotations may be registered by non-platform components.
+constexpr uint32_t kMaxNumNonPlatformAnnotations = 128u;
 
-// 2 annotations are permitted to be from Feedback itself for debugging purposes.
-constexpr uint32_t kMaxNumDebugAnnotations = 2u;
+// 128 annotations are permitted to be from Feedback itself for debugging purposes.
+constexpr uint32_t kMaxNumDebugAnnotations = 128u;
 
 static_assert(kMaxNumPlatformAnnotations + kMaxNumNonPlatformAnnotations +
                       kMaxNumDebugAnnotations ==
-                  fuchsia::feedback::MAX_NUM_ANNOTATIONS_PROVIDED,
+                  fuchsia::feedback::MAX_NUM_ANNOTATIONS2_PROVIDED,
               "Annotations must be allocated to the platform, non-platform components, and "
               "Feedback itself (for debugging)");
 

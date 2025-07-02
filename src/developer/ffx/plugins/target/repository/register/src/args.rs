@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use std::net::SocketAddr;
+
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
 use fidl_fuchsia_pkg_ext::{RepositoryRegistrationAliasConflictMode, RepositoryStorageType};
@@ -22,6 +24,13 @@ pub struct RegisterCommand {
     /// repository server port number.
     /// Required to disambiguate multiple repositories with the same name.
     pub port: Option<u16>,
+
+    #[argh(option)]
+    /// repository server address override.
+    /// When provided, overrides the server address registered on the target.
+    /// Required when the server's listening address is not directly reachable
+    /// by the target.
+    pub address_override: Option<SocketAddr>,
 
     /// enable persisting this repository across reboots.
     #[argh(option, from_str_fn(parse_storage_type))]

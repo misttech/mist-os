@@ -2,24 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub mod device;
 pub mod disable;
 pub mod dump;
-#[cfg(any(not(target_os = "fuchsia"), test))]
-pub mod i2c;
 pub mod list;
 pub mod list_composite_node_specs;
 pub mod list_composites;
 pub mod list_devices;
 pub mod list_hosts;
-#[cfg(not(target_os = "fuchsia"))]
-pub mod lspci;
-#[cfg(not(target_os = "fuchsia"))]
-pub mod lsusb;
-#[cfg(any(not(target_os = "fuchsia"), test))]
-pub mod print_input_report;
+pub mod node;
 pub mod register;
 pub mod restart;
-#[cfg(not(target_os = "fuchsia"))]
-pub mod runtool;
 pub mod test_node;

@@ -12,6 +12,8 @@ mod errors;
 mod filter;
 mod interface;
 mod masquerade;
+mod network;
+mod socketproxy;
 mod virtualization;
 
 use ::dhcpv4::protocol::FromFidlExt as _;
@@ -23,7 +25,7 @@ use std::pin::{pin, Pin};
 use std::str::FromStr;
 use std::{fs, io, path};
 
-use fidl::endpoints::{RequestStream as _, Responder as _};
+use fidl::endpoints::{ControlHandle as _, RequestStream as _, Responder as _};
 use fidl_fuchsia_net_ext::{self as fnet_ext, DisplayExt as _, IpExt as _};
 use fidl_fuchsia_net_interfaces_ext::{self as fnet_interfaces_ext, Update as _};
 use fuchsia_component::client::{clone_namespace_svc, new_protocol_connector_in_dir};
@@ -37,7 +39,8 @@ use {
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
     fidl_fuchsia_net_masquerade as fnet_masquerade, fidl_fuchsia_net_name as fnet_name,
-    fidl_fuchsia_net_ndp as fnet_ndp, fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy,
+    fidl_fuchsia_net_ndp as fnet_ndp, fidl_fuchsia_net_policy_properties as fnp_properties,
+    fidl_fuchsia_net_policy_socketproxy as fnp_socketproxy,
     fidl_fuchsia_net_routes_admin as fnet_routes_admin, fidl_fuchsia_net_stack as fnet_stack,
     fidl_fuchsia_net_virtualization as fnet_virtualization, fuchsia_async as fasync,
 };
@@ -61,9 +64,10 @@ use self::errors::{accept_error, ContextExt as _};
 use self::filter::{FilterControl, FilterEnabledState};
 use self::interface::{DeviceInfoRef, InterfaceNamingIdentifier};
 use self::masquerade::MasqueradeHandler;
+pub use network::NetworkTokenExt;
 
 /// Interface Identifier
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct InterfaceId(NonZeroU64);
 
 impl InterfaceId {
@@ -636,6 +640,9 @@ pub struct NetCfg<'a> {
     // Policy configuration to determine whether to provision an interface.
     interface_provisioning_policy: Vec<interface::ProvisioningRule>,
 
+    // NetworkProperty Watchers
+    netpol_networks_service: network::NetpolNetworksService,
+
     enable_socket_proxy: bool,
 }
 
@@ -793,6 +800,8 @@ enum RequestStream {
     Dhcpv6PrefixProvider(fnet_dhcpv6::PrefixProviderRequestStream),
     Masquerade(fnet_masquerade::FactoryRequestStream),
     DnsServerWatcher(fnet_name::DnsServerWatcherRequestStream),
+    NetworkAttributes(fnp_properties::NetworksRequestStream),
+    DefaultNetwork(fnp_properties::DefaultNetworkRequestStream),
 }
 
 impl std::fmt::Debug for RequestStream {
@@ -802,6 +811,8 @@ impl std::fmt::Debug for RequestStream {
             RequestStream::Dhcpv6PrefixProvider(_) => write!(f, "Dhcpv6PrefixProvider"),
             RequestStream::Masquerade(_) => write!(f, "Masquerade"),
             RequestStream::DnsServerWatcher(_) => write!(f, "DnsServerWatcher"),
+            RequestStream::NetworkAttributes(_) => write!(f, "NetworkAttributes"),
+            RequestStream::DefaultNetwork(_) => write!(f, "DefaultNetwork"),
         }
     }
 }
@@ -947,6 +958,7 @@ impl<'a> NetCfg<'a> {
             dhcpv6_prefixes_streams: dhcpv6::PrefixesStreamMap::empty(),
             allowed_upstream_device_classes,
             interface_provisioning_policy,
+            netpol_networks_service: Default::default(),
             enable_socket_proxy,
         })
     }
@@ -961,6 +973,7 @@ impl<'a> NetCfg<'a> {
             &self.lookup_admin,
             &mut self.dns_servers,
             &mut self.dns_server_watch_responders,
+            &mut self.netpol_networks_service,
             source,
             servers,
         )
@@ -1022,6 +1035,7 @@ impl<'a> NetCfg<'a> {
                             &self.lookup_admin,
                             &mut self.dns_servers,
                             &mut self.dns_server_watch_responders,
+                            &mut self.netpol_networks_service,
                             interface_id,
                             dns_watchers,
                             &mut self.dhcpv6_prefixes_streams,
@@ -1066,6 +1080,7 @@ impl<'a> NetCfg<'a> {
                             &self.lookup_admin,
                             &mut self.dns_servers,
                             &mut self.dns_server_watch_responders,
+                            &mut self.netpol_networks_service,
                             interface_id,
                             dns_watchers,
                         )
@@ -1161,13 +1176,14 @@ impl<'a> NetCfg<'a> {
 
         // Serve fuchsia.net.virtualization/Control.
         let mut fs = ServiceFs::new_local();
-        let _: &mut ServiceFsDir<'_, _> =
-            fs.dir("svc").add_fidl_service(RequestStream::Virtualization);
-        let _: &mut ServiceFsDir<'_, _> =
-            fs.dir("svc").add_fidl_service(RequestStream::Dhcpv6PrefixProvider);
-        let _: &mut ServiceFsDir<'_, _> = fs.dir("svc").add_fidl_service(RequestStream::Masquerade);
-        let _: &mut ServiceFsDir<'_, _> =
-            fs.dir("svc").add_fidl_service(RequestStream::DnsServerWatcher);
+        let _: &mut ServiceFsDir<'_, _> = fs
+            .dir("svc")
+            .add_fidl_service(RequestStream::Virtualization)
+            .add_fidl_service(RequestStream::Dhcpv6PrefixProvider)
+            .add_fidl_service(RequestStream::Masquerade)
+            .add_fidl_service(RequestStream::DnsServerWatcher)
+            .add_fidl_service(RequestStream::NetworkAttributes)
+            .add_fidl_service(RequestStream::DefaultNetwork);
         let _: &mut ServiceFs<_> =
             fs.take_and_serve_directory_handle().context("take and serve directory handle")?;
         let mut fs = fs.fuse();
@@ -1184,6 +1200,10 @@ impl<'a> NetCfg<'a> {
 
         let mut dns_server_watcher_incoming_requests =
             dns::DnsServerWatcherRequestStreams::default();
+
+        let mut networks_request_streams = network::NetworksRequestStreams::default();
+        let mut default_network_request_streams =
+            futures::stream::SelectAll::<fnp_properties::DefaultNetworkRequestStream>::new();
 
         // Lifecycle handle takes no args, must be set to zero.
         // See zircon/processargs.h.
@@ -1205,6 +1225,10 @@ impl<'a> NetCfg<'a> {
             LifecycleRequest(
                 Result<Option<fidl_fuchsia_process_lifecycle::LifecycleRequest>, fidl::Error>,
             ),
+            NetworkAttributesRequest(
+                (network::ConnectionId, Result<fnp_properties::NetworksRequest, fidl::Error>),
+            ),
+            DefaultNetworkRequest(Result<fnp_properties::DefaultNetworkRequest, fidl::Error>),
             ProvisioningEvent(ProvisioningEvent),
         }
 
@@ -1295,6 +1319,12 @@ impl<'a> NetCfg<'a> {
                             masq_event.context("error while receiving MasqueradeEvent")?)
                         )
                 }
+                net_attr_req = networks_request_streams.select_next_some() => {
+                    Event::NetworkAttributesRequest(net_attr_req)
+                }
+                default_network_event = default_network_request_streams.select_next_some() => {
+                    Event::DefaultNetworkRequest(default_network_event)
+                }
                 complete => return Err(anyhow::anyhow!("eventloop ended unexpectedly")),
             };
 
@@ -1344,6 +1374,58 @@ impl<'a> NetCfg<'a> {
                         }
                     }
                 }
+                Event::NetworkAttributesRequest((id, req)) => {
+                    self.netpol_networks_service.handle_network_attributes_request(id, req).await?
+                }
+                Event::DefaultNetworkRequest(req) => {
+                    let req = req.context("default network request")?;
+                    match req {
+                        fnp_properties::DefaultNetworkRequest::Update {
+                            payload:
+                                fnp_properties::DefaultNetworkUpdateRequest {
+                                    interface_id,
+                                    socket_marks,
+                                    ..
+                                },
+                            responder,
+                        } => match (interface_id, socket_marks) {
+                            (None, _) | (_, None) => responder.send(Err(
+                                fnp_properties::UpdateDefaultNetworkError::MissingRequiredArgument,
+                            ))?,
+                            (Some(interface_id), Some(socket_marks)) => {
+                                responder.send(
+                                    (async || {
+                                        use fnp_properties::UpdateDefaultNetworkError::*;
+                                        self.netpol_networks_service
+                                            .update(
+                                                network::PropertyUpdate::default()
+                                                    .default_network(interface_id)
+                                                    .map_err(|e| {
+                                                        warn!(
+                                                            "Failed to parse default network {e:?}"
+                                                        );
+                                                        InvalidInterfaceId
+                                                    })?
+                                                    .socket_marks(interface_id, socket_marks)
+                                                    .map_err(|e| {
+                                                        warn!(
+                                                            "Failed to update socket marks {e:?}"
+                                                        );
+                                                        InvalidSocketMarks
+                                                    })?,
+                                            )
+                                            .await;
+                                        Ok(())
+                                    })()
+                                    .await,
+                                )?;
+                            }
+                        },
+                        _ => {
+                            warn!("Received unexpected request {req:?}");
+                        }
+                    }
+                }
                 Event::ProvisioningEvent(event) => {
                     self.handle_provisioning_event(
                         event,
@@ -1354,6 +1436,8 @@ impl<'a> NetCfg<'a> {
                         &mut virtualization_events,
                         &mut masquerade_handler,
                         &mut masquerade_events,
+                        &mut networks_request_streams,
+                        &mut default_network_request_streams,
                     )
                     .await?
                 }
@@ -1373,6 +1457,10 @@ impl<'a> NetCfg<'a> {
         virtualization_events: &mut futures::stream::SelectAll<virtualization::EventStream>,
         masquerade_handler: &mut MasqueradeHandler,
         masquerade_events: &mut futures::stream::SelectAll<masquerade::EventStream>,
+        networks_request_streams: &mut network::NetworksRequestStreams,
+        default_network_streams: &mut futures::stream::SelectAll<
+            fnp_properties::DefaultNetworkRequestStream,
+        >,
     ) -> Result<(), anyhow::Error> {
         match event {
             ProvisioningEvent::InterfaceWatcherResult(if_watcher_res) => {
@@ -1443,6 +1531,21 @@ impl<'a> NetCfg<'a> {
                     RequestStream::DnsServerWatcher(req_stream) => {
                         dns_server_watcher_incoming_requests.handle_request_stream(req_stream);
                     }
+                    RequestStream::NetworkAttributes(req_stream) => {
+                        networks_request_streams.push(req_stream)
+                    }
+                    RequestStream::DefaultNetwork(req_stream) => {
+                        if default_network_streams.is_empty() {
+                            default_network_streams.push(req_stream)
+                        } else {
+                            // Only one connection to
+                            // fuchsia.net.policy.properties/DefaultNetwork
+                            // allowed at a time.
+                            req_stream
+                                .control_handle()
+                                .shutdown_with_epitaph(zx::Status::CONNECTION_ABORTED);
+                        }
+                    }
                 };
             }
             ProvisioningEvent::Dhcpv4Configuration(config) => {
@@ -1501,6 +1604,7 @@ impl<'a> NetCfg<'a> {
                                     &mut self.dhcpv4_configuration_streams,
                                     &mut self.dns_servers,
                                     &mut self.dns_server_watch_responders,
+                                    &mut self.netpol_networks_service,
                                     control,
                                     &self.lookup_admin,
                                     dhcpv4::AlreadyObservedClientExit::Yes,
@@ -1604,6 +1708,7 @@ impl<'a> NetCfg<'a> {
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dns_servers: &mut DnsServers,
         dns_server_watch_responders: &mut dns::DnsServerWatchResponders,
+        netpol_networks_service: &mut network::NetpolNetworksService,
         control: &fnet_interfaces_ext::admin::Control,
         lookup_admin: &fnet_name::LookupAdminProxy,
         already_observed_client_exit: dhcpv4::AlreadyObservedClientExit,
@@ -1618,6 +1723,7 @@ impl<'a> NetCfg<'a> {
                     configuration_streams,
                     dns_servers,
                     dns_server_watch_responders,
+                    netpol_networks_service,
                     control,
                     lookup_admin,
                     already_observed_client_exit,
@@ -1663,6 +1769,7 @@ impl<'a> NetCfg<'a> {
         configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dns_servers: &mut DnsServers,
         dns_server_watch_responders: &mut dns::DnsServerWatchResponders,
+        netpol_networks_service: &mut network::NetpolNetworksService,
         control: &fnet_interfaces_ext::admin::Control,
         lookup_admin: &fnet_name::LookupAdminProxy,
         route_set_provider: &fnet_routes_admin::RouteTableV4Proxy,
@@ -1687,6 +1794,7 @@ impl<'a> NetCfg<'a> {
                 configuration_streams,
                 dns_servers,
                 dns_server_watch_responders,
+                netpol_networks_service,
                 control,
                 lookup_admin,
                 dhcpv4::AlreadyObservedClientExit::No,
@@ -1769,6 +1877,7 @@ impl<'a> NetCfg<'a> {
             interface_properties,
             dns_servers,
             dns_server_watch_responders,
+            netpol_networks_service,
             interface_states,
             lookup_admin,
             dhcp_server,
@@ -1822,6 +1931,7 @@ impl<'a> NetCfg<'a> {
             watchers,
             dns_servers,
             dns_server_watch_responders,
+            netpol_networks_service,
             interface_states,
             dhcpv4_configuration_streams,
             dhcpv6_prefixes_streams,
@@ -1863,6 +1973,7 @@ impl<'a> NetCfg<'a> {
         watchers: &mut DnsServerWatchers<'_>,
         dns_servers: &mut DnsServers,
         dns_server_watch_responders: &mut dns::DnsServerWatchResponders,
+        netpol_networks_service: &mut network::NetpolNetworksService,
         interface_states: &mut HashMap<InterfaceId, InterfaceState>,
         dhcpv4_configuration_streams: &mut dhcpv4::ConfigurationStreamMap,
         dhcpv6_prefixes_streams: &mut dhcpv6::PrefixesStreamMap,
@@ -1944,6 +2055,7 @@ impl<'a> NetCfg<'a> {
                                 dhcpv4_configuration_streams,
                                 dns_servers,
                                 dns_server_watch_responders,
+                                netpol_networks_service,
                                 control,
                                 lookup_admin,
                                 route_set_v4_provider,
@@ -1979,6 +2091,7 @@ impl<'a> NetCfg<'a> {
                                 &lookup_admin,
                                 dns_servers,
                                 dns_server_watch_responders,
+                                netpol_networks_service,
                                 (*id).into(),
                                 watchers,
                                 dhcpv6_prefixes_streams,
@@ -2022,6 +2135,7 @@ impl<'a> NetCfg<'a> {
                                     &lookup_admin,
                                     dns_servers,
                                     dns_server_watch_responders,
+                                    netpol_networks_service,
                                     (*id).into(),
                                     watchers,
                                     dhcpv6_prefixes_streams,
@@ -2095,6 +2209,7 @@ impl<'a> NetCfg<'a> {
                     state: (),
                 },
             ) => {
+                netpol_networks_service.remove_network(*id).await;
                 match interface_states.remove(&(*id).into()) {
                     // An interface netcfg was not responsible for configuring was removed, do
                     // nothing.
@@ -2116,6 +2231,7 @@ impl<'a> NetCfg<'a> {
                                     dhcpv4_configuration_streams,
                                     dns_servers,
                                     dns_server_watch_responders,
+                                    netpol_networks_service,
                                     &control,
                                     lookup_admin,
                                     dhcpv4::AlreadyObservedClientExit::No,
@@ -2143,6 +2259,7 @@ impl<'a> NetCfg<'a> {
                                     &lookup_admin,
                                     dns_servers,
                                     dns_server_watch_responders,
+                                    netpol_networks_service,
                                     interface_id,
                                     watchers,
                                     dhcpv6_prefixes_streams,
@@ -2153,6 +2270,7 @@ impl<'a> NetCfg<'a> {
                                     &lookup_admin,
                                     dns_servers,
                                     dns_server_watch_responders,
+                                    netpol_networks_service,
                                     interface_id,
                                     watchers,
                                 )
@@ -2384,9 +2502,10 @@ impl<'a> NetCfg<'a> {
         self.installer
             .install_blackhole_interface(
                 control_server_end,
-                &fnet_interfaces_admin::Options {
+                fnet_interfaces_admin::Options {
                     name: Some(name.to_owned()),
                     metric: Some(metric),
+                    netstack_managed_routes_designation: None,
                     __source_breaking: fidl::marker::SourceBreaking,
                 },
             )
@@ -3052,6 +3171,7 @@ impl<'a> NetCfg<'a> {
                     &self.lookup_admin,
                     &mut self.dns_servers,
                     &mut self.dns_server_watch_responders,
+                    &mut self.netpol_networks_service,
                     id,
                     dns_watchers,
                     &mut self.dhcpv6_prefixes_streams,
@@ -3170,6 +3290,7 @@ impl<'a> NetCfg<'a> {
                 &self.lookup_admin,
                 &mut self.dns_servers,
                 &mut self.dns_server_watch_responders,
+                &mut self.netpol_networks_service,
                 *id,
                 dns_watchers,
                 &mut self.dhcpv6_prefixes_streams,
@@ -3309,6 +3430,7 @@ impl<'a> NetCfg<'a> {
             configuration,
             &mut self.dns_servers,
             &mut self.dns_server_watch_responders,
+            &mut self.netpol_networks_service,
             control,
             &self.lookup_admin,
         )
@@ -3336,6 +3458,7 @@ impl<'a> NetCfg<'a> {
                     &self.lookup_admin,
                     &mut self.dns_servers,
                     &mut self.dns_server_watch_responders,
+                    &mut self.netpol_networks_service,
                     interface_id,
                     dns_watchers,
                     &mut self.dhcpv6_prefixes_streams,
@@ -3633,6 +3756,7 @@ mod tests {
     use net_declare::{
         fidl_ip, fidl_ip_v4_with_prefix, fidl_ip_v6, fidl_ip_v6_with_prefix, fidl_mac, fidl_subnet,
     };
+    use pretty_assertions::assert_eq;
     use test_case::test_case;
 
     use super::*;
@@ -3731,6 +3855,7 @@ mod tests {
                     vec![],
                 ),
                 interface_provisioning_policy: Default::default(),
+                netpol_networks_service: Default::default(),
                 enable_socket_proxy: false,
             },
             ServerEnds {

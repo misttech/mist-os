@@ -37,7 +37,7 @@ fn panic_or_error(kernel: &Kernel, errno: Errno) -> Result<(), Errno> {
 }
 
 pub fn sys_reboot(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     magic: u32,
     magic2: u32,

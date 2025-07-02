@@ -21,11 +21,12 @@ class CppDriver : public msd::Driver {
   CppDriver();
 
   // msd::Driver implementation.
-  std::unique_ptr<msd::Device> CreateDevice(msd::DeviceHandle* device_handle) override;
+  std::unique_ptr<msd::Device> MsdCreateDevice(msd::DeviceHandle* device_handle) override;
 
-  std::unique_ptr<msd::Buffer> ImportBuffer(zx::vmo vmo, uint64_t client_id) override;
-  magma_status_t ImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
-                                 std::unique_ptr<msd::Semaphore>* out) override;
+  std::unique_ptr<msd::Buffer> MsdImportBuffer(zx::vmo vmo, uint64_t client_id) override;
+
+  magma_status_t MsdImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
+                                    std::unique_ptr<msd::Semaphore>* out) override;
 };
 }  // namespace msd
 

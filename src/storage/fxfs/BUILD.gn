@@ -58,6 +58,7 @@ fxfs_deps = [
 fxfs_test_deps = [
   "//src/lib/fuchsia",
   "//src/storage/fxfs/crypto/insecure",
+  "//third_party/rust_crates:test-case",
 ]
 
 fxfs_sources = [
@@ -274,38 +275,16 @@ fs_test_config("fxfs") {
   timestamp_granularity = 1
   disk_format = 12  # See //src/storage/lib/fs_management/cpp/format.h
   uses_crypt = true
+  has_min_volume_size = true
 
   options = [
     {
       description = "Fxfs"
       use_fvm = false
-      has_min_volume_size = true
 
       device_block_count = 24576
       device_block_size = 512
     },
-  ]
-}
-
-test("fxfs-interop-fs") {
-  sources = [ "test/fs_test.cc" ]
-  deps = [
-    "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
-    "//sdk/lib/component/incoming/cpp",
-    "//src/lib/fxl/test:gtest_main",
-    "//src/storage/fs_test",
-    "//src/storage/fs_test:test_crypt_service",
-    "//src/storage/fxfs",
-    "//src/storage/lib/block_client/cpp",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/fdio-caller",
-  ]
-}
-
-storage_driver_test_realm_v2_component("fxfs-interop-fs-tests") {
-  deps = [
-    ":fxfs-interop-fs",
-    ":test_fxfs_component_manifest_shard",
   ]
 }
 
@@ -321,7 +300,6 @@ fs_test_suite("fxfs") {
     "//src/storage/crypt/fxfs",
     "//src/storage/fxfs",
   ]
-  extra_components = [ ":fxfs-interop-fs-tests" ]
   component_deps = [
     ":test_fxfs_component_manifest_shard",
     "//src/storage/fs_test:test_crypt_service",

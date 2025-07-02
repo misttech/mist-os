@@ -1,0 +1,38 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+def format(target):
+    """Returns lines containing formatted information about the contents of the
+molecule. It is only for debugging and demonstration purposes.
+Example use:
+    fx bazel cquery build/bazel/bazel_idk/tests:test_molecule --output=starlark --starlark:file=build/bazel/bazel_idk/idk_molecule_info.cquery
+"""
+
+    molecule_info = providers(target)["//build/bazel/bazel_idk:defs.bzl%FuchsiaIdkMoleculeInfo"]
+
+    lines = []
+
+    lines = [ molecule_info.label.name + " contains the following atoms (including indirectly):" ]
+    lines += ["\t" + x.label.name for x in molecule_info.atoms_depset.to_list()]
+
+    lines += [ molecule_info.label.name + " directly depends on:" ]
+    element_lines = []
+
+    for dep in molecule_info.idk_deps:
+        p = providers(dep)
+
+        element_info =  p.get("//build/bazel/bazel_idk:defs.bzl%FuchsiaIdkAtomInfo")
+        if element_info:
+            element_lines += [ "Atom: " + element_info.label.name ]
+            continue
+
+        element_info =  p.get("//build/bazel/bazel_idk:defs.bzl%FuchsiaIdkMoleculeInfo")
+        if element_info:
+            element_lines += [ "Molecule: " + element_info.label.name ]
+            continue
+
+        element_lines += [ "ERROR: Unknown element type." ]
+
+    return "\n".join(lines) + "\n\t" + "\n\t".join(sorted(element_lines))
+

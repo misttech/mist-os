@@ -55,13 +55,11 @@ static bool x86_arch_vmaspace_usermmu_tests() {
     }
 
     paddr_t pa = 0;
-    size_t mapped;
     vm_page_t* vm_page;
     pmm_alloc_page(/*alloc_flags=*/0, &vm_page, &pa);
     EXPECT_EQ(ZX_OK, aspace.Map(kTestVirtualAddress, &pa, 1,
                                 ARCH_MMU_FLAG_PERM_READ | ARCH_MMU_FLAG_PERM_WRITE,
-                                X86ArchVmAspace::ExistingEntryAction::Error, &mapped));
-    EXPECT_EQ(1u, mapped);
+                                X86ArchVmAspace::ExistingEntryAction::Error));
     // Directly examine page tables to ensure there's a mapping.
     EXPECT_EQ(check_virtual_address_mapped(pml4, kTestVirtualAddress), true);
 
@@ -71,9 +69,7 @@ static bool x86_arch_vmaspace_usermmu_tests() {
     EXPECT_EQ(ZX_OK, aspace.Query(kTestVirtualAddress, &retrieved_pa, &flags));
     EXPECT_EQ(retrieved_pa, pa);
 
-    size_t unmapped;
-    EXPECT_EQ(ZX_OK, aspace.Unmap(kTestVirtualAddress, 1, ArchUnmapOptions::Enlarge, &unmapped));
-    EXPECT_EQ(unmapped, mapped);
+    EXPECT_EQ(ZX_OK, aspace.Unmap(kTestVirtualAddress, 1, ArchUnmapOptions::Enlarge));
     EXPECT_EQ(check_virtual_address_mapped(pml4, kTestVirtualAddress), false);
     // Expect no user mode mappings after the user mapping was removed.
     for (uint i = 0; i < kUserPtPerPageTable; i++) {

@@ -5,7 +5,8 @@
 use anyhow::{Context as _, Error};
 use fidl_fuchsia_location_namedplace::{
     RegulatoryRegionConfiguratorMarker, RegulatoryRegionConfiguratorProxy as ConfigProxy,
-    RegulatoryRegionWatcherMarker, RegulatoryRegionWatcherProxy as WatcherProxy,
+    RegulatoryRegionWatcherMarker, RegulatoryRegionWatcherProxy,
+    RegulatoryRegionWatcherProxy as WatcherProxy,
 };
 use fidl_fuchsia_sys2 as fsys2;
 use fuchsia_component::client::connect_to_protocol_at_dir_root;
@@ -158,10 +159,10 @@ async fn from_some_state_reloading_service_yields_expected_region() -> Result<()
 
     // Restart the service backing the protocols so that it will read the cached value.
     stop_component(&test_context._realm_instance, REGION_COMPONENT_NAME).await;
-    let watcher = &test_context
+    let watcher: RegulatoryRegionWatcherProxy = test_context
         ._realm_instance
         .root
-        .connect_to_protocol_at_exposed_dir::<RegulatoryRegionWatcherMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("Failed to connect to Watcher protocol")?;
     assert_eq!(Some(SECOND_REGION.to_string()), watcher.get_region_update().await?);
     Ok(())
@@ -230,11 +231,11 @@ async fn new_test_context() -> Result<TestContext, Error> {
     // Connects to the two fidl services
     let configurator = realm_instance
         .root
-        .connect_to_protocol_at_exposed_dir::<RegulatoryRegionConfiguratorMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("Failed to connect to Configurator protocol")?;
     let watcher = realm_instance
         .root
-        .connect_to_protocol_at_exposed_dir::<RegulatoryRegionWatcherMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("Failed to connect to Watcher protocol")?;
 
     Ok(TestContext { _realm_instance: realm_instance, configurator, watcher })

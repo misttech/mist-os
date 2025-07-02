@@ -5,15 +5,15 @@
 
 import fnmatch
 import json
-from typing import Mapping, cast
+from typing import Any, Mapping, Sequence, cast
 
 from honeydew.fuchsia_device.fuchsia_device import FuchsiaDevice
 from honeydew.transports.ffx import errors as ffx_errors
-from trace_processing import trace_metrics
+from trace_processing import trace_metrics, trace_model
 from trace_processing.trace_metrics import JSON
 
 
-class MemoryProfileMetrics(trace_metrics.ConstantMetricsProcessor):
+class _MemoryProfileMetrics(trace_metrics.MetricsProcessor):
     """Captures kernel and user space memory metrics using `ffx profile memory`.
     See documentation at
     https://fuchsia.dev/fuchsia-src/development/tools/ffx/workflows/explore-memory-usage
@@ -30,12 +30,72 @@ class MemoryProfileMetrics(trace_metrics.ConstantMetricsProcessor):
         "Total populated bytes for private uncompressed memory VMOs"
     )
 
+    def __init__(
+        self,
+        principal_groups: Mapping[str, str],
+        process_groups: Mapping[str, str],
+        component_profile: Any,
+        process_profile: Any,
+    ):
+        self._principal_groups = principal_groups
+        self._process_groups = process_groups
+        self._component_profile = component_profile
+        self._process_profile = process_profile
 
-def capture_and_compute_metrics(
+    def process_metrics(
+        self, model: trace_model.Model
+    ) -> Sequence[trace_metrics.TestCaseResult]:
+        metrics = []
+
+        for group_name, pattern in self._principal_groups.items():
+            digest = self._component_profile["ComponentDigest"]
+            private_populated = sum(
+                principal["populated_private"]
+                for principal in digest["principals"]
+                if fnmatch.fnmatch(principal["name"], pattern)
+            )
+            metrics.append(
+                trace_metrics.TestCaseResult(
+                    label=f"Memory/Principal/{group_name}/PrivatePopulated",
+                    unit=trace_metrics.Unit.bytes,
+                    values=[private_populated],
+                    doc=f"{self.DESCRIPTION_BASE}: {group_name}",
+                )
+            )
+
+        for (
+            process_group_name,
+            process_name_pattern,
+        ) in self._process_groups.items():
+            private_populated = sum(
+                proc["memory"]["private_populated"]
+                for proc in self._process_profile["CompleteDigest"]["processes"]
+                if fnmatch.fnmatch(proc["name"], process_name_pattern)
+            )
+            metrics.append(
+                trace_metrics.TestCaseResult(
+                    label=f"Memory/Process/{process_group_name}/PrivatePopulated",
+                    unit=trace_metrics.Unit.bytes,
+                    values=[private_populated],
+                    doc=(f"{self.DESCRIPTION_BASE}: {process_group_name}"),
+                )
+            )
+        return metrics
+
+    def process_freeform_metrics(
+        self, model: trace_model.Model
+    ) -> tuple[str, JSON]:
+        return (
+            "memory_profile",
+            _simplify_digest(self._process_profile, self._component_profile),
+        )
+
+
+def capture(
     dut: FuchsiaDevice,
     principal_groups: Mapping[str, str] | None = None,
     process_groups: Mapping[str, str] | None = None,
-) -> trace_metrics.ConstantMetricsProcessor:
+) -> trace_metrics.MetricsProcessor:
     """Captures kernel and user space memory metrics using `ffx profile memory`.
 
     Args:
@@ -69,22 +129,6 @@ def capture_and_compute_metrics(
             ],
         )
     )
-    metrics = []
-
-    for group_name, pattern in principal_groups.items():
-        private_populated = sum(
-            principal["populated_private"]
-            for principal in component_profile["ComponentDigest"]["principals"]
-            if fnmatch.fnmatch(principal["name"], pattern)
-        )
-        metrics.append(
-            trace_metrics.TestCaseResult(
-                label=f"Memory/Principal/{group_name}/PrivatePopulated",
-                unit=trace_metrics.Unit.bytes,
-                values=[private_populated],
-                doc=f"{MemoryProfileMetrics.DESCRIPTION_BASE}: {group_name}",
-            )
-        )
 
     # If memory_monitor1 is available.
     try:
@@ -101,34 +145,21 @@ def capture_and_compute_metrics(
                 ],
             )
         )
-
-        for process_group_name, process_name_pattern in process_groups.items():
-            private_populated = sum(
-                proc["memory"]["private_populated"]
-                for proc in process_profile["CompleteDigest"]["processes"]
-                if fnmatch.fnmatch(proc["name"], process_name_pattern)
-            )
-            metrics.append(
-                trace_metrics.TestCaseResult(
-                    label=f"Memory/Process/{process_group_name}/PrivatePopulated",
-                    unit=trace_metrics.Unit.bytes,
-                    values=[private_populated],
-                    doc=(
-                        f"{MemoryProfileMetrics.DESCRIPTION_BASE}: "
-                        f"{process_group_name}"
-                    ),
-                )
-            )
     except ffx_errors.FfxCommandError:
         process_profile = None
 
-    return MemoryProfileMetrics(
-        metrics=metrics,
-        freeform_metrics=(
-            "memory_profile",
-            _simplify_digest(process_profile, component_profile),
-        ),
+    return _MemoryProfileMetrics(
+        principal_groups, process_groups, component_profile, process_profile
     )
+
+
+# TODO: Remove after soft transition to `capture()` is complete
+def capture_and_compute_metrics(
+    dut: FuchsiaDevice,
+    principal_groups: Mapping[str, str] | None = None,
+    process_groups: Mapping[str, str] | None = None,
+) -> trace_metrics.MetricsProcessor:
+    return capture(dut, principal_groups, process_groups)
 
 
 def _simplify_bucket(bucket: JSON) -> dict[str, JSON]:

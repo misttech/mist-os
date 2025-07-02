@@ -232,7 +232,8 @@ void SimpleAudioStream::Connect(ConnectRequestView request, ConnectCompleter::Sy
       [this, stream_channel](fidl::WireServer<audio_fidl::StreamConfig>*, fidl::UnbindInfo info,
                              fidl::ServerEnd<fuchsia_hardware_audio::StreamConfig>) {
         // Do not log canceled cases which happens too often in particular in test cases.
-        if (info.status() != ZX_ERR_CANCELED) {
+        if (info.status() != ZX_ERR_CANCELED && !info.is_peer_closed() &&
+            !info.is_user_initiated()) {
           zxlogf(INFO, "StreamConf channel closing: %s", info.FormatDescription().c_str());
         }
         ScopedToken t(domain_token());
@@ -444,7 +445,8 @@ void SimpleAudioStream::CreateRingBuffer(
         [this](fidl::WireServer<audio_fidl::RingBuffer>*, fidl::UnbindInfo info,
                fidl::ServerEnd<fuchsia_hardware_audio::RingBuffer>) {
           // Do not log canceled cases which happens too often in particular in test cases.
-          if (info.status() != ZX_ERR_CANCELED) {
+          if (info.status() != ZX_ERR_CANCELED && !info.is_peer_closed() &&
+              !info.is_user_initiated()) {
             zxlogf(INFO, "Ring buffer channel closing: %s", info.FormatDescription().c_str());
           }
           ScopedToken t(domain_token());

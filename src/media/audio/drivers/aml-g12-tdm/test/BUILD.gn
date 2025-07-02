@@ -66,19 +66,6 @@ cc_test_executable("aml-g12-tdm-dai-test-bin") {
   configs += [ "//build/cpp:fidl-wire-deprecated-mutable-tables" ]
 }
 
-test("aml-g12-composite-test-bin") {
-  sources = [ "composite-test.cc" ]
-  deps = [
-    "..:aml-g12-composite-common",
-    "//sdk/lib/async_patterns/testing/cpp",
-    "//sdk/lib/driver/fake-bti/cpp",
-    "//sdk/lib/driver/incoming/cpp",
-    "//sdk/lib/driver/testing/cpp",
-    "//zircon/system/ulib/fzl",
-    "//zircon/system/ulib/zxtest",
-  ]
-}
-
 fuchsia_unittest_package("stream-test-package") {
   package_name = "aml-g12-tdm-test"
   deps = [ ":aml-g12-tdm-test-bin" ]
@@ -102,15 +89,4 @@ fuchsia_unittest_package("dai-test-package") {
 
   # TODO(https://fxbug.dev/395154788): Fix compatibility with new zxtest runner
   deprecated_legacy_test_execution = true
-}
-
-fuchsia_unittest_package("composite-test-package") {
-  package_name = "aml-g12-composite-test"
-  deps = [ ":aml-g12-composite-test-bin" ]
-  test_specs = {
-    environments = basic_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
 }

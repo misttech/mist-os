@@ -632,7 +632,7 @@ impl Inner {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use assert_matches::assert_matches;
     use cm_types::NamespacePath;

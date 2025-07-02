@@ -47,7 +47,7 @@ get_package_url() {
 read_expectations() {
     local hash
     log "reading expectations at $2 for $1"
-    ffx target-package explore "$1" --command "cat /pkg/$2"
+    ffx target package explore "$1" --command "cat /pkg/$2"
 }
 
 # Lists cases for a test.

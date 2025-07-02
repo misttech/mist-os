@@ -10,36 +10,41 @@ use fuchsia_inspect_contrib::profile_duration;
 
 use seq_lock::SeqLock;
 
-use starnix_core::device::mem::DevNull;
-use starnix_core::mm::memory::MemoryObject;
-use starnix_core::security;
-use starnix_core::task::CurrentTask;
-use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
-use starnix_core::vfs::{
-    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_seekable,
-    fs_node_impl_dir_readonly, fs_node_impl_not_dir, parse_unsigned_file, unbounded_seek,
-    BytesFile, BytesFileOps, CacheMode, DirEntry, DirectoryEntryType, DirentSink, FileObject,
-    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
-    FsNodeInfo, FsNodeOps, FsStr, FsString, MemoryRegularNode, NamespaceNode, SeekTarget,
-    SimpleFileNode, StaticDirectoryBuilder, VecDirectory, VecDirectoryEntry,
-};
-use starnix_uapi::auth::FsCred;
-
-use selinux::policy::SUPPORTED_POLICY_VERSION;
+use selinux::policy::{AccessDecision, AccessVector, SUPPORTED_POLICY_VERSION};
 use selinux::{
     ClassId, InitialSid, SeLinuxStatus, SeLinuxStatusPublisher, SecurityId, SecurityPermission,
     SecurityServer,
 };
-use starnix_logging::{impossible_error, log_error, log_info, track_stub};
+use starnix_core::device::mem::DevNull;
+use starnix_core::mm::memory::MemoryObject;
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
+use starnix_core::vfs::pseudo::simple_file::{
+    parse_unsigned_file, BytesFile, BytesFileOps, SimpleFileNode,
+};
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::pseudo::vec_directory::{VecDirectory, VecDirectoryEntry};
+use starnix_core::vfs::{
+    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_seekable,
+    fileops_impl_unbounded_seek, fs_node_impl_dir_readonly, fs_node_impl_not_dir, CacheMode,
+    DirEntry, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
+    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    MemoryRegularNode, NamespaceNode,
+};
+use starnix_core::{security, TODO_DENY};
+use starnix_logging::{
+    BugRef, __track_stub_inner, impossible_error, log_error, log_info, log_warn, track_stub,
+};
 use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_types::vfs::default_statfs;
+use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::{errno, error, off_t, statfs, SELINUX_MAGIC};
+use starnix_uapi::{errno, error, statfs, SELINUX_MAGIC};
 use std::borrow::Cow;
-use std::num::NonZeroU32;
+use std::num::{NonZeroU32, NonZeroU64};
 use std::str::FromStr;
 use std::sync::{Arc, OnceLock};
 use zerocopy::{Immutable, IntoBytes};
@@ -94,7 +99,7 @@ struct SeLinuxFs;
 impl FileSystemOps for SeLinuxFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -122,52 +127,37 @@ impl SeLinuxFs {
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         // Read-only files & directories, exposing SELinux internal state.
-        dir.subdir(current_task, "avc", 0o555, |dir| {
+        dir.subdir("avc", 0o555, |dir| {
             dir.entry(
-                current_task,
                 "cache_stats",
                 AvcCacheStatsFile::new_node(security_server.clone()),
                 mode!(IFREG, 0o444),
             );
         });
-        dir.entry(current_task, "checkreqprot", CheckReqProtApi::new_node(), mode!(IFREG, 0o644));
+        dir.entry("checkreqprot", CheckReqProtApi::new_node(), mode!(IFREG, 0o644));
+        dir.entry("class", ClassDirectory::new(security_server.clone()), mode!(IFDIR, 0o555));
         dir.entry(
-            current_task,
-            "class",
-            ClassDirectory::new(security_server.clone()),
-            mode!(IFDIR, 0o555),
-        );
-        dir.entry(
-            current_task,
             "deny_unknown",
             DenyUnknownFile::new_node(security_server.clone()),
             mode!(IFREG, 0o444),
         );
         dir.entry(
-            current_task,
             "reject_unknown",
             RejectUnknownFile::new_node(security_server.clone()),
             mode!(IFREG, 0o444),
         );
-        dir.subdir(current_task, "initial_contexts", 0o555, |dir| {
+        dir.subdir("initial_contexts", 0o555, |dir| {
             for initial_sid in InitialSid::all_variants().into_iter() {
                 dir.entry(
-                    current_task,
                     initial_sid.name(),
                     InitialContextFile::new_node(security_server.clone(), *initial_sid),
                     mode!(IFREG, 0o444),
                 );
             }
         });
-        dir.entry(current_task, "mls", BytesFile::new_node(b"1".to_vec()), mode!(IFREG, 0o444));
+        dir.entry("mls", BytesFile::new_node(b"1".to_vec()), mode!(IFREG, 0o444));
+        dir.entry("policy", PolicyFile::new_node(security_server.clone()), mode!(IFREG, 0o600));
         dir.entry(
-            current_task,
-            "policy",
-            PolicyFile::new_node(security_server.clone()),
-            mode!(IFREG, 0o600),
-        );
-        dir.entry(
-            current_task,
             "policyvers",
             BytesFile::new_node(format!("{}", SUPPORTED_POLICY_VERSION).into_bytes()),
             mode!(IFREG, 0o444),
@@ -182,7 +172,6 @@ impl SeLinuxFs {
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .map_err(impossible_error)?;
         dir.entry(
-            current_task,
             "status",
             MemoryRegularNode::from_memory(Arc::new(MemoryObject::from(status_file))),
             mode!(IFREG, 0o444),
@@ -190,70 +179,49 @@ impl SeLinuxFs {
         security_server.set_status_publisher(Box::new(status_holder));
 
         // Write-only files used to configure and query SELinux.
-        dir.entry(current_task, "access", AccessApi::new_node(), mode!(IFREG, 0o666));
+        let access_todo_bug = (!current_task.kernel().features.selinux_test_suite).then(|| {
+            TODO_DENY!("https://fxbug.dev/422929151", "Enforce SELinuxFS access API").into()
+        });
         dir.entry(
-            current_task,
-            "context",
-            ContextApi::new_node(security_server.clone()),
+            "access",
+            AccessApi::new_node(security_server.clone(), access_todo_bug),
             mode!(IFREG, 0o666),
         );
+        dir.entry("context", ContextApi::new_node(security_server.clone()), mode!(IFREG, 0o666));
+        dir.entry("create", CreateApi::new_node(security_server.clone()), mode!(IFREG, 0o666));
+        dir.entry("member", MemberApi::new_node(), mode!(IFREG, 0o666));
+        dir.entry("relabel", RelabelApi::new_node(), mode!(IFREG, 0o666));
+        dir.entry("user", UserApi::new_node(), mode!(IFREG, 0o666));
+        dir.entry("load", LoadApi::new_node(security_server.clone()), mode!(IFREG, 0o600));
         dir.entry(
-            current_task,
-            "create",
-            CreateApi::new_node(security_server.clone()),
-            mode!(IFREG, 0o666),
-        );
-        dir.entry(current_task, "member", MemberApi::new_node(), mode!(IFREG, 0o666));
-        dir.entry(current_task, "relabel", RelabelApi::new_node(), mode!(IFREG, 0o666));
-        dir.entry(current_task, "user", UserApi::new_node(), mode!(IFREG, 0o666));
-        dir.entry(
-            current_task,
-            "load",
-            LoadApi::new_node(security_server.clone()),
-            mode!(IFREG, 0o600),
-        );
-        dir.entry(
-            current_task,
             "commit_pending_bools",
             CommitBooleansApi::new_node(security_server.clone()),
             mode!(IFREG, 0o200),
         );
 
         // Read/write files allowing values to be queried or changed.
-        dir.entry(
-            current_task,
-            "booleans",
-            BooleansDirectory::new(security_server.clone()),
-            mode!(IFDIR, 0o555),
-        );
-        dir.entry(
-            current_task,
-            "enforce",
-            EnforceApi::new_node(security_server.clone()),
-            // TODO(b/297313229): Get mode from the container.
-            mode!(IFREG, 0o644),
-        );
+        dir.entry("booleans", BooleansDirectory::new(security_server.clone()), mode!(IFDIR, 0o555));
+        // TODO(b/297313229): Get mode from the container.
+        dir.entry("enforce", EnforceApi::new_node(security_server.clone()), mode!(IFREG, 0o644));
 
         // "/dev/null" equivalent used for file descriptors redirected by SELinux.
         let null_ops: Box<dyn FsNodeOps> = (NullFileNode).into();
-        let null_fs_node = fs.create_node(current_task, null_ops, |id| {
-            let mut info = FsNodeInfo::new(id, mode!(IFCHR, 0o666), FsCred::root());
-            info.rdev = DeviceType::NULL;
-            info
-        });
+        let mut info = FsNodeInfo::new(mode!(IFCHR, 0o666), FsCred::root());
+        info.rdev = DeviceType::NULL;
+        let null_fs_node = fs.create_node_and_allocate_node_id(null_ops, info);
         dir.node("null", null_fs_node.clone());
 
         dir.build_root();
 
         // Initialize selinux kernel state to store a copy of "/sys/fs/selinux/null" for use in
-        // hooks that redirect file descriptors to null.
+        // hooks that redirect file descriptors to null. This has the side-effect of applying the
+        // policy-defined "devnull" SID to the `null_fs_node`.
         let null_ops: Box<dyn FileOps> = Box::new(DevNull);
         let null_flags = OpenFlags::empty();
         let null_name =
             NamespaceNode::new_anonymous(DirEntry::new(null_fs_node, None, "null".into()));
         let null_file_object = FileObject::new(current_task, null_ops, null_name, null_flags)
             .expect("create file object for just-created selinuxfs/null");
-
         security::selinuxfs_init_null(current_task, &null_file_object);
 
         Ok(fs)
@@ -278,7 +246,7 @@ impl SeLinuxApiOps for LoadApi {
     }
     fn api_write_with_task(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         current_task: &CurrentTask,
         data: Vec<u8>,
     ) -> Result<(), Errno> {
@@ -405,8 +373,10 @@ impl SeLinuxApiOps for CreateApi {
             return error!(EBUSY);
         }
 
+        let data = str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
+
         // Requests consist of three mandatory space-separated elements.
-        let mut parts = data.split(|x| *x == b' ');
+        let mut parts = data.split_whitespace();
 
         // <scontext>: describes the subject that is creating the new object.
         let scontext = parts.next().ok_or_else(|| errno!(EINVAL))?;
@@ -425,7 +395,6 @@ impl SeLinuxApiOps for CreateApi {
         // <tclass>: the policy-specific Id of the created object's class, as a decimal integer.
         // Class Ids are obtained via lookups in the SELinuxFS "class" directory.
         let tclass = parts.next().ok_or_else(|| errno!(EINVAL))?;
-        let tclass = str::from_utf8(tclass).map_err(|_| errno!(EINVAL))?;
         let tclass = u32::from_str(tclass).map_err(|_| errno!(EINVAL))?;
         let tclass = ClassId::new(NonZeroU32::new(tclass).ok_or_else(|| errno!(EINVAL))?);
 
@@ -618,7 +587,7 @@ impl InitialContextFile {
 impl BytesFileOps for InitialContextFile {
     fn read(&self, _current_task: &CurrentTask) -> Result<Cow<'_, [u8]>, Errno> {
         profile_duration!("selinuxfs.initial_sid");
-        let sid = SecurityId::initial(self.initial_sid);
+        let sid = self.initial_sid.into();
         if let Some(context) = self.security_server.sid_to_security_context(sid) {
             Ok(context.into())
         } else {
@@ -630,13 +599,35 @@ impl BytesFileOps for InitialContextFile {
     }
 }
 
+/// Extends a calculated `AccessDecision` with an additional permission set describing which
+/// permissions were actually `decided` - all other permissions in the `AccessDecision` structure
+/// should be assumed to be un-`decided`. This allows the "access" API to return partial results, to
+/// force userspace to re-query the API if any un-`decided` permission is later requested.
+struct AccessDecisionAndDecided {
+    decision: AccessDecision,
+    decided: AccessVector,
+}
+
 struct AccessApi {
-    result: Mutex<Vec<u8>>,
+    security_server: Arc<SecurityServer>,
+    result: OnceLock<AccessDecisionAndDecided>,
+
+    // TODO: https://fxbug.dev/422929151 - Always enforce the "access" API and remove this.
+    todo_bug: Option<NonZeroU64>,
 }
 
 impl AccessApi {
-    fn new_node() -> impl FsNodeOps {
-        SeLinuxApi::new_node(move || Ok(Self { result: Mutex::default() }))
+    fn new_node(
+        security_server: Arc<SecurityServer>,
+        todo_bug: Option<NonZeroU64>,
+    ) -> impl FsNodeOps {
+        SeLinuxApi::new_node(move || {
+            Ok(Self {
+                security_server: security_server.clone(),
+                result: OnceLock::default(),
+                todo_bug: todo_bug,
+            })
+        })
     }
 }
 
@@ -645,26 +636,118 @@ impl SeLinuxApiOps for AccessApi {
         SecurityPermission::ComputeAv
     }
 
-    fn api_write(&self, _data: Vec<u8>) -> Result<(), Errno> {
-        let mut result = self.result.lock();
-        if !result.is_empty() {
+    fn api_write(&self, data: Vec<u8>) -> Result<(), Errno> {
+        if self.result.get().is_some() {
+            // The "access" API can be written-to at most once.
             return error!(EBUSY);
         }
 
-        // Result format is: allowed decided auditallow auditdeny seqno flags
-        // Everything but seqno must be in hexadecimal format and represents a bits field.
-        track_stub!(TODO("https://fxbug.dev/361551536"), "selinux access");
+        let data = str::from_utf8(&data).map_err(|_| errno!(EINVAL))?;
 
-        // `SEQ_NUMBER` should reflect the policy revision from which the result was calculated.
-        const SEQ_NUMBER: u32 = 1;
-        *result = format!("ffffffff ffffffff 0 ffffffff {} 0\n", SEQ_NUMBER).into_bytes();
+        // Requests consist of three mandatory space-separated elements, and one optional element.
+        let mut parts = data.split_whitespace();
+
+        // <scontext>: describes the subject acting on the class.
+        let scontext = parts.next().ok_or_else(|| errno!(EINVAL))?;
+        let scontext = self
+            .security_server
+            .security_context_to_sid(scontext.into())
+            .map_err(|_| errno!(EINVAL))?;
+
+        // <tcontext>: describes the target (e.g. parent directory) of the operation.
+        let tcontext = parts.next().ok_or_else(|| errno!(EINVAL))?;
+        let tcontext = self
+            .security_server
+            .security_context_to_sid(tcontext.into())
+            .map_err(|_| errno!(EINVAL))?;
+
+        // <tclass>: the policy-specific Id of the target class, as a decimal integer.
+        // Class Ids are obtained via lookups in the SELinuxFS "class" directory.
+        let tclass = parts.next().ok_or_else(|| errno!(EINVAL))?;
+        let tclass = u32::from_str(tclass).map_err(|_| errno!(EINVAL))?;
+        let tclass = ClassId::new(NonZeroU32::new(tclass).ok_or_else(|| errno!(EINVAL))?).into();
+
+        // <request>: the set of permissions that the caller requests.
+        let requested = if let Some(requested) = parts.next() {
+            AccessVector::from_str(requested).map_err(|_| errno!(EINVAL))?
+        } else {
+            AccessVector::ALL
+        };
+
+        // This API does not appear to treat trailing arguments as invalid.
+
+        // Perform the access decision calculation.
+        let permission_check = self.security_server.as_permission_check();
+        let mut decision = permission_check.compute_access_decision(scontext, tcontext, tclass);
+
+        // `compute_access_decision()` returns an `AccessDecision` with results calculated for all
+        // permissions defined by policy, so by default the "access" API reports all permissions as
+        // having been `decided`.
+        let mut decided = AccessVector::ALL;
+
+        // If there is a `todo_bug` associated with the decision then grant all permissions and
+        // make a best-effort attempt to emit a log for missing permissions.
+        let todo_bug = decision.todo_bug.or(self.todo_bug);
+        if let Some(todo_bug) = todo_bug {
+            let denied = AccessVector::ALL - decision.allow;
+            let audited_denied = denied & decision.auditdeny;
+
+            let requested_has_audited_denial = audited_denied & requested != AccessVector::NONE;
+
+            if requested_has_audited_denial {
+                // One or more requested permissions would be denied, and the denial audit-logged,
+                // so emit a track-stub report and a description of the request and result.
+                // Leave all permissions `decided`, so that only the first such failure is audited.
+                __track_stub_inner(
+                    BugRef::from(todo_bug),
+                    "Enforce SELinuxFS access API",
+                    None,
+                    std::panic::Location::caller(),
+                );
+                log_warn!(
+                    "avc: todo_deny SELinuxFS access request {:?} -> {:?}",
+                    FsStr::new(&data),
+                    decision
+                );
+            } else {
+                // All requested permissions were granted. To allow "todo_deny" logs and track-stub
+                // tracking of permissions that would otherwise be denied & audited, remove those
+                // permissions from the `decided` set, to signal that the userspace AVC should re-
+                // query rather than using these cached results.
+                decided -= audited_denied;
+            }
+
+            // Grant all permissions in the returned result, so that clients that ignore the
+            // `decided` set will still have the allowance applied to all permissions.
+            decision.allow = AccessVector::ALL;
+        }
+
+        self.result
+            .set(AccessDecisionAndDecided { decision, decided })
+            .map_err(|_| errno!(EINVAL))?;
 
         Ok(())
     }
 
     fn api_read(&self) -> Result<Cow<'_, [u8]>, Errno> {
-        let result = self.result.lock().clone();
-        Ok(result.into())
+        let Some(AccessDecisionAndDecided { decision, decided }) = self.result.get() else {
+            return Ok(Vec::new().into());
+        };
+
+        let allowed = decision.allow;
+        let auditallow = decision.auditallow;
+        let auditdeny = decision.auditdeny;
+        let flags = decision.flags;
+
+        // TODO: https://fxbug.dev/361551536 - `seqno` should reflect the policy revision from
+        // which the result was calculated, to allow the client to re-try if the policy changed.
+        const SEQNO: u32 = 1;
+
+        // Result format is: allowed decided auditallow auditdeny seqno flags
+        // Everything but seqno must be in hexadecimal format and represents a bits field.
+        let result =
+            format!("{allowed:x} {decided:x} {auditallow:x} {auditdeny:x} {SEQNO} {flags:x}");
+        Ok(result.into_bytes().into())
     }
 }
 
@@ -675,7 +758,7 @@ impl FsNodeOps for NullFileNode {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -700,7 +783,7 @@ impl FsNodeOps for BooleansDirectory {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -710,7 +793,7 @@ impl FsNodeOps for BooleansDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -718,10 +801,9 @@ impl FsNodeOps for BooleansDirectory {
         let utf8_name = String::from_utf8(name.to_vec()).map_err(|_| errno!(ENOENT))?;
         if self.security_server.conditional_booleans().contains(&utf8_name) {
             profile_duration!("selinuxfs.booleans.lookup");
-            Ok(node.fs().create_node(
-                current_task,
+            Ok(node.fs().create_node_and_allocate_node_id(
                 BooleanFile::new_node(self.security_server.clone(), utf8_name),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o644), current_task.as_fscred()),
+                FsNodeInfo::new(mode!(IFREG, 0o644), current_task.as_fscred()),
             ))
         } else {
             error!(ENOENT)
@@ -732,22 +814,11 @@ impl FsNodeOps for BooleansDirectory {
 impl FileOps for BooleansDirectory {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        profile_duration!("selinuxfs.booleans.seek");
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -760,7 +831,7 @@ impl FileOps for BooleansDirectory {
         let iter_offset = sink.offset() - 2;
         for name in self.security_server.conditional_booleans().iter().skip(iter_offset as usize) {
             sink.add(
-                file.fs.next_node_id(),
+                file.fs.allocate_ino(),
                 /* next offset = */ sink.offset() + 1,
                 DirectoryEntryType::REG,
                 FsString::from(name.as_bytes()).as_ref(),
@@ -847,7 +918,7 @@ impl FsNodeOps for ClassDirectory {
     /// Returns the set of classes under the "class" directory.
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -868,9 +939,9 @@ impl FsNodeOps for ClassDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         profile_duration!("selinuxfs.class.lookup");
@@ -883,14 +954,13 @@ impl FsNodeOps for ClassDirectory {
             .map_err(|_| errno!(EINVAL))?
             .into();
         let index_bytes = format!("{}", id).into_bytes();
-        dir.entry(current_task, "index", BytesFile::new_node(index_bytes), mode!(IFREG, 0o444));
+        dir.entry("index", BytesFile::new_node(index_bytes), mode!(IFREG, 0o444));
         dir.entry(
-            current_task,
             "perms",
             PermsDirectory::new(self.security_server.clone(), name.to_string()),
             mode!(IFDIR, 0o555),
         );
-        Ok(dir.build(current_task))
+        Ok(dir.build())
     }
 }
 
@@ -912,7 +982,7 @@ impl FsNodeOps for PermsDirectory {
     /// Lists all available permissions for the corresponding class.
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -933,7 +1003,7 @@ impl FsNodeOps for PermsDirectory {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -948,10 +1018,9 @@ impl FsNodeOps for PermsDirectory {
             .ok_or_else(|| errno!(ENOENT))?
             .0;
 
-        Ok(node.fs().create_node(
-            current_task,
+        Ok(node.fs().create_node_and_allocate_node_id(
             BytesFile::new_node(format!("{}", found_permission_id).into_bytes()),
-            FsNodeInfo::new_factory(mode!(IFREG, 0o444), current_task.as_fscred()),
+            FsNodeInfo::new(mode!(IFREG, 0o444), current_task.as_fscred()),
         ))
     }
 }
@@ -1043,7 +1112,7 @@ trait SeLinuxApiOps {
     /// Variant of `api_write()` that additionally receives the `current_task`.
     fn api_write_with_task(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _current_task: &CurrentTask,
         data: Vec<u8>,
     ) -> Result<(), Errno> {
@@ -1061,7 +1130,7 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -1074,7 +1143,7 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
 
     fn write(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         offset: usize,
@@ -1094,7 +1163,7 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
 
 /// Returns the "selinuxfs" file system, used by the system userspace to administer SELinux.
 pub fn selinux_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {

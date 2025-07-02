@@ -365,9 +365,7 @@ impl ConnectDisconnectLogger {
             }
         }
 
-        if !metric_events.is_empty() {
-            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_periodic_telemetry");
-        }
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_periodic_telemetry");
     }
 
     pub async fn handle_suspend_imminent(&self) {
@@ -383,9 +381,7 @@ impl ConnectDisconnectLogger {
             });
         }
 
-        if !metric_events.is_empty() {
-            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_suspend_imminent");
-        }
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_suspend_imminent");
     }
 }
 
@@ -580,6 +576,7 @@ mod tests {
 
         let tree = harness.get_inspect_data_tree();
         assert_data_tree!(
+            @executor harness.exec,
             tree,
             root: contains {
                 test_stats: contains {
@@ -646,7 +643,7 @@ mod tests {
 
         // Validate Inspect data
         let data = test_helper.get_inspect_data_tree();
-        assert_data_tree!(data, root: contains {
+        assert_data_tree!(@executor test_helper.exec, data, root: contains {
             test_stats: contains {
                 metadata: contains {
                     connected_networks: contains {
@@ -974,7 +971,7 @@ mod tests {
 
         // Validate Inspect data
         let data = test_helper.get_inspect_data_tree();
-        assert_data_tree!(data, root: contains {
+        assert_data_tree!(@executor test_helper.exec, data, root: contains {
             test_stats: contains {
                 metadata: {
                     connected_networks: {

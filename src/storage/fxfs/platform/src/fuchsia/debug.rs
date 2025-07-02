@@ -114,10 +114,6 @@ impl File for InternalFile {
         Err(Status::NOT_SUPPORTED)
     }
 
-    async fn get_backing_memory(&self, _flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        return Err(Status::NOT_SUPPORTED);
-    }
-
     async fn get_size(&self) -> Result<u64, Status> {
         // TODO(ripper): Look up size in LSMTree on every request.
         Ok(self.handle().await?.get_size())

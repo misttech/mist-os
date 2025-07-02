@@ -6,6 +6,9 @@
 
 #![cfg(any(test, feature = "testutils"))]
 
+pub use netstack3_base::testutil::TestIpExt;
+pub use netstack3_filter::testutil::new_filter_egress_ip_packet;
+
 use alloc::borrow::ToOwned;
 use alloc::collections::HashMap;
 use alloc::sync::Arc;
@@ -50,9 +53,9 @@ use netstack3_device::{
     self as device, for_any_device_id, DeviceId, DeviceLayerEventDispatcher, DeviceLayerStateTypes,
     DeviceLayerTypes, DeviceProvider, DeviceSendFrameError, WeakDeviceId,
 };
+use netstack3_filter::testutil::NoOpSocketOpsFilter;
 use netstack3_filter::{
-    FilterBindingsTypes, FilterIpExt, FilterTimerId, IpPacket, SocketEgressFilterResult,
-    SocketOpsFilter, SocketOpsFilterBindingContext,
+    FilterBindingsTypes, FilterTimerId, SocketOpsFilter, SocketOpsFilterBindingContext,
 };
 use netstack3_icmp_echo::{IcmpEchoBindingsContext, IcmpEchoBindingsTypes, IcmpSocketId};
 use netstack3_ip::device::{
@@ -77,7 +80,7 @@ use crate::context::prelude::*;
 use crate::context::UnlockedCoreCtx;
 use crate::state::{StackState, StackStateBuilder};
 use crate::time::{TimerId, TimerIdInner};
-use crate::{BindingsContext, BindingsTypes, IpExt, TxMetadata};
+use crate::{BindingsContext, BindingsTypes, CoreTxMetadata, IpExt};
 
 /// The default interface routing metric for test interfaces.
 pub const DEFAULT_INTERFACE_METRIC: RawMetric = RawMetric(100);
@@ -257,7 +260,8 @@ where
                 Ipv4PresentAddressStatus::LimitedBroadcast
                 | Ipv4PresentAddressStatus::SubnetBroadcast
                 | Ipv4PresentAddressStatus::LoopbackSubnet
-                | Ipv4PresentAddressStatus::Unicast => false,
+                | Ipv4PresentAddressStatus::UnicastAssigned
+                | Ipv4PresentAddressStatus::UnicastTentative => false,
             },
             |Wrap(v6)| match v6 {
                 Ipv6PresentAddressStatus::Multicast => true,
@@ -757,24 +761,8 @@ impl FilterBindingsTypes for FakeBindingsCtx {
     type DeviceClass = ();
 }
 
-struct NoOpSocketOpsFilter;
-
-impl<D: netstack3_base::StrongDeviceIdentifier, T> SocketOpsFilter<D, T> for NoOpSocketOpsFilter {
-    fn on_egress<I: FilterIpExt, P: IpPacket<I>>(
-        &self,
-        _packet: &P,
-        _device: &D,
-        _tx_metadata: &T,
-        _marks: &Marks,
-    ) -> SocketEgressFilterResult {
-        SocketEgressFilterResult::Pass { congestion: false }
-    }
-}
-
 impl SocketOpsFilterBindingContext<DeviceId<FakeBindingsCtx>> for FakeBindingsCtx {
-    fn socket_ops_filter(
-        &self,
-    ) -> impl SocketOpsFilter<DeviceId<FakeBindingsCtx>, TxMetadata<FakeBindingsCtx>> {
+    fn socket_ops_filter(&self) -> impl SocketOpsFilter<DeviceId<FakeBindingsCtx>> {
         NoOpSocketOpsFilter
     }
 }
@@ -858,7 +846,7 @@ impl TimerContext for FakeBindingsCtx {
 }
 
 impl TxMetadataBindingsTypes for FakeBindingsCtx {
-    type TxMetadata = TxMetadata<Self>;
+    type TxMetadata = CoreTxMetadata<Self>;
 }
 
 impl RngContext for FakeBindingsCtx {
@@ -1307,17 +1295,17 @@ impl FakeNetworkSpec for FakeCtxNetworkSpec {
 }
 
 impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx {
-    fn receive_udp<B: BufferMut>(
+    fn receive_udp(
         &mut self,
         id: &UdpSocketId<I, WeakDeviceId<Self>, FakeBindingsCtx>,
         _device_id: &DeviceId<Self>,
         _meta: UdpPacketMeta<I>,
-        body: &B,
+        body: &[u8],
     ) {
         let mut state = self.state_mut();
         let received =
             (&mut *state).udp_state_mut::<I>().entry(id.clone()).or_insert_with(Vec::default);
-        received.push(body.as_ref().to_owned());
+        received.push(body.to_owned());
     }
 }
 

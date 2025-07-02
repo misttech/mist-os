@@ -231,6 +231,30 @@
   .endif
 .endm
 
-#endif  // clang-format on
+#else  // clang-format on
+
+#include <cstddef>
+#include <cstdint>
+
+namespace arch {
+
+// Use `extern arch::AsmLabel name;` for something defined in assembly code
+// with `.label name, global` or the equivalent.  Then use name directly when
+// a `const std::byte*` or `const void*` is needed.  This is often used for
+// code, but it's used from C++ only as memory to copy around or compare an
+// address to, so it's not a function type (even to be never called).
+using AsmLabel = const std::byte[];
+
+// Use `arch::kAsmLabelAddress<name>` when an address is needed.
+template <AsmLabel& Label>
+inline const uintptr_t kAsmLabelAddress = reinterpret_cast<uintptr_t>(Label);
+
+// Use `arch::kAsmLabelSize<start, end>` for the distance between two labels.
+template <AsmLabel& Start, AsmLabel& End>
+inline const uintptr_t kAsmLabelSize = End - Start;
+
+}  // namespace arch
+
+#endif  // !__ASSEMBLER__
 
 #endif  // ZIRCON_KERNEL_LIB_ARCH_INCLUDE_LIB_ARCH_ASM_H_

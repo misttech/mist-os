@@ -147,8 +147,11 @@ impl<R: SeedableRng + Rng> InspectHierarchyGenerator<R> {
 }
 
 impl<R: SeedableRng + Rng> DiagnosticsHierarchyGetter<String> for InspectHierarchyGenerator<R> {
-    fn get_diagnostics_hierarchy(&self) -> Cow<'_, DiagnosticsHierarchy> {
-        self.inspector.get_diagnostics_hierarchy()
+    async fn get_diagnostics_hierarchy<'a>(&'a self) -> Cow<'_, DiagnosticsHierarchy>
+    where
+        String: 'a,
+    {
+        self.inspector.get_diagnostics_hierarchy().await
     }
 }
 

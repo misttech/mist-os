@@ -16,6 +16,8 @@ use fxfs::filesystem::{SyncOptions, MAX_FILE_SIZE};
 use fxfs::future_with_guard::FutureWithGuard;
 use fxfs::log::*;
 use fxfs::object_handle::{ObjectHandle, ReadObjectHandle};
+use fxfs::object_store::data_object_handle::OverwriteOptions;
+use fxfs::object_store::object_record::EncryptionKey;
 use fxfs::object_store::transaction::{lock_keys, LockKey, Options};
 use fxfs::object_store::{DataObjectHandle, ObjectDescriptor, FSCRYPT_KEY_ID};
 use fxfs_macros::ToWeakNode;
@@ -217,7 +219,11 @@ impl FxFile {
         let _ = self
             .handle
             .uncached_handle()
-            .overwrite(offset, buf.as_mut(), true)
+            .overwrite(
+                offset,
+                buf.as_mut(),
+                OverwriteOptions { allow_allocations: true, ..Default::default() },
+            )
             .await
             .map_err(map_to_status)?;
         Ok(content.len() as u64)
@@ -243,13 +249,24 @@ impl FxFile {
     }
 
     async fn fscrypt_wrapping_key_id(&self) -> Result<Option<[u8; 16]>, zx::Status> {
-        if !self.handle.store().is_encrypted() {
-            return Ok(None);
-        } else {
-            let wrapped_keys =
-                self.handle.store().get_keys(self.object_id()).await.map_err(map_to_status)?;
-            Ok(wrapped_keys.get_wrapping_key_with_id(FSCRYPT_KEY_ID))
+        if self.handle.store().is_encrypted() {
+            if let Some(key) = self
+                .handle
+                .store()
+                .get_keys(self.object_id())
+                .await
+                .map_err(map_to_status)?
+                .get(FSCRYPT_KEY_ID)
+            {
+                if let EncryptionKey::Fxfs(fxfs_key) = key {
+                    return Ok(Some(fxfs_key.wrapping_key_id.to_le_bytes()));
+                } else {
+                    error!("Unexpected key type: {:?}", key);
+                    return Ok(None);
+                }
+            }
         }
+        Ok(None)
     }
 
     /// Forcibly marks the file as clean.
@@ -701,7 +718,8 @@ impl PagerBacked for FxFile {
     }
 
     fn page_in(self: Arc<Self>, range: PageInRange<Self>) {
-        default_page_in(self, range)
+        let read_ahead_size = self.handle.owner().read_ahead_size();
+        default_page_in(self, range, read_ahead_size);
     }
 
     #[trace]
@@ -727,10 +745,6 @@ impl PagerBacked for FxFile {
     fn on_zero_children(self: Arc<Self>) {
         // Drop the open count that we took in `get_backing_memory`.
         self.open_count_sub_one();
-    }
-
-    fn read_alignment(&self) -> u64 {
-        self.handle.block_size()
     }
 
     fn byte_size(&self) -> u64 {
@@ -848,11 +862,19 @@ mod tests {
         assert_eq!(buf.len(), expected_output.as_bytes().len());
         assert!(buf.iter().eq(expected_output.as_bytes().iter()));
 
-        let (status, attrs) = file.get_attr().await.expect("FIDL call failed");
-        Status::ok(status).expect("get_attr failed");
-        assert_eq!(attrs.content_size, expected_output.as_bytes().len() as u64);
-        // We haven't synced yet, but the pending writes should have blocks reserved still.
-        assert_eq!(attrs.storage_size, fixture.fs().block_size() as u64);
+        let (_, immutable_attributes) = file
+            .get_attributes(
+                fio::NodeAttributesQuery::CONTENT_SIZE | fio::NodeAttributesQuery::STORAGE_SIZE,
+            )
+            .await
+            .expect("FIDL call failed")
+            .expect("get_attributes failed");
+
+        assert_eq!(
+            immutable_attributes.content_size.unwrap(),
+            expected_output.as_bytes().len() as u64
+        );
+        assert_eq!(immutable_attributes.storage_size.unwrap(), fixture.fs().block_size() as u64);
 
         let () = file
             .sync()
@@ -861,10 +883,19 @@ mod tests {
             .map_err(Status::from_raw)
             .expect("sync failed");
 
-        let (status, attrs) = file.get_attr().await.expect("FIDL call failed");
-        Status::ok(status).expect("get_attr failed");
-        assert_eq!(attrs.content_size, expected_output.as_bytes().len() as u64);
-        assert_eq!(attrs.storage_size, fixture.fs().block_size() as u64);
+        let (_, immutable_attributes) = file
+            .get_attributes(
+                fio::NodeAttributesQuery::CONTENT_SIZE | fio::NodeAttributesQuery::STORAGE_SIZE,
+            )
+            .await
+            .expect("FIDL call failed")
+            .expect("get_attributes failed");
+
+        assert_eq!(
+            immutable_attributes.content_size.unwrap(),
+            expected_output.as_bytes().len() as u64
+        );
+        assert_eq!(immutable_attributes.storage_size.unwrap(), fixture.fs().block_size() as u64);
 
         close_file_checked(file).await;
         fixture.close().await;
@@ -1038,10 +1069,16 @@ mod tests {
                 assert_eq!(buf, vec![0xaa as u8; 8192]);
             }
 
-            let (status, attrs) = file.get_attr().await.expect("FIDL call failed");
-            Status::ok(status).expect("get_attr failed");
-            assert_eq!(attrs.content_size, 8192u64);
-            assert_eq!(attrs.storage_size, 8192u64);
+            let (_, immutable_attributes) = file
+                .get_attributes(
+                    fio::NodeAttributesQuery::CONTENT_SIZE | fio::NodeAttributesQuery::STORAGE_SIZE,
+                )
+                .await
+                .expect("FIDL call failed")
+                .expect("get_attributes failed");
+
+            assert_eq!(immutable_attributes.content_size.unwrap(), 8192u64);
+            assert_eq!(immutable_attributes.storage_size.unwrap(), 8192u64);
 
             close_file_checked(file).await;
             device = fixture.close().await;
@@ -1094,10 +1131,19 @@ mod tests {
         assert_eq!(buf.len(), expected_output.as_bytes().len());
         assert_eq!(&buf[..], expected_output.as_bytes());
 
-        let (status, attrs) = file.get_attr().await.expect("FIDL call failed");
-        Status::ok(status).expect("get_attr failed");
-        assert_eq!(attrs.content_size, expected_output.as_bytes().len() as u64);
-        assert_eq!(attrs.storage_size, fixture.fs().block_size() as u64);
+        let (_, immutable_attributes) = file
+            .get_attributes(
+                fio::NodeAttributesQuery::CONTENT_SIZE | fio::NodeAttributesQuery::STORAGE_SIZE,
+            )
+            .await
+            .expect("FIDL call failed")
+            .expect("get_attributes failed");
+
+        assert_eq!(
+            immutable_attributes.content_size.unwrap(),
+            expected_output.as_bytes().len() as u64
+        );
+        assert_eq!(immutable_attributes.storage_size.unwrap(), fixture.fs().block_size() as u64);
 
         close_file_checked(file).await;
         fixture.close().await;
@@ -2477,7 +2523,7 @@ mod tests {
         )
         .await;
         let wrapping_key_id = 123;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         encrypted_directory
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),
@@ -2567,7 +2613,7 @@ mod tests {
         )
         .await;
         let wrapping_key_id = 123;
-        crypt.add_wrapping_key(wrapping_key_id, [1; 32]);
+        crypt.add_wrapping_key(wrapping_key_id, [1; 32].into());
         encrypted_directory
             .update_attributes(&fio::MutableNodeAttributes {
                 wrapping_key_id: Some(wrapping_key_id.to_le_bytes()),

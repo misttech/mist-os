@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.driver.framework/cpp/fidl.h>
 #include <fidl/fuchsia.gpu.magma/cpp/wire.h>
 #include <lib/driver/devfs/cpp/connector.h>
+#include <lib/driver/node/cpp/add_child.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/magma/util/macros.h>
 
@@ -14,24 +15,25 @@ namespace msd::internal {
 class PerformanceCountersServer
     : public fidl::WireServer<fuchsia_gpu_magma::PerformanceCounterAccess> {
  public:
-  PerformanceCountersServer()
-      : devfs_connector_(fit::bind_member<&PerformanceCountersServer::BindConnector>(this)) {}
+  explicit PerformanceCountersServer(async_dispatcher_t* dispatcher)
+      : devfs_connector_(fit::bind_member<&PerformanceCountersServer::BindConnector>(this)),
+        dispatcher_(dispatcher) {}
 
-  zx::result<> Create(fidl::WireSyncClient<fuchsia_driver_framework::Node>& node_client);
+  zx::result<> Create(fidl::UnownedClientEnd<fuchsia_driver_framework::Node> parent);
 
   zx_koid_t GetEventKoid();
 
  private:
   void BindConnector(fidl::ServerEnd<fuchsia_gpu_magma::PerformanceCounterAccess> server) {
-    fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server), this);
+    fidl::BindServer(dispatcher_, std::move(server), this);
   }
 
   void GetPerformanceCountToken(GetPerformanceCountTokenCompleter::Sync& completer) override;
 
   zx::event event_;
   driver_devfs::Connector<fuchsia_gpu_magma::PerformanceCounterAccess> devfs_connector_;
-  fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
-  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> node_controller_;
+  fdf::OwnedChildNode child_;
+  async_dispatcher_t* dispatcher_;
 };
 
 }  // namespace msd::internal

@@ -123,7 +123,7 @@ template("idk") {
     _subbuilds_target_prefix = ":${_subbuilds_target}"
   }
 
-  _relative_collection_build_manifest = "sdk/manifest/${_sdk_collection_name}"
+  _collection_relative_path = "sdk/exported/${_sdk_collection_name}"
 
   # Targets that must be built before producing the final IDK.
   _subbuild_targets = []
@@ -186,16 +186,12 @@ template("idk") {
   python_action(target_name) {
     binary_label = "//build/sdk/generate_idk"
 
-    _schema_validator_tool =
-        "//build/tools/json_validator:json_validator_valico($host_toolchain)"
+    _schema_validator_tool = "//build/bazel:root_target.json_validator_valico"
 
     # Get the path to the schema validator executable.
-    schema_validator_tool_output_name =
-        get_label_info(_schema_validator_tool, "name")
-    schema_validator_tool_output_dir =
-        get_label_info(_schema_validator_tool, "root_out_dir")
-    host_executable =
-        "$schema_validator_tool_output_dir/$schema_validator_tool_output_name"
+    host_executable = get_label_info(_schema_validator_tool, "target_out_dir") +
+                      "/json_validator_valico"
+
     inputs = [ host_executable ]
 
     deps = _subbuild_targets + [ _schema_validator_tool ]
@@ -220,8 +216,8 @@ template("idk") {
     }
 
     args += [
-      "--relative-manifest",
-      _relative_collection_build_manifest,
+      "--collection-relative-path",
+      _collection_relative_path,
       "--output-directory",
       rebase_path(_exported_dir, root_build_dir),
       "--schema-directory",

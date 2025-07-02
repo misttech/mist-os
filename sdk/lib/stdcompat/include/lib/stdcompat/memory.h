@@ -9,12 +9,6 @@
 
 #include "version.h"
 
-namespace cpp17 {
-
-using std::addressof;
-
-}  // namespace cpp17
-
 namespace cpp20 {
 
 #if defined(__cpp_lib_to_address) && __cpp_lib_to_address >= 201711L && \

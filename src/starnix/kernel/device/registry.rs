@@ -9,6 +9,7 @@ use crate::fs::sysfs::DeviceDirectory;
 use crate::task::CurrentTask;
 use crate::vfs::{FileOps, FsNode, FsNodeOps, FsStr, FsString};
 use starnix_logging::{log_error, log_warn};
+use starnix_uapi::as_any::AsAny;
 use starnix_uapi::device_type::{
     DeviceType, DYN_MAJOR_RANGE, MISC_DYNANIC_MINOR_RANGE, MISC_MAJOR,
 };
@@ -53,14 +54,14 @@ impl DeviceMode {
     }
 }
 
-pub trait DeviceOps: DynClone + Send + Sync + 'static {
+pub trait DeviceOps: DynClone + Send + Sync + AsAny + 'static {
     /// Instantiate a FileOps for this device.
     ///
     /// This function is called when userspace opens a file with a `DeviceType`
     /// assigned to this device.
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         _current_task: &CurrentTask,
         _device_type: DeviceType,
         _node: &FsNode,
@@ -71,7 +72,7 @@ pub trait DeviceOps: DynClone + Send + Sync + 'static {
 impl<T: DeviceOps> DeviceOps for Arc<T> {
     fn open(
         &self,
-        locked: &mut Locked<'_, DeviceOpen>,
+        locked: &mut Locked<DeviceOpen>,
         current_task: &CurrentTask,
         device_type: DeviceType,
         node: &FsNode,
@@ -92,7 +93,7 @@ where
         + Sync
         + Clone
         + Fn(
-            &mut Locked<'_, DeviceOpen>,
+            &mut Locked<DeviceOpen>,
             &CurrentTask,
             DeviceType,
             &FsNode,
@@ -102,7 +103,7 @@ where
 {
     fn open(
         &self,
-        locked: &mut Locked<'_, DeviceOpen>,
+        locked: &mut Locked<DeviceOpen>,
         current_task: &CurrentTask,
         id: DeviceType,
         node: &FsNode,
@@ -114,7 +115,7 @@ where
 
 /// A simple `DeviceOps` function for any device that implements `FileOps + Default`.
 pub fn simple_device_ops<T: Default + FileOps + 'static>(
-    _locked: &mut Locked<'_, DeviceOpen>,
+    _locked: &mut Locked<DeviceOpen>,
     _current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -270,12 +271,8 @@ struct DeviceRegistryState {
 
 impl DeviceRegistry {
     /// Notify devfs and listeners that a device has been added to the registry.
-    fn notify_device<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        current_task: &CurrentTask,
-        device: Device,
-    ) where
+    fn notify_device<L>(&self, locked: &mut Locked<L>, current_task: &CurrentTask, device: Device)
+    where
         L: LockBefore<FileOpsCore>,
     {
         if let Some(metadata) = &device.metadata {
@@ -334,7 +331,7 @@ impl DeviceRegistry {
     /// your device.
     pub fn register_device<F, N, L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         metadata: DeviceMetadata,
@@ -364,7 +361,7 @@ impl DeviceRegistry {
     /// See `register_device` for an explanation of the parameters.
     pub fn register_misc_device<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         dev_ops: impl DeviceOps,
@@ -397,7 +394,7 @@ impl DeviceRegistry {
     /// See `register_device` for an explanation of the parameters.
     pub fn register_dyn_device<F, N, L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         class: Class,
@@ -422,6 +419,24 @@ impl DeviceRegistry {
         ))
     }
 
+    /// Register a "silent" dynamic device with major numbers 234..255.
+    ///
+    /// Only use for devices that should not be registered with the KObjectStore/appear in sysfs.
+    /// This is a rare occurrence.
+    ///
+    /// See `register_dyn_device` for an explanation of dyn devices and of the parameters.
+    pub fn register_silent_dyn_device(
+        &self,
+        name: &FsStr,
+        dev_ops: impl DeviceOps,
+    ) -> Result<DeviceMetadata, Errno> {
+        let device_type = self.state.lock().dyn_chardev_allocator.allocate()?;
+        let metadata = DeviceMetadata::new(name.into(), device_type, DeviceMode::Char);
+        let entry = DeviceEntry::new(name.into(), dev_ops);
+        self.devices(metadata.mode).register_minor(metadata.device_type, entry);
+        Ok(metadata)
+    }
+
     /// Directly add a device to the KObjectStore.
     ///
     /// This function should be used only by device that have registered an entire major device
@@ -431,7 +446,7 @@ impl DeviceRegistry {
     /// See `register_device` for an explanation of the parameters.
     pub fn add_device<F, N, L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         metadata: DeviceMetadata,
@@ -485,7 +500,7 @@ impl DeviceRegistry {
     /// See `register_device` for an explanation of the parameters.
     pub fn add_numberless_device<F, N, L>(
         &self,
-        _locked: &mut Locked<'_, L>,
+        _locked: &mut Locked<L>,
         _current_task: &CurrentTask,
         name: &FsStr,
         class: Class,
@@ -505,7 +520,7 @@ impl DeviceRegistry {
     /// number. Individually registered minor device cannot be removed at this time.
     pub fn remove_device<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         device: Device,
     ) where
@@ -602,7 +617,7 @@ impl DeviceRegistry {
     /// The device will be looked up in the device registry by `DeviceMode` and `DeviceType`.
     pub fn open_device<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         node: &FsNode,
         flags: OpenFlags,
@@ -615,6 +630,14 @@ impl DeviceRegistry {
         let dev_ops = self.devices(mode).get(device_type)?;
         let mut locked = locked.cast_locked::<DeviceOpen>();
         dev_ops.open(&mut locked, current_task, device_type, node, flags)
+    }
+
+    pub fn get_device(
+        &self,
+        device_type: DeviceType,
+        mode: DeviceMode,
+    ) -> Result<Arc<dyn DeviceOps>, Errno> {
+        self.devices(mode).get(device_type)
     }
 }
 
@@ -699,14 +722,15 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registry_opens_device() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let registry = DeviceRegistry::default();
         registry
             .register_major("mem".into(), DeviceMode::Char, MEM_MAJOR, simple_device_ops::<DevNull>)
             .expect("registers unique");
 
-        let node = FsNode::new_root(PanickingFsNode);
+        let fs = create_testfs(&kernel);
+        let node = create_fs_node_for_testing(&fs, PanickingFsNode);
 
         // Fail to open non-existent device.
         assert!(registry
@@ -747,10 +771,10 @@ mod tests {
 
     #[::fuchsia::test]
     async fn registry_dynamic_misc() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         fn create_test_device(
-            _locked: &mut Locked<'_, DeviceOpen>,
+            _locked: &mut Locked<DeviceOpen>,
             _current_task: &CurrentTask,
             _id: DeviceType,
             _node: &FsNode,
@@ -773,7 +797,8 @@ mod tests {
         let device_type = device.metadata.expect("has metadata").device_type;
         assert!(DYN_MAJOR_RANGE.contains(&device_type.major()));
 
-        let node = FsNode::new_root(PanickingFsNode);
+        let fs = create_testfs(&kernel);
+        let node = create_fs_node_for_testing(&fs, PanickingFsNode);
         let _ = registry
             .open_device(
                 &mut locked,

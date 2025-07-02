@@ -12,7 +12,7 @@
         #address-cells = <0x02>;
         #size-cells = <0x02>;
         #interrupt-cells = <0x03>;
-            compatible = "arm,gic-v3";
+        compatible = "arm,gic-v3";
         phandle = <0x8001>;
         interrupt-controller;
     };

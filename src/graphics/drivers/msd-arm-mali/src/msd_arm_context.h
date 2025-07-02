@@ -20,8 +20,8 @@ class MsdArmContext : public msd::Context {
     }
   }
 
-  magma_status_t ExecuteInlineCommand(magma_inline_command_buffer* command,
-                                      msd::Semaphore** semaphores) override;
+  magma_status_t MsdExecuteInlineCommand(magma_inline_command_buffer* command,
+                                         msd::Semaphore** semaphores) override;
 
   std::weak_ptr<MsdArmConnection> connection() { return connection_; }
 

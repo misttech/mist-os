@@ -6,19 +6,16 @@ use assert_matches::assert_matches;
 use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
 use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker as _};
 use fidl_fuchsia_fs_startup::VolumeMarker as FsStartupVolumeMarker;
-use fidl_fuchsia_fshost::AdminMarker;
+use fidl_fuchsia_fshost::AdminProxy;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
 use fidl_fuchsia_update_verify::HealthStatus;
 use fs_management::format::constants::DATA_PARTITION_LABEL;
 use fs_management::partition::{find_partition_in, PartitionMatcher};
 use fs_management::DATA_TYPE_GUID;
 use fshost_test_fixture::disk_builder::{
-    DataSpec, VolumesSpec, FVM_SLICE_SIZE, TEST_DISK_BLOCK_SIZE,
+    DataSpec, VolumesSpec, BLOBFS_MAX_BYTES, TEST_DISK_BLOCK_SIZE,
 };
-use fshost_test_fixture::{
-    round_down, TestFixture, BLOBFS_MAX_BYTES, DATA_MAX_BYTES, VFS_TYPE_FXFS, VFS_TYPE_MEMFS,
-    VFS_TYPE_MINFS,
-};
+use fshost_test_fixture::{round_down, TestFixture, VFS_TYPE_FXFS, VFS_TYPE_MEMFS, VFS_TYPE_MINFS};
 use fuchsia_component::client::connect_to_named_protocol_at_dir_root;
 use futures::FutureExt as _;
 use regex::Regex;
@@ -28,8 +25,8 @@ use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio, fuchsia_async as fas
 use {
     blob_writer::BlobWriter,
     fidl::endpoints::Proxy,
-    fidl_fuchsia_fshost::StarnixVolumeProviderMarker,
-    fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker},
+    fidl_fuchsia_fshost::StarnixVolumeProviderProxy,
+    fidl_fuchsia_fxfs::{BlobCreatorProxy, BlobReaderProxy},
     fshost_test_fixture::STARNIX_VOLUME_NAME,
 };
 
@@ -42,8 +39,8 @@ use {
 pub mod config;
 
 use config::{
-    blob_fs_type, data_fs_spec, data_fs_type, data_fs_zxcrypt, new_builder, volumes_spec,
-    DATA_FILESYSTEM_VARIANT,
+    blob_fs_type, data_fs_spec, data_fs_type, data_fs_zxcrypt, data_max_bytes, fvm_slice_size,
+    new_builder, volumes_spec, DATA_FILESYSTEM_VARIANT,
 };
 
 #[fuchsia::test]
@@ -134,7 +131,7 @@ async fn data_formatted_no_fuchsia_boot() {
 #[fuchsia::test]
 async fn data_formatted_with_small_initial_volume() {
     let mut builder = new_builder();
-    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(FVM_SLICE_SIZE);
+    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(fvm_slice_size());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -148,11 +145,8 @@ async fn data_formatted_with_small_initial_volume_big_target() {
     let mut builder = new_builder();
     // The formatting uses the max bytes argument as the initial target to resize to. If this
     // target is larger than the disk, the resize should still succeed.
-    builder.fshost().set_config_value(
-        "data_max_bytes",
-        fshost_test_fixture::disk_builder::DEFAULT_DISK_SIZE * 2,
-    );
-    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(FVM_SLICE_SIZE);
+    builder.fshost().set_config_value("data_max_bytes", data_max_bytes() * 2);
+    builder.with_disk().format_volumes(volumes_spec()).data_volume_size(fvm_slice_size());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -168,8 +162,8 @@ async fn wipe_storage_not_supported() {
     let builder = new_builder();
     let fixture = builder.build().await;
 
-    let admin =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::AdminMarker>().unwrap();
+    let admin: fshost::AdminProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let (_, blobfs_server) = create_proxy::<fio::DirectoryMarker>();
 
@@ -260,9 +254,9 @@ async fn partition_max_size_set() {
     let mut builder = new_builder();
     builder
         .fshost()
-        .set_config_value("data_max_bytes", DATA_MAX_BYTES)
+        .set_config_value("data_max_bytes", data_max_bytes())
         .set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
-    builder.with_disk().format_volumes(volumes_spec());
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -311,7 +305,7 @@ async fn partition_max_size_set() {
     let (status, blobfs_slice_count) =
         fvm_proxy.get_partition_limit(blobfs_instance_guid.as_mut()).await.unwrap();
     zx::Status::ok(status).unwrap();
-    assert_eq!(blobfs_slice_count, (BLOBFS_MAX_BYTES + FVM_SLICE_SIZE - 1) / FVM_SLICE_SIZE);
+    assert_eq!(blobfs_slice_count, (BLOBFS_MAX_BYTES + fvm_slice_size() - 1) / fvm_slice_size());
 
     // data max size check
     let (status, data_slice_count) =
@@ -320,7 +314,7 @@ async fn partition_max_size_set() {
     // The expected size depends on whether we are using zxcrypt or not.
     // When wrapping in zxcrypt the data partition size is the same, but the physical disk
     // commitment is one slice bigger.
-    let mut expected_slices = (DATA_MAX_BYTES + FVM_SLICE_SIZE - 1) / FVM_SLICE_SIZE;
+    let mut expected_slices = (data_max_bytes() + fvm_slice_size() - 1) / fvm_slice_size();
     if data_fs_zxcrypt() && data_fs_type() != VFS_TYPE_FXFS {
         log::info!("Adding an extra expected data slice for zxcrypt");
         expected_slices += 1;
@@ -338,9 +332,9 @@ async fn set_volume_limit() {
     let mut builder = new_builder();
     builder
         .fshost()
-        .set_config_value("data_max_bytes", DATA_MAX_BYTES)
+        .set_config_value("data_max_bytes", data_max_bytes())
         .set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
-    builder.with_disk().format_volumes(volumes_spec());
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("blob", blob_fs_type()).await;
@@ -359,7 +353,7 @@ async fn set_volume_limit() {
         BLOBFS_MAX_BYTES
     } else {
         // The fvm component rounds the max bytes down to the nearest slice size.
-        (BLOBFS_MAX_BYTES / FVM_SLICE_SIZE) * FVM_SLICE_SIZE
+        round_down(BLOBFS_MAX_BYTES, fvm_slice_size())
     };
     assert_eq!(blobfs_limit, expected_blobfs_limit);
     let data_volume_proxy =
@@ -368,10 +362,10 @@ async fn set_volume_limit() {
     let data_limit =
         data_volume_proxy.get_limit().await.unwrap().map_err(zx::Status::from_raw).unwrap();
     let expected_data_limit = if cfg!(feature = "fxblob") {
-        DATA_MAX_BYTES
+        data_max_bytes()
     } else {
         // The fvm component rounds the max bytes down to the nearest slice size.
-        (DATA_MAX_BYTES / FVM_SLICE_SIZE) * FVM_SLICE_SIZE
+        round_down(data_max_bytes(), fvm_slice_size())
     };
     assert_eq!(data_limit, expected_data_limit);
 
@@ -392,11 +386,10 @@ async fn create_unmount_and_remount_starnix_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -435,11 +428,10 @@ async fn create_unmount_and_remount_starnix_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -477,11 +469,10 @@ async fn create_mount_and_remount_starnix_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -545,11 +536,10 @@ async fn create_starnix_volume_wipes_previous_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -588,11 +578,10 @@ async fn create_starnix_volume_wipes_previous_volume() {
     fixture.check_fs_type("blob", blob_fs_type()).await;
     fixture.check_fs_type("data", data_fs_type()).await;
 
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -623,7 +612,7 @@ async fn set_volume_bytes_limit() {
     let mut builder = new_builder();
     builder
         .fshost()
-        .set_config_value("data_max_bytes", DATA_MAX_BYTES)
+        .set_config_value("data_max_bytes", data_max_bytes())
         .set_config_value("blobfs_max_bytes", BLOBFS_MAX_BYTES);
     builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
@@ -643,7 +632,7 @@ async fn set_volume_bytes_limit() {
             .unwrap();
     let data_volume_bytes_limit = data_volume_proxy.get_limit().await.unwrap().unwrap();
     assert_eq!(blob_volume_bytes_limit, BLOBFS_MAX_BYTES);
-    assert_eq!(data_volume_bytes_limit, DATA_MAX_BYTES);
+    assert_eq!(data_volume_bytes_limit, data_max_bytes());
     fixture.tear_down().await;
 }
 
@@ -698,10 +687,10 @@ async fn set_data_and_blob_max_bytes_zero_new_write_api() {
     let hash = fuchsia_merkle::from_slice(&blob_contents).root();
     let compressed_data: Vec<u8> = Type1Blob::generate(&blob_contents, CompressionMode::Always);
 
-    let blob_proxy = fixture
+    let blob_proxy: BlobCreatorProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<BlobCreatorMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protocol_at_exposed_dir failed");
 
     let writer_client_end = blob_proxy
@@ -769,10 +758,10 @@ async fn shred_data_volume_not_supported() {
     builder.with_disk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
-    let admin = fixture
+    let admin: AdminProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<AdminMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protcol_at_exposed_dir failed");
 
     admin
@@ -799,10 +788,10 @@ async fn shred_data_volume_when_mounted() {
     .await
     .expect("open_file failed");
 
-    let admin = fixture
+    let admin: AdminProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<AdminMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protcol_at_exposed_dir failed");
 
     admin
@@ -847,11 +836,10 @@ async fn shred_data_deletes_starnix_volume() {
 
     // Need to connect to the StarnixVolumeProvider protocol that fshost exposes and Mount the
     // starnix volume.
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (_exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -861,10 +849,10 @@ async fn shred_data_deletes_starnix_volume() {
         .expect("fidl transport error")
         .expect("create failed");
 
-    let admin = fixture
+    let admin: AdminProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<AdminMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protcol_at_exposed_dir failed");
 
     admin
@@ -905,11 +893,10 @@ async fn vend_a_fresh_starnix_test_volume_on_each_mount() {
 
     // Need to connect to the StarnixVolumeProvider protocol that fshost exposes and Mount the
     // starnix volume.
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -947,11 +934,10 @@ async fn vend_a_fresh_starnix_test_volume_on_each_mount() {
 
     // Need to connect to the StarnixVolumeProvider protocol that fshost exposes and Mount the
     // starnix volume.
-    let volume_provider = fixture
-        .realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<StarnixVolumeProviderMarker>()
-        .expect("connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol");
+    let volume_provider: StarnixVolumeProviderProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().expect(
+            "connect_to_protocol_at_exposed_dir failed for the StarnixVolumeProvider protocol",
+        );
     let (crypt, _crypt_management) = fixture.setup_starnix_crypt().await;
     let (exposed_dir_proxy, exposed_dir_server) =
         fidl::endpoints::create_proxy::<fio::DirectoryMarker>();
@@ -999,10 +985,10 @@ async fn shred_data_volume_from_recovery() {
     builder.with_zbi_ramdisk().format_volumes(volumes_spec());
     let fixture = builder.build().await;
 
-    let admin = fixture
+    let admin: AdminProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<AdminMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protcol_at_exposed_dir failed");
 
     admin
@@ -1154,11 +1140,11 @@ async fn migration_toggle() {
     let mut builder = new_builder();
     builder
         .fshost()
-        .set_config_value("data_max_bytes", DATA_MAX_BYTES)
+        .set_config_value("data_max_bytes", data_max_bytes())
         .set_config_value("use_disk_migration", true);
     builder
         .with_disk()
-        .data_volume_size(round_down(DATA_MAX_BYTES / 2, FVM_SLICE_SIZE))
+        .data_volume_size(data_max_bytes())
         .format_volumes(volumes_spec())
         .format_data(DataSpec { format: Some("minfs"), zxcrypt: true, ..Default::default() })
         .set_fs_switch("toggle");
@@ -1170,7 +1156,7 @@ async fn migration_toggle() {
     let disk = fixture.tear_down().await.unwrap();
 
     let mut builder = new_builder().with_disk_from(disk);
-    builder.fshost().set_config_value("data_max_bytes", DATA_MAX_BYTES / 2);
+    builder.fshost().set_config_value("data_max_bytes", data_max_bytes());
     let fixture = builder.build().await;
 
     fixture.check_fs_type("data", VFS_TYPE_MINFS).await;
@@ -1185,11 +1171,11 @@ async fn migration_to_fxfs() {
     let mut builder = new_builder();
     builder
         .fshost()
-        .set_config_value("data_max_bytes", DATA_MAX_BYTES / 2)
+        .set_config_value("data_max_bytes", data_max_bytes())
         .set_config_value("use_disk_migration", true);
     builder
         .with_disk()
-        .data_volume_size(round_down(DATA_MAX_BYTES / 2, FVM_SLICE_SIZE))
+        .data_volume_size(round_down(data_max_bytes(), fvm_slice_size()))
         .format_volumes(volumes_spec())
         .format_data(DataSpec { format: Some("minfs"), zxcrypt: true, ..Default::default() })
         .set_fs_switch("fxfs");
@@ -1207,11 +1193,11 @@ async fn migration_to_minfs() {
     let mut builder = new_builder();
     builder
         .fshost()
-        .set_config_value("data_max_bytes", DATA_MAX_BYTES / 2)
+        .set_config_value("data_max_bytes", data_max_bytes())
         .set_config_value("use_disk_migration", true);
     builder
         .with_disk()
-        .data_volume_size(round_down(DATA_MAX_BYTES / 2, FVM_SLICE_SIZE))
+        .data_volume_size(round_down(data_max_bytes(), fvm_slice_size()))
         .format_volumes(volumes_spec())
         .format_data(DataSpec { format: Some("fxfs"), zxcrypt: false, ..Default::default() })
         .set_fs_switch("minfs");
@@ -1229,10 +1215,10 @@ async fn health_check_blobs() {
     builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
     let fixture = builder.build().await;
 
-    let blobfs_health_check = fixture
+    let blobfs_health_check: fidl_fuchsia_update_verify::ComponentOtaHealthCheckProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_update_verify::ComponentOtaHealthCheckMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protcol_at_exposed_dir failed");
     let status = blobfs_health_check.get_health_status().await.expect("FIDL failure");
     assert_eq!(status, HealthStatus::Healthy);
@@ -1297,10 +1283,10 @@ async fn delivery_blob_support_fxblob() {
     let hash = fuchsia_merkle::from_slice(&data).root();
     let payload = Type1Blob::generate(&data, CompressionMode::Always);
 
-    let blob_creator = fixture
+    let blob_creator: BlobCreatorProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<BlobCreatorMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protocol_at_exposed_dir failed");
     let blob_writer_client_end = blob_creator
         .create(&hash.into(), false)
@@ -1315,10 +1301,10 @@ async fn delivery_blob_support_fxblob() {
     blob_writer.write(&payload).await.unwrap();
 
     // We should now be able to open the blob by its hash and read the contents back.
-    let blob_reader = fixture
+    let blob_reader: BlobReaderProxy = fixture
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<BlobReaderMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("connect_to_protocol_at_exposed_dir failed");
     let vmo = blob_reader.get_vmo(&hash.into()).await.unwrap().unwrap();
 
@@ -1433,8 +1419,8 @@ async fn reset_uninitialized_gpt() {
 
     assert_eq!(gpt_num_partitions(&fixture).await, 0);
 
-    let recovery =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::RecoveryMarker>().unwrap();
+    let recovery: fshost::RecoveryProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     recovery
         .init_system_partition_table(&[fpartitions::PartitionInfo {
             name: "part".to_string(),
@@ -1465,8 +1451,8 @@ async fn reset_initialized_gpt() {
 
     assert_eq!(gpt_num_partitions(&fixture).await, 1);
 
-    let recovery =
-        fixture.realm.root.connect_to_protocol_at_exposed_dir::<fshost::RecoveryMarker>().unwrap();
+    let recovery: fshost::RecoveryProxy =
+        fixture.realm.root.connect_to_protocol_at_exposed_dir().unwrap();
     recovery
         .init_system_partition_table(&[
             fpartitions::PartitionInfo {

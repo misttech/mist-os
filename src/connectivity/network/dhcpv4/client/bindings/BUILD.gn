@@ -13,6 +13,7 @@ network_unified_binary("dhcp_client") {
   deps = [
     "//sdk/fidl/fuchsia.net:fuchsia.net_rust",
     "//sdk/fidl/fuchsia.net.dhcp:fuchsia.net.dhcp_rust",
+    "//sdk/fidl/fuchsia.net.interfaces:fuchsia.net.interfaces_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
@@ -31,6 +32,7 @@ network_unified_binary("dhcp_client") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-sync",
     "//src/lib/network/fidl_fuchsia_net_ext",
+    "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/network/fidl_fuchsia_posix_socket_ext",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:derivative",

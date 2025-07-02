@@ -105,7 +105,7 @@ async fn report_routing_failure_to_target(target: WeakComponentInstance, err: Mo
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, not(feature = "src_model_tests")))]
 mod tests {
     use super::*;
     use crate::builtin_environment::BuiltinEnvironment;

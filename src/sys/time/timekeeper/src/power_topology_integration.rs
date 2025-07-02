@@ -61,7 +61,8 @@ where
                 .add_element(fpb::ElementSchema {
                     element_name: Some(ELEMENT_NAME.into()),
                     initial_current_level: Some(POWER_ON),
-                    valid_levels: Some(vec![POWER_ON, POWER_OFF]),
+                    // The level ordering is important, and must be increasing.
+                    valid_levels: Some(vec![POWER_OFF, POWER_ON]),
                     dependencies: Some(deps),
                     element_runner: Some(element_runner_client),
                     ..Default::default()

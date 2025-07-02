@@ -1,0 +1,56 @@
+// This configuration applies only when an SD or MMC device is connected. For the SDIO configuration
+// see sdio_power_config.json5.
+[
+    {
+        element: {
+            name: "sdmmc-hardware",
+            levels: [
+                {
+                    level: 0,
+                    name: "off",
+                    transitions: [
+                        {
+                            target_level: 1,
+                            latency_us: 100,
+                        },
+                    ],
+                },
+                {
+                    level: 2,
+                    name: "boot",
+                    transitions: [
+                        {
+                            target_level: 0,
+                            latency_us: 200,
+                        },
+                    ],
+                },
+                {
+                    level: 1,
+                    name: "on",
+                    transitions: [
+                        {
+                            target_level: 0,
+                            latency_us: 200,
+                        },
+                    ],
+                },
+            ],
+        },
+        dependencies: [
+            {
+                child: "sdmmc-hardware",
+                parent: {
+                    instance_name: "default",
+                },
+                level_deps: [
+                    {
+                        child_level: 2,
+                        parent_level: 1,
+                    },
+                ],
+                strength: "ASSERTIVE",
+            },
+        ],
+    },
+]

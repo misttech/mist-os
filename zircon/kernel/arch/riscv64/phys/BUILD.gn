@@ -61,6 +61,7 @@ if (toolchain_environment == "kernel.phys" ||
     deps = [
       ":arch-phys-info",
       ":phys",
+      "//zircon/kernel/lib/code-patching",
       "//zircon/kernel/lib/ktl",
       "//zircon/kernel/phys:handoff",
       "//zircon/kernel/phys:handoff-prep.h",

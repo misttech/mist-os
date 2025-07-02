@@ -7,8 +7,10 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 
+#include <cstdint>
 #include <ctime>
 
+#include "src/lib/fxl/strings/string_number_conversions.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
 namespace forensics {
@@ -34,6 +36,19 @@ std::optional<std::string> FormatDuration(zx::duration duration) {
   int64_t s = duration.to_secs();
 
   return fxl::StringPrintf("%03ldd%02ldh%02ldm%02lds", d, h, m, s);
+}
+
+std::optional<std::string> FormatSecondsSinceEpoch(const std::string_view seconds) {
+  const int64_t num_seconds = fxl::StringToNumber<int64_t>(seconds);
+  if (num_seconds == 0) {
+    return std::nullopt;
+  }
+
+  char buffer[64];
+
+  // Hard code the UTC offset because %z returns it without the colon, i.e. "+0000".
+  strftime(buffer, sizeof(buffer), "%Y-%m-%dT%X+00:00", std::gmtime(&num_seconds));
+  return std::string(buffer);
 }
 
 timekeeper::time_utc CurrentUtcTimeRaw(timekeeper::Clock* clock) {

@@ -30,10 +30,10 @@ use zerocopy::{FromBytes, Immutable, IntoBytes, KnownLayout};
     Ord,
     PartialEq,
     PartialOrd,
+    FromBytes,
     Immutable,
     IntoBytes,
     KnownLayout,
-    FromBytes,
 )]
 pub struct __BindgenBitfieldUnit<Storage> {
     storage: Storage,
@@ -152,7 +152,7 @@ where
     }
 }
 #[repr(transparent)]
-#[derive(Default, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Default, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct __IncompleteArrayField<T>(::std::marker::PhantomData<T>, [T; 0]);
 impl<T> __IncompleteArrayField<T> {
     #[inline]
@@ -182,7 +182,7 @@ impl<T> ::std::fmt::Debug for __IncompleteArrayField<T> {
     }
 }
 #[repr(transparent)]
-#[derive(IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct __BindgenUnionField<T>(::std::marker::PhantomData<T>);
 impl<T> __BindgenUnionField<T> {
     #[inline]
@@ -718,6 +718,7 @@ pub const IOCB_FLAG_RESFD: u32 = 1;
 pub const IOCB_FLAG_IOPRIO: u32 = 2;
 pub const B_TYPE_LARGE: u32 = 133;
 pub const BINDER_CURRENT_PROTOCOL_VERSION: u32 = 8;
+pub const BINDERFS_MAX_NAME: u32 = 255;
 pub const ASHMEM_NAME_LEN: u32 = 256;
 pub const ASHMEM_NAME_DEF: &'static std::ffi::CStr = c"dev/ashmem";
 pub const ASHMEM_NOT_PURGED: u32 = 0;
@@ -5091,6 +5092,11 @@ pub const TIOCM_RI: u32 = 128;
 pub const TIOCM_OUT1: u32 = 8192;
 pub const TIOCM_OUT2: u32 = 16384;
 pub const TIOCM_LOOP: u32 = 32768;
+pub const THERMAL_NAME_LENGTH: u32 = 20;
+pub const THERMAL_GENL_FAMILY_NAME: &'static std::ffi::CStr = c"thermal";
+pub const THERMAL_GENL_VERSION: u32 = 1;
+pub const THERMAL_GENL_SAMPLING_GROUP_NAME: &'static std::ffi::CStr = c"sampling";
+pub const THERMAL_GENL_EVENT_GROUP_NAME: &'static std::ffi::CStr = c"event";
 pub const TFD_TIMER_ABSTIME: u32 = 1;
 pub const TFD_TIMER_CANCEL_ON_SET: u32 = 2;
 pub const TFD_CLOEXEC: u32 = 524288;
@@ -5911,7 +5917,7 @@ pub const XATTR_NAME_POSIX_ACL_DEFAULT: &'static std::ffi::CStr = c"system.posix
 pub const __KERNEL__: u32 = 1;
 pub const __HAS_KERNEL__: u32 = 0;
 pub const FUSE_KERNEL_VERSION: u32 = 7;
-pub const FUSE_KERNEL_MINOR_VERSION: u32 = 36;
+pub const FUSE_KERNEL_MINOR_VERSION: u32 = 40;
 pub const FUSE_ROOT_ID: u32 = 1;
 pub const FATTR_MODE: u32 = 1;
 pub const FATTR_UID: u32 = 2;
@@ -5931,6 +5937,8 @@ pub const FOPEN_NONSEEKABLE: u32 = 4;
 pub const FOPEN_CACHE_DIR: u32 = 8;
 pub const FOPEN_STREAM: u32 = 16;
 pub const FOPEN_NOFLUSH: u32 = 32;
+pub const FOPEN_PARALLEL_DIRECT_WRITES: u32 = 64;
+pub const FOPEN_PASSTHROUGH: u32 = 128;
 pub const FUSE_ASYNC_READ: u32 = 1;
 pub const FUSE_POSIX_LOCKS: u32 = 2;
 pub const FUSE_FILE_OPS: u32 = 4;
@@ -5965,6 +5973,11 @@ pub const FUSE_INIT_EXT: u32 = 1073741824;
 pub const FUSE_INIT_RESERVED: u32 = 2147483648;
 pub const FUSE_SECURITY_CTX: u64 = 4294967296;
 pub const FUSE_HAS_INODE_DAX: u64 = 8589934592;
+pub const FUSE_CREATE_SUPP_GROUP: u64 = 17179869184;
+pub const FUSE_HAS_EXPIRE_ONLY: u64 = 34359738368;
+pub const FUSE_DIRECT_IO_ALLOW_MMAP: u64 = 68719476736;
+pub const FUSE_PASSTHROUGH_UPSTREAM: u64 = 137438953472;
+pub const FUSE_DIRECT_IO_RELAX: u64 = 68719476736;
 pub const FUSE_PASSTHROUGH: i64 = -9223372036854775808;
 pub const CUSE_UNRESTRICTED_IOCTL: u32 = 1;
 pub const FUSE_RELEASE_FLUSH: u32 = 1;
@@ -5989,6 +6002,7 @@ pub const FUSE_ATTR_SUBMOUNT: u32 = 1;
 pub const FUSE_ATTR_DAX: u32 = 2;
 pub const FUSE_OPEN_KILL_SUIDGID: u32 = 1;
 pub const FUSE_SETXATTR_ACL_KILL_SGID: u32 = 1;
+pub const FUSE_EXPIRE_ONLY: u32 = 1;
 pub const FUSE_MIN_READ_BUFFER: u32 = 8192;
 pub const FUSE_COMPAT_ENTRY_OUT_SIZE: u32 = 120;
 pub const FUSE_ACTION_KEEP: u32 = 0;
@@ -6354,7 +6368,7 @@ pub type __kernel_gid16_t = crate::types::arch32::c_ushort;
 pub type socklen_t = u32;
 #[repr(C)]
 #[derive(
-    Debug, Default, Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable, Eq, PartialEq,
+    Debug, Default, Copy, Clone, Eq, FromBytes, Immutable, IntoBytes, KnownLayout, PartialEq,
 )]
 pub struct ucred {
     pub pid: __kernel_pid_t,
@@ -6383,7 +6397,7 @@ impl Default for msghdr {
 }
 #[repr(C)]
 #[derive(
-    Debug, Default, Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable, Eq, PartialEq,
+    Debug, Default, Copy, Clone, Eq, FromBytes, Immutable, IntoBytes, KnownLayout, PartialEq,
 )]
 pub struct cmsghdr {
     pub cmsg_len: size_t,
@@ -6442,7 +6456,7 @@ pub type __sighandler_t = __signalfn_t;
 pub type __restorefn_t = crate::uaddr32;
 pub type __sigrestore_t = __restorefn_t;
 #[repr(C)]
-#[derive(Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct __kernel_sigaction {
     pub sa_handler: __sighandler_t,
     pub sa_mask: sigset_t,
@@ -6450,7 +6464,7 @@ pub struct __kernel_sigaction {
     pub sa_restorer: crate::uaddr32,
 }
 #[repr(C)]
-#[derive(Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub union __kernel_sigaction__bindgen_ty_1 {
     pub _sa_handler: __sighandler_t,
     pub _sa_sigaction: crate::uaddr32,
@@ -6764,7 +6778,7 @@ pub struct fscrypt_provisioning_key_payload {
     pub raw: __IncompleteArrayField<__u8>,
 }
 #[repr(C)]
-#[derive(KnownLayout, FromBytes, Immutable)]
+#[derive(FromBytes, Immutable, KnownLayout)]
 pub struct fscrypt_remove_key_arg {
     pub key_spec: fscrypt_key_specifier,
     pub removal_status_flags: __u32,
@@ -7049,7 +7063,7 @@ pub struct binder_object_header {
     pub type_: __u32,
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct flat_binder_object {
     pub hdr: binder_object_header,
     pub flags: __u32,
@@ -7057,7 +7071,7 @@ pub struct flat_binder_object {
     pub cookie: binder_uintptr_t,
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub union flat_binder_object__bindgen_ty_1 {
     pub binder: binder_uintptr_t,
     pub handle: __u32,
@@ -7217,7 +7231,7 @@ pub const transaction_flags_TF_CLEAR_BUF: transaction_flags = 32;
 pub const transaction_flags_TF_UPDATE_TXN: transaction_flags = 64;
 pub type transaction_flags = crate::types::arch32::c_uint;
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct binder_transaction_data {
     pub target: binder_transaction_data__bindgen_ty_1,
     pub cookie: binder_uintptr_t,
@@ -7230,7 +7244,7 @@ pub struct binder_transaction_data {
     pub data: binder_transaction_data__bindgen_ty_2,
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub union binder_transaction_data__bindgen_ty_1 {
     pub handle: __u32,
     pub ptr: binder_uintptr_t,
@@ -7245,13 +7259,13 @@ impl Default for binder_transaction_data__bindgen_ty_1 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub union binder_transaction_data__bindgen_ty_2 {
     pub ptr: binder_transaction_data__bindgen_ty_2__bindgen_ty_1,
     pub buf: [__u8; 8usize],
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct binder_transaction_data__bindgen_ty_2__bindgen_ty_1 {
     pub buffer: binder_uintptr_t,
     pub offsets: binder_uintptr_t,
@@ -7275,7 +7289,7 @@ impl Default for binder_transaction_data {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct binder_transaction_data_secctx {
     pub transaction_data: binder_transaction_data,
     pub secctx: binder_uintptr_t,
@@ -7290,7 +7304,7 @@ impl Default for binder_transaction_data_secctx {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct binder_transaction_data_sg {
     pub transaction_data: binder_transaction_data,
     pub buffers_size: binder_size_t,
@@ -7400,6 +7414,22 @@ pub const binder_driver_command_protocol_BC_CLEAR_FREEZE_NOTIFICATION:
 pub const binder_driver_command_protocol_BC_FREEZE_NOTIFICATION_DONE:
     binder_driver_command_protocol = 1074291477;
 pub type binder_driver_command_protocol = crate::types::arch32::c_uint;
+#[repr(C)]
+#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct binderfs_device {
+    pub name: [crate::types::arch32::c_char; 256usize],
+    pub major: __u32,
+    pub minor: __u32,
+}
+impl Default for binderfs_device {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct ashmem_pin {
@@ -7577,7 +7607,7 @@ pub struct dm_target_deps {
     pub dev: __IncompleteArrayField<__u64>,
 }
 #[repr(C)]
-#[derive(Debug, Default, KnownLayout, IntoBytes, Immutable, FromBytes)]
+#[derive(Debug, Default, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct dm_name_list {
     pub dev: __u64,
     pub next: __u32,
@@ -7585,7 +7615,7 @@ pub struct dm_name_list {
     pub __bindgen_padding_0: [u8; 4usize],
 }
 #[repr(C)]
-#[derive(Debug, Default, KnownLayout, IntoBytes, Immutable, FromBytes)]
+#[derive(Debug, Default, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct dm_target_versions {
     pub next: __u32,
     pub version: [__u32; 3usize],
@@ -9473,7 +9503,7 @@ pub struct sock_filter {
     pub k: __u32,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct sock_fprog {
     pub len: crate::types::arch32::c_ushort,
     pub __bindgen_padding_0: [u8; 2usize],
@@ -9502,7 +9532,7 @@ pub struct fsverity_enable_arg {
     pub __reserved2: [__u64; 11usize],
 }
 #[repr(C)]
-#[derive(Debug, Default, KnownLayout, Clone, IntoBytes, Immutable, FromBytes)]
+#[derive(Debug, Default, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct fsverity_digest {
     pub digest_algorithm: __u16,
     pub digest_size: __u16,
@@ -9556,7 +9586,7 @@ pub struct futex_waitv {
     pub __reserved: __u32,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct robust_list {
     pub next: crate::uref32<robust_list>,
 }
@@ -9570,7 +9600,7 @@ impl Default for robust_list {
     }
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct robust_list_head {
     pub list: robust_list,
     pub futex_offset: crate::types::arch32::c_long,
@@ -9691,14 +9721,14 @@ pub struct ifmap {
     pub __bindgen_padding_0: [u8; 3usize],
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct if_settings {
     pub type_: crate::types::arch32::c_uint,
     pub size: crate::types::arch32::c_uint,
     pub ifs_ifsu: if_settings__bindgen_ty_1,
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub union if_settings__bindgen_ty_1 {
     pub raw_hdlc: crate::uref32<raw_hdlc_proto>,
     pub cisco: crate::uref32<cisco_proto>,
@@ -9728,13 +9758,13 @@ impl Default for if_settings {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct ifreq {
     pub ifr_ifrn: ifreq__bindgen_ty_1,
     pub ifr_ifru: ifreq__bindgen_ty_2,
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub union ifreq__bindgen_ty_1 {
     pub ifrn_name: [crate::types::arch32::c_char; 16usize],
 }
@@ -9748,7 +9778,7 @@ impl Default for ifreq__bindgen_ty_1 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub union ifreq__bindgen_ty_2 {
     pub ifru_addr: sockaddr,
     pub ifru_dstaddr: sockaddr,
@@ -9827,7 +9857,7 @@ pub struct sockaddr_pkt {
     pub spkt_protocol: __be16,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct sockaddr_ll {
     pub sll_family: crate::types::arch32::c_ushort,
     pub sll_protocol: __be16,
@@ -10134,7 +10164,7 @@ pub struct tun_filter {
     pub addr: __IncompleteArrayField<[__u8; 6usize]>,
 }
 #[repr(C)]
-#[derive(Debug, Default, KnownLayout, IntoBytes, Immutable)]
+#[derive(Debug, Default, Immutable, IntoBytes, KnownLayout)]
 pub struct inotify_event {
     pub wd: __s32,
     pub mask: __u32,
@@ -10173,7 +10203,7 @@ pub struct __kernel_sock_timeval {
     pub tv_usec: __s64,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout, PartialEq)]
 pub struct timeval {
     pub tv_sec: __kernel_old_time_t,
     pub tv_usec: __kernel_suseconds_t,
@@ -10197,7 +10227,7 @@ pub struct timezone {
     pub tz_dsttime: crate::types::arch32::c_int,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout, PartialEq)]
 pub struct input_event {
     pub time: timeval,
     pub type_: __u16,
@@ -10205,7 +10235,7 @@ pub struct input_event {
     pub value: __s32,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable, PartialEq)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout, PartialEq)]
 pub struct input_id {
     pub bustype: __u16,
     pub vendor: __u16,
@@ -11097,12 +11127,12 @@ pub const IPV4_DEVCONF_ARP_EVICT_NOCARRIER: _bindgen_ty_81 = 33;
 pub const __IPV4_DEVCONF_MAX: _bindgen_ty_81 = 34;
 pub type _bindgen_ty_81 = crate::types::arch32::c_uint;
 #[repr(C)]
-#[derive(Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct in6_addr {
     pub in6_u: in6_addr__bindgen_ty_1,
 }
 #[repr(C)]
-#[derive(Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub union in6_addr__bindgen_ty_1 {
     pub u6_addr8: [__u8; 16usize],
     pub u6_addr16: [__be16; 8usize],
@@ -11127,7 +11157,7 @@ impl Default for in6_addr {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct sockaddr_in6 {
     pub sin6_family: crate::types::arch32::c_ushort,
     pub sin6_port: __be16,
@@ -11181,7 +11211,7 @@ impl Default for in6_flowlabel_req {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct in6_pktinfo {
     pub ipi6_addr: in6_addr,
     pub ipi6_ifindex: crate::types::arch32::c_int,
@@ -11771,7 +11801,7 @@ pub struct in_pktinfo {
     pub ipi_addr: in_addr,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct sockaddr_in {
     pub sin_family: __kernel_sa_family_t,
     pub sin_port: __be16,
@@ -11801,7 +11831,7 @@ pub const NFPROTO_DECNET: _bindgen_ty_85 = 12;
 pub const NFPROTO_NUMPROTO: _bindgen_ty_85 = 13;
 pub type _bindgen_ty_85 = crate::types::arch32::c_uint;
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub union nf_inet_addr {
     pub all: [__u32; 4usize],
     pub ip: __be32,
@@ -11886,7 +11916,7 @@ pub const ip_conntrack_dir_IP_CT_DIR_REPLY: ip_conntrack_dir = 1;
 pub const ip_conntrack_dir_IP_CT_DIR_MAX: ip_conntrack_dir = 2;
 pub type ip_conntrack_dir = crate::types::arch32::c_uint;
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub union nf_conntrack_man_proto {
     pub all: __be16,
     pub tcp: nf_conntrack_man_proto__bindgen_ty_1,
@@ -11897,32 +11927,32 @@ pub union nf_conntrack_man_proto {
     pub gre: nf_conntrack_man_proto__bindgen_ty_6,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct nf_conntrack_man_proto__bindgen_ty_1 {
     pub port: __be16,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct nf_conntrack_man_proto__bindgen_ty_2 {
     pub port: __be16,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct nf_conntrack_man_proto__bindgen_ty_3 {
     pub id: __be16,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct nf_conntrack_man_proto__bindgen_ty_4 {
     pub port: __be16,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct nf_conntrack_man_proto__bindgen_ty_5 {
     pub port: __be16,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct nf_conntrack_man_proto__bindgen_ty_6 {
     pub key: __be16,
 }
@@ -11936,7 +11966,7 @@ impl Default for nf_conntrack_man_proto {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct nf_nat_ipv4_range {
     pub flags: crate::types::arch32::c_uint,
     pub min_ip: __be32,
@@ -11954,7 +11984,7 @@ impl Default for nf_nat_ipv4_range {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct nf_nat_ipv4_multi_range_compat {
     pub rangesize: crate::types::arch32::c_uint,
     pub range: [nf_nat_ipv4_range; 1usize],
@@ -11969,7 +11999,7 @@ impl Default for nf_nat_ipv4_multi_range_compat {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct nf_nat_range {
     pub flags: crate::types::arch32::c_uint,
     pub min_addr: nf_inet_addr,
@@ -11987,7 +12017,7 @@ impl Default for nf_nat_range {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct nf_nat_range2 {
     pub flags: crate::types::arch32::c_uint,
     pub min_addr: nf_inet_addr,
@@ -12016,7 +12046,7 @@ pub struct xt_tproxy_target_info {
     pub __bindgen_padding_0: [u8; 2usize],
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct xt_tproxy_target_info_v1 {
     pub mark_mask: __u32,
     pub mark_value: __u32,
@@ -12220,7 +12250,7 @@ pub struct xt_counters {
     pub bcnt: __u64,
 }
 #[repr(C)]
-#[derive(Debug, Default, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Default, FromBytes, Immutable, KnownLayout)]
 pub struct xt_counters_info {
     pub name: [crate::types::arch32::c_char; 32usize],
     pub num_counters: crate::types::arch32::c_uint,
@@ -12261,7 +12291,7 @@ pub struct ipt_ip {
     pub invflags: __u8,
 }
 #[repr(C)]
-#[derive(Debug, Default, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Debug, Default, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct ipt_entry {
     pub ip: ipt_ip,
     pub nfcache: crate::types::arch32::c_uint,
@@ -12289,7 +12319,7 @@ pub struct ipt_getinfo {
     pub size: crate::types::arch32::c_uint,
 }
 #[repr(C)]
-#[derive(Debug, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Debug, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct ipt_replace {
     pub name: [crate::types::arch32::c_char; 32usize],
     pub valid_hooks: crate::types::arch32::c_uint,
@@ -12312,7 +12342,7 @@ impl Default for ipt_replace {
     }
 }
 #[repr(C)]
-#[derive(Debug, Default, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Default, FromBytes, Immutable, KnownLayout)]
 pub struct ipt_get_entries {
     pub name: [crate::types::arch32::c_char; 32usize],
     pub size: crate::types::arch32::c_uint,
@@ -12335,7 +12365,7 @@ pub const nf_ip6_hook_priorities_NF_IP6_PRI_CONNTRACK_HELPER: nf_ip6_hook_priori
 pub const nf_ip6_hook_priorities_NF_IP6_PRI_LAST: nf_ip6_hook_priorities = 2147483647;
 pub type nf_ip6_hook_priorities = crate::types::arch32::c_int;
 #[repr(C)]
-#[derive(Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct ip6t_ip6 {
     pub src: in6_addr,
     pub dst: in6_addr,
@@ -12361,7 +12391,7 @@ impl Default for ip6t_ip6 {
     }
 }
 #[repr(C)]
-#[derive(IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct ip6t_entry {
     pub ipv6: ip6t_ip6,
     pub nfcache: crate::types::arch32::c_uint,
@@ -12428,7 +12458,7 @@ pub struct ip6t_getinfo {
     pub size: crate::types::arch32::c_uint,
 }
 #[repr(C)]
-#[derive(IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct ip6t_replace {
     pub name: [crate::types::arch32::c_char; 32usize],
     pub valid_hooks: crate::types::arch32::c_uint,
@@ -12451,7 +12481,7 @@ impl Default for ip6t_replace {
     }
 }
 #[repr(C)]
-#[derive(KnownLayout, FromBytes, Immutable)]
+#[derive(FromBytes, Immutable, KnownLayout)]
 pub struct ip6t_get_entries {
     pub name: [crate::types::arch32::c_char; 32usize],
     pub size: crate::types::arch32::c_uint,
@@ -15992,7 +16022,7 @@ pub struct seccomp_notif_addfd {
 }
 #[repr(C)]
 #[repr(align(4))]
-#[derive(Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub union sigval {
     pub _bindgen_opaque_blob: u32,
 }
@@ -16024,7 +16054,7 @@ pub struct __sifields__bindgen_ty_1 {
     pub _uid: __kernel_uid32_t,
 }
 #[repr(C)]
-#[derive(Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Default, Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct __sifields__bindgen_ty_2 {
     pub _tid: __kernel_timer_t,
     pub _overrun: crate::types::arch32::c_int,
@@ -16032,7 +16062,7 @@ pub struct __sifields__bindgen_ty_2 {
     pub _sys_private: crate::types::arch32::c_int,
 }
 #[repr(C)]
-#[derive(Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Default, Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct __sifields__bindgen_ty_3 {
     pub _pid: __kernel_pid_t,
     pub _uid: __kernel_uid32_t,
@@ -16116,7 +16146,7 @@ pub struct __sifields__bindgen_ty_6 {
     pub _fd: crate::types::arch32::c_int,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Debug, Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct __sifields__bindgen_ty_7 {
     pub _call_addr: crate::uaddr32,
     pub _syscall: crate::types::arch32::c_int,
@@ -16188,7 +16218,7 @@ impl Default for siginfo {
 }
 pub type siginfo_t = siginfo;
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct sigevent {
     pub sigev_value: sigval_t,
     pub sigev_signo: crate::types::arch32::c_int,
@@ -16196,14 +16226,14 @@ pub struct sigevent {
     pub _sigev_un: sigevent__bindgen_ty_1,
 }
 #[repr(C)]
-#[derive(Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub union sigevent__bindgen_ty_1 {
     pub _pad: [crate::types::arch32::c_int; 13usize],
     pub _tid: crate::types::arch32::c_int,
     pub _sigev_thread: sigevent__bindgen_ty_1__bindgen_ty_1,
 }
 #[repr(C)]
-#[derive(Debug, Copy, Clone, KnownLayout, FromBytes, Immutable)]
+#[derive(Debug, Copy, Clone, FromBytes, Immutable, KnownLayout)]
 pub struct sigevent__bindgen_ty_1__bindgen_ty_1 {
     pub _function: crate::uaddr32,
     pub _attribute: crate::uaddr32,
@@ -16337,7 +16367,7 @@ pub struct sync_set_deadline {
     pub pad: __u64,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, KnownLayout, IntoBytes, Immutable)]
+#[derive(Debug, Default, Copy, Clone, Immutable, IntoBytes, KnownLayout)]
 pub struct sysinfo {
     pub uptime: __kernel_long_t,
     pub loads: [__kernel_ulong_t; 3usize],
@@ -16496,6 +16526,69 @@ pub struct termio {
     pub c_cc: [crate::types::arch32::c_uchar; 8usize],
     pub __bindgen_padding_0: u8,
 }
+pub const thermal_device_mode_THERMAL_DEVICE_DISABLED: thermal_device_mode = 0;
+pub const thermal_device_mode_THERMAL_DEVICE_ENABLED: thermal_device_mode = 1;
+pub type thermal_device_mode = crate::types::arch32::c_uint;
+pub const thermal_trip_type_THERMAL_TRIP_ACTIVE: thermal_trip_type = 0;
+pub const thermal_trip_type_THERMAL_TRIP_PASSIVE: thermal_trip_type = 1;
+pub const thermal_trip_type_THERMAL_TRIP_HOT: thermal_trip_type = 2;
+pub const thermal_trip_type_THERMAL_TRIP_CRITICAL: thermal_trip_type = 3;
+pub type thermal_trip_type = crate::types::arch32::c_uint;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_UNSPEC: thermal_genl_attr = 0;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_TZ: thermal_genl_attr = 1;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_TZ_ID: thermal_genl_attr = 2;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_TZ_TEMP: thermal_genl_attr = 3;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_TZ_TRIP: thermal_genl_attr = 4;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_TZ_TRIP_ID: thermal_genl_attr = 5;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_TZ_TRIP_TYPE: thermal_genl_attr = 6;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_TZ_TRIP_TEMP: thermal_genl_attr = 7;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_TZ_TRIP_HYST: thermal_genl_attr = 8;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_TZ_MODE: thermal_genl_attr = 9;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_TZ_NAME: thermal_genl_attr = 10;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_TZ_CDEV_WEIGHT: thermal_genl_attr = 11;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_TZ_GOV: thermal_genl_attr = 12;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_TZ_GOV_NAME: thermal_genl_attr = 13;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_CDEV: thermal_genl_attr = 14;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_CDEV_ID: thermal_genl_attr = 15;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_CDEV_CUR_STATE: thermal_genl_attr = 16;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_CDEV_MAX_STATE: thermal_genl_attr = 17;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_CDEV_NAME: thermal_genl_attr = 18;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_GOV_NAME: thermal_genl_attr = 19;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_CPU_CAPABILITY: thermal_genl_attr = 20;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_CPU_CAPABILITY_ID: thermal_genl_attr = 21;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_CPU_CAPABILITY_PERFORMANCE: thermal_genl_attr = 22;
+pub const thermal_genl_attr_THERMAL_GENL_ATTR_CPU_CAPABILITY_EFFICIENCY: thermal_genl_attr = 23;
+pub const thermal_genl_attr___THERMAL_GENL_ATTR_MAX: thermal_genl_attr = 24;
+pub type thermal_genl_attr = crate::types::arch32::c_uint;
+pub const thermal_genl_sampling_THERMAL_GENL_SAMPLING_TEMP: thermal_genl_sampling = 0;
+pub const thermal_genl_sampling___THERMAL_GENL_SAMPLING_MAX: thermal_genl_sampling = 1;
+pub type thermal_genl_sampling = crate::types::arch32::c_uint;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_UNSPEC: thermal_genl_event = 0;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_TZ_CREATE: thermal_genl_event = 1;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_TZ_DELETE: thermal_genl_event = 2;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_TZ_DISABLE: thermal_genl_event = 3;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_TZ_ENABLE: thermal_genl_event = 4;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_TZ_TRIP_UP: thermal_genl_event = 5;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_TZ_TRIP_DOWN: thermal_genl_event = 6;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_TZ_TRIP_CHANGE: thermal_genl_event = 7;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_TZ_TRIP_ADD: thermal_genl_event = 8;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_TZ_TRIP_DELETE: thermal_genl_event = 9;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_CDEV_ADD: thermal_genl_event = 10;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_CDEV_DELETE: thermal_genl_event = 11;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_CDEV_STATE_UPDATE: thermal_genl_event = 12;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_TZ_GOV_CHANGE: thermal_genl_event = 13;
+pub const thermal_genl_event_THERMAL_GENL_EVENT_CPU_CAPABILITY_CHANGE: thermal_genl_event = 14;
+pub const thermal_genl_event___THERMAL_GENL_EVENT_MAX: thermal_genl_event = 15;
+pub type thermal_genl_event = crate::types::arch32::c_uint;
+pub const thermal_genl_cmd_THERMAL_GENL_CMD_UNSPEC: thermal_genl_cmd = 0;
+pub const thermal_genl_cmd_THERMAL_GENL_CMD_TZ_GET_ID: thermal_genl_cmd = 1;
+pub const thermal_genl_cmd_THERMAL_GENL_CMD_TZ_GET_TRIP: thermal_genl_cmd = 2;
+pub const thermal_genl_cmd_THERMAL_GENL_CMD_TZ_GET_TEMP: thermal_genl_cmd = 3;
+pub const thermal_genl_cmd_THERMAL_GENL_CMD_TZ_GET_GOV: thermal_genl_cmd = 4;
+pub const thermal_genl_cmd_THERMAL_GENL_CMD_TZ_GET_MODE: thermal_genl_cmd = 5;
+pub const thermal_genl_cmd_THERMAL_GENL_CMD_CDEV_GET: thermal_genl_cmd = 6;
+pub const thermal_genl_cmd___THERMAL_GENL_CMD_MAX: thermal_genl_cmd = 7;
+pub type thermal_genl_cmd = crate::types::arch32::c_uint;
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct tms {
@@ -17239,14 +17332,14 @@ pub const usb_functionfs_event_type_FUNCTIONFS_SUSPEND: usb_functionfs_event_typ
 pub const usb_functionfs_event_type_FUNCTIONFS_RESUME: usb_functionfs_event_type = 6;
 pub type usb_functionfs_event_type = crate::types::arch32::c_uint;
 #[repr(C, packed)]
-#[derive(Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct usb_functionfs_event {
     pub u: usb_functionfs_event__bindgen_ty_1,
     pub type_: __u8,
     pub _pad: [__u8; 3usize],
 }
 #[repr(C, packed)]
-#[derive(Copy, Clone, KnownLayout, IntoBytes, FromBytes, Immutable)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub union usb_functionfs_event__bindgen_ty_1 {
     pub setup: usb_ctrlrequest,
 }
@@ -17503,6 +17596,38 @@ pub struct fuse_attr {
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_sx_time {
+    pub tv_sec: i64,
+    pub tv_nsec: u32,
+    pub __reserved: i32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_statx {
+    pub mask: u32,
+    pub blksize: u32,
+    pub attributes: u64,
+    pub nlink: u32,
+    pub uid: u32,
+    pub gid: u32,
+    pub mode: u16,
+    pub __spare0: [u16; 1usize],
+    pub ino: u64,
+    pub size: u64,
+    pub blocks: u64,
+    pub attributes_mask: u64,
+    pub atime: fuse_sx_time,
+    pub btime: fuse_sx_time,
+    pub ctime: fuse_sx_time,
+    pub mtime: fuse_sx_time,
+    pub rdev_major: u32,
+    pub rdev_minor: u32,
+    pub dev_major: u32,
+    pub dev_minor: u32,
+    pub __spare2: [u64; 14usize],
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
 pub struct fuse_kstatfs {
     pub blocks: u64,
     pub bfree: u64,
@@ -17523,6 +17648,10 @@ pub struct fuse_file_lock {
     pub type_: u32,
     pub pid: u32,
 }
+pub const fuse_ext_type_FUSE_MAX_NR_SECCTX: fuse_ext_type = 31;
+pub const fuse_ext_type_FUSE_EXT_GROUPS: fuse_ext_type = 32;
+#[doc = " extension type\n FUSE_MAX_NR_SECCTX: maximum value of &fuse_secctx_header.nr_secctx\n FUSE_EXT_GROUPS: &fuse_supp_groups extension"]
+pub type fuse_ext_type = crate::types::arch32::c_uint;
 pub const fuse_opcode_FUSE_LOOKUP: fuse_opcode = 1;
 pub const fuse_opcode_FUSE_FORGET: fuse_opcode = 2;
 pub const fuse_opcode_FUSE_GETATTR: fuse_opcode = 3;
@@ -17571,6 +17700,8 @@ pub const fuse_opcode_FUSE_COPY_FILE_RANGE: fuse_opcode = 47;
 pub const fuse_opcode_FUSE_SETUPMAPPING: fuse_opcode = 48;
 pub const fuse_opcode_FUSE_REMOVEMAPPING: fuse_opcode = 49;
 pub const fuse_opcode_FUSE_SYNCFS: fuse_opcode = 50;
+pub const fuse_opcode_FUSE_TMPFILE: fuse_opcode = 51;
+pub const fuse_opcode_FUSE_STATX: fuse_opcode = 52;
 pub const fuse_opcode_FUSE_CANONICAL_PATH: fuse_opcode = 2016;
 pub const fuse_opcode_CUSE_INIT: fuse_opcode = 4096;
 pub const fuse_opcode_CUSE_INIT_BSWAP_RESERVED: fuse_opcode = 1048576;
@@ -17634,6 +17765,24 @@ pub struct fuse_attr_out {
     pub attr_valid_nsec: u32,
     pub dummy: u32,
     pub attr: fuse_attr,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_statx_in {
+    pub getattr_flags: u32,
+    pub reserved: u32,
+    pub fh: u64,
+    pub sx_flags: u32,
+    pub sx_mask: u32,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_statx_out {
+    pub attr_valid: u64,
+    pub attr_valid_nsec: u32,
+    pub flags: u32,
+    pub spare: [u64; 2usize],
+    pub stat: fuse_statx,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
@@ -17701,11 +17850,35 @@ pub struct fuse_create_in {
     pub open_flags: u32,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Copy, Clone, Debug, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct fuse_open_out {
     pub fh: u64,
     pub open_flags: u32,
+    pub __bindgen_anon_1: fuse_open_out__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
+pub union fuse_open_out__bindgen_ty_1 {
     pub passthrough_fh: u32,
+    pub backing_id: i32,
+}
+impl Default for fuse_open_out__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for fuse_open_out {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
@@ -17850,7 +18023,8 @@ pub struct fuse_init_out {
     pub max_pages: u16,
     pub map_alignment: u16,
     pub flags2: u32,
-    pub unused: [u32; 7usize],
+    pub max_stack_depth: u32,
+    pub unused: [u32; 6usize],
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
@@ -17943,7 +18117,7 @@ pub struct fuse_fallocate_in {
     pub padding: u32,
 }
 #[repr(C)]
-#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+#[derive(Copy, Clone, Debug, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct fuse_in_header {
     pub len: u32,
     pub opcode: u32,
@@ -17952,7 +18126,37 @@ pub struct fuse_in_header {
     pub uid: u32,
     pub gid: u32,
     pub pid: u32,
+    pub __bindgen_anon_1: fuse_in_header__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
+pub union fuse_in_header__bindgen_ty_1 {
     pub error_in: u32,
+    pub __bindgen_anon_1: fuse_in_header__bindgen_ty_1__bindgen_ty_1,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
+pub struct fuse_in_header__bindgen_ty_1__bindgen_ty_1 {
+    pub total_extlen: u16,
+    pub padding: u16,
+}
+impl Default for fuse_in_header__bindgen_ty_1 {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
+}
+impl Default for fuse_in_header {
+    fn default() -> Self {
+        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
+        unsafe {
+            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
+            s.assume_init()
+        }
+    }
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
@@ -17962,7 +18166,7 @@ pub struct fuse_out_header {
     pub unique: u64,
 }
 #[repr(C)]
-#[derive(Debug, Default, KnownLayout, Clone, IntoBytes, FromBytes, Immutable)]
+#[derive(Debug, Default, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct fuse_dirent {
     pub ino: u64,
     pub off: u64,
@@ -17971,7 +18175,7 @@ pub struct fuse_dirent {
     pub name: __IncompleteArrayField<crate::types::arch32::c_char>,
 }
 #[repr(C)]
-#[derive(Debug, Default, KnownLayout, Clone, IntoBytes, FromBytes, Immutable)]
+#[derive(Debug, Default, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct fuse_direntplus {
     pub entry_out: fuse_entry_out,
     pub dirent: fuse_dirent,
@@ -17988,7 +18192,7 @@ pub struct fuse_notify_inval_inode_out {
 pub struct fuse_notify_inval_entry_out {
     pub parent: u64,
     pub namelen: u32,
-    pub padding: u32,
+    pub flags: u32,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
@@ -18024,6 +18228,13 @@ pub struct fuse_notify_retrieve_in {
     pub dummy2: u32,
     pub dummy3: u64,
     pub dummy4: u64,
+}
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_backing_map {
+    pub fd: i32,
+    pub flags: u32,
+    pub padding: u64,
 }
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
@@ -18085,6 +18296,20 @@ pub struct fuse_secctx {
 pub struct fuse_secctx_header {
     pub size: u32,
     pub nr_secctx: u32,
+}
+#[doc = " struct fuse_ext_header - extension header\n @size: total size of this extension including this header\n @type: type of extension\n\n This is made compatible with fuse_secctx_header by using type values >\n FUSE_MAX_NR_SECCTX"]
+#[repr(C)]
+#[derive(Debug, Default, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
+pub struct fuse_ext_header {
+    pub size: u32,
+    pub type_: u32,
+}
+#[doc = " struct fuse_supp_groups - Supplementary group extension\n @nr_groups: number of supplementary groups\n @groups: flexible array of group IDs"]
+#[repr(C)]
+#[derive(Debug, Default)]
+pub struct fuse_supp_groups {
+    pub nr_groups: u32,
+    pub groups: __IncompleteArrayField<u32>,
 }
 #[repr(C)]
 #[derive(Debug, Copy, Clone, IntoBytes, FromBytes, KnownLayout, Immutable)]
@@ -19225,6 +19450,7 @@ pub struct remote_binder_wait_command {
 }
 pub const REMOTE_BINDER_START: __u32 = 2147766785;
 pub const REMOTE_BINDER_WAIT: __u32 = 1073828354;
+pub const BINDER_CTL_ADD: __u32 = 3238552065;
 pub const FIBMAP: __u32 = 1;
 pub const FIGETBSZ: __u32 = 2;
 pub const FS_IOC_GETVERSION: __u32 = 2147776001;

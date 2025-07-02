@@ -77,6 +77,31 @@ struct rapl_units {
   uint32_t energy_uj;
 };
 
+bool LimitReasonSupported() {
+  // Limit reason MSR is supported on Intel Core generations 6 through 11, Intel Xeon generations
+  // 1 through 3, Intel Core i3 8th generation, and Intel Xeon E processors. See Intel Volume 4
+  // Table 2-39.
+  auto x86_microarch = x86_get_microarch_config()->x86_microarch;
+  if ((x86_microarch != X86_MICROARCH_INTEL_SKYLAKE) &&
+      (x86_microarch != X86_MICROARCH_INTEL_CANNONLAKE) &&
+      (x86_microarch != X86_MICROARCH_INTEL_TIGERLAKE)) {
+    return false;
+  }
+  return true;
+}
+
+bool PowerLimitSuported() {
+  auto x86_microarch = x86_get_microarch_config()->x86_microarch;
+  if ((x86_microarch != X86_MICROARCH_INTEL_SANDY_BRIDGE) &&
+      (x86_microarch != X86_MICROARCH_INTEL_SILVERMONT) &&
+      (x86_microarch != X86_MICROARCH_INTEL_BROADWELL) &&
+      (x86_microarch != X86_MICROARCH_INTEL_HASWELL) &&
+      (x86_microarch != X86_MICROARCH_INTEL_SKYLAKE)) {
+    return false;
+  }
+  return true;
+}
+
 rapl_units GetUnits(MsrAccess* msr) {
   // MSR_RAPL_POWER_UNIT provides the following information across all RAPL domains
   // Power Units[3:0]: power info (in watts) is based on the multiplier, 1/2^PU where PU is an
@@ -102,12 +127,7 @@ rapl_units GetUnits(MsrAccess* msr) {
 }
 
 zx_status_t SetPkgPl1(const zx_system_powerctl_arg_t* arg, MsrAccess* msr) {
-  auto x86_microarch = x86_get_microarch_config()->x86_microarch;
-  if ((x86_microarch != X86_MICROARCH_INTEL_SANDY_BRIDGE) &&
-      (x86_microarch != X86_MICROARCH_INTEL_SILVERMONT) &&
-      (x86_microarch != X86_MICROARCH_INTEL_BROADWELL) &&
-      (x86_microarch != X86_MICROARCH_INTEL_HASWELL) &&
-      (x86_microarch != X86_MICROARCH_INTEL_SKYLAKE)) {
+  if (!PowerLimitSuported()) {
     return ZX_ERR_NOT_SUPPORTED;
   }
 
@@ -208,13 +228,7 @@ void print_limits() {
 }
 
 void clear_limit_reason_log() {
-  // Limit reason MSR is supported on Intel Core generations 6 through 11, Intel Xeon generations
-  // 1 through 3, Intel Core i3 8th generation, and Intel Xeon E processors. See Intel Volume 4
-  // Table 2-39.
-  auto x86_microarch = x86_get_microarch_config()->x86_microarch;
-  if ((x86_microarch != X86_MICROARCH_INTEL_SKYLAKE) &&
-      (x86_microarch != X86_MICROARCH_INTEL_CANNONLAKE) &&
-      (x86_microarch != X86_MICROARCH_INTEL_TIGERLAKE)) {
+  if (!LimitReasonSupported()) {
     printf("Limit reasons msr not supported\n");
     return;
   }
@@ -226,13 +240,7 @@ void clear_limit_reason_log() {
 }
 
 void print_limit_reasons(bool use_log) {
-  // Limit reason MSR is supported on Intel Core generations 6 through 11, Intel Xeon generations
-  // 1 through 3, Intel Core i3 8th generation, and Intel Xeon E processors. See Intel Volume 4
-  // Table 2-39.
-  auto x86_microarch = x86_get_microarch_config()->x86_microarch;
-  if ((x86_microarch != X86_MICROARCH_INTEL_SKYLAKE) &&
-      (x86_microarch != X86_MICROARCH_INTEL_CANNONLAKE) &&
-      (x86_microarch != X86_MICROARCH_INTEL_TIGERLAKE)) {
+  if (!LimitReasonSupported()) {
     printf("Limit reasons msr not supported\n");
     return;
   }
@@ -358,6 +366,11 @@ static zx_status_t cmd_power(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {
     print_command_usage();
     return ZX_ERR_INVALID_ARGS;
+  }
+
+  if (!PowerLimitSuported()) {
+    printf("Power limit controls not supported\n");
+    return ZX_ERR_NOT_SUPPORTED;
   }
 
   if (!strcmp(argv[1].str, "status")) {

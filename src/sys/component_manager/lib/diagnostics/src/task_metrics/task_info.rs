@@ -434,7 +434,7 @@ mod tests {
         assert_eq!(60, COMPONENT_CPU_MAX_SAMPLES);
         assert_eq!(task.measurements.true_measurement_count(), 60);
 
-        let hierarchy = inspector.get_diagnostics_hierarchy();
+        let hierarchy = inspector.get_diagnostics_hierarchy().await;
         for top_level in &hierarchy.children {
             let child = hierarchy.get_child(&top_level.name).unwrap();
             let timestamps = child.get_property("timestamps").unwrap().int_array().unwrap();
@@ -591,9 +591,9 @@ mod tests {
     use diagnostics_hierarchy::Property;
 
     // Returns a list of <bucket index, count> for linear histogram buckets where count > 0.
-    fn linear_histogram_non_zero_values(inspector: &inspect::Inspector) -> BucketPairs {
+    async fn linear_histogram_non_zero_values(inspector: &inspect::Inspector) -> BucketPairs {
         let mut output = vec![];
-        let hierarchy = inspector.get_diagnostics_hierarchy();
+        let hierarchy = inspector.get_diagnostics_hierarchy().await;
         let histogram = hierarchy.get_property_by_path(&["foo"]).unwrap();
         if let Property::UintArray(_, data) = histogram {
             if let ArrayContent::LinearHistogram(LinearHistogram { counts, indexes, .. }) = data {
@@ -652,42 +652,42 @@ mod tests {
         clock.add_ticks(1000);
         task.measure_if_no_parent().await; // 1
         let answer = vec![(1, 1)];
-        assert_eq!(linear_histogram_non_zero_values(&inspector), answer);
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
         task.measure_if_no_parent().await; // 0
         let answer = vec![(0, 1), (1, 1)];
-        assert_eq!(linear_histogram_non_zero_values(&inspector), answer);
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
         task.measure_if_no_parent().await; // 500
         let answer = vec![(0, 1), (1, 1), (50, 1)];
-        assert_eq!(linear_histogram_non_zero_values(&inspector), answer);
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
         task.measure_if_no_parent().await; // 989
         let answer = vec![(0, 1), (1, 1), (50, 1), (99, 1)];
-        assert_eq!(linear_histogram_non_zero_values(&inspector), answer);
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
         task.measure_if_no_parent().await; // 990
         let answer = vec![(0, 1), (1, 1), (50, 1), (99, 2)];
-        assert_eq!(linear_histogram_non_zero_values(&inspector), answer);
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
         task.measure_if_no_parent().await; // 991
         let answer = vec![(0, 1), (1, 1), (50, 1), (99, 2), (100, 1)];
-        assert_eq!(linear_histogram_non_zero_values(&inspector), answer);
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
         task.measure_if_no_parent().await; // 999
         let answer = vec![(0, 1), (1, 1), (50, 1), (99, 2), (100, 2)];
-        assert_eq!(linear_histogram_non_zero_values(&inspector), answer);
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
 
         clock.add_ticks(1000);
         task.measure_if_no_parent().await; // 0...
         let answer = vec![(0, 2), (1, 1), (50, 1), (99, 2), (100, 2)];
-        assert_eq!(linear_histogram_non_zero_values(&inspector), answer);
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, answer);
     }
 
     // Test that short time intervals (less than 90% of sample_period) are discarded.
@@ -709,23 +709,26 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(linear_histogram_non_zero_values(&inspector), vec![]);
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, vec![]);
 
         clock.add_ticks(900);
         task.measure_if_no_parent().await;
-        assert_eq!(linear_histogram_non_zero_values(&inspector), vec![(12, 1)]);
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, vec![(12, 1)]);
 
         clock.add_ticks(899);
         task.measure_if_no_parent().await;
-        assert_eq!(linear_histogram_non_zero_values(&inspector), vec![(12, 1)]); // No change
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, vec![(12, 1)]); // No change
 
         clock.add_ticks(2000);
         task.measure_if_no_parent().await;
-        assert_eq!(linear_histogram_non_zero_values(&inspector), (vec![(5, 1), (12, 1)]));
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, (vec![(5, 1), (12, 1)]));
 
         clock.add_ticks(1000);
         task.measure_if_no_parent().await;
-        assert_eq!(linear_histogram_non_zero_values(&inspector), (vec![(5, 1), (10, 1), (12, 1)]));
+        assert_eq!(
+            linear_histogram_non_zero_values(&inspector).await,
+            (vec![(5, 1), (10, 1), (12, 1)])
+        );
     }
 
     // Test that the CPU% takes the number of cores into account - that is, with N cores
@@ -746,10 +749,10 @@ mod tests {
         )
         .unwrap();
 
-        assert_eq!(linear_histogram_non_zero_values(&inspector), vec![]);
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, vec![]);
 
         clock.add_ticks(1000);
         task.measure_if_no_parent().await;
-        assert_eq!(linear_histogram_non_zero_values(&inspector), vec![(10, 1)]);
+        assert_eq!(linear_histogram_non_zero_values(&inspector).await, vec![(10, 1)]);
     }
 }

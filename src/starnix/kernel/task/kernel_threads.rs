@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::dynamic_thread_spawner::DynamicThreadSpawner;
 use crate::execution::create_kernel_thread;
+use crate::task::dynamic_thread_spawner::DynamicThreadSpawner;
 use crate::task::{CurrentTask, Kernel, Task, ThreadGroup};
 use fragile::Fragile;
 use fuchsia_async as fasync;
@@ -99,7 +99,7 @@ impl KernelThreads {
     /// a few idle threads around to reduce the overhead for spawning threads for short-lived work.
     pub fn spawn<F>(&self, f: F)
     where
-        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static,
+        F: FnOnce(&mut Locked<Unlocked>, &CurrentTask) + Send + 'static,
     {
         self.spawner().spawn(f)
     }
@@ -114,7 +114,7 @@ impl KernelThreads {
     /// for extremely short-lived tasks.
     pub fn spawn_with_role<F>(&self, role: &'static str, f: F)
     where
-        F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) + Send + 'static,
+        F: FnOnce(&mut Locked<Unlocked>, &CurrentTask) + Send + 'static,
     {
         self.spawner().spawn_with_role(role, f)
     }
@@ -137,7 +137,7 @@ impl KernelThreads {
     ///
     /// This function is intended for limited use in async contexts and can only be called from the
     /// kernel main thread.
-    pub fn unlocked_for_async(&self) -> RefMut<'_, Locked<'static, Unlocked>> {
+    pub fn unlocked_for_async(&self) -> RefMut<'_, Locked<Unlocked>> {
         self.unlocked_for_async.unlocked.get().borrow_mut()
     }
 
@@ -170,12 +170,12 @@ impl Drop for KernelThreads {
 
 /// Create a new system task, register it on the thread and run the given closure with it.
 pub fn with_new_current_task<F, R>(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     system_task: &WeakRef<Task>,
     f: F,
 ) -> Result<R, Errno>
 where
-    F: FnOnce(&mut Locked<'_, Unlocked>, &CurrentTask) -> R,
+    F: FnOnce(&mut Locked<Unlocked>, &CurrentTask) -> R,
 {
     let current_task = {
         let Some(system_task) = system_task.upgrade() else {
@@ -198,7 +198,7 @@ struct SystemTask {
 }
 
 struct UnlockedForAsync {
-    unlocked: Fragile<RefCell<Locked<'static, Unlocked>>>,
+    unlocked: Fragile<RefCell<Locked<Unlocked>>>,
 }
 
 impl UnlockedForAsync {

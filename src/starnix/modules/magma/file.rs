@@ -288,7 +288,7 @@ impl MagmaFile {
     ///
     /// Returns an error if the file does not contain a buffer.
     fn get_memory_and_magma_buffer<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         fd: FdNumber,
     ) -> Result<(MemoryObject, BufferInfo), Errno>
@@ -451,7 +451,7 @@ impl FileOps for MagmaFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _request: u32,
@@ -711,26 +711,22 @@ impl FileOps for MagmaFile {
                 let mut result_semaphore_id = 0;
 
                 // Use counter semaphores for compatibility with sync files, which need timestamps.
-                if let Ok(counter) = zx::Counter::create() {
-                    let flags: u64 = 0;
-                    let semaphore;
-                    let semaphore_id;
-                    (status, semaphore, semaphore_id) =
-                        import_semaphore2(&connection, counter, flags);
-                    if status == MAGMA_STATUS_OK {
-                        result_semaphore_id = self.semaphore_id_generator.next();
+                let counter = zx::Counter::create();
+                let flags: u64 = 0;
+                let semaphore;
+                let semaphore_id;
+                (status, semaphore, semaphore_id) = import_semaphore2(&connection, counter, flags);
+                if status == MAGMA_STATUS_OK {
+                    result_semaphore_id = self.semaphore_id_generator.next();
 
-                        self.semaphores.lock().insert(
-                            result_semaphore_id,
-                            Arc::new(MagmaSemaphore {
-                                connection,
-                                handles: vec![semaphore; 1],
-                                ids: vec![semaphore_id; 1],
-                            }),
-                        );
-                    }
-                } else {
-                    status = MAGMA_STATUS_MEMORY_ERROR;
+                    self.semaphores.lock().insert(
+                        result_semaphore_id,
+                        Arc::new(MagmaSemaphore {
+                            connection,
+                            handles: vec![semaphore; 1],
+                            ids: vec![semaphore_id; 1],
+                        }),
+                    );
                 }
                 response.result_return = status as u64;
                 response.semaphore_out = result_semaphore_id;
@@ -1258,7 +1254,7 @@ impl FileOps for MagmaFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,
@@ -1270,7 +1266,7 @@ impl FileOps for MagmaFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         offset: usize,

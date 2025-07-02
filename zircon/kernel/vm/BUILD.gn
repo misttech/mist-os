@@ -34,7 +34,6 @@ zx_library("vm") {
     "ppb_command.cc",
     "scanner.cc",
     "slot_page_storage.cc",
-    "tri_page_storage.cc",
     "vm.cc",
     "vm_address_region.cc",
     "vm_address_region_or_mapping.cc",
@@ -135,7 +134,6 @@ source_set("tests") {
     "unittests/pmm_unittest.cc",
     "unittests/slab_unittest.cc",
     "unittests/test_helper.cc",
-    "unittests/vmo_lock_unittest.cc",
     "unittests/vmo_unittest.cc",
     "unittests/vmpl_unittest.cc",
   ]

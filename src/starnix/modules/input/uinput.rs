@@ -44,7 +44,7 @@ enum DeviceType {
 }
 
 pub fn register_uinput_device(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     system_task: &CurrentTask,
     input_event_relay: Arc<InputEventsRelay>,
 ) {
@@ -64,7 +64,7 @@ pub fn register_uinput_device(
 }
 
 fn add_and_register_input_device<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     system_task: &CurrentTask,
     dev_ops: impl DeviceOps,
     device_id: u32,
@@ -106,7 +106,7 @@ impl UinputDevice {
 impl DeviceOps for UinputDevice {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         _current_task: &CurrentTask,
         _id: device_type::DeviceType,
         _node: &FsNode,
@@ -211,7 +211,7 @@ impl UinputDeviceFile {
 
     fn ui_dev_create<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<SyscallResult, Errno>
     where
@@ -234,7 +234,7 @@ impl UinputDeviceFile {
     /// from previous ioctl() calls.
     fn ui_dev_create_inner<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         // Takes `registry` arg so we can manually inject a mock registry in unit tests.
         registry: Option<futinput::RegistrySynchronousProxy>,
@@ -358,7 +358,7 @@ impl UinputDeviceFile {
 
     fn ui_dev_destroy<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<SyscallResult, Errno>
     where
@@ -415,7 +415,7 @@ impl FileOps for UinputDeviceFile {
 
     fn ioctl(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         file: &FileObject,
         current_task: &CurrentTask,
         request: u32,
@@ -446,7 +446,7 @@ impl FileOps for UinputDeviceFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &vfs::FileObject,
         _current_task: &starnix_core::task::CurrentTask,
         _offset: usize,
@@ -505,7 +505,7 @@ impl FileOps for UinputDeviceFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &vfs::FileObject,
         _current_task: &starnix_core::task::CurrentTask,
         _offset: usize,
@@ -526,7 +526,7 @@ pub struct VirtualDevice {
 impl DeviceOps for VirtualDevice {
     fn open(
         &self,
-        _locked: &mut Locked<'_, DeviceOpen>,
+        _locked: &mut Locked<DeviceOpen>,
         _current_task: &CurrentTask,
         _id: device_type::DeviceType,
         _node: &FsNode,
@@ -555,9 +555,9 @@ mod test {
     use std::sync::Arc;
     use test_case::test_case;
 
-    fn make_kernel_objects<'l>(
+    fn make_kernel_objects(
         file: Arc<UinputDeviceFile>,
-    ) -> (Arc<Kernel>, AutoReleasableTask, FileHandle, Locked<'l, Unlocked>) {
+    ) -> (Arc<Kernel>, AutoReleasableTask, FileHandle, Locked<Unlocked>) {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let file_object = FileObject::new(
             &current_task,

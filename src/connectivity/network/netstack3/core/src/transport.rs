@@ -59,7 +59,8 @@ mod integration;
 
 use derivative::Derivative;
 use net_types::ip::{Ip, Ipv4, Ipv6};
-use netstack3_base::{CoreTxMetadataContext, HandleableTimer, TimerHandler};
+use netstack3_base::socket::SocketCookie;
+use netstack3_base::{CoreTxMetadataContext, HandleableTimer, TimerHandler, TxMetadata};
 use netstack3_datagram as datagram;
 use netstack3_device::WeakDeviceId;
 use netstack3_icmp_echo::{IcmpSocketTxMetadata, IcmpSockets};
@@ -180,7 +181,7 @@ impl<BT: BindingsTypes> From<TcpTimerId<WeakDeviceId<BT>, BT>> for TransportLaye
 #[derive(Derivative)]
 #[derivative(Debug = "transparent", Debug(bound = ""), Default(bound = ""))]
 #[cfg_attr(any(test, feature = "testutils"), derivative(PartialEq(bound = "")))]
-pub struct TxMetadata<BT: BindingsTypes>(TxMetadataInner<BT>);
+pub struct CoreTxMetadata<BT: BindingsTypes>(TxMetadataInner<BT>);
 
 /// The internal metadata type.
 ///
@@ -211,8 +212,8 @@ impl<I: IpExt, L, BT: BindingsTypes>
     fn convert_tx_meta(
         &self,
         tx_meta: UdpSocketTxMetadata<I, WeakDeviceId<BT>, BT>,
-    ) -> TxMetadata<BT> {
-        TxMetadata(I::map_ip_in(tx_meta, TxMetadataInner::Udpv4, TxMetadataInner::Udpv6))
+    ) -> CoreTxMetadata<BT> {
+        CoreTxMetadata(I::map_ip_in(tx_meta, TxMetadataInner::Udpv4, TxMetadataInner::Udpv6))
     }
 }
 
@@ -223,8 +224,8 @@ impl<I: IpExt, L, BT: BindingsTypes>
     fn convert_tx_meta(
         &self,
         tx_meta: IcmpSocketTxMetadata<I, WeakDeviceId<BT>, BT>,
-    ) -> TxMetadata<BT> {
-        TxMetadata(I::map_ip_in(tx_meta, TxMetadataInner::Icmpv4, TxMetadataInner::Icmpv6))
+    ) -> CoreTxMetadata<BT> {
+        CoreTxMetadata(I::map_ip_in(tx_meta, TxMetadataInner::Icmpv4, TxMetadataInner::Icmpv6))
     }
 }
 
@@ -234,7 +235,35 @@ impl<I: IpExt, L, BT: BindingsTypes>
     fn convert_tx_meta(
         &self,
         tx_meta: TcpSocketTxMetadata<I, WeakDeviceId<BT>, BT>,
-    ) -> TxMetadata<BT> {
-        TxMetadata(I::map_ip_in(tx_meta, TxMetadataInner::Tcpv4, TxMetadataInner::Tcpv6))
+    ) -> CoreTxMetadata<BT> {
+        CoreTxMetadata(I::map_ip_in(tx_meta, TxMetadataInner::Tcpv4, TxMetadataInner::Tcpv6))
+    }
+}
+
+impl<BT: BindingsTypes> TxMetadata for CoreTxMetadata<BT> {
+    fn socket_cookie(&self) -> Option<SocketCookie> {
+        let CoreTxMetadata(inner) = self;
+        match inner {
+            // TODO(https://fxbug.dev/417224088): Handle Raw and Packet sockets.
+            TxMetadataInner::None => None,
+            TxMetadataInner::Tcpv4(tx_metadata) => {
+                tx_metadata.socket().upgrade().map(|s| s.socket_cookie())
+            }
+            TxMetadataInner::Tcpv6(tx_metadata) => {
+                tx_metadata.socket().upgrade().map(|s| s.socket_cookie())
+            }
+            TxMetadataInner::Udpv4(tx_metadata) => {
+                tx_metadata.socket().upgrade().map(|s| s.socket_cookie())
+            }
+            TxMetadataInner::Udpv6(tx_metadata) => {
+                tx_metadata.socket().upgrade().map(|s| s.socket_cookie())
+            }
+            TxMetadataInner::Icmpv4(tx_metadata) => {
+                tx_metadata.socket().upgrade().map(|s| s.socket_cookie())
+            }
+            TxMetadataInner::Icmpv6(tx_metadata) => {
+                tx_metadata.socket().upgrade().map(|s| s.socket_cookie())
+            }
+        }
     }
 }

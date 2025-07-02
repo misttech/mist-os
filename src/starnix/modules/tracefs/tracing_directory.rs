@@ -4,29 +4,18 @@
 
 use super::event::{TraceEvent, TraceEventQueue};
 use fuchsia_trace::{ArgValue, Scope, TraceCategoryContext};
+use starnix_core::fileops_impl_nonseekable;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::InputBuffer;
-use starnix_core::vfs::{
-    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FileObject, FileOps, FsNodeOps, SimpleFileNode,
-};
+use starnix_core::vfs::pseudo::simple_file::SimpleFileNode;
+use starnix_core::vfs::{fileops_impl_noop_sync, FileObject, FileOps, FsNodeOps, OutputBuffer};
 use starnix_logging::CATEGORY_ATRACE;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-/// trace_marker, used by applications to write trace events
-struct TraceMarkerFileSource;
-
-impl DynamicFileSource for TraceMarkerFileSource {
-    fn generate(&self, _sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        Ok(())
-    }
-}
-
 pub struct TraceMarkerFile {
-    source: DynamicFile<TraceMarkerFileSource>,
     event_stacks: Mutex<HashMap<u64, Vec<(String, zx::BootTicks)>>>,
     queue: Arc<TraceEventQueue>,
 }
@@ -34,38 +23,52 @@ pub struct TraceMarkerFile {
 impl TraceMarkerFile {
     pub fn new_node(queue: Arc<TraceEventQueue>) -> impl FsNodeOps {
         SimpleFileNode::new(move || {
-            Ok(Self {
-                source: DynamicFile::new(TraceMarkerFileSource {}),
-                event_stacks: Mutex::new(HashMap::new()),
-                queue: queue.clone(),
-            })
+            Ok(Self { event_stacks: Mutex::new(HashMap::new()), queue: queue.clone() })
         })
     }
 }
 
 impl FileOps for TraceMarkerFile {
-    fileops_impl_delegate_read_and_seek!(self, self.source);
     fileops_impl_noop_sync!();
+    fileops_impl_nonseekable!();
+
+    fn read(
+        &self,
+        _locked: &mut Locked<FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        Ok(0)
+    }
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        let bytes = data.read_all()?;
-        if let Some(atrace_event) = ATraceEvent::parse(&String::from_utf8_lossy(&bytes)) {
+        let mut bytes = data.read_all()?;
+        // The TraceEvent struct appends a new line to the trace data unconditionally, so
+        // remove the trailing newline if here to avoid generating empty events when reading.
+        if bytes.ends_with(&['\n' as u8]) {
+            bytes.truncate(bytes.len() - 1);
+        }
+        let input_data = String::from_utf8_lossy(&bytes);
+        if let Some(atrace_event) = ATraceEvent::parse(&input_data) {
             if self.queue.is_enabled() {
-                let timestamp = zx::BootInstant::get();
                 let trace_event = TraceEvent::new(
-                    self.queue.prev_timestamp(),
-                    timestamp,
-                    current_task.get_pid(),
+                    // This pid is a Kernel pid (do not confuse with userspace pid aka tgid), so we use
+                    // the task thread id, the pid and tid are equal when the thread is the "main thread"
+                    // of the thread group/process.
+                    // It is used when CPU scheduling information is not available.
+                    current_task.get_tid(),
                     &bytes,
                 );
-                self.queue.push_event(trace_event, timestamp)?;
+                self.queue.push_event(trace_event)?;
             }
             // TODO(https://fxbug.dev/357665908): Remove forwarding of atrace events to trace
             // manager when dependencies have been migrated.
@@ -175,7 +178,7 @@ impl<'a> ATraceEvent<'a> {
     // function returns an Option rather than a Result. If we did return a Result, this could be
     // put in a TryFrom impl, if desired.
     fn parse(s: &'a str) -> Option<Self> {
-        let mut chunks = s.split('|');
+        let mut chunks = s.trim().split('|');
         let event_type = chunks.next()?;
 
         // event_type matches the systrace phase. See systrace_parser.h in perfetto.

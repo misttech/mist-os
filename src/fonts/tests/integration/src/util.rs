@@ -3,7 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker};
+use fuchsia_component::client::Connect;
 use fuchsia_component_test::ScopedInstance;
 use futures::lock::Mutex;
 use std::collections::HashMap;
@@ -23,10 +24,7 @@ impl ProviderFactory {
     // TODO: Instead of configuring fonts through a different manifest and command-line arguments,
     // offer a service or directory with the right fonts to the new component instance. This will
     // require support to dynamically offer a capability to a component.
-    pub async fn get_provider<T>(&self, fonts_cm: &'static str) -> Result<T::Proxy, Error>
-    where
-        T: DiscoverableProtocolMarker,
-    {
+    pub async fn get_provider<T: Connect>(&self, fonts_cm: &'static str) -> Result<T, Error> {
         let mut providers = self.providers.lock().await;
         if !providers.contains_key(fonts_cm) {
             let app = ScopedInstance::new("coll".to_string(), fonts_cm.to_string())
@@ -34,9 +32,9 @@ impl ProviderFactory {
                 .context("Failed to create dynamic component")?;
             providers.insert(fonts_cm, app);
         }
-        let font_provider = providers[&fonts_cm]
-            .connect_to_protocol_at_exposed_dir::<T>()
-            .context(format!("Failed to connect to exposed protocol {}", T::DEBUG_NAME))?;
+        let font_provider = providers[&fonts_cm].connect_to_protocol_at_exposed_dir().context(
+            format!("Failed to connect to exposed protocol {}", T::Protocol::DEBUG_NAME),
+        )?;
         Ok(font_provider)
     }
 }
@@ -55,6 +53,6 @@ where
     }
 
     pub async fn get_provider(&self, fonts_cm: &'static str) -> Result<T::Proxy, Error> {
-        self.inner.get_provider::<T>(fonts_cm).await
+        self.inner.get_provider(fonts_cm).await
     }
 }

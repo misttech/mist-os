@@ -6,12 +6,9 @@ use component_events::events::*;
 use component_events::matcher::*;
 use diagnostics_reader::{ArchiveReader, RetryConfig};
 use fidl_fuchsia_component::BinderMarker;
-use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
-use fidl_fuchsia_diagnostics_persist::{
-    DataPersistenceMarker, DataPersistenceProxy, PersistResult,
-};
-use fidl_fuchsia_samplertestcontroller::{SamplerTestControllerMarker, SamplerTestControllerProxy};
-use fidl_test_persistence_factory::{ControllerMarker, ControllerProxy};
+use fidl_fuchsia_diagnostics_persist::{DataPersistenceProxy, PersistResult};
+use fidl_fuchsia_samplertestcontroller::SamplerTestControllerProxy;
+use fidl_test_persistence_factory::ControllerProxy;
 use fuchsia_async as fasync;
 use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, RealmInstance};
 use futures::{select, FutureExt};
@@ -437,7 +434,7 @@ async fn never_idles() {
 async fn wait_for_inspect_source(realm: &RealmInstance) {
     let accessor_proxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("Failed to connect to ArchiveAccessor");
     let mut inspect_fetcher = ArchiveReader::inspect();
     inspect_fetcher
@@ -481,16 +478,11 @@ impl TestRealm {
             )
             .unwrap();
         // `inspect` is the source of Inspect data that Persistence will read and persist.
-        let inspect = instance
-            .root
-            .connect_to_protocol_at_exposed_dir::<SamplerTestControllerMarker>()
-            .unwrap();
+        let inspect = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
         // `persistence` is the connection to ask for new data to be read and persisted.
-        let persistence =
-            instance.root.connect_to_protocol_at_exposed_dir::<DataPersistenceMarker>().unwrap();
+        let persistence = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
         // `controller` is the connection to send control signals to the test's update-checker mock.
-        let controller =
-            instance.root.connect_to_protocol_at_exposed_dir::<ControllerMarker>().unwrap();
+        let controller = instance.root.connect_to_protocol_at_exposed_dir().unwrap();
         TestRealm { name, fs, instance, persistence, inspect, controller }
     }
 
@@ -746,7 +738,7 @@ async fn verify_diagnostics_persistence_publication<'a>(
 ) {
     let accessor_proxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<ArchiveAccessorMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("Failed to connect to ArchiveAccessor");
     let mut inspect_fetcher = ArchiveReader::inspect();
     inspect_fetcher

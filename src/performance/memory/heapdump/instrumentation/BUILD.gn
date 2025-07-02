@@ -6,10 +6,12 @@ import("//build/components.gni")
 import("//build/cpp/sdk_shared_library.gni")
 import("//build/rust/rustc_library.gni")
 import("//build/rust/rustc_staticlib.gni")
+import("//build/zircon/c_utils.gni")
 
 group("tests") {
   testonly = true
   deps = [
+    ":dt-needed-list-test",
     ":rust-tests",
     "tests:cpp-tests",
   ]
@@ -40,6 +42,8 @@ rustc_staticlib("core") {
   ]
 
   test_deps = [ "//third_party/rust_crates:assert_matches" ]
+
+  dynamic_libstd = false
 }
 
 # Processes that link to this library must call either `heapdump_bind_with_channel`
@@ -88,6 +92,38 @@ config("include") {
 fuchsia_unittest_package("rust-tests") {
   package_name = "heapdump-instrumentation-rust-tests"
   deps = [ ":core_test" ]
+}
+
+toolchain_utils_action("dt-needed-list-scan") {
+  testonly = true
+  utils = [ "llvm-readelf" ]
+
+  _shared_lib_target =
+      ":instrumentation($shlib_toolchain_no_default_variant_redirect)"
+  _shared_out_dir = get_label_info(_shared_lib_target, "root_out_dir")
+
+  script = "dt_needed_list_scan.py"
+  deps = [ _shared_lib_target ]
+
+  inputs = [ "$_shared_out_dir/libheapdump_instrumentation.so" ]
+  outputs = [ "$target_out_dir/dt_needed_actual.txt" ]
+  args = [
+    "--input",
+    rebase_path(inputs[0], root_build_dir),
+    "--output",
+    rebase_path(outputs[0], root_build_dir),
+  ]
+}
+
+golden_files("dt-needed-list-test") {
+  testonly = true
+  deps = [ ":dt-needed-list-scan" ]
+  comparisons = [
+    {
+      golden = "dt_needed_list_golden.txt"
+      candidate = "$target_out_dir/dt_needed_actual.txt"
+    },
+  ]
 }
 
 rustc_library("rust") {

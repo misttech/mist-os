@@ -1,0 +1,398 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/python/python_action.gni")
+import("//build/python/python_binary.gni")
+import("//build/python/python_library.gni")
+import("//build/testing/golden_files.gni")
+import("../libc.gni")
+import("libc_headers.gni")
+
+# See README.md for a full explanation.
+#
+# This file (with libc_headers.gni) manages all the public libc header files.
+# These go into the "sysroot" built by //zircon/public/sysroot; that's used to
+# compile most Fuchsia user code, and it goes into the SDK.
+#
+# Any changes to these files require manual API review approval via update of
+# the sysroot.api file.  Some of these files come from llvm-libc.  But the
+# auto-roller that updates the llvm-libc code will never update sysroot.api; so
+# llvm-libc header changes always require a manual roll that includes the
+# sysroot.api update along with the //manifests update in a single commit.
+#
+# Public llvm-libc headers used are generated from "$llvm_libc/include/*.yaml"
+# files.  This list drives all the generation work done here, including
+# regenerating llvm-libc-generated.json using the golden_files() mechanism.
+# However, the golden JSON file in the source tree is what drives the
+# libc_headers.gni lists that everything else uses.  After changing this list,
+# the next build with update_goldens=true will update the JSON file in the
+# sources; that will necessitate another build to pick up the new lists and
+# generate the headers correctly so that the sysroot can be updated.
+llvm_libc_generated_headers = [
+  "fenv.h",
+  "malloc.h",
+]
+
+# The generated headers go here, where libc_headers.gni looks for them.
+gen_dir = libc_headers.llvm_libc_gen_dir
+
+# Directory holding the hdrgen Python sources.
+hdrgen_dir = "$llvm_libc/utils/hdrgen"
+
+# This target is in an sdk.deps list in sysroot_entries, to ensure that the
+# generated headers are in place.  This checking only ever happens in the
+# $default_toolchain and is not repeated elsewhere.
+group("include") {
+  public_deps = [
+    ":check-llvm-libc-json($default_toolchain)",
+    ":llvm-libc-generated-headers($default_toolchain)",
+  ]
+}
+
+if (current_toolchain == default_toolchain) {
+  python_action_foreach("llvm-libc-generated-headers") {
+    binary_label = ":hdrgen"
+
+    sources = []
+    generated_headers = []
+    foreach(header, llvm_libc_generated_headers) {
+      header_dir = get_path_info(header, "dir")
+      header_name = get_path_info(header, "name")
+      if (header_dir == ".") {
+        header_dir = ""
+      } else {
+        header_dir += "/"
+      }
+      sources += [ "$llvm_libc/include/$header_dir$header_name.yaml" ]
+      generated_headers += [ "$gen_dir/$header_dir$header_name.h" ]
+    }
+
+    # This is evaluated only in $default_toolchain, where $root_gen_dir is the
+    # prefix of $gen_dir before the full source-relative path in $llvm_libc.
+    # This isn't simpler because the action_foreach() path expansion logic only
+    # does a few fixed things, and it can't be used to distinguish the
+    # directory prefix that's part of the header name (e.g. sys/) from the rest
+    # of the path to the sources or outputs directory.
+    outputs =
+        [ "$root_gen_dir/{{source_root_relative_dir}}/{{source_name_part}}.h" ]
+
+    # That should wind up the same as "$gen_dir/$header" for each one.
+    _processed_sources = process_file_template(sources, outputs)
+    assert(_processed_sources == generated_headers,
+           "process_file_template($sources, $outputs) => " +
+               "$_processed_sources != $generated_headers")
+
+    depfile = "${outputs[0]}.d"
+    args = [
+      "--output=" + rebase_path(outputs[0], root_build_dir),
+      "--depfile=" + rebase_path(depfile, root_build_dir),
+      "--write-if-changed",
+      "{{source}}",
+    ]
+
+    metadata = {
+      # Populate build_api("generated_sources") to ensure all the headers are
+      # present for analysis.
+      generated_sources = rebase_path(generated_headers, root_build_dir)
+    }
+  }
+
+  python_action("llvm-libc-json") {
+    visibility = [ ":*" ]
+    binary_label = ":hdrgen"
+
+    sources = []
+    foreach(header, llvm_libc_generated_headers) {
+      header_dir = get_path_info(header, "dir")
+      header_name = get_path_info(header, "name")
+      if (header_dir == ".") {
+        header_dir = ""
+      } else {
+        header_dir += "/"
+      }
+      sources += [ "$llvm_libc/include/$header_dir$header_name.yaml" ]
+    }
+
+    outputs = [ "$target_gen_dir/llvm-libc-generated.json" ]
+    depfile = "${outputs[0]}.d"
+    args = [
+             "--output=" + rebase_path(outputs[0], root_build_dir),
+             "--depfile=" + rebase_path(depfile, root_build_dir),
+             "--write-if-changed",
+             "--json",
+           ] + rebase_path(sources, root_build_dir)
+  }
+
+  golden_files("check-llvm-libc-json") {
+    visibility = [ ":*" ]
+    deps = [ ":llvm-libc-json" ]
+    _json_outputs = get_target_outputs(deps[0])
+    comparisons = [
+      {
+        golden = libc_headers.llvm_libc_json_file
+        candidate = _json_outputs[0]
+      },
+    ]
+  }
+}
+
+# This reaches all the public libc headers (ones that will be installed)
+# directly at the source of truth.  It's only used for compiling libc code.
+# Note this includes the libc unit test code, as well as the hermetic partial
+# libc bits built for special environments.
+#
+# source_set() is actually a template that injects additional deps...that
+# reach back here.  So this must use basic_source_set() to have only the
+# direct effects spelled out here and nothing else explicit.
+basic_source_set("headers") {
+  visibility = [
+    "../*",
+    "//build/config/zircon:user_deps",
+    "//zircon/kernel/lib/userabi/userboot/*",
+    "//zircon/system/ulib/ldmsg/*",
+    "//zircon/third_party/scudo/*",
+    "//zircon/third_party/ulib/musl/*",
+  ]
+
+  # Make sure no set_defaults() configs contribute anything that might
+  # propagate up from here.
+  configs = []
+
+  public_configs = [ ":headers.config" ]
+  public = []
+  public_deps = []
+
+  foreach(file,
+          libc_headers.root_public_headers + libc_headers.root_impl_headers) {
+    public += [ file ]
+  }
+
+  foreach(file,
+          libc_headers.musl_public_headers + libc_headers.musl_impl_headers) {
+    public += [ "${libc_headers.musl_dir}/$file" ]
+  }
+
+  foreach(file, libc_headers.llvm_libc_impl_headers) {
+    public += [ "$llvm_libc/include/$file" ]
+  }
+
+  foreach(file, llvm_libc_generated_headers) {
+    public += [ "$gen_dir/$file" ]
+  }
+  public_deps += [ ":llvm-libc-generated-headers($default_toolchain)" ]
+
+  public_deps += [ "//zircon/system/public" ]
+}
+
+config("headers.config") {
+  visibility = [ ":*" ]
+  cflags = []
+  dirs = [
+    ".",
+    libc_headers.musl_dir,
+    gen_dir,
+    "$llvm_libc/include",
+  ]
+  foreach(dir, dirs) {
+    cflags += [
+      "-idirafter",
+      rebase_path(dir, root_build_dir),
+    ]
+  }
+  asmflags = cflags
+}
+
+python_binary("hdrgen") {
+  visibility = [ ":*" ]
+
+  main_source = "$hdrgen_dir/main.py"
+  deps = [ ":hdrgen.library" ]
+
+  enable_mypy = false
+}
+
+python_library("hdrgen.library") {
+  visibility = [ ":*" ]
+
+  library_name = "hdrgen"
+  source_root = "$hdrgen_dir/hdrgen"
+  sources = [
+    "__init__.py",
+    "enumeration.py",
+    "function.py",
+    "gpu_headers.py",
+    "header.py",
+    "macro.py",
+    "main.py",
+    "object.py",
+    "type.py",
+    "yaml_to_classes.py",
+  ]
+  library_deps = [ "//third_party/pyyaml:yaml" ]
+
+  enable_mypy = false
+}
+
+# Generate standlaone "#include <foo.h>" compile-time tests for each public
+# header file, and compile them in every known language mode.
+header_test_stdc = [
+  # TODO(https://fxbug.dev/376333113): musl vs llvm-libc repeated typedefs are
+  # invalid in C<11.
+  #
+  #89, 99,
+  11,
+  17,
+  23,
+]
+header_test_stdcxx = [
+  # These can be either integers or strings, doesn't matter.  But GN doesn't
+  # allow (nor would anything else preserve) a leading 0 on an integer and the
+  # result must be exactly "03", not "3".
+  # TODO(https://fxbug.dev/376333113): libc++ headers are not C++03 clean!
+  #"03",
+  11,
+  14,
+  17,
+  20,
+  23,
+  26,
+]
+
+header_test_c_deps = []
+header_test_c_sources = []
+header_test_cxx_deps = []
+header_test_cxx_sources = []
+header_test_zircon_c_deps = []
+header_test_zircon_c_sources = []
+header_test_zircon_cxx_deps = []
+header_test_zircon_cxx_sources = []
+foreach(header, libc_headers.all_public_headers) {
+  header_target = string_replace(header, "/", "-")
+  foreach(extension,
+          [
+            "c",
+            "cc",
+          ]) {
+    generated_file("$header_target.$extension") {
+      visibility = [ ":*" ]
+      testonly = true
+      output_conversion = "list lines"
+      outputs = [ "$target_gen_dir/header-tests/$header.$extension" ]
+      contents = [
+        "/* Generated by" +
+            get_label_info(":target_name", "label_no_toolchain") +
+            ". DO NOT EDIT! */",
+        "#include <$header>",
+      ]
+    }
+  }
+
+  # The <zircon/*.h> headers go in a separate list that isn't tested in C89.
+  if (get_path_info(header, "dir") == "zircon") {
+    header_test_zircon_c_deps += [ ":$header_target.c" ]
+    header_test_zircon_c_sources += get_target_outputs(":$header_target.c")
+    header_test_zircon_cxx_deps += [ ":$header_target.cc" ]
+    header_test_zircon_cxx_sources += get_target_outputs(":$header_target.cc")
+  } else {
+    header_test_c_deps += [ ":$header_target.c" ]
+    header_test_c_sources += get_target_outputs(":$header_target.c")
+    header_test_cxx_deps += [ ":$header_target.cc" ]
+    header_test_cxx_sources += get_target_outputs(":$header_target.cc")
+  }
+}
+
+unittest_deps = []
+foreach(version, header_test_stdc) {
+  foreach(prefix,
+          [
+            "c",
+            "gnu",
+          ]) {
+    unittest_deps += [ ":header-tests.$prefix$version" ]
+    libc_test("header-tests.$prefix$version") {
+      sources = header_test_c_sources
+      deps = header_test_c_deps
+
+      # The <zircon/*.h> headers (and their transitive dependencies on syscall
+      # headers) don't all support strict -std=c89 mode, though they do support
+      # -std=gnu89 mode.
+      if ("$prefix$version" != "c89") {
+        sources += header_test_zircon_c_sources
+        deps += header_test_zircon_c_deps
+      }
+
+      deps += [ ":headers" ]
+      configs = [
+        ":test.$prefix$version",
+        "//build/config:Wsystem-headers",
+      ]
+    }
+
+    config("test.$prefix$version") {
+      visibility = [ ":*" ]
+      cflags_c = [ "-std=$prefix$version" ]
+    }
+  }
+}
+
+foreach(version, header_test_stdcxx) {
+  foreach(prefix,
+          [
+            "c",
+            "gnu",
+          ]) {
+    # libc++ provides wrapper headers that interpose on various libc headers.
+    # Those will be found implicitly in preference to the libc headers, unless
+    # -nostdinc++ is used.  The libc headers should be usable and warning-clean
+    # when used in C++ language modes directly without the libc++ wrappers;
+    # they won't be standard C++ library compatible with `std::` namespace
+    # declarations and such, but they should not get compilation errors.
+    #
+    # The libc headers should also be usable (and warning-clean) when used via
+    # libc++'s wrapper headers.  So test both ways.
+    foreach(libcxx,
+            [
+              "",
+              "-libcxx",
+            ]) {
+      unittest_deps += [ ":header-tests.${prefix}xx$version$libcxx" ]
+      libc_test("header-tests.${prefix}xx$version$libcxx") {
+        sources = header_test_cxx_sources
+        deps = header_test_cxx_deps
+
+        # The <zircon/*.h> headers (and their transitive dependencies on
+        # syscall headers) don't need to support C++ < 17.
+        if (version != "03" && version >= 17) {
+          sources += header_test_zircon_cxx_sources
+          deps += header_test_zircon_cxx_deps
+        }
+
+        deps += [ ":headers" ]
+        configs = [ ":test.$prefix++$version" ]
+        if (libcxx == "") {
+          # Don't use the libc++ headers.
+          configs += [ "//build/config:no-libc++-include" ]
+          remove_configs = [ "//build/config:libc++-include" ]
+
+          # The libc++ headers are not warning-clean, and instead rely on the
+          # system-headers exemption from warnings.  This is an unfortunate and
+          # counterproductive choice by the libc++ maintainers and it should be
+          # changed, but it is unlikely to change soon.  If it ever does
+          # change, then this should be added unconditionally.
+          configs += [ "//build/config:Wsystem-headers" ]
+        }
+      }
+    }
+
+    config("test.$prefix++$version") {
+      visibility = [ ":*" ]
+      cflags_cc = [ "-std=$prefix++$version" ]
+    }
+  }
+}
+
+libc_test("unittests") {
+  sources = []
+  deps = unittest_deps
+}

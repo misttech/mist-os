@@ -135,7 +135,7 @@ fn map_error_to_errno(e: MapError) -> Errno {
 }
 
 pub fn sys_bpf(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     cmd: bpf_cmd,
     attr_addr: UserAddress,
@@ -454,12 +454,12 @@ pub fn sys_bpf(
             error!(EINVAL)
         }
         bpf_cmd_BPF_PROG_GET_NEXT_ID => {
-            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_GET_NEXT_ID");
-            error!(EINVAL)
+            track_stub!(TODO("https://fxbug.dev/423965951"), "BPF_PROG_GET_NEXT_ID");
+            error!(ENOENT)
         }
         bpf_cmd_BPF_MAP_GET_NEXT_ID => {
-            track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_MAP_GET_NEXT_ID");
-            error!(EINVAL)
+            track_stub!(TODO("https://fxbug.dev/423965951"), "BPF_MAP_GET_NEXT_ID");
+            error!(ENOENT)
         }
         bpf_cmd_BPF_PROG_GET_FD_BY_ID => {
             track_stub!(TODO("https://fxbug.dev/322874055"), "BPF_PROG_GET_FD_BY_ID");

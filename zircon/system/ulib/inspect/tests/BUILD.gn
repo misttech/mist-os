@@ -17,6 +17,7 @@ group("tests") {
 
 test("inspect") {
   sources = [
+    "bounded_list_node_unittest.cc",
     "health_unittest.cc",
     "heap_unittest.cc",
     "inspect_unittest.cc",

@@ -171,8 +171,8 @@ mod tests {
 
     use crate::rfcomm::session::channel::Credits;
 
-    #[test]
-    fn session_inspect_tree() {
+    #[fuchsia::test]
+    async fn session_inspect_tree() {
         let inspect = inspect::Inspector::default();
 
         let id = PeerId(999);
@@ -197,8 +197,8 @@ mod tests {
         });
     }
 
-    #[test]
-    fn session_multiplexer_inspect_tree() {
+    #[fuchsia::test]
+    async fn session_multiplexer_inspect_tree() {
         let inspect = inspect::Inspector::default();
 
         let mut multiplexer = SessionMultiplexerInspect::default()
@@ -225,8 +225,8 @@ mod tests {
         });
     }
 
-    #[test]
-    fn session_channel_inspect_tree() {
+    #[fuchsia::test]
+    async fn session_channel_inspect_tree() {
         let inspect = inspect::Inspector::default();
         let mut channel =
             SessionChannelInspect::default().with_inspect(inspect.root(), "channel").unwrap();
@@ -271,14 +271,14 @@ mod tests {
 
     #[test]
     fn duplex_data_stream_inspect_tree_updates_when_changed() {
-        let exec = fasync::TestExecutor::new_with_fake_time();
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::MonotonicInstant::from_nanos(1_234_567));
 
         let inspect = inspect::Inspector::default();
         let mut stream =
             DuplexDataStreamInspect::default().with_inspect(inspect.root(), "stream").unwrap();
         // Default inspect tree.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             inbound_stream: {
                 bytes_per_second_current: 0u64,
                 streaming_secs: 0u64,
@@ -293,7 +293,7 @@ mod tests {
 
         stream.start();
         // Both nodes should have same start_time.
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             inbound_stream: {
                 bytes_per_second_current: 0u64,
                 start_time: 1_234_567i64,
@@ -311,7 +311,7 @@ mod tests {
         exec.set_fake_time(zx::MonotonicDuration::from_seconds(1).after_now());
         // An inbound transfer should have no impact on the outbound stats.
         stream.record_inbound_transfer(500, fasync::MonotonicInstant::now());
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             inbound_stream: {
                 bytes_per_second_current: 500u64,
                 start_time: 1_234_567i64,
@@ -328,7 +328,7 @@ mod tests {
 
         exec.set_fake_time(zx::MonotonicDuration::from_seconds(1).after_now());
         stream.record_outbound_transfer(250, fasync::MonotonicInstant::now());
-        assert_data_tree!(inspect, root: {
+        assert_data_tree!(@executor exec, inspect, root: {
             inbound_stream: {
                 bytes_per_second_current: 500u64, // 500 bytes in 1 second
                 start_time: 1_234_567i64,

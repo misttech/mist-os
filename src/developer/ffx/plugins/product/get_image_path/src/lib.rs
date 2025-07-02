@@ -10,8 +10,8 @@ use ffx_config::EnvironmentContext;
 use ffx_product_get_image_path_args::{GetImagePathCommand, ImageType, Slot};
 use ffx_writer::VerifiedMachineWriter;
 use fho::{bug, return_user_error, user_error, Error, FfxMain, FfxTool, Result};
+use product_bundle::ProductBundle;
 use schemars::JsonSchema;
-use sdk_metadata::ProductBundle;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use utf8_path::path_relative_from;
@@ -149,7 +149,7 @@ impl PbGetImagePathTool {
                 (Image::ZBI { path, .. }, Some(ImageType::Zbi))
                 | (Image::VBMeta(path), Some(ImageType::VBMeta))
                 | (Image::FVM(path), Some(ImageType::Fvm))
-                | (Image::Fxfs { path, .. }, Some(ImageType::Fxfs))
+                | (Image::Fxfs(path), Some(ImageType::Fxfs))
                 | (Image::FxfsSparse { path, .. }, Some(ImageType::FxfsFastboot))
                 | (Image::QemuKernel(path), Some(ImageType::QemuKernel))
                 | (Image::Dtbo(path), Some(ImageType::Dtbo)) => Some(self.compute_path(path)),
@@ -167,7 +167,7 @@ mod tests {
     use assembly_partitions_config::PartitionsConfig;
     use ffx_config::ConfigLevel;
     use ffx_writer::{Format, TestBuffers};
-    use sdk_metadata::ProductBundleV2;
+    use product_bundle::ProductBundleV2;
     use std::fs;
     use std::fs::File;
     use std::io::Write;
@@ -254,6 +254,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
 
         // Each test case is in its own scope
@@ -382,6 +383,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         let tool = PbGetImagePathTool {
             cmd: GetImagePathCommand {
@@ -425,6 +427,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         pb.write(Utf8Path::from_path(&pb_path).expect("temp dir to utf8 path"))
             .expect("temp test product bundle");
@@ -493,6 +496,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         pb.write(Utf8Path::from_path(&pb_path).expect("temp dir to utf8 path"))
             .expect("temp test product bundle");
@@ -567,6 +571,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         });
         pb.write(Utf8Path::from_path(&pb_path).expect("temp dir to utf8 path"))
             .expect("temp test product bundle");

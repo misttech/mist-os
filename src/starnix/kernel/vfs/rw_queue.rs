@@ -55,9 +55,9 @@ impl<L> RwQueue<L> {
 
     pub fn read_and<'a, P>(
         &'a self,
-        locked: &'a mut Locked<'_, P>,
+        locked: &'a mut Locked<P>,
         current_task: &CurrentTask,
-    ) -> Result<(RwQueueReadGuard<'_, L>, Locked<'_, L>), Errno>
+    ) -> Result<(RwQueueReadGuard<'a, L>, &'a mut Locked<L>), Errno>
     where
         P: LockBefore<L>,
     {
@@ -70,9 +70,9 @@ impl<L> RwQueue<L> {
 
     pub fn write_and<'a, P>(
         &'a self,
-        locked: &'a mut Locked<'_, P>,
+        locked: &'a mut Locked<P>,
         current_task: &CurrentTask,
-    ) -> Result<(RwQueueWriteGuard<'_, L>, Locked<'_, L>), Errno>
+    ) -> Result<(RwQueueWriteGuard<'a, L>, &'a mut Locked<L>), Errno>
     where
         P: LockBefore<L>,
     {
@@ -101,9 +101,9 @@ impl<L> RwQueue<L> {
 
     pub fn read<'a, P>(
         &'a self,
-        locked: &'a mut Locked<'_, P>,
+        locked: &'a mut Locked<P>,
         current_task: &CurrentTask,
-    ) -> Result<RwQueueReadGuard<'_, L>, Errno>
+    ) -> Result<RwQueueReadGuard<'a, L>, Errno>
     where
         P: LockBefore<L>,
     {
@@ -112,7 +112,7 @@ impl<L> RwQueue<L> {
 
     pub fn write<'a, P>(
         &'a self,
-        locked: &'a mut Locked<'_, P>,
+        locked: &'a mut Locked<P>,
         current_task: &CurrentTask,
     ) -> Result<RwQueueWriteGuard<'_, L>, Errno>
     where
@@ -125,8 +125,8 @@ impl<L> RwQueue<L> {
     #[cfg(any(test, debug_assertions))]
     pub fn read_for_lock_ordering<'a, P>(
         &'a self,
-        locked: &'a mut Locked<'_, P>,
-    ) -> (RwQueueReadGuard<'_, L>, Locked<'_, L>)
+        locked: &'a mut Locked<P>,
+    ) -> (RwQueueReadGuard<'a, L>, &'a mut Locked<L>)
     where
         P: LockBefore<L>,
     {

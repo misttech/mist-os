@@ -1,6 +1,6 @@
 This library provides polyfills for different versions of the standard library.
 
-Constructs are withing namespaces for each specific version, such as "cpp17, cpp20".
+Constructs are withing namespaces for each specific version, such as "cpp20, cpp23".
 
 Polyfills will only be used when the standard version is not available.
 

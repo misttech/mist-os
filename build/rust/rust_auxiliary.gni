@@ -270,7 +270,7 @@ template("rust_auxiliary") {
         "${rebased_rustc_prefix}/bin/clippy-driver",
         rebase_path(invoker.crate_root, root_build_dir),
         "--sysroot=${rebased_rustc_prefix}",
-        "--crate-type=${invoker.rust_crate_type}",
+        "--crate-type=${invoker.crate_type}",
       ]
 
       if (clippy_force_warn_all) {
@@ -292,7 +292,7 @@ template("rust_auxiliary") {
       args += [ "{{rustflags}}" ]
       args += invoker.rustflags
 
-      if (invoker.rust_crate_type == "proc-macro") {
+      if (invoker.crate_type == "proc-macro") {
         args += [ "--extern=proc_macro" ]
       }
 
@@ -322,17 +322,17 @@ template("rust_auxiliary") {
                              [
                                "configs",
                                "crate_root",
+                               "crate_type",
                                "data_deps",
                                "metadata",
                                "public_deps",
                                "quiet_rustdoc",
                                "rustdoc_args",
-                               "rust_crate_type",
                                "rustenv",
+                               "sources",
                                "testonly",
                                "visibility",
                                "zip_rustdoc_to",
-                               "sources",
                              ])
       script = "//build/rust/rustdoc_wrapper.py"
       mnemonic = "DOC"
@@ -351,7 +351,10 @@ template("rust_auxiliary") {
       # per-target, user-configurable, (opt-in?) basis. There are
       # rustdoc-specific lints that should be acted upon to improve doc quality
       # (https://doc.rust-lang.org/rustdoc/lints.html).
-      configs += [ "//build/config/rust:cap_lints_allow" ]
+      _allow_lint_cfg = [ "//build/config/rust:cap_lints_allow" ]
+      if (configs + _allow_lint_cfg - _allow_lint_cfg == configs) {
+        configs += _allow_lint_cfg
+      }
 
       if (!defined(quiet_rustdoc)) {
         quiet_rustdoc = false
@@ -424,12 +427,12 @@ template("rust_auxiliary") {
         rebase_path(_rustdoc_out_dir, root_build_dir),
         "@" + rebase_path(_transdeps_output, root_build_dir),
         "--sysroot=${rebased_rustc_prefix}",
-        "--crate-type=${rust_crate_type}",
+        "--crate-type=${crate_type}",
         "--crate-name=${_crate_name}",
         "{{rustflags}}",
       ]
       args += invoker.rustflags
-      if (rust_crate_type == "proc-macro") {
+      if (crate_type == "proc-macro") {
         args += [ "--extern=proc_macro" ]
       }
       if (defined(rustdoc_args)) {
@@ -485,10 +488,10 @@ template("rust_auxiliary") {
       data_deps += [ ":${_clippy_name}" ]
     }
 
-    assert(invoker.rust_crate_type != "lib",
+    assert(invoker.crate_type != "lib",
            "always explicitly rlib in our build system")
-    _can_have_reverse_deps = invoker.rust_crate_type == "rlib" ||
-                             invoker.rust_crate_type == "proc-macro"
+    _can_have_reverse_deps =
+        invoker.crate_type == "rlib" || invoker.crate_type == "proc-macro"
     if (_can_have_reverse_deps) {
       _rlib_path = rebase_path(invoker.rlib_path, root_build_dir)
       _searchdir_path = rebase_path(invoker.searchdir_path, root_build_dir)

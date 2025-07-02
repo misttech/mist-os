@@ -115,3 +115,47 @@ def fetch_cipd_contents(ctx, cipd_bin, cipd_ensure_file, root = "."):
     )
     if result.return_code != 0:
         fail("Unable to download cipd content for {}\n{}".format(cipd_ensure_file, result.stderr))
+
+def is_full_bazel_label(s):
+    """Checks if a string is a full Bazel label.
+
+    For example:
+
+        * @@myrepo//my/app/main:app_binary
+        * @myrepo//my/app/main:app_binary
+        * //my/app/main:app_binary
+
+    Args:
+      s: A string to check.
+
+    Returns:
+      True if the string is a full Bazel label, False otherwise.
+    """
+    return s.startswith("@") or s.startswith("//")
+
+def is_full_gn_label(s):
+    """Checks if a string is a GN path.
+
+    Args:
+      s: A string to check.
+
+    Returns:
+      True if the string is a full GN label, False otherwise.
+    """
+    return s.startswith("//")
+
+def abspath_from_full_label_or_repo_relpath(repo_ctx, label_or_relpath):
+    """Returns absolute path for input full label or repository relative path.
+
+    Args:
+      repo_ctx: A Bazel repository context
+      label_or_relpath: A string, it can be either a full Bazel label, or a path
+        relative to repository root.
+
+    Returns:
+      Absolute path based on input label_or_relpath.
+    """
+    p = label_or_relpath
+    if is_full_bazel_label(label_or_relpath):
+        p = str(repo_ctx.path(Label(label_or_relpath)))
+    return workspace_path(repo_ctx, p)

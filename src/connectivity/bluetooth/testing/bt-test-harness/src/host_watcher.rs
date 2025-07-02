@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{format_err, Context, Error};
-use fidl_fuchsia_bluetooth_sys::{HostWatcherMarker, HostWatcherProxy};
+use fidl_fuchsia_bluetooth_sys::HostWatcherProxy;
 use fidl_fuchsia_hardware_bluetooth::EmulatorProxy;
 use fuchsia_bluetooth::expectation::asynchronous::{
     expectable, Expectable, ExpectableExt, ExpectableState, ExpectableStateExt,
@@ -70,7 +70,7 @@ async fn watch_hosts(harness: HostWatcherHarness) -> Result<(), Error> {
 pub async fn new_host_watcher_harness(realm: Arc<CoreRealm>) -> Result<HostWatcherHarness, Error> {
     let proxy = realm
         .instance()
-        .connect_to_protocol_at_exposed_dir::<HostWatcherMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("Failed to connect to host_watcher service")?;
 
     Ok(HostWatcherHarness { expect: expectable(Default::default(), proxy), realm })

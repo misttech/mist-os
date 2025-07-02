@@ -59,7 +59,7 @@ mod tests {
     use fuchsia_inspect::Inspector;
 
     #[fuchsia::test]
-    fn test_insert() {
+    async fn test_insert() {
         let inspector = Inspector::default();
         let cache_node = inspector.root().create_child("cache");
         let mut cache_node = LruCacheNode::new(cache_node, 3);
@@ -115,7 +115,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_insert_custom_struct() {
+    async fn test_insert_custom_struct() {
         let inspector = Inspector::default();
         let cache_node = inspector.root().create_child("cache");
         let mut cache_node = LruCacheNode::new(cache_node, 3);

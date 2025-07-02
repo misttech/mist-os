@@ -32,5 +32,11 @@
             to: "#fs-collection",
             availability: "same_as_target",
         },
+        {
+            protocol: "fuchsia.memorypressure.Provider",
+            from: "void",
+            to: "#fs-collection",
+            availability: "optional",
+        },
     ],
 }

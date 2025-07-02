@@ -198,14 +198,14 @@ struct SymbolInfo<'a> {
 }
 
 #[derive(Debug)]
-struct ElfFile {
+pub struct ElfFile {
     contents: ElfFileContents,
     strings: StringsSection,
     symbols_header: Elf64SectionHeader,
 }
 
 impl ElfFile {
-    fn new(path: &str) -> Result<Self, Error> {
+    pub fn new(path: &str) -> Result<Self, Error> {
         let mut data = Vec::new();
         let mut file = fs::File::open(path)?;
         file.read_to_end(&mut data)?;
@@ -279,7 +279,14 @@ pub fn load_ebpf_program(
     program_name: &str,
 ) -> Result<ProgramDefinition, Error> {
     let elf_file = ElfFile::new(path)?;
+    load_ebpf_program_from_file(&elf_file, section_name, program_name)
+}
 
+pub fn load_ebpf_program_from_file(
+    elf_file: &ElfFile,
+    section_name: &str,
+    program_name: &str,
+) -> Result<ProgramDefinition, Error> {
     if elf_file.contents.header()?.machine != EM_BPF {
         return Err(Error::InvalidArch);
     }
@@ -297,42 +304,48 @@ pub fn load_ebpf_program(
     let mut map_indices = HashMap::new();
 
     let rel_table_section_name = format!(".rel{}", section_name);
-    let rel_table = elf_file.get_section(BStr::new(&rel_table_section_name))?;
-    let rel_entries = <[Elf64_Rel]>::ref_from_bytes(rel_table)
-        .map_err(|_| Error::ElfParse("Failed to parse .rel.text section"))?;
-    for rel in rel_entries.iter().filter(|rel| {
-        rel.offset >= prog_sym.offset && rel.offset < prog_sym.offset + prog_sym.data.len()
-    }) {
-        let offset = rel.offset - prog_sym.offset;
-        if offset % mem::size_of::<EbpfInstruction>() != 0 {
-            return Err(Error::ElfParse("Invalid relocation offset"));
-        }
-        let pc = offset / mem::size_of::<EbpfInstruction>();
-        let sym_index = (rel.info >> 32) as usize;
-        let sym = elf_file.symbol_by_index(sym_index)?;
-        let map_index = match map_indices.entry(sym.name) {
-            hash_map::Entry::Occupied(e) => *e.get(),
-            hash_map::Entry::Vacant(e) => {
-                let (def, _) = bpf_map_def::ref_from_prefix(sym.data)
-                    .map_err(|_| Error::ElfParse("Failed to load map definition"))?;
-                maps.push(MapDefinition {
-                    name: sym.name.to_owned(),
-                    schema: MapSchema {
-                        map_type: def.map_type,
-                        key_size: def.key_size,
-                        value_size: def.value_size,
-                        max_entries: def.max_entries,
-                    },
-                    flags: def.flags,
-                });
-                *e.insert(maps.len() - 1)
+    let rel_table = match elf_file.get_section(BStr::new(&rel_table_section_name)) {
+        Ok(r) => Some(r),
+        Err(Error::ElfMissingSection(_)) => None,
+        Err(e) => return Err(e),
+    };
+    if let Some(rel_table) = rel_table {
+        let rel_entries = <[Elf64_Rel]>::ref_from_bytes(rel_table)
+            .map_err(|_| Error::ElfParse("Failed to parse .rel section"))?;
+        for rel in rel_entries.iter().filter(|rel| {
+            rel.offset >= prog_sym.offset && rel.offset < prog_sym.offset + prog_sym.data.len()
+        }) {
+            let offset = rel.offset - prog_sym.offset;
+            if offset % mem::size_of::<EbpfInstruction>() != 0 {
+                return Err(Error::ElfParse("Invalid relocation offset"));
             }
-        };
+            let pc = offset / mem::size_of::<EbpfInstruction>();
+            let sym_index = (rel.info >> 32) as usize;
+            let sym = elf_file.symbol_by_index(sym_index)?;
+            let map_index = match map_indices.entry(sym.name) {
+                hash_map::Entry::Occupied(e) => *e.get(),
+                hash_map::Entry::Vacant(e) => {
+                    let (def, _) = bpf_map_def::ref_from_prefix(sym.data)
+                        .map_err(|_| Error::ElfParse("Failed to load map definition"))?;
+                    maps.push(MapDefinition {
+                        name: sym.name.to_owned(),
+                        schema: MapSchema {
+                            map_type: def.map_type,
+                            key_size: def.key_size,
+                            value_size: def.value_size,
+                            max_entries: def.max_entries,
+                        },
+                        flags: def.flags,
+                    });
+                    *e.insert(maps.len() - 1)
+                }
+            };
 
-        // Insert map index to the code. The actual map address is inserted
-        // later, when the program is linked.
-        code[pc].set_src_reg(ebpf::BPF_PSEUDO_MAP_IDX);
-        code[pc].set_imm(map_index as i32);
+            // Insert map index to the code. The actual map address is inserted
+            // later, when the program is linked.
+            code[pc].set_src_reg(ebpf::BPF_PSEUDO_MAP_IDX);
+            code[pc].set_imm(map_index as i32);
+        }
     }
 
     Ok(ProgramDefinition { code, maps })

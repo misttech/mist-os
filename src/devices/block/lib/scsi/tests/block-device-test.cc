@@ -426,6 +426,11 @@ class BlockDeviceTest : public ::testing::Test {
         /*times=*/10);
   }
 
+  zx::result<PostProcess> CheckScsiStatus(StatusCode status_code,
+                                          FixedFormatSenseDataHeader& sense_data) {
+    return driver_test().driver()->CheckScsiStatus(status_code, sense_data);
+  }
+
  private:
   fdf_testing::ForegroundDriverTest<TestConfig> driver_test_;
   int default_seq_ = 0;
@@ -519,6 +524,216 @@ TEST_F(BlockDeviceTest, TestCreateReadDestroy) {
     EXPECT_EQ(check_buffer[i], 0x01);
   }
   driver_test().driver()->AsyncIoRelease();
+}
+
+TEST_F(BlockDeviceTest, ScsiComplete) {
+  ASSERT_OK(BlockDevice::Bind(driver_test().driver(), kTarget, kLun, kTransferSize,
+                              DeviceOptions(/*check_unmap_support=*/true, /*use_mode_sense_6=*/true,
+                                            /*use_read_write_12=*/true)));
+  driver_test().RunInNodeContext(
+      [](fdf_testing::TestNode& node) { ASSERT_EQ(size_t{1}, node.children().size()); });
+
+  StatusMessage status_message = {HostStatusCode::kOk, StatusCode::GOOD};
+
+  FixedFormatSenseDataHeader sense_data;
+  sense_data.set_response_code(SenseDataResponseCodes::kFixedCurrentInformation);
+  sense_data.set_filemark(false);
+  sense_data.set_eom(false);
+  sense_data.set_ili(false);
+  sense_data.set_sense_key(SenseKey::NO_SENSE);
+  // ASC=00h, ASCQ=00h, NO ADDITIONAL SENSE INFORMATION
+  sense_data.additional_sense_code = 0x0;
+  sense_data.additional_sense_code_qualifier = 0x0;
+
+  // Success
+  EXPECT_OK(driver_test().driver()->ScsiComplete(status_message, sense_data));
+
+  // Abort
+  status_message.host_status_code = HostStatusCode::kAbort;
+  EXPECT_EQ(driver_test().driver()->ScsiComplete(status_message, sense_data).status_value(),
+            ZX_ERR_IO_REFUSED);
+
+  // Unexpected host status value
+  status_message.host_status_code = HostStatusCode::kUnknown;
+  EXPECT_EQ(driver_test().driver()->ScsiComplete(status_message, sense_data).status_value(),
+            ZX_ERR_BAD_STATE);
+
+  // Error handling
+  status_message.host_status_code = HostStatusCode::kTimeout;
+  EXPECT_OK(driver_test().driver()->ScsiComplete(status_message, sense_data));
+
+  // Retry
+  status_message.host_status_code = HostStatusCode::kRequeue;
+  EXPECT_EQ(driver_test().driver()->ScsiComplete(status_message, sense_data).status_value(),
+            ZX_ERR_BAD_STATE);
+}
+
+TEST_F(BlockDeviceTest, CheckScsiStatus) {
+  ASSERT_OK(BlockDevice::Bind(driver_test().driver(), kTarget, kLun, kTransferSize,
+                              DeviceOptions(/*check_unmap_support=*/true, /*use_mode_sense_6=*/true,
+                                            /*use_read_write_12=*/true)));
+  driver_test().RunInNodeContext(
+      [](fdf_testing::TestNode& node) { ASSERT_EQ(size_t{1}, node.children().size()); });
+
+  FixedFormatSenseDataHeader sense_data;
+  sense_data.set_response_code(SenseDataResponseCodes::kFixedCurrentInformation);
+  sense_data.set_filemark(false);
+  sense_data.set_eom(false);
+  sense_data.set_ili(false);
+  sense_data.set_sense_key(SenseKey::NO_SENSE);
+  // ASC=00h, ASCQ=00h, NO ADDITIONAL SENSE INFORMATION
+  sense_data.additional_sense_code = 0x0;
+  sense_data.additional_sense_code_qualifier = 0x0;
+
+  // StatusCode::GOOD, TASK_ABORTED
+  {
+    EXPECT_OK(CheckScsiStatus(StatusCode::GOOD, sense_data));
+  }
+
+  // StatusCode::CHECK_CONDITION
+  {
+    auto post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_OK(post_process);
+    EXPECT_EQ(post_process.value(), PostProcess::kNone);
+  }
+
+  // StatusCode::TASK_SET_FULL
+  {
+    auto post_process = CheckScsiStatus(StatusCode::TASK_SET_FULL, sense_data);
+    EXPECT_OK(post_process);
+    EXPECT_EQ(post_process.value(), PostProcess::kNeedsRetry);
+  }
+
+  // StatusCode::BUSY
+  {
+    auto post_process = CheckScsiStatus(StatusCode::BUSY, sense_data);
+    EXPECT_OK(post_process);
+    EXPECT_EQ(post_process.value(), PostProcess::kNeedsRetry);
+  }
+
+  // Not supported status codes
+  {
+    auto post_process = CheckScsiStatus(StatusCode::CONDITION_MET, sense_data);
+    EXPECT_EQ(post_process.status_value(), ZX_ERR_NOT_SUPPORTED);
+  }
+}
+
+TEST_F(BlockDeviceTest, CheckSenseData) {
+  ASSERT_OK(BlockDevice::Bind(driver_test().driver(), kTarget, kLun, kTransferSize,
+                              DeviceOptions(/*check_unmap_support=*/true, /*use_mode_sense_6=*/true,
+                                            /*use_read_write_12=*/true)));
+  driver_test().RunInNodeContext(
+      [](fdf_testing::TestNode& node) { ASSERT_EQ(size_t{1}, node.children().size()); });
+
+  FixedFormatSenseDataHeader sense_data;
+  sense_data.set_response_code(SenseDataResponseCodes::kFixedCurrentInformation);
+  sense_data.set_filemark(false);
+  sense_data.set_eom(false);
+  sense_data.set_ili(false);
+  sense_data.set_sense_key(SenseKey::NO_SENSE);
+  // ASC=00h, ASCQ=00h, NO ADDITIONAL SENSE INFORMATION
+  sense_data.additional_sense_code = 0x0;
+  sense_data.additional_sense_code_qualifier = 0x0;
+
+  // Invalid response code
+  {
+    sense_data.set_response_code(SenseDataResponseCodes::kDescriptorCurrentInformation);
+    auto post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_EQ(post_process.status_value(), ZX_ERR_NOT_SUPPORTED);
+
+    sense_data.set_response_code(SenseDataResponseCodes::kFixedCurrentInformation);
+  }
+
+  // Invalid FILEMARK, EOM, ILI
+  {
+    sense_data.set_filemark(true);
+    auto post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_EQ(post_process.status_value(), ZX_ERR_INVALID_ARGS);
+    sense_data.set_filemark(false);
+  }
+
+  // Invalid EOM
+  {
+    sense_data.set_eom(true);
+    auto post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_EQ(post_process.status_value(), ZX_ERR_INVALID_ARGS);
+    sense_data.set_eom(false);
+  }
+
+  // Invalid ILI
+  {
+    sense_data.set_ili(true);
+    auto post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_EQ(post_process.status_value(), ZX_ERR_INVALID_ARGS);
+    sense_data.set_ili(false);
+  }
+
+  // SenseKey::NO_SENSE
+  {
+    sense_data.set_sense_key(SenseKey::NO_SENSE);
+    auto post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_OK(post_process);
+    EXPECT_EQ(post_process.value(), PostProcess::kNone);
+  }
+
+  // SenseKey::RECOVERED_ERROR
+  {
+    sense_data.set_sense_key(SenseKey::NO_SENSE);
+    auto post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_OK(post_process);
+    EXPECT_EQ(post_process.value(), PostProcess::kNone);
+  }
+
+  // SenseKey::ABORTED_COMMAND
+  {
+    sense_data.set_sense_key(SenseKey::ABORTED_COMMAND);
+    sense_data.additional_sense_code = 0x10;  // DIF
+    auto post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_EQ(post_process.status_value(), ZX_ERR_IO_DATA_INTEGRITY);
+
+    // ASC=0x2e, ASCQ=0x01: COMMAND TIMEOUT BEFORE PROCESSING
+    sense_data.additional_sense_code = 0x2e;
+    sense_data.additional_sense_code_qualifier = 0x01;
+    post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_EQ(post_process.status_value(), ZX_ERR_TIMED_OUT);
+    sense_data.additional_sense_code = 0;
+    sense_data.additional_sense_code_qualifier = 0;
+
+    post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_OK(post_process);
+    EXPECT_EQ(post_process.value(), PostProcess::kNeedsRetry);
+  }
+
+  // SenseKey::NOT_READY, UNIT_ATTENTION
+  {
+    // Expected UNIT_ATTENTION
+    sense_data.set_sense_key(SenseKey::UNIT_ATTENTION);
+    driver_test().driver()->SetExpectCheckConditionOrUnitAttention(true);
+    auto post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_OK(post_process);
+    EXPECT_EQ(post_process.value(), PostProcess::kNeedsRetry);
+
+    // Unit is not ready
+    driver_test().driver()->SetExpectCheckConditionOrUnitAttention(false);
+    // ASC=0x04, ASCQ=0x01: LOGICAL UNIT IS IN PROCESS OF BECOMING READY
+    sense_data.additional_sense_code = 0x04;
+    sense_data.additional_sense_code_qualifier = 0x01;
+    post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_OK(post_process);
+    EXPECT_EQ(post_process.value(), PostProcess::kNeedsRetry);
+    sense_data.additional_sense_code = 0;
+    sense_data.additional_sense_code_qualifier = 0;
+
+    post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_EQ(post_process.status_value(), ZX_ERR_BAD_STATE);
+  }
+
+  // Not supported
+  {
+    sense_data.set_sense_key(SenseKey::MEDIUM_ERROR);
+    auto post_process = CheckScsiStatus(StatusCode::CHECK_CONDITION, sense_data);
+    EXPECT_EQ(post_process.status_value(), ZX_ERR_NOT_SUPPORTED);
+  }
 }
 
 }  // namespace scsi

@@ -53,6 +53,10 @@
                     use_type: "protocol",
                     use_path: "/svc/fuchsia.inspect.InspectSink",
                 },
+                {
+                    use_type: "protocol",
+                    use_path: "/svc/fuchsia.pkg.PackageResolver",
+                },
 
                 // TODO(fxbug.dev/42072443) add verification for these routes (by uncommmenting
                 // the entries in routes_to_verify) once pkg_cache_resolver is removed.

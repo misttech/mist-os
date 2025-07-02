@@ -16,7 +16,9 @@ use net_types::ip::{
     Ipv6Addr, Mtu, Subnet,
 };
 use net_types::{MulticastAddr, SpecifiedAddr, UnicastAddr, Witness as _, ZonedAddr};
-use packet::{Buf, InnerPacketBuilder, ParseBuffer, ParseMetadata, Serializer as _};
+use packet::{
+    Buf, InnerPacketBuilder, PacketBuilder as _, ParseBuffer, ParseMetadata, Serializer as _,
+};
 use packet_formats::ethernet::{
     EthernetFrame, EthernetFrameBuilder, EthernetFrameLengthCheck, EthernetIpExt as _,
     ETHERNET_MIN_BODY_LEN_NO_TAG,
@@ -70,8 +72,8 @@ use netstack3_ip::testutil::IpCounterExpectations;
 use netstack3_ip::{
     self as ip, AddableEntryEither, AddableMetric, AddressStatus, Destination, DropReason,
     FragmentTimerId, FragmentationCounters, InternalForwarding, IpDeviceIngressStateContext,
-    IpLayerTimerId, Ipv4PresentAddressStatus, Ipv6PresentAddressStatus, Ipv6RxCounters, NextHop,
-    RawMetric, ReceivePacketAction, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
+    IpLayerTimerId, Ipv4PresentAddressStatus, Ipv6PresentAddressStatus, NextHop, RawMetric,
+    ReceivePacketAction, ResolveRouteError, ResolvedRoute, RoutableIpAddr,
 };
 
 // Some helper functions
@@ -201,8 +203,7 @@ fn process_ipv4_fragment(
     builder.mf_flag(m_flag);
     let mut body: Vec<u8> = Vec::new();
     body.extend(fragment_offset * 8..fragment_offset * 8 + 8);
-    let buffer =
-        Buf::new(body, ..).encapsulate(builder).serialize_vec_outer().unwrap().into_inner();
+    let buffer = builder.wrap_body(Buf::new(body, ..)).serialize_vec_outer().unwrap().into_inner();
     ctx.test_api().receive_ip_packet::<Ipv4, _>(
         device,
         Some(FrameDestination::Individual { local: true }),
@@ -788,12 +789,7 @@ fn test_ipv6_packet_too_big() {
     // Ip packet from some node destined to a remote on this network,
     // arriving locally.
     let mut ipv6_packet_buf = Buf::new(body, ..)
-        .encapsulate(Ipv6PacketBuilder::new(
-            extra_ip,
-            fake_config.remote_ip,
-            64,
-            IpProto::Udp.into(),
-        ))
+        .wrap_in(Ipv6PacketBuilder::new(extra_ip, fake_config.remote_ip, 64, IpProto::Udp.into()))
         .serialize_vec_outer()
         .unwrap();
     // Receive the IP packet.
@@ -857,7 +853,7 @@ fn create_packet_too_big_buf<A: IpAddress>(
 
     match [src_ip, dst_ip].into() {
         IpAddr::V4([src_ip, dst_ip]) => body
-            .encapsulate(IcmpPacketBuilder::<Ipv4, IcmpDestUnreachable>::new(
+            .wrap_in(IcmpPacketBuilder::<Ipv4, IcmpDestUnreachable>::new(
                 dst_ip,
                 src_ip,
                 Icmpv4DestUnreachableCode::FragmentationRequired,
@@ -865,17 +861,17 @@ fn create_packet_too_big_buf<A: IpAddress>(
                     .map(IcmpDestUnreachable::new_for_frag_req)
                     .unwrap_or_else(Default::default),
             ))
-            .encapsulate(Ipv4PacketBuilder::new(src_ip, dst_ip, 64, Ipv4Proto::Icmp))
+            .wrap_in(Ipv4PacketBuilder::new(src_ip, dst_ip, 64, Ipv4Proto::Icmp))
             .serialize_vec_outer()
             .unwrap(),
         IpAddr::V6([src_ip, dst_ip]) => body
-            .encapsulate(IcmpPacketBuilder::<Ipv6, Icmpv6PacketTooBig>::new(
+            .wrap_in(IcmpPacketBuilder::<Ipv6, Icmpv6PacketTooBig>::new(
                 dst_ip,
                 src_ip,
                 IcmpZeroCode,
                 Icmpv6PacketTooBig::new(u32::from(mtu)),
             ))
-            .encapsulate(Ipv6PacketBuilder::new(src_ip, dst_ip, 64, Ipv6Proto::Icmpv6))
+            .wrap_in(Ipv6PacketBuilder::new(src_ip, dst_ip, 64, Ipv6Proto::Icmpv6))
             .serialize_vec_outer()
             .unwrap(),
     }
@@ -1037,7 +1033,7 @@ fn test_ip_update_pmtu_too_low<I: GetPmtuIpExt>() {
 /// where the original packet's body  length is `body_len`.
 fn create_orig_packet_buf(src_ip: Ipv4Addr, dst_ip: Ipv4Addr, body_len: usize) -> Buf<Vec<u8>> {
     Buf::new(vec![0; body_len], ..)
-        .encapsulate(Ipv4PacketBuilder::new(src_ip, dst_ip, 64, IpProto::Udp.into()))
+        .wrap_in(Ipv4PacketBuilder::new(src_ip, dst_ip, 64, IpProto::Udp.into()))
         .serialize_vec_outer()
         .unwrap()
         .into_inner()
@@ -1193,8 +1189,8 @@ fn test_invalid_icmpv4_in_ipv6() {
     );
 
     let buf = Buf::new(Vec::new(), ..)
-        .encapsulate(icmp_builder)
-        .encapsulate(ip_builder)
+        .wrap_in(icmp_builder)
+        .wrap_in(ip_builder)
         .serialize_vec_outer()
         .unwrap();
 
@@ -1241,8 +1237,8 @@ fn test_invalid_icmpv6_in_ipv4() {
     );
 
     let buf = Buf::new(Vec::new(), ..)
-        .encapsulate(icmp_builder)
-        .encapsulate(ip_builder)
+        .wrap_in(icmp_builder)
+        .wrap_in(ip_builder)
         .serialize_vec_outer()
         .unwrap();
 
@@ -1280,13 +1276,8 @@ fn test_joining_leaving_ip_multicast_group<I: TestIpExt + IpExt>() {
     let multi_addr = I::get_multicast_addr(3).get();
     let dst_mac = Mac::from(&MulticastAddr::new(multi_addr).unwrap());
     let buf = Buf::new(vec![0; 10], ..)
-        .encapsulate(I::PacketBuilder::new(
-            config.remote_ip.get(),
-            multi_addr,
-            64,
-            IpProto::Udp.into(),
-        ))
-        .encapsulate(EthernetFrameBuilder::new(
+        .wrap_in(I::PacketBuilder::new(config.remote_ip.get(), multi_addr, 64, IpProto::Udp.into()))
+        .wrap_in(EthernetFrameBuilder::new(
             config.remote_mac.get(),
             dst_mac,
             I::ETHER_TYPE,
@@ -1428,7 +1419,7 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
     let ip: Ipv6Addr = config.local_mac.to_ipv6_link_local().addr().get();
 
     let buf = Buf::new(vec![0; 10], ..)
-        .encapsulate(Ipv6PacketBuilder::new(config.remote_ip, ip, 64, IpProto::Udp.into()))
+        .wrap_in(Ipv6PacketBuilder::new(config.remote_ip, ip, 64, IpProto::Udp.into()))
         .serialize_vec_outer()
         .unwrap()
         .into_inner();
@@ -1441,7 +1432,7 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
         receive_ip_packet: 1,
         dropped: 1,
         send_ip_packet: 1,
-        version_rx: Ipv6RxCounters { drop_for_tentative: 1, ..Default::default() },
+        drop_for_tentative: 1,
         ..Default::default()
     }
     .assert_counters(&ctx.core_ctx(), &device);
@@ -1462,7 +1453,7 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
         receive_ip_packet: 2,
         dropped: 1,
         send_ip_packet: 1,
-        version_rx: Ipv6RxCounters { drop_for_tentative: 1, ..Default::default() },
+        drop_for_tentative: 1,
         dispatch_receive_ip_packet: 1,
         deliver_unicast: 1,
         ..Default::default()
@@ -1477,7 +1468,7 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
         .unwrap();
 
     let buf = Buf::new(vec![0; 10], ..)
-        .encapsulate(Ipv6PacketBuilder::new(config.remote_ip, ip, 64, IpProto::Udp.into()))
+        .wrap_in(Ipv6PacketBuilder::new(config.remote_ip, ip, 64, IpProto::Udp.into()))
         .serialize_vec_outer()
         .unwrap()
         .into_inner();
@@ -1488,7 +1479,7 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
         receive_ip_packet: 3,
         dropped: 2,
         send_ip_packet: 2,
-        version_rx: Ipv6RxCounters { drop_for_tentative: 2, ..Default::default() },
+        drop_for_tentative: 2,
         dispatch_receive_ip_packet: 1,
         deliver_unicast: 1,
         ..Default::default()
@@ -1508,7 +1499,7 @@ fn test_no_dispatch_non_ndp_packets_during_ndp_dad() {
         receive_ip_packet: 4,
         dropped: 2,
         send_ip_packet: 2,
-        version_rx: Ipv6RxCounters { drop_for_tentative: 2, ..Default::default() },
+        drop_for_tentative: 2,
         dispatch_receive_ip_packet: 2,
         deliver_unicast: 2,
         ..Default::default()
@@ -1535,7 +1526,7 @@ fn test_drop_multicast_source<I: IpExt + TestIpExt>() {
     ctx.test_api().enable_device(&device);
 
     let buf = Buf::new(vec![0; 10], ..)
-        .encapsulate(I::PacketBuilder::new(
+        .wrap_in(I::PacketBuilder::new(
             I::MULTICAST_SUBNET.network(),
             I::TEST_ADDRS.remote_ip.get(),
             64,
@@ -1561,7 +1552,7 @@ fn new_ip_packet_buf<I: IpExt>(src_addr: I::Addr, dst_addr: I::Addr) -> impl AsR
     const IP_BODY: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
     IP_BODY
         .into_serializer()
-        .encapsulate(I::PacketBuilder::new(src_addr, dst_addr, TTL, IpProto::Udp.into()))
+        .wrap_in(I::PacketBuilder::new(src_addr, dst_addr, TTL, IpProto::Udp.into()))
         .serialize_vec_outer()
         .unwrap()
 }
@@ -1669,7 +1660,7 @@ fn test_receive_ip_packet_action() {
             v4_config.local_ip.get()
         ),
         ReceivePacketAction::Deliver {
-            address_status: Ipv4PresentAddressStatus::Unicast,
+            address_status: Ipv4PresentAddressStatus::UnicastAssigned,
             internal_forwarding: InternalForwarding::NotUsed
         }
     );
@@ -1690,7 +1681,7 @@ fn test_receive_ip_packet_action() {
     assert_eq!(
         receive_ip_packet_action::<Ipv4>(&mut ctx, &v4_dev, *v4_config.local_ip),
         ReceivePacketAction::Deliver {
-            address_status: Ipv4PresentAddressStatus::Unicast,
+            address_status: Ipv4PresentAddressStatus::UnicastAssigned,
             internal_forwarding: InternalForwarding::NotUsed
         }
     );
@@ -2400,7 +2391,7 @@ fn lookup_route_v6only(
     assert_eq!(result, expected_result);
 }
 
-#[test_case(net_ip_v4!("127.0.0.1"), Ipv4PresentAddressStatus::Unicast)]
+#[test_case(net_ip_v4!("127.0.0.1"), Ipv4PresentAddressStatus::UnicastAssigned)]
 #[test_case(net_ip_v4!("127.0.0.2"), Ipv4PresentAddressStatus::LoopbackSubnet)]
 #[test_case(net_ip_v4!("127.255.255.255"), Ipv4PresentAddressStatus::SubnetBroadcast)]
 fn loopback_assignment_state_v4(addr: Ipv4Addr, status: Ipv4PresentAddressStatus) {
@@ -2575,19 +2566,19 @@ fn conntrack_entry_retained_across_loopback<I: TestDualStackIpExt + IpExt>(
             // Swap the IP version of the packet, but queue it with the same metadata (which
             // includes the cached conntrack entry).
             let frame = Buf::new(HELLO.to_vec(), ..)
-                .encapsulate(UdpPacketBuilder::new(
+                .wrap_in(UdpPacketBuilder::new(
                     I::OtherVersion::LOOPBACK_ADDRESS.get(),
                     I::OtherVersion::LOOPBACK_ADDRESS.get(),
                     Some(local_port),
                     LISTENER_PORT,
                 ))
-                .encapsulate(<I::OtherVersion as packet_formats::ip::IpExt>::PacketBuilder::new(
+                .wrap_in(<I::OtherVersion as packet_formats::ip::IpExt>::PacketBuilder::new(
                     I::OtherVersion::LOOPBACK_ADDRESS.get(),
                     I::OtherVersion::LOOPBACK_ADDRESS.get(),
                     64,
                     IpProto::Udp.into(),
                 ))
-                .encapsulate(EthernetFrameBuilder::new(
+                .wrap_in(EthernetFrameBuilder::new(
                     Mac::UNSPECIFIED,
                     Mac::UNSPECIFIED,
                     I::OtherVersion::ETHER_TYPE,

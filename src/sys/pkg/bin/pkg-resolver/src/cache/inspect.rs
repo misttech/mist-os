@@ -175,8 +175,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn initial_state() {
+    #[fuchsia::test]
+    async fn initial_state() {
         let inspector = Inspector::default();
 
         let _blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
@@ -194,8 +194,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn http_state_progression() {
+    #[fuchsia::test]
+    async fn http_state_progression() {
         let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
@@ -310,8 +310,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn state_does_not_change_other_data() {
+    #[fuchsia::test]
+    async fn state_does_not_change_other_data() {
         let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
@@ -363,8 +363,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn write_bytes_is_cumulative() {
+    #[fuchsia::test]
+    async fn write_bytes_is_cumulative() {
         let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
@@ -409,8 +409,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn multiple_fetches() {
+    #[fuchsia::test]
+    async fn multiple_fetches() {
         let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));
@@ -430,8 +430,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn multiple_attempts() {
+    #[fuchsia::test]
+    async fn multiple_attempts() {
         let inspector = Inspector::default();
 
         let blob_fetcher = BlobFetcher::from_node(inspector.root().create_child("blob_fetcher"));

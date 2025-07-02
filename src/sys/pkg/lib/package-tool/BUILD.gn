@@ -14,7 +14,7 @@ if (is_host) {
     with_unit_tests = true
 
     deps = [
-      "//build/sdk/meta:rust",
+      "//src/lib/assembly/product_bundle",
       "//src/lib/fuchsia-async",
       "//src/lib/fuchsia-lockfile:lib",
       "//src/lib/tempfile-ext",

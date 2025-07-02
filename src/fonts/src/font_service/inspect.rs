@@ -228,7 +228,7 @@ mod tests {
 
     #[allow(unused_variables)]
     #[fuchsia::test]
-    fn test_service_inspect_data() -> Result<(), Error> {
+    async fn test_service_inspect_data() -> Result<(), Error> {
         let inspector = finspect::Inspector::default();
 
         let manifest_paths = vec![

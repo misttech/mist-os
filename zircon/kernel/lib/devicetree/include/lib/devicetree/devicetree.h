@@ -246,7 +246,7 @@ class StringList {
     using value_type = std::string_view;
     using pointer = std::string_view*;
     using reference = std::string_view&;
-    using iterator_category = std::input_iterator_tag;
+    using iterator_category = std::forward_iterator_tag;
 
     constexpr iterator() = default;
     constexpr iterator(const iterator&) = default;
@@ -452,13 +452,18 @@ class PropertyValue {
 
   ByteView AsBytes() const { return bytes_; }
 
-  // Note that the spec requires this to be a NUL-terminated string.
   std::optional<std::string_view> AsString() const {
-    if (bytes_.empty() || bytes_.back() != '\0') {
+    if (bytes_.empty()) {
       return std::nullopt;
     }
-    // Exclude NUL terminator from factoring into the string_view's size.
-    return std::string_view{reinterpret_cast<const char*>(bytes_.data()), bytes_.size() - 1};
+
+    // While a string property is spec'd as including a NUL terminator, per
+    // Postel, we opt not to enforce that, trimming the NUL only if present.
+    std::string_view str{reinterpret_cast<const char*>(bytes_.data()), bytes_.size()};
+    if (str.back() == '\0') {
+      str.remove_suffix(1);
+    }
+    return str;
   }
 
   std::optional<StringList<>> AsStringList() const {

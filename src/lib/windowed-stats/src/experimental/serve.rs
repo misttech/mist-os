@@ -276,10 +276,8 @@ mod tests {
     use crate::experimental::series::metadata::BitSetMap;
     use crate::experimental::series::statistic::Union;
 
-    #[test]
-    fn serve_time_matrix_inspection_then_inspect_data_tree_contains_buffers() {
-        let _executor = fasync::TestExecutor::new_with_fake_time();
-
+    #[fuchsia::test]
+    async fn serve_time_matrix_inspection_then_inspect_data_tree_contains_buffers() {
         let inspector = Inspector::default();
         let (client, _server) =
             serve_time_matrix_inspection(inspector.root().create_child("serve_test_node"));
@@ -296,10 +294,8 @@ mod tests {
         });
     }
 
-    #[test]
-    fn serve_time_matrix_inspection_with_metadata_then_inspect_data_tree_contains_metadata() {
-        let _executor = fasync::TestExecutor::new_with_fake_time();
-
+    #[fuchsia::test]
+    async fn serve_time_matrix_inspection_with_metadata_then_inspect_data_tree_contains_metadata() {
         let inspector = Inspector::default();
         let (client, _server) =
             self::serve_time_matrix_inspection(inspector.root().create_child("serve_test_node"));

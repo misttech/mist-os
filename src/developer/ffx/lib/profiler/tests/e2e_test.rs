@@ -48,7 +48,6 @@ async fn profiler_symbolize_data() {
         "function: \"print_symbolize_data_bin::get_function_addr::to_be_symbolized_5()\","
     ));
     assert!(read_data_string.contains("zx_channel_create\","));
-    emu.stop().await;
 }
 
 async fn run_print_symbolize_data(emu: &IsolatedEmulator) -> String {

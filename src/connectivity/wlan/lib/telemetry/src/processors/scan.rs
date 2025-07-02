@@ -82,9 +82,7 @@ impl ScanLogger {
             }
         }
 
-        if !metric_events.is_empty() {
-            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_scan_result");
-        }
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_scan_result");
     }
 
     pub async fn handle_battery_charge_status(

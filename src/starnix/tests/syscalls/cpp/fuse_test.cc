@@ -847,6 +847,23 @@ TEST_F(FuseTest, Write) {
   EXPECT_EQ(write(fd.get(), "hello\n", 6), 6);
 }
 
+TEST_F(FuseTest, WriteAppend) {
+  ASSERT_TRUE(Mount());
+  std::string filename = GetMountDir() + "/file";
+  fbl::unique_fd fd(open(filename.c_str(), O_WRONLY | O_CREAT | O_APPEND));
+  ASSERT_TRUE(fd.is_valid());
+  EXPECT_EQ(write(fd.get(), "hello\n", 6), 6);
+  fd.reset(open(filename.c_str(), O_WRONLY | O_APPEND));
+  ASSERT_TRUE(fd.is_valid());
+  EXPECT_EQ(write(fd.get(), "hello\n", 6), 6);
+  EXPECT_EQ(write(fd.get(), "hello\n", 6), 6);
+
+  fd.reset(open(filename.c_str(), O_RDONLY));
+  char buffer[1024];
+  EXPECT_EQ(read(fd.get(), buffer, 1024), 18);
+  EXPECT_EQ(strncmp(buffer, "hello\nhello\nhello\n", 18), 0);
+}
+
 TEST_F(FuseTest, Statfs) {
   ASSERT_TRUE(Mount());
   struct statfs stats;
@@ -1111,7 +1128,7 @@ TEST_F(FuseServerTest, NoReqsUntilInitResponse) {
 
   // Send our (delayed) response to the FUSE_INIT request and make sure that the
   // access request is now completed.
-  server->SendInitResponse(init_hdr, 0);
+  ASSERT_TRUE(server->SendInitResponse(init_hdr, 0));
   thrd.join();
   EXPECT_TRUE(access_done);
 }

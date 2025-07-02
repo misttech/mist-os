@@ -5,6 +5,8 @@
 #ifndef LIB_DL_TEST_DL_SYSTEM_TESTS_H_
 #define LIB_DL_TEST_DL_SYSTEM_TESTS_H_
 
+#include <dlfcn.h>  // for dlinfo
+
 #include "dl-load-tests-base.h"
 
 #ifdef __Fuchsia__
@@ -35,6 +37,15 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // Fuchsia's dlclose is a no-op.
   static constexpr bool kDlCloseCanRunFinalizers = false;
   static constexpr bool kDlCloseUnloadsModules = false;
+  // Musl will "double-count" in its `.dlpi_adds` counter a module that was
+  // reused because of DT_SONAME match. For example, if a previously loaded
+  // module had a DT_SONAME that matched the filename of a module that is about
+  // to be loaded, Musl will reuse the previously loaded module, but it will
+  // still increment the counter as if a new module was loaded.
+  static constexpr bool kInaccurateLoadCountAfterSonameMatch = true;
+  // Musl attempts to fetch the same shlib from the filesystem twice, when its
+  // DT_SONAME is matched with another module in a linking session.
+  static constexpr bool kSonameLookupInPendingDeps = false;
 #endif
 
   fit::result<Error, void*> DlOpen(const char* file, int mode);
@@ -60,6 +71,14 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // This function is a no-op for system tests, since they manage their own TLS
   // setup.
   void PrepareForTlsAccess() {}
+
+  // Call the system's dlinfo to fill in the link map for the given handle, and
+  // return it to the caller.
+  static const link_map* ModuleLinkMap(void* handle) {
+    struct link_map* info = nullptr;
+    EXPECT_EQ(dlinfo(handle, RTLD_DI_LINKMAP, static_cast<void*>(&info)), 0) << dlerror();
+    return info;
+  }
 
  private:
   // This will call the system dlopen in an OS-specific context. This method is

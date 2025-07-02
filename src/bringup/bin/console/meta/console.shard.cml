@@ -332,7 +332,10 @@
             to: "#console-launcher",
         },
         {
-            protocol: [ "fuchsia.diagnostics.LogSettings" ],
+            protocol: [
+                "fuchsia.diagnostics.LogSettings",
+                "fuchsia.diagnostics.system.SerialLogControl",
+            ],
             from: "#archivist",
             to: [
                 "#console",
@@ -376,8 +379,6 @@
         },
         {
             protocol: [
-                "fuchsia.test.manager.Query",
-                "fuchsia.test.manager.RunBuilder",
                 "fuchsia.test.manager.SuiteRunner",
                 "fuchsia.test.manager.TestCaseEnumerator",
             ],

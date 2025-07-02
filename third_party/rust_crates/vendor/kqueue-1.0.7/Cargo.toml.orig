@@ -1,0 +1,28 @@
+[package]
+name = "kqueue"
+version = "1.0.7"
+authors = ["William Orr <will@worrbase.com>"]
+description = "kqueue interface for BSDs"
+license = "MIT"
+keywords = ["kqueue", "kevent", "bsd"]
+categories = ["os::unix-apis", "filesystem"]
+repository = "https://gitlab.com/rust-kqueue/rust-kqueue"
+readme = "README.md"
+documentation = "https://docs.worrbase.com/rust/kqueue/"
+edition = "2018"
+
+[package.metadata.docs.rs]
+targets = [
+	"x86_64-unknown-freebsd",
+	"x86_64-unknown-dragonfly",
+	"x86_64-unknown-openbsd",
+	"x86_64-unknown-netbsd",
+	"x86_64-apple-darwin",
+]
+
+[dependencies]
+kqueue-sys = "^1.0.3"
+libc = "^0.2.17"
+
+[dev-dependencies]
+tempfile = "3.1.0"

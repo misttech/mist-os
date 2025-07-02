@@ -6,6 +6,7 @@
 import abc
 from typing import Any
 
+from honeydew.affordances import affordance
 from honeydew.affordances.connectivity.bluetooth.bluetooth_common import (
     bluetooth_common,
 )
@@ -14,7 +15,7 @@ from honeydew.affordances.connectivity.bluetooth.utils import (
 )
 
 
-class Avrcp(bluetooth_common.BluetoothCommon):
+class Avrcp(affordance.Affordance, bluetooth_common.BluetoothCommon):
     """Abstract base class for Bluetooth AVRCP Profile affordance."""
 
     # List all the public methods

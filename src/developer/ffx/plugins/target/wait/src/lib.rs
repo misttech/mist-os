@@ -4,6 +4,7 @@
 
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
+use ffx_diagnostics::Notifier;
 use ffx_wait_args::WaitOptions;
 use ffx_writer::VerifiedMachineWriter;
 use fho::{Error, FfxContext, FfxMain, FfxTool, Result};
@@ -11,6 +12,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::future::Future;
 use std::time::Duration;
+
+const DEFAULT_DIAGNOSTICS_TIMEOUT_SECS: f64 = 2.0;
 
 #[derive(Debug, Deserialize, Serialize, JsonSchema, PartialEq)]
 #[serde(rename_all = "snake_case")]
@@ -65,6 +68,25 @@ pub struct WaitOperation<T: DeviceWaiter + fho::TryFromEnv> {
 
 fho::embedded_plugin!(WaitOperation<DeviceWaiterImpl>);
 
+async fn get_diagnostics_string(env: &EnvironmentContext, timeout: u64, e: Error) -> String {
+    let message = e.to_string();
+    let timeout = if timeout > 0 {
+        Duration::from_secs(timeout)
+    } else {
+        Duration::from_secs_f64(DEFAULT_DIAGNOSTICS_TIMEOUT_SECS)
+    };
+    let err = run_diagnostics(&env, timeout).await;
+    format!("{message}\nDiagnostics:{err}")
+}
+
+async fn run_diagnostics(env: &EnvironmentContext, timeout: Duration) -> String {
+    let mut notifier = ffx_diagnostics::StringNotifier::new();
+    if let Err(e) = ffx_diagnostics_checks::run_diagnostics(&env, &mut notifier, timeout).await {
+        notifier.on_error(format!("{e}")).unwrap();
+    }
+    notifier.into()
+}
+
 #[async_trait(?Send)]
 impl<T: DeviceWaiter + fho::TryFromEnv> FfxMain for WaitOperation<T> {
     type Writer = VerifiedMachineWriter<CommandStatus>;
@@ -76,12 +98,14 @@ impl<T: DeviceWaiter + fho::TryFromEnv> FfxMain for WaitOperation<T> {
                 Ok(())
             }
             Err(e @ Error::User(_)) => {
-                writer.machine(&CommandStatus::UserError { message: e.to_string() })?;
-                Err(e)
+                let message = get_diagnostics_string(&self.env, self.cmd.timeout, e).await;
+                writer.machine(&CommandStatus::UserError { message: message.clone() })?;
+                Err(Error::User(anyhow::anyhow!(message)))
             }
             Err(e) => {
-                writer.machine(&CommandStatus::UnexpectedError { message: e.to_string() })?;
-                Err(e)
+                let message = get_diagnostics_string(&self.env, self.cmd.timeout, e).await;
+                writer.machine(&CommandStatus::UnexpectedError { message: message.clone() })?;
+                Err(Error::Unexpected(anyhow::anyhow!(message)))
             }
         }
     }

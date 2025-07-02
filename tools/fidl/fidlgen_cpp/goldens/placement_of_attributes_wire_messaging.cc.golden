@@ -28,7 +28,7 @@ static_assert(offsetof(::test_placementofattributes::wire::ExampleProtocolMethod
 ::fidl::WireResult<::test_placementofattributes::ExampleProtocol::Method>::WireResult(
     ::fidl::UnownedClientEnd<::test_placementofattributes::ExampleProtocol> client,
     ::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>* request) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>, ::fidl::internal::ChannelTransport> request_message(
       ::fidl::internal::AllowUnownedInputRef{}, request);
   auto& outgoing = request_message.GetOutgoingMessage();
@@ -62,7 +62,7 @@ static_assert(offsetof(::test_placementofattributes::wire::ExampleProtocolMethod
 ::fidl::WireUnownedResult<::test_placementofattributes::ExampleProtocol::Method>::WireUnownedResult(const ::fidl::Status& result) : ::fidl::BaseWireResult<::test_placementofattributes::ExampleProtocol::Method>(result) {}
 
 ::fidl::OneWayStatus fidl::internal::WireWeakOnewayClientImpl<::test_placementofattributes::ExampleProtocol>::Method(const ::test_exampleusing::wire::Empty& arg) {
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method> _request_object{arg};
   ::fidl::internal::OwnedEncodedMessage<::fidl::internal::TransactionalRequest<::test_placementofattributes::ExampleProtocol::Method>, ::fidl::internal::ChannelTransport> _request_message(
       ::fidl::internal::AllowUnownedInputRef{}, &_request_object);

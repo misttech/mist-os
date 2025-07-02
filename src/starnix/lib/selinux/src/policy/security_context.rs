@@ -174,13 +174,10 @@ impl SecurityContext {
             .ok_or_else(|| SecurityContextError::UnknownType { name: type_.into() })?
             .id();
 
-        Ok(Self::new(
-            user,
-            role,
-            type_,
-            SecurityLevel::parse(policy_index, low_level)?,
-            high_level.map(|x| SecurityLevel::parse(policy_index, x)).transpose()?,
-        ))
+        let low_level = SecurityLevel::parse(policy_index, low_level)?;
+        let high_level = high_level.map(|x| SecurityLevel::parse(policy_index, x)).transpose()?;
+
+        Ok(Self::new(user, role, type_, low_level, high_level))
     }
 
     /// Returns this Security Context serialized to a byte string.
@@ -207,18 +204,28 @@ impl SecurityContext {
     ) -> Result<(), SecurityContextError> {
         let user = policy_index.parsed_policy().user(self.user);
 
-        // Validate that the selected role is valid for this user.
-        //
-        // Roles have meaning for processes, with resources (e.g. files) normally having the
-        // well-known "object_r" role.  Validation therefore implicitly allows the "object_r"
-        // role, in addition to those defined for the user.
-        //
-        // TODO(b/335399404): Identifiers are 1-based, while the roles bitmap is 0-based.
-        if self.role != policy_index.object_role() && !user.roles().is_set(self.role.0.get() - 1) {
-            return Err(SecurityContextError::InvalidRoleForUser {
-                role: policy_index.parsed_policy().role(self.role).name_bytes().into(),
-                user: user.name_bytes().into(),
-            });
+        // Validation of the user/role/type relationships is skipped for the special "object_r"
+        // role, which is applied by default to non-process/socket-like resources.
+        if self.role != policy_index.object_role() {
+            // Validate that the selected role is valid for this user.
+            //
+            // TODO(b/335399404): Identifiers are 1-based, while the roles bitmap is 0-based.
+            if !user.roles().is_set(self.role.0.get() - 1) {
+                return Err(SecurityContextError::InvalidRoleForUser {
+                    role: policy_index.parsed_policy().role(self.role).name_bytes().into(),
+                    user: user.name_bytes().into(),
+                });
+            }
+
+            // Validate that the selected type is valid for this role.
+            let role = policy_index.parsed_policy().role(self.role);
+            // TODO(b/335399404): Identifiers are 1-based, while the roles bitmap is 0-based.
+            if !role.types().is_set(self.type_.0.get() - 1) {
+                return Err(SecurityContextError::InvalidTypeForRole {
+                    type_: policy_index.parsed_policy().type_(self.type_).name_bytes().into(),
+                    role: role.name_bytes().into(),
+                });
+            }
         }
 
         // Check that the security context's MLS range is valid for the user (steps 1, 2,
@@ -571,6 +578,8 @@ pub enum SecurityContextError {
     UnknownType { name: BString },
     #[error("role {role:?} not valid for {user:?}")]
     InvalidRoleForUser { role: BString, user: BString },
+    #[error("type {type_:?} not valid for {role:?}")]
+    InvalidTypeForRole { role: BString, type_: BString },
     #[error("security level {level:?} not valid for {user:?}")]
     InvalidLevelForUser { level: BString, user: BString },
     #[error("high security level {high:?} lower than low level {low:?}")]
@@ -1029,6 +1038,12 @@ mod tests {
         // Fails validation because the role is not valid for the user.
         let context = policy
             .parse_security_context(b"user0:subject_r:type0:s0".into())
+            .expect("successfully parsed");
+        assert!(policy.validate_security_context(&context).is_err());
+
+        // Fails validation because the type is not valid for the role.
+        let context = policy
+            .parse_security_context(b"user1:subject_r:non_subject_t:s1".into())
             .expect("successfully parsed");
         assert!(policy.validate_security_context(&context).is_err());
 

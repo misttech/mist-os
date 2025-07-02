@@ -15,12 +15,15 @@ rustc_library("lib") {
   deps = [
     "//third_party/rust_crates:chrono",
     "//third_party/rust_crates:log",
-    "//third_party/rust_crates:tracing",
-    "//third_party/rust_crates:tracing-log",
-    "//third_party/rust_crates:tracing-subscriber",
   ]
 
-  sources = [ "src/lib.rs" ]
+  sources = [
+    "src/filter.rs",
+    "src/format.rs",
+    "src/lib.rs",
+    "src/log_sink.rs",
+    "src/test.rs",
+  ]
 }
 
 group("logging") {

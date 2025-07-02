@@ -79,6 +79,7 @@ config("lto-clang") {
     configs += [ ":lto-whole-program-devirtualization" ]
   }
 
+  asmflags = cflags
   ldflags = cflags
 
   # TODO(https://fxbug.dev/42061844): Temporarily disable branch funneling on lto. Branch
@@ -170,10 +171,14 @@ variant("lto") {
 
 config("thinlto-clang") {
   cflags = [ "-flto=thin" ]
+  asmflags = cflags
   ldflags = cflags
   configs = [
     ":fat-lto-objects",
     ":lto-workarounds",
+
+    # As thin lto is multi-threaded, use the larger RBE workers
+    "//build/config/rbe:big_rbe_machine",
   ]
 
   # These switches have the same meaning but different spellings for
@@ -226,7 +231,12 @@ config("thinlto-rust") {
 
   rustflags += [ "${rust_linkarg}${_cache_dir}${thinlto_cache_dir}" ]
 
-  configs = [ ":lto-workarounds" ]
+  configs = [
+    ":lto-workarounds",
+
+    # As thin lto is multi-threaded, use the larger RBE workers
+    "//build/config/rbe:big_rbe_machine",
+  ]
 }
 
 variant("thinlto") {

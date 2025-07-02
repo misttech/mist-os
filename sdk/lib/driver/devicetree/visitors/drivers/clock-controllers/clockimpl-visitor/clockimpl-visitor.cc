@@ -59,6 +59,8 @@ bool ClockImplVisitor::is_match(std::string_view name) {
   return name.find("clock-controller") != std::string::npos;
 }
 
+uint32_t ClockImplVisitor::GetNextUniqueId() { return next_unique_id_++; }
+
 zx::result<> ClockImplVisitor::Visit(fdf_devicetree::Node& node,
                                      const devicetree::PropertyDecoder& decoder) {
   zx::result parser_output = clock_parser_->Parse(node);
@@ -157,14 +159,16 @@ zx::result<> ClockImplVisitor::Visit(fdf_devicetree::Node& node,
   return zx::ok();
 }
 
-zx::result<> ClockImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t id,
+zx::result<> ClockImplVisitor::AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t clock_id,
+                                                uint32_t node_id,
                                                 std::optional<std::string_view> clock_name) {
   auto clock_node = fuchsia_driver_framework::ParentSpec2{{
       .bind_rules =
           {
               fdf::MakeAcceptBindRule2(bind_fuchsia_hardware_clock::SERVICE,
                                        bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
-              fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, id),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_ID, clock_id),
+              fdf::MakeAcceptBindRule2(bind_fuchsia::CLOCK_NODE_ID, node_id),
           },
       .properties =
           {
@@ -219,18 +223,23 @@ zx::result<> ClockImplVisitor::ParseReferenceChild(fdf_devicetree::Node& child,
   }
 
   auto cells = ClockCells(specifiers);
-  uint32_t clock_id = cells.id();
+  const uint32_t clock_id = cells.id();
+  const uint32_t node_id = GetNextUniqueId();
 
-  FDF_LOG(DEBUG, "Clock ID added - ID 0x%x name '%s' to controller '%s'", cells.id(),
-          clock_name ? std::string(*clock_name).c_str() : "<anonymous>", parent.name().c_str());
+  FDF_LOG(DEBUG, "Clock ID added - Unique ID %u, Clock ID 0x%x name '%s' to controller '%s'",
+          node_id, clock_id, clock_name ? std::string(*clock_name).c_str() : "<anonymous>",
+          parent.name().c_str());
 
-  auto& clock_ids = controller.clock_ids_metadata.clock_ids();
-  if (!clock_ids.has_value()) {
-    clock_ids.emplace(std::vector<uint32_t>{});
+  auto& clock_nodes = controller.clock_nodes_metadata.clock_nodes();
+  if (!clock_nodes.has_value()) {
+    clock_nodes.emplace(std::vector<fuchsia_hardware_clockimpl::ClockNodeDescriptor>{});
   }
-  clock_ids.value().emplace_back(clock_id);
+  clock_nodes.value().emplace_back(fuchsia_hardware_clockimpl::ClockNodeDescriptor{{
+      .clock_id = clock_id,
+      .node_id = node_id,
+  }});
 
-  return AddChildNodeSpec(child, clock_id, clock_name);
+  return AddChildNodeSpec(child, clock_id, node_id, clock_name);
 }
 
 zx::result<> ClockImplVisitor::ParseInitChild(
@@ -310,10 +319,10 @@ zx::result<> ClockImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
     }
 
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-    const auto& clock_ids = controller->second.clock_ids_metadata.clock_ids();
-    if (clock_ids.has_value() && !clock_ids.value().empty()) {
+    const auto& clock_nodes = controller->second.clock_nodes_metadata.clock_nodes();
+    if (clock_nodes.has_value() && !clock_nodes.value().empty()) {
       const fit::result encoded_clock_id_metadata =
-          fidl::Persist(controller->second.clock_ids_metadata);
+          fidl::Persist(controller->second.clock_nodes_metadata);
       if (!encoded_clock_id_metadata.is_ok()) {
         FDF_LOG(ERROR, "Failed to encode clock ID's: %s",
                 encoded_clock_id_metadata.error_value().FormatDescription().c_str());

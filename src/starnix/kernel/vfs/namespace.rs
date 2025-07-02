@@ -8,13 +8,14 @@ use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter}
 use crate::time::utc;
 use crate::vfs::buffers::InputBuffer;
 use crate::vfs::fs_registry::FsRegistry;
+use crate::vfs::pseudo::dynamic_file::{DynamicFile, DynamicFileBuf, DynamicFileSource};
+use crate::vfs::pseudo::simple_file::SimpleFileNode;
 use crate::vfs::socket::{SocketAddress, SocketHandle, UnixSocket};
 use crate::vfs::{
     fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_nonseekable,
     fileops_impl_noop_sync, fs_node_impl_not_dir, CheckAccessReason, DirEntry, DirEntryHandle,
-    DynamicFile, DynamicFileBuf, DynamicFileSource, FileHandle, FileObject, FileOps,
-    FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString,
-    PathBuilder, RenameFlags, SimpleFileNode, SymlinkTarget, UnlinkKind,
+    FileHandle, FileObject, FileOps, FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle,
+    FsNodeOps, FsStr, FsString, PathBuilder, RenameFlags, SymlinkTarget, UnlinkKind,
 };
 use macro_rules_attribute::apply;
 use ref_cast::RefCast;
@@ -105,7 +106,7 @@ impl FsNodeOps for Arc<Namespace> {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -704,7 +705,7 @@ impl Kernel {
 impl CurrentTask {
     pub fn create_filesystem(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         fs_type: &FsStr,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
@@ -777,7 +778,7 @@ impl FileOps for ProcMountsFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -788,7 +789,7 @@ impl FileOps for ProcMountsFile {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -802,7 +803,7 @@ impl FileOps for ProcMountsFile {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -1044,7 +1045,7 @@ impl NamespaceNode {
     /// remember its path in the Namespace.
     pub fn open(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         flags: OpenFlags,
         access_check: AccessCheck,
@@ -1064,7 +1065,7 @@ impl NamespaceNode {
     /// Will return an existing node unless `flags` contains `OpenFlags::EXCL`.
     pub fn open_create_node<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
@@ -1077,7 +1078,7 @@ impl NamespaceNode {
         let owner = current_task.as_fscred();
         let mode = current_task.fs().apply_umask(mode);
         let create_fn =
-            |locked: &mut Locked<'_, L>, dir: &FsNodeHandle, mount: &MountInfo, name: &_| {
+            |locked: &mut Locked<L>, dir: &FsNodeHandle, mount: &MountInfo, name: &_| {
                 dir.mknod(locked, current_task, mount, name, mode, dev, owner)
             };
         let entry = if flags.contains(OpenFlags::EXCL) {
@@ -1099,7 +1100,7 @@ impl NamespaceNode {
     /// Does not return an existing node.
     pub fn create_node<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         mode: FileMode,
@@ -1127,7 +1128,7 @@ impl NamespaceNode {
     /// To create another type of node, use `create_node`.
     pub fn create_symlink<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         target: &FsStr,
@@ -1155,7 +1156,7 @@ impl NamespaceNode {
     /// Used by O_TMPFILE.
     pub fn create_tmpfile<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         mode: FileMode,
         flags: OpenFlags,
@@ -1177,7 +1178,7 @@ impl NamespaceNode {
 
     pub fn link<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         child: &FsNodeHandle,
@@ -1197,7 +1198,7 @@ impl NamespaceNode {
 
     pub fn bind_socket<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         socket: SocketHandle,
@@ -1235,7 +1236,7 @@ impl NamespaceNode {
 
     pub fn unlink<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         name: &FsStr,
         kind: UnlinkKind,
@@ -1266,7 +1267,7 @@ impl NamespaceNode {
     /// Traverse down a parent-to-child link in the namespace.
     pub fn lookup_child<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         context: &mut LookupContext,
         basename: &FsStr,
@@ -1325,13 +1326,17 @@ impl NamespaceNode {
                         child = match child.readlink(locked, current_task)? {
                             SymlinkTarget::Path(link_target) => {
                                 let link_directory = if link_target[0] == b'/' {
+                                    // If the path is absolute, we'll resolve the root directory.
                                     match &context.resolve_base {
                                         ResolveBase::None => current_task.fs().root(),
                                         ResolveBase::Beneath(_) => return error!(EXDEV),
                                         ResolveBase::InRoot(root) => root.clone(),
                                     }
                                 } else {
-                                    self.clone()
+                                    // If the path is not absolute, it's a relative directory. Let's
+                                    // try to get the parent of the current child, or in the case
+                                    // that the child is the root we can just use that directly.
+                                    child.parent().unwrap_or(child)
                                 };
                                 current_task.lookup_path(
                                     locked,
@@ -1519,7 +1524,7 @@ impl NamespaceNode {
     }
 
     pub fn rename<L>(
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         old_parent: &NamespaceNode,
         old_name: &FsStr,
@@ -1572,7 +1577,7 @@ impl NamespaceNode {
 
     pub fn readlink<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno>
     where
@@ -1593,7 +1598,7 @@ impl NamespaceNode {
     /// owner or is in the file's group.
     pub fn check_access<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         access: Access,
         reason: CheckAccessReason,
@@ -1611,7 +1616,7 @@ impl NamespaceNode {
 
     pub fn truncate<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno>
@@ -1793,11 +1798,13 @@ impl Borrow<ArcKey<DirEntry>> for Submount {
 mod test {
     use crate::fs::tmpfs::TmpFs;
     use crate::testing::create_kernel_task_and_unlocked;
+    use crate::vfs::namespace::DeviceType;
     use crate::vfs::{
-        LookupContext, Namespace, NamespaceNode, RenameFlags, UnlinkKind, WhatToMount,
+        CallbackSymlinkNode, FsNodeInfo, LookupContext, MountInfo, Namespace, NamespaceNode,
+        RenameFlags, SymlinkMode, SymlinkTarget, UnlinkKind, WhatToMount,
     };
-    use starnix_uapi::errno;
     use starnix_uapi::mount_flags::MountFlags;
+    use starnix_uapi::{errno, mode};
     use std::sync::Arc;
 
     #[::fuchsia::test]
@@ -2092,6 +2099,110 @@ mod test {
             errno!(ENOENT)
         );
 
+        Ok(())
+    }
+
+    /// Symlinks which need to be traversed across types (nodes and paths), as well as across
+    /// owning directories, can be tricky to get right.
+    #[::fuchsia::test]
+    async fn test_lookup_with_symlink_chain() -> anyhow::Result<()> {
+        // Set up the root filesystem
+        let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let root_fs = TmpFs::new_fs(&kernel);
+        let root_node = Arc::clone(root_fs.root());
+        let _first_subdir_node = root_node
+            .create_dir(&mut locked, &current_task, "first_subdir".into())
+            .expect("failed to mkdir dev");
+        let _second_subdir_node = root_node
+            .create_dir(&mut locked, &current_task, "second_subdir".into())
+            .expect("failed to mkdir dev");
+
+        // Set up two subdirectories under the root filesystem
+        let first_subdir_fs = TmpFs::new_fs(&kernel);
+        let second_subdir_fs = TmpFs::new_fs(&kernel);
+
+        let ns = Namespace::new(root_fs);
+        let mut context = LookupContext::default();
+        let first_subdir = ns
+            .root()
+            .lookup_child(&mut locked, &current_task, &mut context, "first_subdir".into())
+            .expect("failed to lookup first_subdir");
+        first_subdir
+            .mount(WhatToMount::Fs(first_subdir_fs), MountFlags::empty())
+            .expect("failed to mount first_subdir fs node");
+        let second_subdir = ns
+            .root()
+            .lookup_child(&mut locked, &current_task, &mut context, "second_subdir".into())
+            .expect("failed to lookup second_subdir");
+        second_subdir
+            .mount(WhatToMount::Fs(second_subdir_fs), MountFlags::empty())
+            .expect("failed to mount second_subdir fs node");
+
+        // Create the symlink structure. To trigger potential symlink traversal bugs, we're going
+        // for the following directory structure:
+        // / (root)
+        //     + first_subdir/
+        //         - real_file
+        //         - path_symlink (-> real_file)
+        //     + second_subdir/
+        //         - node_symlink (-> path_symlink)
+        let real_file_node = first_subdir
+            .create_node(
+                &mut locked,
+                &current_task,
+                "real_file".into(),
+                mode!(IFREG, 0o777),
+                DeviceType::NONE,
+            )
+            .expect("failed to create real_file");
+        first_subdir
+            .create_symlink(&mut locked, &current_task, "path_symlink".into(), "real_file".into())
+            .expect("failed to create path_symlink");
+
+        let mut no_follow_lookup_context = LookupContext::new(SymlinkMode::NoFollow);
+        let path_symlink_node = first_subdir
+            .lookup_child(
+                &mut locked,
+                &current_task,
+                &mut no_follow_lookup_context,
+                "path_symlink".into(),
+            )
+            .expect("Failed to lookup path_symlink");
+
+        // The second symlink needs to be of type SymlinkTarget::Node in order to trip the sensitive
+        // code path. There's no easy method for creating this type of symlink target, so we'll need
+        // to construct a node from scratch and insert it into the directory manually.
+        let node_symlink_node = second_subdir.entry.node.fs().create_node_and_allocate_node_id(
+            CallbackSymlinkNode::new(move || {
+                let node = path_symlink_node.clone();
+                Ok(SymlinkTarget::Node(node))
+            }),
+            FsNodeInfo::new(mode!(IFLNK, 0o777), current_task.as_fscred()),
+        );
+        second_subdir
+            .entry
+            .create_entry(
+                &mut locked,
+                &current_task,
+                &MountInfo::detached(),
+                "node_symlink".into(),
+                move |_locked, _dir, _mount, _name| Ok(node_symlink_node),
+            )
+            .expect("failed to create node_symlink entry");
+
+        // Finally, exercise the lookup under test.
+        let mut follow_lookup_context = LookupContext::new(SymlinkMode::Follow);
+        let node_symlink_resolution = second_subdir
+            .lookup_child(
+                &mut locked,
+                &current_task,
+                &mut follow_lookup_context,
+                "node_symlink".into(),
+            )
+            .expect("lookup with symlink chain failed");
+
+        // The lookup resolution should have correctly followed the symlinks to the real_file node.
+        assert!(node_symlink_resolution.entry.node.ino == real_file_node.entry.node.ino);
         Ok(())
     }
 }

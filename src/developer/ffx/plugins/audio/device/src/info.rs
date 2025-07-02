@@ -152,7 +152,7 @@ impl Display for CanCannotText<'_> {
                 let s = if value { "✅ Can" } else { "❌ Cannot" };
                 write!(f, "{} {}", s, self.1)
             }
-            None => write!(f, "<unknown if can {}>", self.1),
+            None => write!(f, "❌ Cannot {} <missing>", self.1),
         }
     }
 }
@@ -299,8 +299,14 @@ impl Display for ChannelAttributesText<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut table = Table::new();
         table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
-        table.add_row(row!("Min frequency:", or_unknown(&self.0.min_frequency.map(HertzText))));
-        table.add_row(row!("Max frequency:", or_unknown(&self.0.max_frequency.map(HertzText))));
+        table.add_row(row!(
+            "Min frequency:",
+            or_full_range_none(&self.0.min_frequency.map(HertzText))
+        ));
+        table.add_row(row!(
+            "Max frequency:",
+            or_full_range_none(&self.0.max_frequency.map(HertzText))
+        ));
         table.fmt(f)
     }
 }
@@ -542,7 +548,7 @@ impl Display for ElementWithStateText<'_> {
         table.set_format(*TABLE_FORMAT_NESTED);
         table.add_row(row!("ID:", self.0.element.id));
         table.add_row(row!("Type:", DebugText(self.0.element.type_)));
-        table.add_row(row!("Description:", or_unknown(&self.0.element.description)));
+        table.add_row(row!("Description:", or_nothing(&self.0.element.description)));
         if let Some(type_specific) = &self.0.element.type_specific {
             table.add_row(row!("Type specific:", TypeSpecificElementText(type_specific)));
         }
@@ -629,7 +635,8 @@ impl Display for EqualizerText<'_> {
         ));
         table.add_row(row!(
             "Can disable bands?:",
-            or_unknown(&self.0.can_disable_bands.map(YesNoText))
+            // If missing, it means this Equalizer cannot disable individual bands.
+            or_no_missing(&self.0.can_disable_bands.map(YesNoText))
         ));
         table.add_row(row!(
             "Frequency range:",
@@ -832,7 +839,8 @@ impl Display for ElementStateText<'_> {
             format!("{} ({})", YesNoText(self.0.started), CanCannotText(self.1.can_stop, "Stop"),);
         let bypassed_text = format!(
             "{} ({})",
-            or_unknown(&self.0.bypassed.map(YesNoText)),
+            // If missing, it means this Element is not bypassed.
+            or_no_missing(&self.0.bypassed.map(YesNoText)),
             CanCannotText(self.1.can_bypass, "Bypass"),
         );
 
@@ -840,7 +848,7 @@ impl Display for ElementStateText<'_> {
         table.set_format(*TABLE_FORMAT_NESTED_COMPACT);
         table.add_row(row!(
             "Vendor specific:",
-            or_unknown(
+            or_nothing(
                 &self.0.vendor_specific_data.as_ref().map(|data| BytesText(data.as_slice()))
             )
         ));
@@ -848,15 +856,15 @@ impl Display for ElementStateText<'_> {
         table.add_row(row!("Bypassed:", bypassed_text));
         table.add_row(row!(
             "Turn on delay:",
-            or_unknown(&self.0.turn_on_delay_ns.map(DurationText))
+            or_nothing(&self.0.turn_on_delay_ns.map(DurationText))
         ));
         table.add_row(row!(
             "Turn off delay:",
-            or_unknown(&self.0.turn_off_delay_ns.map(DurationText))
+            or_nothing(&self.0.turn_off_delay_ns.map(DurationText))
         ));
         table.add_row(row!(
             "Processing delay:",
-            or_unknown(&self.0.processing_delay_ns.map(DurationText))
+            or_nothing(&self.0.processing_delay_ns.map(DurationText))
         ));
         if let Some(type_specific) = &self.0.type_specific {
             table.add_row(row!("Type specific:", TypeSpecificElementStateText(type_specific)));
@@ -954,7 +962,8 @@ impl Display for EqualizerBandStateText<'_> {
         table.add_row(row!("Frequency:", or_unknown(&self.0.frequency.map(HertzText))));
         table.add_row(row!("Quality factor:", or_unknown(&self.0.q)));
         table.add_row(row!("Gain:", or_unknown(&self.0.frequency.map(DecibelsText))));
-        table.add_row(row!("Enabled:", or_unknown(&self.0.enabled.map(YesNoText))));
+        // If missing, it means this Equalizer band is enabled.
+        table.add_row(row!("Enabled:", or_yes_missing(&self.0.enabled.map(YesNoText))));
         table.fmt(f)
     }
 }
@@ -1035,7 +1044,7 @@ impl Display for DaiInterconnectElementStateText<'_> {
         table.add_row(row!("Plug state:", PlugStateText(&self.0.plug_state)));
         table.add_row(row!(
             "External delay:",
-            or_unknown(&self.0.external_delay_ns.map(DurationText))
+            or_nothing(&self.0.external_delay_ns.map(DurationText))
         ));
         table.fmt(f)
     }
@@ -1178,7 +1187,18 @@ impl Display for InfoResult {
 fn or_unknown(value: &Option<impl ToString>) -> String {
     value.as_ref().map_or("<unknown>".to_string(), |value| value.to_string())
 }
-
+fn or_yes_missing(value: &Option<impl ToString>) -> String {
+    value.as_ref().map_or("✅ Yes <missing>".to_string(), |value| value.to_string())
+}
+fn or_no_missing(value: &Option<impl ToString>) -> String {
+    value.as_ref().map_or("❌ No <missing>".to_string(), |value| value.to_string())
+}
+fn or_full_range_none(value: &Option<impl ToString>) -> String {
+    value.as_ref().map_or("Full range <none>".to_string(), |value| value.to_string())
+}
+fn or_nothing(value: &Option<impl ToString>) -> String {
+    value.as_ref().map_or("".to_string(), |value| value.to_string())
+}
 impl From<(Info, Selector)> for InfoResult {
     fn from(value: (Info, Selector)) -> Self {
         let (info, selector) = value;
@@ -1989,7 +2009,7 @@ mod test {
                         type_specific: None,
                         description: Some("Destination ring buffer element".to_string()),
                         can_stop: Some(false),
-                        can_bypass: Some(false)
+                        can_bypass: None
                     },
                     state: None,
                 },
@@ -2046,7 +2066,7 @@ mod test {
                             range: GainRange { min: -100.0, max: 0.0, min_step: 1.0 },
                         })),
                         description: Some("Gain element".to_string()),
-                        can_stop: Some(false),
+                        can_stop: None,
                         can_bypass: Some(true)
                     },
                     state: Some(ElementState {
@@ -2208,7 +2228,7 @@ mod test {
                                     frequency: Some(10_000),
                                     q: Some(10.0),
                                     gain_db: None,
-                                    enabled: Some(true),
+                                    enabled: None,
                                 },
                             ],
                         })),
@@ -2288,32 +2308,32 @@ mod test {
     │ Sample types:        int16                                                                │
     │ Frame rates:         16000 Hz, 22050 Hz, 32000 Hz, 44100 Hz, 48000 Hz, 88200 Hz, 96000 Hz │
     │ Number of channels:  1, 2                                                                 │
-    │ Channel attributes:  1 channel:  Channel 1: Min frequency: <unknown>                      │
-    │                                             Max frequency: <unknown>                      │
-    │                      2 channels: Channel 1: Min frequency: <unknown>                      │
-    │                                             Max frequency: <unknown>                      │
-    │                                  Channel 2: Min frequency: <unknown>                      │
-    │                                             Max frequency: <unknown>                      │
+    │ Channel attributes:  1 channel:  Channel 1: Min frequency: Full range <none>              │
+    │                                             Max frequency: Full range <none>              │
+    │                      2 channels: Channel 1: Min frequency: Full range <none>              │
+    │                                             Max frequency: Full range <none>              │
+    │                                  Channel 2: Min frequency: Full range <none>              │
+    │                                             Max frequency: Full range <none>              │
     └───────────────────────────────────────────────────────────────────────────────────────────┘
   • Element 123 has 2 format sets:
-    ┌─────────────────────────────────────────────────────────────────────┐
-    │ Sample types:        uint8, int16                                   │
-    │ Frame rates:         16000 Hz, 22050 Hz, 32000 Hz                   │
-    │ Number of channels:  1                                              │
-    │ Channel attributes:  1 channel: Channel 1: Min frequency: <unknown> │
-    │                                            Max frequency: <unknown> │
-    └─────────────────────────────────────────────────────────────────────┘
-    ┌──────────────────────────────────────────────────────────────────────┐
-    │ Sample types:        float32                                         │
-    │ Frame rates:         44100 Hz, 48000 Hz, 88200 Hz, 96000 Hz          │
-    │ Number of channels:  1, 2                                            │
-    │ Channel attributes:  1 channel:  Channel 1: Min frequency: <unknown> │
-    │                                             Max frequency: <unknown> │
-    │                      2 channels: Channel 1: Min frequency: <unknown> │
-    │                                             Max frequency: <unknown> │
-    │                                  Channel 2: Min frequency: <unknown> │
-    │                                             Max frequency: <unknown> │
-    └──────────────────────────────────────────────────────────────────────┘
+    ┌─────────────────────────────────────────────────────────────────────────────┐
+    │ Sample types:        uint8, int16                                           │
+    │ Frame rates:         16000 Hz, 22050 Hz, 32000 Hz                           │
+    │ Number of channels:  1                                                      │
+    │ Channel attributes:  1 channel: Channel 1: Min frequency: Full range <none> │
+    │                                            Max frequency: Full range <none> │
+    └─────────────────────────────────────────────────────────────────────────────┘
+    ┌──────────────────────────────────────────────────────────────────────────────┐
+    │ Sample types:        float32                                                 │
+    │ Frame rates:         44100 Hz, 48000 Hz, 88200 Hz, 96000 Hz                  │
+    │ Number of channels:  1, 2                                                    │
+    │ Channel attributes:  1 channel:  Channel 1: Min frequency: Full range <none> │
+    │                                             Max frequency: Full range <none> │
+    │                      2 channels: Channel 1: Min frequency: Full range <none> │
+    │                                             Max frequency: Full range <none> │
+    │                                  Channel 2: Min frequency: Full range <none> │
+    │                                             Max frequency: Full range <none> │
+    └──────────────────────────────────────────────────────────────────────────────┘
 
   Signal processing topologies:
     ┌────────────────────────┐
@@ -2341,9 +2361,9 @@ mod test {
     │ Type:           DaiInterconnect                                        │
     │ Description:    Source DAI interconnect element                        │
     │ Type specific:  Plug detection: Pluggable (can async notify)           │
-    │ State:          Vendor specific:  <unknown>                            │
+    │ State:          Vendor specific:                                       │
     │                 Started:          ✅ Yes (✅ Can Stop)                 │
-    │                 Bypassed:         <unknown> (❌ Cannot Bypass)         │
+    │                 Bypassed:         ❌ No <missing> (❌ Cannot Bypass)   │
     │                 Turn on delay:    0 ns                                 │
     │                 Turn off delay:   0 ns                                 │
     │                 Processing delay: 0 ns                                 │
@@ -2394,21 +2414,21 @@ mod test {
     │ Description:  Connection point element │
     │ State:        <unknown>                │
     └────────────────────────────────────────┘
-    ┌───────────────────────────────────────────────────────────┐
-    │ ID:             7                                         │
-    │ Type:           Gain                                      │
-    │ Description:    Gain element                              │
-    │ Type specific:  Type:   Decibels                          │
-    │                 Domain: Digital                           │
-    │                 Range:  [-100 dB, 0 dB]; 1 dB step        │
-    │ State:          Vendor specific:  <unknown>               │
-    │                 Started:          ✅ Yes (❌ Cannot Stop) │
-    │                 Bypassed:         ❌ No (✅ Can Bypass)   │
-    │                 Turn on delay:    0 ns                    │
-    │                 Turn off delay:   0 ns                    │
-    │                 Processing delay: 0 ns                    │
-    │                 Type specific:    Gain: -3                │
-    └───────────────────────────────────────────────────────────┘
+    ┌─────────────────────────────────────────────────────────────────────┐
+    │ ID:             7                                                   │
+    │ Type:           Gain                                                │
+    │ Description:    Gain element                                        │
+    │ Type specific:  Type:   Decibels                                    │
+    │                 Domain: Digital                                     │
+    │                 Range:  [-100 dB, 0 dB]; 1 dB step                  │
+    │ State:          Vendor specific:                                    │
+    │                 Started:          ✅ Yes (❌ Cannot Stop <missing>) │
+    │                 Bypassed:         ❌ No (✅ Can Bypass)             │
+    │                 Turn on delay:    0 ns                              │
+    │                 Turn off delay:   0 ns                              │
+    │                 Processing delay: 0 ns                              │
+    │                 Type specific:    Gain: -3                          │
+    └─────────────────────────────────────────────────────────────────────┘
     ┌──────────────────────────────────────────────┐
     │ ID:           8                              │
     │ Type:         AutomaticGainControl           │
@@ -2436,7 +2456,7 @@ mod test {
     │                                     Level type:      ✅ Yes                  │
     │                                     Linked channels: ✅ Yes                  │
     │                                     Threshold type:  ✅ Yes                  │
-    │ State:          Vendor specific:  <unknown>                                  │
+    │ State:          Vendor specific:                                             │
     │                 Started:          ✅ Yes (❌ Cannot Stop)                    │
     │                 Bypassed:         ❌ No (✅ Can Bypass)                      │
     │                 Turn on delay:    0 ns                                       │
@@ -2475,47 +2495,47 @@ mod test {
     │ Description:  Delay element │
     │ State:        <unknown>     │
     └─────────────────────────────┘
-    ┌────────────────────────────────────────────────────────────────────┐
-    │ ID:             12                                                 │
-    │ Type:           Equalizer                                          │
-    │ Description:    Equalizer element                                  │
-    │ Type specific:  Bands:                  ID: 1                      │
-    │                                         ID: 2                      │
-    │                 Supported controls:     Frequency:          ✅ Yes │
-    │                                         Quality factor (Q): ✅ Yes │
-    │                                         Peak bands:         ✅ Yes │
-    │                                         Notch bands:        ✅ Yes │
-    │                                         Low cut bands:      ✅ Yes │
-    │                                         High cut bands:     ✅ Yes │
-    │                                         Low shelf bands:    ✅ Yes │
-    │                                         High shelf bands:   ✅ Yes │
-    │                 Can disable bands?:     ❌ No                      │
-    │                 Frequency range:        [10 Hz, 20000 Hz]          │
-    │                 Maximum quality factor: 2.5                        │
-    │                 Gain range:             [-24 dB, 24 dB]            │
-    │ State:          Vendor specific:  <unknown>                        │
-    │                 Started:          ✅ Yes (❌ Cannot Stop)          │
-    │                 Bypassed:         ❌ No (✅ Can Bypass)            │
-    │                 Turn on delay:    0 ns                             │
-    │                 Turn off delay:   0 ns                             │
-    │                 Processing delay: 0 ns                             │
-    │                 Type specific:      ┌─────────────────────────┐    │
-    │                                     │ ID:              1      │    │
-    │                                     │ Type:            Peak   │    │
-    │                                     │ Frequency:       300 Hz │    │
-    │                                     │ Quality factor:  2      │    │
-    │                                     │ Gain:            300 dB │    │
-    │                                     │ Enabled:         ✅ Yes │    │
-    │                                     └─────────────────────────┘    │
-    │                                     ┌───────────────────────────┐  │
-    │                                     │ ID:              2        │  │
-    │                                     │ Type:            HighCut  │  │
-    │                                     │ Frequency:       10000 Hz │  │
-    │                                     │ Quality factor:  10       │  │
-    │                                     │ Gain:            10000 dB │  │
-    │                                     │ Enabled:         ✅ Yes   │  │
-    │                                     └───────────────────────────┘  │
-    └────────────────────────────────────────────────────────────────────┘
+    ┌───────────────────────────────────────────────────────────────────────────┐
+    │ ID:             12                                                        │
+    │ Type:           Equalizer                                                 │
+    │ Description:    Equalizer element                                         │
+    │ Type specific:  Bands:                  ID: 1                             │
+    │                                         ID: 2                             │
+    │                 Supported controls:     Frequency:          ✅ Yes        │
+    │                                         Quality factor (Q): ✅ Yes        │
+    │                                         Peak bands:         ✅ Yes        │
+    │                                         Notch bands:        ✅ Yes        │
+    │                                         Low cut bands:      ✅ Yes        │
+    │                                         High cut bands:     ✅ Yes        │
+    │                                         Low shelf bands:    ✅ Yes        │
+    │                                         High shelf bands:   ✅ Yes        │
+    │                 Can disable bands?:     ❌ No                             │
+    │                 Frequency range:        [10 Hz, 20000 Hz]                 │
+    │                 Maximum quality factor: 2.5                               │
+    │                 Gain range:             [-24 dB, 24 dB]                   │
+    │ State:          Vendor specific:                                          │
+    │                 Started:          ✅ Yes (❌ Cannot Stop)                 │
+    │                 Bypassed:         ❌ No (✅ Can Bypass)                   │
+    │                 Turn on delay:    0 ns                                    │
+    │                 Turn off delay:   0 ns                                    │
+    │                 Processing delay: 0 ns                                    │
+    │                 Type specific:      ┌─────────────────────────┐           │
+    │                                     │ ID:              1      │           │
+    │                                     │ Type:            Peak   │           │
+    │                                     │ Frequency:       300 Hz │           │
+    │                                     │ Quality factor:  2      │           │
+    │                                     │ Gain:            300 dB │           │
+    │                                     │ Enabled:         ✅ Yes │           │
+    │                                     └─────────────────────────┘           │
+    │                                     ┌───────────────────────────────────┐ │
+    │                                     │ ID:              2                │ │
+    │                                     │ Type:            HighCut          │ │
+    │                                     │ Frequency:       10000 Hz         │ │
+    │                                     │ Quality factor:  10               │ │
+    │                                     │ Gain:            10000 dB         │ │
+    │                                     │ Enabled:         ✅ Yes <missing> │ │
+    │                                     └───────────────────────────────────┘ │
+    └───────────────────────────────────────────────────────────────────────────┘
     ┌──────────────────────────────────────────────┐
     │ ID:           13                             │
     │ Type:         SampleRateConversion           │
@@ -2732,7 +2752,7 @@ mod test {
                     "type": "ring_buffer",
                     "type_specific": null,
                     "description": "Destination ring buffer element",
-                    "can_bypass": false,
+                    "can_bypass": null,
                     "can_stop": false,
                     "state": null
                 },
@@ -2791,7 +2811,7 @@ mod test {
                     },
                     "description": "Gain element",
                     "can_bypass": true,
-                    "can_stop": false,
+                    "can_stop": null,
                     "state": {
                         "bypassed": false,
                         "started": true,
@@ -2942,7 +2962,7 @@ mod test {
                                         "type": "peak"
                                     },
                                     {
-                                        "enabled": true,
+                                        "enabled": null,
                                         "frequency": 10000,
                                         "gain_db": null,
                                         "id": 2,

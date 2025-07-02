@@ -498,7 +498,13 @@ void PlatformBus::GetFirmware(GetFirmwareRequestView request, fdf::Arena& arena,
 void PlatformBus::GetInterruptInfo(GetInterruptInfoRequest& request,
                                    GetInterruptInfoCompleter::Sync& completer) {
   auto iter = std::find_if(devices_.begin(), devices_.end(), [&request](auto& device) {
-    return device->HasInterruptVector(request.interrupt_vector());
+    if (const auto& vector = request.interrupt_vector(); vector.has_value()) {
+      return device->HasInterruptVector(vector.value());
+    }
+    if (const auto& koid = request.interrupt_koid(); koid.has_value()) {
+      return device->HasInterruptKoid(koid.value());
+    }
+    return false;
   });
   if (iter != devices_.end()) {
     auto* device = iter->get();

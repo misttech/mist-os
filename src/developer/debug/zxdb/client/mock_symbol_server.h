@@ -30,6 +30,9 @@ class MockSymbolServer : public SymbolServer {
   // Force the symbol server into the ready state.
   void ForceReady() { ChangeState(SymbolServer::State::kReady); }
 
+  // Force the symbol server into the unreachable state.
+  void ForceUnreachable() { ChangeState(SymbolServer::State::kUnreachable); }
+
   // Implementation of Symbol server.
   void Fetch(const std::string& build_id, DebugSymbolFileType file_type,
              SymbolServer::FetchCallback cb) override {

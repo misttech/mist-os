@@ -7,10 +7,11 @@ use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
-use fidl_fuchsia_hardware_power_statecontrol as fpowercontrol;
 use fuchsia_inspect::{self as inspect, Property};
 use log::*;
+use serde_derive::Deserialize;
 use std::rc::Rc;
+use {fidl_fuchsia_hardware_power_statecontrol as fpowercontrol, serde_json as json};
 /// Node: SystemShutdownHandler
 ///
 /// Summary: Provides a mechanism for the Power Manager to shut down the system due to either
@@ -29,6 +30,7 @@ pub struct SystemShutdownHandlerBuilder<'a> {
     shutdown_shim_proxy: Option<fpowercontrol::AdminProxy>,
     force_shutdown_func: Box<dyn Fn()>,
     inspect_root: Option<&'a inspect::Node>,
+    poweroff_for_shutdown: bool,
 }
 
 impl<'a> SystemShutdownHandlerBuilder<'a> {
@@ -37,7 +39,30 @@ impl<'a> SystemShutdownHandlerBuilder<'a> {
             shutdown_shim_proxy: None,
             force_shutdown_func: Box::new(force_shutdown),
             inspect_root: None,
+            poweroff_for_shutdown: false,
         }
+    }
+
+    pub fn new_from_json(json_data: json::Value) -> Self {
+        #[derive(Deserialize, Default)]
+        struct Config {
+            #[serde(default)]
+            poweroff_for_shutdown: bool,
+        }
+
+        #[derive(Deserialize)]
+        struct JsonData {
+            config: Option<Config>,
+        }
+
+        let data: JsonData = json::from_value(json_data).unwrap();
+        Self::new()
+            .with_poweroff_for_shutdown(data.config.unwrap_or_default().poweroff_for_shutdown)
+    }
+
+    pub fn with_poweroff_for_shutdown(mut self, poweroff_for_shutdown: bool) -> Self {
+        self.poweroff_for_shutdown = poweroff_for_shutdown;
+        self
     }
 
     #[cfg(test)]
@@ -77,6 +102,7 @@ impl<'a> SystemShutdownHandlerBuilder<'a> {
             force_shutdown_func: self.force_shutdown_func,
             shutdown_shim_proxy,
             inspect: InspectData::new(inspect_root, "SystemShutdownHandler".to_string()),
+            poweroff_for_shutdown: self.poweroff_for_shutdown,
         });
 
         Ok(node)
@@ -92,6 +118,9 @@ pub struct SystemShutdownHandler {
 
     /// Struct for managing Component Inspection data
     inspect: InspectData,
+
+    /// If true, will poweroff during shutdown instead of reboot
+    poweroff_for_shutdown: bool,
 }
 
 impl SystemShutdownHandler {
@@ -107,15 +136,20 @@ impl SystemShutdownHandler {
             "msg" => format!("{:?}", msg).as_str()
         );
 
-        info!("System shutdown ({:?})", msg);
         self.inspect.log_shutdown_request(&msg);
-        let result = self
-            .shutdown_shim_proxy
-            .perform_reboot(&fpowercontrol::RebootOptions {
-                reasons: Some(vec![fpowercontrol::RebootReason2::HighTemperature]),
-                ..Default::default()
-            })
-            .await;
+
+        let result = if self.poweroff_for_shutdown {
+            info!("System poweroff ({:?})", msg);
+            self.shutdown_shim_proxy.poweroff().await
+        } else {
+            info!("System reboot ({:?})", msg);
+            self.shutdown_shim_proxy
+                .perform_reboot(&fpowercontrol::RebootOptions {
+                    reasons: Some(vec![fpowercontrol::RebootReason2::HighTemperature]),
+                    ..Default::default()
+                })
+                .await
+        };
 
         // If the result is an error, either by underlying API failure or by timeout, then force a
         // shutdown using the configured force_shutdown_func
@@ -155,7 +189,7 @@ impl Node for SystemShutdownHandler {
 
     async fn handle_message(&self, msg: &Message) -> Result<MessageReturn, PowerManagerError> {
         match msg {
-            Message::HighTemperatureReboot => self.handle_system_shutdown_message(msg).await,
+            Message::HighTemperatureShutdown => self.handle_system_shutdown_message(msg).await,
             _ => Err(PowerManagerError::Unsupported),
         }
     }
@@ -197,7 +231,8 @@ pub mod tests {
     /// Create a fake Admin service proxy that responds to PerformReboot requests by calling
     /// the provided closure.
     fn setup_fake_admin_service(
-        mut shutdown_function: impl FnMut(fpowercontrol::RebootOptions) + 'static,
+        mut reboot_function: impl FnMut(fpowercontrol::RebootOptions) + 'static,
+        mut poweroff_function: impl FnMut() + 'static,
     ) -> fpowercontrol::AdminProxy {
         let (proxy, mut stream) =
             fidl::endpoints::create_proxy_and_stream::<fpowercontrol::AdminMarker>();
@@ -205,7 +240,11 @@ pub mod tests {
             while let Ok(req) = stream.try_next().await {
                 match req {
                     Some(fpowercontrol::AdminRequest::PerformReboot { options, responder }) => {
-                        shutdown_function(options);
+                        reboot_function(options);
+                        let _ = responder.send(Ok(()));
+                    }
+                    Some(fpowercontrol::AdminRequest::Poweroff { responder }) => {
+                        poweroff_function();
                         let _ = responder.send(Ok(()));
                     }
                     e => panic!("Unexpected request: {:?}", e),
@@ -229,13 +268,13 @@ pub mod tests {
 
         // Issue a shutdown call that will fail which causes a force shutdown to be issued.
         // This gives us something interesting to verify in Inspect.
-        let _ = node.handle_shutdown(&Message::HighTemperatureReboot).await;
+        let _ = node.handle_shutdown(&Message::HighTemperatureShutdown).await;
 
         assert_data_tree!(
             inspector,
             root: {
                 SystemShutdownHandler: {
-                    shutdown_request: "HighTemperatureReboot",
+                    shutdown_request: "HighTemperatureShutdown",
                     force_shutdown_attempted: true
                 }
             }
@@ -256,20 +295,48 @@ pub mod tests {
 
         // Create the node with a special Admin proxy
         let node = SystemShutdownHandlerBuilder::new()
-            .with_shutdown_shim_proxy(setup_fake_admin_service(move |options| {
-                shutdown_count_clone.set(shutdown_count_clone.get() + 1);
-                reboot_reason_clone.set(options.reasons.unwrap());
-            }))
+            .with_shutdown_shim_proxy(setup_fake_admin_service(
+                move |options| {
+                    shutdown_count_clone.set(shutdown_count_clone.get() + 1);
+                    reboot_reason_clone.set(options.reasons.unwrap());
+                },
+                move || {},
+            ))
             .build()
             .unwrap();
 
         // Call handle_shutdown which results in a fidl call.
-        let _ = node.handle_shutdown(&Message::HighTemperatureReboot).await;
+        let _ = node.handle_shutdown(&Message::HighTemperatureShutdown).await;
 
         // Verify the shutdown was called with correct reason.
         assert_eq!(shutdown_count.get(), 1);
         let final_reasons = reboot_reason.take();
         assert_eq!(final_reasons, vec![fpowercontrol::RebootReason2::HighTemperature]);
+    }
+
+    #[fasync::run_singlethreaded(test)]
+    async fn test_high_temperature_poweroff() {
+        // At the end of the test, verify the Admin server's received shutdown request
+        let poweroff_count = Rc::new(Cell::new(0));
+        let poweroff_count_clone = poweroff_count.clone();
+
+        // Create the node with a special Admin proxy
+        let node = SystemShutdownHandlerBuilder::new()
+            .with_shutdown_shim_proxy(setup_fake_admin_service(
+                move |_| {},
+                move || {
+                    poweroff_count_clone.set(poweroff_count_clone.get() + 1);
+                },
+            ))
+            .with_poweroff_for_shutdown(true)
+            .build()
+            .unwrap();
+
+        // Call handle_shutdown which results in a fidl call.
+        let _ = node.handle_shutdown(&Message::HighTemperatureShutdown).await;
+
+        // Verify the shutdown was called with correct reason.
+        assert_eq!(poweroff_count.get(), 1);
     }
 
     /// Tests that if high temperature reboot request fails, the forced shutdown method is called.
@@ -288,7 +355,7 @@ pub mod tests {
 
         // Call the normal shutdown function. The call will fail because there is no routing to the
         // server in this unit test, and then the forced shutdown method will be called.
-        let _ = node.handle_shutdown(&Message::HighTemperatureReboot).await;
+        let _ = node.handle_shutdown(&Message::HighTemperatureShutdown).await;
         assert_eq!(force_shutdown.get(), true);
     }
 }

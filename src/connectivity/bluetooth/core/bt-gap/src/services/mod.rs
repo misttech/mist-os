@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod access;
+pub mod address_lookup;
 pub mod bootstrap;
 pub mod configuration;
 pub mod host_watcher;

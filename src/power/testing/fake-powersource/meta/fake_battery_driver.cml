@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 {
     include: [
-        // Enable system logging
+        "driver_component/driver.shard.cml",
         "syslog/client.shard.cml",
     ],
     program: {
         runner: "driver",
         binary: "driver/fake_battery.so",
-        bind: "meta/bind/fake-battery-driver.bindbc",
+        bind: "meta/bind/fake_battery_driver.bindbc",
     },
     capabilities: [
         {

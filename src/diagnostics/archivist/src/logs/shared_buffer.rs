@@ -566,7 +566,7 @@ impl ContainerBuffer {
             next_id,
             end,
             buffer: Arc::clone(&self.shared_buffer),
-            waker_entry: WakerEntry::new(),
+            waker_entry: self.shared_buffer.inner.waker_entry(),
             stats,
         })
     }

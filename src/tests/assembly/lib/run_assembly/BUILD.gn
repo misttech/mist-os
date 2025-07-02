@@ -13,9 +13,4 @@ python_library("run_assembly") {
     "__init__.py",
     "lib.py",
   ]
-  deps = [
-    # The same dependency as in //src/developer/ffx/build/ffx_action.gni, which
-    # the script imitates.
-    "//src/developer/ffx/build:host_tools_used_by_ffx_action_testonly",
-  ]
 }

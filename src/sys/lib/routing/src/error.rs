@@ -331,6 +331,9 @@ pub enum RoutingError {
     )]
     NonDebugRoutesUnsupported { moniker: ExtendedMoniker },
 
+    #[error("debug routes are unsupported for external routers (at `{moniker}`).")]
+    DebugRoutesUnsupported { moniker: ExtendedMoniker },
+
     #[error("{type_name} router unexpectedly returned debug info for target {moniker}")]
     RouteUnexpectedDebug { type_name: CapabilityTypeName, moniker: ExtendedMoniker },
 
@@ -339,6 +342,9 @@ pub enum RoutingError {
 
     #[error("{name} at {moniker} is missing porcelain type metadata.")]
     MissingPorcelainType { name: Name, moniker: Moniker },
+
+    #[error("path at `{moniker}` was too long for `{keyword}`: {path}")]
+    PathTooLong { moniker: ExtendedMoniker, path: String, keyword: String },
 }
 
 impl Explain for RoutingError {
@@ -385,9 +391,11 @@ impl Explain for RoutingError {
             | RoutingError::BedrockWrongCapabilityType { .. }
             | RoutingError::BedrockRemoteCapability { .. }
             | RoutingError::BedrockNotCloneable { .. }
-            | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
+            | RoutingError::AvailabilityRoutingError(_)
+            | RoutingError::PathTooLong { .. } => zx::Status::NOT_FOUND,
             RoutingError::BedrockMemberAccessUnsupported { .. }
             | RoutingError::NonDebugRoutesUnsupported { .. }
+            | RoutingError::DebugRoutesUnsupported { .. }
             | RoutingError::DictionariesNotSupported { .. } => zx::Status::NOT_SUPPORTED,
             RoutingError::ComponentInstanceError(err) => err.as_zx_status(),
             RoutingError::RightsRoutingError(err) => err.as_zx_status(),
@@ -434,6 +442,7 @@ impl From<RoutingError> for ExtendedMoniker {
             | RoutingError::RouteSourceShutdown { moniker }
             | RoutingError::UseFromSelfNotFound { moniker, .. }
             | RoutingError::MissingPorcelainType { moniker, .. } => moniker.into(),
+            RoutingError::PathTooLong { moniker, .. } => moniker,
 
             RoutingError::BedrockMemberAccessUnsupported { moniker }
             | RoutingError::BedrockNotPresentInDictionary { moniker, .. }
@@ -442,6 +451,7 @@ impl From<RoutingError> for ExtendedMoniker {
             | RoutingError::BedrockFailedToSend { moniker, .. }
             | RoutingError::BedrockWrongCapabilityType { moniker, .. }
             | RoutingError::NonDebugRoutesUnsupported { moniker }
+            | RoutingError::DebugRoutesUnsupported { moniker }
             | RoutingError::RouteUnexpectedDebug { moniker, .. }
             | RoutingError::RouteUnexpectedUnavailable { moniker, .. }
             | RoutingError::UnsupportedCapabilityType { moniker, .. }

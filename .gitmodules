@@ -33,11 +33,6 @@
 	url = https://fuchsia.googlesource.com/third_party/go
 	name = third_party/go
 	ignore = all
-[submodule "third_party/googletest/src"]
-	path = third_party/googletest/src
-	url = https://fuchsia.googlesource.com/third_party/github.com/google/googletest
-	name = third_party/github.com/google/googletest
-	ignore = all
 [submodule "third_party/icu/default"]
 	path = third_party/icu/default
 	url = https://chromium.googlesource.com/chromium/deps/icu

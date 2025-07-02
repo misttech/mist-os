@@ -186,11 +186,11 @@ class MsdIntelAbiContext : public msd::Context {
 
   std::shared_ptr<MsdIntelContext> ptr() { return ptr_; }
 
-  magma_status_t ExecuteCommandBufferWithResources(msd::magma_command_buffer* command_buffer,
-                                                   magma_exec_resource* exec_resources,
-                                                   msd::Buffer** buffers,
-                                                   msd::Semaphore** wait_semaphores,
-                                                   msd::Semaphore** signal_semaphores) override;
+  magma_status_t MsdExecuteCommandBufferWithResources(msd::magma_command_buffer* command_buffer,
+                                                      magma_exec_resource* exec_resources,
+                                                      msd::Buffer** buffers,
+                                                      msd::Semaphore** wait_semaphores,
+                                                      msd::Semaphore** signal_semaphores) override;
 
  private:
   std::shared_ptr<MsdIntelContext> ptr_;

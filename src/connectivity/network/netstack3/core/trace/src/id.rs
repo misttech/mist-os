@@ -4,20 +4,18 @@
 
 //! Types encoding trace point identifiers.
 
-use core::marker::PhantomData;
+use netstack3_sync::rc::ResourceToken;
 
 /// A resource identifier that can be used as an argument for trace events.
-#[derive(Copy, Clone)]
 pub struct TraceResourceId<'a> {
     #[cfg_attr(not(target_os = "fuchsia"), allow(unused))]
-    value: u64,
-    _marker: PhantomData<&'a ()>,
+    token: ResourceToken<'a>,
 }
 
 impl<'a> TraceResourceId<'a> {
     /// Creates a new resource id with the given value.
-    pub fn new(value: u64) -> Self {
-        Self { value, _marker: PhantomData }
+    pub fn new(token: ResourceToken<'a>) -> Self {
+        Self { token }
     }
 }
 
@@ -27,7 +25,7 @@ impl<'a> fuchsia_trace::ArgValue for TraceResourceId<'a> {
     where
         Self: 'x,
     {
-        let Self { value, _marker } = value;
-        fuchsia_trace::ArgValue::of(key, value)
+        let Self { token } = value;
+        fuchsia_trace::ArgValue::of(key, token.export_value())
     }
 }

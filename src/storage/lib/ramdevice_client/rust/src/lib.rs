@@ -10,7 +10,7 @@ use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker as _, Proxy as _};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy, ControllerSynchronousProxy};
 use fidl_fuchsia_hardware_ramdisk::{Guid, RamdiskControllerMarker};
 use fs_management::filesystem::{BlockConnector, DirBasedBlockConnector};
-use fuchsia_component::client::{connect_to_named_protocol_at_dir_root, Service};
+use fuchsia_component_client::{connect_to_named_protocol_at_dir_root, Service};
 use {
     fidl_fuchsia_hardware_block as fhardware_block, fidl_fuchsia_hardware_block_volume as fvolume,
     fidl_fuchsia_hardware_ramdisk as framdisk, fidl_fuchsia_io as fio,

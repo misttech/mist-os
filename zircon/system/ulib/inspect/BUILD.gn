@@ -21,8 +21,10 @@ zx_library("inspect") {
     "lib/inspect/cpp/vmo/limits.h",
     "lib/inspect/cpp/vmo/scanner.h",
     "lib/inspect/cpp/vmo/snapshot.h",
+    "lib/inspect/cpp/bounded_list_node.h",
   ]
   sources = [
+    "bounded_list_node.cc",
     "health.cc",
     "hierarchy.cc",
     "inspector.cc",

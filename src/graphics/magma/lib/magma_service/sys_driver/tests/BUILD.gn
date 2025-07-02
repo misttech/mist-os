@@ -45,11 +45,12 @@ cc_test_executable("magma_system_dfv2_test_executable") {
   sources = [ "test_magma_driver_base.cc" ]
 
   deps = [
-    "//sdk/lib/async_patterns/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
+    "//sdk/lib/driver/testing/cpp:minimal_compat_environment",
     "//src/graphics/magma/lib/magma_service/mock:msd_cpp",
     "//src/graphics/magma/lib/magma_service/sys_driver:magma_driver_base",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
     "//zircon/system/ulib/trace",
   ]
 }

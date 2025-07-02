@@ -4,6 +4,7 @@
 #ifndef SRC_STARNIX_TESTS_SYSCALLS_CPP_TEST_HELPER_H_
 #define SRC_STARNIX_TESTS_SYSCALLS_CPP_TEST_HELPER_H_
 
+#include <lib/fit/function.h>
 #include <lib/fit/result.h>
 #include <stdint.h>
 #include <sys/mman.h>
@@ -72,11 +73,15 @@ class ForkHelper {
   // For the current process and execute the given |action| inside the child,
   // then exit with a status equals to the number of failed expectation and
   // assertion. Return immediately with the pid of the child.
-  pid_t RunInForkedProcess(std::function<void()> action);
+  pid_t RunInForkedProcess(fit::function<void()> action);
 
   // If called, checks for process termination by the given signal, instead of expecting
   // the forked process to terminate normally.
   void ExpectSignal(int signum);
+
+  // If called, checks for process termination with the given exit value,
+  // instead of expecting the forked process to terminate normally.
+  void ExpectExitValue(int value);
 
   // If called, only waits for the children explicitly forked by the ForkHelper, instead
   // of waiting for all children.
@@ -86,8 +91,9 @@ class ForkHelper {
   std::vector<pid_t> child_pids_;
   bool wait_for_all_children_;
   int death_signum_;
+  int exit_value_;
 
-  ::testing::AssertionResult WaitForChildrenInternal(int death_signum);
+  ::testing::AssertionResult WaitForChildrenInternal(int exit_value, int death_signum);
 };
 
 // Helper class to handle tests that needs to clone processes.

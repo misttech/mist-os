@@ -121,8 +121,8 @@ async fn run_test(
 
     let instance = builder.build().await?;
 
-    let suite_runner =
-        instance.root.connect_to_protocol_at_exposed_dir::<ftest_manager::SuiteRunnerMarker>()?;
+    let suite_runner: ftest_manager::SuiteRunnerProxy =
+        instance.root.connect_to_protocol_at_exposed_dir()?;
     let runner = test_manager_test_lib::SuiteRunner::new(suite_runner);
     let suite_instance = runner
         .start_suite_run(

@@ -629,13 +629,14 @@ class RegionList final {
 // A representation of a contiguous range of virtual address space
 class VmAddressRegion final : public VmAddressRegionOrMapping {
  public:
-  // Create a root region.  This will span the entire aspace
+  // Creates a root region.  This will span the entire aspace
   static zx_status_t CreateRootLocked(VmAspace& aspace, uint32_t vmar_flags,
                                       fbl::RefPtr<VmAddressRegion>* out) TA_REQ(aspace.lock());
-  // Create a subregion of this region
+  // Creates a subregion of this region
   zx_status_t CreateSubVmar(size_t offset, size_t size, uint8_t align_pow2, uint32_t vmar_flags,
                             const char* name, fbl::RefPtr<VmAddressRegion>* out);
-  // Create a VmMapping within this region
+  // Creates a VmMapping within this region. To avoid leaks, this should be paired with a call to
+  // VmMapping::Destroy if desired; dropping `MapResult::mapping` will *not* destroy the mapping.
   struct MapResult {
     // This will never be null
     fbl::RefPtr<VmMapping> mapping;
@@ -647,7 +648,7 @@ class VmAddressRegion final : public VmAddressRegionOrMapping {
                                         uint32_t vmar_flags, fbl::RefPtr<VmObject> vmo,
                                         uint64_t vmo_offset, uint arch_mmu_flags, const char* name);
 
-  // Find the child region that contains the given addr.  If addr is in a gap,
+  // Finds the child region that contains the given addr.  If addr is in a gap,
   // returns nullptr.  This is a non-recursive search.
   fbl::RefPtr<VmAddressRegionOrMapping> FindRegion(vaddr_t addr);
   fbl::RefPtr<VmAddressRegionOrMapping> FindRegionLocked(vaddr_t addr) TA_REQ(lock());
@@ -1023,10 +1024,10 @@ class VmMapping final : public VmAddressRegionOrMapping {
     return size_;
   }
 
-  Lock<VmoLockType>* object_lock() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
+  Lock<CriticalMutex>* object_lock() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
     return object_->lock();
   }
-  Lock<VmoLockType>& object_lock_ref() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
+  Lock<CriticalMutex>& object_lock_ref() const TA_RET_CAP(object_->lock()) TA_REQ(lock()) {
     return object_->lock_ref();
   }
 

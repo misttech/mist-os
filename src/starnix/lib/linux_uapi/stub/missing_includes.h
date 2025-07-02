@@ -82,6 +82,8 @@ struct remote_binder_wait_command {
 const __u32 REMOTE_BINDER_START = _IOR('R', 1, struct remote_binder_start_command);
 const __u32 REMOTE_BINDER_WAIT = _IOW('R', 2, struct remote_binder_wait_command);
 
+C(BINDER_CTL_ADD);
+
 C(FIBMAP);
 C(FIGETBSZ);
 

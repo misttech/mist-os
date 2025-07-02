@@ -242,7 +242,7 @@ pub(crate) mod for_tests {
         ) -> Result<Self, Error> {
             let pkg_cache_proxy = realm_instance
                 .root
-                .connect_to_protocol_at_exposed_dir::<fidl_fuchsia_pkg::PackageCacheMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .expect("connect to pkg cache");
 
             let cache = Cache::new_with_proxies(pkg_cache_proxy).unwrap();

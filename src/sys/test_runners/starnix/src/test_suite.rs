@@ -215,7 +215,7 @@ async fn run_test_case(
     debug!("running generic fallback test suite");
     let (case_listener_proxy, case_listener) = create_proxy::<ftest::CaseListenerMarker>();
     let (numbered_handles, std_handles) = create_numbered_handles();
-    start_info.numbered_handles = numbered_handles;
+    start_info.numbered_handles = Some(numbered_handles);
 
     debug!("notifying client test case started");
     run_listener_proxy.on_test_case_started(&test, std_handles, case_listener)?;

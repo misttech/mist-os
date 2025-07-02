@@ -1,0 +1,240 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# This lists all the different kinds of public headers that libc is responsible
+# for.  See README.md for more details.  These are in a separate .gni file so
+# that they can be used by the sysroot_entries.gni machinery and in BUILD.gn.
+libc_headers = {
+  # The *_dir values and *_headers lists are used by BUILD.gn code.
+  root_dir = "//sdk/lib/c/include"
+  musl_dir = "//zircon/third_party/ulib/musl/include"
+  llvm_libc_dir = "//third_party/llvm-libc/src/include"
+
+  # Generated headers all go into this same directory regardless of toolchain.
+  llvm_libc_gen_dir =
+      get_label_info("$llvm_libc_dir($default_toolchain)", "target_gen_dir")
+
+  # The *_public_headers variables list headers that users should include
+  # directly, and that should be tested for being used standalone (roughly a
+  # proxy for every being used before some other particular header that may
+  # interact).  The *_impl_headers variables list additional headers that are
+  # transitive dependencies of some public header, but should not themselves be
+  # named directly by users.
+
+  # Files maintained here in $libc/include.  These are Fuchsia inventions and
+  # their only source of truth is right here.
+  root_public_headers = [
+    "zircon/dlfcn.h",
+    "zircon/lookup.h",
+    "zircon/sanitizer.h",
+    "zircon/threads.h",
+    "zircon/utc.h",
+  ]
+  root_impl_headers = []
+
+  # Files inherited from the legacy musl fork.  These are maintained within the
+  # source tree and have no other active source of truth, but they are not
+  # original to Fuchsia.  These will eventually be replaced or moved elsewhere.
+  musl_public_headers = [
+    "alloca.h",
+    "ar.h",
+    "arpa/ftp.h",
+    "arpa/inet.h",
+    "arpa/nameser.h",
+    "arpa/nameser_compat.h",
+    "arpa/telnet.h",
+    "arpa/tftp.h",
+    "assert.h",
+    "byteswap.h",
+    "complex.h",
+    "cpio.h",
+    "ctype.h",
+    "dirent.h",
+    "dlfcn.h",
+    "elf.h",
+    "endian.h",
+    "err.h",
+    "errno.h",
+    "fcntl.h",
+    "features.h",
+    "fnmatch.h",
+    "getopt.h",
+    "glob.h",
+    "grp.h",
+    "iconv.h",
+    "ifaddrs.h",
+    "inttypes.h",
+    "iso646.h",
+    "langinfo.h",
+    "libgen.h",
+    "limits.h",
+    "link.h",
+    "locale.h",
+    "math.h",
+    "memory.h",
+    "monetary.h",
+    "net/ethernet.h",
+    "net/if.h",
+    "net/if_arp.h",
+    "net/route.h",
+    "netdb.h",
+    "netinet/ether.h",
+    "netinet/icmp6.h",
+    "netinet/if_ether.h",
+    "netinet/igmp.h",
+    "netinet/in.h",
+    "netinet/in_systm.h",
+    "netinet/ip.h",
+    "netinet/ip6.h",
+    "netinet/ip_icmp.h",
+    "netinet/tcp.h",
+    "netinet/udp.h",
+    "netpacket/packet.h",
+    "nl_types.h",
+    "paths.h",
+    "poll.h",
+    "pthread.h",
+    "pwd.h",
+    "regex.h",
+    "resolv.h",
+    "sched.h",
+    "semaphore.h",
+    "setjmp.h",
+    "signal.h",
+    "spawn.h",
+    "stdio.h",
+    "stdlib.h",
+    "string.h",
+    "strings.h",
+    "stropts.h",
+    "sys/acct.h",
+    "sys/auxv.h",
+    "sys/dir.h",
+    "sys/eventfd.h",
+    "sys/file.h",
+    "sys/inotify.h",
+    "sys/io.h",
+    "sys/ioctl.h",
+    "sys/ipc.h",
+    "sys/mman.h",
+    "sys/mount.h",
+    "sys/msg.h",
+    "sys/mtio.h",
+    "sys/param.h",
+    "sys/random.h",
+    "sys/select.h",
+    "sys/sem.h",
+    "sys/shm.h",
+    "sys/socket.h",
+    "sys/stat.h",
+    "sys/statfs.h",
+    "sys/statvfs.h",
+    "sys/stropts.h",
+    "sys/syslog.h",
+    "sys/time.h",
+    "sys/timeb.h",
+    "sys/timerfd.h",
+    "sys/times.h",
+    "sys/ttydefaults.h",
+    "sys/types.h",
+    "sys/ucontext.h",
+    "sys/uio.h",
+    "sys/un.h",
+    "sys/utsname.h",
+    "sys/vfs.h",
+    "sys/wait.h",
+    "sysexits.h",
+    "syslog.h",
+    "tar.h",
+    "termios.h",
+    "threads.h",
+    "time.h",
+    "uchar.h",
+    "ucontext.h",
+    "unistd.h",
+    "utime.h",
+    "values.h",
+    "wchar.h",
+    "wctype.h",
+    "wordexp.h",
+  ]
+  musl_impl_headers = [
+    "bits/aarch64/setjmp.h",
+    "bits/alltypes.h",
+    "bits/errno.h",
+    "bits/io.h",
+    "bits/ioctl.h",
+    "bits/ipc.h",
+    "bits/limits.h",
+    "bits/null.h",
+    "bits/poll.h",
+    "bits/posix.h",
+    "bits/resource.h",
+    "bits/riscv64/setjmp.h",
+    "bits/setjmp.h",
+    "bits/signal.h",
+    "bits/stat.h",
+    "bits/statfs.h",
+    "bits/termios.h",
+    "bits/x86_64/io.h",
+    "bits/x86_64/setjmp.h",
+    "sys/errno.h",
+    "sys/fcntl.h",
+    "sys/poll.h",
+    "sys/signal.h",
+    "sys/termios.h",
+    "wait.h",
+  ]
+
+  # This file is regenerated based on the $llvm_libc_generated_headers list and
+  # updated as a golden file.  It gives details about each generated public
+  # header.
+  llvm_libc_json_file = "$root_dir/llvm-libc-generated.json"
+  llvm_libc_json_data = read_file(llvm_libc_json_file, "json")
+
+  # Accumulate the list of the public headers and merge the lists of
+  # implementation headers each one uses, removing duplicates.
+  llvm_libc_public_headers = []
+  llvm_libc_impl_headers = []
+  foreach(header, llvm_libc_json_data) {
+    llvm_libc_public_headers += [ header.name ]
+    llvm_libc_impl_headers += header.includes
+    llvm_libc_impl_headers -= header.includes
+    llvm_libc_impl_headers += header.includes
+  }
+
+  # These headers will get tested for standalone use.
+  all_public_headers =
+      root_public_headers + musl_public_headers + llvm_libc_public_headers
+
+  # This is in the format used by sysroot_entries.gni; it uses only this.
+  sysroot_entries = [
+    {
+      sdk = {
+        include_dir = root_dir
+        headers = root_public_headers + root_impl_headers
+      }
+    },
+    {
+      sdk = {
+        include_dir = musl_dir
+        headers = musl_public_headers + musl_impl_headers
+      }
+    },
+    {
+      sdk = {
+        include_dir = llvm_libc_gen_dir
+        headers = llvm_libc_public_headers
+        deps = [ root_dir ]
+      }
+    },
+    {
+      sdk = {
+        include_dir = llvm_libc_dir
+        headers = llvm_libc_impl_headers
+        deps = [ root_dir ]
+      }
+    },
+  ]
+}

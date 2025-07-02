@@ -23,6 +23,7 @@
 #include <string>
 #include <utility>
 
+#include "fidl/fuchsia.test.manager/cpp/natural_types.h"
 #include "src/developer/debug/debug_agent/debug_agent.h"
 #include "src/developer/debug/debug_agent/debugged_process.h"
 #include "src/developer/debug/debug_agent/filter.h"
@@ -350,46 +351,35 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
     if (component_manager->running_tests_info_.count(test_url_))
       return debug::Status("Test " + test_url_ + " is already launched");
 
-    auto run_builder_res = component::Connect<fuchsia_test_manager::RunBuilder>();
-    if (!run_builder_res.is_ok()) {
-      return debug::ZxStatus(run_builder_res.error_value());
+    auto suite_runner_res = component::Connect<fuchsia_test_manager::SuiteRunner>();
+    if (!suite_runner_res.is_ok()) {
+      return debug::ZxStatus(suite_runner_res.error_value());
     }
-    fidl::SyncClient run_builder(std::move(*run_builder_res));
+    fidl::SyncClient suite_runner(std::move(*suite_runner_res));
 
     DEBUG_LOG(Process) << "Launching test url=" << test_url_;
 
-    fuchsia_test_manager::RunOptions run_options;
-    run_options.case_filters_to_run() = std::move(case_filters);
+    fuchsia_test_manager::RunSuiteOptions run_suite_options;
+    run_suite_options.test_case_filters() = std::move(case_filters);
     if (realm) {
       auto get_test_realm_res = GetTestRealmAndOffers(*realm);
       if (!get_test_realm_res.is_ok()) {
         return get_test_realm_res.error_value();
       }
 
-      auto add_suite_in_realm_res = run_builder->AddSuiteInRealm(
-          {std::move(get_test_realm_res->realm), std::move(get_test_realm_res->offers),
-           get_test_realm_res->test_collection, test_url_, std::move(run_options),
-           CreateEndpointsAndBind(suite_controller_)});
-      if (!add_suite_in_realm_res.is_ok()) {
-        return debug::ZxStatus(add_suite_in_realm_res.error_value().status(),
-                               add_suite_in_realm_res.error_value().FormatDescription());
-      }
-    } else {
-      auto add_suite_res = run_builder->AddSuite(
-          {test_url_, std::move(run_options), CreateEndpointsAndBind(suite_controller_)});
-      if (!add_suite_res.is_ok()) {
-        return debug::ZxStatus(add_suite_res.error_value().status(),
-                               add_suite_res.error_value().FormatDescription());
-      }
+      run_suite_options.realm_options() = {{
+          .realm = std::move(get_test_realm_res->realm),
+          .offers = std::move(get_test_realm_res->offers),
+          .test_collection = get_test_realm_res->test_collection,
+      }};
     }
-    auto build_res = run_builder->Build(CreateEndpointsAndBind(run_controller_));
-    if (!build_res.is_ok()) {
-      return debug::ZxStatus(build_res.error_value().status(),
-                             build_res.error_value().FormatDescription());
+    auto run_res = suite_runner->Run(
+        {test_url_, std::move(run_suite_options), CreateEndpointsAndBind(suite_controller_)});
+    if (!run_res.is_ok()) {
+      return debug::ZxStatus(run_res.error_value().status(),
+                             run_res.error_value().FormatDescription());
     }
-    run_controller_->GetEvents().Then(
-        [self = fxl::RefPtr<TestLauncher>(this)](auto& res) { self->OnRunEvents(std::move(res)); });
-    suite_controller_->GetEvents().Then([self = fxl::RefPtr<TestLauncher>(this)](auto& res) {
+    suite_controller_->WatchEvents().Then([self = fxl::RefPtr<TestLauncher>(this)](auto& res) {
       self->OnSuiteEvents(std::move(res));
     });
     component_manager->running_tests_info_[test_url_] = {};
@@ -406,7 +396,7 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
  private:
   // Stdout and stderr are in case_artifact. Logs are in suite_artifact. Others are ignored.
   // NOTE: custom.component_moniker in suite_artifact is NOT the moniker of the test!
-  void OnSuiteEvents(fidl::Result<fuchsia_test_manager::SuiteController::GetEvents> result) {
+  void OnSuiteEvents(fidl::Result<fuchsia_test_manager::SuiteController::WatchEvents> result) {
     if (!component_manager_ || !result.is_ok() || result->events().empty()) {
       (void)suite_controller_.UnbindMaybeGetEndpoint();  // Otherwise run_controller won't return.
       if (result.is_error())
@@ -416,23 +406,27 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
       return;
     }
     for (auto& event : result->events()) {
-      FX_CHECK(event.payload());
-      if (event.payload()->case_found()) {
+      FX_CHECK(event.details());
+      if (event.details()->test_case_found()) {
         auto& test_info = component_manager_->running_tests_info_[test_url_];
         // Test cases should come in order.
-        FX_CHECK(test_info.case_names.size() == event.payload()->case_found()->identifier());
-        test_info.case_names.push_back(event.payload()->case_found()->test_case_name());
-        if (event.payload()->case_found()->test_case_name().find_first_of('.') !=
+        FX_CHECK(test_info.case_names.size() == event.details()->test_case_found()->test_case_id());
+        FX_CHECK(event.details()->test_case_found()->test_case_name());
+        test_info.case_names.push_back(
+            event.details()->test_case_found()->test_case_name().value());
+        if (event.details()->test_case_found()->test_case_name()->find_first_of('.') !=
             std::string::npos) {
           test_info.ignored_process = 1;
         }
-      } else if (event.payload()->case_artifact()) {
-        if (auto proc = GetDebuggedProcess(event.payload()->case_artifact()->identifier())) {
-          auto& artifact = event.payload()->case_artifact()->artifact();
-          if (artifact.stdout_()) {
-            proc->SetStdout(std::move(artifact.stdout_().value()));
-          } else if (artifact.stderr_()) {
-            proc->SetStderr(std::move(artifact.stderr_().value()));
+      } else if (event.details()->test_case_artifact_generated()) {
+        FX_CHECK(event.details()->test_case_artifact_generated()->test_case_id());
+        if (auto proc = GetDebuggedProcess(
+                event.details()->test_case_artifact_generated()->test_case_id().value())) {
+          auto& artifact = event.details()->test_case_artifact_generated()->artifact();
+          if (artifact->stdout_()) {
+            proc->SetStdout(std::move(artifact->stdout_().value()));
+          } else if (artifact->stderr_()) {
+            proc->SetStderr(std::move(artifact->stderr_().value()));
           }
         } else {
           // This usually happens when the process has terminated, e.g.
@@ -441,17 +435,18 @@ class ZirconComponentManager::TestLauncher : public fxl::RefCountedThreadSafe<Te
           //
           // Don't print anything because it's very common.
         }
-      } else if (event.payload()->suite_artifact()) {
-        auto& artifact = event.payload()->suite_artifact()->artifact();
+      } else if (event.details()->suite_artifact_generated()) {
+        FX_CHECK(event.details()->suite_artifact_generated()->artifact());
+        auto& artifact = event.details()->suite_artifact_generated()->artifact().value();
         if (artifact.log()) {
           FX_CHECK(artifact.log()->batch());
-          log_listener_.Bind(artifact.log()->batch().value().TakeChannel());
+          log_listener_.Bind(artifact.log()->batch()->TakeChannel());
           log_listener_->GetNext(
               [self = fxl::RefPtr<TestLauncher>(this)](auto res) { self->OnLog(std::move(res)); });
         }
       }
     }
-    suite_controller_->GetEvents().Then([self = fxl::RefPtr<TestLauncher>(this)](auto& res) {
+    suite_controller_->WatchEvents().Then([self = fxl::RefPtr<TestLauncher>(this)](auto& res) {
       self->OnSuiteEvents(std::move(res));
     });
   }

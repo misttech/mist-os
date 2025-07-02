@@ -49,9 +49,9 @@ class AdminTest : public TestBase {
   void RequestBuffer(uint32_t min_ring_buffer_frames, uint32_t notifications_per_ring);
 
   enum SetActiveChannelsOutcome : uint8_t {
-    SUCCESS = 1,  // May or may not represent a change
-    CHANGE,       // Successful change of active channels.
-    NO_CHANGE,    // Successful but not a change.
+    SUCCESS = 1,  // Successful call.
+    CHANGE,       // Successful call. As intended, the active-channels state was changed.
+    NO_CHANGE,    // Successful call. As intended, the active-channels state was NOT changed.
     FAILURE,      // Unsuccessful.
   };
   void ActivateChannelsAndExpectOutcome(uint64_t active_channels_bitmask,
@@ -160,13 +160,7 @@ class AdminTest : public TestBase {
   }
 
  private:
-  static constexpr zx::duration kRingBufferDisconnectCooldownDuration = zx::msec(100);
-  static void CooldownAfterRingBufferDisconnect();
   void RequestRingBufferChannel();
-
-  // This is not needed at this point (cooldown is set to 0), but the mechanism is in place.
-  static constexpr zx::duration kSignalProcessingDisconnectCooldownDuration = zx::msec(0);
-  static void CooldownAfterSignalProcessingDisconnect();
 
   static void ValidateElement(const fuchsia::hardware::audio::signalprocessing::Element& element);
   static void ValidateDaiElement(

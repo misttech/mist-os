@@ -57,6 +57,12 @@ rust_library(
         "default",
         "std",
     ] + select({
+        "@rules_rust//rust/platform:aarch64-apple-darwin": [
+            "unbounded_depth",  # aarch64-apple-darwin
+        ],
+        "@rules_rust//rust/platform:x86_64-apple-darwin": [
+            "unbounded_depth",  # x86_64-apple-darwin
+        ],
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [
             "unbounded_depth",  # x86_64-unknown-linux-gnu
         ],
@@ -75,7 +81,9 @@ rust_library(
         "norustfmt",
     ],
     target_compatible_with = select({
+        "@rules_rust//rust/platform:aarch64-apple-darwin": [],
         "@rules_rust//rust/platform:aarch64-unknown-fuchsia": [],
+        "@rules_rust//rust/platform:x86_64-apple-darwin": [],
         "@rules_rust//rust/platform:x86_64-unknown-fuchsia": [],
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -113,6 +121,12 @@ cargo_build_script(
         "default",
         "std",
     ] + select({
+        "@rules_rust//rust/platform:aarch64-apple-darwin": [
+            "unbounded_depth",  # aarch64-apple-darwin
+        ],
+        "@rules_rust//rust/platform:x86_64-apple-darwin": [
+            "unbounded_depth",  # x86_64-apple-darwin
+        ],
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [
             "unbounded_depth",  # x86_64-unknown-linux-gnu
         ],

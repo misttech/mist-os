@@ -4,22 +4,6 @@
 
 import("//build/compiled_action.gni")
 
-# This is the actual label for the sdk host tools, and is used to provide the
-# path to the sdk molecule manifest.
-_sdk_host_tools_label =
-    "//sdk:host_tools_used_by_ffx_action_during_build($host_toolchain)"
-sdk_host_tools_manifest =
-    get_label_info(_sdk_host_tools_label, "root_out_dir") +
-    "/sdk/manifest/host_tools_used_by_ffx_action_during_build"
-
-# This is a group that has a public dependency on the above, which is visibility
-# restricted to only this group, because ffx_action() instances can be anywhere
-# in the tree, and there isn't a way to otherwise say "only visible to actions
-# defined by template X".
-sdk_host_tools_visibility_bridge_label =
-    "//src/developer/ffx/build:host_tools_used_by_ffx_action($host_toolchain)"
-sdk_host_tools_visibility_bridge_label_testonly = "//src/developer/ffx/build:host_tools_used_by_ffx_action_testonly($host_toolchain)"
-
 # Executes an ffx command as an action during the build.
 #
 # This is a wrapper around compiled_action() that automatically adds ffx as
@@ -38,10 +22,6 @@ sdk_host_tools_visibility_bridge_label_testonly = "//src/developer/ffx/build:hos
 #
 #   hermetic_inputs_file (optional)
 #       Implicit inputs to the ffx plugin.
-#
-#   needs_sdk (optional, default true)
-#       Whether the (host-tools module of the) sdk is needed to run this action
-#       or not.
 #
 #   sources (optional)
 #       Files the plugin takes as input. The step will be re-run whenever any
@@ -151,11 +131,8 @@ template("ffx_action") {
       !defined(invoker.depfile) &&
       (!defined(invoker.hermetic_deps) || invoker.hermetic_deps)
 
-  _needs_sdk = !defined(invoker.needs_sdk) || invoker.needs_sdk
-
   if (_use_hermetic_inputs_file) {
-    # Generate a list of hermetic inputs based on the files in the SDK manifest.
-    # Also, merge in any additional inputs if necessary.
+    # Generate a list of hermetic inputs for any additional inputs if necessary.
     hermetic_inputs_label = "${target_name}_all_inputs"
     hermetic_inputs_path = "${target_out_dir}/${target_name}_all_inputs"
     hermetic_inputs_action(hermetic_inputs_label) {
@@ -177,19 +154,6 @@ template("ffx_action") {
         "--output",
         rebase_path(hermetic_inputs_path, root_build_dir),
       ]
-
-      if (_needs_sdk) {
-        if (defined(invoker.testonly) && invoker.testonly) {
-          deps += [ sdk_host_tools_visibility_bridge_label_testonly ]
-        } else {
-          deps += [ sdk_host_tools_visibility_bridge_label ]
-        }
-        inputs += [ sdk_host_tools_manifest ]
-        args += [
-          "--sdk-manifest",
-          rebase_path(sdk_host_tools_manifest, root_build_dir),
-        ]
-      }
 
       if (defined(invoker.hermetic_inputs_file)) {
         inputs += [ invoker.hermetic_inputs_file ]
@@ -255,20 +219,6 @@ template("ffx_action") {
     }
 
     inputs += [ env_file ]
-
-    if (_needs_sdk) {
-      if (defined(invoker.testonly) && invoker.testonly) {
-        deps += [ sdk_host_tools_visibility_bridge_label_testonly ]
-      } else {
-        deps += [ sdk_host_tools_visibility_bridge_label ]
-      }
-
-      inputs += [ sdk_host_tools_manifest ]
-      _ffx_config += [
-        "sdk.root=" + rebase_path(root_build_dir, root_build_dir),
-        "sdk.module=host_tools_used_by_ffx_action_during_build",
-      ]
-    }
 
     args = [ "--no-environment" ]
     if (defined(invoker.no_environment) && invoker.no_environment == false) {

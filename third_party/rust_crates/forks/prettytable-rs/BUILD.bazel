@@ -67,7 +67,9 @@ rust_library(
         "norustfmt",
     ],
     target_compatible_with = select({
+        "@rules_rust//rust/platform:aarch64-apple-darwin": [],
         "@rules_rust//rust/platform:aarch64-unknown-fuchsia": [],
+        "@rules_rust//rust/platform:x86_64-apple-darwin": [],
         "@rules_rust//rust/platform:x86_64-unknown-fuchsia": [],
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -77,7 +79,7 @@ rust_library(
         "//third_party/rust_crates/ask2patch/csv",
         "//third_party/rust_crates/vendor/atty-0.2.11:atty",
         "//third_party/rust_crates/vendor/encode_unicode-0.3.5:encode_unicode",
-        "//third_party/rust_crates/vendor/lazy_static-1.4.0:lazy_static",
+        "//third_party/rust_crates/vendor/lazy_static-1.5.0:lazy_static",
         "//third_party/rust_crates/vendor/term-0.5.1:term",
         "//third_party/rust_crates/vendor/unicode-width-0.1.14:unicode_width",
     ],

@@ -60,7 +60,7 @@ pub fn vmo_flags_to_rights(vmo_flags: fio::VmoFlags) -> fidl::Rights {
 #[cfg(target_os = "fuchsia")]
 pub fn get_backing_memory_validate_flags(
     vmo_flags: fio::VmoFlags,
-    connection_flags: fio::OpenFlags,
+    options: FileOptions,
 ) -> Result<(), Status> {
     // Disallow inconsistent flag combination.
     if vmo_flags.contains(fio::VmoFlags::PRIVATE_CLONE)
@@ -71,17 +71,17 @@ pub fn get_backing_memory_validate_flags(
 
     // Ensure the requested rights in vmo_flags do not exceed those of the underlying connection.
     if vmo_flags.contains(fio::VmoFlags::READ)
-        && !connection_flags.intersects(fio::OpenFlags::RIGHT_READABLE)
+        && !options.rights.intersects(fio::Operations::READ_BYTES)
     {
         return Err(Status::ACCESS_DENIED);
     }
     if vmo_flags.contains(fio::VmoFlags::WRITE)
-        && !connection_flags.intersects(fio::OpenFlags::RIGHT_WRITABLE)
+        && !options.rights.intersects(fio::Operations::WRITE_BYTES)
     {
         return Err(Status::ACCESS_DENIED);
     }
     if vmo_flags.contains(fio::VmoFlags::EXECUTE)
-        && !connection_flags.intersects(fio::OpenFlags::RIGHT_EXECUTABLE)
+        && !options.rights.intersects(fio::Operations::EXECUTE)
     {
         return Err(Status::ACCESS_DENIED);
     }
@@ -89,7 +89,7 @@ pub fn get_backing_memory_validate_flags(
     // As documented in the fuchsia.io interface, if VmoFlags::EXECUTE is requested, ensure that the
     // connection also has OPEN_RIGHT_READABLE.
     if vmo_flags.contains(fio::VmoFlags::EXECUTE)
-        && !connection_flags.intersects(fio::OpenFlags::RIGHT_READABLE)
+        && !options.rights.intersects(fio::Operations::READ_BYTES)
     {
         return Err(Status::ACCESS_DENIED);
     }
@@ -108,16 +108,16 @@ mod tests {
     use fidl_fuchsia_io as fio;
     use zx_status::Status;
 
-    fn io_flags_to_rights(flags: fio::OpenFlags) -> (bool, bool, bool) {
+    fn options_to_rights(options: FileOptions) -> (bool, bool, bool) {
         return (
-            flags.intersects(fio::OpenFlags::RIGHT_READABLE),
-            flags.intersects(fio::OpenFlags::RIGHT_WRITABLE),
-            flags.intersects(fio::OpenFlags::RIGHT_EXECUTABLE),
+            options.rights.intersects(fio::Operations::READ_BYTES),
+            options.rights.intersects(fio::Operations::WRITE_BYTES),
+            options.rights.intersects(fio::Operations::EXECUTE),
         );
     }
 
     fn ncvf(
-        flags: fio::OpenFlags,
+        flags: impl ToFileOptions,
         readable: bool,
         writable: bool,
         executable: bool,
@@ -128,52 +128,31 @@ mod tests {
     }
 
     #[test]
-    fn new_connection_validate_flags_posix() {
-        // OPEN_FLAG_POSIX_* is ignored for files.
-        const ALL_POSIX_FLAGS: fio::OpenFlags = fio::OpenFlags::empty()
-            .union(fio::OpenFlags::POSIX_WRITABLE)
-            .union(fio::OpenFlags::POSIX_EXECUTABLE);
-        for open_flags in build_flag_combinations(
-            fio::OpenFlags::empty(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_EXECUTABLE
-                | ALL_POSIX_FLAGS,
-        ) {
-            let (readable, writable, executable) = io_flags_to_rights(open_flags);
-            // Skip disallowed W+X combinations, and skip combinations without any POSIX flags.
-            if (writable && executable) || !open_flags.intersects(ALL_POSIX_FLAGS) {
-                continue;
-            }
-            assert_matches!(ncvf(open_flags, readable, writable, executable), Ok(_));
-        }
-    }
-
-    #[test]
     fn new_connection_validate_flags_create() {
         for open_flags in build_flag_combinations(
-            fio::OpenFlags::CREATE,
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::CREATE_IF_ABSENT,
+            fio::Flags::FLAG_MAYBE_CREATE,
+            fio::Flags::PERM_READ_BYTES
+                | fio::Flags::PERM_WRITE_BYTES
+                | fio::Flags::FLAG_MUST_CREATE,
         ) {
-            let (readable, writable, executable) = io_flags_to_rights(open_flags);
-            assert_matches!(ncvf(open_flags, readable, writable, executable), Ok(_));
+            let options = open_flags.to_file_options().unwrap();
+            let (readable, writable, executable) = options_to_rights(options);
+            assert_matches!(ncvf(options, readable, writable, executable), Ok(_));
         }
     }
 
     #[test]
     fn new_connection_validate_flags_truncate() {
         assert_matches!(
-            ncvf(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::TRUNCATE, true, true, false,),
+            ncvf(fio::Flags::PERM_READ_BYTES | fio::Flags::FILE_TRUNCATE, true, true, false),
             Err(Status::INVALID_ARGS)
         );
         assert_matches!(
-            ncvf(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::TRUNCATE, true, true, false),
+            ncvf(fio::Flags::PERM_WRITE_BYTES | fio::Flags::FILE_TRUNCATE, true, true, false),
             Ok(_)
         );
         assert_matches!(
-            ncvf(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::TRUNCATE, true, false, false),
+            ncvf(fio::Flags::PERM_READ_BYTES | fio::Flags::FILE_TRUNCATE, true, false, false),
             Err(Status::INVALID_ARGS)
         );
     }
@@ -181,15 +160,15 @@ mod tests {
     #[test]
     fn new_connection_validate_flags_append() {
         assert_matches!(
-            ncvf(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::APPEND, true, false, false),
+            ncvf(fio::Flags::PERM_READ_BYTES | fio::Flags::FILE_APPEND, true, false, false),
             Ok(_)
         );
         assert_matches!(
-            ncvf(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::APPEND, true, true, false),
+            ncvf(fio::Flags::PERM_READ_BYTES | fio::Flags::FILE_APPEND, true, true, false),
             Ok(_)
         );
         assert_matches!(
-            ncvf(fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND, true, true, false),
+            ncvf(fio::Flags::PERM_READ_BYTES | fio::Flags::FILE_APPEND, true, true, false),
             Ok(_)
         );
     }
@@ -197,34 +176,27 @@ mod tests {
     #[test]
     fn new_connection_validate_flags_open_rights() {
         for open_flags in build_flag_combinations(
-            fio::OpenFlags::empty(),
-            fio::OpenFlags::RIGHT_READABLE
-                | fio::OpenFlags::RIGHT_WRITABLE
-                | fio::OpenFlags::RIGHT_EXECUTABLE,
+            fio::Flags::empty(),
+            fio::Flags::PERM_READ_BYTES | fio::Flags::PERM_READ_BYTES | fio::Flags::PERM_EXECUTE,
         ) {
-            let (readable, writable, executable) = io_flags_to_rights(open_flags);
+            let options = open_flags.to_file_options().unwrap();
+            let (readable, writable, executable) = options_to_rights(options);
 
             // Ensure all combinations are valid except when both writable and executable are set,
             // as this combination is disallowed.
             if !(writable && executable) {
-                assert_matches!(ncvf(open_flags, readable, writable, executable), Ok(_));
+                assert_matches!(ncvf(options, readable, writable, executable), Ok(_));
             }
 
             // Ensure we report ACCESS_DENIED if open_flags exceeds the supported connection rights.
             if readable && !(writable && executable) {
-                assert_eq!(
-                    ncvf(open_flags, false, writable, executable),
-                    Err(Status::ACCESS_DENIED)
-                );
+                assert_eq!(ncvf(options, false, writable, executable), Err(Status::ACCESS_DENIED));
             }
             if writable {
-                assert_eq!(
-                    ncvf(open_flags, readable, false, executable),
-                    Err(Status::ACCESS_DENIED)
-                );
+                assert_eq!(ncvf(options, readable, false, executable), Err(Status::ACCESS_DENIED));
             }
             if executable {
-                assert_eq!(ncvf(open_flags, readable, writable, false), Err(Status::ACCESS_DENIED));
+                assert_eq!(ncvf(options, readable, writable, false), Err(Status::ACCESS_DENIED));
             }
         }
     }
@@ -269,7 +241,7 @@ mod tests {
             assert_eq!(
                 get_backing_memory_validate_flags(
                     fio::VmoFlags::PRIVATE_CLONE | fio::VmoFlags::SHARED_BUFFER,
-                    fio::OpenFlags::empty()
+                    fio::Flags::empty().to_file_options().unwrap()
                 ),
                 Err(Status::INVALID_ARGS)
             );
@@ -280,42 +252,43 @@ mod tests {
         #[test]
         fn get_backing_memory_validate_flags_less_rights() {
             for open_flags in build_flag_combinations(
-                fio::OpenFlags::empty(),
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::RIGHT_EXECUTABLE,
+                fio::Flags::empty(),
+                fio::Flags::PERM_READ_BYTES
+                    | fio::Flags::PERM_WRITE_BYTES
+                    | fio::Flags::PERM_EXECUTE,
             ) {
-                let (readable, writable, executable) = io_flags_to_rights(open_flags);
+                let options = open_flags.to_file_options().unwrap();
+                let (readable, writable, executable) = options_to_rights(options);
                 let vmo_flags = rights_to_vmo_flags(readable, writable, executable);
 
                 // The io1.fidl protocol specifies that VmoFlags::EXECUTE requires the connection to be
                 // both readable and executable.
                 if executable && !readable {
                     assert_eq!(
-                        get_backing_memory_validate_flags(vmo_flags, open_flags),
+                        get_backing_memory_validate_flags(vmo_flags, options),
                         Err(Status::ACCESS_DENIED)
                     );
                     continue;
                 }
 
                 // Ensure that we can open the VMO with the same rights as the connection.
-                get_backing_memory_validate_flags(vmo_flags, open_flags)
+                get_backing_memory_validate_flags(vmo_flags, options)
                     .expect("Failed to validate flags");
 
                 // Ensure that we can also open the VMO with *less* rights than the connection has.
                 if readable {
                     let vmo_flags = rights_to_vmo_flags(false, writable, false);
-                    get_backing_memory_validate_flags(vmo_flags, open_flags)
+                    get_backing_memory_validate_flags(vmo_flags, options)
                         .expect("Failed to validate flags");
                 }
                 if writable {
                     let vmo_flags = rights_to_vmo_flags(readable, false, executable);
-                    get_backing_memory_validate_flags(vmo_flags, open_flags)
+                    get_backing_memory_validate_flags(vmo_flags, options)
                         .expect("Failed to validate flags");
                 }
                 if executable {
                     let vmo_flags = rights_to_vmo_flags(true, writable, false);
-                    get_backing_memory_validate_flags(vmo_flags, open_flags)
+                    get_backing_memory_validate_flags(vmo_flags, options)
                         .expect("Failed to validate flags");
                 }
             }
@@ -325,31 +298,32 @@ mod tests {
         #[test]
         fn get_backing_memory_validate_flags_more_rights() {
             for open_flags in build_flag_combinations(
-                fio::OpenFlags::empty(),
-                fio::OpenFlags::RIGHT_READABLE
-                    | fio::OpenFlags::RIGHT_WRITABLE
-                    | fio::OpenFlags::RIGHT_EXECUTABLE,
+                fio::Flags::empty(),
+                fio::Flags::PERM_READ_BYTES
+                    | fio::Flags::PERM_WRITE_BYTES
+                    | fio::Flags::PERM_EXECUTE,
             ) {
+                let options = open_flags.to_file_options().unwrap();
                 // Ensure we cannot return a VMO with more rights than the connection itself has.
-                let (readable, writable, executable) = io_flags_to_rights(open_flags);
+                let (readable, writable, executable) = options_to_rights(options);
                 if !readable {
                     let vmo_flags = rights_to_vmo_flags(true, writable, executable);
                     assert_eq!(
-                        get_backing_memory_validate_flags(vmo_flags, open_flags),
+                        get_backing_memory_validate_flags(vmo_flags, options),
                         Err(Status::ACCESS_DENIED)
                     );
                 }
                 if !writable {
                     let vmo_flags = rights_to_vmo_flags(readable, true, false);
                     assert_eq!(
-                        get_backing_memory_validate_flags(vmo_flags, open_flags),
+                        get_backing_memory_validate_flags(vmo_flags, options),
                         Err(Status::ACCESS_DENIED)
                     );
                 }
                 if !executable {
                     let vmo_flags = rights_to_vmo_flags(readable, false, true);
                     assert_eq!(
-                        get_backing_memory_validate_flags(vmo_flags, open_flags),
+                        get_backing_memory_validate_flags(vmo_flags, options),
                         Err(Status::ACCESS_DENIED)
                     );
                 }

@@ -22,7 +22,7 @@ func (f *FFXInstance) Flash(ctx context.Context, target, sshKey, productBundle s
 
 	// Set the machine format to json so that errors will get printed to stdout
 	// for parsing.
-	args := []string{"-v", "--machine", "json", "target", "flash", "--product-bundle", productBundle}
+	args := []string{"-v", "--machine", "json", "target", "flash", "--skip-verify", "--product-bundle", productBundle}
 	if tcp {
 		// Rebooting while flashing over TCP will error out.
 		args = append(args, "--no-bootloader-reboot")

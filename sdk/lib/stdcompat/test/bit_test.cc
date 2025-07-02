@@ -36,7 +36,7 @@ static_assert(std::is_trivially_copyable<B>::value, "B must be trivially copyabl
 TEST(BitCastTest, BitContentsMatch) {
   B b = {.number = 32};
   auto result = cpp20::bit_cast<A>(b);
-  EXPECT_TRUE(memcmp(cpp17::addressof(result), cpp17::addressof(b), sizeof(b)) == 0);
+  EXPECT_TRUE(memcmp(std::addressof(result), std::addressof(b), sizeof(b)) == 0);
 }
 
 template <typename From, typename To,

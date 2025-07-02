@@ -25,6 +25,7 @@
         },
         {
             protocol: [
+                "fuchsia.boot.Items",
                 "fuchsia.boot.ReadOnlyLog",
                 "fuchsia.boot.SvcStashProvider",
                 "fuchsia.boot.WriteOnlyLog",
@@ -97,7 +98,7 @@
         },
         {
             protocol: "fuchsia.component.resolution.Resolver",
-            from: "#full-resolver",
+            from: "#pkg-resolver",
             to: "#test_manager",
             source_availability: "unknown",
         },
@@ -209,6 +210,12 @@
         },
         {
             protocol: "fuchsia.vulkan.loader.Loader",
+            from: "#vulkan_loader",
+            to: "#test_manager",
+            source_availability: "unknown",
+        },
+        {
+            service: "fuchsia.vulkan.loader.TrustedService",
             from: "#vulkan_loader",
             to: "#test_manager",
             source_availability: "unknown",
@@ -583,6 +590,15 @@
             from: "#debugger",
             to: "#test_manager",
             dependency: "weak",
+        },
+
+        // Proprietary TEE manager's session capabilitites for system tests.
+        {
+            dictionary: "tee_session",
+            from: "#tee_manager",
+            to: "#test_manager",
+            availability: "optional",
+            source_availability: "unknown",
         },
     ],
 }

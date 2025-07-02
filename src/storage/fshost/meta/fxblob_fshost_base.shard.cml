@@ -37,6 +37,10 @@
             protocol: "fuchsia.fxfs.BlobReader",
             path: "/fs/blob/svc/fuchsia.fxfs.BlobReader",
         },
+        {
+            protocol: "fuchsia.fxfs.FileBackedVolumeProvider",
+            path: "/fs/data/svc/fuchsia.fxfs.FileBackedVolumeProvider",
+        },
     ],
     use: [
         {
@@ -65,15 +69,13 @@
     ],
     offer: [
         {
-            protocol: "fuchsia.memorypressure.Provider",
+            protocol: [
+                "fuchsia.memorypressure.Provider",
+                "fuchsia.scheduler.RoleManager",
+            ],
             from: "parent",
             to: "#fxfs",
             availability: "optional",
-        },
-        {
-            protocol: "fuchsia.scheduler.RoleManager",
-            from: "parent",
-            to: "#fxfs",
         },
         {
             service: "fuchsia.fxfs.CryptService",
@@ -118,6 +120,10 @@
             protocol: "fuchsia.fxfs.BlobReader",
             from: "self",
             availability: "same_as_target",
+        },
+        {
+            protocol: "fuchsia.fxfs.FileBackedVolumeProvider",
+            from: "self",
         },
     ],
 }

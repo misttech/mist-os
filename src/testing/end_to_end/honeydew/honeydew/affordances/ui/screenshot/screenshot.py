@@ -5,10 +5,11 @@
 
 import abc
 
+from honeydew.affordances import affordance
 from honeydew.affordances.ui.screenshot import types
 
 
-class Screenshot(abc.ABC):
+class Screenshot(affordance.Affordance):
     """Abstract base class for Screenshot affordance."""
 
     @abc.abstractmethod

@@ -26,7 +26,7 @@ use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
-    errno, error, pid_t, robust_list_head, uapi, FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME,
+    errno, error, robust_list_head, tid_t, uapi, FUTEX_BITSET_MATCH_ANY, FUTEX_CLOCK_REALTIME,
     FUTEX_CMD_MASK, FUTEX_CMP_REQUEUE, FUTEX_CMP_REQUEUE_PI, FUTEX_LOCK_PI, FUTEX_LOCK_PI2,
     FUTEX_PRIVATE_FLAG, FUTEX_REQUEUE, FUTEX_TRYLOCK_PI, FUTEX_UNLOCK_PI, FUTEX_WAIT,
     FUTEX_WAIT_BITSET, FUTEX_WAIT_REQUEUE_PI, FUTEX_WAKE, FUTEX_WAKE_BITSET, FUTEX_WAKE_OP,
@@ -53,7 +53,7 @@ fn get_valid_platform_mmap_flags() -> u32 {
 
 /// sys_mmap takes a mutable reference to current_task because it may modify the IP register.
 pub fn sys_mmap(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -73,7 +73,7 @@ pub fn sys_mmap(
 }
 
 pub fn do_mmap<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -190,7 +190,7 @@ where
 }
 
 pub fn sys_mprotect(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -210,7 +210,7 @@ pub fn sys_mprotect(
 }
 
 pub fn sys_mremap(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     old_length: usize,
@@ -231,7 +231,7 @@ pub fn sys_mremap(
 }
 
 pub fn sys_munmap(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -241,7 +241,7 @@ pub fn sys_munmap(
 }
 
 pub fn sys_msync(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -265,7 +265,7 @@ pub fn sys_msync(
 }
 
 pub fn sys_madvise(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -276,7 +276,7 @@ pub fn sys_madvise(
 }
 
 pub fn sys_process_madvise(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
     _pidfd: FdNumber,
     _iovec_addr: IOVecPtr,
@@ -289,7 +289,7 @@ pub fn sys_process_madvise(
 }
 
 pub fn sys_brk(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
 ) -> Result<UserAddress, Errno> {
@@ -297,9 +297,9 @@ pub fn sys_brk(
 }
 
 pub fn sys_process_vm_readv(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
-    pid: pid_t,
+    tid: tid_t,
     local_iov_addr: IOVecPtr,
     local_iov_count: UserValue<i32>,
     remote_iov_addr: IOVecPtr,
@@ -319,7 +319,7 @@ pub fn sys_process_vm_readv(
         return Ok(0);
     }
 
-    let weak_remote_task = current_task.get_task(pid);
+    let weak_remote_task = current_task.get_task(tid);
     let remote_task = Task::from_weak(&weak_remote_task)?;
 
     current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &remote_task)?;
@@ -327,8 +327,8 @@ pub fn sys_process_vm_readv(
     let local_iov = current_task.read_iovec(local_iov_addr, local_iov_count)?;
     let remote_iov = current_task.read_iovec(remote_iov_addr, remote_iov_count)?;
     log_trace!(
-        "process_vm_readv(pid={}, local_iov={:?}, remote_iov={:?})",
-        pid,
+        "process_vm_readv(tid={}, local_iov={:?}, remote_iov={:?})",
+        tid,
         local_iov,
         remote_iov
     );
@@ -348,9 +348,9 @@ pub fn sys_process_vm_readv(
 }
 
 pub fn sys_process_vm_writev(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
-    pid: pid_t,
+    tid: tid_t,
     local_iov_addr: IOVecPtr,
     local_iov_count: UserValue<i32>,
     remote_iov_addr: IOVecPtr,
@@ -370,7 +370,7 @@ pub fn sys_process_vm_writev(
         return Ok(0);
     }
 
-    let weak_remote_task = current_task.get_task(pid);
+    let weak_remote_task = current_task.get_task(tid);
     let remote_task = Task::from_weak(&weak_remote_task)?;
 
     current_task.check_ptrace_access_mode(locked, PTRACE_MODE_ATTACH_REALCREDS, &remote_task)?;
@@ -378,8 +378,8 @@ pub fn sys_process_vm_writev(
     let local_iov = current_task.read_iovec(local_iov_addr, local_iov_count)?;
     let remote_iov = current_task.read_iovec(remote_iov_addr, remote_iov_count)?;
     log_trace!(
-        "sys_process_vm_writev(pid={}, local_iov={:?}, remote_iov={:?})",
-        pid,
+        "sys_process_vm_writev(tid={}, local_iov={:?}, remote_iov={:?})",
+        tid,
         local_iov,
         remote_iov
     );
@@ -399,7 +399,7 @@ pub fn sys_process_vm_writev(
 }
 
 pub fn sys_process_mrelease(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
     _pidfd: FdNumber,
     _flags: u32,
@@ -409,7 +409,7 @@ pub fn sys_process_mrelease(
 }
 
 pub fn sys_membarrier(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
     cmd: uapi::membarrier_cmd,
     _flags: u32,
@@ -425,7 +425,7 @@ pub fn sys_membarrier(
 }
 
 pub fn sys_userfaultfd(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     raw_flags: u32,
 ) -> Result<FdNumber, Errno> {
@@ -454,7 +454,7 @@ pub fn sys_userfaultfd(
 }
 
 pub fn sys_futex(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     addr: UserAddress,
     op: u32,
@@ -489,7 +489,7 @@ pub fn sys_futex(
 }
 
 fn do_futex<Key: FutexKey>(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     addr: UserAddress,
     op: u32,
@@ -613,7 +613,7 @@ fn do_futex<Key: FutexKey>(
 }
 
 fn do_futex_wait_with_restart<Key: FutexKey>(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &mut CurrentTask,
     addr: UserAddress,
     value: u32,
@@ -626,15 +626,13 @@ fn do_futex_wait_with_restart<Key: FutexKey>(
             futexes.wait(current_task, addr, value, mask, mono_deadline)
         }
         TargetTime::BootInstant(boot_deadline) => {
-            let timer_slack =
-                zx::Duration::from_nanos(current_task.read().get_timerslack_ns() as i64);
+            let timer_slack = current_task.read().get_timerslack();
             futexes.wait_boot(locked, current_task, addr, value, mask, boot_deadline, timer_slack)
         }
         TargetTime::RealTime(utc_deadline) => {
             // We convert real time deadlines to boot time deadlines since we cannot wait using a UTC deadline.
             let boot_deadline = estimate_boot_deadline_from_utc(utc_deadline);
-            let timer_slack =
-                zx::Duration::from_nanos(current_task.read().get_timerslack_ns() as i64);
+            let timer_slack = current_task.read().get_timerslack();
             futexes.wait_boot(locked, current_task, addr, value, mask, boot_deadline, timer_slack)
         }
     };
@@ -650,22 +648,22 @@ fn do_futex_wait_with_restart<Key: FutexKey>(
 }
 
 pub fn sys_get_robust_list(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
-    pid: pid_t,
+    tid: tid_t,
     user_head_ptr: UserRef<UserAddress>,
     user_len_ptr: UserRef<usize>,
 ) -> Result<(), Errno> {
-    if pid < 0 {
+    if tid < 0 {
         return error!(EINVAL);
     }
     if user_head_ptr.is_null() || user_len_ptr.is_null() {
         return error!(EFAULT);
     }
-    if pid != 0 {
+    if tid != 0 {
         security::check_task_capable(current_task, CAP_SYS_PTRACE)?;
     }
-    let task = if pid == 0 { current_task.weak_task() } else { current_task.get_task(pid) };
+    let task = if tid == 0 { current_task.weak_task() } else { current_task.get_task(tid) };
     let task = Task::from_weak(&task)?;
     current_task.write_object(user_head_ptr, &task.read().robust_list_head.addr())?;
     current_task.write_object(user_len_ptr, &std::mem::size_of::<robust_list_head>())?;
@@ -673,7 +671,7 @@ pub fn sys_get_robust_list(
 }
 
 pub fn sys_set_robust_list(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     user_head: UserRef<robust_list_head>,
     len: usize,
@@ -686,7 +684,7 @@ pub fn sys_set_robust_list(
 }
 
 pub fn sys_mlock(
-    locked: &mut Locked<'_, Unlocked>,
+    locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -696,7 +694,7 @@ pub fn sys_mlock(
 }
 
 pub fn sys_mlock2(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -714,7 +712,7 @@ pub fn sys_mlock2(
 }
 
 pub fn sys_munlock(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     addr: UserAddress,
     length: usize,
@@ -724,7 +722,7 @@ pub fn sys_munlock(
 }
 
 pub fn sys_mlockall(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
     _flags: u64,
 ) -> Result<(), Errno> {
@@ -733,7 +731,7 @@ pub fn sys_mlockall(
 }
 
 pub fn sys_munlockall(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
     _flags: u64,
 ) -> Result<(), Errno> {
@@ -742,7 +740,7 @@ pub fn sys_munlockall(
 }
 
 pub fn sys_mincore(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     _current_task: &CurrentTask,
     _addr: UserAddress,
     _length: usize,
@@ -765,7 +763,7 @@ mod arch32 {
     use starnix_uapi::{errno, error, uapi};
 
     pub fn sys_arch32_set_robust_list(
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         user_head: UserRef<uapi::arch32::robust_list_head>,
         len: usize,
@@ -778,7 +776,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_mmap2(
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &mut CurrentTask,
         addr: UserAddress,
         length: usize,
@@ -791,7 +789,7 @@ mod arch32 {
     }
 
     pub fn sys_arch32_munmap(
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         addr: UserAddress,
         length: usize,

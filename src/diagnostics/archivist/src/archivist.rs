@@ -14,14 +14,16 @@ use crate::inspect::repository::InspectRepository;
 use crate::inspect::servers::*;
 use crate::logs::debuglog::KernelDebugLog;
 use crate::logs::repository::{ComponentInitialInterest, LogsRepository};
-use crate::logs::serial::{SerialConfig, SerialSink};
+use crate::logs::serial::{launch_serial, SerialSink};
 use crate::logs::servers::*;
 use crate::pipeline::PipelineManager;
 use archivist_config::Config;
+use fidl_fuchsia_diagnostics_system::SerialLogControlRequestStream;
 use fidl_fuchsia_process_lifecycle::LifecycleRequestStream;
 use fuchsia_component::server::{ServiceFs, ServiceObj};
 use fuchsia_inspect::component;
 use fuchsia_inspect::health::Reporter;
+use futures::channel::mpsc::{unbounded, UnboundedSender};
 use futures::prelude::*;
 use log::{debug, error, info, warn};
 use moniker::ExtendedMoniker;
@@ -65,6 +67,9 @@ pub struct Archivist {
 
     /// All tasks for FIDL servers that ingest data into the Archivist must run in this scope.
     servers_scope: fasync::Scope,
+
+    /// Freeze sender, for sending the log freeze channel over when we get FDIO requests
+    freeze_sender: UnboundedSender<SerialLogControlRequestStream>,
 }
 
 impl Archivist {
@@ -104,11 +109,19 @@ impl Archivist {
             component::inspector().root(),
             general_scope.new_child_with_name("logs_repository"),
         );
+        let (freeze_sender, freeze_receiver) = unbounded::<SerialLogControlRequestStream>();
         if !config.allow_serial_logs.is_empty() {
-            let write_logs_to_serial =
-                SerialConfig::new(config.allow_serial_logs, config.deny_serial_log_tags)
-                    .write_logs(Arc::clone(&logs_repo), SerialSink);
-            general_scope.spawn(write_logs_to_serial);
+            let logs_repo_clone = Arc::clone(&logs_repo);
+            general_scope.spawn(async move {
+                launch_serial(
+                    config.allow_serial_logs,
+                    config.deny_serial_log_tags,
+                    logs_repo_clone,
+                    SerialSink,
+                    freeze_receiver,
+                )
+                .await;
+            });
         }
         let inspect_repo = Arc::new(InspectRepository::new(
             pipeline_manager.weak_pipelines(),
@@ -193,6 +206,7 @@ impl Archivist {
             logs_repository: logs_repo,
             general_scope,
             servers_scope,
+            freeze_sender,
             incoming_events_scope,
         }
     }
@@ -263,6 +277,7 @@ impl Archivist {
             _inspect_sink_server,
             general_scope,
             incoming_events_scope,
+            freeze_sender: _freeze_sender,
             servers_scope,
             event_router,
         } = self;
@@ -324,6 +339,14 @@ impl Archivist {
         svc_dir.add_fidl_service(move |stream| {
             debug!("fuchsia.logger.Log connection");
             log_server.spawn(stream);
+        });
+
+        let sender = self.freeze_sender.clone();
+
+        svc_dir.add_fidl_service(move |stream| {
+            debug!("fuchsia.diagnostics.system.SerialLogControl connection");
+            // Let the channel close if the server has stopped running.
+            let _ = sender.unbounded_send(stream);
         });
 
         // Server fuchsia.logger.LogStream

@@ -9,6 +9,8 @@ use thiserror::Error;
 #[cfg_attr(target_os = "macos", path = "usb_osx/mod.rs")]
 mod usb_plat;
 
+pub mod bulk_interface;
+
 pub use usb_plat::{
     BulkInEndpoint, BulkOutEndpoint, ControlEndpoint, Interface, InterruptEndpoint,
     IsochronousEndpoint,
@@ -28,7 +30,10 @@ impl From<usb_plat::DeviceHandleInner> for DeviceHandle {
 #[cfg(target_os = "linux")]
 impl DeviceHandle {
     pub fn from_path(path: impl AsRef<std::path::Path>) -> Self {
-        DeviceHandle(usb_plat::DeviceHandleInner(path.as_ref().to_string_lossy().into_owned()))
+        DeviceHandle(usb_plat::DeviceHandleInner {
+            hdl: path.as_ref().to_string_lossy().into_owned(),
+            serial: None,
+        })
     }
 }
 
@@ -38,20 +43,26 @@ impl DeviceHandle {
         self.0.debug_name()
     }
 
+    /// The serial number for the device (if any)
+    pub fn serial(&self) -> Option<String> {
+        self.0.serial.clone()
+    }
+
     /// Given a path to a USB device, scan each interface available on the device. Each interface's
     /// descriptor is passed to the given callback, and the first descriptor for which the callback
     /// returns `true` will be opened and returned.
     pub fn scan_interfaces(
         &self,
+        urb_pool_size: usize,
         f: impl Fn(&DeviceDescriptor, &InterfaceDescriptor) -> bool,
     ) -> Result<Interface> {
-        self.0.scan_interfaces(f)
+        self.0.scan_interfaces(urb_pool_size, f)
     }
 }
 
 impl std::fmt::Debug for DeviceHandle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_tuple("DeviceHandle").field(&self.debug_name()).finish()
+        f.debug_tuple("DeviceHandle").field(&self.debug_name()).field(&self.serial()).finish()
     }
 }
 
@@ -150,6 +161,11 @@ pub fn wait_for_devices(
     notify_removed: bool,
 ) -> Result<impl Stream<Item = Result<DeviceEvent>>> {
     usb_plat::wait_for_devices(notify_added, notify_removed)
+}
+
+/// Lists all USB devices currently on the bus.
+pub fn enumerate_devices() -> Result<Vec<DeviceHandle>> {
+    usb_plat::enumerate_devices()
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

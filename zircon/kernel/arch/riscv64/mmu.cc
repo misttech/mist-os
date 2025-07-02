@@ -274,16 +274,6 @@ constexpr bool IsUserBaseSizeValid(vaddr_t base, size_t size) {
   return true;
 }
 
-// Converts a symbol in the kernel to its physical address based on knowledge of
-// where the kernel is loaded virtually and physically. Only works for data within
-// the kernel proper.
-paddr_t kernel_virt_to_phys(const void* va) {
-  uintptr_t pa = reinterpret_cast<uintptr_t>(va);
-  pa += KernelPhysicalLoadAddress() - kernel_relocated_base;
-
-  return pa;
-}
-
 // Argument to SfenceVma.  Used to perform TLB invalidation on an optional range
 // with an optional ASID.  When no range is present, the target is all
 // addresses.  When no ASID is present the target is invalidated for all ASIDs.
@@ -1000,7 +990,7 @@ void Riscv64ArchVmAspace::HarvestAccessedPageTable(vaddr_t vaddr, vaddr_t vaddr_
       // Mappings for physical VMOs do not have pages associated with them and so there's no state
       // to update on an access.
       if (likely(page)) {
-        pmm_page_queues()->MarkAccessedDeferredCount(page);
+        Pmm::Node().GetPageQueues()->MarkAccessed(page);
 
         if (terminal_action == TerminalAction::UpdateAgeAndHarvest) {
           // Modifying the access flag does not require break-before-make for correctness and as we
@@ -1076,7 +1066,7 @@ zx_status_t Riscv64ArchVmAspace::ProtectPages(vaddr_t vaddr, size_t size, pte_t 
 }
 
 zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, size_t count,
-                                               uint mmu_flags, size_t* mapped) {
+                                               uint mmu_flags) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " paddr %#" PRIxPTR " count %zu flags %#x\n", vaddr, paddr, count,
           mmu_flags);
@@ -1097,10 +1087,6 @@ zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, siz
   DEBUG_ASSERT(IS_PAGE_ALIGNED(paddr));
   if (!IS_PAGE_ALIGNED(vaddr) || !IS_PAGE_ALIGNED(paddr)) {
     return ZX_ERR_INVALID_ARGS;
-  }
-
-  if (count == 0) {
-    return ZX_OK;
   }
 
   Guard<Mutex> a{AssertOrderedLock, &lock_, LockOrder()};
@@ -1129,15 +1115,11 @@ zx_status_t Riscv64ArchVmAspace::MapContiguous(vaddr_t vaddr, paddr_t paddr, siz
   }
   DEBUG_ASSERT(cursor.size() == 0);
 
-  if (mapped) {
-    *mapped = count;
-  }
-
   return ZX_OK;
 }
 
 zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count, uint mmu_flags,
-                                     ExistingEntryAction existing_action, size_t* mapped) {
+                                     ExistingEntryAction existing_action) {
   canary_.Assert();
 
   DEBUG_ASSERT(tt_virt_);
@@ -1195,19 +1177,11 @@ zx_status_t Riscv64ArchVmAspace::Map(vaddr_t vaddr, paddr_t* phys, size_t count,
     }
   }
 
-  if (mapped) {
-    // For ExistingEntryAction::Error, we should have mapped all the addresses we were asked to.
-    // For ExistingEntryAction::Skip, we might have mapped less if we encountered existing entries,
-    // but skipped entries contribute towards the total as well.
-    *mapped = count;
-  }
-
   return ZX_OK;
 }
 
 // TODO(https://fxbug.dev/412464435): Implement ArchUnmapOptions::Harvest for riscv.
-zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge,
-                                       size_t* unmapped) {
+zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOptions enlarge) {
   canary_.Assert();
   LTRACEF("vaddr %#" PRIxPTR " count %zu\n", vaddr, count);
 
@@ -1228,11 +1202,6 @@ zx_status_t Riscv64ArchVmAspace::Unmap(vaddr_t vaddr, size_t count, ArchUnmapOpt
 
   ConsistencyManager cm(*this);
   zx::result<size_t> result = UnmapPages(vaddr, count * PAGE_SIZE, enlarge, cm);
-
-  if (unmapped) {
-    *unmapped = result.is_ok() ? result.value() / PAGE_SIZE : 0u;
-    DEBUG_ASSERT(*unmapped <= count);
-  }
 
   return result.status_value();
 }
@@ -1360,7 +1329,7 @@ zx_status_t Riscv64ArchVmAspace::Init() {
     DEBUG_ASSERT(size_ == KERNEL_ASPACE_SIZE);
 
     tt_virt_ = riscv64_kernel_translation_table;
-    tt_phys_ = kernel_virt_to_phys(riscv64_kernel_translation_table);
+    tt_phys_ = KernelPhysicalAddressOf<riscv64_kernel_translation_table>();
     asid_ = kernel_asid();
   } else {
     if (type_ == Riscv64AspaceType::kUser) {
@@ -1646,7 +1615,7 @@ void Riscv64ArchVmAspace::ContextSwitch(Riscv64ArchVmAspace* old_aspace,
     // Switching to the null aspace, which means kernel address space only.
     satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
            (static_cast<uint64_t>(kernel_asid()) << RISCV64_SATP_ASID_SHIFT) |
-           (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
+           (KernelPhysicalAddressOf<riscv64_kernel_translation_table>() >> PAGE_SIZE_SHIFT);
   }
   if (likely(old_aspace != nullptr)) {
     [[maybe_unused]] uint32_t prev =
@@ -1724,8 +1693,8 @@ void riscv64_mmu_early_init() {
   // top level entries are synchronized.
   for (size_t i = RISCV64_MMU_PT_KERNEL_BASE_INDEX; i < RISCV64_MMU_PT_ENTRIES; i++) {
     if (!riscv64_pte_is_valid(bootstrap_translation_table[i])) {
-      paddr_t pt_paddr = kernel_virt_to_phys(
-          riscv64_kernel_top_level_page_tables[i - RISCV64_MMU_PT_KERNEL_BASE_INDEX]);
+      paddr_t pt_paddr = KernelPhysicalAddressOf<riscv64_kernel_top_level_page_tables>(
+          i - RISCV64_MMU_PT_KERNEL_BASE_INDEX);
 
       LTRACEF("RISCV: MMU allocating top level page table for slot %zu, pa %#lx\n", i, pt_paddr);
 
@@ -1748,9 +1717,10 @@ namespace {
 
 // Load the kernel page tables and set the passed in asid
 void riscv64_switch_kernel_asid(uint16_t asid) {
-  const uint64_t satp = (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
-                        (static_cast<uint64_t>(asid) << RISCV64_SATP_ASID_SHIFT) |
-                        (kernel_virt_to_phys(riscv64_kernel_translation_table) >> PAGE_SIZE_SHIFT);
+  const uint64_t satp =
+      (RISCV64_SATP_MODE_SV39 << RISCV64_SATP_MODE_SHIFT) |
+      (static_cast<uint64_t>(asid) << RISCV64_SATP_ASID_SHIFT) |
+      (KernelPhysicalAddressOf<riscv64_kernel_translation_table>() >> PAGE_SIZE_SHIFT);
   riscv64_csr_write(RISCV64_CSR_SATP, satp);
 
   // Globally TLB flush.

@@ -79,6 +79,7 @@ source_set("driver-integration-test-shim") {
     "//src/security/lib/zxcrypt/tests:*",
     "//src/storage/fvm:*",
     "//src/storage/fvm/driver/test:*",
+    "//src/storage/lib/paver/test:*",
     "//src/storage/lib/ramdevice_client/cpp:*",
     "//zircon/system/ulib/sysconfig-client/test:*",
   ]

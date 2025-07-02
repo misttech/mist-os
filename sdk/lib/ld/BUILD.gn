@@ -108,7 +108,6 @@ static_library("ld-log-zircon") {
   public_deps = [ ":ld-log-zircon.headers" ]
   sources = [ "log-zircon.cc" ]
   deps = [
-    "//sdk/lib/fdio:constants",
     "//zircon/system/ulib/zircon-internal",
     "//zircon/system/ulib/zx",
   ]
@@ -379,10 +378,10 @@ static_library("standalone") {
 
   sources = [ "standalone-assert.cc" ]
   deps = [
+    "//sdk/lib/c/stdlib:hermetic",
+    "//sdk/lib/c/string:hermetic",
+    "//sdk/lib/c/strings:hermetic",
     "//zircon/system/public",
-    "//zircon/system/ulib/c/stdlib:hermetic",
-    "//zircon/system/ulib/c/string:hermetic",
-    "//zircon/system/ulib/c/strings:hermetic",
   ]
 
   if (is_linux) {
@@ -420,14 +419,11 @@ source_set("zircon") {
     "procargs.cc",
   ]
   deps = [
+    ":processargs",
     ":startup-diagnostics",
     "//zircon/system/ulib/ldmsg",
-    "//zircon/system/ulib/processargs",
     "//zircon/system/ulib/zircon-internal",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 source_set("startup-load") {
@@ -512,7 +508,7 @@ source_set("startup-diagnostics") {
   sources = [ "startup-diagnostics.cc" ]
   deps = [
     ":startup-diagnostics.headers",
-    "//zircon/system/ulib/c/stdio/printf_core:wrapper",
+    "//sdk/lib/c/stdio/printf_core:wrapper",
   ]
   if (is_fuchsia || is_mistos) {
     deps += [
@@ -563,7 +559,7 @@ source_set("linux-syscalls") {
   visibility = [ ":*" ]
   sources = [ "linux-syscalls.cc" ]
   include_dirs = [ "//third_party/linux-syscall-support/src" ]
-  deps = [ "//zircon/system/ulib/c/stdio:snprintf" ]
+  deps = [ "//sdk/lib/c/stdio:snprintf" ]
 }
 
 library_headers("fuchsia-debugdata.headers") {
@@ -575,6 +571,14 @@ static_library("fuchsia-debugdata") {
   sources = [ "fuchsia-debugdata.cc" ]
   deps = [
     "//sdk/lib/fidl_base",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+library_headers("processargs") {
+  headers = [ "lib/ld/processargs.h" ]
+  public_deps = [
+    "//sdk/lib/fdio:constants",
     "//zircon/system/ulib/zx",
   ]
 }

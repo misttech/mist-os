@@ -5,13 +5,13 @@
 #include "hevcdec.h"
 
 #include <lib/ddk/io-buffer.h>
+#include <lib/memory_barriers/memory_barriers.h>
 #include <lib/trace/event.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
 
 #include "macros.h"
-#include "src/lib/memory_barriers/memory_barriers.h"
 #include "util.h"
 #include "video_decoder.h"
 

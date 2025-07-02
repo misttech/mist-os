@@ -6,11 +6,13 @@ assert(current_toolchain == default_toolchain,
        "Boards are only defined in the default toolchain")
 
 group("boards") {
+  testonly = true
   deps = [ ":$target_cpu" ]
 }
 
 if (target_cpu == "x64") {
   group("x64") {
+    testonly = true
     deps = [
       "//boards/pkvm:x64",
       "//boards/x64",
@@ -20,6 +22,7 @@ if (target_cpu == "x64") {
   }
 } else if (target_cpu == "arm64") {
   group("arm64") {
+    testonly = true
     deps = [
       "//boards/arm64",
       "//boards/pkvm:arm64",

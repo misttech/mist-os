@@ -10,4 +10,4 @@ pub(crate) mod throughput;
 #[cfg(test)]
 mod test;
 
-pub use throughput::Throughput;
+pub use throughput::{BytesFormatter, Throughput};

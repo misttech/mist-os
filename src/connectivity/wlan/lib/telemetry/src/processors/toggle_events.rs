@@ -133,9 +133,7 @@ impl ToggleLogger {
         }
         self.current_state = Some(event_type);
 
-        if !metric_events.is_empty() {
-            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_toggle_events");
-        }
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_toggle_events");
     }
 
     pub async fn handle_battery_charge_status(
@@ -171,9 +169,7 @@ impl ToggleLogger {
             _ => (),
         }
 
-        if !metric_events.is_empty() {
-            log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_battery_charge_status");
-        }
+        log_cobalt_batch!(self.cobalt_proxy, &metric_events, "handle_battery_charge_status");
     }
 }
 
@@ -201,7 +197,7 @@ mod tests {
         let event = ClientConnectionsToggleEvent::Enabled;
         run_handle_toggle_event(&mut test_helper, &mut toggle_logger, event);
 
-        assert_data_tree!(test_helper.inspector, root: contains {
+        assert_data_tree!(@executor test_helper.exec, test_helper.inspector, root: contains {
             wlan_mock_node: {
                 client_connections_toggle_events: {
                     "0": {

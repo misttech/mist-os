@@ -118,7 +118,7 @@ impl EpollFileObject {
 
     fn wait_on_file<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         key: ReadyItemKey,
         wait_object: &mut WaitObject,
@@ -150,7 +150,7 @@ impl EpollFileObject {
 
     fn wait_on_file_edge_triggered<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         key: ReadyItemKey,
         wait_object: &mut WaitObject,
@@ -196,7 +196,7 @@ impl EpollFileObject {
     /// Asynchronously wait on certain events happening on a FileHandle.
     pub fn add<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         epoll_file_handle: &FileHandle,
@@ -231,7 +231,7 @@ impl EpollFileObject {
     /// Modify the events we are looking for on a Filehandle.
     pub fn modify<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         file: &FileHandle,
         epoll_event: EpollEvent,
@@ -289,7 +289,7 @@ impl EpollFileObject {
     /// Returns true if any events were added. False means there was nothing in the trigger list.
     fn process_triggered_events<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         pending_list: &mut Vec<ReadyItem>,
         max_events: usize,
@@ -337,7 +337,7 @@ impl EpollFileObject {
     /// been reached.
     fn wait_until_pending_event<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         max_events: usize,
         mut wait_deadline: zx::MonotonicInstant,
@@ -400,7 +400,7 @@ impl EpollFileObject {
     /// Blocking wait on all waited upon events with a timeout.
     pub fn wait<L>(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         max_events: usize,
         deadline: zx::MonotonicInstant,
@@ -509,7 +509,7 @@ impl FileOps for EpollFileObject {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -521,7 +521,7 @@ impl FileOps for EpollFileObject {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -535,7 +535,7 @@ impl FileOps for EpollFileObject {
 
     fn close(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) {
@@ -742,7 +742,7 @@ mod tests {
         let server1_zxio = Zxio::create(server1.into_handle()).expect("Zxio::create");
         let server2_zxio = Zxio::create(server2.into_handle()).expect("Zxio::create");
 
-        let poll = |locked: &mut Locked<'_, Unlocked>| {
+        let poll = |locked: &mut Locked<Unlocked>| {
             let epoll_object = EpollFileObject::new_file(&current_task);
             let epoll_file = epoll_object.downcast_file::<EpollFileObject>().unwrap();
             epoll_file

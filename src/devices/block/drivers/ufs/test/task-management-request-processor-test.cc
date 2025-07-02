@@ -87,7 +87,7 @@ TEST_F(TaskManagementRequestProcessorTest, SendTaskManagementRequest) {
             static_cast<uint8_t>(UpiuTransactionCodes::kTaskManagementResponse));
   ASSERT_EQ(response->GetHeader().function,
             static_cast<uint8_t>(TaskManagementFunction::kQueryTask));
-  ASSERT_EQ(response->GetHeader().response, UpiuHeaderResponse::kTargetSuccess);
+  ASSERT_EQ(response->GetHeader().response, UpiuHeaderResponseCode::kTargetSuccess);
   ASSERT_EQ(response->GetHeader().data_segment_length, 0);
   ASSERT_EQ(response->GetHeader().flags, 0);
 
@@ -124,7 +124,7 @@ TEST_F(TaskManagementRequestProcessorTest, SendTaskManagementRequestException) {
         TaskManagementResponseUpiuData *response_upiu = descriptor.GetResponseData();
 
         // Set response error
-        response_upiu->header.response = UpiuHeaderResponse::kTargetFailure;
+        response_upiu->header.response = UpiuHeaderResponseCode::kTargetFailure;
         mock_device.GetTaskManagementRequestProcessor().DefaultQueryTaskHandler(mock_device,
                                                                                 descriptor);
 

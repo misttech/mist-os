@@ -219,6 +219,11 @@
             to: "#starnix_runner",
         },
         {
+            config: "fuchsia.starnix.config.container.ExtraFeatures",
+            from: "parent",
+            to: "#starnix_runner",
+        },
+        {
             config: "fuchsia.starnix.runner.EnableDataCollection",
             from: "parent",
             to: "#starnix_runner",
@@ -239,6 +244,11 @@
             from: "#timekeeper",
             to: "#starnix_runner",
             availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.time.alarms.Wake" ],
+            from: "#timekeeper",
+            to: [ "#starnix_runner" ],
         },
     ],
     expose: [

@@ -41,13 +41,13 @@ async fn mock_rfcomm_client(
     mut sender: mpsc::Sender<Event>,
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
-    let profile_svc = handles.connect_to_protocol::<ProfileMarker>()?;
+    let profile_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::Client { _client: Some(profile_svc) })
         .await
         .expect("failed sending ack to test");
 
-    let test_svc = handles.connect_to_protocol::<RfcommTestMarker>()?;
+    let test_svc = handles.connect_to_protocol()?;
     sender.send(Event::Test { _test: Some(test_svc) }).await.expect("failed sending ack to test");
     Ok(())
 }

@@ -74,7 +74,7 @@ fn stream_request_response(
 
 #[test]
 fn closes_socket_when_dropped() {
-    let mut _exec = fasync::TestExecutor::new();
+    let _exec = fasync::TestExecutor::new();
     let (peer_chan, signaling) = Channel::create();
 
     {
@@ -91,12 +91,34 @@ fn closes_socket_when_dropped() {
 #[test]
 #[should_panic]
 fn can_only_take_stream_once() {
-    let mut _exec = fasync::TestExecutor::new();
+    let _exec = fasync::TestExecutor::new();
     let (_, signaling) = Channel::create();
 
     let peer = Peer::new(signaling);
     let _stream = peer.take_request_stream();
     let _ = peer.take_request_stream();
+}
+
+#[test]
+fn terminates_on_peer_closed() {
+    let mut exec = fasync::TestExecutor::new();
+    let (remote, signaling) = Channel::create();
+
+    let peer = Peer::new(signaling);
+    let mut stream = peer.take_request_stream();
+
+    assert!(!stream.is_terminated());
+
+    assert!(exec.run_until_stalled(&mut stream.next()).is_pending());
+
+    assert!(!stream.is_terminated());
+
+    drop(remote);
+    match exec.run_until_stalled(&mut stream.next()) {
+        Poll::Ready(None) => {}
+        x => panic!("Expected stream to be ready with none, got {x:?}"),
+    }
+    assert!(stream.is_terminated());
 }
 
 // Generic Request tests

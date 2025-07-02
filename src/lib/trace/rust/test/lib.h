@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#pragma once
+#ifndef SRC_LIB_TRACE_RUST_TEST_LIB_H_
+#define SRC_LIB_TRACE_RUST_TEST_LIB_H_
 
+#include <cstdint>
 extern "C" {
 bool rs_test_trace_enabled(void);
 bool rs_test_category_disabled(void);
@@ -28,4 +30,9 @@ void rs_test_trace_future_enabled();
 void rs_test_trace_future_enabled_with_arg();
 void rs_test_trace_future_disabled();
 void rs_test_trace_future_disabled_with_arg();
+uint8_t rs_check_trace_state();
+void rs_wait_trace_state_is(uint32_t expected);
+void rs_setup_trace_observer();
 }
+
+#endif  // SRC_LIB_TRACE_RUST_TEST_LIB_H_

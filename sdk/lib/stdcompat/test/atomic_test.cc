@@ -88,19 +88,19 @@ ATOMIC_REF_HAS_METHOD_TRAIT(specialization_has_fetch_xor, fetch_xor,
 template <typename T>
 void CheckIntegerSpecialization() {
   using U = LibcxxBugWorkaround<T>;
-  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<U>::value_type, U>, "");
-  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<U>::difference_type, U>, "");
+  static_assert(std::is_same_v<typename cpp20::atomic_ref<U>::value_type, U>, "");
+  static_assert(std::is_same_v<typename cpp20::atomic_ref<U>::difference_type, U>, "");
   static_assert(cpp20::atomic_ref<U>::required_alignment == std::max(alignof(U), sizeof(U)), "");
   static_assert(kHasDifferenceType<cpp20::atomic_ref<U>>, "");
 }
 
 template <typename T, typename U>
-std::enable_if_t<cpp17::is_pointer_v<T>, T> cast_helper(U u) {
+std::enable_if_t<std::is_pointer_v<T>, T> cast_helper(U u) {
   return reinterpret_cast<T>(u);
 }
 
 template <typename T, typename U>
-std::enable_if_t<!cpp17::is_pointer_v<T>, std::remove_volatile_t<T>> cast_helper(U u) {
+std::enable_if_t<!std::is_pointer_v<T>, std::remove_volatile_t<T>> cast_helper(U u) {
   return static_cast<T>(u);
 }
 
@@ -110,7 +110,7 @@ struct CheckAtomicOpsMutable {
 };
 
 template <typename T>
-struct CheckAtomicOpsMutable<T, std::enable_if_t<!cpp17::is_const_v<T>>> {
+struct CheckAtomicOpsMutable<T, std::enable_if_t<!std::is_const_v<T>>> {
   static void CheckStoreAndExchange() {
     using U = LibcxxBugWorkaround<T>;
 
@@ -305,8 +305,8 @@ void CheckFloatSpecialization() {
   static_assert(!specialization_has_fetch_and_v<cpp20::atomic_ref<U>>, "");
   static_assert(!specialization_has_fetch_or_v<cpp20::atomic_ref<U>>, "");
   static_assert(!specialization_has_fetch_xor_v<cpp20::atomic_ref<U>>, "");
-  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<U>::value_type, U>, "");
-  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<U>::difference_type, U>, "");
+  static_assert(std::is_same_v<typename cpp20::atomic_ref<U>::value_type, U>, "");
+  static_assert(std::is_same_v<typename cpp20::atomic_ref<U>::difference_type, U>, "");
   static_assert(cpp20::atomic_ref<U>::required_alignment == alignof(U), "");
 }
 
@@ -351,8 +351,8 @@ constexpr void CheckPointerSpecialization() {
   static_assert(!specialization_has_fetch_and_v<cpp20::atomic_ref<T*>>, "");
   static_assert(!specialization_has_fetch_or_v<cpp20::atomic_ref<T*>>, "");
   static_assert(!specialization_has_fetch_xor_v<cpp20::atomic_ref<T*>>, "");
-  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<T*>::value_type, T*>, "");
-  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<T*>::difference_type, ptrdiff_t>, "");
+  static_assert(std::is_same_v<typename cpp20::atomic_ref<T*>::value_type, T*>, "");
+  static_assert(std::is_same_v<typename cpp20::atomic_ref<T*>::difference_type, ptrdiff_t>, "");
   static_assert(cpp20::atomic_ref<T*>::required_alignment == alignof(T*), "");
 }
 
@@ -401,19 +401,8 @@ void CheckNoSpecialization() {
   static_assert(!specialization_has_fetch_xor_v<cpp20::atomic_ref<T>>, "");
 
   static_assert(cpp20::atomic_ref<T>::required_alignment >= alignof(T), "");
-  static_assert(cpp17::is_same_v<typename cpp20::atomic_ref<T>::value_type, T>, "");
+  static_assert(std::is_same_v<typename cpp20::atomic_ref<T>::value_type, T>, "");
 }
-
-struct TriviallyCopyable {
-  TriviallyCopyable(int a) : a(a) {}
-
-  bool operator==(const TriviallyCopyable& rhs) const { return a == rhs.a; }
-
-  bool operator!=(const TriviallyCopyable& rhs) const { return a != rhs.a; }
-
-  int a = 0;
-};
-static_assert(cpp17::is_trivially_copyable_v<TriviallyCopyable>, "");
 
 TEST(AtomicRefTest, NoSpecialization) {
   CheckAtomicOperations<TriviallyCopyable>();

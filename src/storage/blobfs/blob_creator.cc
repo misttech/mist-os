@@ -232,6 +232,9 @@ zx::result<fidl::ClientEnd<fuchsia_fxfs::BlobWriter>> BlobCreator::CreateImpl(co
         return zx::error(ZX_ERR_ALREADY_EXISTS);
       }
       to_overwrite = std::move(blob);
+    } else if (blob->IsReadable()) {
+      // The blob has finished writing and is persistent, but they didn't set allow_existing.
+      return zx::error(ZX_ERR_ALREADY_EXISTS);
     } else if (BlobWriter* handler = blob->GetBlobWriterHandler(); handler) {
       // Drop the local reference, either we're exiting because a write is in-flight or we're going
       // let the blob get cleaned up by removing the binding.
@@ -240,9 +243,6 @@ zx::result<fidl::ClientEnd<fuchsia_fxfs::BlobWriter>> BlobCreator::CreateImpl(co
       if (handler->ChannelActive()) {
         return zx::error(ZX_ERR_ALREADY_EXISTS);
       }
-    } else {
-      // This branch handles when the blob exists, but is not currently being written.
-      return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
   }
 

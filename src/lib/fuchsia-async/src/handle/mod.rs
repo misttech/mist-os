@@ -25,35 +25,35 @@ pub use emulated::*;
 #[macro_export]
 macro_rules! invoke_for_handle_types {
     ($x:ident) => {
-        $x! {Process, "Process", PROCESS, ZX_OBJ_TYPE_PROCESS, FuchsiaOnly}
-        $x! {Thread, "Thread", THREAD, ZX_OBJ_TYPE_THREAD, FuchsiaOnly}
-        $x! {Vmo, "Vmo", VMO, ZX_OBJ_TYPE_VMO, FuchsiaOnly}
+        $x! {Bti, "BTI", BTI, ZX_OBJ_TYPE_BTI, Stub}
         $x! {Channel, "Channel", CHANNEL, ZX_OBJ_TYPE_CHANNEL, Everywhere}
-        $x! {Event, "Event", EVENT, ZX_OBJ_TYPE_EVENT, Everywhere}
-        $x! {Port, "Port", PORT, ZX_OBJ_TYPE_PORT, FuchsiaOnly}
-        $x! {Interrupt, "Interrupt", INTERRUPT, ZX_OBJ_TYPE_INTERRUPT, FuchsiaOnly}
+        $x! {Clock, "Clock", CLOCK, ZX_OBJ_TYPE_CLOCK, FuchsiaOnly}
+        $x! {Counter, "Counter", COUNTER, ZX_OBJ_TYPE_COUNTER, FuchsiaOnly}
         $x! {DebugLog, "Debug Log", DEBUGLOG, ZX_OBJ_TYPE_DEBUGLOG, FuchsiaOnly}
-        $x! {Socket, "Socket", SOCKET, ZX_OBJ_TYPE_SOCKET, Everywhere}
-        $x! {Resource, "Resource", RESOURCE, ZX_OBJ_TYPE_RESOURCE, FuchsiaOnly}
+        $x! {Event, "Event", EVENT, ZX_OBJ_TYPE_EVENT, Everywhere}
         $x! {EventPair, "Event Pair", EVENTPAIR, ZX_OBJ_TYPE_EVENTPAIR, Everywhere}
-        $x! {Job, "Job", JOB, ZX_OBJ_TYPE_JOB, FuchsiaOnly}
-        $x! {Vmar, "VMAR", VMAR, ZX_OBJ_TYPE_VMAR, FuchsiaOnly}
+        $x! {Exception, "Exception", EXCEPTION, ZX_OBJ_TYPE_EXCEPTION, Stub}
         $x! {Fifo, "FIFO", FIFO, ZX_OBJ_TYPE_FIFO, FuchsiaOnly}
         $x! {Guest, "Guest", GUEST, ZX_OBJ_TYPE_GUEST, FuchsiaOnly}
-        $x! {Vcpu, "VCPU", VCPU, ZX_OBJ_TYPE_VCPU, FuchsiaOnly}
-        $x! {Timer, "Timer", TIMER, ZX_OBJ_TYPE_TIMER, FuchsiaOnly}
-        $x! {Iob, "Iobuffer", IOB, ZX_OBJ_TYPE_IOB, FuchsiaOnly}
+        $x! {Interrupt, "Interrupt", INTERRUPT, ZX_OBJ_TYPE_INTERRUPT, FuchsiaOnly}
+        $x! {Iob, "Iob", IOB, ZX_OBJ_TYPE_IOB, FuchsiaOnly}
         $x! {Iommu, "IOMMU", IOMMU, ZX_OBJ_TYPE_IOMMU, Stub}
-        $x! {Bti, "BTI", BTI, ZX_OBJ_TYPE_BTI, Stub}
-        $x! {Profile, "Profile", PROFILE, ZX_OBJ_TYPE_PROFILE, FuchsiaOnly}
-        $x! {Pmt, "PMT", PMT, ZX_OBJ_TYPE_PMT, Stub}
-        $x! {SuspendToken, "Suspend Token", SUSPEND_TOKEN, ZX_OBJ_TYPE_SUSPEND_TOKEN, Stub}
-        $x! {Pager, "Pager", PAGER, ZX_OBJ_TYPE_PAGER, Stub}
-        $x! {Exception, "Exception", EXCEPTION, ZX_OBJ_TYPE_EXCEPTION, Stub}
-        $x! {Clock, "Clock", CLOCK, ZX_OBJ_TYPE_CLOCK, FuchsiaOnly}
-        $x! {Stream, "Stream", STREAM, ZX_OBJ_TYPE_STREAM, FuchsiaOnly}
+        $x! {Job, "Job", JOB, ZX_OBJ_TYPE_JOB, FuchsiaOnly}
         $x! {Msi, "MSI", MSI, ZX_OBJ_TYPE_MSI, Stub}
+        $x! {Pager, "Pager", PAGER, ZX_OBJ_TYPE_PAGER, Stub}
         $x! {PciDevice, "PCI Device", PCI_DEVICE, ZX_OBJ_TYPE_PCI_DEVICE, Stub}
-        $x! {Counter, "Counter", COUNTER, ZX_OBJ_TYPE_COUNTER, FuchsiaOnly}
+        $x! {Pmt, "PMT", PMT, ZX_OBJ_TYPE_PMT, Stub}
+        $x! {Port, "Port", PORT, ZX_OBJ_TYPE_PORT, FuchsiaOnly}
+        $x! {Process, "Process", PROCESS, ZX_OBJ_TYPE_PROCESS, FuchsiaOnly}
+        $x! {Profile, "Profile", PROFILE, ZX_OBJ_TYPE_PROFILE, FuchsiaOnly}
+        $x! {Resource, "Resource", RESOURCE, ZX_OBJ_TYPE_RESOURCE, FuchsiaOnly}
+        $x! {Socket, "Socket", SOCKET, ZX_OBJ_TYPE_SOCKET, Everywhere}
+        $x! {Stream, "Stream", STREAM, ZX_OBJ_TYPE_STREAM, FuchsiaOnly}
+        $x! {SuspendToken, "Suspend Token", SUSPEND_TOKEN, ZX_OBJ_TYPE_SUSPEND_TOKEN, Stub}
+        $x! {Thread, "Thread", THREAD, ZX_OBJ_TYPE_THREAD, FuchsiaOnly}
+        $x! {Timer, "Timer", TIMER, ZX_OBJ_TYPE_TIMER, FuchsiaOnly}
+        $x! {Vcpu, "VCPU", VCPU, ZX_OBJ_TYPE_VCPU, FuchsiaOnly}
+        $x! {Vmar, "VMAR", VMAR, ZX_OBJ_TYPE_VMAR, FuchsiaOnly}
+        $x! {Vmo, "Vmo", VMO, ZX_OBJ_TYPE_VMO, FuchsiaOnly}
     };
 }

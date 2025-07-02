@@ -132,11 +132,17 @@ impl Timer {
     /// Reset the `Timer` to a fire at a new time.
     pub fn reset(self: Pin<&mut Self>, time: MonotonicInstant) {
         let nanos = time.into_nanos();
+        // If in the UNREGISTERED state, we can skip the call to `try_reset_timer` because the timer
+        // has *never* been registered and so there's no danger of another thread having access to
+        // this timer. In all other states, including the FIRED and TERMINATED states, we must use
+        // `try_reset_timer` as that will take a lock and guarantee that other threads are not
+        // concurrently accessing the timer.
+        //
         // This can be Relaxed because because there are no loads or stores that follow that could
         // possibly be reordered before here that matter: the first thing `try_reset_timer` does is
         // take a lock which will have its own memory barriers, and the store to the time is next
         // going to be read by this same task prior to taking the lock in `Timers::inner`.
-        if self.0.state.load(Ordering::Relaxed) != REGISTERED
+        if self.0.state.load(Ordering::Relaxed) == UNREGISTERED
             || !self.0.timers.try_reset_timer(&self.0, nanos)
         {
             // SAFETY: This is safe because we know the timer isn't registered which means we truly
@@ -1039,5 +1045,22 @@ mod test {
         }
 
         panic!("Timer fired late in all 100 attempts");
+    }
+
+    #[test]
+    fn test_reset() {
+        // This is a test for https://fxbug.dev/418235546.
+        SendExecutor::new(2).run(async {
+            const TIMER_DELAY: zx::MonotonicDuration = zx::Duration::from_micros(100);
+            let mut timer = pin!(Timer::new(MonotonicInstant::after(TIMER_DELAY)));
+            for _ in 0..10000 {
+                let _ = futures::poll!(timer.as_mut());
+                std::thread::sleep(std::time::Duration::from_micros(
+                    rand::thread_rng().gen_range(80..120),
+                ));
+                timer.as_mut().reset(MonotonicInstant::after(TIMER_DELAY));
+                timer.set(Timer::new(MonotonicInstant::after(TIMER_DELAY)));
+            }
+        });
     }
 }

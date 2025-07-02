@@ -20,7 +20,6 @@
 
 #include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/storage/lib/block_client/cpp/block_device.h"
-#include "src/storage/lib/storage-metrics/block-metrics.h"
 
 namespace block_client {
 
@@ -85,8 +84,6 @@ class FakeBlockDevice : public BlockDevice {
   void SetBlockSize(uint32_t block_size);
   bool IsRegistered(vmoid_t vmoid) const;
 
-  void GetStats(bool clear, fuchsia_hardware_block::wire::BlockStats* out_stats);
-
   // Wipes the device to a zeroed state.
   void Wipe();
 
@@ -128,8 +125,6 @@ class FakeBlockDevice : public BlockDevice {
 
  private:
   void AdjustBlockDeviceSizeLocked(uint64_t new_size) __TA_REQUIRES(lock_);
-  void UpdateStats(bool success, zx::ticks start_tick, const block_fifo_request_t& op)
-      __TA_REQUIRES(lock_);
 
   // Waits, blocking the current thread, until execution is not paused.
   void WaitOnPaused() const __TA_REQUIRES(lock_);
@@ -152,7 +147,6 @@ class FakeBlockDevice : public BlockDevice {
   uint32_t max_transfer_size_ __TA_GUARDED(lock_) = 0;
   std::map<vmoid_t, zx::vmo> vmos_ __TA_GUARDED(lock_);
   zx::vmo block_device_ __TA_GUARDED(lock_);
-  mutable storage_metrics::BlockDeviceMetrics stats_ __TA_GUARDED(lock_) = {};
   Hook hook_;
 };
 

@@ -118,6 +118,18 @@ fit::result<int, std::string> GetLabel(const std::string& path) {
   return fit::ok(RemoveTrailingNul(std::string(buf, result)));
 }
 
+fit::result<int, bool> IsSameInode(int fd_1, int fd_2) {
+  struct stat fd_1_info;
+  if (fstat(fd_1, &fd_1_info) < 0) {
+    return fit::error(errno);
+  }
+  struct stat fd_2_info;
+  if (fstat(fd_2, &fd_2_info) < 0) {
+    return fit::error(errno);
+  }
+  return fit::ok(fd_1_info.st_dev == fd_2_info.st_dev && fd_1_info.st_ino == fd_2_info.st_ino);
+}
+
 ScopedEnforcement ScopedEnforcement::SetEnforcing() {
   return ScopedEnforcement(/*enforcing=*/true);
 }

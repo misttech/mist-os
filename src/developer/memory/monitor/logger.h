@@ -7,7 +7,7 @@
 
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
-#include <lib/inspect/contrib/cpp/bounded_list_node.h>
+#include <lib/inspect/cpp/bounded_list_node.h>
 
 #include "src/developer/memory/metrics/capture.h"
 #include "src/developer/memory/metrics/digest.h"
@@ -41,7 +41,7 @@ class Logger {
   zx::duration duration_;
   async::TaskClosureMethod<Logger, &Logger::Log> task_{this};
   inspect::Node root_node_;
-  inspect::contrib::BoundedListNode inspect_bucket_digest_node_;
+  inspect::BoundedListNode inspect_bucket_digest_node_;
   std::optional<inspect::StringArray> bucket_names_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(Logger);

@@ -25,7 +25,6 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.memorypressure:fuchsia.memorypressure_cpp",
     "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_cpp",
     "//sdk/lib/inspect/component/cpp",
-    "//sdk/lib/inspect/contrib/cpp:bounded_list_node",
     "//sdk/lib/syslog/cpp",
     "//src/developer/memory/metrics",
     "//zircon/system/ulib/inspect",

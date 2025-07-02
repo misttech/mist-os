@@ -9,7 +9,7 @@ mod moniker;
 #[cfg(feature = "serde")]
 mod serde_ext;
 
-pub use self::child_name::ChildName;
+pub use self::child_name::{BorrowedChildName, ChildName};
 pub use self::error::MonikerError;
 pub use self::extended_moniker::{ExtendedMoniker, EXTENDED_MONIKER_COMPONENT_MANAGER_STR};
 pub use self::moniker::Moniker;

@@ -2,13 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::memory_attribution::MemoryAttributionLifecycleEvent;
+use crate::task::memory_attribution::MemoryAttributionLifecycleEvent;
 use crate::task::{ProcessGroup, Task, ThreadGroup, ZombieProcess};
 use starnix_logging::track_stub;
 use starnix_types::ownership::{TempRef, WeakRef};
-use starnix_uapi::pid_t;
+use starnix_uapi::{pid_t, tid_t};
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
+
+// The maximal pid considered.
+const PID_MAX_LIMIT: pid_t = 1 << 15;
 
 #[derive(Default, Debug)]
 enum ProcessEntry {
@@ -37,6 +40,12 @@ struct PidEntry {
     task: Option<WeakRef<Task>>,
     process: ProcessEntry,
     process_group: Option<Weak<ProcessGroup>>,
+}
+
+impl PidEntry {
+    fn is_empty(&self) -> bool {
+        self.task.is_none() && self.process.is_none() && self.process_group.is_none()
+    }
 }
 
 pub enum ProcessEntryRef<'a> {
@@ -75,7 +84,7 @@ impl PidTable {
     {
         let entry = self.get_entry_mut(pid);
         do_remove(entry);
-        if entry.task.is_none() && entry.process.is_none() && entry.process_group.is_none() {
+        if entry.is_empty() {
             self.table.remove(&pid);
         }
     }
@@ -88,28 +97,35 @@ impl PidTable {
     }
 
     pub fn allocate_pid(&mut self) -> pid_t {
-        match self.last_pid.checked_add(1) {
-            Some(p) => self.last_pid = p,
-            None => {
-                track_stub!(TODO("https://fxbug.dev/322874557"), "pid wraparound");
-                self.last_pid = self.last_pid.overflowing_add(1).0;
+        loop {
+            self.last_pid = {
+                let r = self.last_pid + 1;
+                if r > PID_MAX_LIMIT {
+                    track_stub!(TODO("https://fxbug.dev/322874557"), "pid wraparound");
+                    2
+                } else {
+                    r
+                }
+            };
+            if self.get_entry(self.last_pid).is_none() {
+                break;
             }
         }
         self.last_pid
     }
 
-    pub fn get_task(&self, pid: pid_t) -> WeakRef<Task> {
-        self.get_entry(pid).and_then(|entry| entry.task.clone()).unwrap_or_else(WeakRef::new)
+    pub fn get_task(&self, tid: tid_t) -> WeakRef<Task> {
+        self.get_entry(tid).and_then(|entry| entry.task.clone()).unwrap_or_else(WeakRef::new)
     }
 
     pub fn add_task(&mut self, task: &TempRef<'_, Task>) {
-        let entry = self.get_entry_mut(task.id);
+        let entry = self.get_entry_mut(task.tid);
         assert!(entry.task.is_none());
-        self.get_entry_mut(task.id).task = Some(WeakRef::from(task));
+        self.get_entry_mut(task.tid).task = Some(WeakRef::from(task));
     }
 
-    pub fn remove_task(&mut self, pid: pid_t) {
-        self.remove_item(pid, |entry| {
+    pub fn remove_task(&mut self, tid: tid_t) {
+        self.remove_item(tid, |entry| {
             let removed = entry.task.take();
             assert!(removed.is_some())
         });
@@ -151,7 +167,7 @@ impl PidTable {
     pub fn add_thread_group(&mut self, thread_group: &ThreadGroup) {
         let entry = self.get_entry_mut(thread_group.leader);
         assert!(entry.process.is_none());
-        entry.process = ProcessEntry::ThreadGroup(thread_group.weak_thread_group.clone());
+        entry.process = ProcessEntry::ThreadGroup(thread_group.weak_self.clone());
 
         // Notify thread group changes.
         if let Some(notifier) = &self.thread_group_notifier {

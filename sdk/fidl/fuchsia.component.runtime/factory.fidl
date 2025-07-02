@@ -1,0 +1,310 @@
+// Copyright 2025 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+@available(added=HEAD)
+library fuchsia.component.runtime;
+
+using fuchsia.component.decl;
+using fuchsia.unknown;
+using fuchsia.io;
+using zx;
+using fuchsia.component.sandbox;
+
+@available(added=HEAD)
+const MAX_DATA_LENGTH uint32 = 8192;
+
+/// A runtime capability in the component framework. These are the fundamental
+/// types used by component manager to implement capability routing and access
+/// control.
+///
+/// Each of these client ends is a reference to an object owned by component
+/// manager.
+@available(added=HEAD)
+type Capability = flexible resource union {
+    1: connector client_end:Connector;
+    2: dir_connector client_end:DirConnector;
+    3: dictionary client_end:Dictionary;
+    4: data Data;
+    5: connector_router client_end:ConnectorRouter;
+    6: dir_connector_router client_end:DirConnectorRouter;
+    7: dictionary_router client_end:DictionaryRouter;
+    8: data_router client_end:DataRouter;
+};
+
+/// A `Connector` represents the sending end of a connection to a capability. A
+/// `Connector` presents as a service node when inserted into a
+/// `fuchsia.io.Directory`.
+@available(added=HEAD)
+open protocol Connector {
+    compose fuchsia.unknown.Cloneable;
+
+    /// Sends a channel to the `Receiver` associated with this `Connector`.
+    flexible Connect(resource struct {
+        channel zx.Handle:CHANNEL;
+    });
+};
+
+/// A `Receiver` represents the receiving end of a connection to a capability.
+@available(added=HEAD)
+open protocol Receiver {
+    /// `Receive` will be called by component manager whenever an new handle has
+    /// been given to any `Connector` associated with this `Receiver`.
+    flexible Receive(resource struct {
+        channel zx.Handle:CHANNEL;
+    });
+};
+
+/// A `DirConnector` represents the sending end of a connection to a capability.
+/// A `DirConnector` presents as a directory node when inserted into a
+/// `fuchsia.io.Directory`.
+@available(added=HEAD)
+open protocol DirConnector {
+    compose fuchsia.unknown.Cloneable;
+
+    /// Sends a channel to the `DirReceiver` associated with this `DirConnector`.
+    flexible Connect(resource struct {
+        channel server_end:fuchsia.io.Directory;
+    });
+};
+
+/// A `DirReceiver` represents the receiving end of a connection to a
+/// capability.
+@available(added=HEAD)
+open protocol DirReceiver {
+    /// `Receive` will be called by component manager whenever a new handle has
+    /// been given to any `DirConnector` associated with this `DirReceiver`.
+    flexible Receive(resource struct {
+        channel server_end:fuchsia.io.Directory;
+    });
+};
+
+/// A `Dictionary` is a bundle of named runtime capabilities.
+@available(added=HEAD)
+open protocol Dictionary {
+    compose fuchsia.unknown.Cloneable;
+
+    /// Inserts a new `Capability` into this `Dictionary` under the name `key`.
+    /// Overwrites any existing entry.
+    ///
+    /// The server end associated with the provided client end must be owned by
+    /// component manager.
+    flexible Insert(resource struct {
+        key fuchsia.component.decl.name;
+        capability Capability;
+    });
+
+    /// Returns a clone of the `Capability` named `key` in this dictionary, if
+    /// that capability both exists and can be cloned.
+    flexible Get(resource struct {
+        key fuchsia.component.decl.name;
+    }) -> (resource struct {
+        capability Capability:<optional>;
+    });
+
+    /// Removes the `Capability` named `key` from this dictionary and returns
+    /// it, if that capability exists.
+    flexible Remove(resource struct {
+        key fuchsia.component.decl.name;
+    }) -> (resource struct {
+        capability Capability:<optional>;
+    });
+
+    /// Opens an iterator which can be used to iterate over the keys of this
+    /// dictionary.
+    flexible IterateKeys(resource struct {
+        key_iterator server_end:DictionaryKeyIterator;
+    });
+
+    /// Exports this dictionary for use in a
+    /// `fuchsia.component.Realm/CreateChild` call.
+    flexible LegacyExport() -> (resource struct {
+        dictionary_ref fuchsia.component.sandbox.DictionaryRef;
+    });
+};
+
+@available(added=HEAD)
+open protocol DictionaryKeyIterator {
+    /// Returns the next set of keys in this dictionary. Returns an empty vector
+    /// when there are no more keys to iterate.
+    flexible GetNext() -> (struct {
+        keys vector<fuchsia.component.decl.name>:MAX;
+    });
+};
+
+/// Static data which may be put in a dictionary. This is useful for setting
+/// values in the metadata of a `RouteRequest`.
+@available(added=HEAD)
+type Data = flexible union {
+    1: bytes vector<byte>:MAX_DATA_LENGTH;
+    2: string string:MAX_DATA_LENGTH;
+    3: int64 int64;
+    4: uint64 uint64;
+};
+
+/// A factory for `Connector` capabilities.
+@available(added=HEAD)
+open protocol ConnectorRouter {
+    compose fuchsia.unknown.Cloneable;
+
+    /// Attempts to produce a `Connector` capability from this
+    /// `ConnectorRouter`. This will return:
+    ///
+    /// - A `Connector` if the operation is successful.
+    /// - An empty value if there is no issue found but the capability is not
+    ///   being provided (for example, an optional route ended in an offer from
+    ///   void).
+    /// - An error, if the operation failed.
+    flexible Route(resource struct {
+        request RouteRequest;
+        connector_server_end server_end:<Connector>;
+    }) -> (resource struct {
+        response RouterResponse;
+    }) error RouterError;
+};
+
+/// A factory for `DirConnector` capabilities.
+@available(added=HEAD)
+open protocol DirConnectorRouter {
+    compose fuchsia.unknown.Cloneable;
+
+    /// Attempts to produce a `DirConnector` capability from this
+    /// `DirConnectorRouter`. This will return:
+    ///
+    /// - A `DirConnector` if the operation is successful.
+    /// - An empty value if there is no issue found but the capability is not
+    ///   being provided (for example, an optional route ended in an offer from
+    ///   void).
+    /// - An error, if the operation failed.
+    flexible Route(resource struct {
+        request RouteRequest;
+        dir_connector_server_end server_end:<DirConnector>;
+    }) -> (resource struct {
+        response RouterResponse;
+    }) error RouterError;
+};
+
+/// A factory for `Dictionary` capabilities.
+@available(added=HEAD)
+open protocol DictionaryRouter {
+    compose fuchsia.unknown.Cloneable;
+
+    /// Attempts to produce a `Dictionary` capability from this
+    /// `DictionaryRouter`. This will return:
+    ///
+    /// - A `Dictionary` if the operation is successful.
+    /// - An empty value if there is no issue found but the capability is not
+    ///   being provided (for example, an optional route ended in an offer from
+    ///   void).
+    /// - An error, if the operation failed.
+    flexible Route(resource struct {
+        request RouteRequest;
+        dictionary_server_end server_end:<Dictionary>;
+    }) -> (resource struct {
+        response RouterResponse;
+    }) error RouterError;
+};
+
+/// A factory for `Data` capabilities.
+@available(added=HEAD)
+open protocol DataRouter {
+    compose fuchsia.unknown.Cloneable;
+
+    /// Attempts to produce a `Data` capability from this
+    /// `DataRouter`. This will return:
+    ///
+    /// - A `Data` value if the operation is successful.
+    /// - An empty value if there is no issue found but the capability is not
+    ///   being provided (for example, an optional route ended in an offer from
+    ///   void).
+    /// - An error, if the operation failed.
+    flexible Route(resource struct {
+        request RouteRequest;
+    }) -> (resource struct {
+        response RouterResponse;
+        data Data:optional;
+    }) error RouterError;
+};
+
+/// The error values returned when a route operation succeeds.
+@available(added=HEAD)
+type RouterResponse = flexible enum : uint32 {
+    /// The server end has been connected to a valid object.
+    SUCCESS = 1;
+
+    /// The capability was marked as unavailable.
+    UNAVAILABLE = 2;
+};
+
+/// The error values returned when a route operation fails.
+@available(added=HEAD)
+type RouterError = flexible enum : uint32 {
+    /// The router failed to find the capability.
+    NOT_FOUND = 1;
+
+    /// The arguments provided to the function are invalid.
+    INVALID_ARGS = 2;
+
+    /// The operation is not supported.
+    NOT_SUPPORTED = 3;
+
+    /// An internal error occurred.
+    INTERNAL = 4;
+
+    /// An unknown error occurred.
+    UNKNOWN = 5;
+};
+
+/// A token representing a component instance.
+@available(added=HEAD)
+type WeakInstanceToken = resource struct {
+    token zx.Handle:EVENTPAIR;
+};
+
+/// Contains metadata on how to route a capability, and a token representing the
+/// component that started the route.
+///
+/// Either both fields must be set, or neither.
+@available(added=HEAD)
+type RouteRequest = resource table {
+    1: target WeakInstanceToken;
+    2: metadata client_end:Dictionary;
+};
+
+/// The `CapabilityFactory` can be used to create new runtime capabilities.
+@discoverable(server="platform")
+@available(added=HEAD)
+open protocol CapabilityFactory {
+    flexible CreateConnector(resource struct {
+        receiver_client_end client_end:Receiver;
+        connector_server_end server_end:Connector;
+    });
+
+    flexible CreateDirConnector(resource struct {
+        dir_receiver_client_end client_end:DirReceiver;
+        dir_connector_server_end server_end:DirConnector;
+    });
+
+    flexible CreateDictionary(resource struct {
+        dictionary_server_end server_end:Dictionary;
+    });
+
+    flexible CreateConnectorRouter(resource struct {
+        router_client_end client_end:ConnectorRouter;
+        router_server_end server_end:ConnectorRouter;
+    });
+
+    flexible CreateDirConnectorRouter(resource struct {
+        router_client_end client_end:DirConnectorRouter;
+        router_server_end server_end:DirConnectorRouter;
+    });
+
+    flexible CreateDictionaryRouter(resource struct {
+        router_client_end client_end:DictionaryRouter;
+        router_server_end server_end:DictionaryRouter;
+    });
+
+    flexible CreateDataRouter(resource struct {
+        router_client_end client_end:DataRouter;
+        router_server_end server_end:DataRouter;
+    });
+};

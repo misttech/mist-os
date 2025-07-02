@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // UnknownFilesMode is a mode that describes how to deal with
@@ -91,8 +92,25 @@ func CopyDir(srcDir, dstDir string, unknownFilesMode UnknownFilesMode) ([]string
 			} else if err != nil {
 				return fmt.Errorf("filepath.EvalSymlinks %s: %w", srcPath, err)
 			}
-			if err := os.Symlink(srcLink, dstPath); err != nil {
-				return fmt.Errorf("os.Symlink %s, %s: %w", srcLink, dstPath, err)
+
+			if strings.HasPrefix(srcLink, filepath.Clean(srcDir)) {
+				srcLinkRelToSrcDir, err := filepath.Rel(srcDir, srcLink)
+				if err != nil {
+					return err
+				}
+				dstLink := filepath.Join(dstDir, srcLinkRelToSrcDir)
+				if _, err := os.Stat(dstLink); err != nil {
+					if err := CopyFile(srcLink, dstLink); err != nil {
+						return err
+					}
+				}
+				if err := os.Symlink(dstLink, dstPath); err != nil {
+					return fmt.Errorf("os.Symlink %s, %s: %w", dstLink, dstPath, err)
+				}
+			} else {
+				if err := os.Symlink(srcLink, dstPath); err != nil {
+					return fmt.Errorf("os.Symlink %s, %s: %w", srcLink, dstPath, err)
+				}
 			}
 
 		default:

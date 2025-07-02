@@ -22,6 +22,7 @@
 #include <vm/pmm.h>
 
 class VmPageList;
+class VmPageSpliceList;
 class VMPLCursor;
 
 // RAII helper for representing content in a page list node. This supports being in one of five
@@ -72,26 +73,12 @@ class VmPageOrMarker {
     // used for internal metadata. This is declared here for convenience, and is asserted to be in
     // sync with the private VmPageOrMarker::kTypeBits.
     static constexpr int kAlignBits = 3;
-    // kExtraBits is used for bookkeeping on certain page providers, namely compressed storage.
-    static constexpr int kExtraBits = 2;
-    // Ensure the pmm page-to-index has enough zero bits.
-    static_assert((kAlignBits + kExtraBits) <= PmmNode::kIndexZeroBits);
-
-    explicit ReferenceValue(const vm_page_t* page, uint8_t extra)
-        : value_(Pmm::Node().PageToIndex(page) | (BIT_MASK32(kExtraBits) & extra) << kAlignBits) {
-      DEBUG_ASSERT((extra & ~BIT_MASK32(kExtraBits)) == 0);
-    }
 
     explicit constexpr ReferenceValue(uint32_t raw) : value_(raw) {
       DEBUG_ASSERT((value_ & BIT_MASK32(kAlignBits)) == 0);
     }
 
-    static ReferenceValue GetReservedValue() { return ReferenceValue(PmmNode::kIndexReserved0); }
-
     uint32_t value() const { return value_; }
-    vm_page_t* page() const { return Pmm::Node().IndexToPage(value_); }
-    uint8_t extra() const { return (value_ >> kAlignBits) & BIT_MASK32(kExtraBits); }
-    bool is_reserved() const { return value_ == PmmNode::kIndexReserved0; }
 
    private:
     uint32_t value_;
@@ -104,6 +91,16 @@ class VmPageOrMarker {
     static_assert(kPageType == 0);
     return Pmm::Node().IndexToPage(raw_);
   }
+
+  // Returns the paddr_t of the underlying vm_page*. Is only valid to call if `IsPage` is true. Can
+  // be more efficient than performing |Page()->paddr()| as it saves a memory de-reference.
+  paddr_t PageAsPaddr() const {
+    DEBUG_ASSERT(IsPage());
+    // Do not need to mask any bits out of raw_, since Page has 0's for the type anyway.
+    static_assert(kPageType == 0);
+    return Pmm::Node().IndexToPaddr(raw_);
+  }
+
   ReferenceValue Reference() const {
     DEBUG_ASSERT(IsReference());
     return ReferenceValue(raw_ & ~BIT_MASK32(ReferenceValue::kAlignBits));
@@ -185,6 +182,8 @@ class VmPageOrMarker {
   static VmPageOrMarker ParentContent() { return VmPageOrMarker{kParentContentType}; }
 
   [[nodiscard]] static VmPageOrMarker Page(vm_page* p) {
+    // Ensure the pmm page-to-index has enough zero bits.
+    static_assert(kTypeBits <= PmmNode::kIndexZeroBits);
     // A null page is incorrect for two reasons
     // 1. It's a violation of the API of this method
     // 2. A null page cannot be represented internally as this is used to represent Empty
@@ -782,89 +781,6 @@ class VMPLCursor {
   friend VmPageList;
 };
 
-// Class which holds the list of vm_page structs removed from a VmPageList
-// by TakePages. The list include information about uncommitted pages and markers.
-// Every splice list is expected to go through the following series of states:
-// 1. The splice list is created.
-// 2. Pages are added to the splice list.
-// 3. The list is `Finalize`d, meaning that it can no longer be modified by `Append`.
-// 4. Pages are then `Pop`d from the list. Once all the pages are popped, the list is considered
-//    "processed".
-// 5. The list is then considered `Processed` and can be destroyed.
-class VmPageSpliceList final {
- public:
-  VmPageSpliceList();
-  VmPageSpliceList(uint64_t offset, uint64_t length, uint64_t list_skew);
-  VmPageSpliceList(VmPageSpliceList&& other);
-  VmPageSpliceList& operator=(VmPageSpliceList&& other_tree);
-  ~VmPageSpliceList();
-
-  // For use by PhysicalPageProvider.  The user-pager path doesn't use this. This returns a
-  // finalized list.
-  static VmPageSpliceList CreateFromPageList(uint64_t offset, uint64_t length, list_node* pages);
-
-  // Pops the next page off of the splice list. It is invalid to pop a page from a non-finalized
-  // splice list.
-  VmPageOrMarker Pop();
-
-  // Peeks at the head of the splice list and returns a non-null VmPageOrMarkerRef pointing to it
-  // if and only if it is a reference. It is invalid to peek at a non-finalized splice list.
-  VmPageOrMarkerRef PeekReference();
-
-  // Appends `content` to the end of the splice list.
-  // The splice list takes ownership of `content` after this call.
-  // Note that this method does not work when raw_pages_ is in use.
-  // It is invalid to append to a finalized splice list.
-  zx_status_t Append(VmPageOrMarker content);
-
-  // Returns true after the whole collection has been processed by Pop.
-  bool IsProcessed() const { return pos_ >= length_; }
-
-  // Returns true if this list is empty.
-  bool IsEmpty() const;
-
-  // Marks the list as finalized.
-  // See the comment at `VmPageSpliceList`'s declaration for more info on what this means and when
-  // to call it. Note that it is invalid to call `Finalize` twice on the same list.
-  void Finalize();
-
-  // Returns true if the splice list is finalized.
-  // See the comment at `VmPageSpliceList`'s declaration for more info on what this means.
-  bool IsFinalized() const { return finalized_; }
-
-  // Returns the current position in the list.
-  uint64_t Position() const { return pos_; }
-
-  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(VmPageSpliceList);
-
- private:
-  void FreeAllPages();
-  uint64_t NodeOffset(uint64_t offset) const {
-    return VmPageListNode::NodeOffset(offset, list_skew_);
-  }
-
-  uint64_t NodeIndex(uint64_t offset) const {
-    return VmPageListNode::NodeIndex(offset, list_skew_);
-  }
-
-  uint64_t offset_;
-  uint64_t length_;
-  uint64_t pos_ = 0;
-  uint64_t list_skew_ = 0;
-  bool finalized_ = false;
-
-  VmPageListNode head_ = VmPageListNode(0);
-  fbl::WAVLTree<uint64_t, ktl::unique_ptr<VmPageListNode>> middle_;
-  VmPageListNode tail_ = VmPageListNode(0);
-
-  // To avoid the possibility of allocation failure, we don't use head_, middle_, tail_ for
-  // CreateFromPageList().  With CreateFromPageList() we know that all the pages are present, so
-  // we can just keep a list of pages, and create VmPageListNode on the stack as pages are Pop()ed.
-  list_node raw_pages_ = LIST_INITIAL_VALUE(raw_pages_);
-
-  friend VmPageList;
-};
-
 class VmPageList final {
  public:
   VmPageList();
@@ -1258,10 +1174,10 @@ class VmPageList final {
     list_.clear();
   }
 
-  // Takes the pages, references and markers in the range [offset, length) out of this page list.
-  // This method calls `Finalize` on the splice list prior to returning it, meaning that no more
-  // pages, references, or markers can be added to it.
-  VmPageSpliceList TakePages(uint64_t offset, uint64_t length);
+  // Takes the content out of this page list and places them in the provided |splice| list, which
+  // must have already been initialized but still be empty. The range to be taken is the range
+  // specified by the |splice| list, and will be |Finalize|d before returning.
+  void TakePages(VmPageSpliceList* splice);
 
   uint64_t HeapAllocationBytes() const { return list_.size() * sizeof(VmPageListNode); }
 
@@ -1794,6 +1710,119 @@ class VmPageList final {
   // that the nodes can be moved between different lists without having to worry
   // about needing to split up a node.
   uint64_t list_skew_ = 0;
+};
+
+// Class which holds the list of vm_page structs removed from a VmPageList
+// by TakePages. The list include information about uncommitted pages and markers.
+// Every splice list is expected to go through the following series of states:
+// 1. The splice list is created.
+// 2. List is Initialized with the desired range and skew.
+// 3. Pages are added to the splice list.
+// 4. The list is `Finalize`d, meaning that it can no longer be modified by `Append`.
+// 5. Pages are then `Pop`d from the list. Once all the pages are popped, the list is considered
+//    "processed".
+// 6. The list is then considered `Processed` and can be destroyed.
+class VmPageSpliceList final {
+ public:
+  VmPageSpliceList() = default;
+  // Convenience constructor that calls Initialize.
+  VmPageSpliceList(uint64_t offset, uint64_t length) { Initialize(offset, length); }
+  ~VmPageSpliceList();
+
+  // For use by PhysicalPageProvider.  The user-pager path doesn't use this. This returns a
+  // finalized list.
+  static zx_status_t CreateFromPageList(uint64_t offset, uint64_t length, list_node* pages,
+                                        VmPageSpliceList* splice);
+
+  // Initialize the list with the given range and skew. Can only be done once, and must be done
+  // before providing pages.
+  void Initialize(uint64_t offset, uint64_t length) {
+    DEBUG_ASSERT(IsEmpty() && state_ == State::Constructed);
+    offset_ = offset;
+    length_ = length;
+    state_ = State::Initialized;
+  }
+
+  // Pops the next page off of the splice list. It is invalid to pop a page from a non-finalized
+  // splice list.
+  VmPageOrMarker Pop();
+
+  // Peeks at the head of the splice list and returns a non-null VmPageOrMarkerRef pointing to it
+  // if and only if it is a reference. It is invalid to peek at a non-finalized splice list.
+  VmPageOrMarkerRef PeekReference();
+
+  // Appends `content` to the end of the splice list.
+  // The splice list takes ownership of `content` after this call.
+  // It is invalid to append to a finalized splice list.
+  zx_status_t Append(VmPageOrMarker content);
+
+  // Returns true after the whole collection has been processed by Pop.
+  bool IsProcessed() const { return state_ == State::Processed; }
+
+  // Returns true if the collection has been Initialized.
+  bool IsInitialized() const { return state_ == State::Initialized; }
+
+  // Returns true if this list is empty.
+  bool IsEmpty() const;
+
+  // Marks the list as finalized.
+  // See the comment at `VmPageSpliceList`'s declaration for more info on what this means and when
+  // to call it. Note that it is invalid to call `Finalize` twice on the same list.
+  void Finalize() {
+    DEBUG_ASSERT(IsInitialized());
+    pos_ = 0;
+    state_ = State::Finalized;
+  }
+
+  // Returns true if the splice list is finalized.
+  // See the comment at `VmPageSpliceList`'s declaration for more info on what this means.
+  bool IsFinalized() const { return state_ == State::Finalized; }
+
+  // Returns the current position in the list.
+  uint64_t Position() const { return pos_; }
+
+  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(VmPageSpliceList);
+
+ private:
+  void FreeAllPages();
+  uint64_t NodeOffset(uint64_t offset) const {
+    return VmPageListNode::NodeOffset(offset, list_skew_);
+  }
+
+  uint64_t NodeIndex(uint64_t offset) const {
+    return VmPageListNode::NodeIndex(offset, list_skew_);
+  }
+
+  // Initialize the skew. Must be done after calling Initialize, but before adding any content. Only
+  // necessary if directly moving list nodes where the skew has an impact.
+  void InitializeSkew(uint64_t skew) {
+    DEBUG_ASSERT(IsInitialized() && IsEmpty());
+    // Checking list_skew_ doesn't catch all instances of double-initialization, but
+    // it should catch some of them.
+    DEBUG_ASSERT(list_skew_ == 0);
+    list_skew_ = skew;
+  }
+
+  uint64_t offset_ = 0;
+  uint64_t length_ = 0;
+  uint64_t pos_ = 0;
+  uint64_t list_skew_ = 0;
+
+  // States used to represent the life cycle of the VmPageSpliceList, as per the comment at the
+  // declaration.
+  enum class State : uint8_t {
+    Constructed,
+    Initialized,
+    Finalized,
+    Processed,
+  };
+  State state_ = State::Constructed;
+
+  VmPageListNode head_ = VmPageListNode(0);
+  fbl::WAVLTree<uint64_t, ktl::unique_ptr<VmPageListNode>> middle_;
+  VmPageListNode tail_ = VmPageListNode(0);
+
+  friend VmPageList;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_VM_PAGE_LIST_H_

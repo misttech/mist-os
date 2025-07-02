@@ -86,7 +86,7 @@
 
 // Get the secondary cpu into 64-bit mode with interrupts disabled and no TSS
 .code64
-.label _x86_secondary_cpu_long_mode_entry, global
+.label x86_secondary_cpu_long_mode_entry, global
     // When we get here, %rsi should contain the absolute address of our data
     // page.
     mov $1, %rdi
@@ -114,7 +114,7 @@
     // version of it
     jmp *BCD_VIRT_LM_HIGH_ENTRY_OFFSET(%rsi)
 
-.function _x86_secondary_cpu_long_mode_high_entry, global
+.function x86_secondary_cpu_long_mode_high_entry, global
     // Switch to the kernel's PML4
     mov %rcx, %cr3
     // As of this point, %esi is invalid

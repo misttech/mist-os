@@ -31,10 +31,8 @@ pub async fn start_policy_test(
         .await
         .unwrap();
     let instance = builder.build_in_nested_component_manager(component_manager_url).await.unwrap();
-    let proxy = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
-        .unwrap();
+    let proxy: fcomponent::EventStreamProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     proxy.wait_for_ready().await.unwrap();
 
     let event_stream = EventStream::new(proxy);
@@ -51,8 +49,8 @@ pub async fn start_policy_test(
         .await
         .unwrap();
     // Get to the Realm protocol
-    let realm_query =
-        instance.root.connect_to_protocol_at_exposed_dir::<fsys::RealmQueryMarker>().unwrap();
+    let realm_query: fsys::RealmQueryProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     let (exposed_dir, server_end) = create_proxy();
     realm_query
         .open_directory("./root", fsys::OpenDirType::ExposedDir, server_end)

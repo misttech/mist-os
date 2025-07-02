@@ -8,6 +8,7 @@ use fidl_fuchsia_data as fdata;
 use runner::StartInfoProgramError;
 
 const CREATE_RAW_PROCESSES_KEY: &str = "job_policy_create_raw_processes";
+const DENY_BAD_HANDLES_KEY: &str = "deny_bad_handles";
 const SHARED_PROCESS_KEY: &str = "is_shared_process";
 const CRITICAL_KEY: &str = "main_process_critical";
 const FORWARD_STDOUT_KEY: &str = "forward_stdout_to";
@@ -43,6 +44,7 @@ pub struct ElfProgramConfig {
     pub ambient_mark_vmo_exec: bool,
     pub main_process_critical: bool,
     pub create_raw_processes: bool,
+    pub deny_bad_handles: bool,
     pub is_shared_process: bool,
     pub use_next_vdso: bool,
     pub job_with_available_exception_channel: bool,
@@ -98,6 +100,7 @@ impl ElfProgramConfig {
             ambient_mark_vmo_exec: runner::get_bool(program, VMEX_KEY)?,
             main_process_critical: runner::get_bool(program, CRITICAL_KEY)?,
             create_raw_processes: runner::get_bool(program, CREATE_RAW_PROCESSES_KEY)?,
+            deny_bad_handles: runner::get_bool(program, DENY_BAD_HANDLES_KEY)?,
             is_shared_process: runner::get_bool(program, SHARED_PROCESS_KEY)?,
             use_next_vdso: runner::get_bool(program, USE_NEXT_VDSO_KEY)?,
             job_with_available_exception_channel: runner::get_bool(

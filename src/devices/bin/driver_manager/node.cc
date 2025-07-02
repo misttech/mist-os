@@ -34,6 +34,7 @@ namespace {
 
 const std::string kUnboundUrl = "unbound";
 const std::string kOwnedByParentUrl = "owned by parent";
+const std::string kCompositeParent = "owned by composite(s)";
 
 // TODO(https://fxbug.dev/42075799): Remove this flag once composite node spec rebind once all
 // clients are updated to the new Rebind() behavior and this is fully implemented on both DFv1 and
@@ -477,6 +478,10 @@ const std::string& Node::driver_url() const {
 
   if (owned_by_parent_) {
     return kOwnedByParentUrl;
+  }
+
+  if (is_composite_parent_) {
+    return kCompositeParent;
   }
 
   return kUnboundUrl;
@@ -1036,7 +1041,7 @@ fit::result<fuchsia_driver_framework::wire::NodeError, std::shared_ptr<Node>> No
                                    fidl::kIgnoreBindingClosure);
   }
   if (node.is_valid()) {
-    child->owned_by_parent_ = false;
+    child->owned_by_parent_ = true;
     child->node_ref_.emplace(
         dispatcher_, std::move(node), child.get(),
         [](Node* node, fidl::UnbindInfo info) { node->OnNodeServerUnbound(info); });
@@ -1086,6 +1091,28 @@ void Node::AddChild(fuchsia_driver_framework::NodeAddArgs args,
     callback(fit::as_error(fdf::wire::NodeError::kNameMissing));
     return;
   }
+
+  // Verify the properties.
+  if (args.properties().has_value() && args.properties2().has_value()) {
+    LOGF(ERROR, "Failed to add Node, both properties and properties2 fields were set");
+    callback(fit::as_error(fdf::wire::NodeError::kUnsupportedArgs));
+    return;
+  }
+
+  // Only check for unique property keys for properties2 since properties is deprecated.
+  if (args.properties2().has_value()) {
+    std::unordered_set<std::string> property_keys;
+    for (auto& property : args.properties2().value()) {
+      if (property_keys.contains(property.key())) {
+        LOGF(ERROR,
+             "Failed to add Node since properties2 contain multiple properties with the same key");
+        callback(fit::as_error(fdf::wire::NodeError::kDuplicatePropertyKeys));
+        return;
+      }
+      property_keys.insert(property.key());
+    }
+  }
+
   std::string name = args.name().value();
   WaitForChildToExit(
       name, [self = shared_from_this(), args = std::move(args), controller = std::move(controller),

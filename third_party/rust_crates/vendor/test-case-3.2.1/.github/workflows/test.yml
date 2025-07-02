@@ -1,0 +1,96 @@
+name: Test
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - develop
+
+jobs:
+  validate:
+    name: Validate clippy and rustfmt
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Check
+        uses: actions-rs/cargo@v1
+        with:
+          command: check
+          args: --all-features
+
+      - name: Clippy
+        uses: actions-rs/cargo@v1
+        with:
+          command: clippy
+          args: --all-features --tests -- -D warnings
+
+      - name: Fmt
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: -- --check
+
+  test:
+    name: Test crate
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macOS-latest
+        toolchain:
+          - nightly
+          - stable
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.toolchain }}
+          override: true
+          components: rustfmt, clippy
+
+      - name: Test
+        uses: actions-rs/cargo@v1
+        env:
+          SNAPSHOT_DIR: rust-${{ matrix.toolchain }}
+        with:
+          command: test
+
+  msrv-build:
+    name: Build crate with documented MSRV
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v2
+
+      - name: Install Rust MSRV version
+        run: scripts/force-msrv-toolchain.sh
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build

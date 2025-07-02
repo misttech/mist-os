@@ -44,10 +44,10 @@ mod tests {
 
     #[test]
     fn test_log_state() {
-        let _executor = fuchsia_async::TestExecutor::new();
+        let mut executor = fuchsia_async::TestExecutor::new();
         let inspector = Inspector::default();
         let mut i = InspectInfo::new(inspector.root(), "id", "myname");
-        assert_data_tree!(inspector, root: contains {
+        assert_data_tree!(@executor executor, inspector, root: contains {
             id: {
                 name:"myname",
                 IPv4:{"0": contains {
@@ -62,7 +62,7 @@ mod tests {
         });
 
         i.log_link_state(Proto::IPv4, LinkState::Internet);
-        assert_data_tree!(inspector, root: contains {
+        assert_data_tree!(@executor executor, inspector, root: contains {
             id: {
                 name:"myname",
                 IPv4:{"0": contains {
@@ -80,7 +80,7 @@ mod tests {
         });
         i.log_link_state(Proto::IPv4, LinkState::Gateway);
         i.log_link_state(Proto::IPv6, LinkState::Local);
-        assert_data_tree!(inspector, root: contains {
+        assert_data_tree!(@executor executor, inspector, root: contains {
             id: {
                 name:"myname",
                 IPv4:{"0": contains {

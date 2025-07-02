@@ -20,8 +20,8 @@ use log::info;
 use test_case::test_case;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fcomponent_decl,
-    fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter as fnet_filter,
-    fidl_fuchsia_net_filter_ext as fnet_filter_ext, fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
+    fidl_fuchsia_process as fprocess,
 };
 
 const IPTABLES_RESTORE: &'static str = "iptables-restore";
@@ -73,8 +73,8 @@ async fn run_with_input(name: &'static str, input_lines: &[&'static str]) -> Rea
             .expect("create realm builder");
 
     let realm = builder.build().await.unwrap();
-    let test_realm =
-        realm.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
+    let test_realm: fcomponent::RealmProxy =
+        realm.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     info!("Running {name}");
 
@@ -483,10 +483,7 @@ async fn create_chain(
 
     let realm = run_with_input(binary, table_spec).await;
 
-    let state = realm
-        .root
-        .connect_to_protocol_at_exposed_dir::<fnet_filter::StateMarker>()
-        .expect("connect to protocol");
+    let state = realm.root.connect_to_protocol_at_exposed_dir().expect("connect to protocol");
     let stream = fnet_filter_ext::event_stream_from_state(state).expect("get filter event stream");
     let mut stream = pin!(stream);
     let observed: HashMap<_, _> =

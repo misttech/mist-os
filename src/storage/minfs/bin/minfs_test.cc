@@ -97,22 +97,17 @@ class MinfsComponentTest : public testing::Test {
 
 TEST_F(MinfsComponentTest, FormatCheckStart) {
   fuchsia_fs_startup::wire::FormatOptions format_options;
-  auto format_res = startup_client()->Format(block_client(), std::move(format_options));
+  auto format_res = startup_client()->Format(block_client(), format_options);
   ASSERT_EQ(format_res.status(), ZX_OK);
   ASSERT_FALSE(format_res->is_error());
 
   fuchsia_fs_startup::wire::CheckOptions check_options;
-  auto check_res = startup_client()->Check(block_client(), std::move(check_options));
+  auto check_res = startup_client()->Check(block_client(), check_options);
   ASSERT_EQ(check_res.status(), ZX_OK);
   ASSERT_FALSE(check_res->is_error());
 
   fuchsia_fs_startup::wire::StartOptions start_options;
-  start_options.write_compression_algorithm =
-      fuchsia_fs_startup::wire::CompressionAlgorithm::kZstdChunked;
-  start_options.cache_eviction_policy_override =
-      fuchsia_fs_startup::wire::EvictionPolicyOverride::kNone;
-  start_options.write_compression_level = -1;
-  auto startup_res = startup_client()->Start(block_client(), std::move(start_options));
+  auto startup_res = startup_client()->Start(block_client(), start_options);
   ASSERT_EQ(startup_res.status(), ZX_OK);
   ASSERT_FALSE(startup_res->is_error());
 
@@ -129,22 +124,17 @@ TEST_F(MinfsComponentTest, RequestsBeforeStartupAreQueuedAndServicedAfter) {
   loop.StartThread("minfs caller test thread");
 
   fuchsia_fs_startup::wire::FormatOptions format_options;
-  auto format_res = startup_client()->Format(block_client(), std::move(format_options));
+  auto format_res = startup_client()->Format(block_client(), format_options);
   ASSERT_EQ(format_res.status(), ZX_OK);
   ASSERT_FALSE(format_res->is_error());
 
   fuchsia_fs_startup::wire::CheckOptions check_options;
-  auto check_res = startup_client()->Check(block_client(), std::move(check_options));
+  auto check_res = startup_client()->Check(block_client(), check_options);
   ASSERT_EQ(check_res.status(), ZX_OK);
   ASSERT_FALSE(check_res->is_error());
 
   fuchsia_fs_startup::wire::StartOptions start_options;
-  start_options.write_compression_algorithm =
-      fuchsia_fs_startup::wire::CompressionAlgorithm::kZstdChunked;
-  start_options.cache_eviction_policy_override =
-      fuchsia_fs_startup::wire::EvictionPolicyOverride::kNone;
-  start_options.write_compression_level = -1;
-  auto startup_res = startup_client()->Start(block_client(), std::move(start_options));
+  auto startup_res = startup_client()->Start(block_client(), start_options);
   ASSERT_EQ(startup_res.status(), ZX_OK);
   ASSERT_FALSE(startup_res->is_error());
 

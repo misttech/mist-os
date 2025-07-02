@@ -615,6 +615,9 @@ template("bazel_action") {
     inputs = [
       _all_licenses_spdx_file,
       _gn_targets_repository_manifest,
+
+      # Imported by create_gn_targets_dir.py
+      "//build/bazel/scripts/workspace_utils.py",
     ]
 
     deps = [
@@ -622,7 +625,7 @@ template("bazel_action") {
       ":${_gn_targets_repository_manifest_target}",
     ]
 
-    outputs = [ "${_gn_targets_repository_path}/WORKSPACE.bazel" ]
+    outputs = [ "${_gn_targets_repository_path}/MODULE.bazel" ]
 
     script = "//build/bazel/scripts/create_gn_targets_dir.py"
     args = [
@@ -662,8 +665,12 @@ template("bazel_action") {
     script = "//build/bazel/scripts/bazel_action.py"
 
     inputs = [
+               "//build/bazel/toplevel.WORKSPACE.bzlmod",
+               "//build/bazel/toplevel.MODULE.bazel",
+
                # Imported by bazel_action.py
                "//build/bazel/scripts/build_utils.py",
+               "//build/bazel/scripts/workspace_utils.py",
              ] + _bazel_build_files
 
     if (defined(invoker.inputs)) {

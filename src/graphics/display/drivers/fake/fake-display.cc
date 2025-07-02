@@ -53,7 +53,6 @@
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types/cpp/image-tiling-type.h"
-#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-and-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 #include "src/graphics/display/lib/api-types/cpp/mode.h"
@@ -317,11 +316,8 @@ void FakeDisplay::ReleaseImage(display::DriverImageId image_id) {
 
 display::ConfigCheckResult FakeDisplay::CheckConfiguration(
     display::DisplayId display_id, display::ModeId display_mode_id,
-    cpp20::span<const display::DriverLayer> layers,
-    cpp20::span<display::LayerCompositionOperations> layer_composition_operations) {
+    cpp20::span<const display::DriverLayer> layers) {
   ZX_DEBUG_ASSERT(display_id == kDisplayId);
-
-  ZX_DEBUG_ASSERT(layer_composition_operations.size() == layers.size());
 
   // TODO(https://fxbug.dev/412450577): Remove the single-layer assumption.
   ZX_DEBUG_ASSERT(layers.size() == 1);
@@ -338,12 +334,8 @@ display::ConfigCheckResult FakeDisplay::CheckConfiguration(
       .height = kHeight,
   });
 
-  display::ConfigCheckResult result = display::ConfigCheckResult::kOk;
   if (layer.display_destination() != display_area) {
-    // TODO(https://fxbug.dev/388602122): Revise the definition of MERGE to
-    // include this case, or replace with a different opcode.
-    layer_composition_operations[0] = layer_composition_operations[0].WithMerge();
-    result = display::ConfigCheckResult::kUnsupportedConfig;
+    return display::ConfigCheckResult::kUnsupportedConfig;
   }
   if (layer.image_source().dimensions().IsEmpty()) {
     // Solid color fill layer.
@@ -351,29 +343,24 @@ display::ConfigCheckResult FakeDisplay::CheckConfiguration(
       // The capture simulation implementation is currently optimized for 32-bit
       // colors. Removing this constraint will require updating that
       // implementation.
-      layer_composition_operations[0] = layer_composition_operations[0].WithUseImage();
-      result = display::ConfigCheckResult::kUnsupportedConfig;
+      return display::ConfigCheckResult::kUnsupportedConfig;
     }
   } else {
     // Image layer.
     if (layer.image_source() != layer.display_destination()) {
-      layer_composition_operations[0] = layer_composition_operations[0].WithFrameScale();
-      result = display::ConfigCheckResult::kUnsupportedConfig;
+      return display::ConfigCheckResult::kUnsupportedConfig;
     }
   }
   if (layer.image_metadata().dimensions() != layer.image_source().dimensions()) {
-    layer_composition_operations[0] = layer_composition_operations[0].WithSrcFrame();
-    result = display::ConfigCheckResult::kUnsupportedConfig;
+    return display::ConfigCheckResult::kUnsupportedConfig;
   }
   if (layer.alpha_mode() != display::AlphaMode::kDisable) {
-    layer_composition_operations[0] = layer_composition_operations[0].WithAlpha();
-    result = display::ConfigCheckResult::kUnsupportedConfig;
+    return display::ConfigCheckResult::kUnsupportedConfig;
   }
   if (layer.image_source_transformation() != display::CoordinateTransformation::kIdentity) {
-    layer_composition_operations[0] = layer_composition_operations[0].WithTransform();
-    result = display::ConfigCheckResult::kUnsupportedConfig;
+    return display::ConfigCheckResult::kUnsupportedConfig;
   }
-  return result;
+  return display::ConfigCheckResult::kOk;
 }
 
 void FakeDisplay::ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,

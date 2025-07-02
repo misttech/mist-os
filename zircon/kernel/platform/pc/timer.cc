@@ -850,6 +850,10 @@ void platform_shutdown_timer(void) {
   }
 }
 
+zx_status_t platform_suspend_timer_curr_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
+zx_status_t platform_resume_timer_curr_cpu() { return ZX_ERR_NOT_SUPPORTED; }
+
 zx_instant_mono_ticks_t platform_convert_early_ticks(arch::EarlyTicks sample) {
   return early_ticks_to_ticks.Apply(sample.tsc);
 }

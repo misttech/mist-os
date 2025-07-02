@@ -288,6 +288,10 @@ type NodeError = flexible enum {
     /// The Node contains unsupported arguments, such as deprecated property keys or offers.
     @available(added=26)
     UNSUPPORTED_ARGS = 12;
+
+    /// The Node contains multiple properties with the same key.
+    @available(added=NEXT)
+    DUPLICATE_PROPERTY_KEYS = 13;
 };
 
 /// Protocol through which a driver manages a node that it is bound to.

@@ -307,16 +307,16 @@ pub struct NewerSimpleTable {
 
 impl NewerSimpleTable {
     fn __max_ordinal(&self) -> usize {
-        if self.x.is_some() {
-            return 1;
+        if self.z.is_some() {
+            return 6;
         }
 
         if self.y.is_some() {
             return 5;
         }
 
-        if self.z.is_some() {
-            return 6;
+        if self.x.is_some() {
+            return 1;
         }
 
         0
@@ -821,16 +821,16 @@ pub struct ReverseOrdinalTable {
 
 impl ReverseOrdinalTable {
     fn __max_ordinal(&self) -> usize {
-        if self.z.is_some() {
-            return 1;
+        if self.x.is_some() {
+            return 3;
         }
 
         if self.y.is_some() {
             return 2;
         }
 
-        if self.x.is_some() {
-            return 3;
+        if self.z.is_some() {
+            return 1;
         }
 
         0
@@ -1132,12 +1132,12 @@ pub struct SimpleTable {
 
 impl SimpleTable {
     fn __max_ordinal(&self) -> usize {
-        if self.x.is_some() {
-            return 1;
-        }
-
         if self.y.is_some() {
             return 5;
+        }
+
+        if self.x.is_some() {
+            return 1;
         }
 
         0
@@ -1511,260 +1511,260 @@ pub struct SixtyFourOrdinalTable {
 
 impl SixtyFourOrdinalTable {
     fn __max_ordinal(&self) -> usize {
-        if self.v1.is_some() {
-            return 1;
-        }
-
-        if self.v2.is_some() {
-            return 2;
-        }
-
-        if self.v3.is_some() {
-            return 3;
-        }
-
-        if self.v4.is_some() {
-            return 4;
-        }
-
-        if self.v5.is_some() {
-            return 5;
-        }
-
-        if self.v6.is_some() {
-            return 6;
-        }
-
-        if self.v7.is_some() {
-            return 7;
-        }
-
-        if self.v8.is_some() {
-            return 8;
-        }
-
-        if self.v9.is_some() {
-            return 9;
-        }
-
-        if self.v10.is_some() {
-            return 10;
-        }
-
-        if self.v11.is_some() {
-            return 11;
-        }
-
-        if self.v12.is_some() {
-            return 12;
-        }
-
-        if self.v13.is_some() {
-            return 13;
-        }
-
-        if self.v14.is_some() {
-            return 14;
-        }
-
-        if self.v15.is_some() {
-            return 15;
-        }
-
-        if self.v16.is_some() {
-            return 16;
-        }
-
-        if self.v17.is_some() {
-            return 17;
-        }
-
-        if self.v18.is_some() {
-            return 18;
-        }
-
-        if self.v19.is_some() {
-            return 19;
-        }
-
-        if self.v20.is_some() {
-            return 20;
-        }
-
-        if self.v21.is_some() {
-            return 21;
-        }
-
-        if self.v22.is_some() {
-            return 22;
-        }
-
-        if self.v23.is_some() {
-            return 23;
-        }
-
-        if self.v24.is_some() {
-            return 24;
-        }
-
-        if self.v25.is_some() {
-            return 25;
-        }
-
-        if self.v26.is_some() {
-            return 26;
-        }
-
-        if self.v27.is_some() {
-            return 27;
-        }
-
-        if self.v28.is_some() {
-            return 28;
-        }
-
-        if self.v29.is_some() {
-            return 29;
-        }
-
-        if self.v30.is_some() {
-            return 30;
-        }
-
-        if self.v31.is_some() {
-            return 31;
-        }
-
-        if self.v32.is_some() {
-            return 32;
-        }
-
-        if self.v33.is_some() {
-            return 33;
-        }
-
-        if self.v34.is_some() {
-            return 34;
-        }
-
-        if self.v35.is_some() {
-            return 35;
-        }
-
-        if self.v36.is_some() {
-            return 36;
-        }
-
-        if self.v37.is_some() {
-            return 37;
-        }
-
-        if self.v38.is_some() {
-            return 38;
-        }
-
-        if self.v39.is_some() {
-            return 39;
-        }
-
-        if self.v40.is_some() {
-            return 40;
-        }
-
-        if self.v41.is_some() {
-            return 41;
-        }
-
-        if self.v42.is_some() {
-            return 42;
-        }
-
-        if self.v43.is_some() {
-            return 43;
-        }
-
-        if self.v44.is_some() {
-            return 44;
-        }
-
-        if self.v45.is_some() {
-            return 45;
-        }
-
-        if self.v46.is_some() {
-            return 46;
-        }
-
-        if self.v47.is_some() {
-            return 47;
-        }
-
-        if self.v48.is_some() {
-            return 48;
-        }
-
-        if self.v49.is_some() {
-            return 49;
-        }
-
-        if self.v50.is_some() {
-            return 50;
-        }
-
-        if self.v51.is_some() {
-            return 51;
-        }
-
-        if self.v52.is_some() {
-            return 52;
-        }
-
-        if self.v53.is_some() {
-            return 53;
-        }
-
-        if self.v54.is_some() {
-            return 54;
-        }
-
-        if self.v55.is_some() {
-            return 55;
-        }
-
-        if self.v56.is_some() {
-            return 56;
-        }
-
-        if self.v57.is_some() {
-            return 57;
-        }
-
-        if self.v58.is_some() {
-            return 58;
-        }
-
-        if self.v59.is_some() {
-            return 59;
-        }
-
-        if self.v60.is_some() {
-            return 60;
-        }
-
-        if self.v61.is_some() {
-            return 61;
-        }
-
-        if self.v62.is_some() {
-            return 62;
+        if self.v64.is_some() {
+            return 64;
         }
 
         if self.v63.is_some() {
             return 63;
         }
 
-        if self.v64.is_some() {
-            return 64;
+        if self.v62.is_some() {
+            return 62;
+        }
+
+        if self.v61.is_some() {
+            return 61;
+        }
+
+        if self.v60.is_some() {
+            return 60;
+        }
+
+        if self.v59.is_some() {
+            return 59;
+        }
+
+        if self.v58.is_some() {
+            return 58;
+        }
+
+        if self.v57.is_some() {
+            return 57;
+        }
+
+        if self.v56.is_some() {
+            return 56;
+        }
+
+        if self.v55.is_some() {
+            return 55;
+        }
+
+        if self.v54.is_some() {
+            return 54;
+        }
+
+        if self.v53.is_some() {
+            return 53;
+        }
+
+        if self.v52.is_some() {
+            return 52;
+        }
+
+        if self.v51.is_some() {
+            return 51;
+        }
+
+        if self.v50.is_some() {
+            return 50;
+        }
+
+        if self.v49.is_some() {
+            return 49;
+        }
+
+        if self.v48.is_some() {
+            return 48;
+        }
+
+        if self.v47.is_some() {
+            return 47;
+        }
+
+        if self.v46.is_some() {
+            return 46;
+        }
+
+        if self.v45.is_some() {
+            return 45;
+        }
+
+        if self.v44.is_some() {
+            return 44;
+        }
+
+        if self.v43.is_some() {
+            return 43;
+        }
+
+        if self.v42.is_some() {
+            return 42;
+        }
+
+        if self.v41.is_some() {
+            return 41;
+        }
+
+        if self.v40.is_some() {
+            return 40;
+        }
+
+        if self.v39.is_some() {
+            return 39;
+        }
+
+        if self.v38.is_some() {
+            return 38;
+        }
+
+        if self.v37.is_some() {
+            return 37;
+        }
+
+        if self.v36.is_some() {
+            return 36;
+        }
+
+        if self.v35.is_some() {
+            return 35;
+        }
+
+        if self.v34.is_some() {
+            return 34;
+        }
+
+        if self.v33.is_some() {
+            return 33;
+        }
+
+        if self.v32.is_some() {
+            return 32;
+        }
+
+        if self.v31.is_some() {
+            return 31;
+        }
+
+        if self.v30.is_some() {
+            return 30;
+        }
+
+        if self.v29.is_some() {
+            return 29;
+        }
+
+        if self.v28.is_some() {
+            return 28;
+        }
+
+        if self.v27.is_some() {
+            return 27;
+        }
+
+        if self.v26.is_some() {
+            return 26;
+        }
+
+        if self.v25.is_some() {
+            return 25;
+        }
+
+        if self.v24.is_some() {
+            return 24;
+        }
+
+        if self.v23.is_some() {
+            return 23;
+        }
+
+        if self.v22.is_some() {
+            return 22;
+        }
+
+        if self.v21.is_some() {
+            return 21;
+        }
+
+        if self.v20.is_some() {
+            return 20;
+        }
+
+        if self.v19.is_some() {
+            return 19;
+        }
+
+        if self.v18.is_some() {
+            return 18;
+        }
+
+        if self.v17.is_some() {
+            return 17;
+        }
+
+        if self.v16.is_some() {
+            return 16;
+        }
+
+        if self.v15.is_some() {
+            return 15;
+        }
+
+        if self.v14.is_some() {
+            return 14;
+        }
+
+        if self.v13.is_some() {
+            return 13;
+        }
+
+        if self.v12.is_some() {
+            return 12;
+        }
+
+        if self.v11.is_some() {
+            return 11;
+        }
+
+        if self.v10.is_some() {
+            return 10;
+        }
+
+        if self.v9.is_some() {
+            return 9;
+        }
+
+        if self.v8.is_some() {
+            return 8;
+        }
+
+        if self.v7.is_some() {
+            return 7;
+        }
+
+        if self.v6.is_some() {
+            return 6;
+        }
+
+        if self.v5.is_some() {
+            return 5;
+        }
+
+        if self.v4.is_some() {
+            return 4;
+        }
+
+        if self.v3.is_some() {
+            return 3;
+        }
+
+        if self.v2.is_some() {
+            return 2;
+        }
+
+        if self.v1.is_some() {
+            return 1;
         }
 
         0

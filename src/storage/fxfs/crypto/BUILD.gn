@@ -12,19 +12,27 @@ rustc_library("crypto") {
   deps = [
     "//sdk/rust/zx-status",
     "//src/storage/fxfs:fxfs_macros",
+    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/fxfs/trace:trace",
+    "//src/storage/fxfs/unicode",
     "//src/storage/type-fprint:fprint",
     "//third_party/rust_crates:aes",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:arbitrary",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:byteorder",
     "//third_party/rust_crates:chacha20",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:rustc-hash",
     "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:siphasher",
     "//third_party/rust_crates:static_assertions",
     "//third_party/rust_crates:zerocopy",
   ]
   sources = [
+    "src/cipher.rs",
+    "src/cipher/fscrypt_ino_lblk32.rs",
+    "src/cipher/fxfs.rs",
     "src/ff1.rs",
     "src/lib.rs",
   ]
@@ -32,7 +40,10 @@ rustc_library("crypto") {
     "//third_party/rust_crates:hex",
     "//third_party/rust_crates:rand",
   ]
-  visibility = [ "//src/storage/fxfs/*" ]
+  visibility = [
+    "//src/storage/f2fs_reader/tests/*",
+    "//src/storage/fxfs/*",
+  ]
 
   # Default optimizations are for size, but that has a noticeable impact on speed.
   if (!is_debug) {

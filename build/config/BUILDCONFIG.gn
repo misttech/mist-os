@@ -179,7 +179,7 @@ if (!defined(toolchain_variant.name)) {
 # Meanwhile "lib/${toolchain_variant.libprefix}" will be used to determine the
 # installation/distirbution destination path of shared libraries.
 #
-# IMPORTANT: KEEP THIS IN SYNC WITH //zircon/system/ulib/c/sysroot_entries.gni
+# IMPORTANT: KEEP THIS IN SYNC WITH //sdk/lib/c/sysroot_entries.gni
 #
 toolchain_variant.libprefix = ""
 if (toolchain_variant.instrumented) {
@@ -1054,7 +1054,46 @@ foreach(_target_type,
       hermetic_toolchain = false
     }
 
-    should_trace = build_should_trace_actions && hermetic_deps
+    if (build_should_trace_actions && hermetic_deps) {
+      if (invoker.script == "//build/gn_run_binary.sh") {
+        _temp_args = invoker.args
+        _actual_binary = get_path_info(_temp_args[1], "file")
+        binaries_safe_to_not_trace = [
+          # Host binaries that we can safely skip action tracing for.
+          "bazel2gn",
+        ]
+        ignored_binary =
+            binaries_safe_to_not_trace !=
+            binaries_safe_to_not_trace + [ _actual_binary ] - [ _actual_binary ]
+        should_trace = !ignored_binary
+      } else {
+        scripts_safe_to_not_trace = [
+          # Any no-op action won't have anything to trace, so it can be skipped.
+          "//build/scripts/no_op.sh",
+
+          # Because the clippy linter is effectively the same as the rust
+          # compiler, and we don't enforce hemeticity on rustc, we also exempt
+          # clippy.
+          "//build/rust/clippy_wrapper.sh",
+
+          # rustdoc writes and reads from an arbitrary tree of files.
+          "//build/rust/rustdoc_wrapper.py",
+
+          # When recursively copying a directory, shutil.copy_tree first
+          # recursively deletes the old files. It has to read directories to
+          # delete all the files in them, and those files aren't listed in the
+          # generated depfile.
+          "//build/copy_tree.py",
+        ]
+
+        ignored_script =
+            scripts_safe_to_not_trace !=
+            scripts_safe_to_not_trace + [ invoker.script ] - [ invoker.script ]
+        should_trace = !ignored_script
+      }
+    } else {
+      should_trace = false
+    }
 
     if (defined(invoker.hermetic_inputs_file)) {
       assert(!defined(invoker.depfile),
@@ -1459,7 +1498,8 @@ foreach(_target_type,
       # Prevent the build output dir path from leaking into the
       # command or its outputs, for cache-ability and consistency
       # across different build environments.
-      if (no_output_dir_leaks && check_output_dir_leaks) {
+      if (no_output_dir_leaks && check_output_dir_leaks &&
+          invoker.script != "//build/scripts/no_op.sh") {
         _args = []
         _args =
             [
@@ -1847,6 +1887,27 @@ declare_args() {
       forward_variables_from(_kasan_variant, "*")
     },
 
+    {
+      configs = [
+        "//build/config/lto",
+        "//build/config/sanitizers:cfi",
+      ]
+      tags = [
+        "lto",
+        "custom-runtime",
+      ]
+    },
+    {
+      configs = [
+        "//build/config/lto:thinlto",
+        "//build/config/sanitizers:cfi",
+      ]
+      tags = [
+        "lto",
+        "custom-runtime",
+      ]
+    },
+
     # Same for 'kasan-sancov' that mimics 'asan-sancov'.
     {
       name = "kasan-sancov"
@@ -1990,6 +2051,24 @@ declare_args() {
       ]
     },
     {
+      name = "kernel_lto-cfi"
+      select_variant = [
+        {
+          kernel = true
+          variant = "lto-cfi"
+        },
+      ]
+    },
+    {
+      name = "kernel_thinlto-cfi"
+      select_variant = [
+        {
+          kernel = true
+          variant = "thinlto-cfi"
+        },
+      ]
+    },
+    {
       # This requests the ubsan variant only for kernel-related things.
       name = "kubsan"
       select_variant = []
@@ -2096,7 +2175,11 @@ declare_args() {
   #
   #     host
   #         [boolean] If true, the selector matches in the host toolchain.
-  #         If false, the selector matches in the target toolchain.
+  #         If false, the selector matches in non-host toolchains.
+  #
+  #     kernel
+  #         [boolean] If true, the selector matches in is_kernel toolchains.
+  #         If false, the selector matches in non-kernel toolchains.
   #
   #     testonly
   #         [boolean] If true, the selector matches targets with testonly=true.
@@ -2632,13 +2715,13 @@ template("variant_target") {
   # files. Please keep them in sync, see:
   #   //build/dist/packaged_shared_library.gni
   #   //build/fuzzing/v1/fuzzer_package.gni
-  #   //zircon/system/ulib/c/libc_toolchain.gni
+  #   //sdk/lib/c/libc_toolchain.gni
   target_variant = false
   excluded_toolchain = false
   if (select_variant_canonical != []) {
     # See if there is a selector that matches this target.
     # IMPORTANT: The selection logic below is replicated in
-    # //zircon/system/ulib/c/libc_toolchain.gni due to specific
+    # //sdk/lib/c/libc_toolchain.gni due to specific
     # sysroot-related requirements. See comments in this file for
     # more details. ALWAYS KEEP THEM IN SYNC!
     selected = false
@@ -2668,6 +2751,10 @@ template("variant_target") {
           # or host_arm64, due to the way it is set above in this file.
           # See https://fxbug.dev/42136023 for details.
           selected = is_host == selector.host
+        }
+
+        if (selected && defined(selector.kernel)) {
+          selected = is_kernel == selector.kernel
         }
 
         if (selected && defined(selector.testonly)) {
@@ -3953,7 +4040,6 @@ template("rust_library") {
                              "applicable_licenses",
                              "metadata",
                              "visibility",
-                             "rust_crate_type",
                              "enable_clippy_first_party",
                              "include_rustdoc_first_party",
                              "original_target_name",

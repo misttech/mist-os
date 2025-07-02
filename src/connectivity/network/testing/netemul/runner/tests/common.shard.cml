@@ -9,7 +9,7 @@
     ],
     use: [
         {
-            protocol: "fuchsia.test.manager.RunBuilder",
+            protocol: [ "fuchsia.test.manager.SuiteRunner" ],
             from: "#test_manager",
         },
     ],

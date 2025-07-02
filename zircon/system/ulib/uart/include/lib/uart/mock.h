@@ -22,8 +22,7 @@
 
 #include "uart.h"
 
-namespace uart {
-namespace mock {
+namespace uart::mock {
 
 // uart::KernelDriver IoProvider API
 //
@@ -260,7 +259,6 @@ struct SyncPolicy {
   static void AssertHeld(mock::Lock& lock) TA_ASSERT(lock) { lock.AssertHeld(); }
 };
 
-}  // namespace mock
-}  // namespace uart
+}  // namespace uart::mock
 
 #endif  // LIB_UART_MOCK_H_

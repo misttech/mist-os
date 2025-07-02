@@ -111,17 +111,13 @@ impl TestService {
 
         let realm = builder.build().await.unwrap();
 
-        let publisher = realm
-            .root
-            .connect_to_protocol_at_exposed_dir::<PublisherMarker>()
-            .context("Connecting to Publisher")?;
-        let discovery = realm
-            .root
-            .connect_to_protocol_at_exposed_dir::<DiscoveryMarker>()
-            .context("Connecting to Discovery")?;
+        let publisher =
+            realm.root.connect_to_protocol_at_exposed_dir().context("Connecting to Publisher")?;
+        let discovery =
+            realm.root.connect_to_protocol_at_exposed_dir().context("Connecting to Discovery")?;
         let observer_discovery = realm
             .root
-            .connect_to_protocol_at_exposed_dir::<ObserverDiscoveryMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .context("Connecting to ObserverDiscovery")?;
         let archive = client::connect_to_protocol::<ArchiveAccessorMarker>()
             .context("Connecting to ArchiveAccessor")?;
@@ -919,10 +915,10 @@ async fn player_paused_before_interruption_is_not_resumed_by_its_end() -> Result
 #[fuchsia::test(logging_tags = ["mediasession_tests"])]
 async fn active_session_initializes_clients_without_player() -> Result<()> {
     let service = TestService::new().await?;
-    let active_session_discovery = service
+    let active_session_discovery: ActiveSessionProxy = service
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<ActiveSessionMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("Connecting to Active Session service")?;
 
     let session = active_session_discovery
@@ -939,10 +935,10 @@ async fn active_session_initializes_clients_with_idle_player() -> Result<()> {
     let service = TestService::new().await?;
     let mut player = TestPlayer::new(&service).await?;
     let mut watcher = service.new_watcher(Default::default())?;
-    let active_session_discovery = service
+    let active_session_discovery: ActiveSessionProxy = service
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<ActiveSessionMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("Connecting to Active Session service")?;
 
     player.emit_delta(delta_with_state(PlayerState::Idle)).await?;
@@ -962,10 +958,10 @@ async fn active_session_initializes_clients_with_active_player() -> Result<()> {
     let service = TestService::new().await?;
     let mut player = TestPlayer::new(&service).await?;
     let mut watcher = service.new_watcher(Default::default())?;
-    let active_session_discovery = service
+    let active_session_discovery: ActiveSessionProxy = service
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<ActiveSessionMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("Connecting to Active Session service")?;
 
     player.emit_delta(delta_with_state(PlayerState::Playing)).await?;
@@ -995,10 +991,10 @@ async fn active_session_initializes_clients_with_active_player() -> Result<()> {
 async fn active_session_falls_back_when_session_removed() -> Result<()> {
     let service = TestService::new().await?;
     let mut watcher = service.new_watcher(Default::default())?;
-    let active_session_discovery = service
+    let active_session_discovery: ActiveSessionProxy = service
         .realm
         .root
-        .connect_to_protocol_at_exposed_dir::<ActiveSessionMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .context("Connecting to Active Session service")?;
 
     let mut player1 = TestPlayer::new(&service).await?;

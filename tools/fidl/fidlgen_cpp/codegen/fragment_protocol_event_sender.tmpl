@@ -74,7 +74,7 @@ class {{ .WireBufferEventSender }}
 ::fidl::OneWayStatus {{ $.WireWeakEventSender.NoLeading }}::{{ .Name }}(
     {{- RenderParams .ResponseArgs }}) {
   {{ .WireTransactionalEvent }} _response{ {{- RenderForwardParams .ResponseArgs }} };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<{{ .WireTransactionalEvent }}, {{ .Transport.Type }}> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };
@@ -104,7 +104,7 @@ fidl::OneWayStatus {{ $.WireWeakBufferEventSender.NoLeading }}::{{ .Name }}(
 fidl::OneWayStatus {{ $.WireEventSender.NoLeading }}::{{ .Name }}(
     {{- RenderParams .ResponseArgs }}) {
   {{ .WireTransactionalEvent }} _response{ {{- RenderForwardParams .ResponseArgs }} };
-  FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+  __UNINITIALIZED
   ::fidl::internal::OwnedEncodedMessage<{{ .WireTransactionalEvent }}, {{ .Transport.Type }}> _response_message{
       ::fidl::internal::AllowUnownedInputRef{}, &_response
   };

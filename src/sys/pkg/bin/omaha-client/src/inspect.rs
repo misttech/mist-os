@@ -259,8 +259,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_apps_node() {
+    #[fuchsia::test]
+    async fn test_apps_node() {
         let inspector = Inspector::default();
         let node = AppsNode::new(inspector.root().create_child("apps"));
         let app =
@@ -280,8 +280,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_state_node() {
+    #[fuchsia::test]
+    async fn test_state_node() {
         let inspector = Inspector::default();
         let node = StateNode::new(inspector.root().create_child("state"));
         let state = State {
@@ -302,8 +302,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_schedule_node() {
+    #[fuchsia::test]
+    async fn test_schedule_node() {
         let inspector = Inspector::default();
         let node = ScheduleNode::new(inspector.root().create_child("schedule"));
         let schedule = UpdateCheckSchedule::default();
@@ -319,8 +319,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_protocol_state_node() {
+    #[fuchsia::test]
+    async fn test_protocol_state_node() {
         let inspector = Inspector::default();
         let node = ProtocolStateNode::new(inspector.root().create_child("protocol_state"));
         let protocol_state = ProtocolState::default();
@@ -336,8 +336,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_last_results_node() {
+    #[fuchsia::test]
+    async fn test_last_results_node() {
         let inspector = Inspector::default();
         let mut node = LastResultsNode::new(inspector.root().create_child("last_results"));
         let result = Ok(update_check::Response {

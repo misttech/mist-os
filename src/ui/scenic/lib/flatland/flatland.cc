@@ -474,6 +474,8 @@ void Flatland::Present(fuchsia_ui_composition::PresentArgs args) {
   }
 
   uber_struct->debug_name = debug_name_;
+  const zx::time_monotonic now(async_now(dispatcher()));
+  uber_struct->creation_time = now;
 
   // Obtain the PresentId which is needed to:
   // - enqueue the UberStruct.
@@ -484,8 +486,7 @@ void Flatland::Present(fuchsia_ui_composition::PresentArgs args) {
   FLATLAND_VERBOSE_LOG << "Flatland::Present() session_id=" << session_id_
                        << "  present_count=" << present_count_ << "  present_id=" << present_id;
 
-  present2_helper_.RegisterPresent(present_id,
-                                   /*present_received_time=*/zx::time(async_now(dispatcher())));
+  present2_helper_.RegisterPresent(present_id, /*present_received_time=*/now);
 
   // TODO(https://fxbug.dev/414450649): remove this, since it is a subset of the
   // `scenic_session_present` flow.  This will require updating trace-processing scripts.

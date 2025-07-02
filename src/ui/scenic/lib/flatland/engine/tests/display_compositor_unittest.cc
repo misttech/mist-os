@@ -945,7 +945,7 @@ TEST_F(DisplayCompositorTest, VsyncConfigStampAreProcessed) {
       .WillRepeatedly(
           testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
                               MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
-            completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
+            completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk);
           }));
 
   static constexpr fuchsia_hardware_display::wire::ConfigStamp kConfigStamp1(1);
@@ -1216,7 +1216,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
       .Times(1)
       .WillOnce(testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
                                     MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
-        completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
+        completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk);
       }));
 
   EXPECT_CALL(*renderer_, ChoosePreferredRenderTargetFormat(_));
@@ -1417,7 +1417,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
       .Times(1)
       .WillOnce(testing::Invoke([&](fuchsia_hardware_display::wire::CoordinatorCheckConfigRequest*,
                                     MockDisplayCoordinator::CheckConfigCompleter::Sync& completer) {
-        completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk, {});
+        completer.Reply(fuchsia_hardware_display_types::wire::ConfigResult::kOk);
       }));
 
   EXPECT_CALL(*renderer_, ChoosePreferredRenderTargetFormat(_));

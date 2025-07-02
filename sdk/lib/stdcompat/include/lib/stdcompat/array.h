@@ -22,16 +22,16 @@ using std::to_array;
 
 #else  // Provide to_array polyfill.
 
-template <class T, std::size_t N,
-          typename std::enable_if_t<!cpp17::is_array_v<T> && cpp17::is_copy_constructible_v<T>,
-                                    bool> = true>
+template <
+    class T, std::size_t N,
+    typename std::enable_if_t<!std::is_array_v<T> && std::is_copy_constructible_v<T>, bool> = true>
 constexpr std::array<std::remove_cv_t<T>, N> to_array(T (&a)[N]) {
   return internal::to_array(a, std::make_index_sequence<N>());
 }
 
-template <class T, std::size_t N,
-          typename std::enable_if_t<!cpp17::is_array_v<T> && cpp17::is_move_constructible_v<T>,
-                                    bool> = true>
+template <
+    class T, std::size_t N,
+    typename std::enable_if_t<!std::is_array_v<T> && std::is_move_constructible_v<T>, bool> = true>
 constexpr std::array<std::remove_cv_t<T>, N> to_array(T (&&a)[N]) {
   return internal::to_array(std::move(a), std::make_index_sequence<N>());
 }

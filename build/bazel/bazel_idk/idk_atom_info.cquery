@@ -1,0 +1,52 @@
+# Copyright 2025 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+def _format(target):
+    """Returns lines containing formatted information about the atom.
+ It is only for debugging and demonstration purposes.
+Example use:
+    fx bazel cquery build/bazel/bazel_idk/tests:test-source-set_idk --output=starlark --starlark:file=build/bazel/bazel_idk/idk_atom_info.cquery
+"""
+
+    atom_info = providers(target)["//build/bazel/bazel_idk:defs.bzl%FuchsiaIdkAtomInfo"]
+
+    lines = [
+        atom_info.label.name + " definition:",
+        "idk_name: " + atom_info.idk_name,
+        "id: " + atom_info.id,
+        "meta_dest:" + atom_info.meta_dest,
+        "type: " + atom_info.type,
+        "category: " + atom_info.category,
+        "is_stable: " + str(atom_info.is_stable),
+        "api_area: " + atom_info.api_area,
+        "api_file_path: " + atom_info.api_file_path,
+        "api_contents: " + str(atom_info.api_contents),
+        "atom_files: " + str(atom_info.atom_files),
+    ]
+
+    if atom_info.idk_deps:
+        lines += ["Direct IDK Dependencies: "]
+        lines += ["\t" + dep.label.name for dep in atom_info.idk_deps]
+    if atom_info.atoms_depset:
+        lines += ["Atom Dependencies (including indirect): "]
+        lines += ["\t" + dep.label.name for dep in atom_info.atoms_depset.to_list()]
+    if atom_info.build_deps:
+        lines += ["Non-IDK Dependencies: "]
+        lines += ["\t" + dep.label.name for dep in atom_info.build_deps]
+
+    if atom_info.additional_prebuild_info:
+        lines += ["additional prebuild info: " + str(atom_info.additional_prebuild_info)]
+
+    # Print some common additional prebuild info fields.
+    if "headers" in atom_info.additional_prebuild_info:
+        lines += ["headers: " + str(atom_info.additional_prebuild_info["headers"])]
+    if "sources" in atom_info.additional_prebuild_info:
+        lines += ["sources: " + str(atom_info.additional_prebuild_info["sources"])]
+
+
+    # Indent all lines except the first.
+    return "\n\t".join(lines)
+
+def format(target):
+    return _format(target)

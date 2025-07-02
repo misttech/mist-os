@@ -87,16 +87,48 @@ int main(int argc, const char* const* argv) {
   fs::SynchronousVfs vfs(loop.dispatcher());
   auto root = fbl::MakeRefCounted<fs::PseudoDir>();
 
-  // Add a dev directory that the loader can watch for devices to be added.
+  FakeMagmaDevice magma_device(loop.dispatcher());
+  {
+    // Add a svc directory that the loader can watch for devices to be added.
+    auto svc_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+    zx_status_t status = root->AddEntry("svc", svc_dir);
+    ZX_ASSERT_MSG(status == ZX_OK, "Failed to add /svc: %s", zx_status_get_string(status));
+
+    auto magma_service_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+    svc_dir->AddEntry("fuchsia.gpu.magma.Service", magma_service_dir);
+
+    auto service_instance_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+    magma_service_dir->AddEntry("some-instance-name", service_instance_dir);
+
+    status = service_instance_dir->AddEntry(
+        "device", fbl::MakeRefCounted<fs::Service>(magma_device.ProtocolConnector()));
+    ZX_ASSERT_MSG(status == ZX_OK, "Failed to add service: %s", zx_status_get_string(status));
+
+    auto trusted_magma_service_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+    svc_dir->AddEntry("fuchsia.gpu.magma.TrustedService", trusted_magma_service_dir);
+
+    auto trusted_service_instance_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+    trusted_magma_service_dir->AddEntry("some-instance-name", trusted_service_instance_dir);
+
+    status = trusted_service_instance_dir->AddEntry(
+        "device", fbl::MakeRefCounted<fs::Service>(magma_device.ProtocolConnector()));
+    ZX_ASSERT_MSG(status == ZX_OK, "Failed to add trusted service: %s",
+                  zx_status_get_string(status));
+  }
+
   auto dev_gpu_dir = fbl::MakeRefCounted<fs::PseudoDir>();
   root->AddEntry("dev-gpu", dev_gpu_dir);
-  FakeMagmaDevice magma_device(loop.dispatcher());
-  zx_status_t status = dev_gpu_dir->AddEntry(
-      "000", fbl::MakeRefCounted<fs::Service>(magma_device.ProtocolConnector()));
-  ZX_ASSERT_MSG(status == ZX_OK, "Failed to add device: %s", zx_status_get_string(status));
+
+  // TODO(b/419087951) - remove
+  FakeMagmaDevice devfs_magma_device(loop.dispatcher());
+  {
+    zx_status_t status = dev_gpu_dir->AddEntry(
+        "000", fbl::MakeRefCounted<fs::Service>(devfs_magma_device.ProtocolConnector()));
+    ZX_ASSERT_MSG(status == ZX_OK, "Failed to add device: %s", zx_status_get_string(status));
+  }
 
   auto dev_goldfish_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-  status = root->AddEntry("dev-goldfish-pipe", dev_goldfish_dir);
+  zx_status_t status = root->AddEntry("dev-goldfish-pipe", dev_goldfish_dir);
   ZX_ASSERT_MSG(status == ZX_OK, "Failed to add goldfish pipe: %s", zx_status_get_string(status));
 
   auto dev_dir = fbl::MakeRefCounted<fs::PseudoDir>();

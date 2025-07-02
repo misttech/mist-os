@@ -112,7 +112,7 @@ void MsdVsiContext::Kill() {
   }
 }
 
-magma_status_t MsdVsiAbiContext::ExecuteCommandBufferWithResources(
+magma_status_t MsdVsiAbiContext::MsdExecuteCommandBufferWithResources(
     msd::magma_command_buffer* cmd_buf, magma_exec_resource* exec_resources, msd::Buffer** buffers,
     msd::Semaphore** wait_semaphores, msd::Semaphore** signal_semaphores) {
   if (cmd_buf->flags) {

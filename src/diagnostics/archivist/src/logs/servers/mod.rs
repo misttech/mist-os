@@ -3,10 +3,13 @@
 // found in the LICENSE file.
 
 mod log;
+mod log_freeze;
 mod log_settings;
 mod log_stream;
 
 pub use log::LogServer;
+pub use log_freeze::LogFreezeServer;
 pub use log_settings::LogSettingsServer;
 pub use log_stream::LogStreamServer;
+
 pub(crate) use log_stream::{extend_fxt_record, ExtendRecordOpts};

@@ -51,7 +51,8 @@ impl Summary {
         Ok(())
     }
 
-    /// Merge `Summary` into self.
+    /// Merges `other` into self. This is used for merging test and postprocessor summaries
+    /// into the aggregate summary.
     fn merge(&mut self, other: Summary) {
         self.common.merge(other.common);
         for (other_case_name, other_case) in other.cases {
@@ -75,6 +76,8 @@ pub struct SummaryCase {
 }
 
 impl SummaryCase {
+    /// Merges `other` into self. This is used for merging test and postprocessor summaries
+    /// into the aggregate summary.
     fn merge(&mut self, other: SummaryCase) {
         self.common.merge(other.common);
     }
@@ -87,7 +90,7 @@ pub struct SummaryCommonProperties {
     #[serde(skip_serializing_if = "is_zero")]
     pub duration: i64,
 
-    pub outcome: String,
+    pub outcome: SummaryOutcome,
 
     #[serde(default)]
     #[serde(skip_serializing_if = "HashMap::is_empty")]
@@ -98,14 +101,14 @@ pub struct SummaryCommonProperties {
 }
 
 impl SummaryCommonProperties {
+    /// Merges `other` into self. This is used for merging test and postprocessor summaries
+    /// into the aggregate summary.
     fn merge(&mut self, other: SummaryCommonProperties) {
         if other.duration != 0 {
             self.duration = other.duration;
         }
 
-        if !other.outcome.is_empty() {
-            self.outcome = other.outcome;
-        }
+        self.outcome.merge(other.outcome);
 
         for (other_artifact_name, other_artifact_properties) in other.artifacts {
             match &mut self.artifacts.get_mut(&other_artifact_name) {
@@ -124,6 +127,120 @@ impl SummaryCommonProperties {
     }
 }
 
+/// Expresses the outcome of a test or test case run.
+#[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
+pub struct SummaryOutcome {
+    /// General result of the test run. The result of a test that has one
+    /// or more cases should typically be the maximum of the results of
+    /// the cases.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "is_not_specified")]
+    result: SummaryOutcomeResult,
+
+    /// Optional details describing the outcome, used primarily to
+    /// describe `Failed` and `Error` outcomes. The format of this field
+    /// is not constrained by the ABI. The intent of this field is to offer
+    /// a brief description of the problem for the purposes of triage,
+    /// debugging, and classification of failures and errors.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
+}
+
+impl SummaryOutcome {
+    /// Merges `other` into self. This is used for merging test and postprocessor summaries
+    /// into the aggregate summary.
+    fn merge(&mut self, other: SummaryOutcome) {
+        if other.result != SummaryOutcomeResult::NotSpecified {
+            // If other has a specified result, the merge changes self to equal other.
+            self.result = other.result;
+            self.detail = other.detail;
+        } else if other.detail.is_some() {
+            // Otherwise, if other has detail, the merge changes self's detail to match other's.
+            self.detail = other.detail;
+        }
+    }
+}
+
+/// Summarizes the outcome of a test or test case run.
+///
+/// In general, the result of a test that has many cases will be the
+/// maximum of the results of the cases. This constrains the ordering of
+/// these values.
+#[derive(Serialize, Deserialize, Debug, Default, Copy, Clone, PartialEq)]
+#[repr(u8)]
+pub enum SummaryOutcomeResult {
+    /// Default result value used when a test or postprocessor summary does
+    /// not wish to specify an outcome result. This value must never appear
+    /// in an aggregate summary.
+    #[default]
+    NotSpecified = 0x00,
+
+    /// Regarding a case, the case was not fully executed, because the
+    /// test configuration specified that it should be skipped or because
+    /// the case explicitly requested that it be skipped. In the latter
+    /// case, the detail associated with this result might give the reason
+    /// that the case was skipped.
+    ///
+    /// Regarding a test, all cases in the test were skipped.
+    #[serde(rename = "skipped")]
+    Skipped = 0x10,
+
+    /// Regarding a case, the case was executed as requested and passed.
+    ///
+    /// Regarding a test, at least one case passed, and all others passed
+    /// or were skipped.
+    #[serde(rename = "passed")]
+    Passed = 0x20,
+
+    /// Regarding a case, the case was not executed to completion as
+    /// requested, because test execution was terminated early. This can
+    /// occur if the client requests early termination or if the
+    /// configuration specifies something like 'break on failure'.
+    ///
+    /// Regarding a test, at least one case was canceled, and all others
+    /// either were canceled, passed or were skipped.
+    #[serde(rename = "canceled")]
+    Canceled = 0x30,
+
+    /// Regarding a case, the case was executed as requested but did not
+    /// terminate before the timeout interval for the case or overall test
+    /// elapsed.
+    ///
+    /// Regarding a test, at least one case timed out, and all others either
+    /// timed out, were canceled, passed, or were skipped. Alternatively,
+    /// this value may be used if a timeout applied to the overall test
+    /// run expired.
+    #[serde(rename = "timed_out")]
+    TimedOut = 0x40,
+
+    /// Regarding a case, the case was executed as requested and failed.
+    /// Failed outcomes typically include a non-empty `detail` field,
+    /// formatted in a manner that is specific to the case. That format
+    /// is not defined by the test ABI.
+    ///
+    /// Regarding a test, at least one case failed, and all others either
+    /// failed, timed out, were canceled, passed, or were skipped. Failed
+    /// test outcomes typically aggregate the details of all the failed
+    /// cases.
+    #[serde(rename = "failed")]
+    Failed = 0x50,
+
+    /// Regarding a case, the case was not executed as requested due to
+    /// an error. This can occur due to resource or connectivity problems
+    /// or due to a bug in the test framework implementation. The associated
+    /// string is in a format that is specific to the test framework
+    /// implementation and is not part of the test ABI.
+    ///
+    /// Regarding a test, at least one case resulted in an error result or
+    /// an error that interfered with the execution of the test occurred
+    /// outside the context of any given case. Typically, error results for
+    /// a test are accompanied by a detail string indicating the nature of
+    /// the error.
+    #[serde(rename = "error")]
+    Error = 0x60,
+}
+
 #[derive(Serialize, Deserialize, Debug, Default, Clone, PartialEq)]
 pub struct SummaryArtifact {
     #[serde(rename = "type")]
@@ -131,6 +248,8 @@ pub struct SummaryArtifact {
 }
 
 impl SummaryArtifact {
+    /// Merges `other` into self. This is used for merging test and postprocessor summaries
+    /// into the aggregate summary.
     fn merge(&mut self, other: SummaryArtifact) {
         if !other.artifact_type.is_empty() {
             self.artifact_type = other.artifact_type;
@@ -142,11 +261,16 @@ fn is_zero(to_test: &i64) -> bool {
     *to_test == 0
 }
 
+fn is_not_specified(to_test: &SummaryOutcomeResult) -> bool {
+    *to_test == SummaryOutcomeResult::NotSpecified
+}
+
+const TEST_SUBDIR: &str = "test";
 const EXECUTION_LOG_FILE_PATH: &str = "execution_log.json";
 const TEST_CONFIG_FILE_PATH: &str = "test_config.json";
-const TEST_OUTPUT_SUMMARY_FILE_PATH: &str = "test_output_summary.json";
-const TEST_STDOUT_FILE_PATH: &str = "host_binary_stdout.txt";
-const TEST_STDERR_FILE_PATH: &str = "host_binary_stderr.txt";
+const OUTPUT_SUMMARY_FILE_PATH: &str = "output_summary.json";
+const STDOUT_FILE_PATH: &str = "stdout.txt";
+const STDERR_FILE_PATH: &str = "stderr.txt";
 
 /// Creates path values based on output directory structure.
 pub struct OutputDirectory<'a> {
@@ -159,25 +283,19 @@ impl<'a> OutputDirectory<'a> {
         Self { path }
     }
 
+    /// Returns the full path of the execution log.
+    pub fn execution_log(&self) -> PathBuf {
+        self.path.join(EXECUTION_LOG_FILE_PATH)
+    }
+
     /// Returns the full path of the main summary.
     pub fn main_summary(&self) -> PathBuf {
-        self.path.join(TEST_OUTPUT_SUMMARY_FILE_PATH)
+        self.path.join(OUTPUT_SUMMARY_FILE_PATH)
     }
 
-    /// Returns the full path of the summary in a specified subdirectory.
-    pub fn subdir_summary(&self, subdir: &str) -> PathBuf {
-        self.path.join(subdir).join(TEST_OUTPUT_SUMMARY_FILE_PATH)
-    }
-
-    /// Returns the full path of the summary for a specified postprocessor.
-    pub fn postprocessor_summary(&self, binary: &PathBuf) -> PathBuf {
-        self.subdir_summary(
-            binary
-                .file_name()
-                .expect("binary path has file name")
-                .to_str()
-                .expect("file name is ansi"),
-        )
+    /// Returns the full path of the summary generated by the test.
+    pub fn test_summary(&self) -> PathBuf {
+        self.subdir_file(TEST_SUBDIR, OUTPUT_SUMMARY_FILE_PATH)
     }
 
     /// Returns the full path of the test configuration.
@@ -187,47 +305,43 @@ impl<'a> OutputDirectory<'a> {
 
     /// Returns the full path of the test's stdout file.
     pub fn test_stdout(&self) -> PathBuf {
-        self.path.join(TEST_STDOUT_FILE_PATH)
+        self.subdir_file(TEST_SUBDIR, STDOUT_FILE_PATH)
     }
 
     /// Returns the full path of the test's stderr file.
     pub fn test_stderr(&self) -> PathBuf {
-        self.path.join(TEST_STDERR_FILE_PATH)
+        self.subdir_file(TEST_SUBDIR, STDERR_FILE_PATH)
+    }
+
+    /// Returns the full path of the summary for a specified postprocessor.
+    pub fn postprocessor_summary(&self, binary: &PathBuf) -> PathBuf {
+        self.subdir_file(postprocessor_name(binary), OUTPUT_SUMMARY_FILE_PATH)
     }
 
     /// Returns the full path of a post-processor's stdout file.
     pub fn postprocessor_stdout(&self, binary: &PathBuf) -> PathBuf {
-        self.path.join(format!(
-            "{}_stdout.txt",
-            binary
-                .file_name()
-                .expect("binary path has file name")
-                .to_str()
-                .expect("file name is ansi")
-        ))
+        self.subdir_file(postprocessor_name(binary), STDOUT_FILE_PATH)
     }
 
     /// Returns the full path of a post-processor's stderr file.
     pub fn postprocessor_stderr(&self, binary: &PathBuf) -> PathBuf {
-        self.path.join(format!(
-            "{}_stderr.txt",
-            binary
-                .file_name()
-                .expect("binary path has file name")
-                .to_str()
-                .expect("file name is ansi")
-        ))
-    }
-
-    /// Returns the full path of the execution log.
-    pub fn execution_log(&self) -> PathBuf {
-        self.path.join(EXECUTION_LOG_FILE_PATH)
+        self.subdir_file(postprocessor_name(binary), STDERR_FILE_PATH)
     }
 
     /// Converts a full path into a path relative to the output directory.
     pub fn make_relative(&self, path: &PathBuf) -> Option<PathBuf> {
         path.strip_prefix(self.path).ok().map(|p| p.to_path_buf())
     }
+
+    /// Returns the full path of a specified file in a subdirectory.
+    fn subdir_file(&self, subdir: &str, file: &str) -> PathBuf {
+        self.path.join(subdir).join(file)
+    }
+}
+
+/// Returns the name of a postprocessor subdirectory given a path to the postprocessor's binary.
+fn postprocessor_name<'b>(binary: &'b PathBuf) -> &'b str {
+    binary.file_name().expect("binary path has file name").to_str().expect("file name is ansi")
 }
 
 /// Determines whether `exit_status` indicates the test run ran correctly, but the test itself
@@ -237,11 +351,14 @@ pub fn is_fail_exit_status(exit_status: std::process::ExitStatus) -> bool {
 }
 
 /// Returns an outcome string from an exit status.
-pub fn outcome_from_exit_status(exit_status: std::process::ExitStatus) -> &'static str {
+pub fn outcome_from_exit_status(exit_status: std::process::ExitStatus) -> SummaryOutcome {
     match exit_status.into_raw() {
-        0 => "PASSED",
-        FAIL_EXIT_STATUS => "FAILED",
-        _ => "INTERNAL_ERROR",
+        0 => SummaryOutcome { result: SummaryOutcomeResult::Passed, detail: None },
+        FAIL_EXIT_STATUS => SummaryOutcome { result: SummaryOutcomeResult::Failed, detail: None },
+        status => SummaryOutcome {
+            result: SummaryOutcomeResult::Error,
+            detail: Some(format!("test binary failed with exit status {status}")),
+        },
     }
 }
 
@@ -254,6 +371,19 @@ mod tests {
     use std::process::ExitStatus;
     use tempfile::tempdir;
 
+    fn outcome(result: SummaryOutcomeResult, detail: &str) -> SummaryOutcome {
+        SummaryOutcome { result, detail: Some(String::from(detail)) }
+    }
+
+    fn case(result: SummaryOutcomeResult, detail: &str) -> SummaryCase {
+        SummaryCase {
+            common: SummaryCommonProperties {
+                outcome: outcome(result, detail),
+                ..Default::default()
+            },
+        }
+    }
+
     fn artifact(artifact_type: &str) -> SummaryArtifact {
         SummaryArtifact { artifact_type: String::from(artifact_type) }
     }
@@ -262,7 +392,7 @@ mod tests {
     fn test_merge_common_properties() {
         let mut under_test = SummaryCommonProperties {
             duration: 1,
-            outcome: String::from("test outcome a"),
+            outcome: outcome(SummaryOutcomeResult::Failed, "test outcome a"),
             artifacts: [
                 (PathBuf::from("a"), artifact("a_type")),
                 (PathBuf::from("b"), artifact("b_type")),
@@ -279,7 +409,7 @@ mod tests {
         // Existing artifacts with non-trivial values get updated.
         under_test.merge(SummaryCommonProperties {
             duration: 3,
-            outcome: String::from("test outcome b"),
+            outcome: outcome(SummaryOutcomeResult::Failed, "test outcome b"),
             artifacts: [
                 (PathBuf::from("a"), artifact("new_a_type")),
                 (PathBuf::from("c"), artifact("c_type")),
@@ -295,7 +425,7 @@ mod tests {
             under_test,
             SummaryCommonProperties {
                 duration: 3,
-                outcome: String::from("test outcome b"),
+                outcome: outcome(SummaryOutcomeResult::Failed, "test outcome b"),
                 artifacts: [
                     (PathBuf::from("a"), artifact("new_a_type")),
                     (PathBuf::from("b"), artifact("b_type")),
@@ -315,7 +445,7 @@ mod tests {
         // values from argument are not copied.
         under_test.merge(SummaryCommonProperties {
             duration: 0,
-            outcome: String::from(""),
+            outcome: outcome(SummaryOutcomeResult::NotSpecified, "test outcome c"),
             artifacts: [(PathBuf::from("a"), artifact(""))].into(),
             extension: HashMap::new(),
         });
@@ -323,7 +453,7 @@ mod tests {
             under_test,
             SummaryCommonProperties {
                 duration: 3,
-                outcome: String::from("test outcome b"),
+                outcome: outcome(SummaryOutcomeResult::Failed, "test outcome c"),
                 artifacts: [
                     (PathBuf::from("a"), artifact("new_a_type")),
                     (PathBuf::from("b"), artifact("b_type")),
@@ -340,22 +470,13 @@ mod tests {
         );
     }
 
-    fn case(outcome: &str) -> SummaryCase {
-        SummaryCase {
-            common: SummaryCommonProperties {
-                outcome: String::from(outcome),
-                ..Default::default()
-            },
-        }
-    }
-
     #[fuchsia::test]
     fn test_merge_cases() {
         let mut under_test = Summary {
             common: SummaryCommonProperties::default(),
             cases: [
-                (String::from("case_a"), case("case_a_outcome")),
-                (String::from("case_b"), case("case_b_outcome")),
+                (String::from("case_a"), case(SummaryOutcomeResult::Failed, "case_a_outcome")),
+                (String::from("case_b"), case(SummaryOutcomeResult::Failed, "case_b_outcome")),
             ]
             .into(),
         };
@@ -365,8 +486,8 @@ mod tests {
         under_test.merge(Summary {
             common: SummaryCommonProperties::default(),
             cases: [
-                (String::from("case_a"), case("case_a_new_outcome")),
-                (String::from("case_c"), case("case_c_outcome")),
+                (String::from("case_a"), case(SummaryOutcomeResult::Failed, "case_a_new_outcome")),
+                (String::from("case_c"), case(SummaryOutcomeResult::Failed, "case_c_outcome")),
             ]
             .into(),
         });
@@ -375,9 +496,12 @@ mod tests {
             Summary {
                 common: SummaryCommonProperties::default(),
                 cases: [
-                    (String::from("case_a"), case("case_a_new_outcome")),
-                    (String::from("case_b"), case("case_b_outcome")),
-                    (String::from("case_c"), case("case_c_outcome")),
+                    (
+                        String::from("case_a"),
+                        case(SummaryOutcomeResult::Failed, "case_a_new_outcome")
+                    ),
+                    (String::from("case_b"), case(SummaryOutcomeResult::Failed, "case_b_outcome")),
+                    (String::from("case_c"), case(SummaryOutcomeResult::Failed, "case_c_outcome")),
                 ]
                 .into()
             }
@@ -385,10 +509,75 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn test_merge_outcomes() {
+        let results = [
+            SummaryOutcomeResult::NotSpecified,
+            SummaryOutcomeResult::Skipped,
+            SummaryOutcomeResult::Passed,
+            SummaryOutcomeResult::Canceled,
+            SummaryOutcomeResult::TimedOut,
+            SummaryOutcomeResult::Failed,
+            SummaryOutcomeResult::Error,
+        ];
+        let specified_results = [
+            SummaryOutcomeResult::Skipped,
+            SummaryOutcomeResult::Passed,
+            SummaryOutcomeResult::Canceled,
+            SummaryOutcomeResult::TimedOut,
+            SummaryOutcomeResult::Failed,
+            SummaryOutcomeResult::Error,
+        ];
+
+        // When other is unspecified, merging leaves self unchanged.
+        for result in &results {
+            let mut under_test = outcome(result.clone(), "self");
+            under_test
+                .merge(SummaryOutcome { result: SummaryOutcomeResult::NotSpecified, detail: None });
+            assert_eq!(under_test, outcome(result.clone(), "self"));
+        }
+
+        // When other's result is specified, merging changes self to equal other.
+        for self_result in &results {
+            for other_result in &specified_results {
+                let mut under_test = outcome(self_result.clone(), "self");
+                let other = outcome(other_result.clone(), "other");
+                under_test.merge(other.clone());
+                assert_eq!(under_test, other);
+
+                // ...even if other's detail is_none.
+                let mut under_test = outcome(self_result.clone(), "self");
+                let other = SummaryOutcome { result: other_result.clone(), detail: None };
+                under_test.merge(other.clone());
+                assert_eq!(under_test, other);
+            }
+        }
+
+        // When other's result is unspecified but details is_some, merging changes self's detail
+        // to equal other's.
+        for result in &results {
+            let mut under_test = outcome(result.clone(), "self");
+            under_test.merge(outcome(SummaryOutcomeResult::NotSpecified, "other"));
+            assert_eq!(under_test, outcome(result.clone(), "other"));
+        }
+    }
+
+    #[fuchsia::test]
     fn test_outcome_from_exit_status() {
-        assert_eq!(outcome_from_exit_status(ExitStatus::from_raw(0)), "PASSED");
-        assert_eq!(outcome_from_exit_status(ExitStatus::from_raw(FAIL_EXIT_STATUS)), "FAILED");
-        assert_eq!(outcome_from_exit_status(ExitStatus::from_raw(1)), "INTERNAL_ERROR");
+        assert_eq!(
+            outcome_from_exit_status(ExitStatus::from_raw(0)),
+            SummaryOutcome { result: SummaryOutcomeResult::Passed, detail: None }
+        );
+        assert_eq!(
+            outcome_from_exit_status(ExitStatus::from_raw(FAIL_EXIT_STATUS)),
+            SummaryOutcome { result: SummaryOutcomeResult::Failed, detail: None }
+        );
+        assert_eq!(
+            outcome_from_exit_status(ExitStatus::from_raw(1)),
+            SummaryOutcome {
+                result: SummaryOutcomeResult::Error,
+                detail: Some(String::from("test binary failed with exit status 1"))
+            }
+        );
     }
 
     #[fuchsia::test]
@@ -396,7 +585,7 @@ mod tests {
         let under_test = Summary {
             common: SummaryCommonProperties {
                 duration: 3,
-                outcome: String::from("test outcome b"),
+                outcome: outcome(SummaryOutcomeResult::Failed, "test outcome b"),
                 artifacts: [
                     (PathBuf::from("a"), artifact("a_type")),
                     (PathBuf::from("b"), artifact("b_type")),
@@ -411,8 +600,8 @@ mod tests {
                 .into(),
             },
             cases: [
-                (String::from("case_a"), case("case_a_outcome")),
-                (String::from("case_b"), case("case_b_outcome")),
+                (String::from("case_a"), case(SummaryOutcomeResult::Failed, "case_a_outcome")),
+                (String::from("case_b"), case(SummaryOutcomeResult::Failed, "case_b_outcome")),
             ]
             .into(),
         };
@@ -434,11 +623,11 @@ mod tests {
                     "c": {"type": "c_type"}
                 },
                 "cases": {
-                    "case_a": {"outcome": "case_a_outcome"},
-                    "case_b": {"outcome": "case_b_outcome"}
+                    "case_a": {"outcome": {"result": "failed", "detail": "case_a_outcome"}},
+                    "case_b": {"outcome": {"result": "failed", "detail": "case_b_outcome"}}
                 },
                 "duration": 3,
-                "outcome": "test outcome b",
+                "outcome": {"result": "failed", "detail": "test outcome b"},
                 "x": "x_value",
                 "y": "y_value",
                 "z": "z_value"
@@ -472,11 +661,11 @@ mod tests {
                     "c": {"type": "c_type"}
                 },
                 "cases": {
-                    "case_a": {"outcome": "case_a_outcome"},
-                    "case_b": {"outcome": "case_b_outcome"}
+                    "case_a": {"outcome": {"result": "failed", "detail": "case_a_outcome"}},
+                    "case_b": {"outcome": {"result": "failed", "detail": "case_b_outcome"}}
                 },
                 "duration": 3,
-                "outcome": "test outcome b",
+                "outcome": {"result": "failed", "detail": "test outcome b"},
                 "x": "x_value",
                 "y": "y_value",
                 "z": "z_value"
@@ -491,7 +680,7 @@ mod tests {
             Summary {
                 common: SummaryCommonProperties {
                     duration: 3,
-                    outcome: String::from("test outcome b"),
+                    outcome: outcome(SummaryOutcomeResult::Failed, "test outcome b"),
                     artifacts: [
                         (PathBuf::from("a"), artifact("a_type")),
                         (PathBuf::from("b"), artifact("b_type")),
@@ -506,8 +695,8 @@ mod tests {
                     .into(),
                 },
                 cases: [
-                    (String::from("case_a"), case("case_a_outcome")),
-                    (String::from("case_b"), case("case_b_outcome")),
+                    (String::from("case_a"), case(SummaryOutcomeResult::Failed, "case_a_outcome")),
+                    (String::from("case_b"), case(SummaryOutcomeResult::Failed, "case_b_outcome")),
                 ]
                 .into(),
             },

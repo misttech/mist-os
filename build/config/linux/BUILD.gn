@@ -10,6 +10,9 @@ config("compiler") {
     ":sysroot",
     ":target",
     ":clang_defaults",
+
+    # Default host toolchains to using 16 CGU (and large RBE workers by extension)
+    "//build/config/rust:codegen_units_16",
   ]
 
   rustflags = [

@@ -24,7 +24,7 @@ pub const BPIOCXBP: u32 = 0xC1304201;
 pub const BPIOCXBPTABLE: u32 = 0xC00C4202;
 
 pub fn create_battery_profile_device(
-    _locked: &mut Locked<'_, DeviceOpen>,
+    _locked: &mut Locked<DeviceOpen>,
     _current_task: &CurrentTask,
     _id: DeviceType,
     _node: &FsNode,
@@ -50,7 +50,7 @@ impl FileOps for BatteryProfileFile {
 
     fn ioctl(
         &self,
-        _locked: &mut Locked<'_, Unlocked>,
+        _locked: &mut Locked<Unlocked>,
         _file: &FileObject,
         current_task: &CurrentTask,
         request: u32,

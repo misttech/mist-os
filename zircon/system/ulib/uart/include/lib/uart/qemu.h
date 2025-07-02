@@ -12,8 +12,7 @@
 #include "pl011.h"
 #include "uart.h"
 
-namespace uart {
-namespace qemu {
+namespace uart::qemu {
 
 // uart::qemu::kConfig is configuration object appropriate for QEMU environments.
 
@@ -38,7 +37,6 @@ static constexpr uart::Config<null::Driver> kConfig{};
 
 #endif
 
-}  // namespace qemu
-}  // namespace uart
+}  // namespace uart::qemu
 
 #endif  // LIB_UART_QEMU_H_

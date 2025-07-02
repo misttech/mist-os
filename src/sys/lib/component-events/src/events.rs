@@ -5,7 +5,10 @@
 use anyhow::{format_err, Error};
 use fidl::endpoints::{ProtocolMarker, ServerEnd};
 use fuchsia_component::client::connect_to_protocol_at_path;
+use futures::task::{Context, Poll};
+use futures::{ready, TryFuture};
 use lazy_static::lazy_static;
+use pin_project_lite::pin_project;
 use std::collections::VecDeque;
 use thiserror::Error;
 use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio};
@@ -33,13 +36,13 @@ pub fn event_name(event_type: &fcomponent::EventType) -> String {
     .to_string()
 }
 
-enum InternalStream {
-    New(fcomponent::EventStreamProxy),
-}
-
-pub struct EventStream {
-    stream: InternalStream,
-    buffer: VecDeque<fcomponent::Event>,
+pin_project! {
+    pub struct EventStream {
+        stream: fcomponent::EventStreamProxy,
+        buffer: VecDeque<fcomponent::Event>,
+        #[pin]
+        fut: Option<<fcomponent::EventStreamProxy as fcomponent::EventStreamProxyInterface>::GetNextResponseFut>,
+    }
 }
 
 #[derive(Debug, Error, Clone)]
@@ -50,7 +53,7 @@ pub enum EventStreamError {
 
 impl EventStream {
     pub fn new(stream: fcomponent::EventStreamProxy) -> Self {
-        Self { stream: InternalStream::New(stream), buffer: VecDeque::new() }
+        Self { stream, buffer: VecDeque::new(), fut: None }
     }
 
     pub fn open_at_path_pipelined(path: impl Into<String>) -> Result<Self, Error> {
@@ -82,26 +85,56 @@ impl EventStream {
         if let Some(event) = self.buffer.pop_front() {
             return Ok(event);
         }
-        match &mut self.stream {
-            InternalStream::New(stream) => {
-                match stream.get_next().await {
-                    Ok(events) => {
-                        let mut iter = events.into_iter();
-                        if let Some(real_event) = iter.next() {
-                            let ret = real_event;
-                            while let Some(value) = iter.next() {
-                                self.buffer.push_back(value);
-                            }
-                            return Ok(ret);
-                        } else {
-                            // This should never happen, we should always
-                            // have at least one event.
-                            Err(EventStreamError::StreamClosed)
-                        }
+        match self.stream.get_next().await {
+            Ok(events) => {
+                let mut iter = events.into_iter();
+                if let Some(real_event) = iter.next() {
+                    let ret = real_event;
+                    while let Some(value) = iter.next() {
+                        self.buffer.push_back(value);
                     }
-                    Err(_) => Err(EventStreamError::StreamClosed),
+                    return Ok(ret);
+                } else {
+                    // This should never happen, we should always
+                    // have at least one event.
+                    Err(EventStreamError::StreamClosed)
                 }
             }
+            Err(_) => Err(EventStreamError::StreamClosed),
+        }
+    }
+}
+
+impl futures::Stream for EventStream {
+    type Item = fcomponent::Event;
+
+    fn poll_next(self: std::pin::Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        let mut this = self.project();
+
+        // Return queued up events when possible.
+        if let Some(event) = this.buffer.pop_front() {
+            return Poll::Ready(Some(event));
+        }
+
+        // Otherwise, listen for more events.
+        if let None = this.fut.as_mut().as_pin_mut() {
+            this.fut.set(Some(this.stream.get_next()));
+        }
+
+        let step = ready!(this.fut.as_mut().as_pin_mut().unwrap().try_poll(cx));
+        this.fut.set(None);
+
+        match step {
+            Ok(events) => {
+                let mut iter = events.into_iter();
+                let ret = iter.next().unwrap();
+                // Store leftover events for subsequent polls.
+                while let Some(leftover) = iter.next() {
+                    this.buffer.push_back(leftover);
+                }
+                Poll::Ready(Some(ret))
+            }
+            Err(_) => Poll::Ready(None),
         }
     }
 }

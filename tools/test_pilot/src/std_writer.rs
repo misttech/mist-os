@@ -22,6 +22,8 @@ pub struct StdWriter {
 impl StdWriter {
     /// Creates a new `StdWriter`, creating the file specified by `path`.
     pub fn new(path: PathBuf, also: Box<dyn io::Write + Send>) -> Result<Self, TestRunError> {
+        fs::create_dir_all(path.parent().expect("stdout/err file path has parent"))
+            .map_err(|e| TestRunError::FailedToCreateFile { path: path.clone(), source: e })?;
         let file = fs::File::create(&path)
             .map_err(|e| TestRunError::FailedToCreateFile { path: path.clone(), source: e })?;
         Ok(Self { path, file: Some(file), wrote: false, also })

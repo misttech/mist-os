@@ -21,16 +21,10 @@ class ArmGicVisitor : public fdf_devicetree::DriverVisitor {
                      const devicetree::PropertyDecoder& decoder) override;
 
  private:
-  // `interrupt_names` must either be empty or have the same size as
-  // `interrupts`.
-  zx::result<> ParseInterrupts(fdf_devicetree::Node& node,
-                               std::vector<fdf_devicetree::PropertyValue>& interrupts,
-                               const std::vector<fdf_devicetree::PropertyValue>& interrupt_names);
-
-  static zx::result<> ParseInterrupt(fdf_devicetree::Node& child,
-                                     fdf_devicetree::ReferenceNode& parent,
-                                     fdf_devicetree::PropertyCells interrupt_cells,
-                                     std::optional<std::string> interrupt_name);
+  // Decodes interrupt cell values and adds the interrupt to `node`.
+  static zx::result<fuchsia_hardware_platform_bus::Irq> ParseInterrupt(
+      const std::string& node_name, fdf_devicetree::ReferenceNode& parent,
+      fdf_devicetree::PropertyCells interrupt_cells, std::optional<std::string> interrupt_name);
 
   fdf_devicetree::InterruptParser interrupt_parser_;
 };

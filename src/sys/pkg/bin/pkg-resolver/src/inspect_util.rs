@@ -103,8 +103,8 @@ mod test_inspectable_repository_config {
     use fidl_fuchsia_pkg_ext::{MirrorConfigBuilder, RepositoryConfigBuilder, RepositoryKey};
     use http::Uri;
 
-    #[test]
-    fn test_initialization() {
+    #[fuchsia::test]
+    async fn test_initialization() {
         let inspector = inspect::Inspector::default();
         let fuchsia_url = fuchsia_url::RepositoryUrl::parse("fuchsia-pkg://fuchsia.com/").unwrap();
         let mirror_config =
@@ -139,8 +139,8 @@ mod test_inspectable_repository_config {
         );
     }
 
-    #[test]
-    fn test_watcher() {
+    #[fuchsia::test]
+    async fn test_watcher() {
         let inspector = inspect::Inspector::default();
         let fuchsia_url = fuchsia_url::RepositoryUrl::parse("fuchsia-pkg://fuchsia.com").unwrap();
         let config = Arc::new(

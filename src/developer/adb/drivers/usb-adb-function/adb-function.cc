@@ -16,6 +16,8 @@
 #include <usb/peripheral.h>
 #include <usb/request-cpp.h>
 
+#include "zircon/status.h"
+
 namespace usb_adb_function {
 
 namespace {
@@ -203,7 +205,7 @@ bool UsbAdbDevice::ReceiveQueuedOnce() {
   auto req = usb::FidlRequest(std::move(completion.request().value()));
 
   if (*completion.status() != ZX_OK) {
-    zxlogf(ERROR, "RxComplete called with error %d.", *completion.status());
+    zxlogf(ERROR, "RxComplete called with error %s.", zx_status_get_string(*completion.status()));
     rx_requests_.front().Reply(fit::error(ZX_ERR_INTERNAL));
   } else {
     // This should always be true because when we registered VMOs, we only registered one per

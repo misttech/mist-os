@@ -100,6 +100,15 @@ type CrashReport = resource table {
     /// This field is primarily used for grouping crashes by fatal, not fatal, and unknown,
     /// each corresponding to the field being set to true, set to false, or not set respectively.
     8: is_fatal bool;
+
+    /// Optional. Used to indicate that this report represents more than just this instance of the
+    /// crash. For example, this field should be set to 10 if choosing to only file 1 out of every
+    /// 10 instances of this crash type.
+    ///
+    /// A weight of 1 is used if the field is not set. An explicitly set value of 0 is invalid and
+    /// will be rejected.
+    @available(added=NEXT)
+    9: weight uint32;
 };
 
 /// Represents a specific crash report.

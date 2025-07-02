@@ -85,10 +85,10 @@ async fn mock_hfp_client(
     mut sender: mpsc::Sender<Event>,
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
-    let hfp_svc = handles.connect_to_protocol::<HfpMarker>()?;
+    let hfp_svc = handles.connect_to_protocol()?;
     sender.send(Event::Hfp { _hfp: Some(hfp_svc) }).await.expect("failed sending ack to test");
 
-    let hfp_test_svc = handles.connect_to_protocol::<HfpTestMarker>()?;
+    let hfp_test_svc = handles.connect_to_protocol()?;
     sender
         .send(Event::HfpTest { _hfp_test: Some(hfp_test_svc) })
         .await

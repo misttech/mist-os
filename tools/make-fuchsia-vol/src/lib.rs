@@ -11,9 +11,9 @@ use crc::crc32;
 use fatfs::{FsOptions, NullTimeProvider, OemCpConverter, TimeProvider};
 use gpt::partition_types::{OperatingSystem, Type as PartType};
 use gpt::{DiskDevice, GptDisk};
+use product_bundle::{LoadedProductBundle, ProductBundle};
 use rand::{RngCore, SeedableRng};
 use rand_xorshift::XorShiftRng;
-use sdk_metadata::{LoadedProductBundle, ProductBundle};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::ffi::CString;
@@ -577,7 +577,7 @@ fn check_args(args: &mut TopLevel) -> Result<(), Error> {
                     // fall back to the full (non-sparse) Fxfs image if we didn't find a sparse one.
                     if args.use_fxfs && args.fxfs.is_none() {
                         args.fxfs = system_a.iter().find_map(|i| match i {
-                            Image::Fxfs { path, .. } => Some(path.clone()),
+                            Image::Fxfs(path) => Some(path.clone()),
                             _ => None,
                         });
                     }

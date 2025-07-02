@@ -5,11 +5,11 @@
 use crate::{common, BoardInputBundleArgs};
 
 use anyhow::{Context, Result};
-use assembly_config_schema::release_info::ReleaseInfo;
 use assembly_config_schema::{
     BoardInputBundle, BoardProvidedConfig, PackageDetails, PackageSet, PackagedDriverDetails,
 };
 use assembly_container::AssemblyContainer;
+use assembly_release_info::ReleaseInfo;
 use camino::Utf8PathBuf;
 use serde::{Deserialize, Serialize};
 

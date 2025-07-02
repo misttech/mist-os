@@ -59,6 +59,12 @@
             path: "/config/data",
         },
         {
+            directory: "feedback-config",
+            from: "parent",
+            rights: [ "r*" ],
+            path: "/feedback-config",
+        },
+        {
             directory: "build-info",
             rights: [ "r*" ],
             path: "/config/build-info",

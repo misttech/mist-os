@@ -682,7 +682,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_add_remove_elements() {
+    async fn test_add_remove_elements() {
         let inspect = fuchsia_inspect::Inspector::default();
         let mut t = Topology::new(inspect.root(), 0);
         let water = t
@@ -1139,7 +1139,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_add_remove_direct_deps() {
+    async fn test_add_remove_direct_deps() {
         let inspect = fuchsia_inspect::Inspector::default();
         let mut t = Topology::new(inspect.root(), 0);
 
@@ -1281,7 +1281,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_all_assertive_and_opportunistic_dependencies() {
+    async fn test_all_assertive_and_opportunistic_dependencies() {
         let inspect = fuchsia_inspect::Inspector::default();
         let mut t = Topology::new(inspect.root(), 0);
 

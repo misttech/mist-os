@@ -171,7 +171,7 @@ impl StarnixNodeConnection {
     /// state. It is equivalent to opening the same file, not dup'ing the file descriptor.
     fn reopen(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         current_task: &CurrentTask,
         flags: &impl ProtocolsExt,
     ) -> Result<Arc<Self>, Errno> {
@@ -284,7 +284,7 @@ impl StarnixNodeConnection {
 
     fn lookup_parent<'a>(
         &self,
-        locked: &mut Locked<'_, Unlocked>,
+        locked: &mut Locked<Unlocked>,
         path: &'a FsStr,
     ) -> Result<(NamespaceNode, &'a FsStr), Errno> {
         self.task()?.lookup_parent(locked, &mut LookupContext::default(), &self.file.name, path)

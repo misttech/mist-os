@@ -117,6 +117,9 @@ func TestExecute(t *testing.T) {
 			// Two tests whose dimensions differ only by some random dimension
 			// ("other_dimension") should still be sharded separately.
 			name: "arbitrary dimensions",
+			params: &proto.Params{
+				Pool: "other.pool",
+			},
 			testSpecs: []build.TestSpec{
 				{
 					Test: build.Test{

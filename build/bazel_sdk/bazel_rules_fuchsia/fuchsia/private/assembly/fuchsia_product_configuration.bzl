@@ -6,6 +6,7 @@
 
 # buildifier: disable=module-docstring
 load("@bazel_skylib//lib:paths.bzl", "paths")
+load("@bazel_skylib//rules:common_settings.bzl", "BuildSettingInfo")
 load("//fuchsia/constraints:target_compatibility.bzl", "COMPATIBILITY")
 load("//fuchsia/private:fuchsia_package.bzl", "get_driver_component_manifests")
 load("//fuchsia/private:fuchsia_toolchains.bzl", "FUCHSIA_TOOLCHAIN_DEFINITION", "get_fuchsia_sdk_toolchain")
@@ -162,6 +163,17 @@ def _fuchsia_product_configuration_impl(ctx):
         "--output",
         product_config_dir.path,
     ]
+
+    if ctx.attr.repo:
+        repo = ctx.attr.repo
+    else:
+        repo = ctx.attr._release_repository_flag[BuildSettingInfo].value
+
+    # TODO(https://b.corp.google.com/issues/416239346): Make "repo" field
+    # required.
+    if repo:
+        args += ["--repo", repo]
+
     ctx.actions.run(
         executable = sdk.assembly_config,
         arguments = args,
@@ -255,6 +267,13 @@ _fuchsia_product_configuration = rule(
             doc = "OTA configuration to include in the product. Only for use with products that use Omaha.",
             providers = [FuchsiaOmahaOtaConfigInfo],
         ),
+        "repo": attr.string(
+            doc = "Name of the release repository. Overrides _release_repository_flag when set.",
+        ),
+        "_release_repository_flag": attr.label(
+            doc = "String flag used to set the name of the release repository.",
+            default = "@rules_fuchsia//fuchsia/flags:fuchsia_release_repository",
+        ),
         "deps": attr.label_list(
             doc = "Additional dependencies that must be built before this target is built.",
             default = [],
@@ -272,6 +291,7 @@ def fuchsia_prebuilt_product_configuration(
         name = _all_files_target,
         srcs = native.glob(["{}/**/*".format(product_config_dir)]),
     )
+
     _fuchsia_prebuilt_product_configuration(
         name = name,
         files = [":{}".format(_all_files_target)],

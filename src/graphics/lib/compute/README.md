@@ -33,8 +33,7 @@ This benchmark quantifies the overhead and latency of Magma/FIDL.
    --with //src/graphics/lib/compute:vulkan-tests                                          \
    --with //src/graphics/lib/compute:compute-benchmarks                                    \
    --args='core_realm_shards += [ "//src/graphics/lib/compute:compute-benchmarks-shard" ]' \
-   --release                                                                               \
-   --auto-dir
+   --release
 ```
 
 # Resolve the `/core/compute-benchmarks` instance

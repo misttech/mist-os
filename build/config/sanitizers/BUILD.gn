@@ -86,6 +86,15 @@ template("sanitizer_rustflags") {
   }
 }
 
+variant("cfi") {
+  common_flags = [ "-fsanitize=cfi" ]
+  configs = [ ":cfi.rustflags" ]
+}
+
+sanitizer_rustflags("cfi.rustflags") {
+  variant = "cfi"
+}
+
 variant("asan") {
   common_flags = [ "-fsanitize=address" ]
   cflags = [
@@ -169,7 +178,7 @@ sanitizer_extra_options("suppress-lsan.DO-NOT-USE-THIS") {
 sanitizer_extra_options("suppress-asan-stack-use-after-return") {
   visibility = [
     # These tests need to check actual stack behavior, not fake stack.
-    "//zircon/system/ulib/c/test/sanitizer:memory-snapshot-test",
+    "//sdk/lib/c/test/sanitizer:memory-snapshot-test",
   ]
 
   args = [ "detect_stack_use_after_return=0" ]
@@ -182,7 +191,6 @@ sanitizer_extra_options("suppress-asan-stack-use-after-return") {
 # https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow.
 sanitizer_extra_options("suppress-asan-container-overflow") {
   visibility = [
-    "//sdk/lib/component/outgoing/cpp:*",
     "//sdk/lib/sys/component/cpp/testing:*",
     "//src/lib/llvm:*",
   ]
@@ -238,7 +246,7 @@ variant("rust-asan") {
 
 # TODO(https://fxbug.dev/42120045): Building with this variant alone can still lead to
 # some build errors, but this is still needed for lsan tests (see
-# //zircon/system/ulib/c/test/sanitizer:lsan-test).
+# //sdk/lib/c/test/sanitizer:lsan-test).
 variant("lsan") {
   ldflags = [ "-fsanitize=leak" ]
 

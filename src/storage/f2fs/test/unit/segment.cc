@@ -178,11 +178,10 @@ TEST_F(SegmentManagerTest, GetNewSegmentHeap) {
     ASSERT_NE(new_ni.blk_addr, kNullAddr);
     ASSERT_NE(new_ni.blk_addr, kNewAddr);
 
-    // first segment already has next segment with noheap option
-    if ((i > kDefaultBlocksPerSegment - 1) && ((ni.blk_addr + 1) % kDefaultBlocksPerSegment == 0)) {
-      ASSERT_LT(new_ni.blk_addr, ni.blk_addr);
-    } else {
+    if (new_ni.blk_addr % kDefaultBlocksPerSegment) {
       ASSERT_GT(new_ni.blk_addr, ni.blk_addr);
+    } else {
+      ASSERT_LT(new_ni.blk_addr, ni.blk_addr);
     }
   }
 }
@@ -610,7 +609,6 @@ TEST(SegmentManagerOptionTest, GetNewSegmentHeap) TA_NO_THREAD_SAFETY_ANALYSIS {
   NodeInfo ni;
   fs->GetNodeManager().GetNodeInfo(superblock_info.GetRootIno(), ni);
 
-  size_t num_changes = 0;
   for (uint32_t i = 0; i < nwritten; ++i) {
     NodeInfo ni, new_ni;
     fs->GetNodeManager().GetNodeInfo(superblock_info.GetRootIno(), ni);
@@ -630,13 +628,11 @@ TEST(SegmentManagerOptionTest, GetNewSegmentHeap) TA_NO_THREAD_SAFETY_ANALYSIS {
     ASSERT_NE(new_ni.blk_addr, kNullAddr);
     ASSERT_NE(new_ni.blk_addr, kNewAddr);
 
-    if (new_ni.blk_addr % blocks_per_section == 0) {
-      // The heap style allocation tries to find a free node section from the end of main area
-      if (++num_changes > mkfs_options.secs_per_zone) {
-        ASSERT_LT(new_ni.blk_addr, ni.blk_addr);
-      } else {
-        ASSERT_GT(new_ni.blk_addr, ni.blk_addr);
-      }
+    // The heap style allocation tries to find a free node section from the end of main area
+    if (new_ni.blk_addr % blocks_per_section) {
+      ASSERT_GT(new_ni.blk_addr, ni.blk_addr);
+    } else {
+      ASSERT_LT(new_ni.blk_addr, ni.blk_addr);
     }
   }
 

@@ -206,7 +206,7 @@ pub trait DriverTestRealmInstance {
 #[async_trait::async_trait]
 impl DriverTestRealmInstance for RealmInstance {
     async fn driver_test_realm_start(&self, args: fdt::RealmArgs) -> Result<()> {
-        let config = self.root.connect_to_protocol_at_exposed_dir::<fdt::RealmMarker>()?;
+        let config: fdt::RealmProxy = self.root.connect_to_protocol_at_exposed_dir()?;
         let () = config
             .start(args)
             .await

@@ -23,21 +23,9 @@
 namespace cpp20 {
 namespace internal {
 
-#if defined(__cpp_inline_variables) && __cpp_inline_variables >= 201606L && \
-    !defined(LIB_STDCOMPAT_NO_INLINE_VARIABLES)
-
 static constexpr inline std::size_t dynamic_extent = std::numeric_limits<std::size_t>::max();
 
-#else
-
 struct dynamic_extent_tag {};
-
-// define dynamic extent.
-static constexpr const std::size_t& dynamic_extent =
-    cpp17::internal::inline_storage<dynamic_extent_tag, std::size_t,
-                                    std::numeric_limits<std::size_t>::max()>::storage;
-
-#endif
 
 // Specialization for different extent types, simplifies span implementation and duplication.
 template <typename T, std::size_t Extent>
@@ -179,8 +167,8 @@ struct is_well_formed_data_and_size : std::false_type {};
 template <typename T, typename ElementType>
 struct is_well_formed_data_and_size<
     T, ElementType,
-    cpp17::void_t<decltype(cpp17::data(std::declval<T&>()), cpp17::size(std::declval<T&>()))>>
-    : is_qualification_conversion<std::remove_pointer_t<decltype(cpp17::data(std::declval<T&>()))>,
+    std::void_t<decltype(std::data(std::declval<T&>()), std::size(std::declval<T&>()))>>
+    : is_qualification_conversion<std::remove_pointer_t<decltype(std::data(std::declval<T&>()))>,
                                   ElementType>::type {};
 
 template <typename T, typename = void>
@@ -194,8 +182,8 @@ struct has_range_begin_and_end<T, std::void_t<decltype(std::begin(std::declval<T
 
 template <typename T, class ElementType>
 static constexpr bool is_span_compatible_v =
-    cpp17::conjunction_v<cpp17::negation<is_span<T>>, cpp17::negation<is_array_type<T>>,
-                         has_range_begin_and_end<T>, is_well_formed_data_and_size<T, ElementType>>;
+    std::conjunction_v<std::negation<is_span<T>>, std::negation<is_array_type<T>>,
+                       has_range_begin_and_end<T>, is_well_formed_data_and_size<T, ElementType>>;
 
 template <typename SizeType, SizeType Extent, SizeType Offset, SizeType Count>
 struct subspan_extent

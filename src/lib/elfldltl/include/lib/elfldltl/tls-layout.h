@@ -106,7 +106,8 @@ class TlsLayout {
 
   // This rounds up a size to at least alignment(); and also to at least the
   // second argument if given.
-  constexpr size_type Align(size_type size, size_type min_alignment = 0) const {
+  constexpr size_type Align(size_type size, size_type min_alignment = 1) const {
+    assert(min_alignment > 0);
     return AlignUp(size, std::max<size_type>(min_alignment, alignment_));
   }
 

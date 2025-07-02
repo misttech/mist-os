@@ -21,6 +21,7 @@ use packet_formats::icmp::{
 use packet_formats::ip::DscpAndEcn;
 use packet_formats::utils::NonZeroDuration;
 use rand::Rng;
+use thiserror::Error;
 
 use crate::internal::buffer::BufferLimits;
 use crate::internal::counters::{TcpCountersWithSocket, TcpCountersWithoutSocket};
@@ -32,31 +33,43 @@ use crate::internal::state::DEFAULT_MAX_SYN_RETRIES;
 pub const DEFAULT_FIN_WAIT2_TIMEOUT: Duration = Duration::from_secs(60);
 
 /// Errors surfaced to the user.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 pub enum ConnectionError {
     /// The connection was refused, RST segment received while in SYN_SENT state.
+    #[error("connection refused (RST segment received while in SYN_SENT state")]
     ConnectionRefused,
     /// The connection was reset because of a RST segment.
+    #[error("connection was reset because of a RST segment")]
     ConnectionReset,
     /// The connection was closed because the network is unreachable.
+    #[error("connection was closed because the network is unreachable")]
     NetworkUnreachable,
     /// The connection was closed because the host is unreachable.
+    #[error("connection was closed because the host is unreachable")]
     HostUnreachable,
     /// The connection was closed because the protocol is unreachable.
+    #[error("connection was closed because the protocol is unreachable")]
     ProtocolUnreachable,
     /// The connection was closed because the port is unreachable.
+    #[error("connection was closed because the port is unreachable")]
     PortUnreachable,
     /// The connection was closed because the host is down.
+    #[error("connection was closed because the host is down")]
     DestinationHostDown,
     /// The connection was closed because the source route failed.
+    #[error("connection was closed because the source route failed")]
     SourceRouteFailed,
     /// The connection was closed because the source host is isolated.
+    #[error("connection was closed because the source host is isolated")]
     SourceHostIsolated,
     /// The connection was closed because of a time out.
+    #[error("connection was closed because of a time out")]
     TimedOut,
     /// The connection was closed because of a lack of required permissions.
+    #[error("connection was closed because of a lack of required permissions")]
     PermissionDenied,
     /// The connection was closed because there was a protocol error.
+    #[error("connection was closed because there was a protocol error")]
     ProtocolError,
 }
 

@@ -7,22 +7,24 @@ mod output;
 
 #[macro_use]
 extern crate prettytable;
-
 use anyhow::Result;
 use async_trait::async_trait;
-use attribution_processing::kernel_statistics::KernelStatistics;
 use attribution_processing::summary::{ComponentProfileResult, MemorySummary};
-use attribution_processing::{AttributionData, Principal, Resource, ZXName};
+use attribution_processing::{
+    digest, AttributionData, AttributionDataProvider, Principal, Resource, ResourcesVisitor, ZXName,
+};
 use errors::ffx_error;
 use ffx_profile_memory_components_args::ComponentsCommand;
 use ffx_writer::{MachineWriter, ToolIO};
 use fho::{AvailabilityFlag, FfxMain, FfxTool};
-use fidl_fuchsia_memory_attribution_plugin as fplugin;
+use fidl_fuchsia_memory_attribution_plugin::{self as fplugin, ResourceType};
 use futures::AsyncReadExt;
 use json::JsonConvertible;
+use regex::bytes::Regex;
 use serde::Serialize;
 use std::io::Write;
 use target_holders::moniker;
+use zerocopy::transmute_ref;
 
 #[derive(FfxTool)]
 #[check(AvailabilityFlag("ffx_profile_memory_components"))]
@@ -96,23 +98,13 @@ impl MemoryComponentsTool {
             return Ok(());
         }
 
-        let (summary, kernel_statistics, thrashing_metrics) = process_snapshot(snapshot);
+        let profile_result = process_snapshot(snapshot);
         if writer.is_machine() {
-            writer.machine(ComponentProfileResult {
-                kernel: kernel_statistics,
-                principals: summary.principals,
-                undigested: summary.undigested,
-            })?;
+            writer.machine(profile_result)?;
         } else {
-            output::write_summary(
-                &mut writer.stdout(),
-                self.cmd.csv,
-                &summary,
-                kernel_statistics,
-                thrashing_metrics,
-            )
-            .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
-            .map_err(|e| fho::Error::Unexpected(e.into()))?;
+            output::write_summary(&mut writer.stdout(), self.cmd.csv, &profile_result)
+                .or_else(|e| writeln!(writer.stderr(), "Error: {}", e))
+                .map_err(|e| fho::Error::Unexpected(e.into()))?;
         }
         Ok(())
     }
@@ -136,9 +128,51 @@ impl MemoryComponentsTool {
     }
 }
 
-fn process_snapshot(
-    snapshot: fplugin::Snapshot,
-) -> (MemorySummary, KernelStatistics, fplugin::PerformanceImpactMetrics) {
+pub struct SnapshotAttributionDataProvider<'a> {
+    resources: &'a Vec<Resource>,
+    resource_names: &'a Vec<fplugin::ResourceName>,
+}
+
+impl<'a> AttributionDataProvider for SnapshotAttributionDataProvider<'a> {
+    fn for_each_resource(&self, visitor: &mut impl ResourcesVisitor) -> Result<(), anyhow::Error> {
+        for resource in self.resources {
+            if let Resource { koid, name_index, resource_type: ResourceType::Vmo(vmo), .. } =
+                resource
+            {
+                visitor.on_vmo(
+                    *koid,
+                    transmute_ref!(&self.resource_names[*name_index]),
+                    vmo.clone(),
+                )?;
+            }
+        }
+        for resource in self.resources {
+            if let Resource {
+                koid,
+                name_index,
+                resource_type: ResourceType::Process(process),
+                ..
+            } = resource
+            {
+                visitor.on_process(
+                    *koid,
+                    transmute_ref!(&self.resource_names[*name_index]),
+                    process.clone(),
+                )?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn get_attribution_data(
+        &self,
+    ) -> futures::future::BoxFuture<'_, std::result::Result<AttributionData, anyhow::Error>> {
+        todo!()
+    }
+}
+
+fn process_snapshot(snapshot: fplugin::Snapshot) -> ComponentProfileResult {
     // Map from moniker token ID to Principal struct.
     let principals: Vec<Principal> =
         snapshot.principals.into_iter().flatten().map(|p| p.into()).collect();
@@ -148,8 +182,30 @@ fn process_snapshot(
         snapshot.resources.into_iter().flatten().map(|r| r.into()).collect();
     // Map from subject moniker token ID to Attribution struct.
     let attributions = snapshot.attributions.unwrap().into_iter().map(|a| a.into()).collect();
-
-    (
+    let default_empty_vec = Vec::new();
+    let bucket_definitions: Vec<digest::BucketDefinition> = snapshot
+        .bucket_definitions
+        .as_ref()
+        .unwrap_or(&default_empty_vec)
+        .iter()
+        .map(|bd| digest::BucketDefinition {
+            name: bd.name.clone().unwrap_or_default(),
+            process: bd.process.as_ref().map(|p| Regex::new(&p).unwrap()),
+            vmo: bd.vmo.as_ref().map(|p| Regex::new(&p).unwrap()),
+            event_code: 0, // The information is unavailable client side.
+        })
+        .collect();
+    let digest = digest::Digest::compute(
+        &SnapshotAttributionDataProvider {
+            resources: &resources,
+            resource_names: snapshot.resource_names.as_ref().unwrap(),
+        },
+        &snapshot.kernel_statistics.as_ref().unwrap().memory_stats.as_ref().unwrap(),
+        &snapshot.kernel_statistics.as_ref().unwrap().compression_stats.as_ref().unwrap(),
+        &bucket_definitions,
+    )
+    .expect("Digest computation should succeed");
+    let MemorySummary { principals, unclaimed } =
         attribution_processing::attribute_vmos(AttributionData {
             principals_vec: principals,
             resources_vec: resources,
@@ -157,14 +213,18 @@ fn process_snapshot(
                 .resource_names
                 .unwrap()
                 .iter()
-                .map(|n| ZXName::from_string_lossy(n))
+                .map(|n| ZXName::from_bytes_lossy(n))
                 .collect(),
             attributions,
         })
-        .summary(),
-        snapshot.kernel_statistics.unwrap().into(),
-        snapshot.performance_metrics.unwrap(),
-    )
+        .summary();
+    ComponentProfileResult {
+        kernel: snapshot.kernel_statistics.unwrap().into(),
+        principals,
+        unclaimed,
+        digest,
+        performance: snapshot.performance_metrics.unwrap(),
+    }
 }
 
 #[cfg(test)]
@@ -465,20 +525,20 @@ mod tests {
                 },
             ]),
             resource_names: Some(vec![
-                "root_job".to_owned(),
-                "root_process".to_owned(),
-                "root_vmo".to_owned(),
-                "shared_vmo".to_owned(),
-                "runner_job".to_owned(),
-                "runner_process".to_owned(),
-                "runner_vmo".to_owned(),
-                "component_vmo".to_owned(),
-                "component_2_job".to_owned(),
-                "2_process".to_owned(),
-                "2_vmo".to_owned(),
-                "2_vmo_parent".to_owned(),
-                "component_vmo_mapped".to_owned(),
-                "component_vmo_mapped2".to_owned(),
+                *ZXName::from_string_lossy("root_job").buffer(),
+                *ZXName::from_string_lossy("root_process").buffer(),
+                *ZXName::from_string_lossy("root_vmo").buffer(),
+                *ZXName::from_string_lossy("shared_vmo").buffer(),
+                *ZXName::from_string_lossy("runner_job").buffer(),
+                *ZXName::from_string_lossy("runner_process").buffer(),
+                *ZXName::from_string_lossy("runner_vmo").buffer(),
+                *ZXName::from_string_lossy("component_vmo").buffer(),
+                *ZXName::from_string_lossy("component_2_job").buffer(),
+                *ZXName::from_string_lossy("2_process").buffer(),
+                *ZXName::from_string_lossy("2_vmo").buffer(),
+                *ZXName::from_string_lossy("2_vmo_parent").buffer(),
+                *ZXName::from_string_lossy("component_vmo_mapped").buffer(),
+                *ZXName::from_string_lossy("component_vmo_mapped2").buffer(),
             ]),
             kernel_statistics: Some(fplugin::KernelStatistics {
                 memory_stats: Some(fidl_fuchsia_kernel::MemoryStats {
@@ -527,18 +587,25 @@ mod tests {
                 full_memory_stalls_ns: Some(5),
                 ..Default::default()
             }),
+            bucket_definitions: Some(vec![fplugin::BucketDefinition {
+                name: Some("da_bucket".to_string()),
+                process: None,
+                vmo: Some("root_vmo".to_string()),
+                ..Default::default()
+            }]),
             ..Default::default()
         };
 
-        let (output, _, performance_metrics) = process_snapshot(snapshot);
+        let ComponentProfileResult { principals, unclaimed, performance, digest, .. } =
+            process_snapshot(snapshot);
 
         // VMO 1011 is the parent of VMO 1010, but not claimed by any Principal; it is thus
-        // undigested.
-        assert_eq!(output.undigested, 2048);
-        assert_eq!(output.principals.len(), 4);
+        // unclaimed.
+        assert_eq!(unclaimed, 2048);
+        assert_eq!(principals.len(), 4);
 
         let principals: HashMap<u64, PrincipalSummary> =
-            output.principals.into_iter().map(|p| (p.id, p)).collect();
+            principals.into_iter().map(|p| (p.id, p)).collect();
 
         assert_eq!(
             principals.get(&0).unwrap(),
@@ -727,11 +794,30 @@ mod tests {
         );
 
         assert_eq!(
-            performance_metrics,
+            performance,
             fplugin::PerformanceImpactMetrics {
                 some_memory_stalls_ns: Some(10),
                 full_memory_stalls_ns: Some(5),
                 ..Default::default()
+            }
+        );
+
+        assert_eq!(
+            digest,
+            digest::Digest {
+                buckets: vec![
+                    digest::Bucket { name: "da_bucket".to_string(), size: 1024 },
+                    digest::Bucket { name: "Undigested".to_string(), size: 6272 },
+                    digest::Bucket { name: "Orphaned".to_string(), size: 0 },
+                    digest::Bucket { name: "Kernel".to_string(), size: 39 },
+                    digest::Bucket { name: "Free".to_string(), size: 2 },
+                    digest::Bucket { name: "[Addl]PagerTotal".to_string(), size: 14 },
+                    digest::Bucket { name: "[Addl]PagerNewest".to_string(), size: 15 },
+                    digest::Bucket { name: "[Addl]PagerOldest".to_string(), size: 16 },
+                    digest::Bucket { name: "[Addl]DiscardableLocked".to_string(), size: 18 },
+                    digest::Bucket { name: "[Addl]DiscardableUnlocked".to_string(), size: 19 },
+                    digest::Bucket { name: "[Addl]ZramCompressedBytes".to_string(), size: 16 }
+                ]
             }
         );
     }
@@ -842,10 +928,10 @@ mod tests {
                 },
             ]),
             resource_names: Some(vec![
-                "root_job".to_owned(),
-                "component_job".to_owned(),
-                "component_process".to_owned(),
-                "component_vmo".to_owned(),
+                *ZXName::from_string_lossy("root_job").buffer(),
+                *ZXName::from_string_lossy("component_job").buffer(),
+                *ZXName::from_string_lossy("component_process").buffer(),
+                *ZXName::from_string_lossy("component_vmo").buffer(),
             ]),
             kernel_statistics: Some(fplugin::KernelStatistics {
                 memory_stats: Some(fidl_fuchsia_kernel::MemoryStats {
@@ -897,13 +983,13 @@ mod tests {
             ..Default::default()
         };
 
-        let (output, _, _) = process_snapshot(snapshot);
+        let ComponentProfileResult { principals, unclaimed, .. } = process_snapshot(snapshot);
 
-        assert_eq!(output.undigested, 0);
-        assert_eq!(output.principals.len(), 3);
+        assert_eq!(unclaimed, 0);
+        assert_eq!(principals.len(), 3);
 
         let principals: HashMap<u64, PrincipalSummary> =
-            output.principals.into_iter().map(|p| (p.id, p)).collect();
+            principals.into_iter().map(|p| (p.id, p)).collect();
 
         assert_eq!(
             principals.get(&0).unwrap(),

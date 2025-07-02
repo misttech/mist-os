@@ -35,7 +35,7 @@ class ClockImplVisitor : public fdf_devicetree::Visitor {
  private:
   struct ClockController {
 #if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-    fuchsia_hardware_clockimpl::ClockIdsMetadata clock_ids_metadata;
+    fuchsia_hardware_clockimpl::ClockIdsMetadata clock_nodes_metadata;
 #endif
     fuchsia_hardware_clockimpl::InitMetadata init_metadata;
   };
@@ -55,15 +55,19 @@ class ClockImplVisitor : public fdf_devicetree::Visitor {
                               std::optional<fdf_devicetree::PropertyValue> clock_rate,
                               std::optional<fdf_devicetree::PropertyValue> clock_parent);
 
-  zx::result<> AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t id,
+  zx::result<> AddChildNodeSpec(fdf_devicetree::Node& child, uint32_t clock_id, uint32_t node_id,
                                 std::optional<std::string_view> clock_name);
 
   zx::result<> AddInitChildNodeSpec(fdf_devicetree::Node& child);
+
+  uint32_t GetNextUniqueId();
 
   bool is_match(std::string_view node_name);
 
   std::map<fdf_devicetree::Phandle, ClockController> clock_controllers_;
   std::unique_ptr<fdf_devicetree::PropertyParser> clock_parser_;
+
+  uint32_t next_unique_id_ = 0;
 };
 
 }  // namespace clock_impl_dt

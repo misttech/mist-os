@@ -77,7 +77,7 @@ impl DriverContext {
     }
 
     pub(crate) fn start_logging(&self, driver_name: &str) -> Result<(), Status> {
-        let log_proxy = match self.incoming.protocol().connect() {
+        let log_proxy = match self.incoming.connect_protocol() {
             Ok(log_proxy) => log_proxy,
             Err(err) => {
                 eprintln!("Error connecting to log sink proxy at driver startup: {err}. Continuing without logging.");

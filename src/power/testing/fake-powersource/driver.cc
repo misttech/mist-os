@@ -5,17 +5,12 @@
 #include "driver.h"
 
 #include <fidl/fuchsia.hardware.powersource/cpp/natural_types.h>
-#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devfs/cpp/connector.h>
-#include <lib/driver/logging/cpp/structured_logger.h>
-#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 
 #include <utility>
-
-#include "power_source_state.h"
 
 namespace fake_powersource {
 
@@ -32,20 +27,17 @@ Driver::Driver(fdf::DriverStartArgs start_args,
       simulator_server_ac_(fake_data_ac_) {}
 
 zx::result<> Driver::Start() {
-  node_.Bind(std::move(node()));
   auto result = AddDriverAndControl("fake-battery", "battery-source-simulator",
                                     devfs_connector_source_battery_, devfs_connector_sim_battery_);
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add fake battery driver and its control",
-             KV("status", result.status_string()));
+    fdf::error("Failed to add fake battery driver and its control: {}", result);
     return result.take_error();
   }
 
   result = AddDriverAndControl("fake-ac", "ac-source-simulator", devfs_connector_source_ac_,
                                devfs_connector_sim_ac_);
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add fake ac driver and its control",
-             KV("status", result.status_string()));
+    fdf::error("Failed to add fake ac driver and its control: {}", result);
     return result.take_error();
   }
 
@@ -59,7 +51,7 @@ zx::result<> Driver::AddDriverAndControl(std::string_view driver_node_name,
                                          driver_devfs::Connector<B>& sim_devfs_connector) {
   auto result = AddChild(driver_node_name, "power", driver_devfs_connector);
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add child node fake battery", KV("status", result.status_string()));
+    fdf::error("Failed to add child node fake battery: {}", result);
     return result.take_error();
   }
 
@@ -67,8 +59,7 @@ zx::result<> Driver::AddDriverAndControl(std::string_view driver_node_name,
   // /dev/class/power-simulator, a line needs to be added to src/lib/ddk/include/lib/ddk/protodefs.h
   result = AddChild(sim_node_name, "power-sim", sim_devfs_connector);
   if (result.is_error()) {
-    FDF_SLOG(ERROR, "Failed to add child node battery simulator",
-             KV("status", result.status_string()));
+    fdf::error("Failed to add child node battery simulator: {}", result);
     return result.take_error();
   }
 
@@ -79,35 +70,25 @@ zx::result<> Driver::AddDriverAndControl(std::string_view driver_node_name,
 template <typename Protocol>
 zx::result<> Driver::AddChild(std::string_view node_name, std::string_view class_name,
                               driver_devfs::Connector<Protocol>& devfs_connector) {
-  fidl::Arena arena;
   zx::result connector = devfs_connector.Bind(dispatcher());
-
   if (connector.is_error()) {
+    fdf::error("Failed to bind devfs connector: {}", connector);
     return connector.take_error();
   }
 
-  auto devfs = fuchsia_driver_framework::wire::DevfsAddArgs::Builder(arena)
-                   .connector(std::move(connector.value()))
-                   .class_name(class_name);
+  fuchsia_driver_framework::DevfsAddArgs devfs_args{{
+      .connector = std::move(connector.value()),
+      .class_name{class_name},
+      .connector_supports = fuchsia_device_fs::ConnectionType::kDevice,
+  }};
 
-  auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
-                  .name(arena, node_name)
-                  .devfs_args(devfs.Build())
-                  .Build();
-
-  // Create endpoints of the `NodeController` for the node.
-  auto endpoints = fidl::CreateEndpoints<fuchsia_driver_framework::NodeController>();
-  if (endpoints.is_error()) {
-    FDF_SLOG(ERROR, "Failed to create endpoint", KV("status", endpoints.status_string()));
-    return zx::error(endpoints.status_value());
+  zx::result child = AddOwnedChild(node_name, devfs_args);
+  if (child.is_error()) {
+    fdf::error("Failed to add child: {}", child);
+    return child.take_error();
   }
-  auto result = node_->AddChild(args, std::move(endpoints->server), {});
+  children_.emplace_back(std::move(child.value()));
 
-  if (!result.ok()) {
-    FDF_SLOG(ERROR, "Failed to add child", KV("status", result.status_string()));
-    return zx::error(result.status());
-  }
-  controllers_.emplace_back(std::move(endpoints->client));
   return zx::ok();
 }
 

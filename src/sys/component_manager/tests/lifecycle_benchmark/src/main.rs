@@ -34,9 +34,9 @@ fn main() {
         .unwrap();
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap()
     });
-    let realm_proxy = realm
+    let realm_proxy: fcomponent::RealmProxy = realm
         .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("could not connect to Realm service");
 
     let e = executor.clone();

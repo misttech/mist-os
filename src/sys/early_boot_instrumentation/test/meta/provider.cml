@@ -8,7 +8,12 @@
         binary: "bin/provider",
     },
     capabilities: [
-        { protocol: "fuchsia.boot.SvcStashProvider" },
+        {
+            protocol: [
+                "fuchsia.boot.Items",
+                "fuchsia.boot.SvcStashProvider",
+            ],
+        },
         {
             directory: "boot",
             rights: [ "r*" ],
@@ -21,7 +26,10 @@
             from: "self",
         },
         {
-            protocol: [ "fuchsia.boot.SvcStashProvider" ],
+            protocol: [
+                "fuchsia.boot.Items",
+                "fuchsia.boot.SvcStashProvider",
+            ],
             from: "self",
         },
     ],

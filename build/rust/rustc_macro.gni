@@ -139,11 +139,14 @@ template("rustc_macro") {
 
   # The actual host-target build of the proc macro crate.
   if (in_host_compiler_toolchain) {
-    package_name = target_name
-    if (defined(invoker.output_name)) {
+    if (defined(invoker.crate_name)) {
+      package_name = invoker.crate_name
+    } else if (defined(invoker.output_name)) {
       package_name = invoker.output_name
     } else if (defined(invoker.name)) {
       package_name = invoker.name
+    } else {
+      package_name = target_name
     }
     crate_name = string_replace(package_name, "-", "_")
 
@@ -154,9 +157,29 @@ template("rustc_macro") {
     }
 
     rustc_artifact(proc_macro_target) {
-      target_type = "rust_proc_macro"
-      configs = []
-      configs = invoker.configs
+      forward_variables_from(invoker,
+                             [
+                               "aliased_deps",
+                               "applicable_licenses",
+                               "data_deps",
+                               "define_rustdoc_test_override",
+                               "disable_clippy",
+                               "disable_rustdoc",
+                               "edition",
+                               "enforce_source_listing",
+                               "inputs",
+                               "output_dir",
+                               "output_name",
+                               "public_deps",
+                               "quiet_clippy",
+                               "rustdoc_args",
+                               "rustdoc_out_dir",
+                               "rustenv",
+                               "rustflags",
+                               "sources",
+                               "testonly",
+                               "zip_rustdoc_to",
+                             ])
 
       not_needed(invoker,
                  [
@@ -164,35 +187,17 @@ template("rustc_macro") {
                    "non_rust_deps",
                    "force_opt",
                  ])
+
+      target_type = "rust_proc_macro"
+      configs = []
+      configs = invoker.configs
+
       crate_root = source_root
-      rust_crate_type = "proc-macro"
-      pass_through = {
-        forward_variables_from(invoker,
-                               [
-                                 "data_deps",
-                                 "output_dir",
-                               ])
+      crate_type = "proc-macro"
+      original_target_name = _original_target_name
+      if (!defined(output_name)) {
         output_name = crate_name
       }
-      original_target_name = _original_target_name
-
-      forward_variables_from(invoker,
-                             [
-                               "disable_clippy",
-                               "disable_rustdoc",
-                               "zip_rustdoc_to",
-                               "define_rustdoc_test_override",
-                               "rustdoc_args",
-                               "quiet_clippy",
-                               "public_deps",
-                               "rustdoc_out_dir",
-                               "testonly",
-                               "edition",
-                               "enforce_source_listing",
-                               "inputs",
-                               "rustenv",
-                               "sources",
-                             ])
 
       deps = []
       if (defined(invoker.deps)) {

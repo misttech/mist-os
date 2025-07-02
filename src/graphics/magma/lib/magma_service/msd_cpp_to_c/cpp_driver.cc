@@ -45,7 +45,7 @@ CppDriver::CppDriver() {
   });
 }
 
-std::unique_ptr<msd::Device> CppDriver::CreateDevice(msd::DeviceHandle* device_handle) {
+std::unique_ptr<msd::Device> CppDriver::MsdCreateDevice(msd::DeviceHandle* device_handle) {
   MsdDevice* device = msd_driver_create_device(device_handle->platform_device);
   if (!device) {
     return nullptr;
@@ -53,7 +53,7 @@ std::unique_ptr<msd::Device> CppDriver::CreateDevice(msd::DeviceHandle* device_h
   return std::make_unique<CppDevice>(device);
 }
 
-std::unique_ptr<msd::Buffer> CppDriver::ImportBuffer(zx::vmo vmo, uint64_t client_id) {
+std::unique_ptr<msd::Buffer> CppDriver::MsdImportBuffer(zx::vmo vmo, uint64_t client_id) {
   struct MsdBuffer* buffer = msd_driver_import_buffer(vmo.release(), client_id);
   if (!buffer)
     return MAGMA_DRETP(nullptr, "msd_driver_import_buffer failed");
@@ -61,8 +61,8 @@ std::unique_ptr<msd::Buffer> CppDriver::ImportBuffer(zx::vmo vmo, uint64_t clien
   return std::make_unique<CppBuffer>(buffer);
 }
 
-magma_status_t CppDriver::ImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
-                                          std::unique_ptr<msd::Semaphore>* out) {
+magma_status_t CppDriver::MsdImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
+                                             std::unique_ptr<msd::Semaphore>* out) {
   struct MsdSemaphore* msd_semaphore = nullptr;
 
   magma_status_t status =
@@ -78,4 +78,4 @@ magma_status_t CppDriver::ImportSemaphore(zx::handle handle, uint64_t client_id,
 }  // namespace msd
 
 // static
-std::unique_ptr<msd::Driver> msd::Driver::Create() { return std::make_unique<CppDriver>(); }
+std::unique_ptr<msd::Driver> msd::Driver::MsdCreate() { return std::make_unique<CppDriver>(); }

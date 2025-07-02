@@ -13,70 +13,66 @@ load(
     "tool_path",
     "with_feature_set",
 )
+load("//common:toolchains/clang/cc_features.bzl", "action_names", "get_default_compile_flags_feature")
 load(
     "//common:toolchains/clang/clang_utils.bzl",
     "format_labels_list_to_target_tag_native_glob_select",
+    "to_clang_target_tuple",
 )
+load("//common:toolchains/clang/macos_xcode_utils.bzl", "generate_macos_system_filegroups")
 load("//common:toolchains/clang/providers.bzl", "ClangInfo")
 load("//common:toolchains/clang/sanitizer.bzl", "sanitizer_features")
 load("//common/platforms:utils.bzl", "to_fuchsia_cpu_name", "to_fuchsia_os_name")
 
-_all_actions = [
-    ACTION_NAMES.assemble,
-    ACTION_NAMES.preprocess_assemble,
-    ACTION_NAMES.c_compile,
-    ACTION_NAMES.cpp_compile,
-    ACTION_NAMES.cpp_module_compile,
-    ACTION_NAMES.objc_compile,
-    ACTION_NAMES.objcpp_compile,
-    ACTION_NAMES.cpp_header_parsing,
-    ACTION_NAMES.clif_match,
-]
-
 # buildifier: disable=unused-variable
-_all_compile_actions = [
-    ACTION_NAMES.assemble,
-    ACTION_NAMES.preprocess_assemble,
-    ACTION_NAMES.linkstamp_compile,
-    ACTION_NAMES.c_compile,
-    ACTION_NAMES.cpp_compile,
-    ACTION_NAMES.cpp_header_parsing,
-    ACTION_NAMES.cpp_module_compile,
-    ACTION_NAMES.cpp_module_codegen,
-    ACTION_NAMES.lto_backend,
-    ACTION_NAMES.clif_match,
-]
-
-# buildifier: disable=unused-variable
-_all_cpp_compile_actions = [
-    ACTION_NAMES.linkstamp_compile,
-    ACTION_NAMES.cpp_compile,
-    ACTION_NAMES.cpp_header_parsing,
-    ACTION_NAMES.cpp_module_compile,
-    ACTION_NAMES.cpp_module_codegen,
-    ACTION_NAMES.lto_backend,
-    ACTION_NAMES.clif_match,
-]
-
-_all_link_actions = [
-    ACTION_NAMES.cpp_link_executable,
-    ACTION_NAMES.cpp_link_dynamic_library,
-    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
-]
-
-# buildifier: disable=unused-variable
-def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
+def compute_clang_features(clang_info, repo_name, target_os, target_cpu, sysroot = ""):
     """Compute list of C++ toolchain features required by Clang.
 
     Args:
-      host_os: Host OS, following Fuchsia conventions.
-      host_cpu: Host CPU, following Fuchsia conventions.
+      clang_info: A ClangInfo provider value.
+      repo_name: The canonical name of the toolchain repository.
       target_os: Target OS, following Fuchsia conventions.
       target_cpu: Target CPU, following Fuchsia conventions.
+      sysroot: Optional path to sysroot.
 
     Returns:
       A list of feature() objects.
     """
+    host_os = clang_info.fuchsia_host_os
+    host_cpu = clang_info.fuchsia_host_arch
+
+    is_linux = target_os == "linux"
+    is_fuchsia = target_os == "fuchsia"
+    is_macos = target_os == "mac"
+
+    clang_tuple = to_clang_target_tuple(target_os, target_cpu)
+
+    default_compile_flags_feature = get_default_compile_flags_feature(clang_info, repo_name, target_os, target_cpu, sysroot = sysroot)
+
+    # A feature that adds a --target=<clang_tuple> to compiler and linker commands.
+    target_system_name_feature = feature(
+        # LINT.IfChange(target_system_name)
+        name = "target_system_name",
+        # LINT.ThenChange(cc_features.bzl)
+        flag_sets = [
+            flag_set(
+                actions = action_names.all_compile_actions + action_names.all_link_actions,
+                flag_groups = [
+                    flag_group(
+                        flags = ["--target=" + clang_tuple],
+                    ),
+                ],
+            ),
+        ],
+    )
+
+    # A hard-coded Bazel feature which indicates, when enabled, that the toolchain
+    # can produce PIC objects.
+    supports_pic_feature = feature(
+        name = "supports_pic",
+        enabled = is_linux or is_fuchsia,
+    )
+
     # Redefine the dependency_files feature in order to use -MMD instead of -MD
     # which ensures that system headers files are not listed in the dependency file.
     # Doing this allows remote builds to work with our prebuilt toolchain. Otherwise
@@ -117,7 +113,7 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = _all_actions,
+                actions = action_names.all_compile_actions,
                 flag_groups = [
                     flag_group(
                         flags = ["-MMD", "-MF", "%{dependency_file}"],
@@ -155,9 +151,6 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
             ),
         ],
     )
-
-    is_linux = target_os == "linux"
-    is_fuchsia = target_os == "fuchsia"
 
     coverage_feature = feature(
         name = "coverage",
@@ -207,7 +200,7 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         ] + (
             [
                 flag_set(
-                    actions = _all_link_actions,
+                    actions = action_names.all_link_actions,
                     flag_groups = [
                         flag_group(
                             flags = [
@@ -223,18 +216,16 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         ),
     )
 
-    is_macos = target_os == "mac"
-
     generate_linkmap_feature = feature(
         name = "generate_linkmap",
         enabled = True,
         flag_sets = [
             flag_set(
-                actions = _all_link_actions,
+                actions = action_names.all_link_actions,
                 flag_groups = [
                     flag_group(
                         flags = [
-                            "-Wl,-Map=%{output_execpath}.map" if is_macos else "-Wl,--Map=%{output_execpath}.map",
+                            "-Wl,-map,%{output_execpath}.map" if is_macos else "-Wl,--Map=%{output_execpath}.map",
                         ],
                         expand_if_available = "output_execpath",
                     ),
@@ -260,7 +251,7 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
                 # Regretably, Bazel does not differentiate C-only and C++ link
                 # actions, so this flag will be applied to both cases
                 # indiscriminately.
-                actions = _all_cpp_compile_actions + _all_link_actions,
+                actions = action_names.all_cpp_compile_actions + action_names.all_link_actions,
                 flag_groups = [
                     flag_group(
                         flags = [
@@ -276,7 +267,7 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         name = "static_cpp_standard_library",
         flag_sets = [
             flag_set(
-                actions = _all_link_actions,
+                actions = action_names.all_link_actions,
                 flag_groups = [
                     flag_group(
                         flags = [
@@ -291,6 +282,9 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
     )
 
     features = [
+        default_compile_flags_feature,
+        target_system_name_feature,
+        supports_pic_feature,
         coverage_feature,
         dbg_feature,
         dependency_file_feature,
@@ -301,17 +295,30 @@ def compute_clang_features(host_os, host_cpu, target_os, target_cpu):
         static_cpp_standard_library_feature,
     ] + sanitizer_features
 
+    # This feature adds an RPATH entry into the final binary. We do not want this
+    # because it is not valid for fuchsia since we install all of our libraries
+    # in /lib of our package. Enabling this just adds size to our binaries.
+    if is_fuchsia:
+        # https://cs.opensource.google/bazel/bazel/+/master:src/main/java/com/google/devtools/build/lib/rules/cpp/CppActionConfigs.java;drc=19019ac31f6ded3eecbcb73b1bc3c1e8961b75aa;l=528
+        features.append(
+            feature(
+                name = "runtime_library_search_directories",
+                enabled = False,
+            ),
+        )
+
     # TODO(https://fxbug.dev/356347441): Remove this once Bazel has been fixed.
     #
     # Adding this hard-coded feature to a C++ toolchain disables .d file processing.
     # Surprisingly, this is currently required to avoid incremental Bazel build
     # correctness issues that affect Bazel 7.2+ and 7.3.1, such as the one described
     # in the associated bug.
-    no_dotd_file_feature = feature(
-        name = "no_dotd_file",
-        enabled = True,
+    features.append(
+        feature(
+            name = "no_dotd_file",
+            enabled = True,
+        ),
     )
-    features.append(no_dotd_file_feature)
 
     return features
 
@@ -351,6 +358,12 @@ def define_clang_runtime_filegroups(clang_constants):
             "include/c++/v1/**",
         ]) + __config_site_sources,
     )
+
+    if clang_constants.fuchsia_host_os == "mac":
+        generate_macos_system_filegroups(
+            compiler_files_name = "mac-sdk-compiler-files",
+            linker_files_name = "mac-sdk-linker-files",
+        )
 
     native.filegroup(
         name = "libcxx_runtime_libs",
@@ -415,7 +428,14 @@ def define_clang_runtime_filegroups(clang_constants):
                 extra_dict = {
                     "internal_dir": clang_constants.lib_clang_internal_dir,
                 },
-            ),
+            ) +
+            # As a special case, the libc++ runtime libraries for host MacOS
+            # are not under lib/aarch64-apple-darwin/ but directly under lib/
+            # and only a few static libraries are provided.
+            select({
+                "@platforms//os:macos": native.glob(["lib/*.a"]),
+                "//conditions:default": [],
+            }),
     )
 
 def _prebuilt_clang_cc_toolchain_config_impl(ctx):
@@ -442,10 +462,11 @@ def _prebuilt_clang_cc_toolchain_config_impl(ctx):
 
     # TODO(digit): Change features list based on build variants
     features = compute_clang_features(
-        clang_info.fuchsia_host_os,
-        clang_info.fuchsia_host_arch,
+        clang_info,
+        ctx.attr.toolchain_repo_name,
         to_fuchsia_os_name(ctx.attr.target_os),
         to_fuchsia_cpu_name(ctx.attr.target_arch),
+        sysroot = ctx.attr.sysroot,
     )
 
     return cc_common.create_cc_toolchain_config_info(
@@ -482,6 +503,7 @@ _prebuilt_clang_cc_toolchain_config = rule(
             mandatory = True,
             providers = [ClangInfo],
         ),
+        "toolchain_repo_name": attr.string(mandatory = True),
     },
 )
 
@@ -534,6 +556,7 @@ def generate_clang_cc_toolchain(
         target_arch = target_arch,
         sysroot = sysroot_path,
         clang_info = clang_info,
+        toolchain_repo_name = native.repo_name(),
     )
 
     common_compiler_files = [
@@ -545,6 +568,10 @@ def generate_clang_cc_toolchain(
         ":cc-linker-prebuilts",
         ":libcxx_runtime_libs",
     ]
+
+    if host_os == target_os and target_os == "macos":
+        common_compiler_files += [":mac-sdk-compiler-files"]
+        common_linker_files += [":mac-sdk-linker-files"]
 
     compiler_files = name + "_compiler_files"
     native.filegroup(

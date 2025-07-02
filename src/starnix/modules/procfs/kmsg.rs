@@ -3,9 +3,10 @@
 // found in the LICENSE file.
 
 use starnix_core::task::{CurrentTask, EventHandler, SyslogAccess, WaitCanceler, Waiter};
+use starnix_core::vfs::pseudo::simple_file::SimpleFileNode;
 use starnix_core::vfs::{
     fileops_impl_noop_sync, fileops_impl_seekless, FileObject, FileOps, FileSystemHandle,
-    FsNodeHandle, FsNodeInfo, InputBuffer, OutputBuffer, SimpleFileNode,
+    FsNodeHandle, FsNodeInfo, InputBuffer, OutputBuffer,
 };
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::auth::FsCred;
@@ -13,11 +14,10 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::vfs::FdEvents;
 use starnix_uapi::{error, mode};
 
-pub fn kmsg_file(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
-    fs.create_node(
-        current_task,
+pub fn kmsg_file(fs: &FileSystemHandle) -> FsNodeHandle {
+    fs.create_node_and_allocate_node_id(
         SimpleFileNode::new(|| Ok(KmsgFile)),
-        FsNodeInfo::new_factory(mode!(IFREG, 0o100), FsCred::root()),
+        FsNodeInfo::new(mode!(IFREG, 0o100), FsCred::root()),
     )
 }
 
@@ -29,7 +29,7 @@ impl FileOps for KmsgFile {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
         waiter: &Waiter,
@@ -43,7 +43,7 @@ impl FileOps for KmsgFile {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -57,7 +57,7 @@ impl FileOps for KmsgFile {
 
     fn read(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         _offset: usize,
@@ -72,7 +72,7 @@ impl FileOps for KmsgFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

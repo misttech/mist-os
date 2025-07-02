@@ -49,7 +49,59 @@ To flash a Fuchsia image on your device, do the following:
 
    Verify that the device's state is `Fastboot`.
 
-4. Flash the device:
+   If `ffx target list` shows only a single device in Fastboot mode (as in
+   the example above), `ffx` commands automatically target it. However,
+   if multiple devices are connected, you need to specify a target device.
+
+4. (**Optional**) Set a default Fuchsia target if multiple devices are present.
+
+   This step is needed if the `ffx target list` command in step 3 shows
+   multiple devices and you wish to set a default target for `ffx` commands
+   (instead of using the `--target` flag).
+
+   Setting a default Fuchsia target depends on the environment that you're
+   working in:
+
+   * {Fuchsia SDK}
+
+     For the Fuchsia SDK environment, use the `FUCHSIA_NODENAME` environment
+     variable to set the target:
+
+     ```posix-terminal
+     FUCHSIA_NODENAME=<TARGET_DEVICE>
+     ```
+
+     For example:
+
+     ```none {:.devsite-disable-click-to-copy}
+     $ FUCHSIA_NODENAME=fuchsia-5254-0063-5e7a
+     ```
+
+   * {fuchsia.git}
+
+     When working in the Fuchsia source checkout (`fuchsia.git`) environment,
+     you can run the following `fx` command to set a default target device
+     for your current build directory:
+
+     ```posix-terminal
+     fx set-device <TARGET_DEVICE>`
+     ```
+
+     For example:
+
+     ```none {:.devsite-disable-click-to-copy}
+     $ fx set-device fuchsia-5254-0063-5e7a
+     ```
+
+     Note: Having the `FUCHSIA_NODENAME` environment variable set
+     overrides the `fx set-device` default target.
+
+     You can run `fx unset-device` to unset the default target.
+
+
+   Tip: Run `ffx target default get` to verify your default target.
+
+5. Flash the device:
 
    ```posix-terminal
    ffx target flash <FUCHSIA_IMAGE>
@@ -57,7 +109,6 @@ To flash a Fuchsia image on your device, do the following:
 
    Replace `FUCHSIA_IMAGE` with an archive file that contains
    a Fuchsia prebuilt image and its flash manifest file, for example:
-
 
    ```none {:.devsite-disable-click-to-copy}
    $ ffx target flash ~/Downloads/fuchsia-image-example.zip

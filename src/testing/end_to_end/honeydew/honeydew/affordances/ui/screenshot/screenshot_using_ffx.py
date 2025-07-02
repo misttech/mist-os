@@ -30,6 +30,14 @@ class ScreenshotUsingFfx(screenshot.Screenshot):
 
     def __init__(self, ffx: ffx_transport.FFX) -> None:
         self._ffx: ffx_transport.FFX = ffx
+        self.verify_supported()
+
+    def verify_supported(self) -> None:
+        """Check if UI Screenshot is supported on the DUT.
+        Raises:
+            NotSupportedError: Screenshot affordance is not supported by Fuchsia device.
+        """
+        # TODO(http://b/409624046): Implement the method logic
 
     def take(self) -> types.ScreenshotImage:
         """Take a screenshot.

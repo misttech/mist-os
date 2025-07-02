@@ -108,15 +108,12 @@ void MockDisplayCoordinator::CheckConfig(
     CheckConfigCompleter::Sync& completer) {
   fuchsia_hardware_display_types::ConfigResult result =
       fuchsia_hardware_display_types::ConfigResult::kOk;
-  std::vector<fuchsia_hardware_display::wire::ClientCompositionOp> ops;
   ++check_config_count_;
   if (check_config_fn_) {
-    check_config_fn_(request->discard, &result, &ops);
+    check_config_fn_(request->discard, &result);
   }
 
-  completer.Reply(
-      result,
-      fidl::VectorView<fuchsia_hardware_display::wire::ClientCompositionOp>::FromExternal(ops));
+  completer.Reply(result);
 }
 
 void MockDisplayCoordinator::AcknowledgeVsync(

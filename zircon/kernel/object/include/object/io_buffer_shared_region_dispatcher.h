@@ -21,6 +21,8 @@ class IoBufferSharedRegionDispatcher
   static zx_status_t Create(uint64_t size, KernelHandle<IoBufferSharedRegionDispatcher>* handle,
                             zx_rights_t* rights);
 
+  ~IoBufferSharedRegionDispatcher() { mapping_->Destroy(); }
+
   // SoloDispatcher implementation.
   zx_obj_type_t get_type() const final { return ZX_OBJ_TYPE_IOB_SHARED_REGION; }
 

@@ -9,8 +9,10 @@
 #include <fidl/fuchsia.vulkan.loader/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/component/incoming/cpp/service_member_watcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/fdio/namespace.h>
+#include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
@@ -38,15 +40,38 @@ const char* kIcdFilename = "0-libvulkan_fake.so";
 // the ICD shared library, since the contents don't matter for these tests as long as the file is
 // marked executable.
 
-class VulkanLoader : public testing::Test {
+class VulkanLoader : public testing::TestWithParam<bool> {
+ public:
+  bool is_trusted() const { return GetParam(); }
+
  protected:
   void SetUp() override {
     loop_.StartThread();
+
     auto builder = component_testing::RealmBuilder::CreateFromRelativeUrl("#meta/test_realm.cm");
     realm_ = builder.Build(loop_.dispatcher());
-    auto client_end = realm().component().Connect<fuchsia_vulkan_loader::Loader>();
-    ASSERT_TRUE(client_end.is_ok()) << client_end.status_string();
-    loader_ = fidl::WireSyncClient(std::move(*client_end));
+
+    fidl::ClientEnd<fuchsia_vulkan_loader::Loader> client_end;
+    if (is_trusted()) {
+      fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root(
+          realm().component().exposed().unowned_channel());
+
+      component::SyncServiceMemberWatcher<fuchsia_vulkan_loader::TrustedService::Loader> watcher(
+          std::move(svc_root));
+
+      // Wait indefinitely until a service instance appears in the service directory
+      auto client_end_result = watcher.GetNextInstance(false);
+      ASSERT_TRUE(client_end_result.is_ok());
+
+      client_end = std::move(client_end_result.value());
+    } else {
+      auto client_end_result = realm().component().Connect<fuchsia_vulkan_loader::Loader>();
+      ASSERT_TRUE(client_end_result.is_ok());
+
+      client_end = std::move(client_end_result.value());
+    }
+
+    loader_ = fidl::WireSyncClient(std::move(client_end));
   }
 
   void TearDown() override { loop_.Shutdown(); }
@@ -71,7 +96,7 @@ class VulkanLoader : public testing::Test {
 
 // Test that loader service can use `metadata.json` and `libvulkan_fake.json` to load the ICD, and
 // that the ICD VMO returned has the correct properties.
-TEST_F(VulkanLoader, ManifestLoad) {
+TEST_P(VulkanLoader, ManifestLoad) {
   // manifest.json remaps 0-libvulkan_fake.so to bin/pkg-server.
   zx::result icd = GetIcd(kIcdFilename);
   ASSERT_TRUE(icd.is_ok()) << icd.status_string();
@@ -91,7 +116,7 @@ TEST_F(VulkanLoader, ManifestLoad) {
 // Check that writes to one VMO returned by the server will not modify a separate VMO returned by
 // the service. Requires that zx_process_write_memory is enabled on the device for the result to be
 // meaningful.
-TEST_F(VulkanLoader, VmosIndependent) {
+TEST_P(VulkanLoader, VmosIndependent) {
   // manifest.json remaps this to bin/pkg-server.
   zx::result icd = GetIcd(kIcdFilename);
   ASSERT_TRUE(icd.is_ok()) << icd.status_string();
@@ -128,8 +153,8 @@ TEST_F(VulkanLoader, VmosIndependent) {
   EXPECT_EQ(original_value, *static_cast<uint8_t*>(mapper2.start()));
 }
 
-// Test that the DeviceFs returned from `ConnectToDeviceFs` looks as expected.
-TEST_F(VulkanLoader, DeviceFs) {
+// TODO(b/419087951) - remove
+TEST_P(VulkanLoader, DeprecatedDeviceFs) {
   auto dev_fs = fidl::Endpoints<fuchsia_io::Directory>::Create();
   {
     auto response = loader()->ConnectToDeviceFs(dev_fs.server.TakeChannel());
@@ -151,8 +176,32 @@ TEST_F(VulkanLoader, DeviceFs) {
   EXPECT_EQ((*response)->simple_result(), 5u);
 }
 
+// Test that the DeviceFs returned from `ConnectToDeviceFs` looks as expected.
+TEST_P(VulkanLoader, DeviceFs) {
+  auto dev_fs = fidl::Endpoints<fuchsia_io::Directory>::Create();
+  {
+    auto response = loader()->ConnectToDeviceFs(dev_fs.server.TakeChannel());
+    ASSERT_TRUE(response.ok()) << response;
+  }
+  ASSERT_TRUE(GetIcd(kIcdFilename).is_ok());  // Wait for idle.
+
+  auto device = fidl::CreateEndpoints<fuchsia_gpu_magma::Device>();
+  ASSERT_TRUE(device.is_ok()) << device.status_string();
+  zx_status_t status =
+      fdio_service_connect_at(dev_fs.client.channel().get(), "svc/magma/some-instance-name/device",
+                              device->server.TakeChannel().release());
+  ASSERT_EQ(status, ZX_OK) << zx_status_get_string(status);
+
+  auto response =
+      fidl::WireCall(device->client)->Query(fuchsia_gpu_magma::wire::QueryId::kVendorId);
+  ASSERT_TRUE(response.ok()) << response;
+  ASSERT_TRUE(response->is_ok()) << zx_status_get_string(response->error_value());
+  ASSERT_TRUE((*response)->is_simple_result());
+  EXPECT_EQ((*response)->simple_result(), 5u);
+}
+
 // Test that `GetSupportedFeatures` returns the correct values.
-TEST_F(VulkanLoader, Features) {
+TEST_P(VulkanLoader, Features) {
   auto response = loader()->GetSupportedFeatures();
   ASSERT_TRUE(response.ok()) << response;
   constexpr fuchsia_vulkan_loader::Features kExpectedFeatures =
@@ -164,7 +213,7 @@ TEST_F(VulkanLoader, Features) {
 // Test that ConnectToManifestFs gives access to a manifest fs with the expected files.
 // https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0205_vulkan_loader?hl=en#filesystem_serving
 // describes the contents of this filesystem.
-TEST_F(VulkanLoader, ManifestFs) {
+TEST_P(VulkanLoader, ManifestFs) {
   auto manifest_fs = fidl::Endpoints<fuchsia_io::Directory>::Create();
   {
     auto response =
@@ -189,7 +238,7 @@ TEST_F(VulkanLoader, ManifestFs) {
 }
 
 // Test that the goldfish files in the device-fs are connected correctly.
-TEST_F(VulkanLoader, GoldfishSyncDeviceFs) {
+TEST_P(VulkanLoader, GoldfishSyncDeviceFs) {
   auto dev_fs = fidl::Endpoints<fuchsia_io::Directory>::Create();
   {
     auto response = loader()->ConnectToDeviceFs(dev_fs.server.TakeChannel());
@@ -219,7 +268,7 @@ TEST_F(VulkanLoader, GoldfishSyncDeviceFs) {
 
 // Test that the manifest FS and device FS are exposed through out/debug from the component, and
 // that they have the right contents (see src/graphics/bin/vulkan_loader/README.md for details).
-TEST_F(VulkanLoader, DebugFilesystems) {
+TEST_P(VulkanLoader, DebugFilesystems) {
   ASSERT_TRUE(GetIcd(kIcdFilename).is_ok());  // Wait for idle.
 
   auto client_end = realm().component().Connect<fuchsia_sys2::RealmQuery>();
@@ -243,3 +292,8 @@ TEST_F(VulkanLoader, DebugFilesystems) {
   EXPECT_TRUE(std::filesystem::exists(debug_path + "device-fs/class/gpu/000"));
   EXPECT_TRUE(std::filesystem::exists(debug_path + "manifest-fs/" + kIcdFilename + ".json"));
 }
+
+INSTANTIATE_TEST_SUITE_P(, VulkanLoader, testing::Values(true, false),
+                         [](testing::TestParamInfo<bool> info) {
+                           return info.param ? "Trusted" : "Untrusted";
+                         });

@@ -36,7 +36,6 @@
 #include "src/graphics/display/lib/api-types/cpp/engine-info.h"
 #include "src/graphics/display/lib/api-types/cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types/cpp/image-metadata.h"
-#include "src/graphics/display/lib/api-types/cpp/layer-composition-operations.h"
 #include "src/graphics/display/lib/api-types/cpp/mode-id.h"
 
 namespace fake_display {
@@ -105,9 +104,7 @@ class FakeDisplay : public display::DisplayEngineInterface {
   void ReleaseImage(display::DriverImageId image_id) override __TA_EXCLUDES(mutex_);
   display::ConfigCheckResult CheckConfiguration(
       display::DisplayId display_id, display::ModeId display_mode_id,
-      cpp20::span<const display::DriverLayer> layers,
-      cpp20::span<display::LayerCompositionOperations> layer_composition_operations) override
-      __TA_EXCLUDES(mutex_);
+      cpp20::span<const display::DriverLayer> layers) override __TA_EXCLUDES(mutex_);
   void ApplyConfiguration(display::DisplayId display_id, display::ModeId display_mode_id,
                           cpp20::span<const display::DriverLayer> layers,
                           display::DriverConfigStamp config_stamp) override __TA_EXCLUDES(mutex_);

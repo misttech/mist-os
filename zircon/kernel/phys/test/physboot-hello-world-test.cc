@@ -12,7 +12,12 @@
 
 #include <phys/handoff.h>
 
+PhysHandoff* gPhysHandoff = nullptr;
+
 void PhysbootHandoff(PhysHandoff* handoff) {
+  // Temporary hand-off pointer dereferencing checks that this is set.
+  gPhysHandoff = handoff;
+
   uart::all::KernelDriver<uart::BasicIoProvider, uart::UnsynchronizedPolicy>(
       handoff->boot_options->serial)
       .Visit([](auto& uart) {
@@ -22,11 +27,6 @@ void PhysbootHandoff(PhysHandoff* handoff) {
         uart.Write("\n" BOOT_TEST_SUCCESS_STRING "\n");
       });
   abort();
-}
-
-template <>
-void* PhysHandoffPtrImportPhysAddr<PhysHandoffPtrEncoding::PhysAddr>(uintptr_t ptr) {
-  return reinterpret_cast<void*>(ptr);
 }
 
 // This is what ZX_ASSERT calls.

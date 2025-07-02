@@ -726,7 +726,7 @@ mod tests {
     use core::fmt::Debug;
     use core::time::Duration;
 
-    use packet::{ParseBuffer, Serializer};
+    use packet::{PacketBuilder, ParseBuffer, Serializer};
 
     use super::*;
     use crate::igmp::testdata::*;
@@ -751,9 +751,8 @@ mod tests {
     where
         M::VariableBody: IgmpNonEmptyBody,
     {
-        M::body_bytes(&igmp.body)
-            .into_serializer()
-            .encapsulate(igmp.builder())
+        igmp.builder()
+            .wrap_body(M::body_bytes(&igmp.body).into_serializer())
             .serialize_vec_outer()
             .unwrap()
             .as_ref()
@@ -966,7 +965,7 @@ mod tests {
         let mut reports = reports.map(|builder| {
             builder
                 .into_serializer()
-                .encapsulate(ip_builder.clone())
+                .wrap_in(ip_builder.clone())
                 .serialize_vec_outer()
                 .unwrap_or_else(|(err, _)| panic!("{err:?}"))
                 .unwrap_b()
@@ -1050,7 +1049,7 @@ mod tests {
         let mut reports = reports.map(|builder| {
             builder
                 .into_serializer()
-                .encapsulate(ip_builder.clone())
+                .wrap_in(ip_builder.clone())
                 .serialize_vec_outer()
                 .unwrap_or_else(|(err, _)| panic!("{err:?}"))
                 .unwrap_b()

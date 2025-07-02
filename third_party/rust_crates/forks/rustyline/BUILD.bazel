@@ -62,7 +62,9 @@ rust_library(
         "norustfmt",
     ],
     target_compatible_with = select({
+        "@rules_rust//rust/platform:aarch64-apple-darwin": [],
         "@rules_rust//rust/platform:aarch64-unknown-fuchsia": [],
+        "@rules_rust//rust/platform:x86_64-apple-darwin": [],
         "@rules_rust//rust/platform:x86_64-unknown-fuchsia": [],
         "@rules_rust//rust/platform:x86_64-unknown-linux-gnu": [],
         "//conditions:default": ["@platforms//:incompatible"],
@@ -75,7 +77,15 @@ rust_library(
         "//third_party/rust_crates/vendor/unicode-segmentation-1.12.0:unicode_segmentation",
         "//third_party/rust_crates/vendor/unicode-width-0.1.14:unicode_width",
     ] + select({
+        "@rules_rust//rust/platform:aarch64-apple-darwin": [
+            "//third_party/rust_crates/vendor/nix-0.26.2:nix",  # cfg(all(unix, not(any(target_os = "fuchsia"))))
+            "//third_party/rust_crates/vendor/utf8parse-0.1.1:utf8parse",  # cfg(unix)
+        ],
         "@rules_rust//rust/platform:aarch64-unknown-fuchsia": [
+            "//third_party/rust_crates/vendor/utf8parse-0.1.1:utf8parse",  # cfg(unix)
+        ],
+        "@rules_rust//rust/platform:x86_64-apple-darwin": [
+            "//third_party/rust_crates/vendor/nix-0.26.2:nix",  # cfg(all(unix, not(any(target_os = "fuchsia"))))
             "//third_party/rust_crates/vendor/utf8parse-0.1.1:utf8parse",  # cfg(unix)
         ],
         "@rules_rust//rust/platform:x86_64-unknown-fuchsia": [

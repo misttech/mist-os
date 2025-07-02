@@ -34,12 +34,7 @@ class ScreenshotAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
 
     def setup_test(self) -> None:
         super().setup_test()
-        self.device.session.stop()
-        self.device.session.start()
-
-    def teardown_test(self) -> None:
-        self.device.session.stop()
-        super().teardown_test()
+        self.device.session.ensure_started()
 
     def test_take_screenshot(self) -> None:
         # We launch the test app that draws something on the screen.

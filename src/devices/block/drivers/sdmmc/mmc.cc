@@ -475,6 +475,28 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
     }
   }
 
+  if (raw_ext_csd_[MMC_EXT_CSD_BARRIER_SUPPORT] & MMC_EXT_CSD_BARRIER_SUPPORTED) {
+    zx_status_t st = MmcDoSwitch(MMC_EXT_CSD_BARRIER_CTRL, MMC_EXT_CSD_BARRIER_EN_MASK);
+    if (st != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "Failed to set enable barriers: %s", zx_status_get_string(st));
+      return st;
+    }
+    // Read extended CSD register again to verify that barriers have been enabled.
+    if ((st = sdmmc_->MmcSendExtCsd(raw_ext_csd_)) != ZX_OK) {
+      FDF_LOGL(ERROR, logger(), "MMC_SEND_EXT_CSD failed: %s", zx_status_get_string(st));
+      return st;
+    }
+    if (!(raw_ext_csd_[MMC_EXT_CSD_BARRIER_CTRL] & MMC_EXT_CSD_BARRIER_EN_MASK)) {
+      FDF_LOGL(ERROR, logger(), "Barriers are unexpectedly disabled.");
+      return ZX_ERR_BAD_STATE;
+    }
+    barrier_enabled_ = true;
+  }
+
+  if (raw_ext_csd_[MMC_EXT_CSD_CACHE_FLUSH_POLICY] & MMC_EXT_CSD_CACHE_FLUSH_POLICY_FIFO) {
+    cache_flush_fifo_ = true;
+  }
+
   if (removable) {
     block_info_.flags |= FLAG_REMOVABLE;
   }
@@ -499,6 +521,10 @@ zx_status_t SdmmcBlockDevice::ProbeMmcLocked(
                zx_status_get_string(st));
       return st;
     }
+  }
+
+  if (metadata.vccq_off_with_controller_off()) {
+    vccq_off_with_controller_off_ = *metadata.vccq_off_with_controller_off();
   }
 
   return ZX_OK;
@@ -579,9 +605,7 @@ void SdmmcBlockDevice::MmcSetInspectProperties() {
   properties_.cache_size_bits_ =
       root_.CreateUint("cache_size_bits", GetCacheSizeBits(raw_ext_csd_));
   properties_.cache_enabled_ = root_.CreateBool("cache_enabled", cache_enabled_);
-  properties_.cache_flush_fifo_ =
-      root_.CreateBool("cache_flush_fifo", raw_ext_csd_[MMC_EXT_CSD_CACHE_FLUSH_POLICY] &
-                                               MMC_EXT_CSD_CACHE_FLUSH_POLICY_FIFO);
+  properties_.cache_flush_fifo_ = root_.CreateBool("cache_flush_fifo", cache_flush_fifo_);
   properties_.barrier_supported_ =
       root_.CreateBool("barrier_supported",
                        raw_ext_csd_[MMC_EXT_CSD_BARRIER_SUPPORT] & MMC_EXT_CSD_BARRIER_SUPPORTED);

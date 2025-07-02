@@ -12,6 +12,11 @@ declare_args() {
   # LINT.ThenChange(//build/bazel/BUILD.gn)
 }
 
+_clang_prefix_test = string_replace("##${clang_prefix}", "##/tmp/", "")
+assert(
+    _clang_prefix_test == "##${clang_prefix}",
+    "clang_prefix can't be in /tmp, which is overwritten in Bazel sandboxes, got ${clang_prefix}")
+
 # The value of clang_prefix relative to root_build_dir, useful
 # when expanding it in command arguments.
 rebased_clang_prefix = rebase_path(clang_prefix, root_build_dir)

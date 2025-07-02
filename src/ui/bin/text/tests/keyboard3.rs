@@ -71,10 +71,9 @@ impl TestEnvironment {
         P: fidl::endpoints::Proxy,
         P::Protocol: fidl::endpoints::DiscoverableProtocolMarker,
     {
-        let conn =
-            self.realm.root.connect_to_protocol_at_exposed_dir::<P::Protocol>().with_context(
-                || format!("Failed to connect to test realm's {}", P::Protocol::DEBUG_NAME),
-            );
+        let conn = self.realm.root.connect_to_protocol_at_exposed_dir().with_context(|| {
+            format!("Failed to connect to test realm's {}", P::Protocol::DEBUG_NAME)
+        });
         log::debug!("Connected to test realm's {}", P::Protocol::DEBUG_NAME);
         conn
     }

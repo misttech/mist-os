@@ -29,6 +29,9 @@ import("//build/testing/test_spec.gni")
 #   timeout_secs (optional)
 #     [int] The infra timeout in seconds for the test.
 #
+#   name (optional)
+#     [string] Optionally override the name of the resulting test. Used for display and grouping.
+#
 #   deps, environments, data_deps, public_deps, visibility
 #     Forwarded from invoker.
 #
@@ -90,6 +93,7 @@ template("host_test") {
                            [
                              "environments",
                              "metadata",
+                             "name",
                              "visibility",
                              "isolated",
                              "timeout_secs",

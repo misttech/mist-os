@@ -426,6 +426,8 @@ def write_toml_file(
                     # versions of the same crate declared with different
                     # features.
                     continue
+                # Remove the trailing suffix from proc-macro crates
+                version = version.removesuffix("_proc_macro")
                 dep_crate_names.add(crate_name)
                 version = version.replace("_", ".")
                 fout.write('[%s."%s"]\n' % (dep_type, crate_name))

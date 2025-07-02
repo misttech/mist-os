@@ -24,6 +24,7 @@ rustc_library("lib") {
     "//src/developer/ffx/plugins/target/bootloader:*",
     "//src/developer/ffx/plugins/target/fastboot:*",
     "//src/developer/ffx/plugins/target/flash:*",
+    "//src/developer/ffx/plugins/target/status:*",
   ]
 
   deps = [

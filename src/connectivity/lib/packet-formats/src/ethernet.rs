@@ -456,21 +456,24 @@ mod tests {
         );
     }
 
+    fn new_test_ethernet_packet_builder() -> EthernetFrameBuilder {
+        EthernetFrameBuilder::new(
+            DEFAULT_SRC_MAC,
+            DEFAULT_DST_MAC,
+            EtherType::Arp,
+            ETHERNET_MIN_BODY_LEN_NO_TAG,
+        )
+    }
+
     #[test]
     fn test_serialize() {
-        let buf = (&new_serialize_buf()[..])
-            .into_serializer()
-            .encapsulate(EthernetFrameBuilder::new(
-                DEFAULT_DST_MAC,
-                DEFAULT_SRC_MAC,
-                EtherType::Arp,
-                ETHERNET_MIN_BODY_LEN_NO_TAG,
-            ))
+        let buf = new_test_ethernet_packet_builder()
+            .wrap_body((&new_serialize_buf()[..]).into_serializer())
             .serialize_vec_outer()
             .unwrap();
         assert_eq!(
             &buf.as_ref()[..ETHERNET_HDR_LEN_NO_TAG],
-            [6, 7, 8, 9, 10, 11, 0, 1, 2, 3, 4, 5, 0x08, 0x06]
+            [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0x08, 0x06]
         );
     }
 
@@ -479,25 +482,15 @@ mod tests {
         // Test that EthernetFrame::serialize properly zeroes memory before
         // serializing the header.
         let mut buf_0 = [0; ETHERNET_MIN_FRAME_LEN];
-        let _: Buf<&mut [u8]> = Buf::new(&mut buf_0[..], ETHERNET_HDR_LEN_NO_TAG..)
-            .encapsulate(EthernetFrameBuilder::new(
-                DEFAULT_SRC_MAC,
-                DEFAULT_DST_MAC,
-                EtherType::Arp,
-                ETHERNET_MIN_BODY_LEN_NO_TAG,
-            ))
+        let _: Buf<&mut [u8]> = new_test_ethernet_packet_builder()
+            .wrap_body(Buf::new(&mut buf_0[..], ETHERNET_HDR_LEN_NO_TAG..))
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
         let mut buf_1 = [0; ETHERNET_MIN_FRAME_LEN];
         (&mut buf_1[..ETHERNET_HDR_LEN_NO_TAG]).copy_from_slice(&[0xFF; ETHERNET_HDR_LEN_NO_TAG]);
-        let _: Buf<&mut [u8]> = Buf::new(&mut buf_1[..], ETHERNET_HDR_LEN_NO_TAG..)
-            .encapsulate(EthernetFrameBuilder::new(
-                DEFAULT_SRC_MAC,
-                DEFAULT_DST_MAC,
-                EtherType::Arp,
-                ETHERNET_MIN_BODY_LEN_NO_TAG,
-            ))
+        let _: Buf<&mut [u8]> = new_test_ethernet_packet_builder()
+            .wrap_body(Buf::new(&mut buf_1[..], ETHERNET_HDR_LEN_NO_TAG..))
             .serialize_vec_outer()
             .unwrap()
             .unwrap_a();
@@ -558,13 +551,7 @@ mod tests {
         let mut b = [&mut buf[..]];
         let buf = b.as_fragmented_byte_slice();
         let (header, body, footer) = buf.try_split_contiguous(ETHERNET_HDR_LEN_NO_TAG..).unwrap();
-        EthernetFrameBuilder::new(
-            Mac::new([0, 1, 2, 3, 4, 5]),
-            Mac::new([6, 7, 8, 9, 10, 11]),
-            EtherType::Arp,
-            ETHERNET_MIN_BODY_LEN_NO_TAG,
-        )
-        .serialize(&mut SerializeTarget { header, footer }, body);
+        new_test_ethernet_packet_builder().serialize(&mut SerializeTarget { header, footer }, body);
     }
 
     #[test]

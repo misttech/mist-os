@@ -44,7 +44,7 @@ sdk_source_set("manager") {
     "visitor.h",
   ]
 
-  non_sdk_local_deps = [
+  non_sdk_deps = [
     "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
   ]

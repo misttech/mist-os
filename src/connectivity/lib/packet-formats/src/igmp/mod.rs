@@ -381,7 +381,7 @@ pub fn peek_message_type<MessageType: TryFrom<u8>>(
 #[cfg(test)]
 mod tests {
 
-    use packet::{ParseBuffer, Serializer};
+    use packet::{PacketBuilder, ParseBuffer, Serializer};
 
     use super::*;
     use crate::igmp::messages::*;
@@ -398,13 +398,10 @@ mod tests {
         dst_ip: Ipv4Addr,
     ) -> Vec<u8> {
         let ipv4 = Ipv4PacketBuilder::new(src_ip, dst_ip, 1, Ipv4Proto::Igmp);
-        let with_options =
-            Ipv4PacketBuilderWithOptions::new(ipv4, &[Ipv4Option::RouterAlert { data: 0 }])
-                .unwrap();
 
-        igmp.builder()
-            .into_serializer()
-            .encapsulate(with_options)
+        Ipv4PacketBuilderWithOptions::new(ipv4, &[Ipv4Option::RouterAlert { data: 0 }])
+            .unwrap()
+            .wrap_body(igmp.builder().into_serializer())
             .serialize_vec_outer()
             .unwrap()
             .as_ref()

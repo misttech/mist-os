@@ -11,6 +11,7 @@ use from_enum::FromEnum;
 use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::hash::Hash;
+use strum_macros::EnumIter;
 use thiserror::Error;
 use {
     fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
@@ -2042,7 +2043,7 @@ pub trait ExposeDeclCommon: SourceName + SourcePath + fmt::Debug + Send + Sync {
 ///
 /// `CapabilityTypeName` provides a user friendly type encoding for a capability.
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
 pub enum CapabilityTypeName {
     Directory,
     EventStream,
@@ -2513,7 +2514,7 @@ impl NativeIntoFidl<fdecl::Ref> for ExposeSource {
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum ExposeTarget {
     Parent,
     Framework,

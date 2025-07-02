@@ -39,7 +39,7 @@ source_set("thread") {
   configs -= [ "//build/config:symbol_visibility_hidden" ]
 
   # This is needed by allocate.c for "hwasan-stubs.h".
-  include_dirs = [ "//zircon/system/ulib/c/sanitizers" ]
+  include_dirs = [ "//sdk/lib/c/sanitizers" ]
 }
 
 source_set("tls_get_addr") {

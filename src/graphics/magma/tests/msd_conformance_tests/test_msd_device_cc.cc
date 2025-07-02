@@ -8,10 +8,10 @@
 #include <gtest/gtest.h>
 
 TEST(MsdDevice, CreateAndDestroy) {
-  auto msd_driver = msd::Driver::Create();
+  auto msd_driver = msd::Driver::MsdCreate();
   ASSERT_NE(msd_driver, nullptr);
 
-  auto msd_device = msd_driver->CreateDevice(GetTestDeviceHandle());
+  auto msd_device = msd_driver->MsdCreateDevice(GetTestDeviceHandle());
   ASSERT_NE(msd_device, nullptr);
   msd_device.reset();
   msd_driver.reset();

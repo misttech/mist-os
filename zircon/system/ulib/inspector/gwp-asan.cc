@@ -12,7 +12,7 @@
 #include <cstring>
 #include <vector>
 
-#include "zircon/system/ulib/c/scudo/gwp_asan_info.h"
+#include "sdk/lib/c/scudo/gwp_asan_info.h"
 
 namespace inspector {
 

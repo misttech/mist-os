@@ -55,8 +55,8 @@ mod tests {
     use diagnostics_assertions::assert_data_tree;
     use fuchsia_inspect::Inspector;
 
-    #[test]
-    fn success() {
+    #[fuchsia::test]
+    async fn success() {
         let inspector = Inspector::default();
 
         let () = write_to_inspect(inspector.root(), Ok(()), Duration::from_micros(2));
@@ -71,8 +71,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn failure_verify() {
+    #[fuchsia::test]
+    async fn failure_verify() {
         let inspector = Inspector::default();
 
         let () = write_to_inspect(
@@ -96,8 +96,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn failure_timeout() {
+    #[fuchsia::test]
+    async fn failure_timeout() {
         let inspector = Inspector::default();
 
         let () = write_to_inspect(
@@ -119,8 +119,8 @@ mod tests {
         }
     }
 
-    #[test]
-    fn failure_internal() {
+    #[fuchsia::test]
+    async fn failure_internal() {
         let inspector = Inspector::default();
 
         let () = write_to_inspect(
@@ -143,8 +143,8 @@ mod tests {
     }
 
     /// Verify the reported duration is u64::MAX (millis), even if the actual duration is longer.
-    #[test]
-    fn success_duration_max_u64() {
+    #[fuchsia::test]
+    async fn success_duration_max_u64() {
         let inspector = Inspector::default();
 
         let () = write_to_inspect(inspector.root(), Ok(()), Duration::new(u64::MAX, 0));

@@ -6,6 +6,7 @@ use byteorder::{LittleEndian, WriteBytesExt};
 use std::convert::Infallible;
 use std::io;
 use std::marker::PhantomData;
+use std::num::NonZeroUsize;
 
 use crate::experimental::series::buffer::encoding;
 use crate::experimental::series::buffer::zigzag_simple8b_rle::ZigzagSimple8bRleRingBuffer;
@@ -56,6 +57,12 @@ impl DeltaZigzagSimple8bRleRingBuffer<i64> {
     pub fn push(&mut self, value: i64) {
         self.buffer.push(value)
     }
+
+    /// Push |count| counts of the new value onto the ring buffer.
+    /// Oldest values might be evicted by this call. Evicted values are applied to base value
+    pub fn push_multiple(&mut self, value: i64, count: NonZeroUsize) {
+        self.buffer.push_multiple(value, count)
+    }
 }
 
 impl DeltaZigzagSimple8bRleRingBuffer<u64> {
@@ -63,6 +70,12 @@ impl DeltaZigzagSimple8bRleRingBuffer<u64> {
     /// Evicted values are applied to the base value.
     pub fn push(&mut self, value: u64) {
         self.buffer.push(value as i64)
+    }
+
+    /// Push |count| counts of the new value onto the ring buffer.
+    /// Oldest values might be evicted by this call. Evicted values are applied to base value
+    pub fn push_multiple(&mut self, value: u64, count: NonZeroUsize) {
+        self.buffer.push_multiple(value as i64, count)
     }
 }
 
@@ -97,6 +110,21 @@ impl BaseDeltaZigzagSimple8bRleRingBuffer {
             *base = base.saturating_add(evicted_block.saturating_sum_with_zigzag_decode());
         }
         self.last = Some(value);
+    }
+
+    pub fn push_multiple(&mut self, value: i64, count: NonZeroUsize) {
+        self.push(value);
+        if let Some(remaining_count) = NonZeroUsize::new(count.get() - 1) {
+            // Diff is 0 because the value was already pushed once above, and
+            // now we are pushing the same value again.
+            const DIFF: i64 = 0;
+            let evicted_blocks = self.buffer.push_multiple(DIFF, remaining_count);
+            for evicted_block in evicted_blocks {
+                self.base = self.base.map(|base| {
+                    base.saturating_add(evicted_block.saturating_sum_with_zigzag_decode())
+                });
+            }
+        }
     }
 
     pub fn serialize(&self, buffer: &mut impl io::Write) -> io::Result<()> {
@@ -192,7 +220,7 @@ mod tests {
             3, 0, // length
             1, 0, // selector head index
             1, // last block's # of values
-            4, 0, 0, 0, 0, 0, 0, 0,    // base value (512 - 128*4 = 4)
+            4, 0, 0, 0, 0, 0, 0, 0,    // base value (516 - 128*4 = 4)
             0x77, // first block: 8-bit selector
             // Note that because selector head index is 1, the first block selector is at
             // bits 4-7. Bits 0-3 above are ignored.
@@ -220,6 +248,76 @@ mod tests {
             1, 0, 0, 0, 0, 0, 0, 0,    // base value
             0x03, // 4-bit selector
             0x83, 0, 0, 0, 0, 0, 0, 0, // first block values (-2 and 4 encoded as 3 and 8)
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+    }
+
+    // This test adopts `test_evicted_values_are_added_to_base_value` but modifies some
+    // `push` calls to `push_multiple`.
+    #[test]
+    fn test_push_multiple() {
+        let mut ring_buffer = DeltaZigzagSimple8bRleRingBuffer::<i64>::with_min_samples(10);
+        let mut counter = 516i64;
+        ring_buffer.push(counter);
+        for _ in 0..8 {
+            counter -= 128; // -128 will be encoded as 255, which takes 8 bits
+            ring_buffer.push_multiple(counter, NonZeroUsize::new(2).unwrap());
+        }
+
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            3, 0, // length
+            0, 0, // selector head index
+            8, // last block's # of values
+            0x04, 0x2, 0, 0, 0, 0, 0, 0,    // base value (0x204 = 516)
+            0x77, // first block: 8-bit selector, second block: 8-bit selector
+            255, 0, 255, 0, 255, 0, 255, 0, // first block (alternating encoded -128 and 0)
+            255, 0, 255, 0, 255, 0, 255, 0, // second block (alternating encoded -128 and 0)
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+
+        counter += 1;
+        ring_buffer.push_multiple(counter, NonZeroUsize::new(1).unwrap());
+
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            3, 0, // length
+            1, 0, // selector head index
+            1, // last block's # of values
+            4, 0, 0, 0, 0, 0, 0, 0,    // base value (516 - 128*4 = 4)
+            0x77, // first block: 8-bit selector
+            // Note that because selector head index is 1, the first block selector is at
+            // bits 4-7. Bits 0-3 above are ignored.
+            0x0f, // second block: RLE selector
+            255, 0, 255, 0, 255, 0, 255, 0, // first block
+            2, 0, 0, 0, 0, 0, // second block: value (1 is encoded as 2)
+            1, 0, // second block: length
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+    }
+
+    // This test adopts `test_u64_ring_buffer` but modifies the last call.
+    #[test]
+    fn test_u64_ring_buffer_push_multiple() {
+        let mut ring_buffer =
+            DeltaZigzagSimple8bRleRingBuffer::<u64>::with_min_samples(MIN_SAMPLES);
+        ring_buffer.push(1);
+        ring_buffer.push(u64::MAX);
+        ring_buffer.push_multiple(3, NonZeroUsize::new(40).unwrap());
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            3, 0, // length
+            0, 0,  // selector head index
+            25, // last block's # of values
+            1, 0, 0, 0, 0, 0, 0, 0,    // base value
+            0xf3, // first block: 4-bit selector, second block: RLE selector
+            0x83, 0, 0, 0, 0, 0, 0,
+            0, // first block values (-2, 4 encoded as 3, 8; then 14 0's)
+            0, 0, 0, 0, 0, 0, // second block: value
+            25, 0, // second block: length
         ];
         assert_eq!(&buffer[..], expected_bytes);
     }

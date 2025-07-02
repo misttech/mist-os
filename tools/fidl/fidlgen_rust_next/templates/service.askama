@@ -10,6 +10,15 @@
 {%- endif %}
 pub struct {{ service_name }};
 
+impl ::fidl_next::Service for {{ service_name }} {
+    const SERVICE_NAME: &'static str = "{{ self.service_name() }}";
+    const MEMBER_NAMES: &'static [&'static str] = &[
+        {% for member in service.members %}
+            "{{ member.name.non_canonical() }}",
+        {% endfor %}
+    ];
+}
+
 /// A helper trait for instances of the `{{ non_canonical_name }}` service.
 pub trait {{ instance_trait_name }} {
     /// The error type for the instance.
@@ -19,11 +28,11 @@ pub trait {{ instance_trait_name }} {
     type Transport: ::fidl_next::Transport;
 
     {% for member in service.members %}
-        /// Attempts to connect to the `{{ member.name.non_canonical() }}` member.
-        fn {{ member.name.snake()|ident }}(&mut self) -> Result<
-            ::fidl_next::ClientEnd<Self::Transport, {{ context.natural_type(member.ty) }}>,
-            Self::Error,
-        >;
+        /// Attempts to connect the given server end to the `{{ member.name.non_canonical() }}` member.
+        fn connect_to_{{ member.name.snake()|ident }}(
+            &self,
+            server_end: ::fidl_next::ServerEnd<Self::Transport, {{ context.natural_type(member.ty) }}>,
+        ) -> Result<(), Self::Error>;
     {% endfor %}
 }
 
@@ -35,11 +44,11 @@ where
     type Transport = ___I::Transport;
 
     {% for member in service.members %}
-        fn {{ member.name.snake()|ident }}(&mut self) -> Result<
-            ::fidl_next::ClientEnd<Self::Transport, {{ context.natural_type(member.ty) }}>,
-            Self::Error,
-        > {
-            self.as_untyped_mut().connect("{{ member.name.snake() }}").map(::fidl_next::ClientEnd::from_untyped)
+        fn connect_to_{{ member.name.snake()|ident }}(
+            &self,
+            server_end: ::fidl_next::ServerEnd<Self::Transport, {{ context.natural_type(member.ty) }}>,
+        ) -> Result<(), Self::Error> {
+            self.as_untyped().connect_to("{{ member.name.snake() }}", server_end.into_untyped())
         }
     {% endfor %}
 }

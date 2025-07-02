@@ -274,7 +274,7 @@ impl ZxioBackedSocket {
 
     fn run_sockaddr_ebpf(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
         op: SockAddrOp,
@@ -323,7 +323,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn connect(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &SocketHandle,
         current_task: &CurrentTask,
         peer: SocketPeer,
@@ -353,7 +353,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn listen(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         backlog: i32,
         _credentials: ucred,
@@ -366,7 +366,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn accept(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
     ) -> Result<SocketHandle, Errno> {
         let zxio = self
@@ -385,7 +385,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn bind(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         current_task: &CurrentTask,
         socket_address: SocketAddress,
@@ -406,7 +406,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn OutputBuffer,
@@ -438,7 +438,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
         _current_task: &CurrentTask,
         data: &mut dyn InputBuffer,
@@ -461,7 +461,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         waiter: &Waiter,
@@ -473,7 +473,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -482,7 +482,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn shutdown(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         how: SocketShutdownFlags,
     ) -> Result<(), Errno> {
@@ -492,13 +492,13 @@ impl SocketOps for ZxioBackedSocket {
             .map_err(|out_code| errno_from_zxio_code!(out_code))
     }
 
-    fn close(&self, _locked: &mut Locked<'_, FileOpsCore>, _socket: &Socket) {
+    fn close(&self, _locked: &mut Locked<FileOpsCore>, _socket: &Socket) {
         let _ = self.zxio.close();
     }
 
     fn getsockname(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         socket: &Socket,
     ) -> Result<SocketAddress, Errno> {
         match self.zxio.getsockname() {
@@ -509,7 +509,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn getpeername(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
     ) -> Result<SocketAddress, Errno> {
         self.zxio
@@ -521,7 +521,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn setsockopt(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         current_task: &CurrentTask,
         level: u32,
@@ -569,7 +569,7 @@ impl SocketOps for ZxioBackedSocket {
 
     fn getsockopt(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _socket: &Socket,
         _current_task: &CurrentTask,
         level: u32,

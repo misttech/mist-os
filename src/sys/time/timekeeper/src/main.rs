@@ -303,7 +303,13 @@ async fn main() -> Result<()> {
 
     if config.has_always_on_counter() {
         // A read only RTC implementation using an always-on counter.
-        let read_only_rtc = rtc::new_read_only_rtc(persistent_state.clone());
+        let hrtimer_proxy = alarms::connect_to_hrtimer_async()
+            .map_err(|err| {
+                warn!("could not connect to fuchsia.hardware.hrtimer/Device, falling back to non-persistent RTC: {err:?}");
+                err
+            })
+            .ok();
+        let read_only_rtc = rtc::new_read_only_rtc(persistent_state.clone(), hrtimer_proxy);
         fasync::Task::local(async move {
             maintain_utc(
                 primary_track,
@@ -363,10 +369,8 @@ async fn main() -> Result<()> {
         info!("serving test protocols: fuchsia.test.time/RTC");
     }
 
-    if serve_fuchsia_time_alarms {
-        fs.dir("svc").add_fidl_service(Rpcs::Wake);
-        info!("serving protocol: fuchsia.time.alarms/Wake");
-    }
+    fs.dir("svc").add_fidl_service(Rpcs::Wake);
+    info!("serving protocol: fuchsia.time.alarms/Wake");
     if enable_user_utc_adjustment {
         fs.dir("svc").add_fidl_service(Rpcs::Adjust);
         info!("serving protocol: fuchsia.time.alarms/Adjust");
@@ -377,18 +381,24 @@ async fn main() -> Result<()> {
     // any one time.
     let time_test_mutex: Rc<RefCell<()>> = Rc::new(RefCell::new(()));
 
-    // Instantiate connections to wake alarms. Allow graceful handling of failures,
-    // though we probably want to be loud about issues.
-    let timer_loop = Rc::new(
-        alarms::connect_to_hrtimer_async()
-            .map_err(|e| {
-                // This may not be a bug, if access to wake alarms is not used.
-                // Make this a warning, but attempted connections will be errors.
-                warn!("could not connect to hrtimer: {}", &e);
-                e
-            })
-            .map(|proxy| Rc::new(alarms::Loop::new(proxy, loop_inspect))),
-    );
+    let timer_loop = if serve_fuchsia_time_alarms {
+        // Instantiate connections to wake alarms. Allow graceful handling of failures,
+        // though we probably want to be loud about issues.
+        Rc::new(
+            alarms::connect_to_hrtimer_async()
+                .map_err(|e| {
+                    // This may not be a bug, if access to wake alarms is not used.
+                    // Make this a warning, but attempted connections will be errors.
+                    warn!("could not connect to hrtimer: {}", &e);
+                    e
+                })
+                .map(|proxy| Rc::new(alarms::Loop::new(proxy, loop_inspect))),
+        )
+    } else {
+        // Emulate wake alarms. This is used on platforms that do not have
+        // power management, and will *not* actually sleep.
+        Rc::new(Ok(Rc::new(alarms::Loop::new_emulated(loop_inspect))))
+    };
 
     // Look for this text to know whether connections have succeeded.
     info!("now starting to serve exported FIDL protocols");

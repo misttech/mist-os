@@ -5,6 +5,7 @@
 #include <lib/iob/blob-id-allocator.h>
 #include <lib/stdcompat/functional.h>
 
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <memory>

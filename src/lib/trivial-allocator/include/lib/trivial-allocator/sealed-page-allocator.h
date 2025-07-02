@@ -27,7 +27,7 @@ namespace trivial_allocator {
 // last allocations still in flight.  If Seal() is not called, any unsealed
 // allocations still outstanding will be deallocated on destruction.
 
-template <class Memory, size_t Reserve = 0>
+template <SealableMemory Memory, size_t Reserve = 0>
 class SealedPageAllocator : public PageAllocator<Memory> {
  public:
   using Base = PageAllocator<Memory>;

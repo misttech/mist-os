@@ -24,11 +24,11 @@ class MsdVsiDriver : public msd::Driver {
   static std::unique_ptr<MsdVsiDriver> Create();
   static void Destroy(MsdVsiDriver* drv);
 
-  void Configure(uint32_t flags) override { configure_flags_ = flags; }
-  std::unique_ptr<msd::Device> CreateDevice(msd::DeviceHandle* device_handle) override;
-  std::unique_ptr<msd::Buffer> ImportBuffer(zx::vmo vmo, uint64_t client_id) override;
-  magma_status_t ImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
-                                 std::unique_ptr<msd::Semaphore>* out) override;
+  void MsdConfigure(uint32_t flags) override { configure_flags_ = flags; }
+  std::unique_ptr<msd::Device> MsdCreateDevice(msd::DeviceHandle* device_handle) override;
+  std::unique_ptr<msd::Buffer> MsdImportBuffer(zx::vmo vmo, uint64_t client_id) override;
+  magma_status_t MsdImportSemaphore(zx::handle handle, uint64_t client_id, uint64_t flags,
+                                    std::unique_ptr<msd::Semaphore>* out) override;
 
   uint32_t configure_flags() const { return configure_flags_; }
 

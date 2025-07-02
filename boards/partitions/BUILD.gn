@@ -87,6 +87,11 @@ if (target_cpu == "arm64") {
     forward_variables_from(_standard_names, "*")
     hw_revision = "arm64"
   }
+
+  generated_partitions_config("qemu-arm64") {
+    hw_revision = ""
+    zbi_r = "zircon_r"
+  }
 }
 
 if (target_cpu == "riscv64") {
@@ -97,6 +102,7 @@ if (target_cpu == "riscv64") {
 
   generated_partitions_config("riscv64") {
     hw_revision = "riscv64"
+    zbi_r = "zircon_r"
   }
 }
 

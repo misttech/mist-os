@@ -6,5 +6,5 @@
 from honeydew import errors
 
 
-class UserInputError(errors.HoneydewError):
+class UserInputError(errors.AffordanceError):
     """Exception to be raised by UserInput"""

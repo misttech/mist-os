@@ -7,7 +7,7 @@ use anyhow::{anyhow, Error};
 use async_lock::Semaphore;
 use async_trait::async_trait;
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_io::{FileMarker, FileProxy, MAX_BUF};
+use fidl_fuchsia_io::{self as fio, FileMarker, FileProxy, MAX_BUF};
 use futures::future::try_join_all;
 use virtio_device::mem::DeviceRange;
 use {fuchsia_trace as ftrace, zx_status};
@@ -95,10 +95,15 @@ impl FileBackend {
 impl BlockBackend for FileBackend {
     async fn get_attrs(&self, trace_id: ftrace::Id) -> Result<DeviceAttrs, Error> {
         let _trace = ftrace::async_enter!(trace_id, c"machina", c"FileBackend::get_attrs");
-        let (status, attrs) = self.file.get_attr().await?;
-        zx_status::Status::ok(status)?;
+        let (_, immutable_attributes) = self
+            .file
+            .get_attributes(fio::NodeAttributesQuery::CONTENT_SIZE)
+            .await?
+            .map_err(zx::Status::from_raw)?;
         return Ok(DeviceAttrs {
-            capacity: Sector::from_bytes_round_down(attrs.content_size),
+            capacity: Sector::from_bytes_round_down(
+                immutable_attributes.content_size.ok_or_else(|| anyhow!("content size not set"))?,
+            ),
             block_size: None,
         });
     }

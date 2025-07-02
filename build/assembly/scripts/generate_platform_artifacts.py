@@ -19,13 +19,16 @@ def main() -> int:
     parser.add_argument(
         "--aib-list", type=argparse.FileType("r"), required=True
     )
+    parser.add_argument("--version", type=str)
+    parser.add_argument("--repo", type=str, required=True)
+    parser.add_argument("--tools", type=str, nargs="*")
     parser.add_argument("--outdir", type=str, required=True)
     parser.add_argument("--depfile", type=argparse.FileType("w"), required=True)
-    parser.add_argument("--version", type=str)
     args = parser.parse_args()
 
     shutil.rmtree(args.outdir)
     os.mkdir(args.outdir)
+    os.mkdir(os.path.join(args.outdir, "tools"))
 
     artifacts = json.load(args.aib_list)
     deps = []
@@ -39,8 +42,24 @@ def main() -> int:
         except OSError:
             shutil.copytree(src, dst)
 
+    if args.tools:
+        for tool in args.tools:
+            src = os.path.realpath(tool)
+            dst = os.path.join(args.outdir, "tools", os.path.basename(tool))
+            try:
+                os.link(src, dst)
+            except OSError:
+                shutil.copytree(src, dst)
+
     version = args.version if args.version else "unversioned"
-    config_data = {"release_version": version}
+    config_data = {
+        "release_info": {
+            "name": "fuchsia_platform_artifacts",
+            "repository": args.repo,
+            "version": version,
+        },
+    }
+
     config = os.path.join(args.outdir, "platform_artifacts.json")
     with open(config, "w") as f:
         json.dump(config_data, f, indent=2)

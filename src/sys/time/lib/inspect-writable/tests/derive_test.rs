@@ -27,7 +27,7 @@ const WEATHER_REPORT_2: WeatherReport =
     WeatherReport { temp: -3, pressure: 987, precipitation: 100, summary: Summary::Raining };
 
 #[fuchsia::test]
-fn valid_struct() {
+async fn valid_struct() {
     let inspector = &Inspector::default();
     let root = inspector.root();
     // Use the record API to write the initial state one time.

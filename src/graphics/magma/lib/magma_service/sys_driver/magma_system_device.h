@@ -66,7 +66,7 @@ class MagmaSystemDevice final : public internal::PrimaryFidlServerHolder::Connec
   void ConnectionClosed(std::shared_ptr<internal::PrimaryFidlServerHolder> server,
                         bool* need_detach_out) override;
 
-  void DumpStatus(uint32_t dump_type) { msd_dev()->DumpStatus(dump_type); }
+  void DumpStatus(uint32_t dump_type) { msd_dev()->MsdDumpStatus(dump_type); }
 
   magma::Status Query(uint64_t id, magma_handle_t* buffer_out, uint64_t* value_out);
 

@@ -31,11 +31,13 @@ fn translate_io_error(e: std::io::Error) -> dhcp_client_core::deps::SocketError 
                 e
             ),
             E::Efault => panic!("passed invalid memory address to socket call"),
-            E::Enobufs => panic!("out of memory: {:?}", e),
             E::Enodev => dhcp_client_core::deps::SocketError::NoInterface,
             E::Einval
             | E::Emsgsize
             | E::Enetdown
+            // Enobufs is returned when the tx queue is full, given packet
+            // sockets can write straight into the tx queue.
+            | E::Enobufs
             | E::Enoent
             | E::Enotconn
             | E::Enxio
@@ -312,7 +314,7 @@ mod test {
     use dhcp_client_core::deps::{DatagramInfo, Socket as _};
     use futures::{join, FutureExt as _};
     use netstack_testing_common::realms::TestSandboxExt as _;
-    use packet::{InnerPacketBuilder as _, Serializer as _};
+    use packet::{InnerPacketBuilder as _, PacketBuilder as _, Serializer as _};
     use {
         fidl_fuchsia_net_ext as fnet_ext, fidl_fuchsia_netemul_network as fnetemul_network,
         fidl_fuchsia_posix_socket_packet as fpacket, fuchsia_async as fasync,
@@ -388,12 +390,10 @@ mod test {
             net_types::ip::Ipv4Addr::default(),
             0,
             packet_formats::ip::Ipv4Proto::Other(0),
-        );
-        let payload = b"hello world!"
-            .into_serializer()
-            .encapsulate(payload)
-            .serialize_vec_outer()
-            .expect("serialize");
+        )
+        .wrap_body(b"hello world!".into_serializer())
+        .serialize_vec_outer()
+        .expect("serialize");
 
         let DatagramInfo { length, address } = {
             let send_fut = async {

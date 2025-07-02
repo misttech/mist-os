@@ -2,12 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use attribution_processing::digest::BucketDefinition;
+use attribution_processing::AttributionData;
 use fidl_fuchsia_memory_attribution_plugin as fplugin;
 use fuchsia_trace::duration;
 use futures::AsyncWriteExt;
+use stalls::MemoryStallMetrics;
 use traces::CATEGORY_MEMORY_CAPTURE;
-
-use attribution_processing::AttributionData;
 
 /// AttributionSnapshot holds and serves a snapshot of the memory of a Fuchsia system, to be sent
 /// to a ffx command on a host.
@@ -17,7 +18,8 @@ impl AttributionSnapshot {
     pub fn new(
         attribution_data: AttributionData,
         kernel_statistics: fplugin::KernelStatistics,
-        memory_stalls: zx::MemoryStall,
+        memory_stalls: MemoryStallMetrics,
+        bucket_definitions: &[BucketDefinition],
     ) -> AttributionSnapshot {
         AttributionSnapshot(fplugin::Snapshot {
             attributions: Some(
@@ -27,16 +29,26 @@ impl AttributionSnapshot {
                 attribution_data.principals_vec.into_iter().map(|p| p.into()).collect(),
             ),
             resources: Some(attribution_data.resources_vec.into_iter().map(|r| r.into()).collect()),
-            // TODO(b/411002259) change the protocol to avoid conversion.
             resource_names: Some(
-                attribution_data.resource_names.iter().map(|r| r.to_string()).collect(),
+                attribution_data.resource_names.iter().map(|n| *n.buffer()).collect(),
             ),
             kernel_statistics: Some(kernel_statistics.into()),
             performance_metrics: Some(fplugin::PerformanceImpactMetrics {
-                some_memory_stalls_ns: Some(memory_stalls.stall_time_some),
-                full_memory_stalls_ns: Some(memory_stalls.stall_time_full),
+                some_memory_stalls_ns: memory_stalls.some.as_nanos().try_into().ok(),
+                full_memory_stalls_ns: memory_stalls.full.as_nanos().try_into().ok(),
                 ..Default::default()
             }),
+            bucket_definitions: Some(
+                bucket_definitions
+                    .iter()
+                    .map(|b| fplugin::BucketDefinition {
+                        name: Some(b.name.clone()),
+                        process: b.process.as_ref().map(|r| r.as_str().into()),
+                        vmo: b.vmo.as_ref().map(|r| r.as_str().into()),
+                        ..Default::default()
+                    })
+                    .collect(),
+            ),
             ..Default::default()
         })
     }

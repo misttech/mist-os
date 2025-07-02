@@ -5,6 +5,7 @@
 """Python toolchain definition for our prebuilt Python3 executable."""
 
 load("@rules_python//python:defs.bzl", "py_runtime_pair")
+load("@rules_python//python:py_exec_tools_toolchain.bzl", "py_exec_tools_toolchain")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -75,4 +76,27 @@ toolchain(
     ],
     toolchain = ":runtime_pair",
     toolchain_type = "@rules_python//python:toolchain_type",
+)
+
+# rules_python will try to resolve
+# @rules_python//python:exec_tools_toolchain_type, so provide a stub one so it
+# doesn't resolve to the default interpreter configured in rules_python, which
+# will trigger a download.
+py_exec_tools_toolchain(
+    name = "py_exec_tools_toolchain",
+    exec_interpreter = "@rules_python//python:none",
+)
+
+toolchain(
+    name = "exec_tools_toolchain",
+    toolchain = ":py_exec_tools_toolchain",
+    toolchain_type = "@rules_python//python:exec_tools_toolchain_type",
+    exec_compatible_with = [
+        "{host_platform_os_constraint}",
+        "{host_platform_cpu_constraint}",
+    ],
+    target_compatible_with = [
+        "{host_platform_os_constraint}",
+        "{host_platform_cpu_constraint}",
+    ],
 )

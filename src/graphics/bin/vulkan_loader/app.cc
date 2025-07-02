@@ -46,6 +46,7 @@ LoaderApp::LoaderApp(component::OutgoingDirectory* outgoing_dir, async_dispatche
 
   debug_root_node_ = fbl::MakeRefCounted<fs::PseudoDir>();
   device_root_node_ = fbl::MakeRefCounted<fs::PseudoDir>();
+  trusted_device_root_node_ = fbl::MakeRefCounted<fs::PseudoDir>();
   manifest_fs_root_node_ = fbl::MakeRefCounted<fs::PseudoDir>();
 
   allow_magma_icds_ = structured_config.allow_magma_icds();
@@ -58,11 +59,60 @@ LoaderApp::LoaderApp(component::OutgoingDirectory* outgoing_dir, async_dispatche
 LoaderApp::~LoaderApp() = default;
 
 zx_status_t LoaderApp::InitDeviceFs() {
+  auto service_node = fbl::MakeRefCounted<fs::PseudoDir>();
+  ZX_ASSERT(device_root_node_->AddEntry("svc", service_node) == ZX_OK);
+
+  {
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+
+    std::string input_path = "/svc/fuchsia.gpu.magma.Service";
+
+    zx_status_t status =
+        fdio_open3(input_path.c_str(), static_cast<uint64_t>(fuchsia_io::kPermReadable),
+                   endpoints.server.TakeChannel().release());
+    if (status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed to open " << input_path;
+      return status;
+    }
+
+    ZX_ASSERT(service_node->AddEntry("magma", fbl::MakeRefCounted<fs::RemoteDir>(
+                                                  std::move(endpoints.client))) == ZX_OK);
+  }
+
+  return InitCommonDeviceFs(device_root_node_);
+}
+
+zx_status_t LoaderApp::InitTrustedDeviceFs() {
+  auto service_node = fbl::MakeRefCounted<fs::PseudoDir>();
+  ZX_ASSERT(trusted_device_root_node_->AddEntry("svc", service_node) == ZX_OK);
+
+  {
+    auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
+
+    std::string input_path = "/svc/fuchsia.gpu.magma.TrustedService";
+
+    zx_status_t status =
+        fdio_open3(input_path.c_str(), static_cast<uint64_t>(fuchsia_io::kPermReadable),
+                   endpoints.server.TakeChannel().release());
+    if (status != ZX_OK) {
+      FX_PLOGS(ERROR, status) << "Failed to open " << input_path;
+      return status;
+    }
+
+    ZX_ASSERT(service_node->AddEntry("magma", fbl::MakeRefCounted<fs::RemoteDir>(
+                                                  std::move(endpoints.client))) == ZX_OK);
+  }
+
+  return InitCommonDeviceFs(trusted_device_root_node_);
+}
+
+zx_status_t LoaderApp::InitCommonDeviceFs(fbl::RefPtr<fs::PseudoDir>& root_node) {
+  // Devices using devfs
+  auto class_node = fbl::MakeRefCounted<fs::PseudoDir>();
+  ZX_ASSERT(root_node->AddEntry("class", class_node) == ZX_OK);
+
   const char* kDevClassList[] = {"gpu", "goldfish-pipe", "goldfish-control",
                                  "goldfish-address-space", "goldfish-sync"};
-
-  auto class_node = fbl::MakeRefCounted<fs::PseudoDir>();
-  ZX_ASSERT(device_root_node_->AddEntry("class", class_node) == ZX_OK);
 
   for (const char* dev_class : kDevClassList) {
     auto endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
@@ -89,16 +139,26 @@ zx_status_t LoaderApp::ServeDeviceFs(fidl::ServerEnd<fuchsia_io::Directory> serv
   return debug_fs_.ServeDirectory(device_root_node_, std::move(server_end), fuchsia_io::kRStarDir);
 }
 
+zx_status_t LoaderApp::ServeTrustedDeviceFs(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
+  return debug_fs_.ServeDirectory(trusted_device_root_node_, std::move(server_end),
+                                  fuchsia_io::kRStarDir);
+}
+
 zx_status_t LoaderApp::ServeManifestFs(fidl::ServerEnd<fuchsia_io::Directory> server_end) {
   return debug_fs_.ServeDirectory(manifest_fs_root_node_, std::move(server_end),
                                   fuchsia_io::kRStarDir);
 }
 
 zx_status_t LoaderApp::InitDebugFs() {
+  if (zx_status_t status = InitTrustedDeviceFs(); status != ZX_OK) {
+    FX_PLOGS(ERROR, status) << "Failed to initialize trusted-device-fs: ";
+    return status;
+  }
   if (zx_status_t status = InitDeviceFs(); status != ZX_OK) {
     FX_PLOGS(ERROR, status) << "Failed to initialize device-fs: ";
     return status;
   }
+  ZX_ASSERT(debug_root_node_->AddEntry("trusted-device-fs", trusted_device_root_node_) == ZX_OK);
   ZX_ASSERT(debug_root_node_->AddEntry("device-fs", device_root_node_) == ZX_OK);
   ZX_ASSERT(debug_root_node_->AddEntry("manifest-fs", manifest_fs_root_node_) == ZX_OK);
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -123,12 +183,9 @@ zx_status_t LoaderApp::InitDeviceWatcher() {
   if (allow_magma_icds_) {
     auto gpu_watcher_token = GetPendingActionToken();
     gpu_watcher_ = fsl::DeviceWatcher::CreateWithIdleCallback(
-        "/dev/class/gpu",
+        "/svc/fuchsia.gpu.magma.Service",
         [this](const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename) {
-          if (filename == ".") {
-            return;
-          }
-          zx::result device = MagmaDevice::Create(this, dir, filename, &devices_node_);
+          zx::result device = MagmaDevice::Create(this, dir, filename + "/device", &devices_node_);
           if (device.is_ok()) {
             devices_.emplace_back(std::move(*device));
           } else {

@@ -126,6 +126,9 @@ struct FifoState {
 
     // The waker for the FifoPoller.
     poller_waker: Option<Waker>,
+
+    // If set, attach a barrier to the next write request
+    attach_barrier: bool,
 }
 
 impl FifoState {
@@ -331,6 +334,12 @@ pub trait BlockClient: Send + Sync {
         trace_flow_id: u64,
     ) -> Result<(), zx::Status>;
 
+    /// Attaches a barrier to the next write sent to the underlying block device. This barrier
+    /// method is an alternative to setting the WriteOption::PRE_BARRIER on `write_at_with_opts`.
+    /// This method makes it easier to guarantee that the barrier is attached to the correct
+    /// write operation when subsequent write operations can get reordered.
+    fn barrier(&self);
+
     async fn flush(&self) -> Result<(), zx::Status> {
         self.flush_traced(NO_TRACE_ID).await
     }
@@ -404,6 +413,16 @@ impl Common {
         async move {
             let (request_id, trace_flow_id) = {
                 let mut state = self.fifo_state.lock();
+
+                let mut flags = BlockIoFlag::from_bits_retain(request.command.flags);
+                if BlockOpcode::from_primitive(request.command.opcode) == Some(BlockOpcode::Write)
+                    && state.attach_barrier
+                {
+                    flags |= BlockIoFlag::PRE_BARRIER;
+                    request.command.flags = flags.bits();
+                    state.attach_barrier = false;
+                }
+
                 if state.fifo.is_none() {
                     // Fifo has been closed.
                     return Err(zx::Status::CANCELED);
@@ -517,17 +536,22 @@ impl Common {
         opts: WriteOptions,
         trace_flow_id: u64,
     ) -> Result<(), zx::Status> {
-        let flags = if opts.contains(WriteOptions::FORCE_ACCESS) {
-            BlockIoFlag::FORCE_ACCESS.bits()
-        } else {
-            0
-        };
+        let mut flags = BlockIoFlag::empty();
+
+        if opts.contains(WriteOptions::FORCE_ACCESS) {
+            flags |= BlockIoFlag::FORCE_ACCESS;
+        }
+
+        if opts.contains(WriteOptions::PRE_BARRIER) {
+            flags |= BlockIoFlag::PRE_BARRIER;
+        }
+
         match buffer_slice {
             BufferSlice::VmoId { vmo_id, offset, length } => {
                 self.send(BlockFifoRequest {
                     command: BlockFifoCommand {
                         opcode: BlockOpcode::Write.into_primitive(),
-                        flags,
+                        flags: flags.bits(),
                         ..Default::default()
                     },
                     vmoid: vmo_id.id(),
@@ -552,7 +576,7 @@ impl Common {
                     self.send(BlockFifoRequest {
                         command: BlockFifoCommand {
                             opcode: BlockOpcode::Write.into_primitive(),
-                            flags,
+                            flags: flags.bits(),
                             ..Default::default()
                         },
                         vmoid: self.temp_vmo_id.id(),
@@ -604,6 +628,10 @@ impl Common {
             ..Default::default()
         })
         .await
+    }
+
+    fn barrier(&self) {
+        self.fifo_state.lock().attach_barrier = true;
     }
 
     fn block_size(&self) -> u32 {
@@ -746,6 +774,10 @@ impl BlockClient for RemoteBlockClient {
 
     async fn flush_traced(&self, trace_flow_id: u64) -> Result<(), zx::Status> {
         self.common.flush(trace_flow_id).await
+    }
+
+    fn barrier(&self) {
+        self.common.barrier()
     }
 
     async fn close(&self) -> Result<(), zx::Status> {
@@ -972,14 +1004,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_against_ram_disk() {
-        let (_ramdisk, block_proxy, block_client) = make_ramdisk().await;
-
-        let stats_before = block_proxy
-            .get_stats(false)
-            .await
-            .expect("get_stats failed")
-            .map_err(zx::Status::from_raw)
-            .expect("get_stats error");
+        let (_ramdisk, _block_proxy, block_client) = make_ramdisk().await;
 
         let vmo = zx::Vmo::create(131072).expect("Vmo::create failed");
         vmo.write(b"hello", 5).expect("vmo.write failed");
@@ -996,91 +1021,6 @@ mod tests {
         vmo.read(&mut buf, 1029).expect("vmo.read failed");
         assert_eq!(&buf, b"hello");
         block_client.detach_vmo(vmo_id).await.expect("detach_vmo failed");
-
-        // check that the stats are what we expect them to be
-        let stats_after = block_proxy
-            .get_stats(false)
-            .await
-            .expect("get_stats failed")
-            .map_err(zx::Status::from_raw)
-            .expect("get_stats error");
-        // write stats
-        assert_eq!(
-            stats_before.write.success.total_calls + 1,
-            stats_after.write.success.total_calls
-        );
-        assert_eq!(
-            stats_before.write.success.bytes_transferred + 1024,
-            stats_after.write.success.bytes_transferred
-        );
-        assert_eq!(stats_before.write.failure.total_calls, stats_after.write.failure.total_calls);
-        // read stats
-        assert_eq!(stats_before.read.success.total_calls + 1, stats_after.read.success.total_calls);
-        assert_eq!(
-            stats_before.read.success.bytes_transferred + 2048,
-            stats_after.read.success.bytes_transferred
-        );
-        assert_eq!(stats_before.read.failure.total_calls, stats_after.read.failure.total_calls);
-    }
-
-    #[fuchsia::test]
-    async fn test_against_ram_disk_with_flush() {
-        let (_ramdisk, block_proxy, block_client) = make_ramdisk().await;
-
-        let stats_before = block_proxy
-            .get_stats(false)
-            .await
-            .expect("get_stats failed")
-            .map_err(zx::Status::from_raw)
-            .expect("get_stats error");
-
-        let vmo = zx::Vmo::create(131072).expect("Vmo::create failed");
-        vmo.write(b"hello", 5).expect("vmo.write failed");
-        let vmo_id = block_client.attach_vmo(&vmo).await.expect("attach_vmo failed");
-        block_client
-            .write_at(BufferSlice::new_with_vmo_id(&vmo_id, 0, 1024), 0)
-            .await
-            .expect("write_at failed");
-        block_client.flush().await.expect("flush failed");
-        block_client
-            .read_at(MutableBufferSlice::new_with_vmo_id(&vmo_id, 1024, 2048), 0)
-            .await
-            .expect("read_at failed");
-        let mut buf: [u8; 5] = Default::default();
-        vmo.read(&mut buf, 1029).expect("vmo.read failed");
-        assert_eq!(&buf, b"hello");
-        block_client.detach_vmo(vmo_id).await.expect("detach_vmo failed");
-
-        // check that the stats are what we expect them to be
-        let stats_after = block_proxy
-            .get_stats(false)
-            .await
-            .expect("get_stats failed")
-            .map_err(zx::Status::from_raw)
-            .expect("get_stats error");
-        // write stats
-        assert_eq!(
-            stats_before.write.success.total_calls + 1,
-            stats_after.write.success.total_calls
-        );
-        assert_eq!(
-            stats_before.write.success.bytes_transferred + 1024,
-            stats_after.write.success.bytes_transferred
-        );
-        assert_eq!(stats_before.write.failure.total_calls, stats_after.write.failure.total_calls);
-        // flush stats
-        assert_eq!(
-            stats_before.flush.success.total_calls + 1,
-            stats_after.flush.success.total_calls
-        );
-        assert_eq!(stats_before.flush.failure.total_calls, stats_after.flush.failure.total_calls);
-        // read stats
-        assert_eq!(stats_before.read.success.total_calls + 1, stats_after.read.success.total_calls);
-        assert_eq!(
-            stats_before.read.success.bytes_transferred + 2048,
-            stats_after.read.success.bytes_transferred
-        );
-        assert_eq!(stats_before.read.failure.total_calls, stats_after.read.failure.total_calls);
     }
 
     #[fuchsia::test]
@@ -1385,6 +1325,10 @@ mod tests {
                 _trace_flow_id: Option<NonZero<u64>>,
             ) -> Result<(), zx::Status> {
                 unreachable!();
+            }
+
+            fn barrier(&self) -> Result<(), zx::Status> {
+                unreachable!()
             }
 
             async fn write(

@@ -8,7 +8,6 @@
 #include <lib/zx/socket.h>
 
 #include <filesystem>
-#include <utility>
 
 #include "src/performance/trace_manager/buffer_forwarder.h"
 #include "src/performance/trace_manager/util.h"
@@ -37,7 +36,8 @@ class DeferredBufferForwarder : public BufferForwarder {
   bool flushed_{false};
 
  private:
-  std::filesystem::path buffer_file_;
+  std::filesystem::path buffer_path_;
+  FILE* buffer_file_;
 };
 }  // namespace tracing
 

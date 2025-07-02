@@ -223,11 +223,13 @@ TEST_P(FlatlandScreenshotTest, SimpleTakeFileTest) {
   {
     fuchsia::io::FilePtr screenshot = file.Bind();
     // Get screenshot attributes.
-    uint64_t screenshot_size;
-    screenshot->GetAttr(
-        [&screenshot_size](zx_status_t status, fuchsia::io::NodeAttributes attributes) {
-          EXPECT_EQ(ZX_OK, status);
-          screenshot_size = attributes.content_size;
+    uint64_t screenshot_size{};
+    screenshot->GetAttributes(
+        fuchsia::io::NodeAttributesQuery::CONTENT_SIZE,
+        [&screenshot_size](fuchsia::io::Node_GetAttributes_Result result) {
+          ASSERT_TRUE(result.is_response());
+          ASSERT_TRUE(result.response().immutable_attributes.has_content_size());
+          screenshot_size = result.response().immutable_attributes.content_size();
         });
 
     uint64_t read_count = 0;

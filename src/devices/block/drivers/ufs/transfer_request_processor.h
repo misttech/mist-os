@@ -109,12 +109,17 @@ class TransferRequestProcessor : public RequestProcessor {
   zx::result<> FillDescriptorAndSendRequest(uint8_t slot, DataDirection data_dir,
                                             uint16_t response_offset, uint16_t response_length,
                                             uint16_t prdt_offset, uint32_t prdt_entry_count);
-  zx::result<> GetResponseStatus(TransferRequestDescriptor *descriptor,
-                                 AbstractResponseUpiu &response,
-                                 UpiuTransactionCodes transaction_code);
 
-  zx::result<> ScsiCompletion(uint8_t slot_num, RequestSlot &request_slot,
-                              TransferRequestDescriptor *descriptor);
+  zx::result<> CheckResponse(uint8_t slot_num, AbstractResponseUpiu &response);
+  // Check for errors in the following order: OCS -> header_response -> scsi_status
+  scsi::StatusMessage CheckScsiAndGetStatusMessage(uint8_t slot_num,
+                                                   AbstractResponseUpiu &response);
+  scsi::HostStatusCode GetScsiCommandHostStatus(OverallCommandStatus ocs,
+                                                UpiuHeaderResponseCode header_response,
+                                                scsi::StatusCode response_status);
+  scsi::HostStatusCode ScsiStatusToHostStatus(scsi::StatusCode command_status);
+
+  zx_status_t UpiuCompletion(uint8_t slot_num, RequestSlot &request_slot);
 
   zx::result<uint8_t> GetAdminCommandSlotNumber() override {
     return zx::ok(kAdminCommandSlotNumber);

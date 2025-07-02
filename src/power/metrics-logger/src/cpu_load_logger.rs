@@ -572,6 +572,7 @@ pub mod tests {
 
         // Check CpuLoadLogger added before first query.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -587,6 +588,7 @@ pub mod tests {
         // Run the first logging task.
         runner.iterate_task(&mut task);
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -610,6 +612,7 @@ pub mod tests {
         // Run the second logging task.
         runner.iterate_task(&mut task);
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -634,6 +637,7 @@ pub mod tests {
         // Run the third logging task.
         runner.iterate_task(&mut task);
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -658,6 +662,7 @@ pub mod tests {
         runner.iterate_task(&mut task);
 
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {

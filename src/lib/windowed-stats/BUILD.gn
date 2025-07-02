@@ -26,7 +26,10 @@ rustc_library("windowed-stats") {
     "//third_party/rust_crates:thiserror",
   ]
 
-  test_deps = [ "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions" ]
+  test_deps = [
+    "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
+    "//src/lib/fuchsia",
+  ]
 
   sources = [
     "src/aggregations.rs",

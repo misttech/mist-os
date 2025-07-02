@@ -32,9 +32,9 @@ fuchsia_board_configuration(
     kernel = {
         "serial_mode": "legacy",
     },
+    partitions_configuration = "//build/bazel/assembly/partitions_configurations:pkvm-x64",
     provided_features = [
         "fuchsia::bus_pci",
-        "fuchsia::driver_framework_v2_support",
         "fuchsia::paravirtualization",
         "fuchsia::pmm_checker_auto",
     ],
@@ -62,9 +62,9 @@ fuchsia_board_configuration(
         "vendor_id": 2,
         "revision": 1,
     },
+    partitions_configuration = "//build/bazel/assembly/partitions_configurations:pkvm-arm64",
     provided_features = [
         "fuchsia::bus_pci",
-        "fuchsia::driver_framework_v2_support",
         "fuchsia::paravirtualization",
         "fuchsia::pmm_checker_auto",
     ],

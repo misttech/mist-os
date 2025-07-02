@@ -5,7 +5,6 @@
 mod anon_node;
 mod dir_entry;
 mod dirent_sink;
-mod dynamic_file;
 mod epoll;
 mod fd_number;
 mod fd_table;
@@ -17,12 +16,9 @@ mod fs_node;
 mod memory_regular;
 mod namespace;
 mod record_locks;
-mod simple_file;
 mod splice;
-mod static_directory;
 mod symlink_node;
 mod userfault_file;
-mod vec_directory;
 mod wd_number;
 mod xattr;
 
@@ -32,6 +28,7 @@ pub mod crypt_service;
 pub mod eventfd;
 pub mod file_server;
 pub mod fs_args;
+pub mod fs_node_cache;
 pub mod fs_registry;
 pub mod fsverity;
 pub mod inotify;
@@ -40,10 +37,9 @@ pub mod memory_directory;
 pub mod path;
 pub mod pidfd;
 pub mod pipe;
+pub mod pseudo;
 pub mod rw_queue;
 pub mod socket;
-pub mod stub_bytes_file;
-pub mod stub_empty_file;
 pub mod syscalls;
 pub mod timer;
 
@@ -51,7 +47,6 @@ pub use anon_node::*;
 pub use buffers::*;
 pub use dir_entry::*;
 pub use dirent_sink::*;
-pub use dynamic_file::*;
 pub use epoll::*;
 pub use fd_number::*;
 pub use fd_table::*;
@@ -66,16 +61,12 @@ pub use namespace::*;
 pub use path::*;
 pub use pidfd::*;
 pub use record_locks::*;
-pub use simple_file::*;
-pub use static_directory::*;
 pub use symlink_node::*;
 pub use userfault_file::*;
-pub use vec_directory::*;
 pub use wd_number::*;
 pub use xattr::*;
 
 #[cfg(not(feature = "starnix_lite"))]
-use crate::device::binder::BinderDriver;
 use crate::task::CurrentTask;
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
 use starnix_sync::{FileOpsCore, Locked};
@@ -101,6 +92,7 @@ use std::sync::Arc;
 //             .push(Box::new(Some(to_release)));
 //     });
 // }
+#[macro_export]
 macro_rules! register {
     ($arg:expr) => {
         RELEASERS.with(|cell| {
@@ -124,16 +116,17 @@ macro_rules! register {
 // where
 //    for<'b, 'a> T: Releasable<Context<'a, 'b> = CurrentTaskAndLocked<'a, 'b>>,
 // {
-//     fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_, '_>) {
+//     fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_>) {
 //         if let Some(this) = self.take() {
 //             <T as Releasable>::release(this, context);
 //         }
 //     }
 // }
+#[macro_export]
 macro_rules! impl_ctr_for_option {
     ($arg:ty) => {
         impl CurrentTaskAndLockedReleasable for Option<$arg> {
-            fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_, '_>) {
+            fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_>) {
                 if let Some(this) = self.take() {
                     <$arg as Releasable>::release(this, context);
                 }
@@ -160,34 +153,22 @@ impl ReleaserAction<FsNode> for FsNodeReleaserAction {
 pub type FsNodeReleaser = ObjectReleaser<FsNode, FsNodeReleaserAction>;
 impl_ctr_for_option!(ReleaseGuard<FsNode>);
 
-#[cfg(not(feature = "starnix_lite"))]
-pub enum BinderDriverReleaserAction {}
-#[cfg(not(feature = "starnix_lite"))]
-impl ReleaserAction<BinderDriver> for BinderDriverReleaserAction {
-    fn release(driver: ReleaseGuard<BinderDriver>) {
-        register!(driver);
-    }
-}
-#[cfg(not(feature = "starnix_lite"))]
-pub type BinderDriverReleaser = ObjectReleaser<BinderDriver, BinderDriverReleaserAction>;
-impl_ctr_for_option!(ReleaseGuard<BinderDriver>);
-
-pub type CurrentTaskAndLocked<'a, 'b> = (&'b mut Locked<'a, FileOpsCore>, &'b CurrentTask);
+pub type CurrentTaskAndLocked<'a> = (&'a mut Locked<FileOpsCore>, &'a CurrentTask);
 
 /// An object-safe/dyn-compatible trait to wrap `Releasable` types.
-trait CurrentTaskAndLockedReleasable {
-    fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_, '_>);
+pub trait CurrentTaskAndLockedReleasable {
+    fn release_with_context(&mut self, context: CurrentTaskAndLocked<'_>);
 }
 
 thread_local! {
     /// Container of all `FileObject` that are not used anymore, but have not been closed yet.
-    static RELEASERS: RefCell<Option<LocalReleasers>> = RefCell::new(Some(LocalReleasers::default()));
+    pub static RELEASERS: RefCell<Option<LocalReleasers>> = RefCell::new(Some(LocalReleasers::default()));
 }
 
 #[derive(Default)]
-struct LocalReleasers {
+pub struct LocalReleasers {
     /// The list of entities to be deferred released.
-    releasables: Vec<Box<dyn CurrentTaskAndLockedReleasable>>,
+    pub releasables: Vec<Box<dyn CurrentTaskAndLockedReleasable>>,
 }
 
 impl LocalReleasers {
@@ -197,7 +178,7 @@ impl LocalReleasers {
 }
 
 impl Releasable for LocalReleasers {
-    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a>;
 
     fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         let (locked, current_task) = context;
@@ -220,11 +201,7 @@ impl DelayedReleaser {
     }
 
     /// Run all current delayed releases for the current thread.
-    pub fn apply<'a>(
-        &self,
-        locked: &'a mut Locked<'a, FileOpsCore>,
-        current_task: &'a CurrentTask,
-    ) {
+    pub fn apply<'a>(&self, locked: &'a mut Locked<FileOpsCore>, current_task: &'a CurrentTask) {
         loop {
             let releasers = RELEASERS.with(|cell| {
                 std::mem::take(
@@ -261,7 +238,7 @@ impl DelayedReleaser {
 struct FlushedFile(FileHandle, FdTableId);
 
 impl Releasable for FlushedFile {
-    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a, 'b>;
+    type Context<'a: 'b, 'b> = CurrentTaskAndLocked<'a>;
     fn release<'a: 'b, 'b>(self, context: Self::Context<'a, 'b>) {
         let (locked, current_task) = context;
         self.0.flush(locked, current_task, self.1);

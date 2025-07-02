@@ -41,7 +41,7 @@ pub struct CreateSystemArgs {
     #[argh(switch)]
     pub include_account: bool,
 
-    /// the directory to write assembled outputs to.
+    /// the directory to write the assembled system to.
     #[argh(option)]
     pub outdir: Utf8PathBuf,
 

@@ -560,7 +560,7 @@ impl TestSetupBuilder {
                     .create_interface(
                         &port_id,
                         server_end,
-                        &fidl_fuchsia_net_interfaces_admin::Options::default(),
+                        fidl_fuchsia_net_interfaces_admin::Options::default(),
                     )
                     .expect("create interface");
 
@@ -819,7 +819,7 @@ async fn test_list_del_routes() {
         AddableMetric::ExplicitMetric(RawMetric(0)),
     )
     .into();
-    let sub10_gateway = SpecifiedAddr::new(net_ip_v4!("10.0.0.1")).unwrap().into();
+    let sub10_gateway = SpecifiedAddr::new(net_ip_v4!("10.0.0.1")).unwrap();
     let route3: AddableEntryEither<_> = AddableEntry::with_gateway(
         sub10,
         device.downgrade(),
@@ -832,7 +832,7 @@ async fn test_list_del_routes() {
         test_stack
             .ctx()
             .bindings_ctx()
-            .apply_route_change_either(match route.into() {
+            .apply_route_change_either(match route {
                 netstack3_core::routes::AddableEntryEither::V4(entry) => {
                     routes::ChangeEither::V4(routes::Change::RouteOp(
                         routes::RouteOp::Add(entry),
@@ -1008,7 +1008,7 @@ async fn test_neighbor_table_inspect() {
     });
     let inspector = test_stack.inspector();
     use diagnostics_hierarchy::DiagnosticsHierarchyGetter;
-    let data = inspector.get_diagnostics_hierarchy();
+    let data = inspector.get_diagnostics_hierarchy().await;
     println!("{:#?}", data);
     diagnostics_assertions::assert_data_tree!(data, "root": contains {
         "Neighbors": {
@@ -1255,7 +1255,7 @@ async fn shutdown_with_open_resources_netdev(
             .create_interface(
                 &port_id,
                 server_end,
-                &fidl_fuchsia_net_interfaces_admin::Options::default(),
+                fidl_fuchsia_net_interfaces_admin::Options::default(),
             )
             .expect("create interface");
 
@@ -1333,7 +1333,7 @@ async fn shutdown_with_open_resources_blackhole() {
         installer
             .install_blackhole_interface(
                 server_end,
-                &fidl_fuchsia_net_interfaces_admin::Options::default(),
+                fidl_fuchsia_net_interfaces_admin::Options::default(),
             )
             .expect("install interface");
 

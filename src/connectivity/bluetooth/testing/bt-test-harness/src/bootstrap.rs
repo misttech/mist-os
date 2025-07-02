@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{Context, Error};
-use fidl_fuchsia_bluetooth_sys::{BootstrapMarker, BootstrapProxy};
+use fidl_fuchsia_bluetooth_sys::BootstrapProxy;
 use fuchsia_bluetooth::expectation::asynchronous::{expectable, Expectable};
 use futures::future::{self, BoxFuture, FutureExt};
 use std::ops::{Deref, DerefMut};
@@ -47,7 +47,7 @@ impl TestHarness for BootstrapHarness {
             let fake_host = ActivatedFakeHost::new(realm.clone()).await?;
             let proxy = realm
                 .instance()
-                .connect_to_protocol_at_exposed_dir::<BootstrapMarker>()
+                .connect_to_protocol_at_exposed_dir()
                 .context("Failed to connect to bootstrap service")?;
             Ok((
                 BootstrapHarness(expectable(Default::default(), proxy)),

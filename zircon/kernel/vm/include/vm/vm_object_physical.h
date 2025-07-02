@@ -35,17 +35,8 @@ class VmObjectPhysical final : public VmObject, public VmDeferredDeleter<VmObjec
   // In the absence of a local lock it is assumed, and enforced in vm_object_lock.h, that there is a
   // shared lock in the hierarchy state. If there is both a local and a shared lock then the local
   // lock is to be used for the improved lock tracking.
-#if VMO_USE_LOCAL_LOCK
-  Lock<VmoLockType>* lock() const override TA_RET_CAP(lock_) { return &lock_; }
-  Lock<VmoLockType>& lock_ref() const override TA_RET_CAP(lock_) { return lock_; }
-#else
-  Lock<VmoLockType>* lock() const override TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
-    return hierarchy_state_ptr_->lock();
-  }
-  Lock<VmoLockType>& lock_ref() const override TA_RET_CAP(hierarchy_state_ptr_->lock_ref()) {
-    return hierarchy_state_ptr_->lock_ref();
-  }
-#endif
+  Lock<CriticalMutex>* lock() const override TA_RET_CAP(lock_) { return &lock_; }
+  Lock<CriticalMutex>& lock_ref() const override TA_RET_CAP(lock_) { return lock_; }
 
   VmObject* self_locked() TA_REQ(lock()) TA_ASSERT(self_locked()->lock()) { return this; }
 
@@ -97,8 +88,7 @@ class VmObjectPhysical final : public VmObject, public VmDeferredDeleter<VmObjec
 
  private:
   // private constructor (use Create())
-  VmObjectPhysical(fbl::RefPtr<VmHierarchyState> state, paddr_t base, uint64_t size, bool is_slice_,
-                   uint64_t parent_user_id);
+  VmObjectPhysical(paddr_t base, uint64_t size, bool is_slice_, uint64_t parent_user_id);
 
   // private destructor, only called from refptr
   ~VmObjectPhysical() override;
@@ -107,10 +97,8 @@ class VmObjectPhysical final : public VmObject, public VmDeferredDeleter<VmObjec
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmObjectPhysical);
 
   // members
-#if VMO_USE_LOCAL_LOCK
-  mutable LOCK_DEP_INSTRUMENT(VmObjectPhysical, VmoLockTraits::LocalLockType,
-                              VmoLockTraits::LocalLockFlags) lock_;
-#endif
+  mutable LOCK_DEP_INSTRUMENT(VmObjectPhysical, CriticalMutex, lockdep::LockFlagsNestable) lock_;
+
   const uint64_t size_ = 0;
   const paddr_t base_ = 0;
   const bool is_slice_ = false;

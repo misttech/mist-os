@@ -224,7 +224,8 @@ void UmsFunction::HandleRequestSense(ums_cbw_t* cbw) {
   memset(data, 0, UMS_REQUEST_SENSE_TRANSFER_LENGTH);
   req->request()->header.length = UMS_REQUEST_SENSE_TRANSFER_LENGTH;
 
-  data->response_code = 0x70;
+  data->response_code =
+      static_cast<uint8_t>(scsi::SenseDataResponseCodes::kFixedCurrentInformation);
   data->additional_sense_code = 0x20;
   data->additional_sense_length = 10;
 

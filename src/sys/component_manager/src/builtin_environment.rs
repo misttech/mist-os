@@ -125,9 +125,9 @@ use {
 #[cfg(feature = "tracing")]
 use {
     cm_config::TraceProvider,
-    fidl::endpoints::{self, Proxy},
+    fidl::endpoints::{self},
     fidl_fuchsia_tracing_provider as ftp,
-    zx::AsHandleRef,
+    zx::HandleBased,
 };
 
 // Allow shutdown to take up to an hour.
@@ -1823,7 +1823,7 @@ impl BuiltinEnvironment {
     /// Obtains a connection to tracing, and initializes tracing
     #[cfg(feature = "tracing")]
     async fn connect_to_tracing_from_exposed(&self) {
-        let (trace_provider_proxy, server) = endpoints::create_proxy::<ftp::RegistryMarker>();
+        let (client_end, server) = endpoints::create_endpoints::<ftp::RegistryMarker>();
         let root = self.model.root();
         const FLAGS: fio::Flags = fio::Flags::PROTOCOL_SERVICE;
         let mut object_request = FLAGS.to_object_request(server);
@@ -1837,16 +1837,14 @@ impl BuiltinEnvironment {
             .await
         {
             Ok(()) => {
-                fuchsia_trace_provider::trace_provider_create_with_service(
-                    trace_provider_proxy.as_channel().raw_handle(),
-                );
+                fuchsia_trace_provider::trace_provider_create_with_service(client_end.into_raw());
                 fuchsia_trace_provider::trace_provider_wait_for_init();
             }
             Err(e) => info!("Unable to open Registry server for tracing: {}", e),
         }
     }
 
-    #[cfg(test)]
+    #[cfg(all(test, feature = "src_model_tests"))]
     pub fn inspector(&self) -> &Inspector {
         self.inspect_sink_provider.inspector()
     }

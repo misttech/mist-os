@@ -10,6 +10,7 @@ group("tests") {
     "inspect-fidl-load:tests",
     "log-command:tests",
     "persistence:tests",
+    "ring-buffer:tests",
     "sampler-config:tests",
     "triage:tests",
     "util:tests",

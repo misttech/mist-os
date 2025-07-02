@@ -55,7 +55,7 @@ async fn launch_and_test_echo_server(builder: RealmBuilder) -> Result<(), Error>
         )
         .await?;
     let instance = builder.build().await?;
-    let echo_proxy = instance.root.connect_to_protocol_at_exposed_dir::<fecho::EchoMarker>()?;
+    let echo_proxy: fecho::EchoProxy = instance.root.connect_to_protocol_at_exposed_dir()?;
     assert_eq!(
         Some(DEFAULT_ECHO_STR.to_string()),
         echo_proxy.echo_string(Some(DEFAULT_ECHO_STR)).await?,

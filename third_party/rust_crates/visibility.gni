@@ -239,9 +239,6 @@ tracing_visibility = [
   # library, we've standarized on `log` for multiple reasons listed at
   # go/fuchsia-rust-log
   #
-  # At the moment, `tracing` macro usage is only allowed for ffx code which depends
-  # on #[tracing::instrument] features.
-  #
   # To regenerate, run:
   # (cd $FUCHSIA_DIR && git grep  --files-with-matches '//third_party/rust_crates:tracing"' -- '*BUILD.gn' | sed 's|\(.*\)/BUILD.gn|"//\1:*",|')
   #
@@ -249,10 +246,6 @@ tracing_visibility = [
   # test actually validating tracing macros still work on fuchsia in case we
   # have a 3P lib that uses them.
   "//src/tests/diagnostics:*",
-
-  # At this time we are not enforcing restrictions on ffx and related libraries.
-  "//src/developer/ffx/config:*",
-  "//src/developer/ffx/lib/logging/*",
 
   # At this time we are not enforcing restrictions on the below since the
   # sources are in a 3P library.
@@ -278,10 +271,6 @@ tracing_subscriber_visibility = [
   #
   # To regenerate, run:
   # (cd $FUCHSIA_DIR && git grep  --files-with-matches '//third_party/rust_crates:tracing-subscriber' -- '*BUILD.gn' | sed 's|\(.*\)/BUILD.gn|"//\1:*",|')
-  #
-  # At this time we are not enforcing restrictions on ffx and related code.
-  "//src/developer/ffx/config:*",
-  "//src/developer/ffx/lib/logging/*",
 
   # At this time we are not enforcing restrictions on the below.
   "//third_party/*",

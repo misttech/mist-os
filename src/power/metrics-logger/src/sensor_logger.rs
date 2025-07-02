@@ -973,6 +973,7 @@ pub mod tests {
 
         // Check TemperatureLogger added before first temperature poll.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -990,6 +991,7 @@ pub mod tests {
             runner.gpu_temperature.set(40.0 + i as f32);
             runner.iterate_task(&mut task);
             assert_data_tree!(
+                @executor runner.executor,
                 runner.inspector,
                 root: {
                     MetricsLogger: {
@@ -1012,6 +1014,7 @@ pub mod tests {
         // With one more time step, the end time has been reached.
         runner.iterate_task(&mut task);
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1055,6 +1058,7 @@ pub mod tests {
 
         // Check PowerLogger added before first power sensor poll.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1069,6 +1073,7 @@ pub mod tests {
         // Run 1 logging task.
         assert!(runner.iterate_task(&mut task));
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1104,6 +1109,7 @@ pub mod tests {
         // Finish the remaining task.
         assert!(runner.iterate_task(&mut task));
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1150,6 +1156,7 @@ pub mod tests {
             if i < 2 {
                 // Check statistics data is not available for the first 200 ms.
                 assert_data_tree!(
+                    @executor runner.executor,
                     runner.inspector,
                     root: {
                         MetricsLogger: {
@@ -1170,6 +1177,7 @@ pub mod tests {
             } else {
                 // Check statistics data is updated every 300 ms.
                 assert_data_tree!(
+                    @executor runner.executor,
                     runner.inspector,
                     root: {
                         MetricsLogger: {
@@ -1211,6 +1219,7 @@ pub mod tests {
         // With one more time step, the end time has been reached.
         runner.iterate_task(&mut task);
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1271,6 +1280,7 @@ pub mod tests {
 
         // Check PowerLogger added before first power sensor poll.
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1296,6 +1306,7 @@ pub mod tests {
         }
 
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1368,6 +1379,7 @@ pub mod tests {
         // Run 1 logging task.
         assert!(runner.iterate_task(&mut task));
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1443,6 +1455,7 @@ pub mod tests {
         // Run 1 logging task.
         assert!(runner.iterate_task(&mut task));
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {
@@ -1504,6 +1517,7 @@ pub mod tests {
         // Finish the remaining task.
         assert!(runner.iterate_task(&mut task));
         assert_data_tree!(
+            @executor runner.executor,
             runner.inspector,
             root: {
                 MetricsLogger: {

@@ -2,15 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "dl-load-tests.h"
+#include <lib/elfldltl/self.h>
 
+#include "dl-iterate-phdr-tests.h"
+#include "dl-load-tests.h"
 namespace {
 
 using dl::testing::DlTests;
 TYPED_TEST_SUITE(DlTests, dl::testing::TestTypes);
 
+using ::testing::Contains;
+using ::testing::Not;
+using ::testing::Property;
+
+using dl::testing::CollectModulePhdrInfo;
+using dl::testing::GetGlobalCounters;
+using dl::testing::ModuleInfoList;
+using dl::testing::ModulePhdrInfo;
+
 using dl::testing::RunFunction;
 using dl::testing::TestModule;
+using dl::testing::TestShlib;
 using dl::testing::TestSym;
 
 // Test that the module data structure uses its own copy of the module's name,
@@ -190,6 +202,183 @@ TYPED_TEST(DlTests, UniqueModules) {
 
   ASSERT_TRUE(this->DlClose(open_ret17.value()).is_ok());
   ASSERT_TRUE(this->DlClose(open_ret23.value()).is_ok());
+}
+
+// Test that the same module can be located by either its DT_SONAME or filename.
+// dlopen libfoo-filename (with DT_SONAME libbar-soname)
+// dlopen libbar-soname and expect the same module handle for libfoo-filename.
+// dlopen soname-filename-match:
+//    - libbar-soname
+// Expect dlopen for soname-filename-match to reuse libfoo-filename module.
+// Expect only 2 modules are loaded: libfoo-filename, soname-filename-match.
+TYPED_TEST(DlTests, SonameFilenameMatch) {
+  const std::string kFilename = TestShlib("libfoo-filename");
+  const std::string kSoname = TestShlib("libbar-soname");
+  const std::string kParentFile = TestShlib("libsoname-filename-match");
+
+  const size_t initial_loaded_count = GetGlobalCounters(this).loaded;
+
+  this->Needed({kFilename});
+
+  // Open the module by its filename.
+  auto open_filename = this->DlOpen(kFilename.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_filename.is_ok()) << open_filename.error_value();
+  ASSERT_TRUE(open_filename.value());
+
+  // Open the module by its DT_SONAME, expecting it to already be loaded and is
+  // pointing to the same module as `open_filename`.
+  auto open_soname = this->DlOpen(kSoname.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(open_soname.is_ok()) << open_soname.error_value();
+  ASSERT_TRUE(open_soname.value());
+
+  EXPECT_EQ(open_filename.value(), open_soname.value());
+
+  // Expect only the parent-file to be fetched from the filesystem; its dep
+  // should already be loaded.
+  this->Needed({kParentFile});
+
+  auto open_parent = this->DlOpen(kParentFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_parent.is_ok()) << open_parent.error_value();
+  ASSERT_TRUE(open_parent.value());
+
+  const size_t updated_loaded_count = GetGlobalCounters(this).loaded;
+  if constexpr (TestFixture::kInaccurateLoadCountAfterSonameMatch) {
+    EXPECT_EQ(updated_loaded_count, initial_loaded_count + 3);
+  } else {
+    EXPECT_EQ(updated_loaded_count, initial_loaded_count + 2);
+  }
+  // Expect a file named libbar-soname to be absent from loaded modules.
+  ModuleInfoList info_list;
+  EXPECT_EQ(this->DlIteratePhdr(CollectModulePhdrInfo, &info_list), 0);
+  EXPECT_THAT(info_list,
+              Not(Contains(Property(&ModulePhdrInfo::name, TestShlib("libbar-soname")))));
+
+  ASSERT_TRUE(this->DlClose(open_parent.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_filename.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_soname.value()).is_ok());
+}
+
+// Test a linking session will match the DT_SONAME of a module that is in the
+// loading queue but has not yet been loaded.
+// dlopen soname-filename-dep:
+//  - soname-filename-match
+//    - libbar-soname
+//  - libfoo-filename (with DT_SONAME libbar-soname)
+// Since libbar-soname was enqueued before libfoo-filename was loaded, this
+// tests if the loading logic can match libbar-soname with libfoo-filename's
+// DT_SONAME. Glibc does perform this matching, but Musl/Libdl does not.
+// Check there should be 3 modules that were loaded after this dlopen:
+// soname-filename-loaded-dep, soname-filename-match, and libfoo-filename.
+TYPED_TEST(DlTests, SonameFilenameDep) {
+  const std::string kLibFooFile = TestShlib("libfoo-filename");
+  const std::string kHasLibBarFile = TestShlib("libsoname-filename-match");
+  const std::string kHasDepsFile = TestModule("soname-filename-loaded-dep");
+
+  if constexpr (!TestFixture::kSonameLookupInPendingDeps) {
+    GTEST_SKIP()
+        << "Fixture should be able to look up DT_SONAME in pending deps in a linking session";
+  }
+
+  const size_t initial_loaded_count = GetGlobalCounters(this).loaded;
+
+  this->ExpectRootModule(kHasDepsFile);
+  this->Needed({kHasLibBarFile, kLibFooFile});
+
+  auto open_has_deps = this->DlOpen(kHasDepsFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_has_deps.is_ok()) << open_has_deps.error_value();
+  ASSERT_TRUE(open_has_deps.value());
+
+  const size_t updated_loaded_count = GetGlobalCounters(this).loaded;
+  EXPECT_EQ(updated_loaded_count, initial_loaded_count + 3);
+
+  // Expect a file named libar-soname to be absent from loaded modules.
+  ModuleInfoList info_list;
+  EXPECT_EQ(this->DlIteratePhdr(CollectModulePhdrInfo, &info_list), 0);
+  EXPECT_THAT(info_list,
+              Not(Contains(Property(&ModulePhdrInfo::name, TestShlib("libbar-soname")))));
+
+  ASSERT_TRUE(this->DlClose(open_has_deps.value()).is_ok());
+}
+
+// Test a linking session will match the DT_SONAME of a module that has already
+// been loaded in the same linking session. This test is similar to above,
+// except the module with the matching DT_SONAME has been loaded by the time the
+// pending module is looking for a match.
+// dlopen soname-filename-loaded-dep:
+//  - libfoo-filename (with DT_SONAME libbar-soname)
+//  - soname-filename-match
+//    - libbar-soname
+// Expect that libbar-soname will reuse the module for libfoo-filename, because
+// libfoo-filename was loaded/decoded by the time libbar-soname is added to the
+// loading queue.
+// Check there should be 3 modules that were loaded after this dlopen:
+// soname-filename-loaded-dep, libfoo-filename, and
+// soname-filename-match
+TYPED_TEST(DlTests, SonameFilenameLoadedDep) {
+  const std::string kLibFooFile = TestShlib("libfoo-filename");
+  const std::string kHasLibBarFile = TestShlib("libsoname-filename-match");
+  const std::string kHasDepsFile = TestModule("soname-filename-loaded-dep");
+
+  if constexpr (!TestFixture::kSonameLookupInLoadedDeps) {
+    GTEST_SKIP()
+        << "Fixture should be able to look up DT_SONAME in loaded deps in a linking session.";
+  }
+
+  const size_t initial_loaded_count = GetGlobalCounters(this).loaded;
+
+  this->ExpectRootModule(kHasDepsFile);
+  this->Needed({kLibFooFile, kHasLibBarFile});
+
+  auto open_has_deps = this->DlOpen(kHasDepsFile.c_str(), RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(open_has_deps.is_ok()) << open_has_deps.error_value();
+  ASSERT_TRUE(open_has_deps.value());
+
+  const size_t updated_loaded_count = GetGlobalCounters(this).loaded;
+
+  if constexpr (TestFixture::kInaccurateLoadCountAfterSonameMatch) {
+    // For some reason, Musl only counts one additional module.
+    EXPECT_EQ(updated_loaded_count, initial_loaded_count + 1);
+  } else {
+    EXPECT_EQ(updated_loaded_count, initial_loaded_count + 3);
+  }
+
+  // Expect a file named libar-soname to be absent from loaded modules.
+  ModuleInfoList info_list;
+  EXPECT_EQ(this->DlIteratePhdr(CollectModulePhdrInfo, &info_list), 0);
+  EXPECT_THAT(info_list,
+              Not(Contains(Property(&ModulePhdrInfo::name, TestShlib("libbar-soname")))));
+
+  ASSERT_TRUE(this->DlClose(open_has_deps.value()).is_ok());
+}
+
+// Test that passing a NULL or an empty string as the file arg will return a
+// handle to the executable.
+TYPED_TEST(DlTests, NullFileArgBasic) {
+  const std::string kEmpty;
+
+  auto null_open = this->DlOpen(NULL, RTLD_NOW | RTLD_LOCAL);
+  ASSERT_TRUE(null_open.is_ok()) << null_open.error_value();
+  ASSERT_TRUE(null_open.value());
+
+  // To verify the module handle dlopen() returned is for the executable, we
+  // that the module's link_map.l_ld points to dynamic section of this test
+  // binary.
+  EXPECT_EQ(this->ModuleLinkMap(null_open.value())->l_ld,
+            reinterpret_cast<const Elf64_Dyn*>(elfldltl::Self<>::Dynamic().data()));
+
+  auto empty_str_open = this->DlOpen(kEmpty.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(empty_str_open.is_ok()) << empty_str_open.error_value();
+  EXPECT_TRUE(empty_str_open.value());
+
+  // Expect that the handle for an empty string is the same as the handle for
+  // a NULL argument, which is the executable.
+  EXPECT_EQ(empty_str_open.value(), null_open.value());
+
+  // TODO(https://fxbug.dev/339294119): TODO test that dlsym() will resolve
+  // symbols correctly with this handle.
+
+  ASSERT_TRUE(this->DlClose(null_open.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(empty_str_open.value()).is_ok());
 }
 
 }  // namespace

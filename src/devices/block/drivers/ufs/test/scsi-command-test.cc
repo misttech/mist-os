@@ -143,8 +143,6 @@ TEST_F(ScsiCommandTest, Read10Exception) {
     // The command should be failed with address exceeding device size.
     auto response =
         dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo()));
-    // TODO(https://fxbug.dev/42075643): Modify status code after
-    // |TransferRequestProcessor::GetResponseStatus()| is refactored.
     ASSERT_EQ(response.status_value(), ZX_ERR_BAD_STATE);
   }
 }
@@ -223,8 +221,6 @@ TEST_F(ScsiCommandTest, Write10Exception) {
     const uint8_t kTestFailureLun = 1;
     auto response = dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestFailureLun,
                                                                      zx::unowned_vmo(GetVmo()));
-    // TODO(https://fxbug.dev/42075643): Modify status code after
-    // |TransferRequestProcessor::GetResponseStatus()| is refactored.
     ASSERT_EQ(response.status_value(), ZX_ERR_BAD_STATE);
   }
 
@@ -265,7 +261,7 @@ TEST_F(ScsiCommandTest, TestUnitReady) {
   auto *response_sense_data =
       reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(response->GetSenseData());
   ASSERT_EQ(response_sense_data->response_code(),
-            0x70);  // 0x70 is the fixed format sense data response.
+            scsi::SenseDataResponseCodes::kFixedCurrentInformation);
   ASSERT_EQ(response_sense_data->valid(), 0);
   ASSERT_EQ(response_sense_data->sense_key(), scsi::SenseKey::NO_SENSE);
 
@@ -316,7 +312,7 @@ TEST_F(ScsiCommandTest, RequestSense) {
       dut_->GetTransferRequestProcessor().SendScsiUpiu(upiu, kTestLun, zx::unowned_vmo(GetVmo())));
 
   auto *sense_data = reinterpret_cast<scsi::FixedFormatSenseDataHeader *>(GetVirtualAddress());
-  ASSERT_EQ(sense_data->response_code(), 0x70);  // 0x70 is the fixed format sense data response.
+  ASSERT_EQ(sense_data->response_code(), scsi::SenseDataResponseCodes::kFixedCurrentInformation);
   ASSERT_EQ(sense_data->valid(), 0);
   ASSERT_EQ(sense_data->sense_key(), scsi::SenseKey::NO_SENSE);
 }

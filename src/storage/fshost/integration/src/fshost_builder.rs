@@ -123,6 +123,7 @@ impl FshostBuilder {
             ("storage_host", "fuchsia.fshost.StorageHost"),
             ("disable_automount", "fuchsia.fshost.DisableAutomount"),
             ("starnix_volume_name", "fuchsia.fshost.StarnixVolumeName"),
+            ("inline_crypto", "fuchsia.fshost.InlineCrypto"),
             ("blobfs_write_compression_algorithm", "fuchsia.blobfs.WriteCompressionAlgorithm"),
             ("blobfs_cache_eviction_policy", "fuchsia.blobfs.CacheEvictionPolicy"),
         ]);

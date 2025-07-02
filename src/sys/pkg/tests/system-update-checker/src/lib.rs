@@ -311,15 +311,15 @@ impl TestEnvBuilder {
         let realm_instance = builder.build().await.unwrap();
         let channel_provider = realm_instance
             .root
-            .connect_to_protocol_at_exposed_dir::<ProviderMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect to channel provider");
         let update_manager = realm_instance
             .root
-            .connect_to_protocol_at_exposed_dir::<ManagerMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect to update manager");
         let commit_status_provider = realm_instance
             .root
-            .connect_to_protocol_at_exposed_dir::<CommitStatusProviderMarker>()
+            .connect_to_protocol_at_exposed_dir()
             .expect("connect to commit status provider");
 
         TestEnv {

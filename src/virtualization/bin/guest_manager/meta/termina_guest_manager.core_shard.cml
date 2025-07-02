@@ -31,6 +31,13 @@
             to: "#termina-guest-manager",
         },
         {
+            protocol: [ "fuchsia.fxfs.FileBackedVolumeProvider" ],
+            from: "parent",
+            to: "#termina-guest-manager",
+            source_availability: "unknown", // may not be available on all products
+            availability: "optional",
+        },
+        {
             dictionary: "diagnostics",
             from: "parent",
             to: "#termina-guest-manager",

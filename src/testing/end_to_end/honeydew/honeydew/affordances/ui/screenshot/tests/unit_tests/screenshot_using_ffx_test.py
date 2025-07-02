@@ -23,6 +23,10 @@ class ScreenshotUsingFfxTests(unittest.TestCase):
             ffx=self.mock_ffx
         )
 
+    def test_verify_supported(self) -> None:
+        """Test if verify_supported works."""
+        # TODO(http://b/409624046): Implement the test method logic
+
     def test_take_screenshot(self) -> None:
         # An image with a single pixel:
         expected_img_bytes = [100, 50, 255, 255]

@@ -43,7 +43,7 @@
 #include "src/graphics/display/drivers/coordinator/added-display-info.h"
 #include "src/graphics/display/drivers/coordinator/client-id.h"
 #include "src/graphics/display/drivers/coordinator/client-priority.h"
-#include "src/graphics/display/drivers/coordinator/client.h"
+#include "src/graphics/display/drivers/coordinator/client-proxy.h"
 #include "src/graphics/display/drivers/coordinator/display-info.h"
 #include "src/graphics/display/drivers/coordinator/image.h"
 #include "src/graphics/display/drivers/coordinator/layer.h"
@@ -125,19 +125,17 @@ void Controller::PopulateDisplayTimings(DisplayInfo& display_info) {
 
     test_config.mode = display::ToBanjoDisplayMode(edid_timing);
 
-    config_check_result_t display_cfg_result;
-    layer_composition_operations_t layer_result = 0;
-    size_t display_layer_results_count;
-    display_cfg_result = engine_driver_client_->CheckConfiguration(
-        &test_config, &layer_result,
-        /*layer_composition_operations_count=*/1, &display_layer_results_count);
-    if (display_cfg_result == CONFIG_CHECK_RESULT_OK) {
-      fbl::AllocChecker alloc_checker;
-      display_info.timings.push_back(edid_timing, &alloc_checker);
-      if (!alloc_checker.check()) {
-        fdf::warn("Failed to allocate memory for EDID timing. Skipping it.");
-        break;
-      }
+    display::ConfigCheckResult config_check_result =
+        engine_driver_client_->CheckConfiguration(&test_config);
+    if (config_check_result != display::ConfigCheckResult::kOk) {
+      continue;
+    }
+
+    fbl::AllocChecker alloc_checker;
+    display_info.timings.push_back(edid_timing, &alloc_checker);
+    if (!alloc_checker.check()) {
+      fdf::warn("Failed to allocate memory for EDID timing. Skipping it.");
+      break;
     }
   }
 }

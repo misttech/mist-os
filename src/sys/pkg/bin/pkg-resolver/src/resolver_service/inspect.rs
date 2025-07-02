@@ -91,8 +91,8 @@ mod tests {
     use diagnostics_assertions::{assert_data_tree, AnyProperty};
     use fuchsia_inspect::Inspector;
 
-    #[test]
-    fn package_state_progression() {
+    #[fuchsia::test]
+    async fn package_state_progression() {
         let inspector = Inspector::default();
 
         let resolver_service =
@@ -142,8 +142,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn concurrent_resolves() {
+    #[fuchsia::test]
+    async fn concurrent_resolves() {
         let inspector = Inspector::default();
         let resolver_service =
             ResolverService::from_node(inspector.root().create_child("resolver_service"));
@@ -173,8 +173,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn cache_fallback_due_to_not_found_increments() {
+    #[fuchsia::test]
+    async fn cache_fallback_due_to_not_found_increments() {
         let inspector = Inspector::default();
 
         let resolver_service =

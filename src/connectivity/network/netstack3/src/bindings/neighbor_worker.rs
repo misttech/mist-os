@@ -21,6 +21,7 @@ use log::{error, info, warn};
 use net_types::ethernet::Mac;
 use net_types::ip::{Ip, IpAddr, IpAddress, Ipv4, Ipv6};
 use net_types::{SpecifiedAddr, Witness as _};
+use thiserror::Error;
 
 use crate::bindings::devices::{BindingId, DeviceIdAndName};
 use crate::bindings::time::StackTime;
@@ -486,12 +487,12 @@ impl Watcher {
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 #[error("neighbor worker no longer available")]
 pub(crate) struct WorkerClosedError;
 
 /// Possible errors when serving `fuchsia.net.neighbor/View`.
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub(crate) enum Error {
     #[error("failed to send a Watcher task to parent")]
     Send(#[from] WorkerClosedError),

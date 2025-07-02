@@ -26,7 +26,7 @@ impl Procedure<ProcedureInput, ProcedureOutput> for HangUpProcedure {
     }
 
     fn name(&self) -> &str {
-        "Hang Uo Procedure"
+        "Hang Up Procedure"
     }
 
     fn transition(

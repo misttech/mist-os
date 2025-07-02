@@ -59,7 +59,13 @@ impl FastPairConnectionManager {
     /// Otherwise, returns a Future that never resolves.
     pub fn on_upstream_client_closed(&self) -> impl Future<Output = ()> + 'static {
         match &self.watcher {
-            Some(watcher) => watcher.on_closed().extend_lifetime().map(|_| ()).left_future(),
+            Some(watcher) => {
+                let watcher = watcher.clone();
+                async move {
+                    let _ = watcher.on_closed().await;
+                }
+                .left_future()
+            }
             None => future::pending().right_future(),
         }
     }

@@ -229,12 +229,7 @@ void CatchCrash(void (*crash_function)(), uintptr_t& crash_pc) {
 }
 
 // The crashing entry points can't use anything but the basic stack.
-
-#ifdef __clang__
-#define BASIC_ABI [[clang::no_sanitize("all")]]
-#else
-#define BASIC_ABI  // We don't use anything in GCC that needs to be avoided.
-#endif
+#define BASIC_ABI [[gnu::no_sanitize("all")]]
 
 BASIC_ABI [[noreturn]] void CrashWithIcfExpected1() { __builtin_trap(); }
 

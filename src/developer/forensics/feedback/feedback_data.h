@@ -31,7 +31,8 @@ namespace forensics::feedback {
 class FeedbackData {
  public:
   struct Options {
-    SnapshotConfig config;
+    SnapshotConfig snapshot_config;
+    SnapshotExclusionConfig snapshot_exclusion_config;
     bool is_first_instance;
     bool limit_inspect_data;
     bool run_log_persistence;

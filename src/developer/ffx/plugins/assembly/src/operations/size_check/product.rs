@@ -25,9 +25,9 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
         let output_path = gcs_download(bucket, object, args.auth.clone())
             .await
             .context("download assembly manifest")?;
-        AssembledSystem::try_load_from(output_path)?
+        AssembledSystem::from_relative_config_path(output_path)?
     } else {
-        AssembledSystem::try_load_from(&args.assembly_manifest)?
+        AssembledSystem::from_relative_config_path(&args.assembly_manifest)?
     };
 
     let blobfs_contents = match extract_blob_contents(&assembled_system) {
@@ -61,9 +61,9 @@ pub async fn verify_product_budgets(args: ProductSizeCheckArgs) -> Result<bool> 
             let output_path = gcs_download(bucket, object, args.auth)
                 .await
                 .context("download base assembly manifest")?;
-            AssembledSystem::try_load_from(output_path)?
+            AssembledSystem::from_relative_config_path(output_path)?
         } else {
-            AssembledSystem::try_load_from(&base_assembly_manifest)?
+            AssembledSystem::from_relative_config_path(&base_assembly_manifest)?
         };
 
         let other_blobfs_contents =
@@ -158,14 +158,11 @@ async fn gcs_download(bucket: &str, object: &str, auth_mode: AuthMode) -> Result
     Ok(output_path.to_path_buf())
 }
 
-/// Extracts the blob contents from the images manifest.
+/// Extracts the blob contents from the assembled system.
 fn extract_blob_contents(assembled_system: &AssembledSystem) -> Option<&BlobfsContents> {
     for image in &assembled_system.images {
         match image {
             Image::BlobFS { contents, .. } => {
-                return Some(contents);
-            }
-            Image::Fxfs { contents, .. } => {
                 return Some(contents);
             }
             Image::FxfsSparse { contents, .. } => {
@@ -204,18 +201,22 @@ mod tests {
     fn extract_blob_contents_test() -> Result<()> {
         let blobfs_contents = BlobfsContents {
             packages: PackagesMetadata {
-                base: PackageSetMetadata(vec![PackageMetadata {
-                    name: "hello".to_string(),
-                    manifest: "path".into(),
-                    blobs: Default::default(),
-                }]),
-                cache: PackageSetMetadata(vec![]),
+                base: PackageSetMetadata {
+                    metadata: vec![PackageMetadata {
+                        name: "hello".to_string(),
+                        manifest: "path".into(),
+                        blobs: Default::default(),
+                    }],
+                },
+                cache: PackageSetMetadata { metadata: vec![] },
             },
             maximum_contents_size: Some(1234),
         };
         let mut assembled_system = AssembledSystem {
             images: vec![Image::VBMeta("a/b/c".into()), Image::FVM("x/y/z".into())],
             board_name: "my_board".into(),
+            partitions_config: None,
+            system_release_info: None,
         };
         assert_eq!(extract_blob_contents(&assembled_system), None);
         assembled_system

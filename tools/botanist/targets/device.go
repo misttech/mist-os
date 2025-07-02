@@ -19,6 +19,7 @@ import (
 	"go.fuchsia.dev/fuchsia/tools/botanist"
 	"go.fuchsia.dev/fuchsia/tools/lib/iomisc"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
+	"go.fuchsia.dev/fuchsia/tools/lib/retry"
 	"go.fuchsia.dev/fuchsia/tools/lib/serial"
 	serialconstants "go.fuchsia.dev/fuchsia/tools/lib/serial/constants"
 	"go.fuchsia.dev/fuchsia/tools/lib/subprocess"
@@ -317,13 +318,12 @@ func (t *Device) Start(ctx context.Context, images []bootserver.Image, args []st
 				logger.Errorf(ctx, "Flashing attempt %d/%d failed: %s.", attempt, maxAllowedAttempts, err)
 				return err
 			} else {
-				// If not successful, and we have
-				// remaining attempts, try hard
-				// power-cycling the target to recover.
-				logger.Warningf(ctx, "Flashing attempt %d/%d failed: %s.  Attempting hard power cycle.", attempt, maxAllowedAttempts, err)
-				err = t.hardPowerCycleAndPlaceInFastboot(ctx)
+				// If not successful, and we have remaining attempts,
+				// try placing the device in fastboot and try again.
+				logger.Warningf(ctx, "Flashing attempt %d/%d failed: %s.  Attempting to put device in fastboot.", attempt, maxAllowedAttempts, err)
+				err = t.placeInFastboot(ctx)
 				if err != nil {
-					errWrapped := fmt.Errorf("while hard power cycling and placing device back in fastboot: %w", err)
+					errWrapped := fmt.Errorf("while placing device back in fastboot: %w", err)
 					logger.Errorf(ctx, "%s", errWrapped)
 					return errWrapped
 				}
@@ -409,143 +409,21 @@ func (t *Device) flash(ctx context.Context, productBundle, target string, tcpFla
 	return t.ffx.Flash(ctx, target, "", productBundle, tcpFlash)
 }
 
-// Nasty hack to try to deal with the fact that some devices have real bad USB
-// signal quality which results in dropping packets in a way the target doesn't
-// recognize.
-func (t *Device) hardPowerCycleAndPlaceInFastboot(ctx context.Context) error {
-	// All of this should easily complete within a minute.
-	ctx, cancel := context.WithTimeout(ctx, hardRecoveryTimeoutSecs*time.Second)
-	defer cancel()
-	serialSocketPath := t.SerialSocketPath()
-	if serialSocketPath == "" {
-		return errors.New("No serial socket configured; cannot force device into fastboot")
-	}
-
-	// Start a goroutine which just periodically sends `f\r\n` on the serial
-	// console, which is the magic invocation which tells firmware to drop
-	// into the fastboot idle loop.
-	serialSpamContext, serialSpamCancel := context.WithCancel(ctx)
-	defer serialSpamCancel()
-	go spamFToSerial(serialSpamContext, serialSocketPath)
-
-	// Ask DMS to hard power cycle this device.  This usually takes ~20 seconds.
-	err := t.hardPowerCycle(ctx)
-	if err != nil {
-		return fmt.Errorf("dmc invocation failed: %w", err)
-	}
-	logger.Debugf(ctx, "dmc invocation completed successfully")
-
-	// Start a goroutine which watches the serial logs for this device for
-	// fastbootIdleSignature.  This is intrinsically racy no matter when we
-	// start it -- if we do it before the power-cycle, we might pick up the
-	// line emission due to a USB link renegotiation from before we cut
-	// power.  If we do it after the power-cycle, we might not open the
-	// socket quickly enough to see the `USB RESET` line.
-	// We opt for the latter, combined with a 10-second timeout after which
-	// we assume success and carry on anyway.  This whole flow is only
-	// intended for use in an attempted error recovery path anyway.
-	fastbootedLogChan := make(chan error)
-	go func() {
-		defer close(fastbootedLogChan)
-		logger.Debugf(ctx, "watching serial for string that indicates device is in fastboot: %q", fastbootIdleSignature)
-		socket, err := net.Dial("unix", serialSocketPath)
-		if err != nil {
-			fastbootedLogChan <- fmt.Errorf("%s: %w", serialconstants.FailedToOpenSerialSocketMsg, err)
-			return
-		}
-		defer socket.Close()
-		_, err = iomisc.ReadUntilMatchString(ctx, socket, fastbootIdleSignature)
-		fastbootedLogChan <- err
-	}()
-	fastbootWaitCtx, fastbootWaitCtxCancel := context.WithTimeout(ctx, fastbootIdleWaitTimeoutSecs*time.Second)
-	defer fastbootWaitCtxCancel()
-
-	// Wait until either we have seen the device enumerate on USB again (as
-	// evidenced by the serial log signature) or until 10 seconds have
-	// elapsed (an upper bound on the amount of time it should take a
-	// device to reach fastboot).
-	var retval error
-	select {
-	case res := <-fastbootedLogChan:
-		logger.Debugf(fastbootWaitCtx, "Log watcher returned %s", err)
-		retval = res
-		// We wait an additional two seconds here because at the
-		// instant we see this log line, the host is still enumerating
-		// the device and has likely not finished all of its USB
-		// requests yet, and `ffx flash` will error out immediately if
-		// it can't find the device with the matching serial number,
-		// rather than wait for such a device to appear (which is what
-		// `fastboot` would do).
-		// Feel free to remove this if `ffx flash` ever gets around to
-		// doing the more-useful thing.
-		time.Sleep(2 * time.Second)
-	case <-fastbootWaitCtx.Done():
-		logger.Debugf(fastbootWaitCtx, "Did not see '%s' in logs within %d seconds; carrying on anyway", fastbootIdleSignature, fastbootIdleWaitTimeoutSecs)
-		retval = nil
-	case <-ctx.Done():
-		retval = fmt.Errorf("hard-reboot recovery did not complete within %d seconds", hardRecoveryTimeoutSecs)
-	}
-
-	return retval
-}
-
-func spamFToSerial(ctx context.Context, serialSocketPath string) {
-	logger.Debugf(ctx, "starting serial spam to place device in fastboot")
-	ticker := time.NewTicker(200 * time.Millisecond)
-	defer ticker.Stop()
-	socket, err := net.Dial("unix", serialSocketPath)
-	if err != nil {
-		logger.Errorf(ctx, "%s: %s", serialconstants.FailedToOpenSerialSocketMsg, err)
-		return
-	}
-	defer socket.Close()
-
-	// Start a routine to read from the socket we opened in the background,
-	// lest the socket that never drains the kernel buffer eventually cause
-	// the mux to block on writes, causing all other mux readers to stop
-	// getting any new data as the channel buffers fill
-	go func() {
-		buf := make([]byte, 1024)
-		for {
-			if ctx.Err() != nil {
-				return
-			}
-			_, err := socket.Read(buf)
-			if err != nil {
-				return
-			}
-		}
-	}()
-
-WriteLoop:
-	for {
-		select {
-		case <-ctx.Done():
-			break WriteLoop
-		case <-ticker.C:
-			msg := []byte{'\r', '\n', 'f', '\r', '\n'}
-			socket.Write(msg)
-		}
-	}
-	logger.Debugf(ctx, "stopping serial spam")
-}
-
-func (t *Device) hardPowerCycle(ctx context.Context) error {
+// placeInFastboot runs the dmc health-check command which attempts to recover
+// the device by placing it in fastboot.
+func (t *Device) placeInFastboot(ctx context.Context) error {
 	// there should be an env var DMC_PATH with the path to dmc
 	cmdline := []string{
 		os.Getenv("DMC_PATH"),
-		"set-power-state",
-		"-server-port",
-		os.Getenv("DMS_PORT"),
-		"-state",
-		"cycle",
-		"-nodename",
+		"health-check",
 		t.Nodename(),
 	}
 	runner := subprocess.Runner{}
 	// Run the dmc invocation and wait for the subprocess call to complete.
 	// This usually takes ~20 seconds.
-	return runner.Run(ctx, cmdline, subprocess.RunOptions{})
+	return retry.Retry(ctx, retry.WithMaxAttempts(retry.NewConstantBackoff(time.Second), 3), func() error {
+		return runner.Run(ctx, cmdline, subprocess.RunOptions{})
+	}, nil)
 }
 
 // Stop stops the device.

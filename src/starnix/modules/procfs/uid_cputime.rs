@@ -2,16 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use starnix_core::task::CurrentTask;
-use starnix_core::vfs::stub_empty_file::StubEmptyFile;
-use starnix_core::vfs::{FileSystemHandle, FsNodeHandle, StaticDirectoryBuilder};
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::pseudo::stub_empty_file::StubEmptyFile;
+use starnix_core::vfs::{FileSystemHandle, FsNodeHandle};
 use starnix_logging::bug_ref;
 use starnix_uapi::mode;
 
-pub fn uid_cputime_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
+pub fn uid_cputime_directory(fs: &FileSystemHandle) -> FsNodeHandle {
     let mut dir = StaticDirectoryBuilder::new(fs);
     dir.entry(
-        current_task,
         "remove_uid_range",
         StubEmptyFile::new_node(
             "/proc/uid_cputime/remove_uid_range",
@@ -20,7 +19,6 @@ pub fn uid_cputime_directory(current_task: &CurrentTask, fs: &FileSystemHandle) 
         mode!(IFREG, 0o222),
     );
     dir.entry(
-        current_task,
         "show_uid_stat",
         StubEmptyFile::new_node(
             "/proc/uid_cputime/show_uid_stat",
@@ -28,5 +26,5 @@ pub fn uid_cputime_directory(current_task: &CurrentTask, fs: &FileSystemHandle) 
         ),
         mode!(IFREG, 0444),
     );
-    dir.build(current_task)
+    dir.build()
 }

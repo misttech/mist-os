@@ -6,8 +6,10 @@
 import abc
 import datetime
 
+from honeydew.affordances import affordance
 
-class Rtc(abc.ABC):
+
+class Rtc(affordance.Affordance):
     """Abstract base class for an RTC affordance.
 
     See:

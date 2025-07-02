@@ -74,43 +74,6 @@ async fn test_open_node_on_file() {
 }
 
 #[fuchsia::test]
-async fn test_deprecated_set_attr_and_set_flags_on_node() {
-    let harness = TestHarness::new().await;
-    let entries = vec![file("file", vec![])];
-    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-
-    let proxy =
-        dir.open_node::<fio::NodeMarker>("file", fio::Flags::PROTOCOL_NODE, None).await.unwrap();
-
-    assert_eq!(
-        zx::Status::ok(
-            proxy
-                .deprecated_set_attr(
-                    fio::NodeAttributeFlags::MODIFICATION_TIME,
-                    &fio::NodeAttributes {
-                        mode: 0,
-                        id: 0,
-                        content_size: 0,
-                        storage_size: 0,
-                        link_count: 0,
-                        creation_time: 0,
-                        modification_time: 1234
-                    }
-                )
-                .await
-                .expect("set_attr failed")
-        ),
-        Err(zx::Status::BAD_HANDLE)
-    );
-    assert_eq!(
-        zx::Status::ok(
-            proxy.deprecated_set_flags(fio::OpenFlags::APPEND).await.expect("set_flags failed")
-        ),
-        Err(zx::Status::BAD_HANDLE)
-    );
-}
-
-#[fuchsia::test]
 async fn test_set_flags_on_node() {
     let harness = TestHarness::new().await;
     let entries = vec![file("file", vec![])];
@@ -123,19 +86,6 @@ async fn test_set_flags_on_node() {
         ),
         Err(zx::Status::NOT_SUPPORTED)
     );
-}
-
-#[fuchsia::test]
-async fn test_node_clone() {
-    let harness = TestHarness::new().await;
-    let entries = vec![file("file", vec![])];
-    let dir = harness.get_directory(entries, harness.dir_rights.all_flags());
-    let flags = fio::Flags::PROTOCOL_NODE | fio::Flags::PERM_GET_ATTRIBUTES;
-    let proxy = dir.open_node::<fio::NodeMarker>("file", flags, None).await.unwrap();
-
-    let (cloned, server) = fidl::endpoints::create_proxy::<fio::NodeMarker>();
-    proxy.deprecated_clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server).expect("clone failed");
-    assert_eq!(cloned.get_flags().await.unwrap().unwrap(), flags);
 }
 
 #[fuchsia::test]

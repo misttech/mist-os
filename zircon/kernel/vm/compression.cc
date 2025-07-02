@@ -14,7 +14,6 @@
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/slot_page_storage.h>
-#include <vm/tri_page_storage.h>
 #include <vm/vm.h>
 
 namespace {
@@ -58,7 +57,7 @@ VmCompression::VmCompression(fbl::RefPtr<VmCompressedStorage> storage,
       compression_threshold_(ensure_threshold(compression_threshold)),
       // Currently only a single VmCompressor instance is supported, so only a single temporary
       // reference value (the reserved value) is needed.
-      instance_(*this, CompressedRef::GetReservedValue().value()) {
+      instance_(*this, kTempReferenceValue) {
   ASSERT(storage_);
   ASSERT(strategy_);
   // Ensure we can steal space to store the compression timestamp.
@@ -250,14 +249,6 @@ fbl::RefPtr<VmCompression> VmCompression::CreateDefault() {
   fbl::AllocChecker ac;
   fbl::RefPtr<VmCompressedStorage> storage;
   switch (gBootOptions->compression_storage_strategy) {
-    case CompressionStorageStrategy::kTriPage:
-      storage = fbl::AdoptRef<VmTriPageStorage>(new (&ac) VmTriPageStorage());
-      if (!ac.check()) {
-        printf("[ZRAM]: Failed to create tri_page compressed storage area\n");
-        return nullptr;
-      }
-      printf("[ZRAM]: Using compressed storage strategy: tri_page\n");
-      break;
     case CompressionStorageStrategy::kSlot:
       storage = fbl::AdoptRef<VmSlotPageStorage>(new (&ac) VmSlotPageStorage());
       if (!ac.check()) {

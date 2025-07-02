@@ -81,7 +81,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_lease_helper_one_dependency() -> Result<(), Error> {
         let realm = build_power_broker_realm().await?;
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<fpb::TopologyMarker>()?;
+        let topology = realm.root.connect_to_protocol_at_exposed_dir()?;
 
         let (dependency_token, mut provider_level_receiver, _task) =
             create_test_element(&topology, "Provider").await?;
@@ -122,7 +122,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_lease_helper_two_dependencies() -> Result<(), Error> {
         let realm = build_power_broker_realm().await?;
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<fpb::TopologyMarker>()?;
+        let topology = realm.root.connect_to_protocol_at_exposed_dir()?;
 
         let (dependency_token_1, mut provider_1_receiver, _task) =
             create_test_element(&topology, "Provider 1").await?;
@@ -169,7 +169,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_lease_blocks_until_satisfied() -> Result<(), Error> {
         let realm = build_power_broker_realm().await?;
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<fpb::TopologyMarker>()?;
+        let topology = realm.root.connect_to_protocol_at_exposed_dir()?;
 
         let provider = Arc::new(
             PowerElementContext::builder(&topology, "Provider", &BINARY_POWER_LEVELS)
@@ -234,7 +234,7 @@ mod tests {
     #[fuchsia::test]
     async fn test_leasing_dropped_element_yields_error() -> Result<(), Error> {
         let realm = build_power_broker_realm().await?;
-        let topology = realm.root.connect_to_protocol_at_exposed_dir::<fpb::TopologyMarker>()?;
+        let topology = realm.root.connect_to_protocol_at_exposed_dir()?;
 
         let (dependency_token, _, _task) = create_test_element(&topology, "Provider").await?;
 

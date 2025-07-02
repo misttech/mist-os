@@ -2,11 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use component_events::events::{ExitStatus, Started, Stopped};
+use assert_matches::assert_matches;
+use component_events::events::{EventStream, ExitStatus, Started, Stopped};
 use component_events::matcher::EventMatcher;
-use fidl_fidl_test_components::TriggerMarker;
-use fuchsia_component_test::{RealmBuilder, RealmBuilderParams, ScopedInstanceFactory};
-use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_process as fprocess};
+use fidl_fidl_test_components::{TriggerMarker, TriggerProxy};
+use fidl_fuchsia_component::{Event, EventHeader, EventType, StoppedPayload};
+use fuchsia_component_test::{
+    Capability, ChildOptions, RealmBuilder, RealmBuilderParams, Ref, Route, ScopedInstanceFactory,
+};
+use futures::future::{self, Either};
+use futures::StreamExt;
+use std::pin::pin;
+use {
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_sandbox as fsandbox,
+    fidl_fuchsia_process as fprocess, fuchsia_async as fasync,
+};
 
 /// Tests a component can stop with a request buffered in its outgoing dir,
 /// and that request is handled on the next start (which should be automatic).
@@ -23,7 +33,7 @@ async fn stop_with_pending_request() {
     // Start the component with an eventpair `USER_0` handle for synchronization.
     let realm = instance
         .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("failed to connect to RealmQuery");
     let factory = ScopedInstanceFactory::new("coll").with_realm_proxy(realm);
     let instance = factory
@@ -44,7 +54,7 @@ async fn stop_with_pending_request() {
         .unwrap();
 
     // Queue request.
-    let trigger = instance.connect_to_protocol_at_exposed_dir::<TriggerMarker>().unwrap();
+    let trigger: TriggerProxy = instance.connect_to_protocol_at_exposed_dir().unwrap();
     let call = trigger.run().check().unwrap();
 
     // Tell the component to stop.
@@ -76,7 +86,7 @@ async fn stop_with_delivery_on_readable_request() {
     // on the connection.
     let realm = instance
         .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("failed to connect to RealmQuery");
     let factory = ScopedInstanceFactory::new("coll").with_realm_proxy(realm);
     let instance = factory
@@ -87,7 +97,7 @@ async fn stop_with_delivery_on_readable_request() {
         .await
         .unwrap();
     let execution_controller = instance.start().await.unwrap();
-    let trigger = instance.connect_to_protocol_at_exposed_dir::<TriggerMarker>().unwrap();
+    let trigger: TriggerProxy = instance.connect_to_protocol_at_exposed_dir().unwrap();
 
     // Cause the framework to deliver the request to the component.
     assert_eq!(&trigger.run().await.unwrap(), "hello");
@@ -112,17 +122,15 @@ async fn stop_with_escrowed_dictionary() {
     .unwrap();
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
-    let event_stream = instance
-        .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::EventStreamMarker>()
-        .unwrap();
+    let event_stream: fcomponent::EventStreamProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
     event_stream.wait_for_ready().await.unwrap();
-    let mut event_stream = component_events::events::EventStream::new(event_stream);
+    let mut event_stream = EventStream::new(event_stream);
 
     // Create the component.
     let realm = instance
         .root
-        .connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>()
+        .connect_to_protocol_at_exposed_dir()
         .expect("failed to connect to RealmQuery");
     let factory = ScopedInstanceFactory::new("coll").with_realm_proxy(realm);
     let instance = factory
@@ -134,7 +142,7 @@ async fn stop_with_escrowed_dictionary() {
         .unwrap();
 
     // Send first request.
-    let trigger = instance.connect_to_protocol_at_exposed_dir::<TriggerMarker>().unwrap();
+    let trigger: TriggerProxy = instance.connect_to_protocol_at_exposed_dir().unwrap();
     assert_eq!(trigger.run().await.unwrap(), "1");
 
     // Observe that the component has started then stopped.
@@ -143,13 +151,146 @@ async fn stop_with_escrowed_dictionary() {
         .wait::<Started>(&mut event_stream)
         .await
         .expect("failed to observe Started event");
-    let stopped = EventMatcher::ok()
-        .moniker(instance.moniker())
-        .wait::<Stopped>(&mut event_stream)
-        .await
-        .expect("failed to observe Stopped event");
-    assert_eq!(stopped.result().unwrap().status, ExitStatus::Clean);
+    assert_eq!(
+        EventMatcher::ok()
+            .moniker(instance.moniker())
+            .wait::<Stopped>(&mut event_stream)
+            .await
+            .expect("failed to observe Stopped event")
+            .result()
+            .expect("failed to extract Stopped result")
+            .status,
+        ExitStatus::Clean
+    );
 
     // Send second request, which should start the component again and continue the counter.
     assert_eq!(trigger.run().await.unwrap(), "2");
+    EventMatcher::ok()
+        .moniker(instance.moniker())
+        .wait::<Started>(&mut event_stream)
+        .await
+        .expect("failed to observe Started event");
+    assert_eq!(
+        EventMatcher::ok()
+            .moniker(instance.moniker())
+            .wait::<Stopped>(&mut event_stream)
+            .await
+            .expect("failed to observe Stopped event")
+            .result()
+            .expect("failed to extract Stopped result")
+            .status,
+        ExitStatus::Clean
+    );
+}
+
+/// Tests a component can idle with a connection to a capability exposed by a
+/// dynamic dictionary.
+#[fuchsia::test]
+async fn stop_with_dynamic_dictionary() {
+    let builder = RealmBuilder::new().await.unwrap();
+
+    let stop_with_dynamic_dictionary = builder
+        .add_child(
+            "stop_with_dynamic_dictionary",
+            "#meta/stop_with_dynamic_dictionary.cm",
+            ChildOptions::new().eager(),
+        )
+        .await
+        .unwrap();
+
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol::<fsandbox::CapabilityStoreMarker>())
+                .from(Ref::framework())
+                .to(&stop_with_dynamic_dictionary),
+        )
+        .await
+        .unwrap();
+
+    // Route the capability exposed by the dynamic dictionary to the test.
+    builder
+        .add_route(
+            Route::new()
+                .capability(Capability::protocol_by_name("fidl.test.components.Trigger-dynamic"))
+                .from_dictionary("bundle")
+                .from(&stop_with_dynamic_dictionary)
+                .to(Ref::parent()),
+        )
+        .await
+        .unwrap();
+
+    let instance = builder.build().await.unwrap();
+    let moniker =
+        format!("realm_builder:{}/stop_with_dynamic_dictionary", instance.root.child_name());
+
+    // Wait for the component to start.
+    let mut event_stream = EventStream::open().await.unwrap().filter(|ev| {
+        future::ready(matches!(
+            &ev.header,
+            Some(EventHeader { moniker: Some(m), .. }) if m == &moniker
+        ))
+    });
+    while let Some(ev) = event_stream.next().await {
+        if matches!(ev.header, Some(EventHeader { event_type: Some(EventType::Started), .. })) {
+            break;
+        }
+    }
+
+    let trigger = instance
+        .root
+        .connect_to_named_protocol_at_exposed_dir::<TriggerMarker>(
+            "fidl.test.components.Trigger-dynamic",
+        )
+        .unwrap();
+
+    // Simulate a delay between opening the client channel and sending a
+    // request. This should cause the component to go idle.
+    assert_matches!(
+        event_stream.next().await.unwrap(),
+        Event {
+            header: Some(EventHeader { event_type: Some(EventType::Stopped), .. }),
+            payload: Some(fcomponent::EventPayload::Stopped(StoppedPayload {
+                status: Some(0),
+                ..
+            })),
+            ..
+        }
+    );
+
+    assert_matches!(
+        &trigger.run().await,
+        Ok(m) if m == "hello from fidl.test.components.Trigger-static"
+    );
+
+    // Calling fidl.test.components.Trigger will cause Component Manager to
+    // start the component and reconnect the server-end channel to the
+    // component, which has a `use` declaration for the escrowed version of both
+    // `fuchsia.component.sandbox.Receiver` and the Trigger protocols.
+    assert_matches!(
+        event_stream.next().await.unwrap().header,
+        Some(EventHeader { event_type: Some(EventType::Started), .. })
+    );
+
+    // The component can be escrowed again by idling the client-end
+    // fidl.test.components.Trigger channel.
+    assert_matches!(
+        event_stream.next().await.unwrap(),
+        Event {
+            header: Some(EventHeader { event_type: Some(EventType::Stopped), .. }),
+            payload: Some(fcomponent::EventPayload::Stopped(StoppedPayload {
+                status: Some(0),
+                ..
+            })),
+            ..
+        }
+    );
+
+    // Ensure there are no missed events.
+    let event = pin!(event_stream.next());
+    let timeout = pin!(fasync::Timer::new(fasync::MonotonicDuration::from_millis(100)));
+    match futures::future::select(event, timeout).await {
+        Either::Left((e, _)) => panic!("unexpectedly event: {:?}", e),
+        Either::Right(_) => {}
+    }
 }

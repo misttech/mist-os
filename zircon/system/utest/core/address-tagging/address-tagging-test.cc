@@ -66,12 +66,7 @@ constexpr uintptr_t RemoveTag(uintptr_t ptr) { return ptr & ~kTagMask; }
 // right shift to get a shadow memory location could cause a tag to leak into
 // bit 55, leading to an incorrect shadow being referenced. This will affect
 // ASan and eventually HWASan.
-#ifdef __clang__
-[[clang::no_sanitize("all")]]
-#endif
-void DerefTaggedPtr(int* ptr) {
-  *ptr = 1;
-}
+[[gnu::no_sanitize("all")]] void DerefTaggedPtr(int* ptr) { *ptr = 1; }
 
 TEST(TopByteIgnoreTests, AddressTaggingGetSystemFeaturesAArch64) {
   uint32_t features = 0;
@@ -240,11 +235,8 @@ TEST(TopByteIgnoreTests, VmarTaggedAddress) {
   ASSERT_OK(vmar.destroy());
 }
 
-#ifdef __clang__
-[[clang::no_sanitize("all")]]
-#endif
-[[noreturn]] void
-DerefTaggedPtrCrash(uintptr_t arg1, uintptr_t /*arg2*/) {
+[[gnu::no_sanitize("all")]] [[noreturn]] void DerefTaggedPtrCrash(  //
+    uintptr_t arg1, uintptr_t /*arg2*/) {
   *(reinterpret_cast<int*>(arg1)) = 1;
   __builtin_trap();
 }
@@ -371,13 +363,7 @@ TEST(TopByteIgnoreTests, FutexWaitWake) {
                     kTestTag + 2);  // Wait and wake same futex on different tags.
 }
 
-#ifdef __clang__
-[[clang::no_sanitize("all")]]
-#endif
-uint8_t
-UnsanitizedLoad(volatile uint8_t* ptr) {
-  return *ptr;
-}
+[[gnu::no_sanitize("all")]] uint8_t UnsanitizedLoad(volatile uint8_t* ptr) { return *ptr; }
 
 TEST(TopByteIgnoreTests, VmmPageFaultHandlerDataAbort) {
   zx_handle_t root_vmar = zx_vmar_root_self();
@@ -438,13 +424,7 @@ TEST(TopByteIgnoreTests, InstructionAbortNoTag) {
   EXPECT_EQ(report.context.arch.u.arm_64.far, RemoveTag(reinterpret_cast<uintptr_t>(&kUdf0)));
 }
 
-#ifdef __clang__
-[[clang::no_sanitize("all")]]
-#endif
-__NO_RETURN void
-DoNothing() {
-  zx_thread_exit();
-}
+[[gnu::no_sanitize("all")]] [[noreturn]] void DoNothing() { zx_thread_exit(); }
 
 TEST(TopByteIgnoreTests, ThreadStartTaggedAddress) {
   std::unique_ptr<std::byte[]> thread_stack = std::make_unique<std::byte[]>(kThreadStackSize);

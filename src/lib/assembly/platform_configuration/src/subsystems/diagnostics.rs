@@ -27,6 +27,7 @@ const ALLOWED_SERIAL_LOG_COMPONENTS: &[&str] = &[
     "/core/mdns",
     "/core/network/netcfg",
     "/core/network/netstack",
+    "/core/remote-control",
     "/core/sshd-host",
     "/core/system-update/system-update-committer",
     "/core/wlancfg",

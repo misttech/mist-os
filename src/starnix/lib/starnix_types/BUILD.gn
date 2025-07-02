@@ -4,7 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
-import("//src/starnix/kernel/args.gni")
+import("//src/starnix/build/args.gni")
 
 rustc_library("starnix_types") {
   name = "starnix_types"
@@ -21,6 +21,7 @@ rustc_library("starnix_types") {
     "src/math.rs",
     "src/ownership.rs",
     "src/stats.rs",
+    "src/thread_start_info.rs",
     "src/time.rs",
     "src/user_buffer.rs",
     "src/vfs.rs",

@@ -27,8 +27,11 @@ type TargetInfo = table {
     3: name string:MAX_SPMI_NAME_LEN;
 };
 
-/// `ControllerInfo` is passed to SPMI controller drivers via metadata.
+
+// TODO(b/418000349): Remove once no longer used.
 const CONTROLLER_INFO_METADATA_TYPE uint32 = 0x494d5053; /// 'SPMI'
+/// `ControllerInfo` is passed to SPMI controller drivers via metadata.
+@serializable
 type ControllerInfo = table {
     /// Board-specific controller ID. Optional.
     1: id uint32;

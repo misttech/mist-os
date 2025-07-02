@@ -132,6 +132,7 @@ fuchsia_cc_driver("test-power-driver") {
     "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
+    "//sdk/lib/driver/metadata/cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]

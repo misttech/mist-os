@@ -34,14 +34,14 @@ impl UserFault {
         Self { mm, state: OrderedMutex::new(UserFaultState::new()) }
     }
 
-    pub fn is_initialized<L>(self: &Arc<Self>, locked: &mut Locked<'_, L>) -> bool
+    pub fn is_initialized<L>(self: &Arc<Self>, locked: &mut Locked<L>) -> bool
     where
         L: LockBefore<UserFaultInner>,
     {
         self.state.lock(locked).features.is_some()
     }
 
-    pub fn initialize<L>(self: &Arc<Self>, locked: &mut Locked<'_, L>, features: UserFaultFeatures)
+    pub fn initialize<L>(self: &Arc<Self>, locked: &mut Locked<L>, features: UserFaultFeatures)
     where
         L: LockBefore<UserFaultInner>,
     {
@@ -50,7 +50,7 @@ impl UserFault {
 
     pub fn op_register<L>(
         self: &Arc<Self>,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         start: UserAddress,
         len: u64,
         mode: FaultRegisterMode,
@@ -71,7 +71,7 @@ impl UserFault {
 
     pub fn op_unregister<L>(
         self: &Arc<Self>,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         start: UserAddress,
         len: u64,
     ) -> Result<(), Errno>
@@ -88,7 +88,7 @@ impl UserFault {
 
     pub fn op_copy<L>(
         self: &Arc<Self>,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         _mm_source: &MemoryManager,
         source: UserAddress,
         dest: UserAddress,
@@ -109,7 +109,7 @@ impl UserFault {
 
     pub fn op_zero<L>(
         self: &Arc<Self>,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<L>,
         start: UserAddress,
         len: u64,
         _mode: FaultZeroMode,

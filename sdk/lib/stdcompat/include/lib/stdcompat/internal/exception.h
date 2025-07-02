@@ -45,7 +45,7 @@ inline constexpr void throw_or_abort_if_any_impl(const char* reason, bool head, 
 template <typename T, typename... AbortIf>
 inline constexpr void throw_or_abort_if_any(const char* reason, AbortIf... abort_if) {
   static_assert(sizeof...(AbortIf) > 0, "Must provide an |abort_if| clause.");
-  static_assert(cpp17::conjunction_v<std::is_same<bool, AbortIf>...>,
+  static_assert(std::conjunction_v<std::is_same<bool, AbortIf>...>,
                 "|abort_if| arguments must be boolean.");
   throw_or_abort_if_any_impl<T>(reason, abort_if...);
 }

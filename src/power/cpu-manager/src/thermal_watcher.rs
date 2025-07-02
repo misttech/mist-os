@@ -246,6 +246,7 @@ mod tests {
         assert_matches!(exec.run_until_stalled(&mut task), Poll::Pending);
 
         assert_data_tree!(
+            @executor exec,
             inspector,
             root: {
                 "ThermalWatcher": {
@@ -264,6 +265,7 @@ mod tests {
         // Waiting on the next Watch request.
         assert_matches!(exec.run_until_stalled(&mut task), Poll::Pending);
         assert_data_tree!(
+            @executor exec,
             inspector,
             root: {
                 "ThermalWatcher": {

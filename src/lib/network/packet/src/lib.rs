@@ -272,8 +272,8 @@
 //! TCP segment combined with an `Ipv4PacketBuilder` yields a `Serializer` which
 //! describes a TCP segment in an IPv4 packet. Concretely, given a `Serializer`,
 //! `s`, and a `PacketBuilder`, `b`, a new `Serializer` can be constructed by
-//! calling `s.encapsulate(b)`. The [`Serializer::encapsulate`] method consumes
-//! both the `Serializer` and the `PacketBuilder` by value, and returns a new
+//! calling `b.wrap_body(s)` or `s.wrap_in(b)`. These methods consume both the
+//! `Serializer` and the `PacketBuilder` by value, and returns a new
 //! `Serializer`.
 //!
 //! Note that, while `Serializer`s are passed around by value, they are only as

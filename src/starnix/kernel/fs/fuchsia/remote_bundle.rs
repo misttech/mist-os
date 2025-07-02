@@ -26,7 +26,7 @@ use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::FdEvents;
-use starnix_uapi::{errno, error, from_status_like_fdio, ino_t, off_t, statfs};
+use starnix_uapi::{errno, error, from_status_like_fdio, off_t, statfs};
 use std::io::Read;
 use std::sync::{Arc, Mutex};
 use syncio::{zxio_node_attr_has_t, zxio_node_attributes_t};
@@ -93,9 +93,7 @@ impl RemoteBundle {
             RemoteBundle { metadata, root, rights },
             options,
         )?;
-        let mut root_node = FsNode::new_root(DirectoryObject);
-        root_node.node_id = ext4_metadata::ROOT_INODE_NUM;
-        fs.set_root_node(root_node);
+        fs.create_root(ext4_metadata::ROOT_INODE_NUM, DirectoryObject);
         Ok(fs)
     }
 
@@ -114,16 +112,16 @@ impl RemoteBundle {
 
     fn get_xattr(&self, node: &FsNode, name: &FsStr) -> Result<ValueOrSize<FsString>, Errno> {
         let value = &self
-            .get_node(node.node_id)
+            .get_node(node.ino)
             .extended_attributes
             .get(&**name)
-            .ok_or_else(|| errno!(ENOENT))?[..];
+            .ok_or_else(|| errno!(ENODATA))?[..];
         Ok(FsString::from(value).into())
     }
 
     fn list_xattrs(&self, node: &FsNode) -> Result<ValueOrSize<Vec<FsString>>, Errno> {
         Ok(self
-            .get_node(node.node_id)
+            .get_node(node.ino)
             .extended_attributes
             .keys()
             .map(|k| FsString::from(&k[..]))
@@ -135,7 +133,7 @@ impl RemoteBundle {
 impl FileSystemOps for RemoteBundle {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -176,7 +174,7 @@ impl FsNodeOps for File {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -188,7 +186,7 @@ impl FsNodeOps for File {
 
     fn fetch_and_refresh_info<'a>(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
@@ -215,7 +213,7 @@ impl FsNodeOps for File {
 
     fn get_xattr(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -228,7 +226,7 @@ impl FsNodeOps for File {
 
     fn list_xattrs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         _size: usize,
@@ -260,7 +258,7 @@ impl FileOps for MemoryFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         mut offset: usize,
@@ -281,7 +279,7 @@ impl FileOps for MemoryFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -292,7 +290,7 @@ impl FileOps for MemoryFile {
 
     fn get_memory(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _length: Option<usize>,
@@ -313,7 +311,7 @@ impl FileOps for MemoryFile {
 
     fn wait_async(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _waiter: &Waiter,
@@ -325,7 +323,7 @@ impl FileOps for MemoryFile {
 
     fn query_events(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
     ) -> Result<FdEvents, Errno> {
@@ -341,18 +339,18 @@ impl FileOps for DirectoryObject {
 
     fn seek(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         current_offset: off_t,
         target: SeekTarget,
     ) -> Result<off_t, Errno> {
-        default_seek(current_offset, target, |_| error!(EINVAL))
+        default_seek(current_offset, target, || error!(EINVAL))
     }
 
     fn readdir(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         _current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -361,7 +359,7 @@ impl FileOps for DirectoryObject {
 
         let bundle = RemoteBundle::from_fs(&file.fs);
         let child_iter = bundle
-            .get_node(file.node().node_id)
+            .get_node(file.node().ino)
             .directory()
             .ok_or_else(|| errno!(EIO))?
             .children
@@ -386,7 +384,7 @@ impl FsNodeOps for DirectoryObject {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -396,9 +394,9 @@ impl FsNodeOps for DirectoryObject {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
-        current_task: &CurrentTask,
+        _current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| {
@@ -409,43 +407,34 @@ impl FsNodeOps for DirectoryObject {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
         let metadata = &bundle.metadata;
-        let inode_num = metadata
-            .lookup(node.node_id, name)
+        let ino = metadata
+            .lookup(node.ino, name)
             .map_err(|e| errno!(ENOENT, format!("Error: {e:?} opening {name}")))?;
-        let metadata_node = metadata.get(inode_num).ok_or_else(|| errno!(EIO))?;
-        let info = to_fs_node_info(inode_num, metadata_node);
+        let metadata_node = metadata.get(ino).ok_or_else(|| errno!(EIO))?;
+        let info = to_fs_node_info(metadata_node);
 
         match metadata_node.info() {
-            NodeInfo::Symlink(_) => {
-                Ok(fs.create_node_with_id(current_task, SymlinkObject, inode_num, info))
-            }
-            NodeInfo::Directory(_) => {
-                Ok(fs.create_node_with_id(current_task, DirectoryObject, inode_num, info))
-            }
+            NodeInfo::Symlink(_) => Ok(fs.create_node(ino, SymlinkObject, info)),
+            NodeInfo::Directory(_) => Ok(fs.create_node(ino, DirectoryObject, info)),
             NodeInfo::File(_) => {
                 let (file, server_end) = fidl::endpoints::create_sync_proxy::<fio::FileMarker>();
                 bundle
                     .root
                     .open(
-                        &format!("{inode_num}"),
+                        &format!("{ino}"),
                         bundle.rights,
                         &Default::default(),
                         server_end.into_channel(),
                     )
                     .map_err(|_| errno!(EIO))?;
-                Ok(fs.create_node_with_id(
-                    current_task,
-                    File { inner: Mutex::new(Inner::NeedsVmo(file)) },
-                    inode_num,
-                    info,
-                ))
+                Ok(fs.create_node(ino, File { inner: Mutex::new(Inner::NeedsVmo(file)) }, info))
             }
         }
     }
 
     fn get_xattr(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -458,7 +447,7 @@ impl FsNodeOps for DirectoryObject {
 
     fn list_xattrs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         _size: usize,
@@ -476,20 +465,19 @@ impl FsNodeOps for SymlinkObject {
 
     fn readlink(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
     ) -> Result<SymlinkTarget, Errno> {
         let fs = node.fs();
         let bundle = RemoteBundle::from_fs(&fs);
-        let target =
-            bundle.get_node(node.node_id).symlink().ok_or_else(|| errno!(EIO))?.target.clone();
-        Ok(SymlinkTarget::Path(target.into()))
+        let target = bundle.get_node(node.ino).symlink().ok_or_else(|| errno!(EIO))?.target.clone();
+        Ok(SymlinkTarget::Path(target.as_str().into()))
     }
 
     fn get_xattr(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         name: &FsStr,
@@ -502,7 +490,7 @@ impl FsNodeOps for SymlinkObject {
 
     fn list_xattrs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         _current_task: &CurrentTask,
         _size: usize,
@@ -513,10 +501,10 @@ impl FsNodeOps for SymlinkObject {
     }
 }
 
-fn to_fs_node_info(inode_num: ino_t, metadata_node: &ext4_metadata::Node) -> FsNodeInfo {
+fn to_fs_node_info(metadata_node: &ext4_metadata::Node) -> FsNodeInfo {
     let mode = FileMode::from_bits(metadata_node.mode.into());
     let owner = FsCred { uid: metadata_node.uid.into(), gid: metadata_node.gid.into() };
-    let mut info = FsNodeInfo::new(inode_num, mode, owner);
+    let mut info = FsNodeInfo::new(mode, owner);
     // Set the information for directory and links. For file, they will be overwritten
     // by the FsNodeOps on first access.
     // For now, we just use some made up values. We might need to revisit this.
@@ -658,10 +646,10 @@ mod test {
         assert_eq!(
             sink.entries,
             [
-                (b".".into(), (test_dir.entry.node.node_id, DirectoryEntryType::DIR)),
-                (b"..".into(), (root.entry.node.node_id, DirectoryEntryType::DIR)),
-                (b"file".into(), (test_file.node().node_id, DirectoryEntryType::REG)),
-                (b"symlink".into(), (test_symlink.entry.node.node_id, DirectoryEntryType::LNK))
+                (b".".into(), (test_dir.entry.node.ino, DirectoryEntryType::DIR)),
+                (b"..".into(), (root.entry.node.ino, DirectoryEntryType::DIR)),
+                (b"file".into(), (test_file.node().ino, DirectoryEntryType::REG)),
+                (b"symlink".into(), (test_symlink.entry.node.ino, DirectoryEntryType::LNK))
             ]
             .into()
         );

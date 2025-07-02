@@ -3,23 +3,24 @@
 // found in the LICENSE file.
 
 use starnix_core::task::CurrentTask;
-use starnix_core::vfs::stub_bytes_file::StubBytesFile;
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
+use starnix_core::vfs::pseudo::stub_bytes_file::StubBytesFile;
 use starnix_core::vfs::{
-    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
-    unbounded_seek, DirectoryEntryType, DirentSink, FileObject, FileOps, FsNode, FsNodeHandle,
-    FsNodeOps, FsStr, SeekTarget, StaticDirectoryBuilder,
+    emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_unbounded_seek,
+    fs_node_impl_dir_readonly, DirectoryEntryType, DirentSink, FileObject, FileOps, FsNode,
+    FsNodeHandle, FsNodeOps, FsStr,
 };
 use starnix_logging::bug_ref;
 use starnix_sync::{FileOpsCore, Locked};
+use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{mode, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::{error, off_t};
 
 const FILE_MODE: FileMode = mode!(IFREG, 0o644);
 
 fn netstack_devices_readdir(
-    _locked: &mut Locked<'_, FileOpsCore>,
+    _locked: &mut Locked<FileOpsCore>,
     file: &FileObject,
     current_task: &CurrentTask,
     sink: &mut dyn DirentSink,
@@ -28,7 +29,7 @@ fn netstack_devices_readdir(
 
     if sink.offset() == 2 {
         sink.add(
-            file.fs.next_node_id(),
+            file.fs.allocate_ino(),
             sink.offset() + 1,
             DirectoryEntryType::from_mode(FILE_MODE),
             "all".into(),
@@ -37,7 +38,7 @@ fn netstack_devices_readdir(
 
     if sink.offset() == 3 {
         sink.add(
-            file.fs.next_node_id(),
+            file.fs.allocate_ino(),
             sink.offset() + 1,
             DirectoryEntryType::from_mode(FILE_MODE),
             "default".into(),
@@ -46,7 +47,7 @@ fn netstack_devices_readdir(
 
     let devices = current_task.kernel().netstack_devices.snapshot_devices();
     for (name, _) in devices.iter().skip(sink.offset() as usize - 4) {
-        let inode_num = file.fs.next_node_id();
+        let inode_num = file.fs.allocate_ino();
         sink.add(
             inode_num,
             sink.offset() + 1,
@@ -80,7 +81,7 @@ impl FsNodeOps for ProcSysNetIpv4Conf {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -90,7 +91,7 @@ impl FsNodeOps for ProcSysNetIpv4Conf {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -99,15 +100,14 @@ impl FsNodeOps for ProcSysNetIpv4Conf {
             let fs = node.fs();
             let mut dir = StaticDirectoryBuilder::new(&fs);
             dir.entry(
-                current_task,
                 "accept_redirects",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/conf/accept_redirects",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646442"),
                 ),
                 FILE_MODE,
             );
-            return Ok(dir.build(current_task));
+            return Ok(dir.build());
         }
         error!(ENOENT, "looking for {name}")
     }
@@ -116,21 +116,11 @@ impl FsNodeOps for ProcSysNetIpv4Conf {
 impl FileOps for ProcSysNetIpv4Conf {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -147,7 +137,7 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -157,7 +147,7 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -166,42 +156,38 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
             let fs = node.fs();
             let mut dir = StaticDirectoryBuilder::new(&fs);
             dir.entry(
-                current_task,
                 "ucast_solicit",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/neigh/ucast_solicit",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646444"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "retrans_time_ms",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/neigh/retrans_time_ms",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645762"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "mcast_resolicit",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/neigh/mcast_resolicit",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645992"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "base_reachable_time_ms",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv4/DEVICE/neigh/base_reachable_time_ms",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645348"),
                 ),
                 FILE_MODE,
             );
-            return Ok(dir.build(current_task));
+            return Ok(dir.build());
         }
         error!(ENOENT, "looking for {name}")
     }
@@ -210,21 +196,11 @@ impl FsNodeOps for ProcSysNetIpv4Neigh {
 impl FileOps for ProcSysNetIpv4Neigh {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -241,7 +217,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -251,7 +227,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -260,16 +236,14 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
             let fs = node.fs();
             let mut dir = StaticDirectoryBuilder::new(&fs);
             dir.entry(
-                current_task,
                 "accept_ra",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_ra",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646365"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "accept_ra_defrtr",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_defrtr",
@@ -278,16 +252,14 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "accept_ra_info_min_plen",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_info_min_plen",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645816"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "accept_ra_rt_info_min_plen",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_rt_info_min_plen",
@@ -296,97 +268,86 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "accept_ra_rt_table",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_ra_rt_table",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645566"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "accept_redirects",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/accept_redirects",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646442"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "dad_transmits",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/dad_transmits",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646145"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "use_tempaddr",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/use_tempaddr",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646346"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "addr_gen_mode",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/addr_gen_mode",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645864"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "stable_secret",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/stable_secret",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646722"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "disable_ipv6",
                 StubBytesFile::new_node(
-                    "/proc/sys/net/ipv6/DEVICE/conf/disable_ip64",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    "/proc/sys/net/ipv6/DEVICE/conf/disable_ipv6",
+                    bug_ref!("https://fxbug.dev/423645469"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "optimistic_dad",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/optimistic_dad",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646584"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "use_oif_addrs_only",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/use_oif_addrs_only",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645421"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "use_optimistic",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/use_optimistic",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645883"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "forwarding",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/conf/forwarding",
@@ -394,7 +355,7 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
                 ),
                 FILE_MODE,
             );
-            return Ok(dir.build(current_task));
+            return Ok(dir.build());
         }
         error!(ENOENT, "looking for {name}")
     }
@@ -403,21 +364,11 @@ impl FsNodeOps for ProcSysNetIpv6Conf {
 impl FileOps for ProcSysNetIpv6Conf {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,
@@ -434,7 +385,7 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
 
     fn create_file_ops(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _node: &FsNode,
         _current_task: &CurrentTask,
         _flags: OpenFlags,
@@ -444,7 +395,7 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
 
     fn lookup(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
@@ -453,42 +404,38 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
             let fs = node.fs();
             let mut dir = StaticDirectoryBuilder::new(&fs);
             dir.entry(
-                current_task,
                 "ucast_solicit",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/neigh/ucast_solicit",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423646444"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "retrans_time_ms",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/neigh/retrans_time_ms",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645762"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "mcast_resolicit",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/neigh/mcast_resolicit",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645992"),
                 ),
                 FILE_MODE,
             );
             dir.entry(
-                current_task,
                 "base_reachable_time_ms",
                 StubBytesFile::new_node(
                     "/proc/sys/net/ipv6/DEVICE/neigh/base_reachable_time_ms",
-                    bug_ref!("https://fxbug.dev/297439563"),
+                    bug_ref!("https://fxbug.dev/423645348"),
                 ),
                 FILE_MODE,
             );
-            return Ok(dir.build(current_task));
+            return Ok(dir.build());
         }
         error!(ENOENT, "looking for {name}")
     }
@@ -497,21 +444,11 @@ impl FsNodeOps for ProcSysNetIpv6Neigh {
 impl FileOps for ProcSysNetIpv6Neigh {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
-
-    fn seek(
-        &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
-        _file: &FileObject,
-        _current_task: &CurrentTask,
-        current_offset: off_t,
-        target: SeekTarget,
-    ) -> Result<off_t, Errno> {
-        unbounded_seek(current_offset, target)
-    }
+    fileops_impl_unbounded_seek!();
 
     fn readdir(
         &self,
-        locked: &mut Locked<'_, FileOpsCore>,
+        locked: &mut Locked<FileOpsCore>,
         file: &FileObject,
         current_task: &CurrentTask,
         sink: &mut dyn DirentSink,

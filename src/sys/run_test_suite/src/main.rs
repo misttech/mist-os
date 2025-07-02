@@ -6,7 +6,8 @@ use argh::FromArgs;
 use diagnostics_data::Severity;
 use fidl_fuchsia_diagnostics::LogInterestSelector;
 use fidl_fuchsia_sys2 as fsys;
-use fidl_fuchsia_test_manager::{LogsIteratorOption, RunBuilderMarker};
+use fidl_fuchsia_test_manager::{LaunchError, LogsIteratorType, SuiteRunnerMarker};
+use run_test_suite_lib::{Outcome, RunTestSuiteError};
 
 #[derive(FromArgs, Default, PartialEq, Debug)]
 /// Entry point for executing tests.
@@ -25,6 +26,11 @@ struct Args {
     /// example: --test-filter glob1 --test-filter glob2.
     #[argh(option)]
     test_filter: Vec<String>,
+
+    /// count an empty test suite as a success. This is used when CTF tests are disabled
+    /// to facilitate a breaking change.
+    #[argh(option)]
+    no_cases_equals_success: Option<bool>,
 
     /// the realm to run the test in. This field is optional and takes the form:
     /// /path/to/realm:test_collection. See https://fuchsia.dev/go/components/non-hermetic-tests
@@ -110,6 +116,7 @@ async fn main() {
         timeout,
         test_url,
         test_filter,
+        no_cases_equals_success,
         realm,
         also_run_disabled_tests,
         continue_on_timeout,
@@ -197,42 +204,49 @@ async fn main() {
             }
             Some(Some(stop_after)) => Some(stop_after),
         },
-        experimental_parallel_execution: None,
         accumulate_debug_data: true, // must be true to support coverage via scp
-        log_protocol: Some(LogsIteratorOption::SocketBatchIterator),
+        log_protocol: Some(LogsIteratorType::Batch),
         min_severity_logs: min_severity_logs.clone(),
         // TODO(https://fxbug.dev/42059408): make this configurable
         show_full_moniker: true,
     };
 
-    let proxy = fuchsia_component::client::connect_to_protocol::<RunBuilderMarker>()
-        .expect("connecting to RunBuilderProxy");
+    let proxy = fuchsia_component::client::connect_to_protocol::<SuiteRunnerMarker>()
+        .expect("connecting to SuiteRunner");
     let start_time = std::time::Instant::now();
-    let outcome = run_test_suite_lib::run_tests_and_get_outcome(
+    let mut outcome = run_test_suite_lib::run_test_and_get_outcome(
         run_test_suite_lib::SingleRunConnector::new(proxy),
-        vec![
-            run_test_suite_lib::TestParams {
-                test_url,
-                realm: provided_realm.into(),
-                timeout_seconds: timeout.and_then(std::num::NonZeroU32::new),
-                test_filters,
-                also_run_disabled_tests,
-                parallel,
-                test_args,
-                max_severity_logs,
-                min_severity_logs,
-                tags: vec![],
-                break_on_failure: false,
-                no_exception_channel,
-            };
-            count as usize
-        ],
+        run_test_suite_lib::TestParams {
+            test_url,
+            realm: provided_realm.into(),
+            timeout_seconds: timeout.and_then(std::num::NonZeroU32::new),
+            test_filters,
+            no_cases_equals_success,
+            also_run_disabled_tests,
+            parallel,
+            test_args,
+            max_severity_logs,
+            min_severity_logs,
+            tags: vec![],
+            no_exception_channel,
+            break_on_failure: false,
+        },
         run_params,
         run_reporter,
         futures::future::pending(),
     )
     .await;
     log::info!("run test suite duration: {:?}", start_time.elapsed().as_secs_f32());
+    let is_no_matching_cases = match outcome {
+        run_test_suite_lib::Outcome::Error { ref origin } => match **origin {
+            RunTestSuiteError::Launch(LaunchError::NoMatchingCases) => true,
+            _ => false,
+        },
+        _ => false,
+    };
+    if is_no_matching_cases && no_cases_equals_success == Some(true) {
+        outcome = Outcome::Passed;
+    }
     if outcome != run_test_suite_lib::Outcome::Passed {
         println!("One or more test runs failed.");
     }

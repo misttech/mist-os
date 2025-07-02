@@ -10,13 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"go.fuchsia.dev/fuchsia/tools/lib/jsonutil"
 	"go.fuchsia.dev/fuchsia/tools/lib/logger"
-)
-
-const (
-	// The path to the SDK manifest relative to build root.
-	SDKManifestPath = "sdk/manifest/core"
 )
 
 // EmuTools represent tools used by `ffx emu`. If using tools not included in the SDK,
@@ -27,24 +21,6 @@ type EmuTools struct {
 	ZBI        string
 	UEFI_arm64 string
 	UEFI_x64   string
-}
-
-// SDKManifest contains the atoms that are part of the "SDK" which ffx looks up to find
-// the tools it needs to launch an emulator. The manifest should only contain references
-// to files that exist.
-type SDKManifest struct {
-	Atoms []Atom `json:"atoms"`
-}
-
-type Atom struct {
-	Files []File `json:"files"`
-	ID    string `json:"id"`
-	Meta  string `json:"meta"`
-}
-
-type File struct {
-	Destination string `json:"destination"`
-	Source      string `json:"source"`
 }
 
 type EmuStartArgs struct {
@@ -133,53 +109,4 @@ func (f *FFXInstance) EmuStartConsole(ctx context.Context, sdkRoot, name string,
 // EmuStop terminates all emulator instances launched by ffx.
 func (f *FFXInstance) EmuStopAll(ctx context.Context) error {
 	return f.EmuStop(ctx, "--all")
-}
-
-// GetEmuDeps returns the list of file dependencies for `ffx emu` to work.
-func GetEmuDeps(sdkRoot string, targetCPU string, tools []string) ([]string, error) {
-	deps := []string{
-		SDKManifestPath,
-	}
-
-	manifestPath := filepath.Join(sdkRoot, SDKManifestPath)
-	manifest, err := GetFFXEmuManifest(manifestPath, targetCPU, tools)
-	if err != nil {
-		return nil, err
-	}
-
-	for _, atom := range manifest.Atoms {
-		for _, file := range atom.Files {
-			deps = append(deps, file.Source)
-		}
-	}
-	return deps, nil
-}
-
-// GetFFXEmuManifest returns an SDK manifest with the minimum number of atoms
-// required by `ffx emu`. The `tools` are the names of the tools that we expect to
-// use from the SDK.
-func GetFFXEmuManifest(manifestPath, targetCPU string, tools []string) (SDKManifest, error) {
-	var manifest SDKManifest
-	if err := jsonutil.ReadFromFile(manifestPath, &manifest); err != nil {
-		return manifest, fmt.Errorf("failed to read sdk manifest: %w", err)
-	}
-	if len(tools) == 0 {
-		manifest.Atoms = []Atom{}
-		return manifest, nil
-	}
-
-	toolIds := make(map[string]struct{})
-	for _, tool := range tools {
-		toolIds[fmt.Sprintf("sdk://tools/%s/%s", targetCPU, tool)] = struct{}{}
-	}
-
-	requiredAtoms := []Atom{}
-	for _, atom := range manifest.Atoms {
-		if _, ok := toolIds[atom.ID]; !ok {
-			continue
-		}
-		requiredAtoms = append(requiredAtoms, atom)
-	}
-	manifest.Atoms = requiredAtoms
-	return manifest, nil
 }

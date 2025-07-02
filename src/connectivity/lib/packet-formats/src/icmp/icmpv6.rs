@@ -423,8 +423,8 @@ mod tests {
 
         complete_msg
             .into_serializer()
-            .encapsulate(icmp.builder(src_ip, dst_ip))
-            .encapsulate(builder)
+            .wrap_in(icmp.builder(src_ip, dst_ip))
+            .wrap_in(builder)
             .serialize_vec_outer()
             .unwrap()
             .as_ref()

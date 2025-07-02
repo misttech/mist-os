@@ -6,11 +6,12 @@ use core::fmt::Debug;
 
 use net_types::ip::{Ipv4, Ipv6};
 use net_types::SpecifiedAddr;
+use netstack3_base::socket::SocketCookie;
 use netstack3_base::{
     InstantBindingsTypes, IpDeviceAddr, IpDeviceAddressIdContext, Marks, RngContext,
     StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TxMetadataBindingsTypes,
 };
-use packet::PartialSerializer;
+use packet::{FragmentedByteSlice, PartialSerializer};
 use packet_formats::ip::IpExt;
 
 use crate::matchers::InterfaceProperties;
@@ -125,16 +126,35 @@ pub enum SocketEgressFilterResult {
     },
 }
 
+/// Result returned from [`SocketOpsFilter::on_ingress`].
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum SocketIngressFilterResult {
+    /// Accept the packet.
+    Accept,
+
+    /// Drop the packet.
+    Drop,
+}
+
 /// Trait for a socket operations filter.
-pub trait SocketOpsFilter<D: StrongDeviceIdentifier, T> {
+pub trait SocketOpsFilter<D: StrongDeviceIdentifier> {
     /// Called on every outgoing packet originated from a local socket.
     fn on_egress<I: FilterIpExt, P: IpPacket<I> + PartialSerializer>(
         &self,
         packet: &P,
         device: &D,
-        tx_metadata: &T,
+        cookie: SocketCookie,
         marks: &Marks,
     ) -> SocketEgressFilterResult;
+
+    /// Called on every incoming packet handled by a local socket.
+    fn on_ingress(
+        &self,
+        packet: &FragmentedByteSlice<'_, &[u8]>,
+        device: &D,
+        cookie: SocketCookie,
+        marks: &Marks,
+    ) -> SocketIngressFilterResult;
 }
 
 /// Implemented by bindings to provide socket operations filtering.
@@ -142,10 +162,10 @@ pub trait SocketOpsFilterBindingContext<D: StrongDeviceIdentifier>:
     TxMetadataBindingsTypes
 {
     /// Returns the filter that should be called for socket ops.
-    fn socket_ops_filter(&self) -> impl SocketOpsFilter<D, Self::TxMetadata>;
+    fn socket_ops_filter(&self) -> impl SocketOpsFilter<D>;
 }
 
-#[cfg(feature = "testutils")]
+#[cfg(any(test, feature = "testutils"))]
 impl<
         TimerId: Debug + PartialEq + Clone + Send + Sync + 'static,
         Event: Debug + 'static,
@@ -155,6 +175,21 @@ impl<
     for netstack3_base::testutil::FakeBindingsCtx<TimerId, Event, State, FrameMeta>
 {
     type DeviceClass = ();
+}
+
+#[cfg(any(test, feature = "testutils"))]
+impl<
+        TimerId: Debug + PartialEq + Clone + Send + Sync + 'static,
+        Event: Debug + 'static,
+        State: 'static,
+        FrameMeta: 'static,
+        D: StrongDeviceIdentifier,
+    > SocketOpsFilterBindingContext<D>
+    for netstack3_base::testutil::FakeBindingsCtx<TimerId, Event, State, FrameMeta>
+{
+    fn socket_ops_filter(&self) -> impl SocketOpsFilter<D> {
+        crate::testutil::NoOpSocketOpsFilter
+    }
 }
 
 #[cfg(test)]

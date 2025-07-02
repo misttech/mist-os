@@ -17,7 +17,7 @@ use starnix_types::release_on_error;
 use starnix_uapi::auth::Credentials;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::resource_limits::Resource;
-use starnix_uapi::signals::SIGCHLD;
+use starnix_uapi::signals::{Signal, SIGCHLD};
 use starnix_uapi::{errno, error, from_status_like_fdio, pid_t, rlimit};
 use std::ffi::CString;
 use std::sync::Arc;
@@ -44,10 +44,11 @@ impl Releasable for TaskInfo {
 }
 
 pub fn create_zircon_process<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     kernel: &Arc<Kernel>,
     parent: Option<ThreadGroupWriteGuard<'_>>,
     pid: pid_t,
+    exit_signal: Option<Signal>,
     process_group: Arc<ProcessGroup>,
     signal_actions: Arc<SignalActions>,
     name: &[u8],
@@ -77,6 +78,7 @@ where
         process,
         parent,
         pid,
+        exit_signal,
         process_group,
         signal_actions,
     );
@@ -141,7 +143,7 @@ fn create_shared(
 ///
 /// This function creates an underlying Zircon process to host the new task.
 pub fn create_init_child_process<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     kernel: &Arc<Kernel>,
     initial_name: &CString,
     seclabel: Option<&CString>,
@@ -176,6 +178,7 @@ where
                 kernel,
                 None,
                 pid,
+                Some(SIGCHLD),
                 process_group,
                 SignalActions::default(),
                 &initial_name_bytes,
@@ -187,7 +190,7 @@ where
         let mut init_writer = init_task.thread_group().write();
         let mut new_process_writer = task.thread_group().write();
         new_process_writer.parent = Some(ThreadGroupParent::from(init_task.thread_group()));
-        init_writer.children.insert(task.id, OwnedRef::downgrade(task.thread_group()));
+        init_writer.children.insert(task.tid, OwnedRef::downgrade(task.thread_group()));
     }
     // A child process created via fork(2) inherits its parent's
     // resource limits.  Resource limits are preserved across execve(2).
@@ -215,7 +218,7 @@ where
 /// pass the `pid` as an argument to clarify that it's the callers responsibility to determine
 /// the pid for the process.
 pub fn create_init_process<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     kernel: &Arc<Kernel>,
     pid: pid_t,
     initial_name: CString,
@@ -241,6 +244,7 @@ where
                 kernel,
                 None,
                 pid,
+                Some(SIGCHLD),
                 process_group,
                 SignalActions::default(),
                 &initial_name_bytes,
@@ -266,7 +270,7 @@ where
 /// Rather than calling this function directly, consider using `kthreads`, which provides both
 /// a system task and a threadpool on which the task can do work.
 pub fn create_system_task<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     kernel: &Arc<Kernel>,
     fs: Arc<FsContext>,
 ) -> Result<CurrentTask, Errno>
@@ -287,6 +291,7 @@ where
                 process,
                 None,
                 pid,
+                Some(SIGCHLD),
                 process_group,
                 SignalActions::default(),
             );
@@ -297,8 +302,8 @@ where
     Ok(builder.into())
 }
 
-fn create_task<F, L>(
-    locked: &mut Locked<'_, L>,
+pub fn create_task<F, L>(
+    locked: &mut Locked<L>,
     kernel: &Arc<Kernel>,
     initial_name: CString,
     root_fs: Arc<FsContext>,
@@ -306,7 +311,7 @@ fn create_task<F, L>(
     security_state: security::TaskState,
 ) -> Result<TaskBuilder, Errno>
 where
-    F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<ReleaseGuard<TaskInfo>, Errno>,
+    F: FnOnce(&mut Locked<L>, i32, Arc<ProcessGroup>) -> Result<ReleaseGuard<TaskInfo>, Errno>,
     L: LockBefore<TaskRelease>,
     L: LockBefore<ProcessGroupState>,
 {
@@ -327,7 +332,7 @@ where
 }
 
 fn create_task_with_pid<F, L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     kernel: &Arc<Kernel>,
     mut pids: RwLockWriteGuard<'_, PidTable>,
     pid: pid_t,
@@ -339,7 +344,7 @@ fn create_task_with_pid<F, L>(
     security_state: security::TaskState,
 ) -> Result<TaskBuilder, Errno>
 where
-    F: FnOnce(&mut Locked<'_, L>, i32, Arc<ProcessGroup>) -> Result<ReleaseGuard<TaskInfo>, Errno>,
+    F: FnOnce(&mut Locked<L>, i32, Arc<ProcessGroup>) -> Result<ReleaseGuard<TaskInfo>, Errno>,
     L: LockBefore<TaskRelease>,
     L: LockBefore<ProcessGroupState>,
 {
@@ -359,7 +364,7 @@ where
     // https://man7.org/linux/man-pages/man2/prctl.2.html
     let default_timerslack = 50_000;
     let builder = TaskBuilder {
-        task: OwnedRef::new(Task::new(
+        task: Task::new(
             pid,
             initial_name,
             thread_group,
@@ -370,7 +375,6 @@ where
             creds,
             Arc::clone(&kernel.default_abstract_socket_namespace),
             Arc::clone(&kernel.default_abstract_vsock_namespace),
-            Some(SIGCHLD),
             Default::default(),
             Default::default(),
             None,
@@ -382,7 +386,7 @@ where
             RobustListHeadPtr::null(&ArchWidth::Arch64),
             default_timerslack,
             security_state,
-        )),
+        ),
         thread_state: Default::default(),
     };
     release_on_error!(builder, locked, {
@@ -407,7 +411,7 @@ where
 ///
 /// There is no underlying Zircon thread to host the task.
 pub fn create_kernel_thread<L>(
-    locked: &mut Locked<'_, L>,
+    locked: &mut Locked<L>,
     system_task: &Task,
     initial_name: CString,
 ) -> Result<CurrentTask, Errno>
@@ -440,7 +444,6 @@ where
         system_task.creds(),
         Arc::clone(&system_task.abstract_socket_namespace),
         Arc::clone(&system_task.abstract_vsock_namespace),
-        None,
         Default::default(),
         Default::default(),
         None,

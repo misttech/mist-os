@@ -1648,9 +1648,9 @@ static bool vmo_eviction_hints_test() {
   // Hint that first page is not needed.
   ASSERT_OK(vmo->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::DontNeed));
 
-  // First page should now have moved to the DontNeed queue.
+  // The page should now have moved to the Isolate queue.
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(pages[0]));
-  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
 
   // Hint that the page is always needed.
   ASSERT_OK(vmo->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::AlwaysNeed));
@@ -1659,7 +1659,7 @@ static bool vmo_eviction_hints_test() {
   pages[0] = vmo->DebugGetPage(0);
 
   // The page should now have moved to the first LRU queue.
-  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaim(pages[0], &queue));
   EXPECT_EQ(0u, queue);
 
@@ -1672,15 +1672,15 @@ static bool vmo_eviction_hints_test() {
   // HintRange() is allowed to replace the page.
   pages[0] = vmo->DebugGetPage(0);
 
-  // should now have moved to the DontNeed queue.
+  // The page should now have moved to the Isolate queue.
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(pages[0]));
-  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
 
   // We should still not be able to evict the page, the AlwaysNeed hint is sticky.
   ASSERT_EQ(reclaim_page(vmo, pages[0], 0, VmCowPages::EvictionAction::FollowHint, nullptr), 0u);
 
-  // Accessing the page should move it out of the DontNeed queue.
-  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  // Accessing the page should move it out of the Isolate queue.
+  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaim(pages[0], &queue));
   EXPECT_EQ(0u, queue);
 
@@ -1703,6 +1703,8 @@ static bool vmo_eviction_hints_test() {
 
   // Hint that second page is always needed.
   ASSERT_OK(vmo->HintRange(PAGE_SIZE, PAGE_SIZE, VmObject::EvictionHint::AlwaysNeed));
+  // If the page was loaned, it will be replaced with a non-loaned page now.
+  pages[1] = vmo->DebugGetPage(PAGE_SIZE);
 
   ASSERT_EQ(reclaim_page(vmo, pages[1], PAGE_SIZE, VmCowPages::EvictionAction::Require, nullptr),
             1u);
@@ -1802,9 +1804,9 @@ static bool vmo_eviction_hints_clone_test() {
   // Hint that the page is not needed.
   ASSERT_OK(clone->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::DontNeed));
 
-  // The page should now have moved to the DontNeed queue.
+  // The page should now have moved to the Isolate queue.
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(pages[0]));
-  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
 
   // Hint that the page is always needed.
   ASSERT_OK(clone->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::AlwaysNeed));
@@ -1813,7 +1815,7 @@ static bool vmo_eviction_hints_clone_test() {
   pages[0] = vmo->DebugGetPage(0);
 
   // The page should now have moved to the first LRU queue.
-  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaim(pages[0], &queue));
   EXPECT_EQ(0u, queue);
 
@@ -1829,9 +1831,9 @@ static bool vmo_eviction_hints_clone_test() {
   // Hint that the page is not needed.
   ASSERT_OK(clone2->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::DontNeed));
 
-  // The page should now have moved to the DontNeed queue.
+  // The page should now have moved to the Isolate queue.
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(pages[0]));
-  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
 
   // Hint that the page is always needed.
   ASSERT_OK(clone2->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::AlwaysNeed));
@@ -1840,7 +1842,7 @@ static bool vmo_eviction_hints_clone_test() {
   pages[0] = vmo->DebugGetPage(0);
 
   // The page should now have moved to the first LRU queue.
-  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaim(pages[0], &queue));
   EXPECT_EQ(0u, queue);
 
@@ -1851,9 +1853,9 @@ static bool vmo_eviction_hints_clone_test() {
   // Hint that the page is not needed again.
   ASSERT_OK(vmo->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::DontNeed));
 
-  // The page should now have moved to the DontNeed queue.
+  // The page should now have moved to the Isolate queue.
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(pages[0]));
-  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
 
   // Fork the page in the clone. And make sure hints no longer apply.
   uint64_t data = 0xff;
@@ -1861,28 +1863,28 @@ static bool vmo_eviction_hints_clone_test() {
   EXPECT_TRUE(make_private_attribution_counts(PAGE_SIZE, 0) == clone->GetAttributedMemory());
 
   // The write will have moved the page to the first page queue, because the page is still accessed
-  // in order to perform the fork. So hint using the parent again to move to the DontNeed queue.
+  // in order to perform the fork. So hint using the parent again to move to the Isolate queue.
   ASSERT_OK(vmo->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::DontNeed));
 
-  // The page should now have moved to the DontNeed queue.
+  // The page should now have moved to the Isolate queue.
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(pages[0]));
-  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
 
   // Hint that the page is always needed via the clone.
   ASSERT_OK(clone->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::AlwaysNeed));
 
-  // The page should still be in the DontNeed queue.
+  // The page should still be in the Isolate queue.
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(pages[0]));
-  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
 
   // Hint that the page is always needed via the second level clone.
   ASSERT_OK(clone2->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::AlwaysNeed));
 
-  // This should move the page out of the the DontNeed queue. Since we forked the page in the
+  // This should move the page out of the the Isolate queue. Since we forked the page in the
   // intermediate clone *after* this clone was created, it will still refer to the original page,
   // which is the same as the page in the root.
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaim(pages[0]));
-  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
 
   // Create another clone that sees the forked page.
   // Hinting through this clone should have no effect, since it will see the forked page.
@@ -1891,19 +1893,19 @@ static bool vmo_eviction_hints_clone_test() {
                               true, &clone3);
   ASSERT_EQ(ZX_OK, status);
 
-  // Move the page back to the DontNeed queue first.
+  // Move the page back to the Isolate queue first.
   ASSERT_OK(vmo->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::DontNeed));
 
-  // The page should now have moved to the DontNeed queue.
+  // The page should now have moved to the Isolate queue.
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(pages[0]));
-  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
 
   // Hint through clone3.
   ASSERT_OK(clone3->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::AlwaysNeed));
 
-  // The page should still be in the DontNeed queue.
+  // The page should still be in the Isolate queue.
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(pages[0]));
-  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[0]));
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[0]));
 
   // Hint on the second page using clone3. This page hasn't been forked by the intermediate clone.
   // So clone3 should still be able to see the root page.
@@ -1914,9 +1916,9 @@ static bool vmo_eviction_hints_clone_test() {
   // Hint DontNeed through clone 3.
   ASSERT_OK(clone3->HintRange(PAGE_SIZE, PAGE_SIZE, VmObject::EvictionHint::DontNeed));
 
-  // The page should have moved to the DontNeed queue.
+  // The page should have moved to the Isolate queue.
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(pages[1]));
-  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimDontNeed(pages[1]));
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimIsolate(pages[1]));
 
   END_TEST;
 }
@@ -3217,7 +3219,7 @@ static bool vmo_dirty_pages_with_hints_test() {
 
   // Hint DontNeed on the page. It should remain in the dirty queue.
   ASSERT_OK(vmo->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::DontNeed));
-  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimDontNeed(page));
+  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimIsolate(page));
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(page));
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
 
@@ -3227,7 +3229,7 @@ static bool vmo_dirty_pages_with_hints_test() {
   // Hint AlwaysNeed on the page. It should remain in the dirty queue.
   ASSERT_OK(vmo->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::AlwaysNeed));
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(page));
-  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimDontNeed(page));
+  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimIsolate(page));
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
 
   // Clean the page.
@@ -3256,16 +3258,16 @@ static bool vmo_dirty_pages_with_hints_test() {
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaim(page, &queue));
   EXPECT_EQ(0u, queue);
 
-  // Hint DontNeed on the page. This should move the page to the DontNeed queue.
+  // Hint DontNeed on the page. This should move the page to the Isolate queue.
   ASSERT_OK(vmo->HintRange(0, PAGE_SIZE, VmObject::EvictionHint::DontNeed));
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(page));
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
-  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimDontNeed(page));
+  EXPECT_TRUE(pmm_page_queues()->DebugPageIsReclaimIsolate(page));
 
   // Write to the page now. This should move it to the dirty queue.
   ASSERT_OK(vmo->DirtyPages(0, PAGE_SIZE));
   EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaim(page));
-  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimDontNeed(page));
+  EXPECT_FALSE(pmm_page_queues()->DebugPageIsReclaimIsolate(page));
   EXPECT_TRUE(pmm_page_queues()->DebugPageIsPagerBackedDirty(page));
 
   // Should not be able to evict a dirty page.
@@ -3574,7 +3576,7 @@ static bool vmo_high_priority_reclaim_test() {
   ASSERT_EQ(ZX_OK, status);
 
   auto change_priority = [&vmo](int64_t delta) {
-    Guard<VmoLockType> guard{vmo->lock()};
+    Guard<CriticalMutex> guard{vmo->lock()};
     vmo->ChangeHighPriorityCountLocked(delta);
   };
 
@@ -4017,7 +4019,7 @@ static bool vmo_skip_range_update_test() {
     // Perform the requested range update.
     {
       VmCowPages::DeferredOps deferred(hidden_parent.get());
-      Guard<VmoLockType> guard{hidden_parent->lock()};
+      Guard<CriticalMutex> guard{hidden_parent->lock()};
       const VmCowRange range_update =
           VmCowRange(range.page_start * PAGE_SIZE, range.num_pages * PAGE_SIZE);
       hidden_parent->RangeChangeUpdateLocked(range_update, VmCowPages::RangeChangeOp::Unmap,
@@ -4058,7 +4060,7 @@ static bool vmo_user_stream_size_test() {
   ASSERT_OK(VmObjectPaged::Create(PMM_ALLOC_FLAG_ANY, 0u, 4 * PAGE_SIZE, &vmo));
 
   {
-    Guard<VmoLockType> guard{vmo->lock()};
+    Guard<CriticalMutex> guard{vmo->lock()};
     EXPECT_EQ(vmo->size_locked(), (uint64_t)4 * PAGE_SIZE);
     // Should not have an allocated stream size.
     auto result = vmo->user_stream_size_locked();
@@ -4074,7 +4076,7 @@ static bool vmo_user_stream_size_test() {
   vmo->SetUserStreamSize(csm);
 
   {
-    Guard<VmoLockType> guard{vmo->lock()};
+    Guard<CriticalMutex> guard{vmo->lock()};
     auto result = vmo->user_stream_size_locked();
     ASSERT_TRUE(result.has_value());
     const uint64_t stream_size = result.value();

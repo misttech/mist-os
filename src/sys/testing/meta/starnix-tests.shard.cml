@@ -105,6 +105,11 @@
             to: [ "#starnix-tests" ],
         },
         {
+            service: "fuchsia.hardware.haptics.Service",
+            from: "parent",
+            to: [ "#starnix-tests" ],
+        },
+        {
             storage: "fxfs_tests_data",
             from: "self",
             as: "data",

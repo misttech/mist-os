@@ -44,14 +44,14 @@ constexpr voltage_pwm_period_ns_t kS905d2PwmPeriodNs = 1250;
 }  // namespace
 
 zx_status_t AddPowerImpl(fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus>& pbus) {
-  fuchsia_hardware_power::DomainMetadata domain_metadata = {
+  static const fuchsia_hardware_power::DomainMetadata kDomainMetadata = {
       {.domains = {{{{.id = {bind_fuchsia_amlogic_platform::POWER_DOMAIN_ARM_CORE_BIG}}}}}}};
 
-  const fit::result encoded_metadata = fidl::Persist(domain_metadata);
-  if (!encoded_metadata.is_ok()) {
-    zxlogf(ERROR, "Failed to encode power domain metadata: %s",
-           encoded_metadata.error_value().FormatDescription().c_str());
-    return encoded_metadata.error_value().status();
+  fit::result persisted_metadata = fidl::Persist(kDomainMetadata);
+  if (!persisted_metadata.is_ok()) {
+    zxlogf(ERROR, "Failed to persist power domain metadata: %s",
+           persisted_metadata.error_value().FormatDescription().c_str());
+    return persisted_metadata.error_value().status();
   }
 
   fpbus::Node dev;
@@ -73,8 +73,8 @@ zx_status_t AddPowerImpl(fdf::WireSyncClient<fuchsia_hardware_platform_bus::Plat
               reinterpret_cast<const uint8_t*>(&kS905d2PwmPeriodNs) + sizeof(kS905d2PwmPeriodNs)),
       }},
       {{
-          .id = std::to_string(DEVICE_METADATA_POWER_DOMAINS),
-          .data = encoded_metadata.value(),
+          .id = fuchsia_hardware_power::DomainMetadata::kSerializableName,
+          .data = persisted_metadata.value(),
       }},
   };
 

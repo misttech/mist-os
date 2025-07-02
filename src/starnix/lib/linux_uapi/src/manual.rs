@@ -92,3 +92,35 @@ crate::check_same_layout! {
         f_flags => f_flags,
     }
 }
+
+macro_rules! impl_debug {
+    {} => {};
+    {
+        ,
+        $($token:tt)*
+    } => {
+        impl_debug! { $($token)* }
+    };
+    {
+        $name:ident
+        $($token:tt)*
+    } => {
+        impl std::fmt::Debug for crate::$name {
+            fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+                fmt.debug_struct(std::any::type_name::<Self>()).finish()
+            }
+        }
+        #[cfg(feature = "arch32")]
+        impl std::fmt::Debug for crate::arch32::$name {
+            fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+                fmt.debug_struct(std::any::type_name::<Self>()).finish()
+            }
+        }
+        impl_debug! { $($token)* }
+    };
+}
+
+impl_debug! {
+    fuse_open_out__bindgen_ty_1,
+    fuse_in_header__bindgen_ty_1,
+}

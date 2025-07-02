@@ -134,5 +134,6 @@ template("rust_proto_library") {
     deps = [ ":gen_${target_name}" ] + crate_deps
     source_root = "${target_crate_root}/lib.rs"
     sources = get_target_outputs(":gen_${target_name}")
+    forward_variables_from(invoker, [ "quiet_clippy" ])
   }
 }

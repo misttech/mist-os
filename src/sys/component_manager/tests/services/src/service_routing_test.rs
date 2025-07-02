@@ -329,9 +329,8 @@ async fn start_branch(input: &TestInput) -> Result<ScopedInstance, Error> {
     let branch = ScopedInstance::new(BRANCHES_COLLECTION.to_string(), input.url.to_string())
         .await
         .context("failed to create branch component instance")?;
-    let trigger = branch
-        .connect_to_protocol_at_exposed_dir::<ftest::TriggerMarker>()
-        .context("failed to connect to trigger")?;
+    let trigger: ftest::TriggerProxy =
+        branch.connect_to_protocol_at_exposed_dir().context("failed to connect to trigger")?;
     let _ = trigger.run().await.context("failed to call trigger")?;
     Ok(branch)
 }
@@ -478,8 +477,8 @@ async fn use_from_collection() {
         .unwrap();
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
-    let realm_proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
+    let realm_proxy: fcomponent::RealmProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let publishing_child_builder = RealmBuilder::new().await.unwrap();
     let publishing_child = publishing_child_builder
@@ -698,8 +697,8 @@ async fn not_every_dynamic_component_publishes_service() {
         .unwrap();
     let instance =
         builder.build_in_nested_component_manager("#meta/component_manager.cm").await.unwrap();
-    let realm_proxy =
-        instance.root.connect_to_protocol_at_exposed_dir::<fcomponent::RealmMarker>().unwrap();
+    let realm_proxy: fcomponent::RealmProxy =
+        instance.root.connect_to_protocol_at_exposed_dir().unwrap();
 
     let publishing_child_builder = RealmBuilder::new().await.unwrap();
     let publishing_child = publishing_child_builder

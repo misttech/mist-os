@@ -779,8 +779,7 @@ escher::TexturePtr VkRenderer::ExtractTexture(const allocation::ImageMetadata& m
 
 void VkRenderer::Render(const ImageMetadata& render_target,
                         const std::vector<ImageRect>& rectangles,
-                        const std::vector<ImageMetadata>& images,
-                        const std::vector<zx::event>& release_fences, bool apply_color_conversion) {
+                        const std::vector<ImageMetadata>& images, const RenderArgs& render_args) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   TRACE_DURATION("gfx", "VkRenderer::Render");
 
@@ -875,7 +874,7 @@ void VkRenderer::Render(const ImageMetadata& render_target,
 
   // Now the compositor can finally draw.
   compositor_.DrawBatch(command_buffer, normalized_rects, textures, color_data, output_image,
-                        depth_texture, apply_color_conversion);
+                        depth_texture, render_args.apply_color_conversion);
 
   const auto readback_image_it = local_readback_image_map.find(render_target.identifier);
   // Copy to the readback image if there is a readback image.
@@ -892,7 +891,7 @@ void VkRenderer::Render(const ImageMetadata& render_target,
 
   // Create vk::semaphores from the zx::events.
   std::vector<escher::SemaphorePtr> semaphores;
-  for (auto& fence_original : release_fences) {
+  for (auto& fence_original : render_args.release_fences) {
     // Since the original fences are passed in by const reference, we
     // duplicate them here so that the duped fences can be moved into
     // the create info struct of the semaphore.

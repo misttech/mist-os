@@ -839,7 +839,7 @@ mod tests {
 
         // The inspect hierarchy should contain exactly one bond node, deduplicated from the two
         // in the original store.
-        let inspect_hierarchy = inspector.get_diagnostics_hierarchy();
+        let inspect_hierarchy = inspector.get_diagnostics_hierarchy().await;
         let test_hierarchy =
             inspect_hierarchy.get_child(TEST_INSPECT_ROOT).expect("missing test hierarchy node");
         let bond_3_record =

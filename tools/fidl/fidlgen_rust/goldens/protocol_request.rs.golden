@@ -119,6 +119,15 @@ impl From<fidl::Channel> for ChildSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for ChildSynchronousProxy {
+    type Protocol = ChildMarker;
+
+    fn from_client(value: fidl::endpoints::ClientEnd<ChildMarker>) -> Self {
+        Self::new(value.into_channel())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ChildProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -468,6 +477,15 @@ impl From<ParentSynchronousProxy> for zx::Handle {
 impl From<fidl::Channel> for ParentSynchronousProxy {
     fn from(value: fidl::Channel) -> Self {
         Self::new(value)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for ParentSynchronousProxy {
+    type Protocol = ParentMarker;
+
+    fn from_client(value: fidl::endpoints::ClientEnd<ParentMarker>) -> Self {
+        Self::new(value.into_channel())
     }
 }
 

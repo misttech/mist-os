@@ -5,16 +5,17 @@
 package constants
 
 const (
-	FailedToStartTargetMsg    = "start target error"
-	FailedToCopyImageMsg      = "failed to copy image from GCS"
-	QEMUInvocationErrorMsg    = "QEMU invocation error"
-	ReadConfigFileErrorMsg    = "could not open config file"
-	FailedToResolveIPErrorMsg = "could not resolve target IP address"
-	PackageRepoSetupErrorMsg  = "failed to set up a package repository"
-	SerialReadErrorMsg        = "error reading serial log line"
-	CommandExceededTimeoutMsg = "Command exceeded timeout"
-	FailedToServeMsg          = "[package server] failed to serve"
-	FailedToCaptureSyslogMsg  = "failed to capture syslog"
+	FailedToStartTargetMsg         = "start target error"
+	FailedToCopyImageMsg           = "failed to copy image from GCS"
+	QEMUInvocationErrorMsg         = "QEMU invocation error"
+	ReadConfigFileErrorMsg         = "could not open config file"
+	FailedToResolveIPErrorMsg      = "could not resolve target IP address"
+	PackageRepoSetupErrorMsg       = "failed to set up a package repository"
+	SerialReadErrorMsg             = "error reading serial log line"
+	CommandExceededTimeoutMsg      = "Command exceeded timeout"
+	FailedToServeMsg               = "[package server] failed to serve"
+	FailedToCaptureSyslogMsg       = "failed to capture syslog"
+	FailedToDeriveSshConnectionMsg = "failed to derive $SSH_CONNECTION"
 
 	NodenameEnvKey     = "FUCHSIA_NODENAME"
 	SSHKeyEnvKey       = "FUCHSIA_SSH_KEY"

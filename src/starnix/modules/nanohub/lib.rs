@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#![recursion_limit = "256"]
+
 mod nanohub;
 mod nanohub_comms_directory;
 mod nanohub_firmware_file;

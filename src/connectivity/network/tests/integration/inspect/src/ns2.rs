@@ -11,6 +11,7 @@ mod common;
 use std::collections::HashMap;
 use std::convert::TryFrom as _;
 use std::num::NonZeroU16;
+use std::sync::Arc;
 
 use diagnostics_assertions::{
     assert_data_tree, tree_assertion, AnyProperty, NonZeroIntProperty, PropertyAssertion,
@@ -44,7 +45,7 @@ use test_case::test_case;
 /// matching.
 #[derive(Clone)]
 struct AddressMatcher {
-    set: std::rc::Rc<std::cell::RefCell<std::collections::HashSet<String>>>,
+    set: std::sync::Arc<std::sync::Mutex<std::collections::HashSet<String>>>,
 }
 
 impl AddressMatcher {
@@ -77,7 +78,7 @@ impl AddressMatcher {
             )
             .collect::<std::collections::HashSet<_>>();
 
-        Self { set: std::rc::Rc::new(std::cell::RefCell::new(set)) }
+        Self { set: Arc::new(std::sync::Mutex::new(set)) }
     }
 
     /// Checks that the internal set has been entirely consumed.
@@ -85,10 +86,12 @@ impl AddressMatcher {
     /// Empties the internal set on return. Subsequent calls to check will
     /// always succeed.
     fn check(&self) -> Result<()> {
-        let set = self.set.replace(Default::default());
+        let mut set = self.set.lock().unwrap();
         if set.is_empty() {
+            *set = std::collections::HashSet::default();
             Ok(())
         } else {
+            *set = std::collections::HashSet::default();
             Err(anyhow::anyhow!("unseen addresses left in set: {:?}", set))
         }
     }
@@ -107,7 +110,7 @@ impl PropertyAssertion for AddressMatcher {
         let actual = actual.string().ok_or_else(|| {
             anyhow::anyhow!("invalid property {:#?} for AddressMatcher, want String", actual)
         })?;
-        if self.set.borrow_mut().remove(actual) {
+        if self.set.lock().unwrap().remove(actual) {
             Ok(())
         } else {
             Err(anyhow::anyhow!("{} not in expected address set", actual))
@@ -520,9 +523,9 @@ async fn inspect_dhcp(
 
     for PacketAttributes { ip_proto, port } in &inbound_packets {
         let ser = packet::Buf::new(&mut [], ..)
-            .encapsulate(UdpPacketBuilder::new(SRC_IP, *DST_IP, None, *port))
-            .encapsulate(Ipv4PacketBuilder::new(SRC_IP, DST_IP, /* ttl */ 1, *ip_proto))
-            .encapsulate(EthernetFrameBuilder::new(
+            .wrap_in(UdpPacketBuilder::new(SRC_IP, *DST_IP, None, *port))
+            .wrap_in(Ipv4PacketBuilder::new(SRC_IP, DST_IP, /* ttl */ 1, *ip_proto))
+            .wrap_in(EthernetFrameBuilder::new(
                 constants::eth::MAC_ADDR,            /* src_mac */
                 net_types::ethernet::Mac::BROADCAST, /* dst_mac */
                 EtherType::Ipv4,
@@ -559,33 +562,33 @@ async fn inspect_dhcp(
     let mut invalid_packet_type_assertion = TreeAssertion::new(INVALID_PACKET_TYPE_STAT_NAME, true);
     let mut total_packet_type_assertion = TreeAssertion::new(TOTAL_COUNTER_NAME, true);
     let () = total_packet_type_assertion
-        .add_property_assertion(COUNTER_PROPERTY_NAME, Box::new(0.to_string()));
+        .add_property_assertion(COUNTER_PROPERTY_NAME, Arc::new(0.to_string()));
     let () = invalid_packet_type_assertion.add_child_assertion(total_packet_type_assertion);
 
     let mut total_port = 0;
     for (port, count) in invalid_ports {
         let mut port_assertion = TreeAssertion::new(&port.to_string(), true);
         let () = port_assertion
-            .add_property_assertion(COUNTER_PROPERTY_NAME, Box::new(count.to_string()));
+            .add_property_assertion(COUNTER_PROPERTY_NAME, Arc::new(count.to_string()));
         total_port += count;
         let () = invalid_port_assertion.add_child_assertion(port_assertion);
     }
     let mut total_port_assertion = TreeAssertion::new(TOTAL_COUNTER_NAME, true);
     let () = total_port_assertion
-        .add_property_assertion(COUNTER_PROPERTY_NAME, Box::new(total_port.to_string()));
+        .add_property_assertion(COUNTER_PROPERTY_NAME, Arc::new(total_port.to_string()));
     let () = invalid_port_assertion.add_child_assertion(total_port_assertion);
 
     let mut total_trans_proto = 0;
     for (proto, count) in invalid_trans_protos {
         let mut trans_proto_assertion = TreeAssertion::new(&proto.to_string(), true);
         let () = trans_proto_assertion
-            .add_property_assertion(COUNTER_PROPERTY_NAME, Box::new(count.to_string()));
+            .add_property_assertion(COUNTER_PROPERTY_NAME, Arc::new(count.to_string()));
         total_trans_proto += count;
         let () = invalid_trans_proto_assertion.add_child_assertion(trans_proto_assertion);
     }
     let mut total_trans_proto_assertion = TreeAssertion::new(TOTAL_COUNTER_NAME, true);
     let () = total_trans_proto_assertion
-        .add_property_assertion(COUNTER_PROPERTY_NAME, Box::new(total_trans_proto.to_string()));
+        .add_property_assertion(COUNTER_PROPERTY_NAME, Arc::new(total_trans_proto.to_string()));
     let () = invalid_trans_proto_assertion.add_child_assertion(total_trans_proto_assertion);
 
     let mut discard_stats_assertion = TreeAssertion::new(DISCARD_STATS_NAME, true);
@@ -1551,7 +1554,7 @@ async fn inspect_config(
     });
     if let Some(max_procs) = expect_max_procs_set {
         config_data_assertion
-            .add_property_assertion("max-procs", Box::new(format!("{}", max_procs)));
+            .add_property_assertion("max-procs", Arc::new(format!("{}", max_procs)));
     }
     inspect_assertion.add_child_assertion(config_data_assertion);
 

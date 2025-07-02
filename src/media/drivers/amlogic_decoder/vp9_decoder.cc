@@ -6,6 +6,7 @@
 
 #include <lib/media/codec_impl/codec_buffer.h>
 #include <lib/media/codec_impl/codec_packet.h>
+#include <lib/memory_barriers/memory_barriers.h>
 #include <lib/trace/event.h>
 
 #include <algorithm>
@@ -18,7 +19,6 @@
 #include "firmware_blob.h"
 #include "macros.h"
 #include "pts_manager.h"
-#include "src/lib/memory_barriers/memory_barriers.h"
 #include "src/media/lib/metrics/metrics.cb.h"
 #include "third_party/libvpx/vp9/common/vp9_loopfilter.h"
 #include "third_party/vp9_adapt_probs/vp9_coefficient_adaptation.h"

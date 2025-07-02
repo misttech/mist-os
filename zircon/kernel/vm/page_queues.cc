@@ -33,10 +33,6 @@ KCOUNTER(pq_lru_pages_compressed, "pq.lru.pages_compressed")
 KCOUNTER(pq_lru_pages_discarded, "pq.lru.pages_discarded")
 KCOUNTER(pq_accessed_normal, "pq.accessed.normal")
 KCOUNTER(pq_accessed_normal_same_queue, "pq.accessed.normal_same_queue")
-KCOUNTER(pq_accessed_deferred_count, "pq.accessed.deferred")
-KCOUNTER(pq_accessed_deferred_count_same_queue, "pq.accessed.deferred_same_queue")
-
-}  // namespace
 
 // Helper class for building an isolate list for deferred processing when acting on the LRU queues.
 // Pages are added while the page queues lock is held, and processed once the lock is dropped.
@@ -44,7 +40,7 @@ KCOUNTER(pq_accessed_deferred_count_same_queue, "pq.accessed.deferred_same_queue
 // attempt to add more than this many items, as Flush() cannot automatically be called due to
 // incompatible locking requirements between flushing and adding items.
 template <size_t Items>
-class PageQueues::LruIsolate {
+class LruIsolate {
  public:
   using LruAction = PageQueues::LruAction;
   LruIsolate() = default;
@@ -169,6 +165,8 @@ class PageQueues::LruIsolate {
   size_t items_ = 0;
 };
 
+}  // namespace
+
 // static
 uint64_t PageQueues::GetLruPagesCompressed() { return pq_lru_pages_compressed.SumAcrossAllCpus(); }
 
@@ -178,6 +176,9 @@ PageQueues::PageQueues()
       active_ratio_multiplier_(kDefaultActiveRatioMultiplier) {
   for (uint32_t i = 0; i < PageQueueNumQueues; i++) {
     list_initialize(&page_queues_[i]);
+  }
+  for (uint32_t i = 0; i < kNumIsolateQueues; i++) {
+    list_initialize(&isolate_queues_[i]);
   }
 }
 
@@ -226,7 +227,7 @@ void PageQueues::StartThreads(zx_duration_mono_t min_mru_rotate_time,
   lru_thread->Resume();
 
   {
-    Guard<SpinLock, IrqSave> guard{&lock_};
+    Guard<CriticalMutex> guard{&lock_};
     ASSERT(!mru_thread_);
     ASSERT(!lru_thread_);
     mru_thread_ = mru_thread;
@@ -249,7 +250,7 @@ void PageQueues::StartDebugCompressor() {
   }
   zx_status_t status = dc->Init();
   ASSERT(status == ZX_OK);
-  Guard<SpinLock, IrqSave> guard{&lock_};
+  Guard<SpinLock, IrqSave> guard{&list_lock_};
   debug_compressor_ = ktl::move(dc);
 #endif
 }
@@ -261,18 +262,19 @@ void PageQueues::StopThreads() {
   Thread* lru_thread = nullptr;
 
   {
-    DeferPendingSignals dps{*this};
+    bool signal_aging;
     {
-      Guard<SpinLock, IrqSave> guard{&lock_};
+      Guard<CriticalMutex> guard{&lock_};
       shutdown_threads_ = true;
-      if (aging_disabled_.exchange(false)) {
-        dps.Pend(PendingSignal::AgingToken);
-      }
-      dps.Pend(PendingSignal::AgingActiveRatioEvent);
-      dps.Pend(PendingSignal::LruEvent);
+      signal_aging = aging_disabled_.exchange(false);
       mru_thread = mru_thread_;
       lru_thread = lru_thread_;
     }
+    if (signal_aging) {
+      aging_token_.Signal();
+    }
+    aging_active_ratio_event_.Signal();
+    lru_event_.Signal();
   }
 
   int retcode;
@@ -287,37 +289,36 @@ void PageQueues::StopThreads() {
 }
 
 void PageQueues::SetLruAction(LruAction action) {
-  Guard<SpinLock, IrqSave> guard{&lock_};
+  Guard<CriticalMutex> guard{&lock_};
   lru_action_ = action;
 }
 
 void PageQueues::SetActiveRatioMultiplier(uint32_t multiplier) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
+  Guard<CriticalMutex> guard{&lock_};
   active_ratio_multiplier_ = multiplier;
   // The change in multiplier might have caused us to need to age.
-  MaybeSignalActiveRatioAgingLocked(dps);
+  CheckActiveRatioAgingLocked();
 }
 
-void PageQueues::MaybeSignalActiveRatioAgingLocked(DeferPendingSignals& dps) {
+void PageQueues::CheckActiveRatioAgingLocked() {
   if (active_ratio_triggered_) {
     // Already triggered, nothing more to do.
     return;
   }
   if (IsActiveRatioTriggeringAging()) {
     active_ratio_triggered_ = true;
-    dps.Pend(PendingSignal::AgingActiveRatioEvent);
+    aging_active_ratio_event_.Signal();
   }
 }
 
-bool PageQueues::IsActiveRatioTriggeringAging() const {
-  ActiveInactiveCounts active_count = GetActiveInactiveCountsLocked();
-  return active_count.active * active_ratio_multiplier_ > active_count.inactive;
+bool PageQueues::IsActiveRatioTriggeringAging() {
+  ActiveInactiveCounts counts = GetActiveInactiveCounts();
+  return counts.active * active_ratio_multiplier_ > counts.inactive;
 }
 
 ktl::variant<PageQueues::AgeReason, zx_instant_mono_t> PageQueues::ConsumeAgeReason() {
   AutoPreemptDisabler apd;
-  Guard<SpinLock, IrqSave> guard{&lock_};
+  Guard<CriticalMutex> guard{&lock_};
   auto reason = GetAgeReasonLocked();
   // If the age reason is the active ratio, consume the trigger.
   if (const AgeReason* age_reason = ktl::get_if<AgeReason>(&reason)) {
@@ -340,7 +341,7 @@ void PageQueues::SynchronizeWithAging() {
 
     // The MruThread may not have woken up yet to clear the pending signal, so we must check
     // ourselves.
-    Guard<SpinLock, IrqSave> guard{&lock_};
+    Guard<CriticalMutex> guard{&lock_};
     if (!ktl::holds_alternative<AgeReason>(GetAgeReasonLocked())) {
       // There is no aging reason, so there is no race to worry about, and no aging can be in
       // progress.
@@ -384,12 +385,11 @@ ktl::variant<PageQueues::AgeReason, zx_instant_mono_t> PageQueues::GetAgeReasonL
 void PageQueues::MaybeTriggerLruProcessing() {
   bool needs_lru_processing;
   {
-    Guard<SpinLock, IrqSave> guard{&lock_};
+    Guard<CriticalMutex> guard{&lock_};
     needs_lru_processing = NeedsLruProcessingLocked();
   }
   if (needs_lru_processing) {
-    DeferPendingSignals dps{*this};
-    dps.Pend(PendingSignal::LruEvent);
+    lru_event_.Signal();
   }
 }
 
@@ -421,7 +421,7 @@ void PageQueues::DisableAging() {
   // it.
   VmDebugCompressor* dc = nullptr;
   {
-    Guard<SpinLock, IrqSave> guard{&lock_};
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
     if (debug_compressor_) {
       dc = &*debug_compressor_;
     }
@@ -433,17 +433,15 @@ void PageQueues::DisableAging() {
 }
 
 void PageQueues::EnableAging() {
-  DeferPendingSignals dps{*this};
-
   // Validate a double EnableAging is not happening.
   if (!aging_disabled_.exchange(false)) {
     panic("Mismatched disable/enable pair");
   }
 
   // Return the aging token, allowing the aging thread to proceed if it was waiting.
-  dps.Pend(PendingSignal::AgingToken);
+  aging_token_.Signal();
 #if DEBUG_ASSERT_IMPLEMENTED
-  Guard<SpinLock, IrqSave> guard{&lock_};
+  Guard<SpinLock, IrqSave> guard{&list_lock_};
   if (debug_compressor_) {
     debug_compressor_->Resume();
   }
@@ -477,16 +475,16 @@ void PageQueues::Dump() {
   AgeReason last_age_reason;
   ActiveInactiveCounts activeinactive;
   {
-    Guard<SpinLock, IrqSave> guard{&lock_};
+    Guard<CriticalMutex> guard{&lock_};
     mru_gen = mru_gen_.load(ktl::memory_order_relaxed);
     lru_gen = lru_gen_.load(ktl::memory_order_relaxed);
     failed_reclaim = page_queue_counts_[PageQueueFailedReclaim].load(ktl::memory_order_relaxed);
-    inactive_count = page_queue_counts_[PageQueueReclaimDontNeed].load(ktl::memory_order_relaxed);
+    inactive_count = page_queue_counts_[PageQueueReclaimIsolate].load(ktl::memory_order_relaxed);
     dirty = page_queue_counts_[PageQueuePagerBackedDirty].load(ktl::memory_order_relaxed);
     for (uint32_t i = 0; i < kNumReclaim; i++) {
       counts[i] = page_queue_counts_[PageQueueReclaimBase + i].load(ktl::memory_order_relaxed);
     }
-    activeinactive = GetActiveInactiveCountsLocked();
+    activeinactive = GetActiveInactiveCounts();
     last_age_time = last_age_time_.load(ktl::memory_order_relaxed);
     last_age_reason = last_age_reason_;
   }
@@ -528,9 +526,8 @@ void PageQueues::Dump() {
          mru_gen, age_time.tv_sec, age_time.tv_nsec, string_from_age_reason(last_age_reason),
          lru_gen);
   printf("pq: Pager buckets %s evict first: %zu\n", buf, inactive_count);
-  printf("pq: %s active/inactive totals: %zu/%zu dirty: %zu failed reclaim: %zu\n",
-         activeinactive.cached ? "cached" : "live", activeinactive.active, activeinactive.inactive,
-         dirty, failed_reclaim);
+  printf("pq: active/inactive totals: %zu/%zu dirty: %zu failed reclaim: %zu\n",
+         activeinactive.active, activeinactive.inactive, dirty, failed_reclaim);
 }
 
 // This runs the aging thread. Aging, unlike lru processing, scanning or eviction, requires very
@@ -604,8 +601,6 @@ void PageQueues::MruThread() {
     // Taken the aging token, potentially blocking if aging is disabled, make sure to return it when
     // we are done.
     aging_token_.Wait();
-    DeferPendingSignals dps{*this};
-    dps.Pend(PendingSignal::AgingToken);
 
     // Make sure the accessed information has been harvested since the last time we aged, otherwise
     // we are deliberately making the age information coarser, by effectively not using one of the
@@ -616,14 +611,15 @@ void PageQueues::MruThread() {
 
     // Changing mru_gen_ could have impacted the eviction logic.
     MaybeTriggerLruProcessing();
+    aging_token_.Signal();
   }
 }
 
 // This thread should, at some point, have some of its logic and signaling merged with the Evictor.
 // Currently it might process the lru queue whilst the evictor is already trying to evict, which is
 // not harmful but it's a bit wasteful as it doubles the work that happens.
-// LRU processing, via ProcessDontNeedAndLruQueues, is expensive and happens under the lock_. It is
-// expected that ProcessDontNeedAndLruQueues perform small units of work to avoid this thread
+// LRU processing, via ProcessIsolateAndLruQueues, is expensive and happens under the lock_. It is
+// expected that ProcessIsolateAndLruQueues perform small units of work to avoid this thread
 // causing excessive lock contention.
 void PageQueues::LruThread() {
   constexpr uint kLruNeedsProcessingPollSeconds = 90;
@@ -636,7 +632,7 @@ void PageQueues::LruThread() {
     bool needs_processing = false;
     // Take the lock so we can calculate (race free) a target mru-gen.
     {
-      Guard<SpinLock, IrqSave> guard{&lock_};
+      Guard<CriticalMutex> guard{&lock_};
       needs_processing = NeedsLruProcessingLocked();
       // If needs processing is false this will calculate an incorrect target_gen, but that's fine
       // as we'll just discard it and it's simpler to just do it here unconditionally while the lock
@@ -671,10 +667,10 @@ void PageQueues::LruThread() {
     while (needs_processing) {
       // With the lock dropped process the target. This is not racy as generations are monotonic, so
       // worst case someone else already processed this generation and this call will be a no-op.
-      ProcessDontNeedAndLruQueues(target_gen, false);
+      ProcessLruQueue(target_gen, false);
 
       // Take the lock so we can calculate (race free) a target mru-gen.
-      Guard<SpinLock, IrqSave> guard{&lock_};
+      Guard<CriticalMutex> guard{&lock_};
       needs_processing = NeedsLruProcessingLocked();
       // If needs processing is false this will calculate an incorrect target_gen, but that's fine
       // as we'll just discard it and it's simpler to just do it here unconditionally while the lock
@@ -716,18 +712,12 @@ void PageQueues::RotateReclaimQueues(AgeReason reason) {
   {
     // Acquire the lock to increment the mru_gen_. This allows other queue logic to not worry about
     // mru_gen_ changing whilst they hold the lock.
-    DeferPendingSignals dps{*this};
-    Guard<SpinLock, IrqSave> guard{&lock_};
+    Guard<CriticalMutex> guard{&lock_};
     mru_gen_.fetch_add(1, ktl::memory_order_relaxed);
     last_age_time_ = current_mono_time();
     last_age_reason_ = reason;
-    // Update the active/inactive counts. We could be a bit smarter here since we know exactly which
-    // active bucket might have changed, but this will work.
-    RecalculateActiveInactiveLocked(dps);
-  }
+    CheckActiveRatioAgingLocked();
 
-  {
-    Guard<CriticalMutex> guard{&aging_event_mutex_};
     if (aging_event_) {
       aging_event_->Signal();
     }
@@ -749,112 +739,14 @@ void PageQueues::RotateReclaimQueues(AgeReason reason) {
   }
 }
 
-template <size_t Items>
-ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessLruQueueHelper(
-    LruIsolate<Items>& deferred_list, uint64_t target_gen, bool peek) {
-  VM_KTRACE_DURATION(2, "ProcessQueue");
-
-  // Only accumulate pages to try to replace with loaned pages if loaned pages are available and
-  // we're allowed to borrow at this code location.
-  const bool do_sweeping = (pmm_count_loaned_free_pages() != 0) &&
-                           pmm_physical_page_borrowing_config()->is_borrowing_on_mru_enabled();
-
-  DeferPendingSignals dps{*this};
-  // Ensure the list is empty before we start.
-  deferred_list.Flush();
-
-  // Note: we need to make sure that we disable local preemption while we are
-  // holding our local lock.  Otherwise, if/when we end up posting to our mru
-  // semaphore, it could result in us triggering a preemption while we are
-  // holding the spinlock, which is not something we can allow.
-  AutoPreemptDisabler apd;
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  const PageQueue mru_queue = mru_gen_to_queue();
-  const uint64_t lru = lru_gen_.load(ktl::memory_order_relaxed);
-  // Fill in the lru action now that the lock is held.
-  deferred_list.SetLruAction(lru_action_);
-
-  // If we're processing the lru queue and it has already hit the target gen, return early.
-  if (lru >= target_gen) {
-    return ktl::nullopt;
-  }
-
-  uint32_t work_remain = Items;
-  const PageQueue lru_queue = gen_to_queue(lru);
-  list_node* operating_queue = &page_queues_[lru_queue];
-
-  while (!list_is_empty(operating_queue) && work_remain > 0) {
-    work_remain--;
-    // When moving pages around we want to maintain relative page age as far as possible. Therefore,
-    // if forcefully moving pages from LRU to LRU+1 we want all the pages from LRU, to appear after
-    // those already in LRU+1, as the ones in LRU are older. To achieve this we want to take from
-    // the head of LRU, and place in the tail of LRU+1.
-    // However, if peeking (and not forcefully moving), then we always want to return the oldest
-    // page, which is the tail. For any pages whose stored queue does not match, it is irrelevant
-    // which end we take from as such pages have no meaningful relative ordering.
-    vm_page_t* page = peek ? list_peek_tail_type(operating_queue, vm_page_t, queue_node)
-                           : list_peek_head_type(operating_queue, vm_page_t, queue_node);
-    PageQueue page_queue =
-        (PageQueue)page->object.get_page_queue_ref().load(ktl::memory_order_relaxed);
-    DEBUG_ASSERT(page_queue >= PageQueueReclaimBase);
-
-    // If the queue stored in the page does not match then we want to move it to its correct queue
-    // with the caveat that its queue could be invalid. The queue would be invalid if MarkAccessed
-    // had raced. Should this happen we know that the page is actually *very* old, and so we will
-    // fall back to the case of forcibly changing its age to the new lru gen.
-    if (page_queue != lru_queue && queue_is_valid(page_queue, lru_queue, mru_queue)) {
-      list_delete(&page->queue_node);
-      list_add_head(&page_queues_[page_queue], &page->queue_node);
-
-      if (do_sweeping && !page->is_loaned() && queue_is_active(page_queue, mru_queue)) {
-        deferred_list.AddLoanReplacement(page, this);
-      }
-    } else if (peek) {
-      VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
-      uint64_t page_offset = page->object.get_page_offset();
-      DEBUG_ASSERT(cow);
-
-      // Upgrading to a refptr can never fail as all pages are removed from a VmCowPages, and hence
-      // from the page queues here, prior to the last reference to a cow pages being dropped.
-      fbl::RefPtr<VmCowPages> cow_pages = fbl::MakeRefPtrUpgradeFromRaw(cow, lock_);
-      DEBUG_ASSERT(cow_pages);
-      return VmoBacklink{ktl::move(cow_pages), page, page_offset};
-    } else {
-      // Force it into our target queue, don't care about races. If we happened to access it at
-      // the same time then too bad.
-      PageQueue new_queue = gen_to_queue(lru + 1);
-      PageQueue old_queue = (PageQueue)page->object.get_page_queue_ref().exchange(new_queue);
-      DEBUG_ASSERT(old_queue >= PageQueueReclaimBase);
-
-      page_queue_counts_[old_queue].fetch_sub(1, ktl::memory_order_relaxed);
-      page_queue_counts_[new_queue].fetch_add(1, ktl::memory_order_relaxed);
-      list_delete(&page->queue_node);
-      list_add_tail(&page_queues_[new_queue], &page->queue_node);
-      // We should only have performed this step to move from one inactive bucket to the next,
-      // so there should be no active/inactive count changes needed.
-      DEBUG_ASSERT(!queue_is_active(new_queue, mru_queue));
-      deferred_list.AddReclaimable(page, this);
-    }
-  }
-  if (list_is_empty(operating_queue)) {
-    // Note that we held the lock the entire time, and lru_gen_ is always modified with the lock
-    // held, so this should always precisely set lru_gen_ to lru + 1.
-    [[maybe_unused]] uint64_t prev = lru_gen_.fetch_add(1, ktl::memory_order_relaxed);
-    DEBUG_ASSERT(prev == lru);
-    mru_semaphore_.Post();
-  }
-
-  return ktl::nullopt;
-}
-
-ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedList(bool peek) {
-  // Need to move every page out of the list and either put it back in the regular DontNeed list,
+ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessIsolateList(ktl::optional<size_t> peek) {
+  // Need to move every page out of the list and either put it back in the regular Isolate list,
   // or in its correct queue. If we hit active pages we may need to replace them with loaned.
 
-  // Processing the DontNeed queue requires holding the page_queues_ lock_. The only other actions
+  // Processing the Isolate queue requires holding the page_queues_ lock_. The only other actions
   // that require this lock are inserting or removing pages from the page queues. To ensure these
   // actions can complete in a small bounded time kMaxDeferredWork is chosen to be very small so
-  // that the lock will be regularly dropped. As processing the DontNeed queue is not time critical
+  // that the lock will be regularly dropped. As processing the Isolate queue is not time critical
   // and can be somewhat inefficient in its operation we err on the side of doing less work per lock
   // acquisition.
   constexpr uint64_t kMaxDeferredWork = 16;
@@ -867,64 +759,66 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedList(bool peek
                            pmm_physical_page_borrowing_config()->is_borrowing_on_mru_enabled();
 
   // In order to safely resume iteration where we left off between lock drops we need to make use of
-  // the dont_need_cursor_, which requires holding the dont_need_cursor_lock_.
-  Guard<Mutex> dont_need_cursor_guard{&dont_need_cursor_lock_};
+  // the isolate_cursor_, which requires holding the isolate_cursor_lock_.
+  Guard<Mutex> isolate_cursor_guard{&isolate_cursor_lock_};
 
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  DEBUG_ASSERT(dont_need_cursor_ == nullptr);
-  vm_page_t* current =
-      list_peek_head_type(&page_queues_[PageQueueReclaimDontNeed], vm_page_t, queue_node);
-  // Count work done separately to all iterations so we can periodically drop the lock and process
-  // the deferred_list.
-  uint64_t work_done = 0;
-  while (current) {
-    vm_page_t* page = current;
-    current = list_next_type(&page_queues_[PageQueueReclaimDontNeed], &current->queue_node,
-                             vm_page_t, queue_node);
-    PageQueue page_queue =
-        static_cast<PageQueue>(page->object.get_page_queue_ref().load(ktl::memory_order_relaxed));
-    // Place in the correct list, preserving age
-    if (page_queue == PageQueueReclaimDontNeed) {
-      if (peek) {
-        VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
-        DEBUG_ASSERT(cow);
-        // Upgrading to a refptr can never fail as all pages are removed from a VmCowPages, and
-        // hence from the page queues here, prior to the last reference to a cow pages being
-        // dropped.
-        fbl::RefPtr<VmCowPages> cow_pages = fbl::MakeRefPtrUpgradeFromRaw(cow, lock_);
-        DEBUG_ASSERT(cow_pages);
-        return VmoBacklink{ktl::move(cow_pages), page, page->object.get_page_offset()};
-      }
-    } else {
-      list_delete(&page->queue_node);
+  const size_t max_queue = ktl::min(peek.value_or(kNumIsolateQueues - 1), kNumIsolateQueues - 1);
 
-      // Only reason for a page to be in the DontNeed list and have the wrong queue is if it was
-      // recently accessed. That means it's active and we can attempt to loan to it. As the entire
-      // DontNeed queue is processed each time we change the LRU, we know this is a valid page queue
-      // that has not yet aged out.
-      // We have no way to know the relative age of this page with respect to its target queue, so
-      // the head is as good a place as any to put it.
-      list_add_head(&page_queues_[page_queue], &page->queue_node);
-      if (do_sweeping && !page->is_loaned()) {
-        deferred_list.AddLoanReplacement(page, this);
+  for (size_t i = 0; i <= max_queue; i++) {
+    deferred_list.Flush();
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    list_node_t* list = &isolate_queues_[i];
+    vm_page_t* current = list_peek_head_type(list, vm_page_t, queue_node);
+    // Count work done separately to all iterations so we can periodically drop the lock and process
+    // the deferred_list.
+    uint64_t work_done = 0;
+    while (current) {
+      vm_page_t* page = current;
+      current = list_next_type(list, &current->queue_node, vm_page_t, queue_node);
+      PageQueue page_queue =
+          static_cast<PageQueue>(page->object.get_page_queue_ref().load(ktl::memory_order_relaxed));
+      // Place in the correct list, preserving age
+      if (page_queue == PageQueueReclaimIsolate) {
+        if (peek) {
+          VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
+          DEBUG_ASSERT(cow);
+          // Upgrading to a refptr can never fail as all pages are removed from a VmCowPages, and
+          // hence from the page queues here, prior to the last reference to a cow pages being
+          // dropped.
+          fbl::RefPtr<VmCowPages> cow_pages = fbl::MakeRefPtrUpgradeFromRaw(cow, list_lock_);
+          DEBUG_ASSERT(cow_pages);
+          return VmoBacklink{
+              .cow = ktl::move(cow_pages), .page = page, .offset = page->object.get_page_offset()};
+        }
+      } else {
+        list_delete(&page->queue_node);
+
+        // Only reason for a page to be in the DontNeed list and have the wrong queue is if it was
+        // recently accessed. That means it's active and we can attempt to loan to it. As the entire
+        // DontNeed queue is processed each time we change the LRU, we know this is a valid page
+        // queue that has not yet aged out. We have no way to know the relative age of this page
+        // with respect to its target queue, so the head is as good a place as any to put it.
+        list_add_head(&page_queues_[page_queue], &page->queue_node);
+        if (do_sweeping && !page->is_loaned()) {
+          deferred_list.AddLoanReplacement(page, this);
+        }
       }
-    }
-    work_done++;
-    if (work_done >= kMaxDeferredWork) {
-      // Drop the lock and flush the deferred_list. Saving and restoring current to the
-      // dont_need_cursor_.
-      dont_need_cursor_ = current;
-      guard.CallUnlocked([&deferred_list]() { deferred_list.Flush(); });
-      current = dont_need_cursor_;
-      dont_need_cursor_ = nullptr;
-      work_done = 0;
+      work_done++;
+      if (work_done >= kMaxDeferredWork) {
+        // Drop the lock and flush the deferred_list. Saving and restoring current to the
+        // isolate_cursor_.
+        isolate_cursor_ = {.page = current, .list = list};
+        guard.CallUnlocked([&deferred_list]() { deferred_list.Flush(); });
+        current = isolate_cursor_.page;
+        isolate_cursor_ = {.page = nullptr, .list = nullptr};
+        work_done = 0;
+      }
     }
   }
   return ktl::nullopt;
 }
 
-ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedAndLruQueues(uint64_t target_gen,
-                                                                               bool peek) {
+void PageQueues::ProcessLruQueue(uint64_t target_gen, bool isolate) {
   // This assertion is <=, and not strictly <, since to evict a some queue X, the target must be
   // X+1. Hence to preserve kNumActiveQueues, we can allow target_gen to become equal to the first
   // active queue, as this will process all the non-active queues. Although we might refresh our
@@ -933,12 +827,20 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedAndLruQueues(u
   ASSERT(target_gen <= mru_gen_.load(ktl::memory_order_relaxed) - (kNumActiveQueues - 1));
 
   {
-    VM_KTRACE_DURATION(2, "ProcessDontNeedList");
-    ktl::optional<VmoBacklink> backlink = ProcessDontNeedList(peek);
-    if (backlink != ktl::nullopt) {
-      return backlink;
-    }
+    VM_KTRACE_DURATION(2, "ProcessIsolateList");
+    // Process through the Isolate list and move out anything that has been updated.
+    ProcessIsolateList(ktl::nullopt);
   }
+
+  // Processing the LRU queue requires holding the page_queues_ lock_. The only other
+  // actions that require this lock are inserting or removing pages from the page queues. To ensure
+  // these actions can complete in a small bounded time kMaxQueueWork is chosen to be very small so
+  // that the lock will be regularly dropped. As processing the Isolate/LRU queue is not time
+  // critical and can be somewhat inefficient in its operation we err on the side of doing less work
+  // per lock acquisition.
+  //
+  // Also, we need to limit the number to avoid sweep_to_loaned taking up excessive stack space.
+  static constexpr uint32_t kMaxQueueWork = 16;
 
   // Calculate a truly worst case loop iteration count based on every page being in the LRU
   // queue and needing to iterate the LRU multiple steps to the target_gen. Instead of reading the
@@ -949,16 +851,6 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedAndLruQueues(u
   // Loop iteration counting is just for diagnostic purposes.
   uint64_t loop_iterations = 0;
 
-  // Processing the LRU queue requires holding the page_queues_ lock_. The only other
-  // actions that require this lock are inserting or removing pages from the page queues. To ensure
-  // these actions can complete in a small bounded time kMaxQueueWork is chosen to be very small so
-  // that the lock will be regularly dropped. As processing the DontNeed/LRU queue is not time
-  // critical and can be somewhat inefficient in its operation we err on the side of doing less work
-  // per lock acquisition.
-  //
-  // Also, we need to limit the number to avoid sweep_to_loaned taking up excessive stack space.
-  static constexpr uint32_t kMaxQueueWork = 16;
-
   // Pages in this list might be reclaimed or replaced with a loaned page, depending on the action
   // specified in deferred_action. Each of these actions must be done outside the lock_, so we
   // accumulate pages and then act after lock_ is released.
@@ -966,111 +858,129 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedAndLruQueues(u
   // to reuse it between iterations.
   LruIsolate<kMaxQueueWork> deferred_list;
 
-  // Process the lru queue to reach target_gen.
-  while (lru_gen_.load(ktl::memory_order_relaxed) < target_gen) {
-    VM_KTRACE_DURATION(2, "ProcessLruQueue");
+  // Only accumulate pages to try to replace with loaned pages if loaned pages are available and
+  // we're allowed to borrow at this code location.
+  const bool do_sweeping = (pmm_count_loaned_free_pages() != 0) &&
+                           pmm_physical_page_borrowing_config()->is_borrowing_on_mru_enabled();
+
+  VM_KTRACE_DURATION(2, "ProcessLruQueue");
+  while (true) {
     if (loop_iterations++ == max_lru_iterations) {
-      printf("[pq]: WARNING: %s exceeded expected max LRU loop iterations %" PRIu64 "\n",
-             __FUNCTION__, max_lru_iterations);
+      KERNEL_OOPS("[pq]: WARNING: %s exceeded expected max LRU loop iterations %" PRIu64 "",
+                  __FUNCTION__, max_lru_iterations);
     }
-    auto optional_backlink = ProcessLruQueueHelper(deferred_list, target_gen, peek);
 
-    if (optional_backlink != ktl::nullopt) {
-      return optional_backlink;
+    deferred_list.Flush();
+    bool post = false;
+    {
+      // Need to hold the general lock, in addition to the list lock, so that the lru_gen_ does not
+      // change while we are working.
+      Guard<CriticalMutex> guard{&lock_};
+      // Fill in the lru action now that the lock is held.
+      deferred_list.SetLruAction(lru_action_);
+      Guard<SpinLock, IrqSave> list_guard{&list_lock_};
+      const uint64_t lru = lru_gen_.load(ktl::memory_order_relaxed);
+      if (lru >= target_gen) {
+        break;
+      }
+      const PageQueue mru_queue = mru_gen_to_queue();
+      const PageQueue lru_queue = gen_to_queue(lru);
+      list_node_t* list = &page_queues_[lru_queue];
+
+      for (uint iterations = 0; !list_is_empty(list) && iterations < kMaxQueueWork; iterations++) {
+        vm_page_t* page = list_remove_head_type(list, vm_page_t, queue_node);
+        PageQueue page_queue = static_cast<PageQueue>(
+            page->object.get_page_queue_ref().load(ktl::memory_order_relaxed));
+        DEBUG_ASSERT(page_queue >= PageQueueReclaimBase);
+
+        // If the queue stored in the page does not match then we want to move it to its correct
+        // queue with the caveat that its queue could be invalid. The queue would be invalid if
+        // MarkAccessed had raced. Should this happen we know that the page is actually *very* old,
+        // and so we will fall back to the case of forcibly changing its age to the new lru gen.
+        if (page_queue != lru_queue && queue_is_valid(page_queue, lru_queue, mru_queue)) {
+          list_add_head(&page_queues_[page_queue], &page->queue_node);
+
+          if (do_sweeping && !page->is_loaned() && queue_is_active(page_queue, mru_queue)) {
+            deferred_list.AddLoanReplacement(page, this);
+          }
+        } else {
+          // Force it into either our target queue or the isolate list, don't care about races. If
+          // we happened to access it at the same time then too bad.
+          PageQueue new_queue = isolate ? PageQueueReclaimIsolate : gen_to_queue(target_gen);
+          list_node_t* target_queue = isolate ? &isolate_queues_[0] : &page_queues_[new_queue];
+          PageQueue old_queue =
+              static_cast<PageQueue>(page->object.get_page_queue_ref().exchange(new_queue));
+          DEBUG_ASSERT(old_queue >= PageQueueReclaimBase);
+
+          page_queue_counts_[old_queue].fetch_sub(1, ktl::memory_order_relaxed);
+          page_queue_counts_[new_queue].fetch_add(1, ktl::memory_order_relaxed);
+          list_add_tail(target_queue, &page->queue_node);
+          // We should only have performed this step to move from one inactive bucket to the next,
+          // so there should be no active/inactive count changes needed.
+          DEBUG_ASSERT(!queue_is_active(new_queue, mru_queue));
+          deferred_list.AddReclaimable(page, this);
+        }
+      }
+      if (list_is_empty(list)) {
+        // Note that we held the lock the entire time, and lru_gen_ is always modified with the lock
+        // held, so this should always precisely set lru_gen_ to lru + 1.
+        [[maybe_unused]] uint64_t prev = lru_gen_.fetch_add(1, ktl::memory_order_relaxed);
+        DEBUG_ASSERT(prev == lru);
+        post = true;
+      }
+    }
+    if (post) {
+      mru_semaphore_.Post();
     }
   }
-
-  return ktl::nullopt;
 }
 
-void PageQueues::UpdateActiveInactiveLocked(PageQueue old_queue, PageQueue new_queue,
-                                            DeferPendingSignals& dps) {
-  // Short circuit the lock acquisition and logic if not dealing with active/inactive queues
-  if (!queue_is_reclaim(old_queue) && !queue_is_reclaim(new_queue)) {
-    return;
-  }
-  // This just blindly updates the active/inactive counts. If accessed scanning is happening, and
-  // used use_cached_queue_counts_ is true, then we could be racing and setting these to garbage
-  // values. That's fine as they will never get returned anywhere, and will get reset to correct
-  // values once access scanning completes.
-  PageQueue mru = mru_gen_to_queue();
-  if (queue_is_active(old_queue, mru)) {
-    active_queue_count_--;
-  } else if (queue_is_inactive(old_queue, mru)) {
-    inactive_queue_count_--;
-  }
-  if (queue_is_active(new_queue, mru)) {
-    active_queue_count_++;
-  } else if (queue_is_inactive(new_queue, mru)) {
-    inactive_queue_count_++;
-  }
-  MaybeSignalActiveRatioAgingLocked(dps);
-}
-
-void PageQueues::MarkAccessedContinued(vm_page_t* page) {
-  // Although we can get called with the zero page, it would not be in a reclaimable queue and so
-  // we should have returned in the MarkAccessed wrapper.
-  DEBUG_ASSERT(page != vm_get_zero_page());
-
+void PageQueues::MarkAccessed(vm_page_t* page) {
   pq_accessed_normal.Add(1);
-
-  auto queue_ref = page->object.get_page_queue_ref();
-
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-
-  // We need to check the current queue to see if it is in the reclaimable range. Between checking
-  // this and updating the queue it could change, however it would only change as a result of
-  // MarkAccessedDeferredCount, which would only move it to another reclaimable queue. No other
-  // change is possible as we are holding lock_.
-  if (queue_ref.load(ktl::memory_order_relaxed) < PageQueueReclaimDontNeed) {
-    return;
-  }
-
-  PageQueue queue = mru_gen_to_queue();
-  PageQueue old_queue = (PageQueue)queue_ref.exchange(queue, ktl::memory_order_relaxed);
-  // Double check again that this was previously reclaimable
-  DEBUG_ASSERT(old_queue != PageQueueNone && old_queue >= PageQueueReclaimDontNeed);
-  if (old_queue != queue) {
-    page_queue_counts_[old_queue].fetch_sub(1, ktl::memory_order_relaxed);
-    page_queue_counts_[queue].fetch_add(1, ktl::memory_order_relaxed);
-    UpdateActiveInactiveLocked(old_queue, queue, dps);
-  } else {
-    pq_accessed_normal_same_queue.Add(1);
-  }
-}
-
-void PageQueues::MarkAccessedDeferredCount(vm_page_t* page) {
-  // Ensure that the page queues is returning the cached counts at the moment, otherwise we might
-  // race.
-  pq_accessed_deferred_count.Add(1);
-  DEBUG_ASSERT(use_cached_queue_counts_.load(ktl::memory_order_relaxed));
   auto queue_ref = page->object.get_page_queue_ref();
   uint8_t old_gen = queue_ref.load(ktl::memory_order_relaxed);
+  if (!queue_is_reclaim(static_cast<PageQueue>(old_gen))) {
+    return;
+  }
+  const uint32_t target_queue = mru_gen_to_queue();
+  if (old_gen == target_queue) {
+    pq_accessed_normal_same_queue.Add(1);
+    return;
+  }
   // Between loading the mru_gen and finally storing it in the queue_ref it's possible for our
   // calculated target_queue to become invalid. This is extremely unlikely as it would require
   // us to stall for long enough for the lru_gen to pass this point, but if it does happen then
   // ProcessLruQueues will notice our queue is invalid and correct our age to be that of lru_gen.
-  const uint32_t target_queue = mru_gen_to_queue();
-  if (old_gen == target_queue) {
-    pq_accessed_deferred_count_same_queue.Add(1);
-    return;
-  }
-  do {
+  while (!queue_ref.compare_exchange_weak(old_gen, static_cast<uint8_t>(target_queue),
+                                          ktl::memory_order_relaxed)) {
     // If we ever find old_gen to not be in the active/inactive range then this means the page has
     // either been racily removed from, or was never in, the reclaim queue. In which case we
     // can return as there's nothing to be marked accessed.
     if (!queue_is_reclaim(static_cast<PageQueue>(old_gen))) {
       return;
     }
-  } while (!queue_ref.compare_exchange_weak(old_gen, static_cast<uint8_t>(target_queue),
-                                            ktl::memory_order_relaxed));
+  }
   page_queue_counts_[old_gen].fetch_sub(1, ktl::memory_order_relaxed);
   page_queue_counts_[target_queue].fetch_add(1, ktl::memory_order_relaxed);
+
+  MaybeCheckActiveRatioAging(1);
 }
 
-void PageQueues::SetQueueBacklinkLocked(vm_page_t* page, void* object, uintptr_t page_offset,
-                                        PageQueue queue, DeferPendingSignals& dps) {
+void PageQueues::MaybeCheckActiveRatioAging(size_t pages) {
+  if (unlikely(!RecordActiveRatioSkips(pages))) {
+    Guard<CriticalMutex> guard{&lock_};
+    CheckActiveRatioAgingLocked();
+  }
+}
+
+void PageQueues::MaybeCheckActiveRatioAgingLocked(size_t pages) {
+  if (unlikely(!RecordActiveRatioSkips(pages))) {
+    CheckActiveRatioAgingLocked();
+  }
+}
+
+void PageQueues::SetQueueBacklinkLockedList(vm_page_t* page, void* object, uintptr_t page_offset,
+                                            PageQueue queue) {
   DEBUG_ASSERT(page->state() == vm_page_state::OBJECT);
   DEBUG_ASSERT(!page->is_free());
   DEBUG_ASSERT(!list_in_list(&page->queue_node));
@@ -1085,10 +995,9 @@ void PageQueues::SetQueueBacklinkLocked(vm_page_t* page, void* object, uintptr_t
   page->object.get_page_queue_ref().store(queue, ktl::memory_order_relaxed);
   list_add_head(&page_queues_[queue], &page->queue_node);
   page_queue_counts_[queue].fetch_add(1, ktl::memory_order_relaxed);
-  UpdateActiveInactiveLocked(PageQueueNone, queue, dps);
 }
 
-void PageQueues::MoveToQueueLocked(vm_page_t* page, PageQueue queue, DeferPendingSignals& dps) {
+void PageQueues::MoveToQueueLockedList(vm_page_t* page, PageQueue queue) {
   DEBUG_ASSERT(page->state() == vm_page_state::OBJECT);
   DEBUG_ASSERT(!page->is_free());
   DEBUG_ASSERT(list_in_list(&page->queue_node));
@@ -1096,108 +1005,122 @@ void PageQueues::MoveToQueueLocked(vm_page_t* page, PageQueue queue, DeferPendin
   uint32_t old_queue = page->object.get_page_queue_ref().exchange(queue, ktl::memory_order_relaxed);
   DEBUG_ASSERT(old_queue != PageQueueNone);
 
-  AdvanceDontNeedCursorIf(page);
+  AdvanceIsolateCursorIf(page);
   list_delete(&page->queue_node);
-  list_add_head(&page_queues_[queue], &page->queue_node);
+  if (queue == PageQueueReclaimIsolate) {
+    list_add_tail(&isolate_queues_[0], &page->queue_node);
+  } else {
+    list_add_head(&page_queues_[queue], &page->queue_node);
+  }
   page_queue_counts_[old_queue].fetch_sub(1, ktl::memory_order_relaxed);
   page_queue_counts_[queue].fetch_add(1, ktl::memory_order_relaxed);
-  UpdateActiveInactiveLocked(static_cast<PageQueue>(old_queue), queue, dps);
 }
 
 void PageQueues::SetWired(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  DEBUG_ASSERT(object);
-  SetQueueBacklinkLocked(page, object, page_offset, PageQueueWired, dps);
+  Guard<SpinLock, IrqSave> guard{&list_lock_};
+  SetQueueBacklinkLockedList(page, object, page_offset, PageQueueWired);
 }
 
 void PageQueues::MoveToWired(vm_page_t* page) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  MoveToQueueLocked(page, PageQueueWired, dps);
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    MoveToQueueLockedList(page, PageQueueWired);
+  }
+  MaybeCheckActiveRatioAging(1);
 }
 
 void PageQueues::SetAnonymous(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  DEBUG_ASSERT(object);
-  SetQueueBacklinkLocked(page, object, page_offset,
-                         anonymous_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymous, dps);
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    SetQueueBacklinkLockedList(page, object, page_offset,
+                               anonymous_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymous);
 #if DEBUG_ASSERT_IMPLEMENTED
-  if (debug_compressor_) {
-    debug_compressor_->Add(page, object, page_offset);
-  }
+    if (debug_compressor_) {
+      debug_compressor_->Add(page, object, page_offset);
+    }
 #endif
+  }
+  MaybeCheckActiveRatioAging(1);
 }
 
 void PageQueues::SetHighPriority(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  DEBUG_ASSERT(object);
-  SetQueueBacklinkLocked(page, object, page_offset, PageQueueHighPriority, dps);
+  Guard<SpinLock, IrqSave> guard{&list_lock_};
+  SetQueueBacklinkLockedList(page, object, page_offset, PageQueueHighPriority);
 }
 
 void PageQueues::MoveToHighPriority(vm_page_t* page) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  MoveToQueueLocked(page, PageQueueHighPriority, dps);
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    MoveToQueueLockedList(page, PageQueueHighPriority);
+  }
+  MaybeCheckActiveRatioAging(1);
 }
 
 void PageQueues::MoveToAnonymous(vm_page_t* page) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  MoveToQueueLocked(page, anonymous_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymous, dps);
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    MoveToQueueLockedList(page,
+                          anonymous_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymous);
 #if DEBUG_ASSERT_IMPLEMENTED
-  if (debug_compressor_) {
-    debug_compressor_->Add(page, reinterpret_cast<VmCowPages*>(page->object.get_object()),
-                           page->object.get_page_offset());
-  }
+    if (debug_compressor_) {
+      debug_compressor_->Add(page, reinterpret_cast<VmCowPages*>(page->object.get_object()),
+                             page->object.get_page_offset());
+    }
 #endif
+  }
+  MaybeCheckActiveRatioAging(1);
 }
 
 void PageQueues::SetReclaim(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  DEBUG_ASSERT(object);
-  SetQueueBacklinkLocked(page, object, page_offset, mru_gen_to_queue(), dps);
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    SetQueueBacklinkLockedList(page, object, page_offset, mru_gen_to_queue());
+  }
+  MaybeCheckActiveRatioAging(1);
 }
 
 void PageQueues::MoveToReclaim(vm_page_t* page) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  MoveToQueueLocked(page, mru_gen_to_queue(), dps);
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    MoveToQueueLockedList(page, mru_gen_to_queue());
+  }
+  MaybeCheckActiveRatioAging(1);
 }
 
 void PageQueues::MoveToReclaimDontNeed(vm_page_t* page) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  MoveToQueueLocked(page, PageQueueReclaimDontNeed, dps);
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    MoveToQueueLockedList(page, PageQueueReclaimIsolate);
+  }
+  MaybeCheckActiveRatioAging(1);
 }
 
 void PageQueues::SetPagerBackedDirty(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  DEBUG_ASSERT(object);
-  SetQueueBacklinkLocked(page, object, page_offset, PageQueuePagerBackedDirty, dps);
+  Guard<SpinLock, IrqSave> guard{&list_lock_};
+  SetQueueBacklinkLockedList(page, object, page_offset, PageQueuePagerBackedDirty);
 }
 
 void PageQueues::MoveToPagerBackedDirty(vm_page_t* page) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  MoveToQueueLocked(page, PageQueuePagerBackedDirty, dps);
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    MoveToQueueLockedList(page, PageQueuePagerBackedDirty);
+  }
+  MaybeCheckActiveRatioAging(1);
 }
 
 void PageQueues::SetAnonymousZeroFork(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  SetQueueBacklinkLocked(
-      page, object, page_offset,
-      zero_fork_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymousZeroFork, dps);
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    SetQueueBacklinkLockedList(
+        page, object, page_offset,
+        zero_fork_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymousZeroFork);
 #if DEBUG_ASSERT_IMPLEMENTED
-  if (debug_compressor_) {
-    debug_compressor_->Add(page, object, page_offset);
-  }
+    if (debug_compressor_) {
+      debug_compressor_->Add(page, object, page_offset);
+    }
 #endif
+  }
+  MaybeCheckActiveRatioAging(1);
 }
 
 void PageQueues::MoveToAnonymousZeroFork(vm_page_t* page) {
@@ -1210,31 +1133,35 @@ void PageQueues::MoveToAnonymousZeroFork(vm_page_t* page) {
           page->object.get_page_queue_ref().load(ktl::memory_order_relaxed)))) {
     return;
   }
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  MoveToQueueLocked(
-      page, zero_fork_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymousZeroFork, dps);
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    MoveToQueueLockedList(
+        page, zero_fork_is_reclaimable_ ? mru_gen_to_queue() : PageQueueAnonymousZeroFork);
 #if DEBUG_ASSERT_IMPLEMENTED
-  if (debug_compressor_) {
-    debug_compressor_->Add(page, reinterpret_cast<VmCowPages*>(page->object.get_object()),
-                           page->object.get_page_offset());
-  }
+    if (debug_compressor_) {
+      debug_compressor_->Add(page, reinterpret_cast<VmCowPages*>(page->object.get_object()),
+                             page->object.get_page_offset());
+    }
 #endif
+  }
+  MaybeCheckActiveRatioAging(1);
 }
 
 void PageQueues::CompressFailed(vm_page_t* page) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  // Move the page if its currently in some kind of reclaimable queue.
-  if (queue_is_reclaim(static_cast<PageQueue>(
-          page->object.get_page_queue_ref().load(ktl::memory_order_relaxed)))) {
-    MoveToQueueLocked(page, PageQueueFailedReclaim, dps);
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    // Move the page if its currently in some kind of reclaimable queue.
+    if (queue_is_reclaim(static_cast<PageQueue>(
+            page->object.get_page_queue_ref().load(ktl::memory_order_relaxed)))) {
+      MoveToQueueLockedList(page, PageQueueFailedReclaim);
+    }
   }
+  MaybeCheckActiveRatioAging(1);
 }
 
 void PageQueues::ChangeObjectOffset(vm_page_t* page, VmCowPages* object, uint64_t page_offset) {
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  ChangeObjectOffsetLocked(page, object, page_offset);
+  Guard<SpinLock, IrqSave> guard{&list_lock_};
+  ChangeObjectOffsetLockedList(page, object, page_offset);
 }
 
 void PageQueues::ChangeObjectOffsetArray(vm_page_t** pages, VmCowPages* object, uint64_t* offsets,
@@ -1249,10 +1176,10 @@ void PageQueues::ChangeObjectOffsetArray(vm_page_t** pages, VmCowPages* object, 
     // picking the lock up again and resuming.
     size_t end = i + ktl::min(count - i, kMaxBatchSize);
     {
-      Guard<SpinLock, IrqSave> guard{&lock_};
+      Guard<SpinLock, IrqSave> guard{&list_lock_};
       for (; i < end; i++) {
         DEBUG_ASSERT(pages[i]);
-        ChangeObjectOffsetLocked(pages[i], object, offsets[i]);
+        ChangeObjectOffsetLockedList(pages[i], object, offsets[i]);
       }
     }
 
@@ -1268,8 +1195,8 @@ void PageQueues::ChangeObjectOffsetArray(vm_page_t** pages, VmCowPages* object, 
   }
 }
 
-void PageQueues::ChangeObjectOffsetLocked(vm_page_t* page, VmCowPages* object,
-                                          uint64_t page_offset) {
+void PageQueues::ChangeObjectOffsetLockedList(vm_page_t* page, VmCowPages* object,
+                                              uint64_t page_offset) {
   DEBUG_ASSERT(page->state() == vm_page_state::OBJECT);
   DEBUG_ASSERT(!page->is_free());
   DEBUG_ASSERT(list_in_list(&page->queue_node));
@@ -1279,28 +1206,28 @@ void PageQueues::ChangeObjectOffsetLocked(vm_page_t* page, VmCowPages* object,
   page->object.set_page_offset(page_offset);
 }
 
-void PageQueues::RemoveLocked(vm_page_t* page, DeferPendingSignals& dps) {
+void PageQueues::RemoveLockedList(vm_page_t* page) {
   // Directly exchange the old gen.
   uint32_t old_queue =
       page->object.get_page_queue_ref().exchange(PageQueueNone, ktl::memory_order_relaxed);
   DEBUG_ASSERT(old_queue != PageQueueNone);
   page_queue_counts_[old_queue].fetch_sub(1, ktl::memory_order_relaxed);
-  UpdateActiveInactiveLocked((PageQueue)old_queue, PageQueueNone, dps);
   page->object.set_object(nullptr);
   page->object.set_page_offset(0);
-  AdvanceDontNeedCursorIf(page);
+  AdvanceIsolateCursorIf(page);
   list_delete(&page->queue_node);
 }
 
 void PageQueues::Remove(vm_page_t* page) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  RemoveLocked(page, dps);
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    RemoveLockedList(page);
+  }
+  MaybeCheckActiveRatioAging(1);
 }
 
 void PageQueues::RemoveArrayIntoList(vm_page_t** pages, size_t count, list_node_t* out_list) {
   DEBUG_ASSERT(pages);
-  DeferPendingSignals dps{*this};
 
   for (size_t i = 0; i < count;) {
     // Don't process more than kMaxBatchSize pages while holding the lock.
@@ -1308,10 +1235,10 @@ void PageQueues::RemoveArrayIntoList(vm_page_t** pages, size_t count, list_node_
     // picking the lock up again and resuming.
     size_t end = i + ktl::min(count - i, kMaxBatchSize);
     {
-      Guard<SpinLock, IrqSave> guard{&lock_};
+      Guard<SpinLock, IrqSave> guard{&list_lock_};
       for (; i < end; i++) {
         DEBUG_ASSERT(pages[i]);
-        RemoveLocked(pages[i], dps);
+        RemoveLockedList(pages[i]);
         list_add_tail(out_list, &pages[i]->queue_node);
       }
     }
@@ -1326,56 +1253,7 @@ void PageQueues::RemoveArrayIntoList(vm_page_t** pages, size_t count, list_node_
       arch::Yield();
     }
   }
-}
-
-void PageQueues::BeginAccessScan() {
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  ASSERT(!use_cached_queue_counts_.load(ktl::memory_order_relaxed));
-  cached_active_queue_count_ = active_queue_count_;
-  cached_inactive_queue_count_ = inactive_queue_count_;
-  use_cached_queue_counts_.store(true, ktl::memory_order_relaxed);
-}
-
-void PageQueues::RecalculateActiveInactiveLocked(DeferPendingSignals& dps) {
-  uint64_t active = 0;
-  uint64_t inactive = 0;
-
-  uint64_t lru = lru_gen_.load(ktl::memory_order_relaxed);
-  uint64_t mru = mru_gen_.load(ktl::memory_order_relaxed);
-
-  for (uint64_t index = lru; index <= mru; index++) {
-    uint64_t count = page_queue_counts_[gen_to_queue(index)].load(ktl::memory_order_relaxed);
-    if (queue_is_active(gen_to_queue(index), gen_to_queue(mru))) {
-      active += count;
-    } else {
-      // As we are only operating on reclaimable queues, !active should imply inactive
-      DEBUG_ASSERT(queue_is_inactive(gen_to_queue(index), gen_to_queue(mru)));
-      inactive += count;
-    }
-  }
-  inactive += page_queue_counts_[PageQueueReclaimDontNeed].load(ktl::memory_order_relaxed);
-
-  // Update the counts.
-  active_queue_count_ = active;
-  inactive_queue_count_ = inactive;
-
-  // New counts might mean we need to age.
-  MaybeSignalActiveRatioAgingLocked(dps);
-}
-
-void PageQueues::EndAccessScan() {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-
-  ASSERT(use_cached_queue_counts_.load(ktl::memory_order_relaxed));
-
-  // First clear the cached counts. Although the uncached counts aren't correct right now, we hold
-  // the lock so no one can observe the counts right now.
-  cached_active_queue_count_ = 0;
-  cached_inactive_queue_count_ = 0;
-  use_cached_queue_counts_.store(false, ktl::memory_order_relaxed);
-
-  RecalculateActiveInactiveLocked(dps);
+  MaybeCheckActiveRatioAging(count);
 }
 
 PageQueues::ReclaimCounts PageQueues::GetReclaimQueueCounts() const {
@@ -1386,7 +1264,7 @@ PageQueues::ReclaimCounts PageQueues::GetReclaimQueueCounts() const {
   // Specifically any parallel callers of MarkAccessed could move a page and change the counts,
   // causing us to either double count or miss count that page. As these counts are not load
   // bearing we accept the very small chance of potentially being off a few pages.
-  Guard<SpinLock, IrqSave> guard{&lock_};
+  Guard<SpinLock, IrqSave> guard{&list_lock_};
   uint64_t lru = lru_gen_.load(ktl::memory_order_relaxed);
   uint64_t mru = mru_gen_.load(ktl::memory_order_relaxed);
 
@@ -1402,10 +1280,10 @@ PageQueues::ReclaimCounts PageQueues::GetReclaimQueueCounts() const {
     }
     counts.total += count;
   }
-  // Account the DontNeed queue length under |oldest|, since (DontNeed + oldest LRU) pages are
+  // Account the Isolate queue length under |oldest|, since (Isolate + oldest LRU) pages are
   // eligible for reclamation first. |oldest| is meant to track pages eligible for eviction first.
   uint64_t inactive_count =
-      page_queue_counts_[PageQueueReclaimDontNeed].load(ktl::memory_order_relaxed);
+      page_queue_counts_[PageQueueReclaimIsolate].load(ktl::memory_order_relaxed);
   counts.oldest += inactive_count;
   counts.total += inactive_count;
   return counts;
@@ -1416,7 +1294,7 @@ PageQueues::Counts PageQueues::QueueCounts() const {
 
   // Grab the lock to prevent LRU processing, this lets us get a slightly less racy snapshot of
   // the queue counts. We may still double count pages that move after we count them.
-  Guard<SpinLock, IrqSave> guard{&lock_};
+  Guard<SpinLock, IrqSave> guard{&list_lock_};
   uint64_t lru = lru_gen_.load(ktl::memory_order_relaxed);
   uint64_t mru = mru_gen_.load(ktl::memory_order_relaxed);
 
@@ -1424,8 +1302,8 @@ PageQueues::Counts PageQueues::QueueCounts() const {
     counts.reclaim[mru - index] =
         page_queue_counts_[gen_to_queue(index)].load(ktl::memory_order_relaxed);
   }
-  counts.reclaim_dont_need =
-      page_queue_counts_[PageQueueReclaimDontNeed].load(ktl::memory_order_relaxed);
+  counts.reclaim_isolate =
+      page_queue_counts_[PageQueueReclaimIsolate].load(ktl::memory_order_relaxed);
   counts.pager_backed_dirty =
       page_queue_counts_[PageQueuePagerBackedDirty].load(ktl::memory_order_relaxed);
   counts.anonymous = page_queue_counts_[PageQueueAnonymous].load(ktl::memory_order_relaxed);
@@ -1443,7 +1321,7 @@ bool PageQueues::DebugPageIsSpecificReclaim(const vm_page_t* page, F validator,
                                             size_t* queue) const {
   fbl::RefPtr<VmCowPages> cow_pages;
   {
-    Guard<SpinLock, IrqSave> guard{&lock_};
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
     PageQueue q = (PageQueue)page->object.get_page_queue_ref().load(ktl::memory_order_relaxed);
     if (q < PageQueueReclaimBase || q > PageQueueReclaimLast) {
       return false;
@@ -1464,7 +1342,7 @@ bool PageQueues::DebugPageIsSpecificQueue(const vm_page_t* page, PageQueue queue
                                           F validator) const {
   fbl::RefPtr<VmCowPages> cow_pages;
   {
-    Guard<SpinLock, IrqSave> guard{&lock_};
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
     PageQueue q = (PageQueue)page->object.get_page_queue_ref().load(ktl::memory_order_relaxed);
     if (q != queue) {
       return false;
@@ -1481,8 +1359,8 @@ bool PageQueues::DebugPageIsReclaim(const vm_page_t* page, size_t* queue) const 
   return DebugPageIsSpecificReclaim(page, [](auto cow) { return true; }, queue);
 }
 
-bool PageQueues::DebugPageIsReclaimDontNeed(const vm_page_t* page) const {
-  return DebugPageIsSpecificQueue(page, PageQueueReclaimDontNeed,
+bool PageQueues::DebugPageIsReclaimIsolate(const vm_page_t* page) const {
+  return DebugPageIsSpecificQueue(page, PageQueueReclaimIsolate,
                                   [](auto cow) { return cow->can_evict(); });
 }
 
@@ -1519,84 +1397,96 @@ bool PageQueues::DebugPageIsAnyAnonymous(const vm_page_t* page) const {
 }
 
 ktl::optional<PageQueues::VmoBacklink> PageQueues::PopAnonymousZeroFork() {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
+  ktl::optional<PageQueues::VmoBacklink> ret;
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
 
-  vm_page_t* page =
-      list_peek_tail_type(&page_queues_[PageQueueAnonymousZeroFork], vm_page_t, queue_node);
-  if (!page) {
-    return ktl::nullopt;
+    vm_page_t* page =
+        list_peek_tail_type(&page_queues_[PageQueueAnonymousZeroFork], vm_page_t, queue_node);
+    if (!page) {
+      return ktl::nullopt;
+    }
+
+    VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
+    uint64_t page_offset = page->object.get_page_offset();
+    DEBUG_ASSERT(cow);
+    MoveToQueueLockedList(page, PageQueueAnonymous);
+    ret = VmoBacklink{fbl::MakeRefPtrUpgradeFromRaw(cow, guard), page, page_offset};
   }
-
-  VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
-  uint64_t page_offset = page->object.get_page_offset();
-  DEBUG_ASSERT(cow);
-  MoveToQueueLocked(page, PageQueueAnonymous, dps);
-
-  return VmoBacklink{fbl::MakeRefPtrUpgradeFromRaw(cow, guard), page, page_offset};
+  MaybeCheckActiveRatioAging(1);
+  return ret;
 }
 
-ktl::optional<PageQueues::VmoBacklink> PageQueues::PeekReclaim(size_t lowest_queue) {
+ktl::optional<PageQueues::VmoBacklink> PageQueues::PeekIsolate(size_t lowest_queue) {
   // Ignore any requests to evict from the active queues as this is never allowed.
   lowest_queue = ktl::max(lowest_queue, kNumActiveQueues);
-  // The target gen is 1 larger than the lowest queue because evicting from queue X is done by
-  // attempting to make the lru queue be X+1.
-  ktl::optional<VmoBacklink> result = ProcessDontNeedAndLruQueues(
-      mru_gen_.load(ktl::memory_order_relaxed) - (lowest_queue - 1), true);
-  if (!result) {
+
+  while (true) {
+    // Peek the Isolate queue in case anything is ready for us.
+    ktl::optional<VmoBacklink> result = ProcessIsolateList(0);
+    if (result) {
+      return result;
+    }
+
     SynchronizeWithAging();
-    result = ProcessDontNeedAndLruQueues(
-        mru_gen_.load(ktl::memory_order_relaxed) - (lowest_queue - 1), true);
+    // The limit gen is 1 larger than the lowest queue because evicting from queue X is done by
+    // attempting to make the lru queue be X+1.
+    const uint64_t lru_limit = mru_gen_.load(ktl::memory_order_relaxed) - (lowest_queue - 1);
+    // Attempt to process one generation at a time to limit the work done before we find a
+    // reclaimable page.
+    const uint64_t lru_target = lru_gen_.load(ktl::memory_order_relaxed) + 1;
+    if (lru_target > lru_limit) {
+      return ProcessIsolateList(kNumIsolateQueues - 1);
+    }
+    ProcessLruQueue(lru_target, true);
   }
-  return result;
 }
 
 PageQueues::ActiveInactiveCounts PageQueues::GetActiveInactiveCounts() const {
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  return GetActiveInactiveCountsLocked();
-}
-
-PageQueues::ActiveInactiveCounts PageQueues::GetActiveInactiveCountsLocked() const {
-  if (use_cached_queue_counts_.load(ktl::memory_order_relaxed)) {
-    return ActiveInactiveCounts{.cached = true,
-                                .active = cached_active_queue_count_,
-                                .inactive = cached_inactive_queue_count_};
-  } else {
-    // With use_cached_queue_counts_ false the counts should have been updated to remove any
-    // negative values that might have been caused by races.
-    ASSERT(active_queue_count_ >= 0);
-    ASSERT(inactive_queue_count_ >= 0);
-    return ActiveInactiveCounts{.cached = false,
-                                .active = static_cast<uint64_t>(active_queue_count_),
-                                .inactive = static_cast<uint64_t>(inactive_queue_count_)};
+  uint64_t active_count = 0;
+  uint64_t inactive_count = 0;
+  PageQueue mru = mru_gen_to_queue();
+  for (uint8_t queue = 0; queue < PageQueueNumQueues; queue++) {
+    uint64_t count = page_queue_counts_[queue].load(ktl::memory_order_relaxed);
+    if (queue_is_active(static_cast<PageQueue>(queue), mru)) {
+      active_count += count;
+    }
+    if (queue_is_inactive(static_cast<PageQueue>(queue), mru)) {
+      inactive_count += count;
+    }
   }
+  return ActiveInactiveCounts{.active = active_count, .inactive = inactive_count};
 }
 
 void PageQueues::SetAgingEvent(Event* event) {
-  Guard<CriticalMutex> guard{&aging_event_mutex_};
+  Guard<CriticalMutex> guard{&lock_};
   ASSERT(!event || !aging_event_);
   aging_event_ = event;
 }
 
 void PageQueues::EnableAnonymousReclaim(bool zero_forks) {
-  DeferPendingSignals dps{*this};
-  Guard<SpinLock, IrqSave> guard{&lock_};
-  anonymous_is_reclaimable_ = true;
-  zero_fork_is_reclaimable_ = zero_forks;
+  {
+    Guard<SpinLock, IrqSave> guard{&list_lock_};
+    anonymous_is_reclaimable_ = true;
+    zero_fork_is_reclaimable_ = zero_forks;
 
-  const PageQueue mru_queue = mru_gen_to_queue();
+    const PageQueue mru_queue = mru_gen_to_queue();
 
-  // Migrate any existing pages into the reclaimable queues.
+    // Migrate any existing pages into the reclaimable queues.
 
-  while (!list_is_empty(&page_queues_[PageQueueAnonymous])) {
-    vm_page_t* page = list_peek_head_type(&page_queues_[PageQueueAnonymous], vm_page_t, queue_node);
-    MoveToQueueLocked(page, mru_queue, dps);
+    while (!list_is_empty(&page_queues_[PageQueueAnonymous])) {
+      vm_page_t* page =
+          list_peek_head_type(&page_queues_[PageQueueAnonymous], vm_page_t, queue_node);
+      MoveToQueueLockedList(page, mru_queue);
+    }
+    while (zero_forks && !list_is_empty(&page_queues_[PageQueueAnonymousZeroFork])) {
+      vm_page_t* page =
+          list_peek_head_type(&page_queues_[PageQueueAnonymousZeroFork], vm_page_t, queue_node);
+      MoveToQueueLockedList(page, mru_queue);
+    }
   }
-  while (zero_forks && !list_is_empty(&page_queues_[PageQueueAnonymousZeroFork])) {
-    vm_page_t* page =
-        list_peek_head_type(&page_queues_[PageQueueAnonymousZeroFork], vm_page_t, queue_node);
-    MoveToQueueLocked(page, mru_queue, dps);
-  }
+  Guard<CriticalMutex> guard{&lock_};
+  CheckActiveRatioAgingLocked();
 }
 
 ktl::optional<PageQueues::VmoBacklink> PageQueues::GetCowForLoanedPage(vm_page_t* page) {
@@ -1610,7 +1500,7 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::GetCowForLoanedPage(vm_page_t
       // Delaying the lock acquisition and then reading the object field here is safe since the
       // caller has guaranteed that the page state is not changing, and then the  object field is
       // only modified under lock_, which we will be holding.
-      Guard<SpinLock, IrqSave> guard{&lock_};
+      Guard<SpinLock, IrqSave> guard{&list_lock_};
       VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
       if (!cow) {
         // Our examination of the state was racy and this page may or may not be owned by a VMO, but

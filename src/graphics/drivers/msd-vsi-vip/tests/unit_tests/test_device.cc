@@ -49,7 +49,7 @@ TEST_F(MsdVsiDeviceTest, ChipIdentity) {
   // Now try to get it as a buffer.
   zx::vmo identity_buffer;
   EXPECT_EQ(MAGMA_STATUS_OK,
-            device_->Query(kMsdVsiVendorQueryChipIdentity, &identity_buffer, nullptr));
+            device_->MsdQuery(kMsdVsiVendorQueryChipIdentity, &identity_buffer, nullptr));
   magma_vsi_vip_chip_identity identity_from_buf;
   auto buffer = magma::PlatformBuffer::Import(std::move(identity_buffer));
   EXPECT_TRUE(buffer);
@@ -60,7 +60,7 @@ TEST_F(MsdVsiDeviceTest, ChipIdentity) {
 
 TEST_F(MsdVsiDeviceTest, QueryBadId) {
   uint64_t result;
-  EXPECT_NE(MAGMA_STATUS_OK, device_->Query(0xabcd1234 /* id */, nullptr, &result));
+  EXPECT_NE(MAGMA_STATUS_OK, device_->MsdQuery(0xabcd1234 /* id */, nullptr, &result));
 }
 
 TEST_F(MsdVsiDeviceTest, ChipOption) {
@@ -69,7 +69,8 @@ TEST_F(MsdVsiDeviceTest, ChipOption) {
 
   // Now try to get it as a buffer.
   zx::vmo option_buffer;
-  EXPECT_EQ(MAGMA_STATUS_OK, device_->Query(kMsdVsiVendorQueryChipOption, &option_buffer, nullptr));
+  EXPECT_EQ(MAGMA_STATUS_OK,
+            device_->MsdQuery(kMsdVsiVendorQueryChipOption, &option_buffer, nullptr));
   magma_vsi_vip_chip_option option_from_buf;
   auto buffer = magma::PlatformBuffer::Import(std::move(option_buffer));
   EXPECT_TRUE(buffer);
@@ -83,7 +84,8 @@ TEST_F(MsdVsiDeviceTest, QuerySram) {
     GTEST_SKIP();
   }
   zx::vmo sram_buffer;
-  EXPECT_EQ(MAGMA_STATUS_OK, device_->Query(kMsdVsiVendorQueryExternalSram, &sram_buffer, nullptr));
+  EXPECT_EQ(MAGMA_STATUS_OK,
+            device_->MsdQuery(kMsdVsiVendorQueryExternalSram, &sram_buffer, nullptr));
 
   auto buffer = magma::PlatformBuffer::Import(std::move(sram_buffer));
   ASSERT_TRUE(buffer);
@@ -219,11 +221,11 @@ TEST_F(MsdVsiDeviceTest, Connections) {
     connections.push_back(std::move(connection));
   }
   // Reached the limit
-  auto connection = device_->Open(0);
+  auto connection = device_->MsdOpen(0);
   EXPECT_FALSE(connection);
   connections.clear();
   // Ok to create more now
-  connection = device_->Open(0);
+  connection = device_->MsdOpen(0);
   EXPECT_TRUE(connection);
 }
 

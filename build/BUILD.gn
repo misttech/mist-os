@@ -156,9 +156,11 @@ group("non_hermetic_deps") {
   # will not be resolved except by moving to Bazel.
   visibility += [
     "//build/images/*",
+    "//sdk/lib/c/*",
     "//src/bringup/lib/mexec/tests/*",
     "//src/developer/ffx/lib/profiler/tests:*",
     "//src/developer/ffx/lib/symbolize/tests:*",
+    "//src/developer/ffx/lib/target_net/tests:*",
     "//src/lib/elfldltl/test/*",
     "//src/security/lib/scrutiny/collector/*",
     "//src/security/lib/scrutiny/tests/*",
@@ -170,6 +172,7 @@ group("non_hermetic_deps") {
     "//src/tests/kernel_cprng/*",
     "//src/tests/limited_netsvc/image:*",
     "//third_party/network-conformance/images/*",
+    "//tools/dupefinder/tests/e2e/:*",
     "//zircon/kernel/*",
     "//zircon/system/*",
   ]
@@ -231,6 +234,7 @@ group("non_hermetic_deps") {
     "//build/bazel/bazel_sdk/tests:*",
     "//build/bazel/examples/*",
     "//build/bazel/tests/*",
+    "//build/tools/json_validator:*",
     "//sdk/lib/driver/devicetree/*",
     "//src:*",
     "//src/devices/block/drivers/aml-sdmmc:*",
@@ -487,7 +491,6 @@ group("deprecated_zx_wrapper_allowlist") {
     "//zircon/system/ulib/page_tables:*",
     "//zircon/system/ulib/perftest:*",
     "//zircon/system/ulib/pretty:*",
-    "//zircon/system/ulib/processargs:*",
     "//zircon/system/ulib/profile:*",
     "//zircon/system/ulib/ram-crashlog:*",
     "//zircon/system/ulib/range:*",

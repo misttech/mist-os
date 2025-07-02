@@ -19,7 +19,6 @@
 
 #include <algorithm>
 #include <memory>
-#include <optional>
 
 #include <fbl/alloc_checker.h>
 
@@ -57,6 +56,18 @@ bool IsPossibleLoadedEhdr(const Elf64_Ehdr& ehdr) {
          ehdr.e_version == EV_CURRENT && ehdr.e_ehsize == sizeof(Elf64_Ehdr) &&
          ehdr.e_phentsize == sizeof(Elf64_Phdr) && ehdr.e_phnum > 0 &&
          (ehdr.e_phoff % alignof(Elf64_Phdr) == 0);
+}
+
+bool IsPossibleLoadedEhdr(const Elf32_Ehdr& ehdr) {
+  // Do some basic sanity checks including checking the ELF identifier
+  return ehdr.e_ident[EI_MAG0] == ELFMAG0 && ehdr.e_ident[EI_MAG1] == ELFMAG1 &&
+         ehdr.e_ident[EI_MAG2] == ELFMAG2 && ehdr.e_ident[EI_MAG3] == ELFMAG3 &&
+         ehdr.e_ident[EI_CLASS] == ELFCLASS32 && ehdr.e_ident[EI_DATA] == ELFDATA2LSB &&
+         ehdr.e_ident[EI_VERSION] == EV_CURRENT && ehdr.e_type == ET_DYN &&
+         ehdr.e_machine == static_cast<uint16_t>(elfldltl::ElfMachine::kArm) &&
+         ehdr.e_version == EV_CURRENT && ehdr.e_ehsize == sizeof(Elf32_Ehdr) &&
+         ehdr.e_phentsize == sizeof(Elf32_Phdr) && ehdr.e_phnum > 0 &&
+         (ehdr.e_phoff % alignof(Elf32_Phdr) == 0);
 }
 
 // TODO(jakehehrlich): Switch uses of uint8_t to std::byte where appropriate.
@@ -184,6 +195,215 @@ class ProcessMemReader {
   return ZX_ERR_NOT_FOUND;
 }
 
+Elf64_Ehdr UpcastElf32Ehdr(const Elf32_Ehdr& to_convert) {
+  Elf64_Ehdr converted;
+  converted.e_type = to_convert.e_type;
+  converted.e_machine = to_convert.e_machine;
+  converted.e_version = to_convert.e_version;
+  converted.e_entry = to_convert.e_entry;
+  converted.e_phoff = to_convert.e_phoff;
+  converted.e_shoff = to_convert.e_shoff;
+  converted.e_flags = to_convert.e_flags;
+  converted.e_ehsize = to_convert.e_ehsize;
+  converted.e_phentsize = to_convert.e_phentsize;
+  converted.e_phnum = to_convert.e_phnum;
+  converted.e_shentsize = to_convert.e_shentsize;
+  converted.e_shnum = to_convert.e_shnum;
+  converted.e_shstrndx = to_convert.e_shstrndx;
+  return converted;
+}
+
+Elf64_Phdr UpcastElf32Phdr(const Elf32_Phdr& to_convert) {
+  Elf64_Phdr converted;
+  converted.p_type = to_convert.p_type;
+  converted.p_offset = to_convert.p_offset;
+  converted.p_vaddr = to_convert.p_vaddr;
+  converted.p_paddr = to_convert.p_paddr;
+  converted.p_filesz = to_convert.p_filesz;
+  converted.p_memsz = to_convert.p_memsz;
+  converted.p_flags = to_convert.p_flags;
+  converted.p_align = to_convert.p_align;
+  return converted;
+}
+
+Elf64_Dyn UpcastElf32Dyn(const Elf32_Dyn& to_convert) {
+  Elf64_Dyn converted;
+  converted.d_tag = to_convert.d_tag;
+  memcpy(&converted.d_un, &to_convert.d_un, sizeof(to_convert.d_un));
+  return converted;
+}
+
+void DoActionForModule(ProcessMemReader& reader, const zx_info_maps_t& map,
+                       zx_vaddr_t& end_of_last_module, const ModuleAction& action) {
+  zx_status_t status;
+
+  // First probe the IDENT header to see if this is a 64 or 32 bit module.
+  uint8_t e_ident[EI_NIDENT];
+  status = reader.ReadArray(map.base, e_ident, sizeof(e_ident));
+  if (status != ZX_OK) {
+    return;
+  }
+
+  const bool is_64bit = e_ident[EI_CLASS] == ELFCLASS64;
+
+  // Read in what might be an ELF header.
+  Elf64_Ehdr ehdr;
+  if (is_64bit) {
+    status = reader.Read(map.base, &ehdr);
+    if (status != ZX_OK) {
+      return;
+    }
+
+    // Do some basic checks to see if this could ever be an ELF file.
+    if (!IsPossibleLoadedEhdr(ehdr)) {
+      return;
+    }
+  } else {
+    Elf32_Ehdr ehdr32;
+    status = reader.Read(map.base, &ehdr32);
+    if (status != ZX_OK) {
+      return;
+    }
+
+    // Do some basic checks to see if this could ever be an ELF file. Make sure to verify against
+    // the expected ELF 32 bit header before upcasting to the 64 bit header.
+    if (!IsPossibleLoadedEhdr(ehdr32)) {
+      return;
+    }
+
+    ehdr = UpcastElf32Ehdr(ehdr32);
+  }
+
+  // We only support ELF files with <= 16 program headers.
+  // TODO(jakehehrlich): Log this because with the exception of core dumps
+  // almost nothing should get here *and* have such a large number of phdrs.
+  // This might indicate a larger issue.
+  if (ehdr.e_phnum > kMaxProgramHeaders) {
+    return;
+  }
+  Elf64_Phdr phdrs_buf[kMaxProgramHeaders];
+  auto phdrs = cpp20::span<const Elf64_Phdr>{phdrs_buf, ehdr.e_phnum};
+
+  if (is_64bit) {
+    status = reader.ReadArray(map.base + ehdr.e_phoff, phdrs_buf, ehdr.e_phnum);
+    if (status != ZX_OK) {
+      return;
+    }
+  } else {
+    Elf32_Phdr phdrs32_buf[kMaxProgramHeaders];
+    auto phdrs32 = std::span<const Elf32_Phdr>{phdrs32_buf, ehdr.e_phnum};
+
+    status = reader.ReadArray(map.base + ehdr.e_phoff, phdrs32_buf, ehdr.e_phnum);
+    if (status != ZX_OK) {
+      return;
+    }
+
+    for (size_t i = 0; i < phdrs32.size(); i++) {
+      phdrs_buf[i] = UpcastElf32Phdr(phdrs32[i]);
+    }
+  }
+
+  // Read the PT_DYNAMIC.
+  uintptr_t dynamic = 0;
+  size_t dynamic_count = 0;
+  uintptr_t vaddr_start = -1ul;
+  const size_t size_of_dyn = is_64bit ? sizeof(Elf64_Dyn) : sizeof(Elf32_Dyn);
+  for (const auto& phdr : phdrs) {
+    if (phdr.p_type == PT_DYNAMIC) {
+      dynamic = map.base + phdr.p_vaddr;
+      dynamic_count = phdr.p_filesz / size_of_dyn;
+      break;
+    }
+    // Update end_of_last_module.
+    if (phdr.p_type == PT_LOAD) {
+      if (vaddr_start == -1ul) {
+        // The first p_vaddr may not be 0.
+        vaddr_start = phdr.p_vaddr & -PAGESIZE;
+      }
+      end_of_last_module = map.base - vaddr_start + phdr.p_vaddr + phdr.p_memsz;
+      // Round up to pages.
+      end_of_last_module = (end_of_last_module + PAGESIZE - 1) & -PAGESIZE;
+    }
+  }
+
+  uintptr_t strtab = 0;
+  Elf64_Xword soname_offset = 0;
+  if (dynamic != 0) {
+    for (size_t i = 0; i < dynamic_count; i++) {
+      Elf64_Dyn dyn;
+      if (is_64bit) {
+        status = reader.Read(dynamic + i * size_of_dyn, &dyn);
+      } else {
+        Elf32_Dyn dyn32;
+        status = reader.Read(dynamic + i * size_of_dyn, &dyn32);
+        dyn = UpcastElf32Dyn(dyn32);
+      }
+      if (status != ZX_OK) {
+        break;
+      }
+      if (dyn.d_tag == DT_STRTAB) {
+        // Glibc will relocate the entries in the dynamic table if it's not readonly. Other libc's
+        // such as bionic or musl won't. Use a heuristic here to detect: if the value is larger
+        // than map.base, it's considered an address. Otherwise it's an offset.
+        if (dyn.d_un.d_val >= map.base) {
+          strtab = dyn.d_un.d_val;
+        } else {
+          strtab = map.base + dyn.d_un.d_val;
+        }
+      } else if (dyn.d_tag == DT_SONAME) {
+        soname_offset = dyn.d_un.d_val;
+      } else if (dyn.d_tag == DT_NULL) {
+        break;
+      }
+    }
+  }
+
+  // Look for a DT_SONAME.
+  char soname[kMaxSonameSize] = "";
+  if (strtab != 0 && soname_offset != 0) {
+    status = reader.ReadString(strtab + soname_offset, soname, sizeof(soname));
+    // Ignore status, if it fails we get an empty soname which falls back to the VMO name below.
+    // TODO(tbodt): log when this happens.
+  }
+
+  // Loop though program headers looking for a build ID.
+  uint8_t build_id_buf[kMaxBuildIDSize];
+  cpp20::span<const uint8_t> build_id;
+  for (const auto& phdr : phdrs) {
+    if (phdr.p_type == PT_NOTE) {
+      size_t size;
+      status = GetBuildID(&reader, map.base, phdr, build_id_buf, &size);
+      if (status == ZX_OK && size != 0) {
+        build_id = cpp20::span<const uint8_t>(build_id_buf, size);
+        break;
+      }
+    }
+  }
+  // We're not considering otherwise valid files with no build id here.
+  // TODO(jakehehrlich): Consider reporting loaded modules with no build ID.
+  if (build_id.empty()) {
+    return;
+  }
+
+  char name[kNameBufferSize];
+  if (soname[0] != '\0') {
+    snprintf(name, sizeof(name), "%s", soname);
+  } else if (map.name[0] != '\0') {
+    snprintf(name, sizeof(name), "<VMO#%" PRIu64 "=%s>", map.u.mapping.vmo_koid, map.name);
+  } else {
+    snprintf(name, sizeof(name), "<VMO#%" PRIu64 ">", map.u.mapping.vmo_koid);
+  }
+
+  // All checks have passed so we can give the user a module.
+  action(ModuleInfo{
+      .name = name,
+      .vaddr = map.base,
+      .build_id = build_id,
+      .ehdr = ehdr,
+      .phdrs = phdrs,
+  });
+}
+
 }  // anonymous namespace
 
 zx_status_t ForEachModule(const zx::process& process, ModuleAction action) {
@@ -261,123 +481,7 @@ zx_status_t Searcher::ForEachModule(const zx::process& process, ModuleAction act
       continue;
     }
 
-    // Read in what might be an ELF header.
-    Elf64_Ehdr ehdr;
-    status = reader.Read(map.base, &ehdr);
-    if (status != ZX_OK) {
-      continue;
-    }
-    // Do some basic checks to see if this could ever be an ELF file.
-    if (!IsPossibleLoadedEhdr(ehdr)) {
-      continue;
-    }
-
-    // We only support ELF files with <= 16 program headers.
-    // TODO(jakehehrlich): Log this because with the exception of core dumps
-    // almost nothing should get here *and* have such a large number of phdrs.
-    // This might indicate a larger issue.
-    if (ehdr.e_phnum > kMaxProgramHeaders) {
-      continue;
-    }
-    Elf64_Phdr phdrs_buf[kMaxProgramHeaders];
-    auto phdrs = cpp20::span<const Elf64_Phdr>{phdrs_buf, ehdr.e_phnum};
-    status = reader.ReadArray(map.base + ehdr.e_phoff, phdrs_buf, ehdr.e_phnum);
-    if (status != ZX_OK) {
-      continue;
-    }
-
-    // Read the PT_DYNAMIC.
-    uintptr_t dynamic = 0;
-    size_t dynamic_count = 0;
-    uintptr_t vaddr_start = -1ul;
-    for (const auto& phdr : phdrs) {
-      if (phdr.p_type == PT_DYNAMIC) {
-        dynamic = map.base + phdr.p_vaddr;
-        dynamic_count = phdr.p_filesz / sizeof(Elf64_Dyn);
-        break;
-      }
-      // Update end_of_last_module.
-      if (phdr.p_type == PT_LOAD) {
-        if (vaddr_start == -1ul) {
-          // The first p_vaddr may not be 0.
-          vaddr_start = phdr.p_vaddr & -PAGESIZE;
-        }
-        end_of_last_module = map.base - vaddr_start + phdr.p_vaddr + phdr.p_memsz;
-        // Round up to pages.
-        end_of_last_module = (end_of_last_module + PAGESIZE - 1) & -PAGESIZE;
-      }
-    }
-
-    uintptr_t strtab = 0;
-    Elf64_Xword soname_offset = 0;
-    if (dynamic != 0) {
-      for (size_t i = 0; i < dynamic_count; i++) {
-        Elf64_Dyn dyn;
-        status = reader.Read(dynamic + i * sizeof(Elf64_Dyn), &dyn);
-        if (status != ZX_OK) {
-          break;
-        }
-        if (dyn.d_tag == DT_STRTAB) {
-          // Glibc will relocate the entries in the dynamic table if it's not readonly. Other libc's
-          // such as bionic or musl won't. Use a heuristic here to detect: if the value is larger
-          // than map.base, it's considered an address. Otherwise it's an offset.
-          if (dyn.d_un.d_val >= map.base) {
-            strtab = dyn.d_un.d_val;
-          } else {
-            strtab = map.base + dyn.d_un.d_val;
-          }
-        } else if (dyn.d_tag == DT_SONAME) {
-          soname_offset = dyn.d_un.d_val;
-        } else if (dyn.d_tag == DT_NULL) {
-          break;
-        }
-      }
-    }
-
-    // Look for a DT_SONAME.
-    char soname[kMaxSonameSize] = "";
-    if (strtab != 0 && soname_offset != 0) {
-      status = reader.ReadString(strtab + soname_offset, soname, sizeof(soname));
-      // Ignore status, if it fails we get an empty soname which falls back to the VMO name below.
-      // TODO(tbodt): log when this happens.
-    }
-
-    // Loop though program headers looking for a build ID.
-    uint8_t build_id_buf[kMaxBuildIDSize];
-    cpp20::span<const uint8_t> build_id;
-    for (const auto& phdr : phdrs) {
-      if (phdr.p_type == PT_NOTE) {
-        size_t size;
-        status = GetBuildID(&reader, map.base, phdr, build_id_buf, &size);
-        if (status == ZX_OK && size != 0) {
-          build_id = cpp20::span<const uint8_t>(build_id_buf, size);
-          break;
-        }
-      }
-    }
-    // We're not considering otherwise valid files with no build id here.
-    // TODO(jakehehrlich): Consider reporting loaded modules with no build ID.
-    if (build_id.empty()) {
-      continue;
-    }
-
-    char name[kNameBufferSize];
-    if (soname[0] != '\0') {
-      snprintf(name, sizeof(name), "%s", soname);
-    } else if (map.name[0] != '\0') {
-      snprintf(name, sizeof(name), "<VMO#%" PRIu64 "=%s>", map.u.mapping.vmo_koid, map.name);
-    } else {
-      snprintf(name, sizeof(name), "<VMO#%" PRIu64 ">", map.u.mapping.vmo_koid);
-    }
-
-    // All checks have passed so we can give the user a module.
-    action(ModuleInfo{
-        .name = name,
-        .vaddr = map.base,
-        .build_id = build_id,
-        .ehdr = ehdr,
-        .phdrs = phdrs,
-    });
+    DoActionForModule(reader, map, end_of_last_module, action);
   }
 
   return ZX_OK;

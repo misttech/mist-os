@@ -98,6 +98,8 @@ impl Matchers {
             )));
         }
 
+        matchers.push(Box::new(PublisherMatcher::new()));
+
         Matchers { matchers }
     }
 
@@ -137,6 +139,39 @@ impl Matchers {
             }
         }
         Ok(false)
+    }
+}
+
+struct PublisherMatcher {
+    block_index: u32,
+}
+
+impl PublisherMatcher {
+    fn new() -> Self {
+        PublisherMatcher { block_index: 0 }
+    }
+}
+
+#[async_trait]
+impl Matcher for PublisherMatcher {
+    async fn match_device(&self, device: &mut dyn Device) -> bool {
+        !device.is_managed() && !device.is_nand()
+    }
+
+    async fn process_device(
+        &mut self,
+        device: &mut dyn Device,
+        env: &mut dyn Environment,
+    ) -> Result<Option<DeviceTag>, Error> {
+        // TODO(https://fxbug.dev/407072932): we should move the paver to use configuration for
+        // what specific block devices to export instead of exporting everything. Once we do, this
+        // will go away. Until then, we use an incrementing index because the name doesn't matter.
+        // It's kind of confusing to have it not match the debug directory but it's fine.
+        let index = format!("{:03}", self.block_index);
+        log::info!("Publishing {} to /block/{}", device.path(), index);
+        env.publish_device(device, &index)?;
+        self.block_index += 1;
+        Ok(None)
     }
 }
 
@@ -579,6 +614,7 @@ mod tests {
         is_nand: bool,
         content_format: DiskFormat,
         topological_path: String,
+        is_managed: bool,
         partition_label: Option<String>,
         partition_type: Option<[u8; 16]>,
         is_fshost_ramdisk: bool,
@@ -591,6 +627,8 @@ mod tests {
                 is_nand: false,
                 content_format: DiskFormat::Unknown,
                 topological_path: "mock_device".to_string(),
+                // default to true to skip the publisher matcher when it's unrelated to the test.
+                is_managed: true,
                 partition_label: None,
                 partition_type: None,
                 is_fshost_ramdisk: false,
@@ -610,6 +648,10 @@ mod tests {
         }
         fn set_topological_path(mut self, path: impl ToString) -> Self {
             self.topological_path = path.to_string().into();
+            self
+        }
+        fn set_managed(mut self, managed: bool) -> Self {
+            self.is_managed = managed;
             self
         }
         fn set_partition_label(mut self, label: impl ToString) -> Self {
@@ -641,7 +683,7 @@ mod tests {
             }
         }
         fn is_managed(&self) -> bool {
-            false
+            self.is_managed
         }
         fn is_nand(&self) -> bool {
             self.is_nand
@@ -705,6 +747,7 @@ mod tests {
         expect_mount_data_on: Mutex<bool>,
         expect_format_data: Mutex<bool>,
         expect_bind_data: Mutex<bool>,
+        expect_publish_device: Mutex<Option<String>>,
         expect_launch_storage_host: Mutex<bool>,
         legacy_data_format: bool,
         create_data_partition: bool,
@@ -759,6 +802,10 @@ mod tests {
         }
         fn expect_launch_storage_host(mut self) -> Self {
             *self.expect_launch_storage_host.get_mut() = true;
+            self
+        }
+        fn expect_publish_device(mut self, expected_alias: impl ToString) -> Self {
+            *self.expect_publish_device.get_mut() = Some(expected_alias.to_string());
             self
         }
         fn legacy_data_format(mut self) -> Self {
@@ -904,6 +951,25 @@ mod tests {
             unreachable!();
         }
 
+        fn publish_device(&mut self, _device: &mut dyn Device, name: &str) -> Result<(), Error> {
+            assert_eq!(
+                name,
+                self.expect_publish_device
+                    .lock()
+                    .take()
+                    .expect("Unexpected call to publish_device")
+            );
+            Ok(())
+        }
+
+        fn publish_device_to_debug_block(
+            &mut self,
+            _device: &dyn Device,
+            _name: &str,
+        ) -> Result<(), Error> {
+            unreachable!();
+        }
+
         fn registered_devices(&self) -> &Arc<RegisteredDevices> {
             &self.registered_devices
         }
@@ -929,6 +995,7 @@ mod tests {
             assert!(!*self.expect_mount_blob_volume.lock());
             assert!(!*self.expect_mount_data_volume.lock());
             assert!(!*self.expect_format_data.lock());
+            assert!(self.expect_publish_device.get_mut().is_none());
             assert!(!*self.expect_launch_storage_host.lock());
         }
     }
@@ -1550,5 +1617,41 @@ mod tests {
                 .get_topological_path(DeviceTag::SystemContainerOnRecovery)
                 .is_some());
         }
+    }
+
+    #[fuchsia::test]
+    async fn test_publisher_matcher() {
+        let mut matchers = Matchers::new(&default_config());
+
+        // First unmanaged device should match and be published as "000".
+        let device1 = MockDevice::new()
+            .set_topological_path("dev1")
+            .set_partition_type([0x01; 16])
+            .set_managed(false);
+        let mut env1 = MockEnv::new().expect_publish_device("000");
+        assert!(matchers
+            .match_device(Box::new(device1), &mut env1)
+            .await
+            .expect("match_device failed for device 1"));
+
+        // Second unmanaged device should match and be published as "001".
+        let device2 = MockDevice::new()
+            .set_topological_path("dev2")
+            .set_partition_type([0x01; 16])
+            .set_managed(false);
+        let mut env2 = MockEnv::new().expect_publish_device("001");
+        assert!(matchers
+            .match_device(Box::new(device2), &mut env2)
+            .await
+            .expect("match_device failed for device 2"));
+
+        // A managed device should not match.
+        let managed_device =
+            MockDevice::new().set_topological_path("managed").set_partition_type([0x01; 16]);
+        let mut env3 = MockEnv::new(); // No expectations
+        assert!(!matchers
+            .match_device(Box::new(managed_device), &mut env3)
+            .await
+            .expect("match_device failed for managed device"));
     }
 }

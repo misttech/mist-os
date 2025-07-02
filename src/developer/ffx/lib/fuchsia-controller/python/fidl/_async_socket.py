@@ -71,6 +71,7 @@ class AsyncSocket:
                 if zx.args[0] != fc.ZxStatus.ZX_ERR_PEER_CLOSED:
                     raise zx
                 break
+        self.socket.close()
         return output
 
     def write(self, buf: bytes) -> None:

@@ -5,10 +5,12 @@
 use super::event::TraceEventQueue;
 use super::tracing_directory::TraceMarkerFile;
 use starnix_core::task::CurrentTask;
+use starnix_core::vfs::pseudo::dynamic_file::ConstFile;
+use starnix_core::vfs::pseudo::simple_file::{BytesFile, BytesFileOps, SimpleFileNode};
+use starnix_core::vfs::pseudo::static_directory::StaticDirectoryBuilder;
 use starnix_core::vfs::{
-    BytesFile, BytesFileOps, CacheMode, ConstFile, FileObject, FileOps, FileSystem,
-    FileSystemHandle, FileSystemOps, FileSystemOptions, FsNodeInfo, FsNodeOps, FsStr, OutputBuffer,
-    SimpleFileNode, StaticDirectoryBuilder,
+    CacheMode, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
+    FsNodeInfo, FsNodeOps, FsStr, OutputBuffer,
 };
 use starnix_core::{fileops_impl_nonseekable, fileops_impl_noop_sync};
 use starnix_logging::track_stub;
@@ -23,7 +25,7 @@ use std::borrow::Cow;
 use std::sync::{Arc, LazyLock};
 
 pub fn trace_fs(
-    _locked: &mut Locked<'_, Unlocked>,
+    _locked: &mut Locked<Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -42,7 +44,7 @@ pub struct TraceFs;
 impl FileSystemOps for TraceFs {
     fn statfs(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _fs: &FileSystem,
         _current_task: &CurrentTask,
     ) -> Result<statfs, Errno> {
@@ -66,19 +68,18 @@ impl TraceFs {
 
         dir.node(
             "trace",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 TraceFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
-        dir.subdir(current_task, "per_cpu", 0o755, |dir| {
+        dir.subdir("per_cpu", 0o755, |dir| {
             /// A name for each cpu directory, cached to provide a 'static lifetime.
             static CPU_DIR_NAMES: LazyLock<Vec<String>> = LazyLock::new(|| {
                 (0..zx::system_get_num_cpus()).map(|cpu| format!("cpu{}", cpu)).collect()
             });
             for dir_name in CPU_DIR_NAMES.iter().map(|s| s.as_str()) {
-                dir.subdir(current_task, dir_name, 0o755, |dir| {
+                dir.subdir(dir_name, 0o755, |dir| {
                     // We're not able to detect which cpu events are coming from, so we push them
                     // all into the first cpu.
                     let ops: Box<dyn FsNodeOps> = if dir_name == "cpu0" {
@@ -92,93 +93,75 @@ impl TraceFs {
                     };
                     dir.node(
                         "trace_pipe_raw",
-                        fs.create_node(
-                            current_task,
+                        fs.create_node_and_allocate_node_id(
                             ops,
-                            FsNodeInfo::new_factory(mode!(IFREG, 0o444), FsCred::root()),
+                            FsNodeInfo::new(mode!(IFREG, 0o444), FsCred::root()),
                         ),
                     );
-                    dir.entry(current_task, "trace", TraceFile::new_node(), mode!(IFREG, 0o444));
+                    dir.entry("trace", TraceFile::new_node(), mode!(IFREG, 0o444));
                 });
             }
         });
-        dir.subdir(current_task, "events", 0o755, |dir| {
-            dir.entry(
-                current_task,
-                "header_page",
-                EventsHeaderPage::new_node(),
-                mode!(IFREG, 0o444),
-            );
-            dir.subdir(current_task, "ftrace", 0o755, |dir| {
-                dir.subdir(current_task, "print", 0o755, |dir| {
-                    dir.entry(
-                        current_task,
-                        "format",
-                        FtracePrintFormatFile::new_node(),
-                        mode!(IFREG, 0o444),
-                    );
+        dir.subdir("events", 0o755, |dir| {
+            dir.entry("header_page", EventsHeaderPage::new_node(), mode!(IFREG, 0o444));
+            dir.subdir("ftrace", 0o755, |dir| {
+                dir.subdir("print", 0o755, |dir| {
+                    dir.entry("format", FtracePrintFormatFile::new_node(), mode!(IFREG, 0o444));
                 });
             });
             dir.node(
                 "enable",
-                fs.create_node(
-                    current_task,
+                fs.create_node_and_allocate_node_id(
                     TraceBytesFile::new_node(),
-                    FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                    FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
                 ),
             );
         });
-        dir.subdir(current_task, "options", 0o755, |dir| {
-            dir.entry(current_task, "overwrite", TraceBytesFile::new_node(), mode!(IFREG, 0o444));
+        dir.subdir("options", 0o755, |dir| {
+            dir.entry("overwrite", TraceBytesFile::new_node(), mode!(IFREG, 0o444));
         });
         dir.node(
             "tracing_on",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 TracingOnFile::new_node(trace_event_queue.clone()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.node(
             "current_tracer",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 ConstFile::new_node("nop".into()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.node(
             "trace_marker",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 TraceMarkerFile::new_node(trace_event_queue.clone()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.node(
             "printk_formats",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 TraceBytesFile::new_node(),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.node(
             "trace_clock",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 ConstFile::new_node(
                     "[local] global counter uptime perf mono mono_raw boot tai x86-tsc ".into(),
                 ),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.node(
             "buffer_size_kb",
-            fs.create_node(
-                current_task,
+            fs.create_node_and_allocate_node_id(
                 ConstFile::new_node("7".into()),
-                FsNodeInfo::new_factory(mode!(IFREG, 0o755), FsCred::root()),
+                FsNodeInfo::new(mode!(IFREG, 0o755), FsCred::root()),
             ),
         );
         dir.build_root();
@@ -227,7 +210,7 @@ impl FileOps for TraceRawFile {
 
     fn read(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
@@ -239,7 +222,7 @@ impl FileOps for TraceRawFile {
 
     fn write(
         &self,
-        _locked: &mut Locked<'_, FileOpsCore>,
+        _locked: &mut Locked<FileOpsCore>,
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,

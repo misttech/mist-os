@@ -24,6 +24,9 @@ ffx/target/get-ssh-address.golden
 ffx/target/get-time.golden
 ffx/target/list.golden
 ffx/target/off.golden
+ffx/target/package.golden
+ffx/target/package/explore.golden
+ffx/target/package/resolve.golden
 ffx/target/reboot.golden
 ffx/target/remove.golden
 ffx/target/repository.golden
@@ -35,6 +38,7 @@ ffx/target/set-preferred-ssh-address.golden
 ffx/target/show.golden
 ffx/target/snapshot.golden
 ffx/target/ssh.golden
+ffx/target/status.golden
 ffx/target/update.golden
 ffx/target/update/channel.golden
 ffx/target/update/channel/get-current.golden

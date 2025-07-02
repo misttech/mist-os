@@ -20,6 +20,7 @@ import typing as T
 _SCRIPT_DIR = os.path.dirname(__file__)
 sys.path.insert(0, _SCRIPT_DIR)
 import build_utils
+import workspace_utils
 
 _BUILD_BAZEL_DIR = os.path.dirname(_SCRIPT_DIR)
 
@@ -35,7 +36,7 @@ GnTargetsManifest: T.TypeAlias = list[dict[str, T.Any]]
 # The name of the root Bazel workspace as it appears in its WORKSPACE.bazel file.
 # LINT.IfChange
 _BAZEL_ROOT_WORKSPACE_NAME = "_main"
-# LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+# LINT.ThenChange(//build/bazel/toplevel.MODULE.bazel)
 
 # A list of built-in Bazel workspaces like @bazel_tools// which are actually
 # stored in the prebuilt Bazel install_base directory with a timestamp *far* in
@@ -61,14 +62,15 @@ _BAZEL_BUILTIN_REPOSITORIES = (
     "rules_python_internal",
     # Introduced by bzlmod
     "bazel_skylib",
-    "bazel_skylib~",
-    "bazel_tools~cc_configure_extension~local_config_cc",
+    "bazel_skylib+",
     "platforms",
-    "platforms~host_platform~host_platform",
     "rules_license",
-    "rules_license~",
-    "rules_python~",
-    "rules_python~~internal_deps~rules_python_internal",
+    "rules_license+",
+    "rules_python+",
+    "pythons_hub",  # A sub-repo created by rule_python+
+    "rules_rust",
+    # Created from in-tree top-level module
+    "fuchsia_sdk_common",
 )
 
 # A list of file extensions for files that should be ignored from depfiles.
@@ -92,6 +94,14 @@ _BAZEL_NO_CONTENT_HASH_REPOSITORIES = (
     "fuchsia_build_info",
     "gn_targets",
 )
+
+# Maps from apparent repo names to canonical repo names.
+#
+# This dictionary is created for determining the paths for external
+# repositories, which use canonical repo names as directory names.
+_APPARENT_REPO_NAME_TO_CANONICAL = {
+    "fuchsia_prebuilt_rust": "+_repo_rules+fuchsia_prebuilt_rust",
+}
 
 # Technical notes on input (source and build files) located in Bazel external
 # repositories.
@@ -554,6 +564,17 @@ class BazelLabelMapper(object):
             If the corresponding repository has a content hash file, return
             its path. Otherwise, return an empty string.
         """
+        # TODO(jayzhuang): Refine the logic for bazel_action.py incremental
+        # builds.
+        #
+        # Use the innermost repository name for finding content hash file.
+        #
+        # The call here is unfortunately a bit awkward given how these helper
+        # functions are defined. We are planning on overhauling the logic for
+        # incremental builds so leaving it as-is for now.
+        repository_name = "@" + workspace_utils.innermost_repository_name(
+            f"{repository_name}//:root"
+        )
         hash_file = self._repository_hash_map.get(repository_name, None)
         if hash_file is None:
             # Canonical names like @@foo.<version> need to be converted to just `foo` here.
@@ -658,7 +679,12 @@ class BazelLabelMapper(object):
 
             # @@ is used with canonical repo names, so remove both @@ and @.
             repository_name = repository.removeprefix("@@").removeprefix("@")
-            repository_dir = self._external_dir_prefix + repository_name
+            repository_dir = (
+                self._external_dir_prefix
+                + _APPARENT_REPO_NAME_TO_CANONICAL.get(
+                    repository_name, repository_name
+                )
+            )
             from_external_repository = True
 
         package, colon, target = package_label.partition(":")
@@ -828,20 +854,12 @@ Then ensure that the GN target depends on them transitively.
     return 1
 
 
-def repository_name(label: str) -> str:
-    """Returns repository name of the input label.
-
-    Supports both canonical repository names (starts with @@) and apparent
-    repository names (starts with @).
-    """
-    repository, sep, _ = label.partition("//")
-    assert sep == "//", f"Missing // in label: {label}"
-    return repository.removeprefix("@@").removeprefix("@")
-
-
 def is_ignored_input_label(label: str) -> bool:
     """Return True if the label of a build or source file should be ignored."""
-    is_builtin = repository_name(label) in _BAZEL_BUILTIN_REPOSITORIES
+    is_builtin = (
+        workspace_utils.innermost_repository_name(label)
+        in _BAZEL_BUILTIN_REPOSITORIES
+    )
     is_ignored = label.endswith(_IGNORED_FILE_SUFFIXES)
     return is_builtin or is_ignored
 
@@ -849,7 +867,10 @@ def is_ignored_input_label(label: str) -> bool:
 def label_requires_content_hash(label: str) -> bool:
     """Return True if the label or source file belongs to a repository
     that requires a content hash file."""
-    return not (repository_name(label) in _BAZEL_NO_CONTENT_HASH_REPOSITORIES)
+    return not (
+        workspace_utils.innermost_repository_name(label)
+        in _BAZEL_NO_CONTENT_HASH_REPOSITORIES
+    )
 
 
 def list_to_pairs(l: T.Iterable[T.Any]) -> T.Iterable[tuple[T.Any, T.Any]]:
@@ -1130,7 +1151,7 @@ def main() -> int:
                 args.workspace_dir, "fuchsia_build_generated/gn_targets_dir"
             ),
         )
-        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bazel)
+        # LINT.ThenChange(//build/bazel/toplevel.WORKSPACE.bzlmod)
 
     bazel_launcher = build_utils.BazelLauncher(
         args.bazel_launcher,
@@ -1157,17 +1178,6 @@ def main() -> int:
             if _DEBUG_BAZEL_QUERIES
             else None,
         )
-
-    # Update $WORKSPACE/fuchsia_generated_build/root_bazel_files symlink
-    # if necessary.
-    root_bazel_files_target = "bazel_root_files.fuchsia"
-    root_symlink = os.path.join(
-        args.workspace_dir, "fuchsia_build_generated/bazel_root_files"
-    )
-    root_target = os.readlink(root_symlink)
-    if root_target != root_bazel_files_target:
-        os.remove(root_symlink)
-        os.symlink(root_bazel_files_target, root_symlink)
 
     configured_args = args.extra_bazel_args
 

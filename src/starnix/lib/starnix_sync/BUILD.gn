@@ -4,6 +4,7 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_library.gni")
+import("//src/starnix/build/args.gni")
 
 group("tests") {
   testonly = true
@@ -43,6 +44,14 @@ rustc_library("starnix_sync") {
   ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
+  if (starnix_detect_lock_cycles) {
+    configs += [ ":detect_lock_cycles" ]
+  }
+}
+
+config("detect_lock_cycles") {
+  rustflags = [ "--cfg=detect_lock_cycles" ]
 }
 
 fuchsia_unittest_package("starnix_sync-tests") {

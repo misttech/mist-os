@@ -7,12 +7,12 @@ import("//build/config/clang/clang_cpu.gni")
 group("musl_internal") {
   visibility = [
     "./*",
-    "//zircon/system/ulib/c/*",
+    "//sdk/lib/c/*",
     "//zircon/third_party/scudo/*",
   ]
   public_deps = [
+    "//sdk/lib/c/include:headers",
     "//zircon/system/public",
-    "//zircon/system/ulib/c/include:headers",
     "//zircon/system/ulib/runtime:headers",
     "//zircon/system/ulib/zircon-internal:headers",
   ]
@@ -23,7 +23,7 @@ group("musl_internal_testing") {
   testonly = true
   visibility = [
     "./*",
-    "//zircon/system/ulib/c/*",
+    "//sdk/lib/c/*",
     "//zircon/system/utest/libc:*",
   ]
   public_deps = [ ":musl_internal" ]
@@ -68,9 +68,9 @@ config("musl_internal.config") {
   configs = [ "//build/config/zircon:no_fuzzer" ]
 }
 
-if (toolchain_variant.base == "//zircon/system/ulib/c:user.libc_$target_cpu") {
+if (toolchain_variant.base == "//sdk/lib/c:user.libc_$target_cpu") {
   group("legacy-impl") {
-    visibility = [ "//zircon/system/ulib/c:*" ]
+    visibility = [ "//sdk/lib/c:*" ]
     deps = [
       ":common-impl",
       "ldso",
@@ -81,7 +81,7 @@ if (toolchain_variant.base == "//zircon/system/ulib/c:user.libc_$target_cpu") {
   group("common-impl") {
     visibility = [
       ":*",
-      "//zircon/system/ulib/c:*",
+      "//sdk/lib/c:*",
     ]
     deps = [
       "pthread",
@@ -124,7 +124,7 @@ if (toolchain_variant.base == "//zircon/system/ulib/c:user.libc_$target_cpu") {
   }
 
   group("new-impl") {
-    visibility = [ "//zircon/system/ulib/c:*" ]
+    visibility = [ "//sdk/lib/c:*" ]
     deps = [ ":common-impl" ]
   }
 }

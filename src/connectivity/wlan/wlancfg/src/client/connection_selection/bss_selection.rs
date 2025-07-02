@@ -319,7 +319,7 @@ mod test {
             Some(candidates[2].clone())
         );
 
-        assert_data_tree!(test_values.inspector, root: {
+        assert_data_tree!(@executor exec, test_values.inspector, root: {
             bss_select_test: {
                 "0": {
                     "@time": AnyNumericProperty,
@@ -377,7 +377,7 @@ mod test {
         );
 
         // Verify that an empty list of candidates is still logged to inspect.
-        assert_data_tree!(test_values.inspector, root: {
+        assert_data_tree!(@executor exec, test_values.inspector, root: {
             bss_select_test: {
                 "0": {
                     "@time": AnyProperty,

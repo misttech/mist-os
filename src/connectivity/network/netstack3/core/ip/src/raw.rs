@@ -12,7 +12,9 @@ use derivative::Derivative;
 use log::debug;
 use net_types::ip::{GenericOverIp, Ip, IpVersionMarker, Mtu};
 use net_types::{SpecifiedAddr, ZonedAddr};
-use netstack3_base::socket::{DualStackIpExt, DualStackRemoteIp, SocketZonedAddrExt as _};
+use netstack3_base::socket::{
+    DualStackIpExt, DualStackRemoteIp, SocketCookie, SocketZonedAddrExt as _,
+};
 use netstack3_base::sync::{PrimaryRc, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, ContextPair, DeviceIdContext, Inspector, InspectorDeviceExt, InspectorExt,
@@ -24,6 +26,7 @@ use netstack3_filter::{FilterIpExt, RawIpBody};
 use packet::{BufferMut, SliceBufViewMut};
 use packet_formats::icmp;
 use packet_formats::ip::{DscpAndEcn, IpPacket};
+use thiserror::Error;
 use zerocopy::SplitByteSlice;
 
 use crate::internal::raw::counters::RawIpSocketCounters;
@@ -413,29 +416,35 @@ where
 }
 
 /// Errors that may occur when calling [`RawIpSocketApi::send_to`].
-#[derive(Debug)]
+#[derive(Debug, Error)]
 pub enum RawIpSocketSendToError {
     /// The socket's protocol is `RawIpSocketProtocol::Raw`, which disallows
     /// `send_to` (the remote IP should be specified in the included header, not
     /// as a separate address argument).
+    #[error("send_to is disallowed for raw IP socket with protocol = raw")]
     ProtocolRaw,
     /// The provided remote_ip was an IPv4-mapped-IPv6 address. Dual stack
     /// operations are not supported on raw IP sockets.
+    #[error("dual-stack operations are not supported on raw IP sockets")]
     MappedRemoteIp,
     /// The provided packet body was invalid, and could not be sent. Typically
     /// originates when the stack is asked to inspect the packet body, e.g. to
     /// compute and populate the checksum value.
+    #[error("provided packet body was invalid (e.g. bad checksum)")]
     InvalidBody,
     /// There was an error when resolving the remote_ip's zone.
-    Zone(ZonedAddressError),
+    #[error("resolving remote IP's zone: {0}")]
+    Zone(#[from] ZonedAddressError),
     /// The IP layer failed to send the packet.
-    Ip(IpSockCreateAndSendError),
+    #[error("failed to send packet: {0}")]
+    Ip(#[from] IpSockCreateAndSendError),
 }
 
 /// Errors that may occur getting/setting the ICMP filter for a raw IP socket.
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Error)]
 pub enum RawIpSocketIcmpFilterError {
     /// The socket's protocol does not allow ICMP filters.
+    #[error("socket's protocol does not allow ICMP filters")]
     ProtocolNotIcmp,
 }
 
@@ -460,6 +469,14 @@ impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> Debug
 pub struct RawIpSocketId<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes>(
     StrongRc<RawIpSocketState<I, D, BT>>,
 );
+
+impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> RawIpSocketId<I, D, BT> {
+    /// Returns [`SocketCookie`] for this socket.
+    pub fn socket_cookie(&self) -> SocketCookie {
+        let Self(rc) = self;
+        SocketCookie::new(rc.resource_token())
+    }
+}
 
 impl<I: IpExt, D: WeakDeviceIdentifier, BT: RawIpSocketsBindingsTypes> RawIpSocketId<I, D, BT> {
     /// Return the bindings state associated with this socket.
@@ -854,7 +871,9 @@ mod test {
         FakeStrongDeviceId, FakeTxMetadata, FakeWeakDeviceId, MultipleDevicesId, TestIpExt,
     };
     use netstack3_base::{ContextProvider, CounterContext, CtxPair};
-    use packet::{Buf, InnerPacketBuilder as _, ParseBuffer as _, Serializer as _};
+    use packet::{
+        Buf, InnerPacketBuilder as _, PacketBuilder as _, ParseBuffer as _, Serializer as _,
+    };
     use packet_formats::icmp::{
         IcmpEchoReply, IcmpMessage, IcmpPacketBuilder, IcmpZeroCode, Icmpv6MessageType,
     };
@@ -1066,14 +1085,8 @@ mod test {
         proto: I::Proto,
     ) -> impl AsRef<[u8]> {
         const TTL: u8 = 255;
-        ip_body
-            .into_serializer()
-            .encapsulate(I::PacketBuilder::new(
-                *I::TEST_ADDRS.local_ip,
-                *I::TEST_ADDRS.remote_ip,
-                TTL,
-                proto,
-            ))
+        I::PacketBuilder::new(*I::TEST_ADDRS.local_ip, *I::TEST_ADDRS.remote_ip, TTL, proto)
+            .wrap_body(ip_body.into_serializer())
             .serialize_vec_outer()
             .unwrap()
     }
@@ -1083,13 +1096,8 @@ mod test {
         message: M,
         code: M::Code,
     ) -> impl AsRef<[u8]> {
-        [].into_serializer()
-            .encapsulate(IcmpPacketBuilder::new(
-                *I::TEST_ADDRS.local_ip,
-                *I::TEST_ADDRS.remote_ip,
-                code,
-                message,
-            ))
+        IcmpPacketBuilder::new(*I::TEST_ADDRS.local_ip, *I::TEST_ADDRS.remote_ip, code, message)
+            .wrap_body([].into_serializer())
             .serialize_vec_outer()
             .unwrap()
     }

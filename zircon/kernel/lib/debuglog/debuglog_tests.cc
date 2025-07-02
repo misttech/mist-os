@@ -92,8 +92,10 @@ struct DebuglogTests {
       to_write -= write + sizeof(dlog_header);
     }
 
-    EXPECT_EQ(pad, log->head_);
-
+    {
+      Guard<MonitoredSpinLock, IrqSave> guard{&log->lock_, SOURCE_TAG};
+      EXPECT_EQ(pad, log->head_);
+    }
     log->Write(DEBUGLOG_WARNING, 0, {msg, sizeof(msg)});
 
     // log->data_[pad] is not necessarily aligned as a dlog_header would be so copy rather than

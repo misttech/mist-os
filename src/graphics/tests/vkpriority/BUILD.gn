@@ -10,6 +10,7 @@ executable("vkpriority_bin") {
 
   sources = [
     "main.cc",
+    "vkglobalpriority.cc",
     "vkpriority.cc",
   ]
 

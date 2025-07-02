@@ -6,13 +6,14 @@
 //! interface types. We perform the conversion here to keep dependencies on the sdk_metadata
 //! to a minimum, while improving our ability to fully test the conversion code.
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{anyhow, Result};
 use assembled_system::Image;
 use emulator_instance::{
     DeviceConfig, DiskImage, EmulatorConfiguration, GuestConfig, PortMapping, VirtualCpu,
 };
 
-use sdk_metadata::{ProductBundle, ProductBundleV2, VirtualDeviceV1};
+use product_bundle::{ProductBundle, ProductBundleV2};
+use sdk_metadata::VirtualDeviceV1;
 use std::path::PathBuf;
 
 pub async fn convert_bundle_to_configs(
@@ -61,6 +62,17 @@ fn convert_v2_bundle_to_configs(
         }
     }
 
+    // Check if a single `efi-shell` bootloader partition has been provided, if so there is no
+    // other payload.
+    let bootloader_partitions = &product_bundle.partitions.bootloader_partitions;
+    if bootloader_partitions.len() == 1
+        && bootloader_partitions[0].partition_type.as_str() == "efi-shell"
+    {
+        let disk_image = Some(DiskImage::Fat(bootloader_partitions[0].image.clone().into()));
+        emulator_configuration.guest = GuestConfig { disk_image, ..Default::default() };
+        return Ok(emulator_configuration);
+    }
+
     // Try to find images in system_a.
     let system = product_bundle
         .system_a
@@ -72,21 +84,12 @@ fn convert_v2_bundle_to_configs(
         _ => None,
     });
 
-    let mut disk_image: Option<DiskImage> = system.iter().find_map(|i| match (uefi, i) {
+    let disk_image: Option<DiskImage> = system.iter().find_map(|i| match (uefi, i) {
         (false, Image::FVM(path)) => Some(DiskImage::Fvm(path.clone().into())),
         (false, Image::FxfsSparse { path, .. }) => Some(DiskImage::Fxfs(path.clone().into())),
         (true, Image::FxfsSparse { path, .. }) => Some(DiskImage::Gpt(path.clone().into())),
         _ => None,
     });
-
-    // If there is no kernel, and no disk, check for a bootloader file.
-    if disk_image.is_none() && kernel_image.is_none() {
-        if let Some(bootloader) = product_bundle.partitions.bootloader_partitions.iter().next() {
-            disk_image = Some(DiskImage::Fat(bootloader.image.clone().into()));
-        } else {
-            bail!("No kernel or bootloader specified in the configuration.")
-        }
-    }
 
     // Some kernels do not have separate zbi images.
     let zbi_image: Option<PathBuf> = system.iter().find_map(|i| match i {
@@ -144,6 +147,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         };
         let mut device = VirtualDeviceV1 {
             name: "FakeDevice".to_string(),
@@ -194,11 +198,10 @@ mod tests {
         pb.system_a = Some(vec![
             Image::ZBI { path: expected_zbi.clone(), signed: false },
             Image::QemuKernel(expected_kernel.clone()),
-            Image::Fxfs {
-                path: Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.blk"))
+            Image::Fxfs(
+                Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.blk"))
                     .expect("couldn't convert fxfs to utf8"),
-                contents: BlobfsContents::default(),
-            },
+            ),
             Image::FxfsSparse {
                 path: expected_disk_image_path.clone(),
                 contents: BlobfsContents::default(),
@@ -275,11 +278,10 @@ mod tests {
             system_a: Some(vec![
                 Image::ZBI { path: expected_zbi.clone(), signed: false },
                 Image::QemuKernel(expected_kernel.clone()),
-                Image::Fxfs {
-                    path: Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.blk"))
+                Image::Fxfs(
+                    Utf8PathBuf::from_path_buf(sdk_root.join("fxfs.blk"))
                         .expect("couldn't convert fxfs to utf8"),
-                    contents: BlobfsContents::default(),
-                },
+                ),
                 Image::FxfsSparse {
                     path: expected_disk_image_path.clone(),
                     contents: BlobfsContents::default(),
@@ -290,6 +292,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         };
         let mut device = VirtualDeviceV1 {
             name: "FakeDevice".to_string(),
@@ -366,6 +369,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         };
         let device = VirtualDeviceV1 {
             name: "FakeDevice".to_string(),
@@ -403,13 +407,13 @@ mod tests {
     }
 
     #[test]
-    fn test_bootloader_fatfs_product_bundle() {
+    fn test_bootloader_efi_shell_product_bundle() {
         let pb = ProductBundleV2 {
             product_name: String::default(),
             product_version: String::default(),
             partitions: PartitionsConfig {
                 bootloader_partitions: vec![BootloaderPartition {
-                    partition_type: "fat".into(),
+                    partition_type: "efi-shell".into(),
                     name: Some("some-efi-shell.fatfs".into()),
                     image: "partitions/bootloaders/some-efi-shell.fat".into(),
                 }],
@@ -424,6 +428,7 @@ mod tests {
             repositories: vec![],
             update_package_hash: None,
             virtual_devices_path: None,
+            release_info: None,
         };
         let device = VirtualDeviceV1 {
             name: "FakeDevice".to_string(),

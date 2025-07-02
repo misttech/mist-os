@@ -5,9 +5,9 @@
 use crate::{common, ExtractProductPackageArgs, HybridProductArgs, ProductArgs};
 
 use anyhow::{Context, Result};
-use assembly_config_schema::release_info::{ProductReleaseInfo, ReleaseInfo};
 use assembly_config_schema::AssemblyConfig;
 use assembly_container::AssemblyContainer;
+use assembly_release_info::{ProductReleaseInfo, ReleaseInfo};
 use camino::Utf8PathBuf;
 use fuchsia_pkg::{PackageBuilder, PackageManifest};
 

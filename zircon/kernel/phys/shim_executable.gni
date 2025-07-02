@@ -53,10 +53,6 @@ template("shim_executable") {
                              "import",
                              "target_type",
                            ])
-    if (target_type == "phys_executable") {
-      release_output = defined(invoker.release_output) && invoker.release_output
-    }
-
     if (qemu_boot_shim.name == target_name) {
       # This marks it as the official default boot shim for using QEMU.
       images_metadata = {
@@ -64,6 +60,8 @@ template("shim_executable") {
         archive = add_qemu_to_build_archives
       }
     }
+
+    emulator_support_aib = true
   }
 }
 

@@ -64,11 +64,7 @@ pub struct PkgDirInstance {
 
 impl PkgDirInstance {
     pub fn pkgdir_proxy(&self) -> fidl_test_pkgdir::PkgDirProxy {
-        self.realm
-            .realm()
-            .root
-            .connect_to_protocol_at_exposed_dir::<fidl_test_pkgdir::PkgDirMarker>()
-            .unwrap()
+        self.realm.realm().root.connect_to_protocol_at_exposed_dir().unwrap()
     }
 }
 

@@ -168,7 +168,11 @@ void FileConnection::Sync(SyncCompleter::Sync& completer) {
   });
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+void FileConnection::DeprecatedGetAttr(DeprecatedGetAttrCompleter::Sync& completer) {
+#else
 void FileConnection::GetAttr(GetAttrCompleter::Sync& completer) {
+#endif
   zx::result attrs = vnode()->GetAttributes();
   if (attrs.is_ok()) {
     completer.Reply(ZX_OK, attrs->ToIoV1NodeAttributes(*vnode()));

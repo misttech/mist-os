@@ -61,13 +61,17 @@ To add an external crate, do the following:
       dependencies, places the downloaded crates in the `vendor` directory, and
       then updates `Cargo.toml` and `Cargo.lock`.
 
-      You may need to provide additional configuration in a `[gn.package.<crate>]`
-      section inside the `Cargo.toml` file. For crates that use a `build.rs`
-      script, this configuration replaces the script, which is intentionally
-      unsupported by the build system. This configuration is used by
-      `cargo-gnaw`, which generates the GN rules from the Cargo.toml file.
-      See [cargo-gnaw's README][cargo-gnaw-readme]
-      for more details.
+      You may need to provide additional configuration for crates that use a
+      `build.rs` script. This configuration replaces the script, which is
+      intentionally unsupported by the build system. Configuration should be
+      placed in both:
+
+      - A `[gn.package.<crate>]` section inside the `Cargo.toml` file, and
+      - `//build/bazel/update-rustc-third-party/crate_annotations.bzl`
+
+      This configuration is used by `cargo-gnaw` which generates the GN build
+      rules, and `crate_universe` which generates the Bazel build rules. See
+      [cargo-gnaw's README][cargo-gnaw-readme] for more details.
 
       After committing your change locally, run `fx update-rustc-third-party`
       a second time and ensure it completes successfully without producing any

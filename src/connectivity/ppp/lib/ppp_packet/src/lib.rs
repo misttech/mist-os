@@ -497,8 +497,8 @@ mod tests {
             options.iter(),
         )
         .into_serializer()
-        .encapsulate(ControlProtocolPacketBuilder::new(3, identifier))
-        .encapsulate(PppPacketBuilder::new(protocol))
+        .wrap_in(ControlProtocolPacketBuilder::new(3, identifier))
+        .wrap_in(PppPacketBuilder::new(protocol))
         .serialize_vec_outer()
         .ok()
         .unwrap();
@@ -550,8 +550,8 @@ mod tests {
             options.iter(),
         )
         .into_serializer()
-        .encapsulate(ControlProtocolPacketBuilder::new(4, identifier))
-        .encapsulate(PppPacketBuilder::new(protocol))
+        .wrap_in(ControlProtocolPacketBuilder::new(4, identifier))
+        .wrap_in(PppPacketBuilder::new(protocol))
         .serialize_vec_outer()
         .ok()
         .unwrap();
@@ -604,8 +604,8 @@ mod tests {
             options.iter(),
         )
         .into_serializer()
-        .encapsulate(ControlProtocolPacketBuilder::new(2, identifier))
-        .encapsulate(PppPacketBuilder::new(protocol))
+        .wrap_in(ControlProtocolPacketBuilder::new(2, identifier))
+        .wrap_in(PppPacketBuilder::new(protocol))
         .serialize_vec_outer()
         .ok()
         .unwrap();

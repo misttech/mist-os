@@ -9,11 +9,12 @@
 #include <gtest/gtest.h>
 
 TEST(MsdSemaphore, ImportAndDestroy) {
-  auto msd_driver = msd::Driver::Create();
+  auto msd_driver = msd::Driver::MsdCreate();
   ASSERT_NE(msd_driver, nullptr);
 
-  auto msd_device = msd_driver->CreateDevice(GetTestDeviceHandle());
+  auto msd_device = msd_driver->MsdCreateDevice(GetTestDeviceHandle());
   ASSERT_NE(msd_device, nullptr);
+
   auto semaphore = magma::PlatformSemaphore::Create();
   ASSERT_NE(semaphore, nullptr);
 
@@ -21,8 +22,9 @@ TEST(MsdSemaphore, ImportAndDestroy) {
   ASSERT_TRUE(semaphore->duplicate_handle(&duplicate_handle));
 
   std::unique_ptr<msd::Semaphore> msd_sem = nullptr;
-  EXPECT_EQ(MAGMA_STATUS_OK, msd_driver->ImportSemaphore(zx::event(duplicate_handle),
-                                                         semaphore->id(), /*flags=*/0, &msd_sem));
+  EXPECT_EQ(MAGMA_STATUS_OK,
+            msd_driver->MsdImportSemaphore(zx::event(duplicate_handle), semaphore->id(),
+                                           /*flags=*/0, &msd_sem));
 
   ASSERT_NE(msd_sem, nullptr);
 

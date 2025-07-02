@@ -87,6 +87,9 @@ pub struct IpCounters<I: IpCountersIpExt, C: CounterRepr = Counter> {
     pub invalid_source: C,
     /// Count of incoming IP packets dropped.
     pub dropped: C,
+    /// Count of incoming packets dropped because the destination address
+    /// is only tentatively assigned to the device.
+    pub drop_for_tentative: C,
     /// Number of frames rejected because they'd cause illegal loopback
     /// addresses on the wire.
     pub tx_illegal_loopback_address: C,
@@ -130,6 +133,7 @@ impl<I: IpCountersIpExt, C: CounterRepr> Inspectable for IpCounters<I, C> {
             unspecified_source,
             invalid_source,
             dropped,
+            drop_for_tentative,
             tx_illegal_loopback_address,
             version_rx,
             multicast_no_interest,
@@ -151,6 +155,7 @@ impl<I: IpCountersIpExt, C: CounterRepr> Inspectable for IpCounters<I, C> {
             inspector.record_counter("UnspecifiedSrc", unspecified_source);
             inspector.record_counter("InvalidSrc", invalid_source);
             inspector.record_counter("Dropped", dropped);
+            inspector.record_counter("DroppedTentativeDst", drop_for_tentative);
             inspector.record_counter("MulticastNoInterest", multicast_no_interest);
             inspector.record_counter("DeliveredUnicast", deliver_unicast);
             inspector.record_counter("DeliveredMulticast", deliver_multicast);
@@ -212,9 +217,6 @@ impl<C: CounterRepr> Inspectable for Ipv4RxCounters<C> {
 #[derive(Default, Debug)]
 #[cfg_attr(any(test, feature = "testutils"), derive(PartialEq))]
 pub struct Ipv6RxCounters<C: CounterRepr = Counter> {
-    /// Count of incoming IPv6 packets dropped because the destination address
-    /// is only tentatively assigned to the device.
-    pub drop_for_tentative: C,
     /// Count of incoming IPv6 packets discarded while processing extension
     /// headers.
     pub extension_header_discard: C,
@@ -225,9 +227,7 @@ pub struct Ipv6RxCounters<C: CounterRepr = Counter> {
 
 impl<C: CounterRepr> Inspectable for Ipv6RxCounters<C> {
     fn record<I: Inspector>(&self, inspector: &mut I) {
-        let Self { drop_for_tentative, extension_header_discard, drop_looped_back_dad_probe } =
-            self;
-        inspector.record_counter("DroppedTentativeDst", drop_for_tentative);
+        let Self { extension_header_discard, drop_looped_back_dad_probe } = self;
         inspector.record_counter("DroppedExtensionHeader", extension_header_discard);
         inspector.record_counter("DroppedLoopedBackDadProbe", drop_looped_back_dad_probe);
     }
@@ -248,13 +248,8 @@ pub mod testutil {
 
     impl<C: CounterRepr> From<&Ipv6RxCounters> for Ipv6RxCounters<C> {
         fn from(counters: &Ipv6RxCounters) -> Ipv6RxCounters<C> {
-            let Ipv6RxCounters {
-                drop_for_tentative,
-                extension_header_discard,
-                drop_looped_back_dad_probe,
-            } = counters;
+            let Ipv6RxCounters { extension_header_discard, drop_looped_back_dad_probe } = counters;
             Ipv6RxCounters {
-                drop_for_tentative: drop_for_tentative.get().into_repr(),
                 extension_header_discard: extension_header_discard.into_repr(),
                 drop_looped_back_dad_probe: drop_looped_back_dad_probe.into_repr(),
             }
@@ -288,6 +283,7 @@ pub mod testutil {
                 unspecified_source,
                 invalid_source,
                 dropped,
+                drop_for_tentative,
                 tx_illegal_loopback_address,
                 version_rx,
                 multicast_no_interest,
@@ -317,6 +313,7 @@ pub mod testutil {
                 unspecified_source: unspecified_source.get(),
                 invalid_source: invalid_source.get(),
                 dropped: dropped.get(),
+                drop_for_tentative: drop_for_tentative.get(),
                 tx_illegal_loopback_address: tx_illegal_loopback_address.get(),
                 version_rx: version_rx.into(),
                 multicast_no_interest: multicast_no_interest.get(),

@@ -14,10 +14,14 @@ use crate::object_store::extent_record::{
 };
 use crate::serialized_types::{migrate_nodefault, migrate_to_version, Migrate, Versioned};
 use fprint::TypeFingerprint;
-use fxfs_crypto::{WrappedKeysV32, WrappedKeysV40};
+use fxfs_crypto::{
+    EmptyStruct, FscryptKeyIdentifier, FscryptKeyIdentifierAndNonce, FxfsKeyV40, WrappedKey,
+    WrappedKeysV32, WrappedKeysV40,
+};
 use fxfs_unicode::CasefoldString;
 use rustc_hash::FxHasher;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::default::Default;
 use std::hash::{Hash, Hasher as _};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -243,6 +247,14 @@ impl ObjectKey {
     }
 
     /// Creates an ObjectKey for an encrypted child.
+    ///
+    /// The casefold_hash is important here -- especially for fscrypt as it affects the
+    /// name of locked files.
+    ///
+    /// For case-insensitive lookups in large encrypted directories, we lose the ability to binary
+    /// search for an entry of interest because encryption breaks our sort order. In these cases
+    /// we prefix records with a 32-bit hash based on the stable *casefolded* name. Hash collisions
+    /// aside, this lets us jump straight to the entry of interest, if it exists.
     pub fn encrypted_child(object_id: u64, name: Vec<u8>, casefold_hash: u32) -> Self {
         Self { object_id, data: ObjectKeyData::EncryptedChild { casefold_hash, name } }
     }
@@ -607,20 +619,19 @@ impl From<ObjectKindV32> for ObjectKindV38 {
     }
 }
 
-pub type EncryptionKeys = EncryptionKeysV40;
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint)]
 pub enum EncryptionKeysV40 {
     AES256XTS(WrappedKeysV40),
 }
 
 #[derive(Migrate, Serialize, Deserialize, TypeFingerprint)]
+#[migrate_to_version(EncryptionKeysV40)]
 pub enum EncryptionKeysV32 {
     AES256XTS(WrappedKeysV32),
 }
 
 #[cfg(fuzz)]
-impl<'a> arbitrary::Arbitrary<'a> for EncryptionKeys {
+impl<'a> arbitrary::Arbitrary<'a> for EncryptionKeysV40 {
     fn arbitrary(u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
         <u8>::arbitrary(u).and_then(|count| {
             let mut keys = vec![];
@@ -628,7 +639,7 @@ impl<'a> arbitrary::Arbitrary<'a> for EncryptionKeys {
                 keys.push(<(u64, u128)>::arbitrary(u).map(|(id, wrapping_key_id)| {
                     (
                         id,
-                        fxfs_crypto::WrappedKey {
+                        fxfs_crypto::FxfsKey {
                             wrapping_key_id,
                             // There doesn't seem to be much point to randomly generate crypto keys.
                             key: fxfs_crypto::WrappedKeyBytes::default(),
@@ -636,7 +647,7 @@ impl<'a> arbitrary::Arbitrary<'a> for EncryptionKeys {
                     )
                 })?);
             }
-            Ok(EncryptionKeys::AES256XTS(fxfs_crypto::WrappedKeys::from(keys)))
+            Ok(EncryptionKeysV40::AES256XTS(WrappedKeysV40::from(keys)))
         })
     }
 }
@@ -726,17 +737,99 @@ pub struct FsverityMetadataV33 {
     pub salt: Vec<u8>,
 }
 
+pub type EncryptionKey = EncryptionKeyV47;
+impl From<EncryptionKey> for WrappedKey {
+    fn from(value: EncryptionKey) -> Self {
+        match value {
+            EncryptionKey::Fxfs(key) => WrappedKey::Fxfs(key.into()),
+            EncryptionKey::FscryptInoLblk32File { key_identifier } => {
+                WrappedKey::FscryptInoLblk32File(FscryptKeyIdentifier { key_identifier })
+            }
+            EncryptionKey::FscryptInoLblk32Dir { key_identifier, nonce } => {
+                WrappedKey::FscryptInoLblk32Dir(FscryptKeyIdentifierAndNonce {
+                    key_identifier,
+                    nonce,
+                })
+            }
+            EncryptionKey::DmDefaultKey => WrappedKey::DmDefaultKey(EmptyStruct),
+            EncryptionKey::FscryptPerFile { key_identifier, nonce } => {
+                WrappedKey::FscryptPerFile(FscryptKeyIdentifierAndNonce { key_identifier, nonce })
+            }
+        }
+    }
+}
+
+/// This specifies a single key to be used to encrypt/decrypt.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub enum EncryptionKeyV47 {
+    Fxfs(FxfsKeyV40),
+    FscryptInoLblk32File { key_identifier: [u8; 16] },
+    FscryptInoLblk32Dir { key_identifier: [u8; 16], nonce: [u8; 16] },
+    DmDefaultKey,
+    FscryptPerFile { key_identifier: [u8; 16], nonce: [u8; 16] },
+}
+
+pub type EncryptionKeys = EncryptionKeysV47;
+impl From<EncryptionKeys> for BTreeMap<u64, WrappedKey> {
+    fn from(keys: EncryptionKeys) -> Self {
+        keys.0.into_iter().map(|(id, key)| (id, key.into())).collect()
+    }
+}
+
+impl From<Vec<(u64, EncryptionKey)>> for EncryptionKeys {
+    fn from(value: Vec<(u64, EncryptionKey)>) -> Self {
+        Self(value)
+    }
+}
+impl std::ops::Deref for EncryptionKeys {
+    type Target = Vec<(u64, EncryptionKeyV47)>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize, TypeFingerprint, Versioned)]
+#[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
+pub struct EncryptionKeysV47(Vec<(u64, EncryptionKeyV47)>);
+
+impl EncryptionKeys {
+    pub fn get(&self, id: u64) -> Option<&EncryptionKey> {
+        self.0.iter().find_map(|(i, key)| (*i == id).then_some(key))
+    }
+
+    pub fn insert(&mut self, id: u64, key: EncryptionKey) {
+        self.0.push((id, key))
+    }
+
+    pub fn remove(&mut self, id: u64) -> Option<EncryptionKey> {
+        if let Some(ix) = self.0.iter().position(|(k, _)| *k == id) {
+            Some(self.0.remove(ix).1)
+        } else {
+            None
+        }
+    }
+}
+
+impl From<EncryptionKeysV40> for EncryptionKeysV47 {
+    fn from(EncryptionKeysV40::AES256XTS(WrappedKeysV40(keys)): EncryptionKeysV40) -> Self {
+        EncryptionKeysV47(
+            keys.into_iter().map(|(id, key)| (id, EncryptionKeyV47::Fxfs(key))).collect(),
+        )
+    }
+}
+
 /// ObjectValue is the value of an item in the object store.
 /// Note that the tree stores deltas on objects, so these values describe deltas. Unless specified
 /// otherwise, a value indicates an insert/replace mutation.
-pub type ObjectValue = ObjectValueV46;
+pub type ObjectValue = ObjectValueV47;
 impl Value for ObjectValue {
     const DELETED_MARKER: Self = Self::None;
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint, Versioned)]
 #[cfg_attr(fuzz, derive(arbitrary::Arbitrary))]
-pub enum ObjectValueV46 {
+pub enum ObjectValueV47 {
     /// Some keys have no value (this often indicates a tombstone of some sort).  Records with this
     /// value are always filtered when a major compaction is performed, so the meaning must be the
     /// same as if the item was not present.
@@ -746,8 +839,8 @@ pub enum ObjectValueV46 {
     Some,
     /// The value for an ObjectKey::Object record.
     Object { kind: ObjectKindV46, attributes: ObjectAttributesV32 },
-    /// Encryption keys for an object.
-    Keys(EncryptionKeysV40),
+    /// Specifies encryption keys to use for an object.
+    Keys(EncryptionKeysV47),
     /// An attribute associated with a file object. |size| is the size of the attribute in bytes.
     Attribute { size: u64, has_overwrite_extents: bool },
     /// An extent associated with an object.
@@ -765,6 +858,21 @@ pub enum ObjectValueV46 {
     ExtendedAttribute(ExtendedAttributeValueV32),
     /// An attribute associated with a verified file object. |size| is the size of the attribute
     /// in bytes. |fsverity_metadata| holds the descriptor for the fsverity-enabled file.
+    VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
+}
+#[derive(Migrate, Clone, Debug, Serialize, Deserialize, PartialEq, TypeFingerprint, Versioned)]
+#[migrate_to_version(ObjectValueV47)]
+pub enum ObjectValueV46 {
+    None,
+    Some,
+    Object { kind: ObjectKindV46, attributes: ObjectAttributesV32 },
+    Keys(EncryptionKeysV40),
+    Attribute { size: u64, has_overwrite_extents: bool },
+    Extent(ExtentValueV38),
+    Child(ChildValueV32),
+    Trim,
+    BytesAndNodes { bytes: i64, nodes: i64 },
+    ExtendedAttribute(ExtendedAttributeValueV32),
     VerifiedAttribute { size: u64, fsverity_metadata: FsverityMetadataV33 },
 }
 
@@ -913,8 +1021,8 @@ impl ObjectValue {
             },
         }
     }
-    pub fn keys(keys: EncryptionKeys) -> ObjectValue {
-        ObjectValue::Keys(keys)
+    pub fn keys(encryption_keys: EncryptionKeys) -> ObjectValue {
+        ObjectValue::Keys(encryption_keys)
     }
     /// Creates an ObjectValue for an object attribute.
     pub fn attribute(size: u64, has_overwrite_extents: bool) -> ObjectValue {
@@ -986,12 +1094,18 @@ impl ObjectValue {
     }
 }
 
-pub type ObjectItem = ObjectItemV46;
+pub type ObjectItem = ObjectItemV47;
+pub type ObjectItemV47 = Item<ObjectKeyV43, ObjectValueV47>;
 pub type ObjectItemV46 = Item<ObjectKeyV43, ObjectValueV46>;
 pub type ObjectItemV43 = Item<ObjectKeyV43, ObjectValueV41>;
 pub type ObjectItemV41 = Item<ObjectKeyV40, ObjectValueV41>;
 pub type ObjectItemV40 = Item<ObjectKeyV40, ObjectValueV40>;
 
+impl From<ObjectItemV46> for ObjectItemV47 {
+    fn from(item: ObjectItemV46) -> Self {
+        Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
+    }
+}
 impl From<ObjectItemV43> for ObjectItemV46 {
     fn from(item: ObjectItemV43) -> Self {
         Self { key: item.key.into(), value: item.value.into(), sequence: item.sequence }
@@ -1048,9 +1162,30 @@ impl<'a> From<ItemRef<'a, ObjectKey, ObjectValue>>
 
 #[cfg(test)]
 mod tests {
-    use super::ObjectKey;
-    use crate::lsm_tree::types::{LayerKey, OrdLowerBound, OrdUpperBound, RangeKey};
+    use super::{ObjectKey, ObjectKeyV43};
+    use crate::lsm_tree::types::{
+        FuzzyHash as _, LayerKey, OrdLowerBound, OrdUpperBound, RangeKey,
+    };
     use std::cmp::Ordering;
+
+    // Smoke test to ensure hash stability for Fxfs objects.
+    // If this test fails, the hash algorithm changed, and that won't do -- Fxfs relies on stable
+    // hash values, and existing images will appear to be corrupt if they change (see
+    // https://fxbug.dev/419133532).
+    #[test]
+    fn test_hash_stability() {
+        // Target a specific version of ObjectKey.  If you want to delete ObjectKeyV43, simply
+        // update this test with a later key version, which will also require re-generating the
+        // hashes.
+        assert_eq!(
+            &ObjectKeyV43::object(100).fuzzy_hash().collect::<Vec<_>>()[..],
+            &[2770938889503972258]
+        );
+        assert_eq!(
+            &ObjectKeyV43::extent(1, 0, 0..2 * 1024 * 1024).fuzzy_hash().collect::<Vec<_>>()[..],
+            &[2619169106812529315, 13884007937324812898]
+        );
+    }
 
     #[test]
     fn test_next_key() {

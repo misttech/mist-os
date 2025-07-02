@@ -19,8 +19,7 @@ class MockDisplayCoordinator
     : public fidl::testing::WireTestBase<fuchsia_hardware_display::Coordinator> {
  public:
   using CheckConfigFn =
-      std::function<void(bool, fuchsia_hardware_display_types::wire::ConfigResult*,
-                         std::vector<fuchsia_hardware_display::wire::ClientCompositionOp>*)>;
+      std::function<void(bool, fuchsia_hardware_display_types::wire::ConfigResult*)>;
   using SetDisplayColorConversionFn =
       std::function<void(fuchsia_hardware_display_types::wire::DisplayId, fidl::Array<float, 3>,
                          fidl::Array<float, 9>, fidl::Array<float, 3>)>;

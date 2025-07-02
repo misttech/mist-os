@@ -142,15 +142,15 @@ pub(crate) async fn handle_monitor_request(
         }
         DeviceMonitorRequest::PowerDown { phy_id, responder } => {
             let status = power_down(phys, phy_id).await;
-            responder.send(Err(status.into_raw()))?;
+            responder.send(zx::Status::ok(status.into_raw()).map_err(|e| e.into_raw()))?;
         }
         DeviceMonitorRequest::PowerUp { phy_id, responder } => {
             let status = power_up(phys, phy_id).await;
-            responder.send(Err(status.into_raw()))?;
+            responder.send(zx::Status::ok(status.into_raw()).map_err(|e| e.into_raw()))?;
         }
         DeviceMonitorRequest::Reset { phy_id, responder } => {
             let status = reset(phys, phy_id).await;
-            responder.send(Err(status.into_raw()))?;
+            responder.send(zx::Status::ok(status.into_raw()).map_err(|e| e.into_raw()))?;
         }
         DeviceMonitorRequest::GetPowerState { phy_id, responder } => {
             responder.send(
@@ -233,9 +233,9 @@ async fn handle_single_new_iface(
         }
     }
     match destroy_iface(phys, ifaces, ifaces_tree, new_iface.id).await {
-        Ok(()) => info!("Destroyed iface {}", new_iface.id),
+        Ok(()) => info!("Destroyed iface {} after its SME event stream ended", new_iface.id),
         Err(e) if e == zx::Status::NOT_FOUND => {
-            warn!("destroy_iface - iface {} not found; assume success", new_iface.id)
+            info!("iface {} not found when attempting to destroy after its SME event stream ended; assume successful destruction ", new_iface.id)
         }
         Err(e) => error!("Error while destroying iface {}: {}", new_iface.id, e),
     }
@@ -531,7 +531,8 @@ async fn destroy_iface(
             }
         },
         Err(e) => {
-            error!("Failed to get iface client sme before destruction: {}", e);
+            // If the SME is already gone, we won't be able to get it here
+            info!("Failed to get iface client sme before destruction: {}", e);
             None
         }
     };
@@ -573,7 +574,7 @@ async fn destroy_iface(
         Err(status) => {
             if status == zx::sys::ZX_ERR_NOT_FOUND && ifaces.get_snapshot().contains_key(&id) {
                 info!(
-                    "Encountered NOT_FOUND while removing iface #{} potentially due to recovery.",
+                    "Encountered NOT_FOUND while removing iface #{}, potentially due to recovery.",
                     id
                 );
                 ifaces.remove(&id);
@@ -619,7 +620,7 @@ async fn get_sme_telemetry(
     info!("get_sme_telemetry(id = {})", id);
     let iface = ifaces.get(&id).ok_or(zx::Status::NOT_FOUND)?;
     let result = iface.generic_sme.get_sme_telemetry(telemetry_server).await.map_err(|e| {
-        error!("Failed to request SME telemetry: {}", e);
+        info!("Failed to request SME telemetry: {}", e);
         zx::Status::INTERNAL
     })?;
     result.map_err(zx::Status::from_raw)

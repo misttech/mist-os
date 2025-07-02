@@ -19,7 +19,6 @@ load(
 )
 load(
     ":providers.bzl",
-    "FuchsiaPartitionsConfigInfo",
     "FuchsiaProductBundleInfo",
     "FuchsiaProductImageInfo",
     "FuchsiaRepositoryKeysInfo",
@@ -38,7 +37,6 @@ def fuchsia_product_bundle(
         *,
         name,
         product_bundle_name = None,
-        partitions_config = None,
         main = None,
         testonly = None,
         visibility = None,
@@ -56,7 +54,6 @@ def fuchsia_product_bundle(
     fuchsia_product_bundle(
         name = "product_bundle",
         product_bundle_name = "<your_product_name>",
-        partitions_config = ":your_partitions_config",
         main = ":your_image",
     )
     ```
@@ -68,7 +65,6 @@ def fuchsia_product_bundle(
 
     _build_fuchsia_product_bundle(
         name = name,
-        partitions_config = partitions_config,
         main = main,
         product_bundle_name = product_bundle_name,
         testonly = testonly,
@@ -570,7 +566,6 @@ def _extract_structured_config(ctx, ffx_invocation, ffx_scrutiny_inputs, pb_out_
 
 def _build_fuchsia_product_bundle_impl(ctx):
     fuchsia_toolchain = get_fuchsia_sdk_toolchain(ctx)
-    partitions_configuration = ctx.attr.partitions_config[FuchsiaPartitionsConfigInfo]
     system_a_out = ctx.attr.main[FuchsiaProductImageInfo].images_out
     ffx_tool = fuchsia_toolchain.ffx
     pb_out_dir = ctx.actions.declare_directory(ctx.label.name + "_out")
@@ -594,7 +589,6 @@ def _build_fuchsia_product_bundle_impl(ctx):
         product_bundle_name,
         "--product-version",
         product_version,
-        "--partitions $PARTITIONS_PATH",
         "--system-a $SYSTEM_A_MANIFEST",
         "--out-dir $OUTDIR",
         "--gerrit-size-report $SIZE_REPORT",
@@ -607,14 +601,13 @@ def _build_fuchsia_product_bundle_impl(ctx):
     env = {
         "FFX": ffx_tool.path,
         "OUTDIR": pb_out_dir.path,
-        "PARTITIONS_PATH": partitions_configuration.directory,
-        "SYSTEM_A_MANIFEST": system_a_out.path + "/images.json",
+        "SYSTEM_A_MANIFEST": system_a_out.path,
         "FFX_ISOLATE_DIR": ffx_isolate_dir.path,
         "SIZE_REPORT": size_report.path,
     }
 
     # Gather all the inputs.
-    inputs = ctx.files.partitions_config + ctx.files.main + get_ffx_product_inputs(fuchsia_toolchain)
+    inputs = ctx.files.main + get_ffx_product_inputs(fuchsia_toolchain)
 
     # Add virtual devices.
     for virtual_device in ctx.attr.virtual_devices:
@@ -633,7 +626,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         system_r_out = ctx.attr.recovery[FuchsiaProductImageInfo].images_out
         build_id_dirs += ctx.attr.recovery[FuchsiaProductImageInfo].build_id_dirs
         ffx_invocation.append("--system-r $SYSTEM_R_MANIFEST")
-        env["SYSTEM_R_MANIFEST"] = system_r_out.path + "/images.json"
+        env["SYSTEM_R_MANIFEST"] = system_r_out.path
         inputs.extend(ctx.files.recovery)
 
     # If update info is supplied, add it to the product bundle.
@@ -672,7 +665,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
         mnemonic = "CreatePB",
         **LOCAL_ONLY_ACTION_KWARGS
     )
-    deps = [pb_out_dir, size_report] + ctx.files.partitions_config + ctx.files.main
+    deps = [pb_out_dir, size_report] + ctx.files.main
 
     # Scrutiny Validation
     if ctx.attr.main_scrutiny_config:
@@ -739,11 +732,6 @@ _build_fuchsia_product_bundle = rule(
         "delivery_blob_type": attr.string(
             doc = "Delivery blob type of the product bundle.",
             values = [DELIVERY_BLOB_TYPE.UNCOMPRESSED, DELIVERY_BLOB_TYPE.COMPRESSED],
-        ),
-        "partitions_config": attr.label(
-            doc = "Partitions config to use.",
-            providers = [FuchsiaPartitionsConfigInfo],
-            mandatory = True,
         ),
         "main": attr.label(
             doc = "fuchsia_product target to put in slot A.",

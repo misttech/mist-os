@@ -21,7 +21,7 @@ std::unique_ptr<MagmaSystemBuffer> MagmaSystemBuffer::Create(
   if (!platform_buffer->duplicate_handle(&duplicate_handle))
     return MAGMA_DRETP(nullptr, "failed to get duplicate_handle");
 
-  auto msd_buf = driver->ImportBuffer(zx::vmo(duplicate_handle), platform_buffer->id());
+  auto msd_buf = driver->MsdImportBuffer(zx::vmo(duplicate_handle), platform_buffer->id());
   if (!msd_buf)
     return MAGMA_DRETP(nullptr,
                        "Failed to import newly allocated buffer into the MSD Implementation");

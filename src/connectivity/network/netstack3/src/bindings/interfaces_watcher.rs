@@ -18,6 +18,7 @@ use futures::{
 use log::{debug, error, warn};
 use net_types::ip::{AddrSubnetEither, IpAddr, IpVersion};
 use netstack3_core::ip::{IpAddressState, PreferredLifetime};
+use thiserror::Error;
 use {
     fidl_fuchsia_hardware_network as fhardware_network, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_interfaces_ext as finterfaces_ext,
@@ -27,7 +28,7 @@ use crate::bindings::devices::BindingId;
 use crate::bindings::util::{ErrorLogExt, IntoFidl, ResultExt as _, TryIntoFidl as _};
 
 /// Possible errors when serving `fuchsia.net.interfaces/State`.
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 pub(crate) enum Error {
     #[error("failed to send a Watcher task to parent")]
     Send(#[from] WorkerClosedError),
@@ -419,7 +420,7 @@ impl Drop for InterfaceEventProducer {
     }
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 #[cfg_attr(test, derive(Eq, PartialEq))]
 pub(crate) enum WorkerError {
     #[error("attempted to reinsert interface {interface} over old {old:?}")]
@@ -940,7 +941,7 @@ struct NewWatcher {
     options: WatcherOptions,
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Error, Debug)]
 #[error("connection to interfaces worker closed")]
 pub(crate) struct WorkerClosedError {}
 
@@ -1233,8 +1234,7 @@ mod tests {
                         assignment_state: finterfaces::AddressAssignmentState::Assigned,
                         valid_until: finterfaces_ext::NoInterest,
                         preferred_lifetime_info: finterfaces_ext::NoInterest,
-                    }
-                    .into()],
+                    }],
                     has_default_ipv4_route: true,
                     has_default_ipv6_route: false,
                 }

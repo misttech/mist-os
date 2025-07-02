@@ -18,6 +18,7 @@
 #include <asm/statfs.h>
 #include <linux/aio_abi.h>
 #include <linux/android/binder.h>
+#include <linux/android/binderfs.h>
 #include <linux/ashmem.h>
 #include <linux/audit.h>
 #include <linux/auxvec.h>
@@ -83,6 +84,7 @@
 #include <linux/sysinfo.h>
 #include <linux/taskstats.h>
 #include <linux/termios.h>
+#include <linux/thermal.h>
 #include <linux/time.h>
 #include <linux/timerfd.h>
 #include <linux/times.h>

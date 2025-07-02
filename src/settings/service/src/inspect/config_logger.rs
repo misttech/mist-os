@@ -81,7 +81,7 @@ mod tests {
     use zx::MonotonicInstant;
 
     #[fuchsia::test]
-    fn test_listener_logger() {
+    async fn test_listener_logger() {
         // Set clock for consistent timestamps.
         clock::mock::set(MonotonicInstant::from_nanos(0));
 
@@ -111,7 +111,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    fn test_response_counts() {
+    async fn test_response_counts() {
         // Set clock for consistent timestamps.
         clock::mock::set(MonotonicInstant::from_nanos(0));
 

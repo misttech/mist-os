@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use fidl_fuchsia_diagnostics::Selector;
+use fuchsia_async as fasync;
 use fuchsia_criterion::criterion;
 use fuchsia_inspect::hierarchy::{filter_hierarchy, DiagnosticsHierarchyGetter, HierarchyMatcher};
 use selectors::VerboseError;
@@ -48,7 +49,9 @@ fn snapshot_and_select_bench(b: &mut criterion::Bencher, size: usize) {
     let hierarchy_matcher = parse_selectors(&SELECTOR_TILL_LEVEL_30);
 
     b.iter_with_large_drop(|| {
-        let hierarchy = hierarchy_generator.get_diagnostics_hierarchy().into_owned();
+        let hierarchy = fasync::TestExecutor::new()
+            .run_singlethreaded(hierarchy_generator.get_diagnostics_hierarchy())
+            .into_owned();
         filter_hierarchy(hierarchy, &hierarchy_matcher)
     });
 }

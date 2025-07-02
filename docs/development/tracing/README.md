@@ -14,7 +14,7 @@ performance of a system. In comparison to profiling which samples data every
 so often, tracing captures every event in a short duration and can include extra
 information with the trace event.
 
-Generally,[profiling][fuchsia-profiling] is more useful if you don't know where
+Generally, [profiling][fuchsia-profiling] is more useful if you don't know where
 the problem is, and aren't sure where to put trace spans, or you aren't able to
 add tracing events.
 

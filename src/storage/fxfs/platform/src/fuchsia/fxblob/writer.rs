@@ -21,6 +21,7 @@ use fuchsia_merkle::{MerkleTree, MerkleTreeBuilder};
 use futures::{try_join, TryStreamExt as _};
 use fxfs::errors::FxfsError;
 use fxfs::object_handle::ObjectHandle;
+use fxfs::object_store::data_object_handle::OverwriteOptions;
 use fxfs::object_store::directory::{replace_child_with_object, ReplacedChild};
 use fxfs::object_store::transaction::{lock_keys, LockKey};
 use fxfs::object_store::{
@@ -253,7 +254,11 @@ impl DeliveryBlobWriter {
         let overwrite_fut = async {
             self.stage
                 .handle()
-                .overwrite(self.payload_persisted - self.payload_offset, buffer.as_mut(), false)
+                .overwrite(
+                    self.payload_persisted - self.payload_offset,
+                    buffer.as_mut(),
+                    OverwriteOptions::default(),
+                )
                 .await
                 .context("Failed to write data to object handle.")
         };

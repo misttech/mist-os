@@ -48,7 +48,10 @@ paddr_t zero_page_paddr;
 namespace {
 
 // The initialized VMARs described in the phys hand-off.
+//
+// TODO(mcgrathr): Consider moving these to a stack- or heap-allocated object.
 fbl::Vector<fbl::RefPtr<VmAddressRegion>> handoff_vmars;
+fbl::RefPtr<VmAddressRegion> temporary_handoff_vmar;
 
 constexpr uint32_t ToVmarFlags(PhysMapping::Permissions perms) {
   uint32_t flags = VMAR_FLAG_SPECIFIC | VMAR_FLAG_CAN_MAP_SPECIFIC;
@@ -64,8 +67,15 @@ constexpr uint32_t ToVmarFlags(PhysMapping::Permissions perms) {
   return flags;
 }
 
-constexpr uint ToArchMmuFlags(PhysMapping::Permissions perms) {
-  uint flags = ARCH_MMU_FLAG_CACHED;
+constexpr uint ToArchMmuFlags(PhysMapping::Permissions perms, PhysMapping::Type type) {
+  uint flags = 0;
+  switch (type) {
+    case PhysMapping::Type::kNormal:
+      flags |= ARCH_MMU_FLAG_CACHED;
+      break;
+    case PhysMapping::Type::kMmio:
+      flags |= ARCH_MMU_FLAG_UNCACHED_DEVICE;
+  }
   if (perms.readable()) {
     flags |= ARCH_MMU_FLAG_PERM_READ;
   }
@@ -101,7 +111,7 @@ void RegisterMappings(ktl::span<const PhysMapping> mappings, fbl::RefPtr<VmAddre
             mapping.name.data(), PermissionsName(mapping.perms).data(), mapping.paddr,
             mapping.paddr_end(), mapping.vaddr, mapping.vaddr_end());
     zx_status_t status = vmar->ReserveSpace(mapping.name.data(), mapping.vaddr, mapping.size,
-                                            ToArchMmuFlags(mapping.perms));
+                                            ToArchMmuFlags(mapping.perms, mapping.type));
     ASSERT(status == ZX_OK);
 
 #if __has_feature(address_sanitizer)
@@ -150,6 +160,7 @@ void vm_init() {
 
   arch_zero_page(ptr);
 
+  // Register the permanent and temporary hand-off VMARs.
   fbl::AllocChecker ac;
   handoff_vmars.reserve(gPhysHandoff->vmars.size(), &ac);
   ASSERT(ac.check());
@@ -158,6 +169,7 @@ void vm_init() {
     handoff_vmars.push_back(ktl::move(vmar), &ac);
     ASSERT(ac.check());
   }
+  temporary_handoff_vmar = RegisterVmar(*gPhysHandoff->temporary_vmar.get());
 
 #ifndef __mist_os__
   // Protect the regions of the physmap that are not backed by normal memory.
@@ -168,6 +180,11 @@ void vm_init() {
 #endif
 
   cmpct_set_fill_on_alloc_threshold(gBootOptions->alloc_fill_threshold);
+}
+
+void vm_end_handoff() {
+  DEBUG_ASSERT(temporary_handoff_vmar);
+  temporary_handoff_vmar = nullptr;
 }
 
 paddr_t vaddr_to_paddr(const void* va) {
@@ -244,10 +261,9 @@ static int cmd_vm(int argc, const cmd_args* argv, uint32_t) {
       return -1;
     }
 
-    size_t mapped;
     auto err = VmAspace::kernel_aspace()->arch_aspace().MapContiguous(
-        argv[3].u, argv[2].u, (uint)argv[4].u, (uint)argv[5].u, &mapped);
-    printf("arch_mmu_map returns %d, mapped %zu\n", err, mapped);
+        argv[3].u, argv[2].u, (uint)argv[4].u, (uint)argv[5].u);
+    printf("arch_mmu_map returns %d\n", err);
   } else if (!strcmp(argv[1].str, "unmap")) {
     if (argc < 4) {
       goto notenoughargs;
@@ -258,12 +274,11 @@ static int cmd_vm(int argc, const cmd_args* argv, uint32_t) {
       return -1;
     }
 
-    size_t unmapped;
     // Strictly only attempt to unmap exactly what the user requested, they can deal with any
     // failure that might result.
     auto err = VmAspace::kernel_aspace()->arch_aspace().Unmap(
-        argv[2].u, (uint)argv[3].u, ArchVmAspaceInterface::ArchUnmapOptions::None, &unmapped);
-    printf("arch_mmu_unmap returns %d, unmapped %zu\n", err, unmapped);
+        argv[2].u, (uint)argv[3].u, ArchVmAspaceInterface::ArchUnmapOptions::None);
+    printf("arch_mmu_unmap returns %d\n", err);
   } else {
     printf("unknown command\n");
     goto usage;

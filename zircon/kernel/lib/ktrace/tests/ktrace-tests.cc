@@ -19,9 +19,9 @@
 // ReportMetadata. We need to override ReportMetadata in tests because the base version emits trace
 // records containing the names of all live threads and processes in the system to the global ktrace
 // singleton's trace buffer, which we do not want to do in these unit tests.
-class TestKTrace : public KTraceImpl<BufferMode::kPerCpu> {
+class TestKTrace : public KTrace {
  public:
-  explicit TestKTrace() : KTraceImpl<BufferMode::kPerCpu>(true) {}
+  explicit TestKTrace() : KTrace(true) {}
   void ReportMetadata() override { report_metadata_count_++; }
 
   uint32_t report_metadata_count() const { return report_metadata_count_; }
@@ -35,39 +35,6 @@ class TestKTrace : public KTraceImpl<BufferMode::kPerCpu> {
 class KTraceTests {
  public:
   static constexpr uint32_t kDefaultBufferSize = 4096;
-
-  // Verify that categories are enabled and disabled correctly when using single buffer mode.
-  static bool TestLegacyCategories() {
-    BEGIN_TEST;
-
-#if EXPERIMENTAL_KTRACE_STREAMING_ENABLED
-    // This test is only useful when streaming mode is disabled.
-    END_TEST;
-#else
-
-    KTrace ktrace(true);
-    ktrace.internal_state_.disable_diags_printfs_ = true;
-
-    // Test that no categories are enabled by default.
-    ASSERT_EQ(0u, ktrace.categories_bitmask());
-
-    // Verify that Init correctly sets the categories bitmask.
-    const uint32_t kInitCategories = KTRACE_GRP_SCHEDULER | KTRACE_GRP_SYSCALL_BIT;
-    ktrace.Init(kDefaultBufferSize, kInitCategories);
-    ASSERT_EQ(kInitCategories, ktrace.categories_bitmask());
-
-    // Verify that Start changes the categories bitmask.
-    const uint32_t kStartCategories = KTRACE_GRP_IPC | KTRACE_GRP_ARCH;
-    ASSERT_OK(ktrace.Control(KTRACE_ACTION_START, kStartCategories));
-    ASSERT_EQ(kStartCategories, ktrace.categories_bitmask());
-
-    // Verify that Stop resets the categories bitmask to zero.
-    ASSERT_OK(ktrace.Control(KTRACE_ACTION_STOP, 0));
-    ASSERT_EQ(0u, ktrace.categories_bitmask());
-
-    END_TEST;
-#endif
-  }
 
   // Test the case where tracing is started by Init and stopped by Stop.
   static bool TestInitStop() {
@@ -84,8 +51,11 @@ class KTraceTests {
     // * Metadata should have been reported.
     ktrace.Init(total_bufsize, 0xff1u);
     ASSERT_NONNULL(ktrace.percpu_buffers_);
-    ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
-    ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
+    {
+      Guard<Mutex> guard(&ktrace.lock_);
+      ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
+      ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
+    }
     ASSERT_TRUE(ktrace.WritesEnabled());
     ASSERT_EQ(0xff1u, ktrace.categories_bitmask());
     ASSERT_EQ(1u, ktrace.report_metadata_count());
@@ -123,8 +93,11 @@ class KTraceTests {
     // Init should correctly round the buffer size per-CPU down to PAGE_SIZE.
     ktrace.Init(total_bufsize, 0xff1u);
     ASSERT_NONNULL(ktrace.percpu_buffers_);
-    ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
-    ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
+    {
+      Guard<Mutex> guard(&ktrace.lock_);
+      ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
+      ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
+    }
     ASSERT_TRUE(ktrace.WritesEnabled());
     ASSERT_EQ(0xff1u, ktrace.categories_bitmask());
     ASSERT_EQ(1u, ktrace.report_metadata_count());
@@ -147,8 +120,11 @@ class KTraceTests {
     // * Metadata should _not_ have been reported.
     ktrace.Init(total_bufsize, 0u);
     ASSERT_NULL(ktrace.percpu_buffers_);
-    ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
-    ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
+    {
+      Guard<Mutex> guard(&ktrace.lock_);
+      ASSERT_EQ(static_cast<uint32_t>(PAGE_SIZE), ktrace.buffer_size_);
+      ASSERT_EQ(arch_max_num_cpus(), ktrace.num_buffers_);
+    }
     ASSERT_FALSE(ktrace.WritesEnabled());
     ASSERT_EQ(0u, ktrace.categories_bitmask());
     ASSERT_EQ(0u, ktrace.report_metadata_count());
@@ -228,26 +204,27 @@ class KTraceTests {
 
     // Verify that attempting to Reserve a slot now fails because tracing has not been started, and
     // therefore writes are disabled.
-    zx::result<TestKTrace::Reservation> failed = ktrace.Reserve(fxt_header);
-    ASSERT_EQ(ZX_ERR_BAD_STATE, failed.status_value());
+    {
+      InterruptDisableGuard guard;
+      zx::result<TestKTrace::Reservation> failed = ktrace.Reserve(fxt_header);
+      ASSERT_EQ(ZX_ERR_BAD_STATE, failed.status_value());
+    }
 
     // Start tracing.
     ASSERT_OK(ktrace.Control(KTRACE_ACTION_START, 0xfff));
 
-    // Successfully reserve a slot.
-    zx::result<TestKTrace::Reservation> res = ktrace.Reserve(fxt_header);
-    ASSERT_OK(res.status_value());
-
-    // Reserve turns off interrupts, so we can get the number of the CPU whose buffer we're writing
-    // to.
-    const cpu_num_t target_cpu = arch_curr_cpu_num();
-
-    // Write the trace record.
-    for (uint64_t word : words) {
-      res->WriteWord(word);
-    }
-    res->WriteBytes(bytes.data(), bytes.size());
-    res->Commit();
+    // Now write the record, keeping track of the CPU we wrote the record on.
+    const cpu_num_t target_cpu = [&]() {
+      InterruptDisableGuard guard;
+      zx::result<TestKTrace::Reservation> res = ktrace.Reserve(fxt_header);
+      DEBUG_ASSERT(res.is_ok());
+      for (uint64_t word : words) {
+        res->WriteWord(word);
+      }
+      res->WriteBytes(bytes.data(), bytes.size());
+      res->Commit();
+      return arch_curr_cpu_num();
+    }();
 
     // Read out the data.
     uint8_t actual[padded_record_size];
@@ -579,7 +556,6 @@ class KTraceTests {
 };
 
 UNITTEST_START_TESTCASE(ktrace_tests)
-UNITTEST("legacy_categories", KTraceTests::TestLegacyCategories)
 UNITTEST("init_stop", KTraceTests::TestInitStop)
 UNITTEST("init_with_uneven_buffer_size", KTraceTests::TestInitWithUnevenBufferSize)
 UNITTEST("start_stop", KTraceTests::TestStartStop)

@@ -36,7 +36,6 @@
 #include <vm/page.h>
 #include <vm/vm.h>
 #include <vm/vm_mapping_subtree_state.h>
-#include <vm/vm_object_lock.h>
 #include <vm/vm_page_list.h>
 
 class VmMapping;
@@ -46,7 +45,6 @@ class VmObjectPhysical;
 class VmAspace;
 class VmObject;
 class VmHierarchyBase;
-class VmHierarchyState;
 
 class VmObjectChildObserver {
  public:
@@ -146,30 +144,12 @@ template <typename T>
 fbl::SinglyLinkedListCustomTraits<fbl::RefPtr<T>, typename VmDeferredDeleter<T>::ListTraits>
     VmDeferredDeleter<T>::delete_list_;
 
-// When not using a shared lock this object becomes empty, and never actually gets constructed. We
-// do not fully hide the class definition to avoid the amount of code elsewhere that needs to hidden
-// by pre-precessor guards.
-class VmHierarchyState : public fbl::RefCounted<VmHierarchyState> {
- public:
-  VmHierarchyState() { ASSERT(VMO_USE_SHARED_LOCK); }
-  ~VmHierarchyState() = default;
-
-#if VMO_USE_SHARED_LOCK
-  Lock<typename VmoLockTraits::SharedLockType>* lock() const TA_RET_CAP(lock_) { return &lock_; }
-  Lock<typename VmoLockTraits::SharedLockType>& lock_ref() const TA_RET_CAP(lock_) { return lock_; }
-
- private:
-  mutable LOCK_DEP_INSTRUMENT(VmHierarchyState, VmoLockTraits::SharedLockType,
-                              VmoLockTraits::SharedLockFlags) lock_;
-#endif
-};
-
 // Base class for any objects that want to be part of the VMO hierarchy and share some state,
 // including a lock. Additionally all objects in the hierarchy can become part of the same
 // deferred deletion mechanism to avoid unbounded chained destructors.
 class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase> {
  public:
-  explicit VmHierarchyBase(fbl::RefPtr<VmHierarchyState> state);
+  VmHierarchyBase() = default;
 
  protected:
   // private destructor, only called from refptr
@@ -177,14 +157,7 @@ class VmHierarchyBase : public fbl::RefCountedUpgradeable<VmHierarchyBase> {
   friend fbl::RefPtr<VmHierarchyBase>;
   friend class fbl::Recyclable<VmHierarchyBase>;
 
-#if VMO_USE_SHARED_LOCK
-  // Pointer to state shared across all objects in a hierarchy.
-  fbl::RefPtr<VmHierarchyState> const hierarchy_state_ptr_;
-#endif
-
  private:
-  friend VmHierarchyState;
-
   DISALLOW_COPY_ASSIGN_AND_MOVE(VmHierarchyBase);
 };
 
@@ -298,12 +271,12 @@ class VmObject : public VmHierarchyBase,
   // public API
   virtual zx_status_t Resize(uint64_t size) { return ZX_ERR_NOT_SUPPORTED; }
 
-  virtual Lock<VmoLockType>* lock() const = 0;
-  virtual Lock<VmoLockType>& lock_ref() const = 0;
+  virtual Lock<CriticalMutex>* lock() const = 0;
+  virtual Lock<CriticalMutex>& lock_ref() const = 0;
 
   virtual uint64_t size_locked() const TA_REQ(lock()) = 0;
   uint64_t size() const TA_EXCL(lock()) {
-    Guard<VmoLockType> guard{lock()};
+    Guard<CriticalMutex> guard{lock()};
     return size_locked();
   }
   virtual uint32_t create_options() const { return 0; }
@@ -428,33 +401,27 @@ class VmObject : public VmHierarchyBase,
 
   // read/write operators against user space pointers only
   //
-  // The |out_actual| field will be set to the number of bytes successfully processed, even upon
-  // error. This allows for callers to still pass on this bytes transferred if a particular
-  // error was expected.
+  // The number of bytes successfully processed is always returned, even upon error. This allows for
+  // callers to still pass on this bytes transferred if a particular error was expected.
   //
   // May block on user pager requests and must be called without locks held.
   //
   // Bytes are guaranteed to be transferred in order from low to high offset.
-  virtual zx_status_t ReadUser(user_out_ptr<char> ptr, uint64_t offset, size_t len,
-                               VmObjectReadWriteOptions options, size_t* out_actual) {
-    return ZX_ERR_NOT_SUPPORTED;
+  virtual ktl::pair<zx_status_t, size_t> ReadUser(user_out_ptr<char> ptr, uint64_t offset,
+                                                  size_t len, VmObjectReadWriteOptions options) {
+    return {ZX_ERR_NOT_SUPPORTED, 0};
   }
-  virtual zx_status_t ReadUserVector(user_out_iovec_t vec, uint64_t offset, size_t len,
-                                     size_t* out_actual);
 
   // |OnWriteBytesTransferredCallback| is guaranteed to be called after bytes have been successfully
   // transferred from the user source to the VMO and will be called before the VMO lock is dropped.
   // As a result, operations performed within the callback should not take any other locks or be
   // long-running.
   using OnWriteBytesTransferredCallback = fit::inline_function<void(uint64_t offset, size_t len)>;
-  virtual zx_status_t WriteUser(user_in_ptr<const char> ptr, uint64_t offset, size_t len,
-                                VmObjectReadWriteOptions options, size_t* out_actual,
-                                const OnWriteBytesTransferredCallback& on_bytes_transferred) {
-    return ZX_ERR_NOT_SUPPORTED;
+  virtual ktl::pair<zx_status_t, size_t> WriteUser(
+      user_in_ptr<const char> ptr, uint64_t offset, size_t len, VmObjectReadWriteOptions options,
+      const OnWriteBytesTransferredCallback& on_bytes_transferred) {
+    return {ZX_ERR_NOT_SUPPORTED, 0};
   }
-  virtual zx_status_t WriteUserVector(user_in_iovec_t vec, uint64_t offset, size_t len,
-                                      size_t* out_actual,
-                                      const OnWriteBytesTransferredCallback& on_bytes_transferred);
 
   // Removes the pages from this vmo in the range [offset, offset + len) and returns
   // them in pages.  This vmo must be a paged vmo with no parent, and it cannot have any
@@ -598,7 +565,7 @@ class VmObject : public VmHierarchyBase,
   }
 
   virtual uint32_t GetMappingCachePolicy() const {
-    Guard<VmoLockType> guard{lock()};
+    Guard<CriticalMutex> guard{lock()};
     return GetMappingCachePolicyLocked();
   }
   virtual uint32_t GetMappingCachePolicyLocked() const = 0;
@@ -773,7 +740,7 @@ class VmObject : public VmHierarchyBase,
     Paged = true,
     Physical = false,
   };
-  VmObject(VMOType type, fbl::RefPtr<VmHierarchyState> hierarchy_state_ptr);
+  explicit VmObject(VMOType type);
 
   // private destructor, only called from refptr
   virtual ~VmObject();

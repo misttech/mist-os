@@ -360,6 +360,8 @@ For example, if `kernel.oom.outofmemory-mb` is set to 50 and `kernel.oom.imminen
 is set to 20, an imminent-out-of-memory event will be signaled at 70MB (i.e. 50MB + 20MB)
 free memory, while out-of-memory will be signaled at 50MB free memory.
 
+Setting this value to 0 will disable the imminent-out-of-memory event.
+
 ### kernel.oom.trigger-on-alloc-failure=\<bool>
 
 **Default:** `true`
@@ -824,13 +826,12 @@ This option selects the desired compression strategy to be used when a page need
 If `none` is set then `kernel.compression.storage-strategy` must also be `none`. Selecting `none`
 effectively disables compression.
 
-### kernel.compression.storage-strategy=\[none | tri_page | slot\]
+### kernel.compression.storage-strategy=\[none | slot\]
 
 **Default:** `none`
 
 Supported compression storage strategies are:
 - `none`
-- `tri_page`
 - `slot`
 
 This option selects the desired storage strategy to be used for storing data that has been

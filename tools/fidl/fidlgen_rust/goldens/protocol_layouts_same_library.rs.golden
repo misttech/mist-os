@@ -203,6 +203,15 @@ impl From<fidl::Channel> for ComposedProtocolSynchronousProxy {
     }
 }
 
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for ComposedProtocolSynchronousProxy {
+    type Protocol = ComposedProtocolMarker;
+
+    fn from_client(value: fidl::endpoints::ClientEnd<ComposedProtocolMarker>) -> Self {
+        Self::new(value.into_channel())
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ComposedProtocolProxy {
     client: fidl::client::Client<fidl::encoding::DefaultFuchsiaResourceDialect>,
@@ -1431,6 +1440,15 @@ impl From<MainProtocolSynchronousProxy> for zx::Handle {
 impl From<fidl::Channel> for MainProtocolSynchronousProxy {
     fn from(value: fidl::Channel) -> Self {
         Self::new(value)
+    }
+}
+
+#[cfg(target_os = "fuchsia")]
+impl fidl::endpoints::FromClient for MainProtocolSynchronousProxy {
+    type Protocol = MainProtocolMarker;
+
+    fn from_client(value: fidl::endpoints::ClientEnd<MainProtocolMarker>) -> Self {
+        Self::new(value.into_channel())
     }
 }
 

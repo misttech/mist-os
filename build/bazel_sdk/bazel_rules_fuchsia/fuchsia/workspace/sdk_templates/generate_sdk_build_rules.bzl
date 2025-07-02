@@ -411,8 +411,7 @@ def _generate_sysroot_build_rules(
         parent_sdk_contents):
     ctx = runtime.ctx
     files = []
-    for ifs_file in meta.get("ifs_files", []):
-        files.append("pkg/sysroot/" + ifs_file)
+    files += meta.get("ifs_files", [])
     arch_list = process_context.constants.target_cpus
 
     # TODO(https://fxbug.dev/385408047): Prefer API level-specific "variants"
@@ -652,7 +651,11 @@ def _generate_companion_host_tool_build_rules(
     ctx = runtime.ctx
 
     # the metadata file itself is needed by the emulator
-    files_str = [str(meta["_meta_path"])]
+    files_str = []
+
+    # allow adding an empty host tool for aemu_internal
+    if not meta.get("_no_meta"):
+        files_str.append(str(meta["_meta_path"]))
 
     if "files" in meta:
         files_str.extend(meta["files"])
@@ -1052,7 +1055,7 @@ def _generate_cc_prebuilt_library_build_rules(
     }
     files = meta["headers"]
     if "ifs" in meta:
-        files.append(lib_base_path + meta["ifs"])
+        files.append(meta["ifs"])
     process_context.files_to_copy[meta_sdk_root].extend(files)
 
     prebuilt_select = {}
@@ -1812,10 +1815,22 @@ def _generate_sdk_build_rules(
     )
 
     for dir in dir_to_meta.keys():
+        meta = dir_to_meta[dir]
+        metas = list(meta.values())
+        if dir == "tools":
+            if "aemu_internal" not in [val.get("name") for val in metas]:
+                metas.append({
+                    "name": "aemu_internal",
+                    "root": "tools",
+                    "type": "companion_host_tool",
+                    "_meta_path": "tools/x64/aemu_internal-meta.json",
+                    "_meta_sdk_root": metas[0]["_meta_sdk_root"],
+                    "_no_meta": True,
+                })
         _process_dir(
             runtime,
             dir,
-            dir_to_meta[dir].values(),
+            metas,
             process_context,
             parent_sdk_contents,
         )

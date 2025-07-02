@@ -34,5 +34,4 @@ async fn override_echo_greeting_and_observe_in_logs() {
             break;
         }
     }
-    emu.stop().await;
 }

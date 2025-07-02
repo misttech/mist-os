@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include "dl-iterate-phdr-tests.h"
 #include "dl-load-tests.h"
 #include "startup-symbols.h"
 
@@ -10,6 +11,7 @@ namespace {
 using dl::testing::DlTests;
 TYPED_TEST_SUITE(DlTests, dl::testing::TestTypes);
 
+using dl::testing::GetPhdrInfoForModule;
 using dl::testing::IsUndefinedSymbolErrMsg;
 using dl::testing::RunFunction;
 using dl::testing::TestModule;
@@ -589,6 +591,96 @@ TYPED_TEST(DlTests, StartupModulesPriorityOverGlobal) {
 
   ASSERT_TRUE(this->DlClose(open_has_foo_v1.value()).is_ok());
   ASSERT_TRUE(this->DlClose(open_has_foo_v2.value()).is_ok());
+}
+
+// A simple test that you can look up symbols from a startup module's dep.
+// Unlike previous tests, this test does not rely on the symbol resolution
+// performed by dlopen (since startup modules are already resolved and loaded at
+// program execution). This tests that calling dlopen() on a startup module will
+// properly reference dependencies so that dlsym() can search through the deps
+// for the requested symbol when given a handle for a startup module.
+// (startup module) has-foo-v1:
+//    - foo-v1 -> foo() returns 2
+// dlopen(has-foo-v1)
+// call foo() from has-foo-v1 and expect 2.
+TYPED_TEST(DlTests, StartupModulesDep) {
+  const std::string kHasFooV1File = TestShlib("libhas-foo-v1");
+  constexpr int64_t kFooV1ReturnValue = 2;
+
+  // Make sure has-foo-v1 is linked in with this test by making a direct call to
+  // its unique symbol.
+  EXPECT_EQ(call_foo_v1_StartupModulesDep(), kFooV1ReturnValue);
+
+  // Expect libhas-foo-v1 to already have been loaded at startup.
+  auto open = this->DlOpen(kHasFooV1File.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(open.is_ok()) << open.error_value();
+  EXPECT_TRUE(open.value());
+
+  auto foo = this->DlSym(open.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(foo.is_ok()) << foo.error_value();
+  ASSERT_TRUE(foo.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(foo.value()), kFooV1ReturnValue);
+
+  ASSERT_TRUE(this->DlClose(open.value()).is_ok());
+}
+
+// Test that dlsym() will return the first symbol found from the startup
+// module's dep tree. This is a more extensive version of the above test, where
+// dlsym() will look up symbols multiple levels down the dependency chain of the
+// startup module, in the expected BFS order.
+// (startup module) multiple-transitive-foo-deps:
+//   - has-foo-v1:
+//     - foo-v1 -> foo() returns 2
+//   - has-foo-v2:
+//     - foo-v2 -> foo() returns 7
+// dlopen(multiple-transitive-foo-deps)
+// call foo() from multiple-transitive-foo-deps and expect 2 from foo-v1, then
+// call foo_v2() from multiple-transitive-foo-deps and expect 7 from foo-v2.
+// dlopen(has-foo-v2) and call foo() and expect 7 from foo-v2.
+TYPED_TEST(DlTests, StartupModulesDepOrder) {
+  const std::string kMultipleTransitiveFooDepsFile = TestShlib("libmultiple-transitive-foo-deps");
+  const std::string kHasFooV2File = TestShlib("libhas-foo-v2");
+  constexpr int64_t kFooV1ReturnValue = 2;
+  constexpr int64_t kFooV2ReturnValue = 7;
+
+  // Since multiple-transitive-foo-deps does not export any symbols itself, make
+  // sure it's linked in with this test binary by checking that it's present in
+  // dl_iterate_phdr output.
+  GetPhdrInfoForModule(*this, kMultipleTransitiveFooDepsFile);
+
+  auto open_root =
+      this->DlOpen(kMultipleTransitiveFooDepsFile.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(open_root.is_ok()) << open_root.error_value();
+  EXPECT_TRUE(open_root.value());
+
+  auto root_foo = this->DlSym(open_root.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(root_foo.is_ok()) << root_foo.error_value();
+  ASSERT_TRUE(root_foo.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(root_foo.value()), kFooV1ReturnValue);
+
+  // Test that we can still resolve foo_v2() from the root startup module.
+  auto root_foo_v2 = this->DlSym(open_root.value(), TestSym("foo_v2").c_str());
+  ASSERT_TRUE(root_foo_v2.is_ok()) << root_foo_v2.error_value();
+  ASSERT_TRUE(root_foo_v2.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(root_foo_v2.value()), kFooV2ReturnValue);
+
+  // To make sure the dependency's module tree is filled out correctly, dlopen
+  // the dep has-foo-v2 and make sure its "foo" symbol will resolve from foo_v2()
+  auto open_dep = this->DlOpen(kHasFooV2File.c_str(), RTLD_NOW | RTLD_LOCAL | RTLD_NOLOAD);
+  ASSERT_TRUE(open_dep.is_ok()) << open_dep.error_value();
+  EXPECT_TRUE(open_dep.value());
+
+  auto dep_foo = this->DlSym(open_dep.value(), TestSym("foo").c_str());
+  ASSERT_TRUE(dep_foo.is_ok()) << dep_foo.error_value();
+  ASSERT_TRUE(dep_foo.value());
+
+  EXPECT_EQ(RunFunction<int64_t>(dep_foo.value()), kFooV2ReturnValue);
+
+  ASSERT_TRUE(this->DlClose(open_dep.value()).is_ok());
+  ASSERT_TRUE(this->DlClose(open_root.value()).is_ok());
 }
 
 }  // namespace

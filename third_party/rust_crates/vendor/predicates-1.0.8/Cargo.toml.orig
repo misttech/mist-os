@@ -1,0 +1,35 @@
+[workspace]
+members = ["crates/core", "crates/tree"]
+
+[package]
+name = "predicates"
+version = "1.0.8"
+authors = ["Nick Stevens <nick@bitcurry.com>"]
+license = "MIT/Apache-2.0"
+readme = "README.md"
+keywords = ["predicate", "boolean", "combinatorial", "match", "logic"]
+repository = "https://github.com/assert-rs/predicates-rs"
+homepage = "https://github.com/assert-rs/predicates-rs"
+documentation = "https://docs.rs/predicates"
+description = """
+An implementation of boolean-valued predicate functions.
+"""
+categories = ["data-structures", "rust-patterns"]
+edition = "2018"
+
+[badges]
+azure-devops = { project = "assert-rs", pipeline = "predicates-rs" }
+
+[dependencies]
+predicates-core = { version = "1.0", path = "crates/core" }
+difference = { version = "2.0", optional = true }
+normalize-line-endings = { version = "0.3.0", optional = true }
+regex = { version="1.0", optional = true }
+float-cmp = { version="0.8", optional = true }
+
+[dev-dependencies]
+predicates-tree = { version = "1.0", path = "crates/tree" }
+
+[features]
+default = ["difference", "regex", "float-cmp", "normalize-line-endings"]
+unstable = []

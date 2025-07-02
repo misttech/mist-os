@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import("//build/assembly/assembled_system.gni")
-import("//build/assembly/generated_partitions_config.gni")
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
@@ -74,8 +73,7 @@ if (is_host) {
       testonly = true
       name = "ffx-profiler-test"
 
-      partitions = ":partitions_config"
-      system_a = files.images_json
+      system_a = files.outdir
 
       deps = [ ":assembly" ]
     }
@@ -88,11 +86,6 @@ if (is_host) {
       generate_vbmeta = true
       board_config_label = board_configuration_label
       product_assembly_config_label = ":product_assembly_config"
-    }
-
-    generated_partitions_config("partitions_config") {
-      testonly = true
-      hw_revision = board_name
     }
 
     product_assembly_configuration("product_assembly_config") {

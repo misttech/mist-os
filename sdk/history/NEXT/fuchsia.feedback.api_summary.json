@@ -131,6 +131,12 @@
         "type": "fuchsia.feedback/SpecificCrashReport"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.feedback/CrashReport.weight",
+        "ordinal": "9",
+        "type": "uint32"
+    },
+    {
         "kind": "table",
         "name": "fuchsia.feedback/CrashReport",
         "resourceness": "resource"

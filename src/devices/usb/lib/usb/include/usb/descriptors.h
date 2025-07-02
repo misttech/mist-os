@@ -95,6 +95,7 @@
 #define USB_DT_OTHER_SPEED_CONFIG 0x07
 #define USB_DT_INTERFACE_POWER 0x08
 #define USB_DT_INTERFACE_ASSOCIATION 0x0b
+#define USB_DT_BOS 0x0f
 #define USB_DT_HID 0x21
 #define USB_DT_HIDREPORT 0x22
 #define USB_DT_HIDPHYSICAL 0x23
@@ -258,6 +259,13 @@ typedef struct {
   uint8_t b_function_protocol;
   uint8_t i_function;
 } __attribute__((packed)) usb_interface_assoc_descriptor_t;
+
+typedef struct {
+  uint8_t b_length;
+  uint8_t b_descriptor_type;  // USB_DT_BOS
+  uint16_t w_total_length;
+  uint8_t b_num_device_caps;
+} __attribute__((packed)) usb_bos_descriptor_t;
 
 typedef struct {
   uint8_t b_length;

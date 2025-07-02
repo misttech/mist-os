@@ -36,9 +36,11 @@ from honeydew.affordances.power.system_power_state_controller import (
 )
 from honeydew.affordances.rtc import rtc_using_fc
 from honeydew.affordances.session import session_using_ffx
+from honeydew.affordances.starnix import starnix_using_ffx
 from honeydew.affordances.tracing import tracing_using_fc
 from honeydew.affordances.ui.screenshot import screenshot_using_ffx
 from honeydew.affordances.ui.user_input import user_input_using_fc
+from honeydew.affordances.virtual_audio import audio_using_fuchsia_controller
 from honeydew.auxiliary_devices.power_switch import (
     power_switch as power_switch_interface,
 )
@@ -187,20 +189,28 @@ def _file_read_result(data: f_io.Transfer) -> f_io.ReadableReadResult:
     )
 
 
-def _file_attr_resp(status: ZxStatus, size: int) -> f_io.NodeGetAttrResponse:
-    return f_io.NodeGetAttrResponse(
-        s=status.raw(),
-        attributes=f_io.NodeAttributes(
-            content_size=size,
-            # The args below are arbitrary.
-            mode=0,
-            id_=0,
-            storage_size=0,
-            link_count=0,
-            creation_time=0,
-            modification_time=0,
-        ),
-    )
+def _file_attr_resp(
+    status: ZxStatus, size: int
+) -> f_io.NodeGetAttributesResult:
+    if status.raw() != ZxStatus.ZX_OK:
+        return f_io.NodeGetAttributesResult(err=status.raw())
+    else:
+        return f_io.NodeGetAttributesResult(
+            response=f_io.NodeAttributes2(
+                # The args below (besides content_size) are arbitrary.
+                mutable_attributes=f_io.MutableNodeAttributes(
+                    mode=0,
+                    creation_time=0,
+                    modification_time=0,
+                ),
+                immutable_attributes=f_io.ImmutableNodeAttributes(
+                    content_size=size,
+                    id_=0,
+                    storage_size=0,
+                    link_count=0,
+                ),
+            ),
+        )
 
 
 class FuchsiaDeviceImplTests(unittest.TestCase):
@@ -420,14 +430,24 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
             screenshot_using_ffx.ScreenshotUsingFfx,
         )
 
+    def test_audio(self) -> None:
+        """Test case to make sure fuchsia_device supports audio
+        affordance implemented using Fuchsia controller"""
+        self.fd_fc_obj.fuchsia_controller.ctx = mock.Mock()
+        self.assertIsInstance(
+            self.fd_fc_obj.virtual_audio,
+            audio_using_fuchsia_controller.VirtualAudioUsingFuchsiaController,
+        )
+
     @mock.patch.object(
-        system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix,
-        "_run_starnix_console_shell_cmd",
+        ffx_impl.FfxImpl,
+        "run",
+        return_value="core/starnix_runner/kernels:",
         autospec=True,
     )
     def test_system_power_state_controller(
         self,
-        mock_run_starnix_console_shell_cmd: mock.Mock,
+        mock_ffx_run: mock.Mock,
     ) -> None:
         """Test case to make sure fuchsia_device supports
         system_power_state_controller affordance implemented using starnix"""
@@ -435,7 +455,24 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
             self.fd_fc_obj.system_power_state_controller,
             system_power_state_controller_using_starnix.SystemPowerStateControllerUsingStarnix,
         )
-        mock_run_starnix_console_shell_cmd.assert_called_once()
+        mock_ffx_run.assert_called_once()
+
+    @mock.patch.object(
+        ffx_impl.FfxImpl,
+        "run",
+        return_value="core/starnix_runner/kernels:",
+        autospec=True,
+    )
+    def test_starnix(
+        self,
+        mock_ffx_run: mock.Mock,
+    ) -> None:
+        """Test case to make sure fuchsia_device supports
+        starnix affordance implemented using starnix"""
+        self.assertIsInstance(
+            self.fd_fc_obj.starnix, starnix_using_ffx.StarnixUsingFfx
+        )
+        mock_ffx_run.assert_called_once()
 
     @mock.patch.object(
         rtc_using_fc.RtcUsingFc,
@@ -1637,7 +1674,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     @mock.patch.object(
         f_io.FileClient,
-        "get_attr",
+        "get_attributes",
         new_callable=mock.AsyncMock,
         return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
     )
@@ -1728,7 +1765,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     @mock.patch.object(
         f_io.FileClient,
-        "get_attr",
+        "get_attributes",
         new_callable=mock.AsyncMock,
         # Raise arbitrary failure.
         side_effect=ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS),
@@ -1748,14 +1785,14 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         "create_context",
         autospec=True,
     )
-    def test_send_snapshot_command_get_attr_error(
+    def test_send_snapshot_command_get_attributes_error(
         self,
         unused_mock_fc_create_context: mock.Mock,
         unused_mock_health_check: mock.Mock,
         mock_fc_connect_device_proxy: mock.Mock,
         *unused_args: Any,
     ) -> None:
-        """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attr
+        """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attributes
         FIDL call raises an exception.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         # pylint: disable=protected-access
@@ -1771,7 +1808,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     @mock.patch.object(
         f_io.FileClient,
-        "get_attr",
+        "get_attributes",
         new_callable=mock.AsyncMock,
         return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_ERR_INVALID_ARGS), 0),
     )
@@ -1790,14 +1827,14 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
         "create_context",
         autospec=True,
     )
-    def test_send_snapshot_command_get_attr_status_not_ok(
+    def test_send_snapshot_command_get_attributes_status_not_ok(
         self,
         unused_mock_fc_create_context: mock.Mock,
         unused_mock_health_check: mock.Mock,
         mock_fc_connect_device_proxy: mock.Mock,
         *unused_args: Any,
     ) -> None:
-        """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attr
+        """Testcase for FuchsiaDevice._send_snapshot_command() when the get_attributes
         FIDL call returns a non-OK status code.
         ZX_ERR_INVALID_ARGS was chosen arbitrarily for this purpose."""
         # pylint: disable=protected-access
@@ -1813,7 +1850,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     @mock.patch.object(
         f_io.FileClient,
-        "get_attr",
+        "get_attributes",
         new_callable=mock.AsyncMock,
         return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
     )
@@ -1861,7 +1898,7 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
     )
     @mock.patch.object(
         f_io.FileClient,
-        "get_attr",
+        "get_attributes",
         new_callable=mock.AsyncMock,
         # File reports size of 15 bytes.
         return_value=_file_attr_resp(ZxStatus(ZxStatus.ZX_OK), 15),
@@ -1905,6 +1942,45 @@ class FuchsiaDeviceImplTests(unittest.TestCase):
             self.fd_fc_obj._send_snapshot_command()
 
         mock_fc_connect_device_proxy.assert_called()
+
+    @mock.patch.object(
+        ffx_impl.FfxImpl,
+        "run",
+        return_value="core/starnix_runner/kernels:",
+        autospec=True,
+    )
+    def test_is_starnix_device(self, mock_ffx: mock.Mock) -> None:
+        """Testcase for FuchsiaDevice.is_starnix_device()"""
+        self.assertTrue(self.fd_fc_obj.is_starnix_device())
+
+        mock_ffx.assert_called_once()
+
+    @mock.patch.object(
+        ffx_impl.FfxImpl,
+        "run",
+        return_value="",
+        autospec=True,
+    )
+    def test_is_starnix_device_unsupported_error(
+        self, mock_ffx: mock.Mock
+    ) -> None:
+        """Testcase for FuchsiaDevice.is_starnix_device()"""
+        self.assertFalse(self.fd_fc_obj.is_starnix_device())
+
+        mock_ffx.assert_called_once()
+
+    @mock.patch.object(
+        ffx_impl.FfxImpl,
+        "run",
+        side_effect=ffx_errors.FfxCommandError("error"),
+        autospec=True,
+    )
+    def test_is_starnix_device_error(self, mock_ffx: mock.Mock) -> None:
+        """Testcase for FuchsiaDevice.is_starnix_device()"""
+        with self.assertRaises(errors.FuchsiaDeviceError):
+            self.fd_fc_obj.is_starnix_device()
+
+        mock_ffx.assert_called_once()
 
 
 if __name__ == "__main__":

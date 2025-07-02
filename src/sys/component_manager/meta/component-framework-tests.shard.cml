@@ -16,8 +16,8 @@
     offer: [
         {
             protocol: [
+                "fuchsia.component.resolution.Resolver",
                 "fuchsia.kernel.VmexResource",
-                "fuchsia.pkg.PackageResolver",
                 "fuchsia.process.Launcher",
             ],
             from: "parent",

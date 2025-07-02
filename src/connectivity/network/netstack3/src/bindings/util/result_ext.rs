@@ -4,6 +4,8 @@
 
 use std::fmt::{Debug, Display};
 
+use crate::bindings::errno::ErrnoError;
+
 /// An extension for common logging patterns for error types.
 pub trait ErrorLogExt: Debug {
     fn log_level(&self) -> log::Level;
@@ -26,14 +28,7 @@ pub trait ResultExt {
 
     fn as_result(self) -> Result<Self::Ok, Self::Error>;
 
-    /// Consumes self, logs the error with `msg` if it's an error and returns
-    /// back `Self` unmodified.
-    fn log_error(self, msg: impl Display) -> Self;
-
-    //// Logs the error in `self` if it's an error variant.
-    fn inspect_log_error(&self, msg: impl Display);
-
-    /// Consumes this result and logs an error if it's the `Err`` variant.
+    /// Consumes this result and logs an error if it's the `Err` variant.
     ///
     /// This allows many common logsites to be coalesced into a single function,
     /// which reduces the size of generated code.
@@ -48,27 +43,6 @@ impl<O, E: ErrorLogExt> ResultExt for Result<O, E> {
 
     fn as_result(self) -> Result<O, E> {
         self
-    }
-
-    #[track_caller]
-    fn log_error(self, msg: impl Display) -> Self {
-        match self {
-            Ok(v) => Ok(v),
-            Err(e) => {
-                e.log(msg);
-                Err(e)
-            }
-        }
-    }
-
-    #[track_caller]
-    fn inspect_log_error(&self, msg: impl Display) {
-        match self {
-            Ok(_) => (),
-            Err(e) => {
-                e.log(msg);
-            }
-        }
     }
 
     #[track_caller]
@@ -108,6 +82,32 @@ impl ErrorLogExt for fidl_fuchsia_posix::Errno {
             | fidl_fuchsia_posix::Errno::Eagain => log::Level::Trace,
             // All other errnos.
             _ => log::Level::Debug,
+        }
+    }
+}
+
+/// Extension trait implemented for [`Result`]s whose Err variants are [`ErrnoError`].
+pub(crate) trait ErrnoResultExt {
+    /// The Ok type of this result.
+    type Ok;
+
+    /// Logs the error with `msg` if it's an error and returns back the same result with the
+    /// ErrnoError mapped to just an Errno.
+    fn log_errno_error(self, msg: impl Display) -> Result<Self::Ok, fidl_fuchsia_posix::Errno>;
+}
+
+impl<O> ErrnoResultExt for Result<O, ErrnoError> {
+    type Ok = O;
+
+    #[track_caller]
+    fn log_errno_error(self, msg: impl Display) -> Result<O, fidl_fuchsia_posix::Errno> {
+        match self {
+            Ok(v) => Ok(v),
+            Err(e) => {
+                let (errno, source) = e.into_errno_and_source();
+                errno.log(format_args!("{msg} ({source})"));
+                Err(errno)
+            }
         }
     }
 }

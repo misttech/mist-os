@@ -3,7 +3,6 @@
 # found in the LICENSE file.
 
 import argparse
-import os
 import pathlib
 import subprocess
 import unittest
@@ -64,15 +63,13 @@ def main() -> None:
     args = parser.parse_args()
 
     # Assume we're in the root build dir right now and that is where we'll find ffx env.
-    root_build_dir = os.getcwd()
     ffx_env_path = "./.ffx.env"
 
     # Imitate the configuration in //src/developer/ffx/build/ffx_action.gni.
     base_config = [
-        "analytics.disabled=true",
-        "sdk.root=" + root_build_dir,
-        "sdk.type=in-tree",
-        "sdk.module=host_tools_used_by_ffx_action_during_build",
+        "ffx.analytics.disabled=true",
+        "daemon.autostart=false",
+        "log.enabled=false",
     ]
 
     ffx_args = [args.ffx_bin]

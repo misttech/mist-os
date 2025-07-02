@@ -19,7 +19,7 @@
 {{- define "Method:WireWeakOnewayClientImpl:driver/WireMessagingSource" }}
   ::fidl::OneWayStatus {{ .Protocol.WireWeakOnewayClientImpl.NoLeading }}::{{ .Name }}(
         {{- RenderParams .RequestArgs }}) {
-    FIDL_INTERNAL_DISABLE_AUTO_VAR_INIT
+    __UNINITIALIZED
     {{ .WireTransactionalRequest }} _request_object{ {{ RenderForwardParams .RequestArgs }} };
 
     constexpr uint32_t _buffer_size = ::fidl::AsyncClientMethodBufferSizeInChannel<{{ .Marker }}>();

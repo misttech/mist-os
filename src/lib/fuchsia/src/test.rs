@@ -18,8 +18,33 @@ mod test {
         should_be_false: bool,
     }
 
+    struct NoOpLogger {}
+
+    impl log::Log for NoOpLogger {
+        fn enabled(&self, _metadata: &log::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn log(&self, _record: &log::Record<'_>) {}
+
+        fn flush(&self) {}
+    }
+
+    #[cfg(not(target_os = "fuchsia"))]
     #[fuchsia::test]
-    fn empty_test() {}
+    fn empty_test() {
+        // Host tests do not get the logger pre-installed for them
+        // so setting the logger should succeed
+        log::set_boxed_logger(Box::new(NoOpLogger {})).unwrap();
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    #[fuchsia::test]
+    fn empty_test() {
+        // Target tests get the logger pre-installed for them
+        // so setting the logger should fail
+        assert!(log::set_boxed_logger(Box::new(NoOpLogger {})).is_err());
+    }
 
     #[fuchsia::test(logging = false)]
     fn empty_test_without_logging() {}
@@ -80,14 +105,17 @@ mod test {
     #[fuchsia::test(allow_stalls = true)]
     async fn empty_very_singlethreaded_allow_stalls_test() {}
 
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main]
     #[test]
     fn empty_component_test() {}
 
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main]
     #[test]
     async fn empty_async_component_test() {}
 
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main(threads = 2)]
     #[test]
     async fn empty_async_multithreaded_component_test() {}
@@ -128,6 +156,7 @@ mod test {
     }
 
     #[allow(dead_code)]
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main(add_test_attr = true)]
     fn empty_component_test_with_add_test_attr() {
         // `add_test_attr = true` should only have an effect when using fuchsia::test, not
@@ -140,6 +169,7 @@ mod test {
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main]
     #[test]
     fn empty_component_test_with_result() -> Result<(), Error> {
@@ -150,6 +180,7 @@ mod test {
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main]
     #[test]
     async fn empty_async_component_test_with_result() -> Result<(), Error> {
@@ -160,6 +191,7 @@ mod test {
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main(threads = 2)]
     #[test]
     async fn empty_async_multithreaded_component_test_with_result() -> Result<(), Error> {
@@ -170,6 +202,7 @@ mod test {
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main(logging_tags = [])]
     #[test]
     async fn component_with_empty_logging_tags() -> Result<(), Error> {
@@ -180,6 +213,7 @@ mod test {
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main(logging_tags = ["foo"])]
     #[test]
     async fn component_with_single_logging_tag() -> Result<(), Error> {
@@ -190,6 +224,7 @@ mod test {
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main(logging_tags = ["foo", "bar"])]
     #[test]
     async fn component_with_logging_tags() -> Result<(), Error> {
@@ -200,6 +235,7 @@ mod test {
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main(logging_minimum_severity = "error")]
     #[test]
     async fn component_with_minimum_severity() -> Result<(), Error> {
@@ -210,6 +246,7 @@ mod test {
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main(thread_role = "role.for.test")]
     #[test]
     async fn async_component_with_thread_role() {}
@@ -218,6 +255,7 @@ mod test {
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main(threads = 2, thread_role = "role.for.test")]
     #[test]
     async fn async_multithreaded_component_with_thread_role() {}
@@ -226,6 +264,7 @@ mod test {
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main(thread_role = "role.for.test")]
     #[test]
     fn sync_component_with_thread_role() {}
@@ -234,9 +273,11 @@ mod test {
     // enable testing of the fuchsia::main code in a unit test.
     // Real users of the fuchsia library should not do this, and the ability to do so is not
     // guaranteed to be present in the future.
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main(thread_role = ROLE_NAME_FOR_TEST)]
     #[test]
     async fn component_with_const_thread_role() {}
+    #[cfg(target_os = "fuchsia")]
     const ROLE_NAME_FOR_TEST: &str = "role.for.test";
 
     // fuchsia::main with arguments can't be written as a test
@@ -252,6 +293,7 @@ mod test {
     // (since argh will parse command line arguments and these will be arguments defining
     // the test execution environment)
     #[allow(dead_code)]
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main]
     async fn empty_async_component_test_with_argument(opt: Options) {
         assert_eq!(opt.should_be_false, false);
@@ -261,6 +303,7 @@ mod test {
     // (since argh will parse command line arguments and these will be arguments defining
     // the test execution environment)
     #[allow(dead_code)]
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main(threads = 2)]
     async fn empty_async_multithreaded_component_test_with_argument(opt: Options) {
         assert_eq!(opt.should_be_false, false);
@@ -270,6 +313,7 @@ mod test {
     // (since argh will parse command line arguments and these will be arguments defining
     // the test execution environment)
     #[allow(dead_code)]
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main]
     fn empty_component_test_with_argument_and_result(opt: Options) -> Result<(), Error> {
         assert_eq!(opt.should_be_false, false);
@@ -280,6 +324,7 @@ mod test {
     // (since argh will parse command line arguments and these will be arguments defining
     // the test execution environment)
     #[allow(dead_code)]
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main]
     async fn empty_async_component_test_with_argument_and_result(
         opt: Options,
@@ -292,6 +337,7 @@ mod test {
     // (since argh will parse command line arguments and these will be arguments defining
     // the test execution environment)
     #[allow(dead_code)]
+    #[cfg(target_os = "fuchsia")]
     #[fuchsia::main(threads = 2)]
     async fn empty_async_multithreaded_component_test_with_argument_and_result(
         opt: Options,

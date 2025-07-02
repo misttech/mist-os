@@ -230,7 +230,7 @@ func (c *Conn) newSession(ctx context.Context, stdout io.Writer, stderr io.Write
 	select {
 	case r := <-ch:
 		if r.err != nil {
-			return nil, ConnectionError{fmt.Errorf("failed to start ssh session: %w", r.err)}
+			return nil, ConnectionError{fmt.Errorf("%s: %w", constants.FailedToStartSshSessionMsg, r.err)}
 		}
 		if stdout != nil {
 			r.session.Stdout = &ActivityTracker{

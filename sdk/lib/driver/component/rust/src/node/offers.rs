@@ -128,6 +128,7 @@ impl<S> ZirconServiceOffer<S> {
         let service = OfferService {
             source_name: Some(self.service_name.clone()),
             target_name: Some(self.service_name),
+            source_instance_filter: Some(vec![DEFAULT_SERVICE_INSTANCE.to_owned()]),
             renamed_instances: Some(instances),
             ..Default::default()
         };
