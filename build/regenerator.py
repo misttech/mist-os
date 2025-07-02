@@ -13,6 +13,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+import time
 import typing as T
 from pathlib import Path
 
@@ -104,6 +105,82 @@ def generate_bazel_content_hash_files(
         result |= fstate.get_input_file_paths()
 
     return result
+
+
+class TimeProfile(object):
+    """Track regeneration steps' start and end times.
+
+    Usage is:
+      1) Create instance.
+
+      2) Call start() when starting a new step. Repeat as many times as needed.
+
+      3) Optionally call stop() when a step has completed. Useful if some
+         unrelated work needs to happen after the next start() call.
+
+      4) Call print() to print a table detailing the timings of all
+         steps over a given threshold.
+    """
+
+    def __init__(self, log: None | T.Callable[[str], None] = None) -> None:
+        """Constructor.
+
+        Args:
+            log: An optional callable that can be used to print step descriptions
+               when start() is called.
+        """
+        self._start_time = time.time()
+        self._steps: list[tuple[float, float, str]] = []
+        self._log = log
+
+    def start(self, name: str, description: str = "") -> None:
+        """Start a new regeneration step (and stop the current one if any)
+
+        Args:
+            name: Step name (used in final print() output)
+            description: Optional step description. Will be sent to the log
+               if one was provided in the constructor.
+        """
+        if description and self._log:
+            self._log(description)
+        cur_time = self._close_last_step()
+        self._steps.append((cur_time, 0, name))
+
+    def stop(self) -> None:
+        """Stop the current step (record its end time)."""
+        self._close_last_step()
+
+    def _close_last_step(self) -> float:
+        cur_time = time.time()
+        if self._steps:
+            start_time, end_time, name = self._steps[-1]
+            if end_time == 0:
+                end_time = cur_time
+                self._steps[-1] = (start_time, end_time, name)
+        return cur_time
+
+    def print(self, short_step_threshold: float = 0.0) -> None:
+        """Print timings results for all recorded steps.
+
+        Args:
+            short_step_threshold: A threshold in seconds. Any step
+                that was faster than this will be omitted from the
+                output.
+        """
+        self._close_last_step()
+        if short_step_threshold:
+            print(
+                "Timing results for regeneration steps slower than %.1f seconds:"
+                % short_step_threshold
+            )
+        else:
+            print("Timing results for all regeneration steps:")
+        for step in self._steps:
+            start_time, end_time, name = step
+            duration = end_time - start_time
+            if duration < short_step_threshold:
+                continue
+            print("%5.2fs   %s" % (end_time - start_time, name))
 
 
 def main() -> int:
@@ -252,20 +329,25 @@ def main() -> int:
         for gn_json_ide_script in args.gn_json_ide_script:
             gn_cmd_args += [f"--json-ide-script={gn_json_ide_script}"]
 
-        log("Running gn gen to rebuild Ninja manifest...")
+        time_profile = TimeProfile(log=log)
+
+        time_profile.start(
+            "gn gen", "Running gn gen to rebuild Ninja manifest..."
+        )
+
         ret = run_cmd(gn_cmd_args, cwd=args.fuchsia_dir)
         if ret.returncode != 0:
             # Don't print anything here, assume GN already wrote something to the user.
             return ret.returncode
 
-        log(
-            "Patching Ninja build plan to invoke regenerator on build file changes."
-        )
-
         # Patch build.ninja to ensure Ninja calls this script instead of `gn gen`
         # if any of the BUILD file changes.
         # Do this as early as possible to that this script will be re-invoked if
         # it later fails.
+        time_profile.start(
+            "patching build.ninja",
+            "Patching Ninja build plan to invoke regenerator on build file changes.",
+        )
         log2("- Patching build.ninja")
         build_ninja_path = build_dir / "build.ninja"
         build_ninja = build_ninja_path.read_text()
@@ -319,8 +401,9 @@ def main() -> int:
         extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator")
         extra_ninja_build_inputs.add(fuchsia_dir / "build" / "regenerator.py")
 
-        log(
-            "Generating IDK export directory for Bazel in-tree SDK from GN prebuild metadata."
+        time_profile.start(
+            "generate_prebuild_idk",
+            "Generating IDK export directory for Bazel in-tree SDK from GN prebuild metadata.",
         )
 
         with Path(
@@ -354,7 +437,10 @@ def main() -> int:
             )
             return result
 
-        log("Generating @fuchsia_in_tree_idk repository content.")
+        time_profile.start(
+            "@fuchsia_in_tree_idk",
+            "Generating @fuchsia_in_tree_idk repository content.",
+        )
         # LINT.IfChange
         _idk_repository_name = "fuchsia_in_tree_idk"
         _canonical_idk_repository_name = "+fuchsia_idk+fuchsia_in_tree_idk"
@@ -384,7 +470,9 @@ def main() -> int:
             os.remove(ninja_idk_export_dir_symlink_path)
         os.symlink(idk_export_dir_path, ninja_idk_export_dir_symlink_path)
 
-        log("Generating product_bundles.json.")
+        time_profile.start(
+            "product_bundles.json", "Generating product_bundles.json."
+        )
         product_bundles_metadata = build_dir / "product_bundles_metadata.json"
         product_bundles = build_dir / "product_bundles.json"
         if not product_bundles.exists() or not filecmp.cmp(
@@ -392,7 +480,7 @@ def main() -> int:
         ):
             shutil.copy(product_bundles_metadata, product_bundles)
 
-        log("Generating tests.json.")
+        time_profile.start("tests.json", "Generating tests.json.")
         extra_ninja_build_inputs |= build_tests_json.build_tests_json(build_dir)
 
         # Where to store regenerator outputs. This must be in a directory specific to
@@ -407,7 +495,9 @@ def main() -> int:
         regenerator_outputs_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate content hash files for the Bazel workspace.
-        log("Generating Bazel content hash files")
+        time_profile.start(
+            "bazel_content_hash_files", "Generating Bazel content hash files"
+        )
 
         # Load {build_dir}/bazel_content_hashes.json generated by `gn gen`.
         # by //build/bazel:bazel_content_hashes_json
@@ -428,7 +518,9 @@ def main() -> int:
         )
 
         # Generate remote_services.bazelrc
-        log("Generating remote_services.bazelrc")
+        time_profile.start(
+            "remote_services.bazelrc", "Generating remote_services.bazelrc"
+        )
 
         # NOTE: Since this file is generated by `gn gen`, it doesn't need
         # to be added to extra_ninja_build_inputs.
@@ -455,7 +547,9 @@ def main() -> int:
         # Generate the content of the @fuchsia_build_info directory.
         # `extra_ninja_inputs` does not need to be updated because the content
         # is derived from GN args, and any changes would cause GN gen to run.
-        log("Generating @fuchsia_build_info content")
+        time_profile.start(
+            "@fuchsia_build_info", "Generating @fuchsia_build_info content"
+        )
         workspace_utils.GnBuildArgs.generate_fuchsia_build_info(
             fuchsia_dir=fuchsia_dir,
             build_dir=build_dir,
@@ -465,7 +559,9 @@ def main() -> int:
         )
 
         # Generate the bazel launcher and Bazel workspace files.
-        log("Generating Fuchsia Bazel workspace and launcher")
+        time_profile.start(
+            "bazel_workspace", "Generating Fuchsia Bazel workspace and launcher"
+        )
         extra_ninja_build_inputs |= workspace_utils.generate_fuchsia_workspace(
             fuchsia_dir=fuchsia_dir,
             build_dir=build_dir,
@@ -493,6 +589,7 @@ def main() -> int:
         # Write the set of extra inputs to a file, this is used to ensure
         # that `fx bazel` can invoke regenerator if any of these changes,
         # independent of Ninja-related changes.
+        time_profile.start("regenerator_inputs.txt")
         log2("- Writing regenerator_inputs.txt")
         with regenerator_inputs_path.open("wt") as f:
             for input_path in sorted_extra_ninja_build_inputs:
@@ -500,6 +597,7 @@ def main() -> int:
 
         # Patch build.ninja.d to ensure that Ninja will re-invoke the script if its
         # own source code, or any other extra implicit input, changes.
+        time_profile.start("build.ninja.d")
         log2("- Patching build.ninja.d")
         build_ninja_d_path = build_dir / "build.ninja.d"
         build_ninja_d = build_ninja_d_path.read_text().rstrip()
@@ -510,6 +608,7 @@ def main() -> int:
         log2("- Updating build.ninja.stamp timestamp")
         build_ninja_stamp_path.touch()
 
+        time_profile.print(0.0 if verbose >= 1 else 0.5)
         return 0
 
     def ensure_regenerator_will_run_again() -> None:
