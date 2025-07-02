@@ -53,6 +53,7 @@ sdk_source_set("mock-mmio-reg") {
   public = [ "include/mock-mmio-reg/mock-mmio-reg.h" ]
   include_base = "include"
   public_deps = [
+    "//src/devices/lib/mmio",
     "//src/devices/lib/mmio:test_helper",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/mmio-ptr",
