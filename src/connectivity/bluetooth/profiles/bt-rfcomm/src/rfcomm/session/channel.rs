@@ -18,15 +18,17 @@ use crate::rfcomm::inspect::{DuplexDataStreamInspect, SessionChannelInspect, FLO
 use crate::rfcomm::types::{Error, SignaledTask};
 
 /// Upper bound for the number of credits we allow a remote device to have.
-/// This is used to determine the number of credits to include in frames sent to the peer
-/// after space frees up in the local received frame buffer.
+/// This is used to determine when to refresh the remote credit count to limit the number of
+/// pending RX packets.
 /// This value is arbitrarily chosen and not derived from the GSM or RFCOMM specifications.
-const HIGH_CREDIT_WATER_MARK: usize = u8::MAX as usize;
+// TODO(https://fxbug.dev/428738649): Consider setting this dynamically based on negotiated MTU.
+const HIGH_CREDIT_WATER_MARK: usize = 16;
 
 /// Threshold indicating that the number of credits is low on a remote device.
 /// This is used as an indicator to send an empty frame to replenish the remote's credits.
 /// This value is arbitrarily chosen and not derived from the GSM or RFCOMM specifications.
-const LOW_CREDIT_WATER_MARK: usize = 10;
+// TODO(https://fxbug.dev/428738649): Consider setting this dynamically based on negotiated MTU.
+const LOW_CREDIT_WATER_MARK: usize = 4;
 
 /// Tracks the credits for each device connected to a given RFCOMM channel.
 #[derive(Debug, Default, Inspect)]
@@ -728,7 +730,7 @@ mod tests {
             &mut exec,
             &mut outgoing_frames,
             UserData { information: client_data },
-            Some(1), // HIGH_CREDIT_WATER_MARK - 254 (current)
+            Some(1), // 16 (HIGH_CREDIT_WATER_MARK) - 15 (current)
         );
     }
 
@@ -747,13 +749,10 @@ mod tests {
             ))),
         );
 
-        let data_received_by_client = client.next();
-        let mut data_received_by_client = pin!(data_received_by_client);
-        exec.run_until_stalled(&mut data_received_by_client).expect_pending("shouldn't have data");
+        exec.run_until_stalled(&mut client.next()).expect_pending("shouldn't have data");
+        poll_stream(&mut exec, &mut outgoing_frames).expect_pending("no frame");
 
-        poll_stream(&mut exec, &mut outgoing_frames).expect_pending("shouldn't have frames");
-
-        // Receive user data to be relayed to the profile-client - random amount of credits.
+        // Peer sends data to us. We expect it to be relayed to the upper layer profile.
         let user_data = UserData { information: vec![0x01, 0x02, 0x03] };
         {
             let mut receive_fut = Box::pin(session_channel.receive_user_data(FlowControlledData {
@@ -761,10 +760,12 @@ mod tests {
                 credits: Some(6),
             }));
             assert_matches!(exec.run_until_stalled(&mut receive_fut), Poll::Ready(Ok(_)));
+            // Data should be relayed to the client.
+            assert!(exec.run_until_stalled(&mut client.next()).is_ready());
+            // Don't expect any outgoing empty frame to refresh remote credit count as it is still
+            // above the LOW_CREDIT_WATER_MARK.
+            poll_stream(&mut exec, &mut outgoing_frames).expect_pending("no frame");
         }
-
-        // Data should be relayed to the client.
-        assert!(exec.run_until_stalled(&mut data_received_by_client).is_ready());
 
         // Client responds with some user data.
         let client_data = vec![0xff, 0x00, 0xaa];
@@ -772,12 +773,12 @@ mod tests {
 
         // Data should be processed by the SessionChannel, packed into an RFCOMM frame, and relayed
         // using the `frame_sender`. There should be credits associated with the frame - we always
-        // attempt to replenish with the (`HIGH_CREDIT_WATER_MARK` - remote_credits) amount.
+        // attempt to replenish with the (HIGH_CREDIT_WATER_MARK - remote_credits) amount.
         expect_user_data_frame(
             &mut exec,
             &mut outgoing_frames,
             UserData { information: client_data },
-            Some(244), // = 255 (max) - (12 (initial) - 1 (sent frame))
+            Some(5), // = 16 (max) - (12 (initial) - 1 (sent frame))
         );
     }
 
@@ -790,7 +791,7 @@ mod tests {
     /// credits, and validates the frame from 2 is sent correctly.
     #[test]
     fn test_credit_flow_controller() {
-        let initial_credits = Credits::new(2, 7);
+        let initial_credits = Credits::new(2, 4);
         let (mut exec, _inspect, mut flow_controller, mut outgoing_frames) =
             setup_credit_flow_controller(
                 /* initial_time= */ fasync::MonotonicInstant::from_nanos(0),
@@ -818,7 +819,7 @@ mod tests {
                 &mut exec,
                 &mut outgoing_frames,
                 UserData::empty(),
-                Some(249), // 255 (Max) - (7 (initial) - 1 (received))
+                Some(13), // 16 (Max) - (4 (initial) - 1 (received))
             );
             assert!(exec.run_until_stalled(&mut receive_fut).is_ready());
         }
@@ -1100,8 +1101,8 @@ mod tests {
         {
             let mut send_fut = Box::pin(flow_controller.send_data_to_peer(data2.clone()));
             exec.run_until_stalled(&mut send_fut).expect_pending("should wait for outgoing frame");
-            // Frame should be sent to the peer (Credits = 255 (max) - 69 (current remote)).
-            expect_user_data_frame(&mut exec, &mut outgoing_frames, data2, Some(186));
+            // Frame to peer (No credit refresh because remote is above the watermark).
+            expect_user_data_frame(&mut exec, &mut outgoing_frames, data2, None);
             assert!(exec.run_until_stalled(&mut send_fut).is_ready());
         }
         // Flow controller inspect node should be updated.
@@ -1109,7 +1110,7 @@ mod tests {
             flow_controller: {
                 controller_type: "credit_flow",
                 local_credits: 59u64, // 60 (previous amount) - 1 (sent frame)
-                remote_credits: 255u64, // We replenished the remote with the max.
+                remote_credits: 69u64, // 69 (previous amount unchanged)
                 inbound_stream: {
                     bytes_per_second_current: 5u64,
                     start_time: 987_000_000i64,
