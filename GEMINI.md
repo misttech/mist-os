@@ -241,7 +241,57 @@ committing a file), **always** follow these steps:
     *   **Example:** `git -C "$GIT_ROOT" add "$RELATIVE_PATH"`
     *   **Example:** `git -C "$GIT_ROOT" commit -m "Your message"`
 
-5.  **Repeat for New Tasks:** If you switch context to a file in a different
-    location (e.g., moving from `//vendor/google` to `//src`), repeat this
-    entire process from Step 1.
-    **Do not assume the previous repository root is still correct.**
+5.  **Repeat for New Tasks:** If you switch context to a file in a
+    different location (e.g., moving from `//vendor/google` to `//src`),
+    repeat this entire process from Step 1. **Do not assume the previous
+    repository root is still correct.**
+
+## Git Commit Message Formatting
+
+These guidelines are a summary of the full [commit message style
+guide](docs/contribute/commit-message-style-guide.md).
+
+*   **Subject Line:**
+    *   **Tag:** The subject **must** begin with a `[tag]` to categorize
+        the change.
+        *   The tag should be a short keyword relevant to the change's
+            scope (e.g., `[docs]`, `[test]`, `[fidl]`).
+        *   Multiple tags can be used for more specificity (e.g.,
+            `[net][dhcp]`).
+        *   To choose a good tag, check the commit history for the files
+            you are editing.
+    *   **Summary:** Use the imperative mood (e.g., "Add feature," not
+        "Added feature").
+    *   **Length:** Keep the entire subject line under 50 characters if
+        possible.
+
+*   **Body:**
+    *   Separate the subject from the body with a blank line.
+    *   Explain the *reason and intention* of the change, not just what
+        changed.
+    *   Wrap body lines at 72 characters.
+
+*   **Footer:**
+    *   **Bug:** Include a `Bug: <issue-id>` line to link to an issue. This
+        is recommended when applicable but not required. Use `Fixed:` to
+        automatically close the issue. Do not make up an issue-id. If you do
+        not know a relevant issue-id, ask the user for one.
+    *   **Test:** A `Test:` line is required to describe how the change was
+        verified. Describe how the change is tested, whether new tests were
+        added, and what kind of tests they are (unit, integration, or end-to-end
+        tests). If no new tests are needed (e.g., for a documentation
+        change), you can use `Test: None` with a brief explanation.
+
+**Example:**
+```
+[docs] Add commit message guidelines to GEMINI.md
+
+This provides a summary of the commit message style
+guide for quick reference within the agent's primary
+context file.
+
+Bug: 12345
+Test: None, documentation change.
+
+Change-Id: Iabcdef1234567890abcdef1234567890abcdef12
+```
