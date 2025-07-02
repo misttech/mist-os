@@ -38,6 +38,10 @@ use std::collections::HashSet;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, OnceLock};
 
+/// Rust cannot infer the permission type from an empty slice, so define an explicitly-typed empty
+/// permissions slice to use.
+const NO_PERMISSIONS: &[KernelPermission] = &[];
+
 /// Returns the set of `Permissions` on `class`, corresponding to the specified `flags`.
 fn permissions_from_flags(flags: PermissionFlags, class: FsNodeClass) -> Vec<KernelPermission> {
     let mut result = Vec::new();
@@ -71,7 +75,7 @@ fn has_file_permissions(
     kernel: &Kernel,
     subject_sid: SecurityId,
     file: &FileObject,
-    permissions: &[KernelPermission],
+    permissions: &[impl ForClass<FsNodeClass>],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     // Validate that the `subject` has the "fd { use }" permission to the `file`.
@@ -114,7 +118,7 @@ fn todo_has_file_permissions(
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     file: &FileObject,
-    permissions: &[KernelPermission],
+    permissions: &[impl ForClass<FsNodeClass>],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     // Validate that the `subject` has the "fd { use }" permission to the `file`.
@@ -160,7 +164,14 @@ fn has_file_ioctl_permission(
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     // Validate that the `subject` has the "fd { use }" permission to the `file`.
-    has_file_permissions(permission_check, kernel, subject_sid, file, &[], audit_context)?;
+    has_file_permissions(
+        permission_check,
+        kernel,
+        subject_sid,
+        file,
+        NO_PERMISSIONS,
+        audit_context,
+    )?;
 
     // Validate that the `subject` has the `ioctl` permission on the underlying node,
     // as well as the specified ioctl extended permission.
@@ -233,7 +244,7 @@ fn has_fs_node_permissions(
     kernel: &Kernel,
     subject_sid: SecurityId,
     fs_node: &FsNode,
-    permissions: &[KernelPermission],
+    permissions: &[impl ForClass<FsNodeClass>],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     if Anon::is_private(fs_node) {
@@ -250,7 +261,7 @@ fn has_fs_node_permissions(
             kernel,
             subject_sid,
             target.sid,
-            permission.clone(),
+            permission.for_class(target.class),
             (&audit_context).into(),
         )?;
     }
@@ -265,7 +276,7 @@ fn todo_has_fs_node_permissions(
     permission_check: &PermissionCheck<'_>,
     subject_sid: SecurityId,
     fs_node: &FsNode,
-    permissions: &[KernelPermission],
+    permissions: &[impl ForClass<FsNodeClass>],
     audit_context: Auditable<'_>,
 ) -> Result<(), Errno> {
     if Anon::is_private(fs_node) {
@@ -283,7 +294,7 @@ fn todo_has_fs_node_permissions(
             permission_check,
             subject_sid,
             target.sid,
-            permission.clone(),
+            permission.for_class(target.class),
             (&audit_context).into(),
         )?;
     }

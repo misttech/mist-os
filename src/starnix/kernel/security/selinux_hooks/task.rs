@@ -7,6 +7,7 @@ use crate::security::selinux_hooks::{
     fs_node_set_label_with_task, has_file_permissions, permissions_from_flags,
     task_consistent_attrs, task_effective_sid, todo_check_permission, todo_has_fs_node_permissions,
     Auditable, KernelPermission, PermissionCheck, ProcessPermission, TaskAttrs, TaskAttrsOverride,
+    NO_PERMISSIONS,
 };
 use crate::security::{Arc, ProcAttr, ResolvedElfState, SecurityId, SecurityServer};
 use crate::task::{CurrentTask, Task};
@@ -94,7 +95,7 @@ fn close_inaccessible_file_descriptors(
             current_task.kernel(),
             source_sid,
             file,
-            &[],
+            NO_PERMISSIONS,
             audit_context.into(),
         );
         if !permissions.is_empty() {

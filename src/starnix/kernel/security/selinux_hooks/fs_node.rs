@@ -909,13 +909,12 @@ pub(in crate::security) fn check_fs_node_read_link_access(
     fs_node: &FsNode,
 ) -> Result<(), Errno> {
     let current_sid = task_effective_sid(current_task);
-    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
     has_fs_node_permissions(
         &security_server.as_permission_check(),
         current_task.kernel(),
         current_sid,
         fs_node,
-        &[CommonFsNodePermission::Read.for_class(fs_node_class)],
+        &[CommonFsNodePermission::Read],
         current_task.into(),
     )
 }
@@ -946,14 +945,13 @@ pub(in crate::security) fn check_fs_node_getattr_access(
     fs_node: &FsNode,
 ) -> Result<(), Errno> {
     let current_sid = task_effective_sid(current_task);
-    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
     todo_has_fs_node_permissions(
         TODO_DENY!("https://fxbug.dev/383284672", "Enable permission checks in getattr."),
         &current_task.kernel(),
         &security_server.as_permission_check(),
         current_sid,
         fs_node,
-        &[CommonFsNodePermission::GetAttr.for_class(fs_node_class)],
+        &[CommonFsNodePermission::GetAttr],
         current_task.into(),
     )
 }
@@ -966,7 +964,6 @@ pub(in crate::security) fn check_fs_node_setattr_access(
     attributes: &zxio_node_attr_has_t,
 ) -> Result<(), Errno> {
     let current_sid = task_effective_sid(current_task);
-    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
 
     let permissions = if attributes.mode
         || attributes.uid
@@ -976,9 +973,9 @@ pub(in crate::security) fn check_fs_node_setattr_access(
         || attributes.change_time
         || attributes.casefold
     {
-        [CommonFsNodePermission::SetAttr.for_class(fs_node_class)]
+        [CommonFsNodePermission::SetAttr]
     } else {
-        [CommonFsNodePermission::Write.for_class(fs_node_class)]
+        [CommonFsNodePermission::Write]
     };
 
     has_fs_node_permissions(
@@ -1000,13 +997,12 @@ pub(in crate::security) fn check_fs_node_setxattr_access(
     _op: XattrOp,
 ) -> Result<(), Errno> {
     let current_sid = task_effective_sid(current_task);
-    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
     has_fs_node_permissions(
         &security_server.as_permission_check(),
         current_task.kernel(),
         current_sid,
         fs_node,
-        &[CommonFsNodePermission::SetAttr.for_class(fs_node_class)],
+        &[CommonFsNodePermission::SetAttr],
         current_task.into(),
     )
 }
@@ -1018,13 +1014,12 @@ pub(in crate::security) fn check_fs_node_getxattr_access(
     _name: &FsStr,
 ) -> Result<(), Errno> {
     let current_sid = task_effective_sid(current_task);
-    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
     has_fs_node_permissions(
         &security_server.as_permission_check(),
         current_task.kernel(),
         current_sid,
         fs_node,
-        &[CommonFsNodePermission::GetAttr.for_class(fs_node_class)],
+        &[CommonFsNodePermission::GetAttr],
         current_task.into(),
     )
 }
@@ -1035,13 +1030,12 @@ pub(in crate::security) fn check_fs_node_listxattr_access(
     fs_node: &FsNode,
 ) -> Result<(), Errno> {
     let current_sid = task_effective_sid(current_task);
-    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
     has_fs_node_permissions(
         &security_server.as_permission_check(),
         current_task.kernel(),
         current_sid,
         fs_node,
-        &[CommonFsNodePermission::GetAttr.for_class(fs_node_class)],
+        &[CommonFsNodePermission::GetAttr],
         current_task.into(),
     )
 }
@@ -1055,13 +1049,12 @@ pub(in crate::security) fn check_fs_node_removexattr_access(
     // TODO: https://fxbug.dev/364568818 - Verify the correct permission check here; is removing a
     // security.* attribute even allowed?
     let current_sid = task_effective_sid(current_task);
-    let fs_node_class = fs_node_effective_sid_and_class(fs_node).class;
     has_fs_node_permissions(
         &security_server.as_permission_check(),
         current_task.kernel(),
         current_sid,
         fs_node,
-        &[CommonFsNodePermission::SetAttr.for_class(fs_node_class)],
+        &[CommonFsNodePermission::SetAttr],
         current_task.into(),
     )
 }

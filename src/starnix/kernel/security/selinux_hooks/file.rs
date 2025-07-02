@@ -9,7 +9,7 @@ use super::bpf::{check_bpf_map_access, check_bpf_prog_access};
 use super::{
     fs_node_effective_sid_and_class, has_file_ioctl_permission, has_file_permissions,
     permissions_from_flags, task_effective_sid, todo_has_fs_node_permissions, FileObjectState,
-    FsNodeSidAndClass, PermissionFlags,
+    FsNodeSidAndClass, PermissionFlags, NO_PERMISSIONS,
 };
 use crate::bpf::fs::BpfHandle;
 use crate::mm::{Mapping, MappingName, MappingOptions, ProtectionFlags};
@@ -19,7 +19,7 @@ use crate::security::selinux_hooks::{
 use crate::task::CurrentTask;
 use crate::vfs::{canonicalize_ioctl_request, FileHandle, FileObject, FsNodeHandle};
 use crate::TODO_DENY;
-use selinux::{CommonFsNodePermission, ForClass, SecurityServer};
+use selinux::{CommonFsNodePermission, SecurityServer};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::UserAddress;
@@ -54,7 +54,7 @@ pub(in crate::security) fn file_permission(
         current_task.kernel(),
         current_sid,
         file,
-        &[],
+        NO_PERMISSIONS,
         current_task.into(),
     )?;
 
@@ -89,7 +89,7 @@ pub(in crate::security) fn file_receive(
             current_task.kernel(),
             subject_sid,
             file,
-            &[],
+            NO_PERMISSIONS,
             current_task.into(),
         )?;
         match *bpf_handle {
@@ -124,15 +124,13 @@ pub(in crate::security) fn check_file_ioctl_access(
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
     let subject_sid = task_effective_sid(current_task);
-
-    let file_class = file.node().security_state.lock().class;
     match canonicalize_ioctl_request(current_task, request) {
         FIBMAP | FIONREAD | FIGETBSZ | FS_IOC_GETFLAGS | FS_IOC_GETVERSION => has_file_permissions(
             &permission_check,
             current_task.kernel(),
             subject_sid,
             file,
-            &[CommonFsNodePermission::GetAttr.for_class(file_class)],
+            &[CommonFsNodePermission::GetAttr],
             current_task.into(),
         ),
         FS_IOC_SETFLAGS | FS_IOC_SETVERSION => has_file_permissions(
@@ -140,7 +138,7 @@ pub(in crate::security) fn check_file_ioctl_access(
             current_task.kernel(),
             subject_sid,
             file,
-            &[CommonFsNodePermission::SetAttr.for_class(file_class)],
+            &[CommonFsNodePermission::SetAttr],
             current_task.into(),
         ),
         FIONBIO | FIOASYNC => has_file_permissions(
@@ -148,7 +146,7 @@ pub(in crate::security) fn check_file_ioctl_access(
             current_task.kernel(),
             subject_sid,
             file,
-            &[],
+            NO_PERMISSIONS,
             current_task.into(),
         ),
         _ => {
@@ -174,13 +172,12 @@ pub(in crate::security) fn check_file_lock_access(
 ) -> Result<(), Errno> {
     let permission_check = security_server.as_permission_check();
     let subject_sid = task_effective_sid(current_task);
-    let fs_node_class = file.node().security_state.lock().class;
     has_file_permissions(
         &permission_check,
         current_task.kernel(),
         subject_sid,
         file,
-        &[CommonFsNodePermission::Lock.for_class(fs_node_class)],
+        &[CommonFsNodePermission::Lock],
         current_task.into(),
     )
 }
@@ -206,7 +203,7 @@ pub(in crate::security) fn check_file_fcntl_access(
                 current_task.kernel(),
                 subject_sid,
                 file,
-                &[CommonFsNodePermission::Lock.for_class(fs_node_class)],
+                &[CommonFsNodePermission::Lock],
                 current_task.into(),
             )?;
         }
@@ -217,7 +214,7 @@ pub(in crate::security) fn check_file_fcntl_access(
                 current_task.kernel(),
                 subject_sid,
                 file,
-                &[],
+                NO_PERMISSIONS,
                 current_task.into(),
             )?;
         }
@@ -330,7 +327,6 @@ pub fn mmap_file(
     mapping_options: MappingOptions,
 ) -> Result<(), Errno> {
     if let Some(file) = file {
-        let file_class = file.node().security_state.lock().class;
         let current_sid = task_effective_sid(current_task);
         todo_has_file_permissions(
             TODO_DENY!("https://fxbug.dev/405381460", "Check permissions when mapping."),
@@ -338,7 +334,7 @@ pub fn mmap_file(
             &security_server.as_permission_check(),
             current_sid,
             file,
-            &[CommonFsNodePermission::Map.for_class(file_class)],
+            &[CommonFsNodePermission::Map],
             current_task.into(),
         )?;
     }

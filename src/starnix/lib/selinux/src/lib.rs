@@ -232,6 +232,13 @@ impl KernelClass {
     }
 }
 
+impl<T: Into<KernelClass>> ForClass<T> for KernelPermission {
+    fn for_class(&self, class: T) -> KernelPermission {
+        assert_eq!(self.class(), class.into());
+        self.clone()
+    }
+}
+
 pub trait ForClass<T> {
     /// Returns the `class`-affine `KernelPermission` value corresponding to this common permission.
     /// This is used to allow hooks to resolve e.g. common "sys_nice" permission access based on the
@@ -380,7 +387,7 @@ impl From<SocketClass> for KernelClass {
             SocketClass::NetlinkGeneric => Self::NetlinkGenericSocket,
             SocketClass::NetlinkIp6Fw => Self::NetlinkIp6FwSocket,
             SocketClass::NetlinkIscsi => Self::NetlinkIscsiSocket,
-            SocketClass::NetlinkKobjectUevent => Self::NetlinkDnrtSocket,
+            SocketClass::NetlinkKobjectUevent => Self::NetlinkKobjectUeventSocket,
             SocketClass::NetlinkNetfilter => Self::NetlinkNetfilterSocket,
             SocketClass::NetlinkNflog => Self::NetlinkNflogSocket,
             SocketClass::NetlinkRdma => Self::NetlinkRdmaSocket,
