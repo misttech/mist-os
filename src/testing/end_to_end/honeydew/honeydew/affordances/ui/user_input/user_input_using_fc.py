@@ -227,13 +227,7 @@ class UserInputUsingFc(user_input.UserInput):
     ) -> None:
         self._device_name = device_name
         self._fc_transport: fc_transport.FuchsiaController = fuchsia_controller
-
-        # check if the device have component to support virtual devices.
-        components = ffx_transport.run(["component", "list"])
-        if _INPUT_HELPER_COMPONENT not in components.splitlines():
-            raise errors.NotSupportedError(
-                f"{_INPUT_HELPER_COMPONENT} is not available in device {device_name}"
-            )
+        self._ffx_transport: ffx.FFX = ffx_transport
 
         self.verify_supported()
 
@@ -242,7 +236,12 @@ class UserInputUsingFc(user_input.UserInput):
         Raises:
             NotSupportedError: User Input affordance is not supported by Fuchsia device.
         """
-        # TODO(http://b/409626027): Implement the method logic
+        # check if the device have component to support virtual devices.
+        components = self._ffx_transport.run(["component", "list"])
+        if _INPUT_HELPER_COMPONENT not in components.splitlines():
+            raise errors.NotSupportedError(
+                f"{_INPUT_HELPER_COMPONENT} is not available in device {self._device_name}"
+            )
 
     def create_touch_device(
         self,

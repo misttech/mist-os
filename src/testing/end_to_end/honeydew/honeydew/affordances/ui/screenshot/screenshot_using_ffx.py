@@ -37,7 +37,6 @@ class ScreenshotUsingFfx(screenshot.Screenshot):
         Raises:
             NotSupportedError: Screenshot affordance is not supported by Fuchsia device.
         """
-        # TODO(http://b/409624046): Implement the method logic
 
     def take(self) -> types.ScreenshotImage:
         """Take a screenshot.
