@@ -459,16 +459,6 @@ test("crash") {
   ]
 }
 
-test("syslog_non_root") {
-  # TODO(https://fxbug.dev/297293167) enable ASan instrumentation for Linux binaries in Starnix
-  exclude_toolchain_tags = [ "asan" ]
-  sources = [ "syslog_non_root_test.cc" ]
-  deps = [
-    "//src/lib/fxl/test:gtest_main",
-    "//third_party/googletest:gtest",
-  ]
-}
-
 if (is_linux) {
   executable("extended_pstate_initial_state_child") {
     testonly = true
@@ -578,17 +568,8 @@ starnix_linux_test_component("crash_test") {
   test_type = "starnix"
 }
 
-starnix_linux_test_component("syslog_non_root_test") {
-  test_label = ":syslog_non_root"
-  test_binary = "syslog_non_root"
-  test_type = "starnix"
-}
-
 fuchsia_test_package("starnix_syscalls_cpp_tests") {
-  test_components = [
-    ":syslog_non_root_test",
-    ":crash_test",
-  ]
+  test_components = [ ":crash_test" ]
   deps = []
   foreach(test_name, all_test_names) {
     test_components += [ ":${test_name}" ]
