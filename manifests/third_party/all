@@ -461,7 +461,7 @@
     <project name="third_party/rapidjson"
              path="third_party/rapidjson"
              remote="https://fuchsia.googlesource.com/third_party/rapidjson"
-             revision="cddb2ae39cf834b70327a0cf12416414120d5479"
+             revision="a8bf9c8352dc5791585438a2909624489eaf981c"
              gerrithost="https://fuchsia-review.googlesource.com"/>
     <project name="third_party/re2"
              path="third_party/re2/src"
