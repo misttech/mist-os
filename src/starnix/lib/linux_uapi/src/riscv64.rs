@@ -18414,14 +18414,14 @@ pub struct bpf_attr__bindgen_ty_7 {
     pub __bindgen_padding_0: [u8; 4usize],
 }
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub struct bpf_attr__bindgen_ty_8 {
     pub __bindgen_anon_1: bpf_attr__bindgen_ty_8__bindgen_ty_1,
     pub next_id: __u32,
     pub open_flags: __u32,
 }
 #[repr(C)]
-#[derive(Copy, Clone, FromBytes, Immutable, KnownLayout)]
+#[derive(Copy, Clone, FromBytes, Immutable, IntoBytes, KnownLayout)]
 pub union bpf_attr__bindgen_ty_8__bindgen_ty_1 {
     pub start_id: __u32,
     pub prog_id: __u32,

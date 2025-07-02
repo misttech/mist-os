@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bpf::attachments::EbpfAttachments;
+use crate::bpf::EbpfState;
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
 use crate::device::{DeviceMode, DeviceRegistry};
 use crate::execution::CrashReporter;
@@ -314,8 +314,8 @@ pub struct Kernel {
     /// Control handle to the running container's ComponentController.
     pub container_control_handle: Mutex<Option<ComponentControllerControlHandle>>,
 
-    /// Keeps track of attached eBPF programs.
-    pub ebpf_attachments: EbpfAttachments,
+    /// eBPF state: loaded programs, eBPF maps, etc.
+    pub ebpf_state: Arc<EbpfState>,
 
     /// Cgroups of the kernel.
     pub cgroups: KernelCgroups,
@@ -438,7 +438,7 @@ impl Kernel {
             procfs_device_tree_setup,
             shutting_down: AtomicBool::new(false),
             container_control_handle: Mutex::new(None),
-            ebpf_attachments: Default::default(),
+            ebpf_state: Default::default(),
             cgroups: Default::default(),
             time_adjustment_proxy,
         });

@@ -119,7 +119,7 @@ impl ZxioBackedSocket {
         let socket = Self::new_with_zxio(zxio);
 
         if matches!(domain, SocketDomain::Inet | SocketDomain::Inet6) {
-            match current_task.kernel().ebpf_attachments.root_cgroup().run_sock_prog(
+            match current_task.kernel().ebpf_state.attachments.root_cgroup().run_sock_prog(
                 locked,
                 current_task,
                 SockOp::Create,
@@ -302,15 +302,16 @@ impl ZxioBackedSocket {
         op: SockAddrOp,
         socket_address: &SocketAddress,
     ) -> Result<(), Errno> {
-        let ebpf_result = current_task.kernel().ebpf_attachments.root_cgroup().run_sock_addr_prog(
-            locked,
-            current_task,
-            op,
-            socket.domain,
-            socket.socket_type,
-            socket.protocol,
-            socket_address,
-        )?;
+        let ebpf_result =
+            current_task.kernel().ebpf_state.attachments.root_cgroup().run_sock_addr_prog(
+                locked,
+                current_task,
+                op,
+                socket.domain,
+                socket.socket_type,
+                socket.protocol,
+                socket_address,
+            )?;
         match ebpf_result {
             SockAddrProgramResult::Allow => Ok(()),
             SockAddrProgramResult::Block => error!(EPERM),
@@ -538,7 +539,7 @@ impl SocketOps for ZxioBackedSocket {
             // Invoke eBPF release program (if any). Result is ignored since we cannot block
             // socket release.
             let _: SockProgramResult =
-                current_task.kernel().ebpf_attachments.root_cgroup().run_sock_prog(
+                current_task.kernel().ebpf_state.attachments.root_cgroup().run_sock_prog(
                     locked,
                     current_task,
                     SockOp::Release,

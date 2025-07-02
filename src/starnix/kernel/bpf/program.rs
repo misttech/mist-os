@@ -3,8 +3,9 @@
 // found in the LICENSE file.
 
 use crate::bpf::fs::get_bpf_object;
+use crate::bpf::{BpfMapHandle, EbpfState};
 use crate::security;
-use crate::task::CurrentTask;
+use crate::task::{register_delayed_release, CurrentTask, CurrentTaskAndLocked};
 use crate::vfs::{FdNumber, OutputBuffer};
 use ebpf::{
     link_program, verify_program, EbpfError, EbpfHelperImpl, EbpfInstruction, EbpfProgram,
@@ -12,15 +13,17 @@ use ebpf::{
     BPF_PSEUDO_BTF_ID, BPF_PSEUDO_FUNC, BPF_PSEUDO_MAP_FD, BPF_PSEUDO_MAP_IDX,
     BPF_PSEUDO_MAP_IDX_VALUE, BPF_PSEUDO_MAP_VALUE,
 };
-use ebpf_api::{
-    get_common_helpers, AttachType, EbpfApiError, Map, MapsContext, PinnedMap, ProgramType,
-};
+use ebpf_api::{get_common_helpers, AttachType, EbpfApiError, MapsContext, PinnedMap, ProgramType};
 use fidl_fuchsia_ebpf as febpf;
+use starnix_lifecycle::{AtomicU32Counter, ObjectReleaser, ReleaserAction};
 use starnix_logging::{log_error, log_warn, track_stub};
+use starnix_sync::{EbpfStateLock, LockBefore, Locked};
+use starnix_types::ownership::{Releasable, ReleaseGuard};
 use starnix_uapi::auth::{CAP_BPF, CAP_NET_ADMIN, CAP_PERFMON, CAP_SYS_ADMIN};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{bpf_attr__bindgen_ty_4, errno, error};
 use std::sync::atomic::Ordering;
+use std::sync::{Arc, Weak};
 
 #[derive(Clone, Debug)]
 pub struct ProgramInfo {
@@ -38,12 +41,21 @@ impl TryFrom<&bpf_attr__bindgen_ty_4> for ProgramInfo {
         })
     }
 }
+pub type ProgramId = u32;
+
+static NEXT_PROGRAM_ID: AtomicU32Counter = AtomicU32Counter::new(1);
+fn new_program_id() -> ProgramId {
+    NEXT_PROGRAM_ID.next()
+}
 
 #[derive(Debug)]
 pub struct Program {
     pub info: ProgramInfo,
     program: VerifiedEbpfProgram,
-    maps: Vec<PinnedMap>,
+    maps: Vec<BpfMapHandle>,
+
+    id: ProgramId,
+    ebpf_state: Weak<EbpfState>,
 
     /// The security state associated with this bpf Program.
     pub security_state: security::BpfProgState,
@@ -65,12 +77,16 @@ fn map_ebpf_api_error(e: EbpfApiError) -> Errno {
 }
 
 impl Program {
-    pub fn new(
+    pub fn new<L>(
+        locked: &mut Locked<L>,
         current_task: &CurrentTask,
         info: ProgramInfo,
         logger: &mut dyn OutputBuffer,
         mut code: Vec<EbpfInstruction>,
-    ) -> Result<Program, Errno> {
+    ) -> Result<ProgramHandle, Errno>
+    where
+        L: LockBefore<EbpfStateLock>,
+    {
         Self::check_load_access(current_task, &info)?;
         let maps = link_maps_fds(current_task, &mut code)?;
         let maps_schema = maps.iter().map(|m| m.schema).collect();
@@ -80,8 +96,25 @@ impl Program {
             .create_calling_context(info.expected_attach_type, maps_schema)
             .map_err(map_ebpf_api_error)?;
         let program = verify_program(code, calling_context, &mut logger).map_err(map_ebpf_error)?;
-        let security_state = security::bpf_prog_alloc(current_task);
-        Ok(Program { info, program, maps, security_state })
+
+        let program = ProgramHandle::new(
+            Self {
+                info,
+                program,
+                maps,
+                id: new_program_id(),
+                ebpf_state: Arc::downgrade(&current_task.kernel().ebpf_state),
+                security_state: security::bpf_prog_alloc(current_task),
+            }
+            .into(),
+        );
+        current_task.kernel().ebpf_state.register_program(locked, &program);
+
+        Ok(program)
+    }
+
+    pub fn id(&self) -> ProgramId {
+        self.id
     }
 
     pub fn link<C: EbpfProgramContext<Map = PinnedMap>>(
@@ -99,9 +132,10 @@ impl Program {
 
         let helpers =
             get_common_helpers::<C>().into_iter().chain(local_helpers.iter().cloned()).collect();
+        let maps = self.maps.iter().map(|map| map.map.clone()).collect();
 
-        let program = link_program(&self.program, struct_mappings, self.maps.clone(), helpers)
-            .map_err(map_ebpf_error)?;
+        let program =
+            link_program(&self.program, struct_mappings, maps, helpers).map_err(map_ebpf_error)?;
 
         Ok(program)
     }
@@ -160,6 +194,26 @@ impl Program {
     }
 }
 
+impl Releasable for Program {
+    type Context<'a> = CurrentTaskAndLocked<'a>;
+
+    fn release<'a>(self, (locked, _current_task): CurrentTaskAndLocked<'a>) {
+        if let Some(state) = self.ebpf_state.upgrade() {
+            state.unregister_program(locked, self.id);
+        }
+    }
+}
+
+pub enum ProgramReleaserAction {}
+impl ReleaserAction<Program> for ProgramReleaserAction {
+    fn release(map: ReleaseGuard<Program>) {
+        register_delayed_release(map);
+    }
+}
+pub type ProgramReleaser = ObjectReleaser<Program, ProgramReleaserAction>;
+pub type ProgramHandle = Arc<ProgramReleaser>;
+pub type WeakProgramHandle = Weak<ProgramReleaser>;
+
 impl TryFrom<&Program> for febpf::VerifiedProgram {
     type Error = Errno;
 
@@ -199,9 +253,9 @@ impl TryFrom<&Program> for febpf::VerifiedProgram {
 fn link_maps_fds(
     current_task: &CurrentTask,
     code: &mut Vec<EbpfInstruction>,
-) -> Result<Vec<PinnedMap>, Errno> {
+) -> Result<Vec<BpfMapHandle>, Errno> {
     let code_len = code.len();
-    let mut maps = Vec::<PinnedMap>::new();
+    let mut maps = Vec::<BpfMapHandle>::new();
     for (pc, instruction) in code.iter_mut().enumerate() {
         if instruction.code() == BPF_LDDW {
             // BPF_LDDW requires 2 instructions.
@@ -223,11 +277,10 @@ fn link_maps_fds(
 
                     let fd = FdNumber::from_raw(instruction.imm());
                     let object = get_bpf_object(current_task, fd)?;
-                    let map: &PinnedMap = object.as_map()?;
+                    let map: &BpfMapHandle = object.as_map()?;
 
                     // Find the map in `maps` or insert it otherwise.
-                    let maybe_index =
-                        maps.iter().position(|v| (&**v as *const Map) == (&**map as *const Map));
+                    let maybe_index = maps.iter().position(|v| Arc::ptr_eq(v, map));
                     let index = match maybe_index {
                         Some(index) => index,
                         None => {

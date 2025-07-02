@@ -43,8 +43,8 @@ lock_ordering! {
     // ProcessGroup.mutable_state. Artificial locks above need to be before it because of
     // dependencies in DevPtsFile.{read, write, ioctl}.
     FileOpsCore => ProcessGroupState,
-    // Bpf locks
-    UninterruptibleLock => BpfPrograms,
+    // eBPF locks
+    UninterruptibleLock => EbpfStateLock,
     // Userfaultfd
     FileOpsCore => UserFaultInner,
     UninterruptibleLock => UserFaultInner,

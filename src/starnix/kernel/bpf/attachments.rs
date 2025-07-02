@@ -6,7 +6,7 @@
 #![allow(non_upper_case_globals)]
 
 use crate::bpf::fs::{get_bpf_object, BpfHandle};
-use crate::bpf::program::Program;
+use crate::bpf::program::ProgramHandle;
 use crate::task::CurrentTask;
 use crate::vfs::socket::{
     SocketAddress, SocketDomain, SocketProtocol, SocketType, ZxioBackedSocket,
@@ -20,7 +20,7 @@ use ebpf_api::{
 use fidl_fuchsia_net_filter as fnet_filter;
 use fuchsia_component::client::connect_to_protocol_sync;
 use starnix_logging::{log_error, log_warn, track_stub};
-use starnix_sync::{BpfPrograms, FileOpsCore, Locked, OrderedRwLock, Unlocked};
+use starnix_sync::{EbpfStateLock, FileOpsCore, Locked, OrderedRwLock, Unlocked};
 use starnix_syscalls::{SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{
@@ -103,7 +103,7 @@ pub fn bpf_prog_attach(
     let target_fd = unsafe { attr.__bindgen_anon_1.target_fd };
     let target_fd = FdNumber::from_raw(target_fd as i32);
 
-    current_task.kernel().ebpf_attachments.attach_prog(
+    current_task.kernel().ebpf_state.attachments.attach_prog(
         locked,
         current_task,
         attach_type,
@@ -123,7 +123,12 @@ pub fn bpf_prog_detach(
     let target_fd = unsafe { attr.__bindgen_anon_1.target_fd };
     let target_fd = FdNumber::from_raw(target_fd as i32);
 
-    current_task.kernel().ebpf_attachments.detach_prog(locked, current_task, attach_type, target_fd)
+    current_task.kernel().ebpf_state.attachments.detach_prog(
+        locked,
+        current_task,
+        attach_type,
+        target_fd,
+    )
 }
 
 struct EbpfRunContextImpl<'a> {
@@ -222,7 +227,7 @@ impl SockAddrProgram {
     }
 }
 
-type AttachedSockAddrProgramCell = OrderedRwLock<Option<SockAddrProgram>, BpfPrograms>;
+type AttachedSockAddrProgramCell = OrderedRwLock<Option<SockAddrProgram>, EbpfStateLock>;
 
 // Wrapper for `bpf_sock` used to implement `ProgramArgument` trait.
 #[repr(C)]
@@ -284,7 +289,7 @@ impl SockProgram {
     }
 }
 
-type AttachedSockProgramCell = OrderedRwLock<Option<SockProgram>, BpfPrograms>;
+type AttachedSockProgramCell = OrderedRwLock<Option<SockProgram>, EbpfStateLock>;
 
 #[derive(Default)]
 pub struct CgroupEbpfProgramSet {
@@ -552,7 +557,7 @@ impl EbpfAttachments {
         current_task: &CurrentTask,
         attach_type: AttachType,
         target_fd: FdNumber,
-        program: Arc<Program>,
+        program: ProgramHandle,
     ) -> Result<SyscallResult, Errno> {
         let location: AttachLocation = attach_type.try_into()?;
         let program_type = attach_type.get_program_type();
@@ -650,12 +655,12 @@ impl EbpfAttachments {
     fn attach_prog_in_netstack(
         &self,
         attach_type: AttachType,
-        program: Arc<Program>,
+        program: ProgramHandle,
     ) -> Result<SyscallResult, Errno> {
         let hook = attach_type_to_netstack_hook(attach_type).ok_or_else(|| errno!(ENOTSUP))?;
         let opts = fnet_filter::AttachEbpfProgramOptions {
             hook: Some(hook),
-            program: Some((&*program).try_into()?),
+            program: Some((&**program).try_into()?),
             ..Default::default()
         };
         self.socket_control()

@@ -5,9 +5,8 @@
 // TODO(https://github.com/rust-lang/rust/issues/39371): remove
 #![allow(non_upper_case_globals)]
 
-use super::BpfMap;
-use crate::bpf::program::Program;
 use crate::bpf::syscalls::BpfTypeFormat;
+use crate::bpf::{BpfMapHandle, ProgramHandle};
 use crate::mm::memory::MemoryObject;
 use crate::mm::{ProtectionFlags, PAGE_SIZE};
 use crate::security::{self, PermissionFlags};
@@ -44,23 +43,23 @@ use zx::AsHandleRef;
 /// filesystem.
 #[derive(Debug, Clone)]
 pub enum BpfHandle {
-    Program(Arc<Program>),
+    Program(ProgramHandle),
 
     // Stub used to fake loading of programs of unknown types.
     ProgramStub(u32),
 
-    Map(Arc<BpfMap>),
+    Map(BpfMapHandle),
     BpfTypeFormat(Arc<BpfTypeFormat>),
 }
 
 impl BpfHandle {
-    pub fn as_map(&self) -> Result<&BpfMap, Errno> {
+    pub fn as_map(&self) -> Result<&BpfMapHandle, Errno> {
         match self {
             Self::Map(ref map) => Ok(map),
             _ => error!(EINVAL),
         }
     }
-    pub fn as_program(&self) -> Result<&Arc<Program>, Errno> {
+    pub fn as_program(&self) -> Result<&ProgramHandle, Errno> {
         match self {
             Self::Program(ref program) => Ok(program),
             _ => error!(EINVAL),
@@ -97,15 +96,15 @@ impl BpfHandle {
     }
 }
 
-impl From<Program> for BpfHandle {
-    fn from(program: Program) -> Self {
-        Self::Program(Arc::new(program))
+impl From<ProgramHandle> for BpfHandle {
+    fn from(program: ProgramHandle) -> Self {
+        Self::Program(program)
     }
 }
 
-impl From<BpfMap> for BpfHandle {
-    fn from(map: BpfMap) -> Self {
-        Self::Map(Arc::new(map))
+impl From<BpfMapHandle> for BpfHandle {
+    fn from(map: BpfMapHandle) -> Self {
+        Self::Map(map)
     }
 }
 

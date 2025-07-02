@@ -152,7 +152,7 @@ AUTO_DERIVE_TRAITS = [
     ),
     (r"binder_transaction_data.*", ["KnownLayout", "FromBytes", "Immutable"]),
     (
-        r"bpf_attr__bindgen_ty_(1|3|5|6|7|9|10|11|12|13|16|17|18|19)(_.+)?$",
+        r"bpf_attr__bindgen_ty_(1|3|5|6|7|8|9|10|11|12|13|16|17|18|19)(_.+)?$",
         ["IntoBytes", "FromBytes", "KnownLayout", "Immutable"],
     ),
     (r"bpf_attr.*", ["KnownLayout", "FromBytes", "Immutable"]),
