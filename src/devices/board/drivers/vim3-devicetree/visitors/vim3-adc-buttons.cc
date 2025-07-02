@@ -38,19 +38,19 @@ zx::result<> Vim3AdcButtonsVisitor::AddAdcButtonMetadata(fdf_devicetree::Node& n
   //
   // TODO(https//fxbug/dev/315366570): Change the driver to use an IRQ instead of polling.
   constexpr uint32_t kPollingPeriodUSec = 20'000;
-  auto metadata =
-      fuchsia_buttons::Metadata().polling_rate_usec(kPollingPeriodUSec).buttons(std::move(buttons));
+  fuchsia_buttons::Metadata metadata{
+      {.polling_rate_usec = kPollingPeriodUSec, .buttons = std::move(buttons)}};
 
-  fit::result metadata_bytes = fidl::Persist(std::move(metadata));
-  if (!metadata_bytes.is_ok()) {
-    FDF_LOG(ERROR, "Could not build fuchsia buttons metadata %s",
-            metadata_bytes.error_value().FormatDescription().c_str());
-    return zx::error(metadata_bytes.error_value().status());
+  fit::result persisted_metadata = fidl::Persist(metadata);
+  if (!persisted_metadata.is_ok()) {
+    FDF_LOG(ERROR, "Failed to perist buttons metadata %s",
+            persisted_metadata.error_value().FormatDescription().c_str());
+    return zx::error(persisted_metadata.error_value().status());
   }
 
   fuchsia_hardware_platform_bus::Metadata adc_buttons_metadata{{
-      .id = std::to_string(DEVICE_METADATA_BUTTONS),
-      .data = metadata_bytes.value(),
+      .id = fuchsia_buttons::Metadata::kSerializableName,
+      .data = std::move(persisted_metadata.value()),
   }};
   node.AddMetadata(adc_buttons_metadata);
 

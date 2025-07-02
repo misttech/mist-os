@@ -31,6 +31,7 @@ type Button = table {
     2: button_config ButtonConfig;
 };
 
+@serializable
 type Metadata = table {
     /// Polling Rate in usec if exists.
     1: polling_rate_usec uint32;
