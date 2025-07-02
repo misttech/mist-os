@@ -1,8 +1,6 @@
 #![allow(non_camel_case_types)]
 #![no_std]
 
-extern crate syscall;
-
 use core::{mem, slice};
 use core::ops::{Deref, DerefMut};
 
