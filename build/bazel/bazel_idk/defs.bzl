@@ -407,6 +407,8 @@ def idk_cc_source_library(
         # TODO(https://fxbug.dev/417305295): Add this argument if there is a way
         # to tell Bazel to not always compile the source set.
         # build_as_static = False,
+        # TODO(https://fxbug.dev/425931839): Remove when no longer converting to GN.
+        public_configs = [],  # Unused in Bazel, for GN conversion only.
         **kwargs):
     """Defines a C++_source library that can be exported to an IDK.
 
@@ -447,6 +449,7 @@ def idk_cc_source_library(
             GN equivalent: `sdk_headers_for_internal_use`
         testonly: Standard definition.
         visibility: Standard definition.
+        public_configs: Unused in Bazel, for GN conversion only.
         **kwargs: Additional arguments for the underlying library.
     """
 

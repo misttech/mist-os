@@ -341,3 +341,52 @@ func TestDepsConversion(t *testing.T) {
 		})
 	}
 }
+
+func TestIDKConversion(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		bazel  string
+		wantGN string
+	}{
+		{
+			name: "Simple C++ targets",
+			bazel: `load("//build/bazel/bazel_idk:defs.bzl", "idk_cc_source_library")
+
+idk_cc_source_library(
+    name = "magma_common",
+    category = "partner",
+    idk_name = "magma_common",
+    stable = True,
+    hdrs = ["include/lib/magma_common/magma_common_defs.h"],
+    public_configs = [ ":magma_include" ],
+    visibility = [ "//visibility:public" ],
+)
+`,
+			wantGN: `sdk_source_set("magma_common") {
+  category = "partner"
+  sdk_name = "magma_common"
+  stable = true
+  public = [
+    "include/lib/magma_common/magma_common_defs.h",
+  ]
+  public_configs = [
+    ":magma_include",
+  ]
+  visibility = [
+    "*",
+  ]
+}`,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			f := toSyntaxFile(t, tc.bazel)
+			gotGN, err := bazelToGN(f)
+			if err != nil {
+				t.Fatalf("Unexpected failure converting Bazel build targets: %v", err)
+			}
+			if diff := cmp.Diff(gotGN, tc.wantGN); diff != "" {
+				t.Errorf("Diff found after GN conversion (-got +want):\n%s\nBazel source:\n%s", diff, tc.bazel)
+			}
+		})
+	}
+}
