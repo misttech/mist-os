@@ -3,8 +3,6 @@
 // found in the LICENSE file.
 
 use super::event::{TraceEvent, TraceEventQueue};
-use fuchsia_sync::Mutex;
-use fuchsia_trace::{ArgValue, Scope, TraceCategoryContext};
 use starnix_core::fileops_impl_nonseekable;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::buffers::InputBuffer;
@@ -13,19 +11,15 @@ use starnix_core::vfs::{fileops_impl_noop_sync, FileObject, FileOps, FsNodeOps, 
 use starnix_logging::CATEGORY_ATRACE;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 pub struct TraceMarkerFile {
-    event_stacks: Mutex<HashMap<u64, Vec<(String, zx::BootTicks)>>>,
     queue: Arc<TraceEventQueue>,
 }
 
 impl TraceMarkerFile {
     pub fn new_node(queue: Arc<TraceEventQueue>) -> impl FsNodeOps {
-        SimpleFileNode::new(move || {
-            Ok(Self { event_stacks: Mutex::new(HashMap::new()), queue: queue.clone() })
-        })
+        SimpleFileNode::new(move || Ok(Self { queue: queue.clone() }))
     }
 }
 
@@ -60,242 +54,17 @@ impl FileOps for TraceMarkerFile {
         if bytes.ends_with(&['\n' as u8]) {
             bytes.truncate(bytes.len() - 1);
         }
-        let input_data = String::from_utf8_lossy(&bytes);
-        if let Some(atrace_event) = ATraceEvent::parse(&input_data) {
-            if self.queue.is_enabled() {
-                let trace_event = TraceEvent::new(
-                    // This pid is a Kernel pid (do not confuse with userspace pid aka tgid), so we use
-                    // the task thread id, the pid and tid are equal when the thread is the "main thread"
-                    // of the thread group/process.
-                    // It is used when CPU scheduling information is not available.
-                    current_task.get_tid(),
-                    &bytes,
-                );
-                self.queue.push_event(trace_event)?;
-            }
-            // TODO(https://fxbug.dev/357665908): Remove forwarding of atrace events to trace
-            // manager when dependencies have been migrated.
-            if let Some(context) = TraceCategoryContext::acquire(CATEGORY_ATRACE) {
-                match atrace_event {
-                        ATraceEvent::Begin { pid, name } => {
-                            let now = zx::BootTicks::get();
-                            let mut event_stacks = self.event_stacks.lock();
-                            event_stacks
-                                .entry(pid)
-                                .or_insert_with(Vec::new)
-                                .push((name.to_string(), now));
-                        }
-                        ATraceEvent::End { pid } => {
-                            let pid = if pid != 0 {
-                                pid
-                            } else {
-                                current_task.get_pid().try_into().unwrap_or(pid)
-                            };
-                            let mut event_stacks = self.event_stacks.lock();
-                            if let Some(stack) = event_stacks.get_mut(&pid) {
-                                if let Some((name, start_time)) = stack.pop() {
-                                    context.write_duration_with_inline_name(&name, start_time, &[]);
-                                }
-                            }
-                        }
-                    ATraceEvent::Instant { name } => {
-                        context.write_instant_with_inline_name(&name, Scope::Process, &[]);
-                    }
-                    ATraceEvent::AsyncBegin { name, correlation_id } => {
-                        context.write_async_begin_with_inline_name(
-                            correlation_id.into(),
-                            &name,
-                            &[],
-                        );
-                    }
-                    ATraceEvent::AsyncEnd { name, correlation_id } => {
-                        context.write_async_end_with_inline_name(
-                            correlation_id.into(),
-                            &name,
-                            &[],
-                        );
-                    }
-                    ATraceEvent::Counter { name, value } => {
-                        // ATrace only supplies one name in each counter record,
-                        // so it appears that counters are not intended to be grouped.
-                        // As such, we use the name both for the record name and
-                        // the arg name.
-                        let arg = ArgValue::of(name, value);
-                        context.write_counter_with_inline_name(name, 0, &[arg]);
-                    }
-                    ATraceEvent::AsyncTrackBegin { .. /*track_name, _name, _cookie*/ } => {
-                        // TODO("https://fxbug.dev/408054205"): propagate track events.
-                        // Currently, these only appear in tracefs.
-
-                    }
-                    ATraceEvent::AsyncTrackEnd { ../* track_name, cookie */} => {
-                        // TODO("https://fxbug.dev/408054205"): propagate track events.
-                        // Currently, these only appear in tracefs.
-                    }
-                    ATraceEvent::Track {..} => {
-                        // TODO("https://fxbug.dev/408054205"): propagate track events.
-                        // Currently, these only appear in tracefs.
-                    }
-                }
-            }
-        } else {
-            // Ideally clearing should only be done once when we see tracing
-            // stop, but the trace observer thread is behind the perfetto_consumer
-            // feature, and with the way that filesystem creation is arranged it
-            // is difficult to route a reference to the stacks to the thread.
-            // In lieu of having a trace observer, we clear the stacks whenever
-            // an event is written and starnix:atrace category is disabled.
-            //
-            // Other than extreme circumstances where no trace events are written
-            // between the two trace sessions, this will prevent any events that
-            // were started in the first trace session from being matched with
-            // an end event in the second session. We don't expect such a
-            // situation to occur, as it would mean that we are telling applications
-            // to stop emitting atrace data before stopping the trace, where
-            // a typical use case would want atrace data for the entire duration
-            // of the trace.
-            self.event_stacks.lock().clear();
+        if self.queue.is_enabled() {
+            let trace_event = TraceEvent::new(
+                // This pid is a Kernel pid (do not confuse with userspace pid aka tgid), so we use
+                // the task thread id, the pid and tid are equal when the thread is the "main thread"
+                // of the thread group/process.
+                // It is used when CPU scheduling information is not available.
+                current_task.get_tid(),
+                &bytes,
+            );
+            self.queue.push_event(trace_event)?;
         }
         return Ok(bytes.len());
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum ATraceEvent<'a> {
-    Begin { pid: u64, name: &'a str },
-    End { pid: u64 },
-    Instant { name: &'a str },
-    AsyncBegin { name: &'a str, correlation_id: u64 },
-    AsyncEnd { name: &'a str, correlation_id: u64 },
-    Counter { name: &'a str, value: i64 },
-    AsyncTrackBegin { track_name: &'a str, name: &'a str, cookie: i32 },
-    AsyncTrackEnd { track_name: &'a str, cookie: i32 },
-    Track { track_name: &'a str, name: &'a str },
-}
-
-impl<'a> ATraceEvent<'a> {
-    // Arbitrary data is allowed to be written to tracefs, and we only care about identifying ATrace
-    // events to forward to Fuchsia tracing. Since we would throw away any detailed parsing error, this
-    // function returns an Option rather than a Result. If we did return a Result, this could be
-    // put in a TryFrom impl, if desired.
-    fn parse(s: &'a str) -> Option<Self> {
-        let mut chunks = s.trim().split('|');
-        let event_type = chunks.next()?;
-
-        // event_type matches the systrace phase. See systrace_parser.h in perfetto.
-        match event_type {
-            "B" => {
-                let pid = chunks.next()?.parse::<u64>().ok()?;
-                // It is ok to have an unnamed begin event, so insert a default name.
-                let name = chunks.next().unwrap_or("[empty name]");
-                Some(ATraceEvent::Begin { pid, name })
-            }
-            "E" => {
-                // End thread scoped event. Since it is thread scoped, it is OK to not have the TGID
-                // not present.
-                let pid = chunks.next().unwrap_or("0").parse::<u64>().unwrap_or(0);
-                Some(ATraceEvent::End { pid })
-            }
-            "I" => {
-                let _pid = chunks.next()?;
-                let name = chunks.next()?;
-                Some(ATraceEvent::Instant { name })
-            }
-            "S" => {
-                let _pid = chunks.next()?;
-                let name = chunks.next()?;
-                let correlation_id = chunks.next()?.parse::<u64>().ok()?;
-                Some(ATraceEvent::AsyncBegin { name, correlation_id })
-            }
-            "F" => {
-                let _pid = chunks.next()?;
-                let name = chunks.next()?;
-                let correlation_id = chunks.next()?.parse::<u64>().ok()?;
-                Some(ATraceEvent::AsyncEnd { name, correlation_id })
-            }
-            "C" => {
-                let _pid = chunks.next()?;
-                let name = chunks.next()?;
-                let value = chunks.next()?.parse::<i64>().ok()?;
-                Some(ATraceEvent::Counter { name, value })
-            }
-            "G" => {
-                let _pid = chunks.next()?;
-                let track_name = chunks.next()?;
-                let name = chunks.next()?;
-                let cookie = chunks.next()?.parse::<i32>().ok()?;
-                Some(ATraceEvent::AsyncTrackBegin { track_name, name, cookie })
-            }
-            "H" => {
-                let _pid = chunks.next()?;
-                let track_name = chunks.next()?;
-                let cookie = chunks.next()?.parse::<i32>().ok()?;
-                Some(ATraceEvent::AsyncTrackEnd { track_name, cookie })
-            }
-            "N" => {
-                let _pid = chunks.next()?;
-                let track_name = chunks.next()?;
-                let name = chunks.next()?;
-                Some(ATraceEvent::Track { track_name, name })
-            }
-            _ => None,
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[fuchsia::test]
-    fn atrace_event_parsing() {
-        assert_eq!(
-            ATraceEvent::parse("B|1636|slice_name"),
-            Some(ATraceEvent::Begin { pid: 1636, name: "slice_name" }),
-        );
-
-        let no_name_event = ATraceEvent::parse("B|1166");
-        match no_name_event {
-            Some(ATraceEvent::Begin { pid: 1166, .. }) => (),
-            _ => panic!("Unexpected parsing result: {no_name_event:?} from \"B|1166\""),
-        };
-
-        assert_eq!(ATraceEvent::parse("E|1636"), Some(ATraceEvent::End { pid: 1636 }),);
-        assert_eq!(
-            ATraceEvent::parse("I|1636|instant_name"),
-            Some(ATraceEvent::Instant { name: "instant_name" }),
-        );
-
-        assert_eq!(ATraceEvent::parse("E|"), Some(ATraceEvent::End { pid: 0 }));
-        assert_eq!(ATraceEvent::parse("E"), Some(ATraceEvent::End { pid: 0 }));
-
-        assert_eq!(
-            ATraceEvent::parse("S|1636|async_name|123"),
-            Some(ATraceEvent::AsyncBegin { name: "async_name", correlation_id: 123 }),
-        );
-        assert_eq!(
-            ATraceEvent::parse("F|1636|async_name|123"),
-            Some(ATraceEvent::AsyncEnd { name: "async_name", correlation_id: 123 }),
-        );
-        assert_eq!(
-            ATraceEvent::parse("C|1636|counter_name|123"),
-            Some(ATraceEvent::Counter { name: "counter_name", value: 123 }),
-        );
-        assert_eq!(
-            ATraceEvent::parse("G|1636|a track|async_name|123"),
-            Some(ATraceEvent::AsyncTrackBegin {
-                track_name: "a track",
-                name: "async_name",
-                cookie: 123
-            }),
-        );
-        assert_eq!(
-            ATraceEvent::parse("H|1636|a track|123"),
-            Some(ATraceEvent::AsyncTrackEnd { track_name: "a track", cookie: 123 }),
-        );
-        assert_eq!(
-            ATraceEvent::parse("N|1636|a track|instant_name"),
-            Some(ATraceEvent::Track { track_name: "a track", name: "instant_name" }),
-        );
     }
 }
