@@ -30,6 +30,10 @@
                 // corresponding to any open file descriptors.
                 "InheritTest.FsNodePermissionDeniedFdRemappedToNull",
 
+                // TODO: https://fxbug.dev/378655436 - Reset ITIMER_REAL during `exec` when the `siginh`
+                // permission is denied.
+                "InheritTest.SiginhDeniedItimerRealReset",
+
                 // TODO: https://fxbug.dev/361552580 - Fix SELinuxFS API handling of unknown policy class Ids.
                 "SeLinuxFsCreate.InvalidComputeCreateClassId",
                 "SeLinuxFsAccess.UnknownClassIdIsAccepted",
