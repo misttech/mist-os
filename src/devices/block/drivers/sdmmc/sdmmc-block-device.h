@@ -93,7 +93,7 @@ struct ReadWriteMetadata {
   SdmmcBlockDevice* const block_device;
 };
 
-class SdmmcBlockDevice {
+class SdmmcBlockDevice : public fidl::Server<fuchsia_power_broker::ElementRunner> {
  public:
   static constexpr char kHardwarePowerElementName[] = "sdmmc-hardware";
 
@@ -104,6 +104,14 @@ class SdmmcBlockDevice {
   // state than kPowerLevelOn, based on the order the level is
   // supplied when the element is created.
   static constexpr fuchsia_power_broker::PowerLevel kPowerLevelBoot = 2;
+
+  // Implement fuchsia.power.broker.ElementRunner, allowing Power Broker
+  // to set this device's power level.
+  void SetLevel(fuchsia_power_broker::ElementRunnerSetLevelRequest& request,
+                SetLevelCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_power_broker::ElementRunner> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
   SdmmcBlockDevice(SdmmcRootDevice* parent, std::unique_ptr<SdmmcDevice> sdmmc)
       : parent_(parent), sdmmc_(std::move(sdmmc)) {
@@ -268,10 +276,10 @@ class SdmmcBlockDevice {
 
   fidl::WireSyncClient<fuchsia_power_broker::ElementControl> hardware_power_element_control_client_;
   fidl::WireSyncClient<fuchsia_power_broker::Lessor> hardware_power_lessor_client_;
-  fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel> hardware_power_current_level_client_;
-  fidl::WireClient<fuchsia_power_broker::RequiredLevel> hardware_power_required_level_client_;
   zx::event hardware_power_element_assertive_token_;
   fidl::ClientEnd<fuchsia_power_broker::LeaseControl> hardware_power_lease_control_client_end_;
+  std::optional<fidl::ServerBinding<fuchsia_power_broker::ElementRunner>>
+      hardware_power_element_runner_server_binding_;
 
   block_info_t block_info_{};
 
