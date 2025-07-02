@@ -53,6 +53,14 @@ void EndpointServer::Connect(async_dispatcher_t* dispatcher,
 
 void EndpointServer::OnUnbound(
     fidl::UnbindInfo info, fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end) {
+  {
+    // Return all already completed events.
+    auto status = fidl::SendEvent(server_end)->OnCompletion(std::move(completions_));
+    if (status.is_error()) {
+      zxlogf(ERROR, "Error sending event: %s", status.error_value().status_string());
+    }
+  }
+
   // Unregister VMOs
   auto registered_vmos = std::move(registered_vmos_);
   for (auto& [id, vmo] : registered_vmos) {
