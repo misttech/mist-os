@@ -40,6 +40,19 @@ RegisterID GetSpReg(Registers::Arch arch) {
   }
 }
 
+RegisterID GetReturnAddressRegister(Registers::Arch arch) {
+  switch (arch) {
+    case Registers::Arch::kX64:
+      return RegisterID::kX64_rip;
+    case Registers::Arch::kArm32:
+      return RegisterID::kArm32_lr;
+    case Registers::Arch::kArm64:
+      return RegisterID::kArm64_lr;
+    case Registers::Arch::kRiscv64:
+      return RegisterID::kRiscv64_ra;
+  }
+}
+
 }  // namespace
 
 Error Registers::Get(RegisterID reg_id, uint64_t& val) const {
@@ -68,6 +81,14 @@ Error Registers::SetSP(uint64_t sp) { return Set(GetSpReg(arch_), sp); }
 Error Registers::GetPC(uint64_t& pc) const { return Get(GetPcReg(arch_), pc); }
 
 Error Registers::SetPC(uint64_t pc) { return Set(GetPcReg(arch_), pc); }
+
+Error Registers::GetReturnAddress(uint64_t& ra) const {
+  return Get(GetReturnAddressRegister(arch_), ra);
+}
+
+Error Registers::SetReturnAddress(uint64_t ra) {
+  return Set(GetReturnAddressRegister(arch_), ra);
+}
 
 std::string Registers::Describe() const {
   std::stringstream ss;

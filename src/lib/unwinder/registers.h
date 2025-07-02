@@ -157,6 +157,12 @@ class Registers {
   Error GetPC(uint64_t& pc) const;
   Error SetPC(uint64_t pc);
 
+  // These are not formally specified for all architectures, but we define aliases for them.
+  // It's RIP on x64, LR on Arm64, R14 on Arm, and RA on Riscv64. See the note above for why this
+  // doesn't necessarily always make sense for x64.
+  Error GetReturnAddress(uint64_t& ra) const;
+  Error SetReturnAddress(uint64_t ra);
+
   // Return a string describing the value of all registers. Should be useful in debugging.
   std::string Describe() const;
 

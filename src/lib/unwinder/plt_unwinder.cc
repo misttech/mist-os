@@ -70,7 +70,7 @@ Error PltUnwinder::StepArm64(Memory* stack, const Registers& current, Registers&
   //   2d458c: d61f0220      br      x17
 
   uint64_t lr;
-  if (auto err = current.Get(RegisterID::kArm64_lr, lr); err.has_err()) {
+  if (auto err = current.GetReturnAddress(lr); err.has_err()) {
     return err;
   }
   uint64_t pc;
