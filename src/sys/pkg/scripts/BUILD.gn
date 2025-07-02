@@ -2,28 +2,14 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-# TODO(https://fxbug.dev/314036868): Migrate these tests to be hermetic. Delete
-# this when all unused dependencies are removed.
-#
-# PLEASE DO NOT USE.
-group("tests") {
-  testonly = true
-
-  # Please do not add to this list.
-  deps = [ "gen_eager_package_config:tests" ]
-}
-
 if (is_host) {
   group("host_tests") {
     testonly = true
-    public_deps = []
+    public_deps = [ "gen_eager_package_config:host_tests" ]
   }
 }
 
 group("all_tests") {
   testonly = true
-  public_deps = [
-    ":host_tests($host_toolchain)",
-    ":tests",
-  ]
+  public_deps = [ ":host_tests($host_toolchain)" ]
 }

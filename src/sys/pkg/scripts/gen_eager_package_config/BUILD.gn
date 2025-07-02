@@ -51,7 +51,7 @@ if (is_host) {
   }
 }
 
-group("tests") {
+group("host_tests") {
   testonly = true
   deps = [
     ":gen_eager_package_config_test($host_toolchain)",

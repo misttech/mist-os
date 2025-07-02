@@ -17,7 +17,6 @@ group("tests") {
   public_deps = [
     ":non_hermetic_tests($target_toolchain)",
     "lib:tests",
-    "scripts:tests",
     "testing:tests",
     "tests",
     "//src/sys/lib/fidl-fuchsia-pkg-ext:tests",
@@ -52,6 +51,7 @@ if (is_host) {
     public_deps = [
       "bin:host_tests",
       "lib:host_tests",
+      "scripts:host_tests",
     ]
   }
 }
