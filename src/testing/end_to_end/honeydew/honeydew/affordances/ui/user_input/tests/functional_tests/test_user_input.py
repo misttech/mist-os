@@ -7,7 +7,7 @@ import os
 from typing import Optional
 
 from fuchsia_base_test import fuchsia_base_test
-from mobly import test_runner
+from mobly import asserts, test_runner
 
 from honeydew import errors
 from honeydew.affordances.ui.screenshot import types
@@ -85,9 +85,7 @@ class UserInputAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
                 wait_time=2,  # Time to wait between retries in seconds
             )
         except errors.HoneydewTimeoutError:
-            # TODO(b/320543407): Re-enable the assertion
-            # self.fail("color did not change after tap within timeout")
-            pass
+            asserts.fail("color did not change after tap within timeout")
 
     def test_user_input_swipe(self) -> None:
         self.device.session.add_component(TOUCH_APP)
@@ -119,9 +117,7 @@ class UserInputAffordanceTests(fuchsia_base_test.FuchsiaBaseTest):
                 wait_time=2,  # Time to wait between retries in seconds
             )
         except errors.HoneydewTimeoutError:
-            # TODO(b/320543407): Re-enable the assertion
-            # self.fail("color did not change after swipe within timeout")
-            pass
+            asserts.fail("color did not change after tap within timeout")
 
     def test_user_input_press_key(self) -> None:
         self.device.session.add_component(TOUCH_APP)
