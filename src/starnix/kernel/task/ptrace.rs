@@ -803,7 +803,8 @@ pub fn ptrace_dispatch<L>(
 where
     L: LockBefore<ThreadGroupLimits>,
 {
-    let weak_task = current_task.kernel().pids.read().get_task(pid);
+    let mut pids = current_task.kernel().pids.write();
+    let weak_task = pids.get_task(pid);
     let tracee = weak_task.upgrade().ok_or_else(|| errno!(ESRCH))?;
 
     if let Some(ptrace) = &tracee.read().ptrace {
@@ -839,7 +840,6 @@ where
             return Ok(starnix_syscalls::SUCCESS);
         }
         PTRACE_DETACH => {
-            let mut pids = current_task.kernel().pids.write();
             ptrace_detach(locked, &mut pids, current_task.thread_group(), tracee.as_ref(), &data)?;
             return Ok(starnix_syscalls::SUCCESS);
         }
