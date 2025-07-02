@@ -654,7 +654,7 @@ $ ffx emu start ~/local_pb --console
 This command prints output similar to the following:
 
 ```none {:.devsite-disable-click-to-copy}
-alice@alice:~$ ffx emu start ~/local_pb --console
+$ ffx emu start ~/local_pb --console
 INFO    | Android emulator version 31.3.8.0 (build_id 8611574) (CL:N/A)
 [... various log entries]
 [00021.699] 01095:01158> [component_manager] INFO: Connecting fuchsia.sys2.LifecycleController
@@ -673,7 +673,46 @@ $ power off
 [... various log entries]
 [00260.447] 03742:03744> [00260.447038][3742][3744][driver_manager.cm] WARNING: [src/devices/bin/driver_manager/v1/suspend_handler.cc(211)] Failed to cause VFS exit ourselves, this is expected during orderly shutdown: FIDL operation failed d
 [00260.429] 03341:03344> WARNING | Write called without a backing file!
-alice@alice:~$
+$
+```
+
+## Start the Fuchsia emulator with UEFI support and GPT disk image {:#start-the-fuchsia-emulator-with-uefi}
+
+The Fuchsia emulator supports close approximation of a physical device by
+booting a UEFI enabled instance from a flat disk image. This image contains a
+GPT partition table and the conventional Fuchsia ABR (system partitions **A,B**
+plus **R**ecovery partition) partitioning scheme. The system partitions support
+encrypted ZBIs, and can be OTA'ed via `fx ota` for an end-to-end verification of
+the system update process. Note that this is supported only when working
+**inside a Fuchsia source checkout**.
+
+To start the emulator in this mode, the `--uefi` flag has to be supplied,
+alongside the keys and key metadata for the ZBI encryption. For testing,
+the Fuchsia source tree contains suitable keys. The emulator can be started
+this way, assuming the current directory is the root of the Fuchsia source
+checkout:
+
+```none {:.devsite-disable-click-to-copy}
+$ ffx emu start --uefi \
+  --vbmeta-key third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem \
+  --vbmeta-key-metadata third_party/android/platform/external/avb/test/data/atx_metadata.bin
+[emulator] defaulting to qemu engine to support uefi.
+Use `--engine` to explicitly set the engine type if needed.
+Logging to "/path/to/home/dir/.local/share/Fuchsia/ffx/emu/instances/fuchsia-5254-475e-82ef/emulator.log"
+Waiting for Fuchsia to start (up to 60 seconds).....
+Emulator is ready.
+$
+```
+
+### Setting the key and metadata as config options {:#key-metadata-config-options}
+
+For a more convenient workflow, it is possible to avoid passing the arguments
+`--vbmeta-key` and `--vbmeta-key-metadata` each time on the command line. They
+can be set via `ffx config` if desired, for example:
+
+```none {:.devsite-disable-click-to-copy}
+$ ffx config set emu.vbmeta.key $(fx get-src-dir)/third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem
+$ ffx config set emu.vbmeta.metadata $(fx get-src-dir)/third_party/android/platform/external/avb/test/data/atx_metadata.bin
 ```
 
 <!-- Reference links -->
