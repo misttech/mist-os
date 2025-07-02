@@ -37,6 +37,7 @@ pub fn get_android_bootreason() -> Result<&'static str, Error> {
         Some(RebootReason::ZbiSwap) => return Ok("reboot,normal"),
         Some(RebootReason::SystemUpdate) => return Ok("reboot,ota"),
         Some(RebootReason::NetstackMigration) => return Ok("reboot,normal"),
+        Some(RebootReason::AndroidUnexpectedReason) => return Ok("reboot,normal"),
         Some(RebootReason::__SourceBreaking { .. }) => return Ok("reboot,normal"),
         None => return Ok("reboot,unknown"),
     }

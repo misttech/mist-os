@@ -119,6 +119,10 @@ type RebootReason = strict(removed=9) flexible(added=9) enum : uint16 {
     /// The device rebooted to apply the swap of Zircon boot images.
     ZBI_SWAP = 18;
 
+    /// An Android-initiated reboot reason that Starnix doesn't recognize.
+    @available(added=NEXT)
+    ANDROID_UNEXPECTED_REASON = 21;
+
     // ///////////////////////////////////////////////////////////////////////////////////////////
     // Planned reboot reasons
     // |planned| has a value of true in LastReboot above.

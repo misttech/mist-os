@@ -45,6 +45,7 @@ enum class RebootReason {
   // TODO(https://fxbug.dev/42081574): Remove this reason once Netstack2 is
   // fully migrated to Netstack3.
   kNetstackMigration,
+  kAndroidUnexpectedReason,
 };
 
 std::string ToString(RebootReason reason);

@@ -56,6 +56,8 @@ std::string ToString(const RebootReason reason) {
       return "FACTORY DATA RESET";
     case RebootReason::kNetstackMigration:
       return "NETSTACK MIGRATION";
+    case RebootReason::kAndroidUnexpectedReason:
+      return "ANDROID UNEXPECTED REASON";
   }
 }
 
@@ -76,6 +78,7 @@ bool IsCrash(const RebootReason reason) {
     case RebootReason::kHighTemperature:
     case RebootReason::kGenericGraceful:
     case RebootReason::kUnexpectedReasonGraceful:
+    case RebootReason::kAndroidUnexpectedReason:
       return true;
     case RebootReason::kUserRequest:
     case RebootReason::kSystemUpdate:
@@ -103,6 +106,7 @@ bool IsFatal(const RebootReason reason) {
     case RebootReason::kHighTemperature:
     case RebootReason::kGenericGraceful:
     case RebootReason::kUnexpectedReasonGraceful:
+    case RebootReason::kAndroidUnexpectedReason:
       return true;
     case RebootReason::kUserRequest:
     case RebootReason::kSystemUpdate:
@@ -129,6 +133,7 @@ std::optional<bool> OptionallyGraceful(const RebootReason reason) {
     case RebootReason::kCriticalComponentFailure:
     case RebootReason::kFdr:
     case RebootReason::kNetstackMigration:
+    case RebootReason::kAndroidUnexpectedReason:
       return true;
     case RebootReason::kCold:
     case RebootReason::kSpontaneous:
@@ -167,6 +172,7 @@ std::optional<bool> OptionallyPlanned(const RebootReason reason) {
     case RebootReason::kSoftwareWatchdogTimeout:
     case RebootReason::kBrownout:
     case RebootReason::kRootJobTermination:
+    case RebootReason::kAndroidUnexpectedReason:
       return false;
     case RebootReason::kNotParseable:
       return std::nullopt;
@@ -217,6 +223,9 @@ cobalt::LastRebootReason ToCobaltLastRebootReason(RebootReason reason) {
       return cobalt::LastRebootReason::kRootJobTermination;
     case RebootReason::kNetstackMigration:
       return cobalt::LastRebootReason::kNetstackMigration;
+    case RebootReason::kAndroidUnexpectedReason:
+      // TODO(guochengwei): Add cobalt LastRebootReason
+      return cobalt::LastRebootReason::kUnknown;
   }
 }
 
@@ -256,6 +265,8 @@ std::string ToCrashSignature(const RebootReason reason,
       return "fuchsia-unexpected-reason-userspace-reboot";
     case RebootReason::kHighTemperature:
       return "fuchsia-reboot-high-temperature";
+    case RebootReason::kAndroidUnexpectedReason:
+      return "fuchsia-reboot-android-unexpected-reason";
     case RebootReason::kUserRequest:
     case RebootReason::kSystemUpdate:
     case RebootReason::kZbiSwap:
@@ -288,6 +299,8 @@ std::string ToCrashProgramName(const RebootReason reason) {
     case RebootReason::kGenericGraceful:
     case RebootReason::kUnexpectedReasonGraceful:
       return "system";
+    case RebootReason::kAndroidUnexpectedReason:
+      return "android";
     case RebootReason::kUserRequest:
     case RebootReason::kSystemUpdate:
     case RebootReason::kZbiSwap:
@@ -341,6 +354,8 @@ std::optional<fuchsia::feedback::RebootReason> ToFidlRebootReason(const RebootRe
       return fuchsia::feedback::RebootReason::ROOT_JOB_TERMINATION;
     case RebootReason::kNetstackMigration:
       return fuchsia::feedback::RebootReason::NETSTACK_MIGRATION;
+    case RebootReason::kAndroidUnexpectedReason:
+      return fuchsia::feedback::RebootReason::ANDROID_UNEXPECTED_REASON;
     case RebootReason::kNotParseable:
       return std::nullopt;
   }

@@ -160,7 +160,7 @@ pub fn sys_reboot(
                         TODO("https://fxbug.dev/322874610"),
                         "unknown reboot args, see logs for strings"
                     );
-                    fpower::RebootReason2::UserRequest
+                    fpower::RebootReason2::AndroidUnexpectedReason
                 };
 
                 log_info!("Rebooting... reason: {:?}", reboot_reason);
