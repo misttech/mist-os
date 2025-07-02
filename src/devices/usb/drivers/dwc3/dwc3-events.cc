@@ -196,6 +196,16 @@ void Dwc3::HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_sta
 }
 
 void Dwc3::StartEvents() {
+  zx::result result = event_fifo_.Init(bti_);
+  if (result.is_error()) {
+    FDF_LOG(ERROR, "Failed to init event fifo %s", result.status_string());
+    return;
+  }
+  irq_handler_.set_object(irq_.get());
+  irq_handler_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  // Ack IRQ in case previous ack was hanging
+  irq_.ack();
+
   auto* mmio = get_mmio();
 
   // set event buffer pointer and size

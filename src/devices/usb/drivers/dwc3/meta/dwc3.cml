@@ -14,7 +14,7 @@
         colocate: "true",
         default_dispatcher_opts: [ "allow_sync_calls" ],
         service_connect_validation: "true",
-        allowed_scheduler_roles: [ "fuchsia.devices.usb.drivers.dwc3.interrupt" ],
+        default_dispatcher_scheduler_role: "fuchsia.devices.usb.drivers.dwc3.interrupt",
     },
     capabilities: [
         { protocol: "fuchsia.hardware.usb.endpoint.Endpoint" },

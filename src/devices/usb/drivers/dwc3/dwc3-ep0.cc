@@ -4,6 +4,7 @@
 
 #include <fidl/fuchsia.hardware.usb.descriptor/cpp/wire.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/fit/defer.h>
 
 #include <mutex>
 
@@ -14,8 +15,6 @@ namespace dwc3 {
 namespace fdescriptor = fuchsia_hardware_usb_descriptor;
 
 zx_status_t Dwc3::Ep0Init() {
-  std::lock_guard<std::mutex> lock(ep0_.lock);
-
   if (zx::result result = ep0_.shared_fifo.Init(bti_); result.is_error()) {
     return result.error_value();
   }
@@ -31,16 +30,14 @@ zx_status_t Dwc3::Ep0Init() {
 }
 
 void Dwc3::Ep0Start() {
-  std::lock_guard<std::mutex> lock(ep0_.lock);
-
   CmdStartNewConfig(ep0_.out, 0);
   EpSetConfig(ep0_.out, true);
   EpSetConfig(ep0_.in, true);
 
-  Ep0QueueSetupLocked();
+  Ep0QueueSetup();
 }
 
-void Dwc3::Ep0QueueSetupLocked() {
+void Dwc3::Ep0QueueSetup() {
   CacheFlushInvalidate(ep0_.buffer.get(), 0, sizeof(fdescriptor::wire::UsbSetup));
   EpStartTransfer(ep0_.out, ep0_.shared_fifo, TRB_TRBCTL_SETUP, ep0_.buffer->phys(),
                   sizeof(fdescriptor::wire::UsbSetup));
@@ -63,7 +60,6 @@ void Dwc3::Ep0StartEndpoints() {
 }
 
 void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
-  std::lock_guard<std::mutex> lock(ep0_.lock);
   ZX_DEBUG_ASSERT(is_ep0_num(ep_num));
 
   // Only DataOut state needs TRB read.
@@ -91,14 +87,15 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
         break;
       }
 
-      is_three_stage ? HandleEp0Setup(ep0_.buffer->size(), Ep0::State::DataIn)
-                     : HandleEp0Setup(0, Ep0::State::WaitNrdyIn);
+      ep0_.state = is_three_stage ? Ep0::State::DataIn : Ep0::State::WaitNrdyIn;
+      HandleEp0Setup(is_three_stage ? ep0_.buffer->size() : 0);
       break;
     }
     case Ep0::State::DataOut: {
       ZX_DEBUG_ASSERT(ep_num == kEp0Out);
       zx_off_t received = ep0_.buffer->size() - TRB_BUFSIZ(trb.status);
-      HandleEp0Setup(received, Ep0::State::WaitNrdyIn);
+      ep0_.state = Ep0::State::WaitNrdyIn;
+      HandleEp0Setup(received);
       break;
     }
     case Ep0::State::DataIn:
@@ -106,7 +103,7 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
       ep0_.state = Ep0::State::WaitNrdyOut;
       break;
     case Ep0::State::Status:
-      Ep0QueueSetupLocked();
+      Ep0QueueSetup();
       break;
     default:
       break;
@@ -114,7 +111,6 @@ void Dwc3::HandleEp0TransferCompleteEvent(uint8_t ep_num) {
 }
 
 void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
-  std::lock_guard<std::mutex> lock(ep0_.lock);
   ZX_DEBUG_ASSERT(is_ep0_num(ep_num));
 
   switch (ep0_.state) {
@@ -124,7 +120,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
         // Stall if we receive xfer not ready data/status while waiting for setup to complete
         ep0_.shared_fifo.Clear();
         EpSetStall(ep0_.out, true);
-        Ep0QueueSetupLocked();
+        Ep0QueueSetup();
       }
       break;
     case Ep0::State::DataOut:
@@ -133,7 +129,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
         ep0_.shared_fifo.Clear();
         CmdEpEndTransfer(ep0_.out);
         EpSetStall(ep0_.out, true);
-        Ep0QueueSetupLocked();
+        Ep0QueueSetup();
       }
       break;
     case Ep0::State::DataIn:
@@ -142,7 +138,7 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
         ep0_.shared_fifo.Clear();
         CmdEpEndTransfer(ep0_.in);
         EpSetStall(ep0_.out, true);
-        Ep0QueueSetupLocked();
+        Ep0QueueSetup();
       }
       break;
     case Ep0::State::WaitNrdyOut:
@@ -166,16 +162,13 @@ void Dwc3::HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage) {
   }
 }
 
-void Dwc3::HandleEp0Setup(size_t length, Ep0::State next_state) {
-  ep0_.state = next_state;
+void Dwc3::HandleEp0Setup(size_t length) {
   if (ep0_.cur_setup.bm_request_type == (USB_DIR_OUT | USB_TYPE_STANDARD | USB_RECIP_DEVICE)) {
     // handle some special setup requests in this driver
     switch (ep0_.cur_setup.b_request) {
-      case USB_REQ_SET_ADDRESS: {
-        std::lock_guard<std::mutex> lock{lock_};
+      case USB_REQ_SET_ADDRESS:
         SetDeviceAddress(ep0_.cur_setup.w_value);
         return;
-      }
       case USB_REQ_SET_CONFIGURATION:
         ResetConfiguration();
         Ep0StartEndpoints();
@@ -187,10 +180,10 @@ void Dwc3::HandleEp0Setup(size_t length, Ep0::State next_state) {
     }
   }
 
-  auto fail = [this]() __TA_REQUIRES(ep0_.lock) {
+  auto fail = [this]() {
     ep0_.shared_fifo.Clear();
     EpSetStall(ep0_.out, true);
-    Ep0QueueSetupLocked();
+    Ep0QueueSetup();
   };
   if (!dci_intf_.is_valid()) {
     fail();
@@ -207,7 +200,6 @@ void Dwc3::HandleEp0Setup(size_t length, Ep0::State next_state) {
       .Then(
           [this, is_out, fail, length](
               fidl::WireUnownedResult<fuchsia_hardware_usb_dci::UsbDciInterface::Control>& result) {
-            std::lock_guard<std::mutex> _(ep0_.lock);
             if (!result.ok()) {
               FDF_LOG(ERROR, "(framework) Control(): %s", result.status_string());
               fail();

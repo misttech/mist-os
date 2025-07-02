@@ -279,13 +279,6 @@ zx_status_t Dwc3::AcquirePDevResources() {
     return irq.error_value();
   }
   irq_ = std::move(*irq);
-  auto result = fdf::SynchronizedDispatcher::Create(
-      {}, "dwc3-irq", [](fdf_dispatcher_t*) {}, kScheduleProfileRole);
-  if (result.is_error()) {
-    FDF_LOG(ERROR, "SynchronizedDispatcher::Create failed: %s", result.status_string());
-    return result.error_value();
-  }
-  irq_dispatcher_ = std::move(*result);
 
   return ZX_OK;
 }
@@ -294,29 +287,23 @@ zx_status_t Dwc3::Init() {
   // Start by identifying our hardware and making sure that we recognize it, and
   // it is a version that we know we can support.  Then, reset the hardware so
   // that we know it is in a good state.
-  uint32_t ep_count{0};
-  {
-    std::lock_guard<std::mutex> lock(lock_);
-
-    // Now that we have our registers, check to make sure that we are running on
-    // a version of the hardware that we support.
-    if (zx_status_t status = CheckHwVersion(); status != ZX_OK) {
-      FDF_LOG(ERROR, "CheckHwVersion failed: %s", zx_status_get_string(status));
-      return status;
-    }
-
-    // Now that we have our registers, reset the hardware.  This will ensure that
-    // we are starting from a known state moving forward.
-    if (zx_status_t status = ResetHw(); status != ZX_OK) {
-      FDF_LOG(ERROR, "HW Reset Failed: %s", zx_status_get_string(status));
-      return status;
-    }
-
-    // Finally, figure out the number of endpoints that this version of the
-    // controller supports.
-    ep_count = GHWPARAMS3::Get().ReadFrom(get_mmio()).DWC_USB31_NUM_EPS();
+  // Now that we have our registers, check to make sure that we are running on
+  // a version of the hardware that we support.
+  if (zx_status_t status = CheckHwVersion(); status != ZX_OK) {
+    FDF_LOG(ERROR, "CheckHwVersion failed: %s", zx_status_get_string(status));
+    return status;
   }
 
+  // Now that we have our registers, reset the hardware.  This will ensure that
+  // we are starting from a known state moving forward.
+  if (zx_status_t status = ResetHw(); status != ZX_OK) {
+    FDF_LOG(ERROR, "HW Reset Failed: %s", zx_status_get_string(status));
+    return status;
+  }
+
+  // Finally, figure out the number of endpoints that this version of the
+  // controller supports.
+  uint32_t ep_count = GHWPARAMS3::Get().ReadFrom(get_mmio()).DWC_USB31_NUM_EPS();
   if (ep_count < (kUserEndpointStartNum + 1)) {
     FDF_LOG(ERROR, "HW supports only %u physical endpoints, but at least %u are needed to operate.",
             ep_count, (kUserEndpointStartNum + 1));
@@ -349,14 +336,11 @@ zx_status_t Dwc3::Init() {
   // unpinning the memory during shutdown.
   has_pinned_memory_ = true;
 
-  {
-    std::lock_guard<std::mutex> lock(ep0_.lock);
-    zx_status_t status = dma_buffer::CreateBufferFactory()->CreateContiguous(
-        bti_, kEp0BufferSize, 12, true, &ep0_.buffer);
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "ep0_buffer init failed: %s", zx_status_get_string(status));
-      return status;
-    }
+  zx_status_t status = dma_buffer::CreateBufferFactory()->CreateContiguous(bti_, kEp0BufferSize, 12,
+                                                                           true, &ep0_.buffer);
+  if (status != ZX_OK) {
+    FDF_LOG(ERROR, "ep0_buffer init failed: %s", zx_status_get_string(status));
+    return status;
   }
 
   if (zx_status_t status = Ep0Init(); status != ZX_OK) {
@@ -370,42 +354,34 @@ zx_status_t Dwc3::Init() {
 }
 
 void Dwc3::ReleaseResources() {
-  {
-    std::lock_guard<std::mutex> lock(lock_);
-    // If we managed to get our registers mapped, place the device into reset so
-    // we are certain that there is no DMA going on in the background.
-    if (mmio_.has_value()) {
-      if (zx_status_t status = ResetHw(); status != ZX_OK) {
-        // Deliberately panic and terminate this driver if we fail to place the
-        // hardware into reset at this point and we have any pinned memory..  We do this
-        // deliberately because, if we cannot put the hardware into reset, it may still be accessing
-        // pages we previously pinned using DMA.  If we are on a system with no
-        // IOMMU, deliberately terminating the process will ensure that our
-        // pinned pages are quarantined instead of being returned to the page
-        // pool.
-        if (has_pinned_memory_) {
-          FDF_LOG(
-              ERROR,
-              "Failed to place HW into reset during shutdown (%s), self-terminating in order to "
-              "ensure quarantine",
-              zx_status_get_string(status));
-          ZX_ASSERT(false);
-        }
+  // If we managed to get our registers mapped, place the device into reset so
+  // we are certain that there is no DMA going on in the background.
+  if (mmio_.has_value()) {
+    if (zx_status_t status = ResetHw(); status != ZX_OK) {
+      // Deliberately panic and terminate this driver if we fail to place the
+      // hardware into reset at this point and we have any pinned memory..  We do this
+      // deliberately because, if we cannot put the hardware into reset, it may still be accessing
+      // pages we previously pinned using DMA.  If we are on a system with no
+      // IOMMU, deliberately terminating the process will ensure that our
+      // pinned pages are quarantined instead of being returned to the page
+      // pool.
+      if (has_pinned_memory_) {
+        FDF_LOG(ERROR,
+                "Failed to place HW into reset during shutdown (%s), self-terminating in order to "
+                "ensure quarantine",
+                zx_status_get_string(status));
+        ZX_ASSERT(false);
       }
     }
   }
 
   // Now go ahead and release any buffers we may have pinned.
-  {
-    Ep0Reset();
-    std::lock_guard<std::mutex> lock(ep0_.lock);
-    ep0_.buffer.reset();
-    ep0_.shared_fifo.Release();
-  }
+  Ep0Reset();
+  ep0_.buffer.reset();
+  ep0_.shared_fifo.Release();
 
   for (UserEndpoint& uep : user_endpoints_) {
     UserEpReset(uep);
-    std::lock_guard<std::mutex> lock(uep.ep.lock);
     uep.fifo.Release();
   }
 
@@ -475,55 +451,45 @@ void Dwc3::SetDeviceAddress(uint32_t address) {
 }
 
 void Dwc3::StartPeripheralMode() {
-  {
-    std::lock_guard<std::mutex> lock(lock_);
-    auto* mmio = get_mmio();
+  auto* mmio = get_mmio();
 
-    // configure and enable PHYs
-    GUSB2PHYCFG::Get(0)
-        .ReadFrom(mmio)
-        .set_USBTRDTIM(9)    // USB2.0 Turn-around time == 9 phy clocks
-        .set_ULPIAUTORES(0)  // No auto resume
-        .WriteTo(mmio);
+  // configure and enable PHYs
+  GUSB2PHYCFG::Get(0)
+      .ReadFrom(mmio)
+      .set_USBTRDTIM(9)    // USB2.0 Turn-around time == 9 phy clocks
+      .set_ULPIAUTORES(0)  // No auto resume
+      .WriteTo(mmio);
 
-    GUSB3PIPECTL::Get(0)
-        .ReadFrom(mmio)
-        .set_DELAYP1TRANS(0)
-        .set_SUSPENDENABLE(0)
-        .set_LFPSFILTER(1)
-        .set_SS_TX_DE_EMPHASIS(1)
-        .WriteTo(mmio);
+  GUSB3PIPECTL::Get(0)
+      .ReadFrom(mmio)
+      .set_DELAYP1TRANS(0)
+      .set_SUSPENDENABLE(0)
+      .set_LFPSFILTER(1)
+      .set_SS_TX_DE_EMPHASIS(1)
+      .WriteTo(mmio);
 
-    // TODO(johngro): This is the number of receive buffers.  Why do we set it to 16?
-    constexpr uint32_t nump = 16;
-    DCFG::Get()
-        .ReadFrom(mmio)
-        .set_NUMP(nump)                  // number of receive buffers
-        .set_DEVSPD(DCFG::DEVSPD_SUPER)  // max speed is 5Gbps USB3.1
-        .set_DEVADDR(0)                  // device address is 0
-        .WriteTo(mmio);
+  // TODO(johngro): This is the number of receive buffers.  Why do we set it to 16?
+  constexpr uint32_t nump = 16;
+  DCFG::Get()
+      .ReadFrom(mmio)
+      .set_NUMP(nump)                  // number of receive buffers
+      .set_DEVSPD(DCFG::DEVSPD_SUPER)  // max speed is 5Gbps USB3.1
+      .set_DEVADDR(0)                  // device address is 0
+      .WriteTo(mmio);
 
-    // Program the location of the event buffer, then enable event delivery.
-    StartEvents();
-  }
+  // Program the location of the event buffer, then enable event delivery.
+  StartEvents();
 
   Ep0Start();
 
-  {
-    // Set the run/stop bit to start the controller
-    std::lock_guard<std::mutex> lock(lock_);
-    auto* mmio = get_mmio();
-    DCTL::Get().FromValue(0).set_RUN_STOP(1).WriteTo(mmio);
-  }
+  // Set the run/stop bit to start the controller
+  DCTL::Get().FromValue(0).set_RUN_STOP(1).WriteTo(mmio);
 }
 
 void Dwc3::ResetConfiguration() {
-  {
-    std::lock_guard<std::mutex> lock(lock_);
-    auto* mmio = get_mmio();
-    // disable all endpoints except EP0_OUT and EP0_IN
-    DALEPENA::Get().FromValue(0).EnableEp(kEp0Out).EnableEp(kEp0In).WriteTo(mmio);
-  }
+  auto* mmio = get_mmio();
+  // disable all endpoints except EP0_OUT and EP0_IN
+  DALEPENA::Get().FromValue(0).EnableEp(kEp0Out).EnableEp(kEp0In).WriteTo(mmio);
 
   for (UserEndpoint& uep : user_endpoints_) {
     // Disabled above.
@@ -550,12 +516,7 @@ void Dwc3::HandleResetEvent() {
   FDF_LOG(INFO, "Dwc3::HandleResetEvent");
 
   ResetEndpoints();
-
-  {
-    std::lock_guard<std::mutex> lock(lock_);
-    SetDeviceAddress(0);
-  }
-
+  SetDeviceAddress(0);
   Ep0Start();
 
   if (dci_intf_.is_valid()) {
@@ -576,38 +537,33 @@ void Dwc3::HandleConnectionDoneEvent() {
   uint16_t ep0_max_packet = 0;
   fdescriptor::wire::UsbSpeed new_speed{fdescriptor::UsbSpeed::kUndefined};
 
-  {
-    std::lock_guard<std::mutex> lock(lock_);
-    auto* mmio = get_mmio();
+  auto* mmio = get_mmio();
 
-    uint32_t speed = DSTS::Get().ReadFrom(mmio).CONNECTSPD();
+  uint32_t speed = DSTS::Get().ReadFrom(mmio).CONNECTSPD();
 
-    switch (speed) {
-      case DSTS::CONNECTSPD_HIGH:
-        new_speed = fdescriptor::UsbSpeed::kHigh;
-        ep0_max_packet = 64;
-        break;
-      case DSTS::CONNECTSPD_FULL:
-        new_speed = fdescriptor::UsbSpeed::kFull;
-        ep0_max_packet = 64;
-        break;
-      case DSTS::CONNECTSPD_SUPER:
-        new_speed = fdescriptor::UsbSpeed::kSuper;
-        ep0_max_packet = 512;
-        break;
-      case DSTS::CONNECTSPD_ENHANCED_SUPER:
-        new_speed = fdescriptor::UsbSpeed::kEnhancedSuper;
-        ep0_max_packet = 512;
-        break;
-      default:
-        FDF_LOG(ERROR, "unsupported speed %u", speed);
-        break;
-    }
+  switch (speed) {
+    case DSTS::CONNECTSPD_HIGH:
+      new_speed = fdescriptor::UsbSpeed::kHigh;
+      ep0_max_packet = 64;
+      break;
+    case DSTS::CONNECTSPD_FULL:
+      new_speed = fdescriptor::UsbSpeed::kFull;
+      ep0_max_packet = 64;
+      break;
+    case DSTS::CONNECTSPD_SUPER:
+      new_speed = fdescriptor::UsbSpeed::kSuper;
+      ep0_max_packet = 512;
+      break;
+    case DSTS::CONNECTSPD_ENHANCED_SUPER:
+      new_speed = fdescriptor::UsbSpeed::kEnhancedSuper;
+      ep0_max_packet = 512;
+      break;
+    default:
+      FDF_LOG(ERROR, "unsupported speed %u", speed);
+      break;
   }
 
   if (ep0_max_packet) {
-    std::lock_guard<std::mutex> lock(ep0_.lock);
-
     std::array eps{&ep0_.out, &ep0_.in};
     for (Endpoint* ep : eps) {
       ep->type = USB_ENDPOINT_CONTROL;
@@ -651,8 +607,7 @@ void Dwc3::HandleDisconnectedEvent() {
 }
 
 void Dwc3::Stop() {
-  async::PostTask(irq_dispatcher_.async_dispatcher(), [this]() { irq_handler_.Cancel(); });
-
+  irq_handler_.Cancel();
   ReleaseResources();
 }
 
@@ -664,7 +619,7 @@ void Dwc3::ConnectToEndpoint(ConnectToEndpointRequest& request,
     return;
   }
 
-  uep->server->Connect(uep->server->dispatcher(), std::move(request.ep()));
+  uep->server->Connect(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(request.ep()));
   completer.Reply(fit::ok());
 }
 
@@ -675,29 +630,17 @@ void Dwc3::SetInterface(SetInterfaceRequest& request, SetInterfaceCompleter::Syn
     return;
   }
 
-  async::PostTask(
-      irq_dispatcher_.async_dispatcher(), [this, interface = std::move(request.interface()),
-                                           completer = completer.ToAsync()]() mutable {
-        if (dci_intf_.is_valid()) {
-          FDF_LOG(ERROR, "%s: DCI Interface already set", __func__);
-          completer.Reply(zx::error(ZX_ERR_BAD_STATE));
-          return;
-        }
-        dci_intf_.Bind(std::move(interface), fdf::Dispatcher::GetCurrent()->async_dispatcher());
-        completer.Reply(zx::ok());
-      });
+  if (dci_intf_.is_valid()) {
+    FDF_LOG(ERROR, "%s: DCI Interface already set", __func__);
+    completer.Reply(zx::error(ZX_ERR_BAD_STATE));
+    return;
+  }
+
+  dci_intf_.Bind(std::move(request.interface()), fdf::Dispatcher::GetCurrent()->async_dispatcher());
+  completer.Reply(zx::ok());
 }
 
 void Dwc3::StartController(StartControllerCompleter::Sync& completer) {
-  zx::result result = event_fifo_.Init(bti_);
-  if (result.is_error()) {
-    FDF_LOG(ERROR, "Failed to init event fifo %s", result.status_string());
-    completer.Reply(result.take_error());
-    return;
-  }
-  irq_handler_.set_object(irq_.get());
-  irq_handler_.Begin(irq_dispatcher_.async_dispatcher());
-
   StartPeripheralMode();
   completer.Reply(zx::ok());
 }
@@ -705,18 +648,9 @@ void Dwc3::StartController(StartControllerCompleter::Sync& completer) {
 void Dwc3::StopController(StopControllerCompleter::Sync& completer) {
   ResetEndpoints();
 
-  libsync::Completion wait;
-  async::PostTask(irq_dispatcher_.async_dispatcher(), [this, &wait]() {
-    irq_handler_.Cancel();
-    wait.Signal();
-  });
-  wait.Wait();
+  irq_handler_.Cancel();
 
-  zx_status_t status;
-  {
-    std::lock_guard<std::mutex> _(lock_);
-    status = ResetHw();
-  }
+  zx_status_t status = ResetHw();
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to reset hardware %s", zx_status_get_string(status));
     completer.Reply(zx::error(status));
@@ -743,8 +677,6 @@ void Dwc3::ConfigureEndpoint(ConfigureEndpointRequest& request,
     completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
     return;
   }
-
-  std::lock_guard<std::mutex> lock(uep->ep.lock);
 
   if (uep->ep.enabled) {
     // Endpoint already configured, nothing to do.
@@ -781,10 +713,7 @@ void Dwc3::DisableEndpoint(DisableEndpointRequest& request,
   }
 
   uep->server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
-  {
-    std::lock_guard<std::mutex> _{uep->ep.lock};
-    EpSetConfig(uep->ep, false);
-  }
+  EpSetConfig(uep->ep, false);
 
   completer.Reply(zx::ok());
 }
@@ -799,7 +728,6 @@ void Dwc3::EndpointSetStall(EndpointSetStallRequest& request,
     return;
   }
 
-  std::lock_guard<std::mutex> lock(uep->ep.lock);
   if (zx_status_t status = EpSetStall(uep->ep, true); status != ZX_OK) {
     completer.Reply(zx::error(status));
   } else {
@@ -817,7 +745,6 @@ void Dwc3::EndpointClearStall(EndpointClearStallRequest& request,
     return;
   }
 
-  std::lock_guard<std::mutex> lock(uep->ep.lock);
   if (zx_status_t status = EpSetStall(uep->ep, false); status != ZX_OK) {
     completer.Reply(zx::error(status));
   } else {
@@ -868,38 +795,31 @@ void Dwc3::EpServer::GetInfo(GetInfoCompleter::Sync& completer) {
 
 void Dwc3::EpServer::QueueRequests(QueueRequestsRequest& request,
                                    QueueRequestsCompleter::Sync& completer) {
-  std::lock_guard<std::mutex> lock(uep_->ep.lock);
   for (auto& req : request.req()) {
     usb::FidlRequest freq{std::move(req)};
 
-    zx_status_t status{ZX_OK};
-
     if (!uep_->ep.enabled) {
-      status = ZX_ERR_IO_NOT_PRESENT;
       FDF_LOG(ERROR, "Dwc3: ep(%u) not enabled!", uep_->ep.ep_num);
+      RequestComplete(ZX_ERR_IO_NOT_PRESENT, 0, std::move(freq));
+      continue;
     }
 
-    if (status == ZX_OK && freq->data()->size() != 1) {
-      status = ZX_ERR_INVALID_ARGS;
+    if (freq->data()->size() != 1) {
       FDF_LOG(ERROR, "scatter-gather not implemented");
+      RequestComplete(ZX_ERR_INVALID_ARGS, 0, std::move(freq));
+      continue;
     }
 
-    if (status == ZX_OK && uep_->ep.IsOutput()) {
+    if (uep_->ep.IsOutput()) {
       // Dig the length out of the request data block.
-      size_t length{freq->data()->at(0).size().value()};
+      size_t length = freq->data()->at(0).size().value();
 
       if (length == 0 || (length % uep_->ep.max_packet_size) != 0) {
-        status = ZX_ERR_INVALID_ARGS;
         FDF_LOG(ERROR, "Dwc3: OUT transfers must be multiple of max packet size (len %ld mps %hu)",
                 length, uep_->ep.max_packet_size);
+        RequestComplete(ZX_ERR_INVALID_ARGS, 0, std::move(freq));
+        continue;
       }
-    }
-
-    if (status != ZX_OK) {
-      FDF_LOG(ERROR, "failing request with status %s", zx_status_get_string(status));
-      RequestComplete(status, 0, std::move(freq));
-
-      continue;
     }
 
     queued_reqs.emplace(std::move(freq));
@@ -921,24 +841,16 @@ void Dwc3::EpReset(Endpoint& ep) {
 
 void Dwc3::UserEpReset(UserEndpoint& uep) {
   uep.server->CancelAll(ZX_ERR_IO_NOT_PRESENT);
-  std::lock_guard<std::mutex> _(uep.ep.lock);
   EpReset(uep.ep);
 }
 
 void Dwc3::Ep0Reset() {
-  std::lock_guard<std::mutex> _(ep0_.lock);
   ep0_.cur_setup = {};
   ep0_.cur_speed = fuchsia_hardware_usb_descriptor::wire::UsbSpeed::kUndefined;
   ep0_.state = Ep0::State::None;
   CmdEpEndTransfer(ep0_.out);
-  {
-    std::lock_guard<std::mutex> _(ep0_.out.lock);
-    EpReset(ep0_.out);
-  }
-  {
-    std::lock_guard<std::mutex> _(ep0_.in.lock);
-    EpReset(ep0_.in);
-  }
+  EpReset(ep0_.out);
+  EpReset(ep0_.in);
   ep0_.shared_fifo.Clear();
 }
 

@@ -88,7 +88,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
  private:
   const std::string_view kScheduleProfileRole = "fuchsia.devices.usb.drivers.dwc3.interrupt";
-
   static inline const uint32_t kEp0BufferSize = UINT16_MAX + 1;
 
   // physical endpoint numbers.  We use 0 and 1 for EP0, and let the device-mode
@@ -105,40 +104,22 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   class EpServer : public usb::EndpointServer {
    public:
     EpServer(const zx::bti& bti, Dwc3* dwc3, UserEndpoint* uep)
-        : usb::EndpointServer{bti, uep->ep.ep_num}, dwc3_{dwc3}, uep_{uep} {
-      auto result =
-          fdf::SynchronizedDispatcher::Create({}, "ep-dispatcher", [&](fdf_dispatcher_t*) {});
-      if (result.is_error()) {
-        FDF_LOG(ERROR, "Could not initialize dispatcher: %s", result.status_string());
-        return;
-      }
-      dispatcher_ = std::move(result.value());
-    }
+        : usb::EndpointServer{bti, uep->ep.ep_num}, dwc3_{dwc3}, uep_{uep} {}
 
-    ~EpServer() override {
-      dispatcher_.ShutdownAsync();
-      dispatcher_.release();
-    }
+    void CancelAll(zx_status_t reason);
 
+    std::queue<usb::RequestVariant> queued_reqs;     // requests waiting to be processed
+    std::optional<usb::RequestVariant> current_req;  // request currently being processed (if any)
+
+   private:
     // fuchsia_hardware_usb_endpoint::Endpoint protocol implementation.
     void GetInfo(GetInfoCompleter::Sync& completer) override;
     void QueueRequests(QueueRequestsRequest& request,
                        QueueRequestsCompleter::Sync& completer) override;
     void CancelAll(CancelAllCompleter::Sync& completer) override;
 
-    async_dispatcher_t* dispatcher() { return dispatcher_.async_dispatcher(); }
-
-    void CancelAll(zx_status_t reason);
-
-    std::queue<usb::RequestVariant> queued_reqs
-        __TA_GUARDED(uep_->ep.lock);  // requests waiting to be processed
-    std::optional<usb::RequestVariant> current_req
-        __TA_GUARDED(uep_->ep.lock);  // request currently being processed (if any)
-
-   private:
     Dwc3* dwc3_{nullptr};         // Must outlive this instance.
     UserEndpoint* uep_{nullptr};  // Must outlive this instance.
-    fdf::SynchronizedDispatcher dispatcher_;
   };
 
   struct Endpoint {
@@ -167,10 +148,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
 
     bool got_not_ready{false};
     bool stalled{false};
-
-    // Used for synchronizing endpoint state and ep specific hardware registers
-    // This should be acquired before Dwc3::lock_ if acquiring both locks.
-    std::mutex lock;
   };
 
   struct UserEndpoint {
@@ -180,7 +157,7 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
     UserEndpoint(UserEndpoint&&) = delete;
     UserEndpoint& operator=(UserEndpoint&&) = delete;
 
-    __TA_GUARDED(ep.lock) TrbFifo fifo;
+    TrbFifo fifo;
     Endpoint ep;
     std::optional<EpServer> server;
   };
@@ -203,7 +180,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
       endpoints_ = std::make_unique<UserEndpoint[]>(count_);
       for (size_t i = 0; i < count_; ++i) {
         UserEndpoint& uep = endpoints_[i];
-        std::lock_guard<std::mutex> lock(uep.ep.lock);
         const_cast<uint8_t&>(uep.ep.ep_num) = static_cast<uint8_t>(i) + kUserEndpointStartNum;
         uep.server.emplace(bti, dwc3, &uep);
       }
@@ -245,16 +221,12 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
       Status,       // Waiting for status to complete
     };
 
-    std::mutex lock;
-
-    __TA_GUARDED(lock) TrbFifo shared_fifo;
-    __TA_GUARDED(lock) std::unique_ptr<dma_buffer::ContiguousBuffer> buffer;
-    __TA_GUARDED(lock) State state { Ep0::State::None };
-    __TA_GUARDED(lock) Endpoint out;
-    __TA_GUARDED(lock) Endpoint in;
-    __TA_GUARDED(lock) fuchsia_hardware_usb_descriptor::wire::UsbSetup cur_setup;
-
-    __TA_GUARDED(lock)
+    TrbFifo shared_fifo;
+    std::unique_ptr<dma_buffer::ContiguousBuffer> buffer;
+    State state = Ep0::State::None;
+    Endpoint out;
+    Endpoint in;
+    fuchsia_hardware_usb_descriptor::wire::UsbSetup cur_setup;
     fuchsia_hardware_usb_descriptor::wire::UsbSpeed cur_speed{
         fuchsia_hardware_usb_descriptor::wire::UsbSpeed::kUndefined};
   };
@@ -283,68 +255,63 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   void HandleEpEvent(uint32_t event);
 
   // Handlers for global events posted to the event buffer by the controller HW.
-  void HandleResetEvent() __TA_EXCLUDES(lock_);
-  void HandleConnectionDoneEvent() __TA_EXCLUDES(lock_);
-  void HandleDisconnectedEvent() __TA_EXCLUDES(lock_);
+  void HandleResetEvent();
+  void HandleConnectionDoneEvent();
+  void HandleDisconnectedEvent();
 
   // Handlers for end-point specific events posted to the event buffer by the controller HW.
-  void HandleEpTransferCompleteEvent(uint8_t ep_num) __TA_EXCLUDES(lock_);
-  void HandleEpTransferNotReadyEvent(uint8_t ep_num, uint32_t stage) __TA_EXCLUDES(lock_);
-  void HandleEpTransferStartedEvent(uint8_t ep_num, uint32_t rsrc_id) __TA_EXCLUDES(lock_);
+  void HandleEpTransferCompleteEvent(uint8_t ep_num);
+  void HandleEpTransferNotReadyEvent(uint8_t ep_num, uint32_t stage);
+  void HandleEpTransferStartedEvent(uint8_t ep_num, uint32_t rsrc_id);
 
-  [[nodiscard]] zx_status_t CheckHwVersion() __TA_REQUIRES(lock_);
-  [[nodiscard]] zx_status_t ResetHw() __TA_REQUIRES(lock_);
-  void StartEvents() __TA_REQUIRES(lock_);
-  void SetDeviceAddress(uint32_t address) __TA_REQUIRES(lock_);
+  [[nodiscard]] zx_status_t CheckHwVersion();
+  [[nodiscard]] zx_status_t ResetHw();
+  void StartEvents();
+  void SetDeviceAddress(uint32_t address);
 
   // EP0 stuff
-  zx_status_t Ep0Init() __TA_EXCLUDES(lock_);
-  void Ep0Reset() __TA_EXCLUDES(lock_);
-  void Ep0Start() __TA_EXCLUDES(lock_);
-  void Ep0QueueSetupLocked() __TA_REQUIRES(ep0_.lock) __TA_EXCLUDES(lock_);
-  void Ep0StartEndpoints() __TA_REQUIRES(ep0_.lock) __TA_EXCLUDES(lock_);
-  void HandleEp0Setup(size_t length, Ep0::State next_state) __TA_REQUIRES(ep0_.lock)
-      __TA_EXCLUDES(lock_);
-  void HandleEp0TransferCompleteEvent(uint8_t ep_num) __TA_EXCLUDES(lock_, ep0_.lock);
-  void HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage)
-      __TA_EXCLUDES(lock_, ep0_.lock);
+  zx_status_t Ep0Init();
+  void Ep0Reset();
+  void Ep0Start();
+  void Ep0QueueSetup();
+  void Ep0StartEndpoints();
+  void HandleEp0Setup(size_t length);
+  void HandleEp0TransferCompleteEvent(uint8_t ep_num);
+  void HandleEp0TransferNotReadyEvent(uint8_t ep_num, uint32_t stage);
 
   // General EP stuff
-  void EpEnable(Endpoint& ep, bool enable) __TA_EXCLUDES(lock_);
-  void EpSetConfig(Endpoint& ep, bool enable) __TA_EXCLUDES(lock_);
-  zx_status_t EpSetStall(Endpoint& ep, bool stall) __TA_EXCLUDES(lock_);
-  void EpStartTransfer(Endpoint& ep, TrbFifo& fifo, uint32_t type, zx_paddr_t buffer, size_t length)
-      __TA_EXCLUDES(lock_);
-  void EpReset(Endpoint& ep) __TA_REQUIRES(ep.lock);
+  void EpEnable(Endpoint& ep, bool enable);
+  void EpSetConfig(Endpoint& ep, bool enable);
+  zx_status_t EpSetStall(Endpoint& ep, bool stall);
+  void EpStartTransfer(Endpoint& ep, TrbFifo& fifo, uint32_t type, zx_paddr_t buffer,
+                       size_t length);
+  void EpReset(Endpoint& ep);
 
   // Methods specific to user endpoints
-  void UserEpReset(UserEndpoint& uep) __TA_EXCLUDES(lock_);
-  void UserEpQueueNext(UserEndpoint& uep) __TA_REQUIRES(uep.ep.lock) __TA_EXCLUDES(lock_);
+  void UserEpReset(UserEndpoint& uep);
+  void UserEpQueueNext(UserEndpoint& uep);
 
-  void ResetEndpoints() __TA_EXCLUDES(lock_);
+  void ResetEndpoints();
 
   // Commands
-  void CmdStartNewConfig(const Endpoint& ep, uint32_t rsrc_id) __TA_EXCLUDES(lock_);
-  void CmdEpSetConfig(const Endpoint& ep, bool modify) __TA_EXCLUDES(lock_);
-  void CmdEpTransferConfig(const Endpoint& ep) __TA_EXCLUDES(lock_);
-  void CmdEpStartTransfer(const Endpoint& ep, zx_paddr_t trb_phys) __TA_EXCLUDES(lock_);
-  void CmdEpEndTransfer(const Endpoint& ep) __TA_EXCLUDES(lock_);
-  void CmdEpSetStall(const Endpoint& ep) __TA_EXCLUDES(lock_);
-  void CmdEpClearStall(const Endpoint& ep) __TA_EXCLUDES(lock_);
+  void CmdStartNewConfig(const Endpoint& ep, uint32_t rsrc_id);
+  void CmdEpSetConfig(const Endpoint& ep, bool modify);
+  void CmdEpTransferConfig(const Endpoint& ep);
+  void CmdEpStartTransfer(const Endpoint& ep, zx_paddr_t trb_phys);
+  void CmdEpEndTransfer(const Endpoint& ep);
+  void CmdEpSetStall(const Endpoint& ep);
+  void CmdEpClearStall(const Endpoint& ep);
 
   // Start to operate in peripheral mode.
-  void StartPeripheralMode() __TA_EXCLUDES(lock_);
-  void ResetConfiguration() __TA_EXCLUDES(lock_);
+  void StartPeripheralMode();
+  void ResetConfiguration();
 
   void HandleIrq(async_dispatcher_t* dispatcher, async::IrqBase* irq, zx_status_t status,
                  const zx_packet_interrupt_t* interrupt);
 
-  std::mutex lock_;
-
   fdf::PDev pdev_;
 
-  fidl::WireClient<fuchsia_hardware_usb_dci::UsbDciInterface>
-      dci_intf_;  // Must be accessed on irq_dispatcher_
+  fidl::WireClient<fuchsia_hardware_usb_dci::UsbDciInterface> dci_intf_;
 
   std::optional<ddk::MmioBuffer> mmio_;
 
@@ -354,7 +321,6 @@ class Dwc3 : public fdf::DriverBase, public fidl::Server<fuchsia_hardware_usb_dc
   zx::interrupt irq_;
 
   EventFifo event_fifo_;
-  fdf::SynchronizedDispatcher irq_dispatcher_;
   async::IrqMethod<Dwc3, &Dwc3::HandleIrq> irq_handler_{this};
 
   Ep0 ep0_;
