@@ -380,8 +380,7 @@ mod tests {
         let tests = vec![
             TestCase {
                 name: "basic",
-                content: r#"
-               <?xml version="1.0" encoding="utf-8"?>
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <!-- comment -->
                <resources>
                  <!-- comment -->
@@ -394,8 +393,7 @@ mod tests {
             },
             TestCase {
                 name: "two_entries",
-                content: r#"
-               <?xml version="1.0" encoding="utf-8"?>
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <string
                    name="string_name"
@@ -415,8 +413,7 @@ with intervening newlines
             },
             TestCase {
                 name: "parse xliff:g",
-                content: r#"
-               <?xml version="1.0" encoding="utf-8"?>
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <resources
                  xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
                  <string name="countdown">
@@ -427,8 +424,7 @@ with intervening newlines
             },
             TestCase {
                 name: "parse xliff:g whitespace",
-                content: r#"
-               <?xml version="1.0" encoding="utf-8"?>
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <resources
                  xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
                  <string name="countdown">
@@ -440,8 +436,7 @@ with intervening newlines
             },
             TestCase {
                 name: "comments everywhere",
-                content: r#"
-               <?xml version="1.0" encoding="utf-8"?>
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <!-- comment -->
                <resources
                  xmlns:xliff="urn:oasis:names:tc:xliff:document:1.2">
@@ -475,8 +470,7 @@ with intervening newlines
         let tests = vec![
             TestCase {
                 name: "duplicate_elements",
-                content: r#"
-               <?xml version="1.0" encoding="utf-8"?>
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <string
                    name="string_name"
@@ -489,8 +483,7 @@ with intervening newlines
             },
             TestCase {
                 name: "duplicate resources section",
-                content: r#"
-               <?xml version="1.0" encoding="utf-8"?>
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <string
                    name="string_name"
@@ -505,8 +498,7 @@ with intervening newlines
             },
             TestCase {
                 name: "string_name has unexpected comma",
-                content: r#"
-               <?xml version="1.0" encoding="utf-8"?>
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <string
                    name="string_name,"
@@ -516,8 +508,7 @@ with intervening newlines
             },
             TestCase {
                 name: "comment before ?xml is not allowed",
-                content: r#"
-               <!-- comment -->
+                content: r#"<!-- comment -->
                <?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <string

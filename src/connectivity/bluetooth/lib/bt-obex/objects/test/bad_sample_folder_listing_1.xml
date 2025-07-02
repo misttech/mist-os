@@ -1,6 +1,6 @@
-<!--Folder Listing object with unsupported version-->
 <?xml version = "1.0"?>
 <!DOCTYPE folder-listing SYSTEM "obex-folder-listing.dtd">
+<!--Folder Listing object with unsupported version-->
 <folder-listing version="2.0">
     <parent-folder/>
     <folder name="System"/>

@@ -87,8 +87,7 @@ mod tests {
         let en = tempfile::NamedTempFile::new()?;
         write!(
             en.as_file(),
-            r#"
-               <?xml version="1.0" encoding="utf-8"?>
+            r#"<?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->
                  <string
@@ -133,8 +132,7 @@ type MessageIds = strict enum : uint64 {
         let en = tempfile::NamedTempFile::new()?;
         write!(
             en.as_file(),
-            r#"
-               <!-- comment is not allowed before ?xml? -->
+            r#"<!-- comment is not allowed before ?xml? -->
                <?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->

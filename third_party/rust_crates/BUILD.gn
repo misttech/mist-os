@@ -1251,7 +1251,7 @@ if (current_os == "fuchsia") {
 }
 
 group("xml-rs") {
-  public_deps = [ ":xml-rs-v0_8_0" ]
+  public_deps = [ ":xml-rs-v0_8_26" ]
 }
 
 group("zerocopy") {
@@ -20658,16 +20658,16 @@ rustc_library("xattr-v0_2_3") {
   applicable_licenses = [ ":xattr-v0_2_3.license" ]
 }
 
-license("xml-rs-v0_8_0.license") {
+license("xml-rs-v0_8_26.license") {
   public_package_name = "xml"
-  license_files = [ "//third_party/rust_crates/vendor/xml-rs-0.8.0/LICENSE" ]
+  license_files = [ "//third_party/rust_crates/vendor/xml-rs-0.8.26/LICENSE" ]
 }
 
-rustc_library("xml-rs-v0_8_0") {
+rustc_library("xml-rs-v0_8_26") {
   crate_name = "xml"
-  source_root = "//third_party/rust_crates/vendor/xml-rs-0.8.0/src/lib.rs"
-  output_name = "xml-9187c9c232fb3a0e"
-  edition = "2015"
+  source_root = "//third_party/rust_crates/vendor/xml-rs-0.8.26/src/lib.rs"
+  output_name = "xml-3a87947d219317bc"
+  edition = "2021"
   disable_clippy = true
   enforce_source_listing = false
   configs -= [ "//build/config/rust:2018_idioms" ]
@@ -20678,13 +20678,13 @@ rustc_library("xml-rs-v0_8_0") {
 
   rustflags = [
     "--cap-lints=allow",
-    "-Cmetadata=9187c9c232fb3a0e",
-    "-Cextra-filename=-9187c9c232fb3a0e",
+    "-Cmetadata=3a87947d219317bc",
+    "-Cextra-filename=-3a87947d219317bc",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":xml-rs-v0_8_0.license" ]
+  applicable_licenses = [ ":xml-rs-v0_8_26.license" ]
 }
 
 license("zerocopy-v0_7_35.license") {

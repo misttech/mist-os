@@ -211,9 +211,8 @@ type MessageIds = strict enum : uint64 {
         let tests = vec![
             TestCase {
                 name: "basic",
-                content: r#"
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <!-- comment -->
-               <?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->
                  <string
@@ -234,9 +233,8 @@ type MessageIds = strict enum : uint64 {
             },
             TestCase {
                 name: "long string goes to the comments",
-                content: r#"
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <!-- comment -->
-               <?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->
                  <string
@@ -258,9 +256,8 @@ type MessageIds = strict enum : uint64 {
             },
             TestCase {
                 name: "string with newline in comments",
-                content: r#"
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <!-- comment -->
-               <?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->
                  <string
@@ -283,9 +280,8 @@ type MessageIds = strict enum : uint64 {
             TestCase {
                 // Not sure if we want to prevent this.
                 name: "two identical strings with different IDs",
-                content: r#"
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <!-- comment -->
-               <?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->
                  <string
@@ -312,9 +308,8 @@ type MessageIds = strict enum : uint64 {
             TestCase {
                 // Correct grapheme cluster split is *not* supported yet.
                 name: "pangram in Serbian is split across lines correctly",
-                content: r#"
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <!-- comment -->
-               <?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->
                  <string
@@ -337,9 +332,8 @@ type MessageIds = strict enum : uint64 {
             TestCase {
                 // Correct grapheme cluster split is *not* supported yet.
                 name: "pangram in Serbian is split across lines correctly",
-                content: r#"
+                content: r#"<?xml version="1.0" encoding="utf-8"?>
                <!-- comment -->
-               <?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->
                  <string
@@ -383,9 +377,8 @@ type MessageIds = strict enum : uint64 {
         }
         let tests = vec![TestCase {
             name: "conflicting uppercase is not allowed",
-            content: r#"
+            content: r#"<?xml version="1.0" encoding="utf-8"?>
                <!-- comment -->
-               <?xml version="1.0" encoding="utf-8"?>
                <resources>
                  <!-- comment -->
                  <string
