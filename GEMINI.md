@@ -6,8 +6,9 @@ Fuchsia codebase and should follow these instructions.
 
 The main way to interact with a fuchsia device is via `fx` and `ffx` commands.
 
-To run a build, run `fx build -q`. Make sure to use the `-q` option to
-make the output smaller.
+To run a build, run `fx build -q`. Make sure to use the `-q` option to make the
+output smaller. The Fuchsia platform uses the GN and Bazel build systems. You
+must not generate Cargo.toml, CMakeLists.txt, or Makefile build files.
 
 To run a test, run `fx test <name of test>`. You can list available tests with
 `fx test --dry`. You can get JSON output by adding the arguments `--logpath -`.
