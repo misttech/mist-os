@@ -1703,3 +1703,31 @@ async fn device_config() {
 
     fixture.tear_down().await;
 }
+
+#[fuchsia::test]
+async fn gpt_all_binds_multiple_disks() {
+    let mut builder = new_builder().with_device_config(vec![BlockDeviceConfig {
+        device: String::from("test-part"),
+        from: BlockDeviceIdentifiers {
+            label: String::from("test_part"),
+            parent: BlockDeviceParent::Gpt,
+        },
+    }]);
+    builder.fshost().set_config_value("gpt_all", true);
+    builder.with_disk().format_volumes(volumes_spec()).with_gpt().format_data(data_fs_spec());
+    builder.with_extra_disk().with_gpt().with_extra_gpt_partition("test_part");
+    let fixture = builder.build().await;
+
+    fixture.check_fs_type("blob", blob_fs_type()).await;
+    fixture.check_fs_type("data", data_fs_type()).await;
+
+    // Check that the extra partition is available.
+    let test_part_dir = fixture.dir("block/test-part", fio::PERM_READABLE);
+    let volume =
+        fuchsia_component::client::connect_to_protocol_at_dir_root::<VolumeMarker>(&test_part_dir)
+            .unwrap();
+    let metadata = volume.get_metadata().await.unwrap().unwrap();
+    assert_eq!(metadata.num_blocks, Some(1));
+
+    fixture.tear_down().await;
+}

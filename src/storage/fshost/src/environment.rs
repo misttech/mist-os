@@ -60,6 +60,10 @@ pub trait Environment: Send + Sync {
     async fn attach_driver(&self, device: &mut dyn Device, driver_path: &str) -> Result<(), Error>;
 
     /// Binds an instance of the GPT component to the given device.
+    async fn launch_system_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error>;
+
+    /// Binds an instance of the GPT component to the given device. This is intended for devices
+    /// that are not the system GPT.
     async fn launch_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error>;
 
     /// Returns a proxy for the exposed dir of the partition table manager.  This can be called
@@ -697,7 +701,7 @@ impl Environment for FshostEnvironment {
         self.launcher.attach_driver(device, driver_path).await
     }
 
-    async fn launch_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error> {
+    async fn launch_system_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error> {
         if self.gpt.is_serving() {
             // If we want to support multiple GPT devices, we'll need to change Environment to
             // separate the system GPT and other GPTs.
@@ -729,6 +733,32 @@ impl Environment for FshostEnvironment {
             .await
             .context("Failed to watch gpt partitions dir")?;
         self.gpt = Filesystem::ServingGpt(serving);
+        Ok(())
+    }
+
+    async fn launch_gpt_component(&mut self, device: &mut dyn Device) -> Result<(), Error> {
+        let mut filesystem = fs_management::filesystem::Filesystem::from_boxed_config(
+            device.block_connector()?,
+            Box::new(fs_management::Gpt::dynamic_child()),
+        );
+        let serving = filesystem.serve_multi_volume().await.context("Failed to start GPT")?;
+        let exposed_dir = serving.exposed_dir();
+        let partitions_dir = fuchsia_fs::directory::open_directory(
+            &exposed_dir,
+            fpartitions::PartitionServiceMarker::SERVICE_NAME,
+            fuchsia_fs::PERM_READABLE,
+        )
+        .await
+        .context("Failed to open partitions dir")?;
+        self.watcher
+            .add_source(Box::new(DirSource::new(
+                partitions_dir,
+                filesystem.get_component_moniker().unwrap(),
+                crate::device::Parent::SystemPartitionTable,
+            )))
+            .await
+            .context("Failed to watch gpt partitions dir")?;
+        self.other_filesystems.push(Filesystem::ServingGpt(serving));
         Ok(())
     }
 
@@ -1046,16 +1076,16 @@ impl Environment for FshostEnvironment {
         self.data.shutdown().await.unwrap_or_else(|error| {
             log::error!(error:?; "failed to shut down data");
         });
+        if let Some(container) = self.container.take() {
+            container.into_fs().shutdown().await.unwrap_or_else(|error| {
+                log::error!(error:?; "failed to shut down container");
+            })
+        }
         // Shut down any other dynamic filesystems we happen to know about before we shut down
         // anything that could potentially be hosting them.
         for mut fs in self.other_filesystems.drain(..) {
             fs.shutdown().await.unwrap_or_else(|error| {
                 log::error!(error:?; "failed to shut down other filesystem");
-            })
-        }
-        if let Some(container) = self.container.take() {
-            container.into_fs().shutdown().await.unwrap_or_else(|error| {
-                log::error!(error:?; "failed to shut down container");
             })
         }
         self.gpt.shutdown().await.unwrap_or_else(|error| {
