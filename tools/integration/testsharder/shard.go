@@ -342,7 +342,7 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 					BootupTimeoutSecs: spec.BootupTimeoutSecs,
 					ExpectsSSH:        spec.ExpectsSSH,
 					Env:               e,
-					UseTCG:            opts.UseTCG,
+					UseTCG:            opts.UseTCG || e.UseTCG,
 				}
 			}
 			test := Test{Test: spec.Test, Runs: 1}
@@ -364,7 +364,7 @@ func MakeShards(specs []build.TestSpec, testListEntries map[string]build.TestLis
 					BootupTimeoutSecs: spec.BootupTimeoutSecs,
 					ExpectsSSH:        spec.ExpectsSSH,
 					Env:               e,
-					UseTCG:            opts.UseTCG,
+					UseTCG:            opts.UseTCG || e.UseTCG,
 				})
 			} else {
 				shard.Tests = append(shard.Tests, test)
@@ -486,6 +486,9 @@ func environmentName(env build.Environment) string {
 	if env.GptUefiDisk.Name != "" {
 		addToken("uefi")
 		addToken(env.GptUefiDisk.Name)
+	}
+	if env.TargetsEmulator() && env.UseTCG {
+		addToken("tcg")
 	}
 	return strings.Join(tokens, "-")
 }

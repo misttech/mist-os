@@ -35,7 +35,7 @@ func GetBotDimensions(shard *Shard, params *proto.Params) {
 
 	if isEmuType {
 		dimensions["os"] = "Debian"
-		if !params.UseTcg {
+		if !shard.UseTCG {
 			dimensions["kvm"] = "1"
 		}
 		dimensions["cpu"] = testBotCpu
@@ -55,7 +55,7 @@ func GetBotDimensions(shard *Shard, params *proto.Params) {
 		}
 	}
 	// Ensure we use GCE VMs whenever possible.
-	if isLinux && !isGCEType && testBotCpu == "x64" && !params.UseTcg {
+	if isLinux && !isGCEType && testBotCpu == "x64" && !shard.UseTCG {
 		dimensions["kvm"] = "1"
 	}
 	if (isEmuType || shard.Env.Dimensions.DeviceType() == "") && testBotCpu == "x64" && isLinux {
@@ -212,7 +212,7 @@ func ConstructBaseCommand(shard *Shard, checkoutRoot, buildDir string, tools bui
 	for _, arg := range params.ZirconArgs {
 		cmd = append(cmd, "-zircon-args", arg)
 	}
-	if shard.Env.TargetsEmulator() && params.UseTcg {
+	if shard.Env.TargetsEmulator() && shard.UseTCG {
 		// Used by botanist to scale the test timeout since tests can
 		// run much slower on QEMU bots running with TCG.
 		cmd = append(cmd, "-test-timeout-scale-factor", "2")

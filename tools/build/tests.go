@@ -124,6 +124,9 @@ type Environment struct {
 	// GptUefiDisk specifies whether to run the emulator tests with full GPT/UEFI system disks.
 	GptUefiDisk GptUefiDiskInfo `json:"gpt_uefi_disk,omitempty"`
 
+	// UseTCG specifies whether to run the emulator with TCG instead of KVM.
+	UseTCG bool `json:"use_tcg,omitempty"`
+
 	// Tags are keys given to an environment on which the testsharder may filter.
 	Tags []string `json:"tags,omitempty"`
 
