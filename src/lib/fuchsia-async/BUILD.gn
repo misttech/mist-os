@@ -6,26 +6,8 @@ import("//build/components.gni")
 import("//build/product.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
-import("//build/rust/rustc_staticlib.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/host_test.gni")
-
-rustc_staticlib("fuchsia-async-staticlib") {
-  edition = "2021"
-  deps = [
-    ":fuchsia-async",
-    "//sdk/rust/zx-status",
-    "//sdk/rust/zx-types",
-    "//src/lib/fuchsia-sync",
-    "//third_party/rust_crates:futures",
-  ]
-  if (is_fuchsia) {
-    deps += [ "//sdk/rust/zx" ]
-  }
-  source_root = "src/ffi.rs"
-
-  sources = [ "src/ffi.rs" ]
-}
 
 fuchsia_unittest_package("fuchsia-async-tests") {
   manifest = "meta/fuchsia_async_lib_test.cml"
@@ -73,7 +55,6 @@ group("tests") {
     ":fuchsia-async-shutdown-test($host_toolchain)",
     ":fuchsia-async-tests",
     ":fuchsia-async_test($host_toolchain)",
-    "cpp:tests",
   ]
 }
 
